@@ -1,30 +1,15 @@
 <?php
+
+namespace App\Modulos\DashboardGestao\Controllers;
 /**
  * EducaTudo - Dashboard de Gestão Escolar (admin)
  */
 
-require_once __DIR__ . '/../../../Controllers/Admin/AdminBaseController.php';
-require_once __DIR__ . '/../Services/DashboardGestaoService.php';
-require_once __DIR__ . '/../Services/DashboardFiltro.php';
-require_once __DIR__ . '/../Services/DashboardConsulta.php';
-require_once __DIR__ . '/../Widgets/WidgetDashboard.php';
-require_once __DIR__ . '/../Widgets/KpisWidget.php';
-require_once __DIR__ . '/../Widgets/PendenciasWidget.php';
-require_once __DIR__ . '/../Widgets/FrequenciaHojeWidget.php';
-require_once __DIR__ . '/../Widgets/DesempenhoWidget.php';
-require_once __DIR__ . '/../Widgets/EvolucaoWidget.php';
-require_once __DIR__ . '/../Widgets/AtencaoPedagogicaWidget.php';
-require_once __DIR__ . '/../Widgets/DiariosWidget.php';
-require_once __DIR__ . '/../Widgets/AvaliacoesWidget.php';
-require_once __DIR__ . '/../Widgets/ConselhoWidget.php';
-require_once __DIR__ . '/../Widgets/OcorrenciasWidget.php';
-require_once __DIR__ . '/../Widgets/CalendarioWidget.php';
-require_once __DIR__ . '/../Widgets/MatriculasWidget.php';
 
 use App\Modulos\DashboardGestao\Services\DashboardGestaoService;
 
-if (!class_exists('DashboardGestaoAdminController', false)) {
-class DashboardGestaoAdminController extends AdminBaseController
+if (!class_exists(__NAMESPACE__ . '\\DashboardGestaoAdminController', false)) {
+class DashboardGestaoAdminController extends \App\Controllers\Admin\AdminBaseController
 {
     private function service(): DashboardGestaoService
     {
@@ -41,7 +26,7 @@ class DashboardGestaoAdminController extends AdminBaseController
         $svc = $this->service();
         try {
             $filtros = $svc->montarFiltros($_GET, $user);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $filtros = [
                 'filtro' => [],
                 'anos' => [],
@@ -55,10 +40,10 @@ class DashboardGestaoAdminController extends AdminBaseController
 
         $alunosOnline = 0;
         try {
-            $authManager = new AuthManager();
+            $authManager = new \App\Core\AuthManager();
             $online = $authManager->getAlunosOnline();
             $alunosOnline = is_array($online) ? count($online) : 0;
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $alunosOnline = 0;
         }
 
@@ -67,17 +52,16 @@ class DashboardGestaoAdminController extends AdminBaseController
             try {
                 $row = $this->db->fetch("SELECT COUNT(*) AS n FROM alertas_sensiveis WHERE status = 'novo'");
                 $alertasNovos = (int) ($row['n'] ?? 0);
-            } catch (Throwable $e) {
+            } catch (\Throwable $e) {
                 $alertasNovos = null;
             }
         }
 
         $aulasOnline = [];
-        if (LayoutHelper::isModuleEnabled('aulas_online')) {
+        if (\App\Core\LayoutHelper::isModuleEnabled('aulas_online')) {
             try {
-                require_once __DIR__ . '/../../../Models/Education/OnlineClass.php';
-                $aulasOnline = (new OnlineClass())->listLiveAndUpcomingForAdmin(5);
-            } catch (Throwable $e) {
+                $aulasOnline = (new \App\Models\Education\OnlineClass())->listLiveAndUpcomingForAdmin(5);
+            } catch (\Throwable $e) {
                 $aulasOnline = [];
             }
         }
@@ -104,7 +88,7 @@ class DashboardGestaoAdminController extends AdminBaseController
         $user = $this->auth->getUser() ?? [];
         try {
             $this->json($this->service()->montarFiltros($_GET, $user));
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $this->json([
                 'filtro' => [],
                 'anos' => [],
@@ -127,4 +111,8 @@ class DashboardGestaoAdminController extends AdminBaseController
         $this->json($this->service()->widget($chave, $_GET, $user));
     }
 }
+}
+
+if (!class_exists('DashboardGestaoAdminController', false) && class_exists(__NAMESPACE__ . '\\DashboardGestaoAdminController', false)) {
+    class_alias(__NAMESPACE__ . '\\DashboardGestaoAdminController', 'DashboardGestaoAdminController');
 }

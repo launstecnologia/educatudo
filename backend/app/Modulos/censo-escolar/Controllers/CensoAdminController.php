@@ -1,19 +1,18 @@
 <?php
-/**
- * EducaTudo - Censo Escolar (admin / secretaria)
- */
 
-require_once __DIR__ . '/../../../Controllers/Admin/AdminBaseController.php';
-require_once __DIR__ . '/../Services/CensoEdicaoService.php';
-require_once __DIR__ . '/../Services/CensoNormalizador.php';
-require_once __DIR__ . '/../Models/CensoEdicao.php';
+namespace App\Modulos\CensoEscolar\Controllers;
 
 use App\Modulos\CensoEscolar\Models\CensoEdicao;
 use App\Modulos\CensoEscolar\Services\CensoEdicaoService;
 use App\Modulos\CensoEscolar\Services\CensoNormalizador;
 
-if (!class_exists('CensoAdminController', false)) {
-class CensoAdminController extends AdminBaseController
+/**
+ * EducaTudo - Censo Escolar (admin / secretaria)
+ */
+
+
+if (!class_exists(__NAMESPACE__ . '\\CensoAdminController', false)) {
+class CensoAdminController extends \App\Controllers\Admin\AdminBaseController
 {
     private function service(): CensoEdicaoService
     {
@@ -669,4 +668,8 @@ class CensoAdminController extends AdminBaseController
         return is_array($d) ? $d : [];
     }
 }
+}
+
+if (!class_exists('CensoAdminController', false) && class_exists(__NAMESPACE__ . '\\CensoAdminController', false)) {
+    class_alias(__NAMESPACE__ . '\\CensoAdminController', 'CensoAdminController');
 }

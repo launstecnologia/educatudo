@@ -7,6 +7,7 @@
 return [
     'chave' => 'conselho-classe',
     'label' => 'Conselho de Classe',
+    'namespace' => 'App\\Modulos\\ConselhoClasse',
     'grupo' => 'gestao_escolar',
     'feature_keys' => [
         'admin' => 'conselho_classe',

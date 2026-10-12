@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Services/ClassDiaryService.php';
 
 use App\Modulos\Diario\Services\ClassDiaryService;
 $execLabels = [
@@ -20,7 +19,7 @@ $freqLabels = [
     'falta_justificada' => ['Falta justificada', 'bg-amber-100 text-amber-800'],
     'atraso' => ['Atraso', 'bg-orange-100 text-orange-800'],
 ];
-$moduloOcorrencias = !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('ocorrencias');
+$moduloOcorrencias = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('ocorrencias');
 $status = (string) ($aula['status'] ?? 'rascunho');
 $resumo = $aula['resumo_frequencia'] ?? [];
 $fechamentoId = (int) ($fechamento_id ?? 0);
@@ -70,7 +69,7 @@ $voltarUrl = $fechamentoId > 0
             </div>
             <div>
                 <span class="block text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo da aula</span>
-                <span class="mt-1 block text-sm text-gray-900"><?= htmlspecialchars(ClassDiaryService::tipoAulaLabel((string) ($aula['tipo_aula'] ?? 'regular'))) ?></span>
+                <span class="mt-1 block text-sm text-gray-900"><?= htmlspecialchars(\App\Modulos\Diario\Services\ClassDiaryService::tipoAulaLabel((string) ($aula['tipo_aula'] ?? 'regular'))) ?></span>
             </div>
             <div class="md:col-span-2">
                 <span class="block text-xs font-medium text-gray-500 uppercase tracking-wider">Finalizada em</span>

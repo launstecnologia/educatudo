@@ -1,7 +1,11 @@
 <?php
+
+namespace App\Helpers;
 /**
  * Stream de áudio de feedback da correção (local ou S3).
  */
+
+use App\Services\MediaStorageService;
 class EssayFeedbackAudioHelper
 {
     public static function streamKey(array $config, string $key): void
@@ -11,7 +15,6 @@ class EssayFeedbackAudioHelper
             http_response_code(404);
             exit;
         }
-        require_once __DIR__ . '/../Services/MediaStorageService.php';
         $media = new MediaStorageService($config);
         if ($media->isS3()) {
             $url = $media->getViewUrl('essays_feedback_audio', $key, basename($key), 3600);
@@ -41,4 +44,8 @@ class EssayFeedbackAudioHelper
         readfile($localPath);
         exit;
     }
+}
+
+if (!class_exists('EssayFeedbackAudioHelper', false) && class_exists(__NAMESPACE__ . '\\EssayFeedbackAudioHelper', false)) {
+    class_alias(__NAMESPACE__ . '\\EssayFeedbackAudioHelper', 'EssayFeedbackAudioHelper');
 }

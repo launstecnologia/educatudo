@@ -1,5 +1,7 @@
 <?php
 
+namespace App\Core;
+
 class AdminPermissionMatrix
 {
     /**
@@ -139,18 +141,18 @@ class AdminPermissionMatrix
                 '/admin/turmas/%id%/lista-chamada',
             ]],
 
-            'acao_rapida_editar_aluno' => ['label' => 'Ação Rápida: Editar Aluno', 'prefixes' => ['/admin/students/%id%/edit']],
-            'acao_rapida_acessar_aluno' => ['label' => 'Ação Rápida: Acessar como Aluno', 'prefixes' => ['/admin/students/%id%/acessar-como']],
-            'acao_rapida_acessar_pai' => ['label' => 'Ação Rápida: Acessar como Pai', 'prefixes' => ['/admin/students/%id%/acessar-como-pai']],
-            'acao_rapida_ativar_desativar' => ['label' => 'Ação Rápida: Ativar/Desativar Aluno', 'prefixes' => [
+            'acao_rapida_editar_aluno' => ['label' => 'Ação Rápida: \Editar Aluno', 'prefixes' => ['/admin/students/%id%/edit']],
+            'acao_rapida_acessar_aluno' => ['label' => 'Ação Rápida: \Acessar como Aluno', 'prefixes' => ['/admin/students/%id%/acessar-como']],
+            'acao_rapida_acessar_pai' => ['label' => 'Ação Rápida: \Acessar como Pai', 'prefixes' => ['/admin/students/%id%/acessar-como-pai']],
+            'acao_rapida_ativar_desativar' => ['label' => 'Ação Rápida: \Ativar/Desativar Aluno', 'prefixes' => [
                 '/admin/students/%id%/toggle-status',
                 '/admin/students/%id%/inactivate',
                 '/admin/students/%id%/activate',
             ]],
-            'acao_rapida_resetar_senha' => ['label' => 'Ação Rápida: Resetar Senha', 'prefixes' => ['/admin/students/%id%/password']],
-            'acao_rapida_cadastrar_responsavel' => ['label' => 'Ação Rápida: Cadastrar Responsável', 'prefixes' => ['/admin/students/cadastrar-pai']],
+            'acao_rapida_resetar_senha' => ['label' => 'Ação Rápida: \Resetar Senha', 'prefixes' => ['/admin/students/%id%/password']],
+            'acao_rapida_cadastrar_responsavel' => ['label' => 'Ação Rápida: \Cadastrar Responsável', 'prefixes' => ['/admin/students/cadastrar-pai']],
             'acao_rapida_analise_tudinha' => ['label' => 'Ação Rápida: Análise da Tudinha', 'prefixes' => ['/admin/students/%id%/analise-tudinha']],
-            'acao_rapida_excluir_aluno' => ['label' => 'Ação Rápida: Excluir Aluno', 'prefixes' => [
+            'acao_rapida_excluir_aluno' => ['label' => 'Ação Rápida: \Excluir Aluno', 'prefixes' => [
                 '/admin/students/%id%/excluir',
             ]],
 
@@ -160,6 +162,7 @@ class AdminPermissionMatrix
             'declaracoes_aluno' => ['label' => 'Documentação e Autorização do Aluno', 'prefixes' => [
                 '/admin/students/%id%/declaracoes',
                 '/admin/students/%id%/historico-escolar',
+                '/admin/paineis/documentos',
             ]],
             'documentos_aluno' => ['label' => 'Documentos / Checklist do Aluno', 'prefixes' => ['/admin/students/%id%/documentos']],
 
@@ -533,4 +536,8 @@ class AdminPermissionMatrix
 
         return $base;
     }
+}
+
+if (!class_exists('AdminPermissionMatrix', false) && class_exists(__NAMESPACE__ . '\\AdminPermissionMatrix', false)) {
+    class_alias(__NAMESPACE__ . '\\AdminPermissionMatrix', 'AdminPermissionMatrix');
 }

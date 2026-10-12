@@ -2,10 +2,6 @@
 
 namespace App\Modulos\CensoEscolar\Services;
 
-require_once __DIR__ . '/../Models/CensoEdicao.php';
-require_once __DIR__ . '/CensoLayoutService.php';
-require_once __DIR__ . '/CensoValidacaoService.php';
-require_once __DIR__ . '/CensoMapeadorTxt.php';
 
 use App\Modulos\CensoEscolar\Models\CensoEdicao;
 
@@ -310,4 +306,8 @@ class CensoExportacaoService
         $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
         return $ip !== '' ? substr($ip, 0, 45) : null;
     }
+}
+
+if (!class_exists('CensoExportacaoService', false) && class_exists(__NAMESPACE__ . '\\CensoExportacaoService', false)) {
+    class_alias(__NAMESPACE__ . '\\CensoExportacaoService', 'CensoExportacaoService');
 }

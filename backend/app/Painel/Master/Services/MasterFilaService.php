@@ -1,0 +1,618 @@
+<?php
+
+namespace App\Painel\Master\Services;
+/**
+ * Fila de jobs longos no banco master (clonar escola, etc.).
+ * Não usa ai_jobs dos tenants — o trabalho acontece antes do tenant existir.
+ *
+ * Enfileira na request HTTP e processa via cron/process_master_jobs.php
+ * (ou worker CLI disparado em background).
+ */
+
+
+use App\Core\Database;
+use App\Core\MasterSecretVault;
+use App\Core\MysqlProvisioningService;
+
+class MasterFilaService
+{
+    public const TIPO_CLONAR_ESCOLA = 'clonar_escola';
+    public const TIPO_MIGRATION_ESCOLA = 'migration_escola';
+    public const MAX_TENTATIVAS = 2;
+    public const STALE_MINUTOS = 120;
+
+    public static function tabelaExiste(?\PDO $pdo = null): bool
+    {
+        $pdo = $pdo ?? self::masterPdo();
+        if (!$pdo instanceof \PDO) {
+            return false;
+        }
+        try {
+            $st = $pdo->query("SHOW TABLES LIKE 'fila_jobs_master'");
+            return $st !== false && $st->fetchColumn() !== false;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    public static function masterPdo(): ?\PDO
+    {
+        $global = $GLOBALS['_educatudo_master_pdo'] ?? null;
+        if ($global instanceof \PDO) {
+            return $global;
+        }
+        try {
+            $pdo = Database::createMasterPdo();
+            $GLOBALS['_educatudo_master_pdo'] = $pdo;
+            return $pdo;
+        } catch (\Throwable $e) {
+            error_log('[MasterFilaService] falha ao conectar master: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     */
+    public static function enfileirar(
+        string $tipo,
+        array $payload,
+        ?int $escolaOrigemId = null,
+        ?int $escolaDestinoId = null,
+        ?int $criadoPor = null
+    ): int {
+        $pdo = self::masterPdo();
+        if (!$pdo instanceof \PDO) {
+            throw new \RuntimeException('Não foi possível conectar ao banco master.');
+        }
+        if (!self::tabelaExiste($pdo)) {
+            throw new \RuntimeException('Fila do Master não configurada. Rode a migration 2026_09_16_fila_jobs_master.sql no banco master.');
+        }
+
+        $st = $pdo->prepare(
+            "INSERT INTO fila_jobs_master
+                (tipo, status, payload, escola_origem_id, escola_destino_id, criado_por)
+             VALUES
+                (:tipo, 'pending', :payload, :escola_origem_id, :escola_destino_id, :criado_por)"
+        );
+        $st->execute([
+            'tipo' => $tipo,
+            'payload' => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'escola_origem_id' => $escolaOrigemId,
+            'escola_destino_id' => $escolaDestinoId,
+            'criado_por' => $criadoPor,
+        ]);
+
+        $jobId = (int) $pdo->lastInsertId();
+        self::tryProcessImmediately();
+        return $jobId;
+    }
+
+    /**
+     * Recoloca um job de clonagem falho na fila, restaurando a senha do cadastro da escola destino.
+     *
+     * @return array{success:bool,error?:string}
+     */
+    public static function reenfileirarClonagem(int $jobId): array
+    {
+        $pdo = self::masterPdo();
+        if (!$pdo instanceof \PDO) {
+            return ['success' => false, 'error' => 'Não foi possível conectar ao banco master.'];
+        }
+        if (!self::tabelaExiste($pdo) || $jobId < 1) {
+            return ['success' => false, 'error' => 'Job inválido.'];
+        }
+
+        $st = $pdo->prepare('SELECT * FROM fila_jobs_master WHERE id = :id LIMIT 1');
+        $st->execute(['id' => $jobId]);
+        $job = $st->fetch(\PDO::FETCH_ASSOC);
+        if (!$job) {
+            return ['success' => false, 'error' => 'Job não encontrado.'];
+        }
+        if ((string) ($job['tipo'] ?? '') !== self::TIPO_CLONAR_ESCOLA) {
+            return ['success' => false, 'error' => 'Só é possível reenfileirar clonagem de escola.'];
+        }
+        $status = (string) ($job['status'] ?? '');
+        if (!in_array($status, ['failed', 'pending'], true)) {
+            return ['success' => false, 'error' => 'Este job ainda está em andamento.'];
+        }
+
+        $payload = json_decode((string) ($job['payload'] ?? ''), true);
+        if (!is_array($payload)) {
+            $payload = [];
+        }
+
+        $destinoId = (int) ($job['escola_destino_id'] ?? $payload['escola_destino_id'] ?? 0);
+        if ($destinoId > 0) {
+            $cfg = $pdo->prepare(
+                'SELECT host, porta, nome_banco, usuario, senha_criptografada
+                   FROM config_escolas_banco WHERE escola_id = :id LIMIT 1'
+            );
+            $cfg->execute(['id' => $destinoId]);
+            $banco = $cfg->fetch(\PDO::FETCH_ASSOC) ?: [];
+            if ($banco) {
+                $payload['db_host'] = (string) ($banco['host'] ?? $payload['db_host'] ?? '');
+                $payload['db_porta'] = (int) ($banco['porta'] ?? $payload['db_porta'] ?? 3306);
+                $payload['db_nome_banco'] = (string) ($banco['nome_banco'] ?? $payload['db_nome_banco'] ?? '');
+                $payload['db_usuario'] = (string) ($banco['usuario'] ?? $payload['db_usuario'] ?? '');
+                $payload['db_senha_criptografada'] = (string) ($banco['senha_criptografada'] ?? '');
+            }
+            $esc = $pdo->prepare('SELECT nome, slug, dominio FROM escolas WHERE id = :id LIMIT 1');
+            $esc->execute(['id' => $destinoId]);
+            $escola = $esc->fetch(\PDO::FETCH_ASSOC) ?: [];
+            if ($escola) {
+                $payload['nome'] = (string) ($escola['nome'] ?? $payload['nome'] ?? '');
+                $payload['slug'] = (string) ($escola['slug'] ?? $payload['slug'] ?? '');
+                $payload['dominio'] = (string) ($escola['dominio'] ?? $payload['dominio'] ?? '');
+            }
+        }
+
+        $senha = MasterSecretVault::decryptDbPassword((string) ($payload['db_senha_criptografada'] ?? ''));
+        if ($senha === '' || trim((string) ($payload['db_nome_banco'] ?? '')) === '') {
+            return ['success' => false, 'error' => 'Não há credenciais do banco destino para repetir a clonagem. Edite a escola e clone de novo.'];
+        }
+
+        $up = $pdo->prepare(
+            "UPDATE fila_jobs_master
+                SET status = 'pending',
+                    payload = :payload,
+                    mensagem_erro = NULL,
+                    resultado = :resultado,
+                    tentativas = 0,
+                    started_at = NULL,
+                    completed_at = NULL
+              WHERE id = :id"
+        );
+        $up->execute([
+            'payload' => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'resultado' => json_encode([
+                'mensagem' => 'Reenfileirado. Aguardando o worker…',
+                'percentual' => 0,
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'id' => $jobId,
+        ]);
+
+        self::tryProcessImmediately();
+        return ['success' => true];
+    }
+
+    /**
+     * @param array<string,mixed> $resultado
+     */
+    public static function atualizarProgresso(int $jobId, string $mensagem, int $percentual = 0, array $extra = []): void
+    {
+        $pdo = self::masterPdo();
+        if (!$pdo instanceof \PDO || $jobId < 1) {
+            return;
+        }
+        $body = array_merge($extra, [
+            'mensagem' => $mensagem,
+            'percentual' => max(0, min(100, $percentual)),
+            'atualizado_em' => date('Y-m-d H:i:s'),
+        ]);
+        try {
+            $st = $pdo->prepare(
+                "UPDATE fila_jobs_master
+                    SET resultado = :resultado, started_at = NOW()
+                  WHERE id = :id AND status = 'processing'"
+            );
+            $st->execute([
+                'resultado' => json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'id' => $jobId,
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[MasterFilaService] progresso job=' . $jobId . ' ' . $e->getMessage());
+        }
+    }
+
+    public static function marcarDestino(int $jobId, int $escolaDestinoId): void
+    {
+        $pdo = self::masterPdo();
+        if (!$pdo instanceof \PDO || $jobId < 1 || $escolaDestinoId < 1) {
+            return;
+        }
+        $st = $pdo->prepare('UPDATE fila_jobs_master SET escola_destino_id = :dest WHERE id = :id');
+        $st->execute(['dest' => $escolaDestinoId, 'id' => $jobId]);
+    }
+
+    /**
+     * Processa o próximo job pending. Retorna true se processou algum.
+     */
+    public static function processNext(): bool
+    {
+        $pdo = self::masterPdo();
+        if (!$pdo instanceof \PDO || !self::tabelaExiste($pdo)) {
+            return false;
+        }
+
+        self::liberarJobsTravados($pdo);
+
+        $pdo->beginTransaction();
+        try {
+            $st = $pdo->query(
+                "SELECT * FROM fila_jobs_master
+                  WHERE status = 'pending'
+                  ORDER BY id ASC
+                  LIMIT 1
+                  FOR UPDATE"
+            );
+            $job = $st ? $st->fetch(\PDO::FETCH_ASSOC) : false;
+            if (!$job) {
+                $pdo->commit();
+                return false;
+            }
+
+            $up = $pdo->prepare(
+                "UPDATE fila_jobs_master
+                    SET status = 'processing', started_at = NOW(), tentativas = tentativas + 1
+                  WHERE id = :id"
+            );
+            $up->execute(['id' => (int) $job['id']]);
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            error_log('[MasterFilaService] processNext lock: ' . $e->getMessage());
+            return false;
+        }
+
+        $jobId = (int) $job['id'];
+        $tipo = (string) ($job['tipo'] ?? '');
+        $payload = json_decode((string) ($job['payload'] ?? ''), true);
+        if (!is_array($payload)) {
+            $payload = [];
+        }
+        $payload['_job_id'] = $jobId;
+
+        try {
+            $resultado = self::dispatch($tipo, $payload);
+            $done = $pdo->prepare(
+                "UPDATE fila_jobs_master
+                    SET status = 'done',
+                        resultado = :resultado,
+                        mensagem_erro = NULL,
+                        completed_at = NOW()
+                  WHERE id = :id"
+            );
+            $done->execute([
+                'resultado' => json_encode($resultado, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'id' => $jobId,
+            ]);
+            self::redigirPayload($pdo, $jobId);
+        } catch (\Throwable $e) {
+            $tentativas = (int) ($job['tentativas'] ?? 0) + 1;
+            $final = $tipo === self::TIPO_MIGRATION_ESCOLA || $tentativas >= self::MAX_TENTATIVAS;
+            $fail = $pdo->prepare(
+                "UPDATE fila_jobs_master
+                    SET status = :status,
+                        mensagem_erro = :erro,
+                        resultado = :resultado,
+                        completed_at = IF(:final = 1, NOW(), completed_at)
+                  WHERE id = :id"
+            );
+            $fail->execute([
+                'status' => $final ? 'failed' : 'pending',
+                'erro' => substr($e->getMessage(), 0, 4000),
+                'resultado' => json_encode([
+                    'ok' => false,
+                    'mensagem' => $e->getMessage(),
+                    'percentual' => 0,
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'final' => $final ? 1 : 0,
+                'id' => $jobId,
+            ]);
+            if ($final) {
+                self::redigirPayload($pdo, $jobId);
+            }
+            error_log('[MasterFilaService] job=' . $jobId . ' tipo=' . $tipo . ' ' . $e->getMessage());
+        }
+
+        return true;
+    }
+
+    /**
+     * @param list<string> $statusPermitidos pending|processing|done|failed. Vazio = todos.
+     * @return list<array<string,mixed>>
+     */
+    public static function listarRecentes(string $tipo = '', int $limite = 20, array $statusPermitidos = []): array
+    {
+        $pdo = self::masterPdo();
+        if (!$pdo instanceof \PDO || !self::tabelaExiste($pdo)) {
+            return [];
+        }
+        $limite = max(1, min(50, $limite));
+        $statusValidos = ['pending', 'processing', 'done', 'failed'];
+        $statusFiltro = [];
+        foreach ($statusPermitidos as $st) {
+            $st = (string) $st;
+            if (in_array($st, $statusValidos, true) && !in_array($st, $statusFiltro, true)) {
+                $statusFiltro[] = $st;
+            }
+        }
+
+        $sql = "SELECT j.id, j.tipo, j.status, j.resultado, j.mensagem_erro, j.tentativas,
+                       j.escola_origem_id, j.escola_destino_id, j.criado_por,
+                       j.created_at, j.started_at, j.completed_at,
+                       o.nome AS origem_nome, d.nome AS destino_nome
+                  FROM fila_jobs_master j
+                  LEFT JOIN escolas o ON o.id = j.escola_origem_id
+                  LEFT JOIN escolas d ON d.id = j.escola_destino_id";
+        $where = [];
+        $params = [];
+        if ($tipo !== '') {
+            $where[] = 'j.tipo = :tipo';
+            $params['tipo'] = $tipo;
+        }
+        if ($statusFiltro !== []) {
+            $ph = [];
+            foreach ($statusFiltro as $i => $st) {
+                $key = 'st' . $i;
+                $ph[] = ':' . $key;
+                $params[$key] = $st;
+            }
+            $where[] = 'j.status IN (' . implode(', ', $ph) . ')';
+        }
+        if ($where !== []) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+        $sql .= " ORDER BY j.id DESC LIMIT {$limite}";
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+        $rows = $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        foreach ($rows as &$row) {
+            $row['resultado_decoded'] = json_decode((string) ($row['resultado'] ?? ''), true) ?: [];
+        }
+        unset($row);
+        return $rows;
+    }
+
+    public static function temPendentes(string $tipo = ''): bool
+    {
+        $pdo = self::masterPdo();
+        if (!$pdo instanceof \PDO || !self::tabelaExiste($pdo)) {
+            return false;
+        }
+        if ($tipo !== '') {
+            $st = $pdo->prepare(
+                "SELECT 1 FROM fila_jobs_master
+                  WHERE tipo = :tipo AND status IN ('pending','processing')
+                  LIMIT 1"
+            );
+            $st->execute(['tipo' => $tipo]);
+        } else {
+            $st = $pdo->query(
+                "SELECT 1 FROM fila_jobs_master
+                  WHERE status IN ('pending','processing')
+                  LIMIT 1"
+            );
+        }
+        return $st && $st->fetchColumn() !== false;
+    }
+
+    public static function temJobAbertoDaEscola(string $tipo, int $escolaId): bool
+    {
+        $pdo = self::masterPdo();
+        if (!$pdo instanceof \PDO || !self::tabelaExiste($pdo) || $escolaId < 1 || $tipo === '') {
+            return false;
+        }
+        $st = $pdo->prepare(
+            "SELECT 1 FROM fila_jobs_master
+              WHERE tipo = :tipo
+                AND escola_destino_id = :escola
+                AND status IN ('pending','processing')
+              LIMIT 1"
+        );
+        $st->execute(['tipo' => $tipo, 'escola' => $escolaId]);
+        return $st->fetchColumn() !== false;
+    }
+
+    /**
+     * @return array<string,mixed>|null
+     */
+    public static function buscar(int $jobId): ?array
+    {
+        $pdo = self::masterPdo();
+        if (!$pdo instanceof \PDO || !self::tabelaExiste($pdo) || $jobId < 1) {
+            return null;
+        }
+        $st = $pdo->prepare(
+            'SELECT id, tipo, status, resultado, mensagem_erro, escola_destino_id, started_at, completed_at
+               FROM fila_jobs_master WHERE id = :id LIMIT 1'
+        );
+        $st->execute(['id' => $jobId]);
+        $row = $st->fetch(\PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+        $row['resultado_decoded'] = json_decode((string) ($row['resultado'] ?? ''), true) ?: [];
+        return $row;
+    }
+
+    public static function tryProcessImmediately(): void
+    {
+        if (PHP_SAPI === 'cli') {
+            return;
+        }
+        if (self::spawnBackgroundWorker()) {
+            return;
+        }
+        if (function_exists('ignore_user_abort')) {
+            @ignore_user_abort(true);
+        }
+    }
+
+    private static function spawnBackgroundWorker(): bool
+    {
+        try {
+            if (!function_exists('exec')) {
+                return false;
+            }
+            $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+            if (in_array('exec', $disabled, true)) {
+                return false;
+            }
+            if (stripos(PHP_OS, 'WIN') === 0) {
+                return false;
+            }
+            $script = realpath(__DIR__ . '/../../cron/process_master_jobs.php');
+            if ($script === false) {
+                return false;
+            }
+            $php = self::findPhpCliBinary();
+            if ($php === null) {
+                return false;
+            }
+            $cmd = escapeshellarg($php) . ' ' . escapeshellarg($script) . ' > /dev/null 2>&1 &';
+            exec($cmd);
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private static function findPhpCliBinary(): ?string
+    {
+        $candidates = [];
+        if (defined('PHP_BINARY') && PHP_BINARY !== '') {
+            if (stripos(PHP_BINARY, 'fpm') === false) {
+                $candidates[] = PHP_BINARY;
+            } else {
+                $guess = str_replace(
+                    ['/sbin/php-fpm', '/bin/php-fpm', 'php-fpm'],
+                    ['/bin/php', '/bin/php', 'php'],
+                    PHP_BINARY
+                );
+                if ($guess !== PHP_BINARY) {
+                    $candidates[] = $guess;
+                }
+            }
+        }
+        if (defined('PHP_BINDIR') && PHP_BINDIR !== '') {
+            $candidates[] = PHP_BINDIR . '/php';
+        }
+        $candidates[] = '/usr/bin/php';
+        $candidates[] = '/usr/local/bin/php';
+        foreach ($candidates as $candidate) {
+            if ($candidate && @is_executable($candidate)) {
+                return $candidate;
+            }
+        }
+        return null;
+    }
+
+    private static function liberarJobsTravados(\PDO $pdo): void
+    {
+        $min = (int) self::STALE_MINUTOS;
+        $max = (int) self::MAX_TENTATIVAS;
+        $pdo->exec(
+            "UPDATE fila_jobs_master
+                SET status = IF(tentativas >= {$max}, 'failed', 'pending'),
+                    mensagem_erro = IF(tentativas >= {$max}, 'Job travado (timeout).', mensagem_erro)
+              WHERE status = 'processing'
+                AND started_at < NOW() - INTERVAL {$min} MINUTE"
+        );
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     * @return array<string,mixed>
+     */
+    private static function dispatch(string $tipo, array $payload): array
+    {
+        if ($tipo === self::TIPO_CLONAR_ESCOLA) {
+            return ClonarEscolaService::executar($payload);
+        }
+        if ($tipo === self::TIPO_MIGRATION_ESCOLA) {
+            return self::executarMigrationEscola($payload);
+        }
+        throw new \RuntimeException('Tipo de job desconhecido: ' . $tipo);
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     * @return array<string,mixed>
+     */
+    private static function executarMigrationEscola(array $payload): array
+    {
+        $escolaId = (int) ($payload['escola_id'] ?? 0);
+        $files = $payload['migrations'] ?? [];
+        if ($escolaId < 1 || !is_array($files) || $files === []) {
+            throw new \RuntimeException('Carga sem escola ou sem arquivos.');
+        }
+        $files = array_values(array_filter(array_map('strval', $files)));
+        $jobId = (int) ($payload['_job_id'] ?? 0);
+        self::atualizarProgresso($jobId, 'Conectando no banco da escola...', 5);
+
+        $pdo = self::masterPdo();
+        if (!$pdo instanceof \PDO) {
+            throw new \RuntimeException('Não foi possível conectar ao banco master.');
+        }
+        $st = $pdo->prepare(
+            'SELECT e.id, e.nome, b.host, b.porta, b.nome_banco, b.usuario, b.senha_criptografada
+               FROM escolas e
+               INNER JOIN config_escolas_banco b ON b.escola_id = e.id
+              WHERE e.id = :id
+              LIMIT 1'
+        );
+        $st->execute(['id' => $escolaId]);
+        $escola = $st->fetch(\PDO::FETCH_ASSOC);
+        if (!$escola) {
+            throw new \RuntimeException('Escola não encontrada ou sem banco configurado.');
+        }
+
+
+        $host = (string) ($escola['host'] ?? 'localhost');
+        $port = (int) ($escola['porta'] ?? 3306);
+        $dbName = (string) ($escola['nome_banco'] ?? '');
+        $user = (string) ($escola['usuario'] ?? '');
+        $pass = MasterSecretVault::decryptDbPassword((string) ($escola['senha_criptografada'] ?? ''));
+        $tenantPdo = new \PDO(
+            "mysql:host={$host};port={$port};dbname={$dbName};charset=utf8mb4",
+            $user,
+            $pass,
+            [
+                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+                \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+                \PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
+            ]
+        );
+        $tenantPdo->exec('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci');
+
+        self::atualizarProgresso($jobId, 'Executando a carga. Pode levar vários minutos.', 15);
+        MysqlProvisioningService::runTenantMigrationsSelected($pdo, $tenantPdo, $escolaId, $files);
+
+        return [
+            'ok' => true,
+            'mensagem' => count($files) . ' arquivo(s) executado(s).',
+            'percentual' => 100,
+            'escola_id' => $escolaId,
+            'arquivos' => $files,
+        ];
+    }
+
+    private static function redigirPayload(\PDO $pdo, int $jobId): void
+    {
+        try {
+            $st = $pdo->prepare('SELECT payload FROM fila_jobs_master WHERE id = :id LIMIT 1');
+            $st->execute(['id' => $jobId]);
+            $raw = $st->fetchColumn();
+            $payload = is_string($raw) ? json_decode($raw, true) : null;
+            if (!is_array($payload)) {
+                return;
+            }
+            unset($payload['db_senha_criptografada'], $payload['db_senha']);
+            $up = $pdo->prepare('UPDATE fila_jobs_master SET payload = :payload WHERE id = :id');
+            $up->execute([
+                'payload' => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'id' => $jobId,
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[MasterFilaService] redigirPayload job=' . $jobId . ' ' . $e->getMessage());
+        }
+    }
+}
+
+if (!class_exists('MasterFilaService', false) && class_exists(__NAMESPACE__ . '\\MasterFilaService', false)) {
+    class_alias(__NAMESPACE__ . '\\MasterFilaService', 'MasterFilaService');
+}

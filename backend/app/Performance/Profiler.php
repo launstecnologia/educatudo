@@ -123,3 +123,7 @@ final class Profiler
         self::$enabled = null;
     }
 }
+
+if (!class_exists('Profiler', false) && class_exists(__NAMESPACE__ . '\\Profiler', false)) {
+    class_alias(__NAMESPACE__ . '\\Profiler', 'Profiler');
+}

@@ -13,7 +13,6 @@
  * @var array<string,mixed>|null $quadro_oficial
  */
 if (!class_exists('BoletimQuadroLayoutHelper', false)) {
-    require_once dirname(__DIR__, 2) . '/Helpers/BoletimQuadroLayoutHelper.php';
 }
 
 $resumosNotas = is_array($resumos_notas ?? null) ? $resumos_notas : null;
@@ -39,7 +38,7 @@ if ($resumosNotas === null) {
     if ($quadroResumo === [] && is_array($quadro_oficial ?? null)) {
         $quadroResumo = $quadro_oficial;
     }
-    $resumosNotas = BoletimQuadroLayoutHelper::montarResumosNotas($eventosParaResumo, $quadroResumo);
+    $resumosNotas = \App\Helpers\BoletimQuadroLayoutHelper::montarResumosNotas($eventosParaResumo, $quadroResumo);
     if ($resumosNotas === []) {
         $bimFaltas = null;
         foreach ($eventosParaResumo as $evR) {
@@ -62,7 +61,7 @@ if ($resumosNotas === null) {
         if ($bimFaltas === null && isset($filtro_bimestre) && (int) $filtro_bimestre > 0) {
             $bimFaltas = (int) $filtro_bimestre;
         }
-        $resumosNotas = BoletimQuadroLayoutHelper::montarResumosDoPainelQuadro(
+        $resumosNotas = \App\Helpers\BoletimQuadroLayoutHelper::montarResumosDoPainelQuadro(
             is_array($paineis_notas ?? null) ? $paineis_notas : [],
             $quadroResumo,
             $bimFaltas
@@ -91,8 +90,8 @@ $fmtResumo = static function ($valor, string $chave, int $dec): string {
 <div class="space-y-8 mb-8">
     <?php foreach ($resumosNotas as $resumo): ?>
         <?php
-        $colunasR = is_array($resumo['colunas'] ?? null) ? $resumo['colunas'] : BoletimQuadroLayoutHelper::chavesResumoNotas();
-        $rotulosR = is_array($resumo['rotulos'] ?? null) ? $resumo['rotulos'] : BoletimQuadroLayoutHelper::rotulosResumoNotas();
+        $colunasR = is_array($resumo['colunas'] ?? null) ? $resumo['colunas'] : \App\Helpers\BoletimQuadroLayoutHelper::chavesResumoNotas();
+        $rotulosR = is_array($resumo['rotulos'] ?? null) ? $resumo['rotulos'] : \App\Helpers\BoletimQuadroLayoutHelper::rotulosResumoNotas();
         $linhasR = is_array($resumo['linhas'] ?? null) ? $resumo['linhas'] : [];
         $decR = ((int) ($resumo['decimal_places'] ?? 2) === 1) ? 1 : 2;
         $tituloR = trim((string) ($resumo['titulo'] ?? 'Notas'));

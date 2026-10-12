@@ -2,11 +2,6 @@
 
 namespace App\Modulos\VidaEscolar\Services;
 
-require_once __DIR__ . '/VidaEscolarService.php';
-require_once __DIR__ . '/ProntuarioVidaEscolarService.php';
-require_once __DIR__ . '/VidaEscolarPdfService.php';
-require_once __DIR__ . '/../../../Core/LayoutHelper.php';
-require_once __DIR__ . '/../../../Services/AIJobService.php';
 
 /**
  * Gera um PDF por aluno (boletim oficial da Vida Escolar) e empacota em ZIP.
@@ -27,7 +22,7 @@ class VidaEscolarBoletinsLoteService
             @set_time_limit(0);
         }
 
-        if (!\LayoutHelper::isModuleEnabled('vida_escolar')) {
+        if (!\App\Core\LayoutHelper::isModuleEnabled('vida_escolar')) {
             throw new \RuntimeException('O módulo Vida Escolar está desativado nesta escola.');
         }
 
@@ -124,7 +119,6 @@ class VidaEscolarBoletinsLoteService
                         throw new \RuntimeException('PDF vazio.');
                     }
                     try {
-                        require_once __DIR__ . '/ArquivoPdfAlunoService.php';
                         (new ArquivoPdfAlunoService())->guardar(
                             $alunoId,
                             'boletim',
@@ -267,7 +261,7 @@ class VidaEscolarBoletinsLoteService
         if (class_exists(\ZipArchive::class)) {
             $zip = new \ZipArchive();
             $flags = \ZipArchive::CREATE;
-            if (defined('ZipArchive::OVERWRITE')) {
+            if (defined('\ZipArchive::OVERWRITE')) {
                 $flags |= \ZipArchive::OVERWRITE;
             }
             if ($zip->open($destino, $flags) !== true) {
@@ -348,7 +342,7 @@ class VidaEscolarBoletinsLoteService
         if ($jobId <= 0) {
             return;
         }
-        $db = \Database::getInstance();
+        $db = \App\Core\Database::getInstance();
         if (!$db->tableExists('ai_jobs')) {
             return;
         }
@@ -466,4 +460,8 @@ class VidaEscolarBoletinsLoteService
         }
         @rmdir($dir);
     }
+}
+
+if (!class_exists('VidaEscolarBoletinsLoteService', false) && class_exists(__NAMESPACE__ . '\\VidaEscolarBoletinsLoteService', false)) {
+    class_alias(__NAMESPACE__ . '\\VidaEscolarBoletinsLoteService', 'VidaEscolarBoletinsLoteService');
 }

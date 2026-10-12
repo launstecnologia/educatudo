@@ -2,17 +2,11 @@
 
 namespace App\Modulos\Matricula\Services;
 
-require_once __DIR__ . '/../Models/MatriculaProcesso.php';
-require_once __DIR__ . '/../../../Services/AlunoMovimentacaoService.php';
-require_once __DIR__ . '/../../../Models/User/Student.php';
-require_once __DIR__ . '/MatriculaVagaService.php';
-require_once __DIR__ . '/MatriculaChecklistService.php';
 
 use App\Modulos\Matricula\Models\MatriculaProcesso;
 use App\Services\AlunoMovimentacaoService;
-use Database;
-use Student;
-
+use App\Core\Database;
+use App\Models\User\Student;
 /**
  * Orquestração do processo de matrícula (contrato, assinatura, enturmação).
  * Não materializa cobrança Asaas — apenas escolhe plano e gera contrato.
@@ -1167,7 +1161,6 @@ class MatriculaProcessoService
             if (empty($regra['enviar_zapsign'])) {
                 $msg .= ' (ZapSign desabilitado nesta regra.)';
             } else {
-                require_once __DIR__ . '/ZapSignService.php';
                 $zs = new ZapSignService($this->db);
                 if ($zs->estaAtivo()) {
                     $zsResult = $zs->enviarContratoProcesso(
@@ -2299,7 +2292,6 @@ HTML;
         }
 
         try {
-            require_once dirname(__DIR__, 2) . '/vida-escolar/Services/ProntuarioVidaEscolarService.php';
             (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())->reconhecerEntregasExternas($alunoId);
         } catch (\Throwable $e) {
             error_log('Checklist vida escolar após enturmar: ' . $e->getMessage());
@@ -2593,13 +2585,17 @@ HTML;
         try {
             if (class_exists('RedisCache', false)) {
                 if (defined('TENANT_ID')) {
-                    \RedisCache::delete('config_layout_' . TENANT_ID);
+                    \App\Core\RedisCache::delete('config_layout_' . TENANT_ID);
                 }
-                \RedisCache::delete('config_layout_single');
-                \RedisCache::delete('config_layout');
+                \App\Core\RedisCache::delete('config_layout_single');
+                \App\Core\RedisCache::delete('config_layout');
             }
         } catch (\Throwable $e) {
             // ok
         }
     }
+}
+
+if (!class_exists('MatriculaProcessoService', false) && class_exists(__NAMESPACE__ . '\\MatriculaProcessoService', false)) {
+    class_alias(__NAMESPACE__ . '\\MatriculaProcessoService', 'MatriculaProcessoService');
 }

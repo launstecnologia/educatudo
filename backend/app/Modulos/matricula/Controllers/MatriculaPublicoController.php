@@ -1,17 +1,16 @@
 <?php
+
+namespace App\Modulos\Matricula\Controllers;
 /**
  * Trilha pública do responsável (contrato / assinatura).
  */
 
-require_once __DIR__ . '/../../../Core/BaseController.php';
-require_once __DIR__ . '/../Models/MatriculaProcesso.php';
-require_once __DIR__ . '/../Services/MatriculaProcessoService.php';
 
 use App\Modulos\Matricula\Models\MatriculaProcesso;
 use App\Modulos\Matricula\Services\MatriculaProcessoService;
 
-if (!class_exists('MatriculaPublicoController')) {
-class MatriculaPublicoController extends BaseController
+if (!class_exists(__NAMESPACE__ . '\\MatriculaPublicoController', false)) {
+class MatriculaPublicoController extends \App\Core\BaseController
 {
     private MatriculaProcessoService $service;
     private MatriculaProcesso $model;
@@ -132,7 +131,7 @@ class MatriculaPublicoController extends BaseController
                 require_once $helper;
             }
         }
-        if (class_exists('LayoutHelper', false) && !\LayoutHelper::isModuleEnabled('processo_matricula')) {
+        if (class_exists('LayoutHelper', false) && !\App\Core\LayoutHelper::isModuleEnabled('processo_matricula')) {
             return false;
         }
         return true;
@@ -306,4 +305,8 @@ class MatriculaPublicoController extends BaseController
         echo '<h1>Não foi possível continuar</h1><p>' . htmlspecialchars($message) . '</p></body></html>';
     }
 }
+}
+
+if (!class_exists('MatriculaPublicoController', false) && class_exists(__NAMESPACE__ . '\\MatriculaPublicoController', false)) {
+    class_alias(__NAMESPACE__ . '\\MatriculaPublicoController', 'MatriculaPublicoController');
 }

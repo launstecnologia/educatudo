@@ -1,17 +1,17 @@
 <?php
+
+namespace App\Modulos\RegrasAcademicas\Controllers;
+
+use App\Modulos\RegrasAcademicas\Services\RegraAcademicaService;
+use Throwable;
+
 /**
  * EducaTudo - Cadastro de Regras de Aprovação (admin)
  */
 
-require_once __DIR__ . '/../../../Controllers/Admin/AdminBaseController.php';
-require_once __DIR__ . '/../Models/RegraAcademica.php';
-require_once __DIR__ . '/../../../Models/Education/ClassRoom.php';
-require_once __DIR__ . '/../Services/RegraAcademicaService.php';
 
-use App\Modulos\RegrasAcademicas\Services\RegraAcademicaService;
-
-if (!class_exists('RegraAcademicaAdminController')) {
-class RegraAcademicaAdminController extends AdminBaseController
+if (!class_exists(__NAMESPACE__ . '\\RegraAcademicaAdminController', false)) {
+class RegraAcademicaAdminController extends \App\Controllers\Admin\AdminBaseController
 {
     private function service(): RegraAcademicaService
     {
@@ -164,7 +164,7 @@ class RegraAcademicaAdminController extends AdminBaseController
      */
     private function catalogos(): array
     {
-        $classRoom = new ClassRoom();
+        $classRoom = new \App\Models\Education\ClassRoom();
         $anos = [];
         try {
             foreach ($classRoom->getAnosLetivoNovo() ?: [] as $a) {
@@ -198,4 +198,8 @@ class RegraAcademicaAdminController extends AdminBaseController
         ];
     }
 }
+}
+
+if (!class_exists('RegraAcademicaAdminController', false) && class_exists(__NAMESPACE__ . '\\RegraAcademicaAdminController', false)) {
+    class_alias(__NAMESPACE__ . '\\RegraAcademicaAdminController', 'RegraAcademicaAdminController');
 }

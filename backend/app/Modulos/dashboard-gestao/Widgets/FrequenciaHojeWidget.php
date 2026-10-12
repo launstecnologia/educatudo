@@ -4,11 +4,7 @@ namespace App\Modulos\DashboardGestao\Widgets;
 
 use App\Modulos\DashboardGestao\Services\DashboardFiltro;
 use App\Modulos\Diario\Services\ClassDiaryService;
-use FrequencyService;
-
-require_once dirname(__DIR__, 3) . '/Services/FrequencyService.php';
-require_once dirname(__DIR__, 3) . '/Services/ClassDiaryService.php';
-
+use App\Services\FrequencyService;
 class FrequenciaHojeWidget implements WidgetDashboard
 {
     public function chave(): string
@@ -33,7 +29,7 @@ class FrequenciaHojeWidget implements WidgetDashboard
                     'chamadas_pendentes' => 0,
                 ],
                 'links' => [
-                    'presenca' => (class_exists('LayoutHelper', false) && \LayoutHelper::isModuleEnabled('presenca')) ? '/admin/presenca' : null,
+                    'presenca' => (class_exists('LayoutHelper', false) && \App\Core\LayoutHelper::isModuleEnabled('presenca')) ? '/admin/presenca' : null,
                     'diario' => '/admin/diario',
                     'chamadas' => '/admin/diario',
                 ],
@@ -54,7 +50,7 @@ class FrequenciaHojeWidget implements WidgetDashboard
         $resumo['chamadas_pendentes'] = count($pendentes);
 
         $qs = http_build_query(array_merge($filtro->queryModulo(), ['status' => 'pendente']));
-        $presencaOn = class_exists('LayoutHelper', false) && \LayoutHelper::isModuleEnabled('presenca');
+        $presencaOn = class_exists('LayoutHelper', false) && \App\Core\LayoutHelper::isModuleEnabled('presenca');
 
         return [
             'ok' => true,
@@ -68,4 +64,8 @@ class FrequenciaHojeWidget implements WidgetDashboard
             ],
         ];
     }
+}
+
+if (!class_exists('FrequenciaHojeWidget', false) && class_exists(__NAMESPACE__ . '\\FrequenciaHojeWidget', false)) {
+    class_alias(__NAMESPACE__ . '\\FrequenciaHojeWidget', 'FrequenciaHojeWidget');
 }

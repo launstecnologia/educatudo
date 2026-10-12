@@ -17,9 +17,8 @@
 $master_nome = $master_nome ?? ($_SESSION['master_user_nome'] ?? 'Admin');
 $master_avatar_url = $master_avatar_url ?? ($_SESSION['master_user_avatar'] ?? '');
 if (!class_exists('MasterAvatarService')) {
-    require_once __DIR__ . '/../../Services/MasterAvatarService.php';
 }
-$master_iniciais = MasterAvatarService::iniciais($master_nome);
+$master_iniciais = \App\Services\MasterAvatarService::iniciais($master_nome);
 ?>
     <div id="sidebar-overlay" class="fixed inset-0 bg-black/40 z-40 hidden md:hidden" aria-hidden="true"></div>
     <div class="flex flex-1 min-h-0 h-full overflow-hidden">

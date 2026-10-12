@@ -87,7 +87,7 @@ if (!empty($faltando_enturmar)) {
 }
 $podeEditarProcesso = !in_array($enrollment['status'] ?? '', ['enturmada', 'cancelada'], true);
 $alunoIdFicha = (int) ($enrollment['aluno_id'] ?? 0);
-$mostrarVidaEscolar = $alunoIdFicha > 0 && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('vida_escolar'));
+$mostrarVidaEscolar = $alunoIdFicha > 0 && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('vida_escolar'));
 ob_start(); ?>
 <?php if ($alunoIdFicha > 0): ?>
 <a href="<?= URL ?>/admin/students/<?= $alunoIdFicha ?>" class="btn-secondary text-sm">

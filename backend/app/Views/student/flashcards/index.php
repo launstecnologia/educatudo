@@ -1,6 +1,6 @@
 <?php
 $decks = $decks ?? [];
-$iaName = LayoutHelper::getIaName();
+$iaName = \App\Core\LayoutHelper::getIaName();
 ?>
 <div class="container mx-auto px-4 py-6 max-w-[1600px] w-full">
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4">

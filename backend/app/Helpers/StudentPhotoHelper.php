@@ -1,5 +1,7 @@
 <?php
 
+namespace App\Helpers;
+
 /**
  * Resolve exibição de foto do aluno no admin (alunos.foto_url + fallback BLOB legado).
  */
@@ -37,7 +39,6 @@ class StudentPhotoHelper
             return null;
         }
 
-        require_once __DIR__ . '/AvatarUrlHelper.php';
 
         return AvatarUrlHelper::normalizeAdminAvatarUrl($raw);
     }
@@ -135,8 +136,7 @@ class StudentPhotoHelper
      */
     public static function enrichStudent(array $aluno, bool $includeBlob = false): array
     {
-        require_once __DIR__ . '/StudentFormHelper.php';
-        $aluno = \StudentFormHelper::aplicarNomeExibicao($aluno, false);
+        $aluno = \App\Helpers\StudentFormHelper::aplicarNomeExibicao($aluno, false);
         $resolved = $includeBlob ? self::resolveForShow($aluno) : self::resolveForList($aluno);
         $aluno['foto_display_url'] = $resolved['foto_display_url'];
         $aluno['foto_initials'] = $resolved['foto_initials'];
@@ -147,8 +147,7 @@ class StudentPhotoHelper
     /** @param array<string, mixed> $aluno */
     private static function nomeParaIniciais(array $aluno): string
     {
-        require_once __DIR__ . '/StudentFormHelper.php';
-        $nome = \StudentFormHelper::nomeExibicao($aluno);
+        $nome = \App\Helpers\StudentFormHelper::nomeExibicao($aluno);
 
         return $nome !== '' ? $nome : (string) ($aluno['nome'] ?? '');
     }
@@ -185,4 +184,8 @@ class StudentPhotoHelper
 
         return preg_match('/\.(jpe?g|png|gif|webp)$/i', $raw) === 1;
     }
+}
+
+if (!class_exists('StudentPhotoHelper', false) && class_exists(__NAMESPACE__ . '\\StudentPhotoHelper', false)) {
+    class_alias(__NAMESPACE__ . '\\StudentPhotoHelper', 'StudentPhotoHelper');
 }

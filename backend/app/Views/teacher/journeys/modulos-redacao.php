@@ -53,9 +53,8 @@
                     <button type="button" id="descricaoBtnImage" class="text-sm px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">Inserir imagem</button>
                     <?php
                     if (!class_exists('CreditosModuleRegistry', false)) {
-                        require_once __DIR__ . '/../../../Core/CreditosModuleRegistry.php';
                     }
-                    if (\CreditosModuleRegistry::acaoIaDisponivel('redacao_gerar_tema_aluno')):
+                    if (\App\Core\CreditosModuleRegistry::acaoIaDisponivel('redacao_gerar_tema_aluno')):
                     ?>
                     <button type="button" id="btnGerarDescricaoIA" 
                             class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium flex items-center gap-2">

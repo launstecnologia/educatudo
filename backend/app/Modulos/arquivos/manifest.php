@@ -7,6 +7,7 @@
  */
 return [
     'chave' => 'arquivos',
+    'namespace' => 'App\\Modulos\\Arquivos',
     'label' => 'Arquivos',
     'grupo' => 'geral',
     'feature_keys' => [

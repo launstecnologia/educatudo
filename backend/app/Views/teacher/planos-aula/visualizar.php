@@ -187,7 +187,7 @@
     <div class="mb-4">
         <p class="text-sm text-gray-500 mb-2">Oficinas de Aprendizagem / Salas de Estudo</p>
         <div class="bg-gray-50 rounded-lg p-4">
-            <div class="text-gray-800"><?= LessonPlanAfternoonHelper::renderHtml($plano['aulas_tarde_oficinas']) ?></div>
+            <div class="text-gray-800"><?= \App\Helpers\LessonPlanAfternoonHelper::renderHtml($plano['aulas_tarde_oficinas']) ?></div>
         </div>
     </div>
     <?php endif; ?>

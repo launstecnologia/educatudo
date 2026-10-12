@@ -1,9 +1,14 @@
 <?php
+
+namespace App\Middleware;
 /**
  * EducaTudo - Middleware de Trilha de Auditoria
  * Registra automaticamente ações sensíveis dos usuários
  */
 
+
+use App\Core\AuthManager;
+use App\Core\Logger;
 class AuditMiddleware
 {
     private $authManager;
@@ -25,7 +30,6 @@ class AuditMiddleware
     public function __construct()
     {
         if (!class_exists('AuthManager')) {
-            require_once __DIR__ . '/../Core/AuthManager.php';
         }
         $this->authManager = new AuthManager();
     }
@@ -38,7 +42,6 @@ class AuditMiddleware
         try {
             // Carregar Logger se necessário
             if (!class_exists('Logger')) {
-                require_once __DIR__ . '/../Core/Logger.php';
             }
             
             $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -87,10 +90,10 @@ class AuditMiddleware
                 );
             }
             
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             // Não interromper a requisição se houver erro no middleware
             error_log("Erro no AuditMiddleware: " . $e->getMessage());
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log("Erro fatal no AuditMiddleware: " . $e->getMessage());
         }
     }
@@ -203,3 +206,7 @@ class AuditMiddleware
     }
 }
 
+
+if (!class_exists('AuditMiddleware', false) && class_exists(__NAMESPACE__ . '\\AuditMiddleware', false)) {
+    class_alias(__NAMESPACE__ . '\\AuditMiddleware', 'AuditMiddleware');
+}

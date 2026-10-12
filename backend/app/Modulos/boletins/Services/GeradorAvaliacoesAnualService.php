@@ -2,16 +2,12 @@
 
 namespace App\Modulos\Boletins\Services;
 
-require_once __DIR__ . '/../Models/Boletim.php';
-require_once __DIR__ . '/../../../Models/System/BoletimConfig.php';
-require_once __DIR__ . '/../../../Services/SchoolCalendarService.php';
-require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
 
 use App\Modulos\Boletins\Models\Boletim;
-use BoletimConfig;
-use Database;
-use PeriodoLetivo;
-use SchoolCalendarService;
+use App\Models\System\BoletimConfig;
+use App\Core\Database;
+use App\Core\PeriodoLetivo;
+use App\Services\SchoolCalendarService;
 use Throwable;
 
 /**
@@ -697,4 +693,8 @@ class GeradorAvaliacoesAnualService
         }
         return '';
     }
+}
+
+if (!class_exists('GeradorAvaliacoesAnualService', false) && class_exists(__NAMESPACE__ . '\\GeradorAvaliacoesAnualService', false)) {
+    class_alias(__NAMESPACE__ . '\\GeradorAvaliacoesAnualService', 'GeradorAvaliacoesAnualService');
 }

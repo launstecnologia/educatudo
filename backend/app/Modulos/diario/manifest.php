@@ -6,6 +6,7 @@
 return [
     'chave' => 'diario',
     'label' => 'Diário de Classe',
+    'namespace' => 'App\\Modulos\\Diario',
     'grupo' => 'gestao_escolar',
     'feature_keys' => [
         'admin' => 'diario_classe',

@@ -12,8 +12,8 @@
         <header class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
             <div class="flex items-center justify-between flex-wrap gap-4">
                 <div class="flex items-center gap-3">
-                    <?php if (LayoutHelper::getContextualLogo('login', 'h-10 w-auto', 'Logo EducaTudo')): ?>
-                        <?= LayoutHelper::getContextualLogo('login', 'h-10 w-auto', 'Logo EducaTudo') ?>
+                    <?php if (\App\Core\LayoutHelper::getContextualLogo('login', 'h-10 w-auto', 'Logo EducaTudo')): ?>
+                        <?= \App\Core\LayoutHelper::getContextualLogo('login', 'h-10 w-auto', 'Logo EducaTudo') ?>
                     <?php else: ?>
                         <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">E</div>
                     <?php endif; ?>

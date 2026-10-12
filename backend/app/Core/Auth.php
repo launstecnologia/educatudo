@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Core;
 /**
  * EducaTudo - Sistema de Autenticação
  * Gerencia login, sessões e segurança
@@ -15,13 +17,13 @@ class Auth
         
         $configFile = __DIR__ . '/../../config/app.php';
         if (!file_exists($configFile)) {
-            throw new Exception("Arquivo de configuração não encontrado: {$configFile}");
+            throw new \Exception("Arquivo de configuração não encontrado: {$configFile}");
         }
         
         $this->config = require $configFile;
         
         if (!$this->config || !is_array($this->config)) {
-            throw new Exception("Configuração inválida");
+            throw new \Exception("Configuração inválida");
         }
         
         $this->startSession();
@@ -34,7 +36,7 @@ class Auth
     {
         if (session_status() === PHP_SESSION_NONE) {
             if (!isset($this->config['session'])) {
-                throw new Exception("Configuração de sessão não encontrada");
+                throw new \Exception("Configuração de sessão não encontrada");
             }
             
             $sessionConfig = $this->config['session'];
@@ -66,7 +68,7 @@ class Auth
         try {
             // Verifica tentativas de login
             if (!$this->canAttemptLogin($login)) {
-                throw new Exception("Muitas tentativas de login. Tente novamente em " . $this->getLockoutTime() . " minutos.");
+                throw new \Exception("Muitas tentativas de login. Tente novamente em " . $this->getLockoutTime() . " minutos.");
             }
             
             // Busca usuário baseado no tipo
@@ -74,18 +76,18 @@ class Auth
             
             if (!$user) {
                 $this->recordLoginAttempt($login, false);
-                throw new Exception("Credenciais inválidas");
+                throw new \Exception("Credenciais inválidas");
             }
             
             // Verifica senha
             if (!password_verify($senha, $user['senha_hash'])) {
                 $this->recordLoginAttempt($login, false);
-                throw new Exception("Credenciais inválidas");
+                throw new \Exception("Credenciais inválidas");
             }
             
             // Verifica se usuário está ativo
             if (!$this->isUserActive($user)) {
-                throw new Exception("Usuário inativo");
+                throw new \Exception("Usuário inativo");
             }
             
             // Registra tentativa bem-sucedida
@@ -96,7 +98,7 @@ class Auth
             
             return $user;
             
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             error_log("Erro de login: " . $e->getMessage() . " - Login: " . $login);
             throw $e;
         }
@@ -400,4 +402,8 @@ class Auth
         
         return true;
     }
+}
+
+if (!class_exists('Auth', false) && class_exists(__NAMESPACE__ . '\\Auth', false)) {
+    class_alias(__NAMESPACE__ . '\\Auth', 'Auth');
 }

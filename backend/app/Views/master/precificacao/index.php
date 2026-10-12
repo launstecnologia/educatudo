@@ -4,8 +4,6 @@ $labels = $labels ?? [];
 $erroTabela = $erro_tabela ?? null;
 $flash = $flash ?? [];
 $csrf_token = $csrf_token ?? '';
-require_once __DIR__ . '/../../../Core/CreditosModuleRegistry.php';
-require_once __DIR__ . '/../../../Core/CreditosDecimalHelper.php';
 ?>
 <div class="mb-6">
     <h2 class="text-2xl font-bold text-slate-900 mb-2">Precificação por créditos</h2>
@@ -47,14 +45,14 @@ require_once __DIR__ . '/../../../Core/CreditosDecimalHelper.php';
                 foreach ($labels as $moduloKey => $nomePadrao):
                     $row = $precos[$moduloKey] ?? null;
                     $creditos = $row
-                        ? \CreditosDecimalHelper::fromScalar($row['creditos'] ?? 1, 1.0)
+                        ? \App\Core\CreditosDecimalHelper::fromScalar($row['creditos'] ?? 1, 1.0)
                         : 1.0;
                     if ($creditos <= 0) {
                         $creditos = 1.0;
                     }
                     $nomeExibicao = $row ? ($row['nome_exibicao'] ?? $nomePadrao) : $nomePadrao;
                     $ativo = $row ? (int)($row['ativo'] ?? 1) : 1;
-                    $grupo = \CreditosModuleRegistry::getGrupo($moduloKey);
+                    $grupo = \App\Core\CreditosModuleRegistry::getGrupo($moduloKey);
                 ?>
                 <?php if ($grupo !== $grupoAnterior): $grupoAnterior = $grupo; ?>
                 <tr class="bg-blue-50/80">
@@ -68,7 +66,7 @@ require_once __DIR__ . '/../../../Core/CreditosDecimalHelper.php';
                                class="w-full max-w-md px-2 py-1.5 border border-slate-300 rounded text-sm">
                     </td>
                     <td class="px-4 py-3">
-                        <input type="number" name="creditos[<?= htmlspecialchars($moduloKey) ?>]" value="<?= htmlspecialchars(\CreditosDecimalHelper::formatInput($creditos)) ?>"
+                        <input type="number" name="creditos[<?= htmlspecialchars($moduloKey) ?>]" value="<?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatInput($creditos)) ?>"
                                min="0" step="0.0001" inputmode="decimal" lang="pt-BR" class="w-24 px-2 py-1.5 border border-slate-300 rounded text-sm">
                     </td>
                     <td class="px-4 py-3">

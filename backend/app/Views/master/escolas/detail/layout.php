@@ -89,11 +89,10 @@ $navbar_links_aluno = [
             $corPrimariaMaster = (string) ($layout_config['primary_color'] ?? '#6366f1');
             $navbarBgMaster = (string) ($layout_config['navbar_bg_color'] ?? $corPrimariaMaster);
             if (!class_exists('LayoutHelper', false)) {
-                require_once dirname(__DIR__, 4) . '/Core/LayoutHelper.php';
             }
             $sidebarTextMaster = trim((string) ($layout_config['sidebar_text_color'] ?? ''));
             if ($sidebarTextMaster === '') {
-                $sidebarTextMaster = LayoutHelper::resolveSidebarTextColor($navbarBgMaster, '#ffffff');
+                $sidebarTextMaster = \App\Core\LayoutHelper::resolveSidebarTextColor($navbarBgMaster, '#ffffff');
             }
             $botaoPrimarioMaster = (string) ($layout_config['button_primary_color'] ?? $corPrimariaMaster);
             ?>

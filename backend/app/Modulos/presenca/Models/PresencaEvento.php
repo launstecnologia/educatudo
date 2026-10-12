@@ -1,6 +1,7 @@
 <?php
 
-require_once __DIR__ . '/../../../Core/Database.php';
+namespace App\Modulos\Presenca\Models;
+
 
 class PresencaEvento
 {
@@ -11,7 +12,7 @@ class PresencaEvento
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     public function tabelasProntas(): bool
@@ -38,7 +39,7 @@ class PresencaEvento
     {
         $idExterno = trim((string) ($dados['id_externo'] ?? ''));
         if ($idExterno === '') {
-            throw new InvalidArgumentException('id_externo é obrigatório.');
+            throw new \InvalidArgumentException('id_externo é obrigatório.');
         }
         $existente = $this->findByIdExterno($idExterno);
         if ($existente) {
@@ -46,7 +47,7 @@ class PresencaEvento
         }
         $tipo = (string) ($dados['tipo'] ?? '');
         if (!in_array($tipo, self::TIPOS, true)) {
-            throw new InvalidArgumentException('Tipo deve ser entrada ou saida.');
+            throw new \InvalidArgumentException('Tipo deve ser entrada ou saida.');
         }
         $origem = (string) ($dados['origem'] ?? 'integracao');
         if (!in_array($origem, self::ORIGENS, true)) {
@@ -71,7 +72,7 @@ class PresencaEvento
                 ]
             );
             return ['id' => $id, 'duplicado' => false];
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $existente = $this->findByIdExterno($idExterno);
             if ($existente) {
                 return ['id' => (int) $existente['id'], 'duplicado' => true];
@@ -197,4 +198,8 @@ class PresencaEvento
         }
         return $ids;
     }
+}
+
+if (!class_exists('PresencaEvento', false) && class_exists(__NAMESPACE__ . '\\PresencaEvento', false)) {
+    class_alias(__NAMESPACE__ . '\\PresencaEvento', 'PresencaEvento');
 }

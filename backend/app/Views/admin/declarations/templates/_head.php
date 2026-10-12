@@ -23,7 +23,6 @@ $linhaDocs = trim(implode(' • ', array_filter([
 ])));
 $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
 if (!class_exists('StudentFormHelper', false)) {
-    require_once dirname(__DIR__, 4) . '/Helpers/StudentFormHelper.php';
 }
 ?>
 <!DOCTYPE html>

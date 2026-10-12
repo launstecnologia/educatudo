@@ -6,6 +6,7 @@
 return [
     'chave' => 'agrupamentos-componentes',
     'label' => 'Agrupamento de Disciplinas',
+    'namespace' => 'App\\Modulos\\AgrupamentosComponentes',
     'grupo' => 'academico',
     'feature_keys' => [
         'admin' => 'agrupamentos_componentes',

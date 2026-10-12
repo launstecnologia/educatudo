@@ -1,6 +1,5 @@
 <?php
-// Rotas para Administração (perfil: admin_escola)
-$router->get('/admin/jornadas/ai-job/{id}/status', 'AIJobController@status');
+// Jornadas → Modulos/jornadas/routes.php
 $router->get('/admin/ai-job/{id}/status', 'AIJobController@status');
 // Dashboard: rota em app/Modulos/dashboard-gestao/routes.php
 $router->get('/admin/creditos/pacotes', 'Admin/SchoolSettingsAdminController@creditosPacotes');
@@ -12,79 +11,14 @@ $router->get('/admin/tudicoins/aguardando/{id}', 'Admin/AdminCreditosController@
 $router->post('/admin/tudicoins/pagar/{id}', 'Admin/AdminCreditosController@pagar');
 $router->post('/admin/tudicoins/verificar/{id}', 'Admin/AdminCreditosController@verificar');
 $router->get('/admin/tudicoins/status/{id}', 'Admin/AdminCreditosController@status');
-// Arquivos: rotas em app/Modulos/arquivos/routes.php
-$router->get('/admin/apostilas', 'Apostilas/AdminApostilaController@index');
-$router->post('/admin/apostilas/upload', 'Apostilas/AdminApostilaController@upload');
-$router->post('/admin/apostilas/editar', 'Apostilas/AdminApostilaController@update');
-$router->post('/admin/apostilas/excluir', 'Apostilas/AdminApostilaController@delete');
+// Apostilas → Modulos/apostilas/routes.php
 
 // IA da Apostila (módulo novo, independente do módulo Apostilas acima)
-$router->get('/admin/apostilas-ia', 'Admin/ApostilaIaAdminController@index');
-$router->get('/admin/apostilas-ia/criar', 'Admin/ApostilaIaAdminController@criar');
-$router->post('/admin/apostilas-ia/upload', 'Admin/ApostilaIaAdminController@upload');
-$router->get('/admin/apostilas-ia/{id}/editar', 'Admin/ApostilaIaAdminController@editar');
-$router->post('/admin/apostilas-ia/{id}/atualizar', 'Admin/ApostilaIaAdminController@atualizar');
-$router->post('/admin/apostilas-ia/{id}/reprocessar', 'Admin/ApostilaIaAdminController@reprocessar');
-$router->post('/admin/apostilas-ia/{id}/enviar-pdf', 'Admin/ApostilaIaAdminController@enviarPdf');
-$router->post('/admin/apostilas-ia/{id}/enviar-capa', 'Admin/ApostilaIaAdminController@enviarCapa');
-$router->get('/admin/apostilas-ia/{id}/capa', 'Admin/ApostilaIaAdminController@capa');
-$router->get('/admin/apostilas-ia/{id}/pdf', 'Admin/ApostilaIaAdminController@pdf');
-$router->get('/admin/apostilas-ia/{id}/status', 'Admin/ApostilaIaAdminController@status');
 $router->get('/admin/maintenance/painel', 'Admin/StudentAdminController@painelManutencao');
 $router->post('/admin/maintenance/toggle', 'Admin/StudentAdminController@toggleMaintenance');
-$router->get('/admin/monitoramento/alertas', 'Admin/OccurrenceAdminController@alertasSensiveis');
-$router->post('/admin/monitoramento/alertas/atualizar', 'Admin/OccurrenceAdminController@atualizarAlertaSensivel');
-$router->post('/admin/monitoramento/alertas/ver-conteudo', 'Admin/OccurrenceAdminController@verConteudoAlertaSensivel');
+// Ocorrências extras → Modulos/ocorrencias/routes.php
 
-// Redação Configurável (Admin)
-$router->get('/admin/redacao-configuravel', 'Essays/AdminEssayController@index');
-$router->get('/admin/redacao-configuravel/bancas/novo', 'Essays/AdminEssayController@boardCreate');
-$router->post('/admin/redacao-configuravel/bancas', 'Essays/AdminEssayController@boardStore');
-$router->get('/admin/redacao-configuravel/bancas/{id}/editar', 'Essays/AdminEssayController@boardEdit');
-$router->put('/admin/redacao-configuravel/bancas/{id}', 'Essays/AdminEssayController@boardUpdate');
-$router->post('/admin/redacao-configuravel/bancas/{id}', 'Essays/AdminEssayController@boardUpdate');
-$router->delete('/admin/redacao-configuravel/bancas/{id}', 'Essays/AdminEssayController@boardDelete');
-$router->post('/admin/redacao-configuravel/bancas/{id}/toggle-status', 'Essays/AdminEssayController@boardToggleStatus');
-$router->get('/admin/redacao-configuravel/bancas/{boardId}/tipos', 'Essays/AdminEssayController@textTypesIndex');
-$router->get('/admin/redacao-configuravel/bancas/{boardId}/tipos/novo', 'Essays/AdminEssayController@textTypeCreate');
-$router->post('/admin/redacao-configuravel/bancas/{boardId}/tipos', 'Essays/AdminEssayController@textTypeStore');
-$router->get('/admin/redacao-configuravel/bancas/{boardId}/tipos/{id}/editar', 'Essays/AdminEssayController@textTypeEdit');
-$router->put('/admin/redacao-configuravel/bancas/{boardId}/tipos/{id}', 'Essays/AdminEssayController@textTypeUpdate');
-$router->post('/admin/redacao-configuravel/bancas/{boardId}/tipos/{id}', 'Essays/AdminEssayController@textTypeUpdate');
-$router->delete('/admin/redacao-configuravel/bancas/{boardId}/tipos/{id}', 'Essays/AdminEssayController@textTypeDelete');
-$router->get('/admin/redacao-configuravel/bancas/{boardId}/tipos/{textTypeId}/criterios', 'Essays/AdminEssayController@criteriaIndex');
-$router->get('/admin/redacao-configuravel/bancas/{boardId}/tipos/{textTypeId}/criterios/novo', 'Essays/AdminEssayController@criterionCreate');
-$router->post('/admin/redacao-configuravel/bancas/{boardId}/tipos/{textTypeId}/criterios', 'Essays/AdminEssayController@criterionStore');
-$router->get('/admin/redacao-configuravel/bancas/{boardId}/tipos/{textTypeId}/criterios/{id}/editar', 'Essays/AdminEssayController@criterionEdit');
-$router->put('/admin/redacao-configuravel/bancas/{boardId}/tipos/{textTypeId}/criterios/{id}', 'Essays/AdminEssayController@criterionUpdate');
-$router->post('/admin/redacao-configuravel/bancas/{boardId}/tipos/{textTypeId}/criterios/{id}', 'Essays/AdminEssayController@criterionUpdate');
-$router->delete('/admin/redacao-configuravel/bancas/{boardId}/tipos/{textTypeId}/criterios/{id}', 'Essays/AdminEssayController@criterionDelete');
-$router->get('/admin/redacao-configuravel/bancas/{boardId}/tipos/{textTypeId}/prompts', 'Essays/AdminEssayController@promptsIndex');
-$router->get('/admin/redacao-configuravel/bancas/{boardId}/tipos/{textTypeId}/prompts/novo', 'Essays/AdminEssayController@promptCreate');
-$router->post('/admin/redacao-configuravel/bancas/{boardId}/tipos/{textTypeId}/prompts', 'Essays/AdminEssayController@promptStore');
-$router->get('/admin/redacao-configuravel/bancas/{boardId}/tipos/{textTypeId}/prompts/{id}/editar', 'Essays/AdminEssayController@promptEdit');
-$router->put('/admin/redacao-configuravel/bancas/{boardId}/tipos/{textTypeId}/prompts/{id}', 'Essays/AdminEssayController@promptUpdate');
-$router->post('/admin/redacao-configuravel/bancas/{boardId}/tipos/{textTypeId}/prompts/{id}', 'Essays/AdminEssayController@promptUpdate');
-$router->delete('/admin/redacao-configuravel/bancas/{boardId}/tipos/{textTypeId}/prompts/{id}', 'Essays/AdminEssayController@promptDelete');
-$router->post('/admin/redacao-configuravel/bancas/{boardId}/tipos/{textTypeId}/prompts/{id}/ativar', 'Essays/AdminEssayController@promptSetActive');
-$router->get('/admin/redacao-professor', 'Essays/AdminEssayController@proposalsIndex');
-$router->get('/admin/redacao-professor/relatorio', 'Essays/AdminEssayController@report');
-$router->get('/admin/redacao-professor/analytics', 'Essays/AdminEssayAnalyticsController@index');
-$router->get('/admin/redacao-professor/analytics/aluno', 'Essays/AdminEssayAnalyticsController@byStudent');
-$router->get('/admin/redacao-professor/analytics/proposta', 'Essays/AdminEssayAnalyticsController@byProposal');
-$router->get('/admin/redacao-professor/analytics/exportar', 'Essays/AdminEssayAnalyticsController@exportExcel');
-$router->get('/admin/redacao-professor/novo', 'Essays/AdminEssayController@proposalCreate');
-$router->post('/admin/redacao-professor', 'Essays/AdminEssayController@proposalStore');
-$router->get('/admin/redacao-professor/api/tipos-textuais/{boardId}', 'Essays/AdminEssayController@apiTextTypes');
-$router->get('/admin/redacao-professor/api/alunos-by-turmas', 'Essays/AdminEssayController@apiAlunosByTurmas');
-$router->post('/admin/redacao-professor/upload-imagem', 'Essays/AdminEssayController@uploadImage');
-$router->post('/admin/redacao-professor/upload-tema-pronto', 'Essays/AdminEssayController@uploadTemaPronto');
-$router->post('/admin/redacao-professor/gerar-repertorio-ia', 'Essays/AdminEssayController@gerarRepertorioIA');
-$router->get('/admin/redacao-professor/propostas/{proposalId}/envios/{submissionId}', 'Essays/AdminEssayController@submissionDetail');
-$router->get('/admin/redacao-configuravel/propostas/{id}', 'Essays/AdminEssayController@proposalShow');
-$router->post('/admin/redacao-configuravel/propostas/{id}/permissoes/adicionar', 'Essays/AdminEssayController@grantProfessorPermission');
-$router->post('/admin/redacao-configuravel/propostas/{id}/permissoes/remover', 'Essays/AdminEssayController@revokeProfessorPermission');
-$router->post('/admin/redacao-professor/{id}/toggle-status', 'Essays/AdminEssayController@proposalToggleStatus');
+// Redações → Modulos/redacoes/routes.php
 
 // Registros de entrada/saída facial por aluno
 $router->get('/admin/reconhecimento-facial/alunos/{id}/eventos', 'Admin/FacialRecognitionController@studentEvents');
@@ -168,9 +102,6 @@ $router->get('/admin/resultados-finais/aluno/{id}/ficha', 'Admin/ResultadoFinalA
 $router->get('/admin/resultados-finais/aluno/{id}/ficha/pdf', 'Admin/ResultadoFinalAdminController@fichaPdf');
 $router->get('/admin/resultados-finais/aluno/{id}/boletim/pdf', 'Admin/ResultadoFinalAdminController@boletimPdf');
 
-$router->post('/admin/ocorrencias/transcrever-audio', 'Admin/OccurrenceAdminController@transcreverOcorrenciaAudioGeral');
-$router->post('/admin/ocorrencias/auto-preencher', 'Admin/OccurrenceAdminController@autoPreencherOcorrenciaGeral');
-$router->get('/admin/tentativas-login', 'Admin/OccurrenceAdminController@tentativasLoginIndex');
 $router->post('/admin/students/cadastrar-pai', 'Admin/StudentAdminController@cadastrarPai');
 $router->post('/admin/students/transfer', 'Admin/StudentAdminController@processarTransferenciaAlunos');
 $router->get('/admin/students/remanejamento', 'Admin/StudentAdminController@remanejamentoAlunos');
@@ -196,96 +127,14 @@ $router->get('/admin/teachers/export-csv', 'Admin/TeacherAdminController@exporta
 $router->post('/admin/teachers/import-csv', 'Admin/TeacherAdminController@importarProfessoresCSV');
 
 // Sistema de Jornadas do Admin
-$router->get('/admin/jornadas', 'Education/AdminJourneyController@index');
-$router->get('/admin/jornadas/criar', 'Education/AdminJourneyController@criar');
-$router->get('/admin/jornadas/relatorio', 'Education/AdminJourneyController@relatorio');
-$router->post('/admin/jornadas', 'Education/AdminJourneyController@salvar');
-$router->get('/admin/jornadas/{id}', 'Education/AdminJourneyController@show');
-$router->get('/admin/jornadas/{id}/exercicios-alunos', 'Education/AdminJourneyController@exerciciosAlunos');
-$router->get('/admin/jornadas/{id}/resumos/{resumo_id}', 'Education/AdminJourneyController@verResumo');
-$router->get('/admin/jornadas/{jornada_id}/aluno/{aluno_id}/exercicios', 'Education/AdminJourneyController@verExerciciosAluno');
-$router->get('/admin/jornadas/{id}/editar', 'Education/AdminJourneyController@editar');
-$router->post('/admin/jornadas/{id}/atualizar', 'Education/AdminJourneyController@atualizar');
-$router->post('/admin/jornadas/excluir', 'Education/AdminJourneyController@excluir');
-$router->post('/admin/jornadas/inativar', 'Education/AdminJourneyController@inativar');
-$router->post('/admin/jornadas/inativar-lote', 'Education/AdminJourneyController@inativarLote');
-$router->post('/admin/jornadas/resumos/atribuir-nota', 'Education/AdminJourneyController@atribuirNotaResumo');
-$router->post('/admin/jornadas/exercicios/atribuir-nota-dissertativa', 'Education/AdminJourneyController@atribuirNotaDissertativa');
-$router->delete('/admin/jornadas/{id}', 'Education/AdminJourneyController@delete');
-$router->get('/admin/jornadas/professor/{professor_id}', 'Education/AdminJourneyController@porProfessor');
-$router->get('/admin/jornadas/turma/{turma_id}', 'Education/AdminJourneyController@porTurma');
-$router->post('/admin/jornadas/toggle-status', 'Education/AdminJourneyController@toggleStatus');
-$router->get('/admin/jornadas/retomar', 'Education/AdminJourneyController@retomarJornada');
-$router->get('/admin/jornadas/turmas-do-professor', 'Education/AdminJourneyController@turmasDoProfessor');
-$router->get('/admin/jornadas/buscar-alunos-criar', 'Education/AdminJourneyController@buscarAlunosCriar');
-$router->get('/admin/jornadas/buscar-alunos-professor', 'Education/AdminJourneyController@buscarAlunosProfessor');
-$router->post('/admin/jornadas/retomar-aluno', 'Education/AdminJourneyController@retomarJornadaAluno');
-$router->get('/admin/jornadas/{id}/modulos', 'Education/AdminJourneyController@gerenciarModulos');
-$router->get('/admin/jornadas/{id}/modulos/lista', 'Education/AdminJourneyController@listarModulos');
-$router->post('/admin/jornadas/adicionar-modulo', 'Education/AdminJourneyController@adicionarModulo');
-$router->post('/admin/jornadas/remover-modulo', 'Education/AdminJourneyController@removerModulo');
-$router->post('/admin/jornadas/atualizar-ordem-modulos', 'Education/AdminJourneyController@atualizarOrdemModulos');
-$router->get('/admin/jornadas/modulos/{modulo_id}/exercicios', 'Education/AdminJourneyController@gerenciarExerciciosModulo');
-$router->post('/admin/jornadas/modulos/adicionar-exercicio', 'Education/AdminJourneyController@adicionarExercicioModulo');
-$router->post('/admin/jornadas/modulos/gerar-exercicio-ia', 'Education/AdminJourneyController@gerarExercicioIAModulo');
-$router->post('/admin/jornadas/modulos/importar-exercicios-ia/{jobId}', 'Education/AdminJourneyController@importarExerciciosModuloIA');
-$router->post('/admin/jornadas/modulos/remover-exercicio', 'Education/AdminJourneyController@removerExercicioModulo');
-$router->post('/admin/jornadas/modulos/alternar-status-exercicio', 'Education/AdminJourneyController@alternarStatusExercicio');
-$router->get('/admin/jornadas/modulos/buscar-exercicio', 'Education/AdminJourneyController@buscarExercicioModulo');
-$router->post('/admin/jornadas/modulos/atualizar-exercicio', 'Education/AdminJourneyController@atualizarExercicioModulo');
-$router->get('/admin/jornadas/modulos/{modulo_id}/videos', 'Education/AdminJourneyController@gerenciarVideosModulo');
-$router->post('/admin/jornadas/modulos/adicionar-video', 'Education/AdminJourneyController@adicionarVideoModulo');
-$router->post('/admin/jornadas/modulos/remover-video', 'Education/AdminJourneyController@removerVideoModulo');
-$router->post('/admin/jornadas/modulos/adicionar-documento', 'Education/AdminJourneyController@adicionarDocumentoModulo');
-$router->post('/admin/jornadas/modulos/remover-documento', 'Education/AdminJourneyController@removerDocumentoModulo');
-$router->get('/admin/jornadas/modulos/{modulo_id}/redacao', 'Education/AdminJourneyController@gerenciarRedacaoModulo');
-$router->post('/admin/jornadas/modulos/salvar-tema-redacao', 'Education/AdminJourneyController@salvarTemaRedacaoModulo');
 
-// Mural de Recados (Admin)
-$router->get('/admin/mural-recados', 'Admin/AdminMuralController@index');
-$router->get('/admin/mural-recados/criar', 'Admin/AdminMuralController@criar');
-$router->post('/admin/mural-recados/salvar', 'Admin/AdminMuralController@salvar');
-$router->get('/admin/mural-recados/{id}/dados', 'Admin/AdminMuralController@dados');
-$router->get('/admin/mural-recados/editar', 'Admin/AdminMuralController@editar');
-$router->post('/admin/mural-recados/atualizar', 'Admin/AdminMuralController@atualizar');
-$router->post('/admin/mural-recados/excluir', 'Admin/AdminMuralController@excluir');
+// Mural → Modulos/mural/routes.php
 
-// Comunicação escolar + calendário → Modulos/comunicacao/routes.php
-$router->get('/admin/aulas-online', 'Admin/OnlineClassController@index');
-$router->get('/admin/aulas-online/criar', 'Admin/OnlineClassController@criar');
-$router->get('/admin/aulas-online/editar', 'Admin/OnlineClassController@editar');
-$router->get('/admin/aulas-online/chat', 'Admin/OnlineClassController@chat');
-$router->get('/admin/aulas-online/chat/mensagens', 'Admin/OnlineClassController@chatMensagens');
-$router->post('/admin/aulas-online/chat/enviar', 'Admin/OnlineClassController@chatEnviar');
-$router->post('/admin/aulas-online/salvar', 'Admin/OnlineClassController@salvar');
-$router->post('/admin/aulas-online/atualizar', 'Admin/OnlineClassController@atualizar');
-$router->post('/admin/aulas-online/retry-integracao', 'Admin/OnlineClassController@retryIntegracao');
-$router->post('/admin/aulas-online/sincronizar-gravacoes', 'Admin/OnlineClassController@sincronizarGravacoes');
-$router->post('/admin/aulas-online/excluir', 'Admin/OnlineClassController@excluir');
-$router->post('/admin/aulas-online/arquivo/upload', 'Admin/OnlineClassController@uploadArquivo');
-$router->post('/admin/aulas-online/arquivo/excluir', 'Admin/OnlineClassController@excluirArquivo');
-$router->get('/admin/aulas-online/arquivo/download', 'Admin/OnlineClassController@downloadArquivo');
+// Aulas online → Modulos/aulas-online/routes.php
 
-// EducaInclui — Provas adaptativas por laudo (Coordenação/AEE)
-$router->get('/admin/inclusao', 'EducaInclui/EducaIncluiController@index');
-$router->post('/admin/inclusao/salvar', 'EducaInclui/EducaIncluiController@salvar');
-$router->post('/admin/inclusao/ativar', 'EducaInclui/EducaIncluiController@ativar');
-$router->post('/admin/inclusao/aprovar-reforcada', 'EducaInclui/EducaIncluiController@aprovarReforcada');
-$router->post('/admin/inclusao/analisar-laudo', 'EducaInclui/EducaIncluiController@analisarLaudo');
-$router->get('/admin/inclusao/versoes', 'EducaInclui/EducaIncluiController@versoes');
-$router->post('/admin/inclusao/versoes/gerar', 'EducaInclui/EducaIncluiController@gerarPendentes');
-$router->get('/admin/inclusao/versoes/{id}/diff', 'EducaInclui/EducaIncluiController@verVersao');
-$router->get('/admin/inclusao/versoes/{id}/pdf', 'EducaInclui/EducaIncluiController@pdfVersao');
-$router->post('/admin/inclusao/versoes/aprovar', 'EducaInclui/EducaIncluiController@aprovarVersao');
-$router->post('/admin/inclusao/versoes/questao/refazer', 'EducaInclui/EducaIncluiController@refazerQuestaoVersao');
-$router->post('/admin/inclusao/versoes/questao/editar', 'EducaInclui/EducaIncluiController@editarQuestaoVersao');
-$router->post('/admin/inclusao/status', 'EducaInclui/EducaIncluiController@status');
-$router->post('/admin/inclusao/laudo/upload', 'EducaInclui/EducaIncluiController@uploadLaudo');
-$router->get('/admin/inclusao/laudo/{id}', 'EducaInclui/EducaIncluiController@laudo');
-$router->get('/admin/inclusao/aluno/{id}', 'EducaInclui/EducaIncluiController@manage');
-$router->get('/admin/inclusao/aluno/{id}/resumo', 'EducaInclui/EducaIncluiController@resumoJson');
+// EducaInclui → Modulos/educainclui/routes.php
 
-// Gestão de Jornadas (antiga - redireciona para rotas novas)
+// Gestão de Jornadas (antiga - redireciona para rotas novas) → também em Modulos/jornadas/routes.php
 $router->get('/admin/journeys', function() {
     header('Location: ' . URL . '/admin/jornadas');
     exit;
@@ -294,7 +143,6 @@ $router->get('/admin/journeys/create', function() {
     header('Location: ' . URL . '/admin/jornadas/criar');
     exit;
 });
-// Compatibilidade: redireciona URLs antigas em inglês para as novas em português
 $router->get('/admin/journeys/{id}', function($id) {
     header('Location: ' . URL . '/admin/jornadas/' . $id);
     exit;
@@ -304,78 +152,19 @@ $router->get('/admin/journeys/{id}/edit', function($id) {
     exit;
 });
 
-// Gestão de Exercícios
-$router->get('/admin/exercises', 'Admin/ExerciseAdminController@exercicios');
-$router->get('/admin/exercises/create', 'Admin/ExerciseAdminController@criarExercicio');
-$router->post('/admin/exercises', 'Admin/ExerciseAdminController@salvarExercicio');
-$router->get('/admin/exercises/{id}/edit', 'Admin/ExerciseAdminController@editarExercicio');
-$router->put('/admin/exercises/{id}', 'Admin/ExerciseAdminController@atualizarExercicio');
-$router->delete('/admin/exercises/{id}', 'Admin/ExerciseAdminController@excluirExercicio');
-$router->post('/admin/exercises/import', 'Admin/ExerciseAdminController@importarExercicios');
-$router->get('/admin/exercises/export', 'Admin/ExerciseAdminController@exportarExercicios');
-$router->get('/admin/exercises/{id}/export', 'Admin/ExerciseAdminController@exportarExercicios');
+// Exercícios → Modulos/exercicios/routes.php
 
 // Gerenciamento de Questões
-$router->get('/admin/exercises/{id}/questions', 'Admin/ExerciseAdminController@gerenciarQuestoes');
-$router->get('/admin/exercises/{id}/questions/create', 'Admin/ExerciseAdminController@adicionarQuestao');
-$router->post('/admin/exercises/{id}/questions', 'Admin/ExerciseAdminController@salvarQuestao');
-$router->get('/admin/exercises/{listaId}/questions/{questaoId}/edit', 'Admin/ExerciseAdminController@editarQuestao');
-$router->put('/admin/exercises/{listaId}/questions/{questaoId}', 'Admin/ExerciseAdminController@atualizarQuestao');
-$router->delete('/admin/exercises/{listaId}/questions/{questaoId}', 'Admin/ExerciseAdminController@excluirQuestao');
-$router->post('/admin/exercises/{id}/questions/reorder', 'Admin/ExerciseAdminController@reordenarQuestoes');
 
 // Configurações
 $router->get('/admin/settings', 'Admin/SchoolSettingsAdminController@configuracoes');
 $router->put('/admin/settings', 'User/AdminController@salvarConfiguracoes');
 $router->post('/admin/settings/sliders-dashboard', 'Admin/SchoolSettingsAdminController@salvarSlidersDashboard');
-$router->get('/admin/boletim', 'Admin/BoletimConfigController@listagem');
-$router->get('/admin/boletim/arquivo', 'Admin/BoletimConfigController@arquivo');
-$router->get('/admin/boletim/geracao-status', 'Admin/BoletimConfigController@geracaoStatusJson');
-$router->post('/admin/boletim/cancelar-geracao', 'Admin/BoletimConfigController@cancelarGeracaoBoletim');
-$router->get('/admin/boletim-guia', 'Admin/BoletimGuiaController@index');
-$router->get('/admin/boletim-configuracao', 'Admin/BoletimConfigController@index');
-$router->get('/admin/boletim-configuracao/assistente', 'Admin/BoletimConfigController@assistente');
-$router->get('/admin/boletim-configuracao/jornadas', 'Admin/BoletimConfigController@jornadasJson');
-$router->get('/admin/boletim-configuracao/evento-componentes', 'Admin/BoletimConfigController@eventoComponentesJson');
-$router->get('/admin/boletim-configuracao/keepalive', 'Admin/BoletimConfigController@keepalive');
-$router->post('/admin/boletim-configuracao/salvar', 'Admin/BoletimConfigController@salvarRegra');
-$router->post('/admin/boletim-configuracao/restaurar-config-versao', 'Admin/BoletimConfigController@restaurarConfigVersao');
-$router->post('/admin/boletim-configuracao/renomear', 'Admin/BoletimConfigController@renomearRegra');
-$router->post('/admin/boletim-configuracao/excluir-regra', 'Admin/BoletimConfigController@excluirRegra');
-$router->post('/admin/boletim-configuracao/duplicar-regra', 'Admin/BoletimConfigController@duplicarRegra');
-$router->post('/admin/boletim-configuracao/visibilidade-regra', 'Admin/BoletimConfigController@alternarVisibilidadeRegra');
-$router->post('/admin/boletim-configuracao/desabilitar-lista', 'Admin/BoletimConfigController@desabilitarListaAvaliacoes');
-$router->post('/admin/boletim-configuracao/notas-manuais', 'Admin/BoletimConfigController@salvarNotasManuais');
-$router->post('/admin/boletim-configuracao/nota-manual-materia-ajax', 'Admin/BoletimConfigController@salvarNotaManualMateriaAjax');
-$router->post('/admin/boletim-configuracao/gerar-boletins', 'Admin/BoletimConfigController@gerarBoletins');
-$router->post('/admin/boletim-configuracao/sincronizar-vida-escolar-salvos', 'Admin/BoletimConfigController@sincronizarVidaEscolarSalvos');
-$router->get('/admin/boletim-configuracao/checklist-pre-geracao', 'Admin/BoletimConfigController@checklistPreGeracao');
-$router->get('/admin/boletim-configuracao/logs-geracao', 'Admin/BoletimConfigController@logsGeracaoJson');
-$router->get('/admin/boletim-configuracao/geracao-detalhe', 'Admin/BoletimConfigController@geracaoDetalheJson');
-$router->post('/admin/boletim-configuracao/restaurar-geracao', 'Admin/BoletimConfigController@restaurarGeracao');
-$router->post('/admin/boletim-configuracao/travar-aluno', 'Admin/BoletimConfigController@travarAluno');
-$router->post('/admin/boletim-configuracao/destravar-aluno', 'Admin/BoletimConfigController@destravarAluno');
-$router->post('/admin/boletim-configuracao/simular-lote', 'Admin/BoletimConfigController@simularLote');
-$router->post('/admin/boletim-configuracao/publicar-boletim-aluno', 'Admin/BoletimConfigController@publicarBoletimAlunoSimulado');
-$router->post('/admin/boletim-configuracao/atualizar-boletins-gravados', 'Admin/BoletimConfigController@atualizarBoletinsGravados');
-$router->get('/admin/boletim-configuracao/gerados', 'Admin/BoletimConfigController@boletinsGerados');
-$router->get('/admin/boletim-configuracao/gerados/exportar', 'Admin/BoletimConfigController@exportarBoletinsGerados');
-$router->get('/admin/boletim-configuracao/gerados/preview', 'Admin/BoletimConfigController@boletimGeradoPreview');
-$router->post('/admin/boletim-configuracao/gerados/excluir', 'Admin/BoletimConfigController@excluirBoletimGeradoAdmin');
-$router->post('/admin/boletim-configuracao/gerados/excluir-lote', 'Admin/BoletimConfigController@excluirBoletimGeradoLote');
-$router->get('/admin/boletim-configuracao/assistente/contexto', 'Admin/BoletimAssistenteController@contexto');
-$router->post('/admin/boletim-configuracao/assistente/mensagem', 'Admin/BoletimAssistenteController@mensagem');
-$router->post('/admin/boletim-configuracao/assistente/mensagem-stream', 'Admin/BoletimAssistenteController@mensagemStream');
-$router->post('/admin/boletim-configuracao/assistente/ferramenta', 'Admin/BoletimAssistenteController@ferramenta');
-$router->post('/admin/boletim-configuracao/assistente/wizard/inicio', 'Admin/BoletimAssistenteController@wizardInicio');
-$router->post('/admin/boletim-configuracao/assistente/wizard/montar', 'Admin/BoletimAssistenteController@wizardMontar');
-$router->post('/admin/boletim-configuracao/assistente/consulta', 'Admin/BoletimAssistenteController@consulta');
+// Boletim (config/guia/assistente) → Modulos/boletins/routes.php
 
-// MCP / consulta de provas dos alunos (somente leitura)
-$router->post('/admin/consulta-provas-aluno/mcp/ferramenta', 'Admin/ProvasAlunoMcpController@ferramenta');
+// Provas → Modulos/provas/routes.php
 
 // MCP / consulta de provas na visão do professor (somente leitura)
-$router->post('/admin/consulta-provas-professor/mcp/ferramenta', 'Admin/ProvasProfessorMcpController@ferramenta');
 
 $router->post('/admin/consulta-jornadas-aluno/mcp/ferramenta', 'Admin/JornadasAlunoMcpController@ferramenta');
 
@@ -383,20 +172,7 @@ $router->post('/admin/consulta-jornadas-aluno/mcp/ferramenta', 'Admin/JornadasAl
 $router->post('/admin/consulta-assistente/mcp/ferramenta', 'Admin/AssistenteConsultaMcpController@ferramenta');
 
 // Assistente (chat IA + histórico — coordenação)
-$router->get('/admin/assistente', 'Admin/ProvasAlunoAssistenteController@index');
-$router->get('/admin/assistente/conversas', 'Admin/ProvasAlunoAssistenteController@listarConversas');
-$router->get('/admin/assistente/conversa', 'Admin/ProvasAlunoAssistenteController@obterConversa');
-$router->post('/admin/assistente/conversas/criar', 'Admin/ProvasAlunoAssistenteController@criarConversa');
-$router->post('/admin/assistente/conversas/renomear', 'Admin/ProvasAlunoAssistenteController@renomearConversa');
-$router->post('/admin/assistente/conversas/excluir', 'Admin/ProvasAlunoAssistenteController@excluirConversa');
-$router->post('/admin/assistente/mensagem', 'Admin/ProvasAlunoAssistenteController@mensagem');
-$router->post('/admin/assistente/mensagem-stream', 'Admin/ProvasAlunoAssistenteController@mensagemStream');
-$router->post('/admin/assistente/ferramenta', 'Admin/ProvasAlunoAssistenteController@ferramenta');
 // Alias legado
-$router->get('/admin/assistente-provas', 'Admin/ProvasAlunoAssistenteController@index');
-$router->post('/admin/assistente-provas/mensagem', 'Admin/ProvasAlunoAssistenteController@mensagem');
-$router->post('/admin/assistente-provas/mensagem-stream', 'Admin/ProvasAlunoAssistenteController@mensagemStream');
-$router->post('/admin/assistente-provas/ferramenta', 'Admin/ProvasAlunoAssistenteController@ferramenta');
 
 // Wiki visual dos Markdowns em doc_sistema/
 $router->get('/admin/doc-sistema', 'Admin/DocSistemaController@index');
@@ -415,12 +191,7 @@ $router->post('/admin/faltas/excluir', 'Admin/SchoolAbsenceController@excluirEve
 
 // Diário de Classe: rotas em app/Modulos/diario/routes.php
 
-// Painel de Conformidade Pedagógica / Central de Pendências / Modo Auditoria
-$router->get('/admin/conformidade', 'Admin/ComplianceController@dashboard');
-$router->get('/admin/conformidade/pendencias', 'Admin/ComplianceController@pendencias');
-$router->get('/admin/conformidade/auditoria', 'Admin/ComplianceController@auditoria');
-$router->get('/admin/conformidade/ia', 'Admin/ComplianceController@ia');
-$router->post('/admin/conformidade/ia/perguntar', 'Admin/ComplianceController@iaPerguntar');
+// Conformidade → Modulos/conformidade/routes.php
 
 // BNCC + Plano de Curso
 $router->get('/admin/bncc', 'Admin/BnccController@index');
@@ -495,7 +266,7 @@ $router->post('/admin/dev/prompts-redacao/save', 'Admin/DevAdminController@salva
 // Limites Diários (Dev)
 $router->post('/admin/dev/limites-diarios/save', 'Admin/DevAdminController@salvarLimitesDiarios');
 $router->post('/admin/dev/valor-usuario/save', 'Admin/DevAdminController@salvarValorUsuario');
-$router->post('/admin/dev/financeiro/save', 'Admin/FinanceAdminController@salvarFinanceiroConfig');
+// Dev financeiro → Modulos/financeiro/routes.php
 
 // API Keys (Dev)
 $router->post('/admin/dev/api-keys/save', 'Admin/DevAdminController@salvarApiKeys');
@@ -517,6 +288,9 @@ $router->post('/admin/avatares-alunos/upload', 'Admin/AvatarAlunoAdminController
 $router->post('/admin/avatares-alunos/excluir', 'Admin/AvatarAlunoAdminController@excluir');
 $router->post('/admin/avatares-alunos/excluir-selecionados', 'Admin/AvatarAlunoAdminController@excluirSelecionados');
 $router->post('/admin/avatares-alunos/excluir-todos', 'Admin/AvatarAlunoAdminController@excluirTodos');
+// Hub avaliações
+$router->get('/admin/avaliacoes',      'Education/AnoLetivoController@avaliacoes');
+// AVA → Modulos/ava/routes.php
 
 // Layout do Sistema (Dev Settings)
 $router->get('/admin/dev/layout', 'Admin/SchoolSettingsAdminController@layout');
@@ -552,75 +326,7 @@ $router->post('/admin/usuarios/{id}/restaurar', 'User/UserController@restaurar')
 $router->get('/admin/permissoes-perfis', 'User/AdminPermissionProfileController@index');
 $router->get('/admin/permissoes-perfis/{id}/dados', 'User/AdminPermissionProfileController@dados');
 
-// ── Financeiro Escolar ────────────────────────────────────────────────────
-$router->get('/admin/finance',                                      'Admin/FinanceController@dashboard');
-$router->post('/admin/finance/disparar-regua',                      'Admin/FinanceController@dispararRegua');
-$router->get('/admin/finance/contracts',                            'Admin/FinanceController@contractIndex');
-$router->get('/admin/finance/contracts/create',                     'Admin/FinanceController@contractCreate');
-$router->post('/admin/finance/contracts',                           'Admin/FinanceController@contractStore');
-$router->get('/admin/finance/contracts/{id}',                       'Admin/FinanceController@contractShow');
-$router->post('/admin/finance/contracts/{id}/activate',             'Admin/FinanceController@contractActivate');
-$router->post('/admin/finance/contracts/{id}/cancel',               'Admin/FinanceController@contractCancel');
-$router->post('/admin/finance/contracts/{id}/discounts/add',        'Admin/FinanceController@discountAdd');
-$router->post('/admin/finance/contracts/{contractId}/discounts/{discountId}/approve', 'Admin/FinanceController@discountApprove');
-$router->post('/admin/finance/contracts/{contractId}/discounts/{discountId}/reject',  'Admin/FinanceController@discountReject');
-$router->post('/admin/finance/contracts/{contractId}/discounts/{discountId}/remove',  'Admin/FinanceController@discountRemove');
-$router->get('/admin/finance/installments/{id}',                    'Admin/FinanceController@installmentShow');
-$router->post('/admin/finance/installments/{id}/pay',               'Admin/FinanceController@installmentPay');
-$router->get('/admin/finance/installments/{id}/boleto',             'Admin/FinanceController@installmentBoleto');
-$router->get('/admin/finance/price-table',                          'Admin/FinanceController@priceTable');
-$router->post('/admin/finance/price-table',                         'Admin/FinanceController@priceTableStore');
-$router->post('/admin/finance/price-table/{id}/delete',             'Admin/FinanceController@priceTableDelete');
-$router->get('/admin/finance/discount-rules',                       'Admin/FinanceController@discountRules');
-$router->post('/admin/finance/discount-rules',                      'Admin/FinanceController@discountRuleStore');
-$router->post('/admin/finance/discount-rules/{id}/toggle',          'Admin/FinanceController@discountRuleToggle');
-$router->get('/admin/finance/report/inadimplencia',                 'Admin/FinanceController@reportInadimplencia');
-// Busca de alunos (JSON)
-$router->get('/admin/alunos/search',                                 'Admin/FinanceController@alunoSearch');
-$router->get('/admin/alunos/{alunoId}/responsaveis',                 'Admin/FinanceController@alunoResponsaveis');
-// Planos
-$router->get('/admin/finance/plans',                                 'Admin/FinanceController@plansIndex');
-$router->get('/admin/finance/plans/create',                          'Admin/FinanceController@planCreate');
-$router->post('/admin/finance/plans',                                'Admin/FinanceController@planStore');
-$router->get('/admin/finance/plans/{id}',                            'Admin/FinanceController@planShow');
-$router->post('/admin/finance/plans/{id}/toggle',                    'Admin/FinanceController@planToggle');
-$router->post('/admin/finance/plans/{planId}/items',                 'Admin/FinanceController@planItemStore');
-$router->get('/admin/finance/plans/{planId}/items/{itemId}/dados',   'Admin/FinanceController@planItemDados');
-$router->post('/admin/finance/plans/{planId}/items/{itemId}/update',  'Admin/FinanceController@planItemUpdate');
-$router->post('/admin/finance/plans/{planId}/items/{itemId}/delete', 'Admin/FinanceController@planItemDelete');
-// Extrato / ledger do aluno
-$router->get('/admin/finance/aluno/{alunoId}/extrato',               'Admin/FinanceController@alunoExtrato');
-$router->post('/admin/finance/ledger/{ledgerId}/estorno',            'Admin/FinanceController@ledgerEstornar');
-$router->get('/admin/finance/aluno/{alunoId}/resumo',               'Admin/FinanceController@alunoResumoJson');
-$router->get('/admin/finance/aluno/{alunoId}/parcelas-vencidas',    'Admin/FinanceController@alunoParcelasVencidas');
-// Lista e gestão de cobranças avulsas
-$router->get('/admin/finance/charges',                               'Admin/FinanceController@chargesList');
-$router->post('/admin/finance/charges/{chargeId}/pay',               'Admin/FinanceController@chargePay');
-// Cobranças avulsas (individual)
-$router->get('/admin/finance/aluno/{alunoId}/charge',                'Admin/FinanceController@chargeCreate');
-$router->post('/admin/finance/aluno/{alunoId}/charge',               'Admin/FinanceController@chargeStore');
-// Cobranças em lote
-$router->get('/admin/finance/charges/batch',                         'Admin/FinanceController@chargeBatch');
-$router->post('/admin/finance/charges/batch',                        'Admin/FinanceController@chargeBatchStore');
-// Fluxo de Caixa
-$router->get('/admin/finance/cashflow',                              'Admin/FinanceReportController@cashFlow');
-// Contas a Pagar
-$router->get('/admin/finance/bills',                                 'Admin/FinanceReportController@billsIndex');
-$router->post('/admin/finance/bills',                                'Admin/FinanceReportController@billStore');
-$router->post('/admin/finance/bills/{id}/pay',                       'Admin/FinanceReportController@billPay');
-$router->post('/admin/finance/bills/{id}/delete',                    'Admin/FinanceReportController@billDelete');
-// Relatórios contábeis
-$router->get('/admin/finance/reports/dre',                           'Admin/FinanceReportController@dre');
-$router->get('/admin/finance/reports/dfc',                           'Admin/FinanceReportController@dfc');
-$router->get('/admin/finance/reports/balanco',                       'Admin/FinanceReportController@balanco');
-$router->get('/admin/finance/reports/dmpl',                          'Admin/FinanceReportController@dmpl');
-$router->get('/admin/finance/reports/dlpa',                          'Admin/FinanceReportController@dlpa');
-// Configurações
-$router->get('/admin/finance/settings',                              'Admin/FinanceController@settings');
-$router->post('/admin/finance/settings',                             'Admin/FinanceController@settingsSave');
-// Renegociação
-$router->get('/admin/finance/contracts/{contractId}/renegotiation',  'Admin/FinanceController@renegotiationCreate');
-$router->post('/admin/finance/contracts/{contractId}/renegotiation', 'Admin/FinanceController@renegotiationStore');
+// Financeiro escolar → Modulos/financeiro/routes.php
 $router->post('/admin/permissoes-perfis', 'User/AdminPermissionProfileController@store');
 $router->post('/admin/permissoes-perfis/{id}', 'User/AdminPermissionProfileController@update');
 
@@ -652,21 +358,7 @@ $router->post('/admin/unidades', 'Admin/SchoolUnitsAdminController@store');
 $router->put('/admin/unidades/{id}', 'Admin/SchoolUnitsAdminController@update');
 $router->delete('/admin/unidades/{id}', 'Admin/SchoolUnitsAdminController@delete');
 
-// Almoxarifado e Patrimônio
-$router->get('/admin/almoxarifado', 'Admin/InventoryAdminController@index');
-$router->post('/admin/almoxarifado/itens', 'Admin/InventoryAdminController@storeItem');
-$router->post('/admin/almoxarifado/depositos', 'Admin/InventoryAdminController@storeWarehouse');
-$router->post('/admin/almoxarifado/fornecedores', 'Admin/InventoryAdminController@storeSupplier');
-$router->post('/admin/almoxarifado/movimentacoes', 'Admin/InventoryAdminController@storeMovement');
-$router->post('/admin/almoxarifado/requisicoes', 'Admin/InventoryAdminController@storeRequisition');
-$router->post('/admin/almoxarifado/requisicoes/{id}/aprovar', 'Admin/InventoryAdminController@approve');
-$router->post('/admin/almoxarifado/requisicoes/{id}/rejeitar', 'Admin/InventoryAdminController@reject');
-$router->post('/admin/almoxarifado/requisicoes/{id}/atender', 'Admin/InventoryAdminController@fulfill');
-$router->get('/admin/patrimonio', 'Admin/PatrimonyAdminController@index');
-$router->post('/admin/patrimonio/ambientes', 'Admin/PatrimonyAdminController@storeLocation');
-$router->post('/admin/patrimonio/bens', 'Admin/PatrimonyAdminController@storeAsset');
-$router->post('/admin/patrimonio/movimentacoes', 'Admin/PatrimonyAdminController@moveAsset');
-$router->post('/admin/patrimonio/conferencias', 'Admin/PatrimonyAdminController@checkAsset');
+// Patrimônio / almoxarifado → Modulos/patrimonio/routes.php
 
 // Gestão de Turmas (CRUD Completo - criar/editar em offcanvas no index; show continua página própria)
 $router->get('/admin/turmas', 'Education/ClassController@index');
@@ -691,7 +383,6 @@ $router->get('/admin/turmas/{id}/export-alunos-csv', 'Education/ClassController@
 // Hubs do menu principal — landing pages
 $router->get('/admin/academico',       'Education/AnoLetivoController@academico');
 $router->get('/admin/pedagogico',      'Education/AnoLetivoController@pedagogico');
-$router->get('/admin/avaliacoes',      'Education/AnoLetivoController@avaliacoes');
 $router->get('/admin/rotina',          'Education/AnoLetivoController@rotina');
 $router->get('/admin/paineis',         'Education/AnoLetivoController@paineis');
 $router->get('/admin/gestao-escolar',  'Education/AnoLetivoController@gestaoEscolar');
@@ -769,20 +460,8 @@ $router->get('/admin/reports/boletim-coordenacao/zip/{id}', 'Admin/ReportAdminCo
 $router->get('/admin/financeiro', function() { header('Location: ' . URL . '/admin/finance'); exit; });
 $router->get('/admin/financeiro/relatorio-pagantes', function() { header('Location: ' . URL . '/admin/finance/report/inadimplencia'); exit; });
 
-// Minicursos (Admin)
-$router->get('/admin/minicursos', 'Minicursos/AdminMinicursoController@index');
-$router->get('/admin/minicursos/criar', 'Minicursos/AdminMinicursoController@create');
-$router->post('/admin/minicursos/salvar', 'Minicursos/AdminMinicursoController@store');
+// Minicursos → Modulos/minicursos/routes.php
 
-$router->get('/admin/minicursos/{id}', 'Minicursos/AdminMinicursoController@show');
-$router->get('/admin/minicursos/editar/{id}', 'Minicursos/AdminMinicursoController@edit');
-$router->post('/admin/minicursos/atualizar/{id}', 'Minicursos/AdminMinicursoController@update');
-$router->post('/admin/minicursos/excluir/{id}', 'Minicursos/AdminMinicursoController@delete');
-$router->post('/admin/minicursos/modulo/salvar', 'Minicursos/AdminMinicursoController@moduloStore');
-$router->post('/admin/minicursos/modulo/excluir', 'Minicursos/AdminMinicursoController@moduloDelete');
-$router->post('/admin/minicursos/aula/salvar', 'Minicursos/AdminMinicursoController@aulaStore');
-$router->post('/admin/minicursos/aula/atualizar', 'Minicursos/AdminMinicursoController@aulaUpdate');
-$router->post('/admin/minicursos/aula/excluir', 'Minicursos/AdminMinicursoController@aulaDelete');
 
 // Planos de Aula (Admin)
 $router->get('/admin/planos-aula', 'Education/LessonPlanController@indexAdmin');
@@ -794,90 +473,17 @@ $router->post('/admin/planos-aula/aprovar-rascunhos', 'Education/LessonPlanContr
 $router->get('/admin/planos-aula/pdf/{id}', 'Education/LessonPlanController@exportarPdf');
 
 // Provas Online (Admin)
-$router->get('/admin/provas', 'Exams/ExamController@indexAdmin');
-$router->get('/admin/provas/visualizar/{id}', 'Exams/ExamController@visualizar');
-$router->get('/admin/provas/editar/{id}', 'Exams/ExamController@editar');
-$router->post('/admin/provas/liberar/{id}', 'Exams/ExamController@liberarProva');
-$router->post('/admin/provas/{id}/reprovar', 'Exams/ExamController@reprovar');
-$router->post('/admin/provas/{id}/remover', 'Exams/ExamController@remover');
-$router->post('/admin/provas/{id}/retornar', 'Exams/ExamController@retornar');
-$router->get('/admin/provas/{id}/pdf', 'Exams/ExamController@gerarPdf');
-$router->get('/admin/provas/{id}/imprimir', 'Exams/ExamController@verImpressao');
-$router->post('/admin/provas/corrigir-questao/{id}/{alunoId}/{questaoId}', 'Exams/ExamController@corrigirQuestao');
-$router->post('/admin/provas/questoes/{questaoId}/invalidar', 'Exams/ExamController@invalidarQuestao');
-$router->post('/admin/provas/{id}/observacao-coordenacao', 'Exams/ExamController@salvarObservacaoCoordenacao');
-$router->get('/admin/provas/resultado-aluno/{id}/{alunoId}/historico-respostas', 'Exams/ExamController@historicoRespostasAluno');
-$router->get('/admin/provas/resultado-aluno/{id}/{alunoId}', 'Exams/ExamController@visualizarResultadoAluno');
-$router->post('/admin/provas/liberar-tentativa/{provaId}/{alunoId}', 'Exams/ExamController@liberarTentativa');
-$router->post('/admin/provas/validar-tentativa/{provaId}/{alunoId}', 'Exams/ExamController@validarTentativaCancelada');
 
 // Blocos de Provas (Admin/Coordenador/Diretor)
-// Redireciona /admin/provas/blocos para /admin/provas
-$router->get('/admin/provas/blocos', function() {
-    header('Location: ' . URL . '/admin/provas');
-    exit;
-});
-$router->get('/admin/provas/blocos/criar', 'Exams/ExamBlockController@criar');
-$router->post('/admin/provas/blocos', 'Exams/ExamBlockController@salvar');
+// redirect /admin/provas/blocos → Modulos/provas/routes.php
 // Lote (antes das rotas com {id})
-$router->post('/admin/provas/blocos/lote/marcar-concluido', 'Exams/ExamBlockController@marcarComoConcluidoLote');
-$router->post('/admin/provas/blocos/lote/excluir', 'Exams/ExamBlockController@excluirLote');
-$router->get('/admin/provas/blocos/{id}', 'Exams/ExamBlockController@visualizar');
-$router->get('/admin/provas/blocos/{id}/editar', 'Exams/ExamBlockController@editar');
-$router->post('/admin/provas/blocos/{id}', 'Exams/ExamBlockController@atualizar');
-$router->post('/admin/provas/blocos/{id}/duplicar', 'Exams/ExamBlockController@duplicar');
-$router->delete('/admin/provas/blocos/{id}', 'Exams/ExamBlockController@excluir');
-$router->post('/admin/provas/blocos/{id}/excluir', 'Exams/ExamBlockController@excluir');
-$router->post('/admin/provas/blocos/{id}/toggle-liberado', 'Exams/ExamBlockController@toggleLiberado');
-$router->post('/admin/provas/blocos/{id}/marcar-concluido', 'Exams/ExamBlockController@marcarComoConcluido');
-$router->post('/admin/provas/blocos/{id}/visivel-portal-aluno', 'Exams/ExamBlockController@definirVisivelPortalAluno');
-$router->get('/admin/provas/blocos/{id}/gerenciar', 'Teacher/TeacherExamController@gerenciar');
-$router->get('/admin/provas/blocos/{id}/notas-lancadas', 'Teacher/TeacherExamController@notasLancadasAdmin');
-$router->post('/admin/provas/blocos/{id}/importar-notas-internas', 'Teacher/TeacherExamController@importarNotasInternas');
-$router->get('/admin/provas/blocos/{id}/lancar-notas-coordenacao', 'Teacher/TeacherExamController@lancarNotasCoordenacao');
-$router->post('/admin/provas/blocos/{id}/lancar-notas-coordenacao', 'Teacher/TeacherExamController@lancarNotasCoordenacaoSalvar');
-$router->post('/admin/provas/blocos/{id}/lancar-notas-coordenacao/desbloquear', 'Teacher/TeacherExamController@desbloquearLancamentoNotasCoordenacao');
 
-$router->get('/admin/provas/blocos/{id}/provas-disponiveis', 'Teacher/TeacherExamController@provasDisponiveisParaVincular');
-$router->post('/admin/provas/blocos/{id}/vincular', 'Teacher/TeacherExamController@vincularProva');
-$router->post('/admin/provas/blocos/{id}/trocar-prova', 'Teacher/TeacherExamController@trocarProva');
-$router->get('/admin/provas/blocos/{id}/visualizar-completo', 'Teacher/TeacherExamController@visualizarCompleto');
-$router->get('/admin/provas/blocos/{id}/imprimir', 'Exams/ExamController@verImpressaoBlocoCompleto');
-$router->get('/admin/provas/blocos/{id}/pdf-completo', 'Exams/ExamController@gerarPdfBlocoCompleto');
-$router->get('/admin/provas/blocos/{id}/prova-aluno-pdf', 'Exams/ExamController@gerarPdfProvaAluno');
-$router->get('/admin/provas/blocos/{id}/resultados', 'Teacher/TeacherExamController@resultadosBlocoAdmin');
-$router->get('/admin/provas/blocos/{id}/exportar-notas-excel', 'Teacher/TeacherExamController@exportarNotasLancamentoExcel');
-$router->get('/admin/provas/blocos/{id}/resultados-novos', 'Teacher/TeacherExamController@resultadosBlocoAdminNovo');
-$router->get('/admin/provas/blocos/{id}/canceladas', 'Teacher/TeacherExamController@canceladasBlocoAdmin');
-$router->post('/admin/provas/blocos/{id}/liberar-tentativas', 'Teacher/TeacherExamController@liberarTentativasBlocoAdmin');
-$router->get('/admin/provas/blocos/{id}/relatorio-acertos', 'Teacher/TeacherExamController@relatorioAcertosBloco');
-$router->get('/admin/provas/blocos/{id}/aluno/{alunoId}/resultado', 'Teacher/TeacherExamController@resultadoAlunoBloco');
-$router->post('/admin/provas/blocos/{id}/aluno/{alunoId}/reabrir', 'Teacher/TeacherExamController@reabrirBlocoAluno');
-$router->post('/admin/provas/blocos/{id}/liberar-gabarito', 'Teacher/TeacherExamController@liberarGabaritoBloco');
-$router->post('/admin/provas/blocos/{id}/aprovar-final', 'Teacher/TeacherExamController@aprovarFinal');
 
 // Blocos Modelo (Templates)
-$router->get('/admin/blocos-modelo', 'Exams/ExamBlockModelController@index');
-$router->get('/admin/blocos-modelo/criar', 'Exams/ExamBlockModelController@criar');
-$router->post('/admin/blocos-modelo', 'Exams/ExamBlockModelController@salvar');
-$router->get('/admin/blocos-modelo/{id}/editar', 'Exams/ExamBlockModelController@editar');
-$router->post('/admin/blocos-modelo/{id}', 'Exams/ExamBlockModelController@atualizar');
-$router->delete('/admin/blocos-modelo/{id}', 'Exams/ExamBlockModelController@excluir');
-$router->get('/admin/blocos-modelo/{id}/dados', 'Exams/ExamBlockModelController@dados');
 
 // Tipos de Avaliação (Provas Online)
-$router->get('/admin/provas/tipos-avaliacao', 'Exams/ExamEvaluationTypeController@index');
-$router->get('/admin/provas/tipos-avaliacao/criar', 'Exams/ExamEvaluationTypeController@criar');
-$router->post('/admin/provas/tipos-avaliacao', 'Exams/ExamEvaluationTypeController@salvar');
-$router->get('/admin/provas/tipos-avaliacao/{id}/editar', 'Exams/ExamEvaluationTypeController@editar');
-$router->post('/admin/provas/tipos-avaliacao/{id}', 'Exams/ExamEvaluationTypeController@atualizar');
-$router->delete('/admin/provas/tipos-avaliacao/{id}', 'Exams/ExamEvaluationTypeController@excluir');
 
 // Provas de Professores
-$router->get('/professor/provas-professor', 'Teacher/TeacherExamController@index');
-$router->post('/professor/provas-professor/{id}/enviar', 'Teacher/TeacherExamController@enviar');
-$router->post('/admin/provas-professor/{id}/aprovar', 'Teacher/TeacherExamController@aprovar');
-$router->post('/admin/provas-professor/{id}/reprovar', 'Teacher/TeacherExamController@reprovar');
 
 // Alunos Online
 $router->get('/admin/alunos-online', 'Admin/MonitorAdminController@alunosOnline');
@@ -894,57 +500,12 @@ $router->get('/admin/reports/classes', 'User/AdminController@relatorioTurmas');
 $router->get('/admin/reports/teachers', 'User/AdminController@relatorioProfessores');
 
 // AVA / EAD (Ambiente Virtual de Aprendizagem)
-$router->get('/admin/ava', 'Admin/AvaCourseAdminController@index');
 // Categorias (página própria — um cadastro por tela)
-$router->get('/admin/ava/categorias', 'Admin/AvaCourseAdminController@categorias');
-$router->post('/admin/ava/categorias', 'Admin/AvaCourseAdminController@storeCategoria');
-$router->post('/admin/ava/categorias/{id}/excluir', 'Admin/AvaCourseAdminController@deleteCategoria');
 // Cursos (rotas estáticas/compostas antes das com {id})
-$router->get('/admin/ava/cursos/novo', 'Admin/AvaCourseAdminController@create');
-$router->post('/admin/ava/cursos', 'Admin/AvaCourseAdminController@store');
-$router->get('/admin/ava/cursos/{id}/editar', 'Admin/AvaCourseAdminController@edit');
-$router->post('/admin/ava/cursos/{id}/excluir', 'Admin/AvaCourseAdminController@delete');
-$router->get('/admin/ava/cursos/{id}/periodos', 'Admin/AvaCourseAdminController@periodos');
-$router->post('/admin/ava/cursos/{id}/semestres', 'Admin/AvaCourseAdminController@storeSemestre');
-$router->post('/admin/ava/cursos/{id}', 'Admin/AvaCourseAdminController@update');
-$router->get('/admin/ava/cursos/{id}', 'Admin/AvaCourseAdminController@show');
-$router->post('/admin/ava/semestres/{id}/excluir', 'Admin/AvaCourseAdminController@deleteSemestre');
 // Disciplinas
-$router->post('/admin/ava/disciplinas', 'Admin/AvaDisciplineAdminController@store');
-$router->post('/admin/ava/disciplinas/{id}/sincronizar-turma', 'Admin/AvaDisciplineAdminController@syncTurma');
-$router->post('/admin/ava/disciplinas/{id}/cancelar-matricula', 'Admin/AvaDisciplineAdminController@unenroll');
-$router->post('/admin/ava/disciplinas/{id}/excluir', 'Admin/AvaDisciplineAdminController@delete');
-$router->get('/admin/ava/disciplinas/{id}/editar', 'Admin/AvaDisciplineAdminController@edit');
 // Avaliações da disciplina (vínculo com prova — um cadastro por tela)
-$router->get('/admin/ava/disciplinas/{id}/avaliacoes', 'Admin/AvaDisciplineAdminController@avaliacoes');
-$router->post('/admin/ava/disciplinas/{id}/avaliacoes', 'Admin/AvaDisciplineAdminController@storeAvaliacao');
-$router->post('/admin/ava/avaliacoes/{id}/excluir', 'Admin/AvaDisciplineAdminController@deleteAvaliacao');
-$router->post('/admin/ava/disciplinas/{id}', 'Admin/AvaDisciplineAdminController@update');
-$router->get('/admin/ava/disciplinas/{id}', 'Admin/AvaDisciplineAdminController@show');
 // Módulos
-$router->post('/admin/ava/modulos', 'Admin/AvaContentAdminController@storeModulo');
-$router->get('/admin/ava/modulos/{id}/aulas/nova', 'Admin/AvaContentAdminController@createAula');
-$router->post('/admin/ava/modulos/{id}/aulas', 'Admin/AvaContentAdminController@storeAula');
-$router->post('/admin/ava/modulos/{id}/excluir', 'Admin/AvaContentAdminController@deleteModulo');
-$router->post('/admin/ava/modulos/{id}', 'Admin/AvaContentAdminController@updateModulo');
 // Aulas
-$router->get('/admin/ava/aulas/{id}/editar', 'Admin/AvaContentAdminController@editAula');
-$router->post('/admin/ava/aulas/{id}/anexos', 'Admin/AvaContentAdminController@uploadAnexo');
-$router->post('/admin/ava/aulas/{id}/excluir', 'Admin/AvaContentAdminController@deleteAula');
-$router->post('/admin/ava/aulas/{id}', 'Admin/AvaContentAdminController@updateAula');
 // Anexos
-$router->post('/admin/ava/anexos/{id}/excluir', 'Admin/AvaContentAdminController@deleteAnexo');
 
-// Módulo de Matrículas e Rematrículas
-$router->get('/admin/enrollment',                                   'Admin/EnrollmentAdminController@index');
-$router->get('/admin/enrollment/create',                            'Admin/EnrollmentAdminController@create');
-$router->post('/admin/enrollment',                                  'Admin/EnrollmentAdminController@store');
-$router->get('/admin/enrollment/score',                             'Admin/EnrollmentAdminController@scorePanel');
-$router->post('/admin/enrollment/score/recalcular',                 'Admin/EnrollmentAdminController@recalcularScores');
-$router->get('/admin/enrollment/{id}',                              'Admin/EnrollmentAdminController@show');
-$router->get('/admin/enrollment/{id}/edit',                         'Admin/EnrollmentAdminController@edit');
-$router->post('/admin/enrollment/{id}/edit',                        'Admin/EnrollmentAdminController@update');
-$router->post('/admin/enrollment/{id}/contrato',                    'Admin/EnrollmentAdminController@gerarContrato');
-$router->get('/admin/enrollment/{id}/contrato/download',            'Admin/EnrollmentAdminController@downloadContrato');
-$router->post('/admin/enrollment/{id}/status',                      'Admin/EnrollmentAdminController@transicionar');
-$router->post('/admin/enrollment/{id}/cancelar',                    'Admin/EnrollmentAdminController@cancelar');
+// Matrículas → Modulos/matricula/routes.php

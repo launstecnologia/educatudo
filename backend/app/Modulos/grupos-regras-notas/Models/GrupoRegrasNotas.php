@@ -1,4 +1,10 @@
 <?php
+
+namespace App\Modulos\GruposRegrasNotas\Models;
+
+use App\Core\Database;
+use Throwable;
+
 /**
  * Persistência do Grupo de Regras de Notas.
  */
@@ -1250,4 +1256,8 @@ class GrupoRegrasNotas
             return false;
         }
     }
+}
+
+if (!class_exists('GrupoRegrasNotas', false)) {
+    class_alias(__NAMESPACE__ . '\\GrupoRegrasNotas', 'GrupoRegrasNotas');
 }

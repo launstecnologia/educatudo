@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Core;
 /**
  * EducaTudo - Criação de banco e usuário MySQL a partir do painel Master.
  * Usa credenciais de administrador (DB_ADMIN_* no .env) para executar CREATE DATABASE, CREATE USER e GRANT.
@@ -33,10 +35,10 @@ class MysqlProvisioningService
 
         $dsn = "mysql:host=" . self::dsnEscape($adminHost) . ";port=" . $adminPort . ";charset=utf8mb4";
         $options = [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+            \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
         ];
-        $pdo = new PDO($dsn, $adminUser, $adminPass, $options);
+        $pdo = new \PDO($dsn, $adminUser, $adminPass, $options);
 
         $dbNameQuoted = '`' . str_replace('`', '``', $dbName) . '`';
         $userQuoted = "'" . str_replace("'", "''", $dbUser) . "'@'%'";
@@ -48,8 +50,8 @@ class MysqlProvisioningService
         try {
             $pdo->exec("CREATE USER IF NOT EXISTS {$userQuoted} IDENTIFIED BY {$passQuoted}");
             $pdo->exec("GRANT ALL PRIVILEGES ON {$dbNameQuoted}.* TO {$userQuoted}");
-        } catch (PDOException $e) {
-            // Fallback: MySQL 5.7 ou sintaxe antiga (GRANT ... IDENTIFIED BY cria o usuário)
+        } catch (\PDOException $e) {
+            // Fallback: \MySQL 5.7 ou sintaxe antiga (GRANT ... IDENTIFIED BY cria o usuário)
             if (strpos($e->getMessage(), 'IDENTIFIED') !== false || strpos($e->getMessage(), 'syntax') !== false || strpos($e->getMessage(), 'IF NOT EXISTS') !== false) {
                 $pdo->exec("GRANT ALL PRIVILEGES ON {$dbNameQuoted}.* TO {$userQuoted} IDENTIFIED BY {$passQuoted}");
             } else {
@@ -62,7 +64,7 @@ class MysqlProvisioningService
     /**
      * Mensagem amigável para falha de conexão do usuário admin (DB_ADMIN_*).
      */
-    public static function formatarErroAdminMysql(Throwable $e, string $adminUser, string $adminHost): string
+    public static function formatarErroAdminMysql(\Throwable $e, string $adminUser, string $adminHost): string
     {
         $msg = $e->getMessage();
         $adminUser = trim($adminUser) !== '' ? $adminUser : 'root';
@@ -87,13 +89,13 @@ class MysqlProvisioningService
     private static function validateIdentifier(string $value, string $label): void
     {
         if ($value === '') {
-            throw new Exception("O {$label} não pode ser vazio.");
+            throw new \Exception("O {$label} não pode ser vazio.");
         }
         if (!preg_match('/^[a-zA-Z0-9_]+$/', $value)) {
-            throw new Exception("O {$label} deve conter apenas letras, números e underscore.");
+            throw new \Exception("O {$label} deve conter apenas letras, números e underscore.");
         }
         if (strlen($value) > 64) {
-            throw new Exception("O {$label} é longo demais.");
+            throw new \Exception("O {$label} é longo demais.");
         }
     }
 
@@ -133,7 +135,7 @@ class MysqlProvisioningService
     /**
      * Indica se o banco da escola já tem o schema mínimo (tabela alunos).
      */
-    public static function tenantTemSchemaBase(PDO $tenantPdo): bool
+    public static function tenantTemSchemaBase(\PDO $tenantPdo): bool
     {
         try {
             $n = (int) $tenantPdo->query(
@@ -141,7 +143,7 @@ class MysqlProvisioningService
                  WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'"
             )->fetchColumn();
             return $n >= 350;
-        } catch (PDOException $e) {
+        } catch (\PDOException $e) {
             return false;
         }
     }
@@ -152,22 +154,22 @@ class MysqlProvisioningService
      * @return bool true se importou, false se o schema já existia
      * @throws Exception
      */
-    public static function aplicarSchemaBaseTenant(PDO $tenantPdo): bool
+    public static function aplicarSchemaBaseTenant(\PDO $tenantPdo): bool
     {
         if (self::tenantTemSchemaBase($tenantPdo)) {
             return false;
         }
         $path = self::caminhoSchemaBaseTenant();
         if (!is_file($path)) {
-            throw new Exception('Arquivo de schema base não encontrado: database/educa_core.sql');
+            throw new \Exception('Arquivo de schema base não encontrado: database/educa_core.sql');
         }
         $sql = self::lerSqlMigration($path);
         if (trim($sql) === '') {
-            throw new Exception('Schema base educa_core.sql está vazio.');
+            throw new \Exception('Schema base educa_core.sql está vazio.');
         }
         try {
             $tenantPdo->exec('SET SESSION sql_require_primary_key = 0');
-        } catch (PDOException $ignored) {
+        } catch (\PDOException $ignored) {
             // MySQL sem a variável (ambiente local)
         }
         $tenantPdo->exec('SET FOREIGN_KEY_CHECKS=0');
@@ -176,21 +178,21 @@ class MysqlProvisioningService
             foreach (self::splitSqlStatements($sql) as $q) {
                 try {
                     self::executeStatementAndConsumeResult($tenantPdo, $q);
-                } catch (PDOException $e) {
+                } catch (\PDOException $e) {
                     if (stripos($q, 'sql_require_primary_key') !== false) {
                         continue;
                     }
                     throw $e;
                 }
             }
-        } catch (PDOException $e) {
-            throw new Exception('Erro ao aplicar schema base (educa_core.sql): ' . $e->getMessage());
+        } catch (\PDOException $e) {
+            throw new \Exception('Erro ao aplicar schema base (educa_core.sql): ' . $e->getMessage());
         } finally {
-            try { $tenantPdo->exec('SET UNIQUE_CHECKS=1'); } catch (PDOException $ignored) {}
-            try { $tenantPdo->exec('SET FOREIGN_KEY_CHECKS=1'); } catch (PDOException $ignored) {}
+            try { $tenantPdo->exec('SET UNIQUE_CHECKS=1'); } catch (\PDOException $ignored) {}
+            try { $tenantPdo->exec('SET FOREIGN_KEY_CHECKS=1'); } catch (\PDOException $ignored) {}
         }
         if (!self::tenantTemSchemaBase($tenantPdo)) {
-            throw new Exception('Schema base aplicado, mas a tabela alunos não foi criada.');
+            throw new \Exception('Schema base aplicado, mas a tabela alunos não foi criada.');
         }
         return true;
     }
@@ -199,7 +201,7 @@ class MysqlProvisioningService
      * Provisiona o banco da escola: schema base (se vazio) + migrations tenant.
      * Usado ao criar/conectar uma escola no painel Master.
      */
-    public static function provisionarBancoEscola(PDO $masterPdo, PDO $tenantPdo, int $escolaId): void
+    public static function provisionarBancoEscola(\PDO $masterPdo, \PDO $tenantPdo, int $escolaId): void
     {
         if (function_exists('set_time_limit')) {
             @set_time_limit(180);
@@ -256,7 +258,7 @@ class MysqlProvisioningService
         if (strpos($lower, '_seed_') !== false && strpos($lower, 'catalogo') === false) {
             return true;
         }
-        // Carga pontual de uma escola (ex.: SEB Ribeirânia). Só roda se o Master
+        // Carga pontual de uma escola (ex.: \SEB Ribeirânia). Só roda se o Master
         // escolher o arquivo explicitamente — nunca no bootstrap nem em "Executar todas".
         if (strpos($lower, 'importar_dados_') !== false) {
             return true;
@@ -268,15 +270,15 @@ class MysqlProvisioningService
      * Executa as migrations do tenant no banco novo (exclui multi_tenant_master.sql).
      * Registra em migrations_escolas no banco master.
      *
-     * @param PDO $masterPdo Conexão com o banco master
-     * @param PDO $tenantPdo Conexão com o banco da escola (já selecionado)
+     * @param \PDO $masterPdo Conexão com o banco master
+     * @param \PDO $tenantPdo Conexão com o banco da escola (já selecionado)
      * @param int $escolaId ID da escola em escolas.id
      * @param bool $ignorarConflitosSchema true = trata coluna/tabela já existente como migration aplicada (bootstrap local com educa_core)
      * @throws Exception
      */
     public static function runTenantMigrations(
-        PDO $masterPdo,
-        PDO $tenantPdo,
+        \PDO $masterPdo,
+        \PDO $tenantPdo,
         int $escolaId,
         bool $ignorarConflitosSchema = false
     ): void
@@ -290,11 +292,11 @@ class MysqlProvisioningService
         try {
             $st = $masterPdo->prepare("SELECT migration_name FROM migrations_escolas WHERE escola_id = ?");
             $st->execute([$escolaId]);
-            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+            $rows = $st->fetchAll(\PDO::FETCH_ASSOC);
             foreach ($rows as $row) {
                 $executadas[$row['migration_name']] = true;
             }
-        } catch (PDOException $e) {
+        } catch (\PDOException $e) {
             // Tabela pode não existir
         }
         $stmt = $masterPdo->prepare(
@@ -319,7 +321,7 @@ class MysqlProvisioningService
                 foreach ($queries as $q) {
                     try {
                         self::executeStatementAndConsumeResult($tenantPdo, $q);
-                    } catch (PDOException $e) {
+                    } catch (\PDOException $e) {
                         continue;
                     }
                 }
@@ -336,11 +338,11 @@ class MysqlProvisioningService
                 if (!$hasOwnTransaction && $tenantPdo->inTransaction()) {
                     $tenantPdo->commit();
                 }
-            } catch (PDOException $e) {
+            } catch (\PDOException $e) {
                 if (!$hasOwnTransaction && $tenantPdo->inTransaction()) {
-                    try { $tenantPdo->rollBack(); } catch (PDOException $ignored) {}
+                    try { $tenantPdo->rollBack(); } catch (\PDOException $ignored) {}
                 }
-                throw new Exception(
+                throw new \Exception(
                     "Erro ao executar migration {$m['file']} no banco da escola: " . $e->getMessage()
                 );
             }
@@ -352,13 +354,13 @@ class MysqlProvisioningService
      * Executa apenas as migrations selecionadas no banco da escola.
      * Útil para rodar só uma ou algumas migrations (ex.: novo módulo ainda não habilitado).
      *
-     * @param PDO $masterPdo Conexão com o banco master
-     * @param PDO $tenantPdo Conexão com o banco da escola
+     * @param \PDO $masterPdo Conexão com o banco master
+     * @param \PDO $tenantPdo Conexão com o banco da escola
      * @param int $escolaId ID da escola
      * @param string[] $selectedFiles Lista de nomes de arquivo (ex.: ['009_modulos_arquivos_videos.sql'])
      * @throws Exception
      */
-    public static function runTenantMigrationsSelected(PDO $masterPdo, PDO $tenantPdo, int $escolaId, array $selectedFiles): void
+    public static function runTenantMigrationsSelected(\PDO $masterPdo, \PDO $tenantPdo, int $escolaId, array $selectedFiles): void
     {
         if (empty($selectedFiles)) {
             return;
@@ -382,10 +384,10 @@ class MysqlProvisioningService
         try {
             $st = $masterPdo->prepare("SELECT migration_name FROM migrations_escolas WHERE escola_id = ?");
             $st->execute([$escolaId]);
-            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $row) {
                 $executadas[$row['migration_name']] = true;
             }
-        } catch (PDOException $e) {
+        } catch (\PDOException $e) {
         }
 
         $stmt = $masterPdo->prepare(
@@ -415,11 +417,11 @@ class MysqlProvisioningService
                 if (!$hasOwnTransaction && $tenantPdo->inTransaction()) {
                     $tenantPdo->commit();
                 }
-            } catch (PDOException $e) {
+            } catch (\PDOException $e) {
                 if (!$hasOwnTransaction && $tenantPdo->inTransaction()) {
-                    try { $tenantPdo->rollBack(); } catch (PDOException $ignored) {}
+                    try { $tenantPdo->rollBack(); } catch (\PDOException $ignored) {}
                 }
-                throw new Exception(
+                throw new \Exception(
                     "Erro ao executar migration {$m['file']} no banco da escola: " . $e->getMessage()
                 );
             }
@@ -431,11 +433,11 @@ class MysqlProvisioningService
      * Executa as migrations do MASTER no próprio banco master (arquivos *_master.sql).
      * Cria a tabela migrations_master se não existir e registra cada migration executada.
      *
-     * @param PDO $masterPdo Conexão com o banco master
+     * @param \PDO $masterPdo Conexão com o banco master
      * @return string[] Lista de nomes de arquivos executados
      * @throws Exception
      */
-    public static function runMasterMigrations(PDO $masterPdo): array
+    public static function runMasterMigrations(\PDO $masterPdo): array
     {
         $masterPdo->exec("
             CREATE TABLE IF NOT EXISTS migrations_master (
@@ -469,10 +471,10 @@ class MysqlProvisioningService
         $executadas = [];
         try {
             $st = $masterPdo->query("SELECT migration_name FROM migrations_master");
-            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $row) {
                 $executadas[$row['migration_name']] = true;
             }
-        } catch (PDOException $e) {
+        } catch (\PDOException $e) {
         }
 
         $stmt = $masterPdo->prepare(
@@ -502,11 +504,11 @@ class MysqlProvisioningService
                 if (!$hasOwnTransaction && $masterPdo->inTransaction()) {
                     $masterPdo->commit();
                 }
-            } catch (PDOException $e) {
+            } catch (\PDOException $e) {
                 if (!$hasOwnTransaction && $masterPdo->inTransaction()) {
-                    try { $masterPdo->rollBack(); } catch (PDOException $ignored) {}
+                    try { $masterPdo->rollBack(); } catch (\PDOException $ignored) {}
                 }
-                throw new Exception(
+                throw new \Exception(
                     "Erro ao executar migration {$m['file']} no banco master: " . $e->getMessage()
                 );
             }
@@ -519,12 +521,12 @@ class MysqlProvisioningService
     /**
      * Executa apenas as migrations do master selecionadas (mesma lógica, lista restrita).
      *
-     * @param PDO $masterPdo Conexão com o banco master
+     * @param \PDO $masterPdo Conexão com o banco master
      * @param string[] $selectedFiles Nomes dos arquivos (ex.: ['033_log_validacao_apps_externos_master.sql'])
      * @return string[] Lista de nomes de arquivos executados
      * @throws Exception
      */
-    public static function runMasterMigrationsSelected(PDO $masterPdo, array $selectedFiles): array
+    public static function runMasterMigrationsSelected(\PDO $masterPdo, array $selectedFiles): array
     {
         if (empty($selectedFiles)) {
             return [];
@@ -558,10 +560,10 @@ class MysqlProvisioningService
         $executadas = [];
         try {
             $st = $masterPdo->query("SELECT migration_name FROM migrations_master");
-            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $row) {
                 $executadas[$row['migration_name']] = true;
             }
-        } catch (PDOException $e) {
+        } catch (\PDOException $e) {
         }
 
         $stmt = $masterPdo->prepare("INSERT INTO migrations_master (migration_name) VALUES (?)");
@@ -585,11 +587,11 @@ class MysqlProvisioningService
                 if (!$hasOwnTransaction && $masterPdo->inTransaction()) {
                     $masterPdo->commit();
                 }
-            } catch (PDOException $e) {
+            } catch (\PDOException $e) {
                 if (!$hasOwnTransaction && $masterPdo->inTransaction()) {
-                    try { $masterPdo->rollBack(); } catch (PDOException $ignored) {}
+                    try { $masterPdo->rollBack(); } catch (\PDOException $ignored) {}
                 }
-                throw new Exception(
+                throw new \Exception(
                     "Erro ao executar migration {$m['file']} no banco master: " . $e->getMessage()
                 );
             }
@@ -604,7 +606,7 @@ class MysqlProvisioningService
      * Usa query() para todos os statements e em seguida fetchAll() + closeCursor() (ou nextRowset em loop)
      * para nunca deixar result set ativo na conexão.
      */
-    private static function executeStatementAndConsumeResult(PDO $pdo, string $sql): void
+    private static function executeStatementAndConsumeResult(\PDO $pdo, string $sql): void
     {
         $sql = trim($sql);
         if ($sql === '') {
@@ -616,7 +618,7 @@ class MysqlProvisioningService
         }
         try {
             do {
-                $stmt->fetchAll(PDO::FETCH_ASSOC);
+                $stmt->fetchAll(\PDO::FETCH_ASSOC);
             } while ($stmt->nextRowset());
         } finally {
             $stmt->closeCursor();
@@ -819,4 +821,8 @@ class MysqlProvisioningService
         $next = $sql[$i + $klen] ?? '';
         return $next === '' || $next === ' ' || $next === "\t" || $next === "\n" || $next === "\r";
     }
+}
+
+if (!class_exists('MysqlProvisioningService', false) && class_exists(__NAMESPACE__ . '\\MysqlProvisioningService', false)) {
+    class_alias(__NAMESPACE__ . '\\MysqlProvisioningService', 'MysqlProvisioningService');
 }

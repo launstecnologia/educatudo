@@ -1,15 +1,17 @@
 <?php
+
+namespace App\Modulos\ConselhoClasse\Controllers;
+
+use App\Modulos\ConselhoClasse\Services\ConselhoService;
+use Throwable;
+
 /**
  * EducaTudo - Conselho de Classe (admin / coordenação)
  */
 
-require_once __DIR__ . '/../../../Controllers/Admin/AdminBaseController.php';
-require_once __DIR__ . '/../Services/ConselhoService.php';
 
-use App\Modulos\ConselhoClasse\Services\ConselhoService;
-
-if (!class_exists('ConselhoAdminController', false)) {
-class ConselhoAdminController extends AdminBaseController
+if (!class_exists(__NAMESPACE__ . '\\ConselhoAdminController', false)) {
+class ConselhoAdminController extends \App\Controllers\Admin\AdminBaseController
 {
     private function service(): ConselhoService
     {
@@ -275,7 +277,7 @@ class ConselhoAdminController extends AdminBaseController
             return;
         }
 
-        $escola = class_exists('LayoutHelper') ? (string) LayoutHelper::getSystemTitle() : 'Escola';
+        $escola = class_exists('LayoutHelper') ? (string) \App\Core\LayoutHelper::getSystemTitle() : 'Escola';
         ob_start();
         extract([
             'sessao' => $sessao,
@@ -350,11 +352,10 @@ class ConselhoAdminController extends AdminBaseController
     private function periodoSelecionado(int $anoLetivo): int
     {
         if (!class_exists('PeriodoLetivo', false)) {
-            require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
         }
         try {
-            $quantidade = max(1, (int) PeriodoLetivo::doAno($anoLetivo)['quantidade']);
-            $bimestre = (int) ($_GET['bimestre'] ?? PeriodoLetivo::numeroPadrao($anoLetivo));
+            $quantidade = max(1, (int) \App\Core\PeriodoLetivo::doAno($anoLetivo)['quantidade']);
+            $bimestre = (int) ($_GET['bimestre'] ?? \App\Core\PeriodoLetivo::numeroPadrao($anoLetivo));
             return max(1, min($quantidade, $bimestre));
         } catch (Throwable $e) {
             error_log('ConselhoAdminController::periodoSelecionado: ' . $e->getMessage());
@@ -363,4 +364,8 @@ class ConselhoAdminController extends AdminBaseController
         }
     }
 }
+}
+
+if (!class_exists('ConselhoAdminController', false) && class_exists(__NAMESPACE__ . '\\ConselhoAdminController', false)) {
+    class_alias(__NAMESPACE__ . '\\ConselhoAdminController', 'ConselhoAdminController');
 }

@@ -1,6 +1,7 @@
 <?php
 
-require_once __DIR__ . '/../../../Core/Database.php';
+namespace App\Modulos\Presenca\Models;
+
 
 class PresencaIdentificador
 {
@@ -10,7 +11,7 @@ class PresencaIdentificador
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     public function tabelasProntas(): bool
@@ -57,21 +58,21 @@ class PresencaIdentificador
     public function criar(int $alunoId, string $tipo, string $valor): int
     {
         if ($alunoId <= 0) {
-            throw new InvalidArgumentException('Aluno inválido.');
+            throw new \InvalidArgumentException('Aluno inválido.');
         }
         $aluno = $this->db->fetch('SELECT id FROM alunos WHERE id = :id AND ativo = 1 LIMIT 1', ['id' => $alunoId]);
         if (!$aluno) {
-            throw new InvalidArgumentException('Aluno não encontrado ou inativo.');
+            throw new \InvalidArgumentException('Aluno não encontrado ou inativo.');
         }
         $valor = trim($valor);
         if ($valor === '' || mb_strlen($valor) > 80) {
-            throw new InvalidArgumentException('Identificador inválido.');
+            throw new \InvalidArgumentException('Identificador inválido.');
         }
         if (!in_array($tipo, self::TIPOS, true)) {
             $tipo = 'cartao';
         }
         if (!$this->tabelasProntas()) {
-            throw new RuntimeException('Rode a migration 2026_08_22_gestao_presenca.sql no Master.');
+            throw new \RuntimeException('Rode a migration 2026_08_22_gestao_presenca.sql no Master.');
         }
         return (int) $this->db->insert(
             'INSERT INTO presenca_identificadores (aluno_id, tipo, valor)
@@ -87,4 +88,8 @@ class PresencaIdentificador
         }
         $this->db->query('DELETE FROM presenca_identificadores WHERE id = :id', ['id' => $id]);
     }
+}
+
+if (!class_exists('PresencaIdentificador', false) && class_exists(__NAMESPACE__ . '\\PresencaIdentificador', false)) {
+    class_alias(__NAMESPACE__ . '\\PresencaIdentificador', 'PresencaIdentificador');
 }

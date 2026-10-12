@@ -6,11 +6,11 @@
     <title>Login Pais - EducaTudo</title>
     <link rel="manifest" href="<?= URL ?>/manifest-pais.json">
     <?php require_once __DIR__ . '/../../Core/LayoutHelper.php'; ?>
-    <meta name="theme-color" content="<?= htmlspecialchars(LayoutHelper::get('primary_color', '#a855f7')) ?>">
+    <meta name="theme-color" content="<?= htmlspecialchars(\App\Core\LayoutHelper::get('primary_color', '#a855f7')) ?>">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <?php include __DIR__ . '/../layouts/components/estilos_plataforma.php'; ?>
     <style>
-        <?= LayoutHelper::generateCustomCSS() ?>
+        <?= \App\Core\LayoutHelper::generateCustomCSS() ?>
     </style>
 </head>
 <body class="bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 min-h-screen min-h-dvh flex flex-col items-center justify-center p-4">
@@ -22,9 +22,9 @@
         <div class="bg-white py-8 px-6 shadow-xl rounded-2xl border">
             <!-- Logo e Título dentro do card -->
             <div class="text-center mb-8">
-                <?php if (LayoutHelper::getContextualLogo('login', 'h-16 w-auto mx-auto', 'Logo EducaTudo')): ?>
+                <?php if (\App\Core\LayoutHelper::getContextualLogo('login', 'h-16 w-auto mx-auto', 'Logo EducaTudo')): ?>
                     <div class="mb-4">
-                        <?= LayoutHelper::getContextualLogo('login', 'h-16 w-auto mx-auto', 'Logo EducaTudo') ?>
+                        <?= \App\Core\LayoutHelper::getContextualLogo('login', 'h-16 w-auto mx-auto', 'Logo EducaTudo') ?>
                     </div>
                 <?php else: ?>
                     <div class="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">

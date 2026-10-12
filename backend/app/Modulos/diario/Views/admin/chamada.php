@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Models/ClassDiary.php';
 
 use App\Modulos\Diario\Models\ClassDiary;
 $execucaoAtual = (string) ($aula['execucao'] ?? 'conforme_planejado');
@@ -7,7 +6,7 @@ $statusAtual = (string) ($aula['status'] ?? 'rascunho');
 $situacoes = ['presente' => 'Presente', 'falta' => 'Falta', 'falta_justificada' => 'Justificada', 'atraso' => 'Atraso', 'saida_antecipada' => 'Saída antecipada'];
 $planos = is_array($planos ?? null) ? $planos : [];
 $eventos = is_array($eventos ?? null) ? $eventos : [];
-$tipoAtual = ClassDiary::tipoAulaValido((string) ($aula['tipo_aula'] ?? 'regular'));
+$tipoAtual = \App\Modulos\Diario\Models\ClassDiary::tipoAulaValido((string) ($aula['tipo_aula'] ?? 'regular'));
 $planoAtual = (int) ($aula['plano_aula_id'] ?? 0);
 $eventoAtual = (int) ($aula['evento_bloco_id'] ?? 0);
 ?>
@@ -141,7 +140,7 @@ $eventoAtual = (int) ($aula['evento_bloco_id'] ?? 0);
             <div>
                 <label for="tipo_aula" class="block text-sm font-semibold text-gray-700 mb-2">Tipo da aula</label>
                 <select name="tipo_aula" id="tipo_aula" class="diario-select diario-select--execucao">
-                    <?php foreach (ClassDiary::TIPOS_AULA as $valor => $label): ?>
+                    <?php foreach (\App\Modulos\Diario\Models\ClassDiary::TIPOS_AULA as $valor => $label): ?>
                         <option value="<?= htmlspecialchars($valor) ?>" <?= $tipoAtual === $valor ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
                     <?php endforeach; ?>
                 </select>

@@ -1,9 +1,11 @@
 <?php
+
+namespace App\Modulos\Arquivos\Models;
 /**
  * Model — publicações do módulo Arquivos (tabela modulos_arquivos).
  */
 
-if (!class_exists('ModuloArquivo')) {
+if (!class_exists('ModuloArquivo', false)) {
 class ModuloArquivo
 {
     private $db;
@@ -11,7 +13,7 @@ class ModuloArquivo
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     public function temColunaAtivo(): bool
@@ -444,4 +446,8 @@ class ModuloArquivo
                ))) OR ma.aluno_id = :aluno_id)';
     }
 }
+}
+
+if (!class_exists('ModuloArquivo', false) && class_exists(__NAMESPACE__ . '\\ModuloArquivo', false)) {
+    class_alias(__NAMESPACE__ . '\\ModuloArquivo', 'ModuloArquivo');
 }

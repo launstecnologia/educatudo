@@ -1,9 +1,11 @@
 <?php
 
-require_once __DIR__ . '/CatalogoRegraMascara.php';
-require_once __DIR__ . '/../Services/MascaraResolver.php';
+namespace App\Helpers;
 
-if (!class_exists('AccessibilityCss')) {
+
+use App\Modulos\EducaInclui\Services\MascaraResolver;
+
+if (!class_exists('AccessibilityCss', false)) {
 /**
  * EducaInclui — gera o CSS de acessibilidade visual a partir das regras da
  * Máscara de Acessibilidade ativa de um aluno.
@@ -172,4 +174,8 @@ class AccessibilityCss
         return false;
     }
 }
+}
+
+if (!class_exists('AccessibilityCss', false) && class_exists(__NAMESPACE__ . '\\AccessibilityCss', false)) {
+    class_alias(__NAMESPACE__ . '\\AccessibilityCss', 'AccessibilityCss');
 }

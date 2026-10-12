@@ -1,9 +1,18 @@
 <?php
+
+namespace App\Middleware;
 /**
  * EducaTudo - Middleware de Autenticação
  * Verifica se usuário está logado
  */
 
+
+use App\Core\AdminPermissionMatrix;
+use App\Core\AdminSecretariaAccess;
+use App\Core\AuthManager;
+use App\Core\Database;
+use App\Core\LayoutHelper;
+use App\Core\Logger;
 class AuthMiddleware
 {
     private $auth;
@@ -24,10 +33,9 @@ class AuthMiddleware
             // Limpar sessão corrompida antes de redirecionar
             try {
                 $this->auth->logout();
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 // Logar erro no sistema de logs
                 if (!class_exists('Logger')) {
-                    require_once __DIR__ . '/../Core/Logger.php';
                 }
                 Logger::authError(
                     "Erro ao limpar sessão no middleware: " . $e->getMessage(),
@@ -56,7 +64,7 @@ class AuthMiddleware
         if ($this->adminFoiOcultadoDaListagem($user)) {
             try {
                 $this->auth->logout();
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 session_unset();
                 session_destroy();
                 if (session_status() === PHP_SESSION_NONE) {
@@ -89,7 +97,6 @@ class AuthMiddleware
             $isFinanceiroPath = strpos($path, '/admin/financeiro') === 0
                 || strpos($path, '/admin/finance') === 0;
             if (!class_exists('LayoutHelper', false)) {
-                require_once __DIR__ . '/../Core/LayoutHelper.php';
             }
             $financeiroLigado = LayoutHelper::isModuleEnabled('financeiro');
             if (!$isLogout) {
@@ -107,7 +114,6 @@ class AuthMiddleware
         }
 
         if (!class_exists('AdminSecretariaAccess')) {
-            require_once __DIR__ . '/../Core/AdminSecretariaAccess.php';
         }
         if (AdminSecretariaAccess::isSecretaria($user)) {
             $reqUri = (string) ($_SERVER['REQUEST_URI'] ?? '');
@@ -138,7 +144,7 @@ class AuthMiddleware
                 'SELECT ativo FROM usuarios WHERE id = :id LIMIT 1',
                 ['id' => $adminId]
             );
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return false;
         }
         if (!is_array($row)) {
@@ -178,7 +184,6 @@ class AuthMiddleware
         }
 
         if (!class_exists('AdminPermissionMatrix')) {
-            require_once __DIR__ . '/../Core/AdminPermissionMatrix.php';
         }
 
         try {
@@ -266,4 +271,8 @@ class AuthMiddleware
         exit;
     }
 
+}
+
+if (!class_exists('AuthMiddleware', false) && class_exists(__NAMESPACE__ . '\\AuthMiddleware', false)) {
+    class_alias(__NAMESPACE__ . '\\AuthMiddleware', 'AuthMiddleware');
 }

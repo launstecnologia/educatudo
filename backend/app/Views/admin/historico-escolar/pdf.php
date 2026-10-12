@@ -18,14 +18,13 @@ $logoData = (string) ($logo_data ?? '');
 $validationUrl = (string) ($validation_url ?? '');
 $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
 if (!class_exists('StudentFormHelper', false)) {
-    require_once dirname(__DIR__, 3) . '/Helpers/StudentFormHelper.php';
 }
 $fmtData = static function ($d): string {
     $d = trim((string) $d);
     if ($d === '' || $d === '0000-00-00') {
         return '—';
     }
-    $dt = DateTime::createFromFormat('Y-m-d', substr($d, 0, 10));
+    $dt = \DateTime::createFromFormat('Y-m-d', substr($d, 0, 10));
     return $dt ? $dt->format('d/m/Y') : '—';
 };
 $fmtDataExtenso = static function ($d): string {
@@ -33,7 +32,7 @@ $fmtDataExtenso = static function ($d): string {
     if ($d === '' || $d === '0000-00-00') {
         return '';
     }
-    $dt = DateTime::createFromFormat('Y-m-d', substr($d, 0, 10));
+    $dt = \DateTime::createFromFormat('Y-m-d', substr($d, 0, 10));
     if (!$dt) {
         return '';
     }
@@ -316,7 +315,7 @@ if ($cidadeDataTxt === '') {
             <table class="ident">
                 <tr>
                     <td class="lab">Nome completo:</td>
-                    <td colspan="3"><?= \StudentFormHelper::nomeOficialHtml($aluno, $esc) ?></td>
+                    <td colspan="3"><?= \App\Helpers\StudentFormHelper::nomeOficialHtml($aluno, $esc) ?></td>
                 </tr>
                 <tr>
                     <td class="lab">RG / RNE:</td>

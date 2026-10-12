@@ -1,6 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Models/ConselhoSessao.php';
-require_once __DIR__ . '/../../Services/ConselhoService.php';
 
 use App\Modulos\ConselhoClasse\Models\ConselhoSessao;
 use App\Modulos\ConselhoClasse\Services\ConselhoService;
@@ -14,10 +12,9 @@ $turmaId = (int) ($turma_id ?? 0);
 $csrf_token = $csrf_token ?? '';
 
 if (!class_exists('PeriodoLetivo', false)) {
-    require_once dirname(__DIR__, 4) . '/Core/PeriodoLetivo.php';
 }
 $anoPadrao = (int) ($anos[0] ?? date('Y'));
-$periodoPadrao = (int) PeriodoLetivo::numeroPadrao($anoLetivo);
+$periodoPadrao = (int) \App\Core\PeriodoLetivo::numeroPadrao($anoLetivo);
 $filtrosAtivosCount = 0;
 if ($anoLetivo !== $anoPadrao) {
     $filtrosAtivosCount++;
@@ -76,7 +73,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             <div>
                 <label for="filtro_bimestre" class="block text-sm font-medium text-gray-700 mb-1.5">Período</label>
                 <select id="filtro_bimestre" name="bimestre" class="<?= $selectCls ?>" data-periodo-letivo-select data-periodo-selecionado="<?= (int) $bimestre ?>">
-                    <?= PeriodoLetivo::optionsHtml($anoLetivo, $bimestre) ?>
+                    <?= \App\Core\PeriodoLetivo::optionsHtml($anoLetivo, $bimestre) ?>
                 </select>
             </div>
             <div>
@@ -164,13 +161,13 @@ document.addEventListener('keydown', function (e) {
                         <div class="font-medium"><?= htmlspecialchars((string) $linha['turma_nome']) ?></div>
                         <div class="text-xs text-gray-500"><?= htmlspecialchars((string) ($linha['turma_serie'] ?? '')) ?></div>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700"><?= htmlspecialchars(class_exists('PeriodoLetivo') ? PeriodoLetivo::rotulo($anoLetivo, $bimestre) : ($bimestre . 'º Bimestre')) ?> / <?= (int) $anoLetivo ?></td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700"><?= htmlspecialchars(class_exists('PeriodoLetivo') ? \App\Core\PeriodoLetivo::rotulo($anoLetivo, $bimestre) : ($bimestre . 'º Bimestre')) ?> / <?= (int) $anoLetivo ?></td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700"><?= (int) ($linha['total_alunos'] ?? 0) ?></td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm <?= $pend > 0 ? 'text-amber-700 font-medium' : 'text-gray-700' ?>"><?= $pend ?></td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <?php
-                        $ui_badge_variant = ConselhoService::statusBadge($status);
-                        $ui_badge_label = ConselhoService::statusLabel($status);
+                        $ui_badge_variant = \App\Modulos\ConselhoClasse\Services\ConselhoService::statusBadge($status);
+                        $ui_badge_label = \App\Modulos\ConselhoClasse\Services\ConselhoService::statusLabel($status);
                         include __DIR__ . '/../../../../Views/admin/_partials/ui/badge.php';
                         ?>
                     </td>

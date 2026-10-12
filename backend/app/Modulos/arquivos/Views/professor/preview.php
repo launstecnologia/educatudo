@@ -15,10 +15,9 @@ if ($descricao !== '') {
 }
 if ($iframe) {
     if (!class_exists('EstilosPlataforma', false)) {
-        require_once dirname(__DIR__, 4) . '/Helpers/EstilosPlataforma.php';
     }
     echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
-    echo EstilosPlataforma::tagLink();
+    echo \App\Helpers\EstilosPlataforma::tagLink();
     echo '<style>.prose img{max-width:100%;height:auto;}</style></head><body class="bg-gray-100">';
 }
 ?>

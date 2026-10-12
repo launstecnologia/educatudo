@@ -1,6 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Models/ConselhoSessao.php';
-require_once __DIR__ . '/../../Services/ConselhoService.php';
 
 use App\Modulos\ConselhoClasse\Models\ConselhoSessao;
 use App\Modulos\ConselhoClasse\Services\ConselhoService;
@@ -52,14 +50,14 @@ $linhas = is_array($matriz['linhas'] ?? null) ? $matriz['linhas'] : [];
     <h3 class="text-base font-semibold text-gray-900 mb-3">Prévia da reunião</h3>
     <p class="text-sm text-gray-600 mb-2">
         <?= htmlspecialchars((string) ($sessao['turma_nome'] ?? '')) ?>
-        · <?= htmlspecialchars(class_exists('PeriodoLetivo') ? (PeriodoLetivo::rotulo((int) ($sessao['ano_letivo'] ?? 0), (int) ($sessao['bimestre'] ?? 0)) ?: ((int) ($sessao['bimestre'] ?? 0) . 'º período')) : ((int) ($sessao['bimestre'] ?? 0) . 'º período')) ?> / <?= (int) ($sessao['ano_letivo'] ?? 0) ?>
-        · <?= ConselhoService::statusLabel((string) ($sessao['status'] ?? '')) ?>
+        · <?= htmlspecialchars(class_exists('PeriodoLetivo') ? (\App\Core\PeriodoLetivo::rotulo((int) ($sessao['ano_letivo'] ?? 0), (int) ($sessao['bimestre'] ?? 0)) ?: ((int) ($sessao['bimestre'] ?? 0) . 'º período')) : ((int) ($sessao['bimestre'] ?? 0) . 'º período')) ?> / <?= (int) ($sessao['ano_letivo'] ?? 0) ?>
+        · <?= \App\Modulos\ConselhoClasse\Services\ConselhoService::statusLabel((string) ($sessao['status'] ?? '')) ?>
     </p>
     <p class="text-sm font-medium text-gray-800 mt-4 mb-2">Participantes presentes</p>
     <ul class="text-sm text-gray-700 list-disc pl-5 mb-4">
         <?php foreach ($participantes as $p): ?>
             <?php if (!empty($p['presente'])): ?>
-            <li><?= htmlspecialchars((string) $p['nome']) ?> (<?= htmlspecialchars(ConselhoSessao::CARGOS[$p['cargo']] ?? $p['cargo']) ?>)</li>
+            <li><?= htmlspecialchars((string) $p['nome']) ?> (<?= htmlspecialchars(\App\Modulos\ConselhoClasse\Models\ConselhoSessao::CARGOS[$p['cargo']] ?? $p['cargo']) ?>)</li>
             <?php endif; ?>
         <?php endforeach; ?>
     </ul>
@@ -67,7 +65,7 @@ $linhas = is_array($matriz['linhas'] ?? null) ? $matriz['linhas'] : [];
     <ul class="text-sm text-gray-700 space-y-1">
         <?php foreach ($linhas as $linha):
             $homolog = $linha['resultado_homologado'] ?? null;
-            $label = $homolog ? (ConselhoSessao::RESULTADOS[$homolog] ?? $homolog) : ($linha['resultado_preliminar']['label'] ?? '—');
+            $label = $homolog ? (\App\Modulos\ConselhoClasse\Models\ConselhoSessao::RESULTADOS[$homolog] ?? $homolog) : ($linha['resultado_preliminar']['label'] ?? '—');
         ?>
         <li><?= htmlspecialchars((string) $linha['aluno']['nome']) ?> — <?= htmlspecialchars((string) $label) ?></li>
         <?php endforeach; ?>

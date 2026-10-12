@@ -1,15 +1,15 @@
 <?php
+
+namespace App\Modulos\VidaEscolar\Controllers;
 /**
  * EducaTudo - Ofícios da secretaria (admin)
  */
 
-require_once __DIR__ . '/../../../Controllers/Admin/AdminBaseController.php';
-require_once __DIR__ . '/../Services/OficioService.php';
 
 use App\Modulos\VidaEscolar\Services\OficioService;
 
-if (!class_exists('OficioAdminController', false)) {
-class OficioAdminController extends AdminBaseController
+if (!class_exists(__NAMESPACE__ . '\\OficioAdminController', false)) {
+class OficioAdminController extends \App\Controllers\Admin\AdminBaseController
 {
     private function service(): OficioService
     {
@@ -19,9 +19,8 @@ class OficioAdminController extends AdminBaseController
     private function exigirPermissao(string $acao): bool
     {
         if (!class_exists('LayoutHelper', false)) {
-            require_once dirname(__DIR__, 3) . '/Core/LayoutHelper.php';
         }
-        if (!\LayoutHelper::isModuleEnabled('vida_escolar')) {
+        if (!\App\Core\LayoutHelper::isModuleEnabled('vida_escolar')) {
             $this->setFlashMessage('O módulo Vida Escolar está desativado nesta escola.', 'error');
             $this->redirect('/admin/dashboard');
             return false;
@@ -225,9 +224,8 @@ class OficioAdminController extends AdminBaseController
     public function alunosJson(): void
     {
         if (!class_exists('LayoutHelper', false)) {
-            require_once dirname(__DIR__, 3) . '/Core/LayoutHelper.php';
         }
-        if (!\LayoutHelper::isModuleEnabled('vida_escolar')) {
+        if (!\App\Core\LayoutHelper::isModuleEnabled('vida_escolar')) {
             $this->json(['error' => 'Módulo desativado'], 403);
             return;
         }
@@ -239,4 +237,8 @@ class OficioAdminController extends AdminBaseController
         $this->json(['alunos' => $alunos]);
     }
 }
+}
+
+if (!class_exists('OficioAdminController', false) && class_exists(__NAMESPACE__ . '\\OficioAdminController', false)) {
+    class_alias(__NAMESPACE__ . '\\OficioAdminController', 'OficioAdminController');
 }

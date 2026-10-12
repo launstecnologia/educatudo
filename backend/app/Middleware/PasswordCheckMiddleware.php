@@ -1,9 +1,13 @@
 <?php
+
+namespace App\Middleware;
 /**
  * EducaTudo - Middleware de Verificação de Senha Padrão
  * Verifica se aluno ainda tem senha padrão e redireciona para alteração
  */
 
+
+use App\Core\Database;
 class PasswordCheckMiddleware
 {
     private $db;
@@ -48,4 +52,8 @@ class PasswordCheckMiddleware
         
         return $next($request);
     }
+}
+
+if (!class_exists('PasswordCheckMiddleware', false) && class_exists(__NAMESPACE__ . '\\PasswordCheckMiddleware', false)) {
+    class_alias(__NAMESPACE__ . '\\PasswordCheckMiddleware', 'PasswordCheckMiddleware');
 }

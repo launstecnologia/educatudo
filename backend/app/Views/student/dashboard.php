@@ -154,7 +154,7 @@ $sliderModuleRoutes = [
     <div class="bg-white rounded-xl sm:rounded-2xl shadow-md hover:shadow-lg transition-shadow p-4 sm:p-6 border-l-4 border-purple-500 overflow-hidden flex flex-col">
         <div class="flex flex-row items-start justify-between gap-2 flex-shrink-0">
             <div class="min-w-0">
-                <p class="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wide leading-tight break-words">Chat (<?= htmlspecialchars(LayoutHelper::getIaName()) ?>)</p>
+                <p class="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wide leading-tight break-words">Chat (<?= htmlspecialchars(\App\Core\LayoutHelper::getIaName()) ?>)</p>
                 <p class="text-xl sm:text-3xl font-bold text-gray-900 mt-0.5 sm:mt-1"><?= $stats['total_interacoes_chat'] ?></p>
             </div>
             <div class="w-9 h-9 sm:w-12 sm:h-12 bg-purple-100 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0">
@@ -271,7 +271,7 @@ $fmtContagem = static function ($valor): string {
         <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center text-xl sm:text-2xl group-hover:scale-105 transition-transform flex-shrink-0">🃏</div>
         <div class="flex-1 min-w-0">
             <p class="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors text-sm sm:text-base">Flashcards</p>
-            <p class="text-xs sm:text-sm text-gray-500 mt-0.5">Histórico e criar baralhos com a <?= htmlspecialchars(LayoutHelper::getIaName()) ?></p>
+            <p class="text-xs sm:text-sm text-gray-500 mt-0.5">Histórico e criar baralhos com a <?= htmlspecialchars(\App\Core\LayoutHelper::getIaName()) ?></p>
         </div>
         <svg class="w-5 h-5 text-gray-400 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
     </a>
@@ -296,7 +296,7 @@ $fmtContagem = static function ($valor): string {
     <?php endif; ?>
 </div>
 
-<?php if (LayoutHelper::isModuleEnabled('aulas_online') && !empty($aulas_online) && is_array($aulas_online)): ?>
+<?php if (\App\Core\LayoutHelper::isModuleEnabled('aulas_online') && !empty($aulas_online) && is_array($aulas_online)): ?>
 <!-- Aulas Online -->
 <div class="mb-6 sm:mb-8">
     <div class="bg-white rounded-2xl shadow-md overflow-hidden">

@@ -1,11 +1,10 @@
 <?php
-require_once __DIR__ . '/../../../Helpers/StudentFormHelper.php';
 $student = is_array($student ?? null) ? $student : [];
-$ufs = StudentFormHelper::ufsBrasil();
-$cpfDisplay = StudentFormHelper::formatCpfDisplay($student['cpf'] ?? '');
-$rgDisplay = StudentFormHelper::formatRgDisplay($student['rg'] ?? '');
-$cepDisplay = StudentFormHelper::formatCepDisplay($student['cep'] ?? '');
-$dataNasc = StudentFormHelper::formatDataNascInput($student['data_nasc'] ?? null);
+$ufs = \App\Helpers\StudentFormHelper::ufsBrasil();
+$cpfDisplay = \App\Helpers\StudentFormHelper::formatCpfDisplay($student['cpf'] ?? '');
+$rgDisplay = \App\Helpers\StudentFormHelper::formatRgDisplay($student['rg'] ?? '');
+$cepDisplay = \App\Helpers\StudentFormHelper::formatCepDisplay($student['cep'] ?? '');
+$dataNasc = \App\Helpers\StudentFormHelper::formatDataNascInput($student['data_nasc'] ?? null);
 $ufAtual = strtoupper(trim((string) ($student['uf'] ?? '')));
 $ufRgAtual = strtoupper(trim((string) ($student['uf_rg'] ?? '')));
 $parteDoc = $parteDoc ?? 'tudo';

@@ -3,11 +3,7 @@
 namespace App\Modulos\DashboardGestao\Widgets;
 
 use App\Modulos\DashboardGestao\Services\DashboardFiltro;
-use FrequencyService;
-
-require_once dirname(__DIR__, 3) . '/Services/FrequencyService.php';
-require_once dirname(__DIR__, 3) . '/Models/Education/ResultadoAcademico.php';
-
+use App\Services\FrequencyService;
 class AtencaoPedagogicaWidget implements WidgetDashboard
 {
     public function chave(): string
@@ -32,7 +28,7 @@ class AtencaoPedagogicaWidget implements WidgetDashboard
             }
         }
 
-        $model = new \ResultadoAcademico();
+        $model = new \App\Models\Education\ResultadoAcademico();
         if ($model->schemaPronto() && count($linhas) < 12) {
             $linhas = array_merge($linhas, $this->componentesAbaixo($filtro, 12 - count($linhas)));
         }
@@ -53,7 +49,7 @@ class AtencaoPedagogicaWidget implements WidgetDashboard
         if ($limite <= 0) {
             return [];
         }
-        $db = \Database::getInstance();
+        $db = \App\Core\Database::getInstance();
         $where = [
             "r.status = 'homologado'",
             'r.ano_letivo = :ano',
@@ -98,4 +94,8 @@ class AtencaoPedagogicaWidget implements WidgetDashboard
         }
         return $out;
     }
+}
+
+if (!class_exists('AtencaoPedagogicaWidget', false) && class_exists(__NAMESPACE__ . '\\AtencaoPedagogicaWidget', false)) {
+    class_alias(__NAMESPACE__ . '\\AtencaoPedagogicaWidget', 'AtencaoPedagogicaWidget');
 }

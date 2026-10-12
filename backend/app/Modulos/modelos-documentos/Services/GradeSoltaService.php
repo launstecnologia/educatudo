@@ -398,3 +398,7 @@ class GradeSoltaService
         return trim(preg_replace('/\s+/', ' ', $texto) ?? $texto);
     }
 }
+
+if (!class_exists('GradeSoltaService', false) && class_exists(__NAMESPACE__ . '\\GradeSoltaService', false)) {
+    class_alias(__NAMESPACE__ . '\\GradeSoltaService', 'GradeSoltaService');
+}

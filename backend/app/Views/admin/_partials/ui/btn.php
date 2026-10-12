@@ -1,6 +1,6 @@
 <?php
 /**
- * Botão do design system admin (prompts/admin_ui_sistema/cores-e-botoes.md).
+ * Botão do design system admin (especificacoes/admin_ui_sistema/cores-e-botoes.md).
  *
  * Variantes:
  * - primary      — CTA (criar/salvar), bg-primary, sempre o último no cabeçalho

@@ -5,7 +5,6 @@ namespace App\Modulos\DashboardGestao\Widgets;
 use App\Modulos\ConselhoClasse\Services\ConselhoService;
 use App\Modulos\DashboardGestao\Services\DashboardFiltro;
 
-require_once dirname(__DIR__, 3) . '/Services/ConselhoService.php';
 
 class ConselhoWidget implements WidgetDashboard
 {
@@ -16,7 +15,7 @@ class ConselhoWidget implements WidgetDashboard
 
     public function montar(DashboardFiltro $filtro): array
     {
-        if (class_exists('LayoutHelper', false) && !\LayoutHelper::isModuleEnabled('conselho_classe')) {
+        if (class_exists('LayoutHelper', false) && !\App\Core\LayoutHelper::isModuleEnabled('conselho_classe')) {
             return [
                 'ok' => true,
                 'disponivel' => false,
@@ -73,4 +72,8 @@ class ConselhoWidget implements WidgetDashboard
             'href' => '/admin/conselhos?' . $qs,
         ];
     }
+}
+
+if (!class_exists('ConselhoWidget', false) && class_exists(__NAMESPACE__ . '\\ConselhoWidget', false)) {
+    class_alias(__NAMESPACE__ . '\\ConselhoWidget', 'ConselhoWidget');
 }

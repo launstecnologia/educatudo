@@ -104,9 +104,8 @@ function normalizarImagensEnunciadoAluno($html) {
             . '>';
     }, $html);
 }
-require_once __DIR__ . '/../../../Core/TenantRelease.php';
-$ocultarTituloJornada = TenantRelease::shouldUse('jornadas_ocultar_titulo_v1', true);
-$ocultarTituloExercicioJornada = TenantRelease::shouldUse('jornadas_ocultar_titulo_exercicio_v1', true);
+$ocultarTituloJornada = \App\Core\TenantRelease::shouldUse('jornadas_ocultar_titulo_v1', true);
+$ocultarTituloExercicioJornada = \App\Core\TenantRelease::shouldUse('jornadas_ocultar_titulo_exercicio_v1', true);
 
 // CORREÇÃO CRÍTICA: Garante que $questoes seja sempre um array
 // Isso deve ser feito ANTES de qualquer uso da variável

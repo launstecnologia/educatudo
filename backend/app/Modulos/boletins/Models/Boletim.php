@@ -2,7 +2,7 @@
 
 namespace App\Modulos\Boletins\Models;
 
-use Database;
+use App\Core\Database;
 use Throwable;
 
 /**
@@ -347,4 +347,8 @@ class Boletim
             // migration ainda não rodou / sem permissão ALTER
         }
     }
+}
+
+if (!class_exists('Boletim', false) && class_exists(__NAMESPACE__ . '\\Boletim', false)) {
+    class_alias(__NAMESPACE__ . '\\Boletim', 'Boletim');
 }

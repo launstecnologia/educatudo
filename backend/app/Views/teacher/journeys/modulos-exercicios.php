@@ -12,9 +12,8 @@
         </div>
         <?php
         if (!class_exists('CreditosModuleRegistry', false)) {
-            require_once __DIR__ . '/../../../Core/CreditosModuleRegistry.php';
         }
-        $tudicoinsAcaoExercicioIa = \CreditosModuleRegistry::acaoIaDisponivel('gerar_exercicio_ia_professor');
+        $tudicoinsAcaoExercicioIa = \App\Core\CreditosModuleRegistry::acaoIaDisponivel('gerar_exercicio_ia_professor');
         ?>
         <div class="mt-5 flex flex-wrap items-center gap-3">
             <a href="<?= URL ?>/professor/jornadas/modulos/<?= (int)$modulo['id'] ?>/exercicios"

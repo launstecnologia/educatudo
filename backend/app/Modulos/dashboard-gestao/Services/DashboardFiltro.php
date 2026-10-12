@@ -2,8 +2,7 @@
 
 namespace App\Modulos\DashboardGestao\Services;
 
-use Database;
-
+use App\Core\Database;
 /**
  * Recorte Escola → Curso → Série → Turma (+ ano, bimestre, turno).
  * Resolve IDs de turma uma vez; os widgets só consomem o recorte.
@@ -66,7 +65,6 @@ class DashboardFiltro
      */
     public static function periodoDoBimestre(int $anoLetivo, int $bimestre): array
     {
-        require_once dirname(__DIR__, 2) . '/diario/Models/ClassDiary.php';
         $diary = new \App\Modulos\Diario\Models\ClassDiary();
         return $diary->periodoDoBimestre($anoLetivo, $bimestre);
     }
@@ -253,4 +251,8 @@ class DashboardFiltro
 
         return [$inicio, $fim];
     }
+}
+
+if (!class_exists('DashboardFiltro', false) && class_exists(__NAMESPACE__ . '\\DashboardFiltro', false)) {
+    class_alias(__NAMESPACE__ . '\\DashboardFiltro', 'DashboardFiltro');
 }

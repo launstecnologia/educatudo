@@ -16,15 +16,15 @@
                 </div>
                 <div class="sidebar-text-container logo-navbar-wrap">
                     <?php
-                    $logoSidebar = LayoutHelper::getContextualLogo('sidebar', 'h-9 w-auto max-w-full object-contain', 'Logo');
+                    $logoSidebar = \App\Core\LayoutHelper::getContextualLogo('sidebar', 'h-9 w-auto max-w-full object-contain', 'Logo');
                     if ($logoSidebar): ?>
                         <?= $logoSidebar ?>
                         <div class="sidebar-logo-fallback hidden">
-                            <h1 class="text-xl font-bold text-white sidebar-text"><?= htmlspecialchars(LayoutHelper::getSystemTitle()) ?></h1>
+                            <h1 class="text-xl font-bold text-white sidebar-text"><?= htmlspecialchars(\App\Core\LayoutHelper::getSystemTitle()) ?></h1>
                             <p class="text-sm text-purple-100 sidebar-text">Admin Panel</p>
                         </div>
                     <?php else: ?>
-                        <h1 class="text-xl font-bold text-white sidebar-text"><?= htmlspecialchars(LayoutHelper::getSystemTitle()) ?></h1>
+                        <h1 class="text-xl font-bold text-white sidebar-text"><?= htmlspecialchars(\App\Core\LayoutHelper::getSystemTitle()) ?></h1>
                         <p class="text-sm text-purple-100 sidebar-text">Admin Panel</p>
                     <?php endif; ?>
                 </div>
@@ -61,8 +61,7 @@
         $podeVerAlertas = !in_array($perfilAdmin, ['financeiro', 'secretaria'], true)
             && ($perfilAdmin === '' || in_array($perfilAdmin, ['dev', 'diretor', 'coordenador'], true));
         if (($user['perfil_admin'] ?? '') === 'dev' || $podeVerAlertas) {
-            require_once __DIR__ . '/../../../Core/Database.php';
-            $db = Database::getInstance();
+            $db = \App\Core\Database::getInstance();
             try {
                 if (($user['perfil_admin'] ?? '') === 'dev') {
                     $openTicketsCount = $db->fetch("SELECT COUNT(*) as total FROM suporte_tickets WHERE status = 'aberto'")['total'] ?? 0;
@@ -70,15 +69,14 @@
                 if ($podeVerAlertas) {
                     $alertasSensiveisNovos = $db->fetch("SELECT COUNT(*) as total FROM alertas_sensiveis WHERE status = 'novo'")['total'] ?? 0;
                 }
-            } catch (Throwable $e) {
+            } catch (\Throwable $e) {
                 $openTicketsCount = 0;
                 $alertasSensiveisNovos = 0;
             }
         }
         if (!class_exists('AdminPermissionMatrix')) {
-            require_once __DIR__ . '/../../../Core/AdminPermissionMatrix.php';
         }
-        $adminPermissionsSidebar = AdminPermissionMatrix::effectivePermissionsForUser($db ?? Database::getInstance(), $user ?? []);
+        $adminPermissionsSidebar = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser($db ?? \App\Core\Database::getInstance(), $user ?? []);
         $canViewSidebar = static function (array $keys) use ($adminPermissionsSidebar): bool {
             foreach ($keys as $k) {
                 if (!empty($adminPermissionsSidebar[$k]['visualizar'])) {
@@ -88,11 +86,10 @@
             return false;
         };
         if (!class_exists('AdminMenuDiagnostico')) {
-            require_once __DIR__ . '/../../../Core/AdminMenuDiagnostico.php';
         }
-        AdminMenuDiagnostico::registrarOcultos($user ?? []);
+        \App\Core\AdminMenuDiagnostico::registrarOcultos($user ?? []);
         $modOn = static function (string $key): bool {
-            return !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled($key);
+            return !class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled($key);
         };
         $showDashboardMenu = $canViewSidebar(['dashboard']);
         $showAlunosMenu = $canViewSidebar(['alunos']);
@@ -111,7 +108,7 @@
             'processos_matricula', 'transferencia', 'vida_escolar', 'modelos_documentos',
             'censo_escolar', 'documentos_institucionais', 'almoxarifado', 'patrimonio',
         ]);
-        $showPaineisGroup = $canViewSidebar(['dashboard', 'saude_academica', 'conformidade', 'relatorios_gerais']);
+        $showPaineisGroup = $canViewSidebar(['dashboard', 'saude_academica', 'conformidade', 'relatorios_gerais', 'declaracoes_aluno']);
         $showInventoryGroup = $modOn('recursos_fisicos') && $canViewSidebar(['almoxarifado', 'patrimonio']);
         $cp = $current_page ?? '';
         $uriAtual = $_SERVER['REQUEST_URI'] ?? '';
@@ -145,7 +142,7 @@
         ], true) || $curMovimentacao;
         $paineisOpen = in_array($cp, [
             'paineis', 'dashboard', 'saude_academica', 'conformidade',
-            'relatorios', 'reports_boletim_coordenacao',
+            'relatorios', 'reports_boletim_coordenacao', 'paineis_documentos',
         ], true);
         $comunicacaoOpen = in_array($cp, [
             'comunicacao', 'school-communication', 'school-calendar', 'mural-recados', 'notifications',
@@ -261,7 +258,7 @@
         ?>
         <nav class="admin-sidebar-nav space-y-0.5">
             <?php if (($user['perfil_admin'] ?? '') === 'financeiro'): ?>
-                <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('financeiro')): ?>
+                <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('financeiro')): ?>
                 <div class="menu-group">
                     <div class="flex items-center rounded-xl <?= ($current_page ?? '') === 'financeiro' ? 'bg-white/20' : '' ?>">
                         <a href="<?= URL ?>/admin/financeiro-escolar" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
@@ -882,6 +879,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'conformidade': 'paineis',
         'relatorios': 'paineis',
         'reports_boletim_coordenacao': 'paineis',
+        'paineis_documentos': 'paineis',
         'monitoramento': 'monitoramento',
         'monitoramento_alertas': 'monitoramento',
         'tentativas_login': 'monitoramento',

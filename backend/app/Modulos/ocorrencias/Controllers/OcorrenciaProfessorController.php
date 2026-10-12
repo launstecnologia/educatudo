@@ -1,25 +1,22 @@
 <?php
 
-require_once __DIR__ . '/../../../Core/BaseController.php';
-require_once __DIR__ . '/../../../Core/AuthManager.php';
-require_once __DIR__ . '/../../../Models/User/Teacher.php';
-require_once __DIR__ . '/../../../Models/Education/ClassDiary.php';
-require_once __DIR__ . '/../Services/OcorrenciaService.php';
+namespace App\Modulos\Ocorrencias\Controllers;
 
 use App\Modulos\Ocorrencias\Services\OcorrenciaService;
 
-if (!class_exists('OcorrenciaProfessorController')) {
-class OcorrenciaProfessorController extends BaseController
+
+if (!class_exists(__NAMESPACE__ . '\\OcorrenciaProfessorController', false)) {
+class OcorrenciaProfessorController extends \App\Core\BaseController
 {
     private $auth;
-    private Teacher $teacherModel;
+    private \App\Models\User\Teacher $teacherModel;
     private OcorrenciaService $service;
 
     public function __construct()
     {
         parent::__construct();
-        $this->auth = new AuthManager();
-        $this->teacherModel = new Teacher();
+        $this->auth = new \App\Core\AuthManager();
+        $this->teacherModel = new \App\Models\User\Teacher();
         $this->service = new OcorrenciaService();
         if (!$this->auth->isLoggedIn() || (($this->auth->getUser()['tipo'] ?? '') !== 'professor')) {
             $this->redirect('/');
@@ -95,7 +92,7 @@ class OcorrenciaProfessorController extends BaseController
         $user = $this->auth->getUser();
         $professor = $this->teacherModel->findById((int) ($user['id'] ?? 0));
         if (!$professor) {
-            throw new RuntimeException('Cadastro de professor não encontrado.');
+            throw new \RuntimeException('Cadastro de professor não encontrado.');
         }
         return $professor;
     }
@@ -115,4 +112,8 @@ class OcorrenciaProfessorController extends BaseController
             . '&data=' . urlencode((string) ($aula['data_aula'] ?? ''));
     }
 }
+}
+
+if (!class_exists('OcorrenciaProfessorController', false) && class_exists(__NAMESPACE__ . '\\OcorrenciaProfessorController', false)) {
+    class_alias(__NAMESPACE__ . '\\OcorrenciaProfessorController', 'OcorrenciaProfessorController');
 }

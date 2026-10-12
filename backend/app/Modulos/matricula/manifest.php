@@ -5,6 +5,7 @@
  */
 return [
     'chave' => 'matricula',
+    'namespace' => 'App\\Modulos\\Matricula',
     'label' => 'Processo de Matrícula',
     'grupo' => 'secretaria',
     'feature_keys' => [

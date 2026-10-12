@@ -1,11 +1,11 @@
 <?php
+
+namespace App\Core;
 /**
  * EducaTudo - Helper de Layout
  * Gerencia configurações de layout do sistema
  */
 
-require_once __DIR__ . '/Database.php';
-require_once __DIR__ . '/RedisCache.php';
 
 class LayoutHelper
 {
@@ -45,7 +45,7 @@ class LayoutHelper
                 self::$config = [];
                 return self::$config;
             }
-            // Single-tenant (MULTI_TENANT=false): TENANT_ID não existe; Database já é o banco da escola — carregar config_layout.
+            // Single-tenant (MULTI_TENANT=false): \TENANT_ID não existe; Database já é o banco da escola — carregar config_layout.
             $cacheKey = $tenantId > 0 ? 'config_layout_' . $tenantId : 'config_layout_single';
             $cached = RedisCache::get($cacheKey);
             if ($cached !== null) {
@@ -64,9 +64,8 @@ class LayoutHelper
                     self::$config[$config['config_key']] = $config['config_value'];
                 }
                 RedisCache::set($cacheKey, json_encode(self::$config), 300);
-            } catch (Throwable $e) {
+            } catch (\Throwable $e) {
                 if (!class_exists('Logger')) {
-                    require_once __DIR__ . '/Logger.php';
                 }
                 Logger::error("Erro ao carregar config_layout: " . $e->getMessage(), [
                     'exception' => $e
@@ -93,7 +92,6 @@ class LayoutHelper
     {
         self::$config = null;
         if (!class_exists('RedisCache', false)) {
-            require_once __DIR__ . '/RedisCache.php';
         }
         RedisCache::delete('config_layout');
         RedisCache::delete('config_layout_single');
@@ -536,7 +534,7 @@ class LayoutHelper
             color: inherit !important;
         }
 
-        /* Texto do submenu (itens aninhados: Estrutura, Acadêmico, etc.) */
+        /* Texto do submenu (itens aninhados: \Estrutura, Acadêmico, etc.) */
         .sidebar-custom nav [id\$='-submenu'] a,
         .sidebar-custom nav [id\$='-submenu'] a .sidebar-text,
         .sidebar-custom nav [id\$='-submenu'] button,
@@ -1103,7 +1101,6 @@ class LayoutHelper
         $key = 'module_' . $module;
         if (!array_key_exists($key, $config)) {
             if (!class_exists('ModuloRegistry', false)) {
-                require_once __DIR__ . '/ModuloRegistry.php';
             }
             $value = ModuloRegistry::featureDefault((string) $module);
         } else {
@@ -1148,11 +1145,10 @@ class LayoutHelper
             return false;
         }
         if (!class_exists('CreditosModuleRegistry', false)) {
-            require_once __DIR__ . '/CreditosModuleRegistry.php';
         }
         static $exige = null;
         if ($exige === null) {
-            $exige = array_fill_keys(\CreditosModuleRegistry::getFeatureModulesQueExigemTudiCoins(), true);
+            $exige = array_fill_keys(\App\Core\CreditosModuleRegistry::getFeatureModulesQueExigemTudiCoins(), true);
         }
         return isset($exige[$module]);
     }
@@ -1253,7 +1249,7 @@ class LayoutHelper
             return $str;
         }
 
-        // Converte $$...$$ para \( ... \) para renderizar como fórmula inline (ex.: enunciado salvo com $$)
+        // \Converte $$...$$ para \( ... \) para renderizar como fórmula inline (ex.: enunciado salvo com $$)
         $str = preg_replace('/\$\$([^$]*?)\$\$/s', ' \\( $1 \\) ', $str);
 
         // Preserva blocos LaTeX, <img> e <br>; escapa o resto
@@ -1550,4 +1546,8 @@ class LayoutHelper
         $s = trim($s);
         return $s;
     }
+}
+
+if (!class_exists('LayoutHelper', false) && class_exists(__NAMESPACE__ . '\\LayoutHelper', false)) {
+    class_alias(__NAMESPACE__ . '\\LayoutHelper', 'LayoutHelper');
 }

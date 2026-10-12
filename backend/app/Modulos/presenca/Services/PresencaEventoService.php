@@ -1,11 +1,10 @@
 <?php
 
-require_once __DIR__ . '/../../../Core/Database.php';
-require_once __DIR__ . '/../Models/PresencaEvento.php';
-require_once __DIR__ . '/../Models/PresencaIdentificador.php';
-require_once __DIR__ . '/../Models/PresencaIntegracao.php';
-require_once __DIR__ . '/PresencaAplicacaoService.php';
-require_once __DIR__ . '/PresencaConsolidacaoService.php';
+namespace App\Modulos\Presenca\Services;
+
+
+use App\Modulos\Presenca\Models\PresencaEvento;
+use App\Modulos\Presenca\Models\PresencaIdentificador;
 
 class PresencaEventoService
 {
@@ -16,13 +15,13 @@ class PresencaEventoService
     private $consolidacao;
 
     public function __construct(
-        ?Database $db = null,
+        ?\App\Core\Database $db = null,
         ?PresencaEvento $eventos = null,
         ?PresencaIdentificador $identificadores = null,
         ?PresencaAplicacaoService $aplicacao = null,
         ?PresencaConsolidacaoService $consolidacao = null
     ) {
-        $this->db = $db ?? Database::getInstance();
+        $this->db = $db ?? \App\Core\Database::getInstance();
         $this->eventos = $eventos ?? new PresencaEvento();
         $this->identificadores = $identificadores ?? new PresencaIdentificador();
         $this->aplicacao = $aplicacao ?? new PresencaAplicacaoService($this->db);
@@ -46,7 +45,7 @@ class PresencaEventoService
     public function registrar(array $dados): array
     {
         if (!$this->eventos->tabelasProntas()) {
-            throw new RuntimeException('Rode a migration 2026_08_22_gestao_presenca.sql no Master.');
+            throw new \RuntimeException('Rode a migration 2026_08_22_gestao_presenca.sql no Master.');
         }
         $alunoId = (int) ($dados['aluno_id'] ?? 0);
         $identificador = trim((string) ($dados['identificador_bruto'] ?? ''));
@@ -91,7 +90,7 @@ class PresencaEventoService
             $aplicacao = $this->aplicacao->aplicarDiaAluno($alunoId, $data, $origemMarca);
             $this->eventos->marcarProcessado($eventoId, $aplicacao['erro']);
             $this->consolidacao->consolidarAlunoNaData($alunoId, $data);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $this->eventos->marcarProcessado($eventoId, $e->getMessage());
             $aplicacao['erro'] = $e->getMessage();
         }
@@ -135,7 +134,7 @@ class PresencaEventoService
     /**
      * Ponte do reconhecimento facial: não quebra o fluxo se o módulo/migration não existir.
      */
-    public static function fromFacial(int $alunoId, string $tipo, DateTimeImmutable $quando, string $providerPresenceId, ?int $userId): void
+    public static function fromFacial(int $alunoId, string $tipo, \DateTimeImmutable $quando, string $providerPresenceId, ?int $userId): void
     {
         try {
             if ($alunoId <= 0 || $providerPresenceId === '') {
@@ -144,10 +143,7 @@ class PresencaEventoService
             if (!in_array($tipo, ['entrada', 'saida'], true)) {
                 return;
             }
-            if (!class_exists('LayoutHelper', false)) {
-                require_once dirname(__DIR__, 3) . '/Core/LayoutHelper.php';
-            }
-            if (class_exists('LayoutHelper', false) && !LayoutHelper::isModuleEnabled('presenca')) {
+            if (!\App\Core\LayoutHelper::isModuleEnabled('presenca')) {
                 return;
             }
             $model = new PresencaEvento();
@@ -162,7 +158,7 @@ class PresencaEventoService
                 'id_externo' => 'facial:' . $providerPresenceId,
                 'registrado_por' => $userId,
             ]);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log('PresencaEventoService::fromFacial: ' . $e->getMessage());
         }
     }
@@ -198,4 +194,8 @@ class PresencaEventoService
         }
         return $out;
     }
+}
+
+if (!class_exists('PresencaEventoService', false) && class_exists(__NAMESPACE__ . '\\PresencaEventoService', false)) {
+    class_alias(__NAMESPACE__ . '\\PresencaEventoService', 'PresencaEventoService');
 }

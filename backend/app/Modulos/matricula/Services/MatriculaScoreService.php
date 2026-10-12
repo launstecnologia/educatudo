@@ -2,8 +2,7 @@
 
 namespace App\Modulos\Matricula\Services;
 
-use Database;
-
+use App\Core\Database;
 /**
  * Calcula o score de propensão à rematrícula por aluno.
  * Fórmula determinística e explicável (spec §9.2).
@@ -216,4 +215,8 @@ class MatriculaScoreService
             );
         }
     }
+}
+
+if (!class_exists('MatriculaScoreService', false) && class_exists(__NAMESPACE__ . '\\MatriculaScoreService', false)) {
+    class_alias(__NAMESPACE__ . '\\MatriculaScoreService', 'MatriculaScoreService');
 }

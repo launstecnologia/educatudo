@@ -1,9 +1,10 @@
 <?php
+
+namespace App\Core;
 /**
  * URLs e tokens do EducaHits (produto externo educahits.educatudo.com).
  *
- * Documentação do fluxo atual: docs/EDUCAHITS_INTEGRACAO_EXTERNA.md
- * (documentacao_educahits_edutudo.pdf = módulo legado embutido no EducaTudo.)
+ * URLs e tokens do produto externo EducaHits.
  */
 class EducaHitsConfig
 {
@@ -38,7 +39,7 @@ class EducaHitsConfig
     }
 
     /**
-     * Valor exato do header Authorization: Bearer … na entrega e APIs relacionadas.
+     * Valor exato do header Authorization: \Bearer … na entrega e APIs relacionadas.
      * Deve coincidir com o secret ADMIN_API_KEY da Edge Function receive-song (não confundir com ?token= do portal).
      */
     public static function receiveBearerToken(): string
@@ -122,4 +123,8 @@ class EducaHitsConfig
 
         return strpos(strtolower($_SERVER['HTTP_HOST'] ?? ''), 'demo.educatudo.com') !== false;
     }
+}
+
+if (!class_exists('EducaHitsConfig', false) && class_exists(__NAMESPACE__ . '\\EducaHitsConfig', false)) {
+    class_alias(__NAMESPACE__ . '\\EducaHitsConfig', 'EducaHitsConfig');
 }

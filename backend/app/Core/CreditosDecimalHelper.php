@@ -1,16 +1,18 @@
 <?php
+
+namespace App\Core;
 /**
  * Normalização de valores de TudiCoins (créditos) para precificação, carteira e UI.
- * Na interface, TudiCoins são tratados como dinheiro (formato BR + prefixo TC$).
+ * Na interface, TudiCoins são tratados como dinheiro (formato BR + prefixo \TC$).
  */
 class CreditosDecimalHelper
 {
     public const SCALE = 4;
 
-    /** Prefixo de exibição (como R$ / $). */
-    public const PREFIXO = 'TC$';
+    /** Prefixo de exibição (como \R$ / $). */
+    public const PREFIXO = '\TC$';
 
-    /** Conversão fixa: 1 TudiCoin = R$ 0,20 */
+    /** Conversão fixa: 1 TudiCoin = \R$ 0,20 */
     public const BRL_POR_UNIDADE = 0.20;
 
     /**
@@ -86,7 +88,7 @@ class CreditosDecimalHelper
     }
 
     /**
-     * Exibição monetária: TC$ 1.000,00
+     * Exibição monetária: \TC$ 1.000,00
      */
     public static function formatDisplay(float $v, bool $withPrefix = true): string
     {
@@ -95,7 +97,7 @@ class CreditosDecimalHelper
     }
 
     /**
-     * Equivalente em reais (1 TudiCoin = R$ 0,20).
+     * Equivalente em reais (1 TudiCoin = \R$ 0,20).
      */
     public static function toReais(float $tudicoins): float
     {
@@ -103,10 +105,14 @@ class CreditosDecimalHelper
     }
 
     /**
-     * Ex.: R$ 20,00
+     * Ex.: \R$ 20,00
      */
     public static function formatReaisFromTudicoins(float $tudicoins): string
     {
-        return 'R$ ' . self::formatNumero(self::toReais($tudicoins), 2);
+        return '\R$ ' . self::formatNumero(self::toReais($tudicoins), 2);
     }
+}
+
+if (!class_exists('CreditosDecimalHelper', false) && class_exists(__NAMESPACE__ . '\\CreditosDecimalHelper', false)) {
+    class_alias(__NAMESPACE__ . '\\CreditosDecimalHelper', 'CreditosDecimalHelper');
 }

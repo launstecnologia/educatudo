@@ -63,9 +63,8 @@ $montarEventoPortal = static function (array $ev, int $rid, string $nome, string
 if ($alunoIdPortal > 0) {
     try {
         if (!class_exists('Database', false)) {
-            require_once dirname(__DIR__, 2) . '/Core/Database.php';
         }
-        $dbPortal = Database::getInstance();
+        $dbPortal = \App\Core\Database::getInstance();
         $turmasPortal = [];
         $seriesPortal = [];
         $ordinaisPortal = [];
@@ -112,7 +111,7 @@ if ($alunoIdPortal > 0) {
                     $guardarEscopo($mat['turma_id'] ?? 0, $mat['serie_id'] ?? 0, (string) ($mat['serie_nome'] ?? ''));
                 }
             }
-        } catch (Throwable $eMat) {
+        } catch (\Throwable $eMat) {
             // Sem matrícula ativa, vale a turma principal.
         }
         $visCol = (($notas_perfil ?? 'aluno') === 'pais') ? 'vis_pais' : 'vis_aluno';
@@ -168,7 +167,7 @@ if ($alunoIdPortal > 0) {
                 $regraPortal['ano_letivo'] ?? null
             );
         }
-    } catch (Throwable $ePortal) {
+    } catch (\Throwable $ePortal) {
         error_log('Notas do portal aluno #' . $alunoIdPortal . ': ' . $ePortal->getMessage());
     }
 }

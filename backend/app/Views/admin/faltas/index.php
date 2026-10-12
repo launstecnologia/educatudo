@@ -168,9 +168,8 @@ $urlLancarFaltas = URL . '/admin/faltas/lancar';
                                 <select name="bimestre" id="faltas-modal-bimestre" data-periodo-letivo-select data-periodo-vazio="1" data-periodo-valor="rotulo" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required>
                                     <?php
                                     if (!class_exists('PeriodoLetivo')) {
-                                        require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
                                     }
-                                    echo PeriodoLetivo::optionsHtml((int) date('Y'), '', ['vazio' => true, 'valor_rotulo' => true]);
+                                    echo \App\Core\PeriodoLetivo::optionsHtml((int) date('Y'), '', ['vazio' => true, 'valor_rotulo' => true]);
                                     ?>
                                 </select>
                             </div>

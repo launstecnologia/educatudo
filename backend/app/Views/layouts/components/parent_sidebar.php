@@ -3,8 +3,6 @@ $filhos = $filhos ?? [];
 $filho = $filho ?? null;
 $current_page = $current_page ?? 'dashboard';
 $filhoId = $filho['id'] ?? null;
-require_once __DIR__ . '/../../../Core/LayoutHelper.php';
-require_once __DIR__ . '/../../../Core/FeatureGate.php';
 ?>
 <aside id="sidebar" class="w-64 md:w-64 sidebar-custom shadow-2xl min-h-screen transition-all duration-300 ease-in-out fixed md:relative md:left-0 left-0 z-50">
     <div class="p-6">
@@ -12,23 +10,23 @@ require_once __DIR__ . '/../../../Core/FeatureGate.php';
         <div class="flex items-center justify-between mb-6 sidebar-header">
             <div class="flex items-center sidebar-logo-container">
                 <div class="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center mr-3 sidebar-icon overflow-hidden flex-shrink-0">
-                    <?php if (LayoutHelper::getContextualLogo('favicon', 'w-full h-full object-contain p-1', 'Logo')): ?>
-                        <?= LayoutHelper::getContextualLogo('favicon', 'w-full h-full object-contain p-1', 'Logo') ?>
+                    <?php if (\App\Core\LayoutHelper::getContextualLogo('favicon', 'w-full h-full object-contain p-1', 'Logo')): ?>
+                        <?= \App\Core\LayoutHelper::getContextualLogo('favicon', 'w-full h-full object-contain p-1', 'Logo') ?>
                     <?php else: ?>
                         <span class="text-white font-bold text-lg">E</span>
                     <?php endif; ?>
                 </div>
                 <div class="sidebar-text-container min-w-0">
                     <?php
-                    $logoSidebar = LayoutHelper::getContextualLogo('sidebar', 'h-8 w-auto max-w-full', 'Logo');
+                    $logoSidebar = \App\Core\LayoutHelper::getContextualLogo('sidebar', 'h-8 w-auto max-w-full', 'Logo');
                     if ($logoSidebar): ?>
                         <?= $logoSidebar ?>
                         <div class="sidebar-logo-fallback hidden">
-                            <h1 class="text-xl font-bold text-white sidebar-text"><?= htmlspecialchars(LayoutHelper::getSystemTitle()) ?></h1>
+                            <h1 class="text-xl font-bold text-white sidebar-text"><?= htmlspecialchars(\App\Core\LayoutHelper::getSystemTitle()) ?></h1>
                         </div>
                         <p class="text-sm text-white/80 sidebar-text mt-0.5">Portal dos Pais</p>
                     <?php else: ?>
-                        <h1 class="text-xl font-bold text-white sidebar-text"><?= htmlspecialchars(LayoutHelper::getSystemTitle()) ?></h1>
+                        <h1 class="text-xl font-bold text-white sidebar-text"><?= htmlspecialchars(\App\Core\LayoutHelper::getSystemTitle()) ?></h1>
                         <p class="text-sm text-white/80 sidebar-text">Portal dos Pais</p>
                     <?php endif; ?>
                 </div>
@@ -90,7 +88,7 @@ require_once __DIR__ . '/../../../Core/FeatureGate.php';
                 </svg>
                 <span class="sidebar-text">Boletim</span>
             </a>
-            <?php if (FeatureGate::isModuleEnabled('jornadas')): ?>
+            <?php if (\App\Core\FeatureGate::isModuleEnabled('jornadas')): ?>
             <a href="<?= URL ?>/pais/filhos/<?= (int)$filhoId ?>/jornadas" class="flex items-center px-4 py-3 <?= $current_page === 'jornadas' ? 'text-white bg-white/20' : 'text-white/90 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 sidebar-nav-item">
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
@@ -98,7 +96,7 @@ require_once __DIR__ . '/../../../Core/FeatureGate.php';
                 <span class="sidebar-text">Histórico de Jornadas</span>
             </a>
             <?php endif; ?>
-            <?php if (FeatureGate::isModuleEnabled('aluno_planos_aula')): ?>
+            <?php if (\App\Core\FeatureGate::isModuleEnabled('aluno_planos_aula')): ?>
             <a href="<?= URL ?>/pais/filhos/<?= (int)$filhoId ?>/plano-aula" class="flex items-center px-4 py-3 <?= $current_page === 'plano-aula' ? 'text-white bg-white/20' : 'text-white/90 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 sidebar-nav-item">
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
@@ -106,7 +104,7 @@ require_once __DIR__ . '/../../../Core/FeatureGate.php';
                 <span class="sidebar-text">Plano de Aula</span>
             </a>
             <?php endif; ?>
-            <?php if (FeatureGate::isModuleEnabled('mural_recados')): ?>
+            <?php if (\App\Core\FeatureGate::isModuleEnabled('mural_recados')): ?>
             <a href="<?= URL ?>/pais/filhos/<?= (int)$filhoId ?>/mural-recados" class="flex items-center px-4 py-3 <?= $current_page === 'mural-recados' ? 'text-white bg-white/20' : 'text-white/90 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 sidebar-nav-item">
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
@@ -114,7 +112,7 @@ require_once __DIR__ . '/../../../Core/FeatureGate.php';
                 <span class="sidebar-text">Recados</span>
             </a>
             <?php endif; ?>
-            <?php if (FeatureGate::isModuleEnabled('aluno_arquivos')): ?>
+            <?php if (\App\Core\FeatureGate::isModuleEnabled('aluno_arquivos')): ?>
             <a href="<?= URL ?>/pais/filhos/<?= (int)$filhoId ?>/arquivos" class="flex items-center px-4 py-3 <?= $current_page === 'arquivos' ? 'text-white bg-white/20' : 'text-white/90 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 sidebar-nav-item">
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"></path>
@@ -127,25 +125,25 @@ require_once __DIR__ . '/../../../Core/FeatureGate.php';
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-6m3 6V7m3 10v-4m4 6H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2z"></path></svg>
                 <span class="text-sm">Boletim (selecione um filho)</span>
             </span>
-            <?php if (FeatureGate::isModuleEnabled('jornadas')): ?>
+            <?php if (\App\Core\FeatureGate::isModuleEnabled('jornadas')): ?>
             <span class="flex items-center px-4 py-3 text-white/70 rounded-xl cursor-not-allowed sidebar-text" title="Selecione um filho na lista acima">
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
                 <span class="text-sm">Jornadas (selecione um filho)</span>
             </span>
             <?php endif; ?>
-            <?php if (FeatureGate::isModuleEnabled('aluno_planos_aula')): ?>
+            <?php if (\App\Core\FeatureGate::isModuleEnabled('aluno_planos_aula')): ?>
             <span class="flex items-center px-4 py-3 text-white/70 rounded-xl cursor-not-allowed sidebar-text" title="Selecione um filho na lista acima">
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
                 <span class="text-sm">Plano de Aula (selecione um filho)</span>
             </span>
             <?php endif; ?>
-            <?php if (FeatureGate::isModuleEnabled('mural_recados')): ?>
+            <?php if (\App\Core\FeatureGate::isModuleEnabled('mural_recados')): ?>
             <span class="flex items-center px-4 py-3 text-white/70 rounded-xl cursor-not-allowed sidebar-text" title="Selecione um filho na lista acima">
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
                 <span class="text-sm">Recados (selecione um filho)</span>
             </span>
             <?php endif; ?>
-            <?php if (FeatureGate::isModuleEnabled('aluno_arquivos')): ?>
+            <?php if (\App\Core\FeatureGate::isModuleEnabled('aluno_arquivos')): ?>
             <span class="flex items-center px-4 py-3 text-white/70 rounded-xl cursor-not-allowed sidebar-text" title="Selecione um filho na lista acima">
                 <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"></path></svg>
                 <span class="text-sm">Arquivos (selecione um filho)</span>

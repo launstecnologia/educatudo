@@ -6,6 +6,11 @@
  */
 
 $router->get('/admin/modelos-documentos', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@index');
+$router->get('/admin/paineis/documentos', 'Modulos/modelos-documentos/ArquivoEmissaoDocumentoAdminController@index');
+$router->post('/admin/paineis/documentos/gerar', 'Modulos/modelos-documentos/ArquivoEmissaoDocumentoAdminController@gerar');
+$router->get('/admin/paineis/documentos/{id}/pdf', 'Modulos/modelos-documentos/ArquivoEmissaoDocumentoAdminController@pdf');
+$router->get('/admin/modelos-documentos/emitir-lote', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@emitirLote');
+$router->get('/admin/modelos-documentos/emitir-lote/pdf', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@emitirLotePdf');
 $router->get('/admin/modelos-documentos/importar', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@importar');
 $router->post('/admin/modelos-documentos/importar', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@processarImportacao');
 $router->post('/admin/modelos-documentos/importar/catalogo', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@aplicarCatalogo');

@@ -1,9 +1,14 @@
 <?php
+
+namespace App\Modulos\GruposRegrasNotas\Services;
+
+use App\Modulos\GruposRegrasNotas\Models\GrupoRegrasNotas;
+use Throwable;
+
 /**
  * Regras de negócio do Grupo de Regras de Notas.
  */
 
-require_once __DIR__ . '/../Models/GrupoRegrasNotas.php';
 
 class GrupoRegrasNotasService
 {
@@ -23,9 +28,8 @@ class GrupoRegrasNotasService
     public function moduloAtivo(): bool
     {
         if (!class_exists('LayoutHelper', false)) {
-            require_once dirname(__DIR__, 3) . '/Core/LayoutHelper.php';
         }
-        return LayoutHelper::isModuleEnabled('grupos_regras_notas');
+        return \App\Core\LayoutHelper::isModuleEnabled('grupos_regras_notas');
     }
 
     /**
@@ -1355,4 +1359,8 @@ class GrupoRegrasNotasService
         }
         return $t;
     }
+}
+
+if (!class_exists('GrupoRegrasNotasService', false)) {
+    class_alias(__NAMESPACE__ . '\\GrupoRegrasNotasService', 'GrupoRegrasNotasService');
 }

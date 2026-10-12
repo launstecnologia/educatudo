@@ -1,21 +1,22 @@
 <?php
+
+namespace App\Core;
 /**
  * Conexão PDO ao banco de uma escola (tenant) a partir do escolas.id — uso no Master / webhooks.
  */
 class MasterTenantConnection
 {
-    private static function getMasterPdo(): ?PDO
+    private static function getMasterPdo(): ?\PDO
     {
         $masterPdo = $GLOBALS['_educatudo_master_pdo'] ?? null;
-        if ($masterPdo instanceof PDO) {
+        if ($masterPdo instanceof \PDO) {
             return $masterPdo;
         }
         try {
-            require_once __DIR__ . '/Database.php';
             $masterPdo = Database::createMasterPdo();
             $GLOBALS['_educatudo_master_pdo'] = $masterPdo;
             return $masterPdo;
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log('[MasterTenantConnection] falha ao conectar master: ' . $e->getMessage());
             return null;
         }
@@ -37,7 +38,7 @@ class MasterTenantConnection
              WHERE e.id = ?"
         );
         $stmt->execute([$escolaId]);
-        $escola = $stmt->fetch(PDO::FETCH_ASSOC);
+        $escola = $stmt->fetch(\PDO::FETCH_ASSOC);
         if (!$escola) {
             return null;
         }
@@ -45,24 +46,27 @@ class MasterTenantConnection
         $port = (int) ($escola['porta'] ?? 3306);
         $dbName = $escola['nome_banco'] ?? '';
         $user = $escola['usuario'] ?? '';
-        require_once __DIR__ . '/MasterSecretVault.php';
         $pass = MasterSecretVault::decryptDbPassword($escola['senha_criptografada'] ?? '');
         if ($host === '' || $dbName === '' || $user === '') {
             return null;
         }
         $dsn = "mysql:host={$host};port={$port};dbname={$dbName};charset=utf8mb4";
         try {
-            $pdo = new PDO($dsn, $user, $pass, [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            $pdo = new \PDO($dsn, $user, $pass, [
+                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+                \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
             ]);
             $pdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
             // Alinha NOW() do MySQL com o fuso da aplicação (evita falso "travado" na Fila IA).
             $pdo->exec("SET time_zone = '-03:00'");
             return ['pdo' => $pdo, 'escola' => $escola];
-        } catch (PDOException $e) {
+        } catch (\PDOException $e) {
             error_log('[MasterTenantConnection] ' . $e->getMessage());
             return null;
         }
     }
+}
+
+if (!class_exists('MasterTenantConnection', false) && class_exists(__NAMESPACE__ . '\\MasterTenantConnection', false)) {
+    class_alias(__NAMESPACE__ . '\\MasterTenantConnection', 'MasterTenantConnection');
 }

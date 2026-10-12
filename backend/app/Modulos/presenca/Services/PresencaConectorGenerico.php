@@ -1,5 +1,7 @@
 <?php
 
+namespace App\Modulos\Presenca\Services;
+
 /**
  * Normaliza payloads de catraca (webhook genérico e aliases comuns de fornecedores).
  */
@@ -19,7 +21,7 @@ class PresencaConectorGenerico
             ?? ''
         ));
         if ($idExterno === '' || mb_strlen($idExterno) > 160) {
-            throw new InvalidArgumentException('Informe id_externo (ou event_id) do evento.');
+            throw new \InvalidArgumentException('Informe id_externo (ou event_id) do evento.');
         }
 
         $tipoRaw = strtolower(trim((string) (
@@ -40,16 +42,16 @@ class PresencaConectorGenerico
         ];
         $tipo = $tipoMap[$tipoRaw] ?? '';
         if ($tipo === '') {
-            throw new InvalidArgumentException('Informe tipo entrada ou saida.');
+            throw new \InvalidArgumentException('Informe tipo entrada ou saida.');
         }
 
         $quandoRaw = trim((string) (
             $payload['ocorrido_em'] ?? $payload['event_at'] ?? $payload['timestamp'] ?? $payload['data_hora'] ?? ''
         ));
         try {
-            $quando = $quandoRaw !== '' ? new DateTimeImmutable($quandoRaw) : new DateTimeImmutable('now');
-        } catch (Throwable $e) {
-            throw new InvalidArgumentException('Data e horário inválidos.');
+            $quando = $quandoRaw !== '' ? new \DateTimeImmutable($quandoRaw) : new \DateTimeImmutable('now');
+        } catch (\Throwable $e) {
+            throw new \InvalidArgumentException('Data e horário inválidos.');
         }
 
         $alunoId = (int) ($payload['aluno_id'] ?? $payload['student_id'] ?? 0);
@@ -74,4 +76,8 @@ class PresencaConectorGenerico
             'aluno_id' => $alunoId,
         ];
     }
+}
+
+if (!class_exists('PresencaConectorGenerico', false) && class_exists(__NAMESPACE__ . '\\PresencaConectorGenerico', false)) {
+    class_alias(__NAMESPACE__ . '\\PresencaConectorGenerico', 'PresencaConectorGenerico');
 }

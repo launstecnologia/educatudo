@@ -154,7 +154,7 @@ $csrfToken = $csrf_token ?? $this->generateCsrfToken();
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
                 <select id="itemTipo" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-400 focus:border-transparent">
-                    <?php foreach (\AgendaController::tiposItemPessoal() as $key => $t): ?>
+                    <?php foreach (\App\Controllers\Student\AgendaController::tiposItemPessoal() as $key => $t): ?>
                     <option value="<?= htmlspecialchars($key) ?>"><?= htmlspecialchars($t['label']) ?></option>
                     <?php endforeach; ?>
                 </select>

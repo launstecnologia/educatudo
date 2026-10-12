@@ -63,3 +63,7 @@ final class CsvExporter
         return $flat;
     }
 }
+
+if (!class_exists('CsvExporter', false) && class_exists(__NAMESPACE__ . '\\CsvExporter', false)) {
+    class_alias(__NAMESPACE__ . '\\CsvExporter', 'CsvExporter');
+}

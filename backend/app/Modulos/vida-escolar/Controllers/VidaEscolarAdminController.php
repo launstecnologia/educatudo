@@ -1,14 +1,10 @@
 <?php
+
+namespace App\Modulos\VidaEscolar\Controllers;
 /**
  * EducaTudo - Vida Escolar (admin / secretaria / coordenação)
  */
 
-require_once __DIR__ . '/../../../Controllers/Admin/AdminBaseController.php';
-require_once __DIR__ . '/../Services/VidaEscolarService.php';
-require_once __DIR__ . '/../Services/ProntuarioVidaEscolarService.php';
-require_once __DIR__ . '/../Services/VidaEscolarPdfService.php';
-require_once __DIR__ . '/../Services/EmissaoDocumentosAlunoService.php';
-require_once __DIR__ . '/../Services/ArquivoPdfAlunoService.php';
 
 use App\Modulos\VidaEscolar\Services\ArquivoPdfAlunoService;
 use App\Modulos\VidaEscolar\Services\EmissaoDocumentosAlunoService;
@@ -16,8 +12,8 @@ use App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService;
 use App\Modulos\VidaEscolar\Services\VidaEscolarPdfService;
 use App\Modulos\VidaEscolar\Services\VidaEscolarService;
 
-if (!class_exists('VidaEscolarAdminController', false)) {
-class VidaEscolarAdminController extends AdminBaseController
+if (!class_exists(__NAMESPACE__ . '\\VidaEscolarAdminController', false)) {
+class VidaEscolarAdminController extends \App\Controllers\Admin\AdminBaseController
 {
     private function service(): VidaEscolarService
     {
@@ -32,9 +28,8 @@ class VidaEscolarAdminController extends AdminBaseController
     private function exigirPermissao(string $acao): bool
     {
         if (!class_exists('LayoutHelper', false)) {
-            require_once dirname(__DIR__, 3) . '/Core/LayoutHelper.php';
         }
-        if (!\LayoutHelper::isModuleEnabled('vida_escolar')) {
+        if (!\App\Core\LayoutHelper::isModuleEnabled('vida_escolar')) {
             $this->setFlashMessage('O módulo Vida Escolar está desativado nesta escola.', 'error');
             $this->redirect('/admin/dashboard');
             return false;
@@ -156,8 +151,7 @@ class VidaEscolarAdminController extends AdminBaseController
             return;
         }
         try {
-            require_once dirname(__DIR__, 3) . '/Controllers/Admin/BoletimConfigController.php';
-            (new \BoletimConfigController(true))->atualizarBoletinsOficiaisDoAluno((int) $id);
+            (new \App\Controllers\Admin\BoletimConfigController(true))->atualizarBoletinsOficiaisDoAluno((int) $id);
         } catch (\Throwable $e) {
             error_log('Vida escolar alimentar boletim oficial: ' . $e->getMessage());
         }
@@ -512,8 +506,7 @@ class VidaEscolarAdminController extends AdminBaseController
         }
         $alunoId = (int) $id;
         $docFichaId = (int) $fichaDocId;
-        require_once dirname(__DIR__, 3) . '/Models/User/StudentDocument.php';
-        $doc = (new \StudentDocument())->find($alunoId, $docFichaId);
+        $doc = (new \App\Models\User\StudentDocument())->find($alunoId, $docFichaId);
         if (!$doc || trim((string) ($doc['arquivo_key'] ?? '')) === '') {
             $this->setFlashMessage('Esse documento não está na ficha deste aluno.', 'error');
             $this->redirectAluno($id, 'trajetoria');
@@ -580,16 +573,13 @@ class VidaEscolarAdminController extends AdminBaseController
         if (!$this->podeLerHistoricoIa()) {
             return ['ok' => false, 'job_id' => 0, 'error' => 'Leitura por IA indisponível (TudiCoins desligado ou sem saldo na carteira da escola).'];
         }
-        require_once dirname(__DIR__, 3) . '/Services/AIJobService.php';
-        require_once dirname(__DIR__, 3) . '/Services/CreditosService.php';
-        require_once dirname(__DIR__, 3) . '/Core/CreditosModuleRegistry.php';
         $user = $this->auth->getUser();
         $creditsModulo = 'vida_escolar_ler_historico';
         $creditsRef = 'vida_escolar_doc:' . $docId;
         $debitou = false;
         try {
             $creditos = new \App\Services\CreditosService();
-            if (!$creditos->podeConsumir('escola', \CreditosModuleRegistry::ESCOLA_CARTEIRA_USER_ID, $creditsModulo)) {
+            if (!$creditos->podeConsumir('escola', \App\Core\CreditosModuleRegistry::ESCOLA_CARTEIRA_USER_ID, $creditsModulo)) {
                 throw new \RuntimeException('TudiCoins insuficientes na carteira da escola.');
             }
             $creditos->consumirEscola($creditsModulo, $creditsRef);
@@ -912,15 +902,13 @@ class VidaEscolarAdminController extends AdminBaseController
 
     private function podeLerHistoricoIa(): bool
     {
-        require_once dirname(__DIR__, 3) . '/Core/CreditosModuleRegistry.php';
-        require_once dirname(__DIR__, 3) . '/Services/CreditosService.php';
-        if (!\CreditosModuleRegistry::acaoIaDisponivel('vida_escolar_ler_historico')) {
+        if (!\App\Core\CreditosModuleRegistry::acaoIaDisponivel('vida_escolar_ler_historico')) {
             return false;
         }
         try {
             return (new \App\Services\CreditosService())->podeConsumir(
                 'escola',
-                \CreditosModuleRegistry::ESCOLA_CARTEIRA_USER_ID,
+                \App\Core\CreditosModuleRegistry::ESCOLA_CARTEIRA_USER_ID,
                 'vida_escolar_ler_historico'
             );
         } catch (\Throwable $e) {
@@ -998,8 +986,7 @@ class VidaEscolarAdminController extends AdminBaseController
         if (!in_array($ext, ['pdf', 'jpg', 'jpeg', 'png', 'webp'], true)) {
             throw new \Exception('O arquivo da ficha precisa ser PDF ou imagem (JPG/PNG/WebP).');
         }
-        require_once dirname(__DIR__, 3) . '/Services/MediaStorageService.php';
-        $conteudo = (new \MediaStorageService($this->config))->getContents('arquivos', (string) ($doc['arquivo_key'] ?? ''));
+        $conteudo = (new \App\Services\MediaStorageService($this->config))->getContents('arquivos', (string) ($doc['arquivo_key'] ?? ''));
         if (!is_string($conteudo) || $conteudo === '') {
             throw new \Exception('Não encontrei o arquivo na aba Documentos deste aluno.');
         }
@@ -1064,4 +1051,8 @@ class VidaEscolarAdminController extends AdminBaseController
         }
     }
 }
+}
+
+if (!class_exists('VidaEscolarAdminController', false) && class_exists(__NAMESPACE__ . '\\VidaEscolarAdminController', false)) {
+    class_alias(__NAMESPACE__ . '\\VidaEscolarAdminController', 'VidaEscolarAdminController');
 }

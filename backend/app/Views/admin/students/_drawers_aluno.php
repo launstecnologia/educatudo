@@ -391,7 +391,7 @@
                     <div class="p-6 space-y-3">
                         <p class="text-xs text-slate-500">Os dados institucionais do cabeçalho vêm da unidade vinculada ao aluno.</p>
 
-                        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('vida_escolar')): ?>
+                        <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('vida_escolar')): ?>
                         <a href="<?= URL ?>/admin/students/<?= (int) ($student['id'] ?? 0) ?>?tab=vida-escolar"
                            class="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors">
                             <span class="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center"><i class="fa-solid fa-scroll"></i></span>
@@ -513,6 +513,42 @@
                                 <i class="fa-solid fa-download mr-1"></i> Gerar PDF
                             </button>
                         </div>
+
+                        <?php
+                        $modelosCampos = [];
+                        $svcCampos = dirname(__DIR__, 3) . '/Modulos/modelos-documentos/Services/ModeloDocumentoService.php';
+                        if (is_file($svcCampos)) {
+                            require_once $svcCampos;
+                            try {
+                                $modelosCampos = (new \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService())->listarModelosComCampos();
+                            } catch (\Throwable $e) {
+                                $modelosCampos = [];
+                            }
+                        }
+                        ?>
+                        <?php if ($modelosCampos !== []): ?>
+                        <div class="pt-2 border-t border-slate-200">
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Campos do layout</p>
+                            <p class="text-xs text-slate-500 mb-3">Data, horário, local e os outros campos criados no layout. O mesmo preenchimento vale para a turma em <a href="<?= URL ?>/admin/modelos-documentos/emitir-lote" class="underline">emitir em lote</a>.</p>
+                            <?php foreach ($modelosCampos as $modeloCampo):
+                                $midCampo = (int) ($modeloCampo['id'] ?? 0);
+                            ?>
+                            <form class="js-emitir-modelo p-3 rounded-xl border border-slate-200 mb-3"
+                                  data-url="<?= URL ?>/admin/students/<?= (int) ($student['id'] ?? 0) ?>/declaracoes/modelo/<?= $midCampo ?>/pdf">
+                                <div class="font-medium text-slate-800 mb-3"><?= htmlspecialchars((string) ($modeloCampo['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+                                <?php
+                                $campos_variaveis = is_array($modeloCampo['campos'] ?? null) ? $modeloCampo['campos'] : [];
+                                $campos_variaveis_prefix = 'aluno-' . $midCampo;
+                                include __DIR__ . '/../_partials/campos_variaveis_documento.php';
+                                ?>
+                                <button type="submit" class="btn-primary-custom mt-3 w-full px-3 py-2 rounded-lg text-sm font-medium">
+                                    <i class="fa-solid fa-download mr-1"></i> Gerar PDF
+                                </button>
+                            </form>
+                            <?php endforeach; ?>
+                        </div>
+                        <script src="<?= URL ?>/static/js/campos-variaveis-documento.js?v=1"></script>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -563,6 +599,15 @@
                     window.gerarAutPasseio = function () {
                         abrir('aut_passeio', { local: val('aut_pas_local'), data: val('aut_pas_data'), hora_saida: val('aut_pas_saida'), hora_retorno: val('aut_pas_retorno') });
                     };
+                    document.querySelectorAll('.js-emitir-modelo').forEach(function (form) {
+                        form.addEventListener('submit', function (e) {
+                            e.preventDefault();
+                            if (typeof form.reportValidity === 'function' && !form.reportValidity()) return;
+                            var url = form.getAttribute('data-url') || '';
+                            var params = new URLSearchParams(new FormData(form));
+                            window.open(url + '?' + params.toString(), '_blank', 'noopener');
+                        });
+                    });
                     document.addEventListener('click', function (e) {
                         if (e.target && e.target.classList && e.target.classList.contains('doc-modal')) {
                             e.target.style.display = 'none';

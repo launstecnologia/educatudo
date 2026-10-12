@@ -848,3 +848,7 @@ class GradeHistoricoOficial
         return htmlspecialchars($valor, ENT_QUOTES, 'UTF-8');
     }
 }
+
+if (!class_exists('GradeHistoricoOficial', false) && class_exists(__NAMESPACE__ . '\\GradeHistoricoOficial', false)) {
+    class_alias(__NAMESPACE__ . '\\GradeHistoricoOficial', 'GradeHistoricoOficial');
+}

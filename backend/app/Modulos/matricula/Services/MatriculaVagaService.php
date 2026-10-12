@@ -2,8 +2,7 @@
 
 namespace App\Modulos\Matricula\Services;
 
-use Database;
-
+use App\Core\Database;
 /**
  * Conta vagas da turma, reserva no processo e gerencia a fila de espera.
  */
@@ -347,4 +346,8 @@ class MatriculaVagaService
             return false;
         }
     }
+}
+
+if (!class_exists('MatriculaVagaService', false) && class_exists(__NAMESPACE__ . '\\MatriculaVagaService', false)) {
+    class_alias(__NAMESPACE__ . '\\MatriculaVagaService', 'MatriculaVagaService');
 }

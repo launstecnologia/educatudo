@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Core;
 /**
  * EducaTudo - Classe para Gerenciar Webhooks
  * Gerencia comunicação com webhooks externos
@@ -18,7 +20,7 @@ class WebhookManager
      */
     public function getChatWebhook($escola_id = null)
     {
-        // Prioridade 1: Webhook específico da escola
+        // Prioridade 1: \Webhook específico da escola
         if ($escola_id) {
             $webhook = $this->db->fetch(
                 "SELECT * FROM webhooks 
@@ -35,7 +37,7 @@ class WebhookManager
             }
         }
         
-        // Prioridade 2: Webhook global
+        // Prioridade 2: \Webhook global
         $webhook = $this->db->fetch(
             "SELECT * FROM webhooks 
              WHERE escola_id IS NULL 
@@ -56,7 +58,7 @@ class WebhookManager
         $webhook = $this->getChatWebhook();
         
         if (!$webhook) {
-            throw new Exception('Nenhum webhook de chat configurado');
+            throw new \Exception('Nenhum webhook de chat configurado');
         }
         
         // Preparar payload
@@ -78,7 +80,7 @@ class WebhookManager
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Content-Type: application/json',
-            'User-Agent: EducaTudo-Chat/1.0'
+            'User-Agent: \EducaTudo-Chat/1.0'
         ]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 120);  // Aumentado de 30 para 120 segundos
@@ -95,11 +97,11 @@ class WebhookManager
         $this->logWebhookResponse($webhook['endpoint'], $payload, $response, $httpCode, $error);
         
         if ($error) {
-            throw new Exception("Erro cURL: {$error}");
+            throw new \Exception("Erro cURL: {$error}");
         }
         
         if ($httpCode >= 400) {
-            throw new Exception("Erro HTTP {$httpCode}: {$response}");
+            throw new \Exception("Erro HTTP {$httpCode}: {$response}");
         }
         
         return $this->parseResponse($response);
@@ -333,7 +335,7 @@ class WebhookManager
         $webhook = $this->db->fetch("SELECT * FROM webhooks WHERE id = :id", ['id' => $webhook_id]);
         
         if (!$webhook) {
-            throw new Exception('Webhook não encontrado');
+            throw new \Exception('Webhook não encontrado');
         }
         
         // Payload de teste
@@ -357,7 +359,7 @@ class WebhookManager
                 'response' => $response,
                 'webhook' => $webhook
             ];
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return [
                 'success' => false,
                 'error' => $e->getMessage(),
@@ -418,4 +420,8 @@ class WebhookManager
         $tags = array_unique($matches[1]);
         return array_slice($tags, 0, 10); // Limitar a 10 tags para não poluir o log
     }
+}
+
+if (!class_exists('WebhookManager', false) && class_exists(__NAMESPACE__ . '\\WebhookManager', false)) {
+    class_alias(__NAMESPACE__ . '\\WebhookManager', 'WebhookManager');
 }

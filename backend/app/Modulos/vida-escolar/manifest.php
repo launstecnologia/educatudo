@@ -5,6 +5,7 @@
  */
 return [
     'chave' => 'vida-escolar',
+    'namespace' => 'App\\Modulos\\VidaEscolar',
     'label' => 'Vida Escolar',
     'grupo' => 'gestao_escolar',
     'feature_keys' => [

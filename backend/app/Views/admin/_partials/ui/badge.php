@@ -1,6 +1,6 @@
 <?php
 /**
- * Badge de status (prompts/admin_ui_sistema/tabela-dropdown-paginacao.md §5).
+ * Badge de status (especificacoes/admin_ui_sistema/tabela-dropdown-paginacao.md §5).
  *
  * Variáveis:
  * - $ui_badge_variant (string): ativo|inativo|pendente|neutro|info|rascunho|erro|transferido

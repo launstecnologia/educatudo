@@ -61,7 +61,6 @@ if ($flash_message !== ''):
             <form id="menu-order-estudo-form" method="post" action="<?= URL ?>/admin/dev/menu-order">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                 <?php
-                    require_once __DIR__ . '/../../../Core/LayoutHelper.php';
                     $menuOrderEstudoDefault = [
                         'aulas_online',
                         'drive',
@@ -91,7 +90,7 @@ if ($flash_message !== ''):
                         'forum' => 'Fórum',
                         'drive' => 'Drive',
                     ];
-                    $menuOrderEstudoSalvo = json_decode((string) LayoutHelper::get('menu_order_estudo', '[]'), true);
+                    $menuOrderEstudoSalvo = json_decode((string) \App\Core\LayoutHelper::get('menu_order_estudo', '[]'), true);
                     if (!is_array($menuOrderEstudoSalvo)) {
                         $menuOrderEstudoSalvo = [];
                     }
@@ -106,7 +105,7 @@ if ($flash_message !== ''):
                             $menuOrderEstudoFinal[] = $k;
                         }
                     }
-                    $menuLabelsSalvos = json_decode((string) LayoutHelper::get('menu_labels', '[]'), true);
+                    $menuLabelsSalvos = json_decode((string) \App\Core\LayoutHelper::get('menu_labels', '[]'), true);
                     if (!is_array($menuLabelsSalvos)) {
                         $menuLabelsSalvos = [];
                     }
@@ -145,7 +144,7 @@ if ($flash_message !== ''):
             <form id="menu-links-form" method="post" action="<?= URL ?>/admin/dev/layout/save" class="space-y-4">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                 <?php
-                    $customLinksJson = LayoutHelper::get('menu_links_submenu', '[]');
+                    $customLinksJson = \App\Core\LayoutHelper::get('menu_links_submenu', '[]');
                     $customLinks = json_decode($customLinksJson, true);
                     if (!is_array($customLinks)) {
                         $customLinks = [];

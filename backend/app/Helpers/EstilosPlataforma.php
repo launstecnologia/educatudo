@@ -1,5 +1,7 @@
 <?php
 
+namespace App\Helpers;
+
 /**
  * URL do CSS Tailwind compilado (substitui o Play CDN).
  */
@@ -23,4 +25,8 @@ class EstilosPlataforma
     {
         return '<link rel="stylesheet" href="' . htmlspecialchars(self::href(), ENT_QUOTES, 'UTF-8') . '">';
     }
+}
+
+if (!class_exists('EstilosPlataforma', false) && class_exists(__NAMESPACE__ . '\\EstilosPlataforma', false)) {
+    class_alias(__NAMESPACE__ . '\\EstilosPlataforma', 'EstilosPlataforma');
 }

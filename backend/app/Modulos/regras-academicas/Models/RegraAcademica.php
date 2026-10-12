@@ -2,7 +2,7 @@
 
 namespace App\Modulos\RegrasAcademicas\Models;
 
-use Database;
+use App\Core\Database;
 use Throwable;
 
 /**
@@ -375,4 +375,8 @@ class RegraAcademica
         }
         return $ok;
     }
+}
+
+if (!class_exists('RegraAcademica', false) && class_exists(__NAMESPACE__ . '\\RegraAcademica', false)) {
+    class_alias(__NAMESPACE__ . '\\RegraAcademica', 'RegraAcademica');
 }

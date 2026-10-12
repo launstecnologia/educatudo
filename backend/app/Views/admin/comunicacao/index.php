@@ -1,6 +1,6 @@
 <?php
 $modOn = static function (string $key): bool {
-    return !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled($key);
+    return !class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled($key);
 };
 
 $hub_title = 'Comunicação';
@@ -23,7 +23,7 @@ if ($modOn('calendario_escolar')) {
     ];
 }
 
-if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('forum')) {
+if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('forum')) {
     $hub_cards[] = [
         'href' => URL . '/forum',
         'title' => 'Fórum',
@@ -38,7 +38,7 @@ if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('forum')) {
     ];
 }
 
-if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('mural_recados')) {
+if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('mural_recados')) {
     $hub_cards[] = [
         'href' => URL . '/admin/mural-recados',
         'title' => 'Mural de Recados',

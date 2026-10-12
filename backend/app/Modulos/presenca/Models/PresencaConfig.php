@@ -1,6 +1,7 @@
 <?php
 
-require_once __DIR__ . '/../../../Core/Database.php';
+namespace App\Modulos\Presenca\Models;
+
 
 class PresencaConfig
 {
@@ -8,7 +9,7 @@ class PresencaConfig
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     public function tabelasProntas(): bool
@@ -56,7 +57,7 @@ class PresencaConfig
     public function salvar(array $post): void
     {
         if (!$this->db->tableExists('presenca_config')) {
-            throw new RuntimeException('Rode a migration 2026_08_22_gestao_presenca.sql no Master.');
+            throw new \RuntimeException('Rode a migration 2026_08_22_gestao_presenca.sql no Master.');
         }
         $existe = $this->db->fetch('SELECT id FROM presenca_config WHERE id = 1');
         if (!$existe) {
@@ -80,4 +81,8 @@ class PresencaConfig
             ]
         );
     }
+}
+
+if (!class_exists('PresencaConfig', false) && class_exists(__NAMESPACE__ . '\\PresencaConfig', false)) {
+    class_alias(__NAMESPACE__ . '\\PresencaConfig', 'PresencaConfig');
 }

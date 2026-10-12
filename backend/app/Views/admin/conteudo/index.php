@@ -10,16 +10,15 @@ $hub_cards = [
     ],
 ];
 
-if (class_exists('LayoutHelper') && !LayoutHelper::isModuleEnabled('aluno_arquivos')) {
+if (class_exists('LayoutHelper') && !\App\Core\LayoutHelper::isModuleEnabled('aluno_arquivos')) {
     $hub_cards = [];
 }
 
-if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('educa_hits')) {
+if (class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('educa_hits')) {
     if (!class_exists('EducaHitsConfig')) {
-        require_once dirname(__DIR__, 3) . '/Core/EducaHitsConfig.php';
     }
     $hub_cards[] = [
-        'href' => EducaHitsConfig::portalLoginUrl(),
+        'href' => \App\Core\EducaHitsConfig::portalLoginUrl(),
         'title' => 'EducaHits (portal)',
         'description' => 'Abre o portal EducaHits em uma nova aba.',
         'icon' => 'fa-solid fa-music',
@@ -27,7 +26,7 @@ if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('educa_hits'))
     ];
 }
 
-if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_apostilas')) {
+if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('aluno_apostilas')) {
     $hub_cards[] = [
         'href' => URL . '/admin/apostilas-ia',
         'title' => 'Meu Material',

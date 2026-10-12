@@ -138,8 +138,7 @@
                     <div class="mb-4">
                         <div class="prose max-w-none">
                             <?php
-                            require_once __DIR__ . '/../../../Helpers/MarkdownHelper.php';
-                            $enunciado = MarkdownHelper::processMarkdown($questao['enunciado']);
+                            $enunciado = \App\Helpers\MarkdownHelper::processMarkdown($questao['enunciado']);
                             echo $enunciado;
                             ?>
                         </div>
@@ -188,7 +187,7 @@
                                         <!-- Exibir ambos texto e imagem -->
                                         <span class="text-gray-700">
                                             <?php
-                                            $texto_processado = MarkdownHelper::processMarkdown($texto);
+                                            $texto_processado = \App\Helpers\MarkdownHelper::processMarkdown($texto);
                                             echo $texto_processado;
                                             ?>
                                         </span>
@@ -203,7 +202,7 @@
                                         <!-- Exibir apenas texto -->
                                         <span class="text-gray-700">
                                             <?php
-                                            $texto_processado = MarkdownHelper::processMarkdown($texto);
+                                            $texto_processado = \App\Helpers\MarkdownHelper::processMarkdown($texto);
                                             echo $texto_processado;
                                             ?>
                                         </span>

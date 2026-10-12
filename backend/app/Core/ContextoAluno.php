@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Core;
 /**
  * Contexto do aluno logado — sessão + cache por request.
  *
@@ -48,7 +50,6 @@ class ContextoAluno
         }
 
         if (!class_exists('AlunoTurmaHelper')) {
-            require_once __DIR__ . '/AlunoTurmaHelper.php';
         }
         $turmaIds = AlunoTurmaHelper::getTurmaIds($db, $alunoId, true);
 
@@ -171,7 +172,7 @@ class ContextoAluno
     }
 
     /**
-     * Docroot já é public/: URLs legadas /public/assets|uploads quebram na VPS.
+     * Docroot já é public/: \URLs legadas /public/assets|uploads quebram na VPS.
      */
     public static function normalizarUrlAvatar(string $url): string
     {
@@ -351,4 +352,8 @@ class ContextoAluno
     {
         self::$requestCache = [];
     }
+}
+
+if (!class_exists('ContextoAluno', false) && class_exists(__NAMESPACE__ . '\\ContextoAluno', false)) {
+    class_alias(__NAMESPACE__ . '\\ContextoAluno', 'ContextoAluno');
 }

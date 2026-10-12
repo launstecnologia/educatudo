@@ -161,7 +161,6 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
                     <?php else: ?>
                         <?php
                         if (!class_exists('AlunoLancamentoNotaHelper', false)) {
-                            require_once __DIR__ . '/../../../../Helpers/AlunoLancamentoNotaHelper.php';
                         }
                         foreach ($linhas as $ln):
                             $pid = (int) ($ln['professor_id'] ?? 0);
@@ -173,7 +172,7 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
                             $nChamada = (int) ($ln['numero_chamada'] ?? 0);
                             $bloqueada = $temNota && !$edicaoDesbloqueada;
                             $transferido = !empty($ln['transferido']);
-                            $nomeAluno = AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+                            $nomeAluno = \App\Helpers\AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
                                 (string) ($ln['aluno_nome'] ?? ''),
                                 $transferido
                             );

@@ -1,6 +1,7 @@
 <?php
 
-require_once __DIR__ . '/LayoutHelper.php';
+namespace App\Core;
+
 
 class TenantRelease
 {
@@ -60,3 +61,7 @@ class TenantRelease
     }
 }
 
+
+if (!class_exists('TenantRelease', false) && class_exists(__NAMESPACE__ . '\\TenantRelease', false)) {
+    class_alias(__NAMESPACE__ . '\\TenantRelease', 'TenantRelease');
+}

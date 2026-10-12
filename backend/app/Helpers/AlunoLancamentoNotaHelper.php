@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Helpers;
 /**
  * Regras de listagem no lançamento/relatório de notas e telas acadêmicas.
  *
@@ -151,4 +153,8 @@ class AlunoLancamentoNotaHelper
             )
         )";
     }
+}
+
+if (!class_exists('AlunoLancamentoNotaHelper', false) && class_exists(__NAMESPACE__ . '\\AlunoLancamentoNotaHelper', false)) {
+    class_alias(__NAMESPACE__ . '\\AlunoLancamentoNotaHelper', 'AlunoLancamentoNotaHelper');
 }

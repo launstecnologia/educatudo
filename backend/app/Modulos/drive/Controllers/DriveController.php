@@ -1,15 +1,16 @@
 <?php
+
+namespace App\Modulos\Drive\Controllers;
 /**
  * Drive EducaTudo - Espaço de arquivos e pastas para aluno e professor.
  * Controllers em app/Modulos/drive/Controllers/
  */
-require_once __DIR__ . '/../../../Core/BaseController.php';
-require_once __DIR__ . '/../../../Core/AuthManager.php';
-require_once __DIR__ . '/../Models/DriveItem.php';
-require_once __DIR__ . '/../Models/DriveShare.php';
-require_once __DIR__ . '/../Services/DriveStorageService.php';
 
-class DriveController extends BaseController
+use App\Modulos\Drive\Models\DriveItem;
+use App\Modulos\Drive\Models\DriveShare;
+use App\Modulos\Drive\Services\DriveStorageService;
+
+class DriveController extends \App\Core\BaseController
 {
     private $auth;
     private $driveItem;
@@ -21,7 +22,7 @@ class DriveController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        $this->auth = new AuthManager();
+        $this->auth = new \App\Core\AuthManager();
         $this->driveItem = new DriveItem();
         $this->driveShare = new DriveShare();
         // backend/storage/drive (alinhado ao DriveStorageService / config)
@@ -312,7 +313,7 @@ class DriveController extends BaseController
         $uniqueName = date('YmdHis') . '_' . uniqid() . ($ext ? '.' . $ext : '');
         $key = $schoolCode . '/' . $role . '/' . $userId . '/' . $uniqueName;
         // Detect real MIME type via finfo — never trust the browser-supplied type field
-        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
         $mimeType = $finfo->file($file['tmp_name']) ?: ($file['type'] ?? 'application/octet-stream');
 
         if (!$this->driveStorage->put($key, $file['tmp_name'], $mimeType)) {
@@ -659,7 +660,7 @@ class DriveController extends BaseController
             echo json_encode(['users' => []]);
             exit;
         }
-        $db = Database::getInstance();
+        $db = \App\Core\Database::getInstance();
         $term = '%' . $q . '%';
         $alunos = $db->fetchAll(
             'SELECT id, nome, email FROM alunos WHERE ativo = 1 AND (nome LIKE :q OR email LIKE :q2) AND id != :me LIMIT 15',
@@ -696,7 +697,7 @@ class DriveController extends BaseController
             exit;
         }
         $list = $this->driveShare->listByItem($id);
-        $db = Database::getInstance();
+        $db = \App\Core\Database::getInstance();
         foreach ($list as &$s) {
             if ($s['shared_with_type'] === 'student') {
                 $row = $db->fetch('SELECT nome, email FROM alunos WHERE id = :id', ['id' => $s['shared_with_id']]);
@@ -720,4 +721,8 @@ class DriveController extends BaseController
         }
         exit;
     }
+}
+
+if (!class_exists('DriveController', false) && class_exists(__NAMESPACE__ . '\\DriveController', false)) {
+    class_alias(__NAMESPACE__ . '\\DriveController', 'DriveController');
 }

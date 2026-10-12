@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Modulos\Drive\Services;
 /**
  * EducaTudo - Armazenamento do Drive (local ou AWS S3)
  * Quando AWS_BUCKET e credenciais estão definidos, usa S3; senão usa app/storage/drive.
@@ -29,7 +31,7 @@ class DriveStorageService
         if ($storage === 's3' && $bucket !== '' && $key !== '' && $secret !== '') {
             $this->bucket = $bucket;
             $this->useS3 = true;
-            $this->s3Client = new Aws\S3\S3Client([
+            $this->s3Client = new \Aws\S3\S3Client([
                 'version' => 'latest',
                 'region' => $aws['region'] ?? 'us-east-1',
                 'credentials' => [
@@ -66,7 +68,7 @@ class DriveStorageService
             try {
                 $this->s3Client->putObject($params);
                 return true;
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 error_log('DriveStorageService S3 putObject: ' . $e->getMessage());
                 return false;
             }
@@ -97,7 +99,7 @@ class DriveStorageService
             ]);
             $request = $this->s3Client->createPresignedRequest($cmd, "+{$expiresIn} seconds");
             return (string) $request->getUri();
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             error_log('DriveStorageService S3 getDownloadUrl: ' . $e->getMessage());
             return null;
         }
@@ -120,7 +122,7 @@ class DriveStorageService
             ]);
             $request = $this->s3Client->createPresignedRequest($cmd, "+{$expiresIn} seconds");
             return (string) $request->getUri();
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             error_log('DriveStorageService S3 getViewUrl: ' . $e->getMessage());
             return null;
         }
@@ -161,7 +163,7 @@ class DriveStorageService
                 echo (string) $body;
             }
             return true;
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             error_log('DriveStorageService S3 streamInline: ' . $e->getMessage());
             return false;
         }
@@ -193,7 +195,7 @@ class DriveStorageService
                     'Key' => 'drive/' . $key,
                 ]);
                 return true;
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 error_log('DriveStorageService S3 deleteObject: ' . $e->getMessage());
                 return false;
             }
@@ -215,7 +217,7 @@ class DriveStorageService
                     'Key' => 'drive/' . $key,
                 ]);
                 return true;
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 return false;
             }
         }
@@ -239,4 +241,8 @@ class DriveStorageService
 
         return trim($key, '/');
     }
+}
+
+if (!class_exists('DriveStorageService', false) && class_exists(__NAMESPACE__ . '\\DriveStorageService', false)) {
+    class_alias(__NAMESPACE__ . '\\DriveStorageService', 'DriveStorageService');
 }

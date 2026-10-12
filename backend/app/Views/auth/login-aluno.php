@@ -1,12 +1,11 @@
 <?php
-require_once __DIR__ . '/../../Core/LayoutHelper.php';
 
 // Buscar configurações de layout (logo na login conforme config Master: logo_use_login)
-$logo_url = LayoutHelper::getLogoUrl();
-$logo_horizontal_url = LayoutHelper::getLoginLogoUrl();
-$login_cover_url = LayoutHelper::getLoginCoverUrl();
-$system_title = LayoutHelper::getSystemTitle();
-$system_subtitle = LayoutHelper::getSystemSubtitle();
+$logo_url = \App\Core\LayoutHelper::getLogoUrl();
+$logo_horizontal_url = \App\Core\LayoutHelper::getLoginLogoUrl();
+$login_cover_url = \App\Core\LayoutHelper::getLoginCoverUrl();
+$system_title = \App\Core\LayoutHelper::getSystemTitle();
+$system_subtitle = \App\Core\LayoutHelper::getSystemSubtitle();
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -15,8 +14,8 @@ $system_subtitle = LayoutHelper::getSystemSubtitle();
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <title>Portal do Aluno - <?= htmlspecialchars($system_title) ?></title>
     <?php
-        $pwaThemeColor = LayoutHelper::get('pwa_aluno_theme_color', LayoutHelper::get('primary_color', '#a855f7'));
-        $pwaIcon192 = LayoutHelper::get('pwa_aluno_icon_192', LayoutHelper::getLogo1x1Url());
+        $pwaThemeColor = \App\Core\LayoutHelper::get('pwa_aluno_theme_color', \App\Core\LayoutHelper::get('primary_color', '#a855f7'));
+        $pwaIcon192 = \App\Core\LayoutHelper::get('pwa_aluno_icon_192', \App\Core\LayoutHelper::getLogo1x1Url());
     ?>
     <link rel="manifest" href="<?= URL ?>/manifest-aluno.json">
     <meta name="theme-color" content="<?= htmlspecialchars($pwaThemeColor) ?>">
@@ -36,7 +35,7 @@ $system_subtitle = LayoutHelper::getSystemSubtitle();
         <div class="flex-1 w-full bg-gray-50 flex flex-col items-center justify-center p-4 md:p-8 min-h-screen">
         <div class="w-full max-w-md flex flex-col">
             <!-- Logo pequena no topo (tamanho configurável no Master) -->
-            <?php $logoLoginRem = (float) LayoutHelper::get('logo_size_login', '1') * 4; ?>
+            <?php $logoLoginRem = (float) \App\Core\LayoutHelper::get('logo_size_login', '1') * 4; ?>
             <div class="text-center mb-6 md:mb-8">
                 <?php if (!empty($logo_horizontal_url)): ?>
                     <img src="<?= htmlspecialchars($logo_horizontal_url) ?>" alt="Logo" class="mx-auto mb-3 md:mb-4 object-contain" style="max-height: <?= $logoLoginRem ?>rem; width: auto;">

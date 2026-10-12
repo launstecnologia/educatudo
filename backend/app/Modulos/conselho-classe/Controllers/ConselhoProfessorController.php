@@ -1,28 +1,27 @@
 <?php
+
+namespace App\Modulos\ConselhoClasse\Controllers;
+
+use App\Modulos\ConselhoClasse\Services\ConselhoService;
+use Throwable;
+
 /**
  * EducaTudo - Conselho de Classe (professor)
  * Somente leitura das turmas da grade + observação pedagógica.
  */
 
-require_once __DIR__ . '/../../../Core/BaseController.php';
-require_once __DIR__ . '/../../../Core/AuthManager.php';
-require_once __DIR__ . '/../../../Models/User/Teacher.php';
-require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
-require_once __DIR__ . '/../Services/ConselhoService.php';
 
-use App\Modulos\ConselhoClasse\Services\ConselhoService;
-
-if (!class_exists('ConselhoProfessorController', false)) {
-class ConselhoProfessorController extends BaseController
+if (!class_exists(__NAMESPACE__ . '\\ConselhoProfessorController', false)) {
+class ConselhoProfessorController extends \App\Core\BaseController
 {
     private $auth;
-    private Teacher $teacherModel;
+    private \App\Models\User\Teacher $teacherModel;
 
     public function __construct()
     {
         parent::__construct();
-        $this->auth = new AuthManager();
-        $this->teacherModel = new Teacher();
+        $this->auth = new \App\Core\AuthManager();
+        $this->teacherModel = new \App\Models\User\Teacher();
         if (!$this->auth->isLoggedIn() || (($this->auth->getUser()['tipo'] ?? '') !== 'professor')) {
             $this->redirect('/');
             exit;
@@ -39,8 +38,8 @@ class ConselhoProfessorController extends BaseController
             if (!in_array($anoLetivo, $anos, true)) {
                 $anoLetivo = (int) ($anos[0] ?? date('Y'));
             }
-            $quantidade = max(1, (int) PeriodoLetivo::doAno($anoLetivo)['quantidade']);
-            $bimestre = (int) ($_GET['bimestre'] ?? PeriodoLetivo::numeroPadrao($anoLetivo));
+            $quantidade = max(1, (int) \App\Core\PeriodoLetivo::doAno($anoLetivo)['quantidade']);
+            $bimestre = (int) ($_GET['bimestre'] ?? \App\Core\PeriodoLetivo::numeroPadrao($anoLetivo));
             $bimestre = max(1, min($quantidade, $bimestre));
             $turmaIds = $svc->model()->turmaIdsDoProfessor((int) $professor['id']);
             $linhas = [];
@@ -140,9 +139,13 @@ class ConselhoProfessorController extends BaseController
         $user = $this->auth->getUser();
         $professor = $this->teacherModel->findById((int) ($user['id'] ?? 0));
         if (!$professor) {
-            throw new RuntimeException('Cadastro de professor não encontrado.');
+            throw new \RuntimeException('Cadastro de professor não encontrado.');
         }
         return $professor;
     }
 }
+}
+
+if (!class_exists('ConselhoProfessorController', false) && class_exists(__NAMESPACE__ . '\\ConselhoProfessorController', false)) {
+    class_alias(__NAMESPACE__ . '\\ConselhoProfessorController', 'ConselhoProfessorController');
 }

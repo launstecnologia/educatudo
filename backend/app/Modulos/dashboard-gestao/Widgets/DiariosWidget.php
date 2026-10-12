@@ -5,7 +5,6 @@ namespace App\Modulos\DashboardGestao\Widgets;
 use App\Modulos\DashboardGestao\Services\DashboardFiltro;
 use App\Modulos\Diario\Services\ClassDiaryService;
 
-require_once dirname(__DIR__, 3) . '/Services/ClassDiaryService.php';
 
 class DiariosWidget implements WidgetDashboard
 {
@@ -16,7 +15,7 @@ class DiariosWidget implements WidgetDashboard
 
     public function montar(DashboardFiltro $filtro): array
     {
-        if (class_exists('LayoutHelper', false) && !\LayoutHelper::isModuleEnabled('diario_classe')) {
+        if (class_exists('LayoutHelper', false) && !\App\Core\LayoutHelper::isModuleEnabled('diario_classe')) {
             return [
                 'ok' => true,
                 'disponivel' => false,
@@ -79,4 +78,8 @@ class DiariosWidget implements WidgetDashboard
             'href' => '/admin/diario/indicadores?' . $qs,
         ];
     }
+}
+
+if (!class_exists('DiariosWidget', false) && class_exists(__NAMESPACE__ . '\\DiariosWidget', false)) {
+    class_alias(__NAMESPACE__ . '\\DiariosWidget', 'DiariosWidget');
 }

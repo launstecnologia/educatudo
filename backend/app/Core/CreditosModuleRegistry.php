@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Core;
 /**
  * Catálogo de módulos/ações que podem consumir TudiCoins (créditos).
  * Usado pelo Master (precificação), CreditosService (tenant) e FeatureGate (UI).
@@ -8,9 +10,11 @@
  *   - acao           → some só o botão/ação; o módulo pai continua
  * pagador:
  *   - usuario → debita carteira do aluno/professor/admin (ou pool da escola se modo pool)
- *   - escola  → debita sempre a carteira da escola (ex.: EducaInclui)
+ *   - escola  → debita sempre a carteira da escola (ex.: \EducaInclui)
  */
 
+
+use App\Services\CreditosService;
 class CreditosModuleRegistry
 {
     /**
@@ -23,7 +27,7 @@ class CreditosModuleRegistry
      * }>
      */
     private static $MODULES = [
-        // Motor único de geração de questão por IA (app/AI/) — cobre Prova
+        // Motor único de geração de questão por IA (app/Agentes/) — cobre Prova
         // Online + Jornada do Aluno, pago sempre por quem aciona (professor).
         'gerar_exercicio_ia_professor' => [
             'label' => 'Exercício/Questão via IA (Professor)',
@@ -355,9 +359,8 @@ class CreditosModuleRegistry
             return false;
         }
         if (!class_exists('LayoutHelper', false)) {
-            require_once __DIR__ . '/LayoutHelper.php';
         }
-        return \LayoutHelper::get('creditos_habilitado', '0') === '1';
+        return \App\Core\LayoutHelper::get('creditos_habilitado', '0') === '1';
     }
 
     /**
@@ -402,4 +405,8 @@ class CreditosModuleRegistry
             'codigo' => $referenciaId !== '' ? $referenciaId : null,
         ];
     }
+}
+
+if (!class_exists('CreditosModuleRegistry', false) && class_exists(__NAMESPACE__ . '\\CreditosModuleRegistry', false)) {
+    class_alias(__NAMESPACE__ . '\\CreditosModuleRegistry', 'CreditosModuleRegistry');
 }

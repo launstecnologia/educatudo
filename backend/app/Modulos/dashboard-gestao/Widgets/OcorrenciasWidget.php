@@ -5,7 +5,6 @@ namespace App\Modulos\DashboardGestao\Widgets;
 use App\Modulos\DashboardGestao\Services\DashboardFiltro;
 use App\Modulos\Ocorrencias\Services\OcorrenciaService;
 
-require_once dirname(__DIR__, 3) . '/Services/OcorrenciaService.php';
 
 class OcorrenciasWidget implements WidgetDashboard
 {
@@ -16,7 +15,7 @@ class OcorrenciasWidget implements WidgetDashboard
 
     public function montar(DashboardFiltro $filtro): array
     {
-        if (class_exists('LayoutHelper', false) && !\LayoutHelper::isModuleEnabled('ocorrencias')) {
+        if (class_exists('LayoutHelper', false) && !\App\Core\LayoutHelper::isModuleEnabled('ocorrencias')) {
             return [
                 'ok' => true,
                 'disponivel' => false,
@@ -72,7 +71,7 @@ class OcorrenciasWidget implements WidgetDashboard
             return 0;
         }
         try {
-            $db = \Database::getInstance();
+            $db = \App\Core\Database::getInstance();
             $sql = "SELECT COUNT(*) AS n FROM alunos_ocorrencias o
                     WHERE DATE(o.data_ocorrencia) BETWEEN :inicio AND :fim
                       AND (o.encaminhamento IS NULL OR o.encaminhamento = '')
@@ -88,4 +87,8 @@ class OcorrenciasWidget implements WidgetDashboard
             return $model->contar(['data_inicio' => $inicio, 'data_fim' => $fim, 'status' => 'aberta']);
         }
     }
+}
+
+if (!class_exists('OcorrenciasWidget', false) && class_exists(__NAMESPACE__ . '\\OcorrenciasWidget', false)) {
+    class_alias(__NAMESPACE__ . '\\OcorrenciasWidget', 'OcorrenciasWidget');
 }

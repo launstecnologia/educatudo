@@ -46,7 +46,7 @@ class CalendarioWidget implements WidgetDashboard
         if (!$this->consulta->tabelaExiste('school_calendar_events')) {
             return [];
         }
-        $db = \Database::getInstance();
+        $db = \App\Core\Database::getInstance();
         $rows = $db->fetchAll(
             "SELECT titulo, DATE(inicio_em) AS data_evento, categoria
              FROM school_calendar_events
@@ -74,7 +74,7 @@ class CalendarioWidget implements WidgetDashboard
         if (!$this->consulta->tabelaExiste('calendario_letivo_eventos')) {
             return [];
         }
-        $db = \Database::getInstance();
+        $db = \App\Core\Database::getInstance();
         $rows = $db->fetchAll(
             "SELECT e.descricao, e.data_inicio, e.tipo
              FROM calendario_letivo_eventos e
@@ -103,7 +103,7 @@ class CalendarioWidget implements WidgetDashboard
         if (!$this->consulta->tabelaExiste('provas_blocos')) {
             return [];
         }
-        $db = \Database::getInstance();
+        $db = \App\Core\Database::getInstance();
         $rows = $db->fetchAll(
             "SELECT titulo, DATE(data_prova) AS data_prova
              FROM provas_blocos
@@ -147,8 +147,7 @@ class CalendarioWidget implements WidgetDashboard
             'suspensao' => 'Suspensão',
         ];
         try {
-            require_once dirname(__DIR__, 3) . '/Services/SchoolCalendarService.php';
-            $service = new \SchoolCalendarService();
+            $service = new \App\Services\SchoolCalendarService();
             foreach ($service->tipos() as $slug => $t) {
                 $map[$slug] = (string) ($t['nome'] ?? $slug);
             }
@@ -157,4 +156,8 @@ class CalendarioWidget implements WidgetDashboard
         }
         return $map[$tipo] ?? 'Evento escolar';
     }
+}
+
+if (!class_exists('CalendarioWidget', false) && class_exists(__NAMESPACE__ . '\\CalendarioWidget', false)) {
+    class_alias(__NAMESPACE__ . '\\CalendarioWidget', 'CalendarioWidget');
 }

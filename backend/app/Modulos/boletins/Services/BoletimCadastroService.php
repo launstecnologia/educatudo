@@ -2,16 +2,12 @@
 
 namespace App\Modulos\Boletins\Services;
 
-require_once __DIR__ . '/../Models/Boletim.php';
-require_once __DIR__ . '/../../../Models/System/BoletimConfig.php';
-require_once __DIR__ . '/../../../Services/BoletimAssistenteWizard.php';
-require_once __DIR__ . '/../../regras-academicas/Models/RegraAcademica.php';
 
 use App\Modulos\Boletins\Models\Boletim;
 use App\Modulos\RegrasAcademicas\Models\RegraAcademica;
-use BoletimAssistenteWizard;
-use BoletimConfig;
-use Database;
+use App\Services\BoletimAssistenteWizard;
+use App\Models\System\BoletimConfig;
+use App\Core\Database;
 use Throwable;
 
 /**
@@ -58,8 +54,7 @@ class BoletimCadastroService
             $this->model->atualizar($id, $data);
             $materiasParaEventos = array_map('intval', (array) ($data['materias_ids'] ?? []));
             try {
-                require_once dirname(__DIR__, 3) . '/Models/Education/ComponenteCurricular.php';
-                $materiasParaEventos = (new \ComponenteCurricular())->expandirIdsComFilhos($materiasParaEventos);
+                $materiasParaEventos = (new \App\Models\Education\ComponenteCurricular())->expandirIdsComFilhos($materiasParaEventos);
             } catch (Throwable $e) {
                 // mantém ids do modelo
             }
@@ -200,8 +195,7 @@ class BoletimCadastroService
         $out = [];
         $componentes = null;
         try {
-            require_once dirname(__DIR__, 3) . '/Models/Education/ComponenteCurricular.php';
-            $componentes = new \ComponenteCurricular();
+            $componentes = new \App\Models\Education\ComponenteCurricular();
         } catch (Throwable $e) {
             $componentes = null;
         }
@@ -569,4 +563,8 @@ class BoletimCadastroService
 
         return false;
     }
+}
+
+if (!class_exists('BoletimCadastroService', false) && class_exists(__NAMESPACE__ . '\\BoletimCadastroService', false)) {
+    class_alias(__NAMESPACE__ . '\\BoletimCadastroService', 'BoletimCadastroService');
 }

@@ -1,15 +1,15 @@
 <?php
+
+namespace App\Modulos\Matricula\Controllers;
 /**
  * Webhook ZapSign (assinatura eletrônica) — rota pública.
  */
 
-require_once __DIR__ . '/../../../Core/BaseController.php';
-require_once __DIR__ . '/../Services/ZapSignService.php';
 
 use App\Modulos\Matricula\Services\ZapSignService;
 
-if (!class_exists('ZapSignWebhookController')) {
-class ZapSignWebhookController extends BaseController
+if (!class_exists(__NAMESPACE__ . '\\ZapSignWebhookController', false)) {
+class ZapSignWebhookController extends \App\Core\BaseController
 {
     public function handle(?string $tenantSlug = null): void
     {
@@ -55,4 +55,8 @@ class ZapSignWebhookController extends BaseController
         echo json_encode($result);
     }
 }
+}
+
+if (!class_exists('ZapSignWebhookController', false) && class_exists(__NAMESPACE__ . '\\ZapSignWebhookController', false)) {
+    class_alias(__NAMESPACE__ . '\\ZapSignWebhookController', 'ZapSignWebhookController');
 }

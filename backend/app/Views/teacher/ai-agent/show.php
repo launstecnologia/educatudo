@@ -164,9 +164,8 @@ const agenteId = <?= $agente['id'] ?>;
 const csrfToken = <?= json_encode($csrf_token) ?>;
 <?php 
 // DEBUG usando Logger
-require_once __DIR__ . '/../../../Core/Logger.php';
-Logger::info("DEBUG JavaScript - User existe: " . (isset($user) ? 'SIM' : 'NÃO'), [], 'debug');
-Logger::info("DEBUG JavaScript - User avatar_url: " . (isset($user['avatar_url']) ? ($user['avatar_url'] ?? 'NULL') : 'USER NÃO EXISTE'), ['avatar_url' => $user['avatar_url'] ?? null], 'debug');
+\App\Core\Logger::info("DEBUG JavaScript - User existe: " . (isset($user) ? 'SIM' : 'NÃO'), [], 'debug');
+\App\Core\Logger::info("DEBUG JavaScript - User avatar_url: " . (isset($user['avatar_url']) ? ($user['avatar_url'] ?? 'NULL') : 'USER NÃO EXISTE'), ['avatar_url' => $user['avatar_url'] ?? null], 'debug');
 
 $userAvatarUrl = isset($user['avatar_url']) && !empty($user['avatar_url']) ? $user['avatar_url'] : null;
 $userName = isset($user['nome']) && !empty($user['nome']) ? $user['nome'] : 'P';

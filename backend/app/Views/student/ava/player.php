@@ -84,7 +84,7 @@ require_once __DIR__ . '/../../../Helpers/RichTextHelper.php';
             $coment_can_pin = false;
             $coment_user_tipo = 'aluno';
             $coment_permite = !empty($aula['permite_comentarios']);
-            $user = (new AuthManager())->getUser();
+            $user = (new \App\Core\AuthManager())->getUser();
             $coment_user_id = (int) ($user['id'] ?? 0);
             include __DIR__ . '/../../ava/_comments.php';
         endif; ?>

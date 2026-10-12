@@ -8,15 +8,14 @@ $blocos = is_array($blocos ?? null) ? $blocos : [];
 $categoria = (string) ($categoria ?? 'outro');
 $categorias = is_array($categorias ?? null) ? $categorias : [];
 
-require_once __DIR__ . '/../../Services/ModeloDocumentoService.php';
 
 use App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService;
 
 $estruturas = is_array($estruturas ?? null) && $estruturas !== []
     ? $estruturas
-    : ModeloDocumentoService::estruturasEditor();
+    : \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService::estruturasEditor();
 
-$codigoSistema = $isEdit && ModeloDocumentoService::isCodigoSistema((string) ($modelo['codigo'] ?? ''));
+$codigoSistema = $isEdit && \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService::isCodigoSistema((string) ($modelo['codigo'] ?? ''));
 $ori = ($modelo['orientacao'] ?? 'retrato') === 'paisagem' ? 'paisagem' : 'retrato';
 $formatoPapel = strtolower((string) ($modelo['formato_papel'] ?? 'a4')) === 'a5' ? 'a5' : 'a4';
 $margemMm = (int) ($modelo['margem_mm'] ?? 20);

@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Core;
 /**
  * EducaTudo - Helper para crons em modo multi-tenant
  * Quando MULTI_TENANT=true: executa o callback para cada escola ativa (conexão do tenant já registrada).
@@ -20,7 +22,7 @@ require_once __DIR__ . '/../Helpers/mbstring_polyfill.php';
 class CronMultiTenantHelper
 {
     /**
-     * Executa $callback uma vez (single-tenant) ou uma vez por escola ativa (multi-tenant).
+     * \Executa $callback uma vez (single-tenant) ou uma vez por escola ativa (multi-tenant).
      * Em multi-tenant, $escolaId é passado para o callback; em single-tenant é null.
      *
      * @param callable $callback function(?int $escolaId): void|int|array
@@ -59,7 +61,6 @@ class CronMultiTenantHelper
      */
     public static function runWithReport(callable $callback, bool $forceIterateTenants = false): array
     {
-        require_once __DIR__ . '/Database.php';
 
         $report = [
             'escolas_total' => 0,
@@ -80,8 +81,6 @@ class CronMultiTenantHelper
             return $report;
         }
 
-        require_once __DIR__ . '/TenantResolver.php';
-        require_once __DIR__ . '/DatabaseManager.php';
 
         $masterConfig = Database::getConfigFromEnv();
         $masterPdo = self::createMasterPdo($masterConfig);
@@ -113,7 +112,7 @@ class CronMultiTenantHelper
                         "SELECT nome_banco FROM config_escolas_banco WHERE escola_id = :escola_id LIMIT 1"
                     );
                     $stmt->execute(['escola_id' => $escolaId]);
-                    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                    $row = $stmt->fetch(\PDO::FETCH_ASSOC);
                     if ($row && trim($row['nome_banco'] ?? '') === $masterDbName) {
                         error_log("Cron multi-tenant: pulando escola_id={$escolaId} (banco aponta para o master; configure um banco próprio em config_escolas_banco).");
                         $detalhe = [
@@ -133,7 +132,7 @@ class CronMultiTenantHelper
                 Database::setCurrentInstance($tenantDb);
                 $detalhe = self::executarCallbackCapturando($callback, (int) $escolaId, $escolaNome);
                 self::acumularDetalhe($report, $detalhe);
-            } catch (Throwable $e) {
+            } catch (\Throwable $e) {
                 error_log("Cron multi-tenant: erro para escola_id={$escolaId}: " . $e->getMessage());
                 $detalhe = [
                     'escola_id' => (int) $escolaId,
@@ -175,7 +174,7 @@ class CronMultiTenantHelper
      * @param list<int> $escolasIds
      * @return array<int, string>
      */
-    private static function mapearNomesEscolas(PDO $masterPdo, array $escolasIds): array
+    private static function mapearNomesEscolas(\PDO $masterPdo, array $escolasIds): array
     {
         if ($escolasIds === []) {
             return [];
@@ -186,11 +185,11 @@ class CronMultiTenantHelper
             $stmt = $masterPdo->prepare("SELECT id, nome FROM escolas WHERE id IN ({$placeholders})");
             $stmt->execute($ids);
             $map = [];
-            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
                 $map[(int) $row['id']] = (string) ($row['nome'] ?? '');
             }
             return $map;
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return [];
         }
     }
@@ -234,7 +233,7 @@ class CronMultiTenantHelper
         try {
             $ret = $callback($escolaId);
             return self::montarDetalheOk($escolaId, $escolaNome, $ret, $iniciado);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log('Cron multi-tenant: erro no callback escola_id=' . ($escolaId ?? 'null') . ': ' . $e->getMessage());
             return [
                 'escola_id' => $escolaId,
@@ -311,7 +310,7 @@ class CronMultiTenantHelper
         return false;
     }
 
-    private static function createMasterPdo(array $config): PDO
+    private static function createMasterPdo(array $config): \PDO
     {
         $host = $config['host'] ?? 'localhost';
         $port = (int) ($config['port'] ?? 3306);
@@ -320,12 +319,16 @@ class CronMultiTenantHelper
         $pass = $config['pass'] ?? '';
         $dsn = "mysql:host={$host};port={$port};dbname={$name};charset=utf8mb4";
         $options = [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+            \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
         ];
-        $pdo = new PDO($dsn, $user, $pass, $options);
+        $pdo = new \PDO($dsn, $user, $pass, $options);
         $pdo->exec("SET time_zone = '-03:00'");
         $pdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
         return $pdo;
     }
+}
+
+if (!class_exists('CronMultiTenantHelper', false) && class_exists(__NAMESPACE__ . '\\CronMultiTenantHelper', false)) {
+    class_alias(__NAMESPACE__ . '\\CronMultiTenantHelper', 'CronMultiTenantHelper');
 }

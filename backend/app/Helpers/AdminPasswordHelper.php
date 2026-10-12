@@ -1,5 +1,9 @@
 <?php
 
+namespace App\Helpers;
+
+
+use App\Core\Database;
 class AdminPasswordHelper
 {
     public static function verifyAdminPassword(Database $db, array $user, string $senha): bool
@@ -32,4 +36,8 @@ class AdminPasswordHelper
             return $v > 0;
         })));
     }
+}
+
+if (!class_exists('AdminPasswordHelper', false) && class_exists(__NAMESPACE__ . '\\AdminPasswordHelper', false)) {
+    class_alias(__NAMESPACE__ . '\\AdminPasswordHelper', 'AdminPasswordHelper');
 }

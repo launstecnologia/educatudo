@@ -1,8 +1,6 @@
 <?php
-require_once __DIR__ . '/FechamentoMaquinaEstados.php';
-require_once __DIR__ . '/../../../Services/DocumentoOficialService.php';
-require_once __DIR__ . '/../../../Services/HistoricoEscolarService.php';
-require_once __DIR__ . '/../../vida-escolar/Services/VidaEscolarPdfService.php';
+
+namespace App\Modulos\Fechamento\Services;
 
 use App\Modulos\VidaEscolar\Services\VidaEscolarPdfService;
 use App\Services\HistoricoEscolarService;
@@ -32,16 +30,16 @@ class ImpressaoLoteFechamentoService
 
     private string $rotuloJob = '';
 
-    private DocumentoOficialService $documentos;
+    private \App\Services\DocumentoOficialService $documentos;
     private HistoricoEscolarService $historicos;
     private VidaEscolarPdfService $pdfHistorico;
 
     public function __construct(
-        ?DocumentoOficialService $documentos = null,
+        ?\App\Services\DocumentoOficialService $documentos = null,
         ?HistoricoEscolarService $historicos = null,
         ?VidaEscolarPdfService $pdfHistorico = null
     ) {
-        $this->documentos = $documentos ?? new DocumentoOficialService();
+        $this->documentos = $documentos ?? new \App\Services\DocumentoOficialService();
         $this->historicos = $historicos ?? new HistoricoEscolarService();
         $this->pdfHistorico = $pdfHistorico ?? new VidaEscolarPdfService();
     }
@@ -87,11 +85,11 @@ class ImpressaoLoteFechamentoService
     {
         $resumo = $this->resumo($paineis);
         if ($resumo['total_turmas'] > 12) {
-            throw new RuntimeException('Escolha uma turma ou uma série menor. Este recorte ainda tem ' . $resumo['total_turmas'] . ' turmas.');
+            throw new \RuntimeException('Escolha uma turma ou uma série menor. Este recorte ainda tem ' . $resumo['total_turmas'] . ' turmas.');
         }
         if (in_array($documento, ['ficha', 'historico'], true) && $resumo['total_alunos'] > self::MAX_ALUNOS) {
             $nome = self::DOCUMENTOS[$documento] ?? 'documento';
-            throw new RuntimeException(
+            throw new \RuntimeException(
                 'Este recorte tem ' . $resumo['total_alunos'] . ' alunos. Escolha uma turma com até '
                 . self::MAX_ALUNOS . ' alunos para gerar ' . $nome . '.'
             );
@@ -104,7 +102,6 @@ class ImpressaoLoteFechamentoService
      */
     public function executarJob(array $payload): array
     {
-        require_once __DIR__ . '/FechamentoService.php';
         $jobId = (int) ($payload['_job_id'] ?? 0);
         $documento = (string) ($payload['documento'] ?? '');
         $anoLetivo = (int) ($payload['ano_letivo'] ?? 0);
@@ -116,17 +113,17 @@ class ImpressaoLoteFechamentoService
         $this->rotuloJob = trim((string) ($payload['turma_nome'] ?? ''));
         $slug = $this->slugTenant((string) ($payload['tenant_slug'] ?? ''));
         if ($jobId <= 0 || $anoLetivo <= 0 || !isset(self::DOCUMENTOS[$documento])) {
-            throw new RuntimeException('Lote de impressão incompleto.');
+            throw new \RuntimeException('Lote de impressão incompleto.');
         }
         if (!$this->escopoInformado($turmaId, $serie)) {
-            throw new RuntimeException('Escolha uma turma ou uma série antes de gerar.');
+            throw new \RuntimeException('Escolha uma turma ou uma série antes de gerar.');
         }
         $this->gravarAndamento($jobId, $documento, 'Lendo a turma…');
 
         $paineis = (new FechamentoService())->painel($anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serie);
         $resumo = $this->resumo($paineis);
         if (!$resumo['pode']) {
-            throw new RuntimeException('A impressão em lote só fica disponível quando todas as turmas deste filtro estão homologadas.');
+            throw new \RuntimeException('A impressão em lote só fica disponível quando todas as turmas deste filtro estão homologadas.');
         }
         $chave = self::chavePdf($anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serie, $documento);
         $this->gravarAndamento($jobId, $documento, 'Montando documentos…');
@@ -149,16 +146,16 @@ class ImpressaoLoteFechamentoService
         $pdf = $this->pdfDeHtml($html, $orientacao);
         unset($html);
         if ($pdf === '') {
-            throw new RuntimeException('O PDF saiu vazio.');
+            throw new \RuntimeException('O PDF saiu vazio.');
         }
         $tmp = tempnam(sys_get_temp_dir(), 'fechpdf');
         if ($tmp === false || file_put_contents($tmp, $pdf) === false) {
-            throw new RuntimeException('Não foi possível gravar o PDF temporário.');
+            throw new \RuntimeException('Não foi possível gravar o PDF temporário.');
         }
         try {
             $media = $this->media($slug);
             if (!$media->put(self::TIPO_ARQUIVO, $chave, $tmp, 'application/pdf')) {
-                throw new RuntimeException('Não foi possível salvar o PDF no armazenamento da escola.');
+                throw new \RuntimeException('Não foi possível salvar o PDF no armazenamento da escola.');
             }
         } finally {
             if (is_file($tmp)) {
@@ -337,7 +334,7 @@ class ImpressaoLoteFechamentoService
     {
         $limpo = preg_replace('/[^a-z0-9_-]/i', '', $slug);
         if (!is_string($limpo) || $limpo === '') {
-            throw new RuntimeException('Slug da escola ausente; não é possível gravar a impressão.');
+            throw new \RuntimeException('Slug da escola ausente; não é possível gravar a impressão.');
         }
         $base = defined('BASE_PATH') ? (string) BASE_PATH : dirname(__DIR__, 4);
         return rtrim($base, '/\\') . '/storage/exports/' . $limpo . '/fechamento';
@@ -359,11 +356,11 @@ class ImpressaoLoteFechamentoService
         int $jobId = 0
     ): string {
         if (!isset(self::DOCUMENTOS[$documento])) {
-            throw new InvalidArgumentException('Documento de impressão desconhecido.');
+            throw new \InvalidArgumentException('Documento de impressão desconhecido.');
         }
         $resumo = $this->resumo($paineis);
         if (!$resumo['pode']) {
-            throw new RuntimeException('A impressão em lote só fica disponível quando todas as turmas deste filtro estão homologadas.');
+            throw new \RuntimeException('A impressão em lote só fica disponível quando todas as turmas deste filtro estão homologadas.');
         }
 
         if (function_exists('set_time_limit')) {
@@ -438,7 +435,7 @@ class ImpressaoLoteFechamentoService
                         if (($emitido['orientacao'] ?? '') === 'landscape') {
                             $orientacao = 'landscape';
                         }
-                    } catch (Throwable $e) {
+                    } catch (\Throwable $e) {
                         $avisos[] = $turmaNome . ' — ' . $alunoNome . ': ' . $e->getMessage();
                     }
                     continue;
@@ -455,7 +452,7 @@ class ImpressaoLoteFechamentoService
         $htmls = array_values(array_filter($htmls, static fn ($html) => trim($html) !== ''));
         if ($htmls === []) {
             $detalhe = $avisos !== [] ? ' ' . implode(' ', $avisos) : '';
-            throw new RuntimeException('Nenhum documento para imprimir neste filtro.' . $detalhe);
+            throw new \RuntimeException('Nenhum documento para imprimir neste filtro.' . $detalhe);
         }
 
         return $this->juntarParaImpressao(
@@ -554,7 +551,7 @@ class ImpressaoLoteFechamentoService
         $dados['resultado_labels'] = HistoricoEscolarService::RESULTADO_LABELS;
         try {
             return $this->pdfHistorico->htmlHistorico($dados, $configApp);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $avisos[] = $turmaNome . ' — ' . $alunoNome . ': ' . $e->getMessage();
             return null;
         }
@@ -672,7 +669,6 @@ class ImpressaoLoteFechamentoService
         if ($jobId <= 0) {
             return;
         }
-        require_once __DIR__ . '/../../../Services/AIJobService.php';
         \App\Services\AIJobService::renovarHeartbeat($jobId);
         $nome = self::DOCUMENTOS[$documento] ?? 'Documento';
         $this->gravarAndamento($jobId, $documento, $nome . ': ' . $feitos . ' de ' . max($total, $feitos));
@@ -683,7 +679,7 @@ class ImpressaoLoteFechamentoService
         if ($jobId <= 0) {
             return;
         }
-        $db = Database::getInstance();
+        $db = \App\Core\Database::getInstance();
         if (!$db->tableExists('ai_jobs')) {
             return;
         }
@@ -701,7 +697,7 @@ class ImpressaoLoteFechamentoService
                     'status' => 'processing',
                 ]
             );
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log('ImpressaoLoteFechamento andamento job=' . $jobId . ': ' . $e->getMessage());
         }
     }
@@ -737,13 +733,12 @@ class ImpressaoLoteFechamentoService
         return (string) $dompdf->output();
     }
 
-    private function media(string $slug): \MediaStorageService
+    private function media(string $slug): \App\Services\MediaStorageService
     {
-        require_once __DIR__ . '/../../../Services/MediaStorageService.php';
         $config = $this->configApp();
         $config['tenant']['slug'] = $slug;
 
-        return new \MediaStorageService($config);
+        return new \App\Services\MediaStorageService($config);
     }
 
     /**
@@ -795,6 +790,10 @@ class ImpressaoLoteFechamentoService
                 return $constante;
             }
         }
-        throw new RuntimeException('Slug da escola ausente; não é possível gravar a impressão.');
+        throw new \RuntimeException('Slug da escola ausente; não é possível gravar a impressão.');
     }
+}
+
+if (!class_exists('ImpressaoLoteFechamentoService', false) && class_exists(__NAMESPACE__ . '\\ImpressaoLoteFechamentoService', false)) {
+    class_alias(__NAMESPACE__ . '\\ImpressaoLoteFechamentoService', 'ImpressaoLoteFechamentoService');
 }

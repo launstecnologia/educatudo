@@ -1,15 +1,13 @@
 <?php
 
 namespace App\Modulos\Diario\Services;
+use App\Core\PeriodoLetivo;
 
-require_once __DIR__ . '/../Models/ClassDiary.php';
-require_once __DIR__ . '/../../../Models/Education/SchoolAbsence.php';
 
 use App\Modulos\Diario\Models\ClassDiary;
-use Database;
+use App\Core\Database;
 use RuntimeException;
-use SchoolAbsence;
-
+use App\Models\Education\SchoolAbsence;
 /**
  * EducaTudo - ClassDiaryService
  *
@@ -621,4 +619,8 @@ class ClassDiaryService
             'periodo' => $this->diary->periodoDoBimestre((int) $row['ano_letivo'], (int) $row['bimestre']),
         ];
     }
+}
+
+if (!class_exists('ClassDiaryService', false) && class_exists(__NAMESPACE__ . '\\ClassDiaryService', false)) {
+    class_alias(__NAMESPACE__ . '\\ClassDiaryService', 'ClassDiaryService');
 }

@@ -1,7 +1,6 @@
 <?php
 $eventos = $eventos ?? [];
 if (!class_exists('PeriodoLetivo')) {
-    require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
 }
 $bimestreLabel = static function ($bimestre, $ano = 0) {
     $bimestre = (int) $bimestre;
@@ -9,7 +8,7 @@ $bimestreLabel = static function ($bimestre, $ano = 0) {
     if ($bimestre <= 0) {
         return '—';
     }
-    $lab = PeriodoLetivo::rotulo($ano > 0 ? $ano : (int) date('Y'), $bimestre);
+    $lab = \App\Core\PeriodoLetivo::rotulo($ano > 0 ? $ano : (int) date('Y'), $bimestre);
 
     return $lab !== '' ? $lab : '—';
 };

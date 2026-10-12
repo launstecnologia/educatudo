@@ -292,3 +292,7 @@ class MigrationRunner
     }
 }
 
+
+if (!class_exists('MigrationRunner', false) && class_exists(__NAMESPACE__ . '\\MigrationRunner', false)) {
+    class_alias(__NAMESPACE__ . '\\MigrationRunner', 'MigrationRunner');
+}

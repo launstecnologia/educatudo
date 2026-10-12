@@ -5,7 +5,6 @@ namespace App\Modulos\DashboardGestao\Widgets;
 use App\Modulos\DashboardGestao\Services\DashboardConsulta;
 use App\Modulos\DashboardGestao\Services\DashboardFiltro;
 
-require_once dirname(__DIR__, 3) . '/Models/Exams/ExamBlock.php';
 
 class AvaliacoesWidget implements WidgetDashboard
 {
@@ -23,7 +22,7 @@ class AvaliacoesWidget implements WidgetDashboard
 
     public function montar(DashboardFiltro $filtro): array
     {
-        $blocos = new \ExamBlock();
+        $blocos = new \App\Models\Exams\ExamBlock();
         $hoje = $filtro->hoje;
         $inicioSemana = date('Y-m-d', strtotime('monday this week'));
         $fimSemana = date('Y-m-d', strtotime('sunday this week'));
@@ -56,7 +55,7 @@ class AvaliacoesWidget implements WidgetDashboard
 
     private function contarNoIntervalo(string $inicio, string $fim, DashboardFiltro $filtro): int
     {
-        $db = \Database::getInstance();
+        $db = \App\Core\Database::getInstance();
         $where = ['pb.deleted_at IS NULL', 'DATE(pb.data_prova) BETWEEN :inicio AND :fim'];
         $params = ['inicio' => $inicio, 'fim' => $fim];
         if ($filtro->bimestre > 0) {
@@ -76,7 +75,7 @@ class AvaliacoesWidget implements WidgetDashboard
      */
     private function proximas(DashboardFiltro $filtro, int $limite): array
     {
-        $db = \Database::getInstance();
+        $db = \App\Core\Database::getInstance();
         $where = ['pb.deleted_at IS NULL', 'DATE(pb.data_prova) >= :hoje'];
         $params = ['hoje' => $filtro->hoje];
         if ($filtro->bimestre > 0) {
@@ -109,7 +108,7 @@ class AvaliacoesWidget implements WidgetDashboard
         if (!$this->consulta->colunaExiste('provas_blocos', 'formato_evento')) {
             return 0;
         }
-        $db = \Database::getInstance();
+        $db = \App\Core\Database::getInstance();
         $where = [
             'pb.deleted_at IS NULL',
             "pb.formato_evento = 'lancamento_nota'",
@@ -145,4 +144,8 @@ class AvaliacoesWidget implements WidgetDashboard
                 WHERE pbp2.bloco_id = pb.id AND pbpt.turma_id = :turma_id
             ))';
     }
+}
+
+if (!class_exists('AvaliacoesWidget', false) && class_exists(__NAMESPACE__ . '\\AvaliacoesWidget', false)) {
+    class_alias(__NAMESPACE__ . '\\AvaliacoesWidget', 'AvaliacoesWidget');
 }

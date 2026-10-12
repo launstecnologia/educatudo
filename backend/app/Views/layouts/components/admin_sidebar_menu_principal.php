@@ -1,7 +1,6 @@
 <?php
 /** Menu lateral completo do admin (exceto perfis financeiro e secretaria). */
 if (!class_exists('FeatureGate')) {
-    require_once __DIR__ . '/../../../Core/FeatureGate.php';
 }
 $linkCls = static function (bool $ativo): string {
     return 'flex items-center px-4 py-2 ' . ($ativo
@@ -9,22 +8,22 @@ $linkCls = static function (bool $ativo): string {
         : 'text-purple-100 hover:bg-white/20 hover:text-white') . ' rounded-lg transition-all duration-200';
 };
 $showPedagogicoGroup = $modOn('aulas_online')
-    || FeatureGate::isModuleEnabled('ead')
+    || \App\Core\FeatureGate::isModuleEnabled('ead')
     || $modOn('bncc')
     || $modOn('aluno_minicursos')
     || $modOn('professor_planos_aula')
     || ($canViewSidebar(['inclusao']) && $modOn('inclusao'))
     || $modOn('redacao_configuravel')
-    || FeatureGate::isModuleEnabled('jornadas');
+    || \App\Core\FeatureGate::isModuleEnabled('jornadas');
 $showSistemaGroup = $canViewSidebar(['avatares_alunos'])
     || $modOn('redacao_configuravel')
     || (($user['perfil_admin'] ?? '') === 'dev');
-$showEscolaExpoGroup = FeatureGate::isModuleEnabled('expo_colag') && $canViewSidebar(['expo_colag']);
+$showEscolaExpoGroup = \App\Core\FeatureGate::isModuleEnabled('expo_colag') && $canViewSidebar(['expo_colag']);
 $nomeMenuEscola = '';
 if (class_exists('LayoutHelper')) {
-    $nomeMenuEscola = trim((string) LayoutHelper::get('menu_colag_nome', ''));
+    $nomeMenuEscola = trim((string) \App\Core\LayoutHelper::get('menu_colag_nome', ''));
     if ($nomeMenuEscola === '') {
-        $nomeMenuEscola = trim((string) LayoutHelper::getSystemTitle());
+        $nomeMenuEscola = trim((string) \App\Core\LayoutHelper::getSystemTitle());
     }
 }
 if ($nomeMenuEscola === '') {
@@ -132,19 +131,19 @@ if ($nomeMenuEscola === '') {
             <span class="sidebar-text text-sm">Regras de Aprovação</span>
         </a>
         <?php endif; ?>
-        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_provas') || LayoutHelper::isModuleEnabled('professor_provas')): ?>
+        <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('aluno_provas') || \App\Core\LayoutHelper::isModuleEnabled('professor_provas')): ?>
         <a href="<?= URL ?>/admin/provas/tipos-avaliacao" class="<?= $linkCls($cp === 'tipos_avaliacao') ?>">
             <i class="fa-solid fa-tags w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Tipos de Nota</span>
         </a>
         <?php endif; ?>
-        <?php if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('grupos_regras_notas') && $canViewSidebar(['grupos_regras_notas'])): ?>
+        <?php if (class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('grupos_regras_notas') && $canViewSidebar(['grupos_regras_notas'])): ?>
         <a href="<?= URL ?>/admin/quadros-notas" class="<?= $linkCls(in_array($cp, ['grupos-regras-notas', 'quadros-notas'], true)) ?>">
             <i class="fa-solid fa-layer-group w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Quadro de Notas</span>
         </a>
         <?php endif; ?>
-        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_provas') || LayoutHelper::isModuleEnabled('professor_provas')): ?>
+        <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('aluno_provas') || \App\Core\LayoutHelper::isModuleEnabled('professor_provas')): ?>
         <a href="<?= URL ?>/admin/provas" class="<?= $linkCls($cp === 'provas' || $cp === 'provas_blocos') ?>">
             <i class="fa-regular fa-clipboard w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Lançamento de Notas</span>
@@ -179,7 +178,7 @@ if ($nomeMenuEscola === '') {
     <div id="rotina-submenu" class="<?= !empty($rotinaOpen) ? '' : 'hidden' ?> ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
         <?php $menu_subcab_titulo = 'O dia a dia'; $menu_subcab_periodo = ''; $menu_subcab_ordenar = true; require __DIR__ . '/admin_sidebar_subcabecalho.php'; ?>
         <div class="sidebar-sublista">
-        <?php if ($canViewSidebar(['diario_classe']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('diario_classe'))): ?>
+        <?php if ($canViewSidebar(['diario_classe']) && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('diario_classe'))): ?>
         <a href="<?= URL ?>/admin/diario" class="<?= $linkCls($cp === 'diario_classe') ?>">
             <i class="fa-regular fa-address-book w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Diário de Classe</span>
@@ -191,7 +190,7 @@ if ($nomeMenuEscola === '') {
             <span class="sidebar-text text-sm">Frequência</span>
         </a>
         <?php endif; ?>
-        <?php if ($canViewSidebar(['ocorrencias']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('ocorrencias'))): ?>
+        <?php if ($canViewSidebar(['ocorrencias']) && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('ocorrencias'))): ?>
         <a href="<?= URL ?>/admin/ocorrencias" class="<?= $linkCls($cp === 'ocorrencias') ?>">
             <i class="fa-regular fa-clock w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Ocorrências</span>
@@ -225,7 +224,7 @@ if ($nomeMenuEscola === '') {
             <span class="sidebar-text text-sm">Painel de Fechamento</span>
         </a>
         <?php endif; ?>
-        <?php if ($canViewSidebar(['conselho_classe']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('conselho_classe'))): ?>
+        <?php if ($canViewSidebar(['conselho_classe']) && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('conselho_classe'))): ?>
         <a href="<?= URL ?>/admin/conselhos" class="<?= $linkCls($cp === 'conselho_classe') ?>">
             <i class="fa-solid fa-chalkboard-user w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Conselho de Classe</span>
@@ -259,7 +258,7 @@ if ($nomeMenuEscola === '') {
 <?php endif; ?>
 
 <!-- Comunicação -->
-<?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('comunicacao') || $modOn('calendario_escolar')): ?>
+<?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('comunicacao') || $modOn('calendario_escolar')): ?>
 <div class="menu-group">
     <div class="flex items-center rounded-xl <?= $cp === 'comunicacao' ? 'bg-white/20' : '' ?>">
         <a href="<?= URL ?>/admin/comunicacao" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
@@ -283,7 +282,7 @@ if ($nomeMenuEscola === '') {
             <span class="sidebar-text text-sm">Calendário Escolar</span>
         </a>
         <?php endif; ?>
-        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('forum')): ?>
+        <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('forum')): ?>
         <div class="flex items-center rounded-lg <?= $forumAtivo ? 'bg-white/20' : '' ?>">
             <a href="<?= URL ?>/forum" class="flex-1 <?= $linkCls($forumAtivo) ?>">
                 <i class="fa-regular fa-comments w-4 h-4 mr-3"></i>
@@ -301,7 +300,7 @@ if ($nomeMenuEscola === '') {
             </a>
         </div>
         <?php endif; ?>
-        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('mural_recados')): ?>
+        <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('mural_recados')): ?>
         <a href="<?= URL ?>/admin/mural-recados" class="<?= $linkCls($cp === 'mural-recados') ?>">
             <i class="fa-solid fa-bullhorn w-4 h-4 mr-3"></i>
             <span class="sidebar-text text-sm">Mural de Recados</span>
@@ -333,9 +332,9 @@ if ($nomeMenuEscola === '') {
 
 <!-- Conteúdo -->
 <?php
-$conteudoArquivosOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_arquivos');
-$conteudoHitsOn = class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('educa_hits');
-$conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_apostilas');
+$conteudoArquivosOn = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('aluno_arquivos');
+$conteudoHitsOn = class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('educa_hits');
+$conteudoMaterialOn = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('aluno_apostilas');
 ?>
 <?php if ($conteudoArquivosOn || $conteudoHitsOn || $conteudoMaterialOn): ?>
 <div class="menu-group">
@@ -357,14 +356,14 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
             <span class="sidebar-text text-sm">Arquivos</span>
         </a>
         <?php endif; ?>
-        <?php if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('educa_hits')): ?>
+        <?php if (class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('educa_hits')): ?>
         <?php require_once __DIR__ . '/../../../Core/EducaHitsConfig.php'; ?>
-        <a href="<?= htmlspecialchars(EducaHitsConfig::portalLoginUrl()) ?>" target="_blank" rel="noopener noreferrer" class="flex items-center px-4 py-2 text-purple-100 hover:bg-white/20 hover:text-white rounded-lg transition-all duration-200">
+        <a href="<?= htmlspecialchars(\App\Core\EducaHitsConfig::portalLoginUrl()) ?>" target="_blank" rel="noopener noreferrer" class="flex items-center px-4 py-2 text-purple-100 hover:bg-white/20 hover:text-white rounded-lg transition-all duration-200">
             <i class="fa-solid fa-music w-4 h-4 mr-3"></i>
             <span class="sidebar-text text-sm">EducaHits (portal)</span>
         </a>
         <?php endif; ?>
-        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_apostilas')): ?>
+        <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('aluno_apostilas')): ?>
         <a href="<?= URL ?>/admin/apostilas-ia" class="<?= $linkCls($cp === 'apostilas-ia') ?>">
             <i class="fa-solid fa-wand-magic-sparkles w-4 h-4 mr-3"></i>
             <span class="sidebar-text text-sm">Meu Material</span>
@@ -375,7 +374,7 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
 <?php endif; ?>
 
 <!-- Financeiro -->
-<?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('financeiro')): ?>
+<?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('financeiro')): ?>
 <div class="menu-group">
     <div class="flex items-center rounded-xl <?= $cp === 'financeiro' ? 'bg-white/20' : '' ?>">
         <a href="<?= URL ?>/admin/financeiro-escolar" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
@@ -408,19 +407,19 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
         </button>
     </div>
     <div id="secretaria-submenu" class="<?= !empty($secretariaNavOpen) ? '' : 'hidden' ?> ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
-        <?php if ($canViewSidebar(['censo_escolar']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('censo_escolar'))): ?>
+        <?php if ($canViewSidebar(['censo_escolar']) && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('censo_escolar'))): ?>
         <a href="<?= URL ?>/admin/censo" class="<?= $linkCls($cp === 'censo_escolar') ?>">
             <i class="fa-solid fa-school-flag w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Censo Escolar</span>
         </a>
         <?php endif; ?>
-        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('documentos_institucionais')): ?>
+        <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('documentos_institucionais')): ?>
         <div class="flex items-center rounded-lg <?= $cp === 'documentos_institucionais' ? 'bg-white/20' : '' ?>">
             <a href="<?= URL ?>/admin/documentos-institucionais" class="flex-1 <?= $linkCls($cp === 'documentos_institucionais') ?>">
                 <i class="fa-solid fa-file-shield w-4 h-4 mr-3 flex-shrink-0"></i>
                 <span class="sidebar-text text-sm">Documentos Institucionais</span>
             </a>
-            <?php if ((class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('processo_matricula') && $canViewSidebar(['processos_matricula'])) || $canViewSidebar(['modelos_documentos'])): ?>
+            <?php if ((class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('processo_matricula') && $canViewSidebar(['processos_matricula'])) || $canViewSidebar(['modelos_documentos'])): ?>
             <button type="button" onclick="toggleNestedMenu('documentos-institucionais')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
                 <svg id="documentos-institucionais-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -428,9 +427,9 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
             </button>
             <?php endif; ?>
         </div>
-        <?php if ((class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('processo_matricula') && $canViewSidebar(['processos_matricula'])) || $canViewSidebar(['modelos_documentos'])): ?>
+        <?php if ((class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('processo_matricula') && $canViewSidebar(['processos_matricula'])) || $canViewSidebar(['modelos_documentos'])): ?>
         <div id="documentos-institucionais-nested" class="<?= $documentosNestedOpen ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
-            <?php if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('processo_matricula') && $canViewSidebar(['processos_matricula'])): ?>
+            <?php if (class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('processo_matricula') && $canViewSidebar(['processos_matricula'])): ?>
             <a href="<?= URL ?>/admin/configuracao/assinatura-digital" class="<?= $linkCls($cp === 'assinatura_digital') ?>">
                 <span class="sidebar-text text-sm">Assinatura Digital</span>
             </a>
@@ -443,7 +442,7 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
         </div>
         <?php endif; ?>
         <?php endif; ?>
-        <?php if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('processo_matricula')): ?>
+        <?php if (class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('processo_matricula')): ?>
         <div class="flex items-center rounded-lg <?= $cp === 'enrollment' ? 'bg-white/20' : '' ?>">
             <a href="<?= URL ?>/admin/enrollment" class="flex-1 <?= $linkCls($cp === 'enrollment') ?>">
                 <i class="fa-solid fa-file-signature w-4 h-4 mr-3 flex-shrink-0"></i>
@@ -547,7 +546,7 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
             <span class="sidebar-text text-sm">Saúde Acadêmica</span>
         </a>
         <?php endif; ?>
-        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('conformidade')): ?>
+        <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('conformidade')): ?>
         <a href="<?= URL ?>/admin/conformidade" class="<?= $linkCls($cp === 'conformidade') ?>">
             <i class="fa-solid fa-clipboard-check w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Conformidade</span>
@@ -621,13 +620,13 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
         </button>
     </div>
     <div id="pedagogico-submenu" class="<?= $pedagogicoOpen ? '' : 'hidden' ?> ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
-        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aulas_online')): ?>
+        <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('aulas_online')): ?>
         <a href="<?= URL ?>/admin/aulas-online" class="<?= $linkCls($cp === 'aulas_online') ?>">
             <i class="fa-solid fa-video w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Aulas Online</span>
         </a>
         <?php endif; ?>
-        <?php if (class_exists('FeatureGate') && FeatureGate::isModuleEnabled('ead')): ?>
+        <?php if (class_exists('FeatureGate') && \App\Core\FeatureGate::isModuleEnabled('ead')): ?>
         <a href="<?= URL ?>/admin/ava" class="<?= $linkCls($cp === 'ava') ?>">
             <i class="fa-solid fa-graduation-cap w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">AVA / EAD</span>
@@ -639,31 +638,31 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || LayoutHelper::isModuleEna
             <span class="sidebar-text text-sm">BNCC / Plano de Curso</span>
         </a>
         <?php endif; ?>
-        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_minicursos')): ?>
+        <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('aluno_minicursos')): ?>
         <a href="<?= URL ?>/admin/minicursos" class="<?= $linkCls($cp === 'minicursos') ?>">
             <i class="fa-solid fa-play-circle w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">EducaCursos</span>
         </a>
         <?php endif; ?>
-        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('professor_planos_aula')): ?>
+        <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('professor_planos_aula')): ?>
         <a href="<?= URL ?>/admin/planos-aula" class="<?= $linkCls($cp === 'planos-aula') ?>">
             <i class="fa-regular fa-file-lines w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Plano de Aula</span>
         </a>
         <?php endif; ?>
-        <?php if ($canViewSidebar(['inclusao']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('inclusao'))): ?>
+        <?php if ($canViewSidebar(['inclusao']) && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('inclusao'))): ?>
         <a href="<?= URL ?>/admin/inclusao/versoes" class="<?= $linkCls($cp === 'inclusao') ?>">
             <i class="fa-solid fa-universal-access w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Avaliação Adaptativa</span>
         </a>
         <?php endif; ?>
-        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('redacao_configuravel')): ?>
+        <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('redacao_configuravel')): ?>
         <a href="<?= URL ?>/admin/redacao-professor" class="<?= $linkCls(in_array($cp, ['essays_teacher', 'essays_teacher_report'], true)) ?>">
             <i class="fa-solid fa-pen-to-square w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Jornada da Redação</span>
         </a>
         <?php endif; ?>
-        <?php if (FeatureGate::isModuleEnabled('jornadas')): ?>
+        <?php if (\App\Core\FeatureGate::isModuleEnabled('jornadas')): ?>
         <a href="<?= URL ?>/admin/jornadas" class="<?= $linkCls(in_array($cp, ['journeys', 'journeys_relatorio'], true)) ?>">
             <i class="fa-solid fa-route w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Jornada do Aluno</span>

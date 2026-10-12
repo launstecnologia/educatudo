@@ -1,17 +1,13 @@
 <?php
 
 namespace App\Modulos\VidaEscolar\Services;
+use App\Core\PeriodoLetivo;
 
-require_once __DIR__ . '/../Models/VidaEscolar.php';
-require_once __DIR__ . '/../../../Services/ResultadoAcademicoService.php';
-require_once __DIR__ . '/../../../Models/Education/ComponenteCurricular.php';
-require_once __DIR__ . '/../../boletins/Services/BoletimCadastroService.php';
 
 use App\Modulos\Boletins\Services\BoletimCadastroService;
 use App\Modulos\VidaEscolar\Models\VidaEscolar;
-use Database;
-use ResultadoAcademicoService;
-
+use App\Core\Database;
+use App\Services\ResultadoAcademicoService;
 /**
  * Fichas oficiais de boletim e histórico. A composição (provas/jornadas)
  * continua no motor legado; este serviço grava a célula do documento.
@@ -2181,7 +2177,6 @@ class VidaEscolarService
     private function periodosDaLinhaGerada(array $row): array
     {
         if (!class_exists('BoletimQuadroLayoutHelper', false)) {
-            require_once __DIR__ . '/../../../Helpers/BoletimQuadroLayoutHelper.php';
         }
 
         $notas = json_decode((string) ($row['notas_json'] ?? ''), true);
@@ -2261,7 +2256,7 @@ class VidaEscolarService
         // 1) Resultado oficial do período (média final / média bim final pós-ENAC).
         // Preferência: coluna Média Bim Final > códigos media_final > layout resultado.
         foreach ($colunas as $col) {
-            if (!is_array($col) || !\BoletimQuadroLayoutHelper::colunaEhResultadoResumo($col)) {
+            if (!is_array($col) || !\App\Helpers\BoletimQuadroLayoutHelper::colunaEhResultadoResumo($col)) {
                 continue;
             }
             $periodo = $resolverPeriodo($col);
@@ -2326,7 +2321,7 @@ class VidaEscolarService
             if ($codOrig === '') {
                 continue;
             }
-            if (\BoletimQuadroLayoutHelper::colunaEhResultadoResumo($col)) {
+            if (\App\Helpers\BoletimQuadroLayoutHelper::colunaEhResultadoResumo($col)) {
                 continue;
             }
             $cod = strtolower($codOrig);
@@ -2608,7 +2603,7 @@ class VidaEscolarService
         if (!class_exists('SchoolAbsence', false)) {
             return [];
         }
-        $absence = new \SchoolAbsence();
+        $absence = new \App\Models\Education\SchoolAbsence();
         $eventoId = $absence->idEventoPorAnoBimestre($anoLetivo, $bimestre);
         $this->faltasEventoExisteCache[$cacheKey] = $eventoId > 0;
         if ($eventoId <= 0) {
@@ -2955,8 +2950,7 @@ class VidaEscolarService
             return;
         }
         try {
-            require_once dirname(__DIR__, 3) . '/Controllers/Admin/BoletimConfigController.php';
-            (new \BoletimConfigController(true))->atualizarBoletinsOficiaisDoAluno($alunoId);
+            (new \App\Controllers\Admin\BoletimConfigController(true))->atualizarBoletinsOficiaisDoAluno($alunoId);
         } catch (\Throwable $e) {
             error_log('Vida escolar recolher desdobramentos aluno #' . $alunoId . ': ' . $e->getMessage());
         }
@@ -3139,7 +3133,7 @@ class VidaEscolarService
             return $this->paiPorFilhoCache;
         }
         try {
-            $this->paiPorFilhoCache = (new \ComponenteCurricular())->mapaPaiPorFilho();
+            $this->paiPorFilhoCache = (new \App\Models\Education\ComponenteCurricular())->mapaPaiPorFilho();
         } catch (\Throwable $e) {
             $this->paiPorFilhoCache = [];
         }
@@ -4054,4 +4048,8 @@ class VidaEscolarService
         $v = trim((string) $v);
         return preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) ? $v : null;
     }
+}
+
+if (!class_exists('VidaEscolarService', false) && class_exists(__NAMESPACE__ . '\\VidaEscolarService', false)) {
+    class_alias(__NAMESPACE__ . '\\VidaEscolarService', 'VidaEscolarService');
 }

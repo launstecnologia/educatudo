@@ -6,7 +6,7 @@ $grade = $grade ?? ($grade_suggested ?? '');
 $quantity = isset($quantity) ? (int) $quantity : 5;
 $csrf_token = $csrf_token ?? '';
 $grade_suggested = $grade_suggested ?? '';
-$iaName = LayoutHelper::getIaName();
+$iaName = \App\Core\LayoutHelper::getIaName();
 ?>
 <div class="container mx-auto px-4 py-6 max-w-5xl w-full">
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4">

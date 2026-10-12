@@ -1,6 +1,5 @@
 <?php
 if (!class_exists('LayoutHelper')) {
-    require_once __DIR__ . '/../../../Core/LayoutHelper.php';
 }
 ?>
 <!-- Header Section -->
@@ -108,7 +107,7 @@ if (!class_exists('LayoutHelper')) {
                             </button>
                         <?php endif; ?>
                     </div>
-                    <div class="text-gray-700 mb-3"><?= isset($questao['enunciado']) ? LayoutHelper::renderEnunciadoProva($questao['enunciado']) : '' ?></div>
+                    <div class="text-gray-700 mb-3"><?= isset($questao['enunciado']) ? \App\Core\LayoutHelper::renderEnunciadoProva($questao['enunciado']) : '' ?></div>
                     
                     <?php if ($questao['tipo'] === 'multipla_escolha' && !empty($questao['alternativas'])): ?>
                         <div class="ml-4 space-y-2">
@@ -121,7 +120,7 @@ if (!class_exists('LayoutHelper')) {
                                             </svg>
                                         <?php endif; ?>
                                     </span>
-                                    <span class="text-gray-700"><?= isset($alt['texto']) ? LayoutHelper::renderEnunciadoProva($alt['texto']) : '' ?></span>
+                                    <span class="text-gray-700"><?= isset($alt['texto']) ? \App\Core\LayoutHelper::renderEnunciadoProva($alt['texto']) : '' ?></span>
                                 </div>
                             <?php endforeach; ?>
                         </div>

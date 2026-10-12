@@ -6,10 +6,10 @@ $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
 $fmtData = static function ($d): string {
     $d = trim((string) $d);
     if ($d === '') return '—';
-    $dt = DateTime::createFromFormat('Y-m-d', substr($d, 0, 10));
+    $dt = \DateTime::createFromFormat('Y-m-d', substr($d, 0, 10));
     return $dt ? $dt->format('d/m/Y') : '—';
 };
-$nome = \StudentFormHelper::nomeOficialLinha($aluno);
+$nome = \App\Helpers\StudentFormHelper::nomeOficialLinha($aluno);
 $turma = trim((string) ($mat['turma_nome'] ?? $aluno['turma_nome'] ?? ''));
 $dataComp = $fmtData($dados['data_comparecimento'] ?? '');
 $periodoTexto = trim((string) ($dados['periodo_texto'] ?? ''));

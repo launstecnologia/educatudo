@@ -1,7 +1,6 @@
 <?php
-require_once __DIR__ . '/../../Core/LayoutHelper.php';
-$logo_horizontal_url = LayoutHelper::getLoginLogoUrl();
-$system_title = LayoutHelper::getSystemTitle();
+$logo_horizontal_url = \App\Core\LayoutHelper::getLoginLogoUrl();
+$system_title = \App\Core\LayoutHelper::getSystemTitle();
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">

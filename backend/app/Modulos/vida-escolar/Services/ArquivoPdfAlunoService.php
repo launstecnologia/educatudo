@@ -2,11 +2,9 @@
 
 namespace App\Modulos\VidaEscolar\Services;
 
-require_once __DIR__ . '/../../../Services/MediaStorageService.php';
 
-use Database;
-use MediaStorageService;
-
+use App\Core\Database;
+use App\Services\MediaStorageService;
 /**
  * Guarda o PDF gerado para o aluno no storage da escola (S3 quando configurado)
  * e registra a emissão para a aba Histórico / emissões.
@@ -232,4 +230,8 @@ class ArquivoPdfAlunoService
 
         return $carregado = (is_array($loaded) ? $loaded : []);
     }
+}
+
+if (!class_exists('ArquivoPdfAlunoService', false) && class_exists(__NAMESPACE__ . '\\ArquivoPdfAlunoService', false)) {
+    class_alias(__NAMESPACE__ . '\\ArquivoPdfAlunoService', 'ArquivoPdfAlunoService');
 }

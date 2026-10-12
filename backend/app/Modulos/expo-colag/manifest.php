@@ -5,6 +5,7 @@
  */
 return [
     'chave' => 'expo-colag',
+    'namespace' => 'App\\Modulos\\ExpoColag',
     'label' => 'Expo Colag',
     'grupo' => 'colag',
     'feature_keys' => [

@@ -1,7 +1,6 @@
 <?php
 $regra = $regra ?? [];
 if (!class_exists('PeriodoLetivo')) {
-    require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
 }
 $componentes = $regra['componentes'] ?? [];
 $alunos = $alunos ?? [];
@@ -453,7 +452,6 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     $matrizLinhas = is_array($matrizSim) && !empty($matrizSim['linhas']) ? $matrizSim['linhas'] : [];
                     $matrizColunas = is_array($matrizSim) && !empty($matrizSim['colunas']) ? $matrizSim['colunas'] : [];
                     if (!class_exists('BoletimQuadroLayoutHelper', false)) {
-                        require_once dirname(__DIR__, 3) . '/Helpers/BoletimQuadroLayoutHelper.php';
                     }
                     ?>
                     <?php
@@ -542,7 +540,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
             $anoCab = (int) ($regra['ano_letivo'] ?? 0);
             $bimCab = (int) ($regra['bimestre'] ?? 0);
             $rotuloBimCab = ($anoCab > 0 && $bimCab > 0)
-                ? PeriodoLetivo::rotulo($anoCab, $bimCab)
+                ? \App\Core\PeriodoLetivo::rotulo($anoCab, $bimCab)
                 : ($bimCab > 0 ? ($bimCab . 'º') : '—');
             $detalheCab = trim((string) ($regra['descricao_curta'] ?? ''));
             $nomeBoletimVinculado = '';
@@ -744,9 +742,8 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                             <select name="bimestre" id="regra-bimestre" class="w-full h-10 px-3 border border-gray-300 rounded-lg" data-periodo-letivo-select data-periodo-vazio="1">
                                 <?php
                                 if (!class_exists('PeriodoLetivo')) {
-                                    require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
                                 }
-                                echo PeriodoLetivo::optionsHtml($anoRegra, $bimRegra, ['vazio' => true]);
+                                echo \App\Core\PeriodoLetivo::optionsHtml($anoRegra, $bimRegra, ['vazio' => true]);
                                 ?>
                             </select>
                         </div>
@@ -1145,7 +1142,6 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                 $matrizLinhas = is_array($matrizSim) && !empty($matrizSim['linhas']) ? $matrizSim['linhas'] : [];
                 $matrizColunas = is_array($matrizSim) && !empty($matrizSim['colunas']) ? $matrizSim['colunas'] : [];
                 if (!class_exists('BoletimQuadroLayoutHelper', false)) {
-                    require_once dirname(__DIR__, 3) . '/Helpers/BoletimQuadroLayoutHelper.php';
                 }
                 ?>
                 <?php
@@ -1366,8 +1362,9 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                 <input id="bloco-peso" type="number" step="0.01" min="0.01" value="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Escala máxima</label>
-                <input id="bloco-escala" type="number" step="0.01" min="0.01" value="10" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Valor máximo (escala)</label>
+                <input id="bloco-escala" type="number" step="0.01" min="0.01" max="999" value="10" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                <p class="text-xs text-gray-500 mt-1">Teto da coluna. Em fórmula tipo <code class="bg-gray-100 px-1 rounded">Resultado Final × 2</code>, use <strong>20</strong> (senão corta em 10).</p>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Grupo no boletim (layout)</label>
@@ -1574,7 +1571,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     <div class="min-w-[140px]">
                         <label for="jornada-tabela-filtro-bimestre" class="block text-xs font-medium text-gray-600 mb-1" data-periodo-label>Bimestre</label>
                         <select id="jornada-tabela-filtro-bimestre" class="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm">
-                            <?= PeriodoLetivo::optionsHtml((int) date('Y'), 0, ['todos' => true]) ?>
+                            <?= \App\Core\PeriodoLetivo::optionsHtml((int) date('Y'), 0, ['todos' => true]) ?>
                         </select>
                     </div>
                     <div class="min-w-[120px]">
@@ -1679,7 +1676,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     <div class="min-w-[140px]">
                         <label for="bloco-tabela-filtro-bimestre" class="block text-xs font-medium text-gray-600 mb-1" data-periodo-label>Bimestre</label>
                         <select id="bloco-tabela-filtro-bimestre" class="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm">
-                            <?= PeriodoLetivo::optionsHtml((int) date('Y'), 0, ['todos' => true]) ?>
+                            <?= \App\Core\PeriodoLetivo::optionsHtml((int) date('Y'), 0, ['todos' => true]) ?>
                         </select>
                     </div>
                     <div class="min-w-[120px]">

@@ -5,6 +5,7 @@
  */
 return [
     'chave' => 'fechamento',
+    'namespace' => 'App\\Modulos\\Fechamento',
     'label' => 'Fechamento',
     'grupo' => 'academico',
     'feature_keys' => [

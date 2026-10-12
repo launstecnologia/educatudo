@@ -2,7 +2,7 @@
 
 namespace App\Modulos\AgrupamentosComponentes\Models;
 
-use Database;
+use App\Core\Database;
 use Throwable;
 
 /**
@@ -212,4 +212,8 @@ class AgrupamentoComponente
             'ativo' => !empty($data['ativo']) ? 1 : 0,
         ];
     }
+}
+
+if (!class_exists('AgrupamentoComponente', false) && class_exists(__NAMESPACE__ . '\\AgrupamentoComponente', false)) {
+    class_alias(__NAMESPACE__ . '\\AgrupamentoComponente', 'AgrupamentoComponente');
 }

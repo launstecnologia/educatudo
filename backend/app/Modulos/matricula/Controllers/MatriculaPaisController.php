@@ -1,18 +1,15 @@
 <?php
 
-require_once __DIR__ . '/../../../Core/BaseController.php';
-require_once __DIR__ . '/../Services/MatriculaCampanhaService.php';
-require_once __DIR__ . '/../Services/MatriculaProcessoService.php';
-require_once __DIR__ . '/../Services/MatriculaVagaService.php';
-require_once __DIR__ . '/../Models/MatriculaProcesso.php';
+namespace App\Modulos\Matricula\Controllers;
+
 
 use App\Modulos\Matricula\Models\MatriculaProcesso;
 use App\Modulos\Matricula\Services\MatriculaCampanhaService;
 use App\Modulos\Matricula\Services\MatriculaProcessoService;
 use App\Modulos\Matricula\Services\MatriculaVagaService;
 
-if (!class_exists('MatriculaPaisController')) {
-class MatriculaPaisController extends BaseController
+if (!class_exists(__NAMESPACE__ . '\\MatriculaPaisController', false)) {
+class MatriculaPaisController extends \App\Core\BaseController
 {
     private $auth;
     private $db;
@@ -23,8 +20,8 @@ class MatriculaPaisController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        $this->auth = new AuthManager();
-        $this->db = Database::getInstance();
+        $this->auth = new \App\Core\AuthManager();
+        $this->db = \App\Core\Database::getInstance();
         $this->campanhaService = new MatriculaCampanhaService($this->db);
         $this->processoService = new MatriculaProcessoService($this->db);
         $this->model = $this->processoService->getModel();
@@ -203,4 +200,8 @@ class MatriculaPaisController extends BaseController
         ) ?: [];
     }
 }
+}
+
+if (!class_exists('MatriculaPaisController', false) && class_exists(__NAMESPACE__ . '\\MatriculaPaisController', false)) {
+    class_alias(__NAMESPACE__ . '\\MatriculaPaisController', 'MatriculaPaisController');
 }

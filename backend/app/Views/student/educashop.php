@@ -4,9 +4,8 @@ $categorias = $categorias ?? [];
 $compras = $compras ?? [];
 $saldo = isset($saldo) ? (float) $saldo : 0.0;
 $wallet_saldos = $wallet_saldos ?? ['saldo_comprado' => 0, 'saldo_escola' => 0];
-require_once __DIR__ . '/../../Core/CreditosDecimalHelper.php';
 
-$saldoComprado = \CreditosDecimalHelper::fromScalar($wallet_saldos['saldo_comprado'] ?? 0, 0.0);
+$saldoComprado = \App\Core\CreditosDecimalHelper::fromScalar($wallet_saldos['saldo_comprado'] ?? 0, 0.0);
 $totalPacotes = count($pacotes);
 $categoriasMeta = $categorias_meta ?? [];
 ?>
@@ -43,8 +42,8 @@ $categoriasMeta = $categorias_meta ?? [];
                 <div class="flex flex-col sm:flex-row gap-3 lg:flex-col xl:flex-row shrink-0">
                     <div class="rounded-xl border border-gray-200 bg-white/90 backdrop-blur px-5 py-4 min-w-[200px] shadow-sm">
                         <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Seu saldo</p>
-                        <p class="text-2xl font-bold text-accent tabular-nums mt-1"><?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay($saldo)) ?></p>
-                        <p class="text-xs text-gray-500 mt-1">Comprados: <?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay($saldoComprado)) ?></p>
+                        <p class="text-2xl font-bold text-accent tabular-nums mt-1"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay($saldo)) ?></p>
+                        <p class="text-xs text-gray-500 mt-1">Comprados: <?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay($saldoComprado)) ?></p>
                     </div>
                     <div class="rounded-xl border border-emerald-100 bg-emerald-50/80 px-5 py-4 min-w-[200px]">
                         <p class="text-xs font-semibold uppercase tracking-wide text-emerald-800">Pagamento seguro</p>
@@ -236,7 +235,7 @@ $categoriasMeta = $categorias_meta ?? [];
                         <?php foreach ($compras as $c): ?>
                         <?php
                             $valorReais = 'R$ ' . number_format(((int) ($c['valor_centavos'] ?? 0)) / 100, 2, ',', '.');
-                            $creditosCompra = \CreditosDecimalHelper::fromScalar($c['creditos'] ?? 0, 0.0);
+                            $creditosCompra = \App\Core\CreditosDecimalHelper::fromScalar($c['creditos'] ?? 0, 0.0);
                             $billingType = strtoupper((string) ($c['billing_type'] ?? ''));
                             $billingLabel = [
                                 'PIX' => 'PIX',
@@ -265,7 +264,7 @@ $categoriasMeta = $categorias_meta ?? [];
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><?= htmlspecialchars($createdAt) ?></td>
                             <td class="px-6 py-4 text-sm text-gray-900">
                                 <span class="font-medium"><?= htmlspecialchars((string) ($c['pacote_nome'] ?? 'Pacote')) ?></span>
-                                <span class="block text-xs text-gray-500 mt-0.5 tabular-nums"><?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay($creditosCompra)) ?> TudiCoins</span>
+                                <span class="block text-xs text-gray-500 mt-0.5 tabular-nums"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay($creditosCompra)) ?> TudiCoins</span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium"><?= htmlspecialchars($valorReais) ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><?= htmlspecialchars($billingLabel) ?></td>

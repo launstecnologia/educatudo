@@ -2,12 +2,9 @@
 
 namespace App\Modulos\Matricula\Services;
 
-require_once __DIR__ . '/MatriculaProcessoService.php';
-require_once __DIR__ . '/../Models/MatriculaProcesso.php';
 
 use App\Modulos\Matricula\Models\MatriculaProcesso;
-use Database;
-
+use App\Core\Database;
 class MatriculaCampanhaService
 {
     private $db;
@@ -562,4 +559,8 @@ class MatriculaCampanhaService
             return false;
         }
     }
+}
+
+if (!class_exists('MatriculaCampanhaService', false) && class_exists(__NAMESPACE__ . '\\MatriculaCampanhaService', false)) {
+    class_alias(__NAMESPACE__ . '\\MatriculaCampanhaService', 'MatriculaCampanhaService');
 }

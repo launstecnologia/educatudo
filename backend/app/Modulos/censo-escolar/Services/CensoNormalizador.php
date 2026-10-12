@@ -152,3 +152,7 @@ class CensoNormalizador
         return strtr($valor, $map);
     }
 }
+
+if (!class_exists('CensoNormalizador', false) && class_exists(__NAMESPACE__ . '\\CensoNormalizador', false)) {
+    class_alias(__NAMESPACE__ . '\\CensoNormalizador', 'CensoNormalizador');
+}

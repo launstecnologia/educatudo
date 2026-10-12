@@ -58,7 +58,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             </select>
         </div>
     </div>
-    <p class="text-sm text-gray-500 mt-4">Cada turma ganha o próprio PDF. Trocar a turma mostra o download dela. Ficha e histórico aceitam até <?= (int) ImpressaoLoteFechamentoService::MAX_ALUNOS ?> alunos por turma.</p>
+    <p class="text-sm text-gray-500 mt-4">Cada turma ganha o próprio PDF. Trocar a turma mostra o download dela. Ficha e histórico aceitam até <?= (int) \App\Modulos\Fechamento\Services\ImpressaoLoteFechamentoService::MAX_ALUNOS ?> alunos por turma.</p>
 </form>
 
 <?php if ($jobs !== []): ?>
@@ -77,7 +77,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
     var ids = (caixa.getAttribute('data-jobs') || '').split(',').filter(Boolean);
     var baseStatus = caixa.getAttribute('data-status') || '';
     var basePdf = caixa.getAttribute('data-pdf') || '';
-    var nomes = <?= json_encode(ImpressaoLoteFechamentoService::DOCUMENTOS, JSON_UNESCAPED_UNICODE) ?>;
+    var nomes = <?= json_encode(\App\Modulos\Fechamento\Services\ImpressaoLoteFechamentoService::DOCUMENTOS, JSON_UNESCAPED_UNICODE) ?>;
     var recarregou = false;
     function desenhar(id, dados) {
         var item = document.getElementById('job-' + id);

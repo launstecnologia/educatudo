@@ -9,7 +9,6 @@
  * - $simVistaId (string único no DOM)
  */
 if (!class_exists('BoletimQuadroLayoutHelper', false)) {
-    require_once dirname(__DIR__, 2) . '/Helpers/BoletimQuadroLayoutHelper.php';
 }
 
 $colsVista = is_array($cols ?? null) ? $cols : [];
@@ -24,7 +23,7 @@ $fmtVista = is_callable($formatNotaBoletim ?? null)
         return number_format((float) $valor, $decVista, ',', '.');
     };
 $simVistaId = preg_replace('/[^a-zA-Z0-9_-]/', '', (string) ($simVistaId ?? 'sim')) ?: 'sim';
-$colsResumo = BoletimQuadroLayoutHelper::filtrarColunasResumoBoletim($colsVista);
+$colsResumo = \App\Helpers\BoletimQuadroLayoutHelper::filtrarColunasResumoBoletim($colsVista);
 ?>
 <div class="boletim-sim-vistas" data-sim-vistas="<?= htmlspecialchars($simVistaId, ENT_QUOTES, 'UTF-8') ?>">
     <div class="flex flex-wrap gap-2 mb-3">

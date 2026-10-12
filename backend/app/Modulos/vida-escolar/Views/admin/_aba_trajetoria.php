@@ -255,7 +255,7 @@ $vePodeVerLog = is_array($user ?? null) && (string) ($user['perfil_admin'] ?? ''
                 require_once $pathDocAluno;
             }
         }
-        $rotulosDoc = class_exists('StudentDocument', false) ? StudentDocument::checklist() : [];
+        $rotulosDoc = class_exists('StudentDocument', false) ? \App\Models\User\StudentDocument::checklist() : [];
         $ordemDoc = ['historico_escolar' => 0, 'declaracao_transferencia' => 1];
         foreach (is_array($documentos_aluno ?? null) ? $documentos_aluno : [] as $docFicha) {
             if (!is_array($docFicha) || trim((string) ($docFicha['arquivo_key'] ?? '')) === '') {
@@ -376,15 +376,14 @@ $vePodeVerLog = is_array($user ?? null) && (string) ($user['perfil_admin'] ?? ''
         $anoPeriodo = (int) date('Y');
     }
     if (!class_exists('PeriodoLetivo', false)) {
-        require_once dirname(__DIR__, 4) . '/Core/PeriodoLetivo.php';
     }
-    $infoPeriodo = PeriodoLetivo::doAno($anoPeriodo);
+    $infoPeriodo = \App\Core\PeriodoLetivo::doAno($anoPeriodo);
     $periodosMeio = is_array($infoPeriodo['rotulos'] ?? null) && $infoPeriodo['rotulos'] !== []
         ? $infoPeriodo['rotulos']
         : [1 => '1º Bimestre', 2 => '2º Bimestre', 3 => '3º Bimestre', 4 => '4º Bimestre'];
     $nomePeriodos = mb_strtolower((string) ($infoPeriodo['rotulo_campo_plural'] ?? 'períodos'));
     $tipoPeriodo = (string) ($infoPeriodo['tipo'] ?? 'bimestre');
-    $rotuloDivisao = (string) (PeriodoLetivo::TIPOS[$tipoPeriodo] ?? 'Bimestral (4 períodos)');
+    $rotuloDivisao = (string) (\App\Core\PeriodoLetivo::TIPOS[$tipoPeriodo] ?? 'Bimestral (4 períodos)');
     ?>
     <p class="text-sm text-gray-500 mb-4">Só se a outra escola já lançou <?= $esc($nomePeriodos) ?> de <?= (int) $anoPeriodo ?>. A nota digitada entra no boletim e esse período sai da aba Notas, porque veio de outra escola. Anos fechados ficam na outra aba.</p>
     <p class="text-xs text-gray-500 mb-4">Ano letivo <?= (int) $anoPeriodo ?> · <?= $esc($rotuloDivisao) ?>. As colunas seguem essa divisão (bimestre, trimestre, semestre ou etapa única), a mesma do boletim.</p>

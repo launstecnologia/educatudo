@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Modulos\ExpoColag\Models;
 /**
  * Pedidos de material do aluno ao professor (Expo Colag).
  */
@@ -9,7 +11,7 @@ class ExpoColagPedidoMaterial
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     public function findById(int $id): ?array
@@ -81,4 +83,8 @@ class ExpoColagPedidoMaterial
         );
         return $stmt && $stmt->rowCount() > 0;
     }
+}
+
+if (!class_exists('ExpoColagPedidoMaterial', false) && class_exists(__NAMESPACE__ . '\\ExpoColagPedidoMaterial', false)) {
+    class_alias(__NAMESPACE__ . '\\ExpoColagPedidoMaterial', 'ExpoColagPedidoMaterial');
 }

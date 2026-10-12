@@ -2,7 +2,7 @@
 
 namespace App\Modulos\CensoEscolar\Models;
 
-use Database;
+use App\Core\Database;
 use Throwable;
 
 /**
@@ -1054,4 +1054,8 @@ class CensoEdicao
                 return "SELECT c.* FROM {$tabela} c";
         }
     }
+}
+
+if (!class_exists('CensoEdicao', false) && class_exists(__NAMESPACE__ . '\\CensoEdicao', false)) {
+    class_alias(__NAMESPACE__ . '\\CensoEdicao', 'CensoEdicao');
 }

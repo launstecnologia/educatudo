@@ -109,14 +109,14 @@ $base = $base_url_jornadas ?? (URL . '/admin/jornadas');
         $respostaAlunoRaw = $exercicio['resposta_aluno'] ?? '';
         $pontuacao = $exercicio['pontuacao_aluno'] ?? null;
         $respondido = !empty($respostaAlunoRaw);
-        $resultadoEx = JornadaExercicioAvaliacao::classificar(
+        $resultadoEx = \App\Core\JornadaExercicioAvaliacao::classificar(
             $exercicio['tipo'] ?? '',
             $pontuacao,
             $respostaAlunoRaw,
             $respondido
         );
-        $pendente = $resultadoEx === JornadaExercicioAvaliacao::STATUS_PENDENTE;
-        $correto = $resultadoEx === JornadaExercicioAvaliacao::STATUS_ACERTO;
+        $pendente = $resultadoEx === \App\Core\JornadaExercicioAvaliacao::STATUS_PENDENTE;
+        $correto = $resultadoEx === \App\Core\JornadaExercicioAvaliacao::STATUS_ACERTO;
         $respostaAluno = $respostaAlunoRaw;
 
         if ($respondido && (strpos($respostaAluno, '{') === 0 || strpos($respostaAluno, '[') === 0)) {

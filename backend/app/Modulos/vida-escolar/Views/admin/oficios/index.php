@@ -119,7 +119,7 @@ include dirname(__DIR__, 5) . '/Views/admin/_partials/flash_message.php';
                     $ui_badge_label = $st === 'emitido' ? 'Emitido' : ($st === 'cancelado' ? 'Cancelado' : 'Rascunho');
                     $dataFmt = '';
                     if (!empty($o['data_oficio'])) {
-                        $dt = DateTime::createFromFormat('Y-m-d', substr((string) $o['data_oficio'], 0, 10));
+                        $dt = \DateTime::createFromFormat('Y-m-d', substr((string) $o['data_oficio'], 0, 10));
                         $dataFmt = $dt ? $dt->format('d/m/Y') : (string) $o['data_oficio'];
                     }
                     $numeroTxt = (int) ($o['numero'] ?? 0) > 0

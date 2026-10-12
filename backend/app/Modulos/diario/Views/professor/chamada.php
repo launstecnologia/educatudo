@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Models/ClassDiary.php';
 
 use App\Modulos\Diario\Models\ClassDiary;
 $execucaoAtual = (string) ($aula['execucao'] ?? 'conforme_planejado');
@@ -8,14 +7,14 @@ $situacoes = ['presente' => 'Presente', 'falta' => 'Falta', 'falta_justificada' 
 $origem = (string) ($origem ?? '');
 $planos = is_array($planos ?? null) ? $planos : [];
 $eventos = is_array($eventos ?? null) ? $eventos : [];
-$tipoAtual = ClassDiary::tipoAulaValido((string) ($aula['tipo_aula'] ?? 'regular'));
+$tipoAtual = \App\Modulos\Diario\Models\ClassDiary::tipoAulaValido((string) ($aula['tipo_aula'] ?? 'regular'));
 $planoAtual = (int) ($aula['plano_aula_id'] ?? 0);
 $eventoAtual = (int) ($aula['evento_bloco_id'] ?? 0);
 $voltarUrl = $origem === 'diario'
     ? URL . '/professor/diarios/abrir?turma_id=' . (int) $aula['turma_id'] . '&materia_id=' . (int) $aula['materia_id'] . '&aba=aulas'
     : URL . '/professor/diario?data=' . urlencode($aula['data_aula']);
 $voltarLabel = $origem === 'diario' ? '← Voltar ao diário' : '← Voltar à agenda do dia';
-$moduloOcorrencias = !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('ocorrencias');
+$moduloOcorrencias = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('ocorrencias');
 ?>
 <link rel="stylesheet" href="https://cdn.quilljs.com/1.3.7/quill.snow.css">
 <style>
@@ -163,7 +162,7 @@ $moduloOcorrencias = !class_exists('LayoutHelper') || LayoutHelper::isModuleEnab
             <div>
                 <label for="tipo_aula" class="block text-sm font-semibold text-gray-700 mb-2">Tipo da aula</label>
                 <select name="tipo_aula" id="tipo_aula" class="diario-select diario-select--execucao">
-                    <?php foreach (ClassDiary::TIPOS_AULA as $valor => $label): ?>
+                    <?php foreach (\App\Modulos\Diario\Models\ClassDiary::TIPOS_AULA as $valor => $label): ?>
                         <option value="<?= htmlspecialchars($valor) ?>" <?= $tipoAtual === $valor ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
                     <?php endforeach; ?>
                 </select>

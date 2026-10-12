@@ -1,8 +1,9 @@
 <?php
+
+namespace App\Modulos\Drive\Models;
 /**
  * Drive EducaTudo - Item (pasta ou arquivo)
  */
-require_once __DIR__ . '/../../../Core/Database.php';
 
 class DriveItem
 {
@@ -10,7 +11,7 @@ class DriveItem
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     public function createFolder($ownerId, $ownerType, $parentId, $name)
@@ -158,4 +159,8 @@ class DriveItem
         }
         return $keys;
     }
+}
+
+if (!class_exists('DriveItem', false) && class_exists(__NAMESPACE__ . '\\DriveItem', false)) {
+    class_alias(__NAMESPACE__ . '\\DriveItem', 'DriveItem');
 }

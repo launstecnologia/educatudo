@@ -1,6 +1,5 @@
 <?php
 if (!class_exists('LayoutHelper')) {
-    require_once __DIR__ . '/../../../Core/LayoutHelper.php';
 }
 ?>
 <!-- Header Section -->
@@ -114,7 +113,7 @@ if (!class_exists('LayoutHelper')) {
                             ?>
                         </h4>
                     </div>
-                    <p class="text-gray-700 mb-3"><?= isset($questao['enunciado']) ? LayoutHelper::renderEnunciadoProva($questao['enunciado']) : '' ?></p>
+                    <p class="text-gray-700 mb-3"><?= isset($questao['enunciado']) ? \App\Core\LayoutHelper::renderEnunciadoProva($questao['enunciado']) : '' ?></p>
                     
                     <?php if (!empty($questao['imagem_url'])): ?>
                         <div class="mb-3">
@@ -134,7 +133,7 @@ if (!class_exists('LayoutHelper')) {
                                             </svg>
                                         <?php endif; ?>
                                     </span>
-                                    <span class="text-gray-700"><?= isset($alt['texto']) ? LayoutHelper::renderEnunciadoProva($alt['texto']) : '' ?></span>
+                                    <span class="text-gray-700"><?= isset($alt['texto']) ? \App\Core\LayoutHelper::renderEnunciadoProva($alt['texto']) : '' ?></span>
                                 </div>
                             <?php endforeach; ?>
                         </div>

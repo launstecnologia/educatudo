@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../../Core/LayoutHelper.php';
 
 $defaultStudent = [
     'enabled' => false,
@@ -64,8 +63,8 @@ $defaultAdmin = [
     ]
 ];
 
-$studentConfig = json_decode(LayoutHelper::get('mobile_layout_aluno', ''), true);
-$adminConfig = json_decode(LayoutHelper::get('mobile_layout_admin', ''), true);
+$studentConfig = json_decode(\App\Core\LayoutHelper::get('mobile_layout_aluno', ''), true);
+$adminConfig = json_decode(\App\Core\LayoutHelper::get('mobile_layout_admin', ''), true);
 $studentConfig = is_array($studentConfig) ? array_replace_recursive($defaultStudent, $studentConfig) : $defaultStudent;
 $adminConfig = is_array($adminConfig) ? array_replace_recursive($defaultAdmin, $adminConfig) : $defaultAdmin;
 ?>

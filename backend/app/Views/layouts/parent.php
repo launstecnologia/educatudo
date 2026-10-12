@@ -8,7 +8,7 @@
     <link rel="manifest" href="<?= URL ?>/manifest-pais.json">
     <?php require_once __DIR__ . '/../../Core/LayoutHelper.php'; ?>
     <?php require_once __DIR__ . '/../../Core/PeriodoLetivo.php'; ?>
-    <meta name="theme-color" content="<?= htmlspecialchars(LayoutHelper::get('primary_color', '#a855f7')) ?>">
+    <meta name="theme-color" content="<?= htmlspecialchars(\App\Core\LayoutHelper::get('primary_color', '#a855f7')) ?>">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="mobile-web-app-capable" content="yes">
@@ -19,7 +19,7 @@
     $current_page = $current_page ?? 'dashboard';
     ?>
     <style>
-        <?= LayoutHelper::generateCustomCSS() ?>
+        <?= \App\Core\LayoutHelper::generateCustomCSS() ?>
         @media (max-width: 768px) {
             #sidebar {
                 position: fixed;
@@ -68,11 +68,10 @@
                         $notificacoesRecentes = [];
                         if (isset($user['id'])) {
                             try {
-                                require_once __DIR__ . '/../../Models/Notifications/Notification.php';
-                                $notificacaoModel = new Notification();
+                                $notificacaoModel = new \App\Models\Notifications\Notification();
                                 $notificacoesNaoLidas = $notificacaoModel->getNaoLidas($user['id'], 'pai');
                                 $notificacoesRecentes = $notificacaoModel->getByDestinatario($user['id'], 'pai', 5);
-                            } catch (Exception $e) {
+                            } catch (\Exception $e) {
                                 $notificacoesRecentes = [];
                             }
                         }
@@ -141,8 +140,7 @@
     </script>
     <?php
     $base_url = defined('URL') ? URL : '';
-    if (!class_exists('LayoutHelper')) { require_once __DIR__ . '/../Core/LayoutHelper.php'; }
-    $onesignal_app_id = class_exists('LayoutHelper') ? trim(LayoutHelper::get('onesignal_app_id', '')) : '';
+    $onesignal_app_id = trim(\App\Core\LayoutHelper::get('onesignal_app_id', ''));
     if ($onesignal_app_id === '' && function_exists('env')) { $onesignal_app_id = trim(env('ONESIGNAL_APP_ID', '')); }
     include __DIR__ . '/../components/onesignal-init.php';
     ?>

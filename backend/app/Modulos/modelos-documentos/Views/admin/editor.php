@@ -9,7 +9,6 @@ $rotuloVar = static function (string $ch): string {
     }
     return '{{' . $ch . '}}';
 };
-require_once BASE_PATH . '/app/Core/LayoutHelper.php';
 
 $modelo = is_array($modelo ?? null) ? $modelo : [];
 $estrutura = is_array($estrutura ?? null) ? $estrutura : [];
@@ -53,7 +52,7 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
     <link rel="stylesheet" href="<?= URL ?>/static/css/editor-documento.css?v=<?= $esc($vCss) ?>">
     <link rel="stylesheet" href="<?= URL ?>/static/css/folha-oficial.css?v=<?= $esc($vFolha) ?>">
-    <style><?= LayoutHelper::generateCustomCSS() ?></style>
+    <style><?= \App\Core\LayoutHelper::generateCustomCSS() ?></style>
 </head>
 <body class="edoc-body">
 <div class="edoc-app">

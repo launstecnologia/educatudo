@@ -18,10 +18,8 @@ $logoData = isset($logo_data) ? (string) $logo_data : '';
 $geradoEm = isset($gerado_em) ? (string) $gerado_em : date('d/m/Y H:i');
 
 if (!class_exists('BoletimQuadroLayoutHelper', false)) {
-    require_once dirname(__DIR__, 3) . '/Helpers/BoletimQuadroLayoutHelper.php';
 }
 if (!class_exists('StudentFormHelper', false)) {
-    require_once dirname(__DIR__, 3) . '/Helpers/StudentFormHelper.php';
 }
 
 // Reutiliza o agrupador de colunas (mesma lógica do partial).
@@ -254,7 +252,7 @@ $buildGroupedBoletimHeader = static function (array $cols): array {
         <div class="title-cell">
             <h1>Boletim Escolar - <?= (int) $anoLetivo ?></h1>
             <h2>
-                <?= \StudentFormHelper::nomeOficialHtml($aluno, static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8')) ?>
+                <?= \App\Helpers\StudentFormHelper::nomeOficialHtml($aluno, static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8')) ?>
                 <?php if (!empty($aluno['turma_nome'])): ?>
                     &nbsp;|&nbsp; <?= htmlspecialchars((string) $aluno['turma_nome'], ENT_QUOTES, 'UTF-8') ?>
                 <?php endif; ?>
@@ -280,7 +278,7 @@ $buildGroupedBoletimHeader = static function (array $cols): array {
                 continue;
             }
             $exibirEmEv = strtolower(trim((string) ($ev['exibir_em'] ?? 'boletim')));
-            $groupedHeader = BoletimQuadroLayoutHelper::deveAgruparCabecalhoBoletimOficial($exibirEmEv)
+            $groupedHeader = \App\Helpers\BoletimQuadroLayoutHelper::deveAgruparCabecalhoBoletimOficial($exibirEmEv)
                 ? $buildGroupedBoletimHeader($cols)
                 : ['enabled' => false, 'groups' => []];
             ?>

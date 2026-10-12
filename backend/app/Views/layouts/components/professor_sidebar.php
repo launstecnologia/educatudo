@@ -1,13 +1,11 @@
 <?php
 // Garantir que o user tem avatar_url se não foi passado
 if (isset($user) && empty($user['avatar_url'])) {
-    require_once __DIR__ . '/../../../Core/Database.php';
-    require_once __DIR__ . '/../../../Core/AuthManager.php';
-    $authManager = new AuthManager();
+    $authManager = new \App\Core\AuthManager();
     $currentUser = $authManager->getUser();
     
     if ($currentUser && $currentUser['tipo'] === 'professor') {
-        $db = Database::getInstance();
+        $db = \App\Core\Database::getInstance();
         $professor = $db->fetch(
             "SELECT * FROM professores WHERE id = :user_id",
             ['user_id' => $currentUser['id']]
@@ -66,15 +64,15 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                 </div>
                 <div class="sidebar-text-container logo-navbar-wrap">
                     <?php
-                    $logoSidebar = LayoutHelper::getContextualLogo('sidebar', 'max-h-full w-auto', 'Logo');
+                    $logoSidebar = \App\Core\LayoutHelper::getContextualLogo('sidebar', 'max-h-full w-auto', 'Logo');
                     if ($logoSidebar): ?>
                         <?= $logoSidebar ?>
                         <div class="sidebar-logo-fallback hidden">
-                            <h1 class="text-xl font-bold text-white sidebar-text"><?= htmlspecialchars(LayoutHelper::getSystemTitle()) ?></h1>
+                            <h1 class="text-xl font-bold text-white sidebar-text"><?= htmlspecialchars(\App\Core\LayoutHelper::getSystemTitle()) ?></h1>
                             <p class="text-sm text-purple-100 sidebar-text">Painel do Professor</p>
                         </div>
                     <?php else: ?>
-                        <h1 class="text-xl font-bold text-white sidebar-text"><?= htmlspecialchars(LayoutHelper::getSystemTitle()) ?></h1>
+                        <h1 class="text-xl font-bold text-white sidebar-text"><?= htmlspecialchars(\App\Core\LayoutHelper::getSystemTitle()) ?></h1>
                         <p class="text-sm text-purple-100 sidebar-text">Painel do Professor</p>
                     <?php endif; ?>
                 </div>
@@ -113,30 +111,29 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
         
         <?php
         // Verificar módulos do professor
-        require_once __DIR__ . '/../../../Core/LayoutHelper.php';
         $modulosProfessor = [
-            'professor_alunos' => LayoutHelper::get('module_professor_alunos', '1') === '1',
-            'professor_planos_aula' => LayoutHelper::get('module_professor_planos_aula', '1') === '1',
-            'professor_jornadas' => LayoutHelper::get('module_professor_jornadas', '1') === '1',
-            'professor_provas' => LayoutHelper::get('module_professor_provas', '1') === '1',
-            'professor_redacao_configuravel' => LayoutHelper::get('module_redacao_configuravel', '1') === '1' && LayoutHelper::get('module_professor_redacao_configuravel', '1') === '1',
-            'professor_redacao_livre' => LayoutHelper::get('module_professor_redacao_livre', '0') === '1',
-            'professor_gerar_slides' => LayoutHelper::isModuleEnabled('professor_gerar_slides'),
-            'professor_ai_agents' => LayoutHelper::isModuleEnabled('professor_ai_agents'),
-            'professor_notifications' => LayoutHelper::get('module_professor_notifications', '1') === '1',
-            'professor_arquivos' => LayoutHelper::get('module_professor_arquivos', '1') === '1',
-            'professor_apostilas' => LayoutHelper::get('module_professor_apostilas', '1') === '1',
+            'professor_alunos' => \App\Core\LayoutHelper::get('module_professor_alunos', '1') === '1',
+            'professor_planos_aula' => \App\Core\LayoutHelper::get('module_professor_planos_aula', '1') === '1',
+            'professor_jornadas' => \App\Core\LayoutHelper::get('module_professor_jornadas', '1') === '1',
+            'professor_provas' => \App\Core\LayoutHelper::get('module_professor_provas', '1') === '1',
+            'professor_redacao_configuravel' => \App\Core\LayoutHelper::get('module_redacao_configuravel', '1') === '1' && \App\Core\LayoutHelper::get('module_professor_redacao_configuravel', '1') === '1',
+            'professor_redacao_livre' => \App\Core\LayoutHelper::get('module_professor_redacao_livre', '0') === '1',
+            'professor_gerar_slides' => \App\Core\LayoutHelper::isModuleEnabled('professor_gerar_slides'),
+            'professor_ai_agents' => \App\Core\LayoutHelper::isModuleEnabled('professor_ai_agents'),
+            'professor_notifications' => \App\Core\LayoutHelper::get('module_professor_notifications', '1') === '1',
+            'professor_arquivos' => \App\Core\LayoutHelper::get('module_professor_arquivos', '1') === '1',
+            'professor_apostilas' => \App\Core\LayoutHelper::get('module_professor_apostilas', '1') === '1',
         ];
 
-        $externalAppsLinks = json_decode(LayoutHelper::get('external_apps_links', '[]'), true);
+        $externalAppsLinks = json_decode(\App\Core\LayoutHelper::get('external_apps_links', '[]'), true);
         if (!is_array($externalAppsLinks)) {
             $externalAppsLinks = [];
         }
         if (empty($externalAppsLinks)) {
             $legacyExternalLinks = [
-                ['id' => 'educalabs', 'url' => trim((string) LayoutHelper::get('educalabs_external_url', ''))],
-                ['id' => 'games', 'url' => trim((string) LayoutHelper::get('games_external_url', ''))],
-                ['id' => 'notes', 'url' => trim((string) LayoutHelper::get('notes_external_url', ''))],
+                ['id' => 'educalabs', 'url' => trim((string) \App\Core\LayoutHelper::get('educalabs_external_url', ''))],
+                ['id' => 'games', 'url' => trim((string) \App\Core\LayoutHelper::get('games_external_url', ''))],
+                ['id' => 'notes', 'url' => trim((string) \App\Core\LayoutHelper::get('notes_external_url', ''))],
             ];
             foreach ($legacyExternalLinks as $legacyLink) {
                 if (trim((string) ($legacyLink['url'] ?? '')) !== '') {
@@ -152,19 +149,53 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
             return rtrim($value, '/');
         };
         $professorExternalApps = [];
+        $professorTudinhaApps = [];
+        $temAppProfessorConfigurado = false;
+        $tudinhaAceitaProfessor = false;
+        try {
+            if (!class_exists('Database')) {
+            }
+            $dbMenuProfessor = \App\Core\Database::getInstance();
+            $colunaUserTipo = $dbMenuProfessor->fetch(
+                "SELECT 1 AS ok
+                 FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'validacao_tokens_apps'
+                   AND COLUMN_NAME = 'user_tipo'
+                 LIMIT 1"
+            );
+            $tudinhaAceitaProfessor = !empty($colunaUserTipo);
+        } catch (\Throwable $e) {
+            $tudinhaAceitaProfessor = false;
+        }
         foreach ($externalAppsLinks as $idx => $externalLink) {
             if (!is_array($externalLink)) {
                 continue;
             }
             $showProfessor = !empty($externalLink['professor']);
+            $showAluno = !empty($externalLink['aluno']);
             $externalId = (string) ($externalLink['id'] ?? $idx);
             $externalUrl = trim((string) ($externalLink['url'] ?? ''));
             $externalNome = trim((string) ($externalLink['nome'] ?? $externalLink['label'] ?? ''));
-            if (!$showProfessor || $externalId === '' || $externalUrl === '' || $externalNome === '') {
+            if ($externalId === '' || $externalUrl === '' || $externalNome === '') {
                 continue;
             }
             $normalizedApp = strtolower((string) ($externalLink['app'] ?? $externalId));
             $normalizedNome = strtolower($externalNome);
+            $isTudinhaApp = str_contains($normalizedNome, 'tudinha')
+                || str_contains(strtolower($externalId), 'tudinha')
+                || str_contains($normalizedApp, 'tudinha');
+            if ($isTudinhaApp && ($showProfessor || ($showAluno && $tudinhaAceitaProfessor))) {
+                $professorTudinhaApps[$externalId] = [
+                    'id' => $externalId,
+                    'nome' => 'Tudinha',
+                    'href' => URL . '/external-apps/abrir/' . rawurlencode($externalId),
+                    'nova_guia' => !empty($externalLink['nova_guia']),
+                ];
+            }
+            if (!$showProfessor) {
+                continue;
+            }
             $isEducaHitsApp = str_contains($normalizedApp, 'educahits')
                 || str_contains($normalizedApp, 'educa-hits')
                 || str_contains($normalizedApp, 'educa_hits')
@@ -172,6 +203,10 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                 || str_contains($normalizedNome, 'educa hits')
                 || str_contains(strtolower($externalId), 'educahits');
             if ($isEducaHitsApp) {
+                continue;
+            }
+            $temAppProfessorConfigurado = true;
+            if ($isTudinhaApp) {
                 continue;
             }
             $professorExternalApps[] = [
@@ -182,7 +217,8 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                 'current_page' => preg_replace('/[^a-z0-9_-]+/i', '-', $normalizedApp) ?: $externalId,
             ];
         }
-        if (empty($professorExternalApps)) {
+        $professorTudinhaApps = array_values($professorTudinhaApps);
+        if (!$temAppProfessorConfigurado) {
             $professorExternalApps[] = [
                 'id' => 'educaprof',
                 'nome' => 'Educa Prof',
@@ -200,7 +236,13 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                 </svg>
                 <span class="sidebar-text">Dashboard</span>
             </a>
-            <?php if (LayoutHelper::get('creditos_habilitado', '0') === '1'): ?>
+            <?php foreach ($professorTudinhaApps as $tudinhaApp): ?>
+            <a href="<?= htmlspecialchars($tudinhaApp['href']) ?>"<?= !empty($tudinhaApp['nova_guia']) ? ' target="_blank" rel="noopener noreferrer"' : '' ?> class="flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200 hover:scale-105">
+                <img src="<?= URL ?>/public/assets/educaprof-icone-v3.png" alt="" class="mr-3 h-5 w-5 shrink-0 object-contain" width="20" height="20">
+                <span class="sidebar-text"><?= htmlspecialchars($tudinhaApp['nome']) ?></span>
+            </a>
+            <?php endforeach; ?>
+            <?php if (\App\Core\LayoutHelper::get('creditos_habilitado', '0') === '1'): ?>
             <a href="<?= URL ?>/professor/carteira" class="flex items-center px-4 py-3 <?= ($current_page ?? '') === 'carteira' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105">
                 <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7.5A2.5 2.5 0 015.5 5H18a2 2 0 012 2v2H6a2 2 0 00-2 2v6.5A2.5 2.5 0 016.5 20H18a2 2 0 002-2v-2H6a2 2 0 01-2-2V7.5z"></path>
@@ -239,7 +281,7 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
             <?php endif; ?>
 
             <!-- AVA / EAD -->
-            <?php require_once __DIR__ . '/../../../Core/FeatureGate.php'; if (FeatureGate::isModuleEnabled('ead')): ?>
+            <?php require_once __DIR__ . '/../../../Core/FeatureGate.php'; if (\App\Core\FeatureGate::isModuleEnabled('ead')): ?>
             <a href="<?= URL ?>/professor/ava"
                class="flex items-center px-4 py-3 <?= ($current_page ?? '') === 'ava' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105">
                 <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -265,8 +307,7 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
             
             <!-- EducaTudo (Menu Expansível) -->
             <?php 
-            require_once __DIR__ . '/../../../Core/LayoutHelper.php';
-            $menuColagNome = LayoutHelper::get('menu_colag_nome', 'Colag');
+            $menuColagNome = \App\Core\LayoutHelper::get('menu_colag_nome', 'Colag');
             ?>
             <div class="menu-group">
                 <button type="button" onclick="toggleMenuGroup('academico')" class="w-full flex items-center justify-between px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200 hover:scale-105">
@@ -281,8 +322,8 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                     </svg>
                 </button>
                 <div id="academico-submenu" class="hidden ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
-                    <?php if (LayoutHelper::isModuleEnabled('expo_colag')): ?>
-                    <?php $expoColagEnabled = LayoutHelper::isModuleEnabled('expo_colag'); ?>
+                    <?php if (\App\Core\LayoutHelper::isModuleEnabled('expo_colag')): ?>
+                    <?php $expoColagEnabled = \App\Core\LayoutHelper::isModuleEnabled('expo_colag'); ?>
                     <a href="<?= $expoColagEnabled ? URL . '/professor/expo-colag' : '#' ?>"
                        onclick="<?= $expoColagEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Expo Colag\'); return false;' ?>"
                        class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'expo-colag' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$expoColagEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
@@ -306,8 +347,7 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
 
                     <!-- Diários de Classe -->
                     <?php
-                    require_once __DIR__ . '/../../../Core/FeatureGate.php';
-                    if (FeatureGate::isModuleEnabled('diario_classe')):
+                    if (\App\Core\FeatureGate::isModuleEnabled('diario_classe')):
                     ?>
                     <a href="<?= URL ?>/professor/diarios"
                        class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'diarios_classe' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
@@ -317,7 +357,7 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                         <span class="sidebar-text text-sm">Diários de Classe</span>
                     </a>
                     <?php endif; ?>
-                    <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('conselho_classe')): ?>
+                    <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('conselho_classe')): ?>
                     <a href="<?= URL ?>/professor/conselhos"
                        class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'conselho_classe' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -329,10 +369,9 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
 
                     <!-- Jornadas do Aluno -->
                     <?php 
-                    require_once __DIR__ . '/../../../Core/FeatureGate.php';
-                    $jornadasEnabled = FeatureGate::isModuleEnabled('jornadas') && $modulosProfessor['professor_jornadas'];
+                    $jornadasEnabled = \App\Core\FeatureGate::isModuleEnabled('jornadas') && $modulosProfessor['professor_jornadas'];
                     ?>
-                    <?php if (FeatureGate::isModuleEnabled('jornadas')): ?>
+                    <?php if (\App\Core\FeatureGate::isModuleEnabled('jornadas')): ?>
                     <a href="<?= $jornadasEnabled ? URL . '/professor/jornadas' : '#' ?>" 
                        onclick="<?= $jornadasEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Jornada do Aluno\'); return false;' ?>"
                        class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'jornadas' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$jornadasEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
@@ -436,7 +475,7 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                     </a>
                     <?php endif; ?>
 
-                    <?php if (LayoutHelper::isModuleEnabled('mural_recados')): ?>
+                    <?php if (\App\Core\LayoutHelper::isModuleEnabled('mural_recados')): ?>
                     <a href="<?= URL ?>/professor/mural-recados"
                        class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'mural-recados' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                         <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -446,10 +485,10 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                     </a>
                     <?php endif; ?>
 
-                    <?php if (LayoutHelper::isModuleEnabled('professor_links_uteis')): ?>
+                    <?php if (\App\Core\LayoutHelper::isModuleEnabled('professor_links_uteis')): ?>
                     <?php
-                    $linksUteisProfessorEnabled = LayoutHelper::isModuleEnabled('professor_links_uteis');
-                    $customMenuLinks = json_decode(LayoutHelper::get('menu_links_submenu', '[]'), true);
+                    $linksUteisProfessorEnabled = \App\Core\LayoutHelper::isModuleEnabled('professor_links_uteis');
+                    $customMenuLinks = json_decode(\App\Core\LayoutHelper::get('menu_links_submenu', '[]'), true);
                     if (!is_array($customMenuLinks)) {
                         $customMenuLinks = [];
                     }
@@ -498,7 +537,7 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
             </div>
             
             <!-- Gerar Slides -->
-            <?php if (LayoutHelper::isModuleEnabled('professor_gerar_slides')): ?>
+            <?php if (\App\Core\LayoutHelper::isModuleEnabled('professor_gerar_slides')): ?>
             <?php $gerarSlidesEnabled = $modulosProfessor['professor_gerar_slides']; ?>
             <a href="<?= $gerarSlidesEnabled ? URL . '/professor/gerar-slides' : '#' ?>" 
                onclick="<?= $gerarSlidesEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Educa Slides\'); return false;' ?>"

@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Modulos\ExpoColag\Models;
 /**
  * Autorização de uso de imagem do aluno (Expo Colag).
  */
@@ -11,7 +13,7 @@ class ExpoColagAutorizacaoImagem
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     public function findByAluno(int $alunoId): ?array
@@ -134,4 +136,8 @@ class ExpoColagAutorizacaoImagem
         $status = $row['status'] ?? 'Nao_autorizado';
         return in_array($status, ['Autorizado_total', 'Autorizado_interno'], true);
     }
+}
+
+if (!class_exists('ExpoColagAutorizacaoImagem', false) && class_exists(__NAMESPACE__ . '\\ExpoColagAutorizacaoImagem', false)) {
+    class_alias(__NAMESPACE__ . '\\ExpoColagAutorizacaoImagem', 'ExpoColagAutorizacaoImagem');
 }

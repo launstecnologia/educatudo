@@ -330,7 +330,7 @@ function processarObjetivos($texto) {
                 <h2 class="text-xl font-semibold text-gray-900">Aulas da Tarde (Oficinas de Aprendizagem / Salas de Estudo)</h2>
             </div>
             <div class="bg-amber-50 rounded-lg p-6 text-gray-700 leading-relaxed">
-                <?= LessonPlanAfternoonHelper::renderHtml($plano_aula['aulas_tarde_oficinas']) ?>
+                <?= \App\Helpers\LessonPlanAfternoonHelper::renderHtml($plano_aula['aulas_tarde_oficinas']) ?>
             </div>
         </div>
         <?php endif; ?>

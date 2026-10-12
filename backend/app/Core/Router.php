@@ -1,9 +1,14 @@
 <?php
+
+namespace App\Core;
 /**
  * EducaTudo - Sistema de Roteamento
  * Gerencia as rotas da aplicação com suporte a pasta base dinâmica
  */
 
+
+use App\Middleware\AuditMiddleware;
+use App\Helpers\EstilosPlataforma;
 class Router
 {
     private $routes = [];
@@ -149,8 +154,6 @@ class Router
             });
             $count = 0;
             foreach ($jornadasRoutes as $r) {
-                if ($count++ < 10) {
-                }
             }
         }
         
@@ -183,7 +186,6 @@ class Router
 
         // Feature gating por módulo (bloqueio antes de casar rotas)
         if (!class_exists('FeatureGate')) {
-            require_once __DIR__ . '/FeatureGate.php';
         }
         $redirectUrl = FeatureGate::getRedirectIfBlocked($uri);
         if ($redirectUrl !== null) {
@@ -265,13 +267,11 @@ class Router
         }
         if (strpos($uri, 'iniciar') !== false) {
             try {
-                require_once __DIR__ . '/Logger.php';
                 Logger::warning('[ROUTER] Rota iniciar prova NÃO encontrada', ['method' => $method, 'uri' => $uri], 'provas');
-            } catch (Throwable $e) { /* não falhar */ }
+            } catch (\Throwable $e) { /* não falhar */ }
         }
         if (strpos($uri, 'primeiro-acesso') !== false) {
             try {
-                require_once __DIR__ . '/Logger.php';
                 $primeiroAcessoRoutes = array_filter($this->routes, function ($r) {
                     return strpos($r['path'], 'primeiro-acesso') !== false && $r['method'] === $method;
                 });
@@ -288,7 +288,7 @@ class Router
                     ],
                     'auth'
                 );
-            } catch (Throwable $e) { /* não falhar */ }
+            } catch (\Throwable $e) { /* não falhar */ }
         }
         $this->handleNotFound();
     }
@@ -300,13 +300,12 @@ class Router
     {
         try {
             if (!class_exists('AuditMiddleware')) {
-                require_once __DIR__ . '/../Middleware/AuditMiddleware.php';
             }
             $auditMiddleware = new AuditMiddleware();
             $auditMiddleware->handle();
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             // Não interromper requisição se houver erro no audit middleware
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
         }
     }
     
@@ -332,12 +331,33 @@ class Router
                 }
             }
             
-            throw new Exception("Middleware não encontrado: {$middleware}");
+            throw new \Exception("Middleware não encontrado: {$middleware}");
         } elseif (is_callable($middleware)) {
             $middleware();
         }
     }
     
+    /**
+     * Nome completo do controller quando o manifest do módulo declara namespace.
+     * Módulos antigos não têm essa chave e seguem com a classe global.
+     */
+    private function classeComNamespaceDoModulo(string $controller, string $controllerName): ?string
+    {
+        if (!preg_match('#^Modulos/([^/]+)/#', $controller, $m)) {
+            return null;
+        }
+        if (!class_exists('ModuloRegistry', false)) {
+        }
+        $manifest = ModuloRegistry::get($m[1]);
+        $ns = is_array($manifest) ? (string) ($manifest['namespace'] ?? '') : '';
+        if ($ns === '') {
+            return null;
+        }
+        $fqcn = rtrim($ns, '\\') . '\\Controllers\\' . $controllerName;
+
+        return class_exists($fqcn, false) ? $fqcn : null;
+    }
+
     /**
      * Executa o handler da rota
      */
@@ -345,7 +365,7 @@ class Router
     {
         try {
             if (is_string($handler)) {
-                // Formato: Controller@method
+                // Formato: \Controller@method
                 if (strpos($handler, '@') !== false) {
                     list($controller, $method) = explode('@', $handler);
                     
@@ -355,94 +375,68 @@ class Router
                     $controllerName = end($controllerParts);
                     $subfolder = count($controllerParts) > 1 ? implode('/', array_slice($controllerParts, 0, -1)) . '/' : '';
                     
-                    $controllerClasses = [
-                        "Controllers\\" . str_replace('/', '\\', $controller),
-                        str_replace('/', '\\', $controller),
-                        "App\\Controllers\\" . str_replace('/', '\\', $controller),
-                        $controllerName
-                    ];
-                    
-                    $basePath = __DIR__ . "/../Controllers/";
-                    $controllerPaths = [
-                        $basePath . $controller . ".php",
-                        $basePath . $subfolder . $controllerName . ".php",
-                        __DIR__ . "/../../app/Controllers/{$controller}.php",
-                        __DIR__ . "/../../app/Controllers/{$subfolder}{$controllerName}.php"
-                    ];
+                    // Opção A: resolve em Modulos/Dominio/Painel (sem app/Controllers)
+                    $located = \App\Core\ControllerLocator::resolve($controller);
+                    if ($located === null) {
+                        $moduloControllerPath = ModuloRegistry::resolveControllerPath($controller);
+                        if ($moduloControllerPath !== null) {
+                            $located = ['path' => $moduloControllerPath, 'fqcn' => $this->classeComNamespaceDoModulo($controller, $controllerName)];
+                        }
+                    }
 
-                    // Módulos físicos: Modulos/<chave>/<Controller>
-                    if (!class_exists('ModuloRegistry', false)) {
-                        require_once __DIR__ . '/ModuloRegistry.php';
+                    if ($located !== null && is_file($located['path'])) {
+                        require_once $located['path'];
                     }
-                    $moduloControllerPath = ModuloRegistry::resolveControllerPath($controller);
-                    if ($moduloControllerPath !== null) {
-                        array_unshift($controllerPaths, $moduloControllerPath);
-                        array_unshift($controllerClasses, $controllerName);
+
+                    $controllerClasses = [];
+                    if (!empty($located['fqcn'])) {
+                        $controllerClasses[] = $located['fqcn'];
                     }
-                    
-                    foreach ($controllerClasses as $index => $controllerClass) {
-                        // Tentar carregar o arquivo primeiro
-                        if (isset($controllerPaths[$index]) && file_exists($controllerPaths[$index])) {
-                            require_once $controllerPaths[$index];
-                            
-                            // Se a classe especificada não existe, tentar encontrar classes no arquivo
-                            if (!class_exists($controllerClass)) {
-                                // Caso especial: UserController.php contém UsuarioController
-                                if ($controllerName === 'UserController') {
-                                    if (class_exists('UsuarioController')) {
-                                        $controllerClass = 'UsuarioController';
-                                    }
-                                }
-                                
-                                // Tentar outras variações comuns
-                                if (!class_exists($controllerClass)) {
-                                    $variations = [
-                                        $controllerName . 'Controller',
-                                        str_replace('Controller', '', $controllerName) . 'Controller'
-                                    ];
-                                    
-                                    foreach ($variations as $variation) {
-                                        if (class_exists($variation)) {
-                                            $controllerClass = $variation;
-                                            break;
-                                        }
-                                    }
-                                }
+                    $controllerClasses[] = "App\\Controllers\\" . str_replace('/', '\\', $controller);
+                    $controllerClasses[] = $controllerName;
+                    $fqcnModulo = $this->classeComNamespaceDoModulo($controller, $controllerName);
+                    if ($fqcnModulo !== null) {
+                        $controllerClasses[] = $fqcnModulo;
+                    }
+                    if ($controllerName === 'UserController') {
+                        $controllerClasses[] = 'UsuarioController';
+                    }
+
+                    foreach (array_unique($controllerClasses) as $controllerClass) {
+                        if (!class_exists($controllerClass)) {
+                            continue;
+                        }
+                        $instance = new $controllerClass();
+                        if (!method_exists($instance, $method)) {
+                            continue;
+                        }
+                        $profiler = class_exists(\App\Performance\RequestProfiler::class);
+                        if ($profiler) {
+                            \App\Performance\RequestProfiler::setController($controller, $method);
+                            \App\Performance\RequestProfiler::markControllerStart();
+                        }
+                        try {
+                            call_user_func_array([$instance, $method], $params);
+                        } finally {
+                            if ($profiler) {
+                                \App\Performance\RequestProfiler::markControllerEnd();
                             }
                         }
-                        
-                        if (class_exists($controllerClass)) {
-                            $instance = new $controllerClass();
-                            if (method_exists($instance, $method)) {
-                                $profiler = class_exists(\App\Performance\RequestProfiler::class);
-                                if ($profiler) {
-                                    \App\Performance\RequestProfiler::setController($controller, $method);
-                                    \App\Performance\RequestProfiler::markControllerStart();
-                                }
-                                try {
-                                    call_user_func_array([$instance, $method], $params);
-                                } finally {
-                                    if ($profiler) {
-                                        \App\Performance\RequestProfiler::markControllerEnd();
-                                    }
-                                }
-                                return;
-                            }
-                        }
+                        return;
                     }
                     
-                    throw new Exception("Controller não encontrado: {$controller} ou método não existe: {$method}");
+                    throw new \Exception("Controller não encontrado: {$controller} ou método não existe: {$method}");
                 }
             } elseif (is_callable($handler)) {
                 call_user_func_array($handler, $params);
                 return;
             }
             
-            throw new Exception("Handler inválido: " . print_r($handler, true));
-        } catch (Exception $e) {
+            throw new \Exception("Handler inválido: " . print_r($handler, true));
+        } catch (\Exception $e) {
             $this->logRouterError($e, $handler, $params);
             throw $e;
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $this->logRouterError($e, $handler, $params);
             throw $e;
         }
@@ -454,7 +448,6 @@ class Router
     private function logRouterError($e, $handler, $params = [])
     {
         try {
-            require_once __DIR__ . '/Logger.php';
             
             $context = [
                 'exception' => $e,
@@ -481,7 +474,7 @@ class Router
                 $context,
                 'general'
             );
-        } catch (Exception $logError) {
+        } catch (\Exception $logError) {
         }
     }
     
@@ -518,7 +511,7 @@ class Router
         if (strpos($pathNorm, '.well-known/') === 0 || strpos($pathNorm, '.well-known') !== false) {
             return; // Chrome DevTools e outros pedidos .well-known
         }
-        // Não logar 404 de arquivos estáticos (fontes, CSS, JS, imagens) — evita ruído e notificações (ex.: KaTeX .woff2)
+        // Não logar 404 de arquivos estáticos (fontes, CSS, JS, imagens) — evita ruído e notificações (ex.: \KaTeX .woff2)
         if (strpos($pathNorm, 'public/static/') !== false || strpos($pathNorm, 'static/') === 0) {
             return;
         }
@@ -528,7 +521,6 @@ class Router
             return;
         }
         try {
-            require_once __DIR__ . '/Logger.php';
             
             $context = [
                 'request_uri' => $requestUri,
@@ -551,7 +543,7 @@ class Router
                 $context,
                 'rotas_nao_encontrada'
             );
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             // Silenciosamente falhar no logging
         }
     }
@@ -562,7 +554,6 @@ class Router
     private function renderNotFoundPage()
     {
         if (!class_exists('EstilosPlataforma', false)) {
-            require_once __DIR__ . '/../Helpers/EstilosPlataforma.php';
         }
 
         return '<!DOCTYPE html>
@@ -590,10 +581,9 @@ class Router
     {
         try {
             if (!class_exists('LayoutHelper')) {
-                require_once __DIR__ . '/LayoutHelper.php';
             }
             return LayoutHelper::get('maintenance_mode', '0') === '1';
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return false;
         }
     }
@@ -750,4 +740,8 @@ class Router
         </body>
         </html>';
     }
+}
+
+if (!class_exists('Router', false) && class_exists(__NAMESPACE__ . '\\Router', false)) {
+    class_alias(__NAMESPACE__ . '\\Router', 'Router');
 }

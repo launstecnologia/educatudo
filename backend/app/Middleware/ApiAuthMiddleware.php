@@ -1,9 +1,14 @@
 <?php
+
+namespace App\Middleware;
 /**
  * EducaTudo - Middleware de autenticação da API (Pais)
  * Valida Bearer JWT, expiração e role parent; injeta parent_id na requisição
  */
 
+
+use App\Services\JWTService;
+use App\Core\Logger;
 class ApiAuthMiddleware
 {
     /**
@@ -34,10 +39,9 @@ class ApiAuthMiddleware
             return;
         }
 
-        require_once __DIR__ . '/../Services/JWTService.php';
         try {
             $jwt = new JWTService();
-        } catch (RuntimeException $e) {
+        } catch (\RuntimeException $e) {
             http_response_code(503);
             echo json_encode([
                 'success' => false,
@@ -88,8 +92,12 @@ class ApiAuthMiddleware
                     'uri' => $_SERVER['REQUEST_URI'] ?? null,
                 ], 'general');
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log('ApiAuthMiddleware log: ' . $e->getMessage());
         }
     }
+}
+
+if (!class_exists('ApiAuthMiddleware', false) && class_exists(__NAMESPACE__ . '\\ApiAuthMiddleware', false)) {
+    class_alias(__NAMESPACE__ . '\\ApiAuthMiddleware', 'ApiAuthMiddleware');
 }

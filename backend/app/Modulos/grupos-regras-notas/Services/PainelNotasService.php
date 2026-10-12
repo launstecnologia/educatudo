@@ -1,11 +1,16 @@
 <?php
+
+namespace App\Modulos\GruposRegrasNotas\Services;
+
+use App\Modulos\GruposRegrasNotas\Models\GrupoRegrasNotas;
+use App\Core\Database;
+use Throwable;
+
 /**
  * Monta o painel de notas do aluno a partir do Quadro de Notas.
  * Lançamento preenche célula; calculada fecha a linha; blocos viram tabelas; filhos nas linhas.
  */
 
-require_once __DIR__ . '/GrupoRegrasNotasService.php';
-require_once dirname(__DIR__, 3) . '/Models/Education/ComponenteCurricular.php';
 
 class PainelNotasService
 {
@@ -263,7 +268,7 @@ class PainelNotasService
         int $blocoId
     ): array {
         $ids = array_values(array_filter(array_map('intval', $materiasIds)));
-        $cc = new ComponenteCurricular();
+        $cc = new \App\Models\Education\ComponenteCurricular();
         $filhosPorPai = $cc->mapaFilhosPorPai();
         if ($ids === []) {
             $ids = $this->materiasComNotaNasColunas($notas, $colunas, $quadroId, $blocoId);
@@ -491,7 +496,7 @@ class PainelNotasService
     private function catalogoMaterias(): array
     {
         try {
-            $rows = (new ComponenteCurricular())->getAll(true) ?: [];
+            $rows = (new \App\Models\Education\ComponenteCurricular())->getAll(true) ?: [];
         } catch (Throwable $e) {
             return [];
         }
@@ -677,4 +682,8 @@ class PainelNotasService
             return false;
         }
     }
+}
+
+if (!class_exists('PainelNotasService', false)) {
+    class_alias(__NAMESPACE__ . '\\PainelNotasService', 'PainelNotasService');
 }

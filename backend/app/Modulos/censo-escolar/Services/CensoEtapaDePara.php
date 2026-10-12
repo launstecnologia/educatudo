@@ -97,3 +97,7 @@ class CensoEtapaDePara
         ];
     }
 }
+
+if (!class_exists('CensoEtapaDePara', false) && class_exists(__NAMESPACE__ . '\\CensoEtapaDePara', false)) {
+    class_alias(__NAMESPACE__ . '\\CensoEtapaDePara', 'CensoEtapaDePara');
+}

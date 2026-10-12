@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Modulos\ExpoColag\Models;
 /**
  * Programação pública da edição (Expo Colag S4).
  */
@@ -9,7 +11,7 @@ class ExpoColagProgramacao
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     public function listarPorEdicao(int $edicaoId): array
@@ -84,4 +86,8 @@ class ExpoColagProgramacao
             ]
         );
     }
+}
+
+if (!class_exists('ExpoColagProgramacao', false) && class_exists(__NAMESPACE__ . '\\ExpoColagProgramacao', false)) {
+    class_alias(__NAMESPACE__ . '\\ExpoColagProgramacao', 'ExpoColagProgramacao');
 }

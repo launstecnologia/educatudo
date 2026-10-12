@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Services/ConselhoService.php';
 
 use App\Modulos\ConselhoClasse\Services\ConselhoService;
 $linhas = is_array($linhas ?? null) ? $linhas : [];
@@ -33,9 +32,8 @@ $bimestre = (int) ($bimestre ?? 1);
             <select name="bimestre" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" data-periodo-letivo-select>
                 <?php
                 if (!class_exists('PeriodoLetivo')) {
-                    require_once dirname(__DIR__, 4) . '/Core/PeriodoLetivo.php';
                 }
-                echo PeriodoLetivo::optionsHtml($anoLetivo, $bimestre);
+                echo \App\Core\PeriodoLetivo::optionsHtml($anoLetivo, $bimestre);
                 ?>
             </select>
         </div>
@@ -66,7 +64,7 @@ $bimestre = (int) ($bimestre ?? 1);
                     <td class="px-6 py-4 text-sm font-medium text-gray-900"><?= htmlspecialchars((string) $linha['turma_nome']) ?></td>
                     <td class="px-6 py-4 text-sm text-gray-700"><?= (int) ($linha['total_alunos'] ?? 0) ?></td>
                     <td class="px-6 py-4 text-sm text-gray-700"><?= (int) (($linha['pendencias']['total'] ?? 0)) ?></td>
-                    <td class="px-6 py-4 text-sm text-gray-700"><?= htmlspecialchars(ConselhoService::statusLabel($status)) ?></td>
+                    <td class="px-6 py-4 text-sm text-gray-700"><?= htmlspecialchars(\App\Modulos\ConselhoClasse\Services\ConselhoService::statusLabel($status)) ?></td>
                     <td class="px-6 py-4 text-right text-sm">
                         <?php if (!empty($linha['sessao_id'])): ?>
                             <a href="<?= URL ?>/professor/conselhos/<?= (int) $linha['sessao_id'] ?>" class="text-purple-700 font-semibold hover:underline">Ver matriz</a>

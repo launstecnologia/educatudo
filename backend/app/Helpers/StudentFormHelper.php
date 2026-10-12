@@ -1,5 +1,7 @@
 <?php
 
+namespace App\Helpers;
+
 class StudentFormHelper
 {
     public static function digitsOnly(?string $value): string
@@ -202,7 +204,7 @@ class StudentFormHelper
     }
 
     /**
-     * Preenche nome_civil e nome_exibicao. Com $substituirNome, troca `nome` pelo social
+     * Preenche nome_civil e nome_exibicao. \Com $substituirNome, troca `nome` pelo social
      * (listagens/sessão). Nunca usar no formulário de edição — lá `nome` é o civil.
      *
      * @param array<string, mixed> $aluno
@@ -248,7 +250,7 @@ class StudentFormHelper
     /**
      * Expressão SQL do nome de exibição (social ou civil).
      * $alias só aceita identificador simples (ex.: a).
-     * Passe $db para cair em `{alias}.nome` quando a coluna ainda não existir no tenant.
+     * \Passe $db para cair em `{alias}.nome` quando a coluna ainda não existir no tenant.
      */
     public static function sqlNomeExibicao(string $alias = 'a', $db = null): string
     {
@@ -336,4 +338,8 @@ class StudentFormHelper
             'TO' => 'Tocantins',
         ];
     }
+}
+
+if (!class_exists('StudentFormHelper', false) && class_exists(__NAMESPACE__ . '\\StudentFormHelper', false)) {
+    class_alias(__NAMESPACE__ . '\\StudentFormHelper', 'StudentFormHelper');
 }

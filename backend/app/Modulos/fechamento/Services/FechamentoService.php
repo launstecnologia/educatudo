@@ -1,9 +1,8 @@
 <?php
-require_once __DIR__ . '/../Models/FechamentoPeriodo.php';
-require_once __DIR__ . '/FechamentoMaquinaEstados.php';
-require_once __DIR__ . '/FechamentoGates.php';
-require_once __DIR__ . '/../../../Models/Education/ResultadoAcademico.php';
-require_once __DIR__ . '/../../../Services/ResultadoHomologacaoService.php';
+
+namespace App\Modulos\Fechamento\Services;
+
+use App\Modulos\Fechamento\Models\FechamentoPeriodo;
 
 /**
  * Fechamento oficial: estado canônico por turma × período.
@@ -12,14 +11,14 @@ require_once __DIR__ . '/../../../Services/ResultadoHomologacaoService.php';
 class FechamentoService
 {
     private FechamentoPeriodo $model;
-    private ResultadoHomologacaoService $homologacao;
+    private \App\Services\ResultadoHomologacaoService $homologacao;
 
     public function __construct(
         ?FechamentoPeriodo $model = null,
-        ?ResultadoHomologacaoService $homologacao = null
+        ?\App\Services\ResultadoHomologacaoService $homologacao = null
     ) {
         $this->model = $model ?? new FechamentoPeriodo();
-        $this->homologacao = $homologacao ?? new ResultadoHomologacaoService();
+        $this->homologacao = $homologacao ?? new \App\Services\ResultadoHomologacaoService();
     }
 
     public function model(): FechamentoPeriodo
@@ -27,7 +26,7 @@ class FechamentoService
         return $this->model;
     }
 
-    public function homologacao(): ResultadoHomologacaoService
+    public function homologacao(): \App\Services\ResultadoHomologacaoService
     {
         return $this->homologacao;
     }
@@ -149,7 +148,7 @@ class FechamentoService
             return ['success' => false, 'error' => 'Só é possível retificar um período homologado.'];
         }
 
-        $db = Database::getInstance();
+        $db = \App\Core\Database::getInstance();
         $db->beginTransaction();
         try {
             $this->model->marcarNaoVigente((int) $atual['id']);
@@ -174,7 +173,7 @@ class FechamentoService
                 'vigente' => 1,
             ]);
             if ($novoId <= 0) {
-                throw new RuntimeException('Falha ao criar o período vigente da retificação.');
+                throw new \RuntimeException('Falha ao criar o período vigente da retificação.');
             }
             $this->model->registrarHistorico($novoId, [
                 'status_anterior' => $de,
@@ -192,7 +191,7 @@ class FechamentoService
                 $justificativa
             );
             $db->commit();
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             if ($db->inTransaction()) {
                 $db->rollback();
             }
@@ -459,7 +458,7 @@ class FechamentoService
             $emissoes[] = [
                 'emitido_em' => (string) ($em['emitido_em'] ?? ''),
                 'tipo' => $tipo,
-                'tipo_rotulo' => ResultadoAcademico::DOCUMENTO_TIPOS[$tipo] ?? $tipo,
+                'tipo_rotulo' => \App\Models\Education\ResultadoAcademico::DOCUMENTO_TIPOS[$tipo] ?? $tipo,
                 'turma_nome' => (string) ($em['turma_nome'] ?? ''),
                 'aluno_nome' => (string) ($em['aluno_nome'] ?? ''),
                 'numero' => (int) ($em['numero'] ?? 0),
@@ -480,4 +479,8 @@ class FechamentoService
             ]),
         ];
     }
+}
+
+if (!class_exists('FechamentoService', false) && class_exists(__NAMESPACE__ . '\\FechamentoService', false)) {
+    class_alias(__NAMESPACE__ . '\\FechamentoService', 'FechamentoService');
 }

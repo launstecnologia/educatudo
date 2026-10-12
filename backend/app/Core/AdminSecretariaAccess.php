@@ -1,5 +1,7 @@
 <?php
 
+namespace App\Core;
+
 /**
  * Perfil admin_escola "secretaria": acesso restrito a cadastros acadêmicos,
  * gestão escolar (sem pacotes de crédito) e avaliações.
@@ -48,6 +50,7 @@ class AdminSecretariaAccess
             '/admin/grade-horaria',
             '/admin/componentes-curriculares',
             '/admin/matrizes-curriculares',
+            '/admin/calendario-letivo',
             '/admin/salas',
             '/admin/agrupamentos-componentes',
             '/admin/regras-academicas',
@@ -114,4 +117,8 @@ class AdminSecretariaAccess
 
         return false;
     }
+}
+
+if (!class_exists('AdminSecretariaAccess', false) && class_exists(__NAMESPACE__ . '\\AdminSecretariaAccess', false)) {
+    class_alias(__NAMESPACE__ . '\\AdminSecretariaAccess', 'AdminSecretariaAccess');
 }

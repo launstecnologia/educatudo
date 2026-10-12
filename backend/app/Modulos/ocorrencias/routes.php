@@ -20,3 +20,9 @@ $router->post('/admin/ocorrencias/{id}/encaminhamento', 'Modulos/ocorrencias/Oco
 
 $router->get('/professor/ocorrencias/nova', 'Modulos/ocorrencias/OcorrenciaProfessorController@nova');
 $router->post('/professor/ocorrencias', 'Modulos/ocorrencias/OcorrenciaProfessorController@salvar');
+$router->get('/admin/monitoramento/alertas', 'Modulos/ocorrencias/OccurrenceAdminController@alertasSensiveis');
+$router->post('/admin/monitoramento/alertas/atualizar', 'Modulos/ocorrencias/OccurrenceAdminController@atualizarAlertaSensivel');
+$router->post('/admin/monitoramento/alertas/ver-conteudo', 'Modulos/ocorrencias/OccurrenceAdminController@verConteudoAlertaSensivel');
+$router->post('/admin/ocorrencias/transcrever-audio', 'Modulos/ocorrencias/OccurrenceAdminController@transcreverOcorrenciaAudioGeral');
+$router->post('/admin/ocorrencias/auto-preencher', 'Modulos/ocorrencias/OccurrenceAdminController@autoPreencherOcorrenciaGeral');
+$router->get('/admin/tentativas-login', 'Modulos/ocorrencias/OccurrenceAdminController@tentativasLoginIndex');

@@ -1,6 +1,4 @@
 <?php
-require_once __DIR__ . '/../../../Models/Education/ResultadoAcademico.php';
-require_once __DIR__ . '/../../../Services/ResultadoAcademicoService.php';
 
 $preview = is_array($preview ?? null) ? $preview : [];
 $turma = is_array($preview['turma'] ?? null) ? $preview['turma'] : [];
@@ -86,7 +84,6 @@ include __DIR__ . '/_filtros.php';
                 <tr><td colspan="8" class="px-6 py-12 text-center text-gray-500">Nenhum aluno nesta turma.</td></tr>
                 <?php else:
                 if (!class_exists('AlunoLancamentoNotaHelper', false)) {
-                    require_once __DIR__ . '/../../../Helpers/AlunoLancamentoNotaHelper.php';
                 }
                 foreach ($linhas as $linha):
                     $aluno = $linha['aluno'] ?? [];
@@ -97,7 +94,7 @@ include __DIR__ . '/_filtros.php';
                     $freqTxt = is_numeric($freq) ? number_format((float) $freq, 1, ',', '.') . '%' : '—';
                     $qsAluno = $qs . '&turma_id=' . $turmaId;
                     $transferidoRf = !empty($aluno['transferido']);
-                    $nomeRf = AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+                    $nomeRf = \App\Helpers\AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
                         (string) ($aluno['nome'] ?? ''),
                         $transferidoRf
                     );
@@ -126,7 +123,7 @@ include __DIR__ . '/_filtros.php';
                     <td class="px-4 py-3">
                         <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars((string) ($linha['rotulo'] ?? '—')) ?></div>
                         <span class="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium <?= $statusBadge($status) ?>">
-                            <?= htmlspecialchars(ResultadoAcademico::STATUS[$status] ?? $status) ?>
+                            <?= htmlspecialchars(\App\Models\Education\ResultadoAcademico::STATUS[$status] ?? $status) ?>
                         </span>
                     </td>
                     <td class="px-4 py-3 text-xs text-gray-600">
@@ -218,7 +215,7 @@ include __DIR__ . '/_filtros.php';
                 <?php foreach ($especiais as $esp): ?>
                 <tr>
                     <td class="px-4 py-2"><?= htmlspecialchars((string) ($esp['aluno_nome'] ?? '')) ?></td>
-                    <td class="px-4 py-2"><?= htmlspecialchars(ResultadoAcademico::ESPECIAIS[$esp['tipo'] ?? ''] ?? (string) ($esp['tipo'] ?? '')) ?></td>
+                    <td class="px-4 py-2"><?= htmlspecialchars(\App\Models\Education\ResultadoAcademico::ESPECIAIS[$esp['tipo'] ?? ''] ?? (string) ($esp['tipo'] ?? '')) ?></td>
                     <td class="px-4 py-2"><?= htmlspecialchars((string) ($esp['materia_nome'] ?? 'Geral')) ?></td>
                     <td class="px-4 py-2 text-gray-500"><?= htmlspecialchars((string) ($esp['observacao'] ?? '')) ?></td>
                     <td class="px-4 py-2 text-right">
@@ -250,7 +247,7 @@ include __DIR__ . '/_filtros.php';
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
             <select name="tipo" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
-                <?php foreach (ResultadoAcademico::ESPECIAIS as $cod => $lab): ?>
+                <?php foreach (\App\Models\Education\ResultadoAcademico::ESPECIAIS as $cod => $lab): ?>
                     <option value="<?= htmlspecialchars($cod) ?>"><?= htmlspecialchars($lab) ?></option>
                 <?php endforeach; ?>
             </select>

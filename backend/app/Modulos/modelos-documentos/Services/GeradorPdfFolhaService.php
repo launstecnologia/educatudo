@@ -116,3 +116,7 @@ class GeradorPdfFolhaService
         return null;
     }
 }
+
+if (!class_exists('GeradorPdfFolhaService', false) && class_exists(__NAMESPACE__ . '\\GeradorPdfFolhaService', false)) {
+    class_alias(__NAMESPACE__ . '\\GeradorPdfFolhaService', 'GeradorPdfFolhaService');
+}

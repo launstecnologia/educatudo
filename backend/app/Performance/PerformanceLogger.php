@@ -86,3 +86,7 @@ final class PerformanceLogger
         return $files;
     }
 }
+
+if (!class_exists('PerformanceLogger', false) && class_exists(__NAMESPACE__ . '\\PerformanceLogger', false)) {
+    class_alias(__NAMESPACE__ . '\\PerformanceLogger', 'PerformanceLogger');
+}

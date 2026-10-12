@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../../Helpers/EssayCriteriaDisplayHelper.php';
 
 $studentName = (string) ($student['nome'] ?? $submission['student_name'] ?? 'Aluno');
 $essayText = trim((string) ($submission['content_text'] ?? $submission['ocr_text'] ?? ''));
@@ -22,17 +21,17 @@ $teacherTotalScore = isset($correction['teacher_total_score']) && $correction['t
 $useAverage = !empty($correction['use_average']);
 $totalScore = isset($correction['total_score']) ? (float) $correction['total_score'] : null;
 
-$isEnemBoard = EssayCriteriaDisplayHelper::isEnemBoard(
+$isEnemBoard = \App\Helpers\EssayCriteriaDisplayHelper::isEnemBoard(
     $proposal['board_name'] ?? '',
     $proposal['board_slug'] ?? ''
 );
-$criteriaDisplay = EssayCriteriaDisplayHelper::buildCriteriaDisplay(
+$criteriaDisplay = \App\Helpers\EssayCriteriaDisplayHelper::buildCriteriaDisplay(
     isset($criteria) && is_array($criteria) ? $criteria : [],
     $gradesJson,
     $isEnemBoard
 );
-$criteriaSectionTitleSingular = EssayCriteriaDisplayHelper::getSectionTitle($isEnemBoard, false);
-$maxTotalScore = EssayCriteriaDisplayHelper::calculateMaxTotal($criteriaDisplay, $isEnemBoard);
+$criteriaSectionTitleSingular = \App\Helpers\EssayCriteriaDisplayHelper::getSectionTitle($isEnemBoard, false);
+$maxTotalScore = \App\Helpers\EssayCriteriaDisplayHelper::calculateMaxTotal($criteriaDisplay, $isEnemBoard);
 ?>
 
 <div class="mb-8">
@@ -123,7 +122,7 @@ $maxTotalScore = EssayCriteriaDisplayHelper::calculateMaxTotal($criteriaDisplay,
                 $displayFeedback = trim($teacherFeedback) !== '' ? $teacherFeedback : $aiFeedback;
             ?>
             <div class="border-l-4 border-blue-200 pl-4 py-2">
-                <p class="text-sm font-medium text-gray-900"><?= htmlspecialchars(EssayCriteriaDisplayHelper::formatCriterionLabel($pos, $name, $isEnemBoard)) ?> (máx. <?= number_format($max, 0, ',', '.') ?>)</p>
+                <p class="text-sm font-medium text-gray-900"><?= htmlspecialchars(\App\Helpers\EssayCriteriaDisplayHelper::formatCriterionLabel($pos, $name, $isEnemBoard)) ?> (máx. <?= number_format($max, 0, ',', '.') ?>)</p>
                 <div class="mt-1 flex flex-wrap items-center gap-6">
                     <div class="flex items-center gap-1">
                         <span class="text-xs text-amber-700 font-medium">Nota da IA:</span>

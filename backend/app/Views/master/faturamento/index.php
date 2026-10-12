@@ -111,7 +111,7 @@ $limparUrl = URL . '/master/faturamento';
                     'BOLETO' => 'Boleto',
                 ][$billing] ?? ($billing !== '' ? $billing : '—');
                 $valor = 'R$ ' . number_format(((int) ($compra['valor_centavos'] ?? 0)) / 100, 2, ',', '.');
-                $creditos = \CreditosDecimalHelper::fromScalar($compra['creditos'] ?? 0, 0.0);
+                $creditos = \App\Core\CreditosDecimalHelper::fromScalar($compra['creditos'] ?? 0, 0.0);
                 $tipoUser = (string) ($compra['user_type'] ?? '');
                 $tipoLabel = $tipoUser === 'aluno' ? 'Aluno' : ($tipoUser === 'professor' ? 'Professor' : $tipoUser);
             ?>
@@ -124,7 +124,7 @@ $limparUrl = URL . '/master/faturamento';
                 </td>
                 <td class="px-6 py-4 text-sm text-slate-700">
                     <span class="block font-medium"><?= htmlspecialchars((string) ($compra['pacote_nome'] ?? 'Pacote')) ?></span>
-                    <span class="block text-xs text-slate-500 mt-0.5"><?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay($creditos)) ?></span>
+                    <span class="block text-xs text-slate-500 mt-0.5"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay($creditos)) ?></span>
                 </td>
                 <td class="px-6 py-4 text-sm text-slate-900 font-medium"><?= htmlspecialchars($valor) ?></td>
                 <td class="px-6 py-4 text-sm text-slate-700">

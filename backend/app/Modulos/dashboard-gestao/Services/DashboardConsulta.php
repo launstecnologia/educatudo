@@ -2,8 +2,7 @@
 
 namespace App\Modulos\DashboardGestao\Services;
 
-use Database;
-
+use App\Core\Database;
 /**
  * Consultas de leitura sobre tabelas oficiais. Sem regra de negócio nova.
  */
@@ -246,4 +245,8 @@ class DashboardConsulta
         $row = $this->db->fetch('SELECT COUNT(*) AS n FROM professores WHERE ativo = 1');
         return (int) ($row['n'] ?? 0);
     }
+}
+
+if (!class_exists('DashboardConsulta', false) && class_exists(__NAMESPACE__ . '\\DashboardConsulta', false)) {
+    class_alias(__NAMESPACE__ . '\\DashboardConsulta', 'DashboardConsulta');
 }

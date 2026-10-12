@@ -1,13 +1,18 @@
 <?php
+
+namespace App\Modulos\GruposRegrasNotas\Controllers;
+
+use App\Modulos\GruposRegrasNotas\Models\GrupoRegrasNotas;
+use App\Modulos\GruposRegrasNotas\Services\GrupoRegrasNotasService;
+use Throwable;
+
 /**
  * Admin — cadastro de Quadro de Notas.
  */
 
-require_once __DIR__ . '/../../../Controllers/Admin/AdminBaseController.php';
-require_once __DIR__ . '/../Services/GrupoRegrasNotasService.php';
 
-if (!class_exists('GrupoRegrasNotasAdminController')) {
-class GrupoRegrasNotasAdminController extends AdminBaseController
+if (!class_exists(__NAMESPACE__ . '\\GrupoRegrasNotasAdminController', false)) {
+class GrupoRegrasNotasAdminController extends \App\Controllers\Admin\AdminBaseController
 {
     /** @var GrupoRegrasNotasService */
     private $service;
@@ -126,11 +131,10 @@ class GrupoRegrasNotasAdminController extends AdminBaseController
     {
         $user = $this->auth->getUser();
         if (!class_exists('AdminPermissionMatrix')) {
-            require_once dirname(__DIR__, 3) . '/Core/AdminPermissionMatrix.php';
         }
-        $permissions = AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user ?? []);
-        $pode = AdminPermissionMatrix::can($permissions, 'grupos_regras_notas', 'visualizar')
-            || AdminPermissionMatrix::can($permissions, 'configuracao_boletim', 'visualizar');
+        $permissions = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user ?? []);
+        $pode = \App\Core\AdminPermissionMatrix::can($permissions, 'grupos_regras_notas', 'visualizar')
+            || \App\Core\AdminPermissionMatrix::can($permissions, 'configuracao_boletim', 'visualizar');
         if (!$pode) {
             $this->json(['ok' => false, 'error' => 'Sem permissão para esta ação.'], 403);
             return;
@@ -147,12 +151,11 @@ class GrupoRegrasNotasAdminController extends AdminBaseController
     {
         $user = $this->auth->getUser();
         if (!class_exists('AdminPermissionMatrix')) {
-            require_once dirname(__DIR__, 3) . '/Core/AdminPermissionMatrix.php';
         }
-        $permissions = AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user ?? []);
-        $pode = AdminPermissionMatrix::can($permissions, 'grupos_regras_notas', 'visualizar')
-            || AdminPermissionMatrix::can($permissions, 'configuracao_boletim', 'visualizar')
-            || AdminPermissionMatrix::can($permissions, 'provas_online', 'visualizar');
+        $permissions = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user ?? []);
+        $pode = \App\Core\AdminPermissionMatrix::can($permissions, 'grupos_regras_notas', 'visualizar')
+            || \App\Core\AdminPermissionMatrix::can($permissions, 'configuracao_boletim', 'visualizar')
+            || \App\Core\AdminPermissionMatrix::can($permissions, 'provas_online', 'visualizar');
         if (!$pode) {
             $this->json(['ok' => false, 'error' => 'Sem permissão para esta ação.'], 403);
             return;
@@ -192,8 +195,7 @@ class GrupoRegrasNotasAdminController extends AdminBaseController
     private function listarTiposNota(): array
     {
         try {
-            require_once dirname(__DIR__, 3) . '/Models/Exams/ExamEvaluationType.php';
-            $rows = (new ExamEvaluationType())->getAllActive();
+            $rows = (new \App\Models\Exams\ExamEvaluationType())->getAllActive();
         } catch (Throwable $e) {
             return [];
         }
@@ -235,4 +237,8 @@ class GrupoRegrasNotasAdminController extends AdminBaseController
         $this->redirect('/admin/grupos-regras-notas');
     }
 }
+}
+
+if (!class_exists('GrupoRegrasNotasAdminController', false) && class_exists(__NAMESPACE__ . '\\GrupoRegrasNotasAdminController', false)) {
+    class_alias(__NAMESPACE__ . '\\GrupoRegrasNotasAdminController', 'GrupoRegrasNotasAdminController');
 }

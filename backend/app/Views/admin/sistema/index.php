@@ -10,7 +10,7 @@ $hub_cards[] = [
     'icon' => 'fa-regular fa-images',
 ];
 
-if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('redacao_configuravel')) {
+if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('redacao_configuravel')) {
     $hub_cards[] = [
         'href' => URL . '/admin/redacao-configuravel',
         'title' => 'Configuração de Prompt',

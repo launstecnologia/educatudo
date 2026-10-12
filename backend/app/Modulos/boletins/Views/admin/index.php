@@ -43,7 +43,6 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 
 <?php
 if (!class_exists('PeriodoLetivo')) {
-    require_once __DIR__ . '/../../../../Core/PeriodoLetivo.php';
 }
 ?>
 <?php if (!$schemaPronto): ?>
@@ -101,7 +100,7 @@ if (!class_exists('PeriodoLetivo')) {
                     <td class="px-6 py-4 whitespace-nowrap text-right">
                         <?php
                         $anoModelo = (int) ($item['ano_letivo'] ?? 0);
-                        $rotuloPeriodo = mb_strtolower((string) (PeriodoLetivo::doAno($anoModelo > 0 ? $anoModelo : (int) date('Y'))['rotulo_campo'] ?? 'Bimestre'), 'UTF-8');
+                        $rotuloPeriodo = mb_strtolower((string) (\App\Core\PeriodoLetivo::doAno($anoModelo > 0 ? $anoModelo : (int) date('Y'))['rotulo_campo'] ?? 'Bimestre'), 'UTF-8');
                         $eventosVinculados = is_array($item['eventos_notas'] ?? null) ? $item['eventos_notas'] : [];
                         ob_start();
                         ?>

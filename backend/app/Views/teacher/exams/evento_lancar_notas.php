@@ -53,7 +53,6 @@ $materiaId = (int) ($materia['id'] ?? $_GET['materia_id'] ?? 0);
                     <tbody class="divide-y divide-gray-100">
                         <?php
                         if (!class_exists('AlunoLancamentoNotaHelper', false)) {
-                            require_once __DIR__ . '/../../../Helpers/AlunoLancamentoNotaHelper.php';
                         }
                         foreach ($alunos as $al):
                             $aid = (int) ($al['id'] ?? 0);
@@ -61,7 +60,7 @@ $materiaId = (int) ($materia['id'] ?? $_GET['materia_id'] ?? 0);
                             $nv = $notas_map[$nk] ?? null;
                             $notaStr = ($nv && isset($nv['nota']) && $nv['nota'] !== null) ? number_format((float) $nv['nota'], 2, '.', '') : '';
                             $transferido = !empty($al['transferido']);
-                            $nomeAluno = AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+                            $nomeAluno = \App\Helpers\AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
                                 (string) ($al['nome'] ?? ''),
                                 $transferido
                             );

@@ -1,9 +1,8 @@
 <?php
-require_once __DIR__ . '/../../../Helpers/StudentFormHelper.php';
 $student = is_array($student ?? null) ? $student : [];
-$telefoneDisplay = StudentFormHelper::formatTelefoneDisplay($student['telefone'] ?? '');
-$celularDisplay = StudentFormHelper::formatTelefoneDisplay($student['celular'] ?? '');
-$whatsappDisplay = StudentFormHelper::formatTelefoneDisplay($student['whatsapp'] ?? '');
+$telefoneDisplay = \App\Helpers\StudentFormHelper::formatTelefoneDisplay($student['telefone'] ?? '');
+$celularDisplay = \App\Helpers\StudentFormHelper::formatTelefoneDisplay($student['celular'] ?? '');
+$whatsappDisplay = \App\Helpers\StudentFormHelper::formatTelefoneDisplay($student['whatsapp'] ?? '');
 $escc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
 ?>
 <div>

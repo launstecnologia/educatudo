@@ -337,3 +337,7 @@ class EstruturaDocumentosOficiais
         return $sec;
     }
 }
+
+if (!class_exists('EstruturaDocumentosOficiais', false) && class_exists(__NAMESPACE__ . '\\EstruturaDocumentosOficiais', false)) {
+    class_alias(__NAMESPACE__ . '\\EstruturaDocumentosOficiais', 'EstruturaDocumentosOficiais');
+}

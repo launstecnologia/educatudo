@@ -4,7 +4,6 @@
  * Mostra todas as provas do bloco juntas
  */
 if (!class_exists('LayoutHelper')) {
-    require_once __DIR__ . '/../../../../Core/LayoutHelper.php';
 }
 ?>
 
@@ -133,7 +132,7 @@ function liberarProvaParaAluno(blocoId) {
                                 
                                 <div class="mb-4">
                                     <p class="text-gray-700 font-medium mb-2">Enunciado:</p>
-                                    <div class="text-gray-900"><?= isset($questao['enunciado']) ? LayoutHelper::renderEnunciadoProva($questao['enunciado']) : '' ?></div>
+                                    <div class="text-gray-900"><?= isset($questao['enunciado']) ? \App\Core\LayoutHelper::renderEnunciadoProva($questao['enunciado']) : '' ?></div>
                                 </div>
                                 
                                 <?php if ($questao['imagem_url']): ?>
@@ -157,7 +156,7 @@ function liberarProvaParaAluno(blocoId) {
                                                             </svg>
                                                         <?php endif; ?>
                                                         <span class="<?= $alt['correta'] ? 'font-semibold text-green-900' : 'text-gray-700' ?>">
-                                                            <?= isset($alt['texto']) ? LayoutHelper::renderEnunciadoProva($alt['texto']) : '' ?>
+                                                            <?= isset($alt['texto']) ? \App\Core\LayoutHelper::renderEnunciadoProva($alt['texto']) : '' ?>
                                                             <?php if ($alt['correta']): ?>
                                                                 <span class="ml-2 text-xs text-green-700">(Correta)</span>
                                                             <?php endif; ?>

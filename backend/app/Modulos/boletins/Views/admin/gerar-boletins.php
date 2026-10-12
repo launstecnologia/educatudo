@@ -206,9 +206,8 @@ $alunoSimNome = trim((string) ($simulacao['aluno']['nome'] ?? ''));
     <div class="p-5 overflow-x-auto">
         <?php
         if (!class_exists('BoletimQuadroLayoutHelper', false)) {
-            require_once dirname(__DIR__, 4) . '/Helpers/BoletimQuadroLayoutHelper.php';
         }
-        $ehQuadroSim = BoletimQuadroLayoutHelper::ehLayoutQuadro((array) $matrizColunas);
+        $ehQuadroSim = \App\Helpers\BoletimQuadroLayoutHelper::ehLayoutQuadro((array) $matrizColunas);
         ?>
         <?php if ($matrizLinhas === [] || $matrizColunas === []): ?>
             <p class="text-sm text-gray-500">Sem dados de simulação para o aluno/evento selecionado.</p>

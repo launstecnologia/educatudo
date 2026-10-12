@@ -1,9 +1,11 @@
 <?php
+
+namespace App\Modulos\Arquivos\Models;
 /**
  * Model — pastas do módulo Arquivos (tabela modulos_arquivos_pastas).
  */
 
-if (!class_exists('ModuloArquivoPasta')) {
+if (!class_exists('ModuloArquivoPasta', false)) {
 class ModuloArquivoPasta
 {
     private $db;
@@ -11,7 +13,7 @@ class ModuloArquivoPasta
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     private function sqlArquivoAtivo(string $alias = 'ma'): string
@@ -274,4 +276,8 @@ class ModuloArquivoPasta
         return $this->breadcrumb($pastaAtual);
     }
 }
+}
+
+if (!class_exists('ModuloArquivoPasta', false) && class_exists(__NAMESPACE__ . '\\ModuloArquivoPasta', false)) {
+    class_alias(__NAMESPACE__ . '\\ModuloArquivoPasta', 'ModuloArquivoPasta');
 }

@@ -1,5 +1,5 @@
 <?php
-$primaryColor = LayoutHelper::get('primary_color', '#6366f1');
+$primaryColor = \App\Core\LayoutHelper::get('primary_color', '#6366f1');
 ?>
 <style>
     .filters-panel {

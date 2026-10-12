@@ -1,6 +1,5 @@
 <?php
-require_once __DIR__ . '/../../../Models/Education/ResultadoAcademico.php';
-$tipos = is_array($tipos ?? null) ? $tipos : ResultadoAcademico::DOCUMENTO_TIPOS;
+$tipos = is_array($tipos ?? null) ? $tipos : \App\Models\Education\ResultadoAcademico::DOCUMENTO_TIPOS;
 $escolhidos = is_array($escolhidos ?? null) ? $escolhidos : [];
 $modelos = is_array($modelos ?? null) ? $modelos : [];
 $config = is_array($config ?? null) ? $config : [];
@@ -48,7 +47,7 @@ include __DIR__ . '/../_partials/flash_message.php';
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Modelo por documento</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <?php foreach ($tipos as $tipo => $label):
-                $atual = $escolhidos[$tipo] ?? (ResultadoAcademico::LAYOUT_PADRAO[$tipo] ?? '');
+                $atual = $escolhidos[$tipo] ?? (\App\Models\Education\ResultadoAcademico::LAYOUT_PADRAO[$tipo] ?? '');
             ?>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2"><?= htmlspecialchars($label) ?></label>

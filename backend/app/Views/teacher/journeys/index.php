@@ -37,9 +37,8 @@
 <span id="jornadaCount" class="hidden"><?= count($jornadas) ?></span>
 <?php
 if (!class_exists('PeriodoLetivo')) {
-    require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
 }
-$rotuloPeriodo = PeriodoLetivo::doAno((int) date('Y'))['rotulo_campo'] ?? 'Bimestre';
+$rotuloPeriodo = \App\Core\PeriodoLetivo::doAno((int) date('Y'))['rotulo_campo'] ?? 'Bimestre';
 $opcoesTurma = ['' => 'Todas as turmas'];
 foreach ($turmas as $turma) {
     $opcoesTurma[(string) ($turma['id'] ?? '')] = (string) ($turma['nome'] ?? '');
@@ -71,7 +70,7 @@ ob_start();
         <div>
             <label for="filtroBimestre" class="block text-sm font-medium text-gray-700 mb-1" data-periodo-label><?= htmlspecialchars($rotuloPeriodo) ?></label>
             <select id="filtroBimestre" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
-                <?= PeriodoLetivo::optionsHtml((int) date('Y'), 0, ['todos' => true, 'todos_label' => 'Todos']) ?>
+                <?= \App\Core\PeriodoLetivo::optionsHtml((int) date('Y'), 0, ['todos' => true, 'todos_label' => 'Todos']) ?>
             </select>
         </div>
         <div>

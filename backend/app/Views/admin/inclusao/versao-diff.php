@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../../Helpers/CatalogoRegraMascara.php';
 
 $resumo = static function (string $html, int $len = 180): string {
     $t = html_entity_decode(strip_tags($html), ENT_QUOTES, 'UTF-8');
@@ -71,7 +70,7 @@ $questaoModal = static function (array $questao, string $enunciado) use ($textoE
 $fmt = static function (?float $v): string {
     return $v === null ? '—' : number_format($v, 2, ',', '.');
 };
-$catalog = CatalogoRegraMascara::rules();
+$catalog = \App\Helpers\CatalogoRegraMascara::rules();
 $isTruthyRule = static function ($v): bool {
     return in_array(strtolower(trim((string) $v)), ['1', 'true', 'on', 'sim', 'yes'], true);
 };
@@ -89,7 +88,7 @@ $ruleValueLabel = static function (string $key, $value) use ($catalog): string {
     return (string) $value;
 };
 $hasAiRewriteRule = false;
-foreach (CatalogoRegraMascara::aiRewriteKeys() as $aiRuleKey) {
+foreach (\App\Helpers\CatalogoRegraMascara::aiRewriteKeys() as $aiRuleKey) {
     if (array_key_exists($aiRuleKey, $rules_snapshot ?? []) && $isTruthyRule(($rules_snapshot ?? [])[$aiRuleKey])) {
         $hasAiRewriteRule = true;
         break;

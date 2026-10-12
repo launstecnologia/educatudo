@@ -588,3 +588,7 @@ class ConversorFolhaExcelHtml
         return htmlspecialchars($texto, ENT_QUOTES, 'UTF-8');
     }
 }
+
+if (!class_exists('ConversorFolhaExcelHtml', false) && class_exists(__NAMESPACE__ . '\\ConversorFolhaExcelHtml', false)) {
+    class_alias(__NAMESPACE__ . '\\ConversorFolhaExcelHtml', 'ConversorFolhaExcelHtml');
+}

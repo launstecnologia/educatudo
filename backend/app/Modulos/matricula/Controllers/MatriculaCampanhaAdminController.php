@@ -1,16 +1,13 @@
 <?php
 
-require_once __DIR__ . '/../../../Core/BaseController.php';
-require_once __DIR__ . '/../Services/MatriculaCampanhaService.php';
-require_once __DIR__ . '/../Services/MatriculaProcessoService.php';
-require_once __DIR__ . '/../../../Services/FinancePlanService.php';
+namespace App\Modulos\Matricula\Controllers;
 
 use App\Modulos\Matricula\Services\MatriculaCampanhaService;
 use App\Modulos\Matricula\Services\MatriculaProcessoService;
 use App\Services\FinancePlanService;
 
-if (!class_exists('MatriculaCampanhaAdminController')) {
-class MatriculaCampanhaAdminController extends BaseController
+if (!class_exists(__NAMESPACE__ . '\\MatriculaCampanhaAdminController', false)) {
+class MatriculaCampanhaAdminController extends \App\Core\BaseController
 {
     private $auth;
     private $db;
@@ -20,8 +17,8 @@ class MatriculaCampanhaAdminController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        $this->auth = new AuthManager();
-        $this->db = Database::getInstance();
+        $this->auth = new \App\Core\AuthManager();
+        $this->db = \App\Core\Database::getInstance();
         $this->service = new MatriculaCampanhaService($this->db);
         $this->processoService = new MatriculaProcessoService($this->db);
         $user = $this->auth->getUser();
@@ -210,4 +207,8 @@ class MatriculaCampanhaAdminController extends BaseController
         return 'Não foi possível concluir. Tente de novo.';
     }
 }
+}
+
+if (!class_exists('MatriculaCampanhaAdminController', false) && class_exists(__NAMESPACE__ . '\\MatriculaCampanhaAdminController', false)) {
+    class_alias(__NAMESPACE__ . '\\MatriculaCampanhaAdminController', 'MatriculaCampanhaAdminController');
 }

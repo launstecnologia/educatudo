@@ -1,16 +1,18 @@
 <?php
+
+namespace App\Modulos\Arquivos\Models;
 /**
  * Model — anexos do módulo Arquivos (tabela modulos_arquivos_anexos).
  */
 
-if (!class_exists('ModuloArquivoAnexo')) {
+if (!class_exists('ModuloArquivoAnexo', false)) {
 class ModuloArquivoAnexo
 {
     private $db;
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     public function findById(int $id): ?array
@@ -69,4 +71,8 @@ class ModuloArquivoAnexo
         $this->db->query('DELETE FROM modulos_arquivos_anexos WHERE id = :aid', ['aid' => $id]);
     }
 }
+}
+
+if (!class_exists('ModuloArquivoAnexo', false) && class_exists(__NAMESPACE__ . '\\ModuloArquivoAnexo', false)) {
+    class_alias(__NAMESPACE__ . '\\ModuloArquivoAnexo', 'ModuloArquivoAnexo');
 }

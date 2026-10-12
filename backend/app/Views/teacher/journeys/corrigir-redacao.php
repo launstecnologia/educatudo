@@ -78,9 +78,8 @@
                     <?php endif; ?>
                     <?php
                     if (!class_exists('CreditosModuleRegistry', false)) {
-                        require_once __DIR__ . '/../../../Core/CreditosModuleRegistry.php';
                     }
-                    $tudicoinsCorrecaoIa = \CreditosModuleRegistry::acaoIaDisponivel('redacao_correcao_ia');
+                    $tudicoinsCorrecaoIa = \App\Core\CreditosModuleRegistry::acaoIaDisponivel('redacao_correcao_ia');
                     ?>
                     <?php if ($tudicoinsCorrecaoIa): ?>
                     <button 

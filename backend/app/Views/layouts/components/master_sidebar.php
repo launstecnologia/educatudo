@@ -3,9 +3,8 @@ $current_page = $current_page ?? '';
 $master_nome = $master_nome ?? ($_SESSION['master_user_nome'] ?? 'Admin');
 $master_avatar_url = $master_avatar_url ?? ($_SESSION['master_user_avatar'] ?? '');
 if (!class_exists('MasterAvatarService')) {
-    require_once __DIR__ . '/../../../Services/MasterAvatarService.php';
 }
-$master_iniciais = MasterAvatarService::iniciais($master_nome);
+$master_iniciais = \App\Services\MasterAvatarService::iniciais($master_nome);
 
 $navItemClass = static function (bool $active): string {
     return $active

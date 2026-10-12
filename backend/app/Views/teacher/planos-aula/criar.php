@@ -1,9 +1,7 @@
 <?php
-require_once __DIR__ . '/../../../Core/CreditosModuleRegistry.php';
-require_once __DIR__ . '/../../../Core/LayoutHelper.php';
 
-$copilotoDisponivel = CreditosModuleRegistry::acaoIaDisponivel('planos_aula_copiloto');
-$copilotoCusto = LayoutHelper::get('credito_custo_planos_aula_copiloto', '1');
+$copilotoDisponivel = \App\Core\CreditosModuleRegistry::acaoIaDisponivel('planos_aula_copiloto');
+$copilotoCusto = \App\Core\LayoutHelper::get('credito_custo_planos_aula_copiloto', '1');
 if (!is_numeric($copilotoCusto)) {
     $copilotoCusto = '1';
 }

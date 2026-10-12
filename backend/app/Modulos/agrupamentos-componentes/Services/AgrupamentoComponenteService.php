@@ -2,12 +2,9 @@
 
 namespace App\Modulos\AgrupamentosComponentes\Services;
 
-require_once __DIR__ . '/../Models/AgrupamentoComponente.php';
-require_once __DIR__ . '/../../../Models/Education/ComponenteCurricular.php';
 
 use App\Modulos\AgrupamentosComponentes\Models\AgrupamentoComponente;
-use ComponenteCurricular;
-
+use App\Models\Education\ComponenteCurricular;
 /**
  * CRUD da regra de nota da área (média/soma). Os filhos vêm do componente pai.
  */
@@ -181,4 +178,8 @@ class AgrupamentoComponenteService
         }
         return null;
     }
+}
+
+if (!class_exists('AgrupamentoComponenteService', false) && class_exists(__NAMESPACE__ . '\\AgrupamentoComponenteService', false)) {
+    class_alias(__NAMESPACE__ . '\\AgrupamentoComponenteService', 'AgrupamentoComponenteService');
 }

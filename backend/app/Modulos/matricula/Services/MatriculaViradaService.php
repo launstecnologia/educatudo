@@ -2,8 +2,7 @@
 
 namespace App\Modulos\Matricula\Services;
 
-use Database;
-
+use App\Core\Database;
 /**
  * Virada de ano: clona turmas e sugere sucessão por ordem da série.
  */
@@ -186,4 +185,8 @@ class MatriculaViradaService
             return false;
         }
     }
+}
+
+if (!class_exists('MatriculaViradaService', false) && class_exists(__NAMESPACE__ . '\\MatriculaViradaService', false)) {
+    class_alias(__NAMESPACE__ . '\\MatriculaViradaService', 'MatriculaViradaService');
 }

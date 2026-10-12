@@ -1,15 +1,17 @@
 <?php
 
-require_once __DIR__ . '/../../../Controllers/Admin/AdminBaseController.php';
-require_once __DIR__ . '/../Models/PresencaConfig.php';
-require_once __DIR__ . '/../Models/PresencaEvento.php';
-require_once __DIR__ . '/../Models/PresencaIntegracao.php';
-require_once __DIR__ . '/../Models/PresencaIdentificador.php';
-require_once __DIR__ . '/../Services/PresencaEventoService.php';
-require_once __DIR__ . '/../Services/PresencaAplicacaoService.php';
+namespace App\Modulos\Presenca\Controllers;
 
-if (!class_exists('PresencaAdminController')) {
-class PresencaAdminController extends AdminBaseController
+
+use App\Modulos\Presenca\Services\PresencaAplicacaoService;
+use App\Modulos\Presenca\Models\PresencaConfig;
+use App\Modulos\Presenca\Models\PresencaEvento;
+use App\Modulos\Presenca\Services\PresencaEventoService;
+use App\Modulos\Presenca\Models\PresencaIdentificador;
+use App\Modulos\Presenca\Models\PresencaIntegracao;
+
+if (!class_exists(__NAMESPACE__ . '\\PresencaAdminController', false)) {
+class PresencaAdminController extends \App\Controllers\Admin\AdminBaseController
 {
     /** @var PresencaConfig */
     private $configModel;
@@ -89,15 +91,15 @@ class PresencaAdminController extends AdminBaseController
         $ok = false;
         try {
             if ($alunoId <= 0) {
-                throw new InvalidArgumentException('Selecione o aluno.');
+                throw new \InvalidArgumentException('Selecione o aluno.');
             }
             if (!in_array($tipo, ['entrada', 'saida'], true)) {
-                throw new InvalidArgumentException('Informe entrada ou saída.');
+                throw new \InvalidArgumentException('Informe entrada ou saída.');
             }
             try {
-                $dt = $quando !== '' ? new DateTimeImmutable($quando) : new DateTimeImmutable('now');
-            } catch (Throwable $e) {
-                throw new InvalidArgumentException('Data e horário inválidos.');
+                $dt = $quando !== '' ? new \DateTimeImmutable($quando) : new \DateTimeImmutable('now');
+            } catch (\Throwable $e) {
+                throw new \InvalidArgumentException('Data e horário inválidos.');
             }
             $user = $this->auth->getUser();
             $this->service->registrar([
@@ -110,9 +112,9 @@ class PresencaAdminController extends AdminBaseController
             ]);
             $this->setFlashMessage('Registro de ' . ($tipo === 'entrada' ? 'entrada' : 'saída') . ' aplicado nas aulas do dia.', 'success');
             $ok = true;
-        } catch (InvalidArgumentException | RuntimeException $e) {
+        } catch (\InvalidArgumentException | \RuntimeException $e) {
             $this->setFlashMessage($e->getMessage(), 'error');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log('PresencaAdminController::registrar: ' . $e->getMessage());
             $this->setFlashMessage('Não foi possível registrar a entrada/saída.', 'error');
         }
@@ -180,9 +182,9 @@ class PresencaAdminController extends AdminBaseController
         try {
             $this->configModel->salvar($_POST);
             $this->setFlashMessage('Configuração salva.', 'success');
-        } catch (InvalidArgumentException | RuntimeException $e) {
+        } catch (\InvalidArgumentException | \RuntimeException $e) {
             $this->setFlashMessage($e->getMessage(), 'error');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log('PresencaAdminController::salvarConfig: ' . $e->getMessage());
             $this->setFlashMessage('Não foi possível salvar a configuração.', 'error');
         }
@@ -203,9 +205,9 @@ class PresencaAdminController extends AdminBaseController
             $criada = $this->integracoes->criar($_POST);
             $_SESSION['presenca_token_gerado'] = $criada['token'];
             $this->setFlashMessage('Integração criada. Copie o token agora — ele não será exibido de novo.', 'success');
-        } catch (InvalidArgumentException | RuntimeException $e) {
+        } catch (\InvalidArgumentException | \RuntimeException $e) {
             $this->setFlashMessage($e->getMessage(), 'error');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log('PresencaAdminController::criarIntegracao: ' . $e->getMessage());
             $this->setFlashMessage('Não foi possível criar a integração.', 'error');
         }
@@ -246,9 +248,9 @@ class PresencaAdminController extends AdminBaseController
                 (string) ($_POST['valor'] ?? '')
             );
             $this->setFlashMessage('Identificador vinculado ao aluno.', 'success');
-        } catch (InvalidArgumentException | RuntimeException $e) {
+        } catch (\InvalidArgumentException | \RuntimeException $e) {
             $this->setFlashMessage($e->getMessage(), 'error');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log('PresencaAdminController::criarIdentificador: ' . $e->getMessage());
             $this->setFlashMessage('Não foi possível vincular o identificador.', 'error');
         }
@@ -272,8 +274,12 @@ class PresencaAdminController extends AdminBaseController
 
     private function dataValida(string $data): string
     {
-        $dt = DateTime::createFromFormat('Y-m-d', $data);
+        $dt = \DateTime::createFromFormat('Y-m-d', $data);
         return ($dt && $dt->format('Y-m-d') === $data) ? $data : date('Y-m-d');
     }
 }
+}
+
+if (!class_exists('PresencaAdminController', false) && class_exists(__NAMESPACE__ . '\\PresencaAdminController', false)) {
+    class_alias(__NAMESPACE__ . '\\PresencaAdminController', 'PresencaAdminController');
 }

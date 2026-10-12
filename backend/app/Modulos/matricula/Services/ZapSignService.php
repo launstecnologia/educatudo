@@ -25,9 +25,9 @@ class ZapSignService
 
     private $db;
 
-    public function __construct(?\Database $db = null)
+    public function __construct(?\App\Core\Database $db = null)
     {
-        $this->db = $db ?? \Database::getInstance();
+        $this->db = $db ?? \App\Core\Database::getInstance();
     }
 
     public function estaAtivo(): bool
@@ -136,8 +136,7 @@ class ZapSignService
 
         $apiToken = trim((string) ($input['api_token'] ?? ''));
         if ($apiToken !== '') {
-            require_once BASE_PATH . '/app/Core/MasterSecretVault.php';
-            $enc = \MasterSecretVault::encrypt($apiToken);
+            $enc = \App\Core\MasterSecretVault::encrypt($apiToken);
             if ($enc === null || $enc === '') {
                 throw new \RuntimeException('Falha ao criptografar o token da API.');
             }
@@ -243,7 +242,6 @@ class ZapSignService
             return ['ok' => false, 'message' => 'ZapSign não retornou token do documento.'];
         }
 
-        require_once __DIR__ . '/../Models/MatriculaProcesso.php';
         $model = new \App\Modulos\Matricula\Models\MatriculaProcesso($this->db);
         $model->update($id, [
             'zapsign_doc_token' => $docToken,
@@ -375,7 +373,6 @@ class ZapSignService
                 [$processoContratoId]
             );
             if (($inst['tipo'] ?? '') === 'matricula') {
-                require_once __DIR__ . '/../Models/MatriculaProcesso.php';
                 $model = new \App\Modulos\Matricula\Models\MatriculaProcesso($this->db);
                 $model->update($id, [
                     'zapsign_doc_token' => $docToken,
@@ -422,8 +419,6 @@ class ZapSignService
             return ['ok' => false, 'message' => 'missing_doc_token'];
         }
 
-        require_once __DIR__ . '/../Models/MatriculaProcesso.php';
-        require_once __DIR__ . '/MatriculaProcessoService.php';
         $model = new \App\Modulos\Matricula\Models\MatriculaProcesso($this->db);
 
         // Preferência: instância multi-contrato
@@ -550,7 +545,6 @@ class ZapSignService
 
         $status = strtolower(trim((string) ($doc['status'] ?? '')));
         if ($status !== 'signed') {
-            require_once __DIR__ . '/../Models/MatriculaProcesso.php';
             $model = new \App\Modulos\Matricula\Models\MatriculaProcesso($this->db);
             $model->update((int) $enrollment['id'], [
                 'zapsign_status' => $status !== '' ? $status : 'pending',
@@ -685,8 +679,7 @@ class ZapSignService
         if ($enc === '') {
             return '';
         }
-        require_once BASE_PATH . '/app/Core/MasterSecretVault.php';
-        $plain = \MasterSecretVault::decrypt($enc);
+        $plain = \App\Core\MasterSecretVault::decrypt($enc);
         return is_string($plain) ? trim($plain) : '';
     }
 
@@ -782,13 +775,17 @@ class ZapSignService
         try {
             if (class_exists('RedisCache', false)) {
                 if (defined('TENANT_ID')) {
-                    \RedisCache::delete('config_layout_' . TENANT_ID);
+                    \App\Core\RedisCache::delete('config_layout_' . TENANT_ID);
                 }
-                \RedisCache::delete('config_layout_single');
-                \RedisCache::delete('config_layout');
+                \App\Core\RedisCache::delete('config_layout_single');
+                \App\Core\RedisCache::delete('config_layout');
             }
         } catch (\Throwable $e) {
             // ok
         }
     }
+}
+
+if (!class_exists('ZapSignService', false) && class_exists(__NAMESPACE__ . '\\ZapSignService', false)) {
+    class_alias(__NAMESPACE__ . '\\ZapSignService', 'ZapSignService');
 }

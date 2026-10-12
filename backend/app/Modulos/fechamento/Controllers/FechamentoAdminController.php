@@ -1,18 +1,18 @@
 <?php
+
+namespace App\Modulos\Fechamento\Controllers;
 /**
  * EducaTudo - Painel de Fechamento, homologações e documentos do período.
  */
 
-require_once __DIR__ . '/../../../Controllers/Admin/AdminBaseController.php';
-require_once __DIR__ . '/../Services/FechamentoService.php';
-require_once __DIR__ . '/../Services/ImpressaoLoteFechamentoService.php';
-require_once __DIR__ . '/../Services/ApoioDigitacaoFechamentoService.php';
-require_once __DIR__ . '/../Services/FechamentoMaquinaEstados.php';
-require_once __DIR__ . '/../../../Models/Education/ResultadoAcademico.php';
-require_once __DIR__ . '/../../../Core/AdminMenuDiagnostico.php';
 
-if (!class_exists('FechamentoAdminController')) {
-class FechamentoAdminController extends AdminBaseController
+use App\Modulos\Fechamento\Services\ApoioDigitacaoFechamentoService;
+use App\Modulos\Fechamento\Services\FechamentoMaquinaEstados;
+use App\Modulos\Fechamento\Services\FechamentoService;
+use App\Modulos\Fechamento\Services\ImpressaoLoteFechamentoService;
+
+if (!class_exists(__NAMESPACE__ . '\\FechamentoAdminController', false)) {
+class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseController
 {
     private function service(): FechamentoService
     {
@@ -83,9 +83,8 @@ class FechamentoAdminController extends AdminBaseController
         $especiais = $model->listarEspeciaisTurma($turmaId, $anoLetivo);
         $componentes = [];
         try {
-            require_once __DIR__ . '/../../../Models/Education/ComponenteCurricular.php';
-            $componentes = (new ComponenteCurricular())->getAll(false) ?: [];
-        } catch (Throwable $e) {
+            $componentes = (new \App\Models\Education\ComponenteCurricular())->getAll(false) ?: [];
+        } catch (\Throwable $e) {
             $componentes = [];
         }
         $flash = $this->getFlashMessage();
@@ -447,7 +446,6 @@ class FechamentoAdminController extends AdminBaseController
             }
             $avisos[] = 'O histórico não entrou: falta permissão para alterar resultados finais.';
         }
-        require_once dirname(__DIR__, 3) . '/Services/AIJobService.php';
         $jobs = [];
         $jaSalvos = 0;
         try {
@@ -455,7 +453,7 @@ class FechamentoAdminController extends AdminBaseController
                 foreach ($documentos as $documento) {
                     try {
                         $lote->exigirEscopoLeve([$alvo['painel']], $documento);
-                    } catch (Throwable $e) {
+                    } catch (\Throwable $e) {
                         $avisos[] = $alvo['nome'] . ': ' . $e->getMessage();
                         continue;
                     }
@@ -502,7 +500,7 @@ class FechamentoAdminController extends AdminBaseController
             if ($jobs !== []) {
                 \App\Services\AIJobService::tentarDispararWorker();
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $this->setFlashMessage('Não foi possível iniciar a geração. Tente de novo em instantes.', 'error');
             $this->redirect($voltar);
             return;
@@ -537,7 +535,6 @@ class FechamentoAdminController extends AdminBaseController
             return;
         }
         $jobId = (int) $id;
-        require_once dirname(__DIR__, 3) . '/Services/AIJobService.php';
         $job = \App\Services\AIJobService::getJob($jobId);
         $voltar = '/admin/fechamento/impressao-lote';
         if (!$job || (string) ($job['job_type'] ?? '') !== ImpressaoLoteFechamentoService::TIPO_JOB) {
@@ -682,7 +679,7 @@ class FechamentoAdminController extends AdminBaseController
         if (!$this->enforceAdminPermissionKey('resultados_finais', 'visualizar', false)) {
             return;
         }
-        $matriz = AdminMenuDiagnostico::avaliar($user ?? []);
+        $matriz = \App\Core\AdminMenuDiagnostico::avaliar($user ?? []);
         $this->viewWithLayout('admin', 'admin/fechamento/diagnostico', [
             'title' => 'Diagnóstico do menu - EducaTudo',
             'user' => $user,
@@ -884,7 +881,7 @@ class FechamentoAdminController extends AdminBaseController
     private function periodoDaRequest(): array
     {
         $tipo = (string) ($_GET['periodo_tipo'] ?? 'ano');
-        if (!isset(ResultadoAcademico::PERIODO_TIPOS[$tipo])) {
+        if (!isset(\App\Models\Education\ResultadoAcademico::PERIODO_TIPOS[$tipo])) {
             $tipo = 'ano';
         }
         $numero = (int) ($_GET['periodo_numero'] ?? 0);
@@ -900,7 +897,7 @@ class FechamentoAdminController extends AdminBaseController
     private function periodoDoPost(): array
     {
         $tipo = (string) ($_POST['periodo_tipo'] ?? 'ano');
-        if (!isset(ResultadoAcademico::PERIODO_TIPOS[$tipo])) {
+        if (!isset(\App\Models\Education\ResultadoAcademico::PERIODO_TIPOS[$tipo])) {
             $tipo = 'ano';
         }
         $numero = (int) ($_POST['periodo_numero'] ?? 0);
@@ -1089,9 +1086,8 @@ class FechamentoAdminController extends AdminBaseController
             $this->redirect('/admin/academico');
             return;
         }
-        require_once dirname(__DIR__, 3) . '/Services/ImplantacaoAcademicaService.php';
         $ano = (int) ($_GET['ano_letivo'] ?? date('Y'));
-        $diag = (new ImplantacaoAcademicaService())->diagnosticar($ano);
+        $diag = (new \App\Services\ImplantacaoAcademicaService())->diagnosticar($ano);
         $flash = $this->getFlashMessage();
         $this->viewWithLayout('admin', 'admin/fechamento/implantar', [
             'title' => 'Implantar acadêmico — EducaTudo',
@@ -1107,31 +1103,28 @@ class FechamentoAdminController extends AdminBaseController
     {
         $user = $this->auth->getUser();
         if (!class_exists('AdminPermissionMatrix')) {
-            require_once dirname(__DIR__, 3) . '/Core/AdminPermissionMatrix.php';
         }
-        $permissions = AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user ?? []);
+        $permissions = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user ?? []);
 
-        return AdminPermissionMatrix::can($permissions, 'resultados_finais', 'alterar');
+        return \App\Core\AdminPermissionMatrix::can($permissions, 'resultados_finais', 'alterar');
     }
 
     private function podeImplantarAcademico(): bool
     {
         $user = $this->auth->getUser();
         if (!class_exists('AdminPermissionMatrix')) {
-            require_once dirname(__DIR__, 3) . '/Core/AdminPermissionMatrix.php';
         }
-        $permissions = AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user ?? []);
-        return AdminPermissionMatrix::can($permissions, 'configuracao_boletim', 'visualizar')
-            || AdminPermissionMatrix::can($permissions, 'resultados_finais', 'visualizar');
+        $permissions = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user ?? []);
+        return \App\Core\AdminPermissionMatrix::can($permissions, 'configuracao_boletim', 'visualizar')
+            || \App\Core\AdminPermissionMatrix::can($permissions, 'resultados_finais', 'visualizar');
     }
 
     private function simularRegraId(): int
     {
         try {
-            require_once dirname(__DIR__, 3) . '/Models/System/BoletimConfig.php';
-            $ultima = (new BoletimConfig())->getUltimaRegraNotas();
+            $ultima = (new \App\Models\System\BoletimConfig())->getUltimaRegraNotas();
             return (int) ($ultima['id'] ?? 0);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return 0;
         }
     }
@@ -1146,4 +1139,8 @@ class FechamentoAdminController extends AdminBaseController
         return false;
     }
 }
+}
+
+if (!class_exists('FechamentoAdminController', false) && class_exists(__NAMESPACE__ . '\\FechamentoAdminController', false)) {
+    class_alias(__NAMESPACE__ . '\\FechamentoAdminController', 'FechamentoAdminController');
 }

@@ -4,9 +4,8 @@
  * Usa logo branca/horizontal branca do LayoutHelper ou fallback para /static/images/logo-educatudo-white.png
  */
 if (!class_exists('LayoutHelper')) {
-    require_once __DIR__ . '/../../Core/LayoutHelper.php';
 }
-$logoUrl = class_exists('LayoutHelper') ? (LayoutHelper::getLogoHorizontalWhiteUrl() ?: LayoutHelper::getLogoWhiteUrl()) : '';
+$logoUrl = class_exists('LayoutHelper') ? (\App\Core\LayoutHelper::getLogoHorizontalWhiteUrl() ?: \App\Core\LayoutHelper::getLogoWhiteUrl()) : '';
 if (empty($logoUrl)) {
     $logoUrl = (defined('URL') ? URL : '') . '/static/images/logo-educatudo-white.png';
 }

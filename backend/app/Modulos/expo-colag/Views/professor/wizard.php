@@ -15,7 +15,7 @@ $pid = (int) ($projeto['id'] ?? 0);
 $status = (string) ($projeto['status'] ?? 'Rascunho');
 $profAtualId = $modoAdmin ? (int) ($projeto['professor_id'] ?? 0) : (int) ($user['id'] ?? 0);
 $capaUrl = (string) ($projeto['capa_url'] ?? '');
-$capaSrc = (string) ($projeto['capa_src'] ?? ExpoColagService::resolverUrlCapa($capaUrl, $pid));
+$capaSrc = (string) ($projeto['capa_src'] ?? \App\Modulos\ExpoColag\Services\ExpoColagService::resolverUrlCapa($capaUrl, $pid));
 
 $matConectadas = array_map('intval', array_column($relacoes['materias'] ?? [], 'materia_id'));
 $profParceiros = array_map('intval', array_column($relacoes['professores'] ?? [], 'professor_id'));
@@ -50,7 +50,7 @@ foreach ($visib as $v) {
 $etapas = $relacoes['etapas'] ?? [];
 $papeis = $relacoes['papeis'] ?? [];
 $materiais = $relacoes['materiais'] ?? [];
-$listaAlmox = ExpoColagService::decodificarMateriaisNecessarios($projeto['materiais_necessarios'] ?? []);
+$listaAlmox = \App\Modulos\ExpoColag\Services\ExpoColagService::decodificarMateriaisNecessarios($projeto['materiais_necessarios'] ?? []);
 if ($listaAlmox === []) {
     $listaAlmox = [['nome' => '', 'quantidade' => '', 'observacao' => '']];
 }

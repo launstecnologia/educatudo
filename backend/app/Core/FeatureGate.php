@@ -1,12 +1,11 @@
 <?php
+
+namespace App\Core;
 /**
  * EducaTudo - FeatureGate
  * Verifica habilitação de módulos por rota
  */
 
-require_once __DIR__ . '/LayoutHelper.php';
-require_once __DIR__ . '/ModuloRegistry.php';
-require_once __DIR__ . '/ModuloCatalogo.php';
 
 class FeatureGate
 {
@@ -232,3 +231,7 @@ class FeatureGate
 }
 
 
+
+if (!class_exists('FeatureGate', false) && class_exists(__NAMESPACE__ . '\\FeatureGate', false)) {
+    class_alias(__NAMESPACE__ . '\\FeatureGate', 'FeatureGate');
+}

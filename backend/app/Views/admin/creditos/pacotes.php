@@ -1,6 +1,5 @@
 <?php
 if (!class_exists('CreditosDecimalHelper')) {
-    require_once __DIR__ . '/../../../Core/CreditosDecimalHelper.php';
 }
 $pacotes = $pacotes ?? [];
 ?>
@@ -34,7 +33,7 @@ $pacotes = $pacotes ?? [];
                                 <div class="text-sm font-semibold text-gray-900"><?= htmlspecialchars($pacote['nome'] ?? '') ?></div>
                                 <div class="text-xs text-gray-500">ID <?= (int) ($pacote['id'] ?? 0) ?></div>
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-700"><?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay(\CreditosDecimalHelper::fromScalar($pacote['creditos'] ?? 0, 0.0))) ?></td>
+                            <td class="px-6 py-4 text-sm text-gray-700"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay(\App\Core\CreditosDecimalHelper::fromScalar($pacote['creditos'] ?? 0, 0.0))) ?></td>
                             <td class="px-6 py-4 text-sm text-gray-700">R$ <?= number_format(((int) ($pacote['valor_centavos'] ?? 0)) / 100, 2, ',', '.') ?></td>
                             <td class="px-6 py-4 text-sm">
                                 <?php if (!empty($pacote['ativo'])): ?>

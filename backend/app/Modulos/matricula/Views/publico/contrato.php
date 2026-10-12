@@ -2,7 +2,7 @@
 $esc   = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 $fmtDt = function($d) {
     if (!$d || $d === '0000-00-00') return '—';
-    $dt = DateTime::createFromFormat('Y-m-d', substr($d, 0, 10));
+    $dt = \DateTime::createFromFormat('Y-m-d', substr($d, 0, 10));
     return $dt ? $dt->format('d/m/Y') : '—';
 };
 $tipoLabel = ['nova' => 'Matrícula', 'rematricula' => 'Rematrícula', 'transferencia' => 'Transferência'];

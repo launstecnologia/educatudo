@@ -7,11 +7,10 @@
     <?php include __DIR__ . '/../layouts/components/estilos_plataforma.php'; ?>
     <?php 
     // Incluir LayoutHelper
-    require_once __DIR__ . '/../../Core/LayoutHelper.php';
     ?>
     <?php
-        $pwaThemeColor = LayoutHelper::get('pwa_admin_theme_color', LayoutHelper::get('primary_color', '#a855f7'));
-        $pwaIcon192 = LayoutHelper::get('pwa_admin_icon_192', LayoutHelper::getLogo1x1Url());
+        $pwaThemeColor = \App\Core\LayoutHelper::get('pwa_admin_theme_color', \App\Core\LayoutHelper::get('primary_color', '#a855f7'));
+        $pwaIcon192 = \App\Core\LayoutHelper::get('pwa_admin_icon_192', \App\Core\LayoutHelper::getLogo1x1Url());
     ?>
     <link rel="manifest" href="<?= URL ?>/manifest-admin.json">
     <meta name="theme-color" content="<?= htmlspecialchars($pwaThemeColor) ?>">
@@ -19,7 +18,7 @@
         <link rel="apple-touch-icon" href="<?= htmlspecialchars($pwaIcon192) ?>">
     <?php endif; ?>
     <style>
-        <?= LayoutHelper::generateCustomCSS() ?>
+        <?= \App\Core\LayoutHelper::generateCustomCSS() ?>
     </style>
 </head>
 <body class="bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 min-h-screen flex flex-col items-center justify-center p-4 md:p-6">
@@ -28,9 +27,9 @@
         <div class="bg-white py-6 px-4 md:py-8 md:px-6 shadow-xl rounded-2xl border">
             <!-- Logo e Título dentro do card -->
             <div class="text-center mb-6 md:mb-8">
-                <?php if (LayoutHelper::getContextualLogo('login', 'h-12 md:h-16 w-auto mx-auto', 'Logo EducaTudo')): ?>
+                <?php if (\App\Core\LayoutHelper::getContextualLogo('login', 'h-12 md:h-16 w-auto mx-auto', 'Logo EducaTudo')): ?>
                     <div class="mb-3 md:mb-4">
-                        <?= LayoutHelper::getContextualLogo('login', 'h-12 md:h-16 w-auto mx-auto', 'Logo EducaTudo') ?>
+                        <?= \App\Core\LayoutHelper::getContextualLogo('login', 'h-12 md:h-16 w-auto mx-auto', 'Logo EducaTudo') ?>
                     </div>
                 <?php else: ?>
                     <div class="w-12 h-12 md:w-16 md:h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-3 md:mb-4 shadow-lg">

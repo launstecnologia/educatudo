@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Modulos\ExpoColag\Models;
 /**
  * Edição da Expo Colag (evento / feira).
  */
@@ -9,7 +11,7 @@ class ExpoColagEdicao
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     public function findById(int $id): ?array
@@ -90,4 +92,8 @@ class ExpoColagEdicao
             $params
         );
     }
+}
+
+if (!class_exists('ExpoColagEdicao', false) && class_exists(__NAMESPACE__ . '\\ExpoColagEdicao', false)) {
+    class_alias(__NAMESPACE__ . '\\ExpoColagEdicao', 'ExpoColagEdicao');
 }

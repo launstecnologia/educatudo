@@ -37,11 +37,10 @@ if ($voltarRaw !== '' && preg_match('#^/admin/provas(?:\?[A-Za-z0-9_\-.&=%+]*)?$
     $urlVoltarListaProvas = rtrim((string) URL, '/') . $voltarRaw;
 }
 if (!class_exists('PeriodoLetivo')) {
-    require_once __DIR__ . '/../../../../Core/PeriodoLetivo.php';
 }
 $anoEvento = (int) ($bloco['ano_letivo'] ?? date('Y'));
 $bimSel = (int) ($bloco['bimestre'] ?? 0);
-$periodoEvento = PeriodoLetivo::doAno($anoEvento);
+$periodoEvento = \App\Core\PeriodoLetivo::doAno($anoEvento);
 $dataProvaVal = !empty($bloco['data_prova']) ? date('Y-m-d', strtotime((string)$bloco['data_prova'])) : '';
 $horaInicioVal = !empty($bloco['hora_inicio']) ? date('H:i', strtotime((string)$bloco['hora_inicio'])) : '';
 $horaFimVal = !empty($bloco['hora_fim']) ? date('H:i', strtotime((string)$bloco['hora_fim'])) : '';
@@ -159,7 +158,7 @@ $chkLancProf = $isFmtLanc && $cfgNota === 'professor_por_questao';
                         data-periodo-vazio="1"
                         data-periodo-selecionado="<?= $bimSel ?>"
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                    <?= PeriodoLetivo::optionsHtml($anoEvento, $bimSel, ['vazio' => true]) ?>
+                    <?= \App\Core\PeriodoLetivo::optionsHtml($anoEvento, $bimSel, ['vazio' => true]) ?>
                 </select>
             </div>
         </div>

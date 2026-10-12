@@ -1,8 +1,6 @@
 <?php
-require_once __DIR__ . '/AdminPermissionMatrix.php';
-require_once __DIR__ . '/AdminSecretariaAccess.php';
-require_once __DIR__ . '/LayoutHelper.php';
-require_once __DIR__ . '/Logger.php';
+
+namespace App\Core;
 
 /**
  * Diagnóstico consultável: item de menu × FeatureGate × permissão × perfil secretaria.
@@ -115,4 +113,8 @@ class AdminMenuDiagnostico
             );
         }
     }
+}
+
+if (!class_exists('AdminMenuDiagnostico', false) && class_exists(__NAMESPACE__ . '\\AdminMenuDiagnostico', false)) {
+    class_alias(__NAMESPACE__ . '\\AdminMenuDiagnostico', 'AdminMenuDiagnostico');
 }

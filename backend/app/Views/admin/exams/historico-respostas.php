@@ -1,6 +1,5 @@
 <?php
 if (!class_exists('LayoutHelper')) {
-    require_once __DIR__ . '/../../../Core/LayoutHelper.php';
 }
 ?>
 <div class="mb-6">

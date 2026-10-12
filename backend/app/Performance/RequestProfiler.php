@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Performance;
+use App\Core\Database;
 
 /**
  * Orquestrador do profiler de um request. Chamado a partir de 4 pontos já
@@ -219,11 +220,15 @@ final class RequestProfiler
     {
         try {
             if (class_exists('Database', false)) {
-                return \Database::getInstance()->getPdo();
+                return \App\Core\Database::getInstance()->getPdo();
             }
         } catch (\Throwable $e) {
             // Sem conexão disponível — não tenta EXPLAIN.
         }
         return null;
     }
+}
+
+if (!class_exists('RequestProfiler', false) && class_exists(__NAMESPACE__ . '\\RequestProfiler', false)) {
+    class_alias(__NAMESPACE__ . '\\RequestProfiler', 'RequestProfiler');
 }

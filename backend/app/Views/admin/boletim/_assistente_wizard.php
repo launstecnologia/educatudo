@@ -1393,6 +1393,7 @@ $boletimWizardSteps = [
             formulas_blocos: {},
             formulas_materias_blocos: {},
             nomes_blocos: {},
+            escalas_blocos: {},
             nomes_limpos: {},
             bloco_calc: '',
             materia_calc: 0,
@@ -1456,6 +1457,9 @@ $boletimWizardSteps = [
             });
         }
         if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
+        if (!estado.escalas_blocos || typeof estado.escalas_blocos !== 'object' || Array.isArray(estado.escalas_blocos)) {
+            estado.escalas_blocos = {};
+        }
         if (!Array.isArray(estado.blocos_calc)) estado.blocos_calc = [];
         if (estado.bloco_calc == null) estado.bloco_calc = '';
         if (estado.materia_calc == null) estado.materia_calc = 0;
@@ -1904,10 +1908,13 @@ $boletimWizardSteps = [
             if (tituloFoiLimpo(cod)) {
                 var padrao = nomeBlocoCalc(cod);
                 if (padrao) c.nome = padrao;
-                return;
+            } else {
+                var nome = nomeTituloParaCodigo(cod);
+                if (nome) c.nome = nome;
             }
-            var nome = nomeTituloParaCodigo(cod);
-            if (nome) c.nome = nome;
+            if (estado.escalas_blocos && estado.escalas_blocos[cod] != null) {
+                c.escala_max = escalaBlocoCalc(cod);
+            }
         });
         return r;
     }
@@ -1917,6 +1924,38 @@ $boletimWizardSteps = [
         var inp = document.getElementById('bw-formula-bloco-nome-input');
         if (!inp) return;
         aplicarTituloBloco(estado.bloco_calc, String(inp.value || ''));
+        flushEscalaAberta();
+    }
+
+    function escalaBlocoCalc(codigo) {
+        codigo = String(codigo || '');
+        if (!codigo || !estado || !estado.escalas_blocos) return 10;
+        var v = Number(estado.escalas_blocos[codigo]);
+        if (!isFinite(v) || v < 0.01) return 10;
+        return Math.min(999, Math.round(v * 100) / 100);
+    }
+
+    function aplicarEscalaBloco(codigo, escala) {
+        codigo = String(codigo || '');
+        if (!estado || !codigo || codigo === '_semanal' || /^s[1-8]$/.test(codigo)) return;
+        if (!estado.escalas_blocos || typeof estado.escalas_blocos !== 'object' || Array.isArray(estado.escalas_blocos)) {
+            estado.escalas_blocos = {};
+        }
+        var v = Number(escala);
+        if (!isFinite(v) || v < 0.01) v = 10;
+        if (v > 999) v = 999;
+        v = Math.round(v * 100) / 100;
+        estado.escalas_blocos[codigo] = v;
+        var inp = document.getElementById('bw-formula-bloco-escala-input');
+        if (inp && estado.bloco_calc === codigo) inp.value = String(v);
+        marcarEdicaoManual();
+    }
+
+    function flushEscalaAberta() {
+        if (!estado || !estado.bloco_calc) return;
+        var inp = document.getElementById('bw-formula-bloco-escala-input');
+        if (!inp) return;
+        aplicarEscalaBloco(estado.bloco_calc, inp.value);
     }
 
     function nomeBlocoCalc(codigo) {
@@ -2281,6 +2320,8 @@ $boletimWizardSteps = [
                 setTimeout(function () { inp.focus(); inp.select(); }, 30);
             }
         }
+        var inpEsc = document.getElementById('bw-formula-bloco-escala-input');
+        if (inpEsc) inpEsc.value = String(escalaBlocoCalc(codigo));
         renderFormulaCanvas();
         var lista = document.getElementById('bw-colunas-lista');
         if (lista) {
@@ -2490,6 +2531,8 @@ $boletimWizardSteps = [
             estado.nomes_blocos[codigo] = codigo === 'media_bim' ? 'Média Bim'
                 : (codigo === 'media_final' ? 'Resultado Final' : 'Nova média');
         }
+        if (!estado.escalas_blocos || typeof estado.escalas_blocos !== 'object') estado.escalas_blocos = {};
+        if (estado.escalas_blocos[codigo] == null) estado.escalas_blocos[codigo] = 10;
         marcarEdicaoManual();
         previewAtual = null;
         renderRevisarDinamico();
@@ -2587,6 +2630,7 @@ $boletimWizardSteps = [
         var nome = String((inp && inp.value) || '').trim().slice(0, 60);
         if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
         aplicarTituloBloco(estado.bloco_calc, nome);
+        flushEscalaAberta();
         var codigoSalvo = estado.bloco_calc;
         formulaVersao++;
         gravarTokensBlocoAberto();
@@ -2640,6 +2684,7 @@ $boletimWizardSteps = [
         if (estado.formulas_blocos) delete estado.formulas_blocos[codigo];
         if (estado.formulas_materias_blocos) delete estado.formulas_materias_blocos[codigo];
         if (estado.nomes_blocos) delete estado.nomes_blocos[codigo];
+        if (estado.escalas_blocos) delete estado.escalas_blocos[codigo];
         estado.colunas_ordem = (estado.colunas_ordem || []).filter(function (c) { return c !== codigo; });
         if (estado.bloco_calc === codigo) {
             estado.bloco_calc = '';
@@ -2675,6 +2720,14 @@ $boletimWizardSteps = [
             if (e.target.closest('#bw-formula-salvar')) {
                 e.preventDefault();
                 salvarBlocoCalc();
+                return;
+            }
+            var atalhoEsc = e.target.closest('.bw-escala-atalho');
+            if (atalhoEsc) {
+                e.preventDefault();
+                if (!estado || !estado.bloco_calc) return;
+                aplicarEscalaBloco(estado.bloco_calc, atalhoEsc.getAttribute('data-escala'));
+                agendarMontar();
                 return;
             }
             if (e.target.closest('#bw-excecao-add')) {
@@ -2738,7 +2791,7 @@ $boletimWizardSteps = [
             }
         });
         bodyEl.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter' && e.target && e.target.id === 'bw-formula-bloco-nome-input') {
+            if (e.key === 'Enter' && e.target && (e.target.id === 'bw-formula-bloco-nome-input' || e.target.id === 'bw-formula-bloco-escala-input')) {
                 e.preventDefault();
                 salvarBlocoCalc();
                 return;
@@ -2749,9 +2802,20 @@ $boletimWizardSteps = [
             if (btn) btn.click();
         });
         bodyEl.addEventListener('input', function (e) {
-            if (!e.target || e.target.id !== 'bw-formula-bloco-nome-input' || !estado || !estado.bloco_calc) return;
-            if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
-            aplicarTituloBloco(estado.bloco_calc, String(e.target.value || ''));
+            if (!e.target || !estado || !estado.bloco_calc) return;
+            if (e.target.id === 'bw-formula-bloco-nome-input') {
+                if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
+                aplicarTituloBloco(estado.bloco_calc, String(e.target.value || ''));
+                return;
+            }
+            if (e.target.id === 'bw-formula-bloco-escala-input') {
+                aplicarEscalaBloco(estado.bloco_calc, e.target.value);
+            }
+        });
+        bodyEl.addEventListener('change', function (e) {
+            if (!e.target || e.target.id !== 'bw-formula-bloco-escala-input' || !estado || !estado.bloco_calc) return;
+            aplicarEscalaBloco(estado.bloco_calc, e.target.value);
+            agendarMontar();
         });
         bodyEl.addEventListener('dragstart', function (e) {
             var pal = e.target.closest('.bw-pal-chip');
@@ -4745,9 +4809,18 @@ $boletimWizardSteps = [
                 html += '<label class="flex-1 min-w-[12rem]"><span class="text-xs font-medium text-amber-950">Título da coluna</span>';
                 html += '<input id="bw-formula-bloco-nome-input" type="text" maxlength="60" class="mt-1 w-full h-10 border border-amber-200 rounded-lg px-3 text-sm bg-white" value="' + esc(nomeBlocoCalc(estado.bloco_calc || '')) + '" placeholder="Ex.: Média Bim">';
                 html += '</label>';
+                html += '<label class="w-36"><span class="text-xs font-medium text-amber-950">Valor máximo</span>';
+                html += '<input id="bw-formula-bloco-escala-input" type="number" min="0.01" max="999" step="0.01" class="mt-1 w-full h-10 border border-amber-200 rounded-lg px-3 text-sm bg-white" value="' + esc(String(escalaBlocoCalc(estado.bloco_calc || ''))) + '" title="Teto da coluna. Em Resultado Final × 2 use 20.">';
+                html += '</label>';
+                html += '<div class="flex flex-wrap gap-1 pb-0.5">';
+                [10, 20, 100].forEach(function (v) {
+                    html += '<button type="button" class="bw-escala-atalho h-8 px-2 text-xs rounded-md border border-amber-200 text-amber-900 hover:bg-amber-100" data-escala="' + v + '">' + v + '</button>';
+                });
+                html += '</div>';
                 html += '<button type="button" id="bw-formula-salvar" class="h-10 px-4 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700">Salvar bloco</button>';
                 html += '<p id="bw-formula-salva" class="hidden text-sm font-semibold text-emerald-700">Salvo.</p>';
                 html += '</div>';
+                html += '<p class="text-[11px] text-amber-900/80 mb-2">Valor máximo corta o resultado da fórmula. Em <strong>Resultado Final × 2</strong>, use <strong>20</strong> (senão fica 10).</p>';
                 html += '<p id="bw-formula-bloco-titulo" class="text-sm font-semibold text-amber-950">Cálculo de <span id="bw-formula-bloco-nome">' + esc(nomeBlocoCalc(estado.bloco_calc || 'média')) + '</span></p>';
                 html += '<p id="bw-formula-bloco-ajuda" class="text-xs text-amber-900/80 mt-0.5 mb-2">A média é a soma entre parênteses, depois ÷ quantidade. Ex.: (Prova + Trabalho + Participação) ÷ 3.</p>';
                 html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-1.5">Usar no cálculo</p>';
@@ -5525,6 +5598,7 @@ $boletimWizardSteps = [
         if (estado.bloco_calc) gravarTokensBlocoAberto();
         var versaoEnvio = formulaVersao;
         var nomesLocal = JSON.parse(JSON.stringify(estado.nomes_blocos || {}));
+        var escalasLocal = JSON.parse(JSON.stringify(estado.escalas_blocos || {}));
         var formulaLocal = JSON.parse(JSON.stringify(estado.formulas_blocos || {}));
         var excecoesLocal = JSON.parse(JSON.stringify(estado.formulas_materias_blocos || {}));
         var tokensLocal = (estado.formula_tokens || []).slice();
@@ -5561,6 +5635,24 @@ $boletimWizardSteps = [
                     if (nomeVivo) nomesAgora[cod] = nomeVivo;
                 });
                 remoto.nomes_blocos = nomesAgora;
+                var escalasAgora = {};
+                var fonteEscalas = (estado && estado.escalas_blocos && typeof estado.escalas_blocos === 'object' && !Array.isArray(estado.escalas_blocos))
+                    ? estado.escalas_blocos
+                    : (escalasLocal || {});
+                Object.keys(fonteEscalas).forEach(function (cod) {
+                    if (!cod || cod === '_semanal' || /^s[1-8]$/.test(cod)) return;
+                    var escV = Number(fonteEscalas[cod]);
+                    if (!isFinite(escV) || escV < 0.01) return;
+                    escalasAgora[cod] = Math.min(999, Math.round(escV * 100) / 100);
+                });
+                // Se o remoto trouxe escala reidratada e o local não tem, mantém a remota.
+                Object.keys(remoto.escalas_blocos || {}).forEach(function (cod) {
+                    if (escalasAgora[cod] != null) return;
+                    var escR = Number((remoto.escalas_blocos || {})[cod]);
+                    if (!isFinite(escR) || escR < 0.01) return;
+                    escalasAgora[cod] = Math.min(999, Math.round(escR * 100) / 100);
+                });
+                remoto.escalas_blocos = escalasAgora;
                 var limposAgora = {};
                 var fonteLimpos = (estado && estado.nomes_limpos && typeof estado.nomes_limpos === 'object' && !Array.isArray(estado.nomes_limpos))
                     ? estado.nomes_limpos : {};
@@ -5861,6 +5953,7 @@ $boletimWizardSteps = [
             var nomeAv = String((inpNome && inpNome.value) || '').trim().slice(0, 60);
             if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
             if (nomeAv) estado.nomes_blocos[estado.bloco_calc] = nomeAv;
+            flushEscalaAberta();
             gravarTokensBlocoAberto();
         }
         var next = vis[Math.min(i + 1, vis.length - 1)].id;

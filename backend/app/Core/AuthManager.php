@@ -1,9 +1,13 @@
 <?php
+
+namespace App\Core;
 /**
  * EducaTudo - Gerenciador de Autenticação
  * Gerencia autenticação para diferentes tipos de usuários usando suas tabelas específicas
  */
 
+
+use App\Helpers\StudentFormHelper;
 class AuthManager
 {
     private $db;
@@ -20,7 +24,7 @@ class AuthManager
     /**
      * Retorna limites de tentativas e bloqueio por tipo.
      * Aluno: por nickname (5 tentativas, 5 min) para não afetar outros no mesmo IP da escola.
-     * Outros: MAX_LOGIN_ATTEMPTS e LOCKOUT_DURATION do .env ou config.
+     * Outros: \MAX_LOGIN_ATTEMPTS e LOCKOUT_DURATION do .env ou config.
      */
     private function getSecurityForType($tipo)
     {
@@ -80,7 +84,7 @@ class AuthManager
             $allowUntil = max(1, $security['max_login_attempts'] - 1);
             if ($count >= $allowUntil) {
                 $minutos = max(1, (int) ceil($security['lockout_duration'] / 60));
-                throw new Exception("Muitas tentativas de login. Tente novamente em {$minutos} minutos.");
+                throw new \Exception("Muitas tentativas de login. Tente novamente em {$minutos} minutos.");
             }
 
             $user = null;
@@ -103,11 +107,11 @@ class AuthManager
                     $user = $this->authenticateMonitor($login, $senha);
                     break;
                 default:
-                    throw new Exception('Tipo de usuário inválido');
+                    throw new \Exception('Tipo de usuário inválido');
             }
             
             if (!$user) {
-                throw new Exception('Credenciais inválidas');
+                throw new \Exception('Credenciais inválidas');
             }
             
             // Sempre criar sessão (inclusive senha padrão 123456) para poder redirecionar à tela de alterar senha
@@ -115,7 +119,7 @@ class AuthManager
             
             return $user;
             
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             throw $e;
         }
     }
@@ -167,17 +171,16 @@ class AuthManager
             return null;
         }
         if (!empty($aluno['primeiro_acesso'])) {
-            throw new Exception('Primeiro acesso pendente. Use o fluxo de primeiro acesso.');
+            throw new \Exception('Primeiro acesso pendente. Use o fluxo de primeiro acesso.');
         }
         if (empty($aluno['senha_hash'])) {
-            throw new Exception('Acesso não criado. Use o fluxo de primeiro acesso.');
+            throw new \Exception('Acesso não criado. Use o fluxo de primeiro acesso.');
         }
         if (!password_verify($senha, $aluno['senha_hash'])) {
             $this->recordLoginAttempt($nickname, false, 'aluno', 'senha_invalida');
             return null;
         }
 
-        require_once __DIR__ . '/../Helpers/StudentFormHelper.php';
         return [
             'id' => $aluno['id'],
             'nome' => StudentFormHelper::nomeExibicao($aluno),
@@ -326,7 +329,6 @@ class AuthManager
                 $_SESSION['serie'] = $user['serie'];
                 $this->registrarLoginAluno($user['id']);
                 if (!class_exists('ContextoAluno')) {
-                    require_once __DIR__ . '/ContextoAluno.php';
                 }
                 ContextoAluno::gravarSessaoNoLogin($this->db, (int) $user['id']);
                 break;
@@ -376,7 +378,7 @@ class AuthManager
                     'user_agent' => $user_agent
                 ]
             );
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
         }
     }
     
@@ -451,7 +453,6 @@ class AuthManager
         }
 
         if (!class_exists('ContextoAluno')) {
-            require_once __DIR__ . '/ContextoAluno.php';
         }
         ContextoAluno::limparSessao();
         
@@ -512,7 +513,7 @@ class AuthManager
                     'aluno_id' => $aluno_id
                 ]
             );
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
         }
     }
     
@@ -574,7 +575,7 @@ class AuthManager
             $cached[$cacheKey] = $data;
             $lastFetch[$cacheKey] = $now;
             return $data;
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return [];
         }
     }
@@ -655,7 +656,7 @@ class AuthManager
                 ]
             );
             return true;
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return false;
         }
     }
@@ -691,7 +692,7 @@ class AuthManager
             }
             $result = $this->db->fetch($sql, $params);
             return (int) ($result['attempts'] ?? 0);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return 999;
         }
     }
@@ -713,7 +714,7 @@ class AuthManager
             try {
                 $cols = $this->db->fetchAll("SHOW COLUMNS FROM tentativas_login LIKE 'tipo'");
                 $has = !empty($cols);
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 $has = false;
             }
         }
@@ -735,7 +736,7 @@ class AuthManager
             $count = $this->getFailedAttemptsCount($login, $tipo, $lockoutDuration);
             if ($count >= $allowUntil) {
                 $minutos = max(1, (int) ceil($lockoutDuration / 60));
-                throw new Exception("Muitas tentativas de login. Tente novamente em {$minutos} minutos.");
+                throw new \Exception("Muitas tentativas de login. Tente novamente em {$minutos} minutos.");
             }
         }
 
@@ -758,10 +759,14 @@ class AuthManager
                     ['email' => $login, 'ip' => $ip, 'success' => $success ? 1 : 0]
                 );
             }
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             if (strpos($e->getMessage(), 'Muitas tentativas') !== false) {
                 throw $e;
             }
         }
     }
+}
+
+if (!class_exists('AuthManager', false) && class_exists(__NAMESPACE__ . '\\AuthManager', false)) {
+    class_alias(__NAMESPACE__ . '\\AuthManager', 'AuthManager');
 }

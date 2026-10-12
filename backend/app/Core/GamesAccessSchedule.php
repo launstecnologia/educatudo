@@ -1,6 +1,7 @@
 <?php
 
-require_once __DIR__ . '/LayoutHelper.php';
+namespace App\Core;
+
 
 /**
  * Horário de acesso ao Games (aluno): fim de semana liberado;
@@ -33,16 +34,16 @@ final class GamesAccessSchedule
         return 'Jogos liberados de segunda a sexta das 17h às 7h (horário do dia seguinte). Fins de semana liberados o dia todo.';
     }
 
-    public static function isAccessAllowedNow(?DateTimeInterface $now = null): bool
+    public static function isAccessAllowedNow(?\DateTimeInterface $now = null): bool
     {
         if (self::isAlwaysUnrestrictedEnabled()) {
             return true;
         }
 
-        $tz = new DateTimeZone(self::timezone());
-        $d = $now instanceof DateTimeInterface
-            ? (new DateTimeImmutable('@' . $now->getTimestamp()))->setTimezone($tz)
-            : new DateTimeImmutable('now', $tz);
+        $tz = new \DateTimeZone(self::timezone());
+        $d = $now instanceof \DateTimeInterface
+            ? (new \DateTimeImmutable('@' . $now->getTimestamp()))->setTimezone($tz)
+            : new \DateTimeImmutable('now', $tz);
 
         $dow = (int) $d->format('N');
         $h = (int) $d->format('G');
@@ -88,4 +89,8 @@ final class GamesAccessSchedule
 
         return self::linkLooksLikeGames($link) && !self::isAccessAllowedNow();
     }
+}
+
+if (!class_exists('GamesAccessSchedule', false) && class_exists(__NAMESPACE__ . '\\GamesAccessSchedule', false)) {
+    class_alias(__NAMESPACE__ . '\\GamesAccessSchedule', 'GamesAccessSchedule');
 }

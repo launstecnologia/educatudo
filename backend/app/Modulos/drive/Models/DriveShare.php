@@ -1,8 +1,9 @@
 <?php
+
+namespace App\Modulos\Drive\Models;
 /**
  * Drive EducaTudo - Compartilhamentos
  */
-require_once __DIR__ . '/../../../Core/Database.php';
 
 class DriveShare
 {
@@ -10,7 +11,7 @@ class DriveShare
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     public function add($itemId, $sharedWithId, $sharedWithType, $permission = 'view')
@@ -91,4 +92,8 @@ class DriveShare
         $p = $this->getPermission($itemId, $userId, $userType);
         return $p === 'owner' || $p === 'edit';
     }
+}
+
+if (!class_exists('DriveShare', false) && class_exists(__NAMESPACE__ . '\\DriveShare', false)) {
+    class_alias(__NAMESPACE__ . '\\DriveShare', 'DriveShare');
 }

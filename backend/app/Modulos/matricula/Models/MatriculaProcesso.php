@@ -2,8 +2,7 @@
 
 namespace App\Modulos\Matricula\Models;
 
-use Database;
-
+use App\Core\Database;
 /**
  * Processo de matrícula/rematrícula (workflow digital).
  * Tabela: matricula_processos — distinta de `matricula` (vínculo acadêmico).
@@ -34,7 +33,7 @@ class MatriculaProcesso
     {
         static $cache = [];
         $tk = class_exists('TenantResolver', false)
-            ? \TenantResolver::workerCacheKey()
+            ? \App\Core\TenantResolver::workerCacheKey()
             : (defined('TENANT_ID') ? ('t' . TENANT_ID) : 'no_tenant');
         $key = $tk . ':' . $coluna;
         if (array_key_exists($key, $cache)) {
@@ -73,7 +72,7 @@ class MatriculaProcesso
     {
         static $cache = [];
         $tk = class_exists('TenantResolver', false)
-            ? \TenantResolver::workerCacheKey()
+            ? \App\Core\TenantResolver::workerCacheKey()
             : (defined('TENANT_ID') ? ('t' . TENANT_ID) : 'no_tenant');
         $key = $tk . ':' . $nome;
         if (array_key_exists($key, $cache)) {
@@ -425,7 +424,7 @@ class MatriculaProcesso
     {
         static $cache = [];
         $tk = class_exists('TenantResolver', false)
-            ? \TenantResolver::workerCacheKey()
+            ? \App\Core\TenantResolver::workerCacheKey()
             : (defined('TENANT_ID') ? ('t' . TENANT_ID) : 'no_tenant');
         $key = $tk . ':mpr:' . $coluna;
         if (array_key_exists($key, $cache)) {
@@ -536,4 +535,8 @@ class MatriculaProcesso
         );
         return $doc;
     }
+}
+
+if (!class_exists('MatriculaProcesso', false) && class_exists(__NAMESPACE__ . '\\MatriculaProcesso', false)) {
+    class_alias(__NAMESPACE__ . '\\MatriculaProcesso', 'MatriculaProcesso');
 }

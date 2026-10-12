@@ -187,11 +187,8 @@ $totalAltErros = (int) ($totaisAlt['erros'] ?? 0);
                 <label for="filtro_bimestre" class="block text-sm font-medium text-gray-700 mb-1" data-periodo-label>Bimestre</label>
                 <select id="filtro_bimestre" name="bimestre" data-periodo-letivo-select data-periodo-todos="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
                     <?php
-                    if (!class_exists('PeriodoLetivo')) {
-                        require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
-                    }
                     $anoFiltroJor = $filtroAnoLetivo > 0 ? $filtroAnoLetivo : (int) date('Y');
-                    echo PeriodoLetivo::optionsHtml($anoFiltroJor, $filtroBimestre, ['todos' => true]);
+                    echo \App\Core\PeriodoLetivo::optionsHtml($anoFiltroJor, $filtroBimestre, ['todos' => true]);
                     ?>
                 </select>
             </div>

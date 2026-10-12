@@ -44,7 +44,7 @@ final class QueryCollector
         self::$queries[] = [
             'seq' => $seq,
             'sql' => self::sanitizeSql($sql),
-            'fingerprint' => \PerfLogger::fingerprintSql($sql),
+            'fingerprint' => \App\Core\PerfLogger::fingerprintSql($sql),
             'params_count' => count($params),
             // Nunca guarda o valor cru dos parâmetros no log final — só metadados
             // (evita PII em disco). Os valores reais ficam só em $paramsBySeq,
@@ -113,4 +113,8 @@ final class QueryCollector
         $sql = preg_replace('/\s+/', ' ', trim($sql)) ?? trim($sql);
         return strlen($sql) > 1500 ? substr($sql, 0, 1500) . '…' : $sql;
     }
+}
+
+if (!class_exists('QueryCollector', false) && class_exists(__NAMESPACE__ . '\\QueryCollector', false)) {
+    class_alias(__NAMESPACE__ . '\\QueryCollector', 'QueryCollector');
 }

@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Modulos\ExpoColag\Models;
 /**
  * Inscrição de aluno em projeto da Expo Colag.
  */
@@ -11,7 +13,7 @@ class ExpoColagInscricao
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     public function findById(int $id): ?array
@@ -240,4 +242,8 @@ class ExpoColagInscricao
         ) ?: [];
         return array_map(static fn($r) => (int) $r['projeto_id'], $rows);
     }
+}
+
+if (!class_exists('ExpoColagInscricao', false) && class_exists(__NAMESPACE__ . '\\ExpoColagInscricao', false)) {
+    class_alias(__NAMESPACE__ . '\\ExpoColagInscricao', 'ExpoColagInscricao');
 }

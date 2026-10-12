@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../../Models/Education/ResultadoAcademico.php';
 $anos = is_array($anos ?? null) ? $anos : [];
 $turmas = is_array($turmas ?? null) ? $turmas : [];
 $anoLetivo = (int) ($ano_letivo ?? date('Y'));
@@ -35,7 +34,7 @@ ob_start();
     <div>
         <label for="filtro_periodo_tipo" class="block text-sm font-medium text-gray-700 mb-1.5">Período</label>
         <select id="filtro_periodo_tipo" name="periodo_tipo" class="<?= $selectCls ?>">
-            <?php foreach (ResultadoAcademico::PERIODO_TIPOS as $cod => $lab): ?>
+            <?php foreach (\App\Models\Education\ResultadoAcademico::PERIODO_TIPOS as $cod => $lab): ?>
                 <option value="<?= htmlspecialchars($cod) ?>" <?= $periodoTipo === $cod ? 'selected' : '' ?>><?= htmlspecialchars($lab) ?></option>
             <?php endforeach; ?>
         </select>

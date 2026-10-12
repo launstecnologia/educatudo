@@ -1,6 +1,6 @@
 <?php
-$iaName = LayoutHelper::getIaName();
-$iaAvatarUrl = LayoutHelper::getIaAvatarUrl();
+$iaName = \App\Core\LayoutHelper::getIaName();
+$iaAvatarUrl = \App\Core\LayoutHelper::getIaAvatarUrl();
 $iaAvatarTag = $iaAvatarUrl !== ''
     ? '<img src="' . htmlspecialchars($iaAvatarUrl) . '" alt="' . htmlspecialchars($iaName) . '" class="inline-block w-8 h-8 rounded-full object-cover align-middle -mt-1">'
     : '🤖';

@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Helpers;
 /**
  * Helper para processar markdown de imagens
  */
@@ -54,3 +56,7 @@ class MarkdownHelper
     }
 }
 
+
+if (!class_exists('MarkdownHelper', false) && class_exists(__NAMESPACE__ . '\\MarkdownHelper', false)) {
+    class_alias(__NAMESPACE__ . '\\MarkdownHelper', 'MarkdownHelper');
+}

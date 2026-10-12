@@ -2,10 +2,6 @@
 
 namespace App\Modulos\CensoEscolar\Services;
 
-require_once __DIR__ . '/../Models/CensoEdicao.php';
-require_once __DIR__ . '/CensoLayoutService.php';
-require_once __DIR__ . '/CensoEtapaDePara.php';
-require_once __DIR__ . '/CensoNormalizador.php';
 
 use App\Modulos\CensoEscolar\Models\CensoEdicao;
 
@@ -294,4 +290,8 @@ class CensoValidacaoService
         $decoded = json_decode($raw, true);
         return is_array($decoded) ? $decoded : [];
     }
+}
+
+if (!class_exists('CensoValidacaoService', false) && class_exists(__NAMESPACE__ . '\\CensoValidacaoService', false)) {
+    class_alias(__NAMESPACE__ . '\\CensoValidacaoService', 'CensoValidacaoService');
 }

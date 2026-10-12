@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Services/ClassDiaryService.php';
 
 use App\Modulos\Diario\Services\ClassDiaryService;
 

@@ -1,18 +1,17 @@
 <?php
+
+namespace App\Modulos\Boletins\Controllers;
+
+use App\Modulos\Boletins\Services\BoletimCadastroService;
+use Throwable;
+
 /**
  * Admin — cadastro de boletins (oficial / extra).
  */
 
-require_once __DIR__ . '/../../../Controllers/Admin/AdminBaseController.php';
-require_once __DIR__ . '/../Services/BoletimCadastroService.php';
-require_once __DIR__ . '/../../../Models/System/BoletimConfig.php';
-require_once __DIR__ . '/../../../Models/Education/ComponenteCurricular.php';
-require_once __DIR__ . '/../../../Helpers/AdminPasswordHelper.php';
 
-use App\Modulos\Boletins\Services\BoletimCadastroService;
-
-if (!class_exists('BoletimCadastroAdminController')) {
-class BoletimCadastroAdminController extends AdminBaseController
+if (!class_exists(__NAMESPACE__ . '\\BoletimCadastroAdminController', false)) {
+class BoletimCadastroAdminController extends \App\Controllers\Admin\AdminBaseController
 {
     /** @var BoletimCadastroService */
     private $service;
@@ -29,7 +28,7 @@ class BoletimCadastroAdminController extends AdminBaseController
             return;
         }
         $flash = $this->getFlashMessage();
-        $cfg = new BoletimConfig();
+        $cfg = new \App\Models\System\BoletimConfig();
         $cfg->ensureSchema();
         $itens = $this->service->model()->listar();
         $qtdNotasPorBoletim = $cfg->contarEventosNotasPorBoletim();
@@ -165,7 +164,7 @@ class BoletimCadastroAdminController extends AdminBaseController
             $this->redirect('/admin/boletins');
             return;
         }
-        if (!is_array($user) || !AdminPasswordHelper::verifyAdminPassword($this->db, $user, $senha)) {
+        if (!is_array($user) || !\App\Helpers\AdminPasswordHelper::verifyAdminPassword($this->db, $user, $senha)) {
             $this->setFlashMessage('Senha incorreta.', 'error');
             $this->redirect('/admin/boletins');
             return;
@@ -188,7 +187,6 @@ class BoletimCadastroAdminController extends AdminBaseController
         if (!$this->enforceAdminPermissionKey('configuracao_boletim', 'cadastrar', false)) {
             return;
         }
-        require_once __DIR__ . '/../Services/GeradorAvaliacoesAnualService.php';
         $id = (int) $id;
         $gerador = new \App\Modulos\Boletins\Services\GeradorAvaliacoesAnualService();
         $prev = $gerador->previsualizar($id, (int) ($_GET['ano_letivo'] ?? 0));
@@ -240,7 +238,6 @@ class BoletimCadastroAdminController extends AdminBaseController
             $this->redirect('/admin/boletins/' . $id . '/gerar-avaliacoes');
             return;
         }
-        require_once __DIR__ . '/../Services/GeradorAvaliacoesAnualService.php';
         $gerador = new \App\Modulos\Boletins\Services\GeradorAvaliacoesAnualService();
         $modelosPorBimestre = [];
         $rawModelos = $_POST['modelo_por_bimestre'] ?? [];
@@ -363,7 +360,7 @@ class BoletimCadastroAdminController extends AdminBaseController
             return;
         }
 
-        $cfg = new BoletimConfig();
+        $cfg = new \App\Models\System\BoletimConfig();
         $cfg->ensureSchema();
         $eventos = $cfg->listarEventosNotasDoBoletim($id);
         $regraId = isset($_GET['regra_id']) ? (int) $_GET['regra_id'] : 0;
@@ -412,8 +409,7 @@ class BoletimCadastroAdminController extends AdminBaseController
                     }
                 }
                 if ($permitido) {
-                    require_once __DIR__ . '/../../../Controllers/Admin/BoletimConfigController.php';
-                    $motor = new BoletimConfigController(true);
+                    $motor = new \App\Controllers\Admin\BoletimConfigController(true);
                     // Igual ao Evento de Notas: Demonstrativo com mãe + filhas (ex.: Língua Portuguesa).
                     $simulacao = $motor->simularRegraAluno(
                         $regra,
@@ -488,7 +484,7 @@ class BoletimCadastroAdminController extends AdminBaseController
      * @param array<string,mixed> $regra
      * @return list<array<string,mixed>>
      */
-    private function alunosVinculadosRegra(BoletimConfig $cfg, array $regra): array
+    private function alunosVinculadosRegra(\App\Models\System\BoletimConfig $cfg, array $regra): array
     {
         $turmasIds = $this->idsJsonCampo($regra['turmas_ids'] ?? null);
         if ($turmasIds !== []) {
@@ -546,7 +542,7 @@ class BoletimCadastroAdminController extends AdminBaseController
      */
     private function renderFormulario(?array $item): void
     {
-        $cfg = new BoletimConfig();
+        $cfg = new \App\Models\System\BoletimConfig();
         $cfg->ensureSchema();
         $flash = $this->getFlashMessage();
         $this->viewWithLayout('admin', 'admin/boletins/form', [
@@ -579,7 +575,7 @@ class BoletimCadastroAdminController extends AdminBaseController
     {
         $out = [];
         try {
-            foreach ((new ComponenteCurricular())->getOficiaisParaMatriz(true) as $c) {
+            foreach ((new \App\Models\Education\ComponenteCurricular())->getOficiaisParaMatriz(true) as $c) {
                 $id = (int) ($c['id'] ?? 0);
                 if ($id <= 0) {
                     continue;
@@ -610,4 +606,8 @@ class BoletimCadastroAdminController extends AdminBaseController
         return $out;
     }
 }
+}
+
+if (!class_exists('BoletimCadastroAdminController', false) && class_exists(__NAMESPACE__ . '\\BoletimCadastroAdminController', false)) {
+    class_alias(__NAMESPACE__ . '\\BoletimCadastroAdminController', 'BoletimCadastroAdminController');
 }

@@ -5,7 +5,7 @@ $mat = is_array($dados['matricula'] ?? null) ? $dados['matricula'] : [];
 $responsaveis = is_array($dados['responsaveis'] ?? null) ? $dados['responsaveis'] : [];
 $aut = is_array($dados['aut'] ?? null) ? $dados['aut'] : [];
 $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
-$nome = \StudentFormHelper::nomeOficialLinha($aluno);
+$nome = \App\Helpers\StudentFormHelper::nomeOficialLinha($aluno);
 $turma = trim((string) ($mat['turma_nome'] ?? $aluno['turma_nome'] ?? ''));
 $respNome = trim((string) ($responsaveis[0]['nome'] ?? ''));
 $finalidade = trim((string) ($aut['finalidade'] ?? ''));

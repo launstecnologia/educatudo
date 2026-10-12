@@ -1,7 +1,4 @@
 <?php
-require_once __DIR__ . '/../../../../Models/Education/ResultadoAcademico.php';
-require_once __DIR__ . '/../../Services/FechamentoMaquinaEstados.php';
-require_once __DIR__ . '/../../Services/FechamentoGates.php';
 
 $preview = is_array($preview ?? null) ? $preview : [];
 $turma = is_array($preview['turma'] ?? null) ? $preview['turma'] : [];
@@ -18,10 +15,10 @@ $periodoNumero = (int) ($periodo_numero ?? ($periodo['numero'] ?? 0));
 $turmaId = (int) ($turma['id'] ?? 0);
 $qs = http_build_query(['ano_letivo' => $anoLetivo, 'periodo_tipo' => $periodoTipo, 'periodo_numero' => $periodoNumero]);
 $csrf_token = $csrf_token ?? '';
-$statusPeriodo = FechamentoMaquinaEstados::normalizar((string) ($fechamento['status'] ?? FechamentoMaquinaEstados::ABERTO));
-$travado = FechamentoMaquinaEstados::estaTravado($statusPeriodo);
-$errosIniciar = FechamentoGates::errosIniciarFechamento($resumo);
-$podeIniciar = $statusPeriodo === FechamentoMaquinaEstados::ABERTO && $errosIniciar === [];
+$statusPeriodo = \App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::normalizar((string) ($fechamento['status'] ?? \App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::ABERTO));
+$travado = \App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::estaTravado($statusPeriodo);
+$errosIniciar = \App\Modulos\Fechamento\Services\FechamentoGates::errosIniciarFechamento($resumo);
+$podeIniciar = $statusPeriodo === \App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::ABERTO && $errosIniciar === [];
 $motivoIniciar = $errosIniciar[0] ?? '';
 
 $page_header_title = 'Fechamento · ' . (string) ($turma['nome'] ?? 'Turma');
@@ -43,12 +40,12 @@ $filtros_action = URL . '/admin/fechamento/turma/' . $turmaId;
 include __DIR__ . '/../../../../Views/admin/resultados-finais/_filtros.php';
 
 $statusBadge = static function (string $status): string {
-    return match (FechamentoMaquinaEstados::normalizar($status)) {
-        FechamentoMaquinaEstados::HOMOLOGADO, 'HOMOLOGADO' => 'bg-green-100 text-green-700',
+    return match (\App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::normalizar($status)) {
+        \App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::HOMOLOGADO, 'HOMOLOGADO' => 'bg-green-100 text-green-700',
         'homologado' => 'bg-green-100 text-green-700',
-        FechamentoMaquinaEstados::RETIFICADO => 'bg-purple-100 text-purple-700',
-        FechamentoMaquinaEstados::EM_FECHAMENTO => 'bg-sky-100 text-sky-800',
-        FechamentoMaquinaEstados::EM_RECUPERACAO => 'bg-amber-100 text-amber-800',
+        \App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::RETIFICADO => 'bg-purple-100 text-purple-700',
+        \App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::EM_FECHAMENTO => 'bg-sky-100 text-sky-800',
+        \App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::EM_RECUPERACAO => 'bg-amber-100 text-amber-800',
         default => 'bg-gray-100 text-gray-600',
     };
 };
@@ -58,16 +55,16 @@ $statusBadge = static function (string $status): string {
     <div>
         <div class="text-xs text-gray-500 uppercase tracking-wide">Estado do período</div>
         <span class="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium <?= $statusBadge($statusPeriodo) ?>">
-            <?= htmlspecialchars(FechamentoMaquinaEstados::rotulo($statusPeriodo)) ?>
+            <?= htmlspecialchars(\App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::rotulo($statusPeriodo)) ?>
         </span>
         <?php if (!empty($fechamento['periodo_ref'])): ?>
             <span class="ml-2 text-xs text-gray-500"><?= htmlspecialchars((string) $fechamento['periodo_ref']) ?></span>
         <?php endif; ?>
         <?php if ($travado): ?>
             <p class="text-xs text-amber-800 mt-2">Notas, faltas e boletim travados. Para alterar, retifique com justificativa.</p>
-        <?php elseif ($statusPeriodo === FechamentoMaquinaEstados::ABERTO && $motivoIniciar !== ''): ?>
+        <?php elseif ($statusPeriodo === \App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::ABERTO && $motivoIniciar !== ''): ?>
             <p class="text-xs text-amber-800 mt-2">Conferir a turma não inicia o fechamento. <?= htmlspecialchars($motivoIniciar) ?></p>
-        <?php elseif ($statusPeriodo === FechamentoMaquinaEstados::EM_FECHAMENTO && $motivoIniciar !== ''): ?>
+        <?php elseif ($statusPeriodo === \App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::EM_FECHAMENTO && $motivoIniciar !== ''): ?>
             <p class="text-xs text-amber-800 mt-2"><?= htmlspecialchars($motivoIniciar) ?> Use Voltar para aberto se o fechamento foi iniciado com pendência.</p>
         <?php endif; ?>
     </div>
@@ -80,10 +77,10 @@ $statusBadge = static function (string $status): string {
             <input type="hidden" name="periodo_numero" value="<?= $periodoNumero ?>">
             <button type="submit" class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Iniciar fechamento</button>
         </form>
-        <?php elseif ($statusPeriodo === FechamentoMaquinaEstados::ABERTO): ?>
+        <?php elseif ($statusPeriodo === \App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::ABERTO): ?>
         <span class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed" title="<?= htmlspecialchars($motivoIniciar, ENT_QUOTES, 'UTF-8') ?>">Iniciar fechamento</span>
         <?php endif; ?>
-        <?php if ($statusPeriodo === FechamentoMaquinaEstados::EM_FECHAMENTO): ?>
+        <?php if ($statusPeriodo === \App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::EM_FECHAMENTO): ?>
         <form method="POST" action="<?= URL ?>/admin/fechamento/turma/<?= $turmaId ?>/reabrir">
             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
             <input type="hidden" name="ano_letivo" value="<?= $anoLetivo ?>">
@@ -214,7 +211,7 @@ $fechHomologarQs = http_build_query([
                         <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars((string) ($linha['rotulo'] ?? '—')) ?></div>
                         <?php if (!$travado): ?>
                         <span class="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium <?= $statusAluno === 'homologado' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600' ?>">
-                            <?= htmlspecialchars(ResultadoAcademico::STATUS[$statusAluno] ?? $statusAluno) ?>
+                            <?= htmlspecialchars(\App\Models\Education\ResultadoAcademico::STATUS[$statusAluno] ?? $statusAluno) ?>
                         </span>
                         <?php endif; ?>
                     </td>
@@ -303,9 +300,9 @@ $fechHomologarQs = http_build_query([
         $elegiveisTurma = (int) ($resumo['elegiveis'] ?? 0);
         $podeHomologarTurma = !$travado && $chamadasTurma === 0 && $elegiveisTurma > 0;
         $motivoHomologarTurma = $chamadasTurma > 0
-            ? FechamentoGates::mensagemChamadasPendentes($chamadasTurma)
+            ? \App\Modulos\Fechamento\Services\FechamentoGates::mensagemChamadasPendentes($chamadasTurma)
             : ($recTurma > 0 && $elegiveisTurma === 0
-                ? FechamentoGates::mensagemAlunosEmRecuperacao($recTurma)
+                ? \App\Modulos\Fechamento\Services\FechamentoGates::mensagemAlunosEmRecuperacao($recTurma)
                 : ($pendTurma > 0 && $elegiveisTurma === 0
                     ? ('Há ' . $pendTurma . ' pendência(s) crítica(s). Resolva antes de homologar.')
                     : 'Nenhum aluno elegível nesta turma.'));
@@ -353,7 +350,7 @@ $fechHomologarQs = http_build_query([
                 <?php foreach ($especiais as $esp): ?>
                 <tr>
                     <td class="px-4 py-2"><?= htmlspecialchars((string) ($esp['aluno_nome'] ?? '')) ?></td>
-                    <td class="px-4 py-2"><?= htmlspecialchars(ResultadoAcademico::ESPECIAIS[$esp['tipo'] ?? ''] ?? (string) ($esp['tipo'] ?? '')) ?></td>
+                    <td class="px-4 py-2"><?= htmlspecialchars(\App\Models\Education\ResultadoAcademico::ESPECIAIS[$esp['tipo'] ?? ''] ?? (string) ($esp['tipo'] ?? '')) ?></td>
                     <td class="px-4 py-2"><?= htmlspecialchars((string) ($esp['materia_nome'] ?? 'Geral')) ?></td>
                     <td class="px-4 py-2 text-gray-500"><?= htmlspecialchars((string) ($esp['observacao'] ?? '')) ?></td>
                     <?php if (!$travado): ?>
@@ -392,7 +389,7 @@ $fechHomologarQs = http_build_query([
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
             <select name="tipo" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
-                <?php foreach (ResultadoAcademico::ESPECIAIS as $cod => $lab): ?>
+                <?php foreach (\App\Models\Education\ResultadoAcademico::ESPECIAIS as $cod => $lab): ?>
                     <option value="<?= htmlspecialchars($cod) ?>"><?= htmlspecialchars($lab) ?></option>
                 <?php endforeach; ?>
             </select>

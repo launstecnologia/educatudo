@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Models/Ocorrencia.php';
 
 use App\Modulos\Ocorrencias\Models\Ocorrencia;
 
@@ -75,7 +74,7 @@ if ($aula && !empty($aula['data_aula'])) {
                 <label class="block text-sm font-medium text-gray-700 mb-2">Gravidade <span class="text-red-500">*</span></label>
                 <select name="nivel_gravidade" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                     <option value="">Selecione</option>
-                    <?php foreach (Ocorrencia::GRAVIDADES as $valor => $rotulo): ?>
+                    <?php foreach (\App\Modulos\Ocorrencias\Models\Ocorrencia::GRAVIDADES as $valor => $rotulo): ?>
                         <option value="<?= htmlspecialchars($valor) ?>"><?= htmlspecialchars($rotulo) ?></option>
                     <?php endforeach; ?>
                 </select>

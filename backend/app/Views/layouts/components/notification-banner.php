@@ -20,8 +20,7 @@ function normalizarUrlNotificacao($url) {
 // Buscar notificações não lidas para o modal
 $notificacoesModal = [];
 if ($usuario && $notificacoesNaoLidas > 0) {
-    require_once __DIR__ . '/../../../Models/Notifications/Notification.php';
-    $notificacaoModel = new Notification();
+    $notificacaoModel = new \App\Models\Notifications\Notification();
     
     // Buscar apenas notificações não lidas
     $tipoDestinatario = $notificacaoModel->mapearTipoUsuario($tipoUsuario);
@@ -51,8 +50,7 @@ if ($usuario && $notificacoesNaoLidas > 0) {
     $params = [$tipoDestinatario, $usuario['id'], $usuario['id']];
     
     // Usar Database diretamente em vez de propriedade privada
-    require_once __DIR__ . '/../../../Core/Database.php';
-    $db = Database::getInstance();
+    $db = \App\Core\Database::getInstance();
     $notificacoesModal = $db->fetchAll($sql, $params);
 }
 ?>

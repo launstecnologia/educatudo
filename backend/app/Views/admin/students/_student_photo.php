@@ -18,9 +18,8 @@ $canUpload = false;
 if ($mode !== 'readonly') {
     if (!empty($admin_permissions)) {
         if (!class_exists('AdminPermissionMatrix')) {
-            require_once __DIR__ . '/../../../Core/AdminPermissionMatrix.php';
         }
-        $canUpload = AdminPermissionMatrix::can($admin_permissions, 'alunos', 'alterar');
+        $canUpload = \App\Core\AdminPermissionMatrix::can($admin_permissions, 'alunos', 'alterar');
     } else {
         $canUpload = true;
     }

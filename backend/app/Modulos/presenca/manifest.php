@@ -5,6 +5,7 @@
  */
 return [
     'chave' => 'presenca',
+    'namespace' => 'App\\Modulos\\Presenca',
     'label' => 'Presença',
     'grupo' => 'gestao_escolar',
     'feature_keys' => [

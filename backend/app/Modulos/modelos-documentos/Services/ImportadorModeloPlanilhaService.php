@@ -2,8 +2,6 @@
 
 namespace App\Modulos\ModelosDocumentos\Services;
 
-require_once __DIR__ . '/GradeSoltaService.php';
-require_once __DIR__ . '/ConversorFolhaExcelHtml.php';
 
 /**
  * Lê planilha oficial (xlsx/xlsm) e monta a estrutura do editor.
@@ -735,4 +733,8 @@ class ImportadorModeloPlanilhaService
         $texto = preg_replace('/\s+/', ' ', $texto) ?? $texto;
         return trim($texto);
     }
+}
+
+if (!class_exists('ImportadorModeloPlanilhaService', false) && class_exists(__NAMESPACE__ . '\\ImportadorModeloPlanilhaService', false)) {
+    class_alias(__NAMESPACE__ . '\\ImportadorModeloPlanilhaService', 'ImportadorModeloPlanilhaService');
 }

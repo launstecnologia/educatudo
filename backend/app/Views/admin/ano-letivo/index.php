@@ -5,7 +5,6 @@ $status = (string) ($status ?? '');
 $message = (string) ($message ?? '');
 $csrf_token = $csrf_token ?? '';
 if (!class_exists('PeriodoLetivo')) {
-    require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
 }
 
 $page_header_title = 'Anos Letivos';
@@ -73,10 +72,9 @@ include __DIR__ . '/../_partials/flash_message.php';
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                         <?php
                         if (!class_exists('PeriodoLetivo')) {
-                            require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
                         }
-                        $tipoAno = PeriodoLetivo::normalizarTipo((string) ($row['periodo_tipo'] ?? 'bimestre'));
-                        echo htmlspecialchars(PeriodoLetivo::TIPOS[$tipoAno] ?? PeriodoLetivo::TIPOS['bimestre']);
+                        $tipoAno = \App\Core\PeriodoLetivo::normalizarTipo((string) ($row['periodo_tipo'] ?? 'bimestre'));
+                        echo htmlspecialchars(\App\Core\PeriodoLetivo::TIPOS[$tipoAno] ?? \App\Core\PeriodoLetivo::TIPOS['bimestre']);
                         ?>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
@@ -190,7 +188,7 @@ include __DIR__ . '/../_partials/flash_message.php';
                         <label for="al_periodo_tipo" class="block text-sm font-medium text-gray-700 mb-1">Divisão do ano <span class="text-red-500">*</span></label>
                         <select id="al_periodo_tipo" name="periodo_tipo" required
                                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white">
-                            <?php foreach (PeriodoLetivo::TIPOS as $cod => $lab): ?>
+                            <?php foreach (\App\Core\PeriodoLetivo::TIPOS as $cod => $lab): ?>
                                 <option value="<?= htmlspecialchars($cod) ?>" <?= $cod === 'bimestre' ? 'selected' : '' ?>><?= htmlspecialchars($lab) ?></option>
                             <?php endforeach; ?>
                         </select>
@@ -246,10 +244,10 @@ include __DIR__ . '/../_partials/flash_message.php';
 <script>
 var PERIODOS_LETIVOS = <?= json_encode((function () {
     $mapa = [];
-    foreach (PeriodoLetivo::TIPOS as $cod => $lab) {
+    foreach (\App\Core\PeriodoLetivo::TIPOS as $cod => $lab) {
         $mapa[$cod] = [
             'nome' => $lab,
-            'rotulos' => PeriodoLetivo::rotulosDoTipo($cod),
+            'rotulos' => \App\Core\PeriodoLetivo::rotulosDoTipo($cod),
         ];
     }
     return $mapa;

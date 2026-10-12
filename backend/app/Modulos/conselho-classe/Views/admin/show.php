@@ -1,6 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Models/ConselhoSessao.php';
-require_once __DIR__ . '/../../Services/ConselhoService.php';
 
 use App\Modulos\ConselhoClasse\Models\ConselhoSessao;
 use App\Modulos\ConselhoClasse\Services\ConselhoService;
@@ -16,7 +14,7 @@ $csrf_token = $csrf_token ?? '';
 $status = (string) ($sessao['status'] ?? '');
 $sid = (int) ($sessao['id'] ?? 0);
 $periodo = class_exists('PeriodoLetivo')
-    ? PeriodoLetivo::rotulo((int) ($sessao['ano_letivo'] ?? 0), (int) ($sessao['bimestre'] ?? 0))
+    ? \App\Core\PeriodoLetivo::rotulo((int) ($sessao['ano_letivo'] ?? 0), (int) ($sessao['bimestre'] ?? 0))
     : '';
 if ($periodo === '') {
     $periodo = (int) ($sessao['bimestre'] ?? 0) . 'º período';
@@ -43,8 +41,8 @@ if ($periodo === '') {
 
 <div class="flex flex-wrap items-center gap-3 mb-6">
     <?php
-    $ui_badge_variant = ConselhoService::statusBadge($status);
-    $ui_badge_label = ConselhoService::statusLabel($status);
+    $ui_badge_variant = \App\Modulos\ConselhoClasse\Services\ConselhoService::statusBadge($status);
+    $ui_badge_label = \App\Modulos\ConselhoClasse\Services\ConselhoService::statusLabel($status);
     include __DIR__ . '/../../../../Views/admin/_partials/ui/badge.php';
     ?>
     <span class="text-sm text-gray-600"><?= (int) ($pendencias['total'] ?? 0) ?> pendência(s)</span>
@@ -114,7 +112,6 @@ if ($periodo === '') {
                 <?php else: ?>
                 <?php
                 if (!class_exists('AlunoLancamentoNotaHelper', false)) {
-                    require_once __DIR__ . '/../../../../Helpers/AlunoLancamentoNotaHelper.php';
                 }
                 foreach ($linhas as $linha):
                     $aluno = $linha['aluno'];
@@ -123,7 +120,7 @@ if ($periodo === '') {
                     $freq = $linha['frequencia']['percentual'] ?? null;
                     $abaixo = $prelim['abaixo'] ?? [];
                     $transferidoCc = !empty($aluno['transferido']);
-                    $nomeCc = AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+                    $nomeCc = \App\Helpers\AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
                         (string) ($aluno['nome'] ?? ''),
                         $transferidoCc
                     );
@@ -159,7 +156,7 @@ if ($periodo === '') {
                         <?php endif; ?>
                     </td>
                     <td class="px-4 py-3 text-sm text-gray-700">
-                        <?= $homolog ? htmlspecialchars(ConselhoSessao::RESULTADOS[$homolog] ?? $homolog) : '—' ?>
+                        <?= $homolog ? htmlspecialchars(\App\Modulos\ConselhoClasse\Models\ConselhoSessao::RESULTADOS[$homolog] ?? $homolog) : '—' ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -206,7 +203,7 @@ if ($periodo === '') {
                         </td>
                         <td class="px-4 py-2">
                             <select name="cargo[<?= (int) $i ?>]" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" <?= $status === 'finalizado' ? 'disabled' : '' ?>>
-                                <?php foreach (ConselhoSessao::CARGOS as $valor => $rotulo): ?>
+                                <?php foreach (\App\Modulos\ConselhoClasse\Models\ConselhoSessao::CARGOS as $valor => $rotulo): ?>
                                     <option value="<?= htmlspecialchars($valor) ?>" <?= ($p['cargo'] ?? '') === $valor ? 'selected' : '' ?>><?= htmlspecialchars($rotulo) ?></option>
                                 <?php endforeach; ?>
                             </select>

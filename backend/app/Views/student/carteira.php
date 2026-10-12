@@ -1,20 +1,17 @@
 <?php
 if (!class_exists('LayoutHelper')) {
-    require_once __DIR__ . '/../../Core/LayoutHelper.php';
 }
 if (!class_exists('CreditosDecimalHelper')) {
-    require_once __DIR__ . '/../../Core/CreditosDecimalHelper.php';
 }
 if (!class_exists('CreditosModuleRegistry')) {
-    require_once __DIR__ . '/../../Core/CreditosModuleRegistry.php';
 }
-$saldo = isset($saldo) ? \CreditosDecimalHelper::fromScalar($saldo, 0.0) : 0.0;
+$saldo = isset($saldo) ? \App\Core\CreditosDecimalHelper::fromScalar($saldo, 0.0) : 0.0;
 $wallet_saldos = $wallet_saldos ?? ['saldo_escola' => 0, 'saldo_comprado' => 0, 'saldo_total' => $saldo];
-$saldoEscola = \CreditosDecimalHelper::fromScalar($wallet_saldos['saldo_escola'] ?? 0, 0.0);
-$saldoComprado = \CreditosDecimalHelper::fromScalar($wallet_saldos['saldo_comprado'] ?? 0, 0.0);
+$saldoEscola = \App\Core\CreditosDecimalHelper::fromScalar($wallet_saldos['saldo_escola'] ?? 0, 0.0);
+$saldoComprado = \App\Core\CreditosDecimalHelper::fromScalar($wallet_saldos['saldo_comprado'] ?? 0, 0.0);
 $movimentacoes = $movimentacoes ?? [];
 $creditosHabilitado = (bool) ($creditos_habilitado ?? false);
-$creditosLiberarB2C = LayoutHelper::get('creditos_liberar_b2c', '0') === '1';
+$creditosLiberarB2C = \App\Core\LayoutHelper::get('creditos_liberar_b2c', '0') === '1';
 $filtro_tipo = $filtro_tipo ?? '';
 $filtro_modulo = $filtro_modulo ?? '';
 $data_ini = $data_ini ?? '';
@@ -64,15 +61,15 @@ $tipoLabels = [
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">Saldo atual</p>
-        <p class="text-4xl font-bold mt-1 text-accent tabular-nums"><?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay($saldo)) ?> <span class="text-lg font-normal text-gray-600">TudiCoins</span></p>
+        <p class="text-4xl font-bold mt-1 text-accent tabular-nums"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay($saldo)) ?> <span class="text-lg font-normal text-gray-600">TudiCoins</span></p>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
             <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <p class="text-xs font-semibold uppercase tracking-wide text-gray-600">TudiCoins da escola</p>
-                <p class="text-2xl font-bold text-gray-900 mt-1 tabular-nums"><?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay($saldoEscola)) ?></p>
+                <p class="text-2xl font-bold text-gray-900 mt-1 tabular-nums"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay($saldoEscola)) ?></p>
             </div>
             <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <p class="text-xs font-semibold uppercase tracking-wide text-gray-600">TudiCoins comprados</p>
-                <p class="text-2xl font-bold text-gray-900 mt-1 tabular-nums"><?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay($saldoComprado)) ?></p>
+                <p class="text-2xl font-bold text-gray-900 mt-1 tabular-nums"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay($saldoComprado)) ?></p>
                 <p class="text-xs text-gray-500 mt-1">Não expiram na recarga mensal da escola.</p>
             </div>
         </div>
@@ -146,16 +143,16 @@ $tipoLabels = [
                     </tr>
                     <?php else: ?>
                     <?php foreach ($movimentacoes as $m):
-                        $valor = \CreditosDecimalHelper::fromSignedScalar($m['valor'] ?? 0, 0.0);
+                        $valor = \App\Core\CreditosDecimalHelper::fromSignedScalar($m['valor'] ?? 0, 0.0);
                         $tipoLabel = $tipoLabels[$m['tipo'] ?? ''] ?? ($m['tipo'] ?? '—');
                         $dataFormatada = date('d/m/Y H:i', strtotime($m['created_at'] ?? 'now'));
-                        $exibicao = \CreditosModuleRegistry::formatMovimentacaoExibicao($m);
+                        $exibicao = \App\Core\CreditosModuleRegistry::formatMovimentacaoExibicao($m);
                     ?>
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><?= htmlspecialchars($dataFormatada) ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?= htmlspecialchars($tipoLabel) ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm tabular-nums <?= $valor >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium' ?>">
-                            <?= $valor >= 0 ? '+' : '' ?><?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay($valor)) ?>
+                            <?= $valor >= 0 ? '+' : '' ?><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay($valor)) ?>
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-900">
                             <span class="font-medium"><?= htmlspecialchars($exibicao['label']) ?></span>

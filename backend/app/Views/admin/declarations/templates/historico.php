@@ -13,11 +13,9 @@ $logoData = (string) ($logo_data ?? '');
 $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
 
 if (!class_exists('StudentFormHelper', false)) {
-    require_once dirname(__DIR__, 4) . '/Helpers/StudentFormHelper.php';
 }
 
 if (!class_exists('BoletimQuadroLayoutHelper', false)) {
-    require_once dirname(__DIR__, 4) . '/Helpers/BoletimQuadroLayoutHelper.php';
 }
 
 $nomeUnidade = trim((string) ($unidade['razao_social'] ?? '')) ?: trim((string) ($unidade['nome'] ?? ''));
@@ -35,7 +33,7 @@ $linhaDocs = trim(implode(' • ', array_filter([
     trim((string) ($unidade['inep'] ?? '')) !== '' ? 'INEP: ' . $unidade['inep'] : '',
 ])));
 
-$alunoNome = \StudentFormHelper::nomeOficialLinha($aluno);
+$alunoNome = \App\Helpers\StudentFormHelper::nomeOficialLinha($aluno);
 $codigoAluno = trim((string) ($aluno['codigo_aluno'] ?? ''));
 $alunoRa = trim((string) ($aluno['ra'] ?? ''));
 $alunoCpf = trim((string) ($aluno['cpf'] ?? ''));
@@ -188,7 +186,7 @@ $buildGroupedBoletimHeader = static function (array $cols): array {
                     if (strtolower(trim((string) ($ev['finalidade'] ?? 'oficial'))) === 'complementar') {
                         continue;
                     }
-                    $groupedHeader = BoletimQuadroLayoutHelper::deveAgruparCabecalhoBoletimOficial($exibirEmEv)
+                    $groupedHeader = \App\Helpers\BoletimQuadroLayoutHelper::deveAgruparCabecalhoBoletimOficial($exibirEmEv)
                         ? $buildGroupedBoletimHeader($cols)
                         : ['enabled' => false, 'groups' => []];
                     ?>

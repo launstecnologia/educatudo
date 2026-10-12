@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Models/Ocorrencia.php';
 
 use App\Modulos\Ocorrencias\Models\Ocorrencia;
 
@@ -36,9 +35,9 @@ $acoesHistorico = [
 
 <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
     <div class="flex flex-wrap gap-2 mb-4">
-        <?php $ui_badge_variant = $gravVariant; $ui_badge_label = Ocorrencia::GRAVIDADES[$grav] ?? $grav; include __DIR__ . '/../../../../Views/admin/_partials/ui/badge.php'; ?>
+        <?php $ui_badge_variant = $gravVariant; $ui_badge_label = \App\Modulos\Ocorrencias\Models\Ocorrencia::GRAVIDADES[$grav] ?? $grav; include __DIR__ . '/../../../../Views/admin/_partials/ui/badge.php'; ?>
         <?php if ($schemaEstendido): ?>
-            <?php $ui_badge_variant = $statusVariant; $ui_badge_label = Ocorrencia::STATUS[$status] ?? $status; include __DIR__ . '/../../../../Views/admin/_partials/ui/badge.php'; ?>
+            <?php $ui_badge_variant = $statusVariant; $ui_badge_label = \App\Modulos\Ocorrencias\Models\Ocorrencia::STATUS[$status] ?? $status; include __DIR__ . '/../../../../Views/admin/_partials/ui/badge.php'; ?>
         <?php endif; ?>
         <?php $ui_badge_variant = !empty($oc['enviar_pais']) ? 'info' : 'neutro'; $ui_badge_label = !empty($oc['enviar_pais']) ? 'Visível aos pais' : 'Interno'; include __DIR__ . '/../../../../Views/admin/_partials/ui/badge.php'; ?>
     </div>
@@ -138,7 +137,7 @@ $acoesHistorico = [
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
                 <select name="status" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                    <?php foreach (Ocorrencia::STATUS as $valor => $rotulo): ?>
+                    <?php foreach (\App\Modulos\Ocorrencias\Models\Ocorrencia::STATUS as $valor => $rotulo): ?>
                         <option value="<?= htmlspecialchars($valor) ?>" <?= $status === $valor ? 'selected' : '' ?>><?= htmlspecialchars($rotulo) ?></option>
                     <?php endforeach; ?>
                 </select>

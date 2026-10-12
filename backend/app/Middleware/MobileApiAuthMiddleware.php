@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Middleware;
 /**
  * Autenticação exclusiva da API mobile v1.
  *
@@ -6,6 +8,9 @@
  * responsável no banco em toda requisição. Isso impede reutilização de token
  * entre escolas e encerra o acesso quando o cadastro é desativado.
  */
+
+use App\Core\Database;
+use App\Services\JWTService;
 class MobileApiAuthMiddleware
 {
     public static $parentId = null;
@@ -30,7 +35,6 @@ class MobileApiAuthMiddleware
             $this->unauthorized('missing_token', 'Token de acesso não informado.');
         }
 
-        require_once __DIR__ . '/../Services/JWTService.php';
         $payload = (new JWTService())->decode(trim($matches[1]));
         if (!is_array($payload)) {
             $this->unauthorized('invalid_token', 'Token inválido ou expirado.');
@@ -51,7 +55,6 @@ class MobileApiAuthMiddleware
             $this->unauthorized('invalid_token', 'Token inválido.');
         }
 
-        require_once __DIR__ . '/../Core/Database.php';
         $parent = Database::getInstance()->fetch(
             "SELECT r.id, r.nome, r.email, r.cpf, r.telefone, r.force_password_change
              FROM responsaveis r INNER JOIN mobile_auth_sessions s ON s.parent_id = r.id
@@ -121,4 +124,8 @@ class MobileApiAuthMiddleware
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
+}
+
+if (!class_exists('MobileApiAuthMiddleware', false) && class_exists(__NAMESPACE__ . '\\MobileApiAuthMiddleware', false)) {
+    class_alias(__NAMESPACE__ . '\\MobileApiAuthMiddleware', 'MobileApiAuthMiddleware');
 }

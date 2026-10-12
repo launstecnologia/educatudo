@@ -2,13 +2,10 @@
 
 namespace App\Modulos\VidaEscolar\Services;
 
-require_once __DIR__ . '/../../../Modulos/modelos-documentos/Services/ModeloDocumentoService.php';
-require_once __DIR__ . '/../../../Modulos/modelos-documentos/Services/GeradorPdfFolhaService.php';
 
 use App\Modulos\ModelosDocumentos\Services\GeradorPdfFolhaService;
 use App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService;
-use Database;
-
+use App\Core\Database;
 /**
  * Emite PDFs da Vida Escolar no papel timbrado (Layout de documentos).
  */
@@ -170,8 +167,6 @@ class VidaEscolarPdfService
      */
     public function htmlHistorico(array $dadosPdf, ?array $config): string
     {
-        require_once __DIR__ . '/GradeHistoricoOficial.php';
-        require_once __DIR__ . '/../../modelos-documentos/Services/GiradorTextoVerticalDocumento.php';
         $unidade = is_array($dadosPdf['unidade'] ?? null) ? $dadosPdf['unidade'] : [];
         $logo = '';
         try {
@@ -332,9 +327,8 @@ class VidaEscolarPdfService
             if ($alunoIdObs > 0) {
                 try {
                     if (!class_exists('BoletimConfig', false)) {
-                        require_once dirname(__DIR__, 3) . '/Models/System/BoletimConfig.php';
                     }
-                    $rowObs = (new \BoletimConfig())->getObservacaoCoordenacao($alunoIdObs);
+                    $rowObs = (new \App\Models\System\BoletimConfig())->getObservacaoCoordenacao($alunoIdObs);
                     $obsCoord = is_array($rowObs) ? trim((string) ($rowObs['conteudo'] ?? '')) : '';
                 } catch (\Throwable $e) {
                     $obsCoord = '';
@@ -650,8 +644,7 @@ class VidaEscolarPdfService
             $candidatos[] = $vinculado;
         }
         try {
-            require_once dirname(__DIR__, 3) . '/Models/Education/ResultadoAcademico.php';
-            $candidatos[] = (new \ResultadoAcademico())->getLayoutCodigo('historico');
+            $candidatos[] = (new \App\Models\Education\ResultadoAcademico())->getLayoutCodigo('historico');
         } catch (\Throwable $e) {
             $candidatos[] = '';
         }
@@ -802,7 +795,6 @@ class VidaEscolarPdfService
         $alunoId = (int) ($oficio['aluno_id'] ?? 0);
         if ($alunoId > 0) {
             try {
-                require_once dirname(__DIR__, 3) . '/Services/DeclarationService.php';
                 $decl = new \App\Services\DeclarationService($this->db);
                 $encontrado = $decl->getAluno($alunoId);
                 $aluno = is_array($encontrado) ? $encontrado : [];
@@ -840,9 +832,8 @@ class VidaEscolarPdfService
         $dt = \DateTime::createFromFormat('Y-m-d', $data);
         $vars['data_oficio'] = $dt ? $esc($dt->format('d/m/Y')) : $esc($data);
         $vars['corpo_oficio_html'] = nl2br($esc(trim((string) ($oficio['corpo'] ?? ''))), false);
-        require_once dirname(__DIR__, 3) . '/Helpers/StudentFormHelper.php';
-        if (\StudentFormHelper::nomeExibicao($aluno) !== '') {
-            $vars['aluno_nome'] = $esc(\StudentFormHelper::nomeOficialLinha($aluno));
+        if (\App\Helpers\StudentFormHelper::nomeExibicao($aluno) !== '') {
+            $vars['aluno_nome'] = $esc(\App\Helpers\StudentFormHelper::nomeOficialLinha($aluno));
         } elseif (!empty($oficio['aluno_nome'])) {
             $vars['aluno_nome'] = $esc($oficio['aluno_nome']);
         }
@@ -895,7 +886,6 @@ class VidaEscolarPdfService
             return;
         }
         try {
-            require_once __DIR__ . '/ArquivoPdfAlunoService.php';
             $tipo = preg_replace('/[^a-z0-9]+/i', '_', $titulo) ?: 'documento';
             (new ArquivoPdfAlunoService($this->db))->guardar(
                 $alunoId,
@@ -1050,4 +1040,8 @@ class VidaEscolarPdfService
             ],
         ];
     }
+}
+
+if (!class_exists('VidaEscolarPdfService', false) && class_exists(__NAMESPACE__ . '\\VidaEscolarPdfService', false)) {
+    class_alias(__NAMESPACE__ . '\\VidaEscolarPdfService', 'VidaEscolarPdfService');
 }

@@ -1,14 +1,13 @@
 <?php
 if (!class_exists('AdminPermissionMatrix')) {
-    require_once dirname(__DIR__, 3) . '/Core/AdminPermissionMatrix.php';
 }
 
 $hub_title = 'Z-Configuração';
 $hub_subtitle = 'Parâmetros da instituição, manutenção e ferramentas internas.';
 $hub_cards = [];
 
-$permsHub = AdminPermissionMatrix::effectivePermissionsForUser(
-    Database::getInstance(),
+$permsHub = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser(
+    \App\Core\Database::getInstance(),
     $user ?? []
 );
 $podeHub = static function (string $chave) use ($permsHub): bool {
@@ -51,7 +50,7 @@ if ($podeHub('slider_dashboard')) {
     ];
 }
 
-if ($podeHub('resultados_finais') && (!class_exists('LayoutHelper', false) || LayoutHelper::isModuleEnabled('resultados_finais'))) {
+if ($podeHub('resultados_finais') && (!class_exists('LayoutHelper', false) || \App\Core\LayoutHelper::isModuleEnabled('resultados_finais'))) {
     $hub_cards[] = [
         'href' => URL . '/admin/resultados-finais/layouts',
         'title' => 'Layouts',

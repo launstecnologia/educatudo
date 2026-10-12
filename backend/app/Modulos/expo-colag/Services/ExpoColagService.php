@@ -1,13 +1,16 @@
 <?php
+
+namespace App\Modulos\ExpoColag\Services;
 /**
  * Lógica de negócio da Expo Colag (edição, wizard de projeto, autorização de imagem).
  */
 
-require_once __DIR__ . '/../Models/ExpoColagEdicao.php';
-require_once __DIR__ . '/../Models/ExpoColagProjeto.php';
-require_once __DIR__ . '/../Models/ExpoColagInscricao.php';
-require_once __DIR__ . '/../Models/ExpoColagProjetoRelacoes.php';
-require_once __DIR__ . '/../Models/ExpoColagAutorizacaoImagem.php';
+
+use App\Modulos\ExpoColag\Models\ExpoColagAutorizacaoImagem;
+use App\Modulos\ExpoColag\Models\ExpoColagEdicao;
+use App\Modulos\ExpoColag\Models\ExpoColagInscricao;
+use App\Modulos\ExpoColag\Models\ExpoColagProjeto;
+use App\Modulos\ExpoColag\Models\ExpoColagProjetoRelacoes;
 
 class ExpoColagService
 {
@@ -25,7 +28,7 @@ class ExpoColagService
         $this->inscricaoModel = new ExpoColagInscricao();
         $this->relacoesModel = new ExpoColagProjetoRelacoes();
         $this->autorizacaoModel = new ExpoColagAutorizacaoImagem();
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     /**
@@ -277,7 +280,7 @@ class ExpoColagService
         }
         try {
             $this->projetoModel->excluir($projetoId);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log('ExpoColagService::excluirProjeto: ' . $e->getMessage());
             return ['success' => false, 'error' => 'Não foi possível excluir o projeto.'];
         }
@@ -310,12 +313,12 @@ class ExpoColagService
         $this->db->query('DELETE FROM expo_colag_projeto_materiais WHERE projeto_id = :id', $params);
         try {
             $this->db->query('DELETE FROM expo_colag_pedidos_materiais WHERE projeto_id = :id', $params);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             // tabela ainda não migrada
         }
         try {
             $this->db->query('DELETE FROM expo_colag_mensagens WHERE projeto_id = :id', $params);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             // tabela ainda não migrada
         }
     }
@@ -789,7 +792,7 @@ class ExpoColagService
                 'alertas' => $conflitos['alertas'],
                 'infos' => $conflitos['infos'],
             ];
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollback();
             }
@@ -851,7 +854,7 @@ class ExpoColagService
             }
             $this->db->commit();
             return ['success' => true];
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollback();
             }
@@ -974,7 +977,7 @@ class ExpoColagService
             }
             $this->db->commit();
             return ['success' => true, 'status' => 'Aprovada'];
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollback();
             }
@@ -1251,7 +1254,7 @@ class ExpoColagService
             }
             $this->relacoesModel->sincronizarMateriais($projetoId, $materiais, $professorResponsavelId);
             $this->db->commit();
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollback();
             }
@@ -1403,14 +1406,14 @@ class ExpoColagService
         $materias = $this->db->fetchAll('SELECT id, nome FROM materias ORDER BY nome ASC') ?: [];
         try {
             $professores = $this->db->fetchAll('SELECT id, nome FROM professores WHERE ativo = 1 ORDER BY nome ASC') ?: [];
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $professores = $this->db->fetchAll('SELECT id, nome FROM professores ORDER BY nome ASC') ?: [];
         }
         try {
             $turmas = $this->db->fetchAll(
                 'SELECT id, nome, serie, serie_id FROM turmas WHERE ativo = 1 ORDER BY serie ASC, nome ASC'
             ) ?: [];
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $turmas = $this->db->fetchAll(
                 'SELECT id, nome, serie FROM turmas ORDER BY serie ASC, nome ASC'
             ) ?: [];
@@ -1424,8 +1427,7 @@ class ExpoColagService
 
         $habilidades = [];
         if (is_file(__DIR__ . '/../../../Models/Bncc/BnccSkill.php')) {
-            require_once __DIR__ . '/../../../Models/Bncc/BnccSkill.php';
-            $bncc = new BnccSkill();
+            $bncc = new \App\Models\Bncc\BnccSkill();
             $habilidades = $bncc->listar('', '', 200);
         }
 
@@ -1461,7 +1463,7 @@ class ExpoColagService
 
         try {
             $row = $this->db->fetch('SELECT id FROM professores WHERE id = :id AND ativo = 1', ['id' => $id]);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $row = $this->db->fetch('SELECT id FROM professores WHERE id = :id', ['id' => $id]);
         }
 
@@ -1482,7 +1484,7 @@ class ExpoColagService
             foreach ($serieRows as $s) {
                 $nomePorId[(int) $s['id']] = trim((string) $s['nome']);
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $nomePorId = [];
         }
 
@@ -1602,8 +1604,7 @@ class ExpoColagService
         if (!is_file(__DIR__ . '/../../../Models/Bncc/BnccSkill.php')) {
             return [];
         }
-        require_once __DIR__ . '/../../../Models/Bncc/BnccSkill.php';
-        $bncc = new BnccSkill();
+        $bncc = new \App\Models\Bncc\BnccSkill();
         return $bncc->listar($q, '', 50);
     }
 
@@ -1752,7 +1753,7 @@ class ExpoColagService
             return ['success' => false, 'error' => 'Upload de capa inválido.'];
         }
 
-        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
         $mime = $finfo->file($tmp) ?: '';
         $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
         if (!isset($allowed[$mime])) {
@@ -1801,7 +1802,7 @@ class ExpoColagService
 
         if (!$gravou) {
             if (class_exists('Logger')) {
-                Logger::error('Expo Colag: falha no upload da capa', [
+                \App\Core\Logger::error('Expo Colag: falha no upload da capa', [
                     'projeto_id' => $projetoId,
                     'slug' => $slug,
                     'public_dir' => $destinos[0],
@@ -2022,4 +2023,8 @@ class ExpoColagService
         $ok = ['Individual', 'Grupo', 'Grupo_com_papeis'];
         return in_array($v, $ok, true) ? $v : 'Grupo';
     }
+}
+
+if (!class_exists('ExpoColagService', false) && class_exists(__NAMESPACE__ . '\\ExpoColagService', false)) {
+    class_alias(__NAMESPACE__ . '\\ExpoColagService', 'ExpoColagService');
 }

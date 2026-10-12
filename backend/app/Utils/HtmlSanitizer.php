@@ -194,3 +194,7 @@ class HtmlSanitizer
         return nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
     }
 }
+
+if (!class_exists('HtmlSanitizer', false) && class_exists(__NAMESPACE__ . '\\HtmlSanitizer', false)) {
+    class_alias(__NAMESPACE__ . '\\HtmlSanitizer', 'HtmlSanitizer');
+}

@@ -6,6 +6,7 @@
 return [
     'chave' => 'grupos-regras-notas',
     'label' => 'Quadro de Notas',
+    'namespace' => 'App\\Modulos\\GruposRegrasNotas',
     'grupo' => 'academico',
     'feature_keys' => [
         'admin' => 'grupos_regras_notas',

@@ -25,12 +25,11 @@ $enderecoCidade = student_campo_endereco($student, ['cidade', 'endereco_cidade']
 $enderecoUf = student_campo_endereco($student, ['uf', 'estado', 'endereco_uf']);
 $enderecoCepRaw = student_campo_endereco($student, ['cep', 'endereco_cep']);
 $enderecoCep = $enderecoCepRaw !== '' ? format_cep_exibicao($enderecoCepRaw) : '';
-require_once __DIR__ . '/../../../Helpers/StudentFormHelper.php';
-$cpfDisplay = StudentFormHelper::formatCpfDisplay($student['cpf'] ?? '');
-$rgDisplay = StudentFormHelper::formatRgDisplay($student['rg'] ?? '');
-$telefoneDisplay = StudentFormHelper::formatTelefoneDisplay($student['telefone'] ?? '');
-$celularDisplay = StudentFormHelper::formatTelefoneDisplay($student['celular'] ?? '');
-$dataNascInput = StudentFormHelper::formatDataNascInput($student['data_nasc'] ?? null);
+$cpfDisplay = \App\Helpers\StudentFormHelper::formatCpfDisplay($student['cpf'] ?? '');
+$rgDisplay = \App\Helpers\StudentFormHelper::formatRgDisplay($student['rg'] ?? '');
+$telefoneDisplay = \App\Helpers\StudentFormHelper::formatTelefoneDisplay($student['telefone'] ?? '');
+$celularDisplay = \App\Helpers\StudentFormHelper::formatTelefoneDisplay($student['celular'] ?? '');
+$dataNascInput = \App\Helpers\StudentFormHelper::formatDataNascInput($student['data_nasc'] ?? null);
 $dataNascDisplay = '';
 if ($dataNascInput !== '') {
     $dataNascDisplay = implode('/', array_reverse(explode('-', $dataNascInput)));

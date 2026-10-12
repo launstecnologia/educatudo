@@ -11,7 +11,6 @@ $totalPages = (int) ($total_pages ?? 1);
 $flashMessage = trim((string) ($flash_message ?? ''));
 $flashType = (string) ($flash_type ?? 'success');
 if (!class_exists('PeriodoLetivo')) {
-    require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
 }
 
 $selectedRegraId = (int) ($filters['regra_id'] ?? 0);
@@ -219,7 +218,7 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
                             $anoLinha = (int) ($row['regra_ano_letivo'] ?? 0);
                             $bimestreLinha = (int) ($row['regra_bimestre'] ?? 0);
                             $rotuloBimestre = $bimestreLinha > 0
-                                ? PeriodoLetivo::rotulo($anoLinha > 0 ? $anoLinha : (int) date('Y'), $bimestreLinha)
+                                ? \App\Core\PeriodoLetivo::rotulo($anoLinha > 0 ? $anoLinha : (int) date('Y'), $bimestreLinha)
                                 : '';
                             $rowKey = $alunoId . '-' . $regraId . '-' . md5($periodoRef);
                             ?>

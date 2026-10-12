@@ -5,6 +5,7 @@
 return [
     'chave' => 'boletins',
     'label' => 'Modelo de Boletim',
+    'namespace' => 'App\\Modulos\\Boletins',
     'grupo' => 'academico',
     'feature_keys' => [
         'admin' => 'boletim',

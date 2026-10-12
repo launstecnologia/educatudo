@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Modulos\Fechamento\Services;
 /**
  * Gates de Avaliação / geração oficial (sem I/O — testável sem banco).
  */
@@ -129,4 +131,8 @@ class FechamentoGates
             default => 'Recuperação em andamento',
         };
     }
+}
+
+if (!class_exists('FechamentoGates', false) && class_exists(__NAMESPACE__ . '\\FechamentoGates', false)) {
+    class_alias(__NAMESPACE__ . '\\FechamentoGates', 'FechamentoGates');
 }

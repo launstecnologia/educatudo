@@ -1,12 +1,11 @@
 <?php
-require_once __DIR__ . '/../../Core/LayoutHelper.php';
 
 // Buscar configurações de layout
-$logo_url = LayoutHelper::getLogoUrl();
-$logo_horizontal_url = LayoutHelper::getLoginLogoUrl();
-$login_cover_url = LayoutHelper::getLoginCoverUrl();
-$system_title = LayoutHelper::getSystemTitle();
-$system_subtitle = LayoutHelper::getSystemSubtitle();
+$logo_url = \App\Core\LayoutHelper::getLogoUrl();
+$logo_horizontal_url = \App\Core\LayoutHelper::getLoginLogoUrl();
+$login_cover_url = \App\Core\LayoutHelper::getLoginCoverUrl();
+$system_title = \App\Core\LayoutHelper::getSystemTitle();
+$system_subtitle = \App\Core\LayoutHelper::getSystemSubtitle();
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">

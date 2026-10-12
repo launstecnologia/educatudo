@@ -7,11 +7,9 @@
     <?php include __DIR__ . '/components/estilos_plataforma.php'; ?>
     <?php 
     // Incluir LayoutHelper
-    require_once __DIR__ . '/../../Core/LayoutHelper.php';
-    require_once __DIR__ . '/../../Core/PeriodoLetivo.php';
     ?>
     <style>
-        <?= LayoutHelper::generateCustomCSS() ?>
+        <?= \App\Core\LayoutHelper::generateCustomCSS() ?>
     </style>
     <?php include __DIR__ . '/components/form_control_safari.php'; ?>
     <?php if (isset($additional_css)): ?>
@@ -26,12 +24,12 @@
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
                         <?php
-                        $logoNavbar = LayoutHelper::getContextualLogo('navbar', 'h-8 w-auto', 'Logo');
+                        $logoNavbar = \App\Core\LayoutHelper::getContextualLogo('navbar', 'h-8 w-auto', 'Logo');
                         if ($logoNavbar): ?>
                             <?= $logoNavbar ?>
-                            <h1 class="sidebar-logo-fallback hidden text-white text-xl font-bold"><?= htmlspecialchars(LayoutHelper::getSystemTitle()) ?></h1>
+                            <h1 class="sidebar-logo-fallback hidden text-white text-xl font-bold"><?= htmlspecialchars(\App\Core\LayoutHelper::getSystemTitle()) ?></h1>
                         <?php else: ?>
-                            <h1 class="text-white text-xl font-bold"><?= htmlspecialchars(LayoutHelper::getSystemTitle()) ?></h1>
+                            <h1 class="text-white text-xl font-bold"><?= htmlspecialchars(\App\Core\LayoutHelper::getSystemTitle()) ?></h1>
                         <?php endif; ?>
                     </div>
                     <div class="ml-10 flex items-baseline space-x-4">

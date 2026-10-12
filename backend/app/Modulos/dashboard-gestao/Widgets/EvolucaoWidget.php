@@ -4,11 +4,7 @@ namespace App\Modulos\DashboardGestao\Widgets;
 
 use App\Modulos\DashboardGestao\Services\DashboardConsulta;
 use App\Modulos\DashboardGestao\Services\DashboardFiltro;
-use FrequencyService;
-
-require_once dirname(__DIR__, 3) . '/Services/FrequencyService.php';
-require_once dirname(__DIR__, 3) . '/Models/Education/ResultadoAcademico.php';
-
+use App\Services\FrequencyService;
 /**
  * Evolução por bimestre: frequência do Diário (sempre) e média homologada (se houver).
  * Metodologia da média: AVG(media_final) do snapshot homologado em resultado_academico,
@@ -49,9 +45,9 @@ class EvolucaoWidget implements WidgetDashboard
             ];
         }
 
-        $model = new \ResultadoAcademico();
+        $model = new \App\Models\Education\ResultadoAcademico();
         $schemaResultado = $model->schemaPronto();
-        $db = \Database::getInstance();
+        $db = \App\Core\Database::getInstance();
         [$turmaSql, $turmaParams] = $this->consulta->sqlInTurmas($filtro->turmaIds, 'r.turma_id');
 
         for ($b = 1; $b <= 4; $b++) {
@@ -97,4 +93,8 @@ class EvolucaoWidget implements WidgetDashboard
             'nota' => 'Frequência: presente+atraso sobre registros do diário. Média: somente resultados homologados.',
         ];
     }
+}
+
+if (!class_exists('EvolucaoWidget', false) && class_exists(__NAMESPACE__ . '\\EvolucaoWidget', false)) {
+    class_alias(__NAMESPACE__ . '\\EvolucaoWidget', 'EvolucaoWidget');
 }

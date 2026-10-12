@@ -1,6 +1,5 @@
 <?php
 if (!class_exists('AdminPermissionMatrix')) {
-    require_once dirname(__DIR__, 3) . '/Core/AdminPermissionMatrix.php';
 }
 
 $hub_title = 'Painéis';
@@ -9,8 +8,8 @@ $hub_cards = [];
 
 $permsHub = [];
 if (class_exists('AdminPermissionMatrix')) {
-    $permsHub = AdminPermissionMatrix::effectivePermissionsForUser(
-        Database::getInstance(),
+    $permsHub = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser(
+        \App\Core\Database::getInstance(),
         $user ?? []
     );
 }
@@ -27,7 +26,7 @@ if ($podeHub('dashboard')) {
     ];
 }
 
-if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('saude_academica')) {
+if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('saude_academica')) {
     $hub_cards[] = [
         'href' => URL . '/admin/saude-academica',
         'title' => 'Saúde Acadêmica',
@@ -36,12 +35,21 @@ if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('saude_academ
     ];
 }
 
-if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('conformidade')) {
+if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('conformidade')) {
     $hub_cards[] = [
         'href' => URL . '/admin/conformidade',
         'title' => 'Conformidade',
         'description' => 'Pendências operacionais da escola.',
         'icon' => 'fa-solid fa-clipboard-check',
+    ];
+}
+
+if ($podeHub('declaracoes_aluno')) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/paineis/documentos',
+        'title' => 'Documentos',
+        'description' => 'Declarações e autorizações por turma, série ou aluno, com versões guardadas.',
+        'icon' => 'fa-solid fa-file-lines',
     ];
 }
 

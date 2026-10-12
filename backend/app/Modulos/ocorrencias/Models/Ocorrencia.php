@@ -2,8 +2,7 @@
 
 namespace App\Modulos\Ocorrencias\Models;
 
-use Database;
-
+use App\Core\Database;
 /**
  * EducaTudo - Modelo de Ocorrência do aluno
  * Registro central da vida escolar. Não altera nota nem frequência.
@@ -115,7 +114,7 @@ class Ocorrencia
         $alunoIds = array_values(array_unique(array_map('intval', $alunoIds)));
         $alunoIds = array_values(array_filter($alunoIds, static fn($id) => $id > 0));
         if ($alunoIds === []) {
-            throw new InvalidArgumentException('Informe ao menos um aluno.');
+            throw new \InvalidArgumentException('Informe ao menos um aluno.');
         }
 
         $alunoPrincipal = (int) ($data['aluno_id'] ?? $alunoIds[0]);
@@ -567,4 +566,8 @@ class Ocorrencia
             ]
         );
     }
+}
+
+if (!class_exists('Ocorrencia', false) && class_exists(__NAMESPACE__ . '\\Ocorrencia', false)) {
+    class_alias(__NAMESPACE__ . '\\Ocorrencia', 'Ocorrencia');
 }

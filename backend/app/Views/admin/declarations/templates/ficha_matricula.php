@@ -7,7 +7,7 @@ $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
 $fmtData = static function ($d): string {
     $d = trim((string) $d);
     if ($d === '' || $d === '0000-00-00') return '—';
-    $dt = DateTime::createFromFormat('Y-m-d', substr($d, 0, 10));
+    $dt = \DateTime::createFromFormat('Y-m-d', substr($d, 0, 10));
     return $dt ? $dt->format('d/m/Y') : '—';
 };
 $val = static function ($v): string {
@@ -24,7 +24,7 @@ $pick = static function (array $arr, array $keys): string {
 };
 $sexoLabels = ['M' => 'Masculino', 'F' => 'Feminino', 'N' => 'Neutro / outro'];
 
-$nome = \StudentFormHelper::nomeOficialLinha($aluno);
+$nome = \App\Helpers\StudentFormHelper::nomeOficialLinha($aluno);
 $cpf = $val($aluno['cpf'] ?? '');
 $rg = $val($aluno['rg'] ?? '');
 $nasc = $fmtData($aluno['data_nasc'] ?? '');
@@ -57,7 +57,7 @@ $endereco = $endereco !== '' ? $endereco : '—';
 
         <h2 style="font-size:11pt; color:#064e3b; margin:18px 0 6px 0;">1. Dados do(a) Aluno(a)</h2>
         <table class="dados">
-            <tr><td class="label">Nome completo</td><td><?= \StudentFormHelper::nomeOficialHtml($aluno, $esc) ?></td></tr>
+            <tr><td class="label">Nome completo</td><td><?= \App\Helpers\StudentFormHelper::nomeOficialHtml($aluno, $esc) ?></td></tr>
             <tr><td class="label">Código</td><td><?= $esc($codigo) ?></td></tr>
             <tr><td class="label">RA</td><td><?= $esc($raGov) ?></td></tr>
             <tr><td class="label">Data de nascimento</td><td><?= $esc($nasc) ?></td></tr>

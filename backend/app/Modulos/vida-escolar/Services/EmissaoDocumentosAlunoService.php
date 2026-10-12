@@ -2,19 +2,12 @@
 
 namespace App\Modulos\VidaEscolar\Services;
 
-require_once __DIR__ . '/../../../Services/HistoricoEscolarService.php';
-require_once __DIR__ . '/../../../Services/DocumentoOficialService.php';
-require_once __DIR__ . '/../../../Models/Education/ResultadoAcademico.php';
-require_once __DIR__ . '/../../../Models/Education/HistoricoDocumento.php';
-require_once __DIR__ . '/../../../Controllers/Admin/ReportAdminController.php';
-require_once __DIR__ . '/VidaEscolarPdfService.php';
 
 use App\Services\HistoricoEscolarService;
-use Database;
-use DocumentoOficialService;
-use HistoricoDocumento;
-use ResultadoAcademico;
-
+use App\Core\Database;
+use App\Services\DocumentoOficialService;
+use App\Models\Education\HistoricoDocumento;
+use App\Models\Education\ResultadoAcademico;
 /**
  * Emite histórico, ficha, boletim e demonstrativo a partir da aba do aluno
  * e registra cada geração com data e hora.
@@ -408,7 +401,7 @@ class EmissaoDocumentosAlunoService
     private function emitirDemonstrativo(array $aluno, ?int $userId, string $userNome, string $slug, ?array $config): void
     {
         $alunoId = (int) ($aluno['id'] ?? 0);
-        $quadro = (new \ReportAdminController())->htmlDemonstrativoNotasDoAluno($alunoId);
+        $quadro = (new \App\Controllers\Admin\ReportAdminController())->htmlDemonstrativoNotasDoAluno($alunoId);
         if (trim($quadro) === '') {
             throw new \RuntimeException('Não há demonstrativo de notas vigente para este aluno.');
         }
@@ -464,7 +457,6 @@ class EmissaoDocumentosAlunoService
         if (!str_ends_with(strtolower($arquivo), '.pdf')) {
             $arquivo .= '.pdf';
         }
-        require_once __DIR__ . '/ArquivoPdfAlunoService.php';
         (new ArquivoPdfAlunoService($this->db))->guardar($alunoId, $tipo, $titulo, $bin, $arquivo, $userId, $userNome, $config);
         while (ob_get_level() > 0) {
             ob_end_clean();
@@ -540,4 +532,8 @@ class EmissaoDocumentosAlunoService
 
         return is_array($row) ? $row : null;
     }
+}
+
+if (!class_exists('EmissaoDocumentosAlunoService', false) && class_exists(__NAMESPACE__ . '\\EmissaoDocumentosAlunoService', false)) {
+    class_alias(__NAMESPACE__ . '\\EmissaoDocumentosAlunoService', 'EmissaoDocumentosAlunoService');
 }

@@ -1,7 +1,6 @@
 <?php
 /** Menu lateral reduzido: perfil Secretaria (@see AdminSecretariaAccess) */
 if (!class_exists('AdminSecretariaAccess')) {
-    require_once __DIR__ . '/../../../Core/AdminSecretariaAccess.php';
 }
 $urlBase = defined('URL') ? rtrim((string) URL, '/') : '';
 $cur = $current_page ?? '';
@@ -20,7 +19,7 @@ $linkCls = static function (bool $ativo): string {
         : 'text-purple-100 hover:bg-white/20 hover:text-white') . ' rounded-lg transition-all duration-200';
 };
 $modOn = is_callable($modOn ?? null) ? $modOn : static function (string $key): bool {
-    return !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled($key);
+    return !class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled($key);
 };
 $academicoOpen = in_array($cur, [
     'academico', 'students', 'ano_letivo', 'calendario_letivo', 'componentes-curriculares',
@@ -110,7 +109,7 @@ $gestaoOpen = $secretariaNavOpen;
             <span class="sidebar-text text-sm">Professores</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['salas']) && $modOn('salas') && AdminSecretariaAccess::requestPathIsAllowed('/admin/salas')): ?>
+        <?php if ($secCan(['salas']) && $modOn('salas') && \App\Core\AdminSecretariaAccess::requestPathIsAllowed('/admin/salas')): ?>
         <a href="<?= $urlBase ?>/admin/salas" class="<?= $linkCls($cur === 'salas') ?>">
             <i class="fa-solid fa-door-open w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Salas / Ambientes</span>
@@ -145,7 +144,7 @@ $gestaoOpen = $secretariaNavOpen;
             <span class="sidebar-text text-sm">Regras de Aprovação</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['provas_online']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('professor_provas'))): ?>
+        <?php if ($secCan(['provas_online']) && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('professor_provas'))): ?>
         <a href="<?= $urlBase ?>/admin/provas/tipos-avaliacao" class="<?= $linkCls($cur === 'tipos_avaliacao') ?>">
             <i class="fa-solid fa-tags w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Tipos de Nota</span>
@@ -157,7 +156,7 @@ $gestaoOpen = $secretariaNavOpen;
             <span class="sidebar-text text-sm">Quadro de Notas</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['provas_online']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('professor_provas'))): ?>
+        <?php if ($secCan(['provas_online']) && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('professor_provas'))): ?>
         <a href="<?= $urlBase ?>/admin/provas" class="<?= $linkCls($cur === 'provas' || $cur === 'provas_blocos') ?>">
             <i class="fa-regular fa-clipboard w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Lançamento de Notas</span>
@@ -191,7 +190,7 @@ $gestaoOpen = $secretariaNavOpen;
     <div id="sec-rotina-submenu" class="<?= $rotinaOpen ? '' : 'hidden' ?> ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
         <?php $menu_subcab_titulo = 'O dia a dia'; $menu_subcab_periodo = ''; $menu_subcab_ordenar = true; require __DIR__ . '/admin_sidebar_subcabecalho.php'; ?>
         <div class="sidebar-sublista">
-        <?php if ($secCan(['diario_classe']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('diario_classe'))): ?>
+        <?php if ($secCan(['diario_classe']) && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('diario_classe'))): ?>
         <a href="<?= $urlBase ?>/admin/diario" class="<?= $linkCls($cur === 'diario_classe') ?>">
             <i class="fa-regular fa-address-book w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Diário de Classe</span>
@@ -203,7 +202,7 @@ $gestaoOpen = $secretariaNavOpen;
             <span class="sidebar-text text-sm">Frequência</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['ocorrencias']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('ocorrencias'))): ?>
+        <?php if ($secCan(['ocorrencias']) && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('ocorrencias'))): ?>
         <a href="<?= $urlBase ?>/admin/ocorrencias" class="<?= $linkCls($cur === 'ocorrencias') ?>">
             <i class="fa-regular fa-clock w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Ocorrências</span>
@@ -229,13 +228,13 @@ $gestaoOpen = $secretariaNavOpen;
     </div>
     <div id="sec-pedagogico-submenu" class="<?= $pedagogicoOpen ? '' : 'hidden' ?> ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
         <?php require_once __DIR__ . '/../../../Core/LayoutHelper.php'; require_once __DIR__ . '/../../../Core/FeatureGate.php'; ?>
-        <?php if ($secCan(['redacao_professor']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('redacao_configuravel'))): ?>
+        <?php if ($secCan(['redacao_professor']) && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('redacao_configuravel'))): ?>
         <a href="<?= $urlBase ?>/admin/redacao-professor" class="<?= $linkCls(in_array($cur, ['essays_teacher', 'essays_teacher_report'], true)) ?>">
             <i class="fa-solid fa-pen-to-square w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Jornada da Redação</span>
         </a>
         <?php endif; ?>
-        <?php if (FeatureGate::isModuleEnabled('jornadas') && $secCan(['jornadas_aluno'])): ?>
+        <?php if (\App\Core\FeatureGate::isModuleEnabled('jornadas') && $secCan(['jornadas_aluno'])): ?>
         <a href="<?= $urlBase ?>/admin/jornadas" class="<?= $linkCls(in_array($cur, ['journeys', 'journeys_relatorio'], true)) ?>">
             <i class="fa-solid fa-route w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Jornada do Aluno</span>
@@ -267,7 +266,7 @@ $gestaoOpen = $secretariaNavOpen;
             <span class="sidebar-text text-sm">Painel de Fechamento</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['conselho_classe']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('conselho_classe'))): ?>
+        <?php if ($secCan(['conselho_classe']) && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('conselho_classe'))): ?>
         <a href="<?= $urlBase ?>/admin/conselhos" class="<?= $linkCls($cur === 'conselho_classe') ?>">
             <i class="fa-solid fa-chalkboard-user w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Conselho de Classe</span>
@@ -310,15 +309,15 @@ $gestaoOpen = $secretariaNavOpen;
             <span class="sidebar-text text-sm">Layout de documentos</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['censo_escolar']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('censo_escolar'))): ?>
+        <?php if ($secCan(['censo_escolar']) && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('censo_escolar'))): ?>
         <a href="<?= $urlBase ?>/admin/censo" class="<?= $linkCls($cur === 'censo_escolar') ?>">
             <i class="fa-solid fa-school-flag w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Censo Escolar</span>
         </a>
         <?php endif; ?>
         <?php
-        $secAlmoxarifadoOk = $modOn('recursos_fisicos') && $secCan(['almoxarifado']) && class_exists('AdminSecretariaAccess') && AdminSecretariaAccess::requestPathIsAllowed('/admin/almoxarifado');
-        $secPatrimonioOk = $modOn('recursos_fisicos') && $secCan(['patrimonio']) && class_exists('AdminSecretariaAccess') && AdminSecretariaAccess::requestPathIsAllowed('/admin/patrimonio');
+        $secAlmoxarifadoOk = $modOn('recursos_fisicos') && $secCan(['almoxarifado']) && class_exists('AdminSecretariaAccess') && \App\Core\AdminSecretariaAccess::requestPathIsAllowed('/admin/almoxarifado');
+        $secPatrimonioOk = $modOn('recursos_fisicos') && $secCan(['patrimonio']) && class_exists('AdminSecretariaAccess') && \App\Core\AdminSecretariaAccess::requestPathIsAllowed('/admin/patrimonio');
         if ($secAlmoxarifadoOk || $secPatrimonioOk):
         ?>
         <?php $menu_subcab_titulo = 'Outros da escola'; $menu_subcab_periodo = ''; require __DIR__ . '/admin_sidebar_subcabecalho.php'; ?>
@@ -366,7 +365,7 @@ $gestaoOpen = $secretariaNavOpen;
             <span class="sidebar-text text-sm">Dashboard</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['saude_academica']) && $modOn('saude_academica') && class_exists('AdminSecretariaAccess') && AdminSecretariaAccess::requestPathIsAllowed('/admin/saude-academica')): ?>
+        <?php if ($secCan(['saude_academica']) && $modOn('saude_academica') && class_exists('AdminSecretariaAccess') && \App\Core\AdminSecretariaAccess::requestPathIsAllowed('/admin/saude-academica')): ?>
         <a href="<?= $urlBase ?>/admin/saude-academica" class="<?= $linkCls($cur === 'saude_academica') ?>">
             <i class="fa-solid fa-heart-pulse w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Saúde Acadêmica</span>

@@ -1,5 +1,7 @@
 <?php
 
+namespace App\Helpers;
+
 /**
  * EducaInclui — Catálogo de rule keys da Máscara de Acessibilidade.
  *
@@ -420,4 +422,8 @@ class CatalogoRegraMascara
         }
         return false;
     }
+}
+
+if (!class_exists('CatalogoRegraMascara', false) && class_exists(__NAMESPACE__ . '\\CatalogoRegraMascara', false)) {
+    class_alias(__NAMESPACE__ . '\\CatalogoRegraMascara', 'CatalogoRegraMascara');
 }

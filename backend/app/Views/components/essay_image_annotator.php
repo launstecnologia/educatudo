@@ -127,7 +127,7 @@ $annotatorJsVersion = '20250612';
     var annotator = new EssayImageAnnotator(mount, {
         imageUrl: <?= json_encode($imageUrl, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
         readonly: <?= $readonly ? 'true' : 'false' ?>,
-        initialData: <?= json_encode($initialAnnotations ?? new stdClass(), JSON_UNESCAPED_UNICODE) ?>,
+        initialData: <?= json_encode($initialAnnotations ?? new \stdClass(), JSON_UNESCAPED_UNICODE) ?>,
         toolbarId: <?= json_encode($toolbarId) ?>
     });
 

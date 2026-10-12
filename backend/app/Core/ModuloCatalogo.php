@@ -1,11 +1,12 @@
 <?php
+
+namespace App\Core;
 /**
  * Catálogo único de módulos comerciais do Master.
  * Um nome na tela; ao salvar, grava todas as chaves (aluno, professor, pais).
  * Rotas alimentam o FeatureGate — desligar some do menu e bloqueia a URL.
  */
 
-require_once __DIR__ . '/ModuloRegistry.php';
 
 class ModuloCatalogo
 {
@@ -760,4 +761,8 @@ class ModuloCatalogo
         $quoted = str_replace('\\{id\\}', '\\d+', $quoted);
         return '#^' . $quoted . '(?:/|$)#';
     }
+}
+
+if (!class_exists('ModuloCatalogo', false) && class_exists(__NAMESPACE__ . '\\ModuloCatalogo', false)) {
+    class_alias(__NAMESPACE__ . '\\ModuloCatalogo', 'ModuloCatalogo');
 }

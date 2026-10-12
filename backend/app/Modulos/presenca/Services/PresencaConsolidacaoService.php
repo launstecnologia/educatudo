@@ -1,9 +1,10 @@
 <?php
 
-require_once __DIR__ . '/../../../Core/Database.php';
-require_once __DIR__ . '/../../../Models/Education/ClassDiary.php';
-require_once __DIR__ . '/../../../Models/Education/SchoolAbsence.php';
-require_once __DIR__ . '/../Models/PresencaConfig.php';
+namespace App\Modulos\Presenca\Services;
+
+
+use App\Modulos\Diario\Models\ClassDiary;
+use App\Modulos\Presenca\Models\PresencaConfig;
 
 /**
  * Recalcula o total em faltas_lancamentos (não soma +1) para eventos de origem=diario.
@@ -16,15 +17,15 @@ class PresencaConsolidacaoService
     private $absence;
 
     public function __construct(
-        ?Database $db = null,
+        ?\App\Core\Database $db = null,
         ?PresencaConfig $config = null,
         ?ClassDiary $diary = null,
-        ?SchoolAbsence $absence = null
+        ?\App\Models\Education\SchoolAbsence $absence = null
     ) {
-        $this->db = $db ?? Database::getInstance();
+        $this->db = $db ?? \App\Core\Database::getInstance();
         $this->configModel = $config ?? new PresencaConfig();
         $this->diary = $diary ?? new ClassDiary();
-        $this->absence = $absence ?? new SchoolAbsence();
+        $this->absence = $absence ?? new \App\Models\Education\SchoolAbsence();
     }
 
     public function consolidarAlunoNaData(int $alunoId, string $data): void
@@ -196,4 +197,8 @@ class PresencaConsolidacaoService
         );
         return (bool) $row;
     }
+}
+
+if (!class_exists('PresencaConsolidacaoService', false) && class_exists(__NAMESPACE__ . '\\PresencaConsolidacaoService', false)) {
+    class_alias(__NAMESPACE__ . '\\PresencaConsolidacaoService', 'PresencaConsolidacaoService');
 }

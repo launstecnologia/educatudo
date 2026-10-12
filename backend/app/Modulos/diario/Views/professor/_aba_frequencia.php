@@ -1,5 +1,4 @@
 <?php
-require_once dirname(__DIR__, 4) . '/Services/FrequencyService.php';
 ?>
 <div class="space-y-6">
     <div class="bg-white border border-gray-200 rounded-xl p-5">
@@ -7,9 +6,9 @@ require_once dirname(__DIR__, 4) . '/Services/FrequencyService.php';
         <p class="text-3xl font-bold text-gray-900 mt-1">
             <?= $frequencia_turma !== null ? number_format($frequencia_turma, 1) . '%' : '—' ?>
         </p>
-        <?php if ($frequencia_turma !== null && $frequencia_turma < FrequencyService::MINIMO_LEGAL): ?>
+        <?php if ($frequencia_turma !== null && $frequencia_turma < \App\Services\FrequencyService::MINIMO_LEGAL): ?>
             <p class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mt-3">
-                Abaixo do mínimo legal (<?= FrequencyService::MINIMO_LEGAL ?>% — LDB art. 24, VI).
+                Abaixo do mínimo legal (<?= \App\Services\FrequencyService::MINIMO_LEGAL ?>% — LDB art. 24, VI).
             </p>
         <?php endif; ?>
         <p class="text-xs text-gray-400 mt-3">Calculada automaticamente a partir das chamadas finalizadas — não é um lançamento separado.</p>
@@ -39,7 +38,7 @@ require_once dirname(__DIR__, 4) . '/Services/FrequencyService.php';
                                 <td class="px-6 py-4 text-sm text-gray-700"><?= (int) $a['presencas'] ?></td>
                                 <td class="px-6 py-4 text-sm text-gray-700"><?= (int) $a['faltas'] ?></td>
                                 <td class="px-6 py-4 text-sm text-gray-700"><?= (int) $a['faltas_justificadas'] ?></td>
-                                <td class="px-6 py-4 text-sm font-semibold <?= $a['percentual'] !== null && $a['percentual'] < FrequencyService::MINIMO_LEGAL ? 'text-red-700' : 'text-gray-900' ?>">
+                                <td class="px-6 py-4 text-sm font-semibold <?= $a['percentual'] !== null && $a['percentual'] < \App\Services\FrequencyService::MINIMO_LEGAL ? 'text-red-700' : 'text-gray-900' ?>">
                                     <?= $a['percentual'] !== null ? number_format($a['percentual'], 1) . '%' : '—' ?>
                                 </td>
                             </tr>

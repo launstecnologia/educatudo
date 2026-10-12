@@ -1,6 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Models/ConselhoSessao.php';
-require_once __DIR__ . '/../../Services/ConselhoService.php';
 
 use App\Modulos\ConselhoClasse\Models\ConselhoSessao;
 use App\Modulos\ConselhoClasse\Services\ConselhoService;
@@ -27,7 +25,7 @@ $freq = $linha['frequencia'] ?? null;
             <h2 class="text-2xl font-bold text-gray-900 mb-2"><?= htmlspecialchars((string) ($aluno['nome'] ?? 'Aluno')) ?></h2>
             <p class="text-gray-600">
                 Ficha no Conselho · <?= htmlspecialchars((string) ($sessao['turma_nome'] ?? '')) ?>
-                · <?= htmlspecialchars(class_exists('PeriodoLetivo') ? (PeriodoLetivo::rotulo((int) ($sessao['ano_letivo'] ?? 0), (int) ($sessao['bimestre'] ?? 0)) ?: ((int) ($sessao['bimestre'] ?? 0) . 'º período')) : ((int) ($sessao['bimestre'] ?? 0) . 'º período')) ?> / <?= (int) ($sessao['ano_letivo'] ?? 0) ?>
+                · <?= htmlspecialchars(class_exists('PeriodoLetivo') ? (\App\Core\PeriodoLetivo::rotulo((int) ($sessao['ano_letivo'] ?? 0), (int) ($sessao['bimestre'] ?? 0)) ?: ((int) ($sessao['bimestre'] ?? 0) . 'º período')) : ((int) ($sessao['bimestre'] ?? 0) . 'º período')) ?> / <?= (int) ($sessao['ano_letivo'] ?? 0) ?>
             </p>
         </div>
         <a href="<?= URL ?>/admin/conselhos/<?= $sid ?>" class="text-gray-600 hover:text-gray-900">← Voltar à matriz</a>
@@ -58,7 +56,7 @@ $freq = $linha['frequencia'] ?? null;
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
         <p class="text-xs font-medium text-gray-500 uppercase mb-2">Homologado</p>
         <?php $homolog = $linha['resultado_homologado'] ?? null; ?>
-        <p class="text-lg font-semibold text-gray-900"><?= $homolog ? htmlspecialchars(ConselhoSessao::RESULTADOS[$homolog] ?? $homolog) : 'Ainda sem deliberação' ?></p>
+        <p class="text-lg font-semibold text-gray-900"><?= $homolog ? htmlspecialchars(\App\Modulos\ConselhoClasse\Models\ConselhoSessao::RESULTADOS[$homolog] ?? $homolog) : 'Ainda sem deliberação' ?></p>
     </div>
 </div>
 
@@ -106,7 +104,7 @@ $freq = $linha['frequencia'] ?? null;
                 <label class="block text-sm font-medium text-gray-700 mb-2">Decisão <span class="text-red-500">*</span></label>
                 <select name="resultado_decisao" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                     <option value="">Selecione</option>
-                    <?php foreach (ConselhoSessao::RESULTADOS as $valor => $rotulo): ?>
+                    <?php foreach (\App\Modulos\ConselhoClasse\Models\ConselhoSessao::RESULTADOS as $valor => $rotulo): ?>
                         <option value="<?= htmlspecialchars($valor) ?>"><?= htmlspecialchars($rotulo) ?></option>
                     <?php endforeach; ?>
                 </select>
@@ -129,7 +127,7 @@ $freq = $linha['frequencia'] ?? null;
             <?php else: ?>
                 <?php foreach ($deliberacoes as $d): ?>
                 <div class="text-sm border border-gray-100 rounded-lg p-3">
-                    <div class="font-medium text-gray-900"><?= htmlspecialchars(ConselhoSessao::RESULTADOS[$d['resultado_decisao']] ?? $d['resultado_decisao']) ?></div>
+                    <div class="font-medium text-gray-900"><?= htmlspecialchars(\App\Modulos\ConselhoClasse\Models\ConselhoSessao::RESULTADOS[$d['resultado_decisao']] ?? $d['resultado_decisao']) ?></div>
                     <div class="text-xs text-gray-500 mt-1">Antes: <?= htmlspecialchars((string) $d['resultado_anterior']) ?> · <?= date('d/m/Y H:i', strtotime((string) $d['created_at'])) ?></div>
                     <p class="text-gray-700 mt-2 whitespace-pre-wrap"><?= htmlspecialchars((string) $d['justificativa']) ?></p>
                 </div>
@@ -149,7 +147,7 @@ $freq = $linha['frequencia'] ?? null;
                 <label class="block text-sm font-medium text-gray-700 mb-2">Tipo <span class="text-red-500">*</span></label>
                 <select name="tipo" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                     <option value="">Selecione</option>
-                    <?php foreach (ConselhoSessao::ENCAMINHAMENTOS as $valor => $rotulo): ?>
+                    <?php foreach (\App\Modulos\ConselhoClasse\Models\ConselhoSessao::ENCAMINHAMENTOS as $valor => $rotulo): ?>
                         <option value="<?= htmlspecialchars($valor) ?>"><?= htmlspecialchars($rotulo) ?></option>
                     <?php endforeach; ?>
                 </select>
@@ -158,7 +156,7 @@ $freq = $linha['frequencia'] ?? null;
                 <label class="block text-sm font-medium text-gray-700 mb-2">Detalhe <span class="text-red-500">*</span></label>
                 <textarea name="detalhe" rows="3" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"></textarea>
             </div>
-            <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('ocorrencias')): ?>
+            <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('ocorrencias')): ?>
             <label class="inline-flex items-center gap-2 text-sm text-gray-700 mb-4">
                 <input type="checkbox" name="gerar_ocorrencia" value="1" class="rounded border-gray-300">
                 Criar ocorrência pedagógica vinculada
@@ -176,9 +174,9 @@ $freq = $linha['frequencia'] ?? null;
             <?php else: ?>
                 <?php foreach ($encaminhamentos as $e): ?>
                 <div class="text-sm border border-gray-100 rounded-lg p-3">
-                    <div class="font-medium text-gray-900"><?= htmlspecialchars(ConselhoSessao::ENCAMINHAMENTOS[$e['tipo']] ?? $e['tipo']) ?></div>
+                    <div class="font-medium text-gray-900"><?= htmlspecialchars(\App\Modulos\ConselhoClasse\Models\ConselhoSessao::ENCAMINHAMENTOS[$e['tipo']] ?? $e['tipo']) ?></div>
                     <p class="text-gray-700 mt-1 whitespace-pre-wrap"><?= htmlspecialchars((string) $e['detalhe']) ?></p>
-                    <?php if (!empty($e['ocorrencia_id']) && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('ocorrencias'))): ?>
+                    <?php if (!empty($e['ocorrencia_id']) && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('ocorrencias'))): ?>
                         <a href="<?= URL ?>/admin/ocorrencias/<?= (int) $e['ocorrencia_id'] ?>" class="text-xs text-purple-700 hover:underline mt-1 inline-block">Ver ocorrência</a>
                     <?php endif; ?>
                 </div>
@@ -204,7 +202,7 @@ $freq = $linha['frequencia'] ?? null;
             </ul>
         <?php endif; ?>
     </div>
-    <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('ocorrencias')): ?>
+    <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('ocorrencias')): ?>
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <h3 class="text-base font-semibold text-gray-900 mb-3">Ocorrências do aluno</h3>
         <?php if ($ocorrencias === []): ?>

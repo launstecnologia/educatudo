@@ -5,7 +5,7 @@ $alunoCodigoAcoes = trim((string) ($student['codigo_aluno'] ?? ''));
 $alunoRaAcoes = trim((string) ($student['ra'] ?? ''));
 $alunoIdentAcoes = 'Cód. ' . ($alunoCodigoAcoes !== '' ? $alunoCodigoAcoes : '—')
     . ' · RA ' . ($alunoRaAcoes !== '' ? $alunoRaAcoes : '—');
-$inclusaoVisivel = !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('inclusao');
+$inclusaoVisivel = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('inclusao');
 $alunoAtivoAcoes = (int) ($student['ativo'] ?? 0) === 1;
 $semResponsaveis = empty($responsaveis_aluno);
 
@@ -80,7 +80,7 @@ $gruposAcoesAluno = [
                 'perm_action' => 'visualizar',
                 'onclick' => "abrirModalDoc('Autorizacoes')",
             ],
-            (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('financeiro')) ? [
+            (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('financeiro')) ? [
                 'id' => 'financeiro',
                 'label' => 'Financeiro',
                 'descricao' => 'Ver saldo, faturas e extrato do aluno',
@@ -117,7 +117,7 @@ $gruposAcoesAluno = [
                 'perm_action' => 'visualizar',
                 'onclick' => "abrirModalDoc('Documentacao')",
             ],
-            (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('vida_escolar')) ? [
+            (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('vida_escolar')) ? [
                 'id' => 'vida-escolar',
                 'label' => 'Vida escolar',
                 'descricao' => 'Prontuário: boletim, histórico, documentos, SED e INEP',

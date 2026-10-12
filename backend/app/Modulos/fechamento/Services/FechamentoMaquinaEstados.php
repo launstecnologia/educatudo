@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Modulos\Fechamento\Services;
 /**
  * Transições canônicas do fechamento por turma × período.
  * Sem I/O — testável sem banco.
@@ -96,4 +98,8 @@ class FechamentoMaquinaEstados
         }
         return 'Transição de ' . self::rotulo($de) . ' para ' . self::rotulo($para) . ' não é permitida.';
     }
+}
+
+if (!class_exists('FechamentoMaquinaEstados', false) && class_exists(__NAMESPACE__ . '\\FechamentoMaquinaEstados', false)) {
+    class_alias(__NAMESPACE__ . '\\FechamentoMaquinaEstados', 'FechamentoMaquinaEstados');
 }

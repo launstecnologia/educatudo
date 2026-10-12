@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Services/ApoioDigitacaoFechamentoService.php';
 
 $escola = is_array($escola ?? null) ? $escola : [];
 $turmas = is_array($turmas ?? null) ? $turmas : [];
@@ -12,7 +11,7 @@ $schemaPronto = !empty($schema_pronto);
 $disponivel = !empty($escola['disponivel']);
 $uf = (string) ($escola['uf'] ?? '');
 $ehSp = $uf === 'SP';
-$statusRotulos = is_array($status_rotulos ?? null) ? $status_rotulos : ApoioDigitacaoFechamentoService::STATUS;
+$statusRotulos = is_array($status_rotulos ?? null) ? $status_rotulos : \App\Modulos\Fechamento\Services\ApoioDigitacaoFechamentoService::STATUS;
 $pagina = max(1, (int) ($pagina ?? 1));
 $paginas = max(1, (int) ($paginas ?? 1));
 $totalEmissoes = (int) ($emissoes_total ?? 0);
@@ -204,7 +203,7 @@ $statusBadge = static function (string $status): string {
                 <?php else: foreach ($emissoes as $em):
                     $eid = (int) ($em['id'] ?? 0);
                     $status = (string) ($em['status'] ?? 'exportado');
-                    $pendencias = ApoioDigitacaoFechamentoService::lerPendencias($em['pendencias_json'] ?? '');
+                    $pendencias = \App\Modulos\Fechamento\Services\ApoioDigitacaoFechamentoService::lerPendencias($em['pendencias_json'] ?? '');
                     $criticas = 0;
                     foreach ($pendencias as $pend) {
                         if (!empty($pend['critica'])) {

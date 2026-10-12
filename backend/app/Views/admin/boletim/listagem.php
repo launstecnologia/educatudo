@@ -42,12 +42,11 @@ $bimestreLabel = static function ($bimestre, $ano = 0) {
     $bimestre = (int) $bimestre;
     $ano = (int) $ano;
     if (!class_exists('PeriodoLetivo')) {
-        require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
     }
     if ($bimestre <= 0) {
         return 'N/A';
     }
-    $lab = PeriodoLetivo::rotulo($ano > 0 ? $ano : (int) date('Y'), $bimestre);
+    $lab = \App\Core\PeriodoLetivo::rotulo($ano > 0 ? $ano : (int) date('Y'), $bimestre);
     return $lab !== '' ? $lab : 'N/A';
 };
 ?>
@@ -151,9 +150,9 @@ $bimestreLabel = static function ($bimestre, $ano = 0) {
                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
             </div>
             <div>
-                <label for="filtro_bimestre" class="block text-sm font-medium text-gray-700 mb-1.5"><?= htmlspecialchars(PeriodoLetivo::doAno((int) ($filtroAno !== '' ? $filtroAno : date('Y')))['rotulo_campo']) ?></label>
+                <label for="filtro_bimestre" class="block text-sm font-medium text-gray-700 mb-1.5"><?= htmlspecialchars(\App\Core\PeriodoLetivo::doAno((int) ($filtroAno !== '' ? $filtroAno : date('Y')))['rotulo_campo']) ?></label>
                 <select id="filtro_bimestre" name="bimestre" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <?= PeriodoLetivo::optionsHtml((int) ($filtroAno !== '' ? $filtroAno : date('Y')), (int) $filtroBimestre, ['todos' => true]) ?>
+                    <?= \App\Core\PeriodoLetivo::optionsHtml((int) ($filtroAno !== '' ? $filtroAno : date('Y')), (int) $filtroBimestre, ['todos' => true]) ?>
                 </select>
             </div>
             <div>

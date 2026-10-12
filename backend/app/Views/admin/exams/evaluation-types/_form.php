@@ -49,9 +49,9 @@ include __DIR__ . '/../../_partials/flash_message.php';
             <span class="block text-sm font-medium text-gray-700 mb-2">Origem</span>
             <p class="text-sm text-gray-500 mb-3">Onde a avaliação acontece.</p>
             <?php
-            $canalSel = TipoNotaRegraService::canalDaOrigem($origemSel);
-            $canais = TipoNotaRegraService::CANAIS_ORIGEM;
-            $modosOffline = TipoNotaRegraService::MODOS_OFFLINE;
+            $canalSel = \App\Services\TipoNotaRegraService::canalDaOrigem($origemSel);
+            $canais = \App\Services\TipoNotaRegraService::CANAIS_ORIGEM;
+            $modosOffline = \App\Services\TipoNotaRegraService::MODOS_OFFLINE;
             ?>
             <input type="hidden" name="origem" id="campo-origem" value="<?= htmlspecialchars($origemSel, ENT_QUOTES, 'UTF-8') ?>">
             <div class="space-y-3">

@@ -1,9 +1,13 @@
 <?php
+
+namespace App\Middleware;
 /**
  * Middleware de Segurança para Jogos
  * Previne trapaças e abusos no sistema de jogos
  */
 
+
+use App\Core\Database;
 class GameSecurityMiddleware
 {
     private $db;
@@ -33,7 +37,7 @@ class GameSecurityMiddleware
         );
         
         if (!$partida) {
-            error_log("SECURITY: Partida inválida para aluno $alunoId, partida $partidaId");
+            error_log("SECURITY: \Partida inválida para aluno $alunoId, partida $partidaId");
             return ['valid' => false, 'error' => 'Partida inválida ou finalizada'];
         }
         
@@ -49,7 +53,7 @@ class GameSecurityMiddleware
         
         // 4. Verificar inatividade
         if (!$this->checkInactivity($partidaId)) {
-            error_log("SECURITY: Inatividade detectada para partida $partidaId");
+            error_log("SECURITY: \Inatividade detectada para partida $partidaId");
             return ['valid' => false, 'error' => 'Partida pausada devido a inatividade'];
         }
         
@@ -173,7 +177,7 @@ class GameSecurityMiddleware
                     'action' => $action
                 ]
             );
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             // Tabela pode não existir ainda
             error_log("Erro ao registrar ação: " . $e->getMessage());
         }
@@ -236,3 +240,7 @@ class GameSecurityMiddleware
     }
 }
 
+
+if (!class_exists('GameSecurityMiddleware', false) && class_exists(__NAMESPACE__ . '\\GameSecurityMiddleware', false)) {
+    class_alias(__NAMESPACE__ . '\\GameSecurityMiddleware', 'GameSecurityMiddleware');
+}

@@ -47,7 +47,7 @@
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                 Redações
             </button>
-            <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('ocorrencias')): ?>
+            <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('ocorrencias')): ?>
             <button onclick="showTab('ocorrencias')" id="tab-ocorrencias" class="tab-button flex items-center px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 Ocorrências
@@ -110,7 +110,7 @@
             <?php endif; ?>
         </div>
 
-        <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('ocorrencias')): ?>
+        <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('ocorrencias')): ?>
         <div id="content-ocorrencias" class="tab-content hidden">
             <div class="flex items-center justify-between mb-6">
                 <h3 class="text-xl font-bold text-gray-900">Ocorrências</h3>

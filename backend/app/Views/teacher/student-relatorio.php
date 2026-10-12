@@ -225,14 +225,14 @@
                         </div>
                         <div class="ml-4 text-right">
                             <?php
-                            $statusEx = JornadaExercicioAvaliacao::classificar(
+                            $statusEx = \App\Core\JornadaExercicioAvaliacao::classificar(
                                 $exercicio['exercicio_tipo'] ?? '',
                                 $exercicio['pontuacao'] ?? null,
                                 $exercicio['resposta'] ?? '',
                                 true
                             );
-                            $pendenteEx = $statusEx === JornadaExercicioAvaliacao::STATUS_PENDENTE;
-                            $corretoEx = $statusEx === JornadaExercicioAvaliacao::STATUS_ACERTO;
+                            $pendenteEx = $statusEx === \App\Core\JornadaExercicioAvaliacao::STATUS_PENDENTE;
+                            $corretoEx = $statusEx === \App\Core\JornadaExercicioAvaliacao::STATUS_ACERTO;
                             ?>
                             <?php if ($pendenteEx): ?>
                                 <span class="inline-block px-3 py-1 bg-amber-100 text-amber-800 text-sm font-semibold rounded-full">

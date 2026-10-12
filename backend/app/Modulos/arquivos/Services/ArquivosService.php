@@ -1,14 +1,17 @@
 <?php
+
+namespace App\Modulos\Arquivos\Services;
 /**
  * Service — lógica de negócio do módulo Arquivos.
  */
 
-require_once __DIR__ . '/../Models/ModuloArquivo.php';
-require_once __DIR__ . '/../Models/ModuloArquivoAnexo.php';
-require_once __DIR__ . '/../Models/ModuloArquivoVideo.php';
-require_once __DIR__ . '/../Models/ModuloArquivoPasta.php';
 
-if (!class_exists('ArquivosService')) {
+use App\Modulos\Arquivos\Models\ModuloArquivo;
+use App\Modulos\Arquivos\Models\ModuloArquivoAnexo;
+use App\Modulos\Arquivos\Models\ModuloArquivoPasta;
+use App\Modulos\Arquivos\Models\ModuloArquivoVideo;
+
+if (!class_exists('ArquivosService', false)) {
 class ArquivosService
 {
     private $db;
@@ -19,7 +22,7 @@ class ArquivosService
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
         $this->arquivoModel = new ModuloArquivo();
         $this->anexoModel = new ModuloArquivoAnexo();
         $this->videoModel = new ModuloArquivoVideo();
@@ -812,8 +815,7 @@ class ArquivosService
 
     public function processarUploads(int $moduloArquivoId, array $files, array $config, array $extensoesPermitidas): void
     {
-        require_once __DIR__ . '/../../../Services/MediaStorageService.php';
-        $media = new MediaStorageService($config);
+        $media = new \App\Services\MediaStorageService($config);
         $ordemBase = count($this->anexoModel->listByModuloArquivo($moduloArquivoId));
         $ordem = $ordemBase;
 
@@ -859,8 +861,7 @@ class ArquivosService
     public function removerAnexosFisicos(int $moduloArquivoId, array $config): void
     {
         $anexos = $this->anexoModel->listByModuloArquivo($moduloArquivoId);
-        require_once __DIR__ . '/../../../Services/MediaStorageService.php';
-        $media = new MediaStorageService($config);
+        $media = new \App\Services\MediaStorageService($config);
         $basePath = defined('ROOT_PATH') ? ROOT_PATH . '/' : (__DIR__ . '/../../../../');
         foreach ($anexos as $a) {
             $key = self::anexoPathToMediaKey((string) $a['caminho']);
@@ -878,8 +879,7 @@ class ArquivosService
     public function removerAnexosNaoMantidos(int $moduloArquivoId, array $idsManter, array $config): void
     {
         $anexosAtuais = $this->anexoModel->listIdsCaminhosByModuloArquivo($moduloArquivoId);
-        require_once __DIR__ . '/../../../Services/MediaStorageService.php';
-        $media = new MediaStorageService($config);
+        $media = new \App\Services\MediaStorageService($config);
         $basePath = defined('ROOT_PATH') ? ROOT_PATH . '/' : (__DIR__ . '/../../../../');
         foreach ($anexosAtuais as $a) {
             if (in_array((int) $a['id'], $idsManter, true)) {
@@ -1004,8 +1004,7 @@ class ArquivosService
             return ['ok' => false, 'error' => 'Selecione pelo menos uma turma.'];
         }
 
-        require_once __DIR__ . '/../../../Services/MediaStorageService.php';
-        $media = new MediaStorageService($config);
+        $media = new \App\Services\MediaStorageService($config);
         $safeKey = 'arquivo_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
         $mime = self::detectMimeType($tmpPath, (string) ($file['type'] ?? ''));
         if (!$media->put('arquivos', $safeKey, $tmpPath, $mime)) {
@@ -1168,8 +1167,7 @@ class ArquivosService
         $contentType = self::mimePorExtensao((string) ($anexo['extensao'] ?? ''));
         $disposition = $download ? 'attachment' : 'inline';
 
-        require_once __DIR__ . '/../../../Services/MediaStorageService.php';
-        $media = new MediaStorageService($config);
+        $media = new \App\Services\MediaStorageService($config);
         $mediaKey = self::anexoPathToMediaKey((string) ($anexo['caminho'] ?? ''));
         if ($media->isS3() && $mediaKey !== '') {
             $signedUrl = $media->getViewUrl('arquivos', $mediaKey, $filename, 900);
@@ -1237,4 +1235,8 @@ class ArquivosService
         return false;
     }
 }
+}
+
+if (!class_exists('ArquivosService', false) && class_exists(__NAMESPACE__ . '\\ArquivosService', false)) {
+    class_alias(__NAMESPACE__ . '\\ArquivosService', 'ArquivosService');
 }

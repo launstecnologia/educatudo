@@ -78,9 +78,8 @@
                                 
                                 <?php
                                 if (!class_exists('CreditosModuleRegistry', false)) {
-                                    require_once __DIR__ . '/../../../Core/CreditosModuleRegistry.php';
                                 }
-                                $tudicoinsExercicioFormIa = \CreditosModuleRegistry::acaoIaDisponivel('gerar_exercicio_ia_professor');
+                                $tudicoinsExercicioFormIa = \App\Core\CreditosModuleRegistry::acaoIaDisponivel('gerar_exercicio_ia_professor');
                                 if ($tudicoinsExercicioFormIa):
                                 ?>
                                 <label class="relative flex items-center p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">

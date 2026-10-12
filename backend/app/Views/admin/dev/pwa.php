@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../../Core/LayoutHelper.php';
 
 $profiles = [
     'aluno' => [
@@ -38,12 +37,12 @@ $profiles = [
                 <?php foreach ($profiles as $key => $profile): ?>
                     <?php
                         $prefix = $profile['prefix'];
-                        $name = LayoutHelper::get("{$prefix}_name", "EducaTudo {$profile['label']}");
-                        $shortName = LayoutHelper::get("{$prefix}_short_name", $profile['label']);
-                        $icon192 = LayoutHelper::get("{$prefix}_icon_192", LayoutHelper::getLogo1x1Url());
-                        $icon512 = LayoutHelper::get("{$prefix}_icon_512", LayoutHelper::getLogo1x1Url());
-                        $themeColor = LayoutHelper::get("{$prefix}_theme_color", LayoutHelper::get('primary_color', '#a855f7'));
-                        $backgroundColor = LayoutHelper::get("{$prefix}_background_color", '#ffffff');
+                        $name = \App\Core\LayoutHelper::get("{$prefix}_name", "EducaTudo {$profile['label']}");
+                        $shortName = \App\Core\LayoutHelper::get("{$prefix}_short_name", $profile['label']);
+                        $icon192 = \App\Core\LayoutHelper::get("{$prefix}_icon_192", \App\Core\LayoutHelper::getLogo1x1Url());
+                        $icon512 = \App\Core\LayoutHelper::get("{$prefix}_icon_512", \App\Core\LayoutHelper::getLogo1x1Url());
+                        $themeColor = \App\Core\LayoutHelper::get("{$prefix}_theme_color", \App\Core\LayoutHelper::get('primary_color', '#a855f7'));
+                        $backgroundColor = \App\Core\LayoutHelper::get("{$prefix}_background_color", '#ffffff');
                     ?>
                     <div class="border border-gray-200 rounded-lg p-4">
                         <div class="flex items-center justify-between mb-4">

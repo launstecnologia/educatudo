@@ -5,8 +5,8 @@ $monCssPath = dirname(__DIR__, 4) . '/public/static/css/monitoramento.css';
 $monJsPath  = dirname(__DIR__, 4) . '/public/static/js/monitoramento.js';
 $monCss = file_exists($monCssPath) ? file_get_contents($monCssPath) : '';
 $monJs  = file_exists($monJsPath)  ? file_get_contents($monJsPath)  : '';
-$logoUrl = class_exists('LayoutHelper') ? LayoutHelper::getNavbarLogoUrl() : '';
-$escolaNome = class_exists('LayoutHelper') ? LayoutHelper::getSystemTitle() : (getenv('ESCOLA_NOME') ?: 'EducaTudo');
+$logoUrl = class_exists('LayoutHelper') ? \App\Core\LayoutHelper::getNavbarLogoUrl() : '';
+$escolaNome = class_exists('LayoutHelper') ? \App\Core\LayoutHelper::getSystemTitle() : (getenv('ESCOLA_NOME') ?: 'EducaTudo');
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">

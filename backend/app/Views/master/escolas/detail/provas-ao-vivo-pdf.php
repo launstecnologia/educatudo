@@ -11,10 +11,10 @@ $materias = is_array($materias ?? null) ? $materias : [];
 $alunos = is_array($alunos ?? null) ? $alunos : [];
 $efetividade = is_array($efetividade ?? null) ? $efetividade : [];
 $eventos = is_array($eventos ?? null) ? $eventos : [];
-$rotulosEvento = is_array($rotulos_evento ?? null) ? $rotulos_evento : MasterProvasAoVivoService::rotulosTipoEvento();
+$rotulosEvento = is_array($rotulos_evento ?? null) ? $rotulos_evento : \App\Services\MasterProvasAoVivoService::rotulosTipoEvento();
 $logoData = (string) ($logo_data ?? '');
 $geradoEm = (string) ($gerado_em ?? date('d/m/Y H:i'));
-$tiposSaida = MasterProvasAoVivoService::TIPOS_SAIDA_PROVA;
+$tiposSaida = \App\Services\MasterProvasAoVivoService::TIPOS_SAIDA_PROVA;
 
 $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
 

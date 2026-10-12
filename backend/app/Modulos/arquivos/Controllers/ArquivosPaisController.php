@@ -1,13 +1,16 @@
 <?php
+
+namespace App\Modulos\Arquivos\Controllers;
 /**
  * EducaTudo - Módulo Arquivos (Pais)
  * Somente leitura: materiais que o professor disponibilizou ao aluno.
  */
 
-require_once __DIR__ . '/../Services/ArquivosService.php';
 
-if (!class_exists('ArquivosPaisController')) {
-class ArquivosPaisController extends BaseController
+use App\Modulos\Arquivos\Services\ArquivosService;
+
+if (!class_exists(__NAMESPACE__ . '\\ArquivosPaisController', false)) {
+class ArquivosPaisController extends \App\Core\BaseController
 {
     private $auth;
     private $db;
@@ -16,8 +19,8 @@ class ArquivosPaisController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        $this->auth = new AuthManager();
-        $this->db = Database::getInstance();
+        $this->auth = new \App\Core\AuthManager();
+        $this->db = \App\Core\Database::getInstance();
         $this->arquivosService = new ArquivosService();
         $user = $this->auth->getUser();
         if ($user && ($user['tipo'] ?? '') !== 'pai') {
@@ -176,8 +179,7 @@ class ArquivosPaisController extends BaseController
 
     private function moduloHabilitado(): bool
     {
-        require_once __DIR__ . '/../../../Core/LayoutHelper.php';
-        return LayoutHelper::isModuleEnabled('aluno_arquivos');
+        return \App\Core\LayoutHelper::isModuleEnabled('aluno_arquivos');
     }
 
     private function resultadoVazio(): array
@@ -277,4 +279,8 @@ class ArquivosPaisController extends BaseController
         }
     }
 }
+}
+
+if (!class_exists('ArquivosPaisController', false) && class_exists(__NAMESPACE__ . '\\ArquivosPaisController', false)) {
+    class_alias(__NAMESPACE__ . '\\ArquivosPaisController', 'ArquivosPaisController');
 }

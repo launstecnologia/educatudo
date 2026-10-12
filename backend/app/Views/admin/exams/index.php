@@ -18,10 +18,7 @@ foreach (['titulo', 'data_prova', 'bloco_modelo_id', 'turma_id', 'materia_id', '
         $filtrosAtivosCount++;
     }
 }
-if (!class_exists('PeriodoLetivo')) {
-    require_once __DIR__ . '/../../../../Core/PeriodoLetivo.php';
-}
-$periodoFiltro = PeriodoLetivo::doAno((int) date('Y'));
+$periodoFiltro = \App\Core\PeriodoLetivo::doAno((int) date('Y'));
 // Conta status só quando o usuário escolheu um filtro explícito (não o padrão "exceto concluídos")
 if (!empty($filterStatus)) {
     $filtrosAtivosCount++;
@@ -218,7 +215,7 @@ $editarVoltarQs = $qsListaAtual !== '' ? ('?voltar=' . rawurlencode($voltarLista
             <div>
                 <label for="filtro_bimestre" class="block text-sm font-medium text-gray-700 mb-1.5"><?= htmlspecialchars($periodoFiltro['rotulo_campo']) ?></label>
                 <select id="filtro_bimestre" name="bimestre" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <?= PeriodoLetivo::optionsHtml((int) date('Y'), $filterBimestre, ['todos' => true]) ?>
+                    <?= \App\Core\PeriodoLetivo::optionsHtml((int) date('Y'), $filterBimestre, ['todos' => true]) ?>
                 </select>
             </div>
             <div>
@@ -306,6 +303,22 @@ document.addEventListener('keydown', function(e) {
         <h3 class="text-lg font-semibold text-gray-900">Evento de Provas</h3>
         <div id="barraAcoesLote" class="hidden flex-wrap items-center gap-2">
             <span id="contadorSelecionados" class="text-sm text-gray-600 mr-1">0 selecionado(s)</span>
+            <button type="button" onclick="abrirRelatorioNotasLote()"
+                    class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700"
+                    title="Relatório com matéria, professor, turma, aluno e nota">
+                <i class="fa-solid fa-table" aria-hidden="true"></i>
+                Relatório de notas
+            </button>
+            <button type="button" onclick="exportarRelatorioNotasLoteExcel()"
+                    class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700">
+                <i class="fa-solid fa-file-excel" aria-hidden="true"></i>
+                Excel
+            </button>
+            <button type="button" onclick="exportarRelatorioNotasLotePdf()"
+                    class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700">
+                <i class="fa-solid fa-file-pdf" aria-hidden="true"></i>
+                PDF
+            </button>
             <button type="button" onclick="marcarSelecionadosConcluidos()"
                     class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-gray-800 text-white hover:bg-gray-900">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -317,6 +330,18 @@ document.addEventListener('keydown', function(e) {
                 Excluir
             </button>
         </div>
+    </div>
+
+    <div id="bannerSelecionarTodasPaginas" class="hidden px-6 py-3 border-b border-indigo-100 bg-indigo-50 text-sm text-indigo-950">
+        <span id="textoBannerSelecaoPagina"></span>
+        <button type="button" id="btnSelecionarTodasPaginas" onclick="selecionarTodasPaginas()"
+                class="ml-2 font-semibold text-indigo-700 underline hover:text-indigo-900">
+            Selecionar todos os eventos deste filtro
+        </button>
+        <button type="button" id="btnLimparSelecaoTodasPaginas" onclick="limparSelecaoTodasPaginas()"
+                class="hidden ml-2 font-semibold text-indigo-700 underline hover:text-indigo-900">
+            Limpar seleção
+        </button>
     </div>
     
     <div class="overflow-x-auto">
@@ -373,7 +398,7 @@ document.addEventListener('keydown', function(e) {
                                 }
                                 $bimestreNumero = (int)($bloco['bimestre'] ?? 0);
                                 $anoBloco = (int)($bloco['ano_letivo'] ?? 0);
-                                $bimestreTexto = $bimestreNumero > 0 ? PeriodoLetivo::rotulo($anoBloco, $bimestreNumero) : '';
+                                $bimestreTexto = $bimestreNumero > 0 ? \App\Core\PeriodoLetivo::rotulo($anoBloco, $bimestreNumero) : '';
                                 $destinosQuadro = $rotulos_quadro[(int) ($bloco['id'] ?? 0)] ?? [];
                                 if ($destinosQuadro === []) {
                                     $semanaNum = (int) ($bloco['semana'] ?? 0);
@@ -422,7 +447,7 @@ document.addEventListener('keydown', function(e) {
                             <td class="px-6 py-4 text-sm text-gray-700">
                                 <?php
                                 $bim = (int)($bloco['bimestre'] ?? 0);
-                                $labBim = $bim > 0 ? PeriodoLetivo::rotulo((int)($bloco['ano_letivo'] ?? 0), $bim) : '';
+                                $labBim = $bim > 0 ? \App\Core\PeriodoLetivo::rotulo((int)($bloco['ano_letivo'] ?? 0), $bim) : '';
                                 echo $labBim !== '' ? htmlspecialchars($labBim) : '<span class="text-gray-400">—</span>';
                                 ?>
                             </td>
@@ -606,15 +631,139 @@ function toggleLiberado(blocoId, novoStatus) {
 
 var blocoIdExcluir = null;
 var blocoIdsExcluirLote = null;
+var TOTAL_SELECAO_PROVAS = 'educatudo:admin-provas-selecao';
+var TOTAL_FILTRO_PROVAS = <?= json_encode((string) ($qsListaAtual ?? ''), JSON_UNESCAPED_UNICODE) ?>;
+var TOTAL_EVENTOS_FILTRO = <?= (int) (($pagination['total'] ?? 0)) ?>;
+var TOTAL_PAGINAS_FILTRO = <?= (int) (($pagination['total_pages'] ?? 1)) ?>;
+var URL_IDS_FILTRADOS = <?= json_encode(URL . '/admin/provas/blocos/ids-filtrados' . (($qsListaAtual ?? '') !== '' ? ('?' . $qsListaAtual) : ''), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+var URL_RELATORIO_LOTE = <?= json_encode(URL . '/admin/provas/blocos/relatorio-notas-lote', JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+var URL_RELATORIO_LOTE_EXCEL = <?= json_encode(URL . '/admin/provas/blocos/relatorio-notas-lote/excel', JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+var selecaoTodasPaginas = false;
+
+function carregarSelecaoPersistida() {
+    try {
+        var raw = sessionStorage.getItem(TOTAL_SELECAO_PROVAS);
+        if (!raw) {
+            return { filtro: TOTAL_FILTRO_PROVAS, ids: [], todas: false };
+        }
+        var data = JSON.parse(raw);
+        if (!data || data.filtro !== TOTAL_FILTRO_PROVAS) {
+            sessionStorage.removeItem(TOTAL_SELECAO_PROVAS);
+            return { filtro: TOTAL_FILTRO_PROVAS, ids: [], todas: false };
+        }
+        return {
+            filtro: TOTAL_FILTRO_PROVAS,
+            ids: Array.isArray(data.ids) ? data.ids.map(function (id) { return parseInt(id, 10); }).filter(function (id) { return id > 0; }) : [],
+            todas: !!data.todas
+        };
+    } catch (e) {
+        return { filtro: TOTAL_FILTRO_PROVAS, ids: [], todas: false };
+    }
+}
+
+function salvarSelecaoPersistida(ids, todas) {
+    try {
+        sessionStorage.setItem(TOTAL_SELECAO_PROVAS, JSON.stringify({
+            filtro: TOTAL_FILTRO_PROVAS,
+            ids: ids,
+            todas: !!todas
+        }));
+    } catch (e) {}
+}
+
+function idsPaginaAtual() {
+    return Array.prototype.map.call(
+        document.querySelectorAll('.checkbox-bloco-lote'),
+        function (cb) { return parseInt(cb.value, 10); }
+    ).filter(function (id) { return id > 0; });
+}
 
 function idsBlocosSelecionados() {
-    return Array.prototype.map.call(
-        document.querySelectorAll('.checkbox-bloco-lote:checked'),
-        function(cb) { return parseInt(cb.value, 10); }
-    ).filter(function(id) { return id > 0; });
+    var persistida = carregarSelecaoPersistida();
+    return Array.isArray(persistida.ids) ? persistida.ids.slice() : [];
+}
+
+function sincronizarCheckboxesComPersistencia() {
+    var persistida = carregarSelecaoPersistida();
+    selecaoTodasPaginas = !!persistida.todas;
+    var setIds = {};
+    persistida.ids.forEach(function (id) { setIds[id] = true; });
+    document.querySelectorAll('.checkbox-bloco-lote').forEach(function (cb) {
+        var id = parseInt(cb.value, 10);
+        cb.checked = !!setIds[id];
+    });
+}
+
+function atualizarBannerSelecao() {
+    var banner = document.getElementById('bannerSelecionarTodasPaginas');
+    var texto = document.getElementById('textoBannerSelecaoPagina');
+    var btnTodas = document.getElementById('btnSelecionarTodasPaginas');
+    var btnLimpar = document.getElementById('btnLimparSelecaoTodasPaginas');
+    if (!banner || !texto || !btnTodas || !btnLimpar) {
+        return;
+    }
+    var idsPagina = idsPaginaAtual();
+    var checkedPagina = document.querySelectorAll('.checkbox-bloco-lote:checked').length;
+    var mostrar = TOTAL_PAGINAS_FILTRO > 1 && TOTAL_EVENTOS_FILTRO > idsPagina.length && (
+        selecaoTodasPaginas || checkedPagina === idsPagina.length
+    );
+    if (!mostrar) {
+        banner.classList.add('hidden');
+        return;
+    }
+    banner.classList.remove('hidden');
+    if (selecaoTodasPaginas) {
+        texto.textContent = 'Todos os ' + TOTAL_EVENTOS_FILTRO + ' evento(s) deste filtro estão selecionados (todas as páginas).';
+        btnTodas.classList.add('hidden');
+        btnLimpar.classList.remove('hidden');
+    } else {
+        texto.textContent = 'Todos os ' + checkedPagina + ' desta página estão selecionados.';
+        btnTodas.classList.remove('hidden');
+        btnTodas.textContent = 'Selecionar os ' + TOTAL_EVENTOS_FILTRO + ' eventos deste filtro (todas as páginas)';
+        btnLimpar.classList.add('hidden');
+    }
 }
 
 function atualizarBarraAcoesLote() {
+    var persistida = carregarSelecaoPersistida();
+    var idsPagina = idsPaginaAtual();
+    var checkedNaPagina = Array.prototype.map.call(
+        document.querySelectorAll('.checkbox-bloco-lote:checked'),
+        function (cb) { return parseInt(cb.value, 10); }
+    ).filter(function (id) { return id > 0; });
+
+    if (selecaoTodasPaginas) {
+        var faltandoNaPagina = idsPagina.some(function (id) {
+            return checkedNaPagina.indexOf(id) === -1;
+        });
+        if (faltandoNaPagina) {
+            var setTodas = {};
+            persistida.ids.forEach(function (id) { setTodas[id] = true; });
+            idsPagina.forEach(function (id) {
+                if (checkedNaPagina.indexOf(id) === -1) {
+                    delete setTodas[id];
+                }
+            });
+            selecaoTodasPaginas = false;
+            salvarSelecaoPersistida(
+                Object.keys(setTodas).map(function (id) { return parseInt(id, 10); }),
+                false
+            );
+        }
+    } else {
+        var set = {};
+        persistida.ids.forEach(function (id) {
+            if (idsPagina.indexOf(id) === -1) {
+                set[id] = true;
+            }
+        });
+        checkedNaPagina.forEach(function (id) { set[id] = true; });
+        salvarSelecaoPersistida(
+            Object.keys(set).map(function (id) { return parseInt(id, 10); }),
+            false
+        );
+    }
+
     var ids = idsBlocosSelecionados();
     var barra = document.getElementById('barraAcoesLote');
     var contador = document.getElementById('contadorSelecionados');
@@ -633,17 +782,127 @@ function atualizarBarraAcoesLote() {
         }
     }
     if (master && todos.length) {
-        master.checked = ids.length === todos.length;
-        master.indeterminate = ids.length > 0 && ids.length < todos.length;
+        master.checked = checkedNaPagina.length === todos.length && todos.length > 0;
+        master.indeterminate = checkedNaPagina.length > 0 && checkedNaPagina.length < todos.length;
     }
+    atualizarBannerSelecao();
 }
 
 function toggleSelecionarTodos(master) {
-    document.querySelectorAll('.checkbox-bloco-lote').forEach(function(cb) {
-        cb.checked = !!master.checked;
+    var idsPagina = idsPaginaAtual();
+    if (master.checked) {
+        document.querySelectorAll('.checkbox-bloco-lote').forEach(function (cb) {
+            cb.checked = true;
+        });
+        if (selecaoTodasPaginas) {
+            // Mantém a seleção completa se já estava em "todas as páginas".
+            atualizarBarraAcoesLote();
+            return;
+        }
+        selecaoTodasPaginas = false;
+        atualizarBarraAcoesLote();
+        return;
+    }
+
+    // Desmarca só a página atual; preserva IDs das outras páginas.
+    selecaoTodasPaginas = false;
+    document.querySelectorAll('.checkbox-bloco-lote').forEach(function (cb) {
+        cb.checked = false;
     });
+    var persistida = carregarSelecaoPersistida();
+    var restantes = persistida.ids.filter(function (id) {
+        return idsPagina.indexOf(id) === -1;
+    });
+    salvarSelecaoPersistida(restantes, false);
     atualizarBarraAcoesLote();
 }
+
+function selecionarTodasPaginas() {
+    btnSelecionarTodasPaginasCarregando(true);
+    fetch(URL_IDS_FILTRADOS, { headers: { 'Accept': 'application/json' } })
+        .then(function (response) { return response.json(); })
+        .then(function (data) {
+            btnSelecionarTodasPaginasCarregando(false);
+            if (!data || !data.success || !Array.isArray(data.ids) || !data.ids.length) {
+                alert('Não foi possível carregar os eventos de todas as páginas.');
+                return;
+            }
+            if (data.truncado) {
+                alert('O filtro tem muitos eventos. Foram selecionados os primeiros ' + data.ids.length + '.');
+            }
+            selecaoTodasPaginas = true;
+            salvarSelecaoPersistida(data.ids, true);
+            sincronizarCheckboxesComPersistencia();
+            atualizarBarraAcoesLote();
+        })
+        .catch(function (error) {
+            console.error(error);
+            btnSelecionarTodasPaginasCarregando(false);
+            alert('Erro ao selecionar todas as páginas.');
+        });
+}
+
+function btnSelecionarTodasPaginasCarregando(ativo) {
+    var btn = document.getElementById('btnSelecionarTodasPaginas');
+    if (!btn) return;
+    btn.disabled = !!ativo;
+    btn.textContent = ativo
+        ? 'Carregando…'
+        : ('Selecionar os ' + TOTAL_EVENTOS_FILTRO + ' eventos deste filtro (todas as páginas)');
+}
+
+function limparSelecaoTodasPaginas() {
+    selecaoTodasPaginas = false;
+    salvarSelecaoPersistida([], false);
+    document.querySelectorAll('.checkbox-bloco-lote').forEach(function (cb) { cb.checked = false; });
+    var master = document.getElementById('selecionarTodosBlocos');
+    if (master) {
+        master.checked = false;
+        master.indeterminate = false;
+    }
+    atualizarBarraAcoesLote();
+}
+
+function urlRelatorioComIds(base) {
+    var ids = idsBlocosSelecionados();
+    if (!ids.length) {
+        alert('Selecione pelo menos um evento.');
+        return '';
+    }
+    if (ids.length > 100) {
+        if (!confirm('Há ' + ids.length + ' eventos selecionados. O relatório usa no máximo 100. Continuar com os 100 primeiros?')) {
+            return '';
+        }
+        ids = ids.slice(0, 100);
+    }
+    return base + '?ids=' + encodeURIComponent(ids.join(','));
+}
+
+function abrirRelatorioNotasLote() {
+    var url = urlRelatorioComIds(URL_RELATORIO_LOTE);
+    if (url) {
+        window.location.href = url;
+    }
+}
+
+function exportarRelatorioNotasLoteExcel() {
+    var url = urlRelatorioComIds(URL_RELATORIO_LOTE_EXCEL);
+    if (url) {
+        window.location.href = url;
+    }
+}
+
+function exportarRelatorioNotasLotePdf() {
+    var url = urlRelatorioComIds(URL_RELATORIO_LOTE);
+    if (url) {
+        window.open(url + '&print=1', '_blank');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    sincronizarCheckboxesComPersistencia();
+    atualizarBarraAcoesLote();
+});
 
 function marcarSelecionadosConcluidos() {
     var ids = idsBlocosSelecionados();

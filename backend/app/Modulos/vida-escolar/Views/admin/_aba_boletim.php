@@ -6,10 +6,9 @@ $quadro = is_array($quadro ?? null) ? $quadro : null;
 $ficha = is_array($quadro['ficha'] ?? null) ? $quadro['ficha'] : null;
 $grid = is_array($quadro['grid'] ?? null) ? $quadro['grid'] : [];
 if (!class_exists('PeriodoLetivo')) {
-    require_once dirname(__DIR__, 4) . '/Core/PeriodoLetivo.php';
 }
 $anoFicha = (int) ($ficha['ano_letivo'] ?? date('Y'));
-$infoPeriodo = PeriodoLetivo::doAno($anoFicha);
+$infoPeriodo = \App\Core\PeriodoLetivo::doAno($anoFicha);
 $periodos = $infoPeriodo['rotulos'];
 $periodosQuadro = [1, 2, 3, 4];
 $fichas = is_array($fichas ?? null) ? $fichas : [];
@@ -201,7 +200,7 @@ $fmtNota = static function ($c): string {
                         <div class="flex-1 min-w-0">
                             <label class="block text-sm font-medium text-gray-700 mb-1"><?= htmlspecialchars($infoPeriodo['rotulo_campo']) ?></label>
                             <select name="bimestre" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-                                <?= PeriodoLetivo::optionsHtml($anoFicha, 0) ?>
+                                <?= \App\Core\PeriodoLetivo::optionsHtml($anoFicha, 0) ?>
                             </select>
                         </div>
                         <button class="shrink-0 h-10 px-4 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">Fechar</button>
@@ -225,7 +224,7 @@ $fmtNota = static function ($c): string {
                         <label class="block text-sm font-medium text-gray-700 mb-1">Período</label>
                             <select name="bimestre" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
                                 <option value="-1">Ano inteiro</option>
-                                <?= PeriodoLetivo::optionsHtml($anoFicha, 0) ?>
+                                <?= \App\Core\PeriodoLetivo::optionsHtml($anoFicha, 0) ?>
                             </select>
                     </div>
                     <div class="sm:col-span-5">

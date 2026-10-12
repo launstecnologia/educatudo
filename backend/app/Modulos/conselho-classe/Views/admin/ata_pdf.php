@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Models/ConselhoSessao.php';
 
 use App\Modulos\ConselhoClasse\Models\ConselhoSessao;
 $sessao = is_array($sessao ?? null) ? $sessao : [];
@@ -48,7 +47,7 @@ $linhas = is_array($matriz['linhas'] ?? null) ? $matriz['linhas'] : [];
         <?php foreach ($participantes as $p): ?>
             <tr>
                 <td><?= htmlspecialchars((string) $p['nome']) ?></td>
-                <td><?= htmlspecialchars(ConselhoSessao::CARGOS[$p['cargo']] ?? (string) $p['cargo']) ?></td>
+                <td><?= htmlspecialchars(\App\Modulos\ConselhoClasse\Models\ConselhoSessao::CARGOS[$p['cargo']] ?? (string) $p['cargo']) ?></td>
                 <td><?= !empty($p['presente']) ? 'Sim' : 'Não' ?></td>
             </tr>
         <?php endforeach; ?>
@@ -72,7 +71,7 @@ $linhas = is_array($matriz['linhas'] ?? null) ? $matriz['linhas'] : [];
             <tr>
                 <td><?= htmlspecialchars((string) $linha['aluno']['nome']) ?></td>
                 <td><?= htmlspecialchars((string) ($linha['resultado_preliminar']['label'] ?? '—')) ?></td>
-                <td><?= $homolog ? htmlspecialchars(ConselhoSessao::RESULTADOS[$homolog] ?? $homolog) : '—' ?></td>
+                <td><?= $homolog ? htmlspecialchars(\App\Modulos\ConselhoClasse\Models\ConselhoSessao::RESULTADOS[$homolog] ?? $homolog) : '—' ?></td>
                 <td><?= $freq !== null ? number_format((float) $freq, 1, ',', '.') . '%' : '—' ?></td>
             </tr>
         <?php endforeach; ?>

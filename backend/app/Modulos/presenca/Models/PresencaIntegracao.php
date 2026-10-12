@@ -1,6 +1,7 @@
 <?php
 
-require_once __DIR__ . '/../../../Core/Database.php';
+namespace App\Modulos\Presenca\Models;
+
 
 class PresencaIntegracao
 {
@@ -12,7 +13,7 @@ class PresencaIntegracao
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     public function tabelasProntas(): bool
@@ -61,11 +62,11 @@ class PresencaIntegracao
     public function criar(array $dados): array
     {
         if (!$this->tabelasProntas()) {
-            throw new RuntimeException('Rode a migration 2026_08_22_gestao_presenca.sql no Master.');
+            throw new \RuntimeException('Rode a migration 2026_08_22_gestao_presenca.sql no Master.');
         }
         $nome = trim((string) ($dados['nome'] ?? ''));
         if ($nome === '') {
-            throw new InvalidArgumentException('Informe o nome da integração.');
+            throw new \InvalidArgumentException('Informe o nome da integração.');
         }
         $provedor = (string) ($dados['provedor'] ?? 'generico');
         if (!in_array($provedor, self::PROVEDORES, true)) {
@@ -116,4 +117,8 @@ class PresencaIntegracao
             ['erro' => mb_substr($erro, 0, 255), 'id' => $id]
         );
     }
+}
+
+if (!class_exists('PresencaIntegracao', false) && class_exists(__NAMESPACE__ . '\\PresencaIntegracao', false)) {
+    class_alias(__NAMESPACE__ . '\\PresencaIntegracao', 'PresencaIntegracao');
 }

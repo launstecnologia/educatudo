@@ -2,7 +2,6 @@
 
 namespace App\Modulos\RegrasAcademicas\Services;
 
-require_once __DIR__ . '/../Models/RegraAcademica.php';
 
 use App\Modulos\RegrasAcademicas\Models\RegraAcademica;
 
@@ -169,4 +168,8 @@ class RegraAcademicaService
         }
         return null;
     }
+}
+
+if (!class_exists('RegraAcademicaService', false) && class_exists(__NAMESPACE__ . '\\RegraAcademicaService', false)) {
+    class_alias(__NAMESPACE__ . '\\RegraAcademicaService', 'RegraAcademicaService');
 }

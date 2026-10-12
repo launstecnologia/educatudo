@@ -1,10 +1,9 @@
 <?php
 if (!class_exists('CreditosDecimalHelper')) {
-    require_once __DIR__ . '/../../Core/CreditosDecimalHelper.php';
 }
 $compra = $compra ?? [];
 $compraId = $compra['id'] ?? 0;
-$creditos = \CreditosDecimalHelper::fromScalar($compra['creditos'] ?? 0, 0.0);
+$creditos = \App\Core\CreditosDecimalHelper::fromScalar($compra['creditos'] ?? 0, 0.0);
 $pacoteNome = $compra['pacote_nome'] ?? '';
 $valorCentavos = (int) ($compra['valor_centavos'] ?? 0);
 $valorReais = 'R$ ' . number_format($valorCentavos / 100, 2, ',', '.');
@@ -35,7 +34,7 @@ $voltar_label = $voltar_label ?? 'Voltar ao EducaShop';
         <div class="px-6 py-5 grid grid-cols-2 gap-4">
             <div>
                 <p class="text-xs text-gray-500">TudiCoins</p>
-                <p class="text-xl font-bold text-accent tabular-nums"><?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay($creditos)) ?></p>
+                <p class="text-xl font-bold text-accent tabular-nums"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay($creditos)) ?></p>
             </div>
             <div class="text-right">
                 <p class="text-xs text-gray-500">Total</p>

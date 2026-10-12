@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../../Models/Education/ResultadoAcademico.php';
 
 $linhas = is_array($linhas ?? null) ? $linhas : [];
 $tipo = (string) ($tipo ?? 'relatorio_fechamento');
@@ -39,7 +38,7 @@ include __DIR__ . '/../_partials/flash_message.php';
     <div>
         <label class="block text-xs font-medium text-gray-500 mb-1">Relatório</label>
         <select name="tipo" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
-            <?php foreach (ResultadoAcademico::DOCUMENTO_TIPOS as $cod => $lab):
+            <?php foreach (\App\Models\Education\ResultadoAcademico::DOCUMENTO_TIPOS as $cod => $lab):
                 if (!str_starts_with($cod, 'relatorio_')) {
                     continue;
                 }
@@ -59,7 +58,7 @@ include __DIR__ . '/../_partials/flash_message.php';
     <div>
         <label class="block text-xs font-medium text-gray-500 mb-1">Período</label>
         <select name="periodo_tipo" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
-            <?php foreach (ResultadoAcademico::PERIODO_TIPOS as $cod => $lab): ?>
+            <?php foreach (\App\Models\Education\ResultadoAcademico::PERIODO_TIPOS as $cod => $lab): ?>
                 <option value="<?= htmlspecialchars($cod) ?>" <?= $periodoTipo === $cod ? 'selected' : '' ?>><?= htmlspecialchars($lab) ?></option>
             <?php endforeach; ?>
         </select>

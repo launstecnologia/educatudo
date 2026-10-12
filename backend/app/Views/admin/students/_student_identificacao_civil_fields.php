@@ -1,10 +1,9 @@
 <?php
-require_once __DIR__ . '/../../../Helpers/StudentFormHelper.php';
 $student = is_array($student ?? null) ? $student : [];
-$coresRaca = StudentFormHelper::corRacaOpcoes();
+$coresRaca = \App\Helpers\StudentFormHelper::corRacaOpcoes();
 $ufNascAtual = strtoupper(trim((string) ($student['uf_nascimento'] ?? '')));
 $naturalidadeAtual = trim((string) ($student['naturalidade'] ?? ''));
-$ufsPorNome = StudentFormHelper::ufsBrasilPorNome();
+$ufsPorNome = \App\Helpers\StudentFormHelper::ufsBrasilPorNome();
 $corRacaAtual = trim((string) ($student['cor_raca'] ?? ''));
 $zonaAtual = trim((string) ($student['zona'] ?? ''));
 $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');

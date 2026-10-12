@@ -1,6 +1,5 @@
 <?php
 if (!class_exists('AdminPermissionMatrix')) {
-    require_once dirname(__DIR__, 3) . '/Core/AdminPermissionMatrix.php';
 }
 
 $hub_title = 'Secretaria';
@@ -9,8 +8,8 @@ $hub_cards = [];
 
 $permsHub = [];
 if (class_exists('AdminPermissionMatrix')) {
-    $permsHub = AdminPermissionMatrix::effectivePermissionsForUser(
-        Database::getInstance(),
+    $permsHub = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser(
+        \App\Core\Database::getInstance(),
         $user ?? []
     );
 }
@@ -18,7 +17,7 @@ $podeHub = static function (string $chave) use ($permsHub): bool {
     return !empty($permsHub[$chave]['visualizar']);
 };
 
-if ($podeHub('censo_escolar') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('censo_escolar'))) {
+if ($podeHub('censo_escolar') && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('censo_escolar'))) {
     $hub_cards[] = [
         'href' => URL . '/admin/censo',
         'title' => 'Censo Escolar',
@@ -27,7 +26,7 @@ if ($podeHub('censo_escolar') && (!class_exists('LayoutHelper') || LayoutHelper:
     ];
 }
 
-if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('conformidade')) {
+if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('conformidade')) {
     $hub_cards[] = [
         'href' => URL . '/admin/conformidade',
         'title' => 'Conformidade',
@@ -36,7 +35,7 @@ if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('conformidade
     ];
 }
 
-if ($podeHub('diario_classe') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('diario_classe'))) {
+if ($podeHub('diario_classe') && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('diario_classe'))) {
     $hub_cards[] = [
         'href' => URL . '/admin/diario',
         'title' => 'Diário de Classe',
@@ -45,8 +44,8 @@ if ($podeHub('diario_classe') && (!class_exists('LayoutHelper') || LayoutHelper:
     ];
 }
 
-if ((!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('faltas'))
-    || ($podeHub('presenca') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('presenca')))) {
+if ((!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('faltas'))
+    || ($podeHub('presenca') && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('presenca')))) {
     $hub_cards[] = [
         'href' => URL . '/admin/frequencia',
         'title' => 'Frequência',
@@ -55,7 +54,7 @@ if ((!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('faltas'))
     ];
 }
 
-if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('documentos_institucionais')) {
+if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('documentos_institucionais')) {
     $hub_cards[] = [
         'href' => URL . '/admin/documentos-institucionais',
         'title' => 'Documentos Institucionais',
@@ -64,7 +63,7 @@ if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('documentos_i
     ];
 }
 
-if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('processo_matricula') && $podeHub('processos_matricula')) {
+if (class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('processo_matricula') && $podeHub('processos_matricula')) {
     $hub_cards[] = [
         'href' => URL . '/admin/configuracao/assinatura-digital',
         'title' => 'Assinatura Digital',
@@ -82,7 +81,7 @@ if ($podeHub('modelos_documentos')) {
     ];
 }
 
-if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('processo_matricula')) {
+if (class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('processo_matricula')) {
     $hub_cards[] = [
         'href' => URL . '/admin/enrollment',
         'title' => 'Matrículas',
@@ -108,7 +107,7 @@ if ($podeHub('transferencia')) {
     ];
 }
 
-if ($podeHub('ocorrencias') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('ocorrencias'))) {
+if ($podeHub('ocorrencias') && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('ocorrencias'))) {
     $hub_cards[] = [
         'href' => URL . '/admin/ocorrencias',
         'title' => 'Ocorrências',
@@ -117,7 +116,7 @@ if ($podeHub('ocorrencias') && (!class_exists('LayoutHelper') || LayoutHelper::i
     ];
 }
 
-if ((!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('recursos_fisicos')) && $podeHub('almoxarifado')) {
+if ((!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('recursos_fisicos')) && $podeHub('almoxarifado')) {
     $hub_cards[] = [
         'href' => URL . '/admin/almoxarifado',
         'title' => 'Almoxarifado',
@@ -126,7 +125,7 @@ if ((!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('recursos_fi
     ];
 }
 
-if ((!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('recursos_fisicos')) && $podeHub('patrimonio')) {
+if ((!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('recursos_fisicos')) && $podeHub('patrimonio')) {
     $hub_cards[] = [
         'href' => URL . '/admin/patrimonio',
         'title' => 'Patrimônio',
@@ -135,7 +134,7 @@ if ((!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('recursos_fi
     ];
 }
 
-if ($podeHub('resultados_finais') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('resultados_finais'))) {
+if ($podeHub('resultados_finais') && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('resultados_finais'))) {
     $hub_cards[] = [
         'href' => URL . '/admin/resultados-finais',
         'title' => 'Resultados Finais',
@@ -144,7 +143,7 @@ if ($podeHub('resultados_finais') && (!class_exists('LayoutHelper') || LayoutHel
     ];
 }
 
-if ($podeHub('vida_escolar') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('vida_escolar'))) {
+if ($podeHub('vida_escolar') && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('vida_escolar'))) {
     $hub_cards[] = [
         'href' => URL . '/admin/vida-escolar',
         'title' => 'Vida Escolar',
@@ -153,7 +152,7 @@ if ($podeHub('vida_escolar') && (!class_exists('LayoutHelper') || LayoutHelper::
     ];
 }
 
-if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('saude_academica')) {
+if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('saude_academica')) {
     $hub_cards[] = [
         'href' => URL . '/admin/saude-academica',
         'title' => 'Saúde Acadêmica',

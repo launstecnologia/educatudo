@@ -1,6 +1,8 @@
 <?php
+
+namespace App\Modulos\ExpoColag\Models;
 /**
- * Relações N:N / 1:N do projeto Expo Colag (wizard S2).
+ * Relações N:\N / 1:\N do projeto Expo Colag (wizard S2).
  */
 
 class ExpoColagProjetoRelacoes
@@ -9,7 +11,7 @@ class ExpoColagProjetoRelacoes
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     public function carregarTudo(int $projetoId): array
@@ -303,4 +305,8 @@ class ExpoColagProjetoRelacoes
         }
         return $v;
     }
+}
+
+if (!class_exists('ExpoColagProjetoRelacoes', false) && class_exists(__NAMESPACE__ . '\\ExpoColagProjetoRelacoes', false)) {
+    class_alias(__NAMESPACE__ . '\\ExpoColagProjetoRelacoes', 'ExpoColagProjetoRelacoes');
 }

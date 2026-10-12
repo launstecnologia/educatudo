@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Core;
 /**
  * EducaTudo — log de performance por request (queries e páginas lentas).
  * Ativado via PERF_LOG_SLOW_QUERIES=true no .env do servidor.
@@ -172,7 +174,7 @@ class PerfLogger
             $payload['ts'] = date('c');
             $payload['host'] = gethostname() ?: 'unknown';
             @file_put_contents($file, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n", FILE_APPEND | LOCK_EX);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log('PerfLogger: ' . $e->getMessage());
         }
     }
@@ -227,4 +229,8 @@ class PerfLogger
         }
         return $cache;
     }
+}
+
+if (!class_exists('PerfLogger', false) && class_exists(__NAMESPACE__ . '\\PerfLogger', false)) {
+    class_alias(__NAMESPACE__ . '\\PerfLogger', 'PerfLogger');
 }

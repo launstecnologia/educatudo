@@ -5,8 +5,6 @@ $itens = $itens ?? [];
 $flash = $flash ?? [];
 $csrf_token = $csrf_token ?? '';
 $id = (int) ($tabela['id'] ?? 0);
-require_once __DIR__ . '/../../../Core/CreditosModuleRegistry.php';
-require_once __DIR__ . '/../../../Core/CreditosDecimalHelper.php';
 ?>
 <div class="mb-6">
     <a href="<?= URL ?>/master/creditos-catalogo/tabelas" class="text-sm text-blue-600 hover:underline">&larr; Voltar às tabelas de preço</a>
@@ -51,10 +49,10 @@ require_once __DIR__ . '/../../../Core/CreditosDecimalHelper.php';
                 $grupoAnt = null;
                 foreach ($labels as $moduloKey => $nomePadrao):
                     $row = $itens[$moduloKey] ?? null;
-                    $creditos = $row ? \CreditosDecimalHelper::fromScalar($row['creditos'] ?? 1, 1.0) : 1.0;
+                    $creditos = $row ? \App\Core\CreditosDecimalHelper::fromScalar($row['creditos'] ?? 1, 1.0) : 1.0;
                     $cobra = $row ? !empty($row['cobra']) : false;
                     $nomeEx = $row && !empty($row['nome_exibicao']) ? (string) $row['nome_exibicao'] : $nomePadrao;
-                    $grupo = \CreditosModuleRegistry::getGrupo($moduloKey);
+                    $grupo = \App\Core\CreditosModuleRegistry::getGrupo($moduloKey);
                 ?>
                 <?php if ($grupo !== $grupoAnt): $grupoAnt = $grupo; ?>
                 <tr class="bg-blue-50/80">
@@ -70,7 +68,7 @@ require_once __DIR__ . '/../../../Core/CreditosDecimalHelper.php';
                         <input type="checkbox" name="cobra[<?= htmlspecialchars($moduloKey) ?>]" value="1" <?= $cobra ? 'checked' : '' ?> class="cobra-checkbox rounded border-slate-300">
                     </td>
                     <td class="px-4 py-2">
-                        <input type="number" name="creditos[<?= htmlspecialchars($moduloKey) ?>]" value="<?= htmlspecialchars(\CreditosDecimalHelper::formatInput($creditos)) ?>" min="0" step="0.0001" class="w-28 px-2 py-1 border border-slate-300 rounded text-sm">
+                        <input type="number" name="creditos[<?= htmlspecialchars($moduloKey) ?>]" value="<?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatInput($creditos)) ?>" min="0" step="0.0001" class="w-28 px-2 py-1 border border-slate-300 rounded text-sm">
                     </td>
                 </tr>
                 <?php endforeach; ?>

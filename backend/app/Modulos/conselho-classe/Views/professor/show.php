@@ -1,6 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Models/ConselhoSessao.php';
-require_once __DIR__ . '/../../Services/ConselhoService.php';
 
 use App\Modulos\ConselhoClasse\Models\ConselhoSessao;
 use App\Modulos\ConselhoClasse\Services\ConselhoService;
@@ -18,7 +16,7 @@ $podeObs = in_array($status, ['em_andamento', 'reaberto'], true);
     <div class="flex justify-between items-start gap-4 flex-wrap">
         <div>
             <h1 class="text-3xl font-bold text-gray-900">Conselho · <?= htmlspecialchars((string) ($sessao['turma_nome'] ?? '')) ?></h1>
-            <p class="text-gray-600 mt-1"><?= htmlspecialchars(class_exists('PeriodoLetivo') ? (PeriodoLetivo::rotulo((int) ($sessao['ano_letivo'] ?? 0), (int) ($sessao['bimestre'] ?? 0)) ?: ((int) ($sessao['bimestre'] ?? 0) . 'º período')) : ((int) ($sessao['bimestre'] ?? 0) . 'º período')) ?> / <?= (int) ($sessao['ano_letivo'] ?? 0) ?> · <?= htmlspecialchars(ConselhoService::statusLabel($status)) ?></p>
+            <p class="text-gray-600 mt-1"><?= htmlspecialchars(class_exists('PeriodoLetivo') ? (\App\Core\PeriodoLetivo::rotulo((int) ($sessao['ano_letivo'] ?? 0), (int) ($sessao['bimestre'] ?? 0)) ?: ((int) ($sessao['bimestre'] ?? 0) . 'º período')) : ((int) ($sessao['bimestre'] ?? 0) . 'º período')) ?> / <?= (int) ($sessao['ano_letivo'] ?? 0) ?> · <?= htmlspecialchars(\App\Modulos\ConselhoClasse\Services\ConselhoService::statusLabel($status)) ?></p>
         </div>
         <a href="<?= URL ?>/professor/conselhos" class="text-gray-600 hover:text-gray-900">← Voltar</a>
     </div>
@@ -44,14 +42,13 @@ $podeObs = in_array($status, ['em_andamento', 'reaberto'], true);
             <tbody class="divide-y divide-gray-200">
                 <?php
                 if (!class_exists('AlunoLancamentoNotaHelper', false)) {
-                    require_once __DIR__ . '/../../../../Helpers/AlunoLancamentoNotaHelper.php';
                 }
                 foreach ($linhas as $linha):
                     $aluno = $linha['aluno'];
                     $freq = $linha['frequencia']['percentual'] ?? null;
                     $prelim = $linha['resultado_preliminar'] ?? [];
                     $transferidoProfCc = !empty($aluno['transferido']);
-                    $nomeProfCc = AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+                    $nomeProfCc = \App\Helpers\AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
                         (string) ($aluno['nome'] ?? ''),
                         $transferidoProfCc
                     );

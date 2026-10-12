@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Core;
 /**
  * Turmas efetivas do aluno: principal (alunos.turma_id) + matrículas ativas.
  */
@@ -50,7 +52,6 @@ class AlunoTurmaHelper
 
         if (!$forcarDb) {
             if (!class_exists('ContextoAluno')) {
-                require_once __DIR__ . '/ContextoAluno.php';
             }
             if (ContextoAluno::idDaSessao() === $alunoId) {
                 $ctx = $_SESSION['aluno_ctx'] ?? null;
@@ -127,4 +128,8 @@ class AlunoTurmaHelper
         }
         return implode(',', $turmaIds);
     }
+}
+
+if (!class_exists('AlunoTurmaHelper', false) && class_exists(__NAMESPACE__ . '\\AlunoTurmaHelper', false)) {
+    class_alias(__NAMESPACE__ . '\\AlunoTurmaHelper', 'AlunoTurmaHelper');
 }

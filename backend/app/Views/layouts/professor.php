@@ -14,23 +14,20 @@
     <title><?= htmlspecialchars($title ?? 'EducaTudo Professor') ?></title>
     <?php require_once __DIR__ . '/../../Core/LayoutHelper.php'; ?>
     <?php require_once __DIR__ . '/../../Core/PeriodoLetivo.php'; ?>
-    <?php $logo1x1 = LayoutHelper::getLogo1x1Url(); ?>
+    <?php $logo1x1 = \App\Core\LayoutHelper::getLogo1x1Url(); ?>
     <link rel="manifest" href="<?= URL ?>/manifest-professor.json">
     <link rel="apple-touch-icon" href="<?= htmlspecialchars($logo1x1 ?: (URL . '/public/uploads/layout/logo-1x1_1761250311.png')) ?>">
     <?php 
     // Incluir LayoutHelper
-    require_once __DIR__ . '/../../Core/LayoutHelper.php';
     $csrf_token = $_SESSION['csrf_token'] ?? '';
     
     // Garantir que o user tem avatar_url se não foi passado
     if (isset($user) && empty($user['avatar_url'])) {
-        require_once __DIR__ . '/../../Core/Database.php';
-        require_once __DIR__ . '/../../Core/AuthManager.php';
-        $authManager = new AuthManager();
+        $authManager = new \App\Core\AuthManager();
         $currentUser = $authManager->getUser();
         
         if ($currentUser && $currentUser['tipo'] === 'professor') {
-            $db = Database::getInstance();
+            $db = \App\Core\Database::getInstance();
             $professor = $db->fetch(
                 "SELECT * FROM professores WHERE id = :user_id",
                 ['user_id' => $currentUser['id']]
@@ -91,7 +88,7 @@
     ?>
     <meta name="csrf-token" content="<?= htmlspecialchars($csrf_token) ?>">
     <style>
-        <?= LayoutHelper::generateCustomCSS() ?>
+        <?= \App\Core\LayoutHelper::generateCustomCSS() ?>
         
         /* Forçar background branco para professor */
         .page-background {
@@ -217,7 +214,7 @@
                     <div class="flex items-center space-x-2 md:space-x-4 flex-shrink-0">
                         <?php
                         $mostrarCreditosTopo = (bool) (
-                            LayoutHelper::get('creditos_habilitado', '0') === '1'
+                            \App\Core\LayoutHelper::get('creditos_habilitado', '0') === '1'
                             && empty($preview)
                             && isset($user['id'])
                             && ($user['tipo'] ?? '') === 'professor'
@@ -225,12 +222,9 @@
                         $teacherSaldoCreditosTopo = null;
                         if ($mostrarCreditosTopo) {
                             try {
-                                require_once __DIR__ . '/../../Core/CreditosDecimalHelper.php';
                                 $uidTopo = (int) $user['id'];
-                                $creditosSvcPath = __DIR__ . '/../../Services/CreditosService.php';
-                                if (is_file($creditosSvcPath)) {
-                                    require_once $creditosSvcPath;
-                                    $dbCredTopo = Database::getInstance();
+                                if (class_exists(\App\Services\CreditosService::class)) {
+                                    $dbCredTopo = \App\Core\Database::getInstance();
                                     $professorCarteira = $dbCredTopo->fetch(
                                         'SELECT id FROM professores WHERE id = ? AND ativo = 1 LIMIT 1',
                                         [$uidTopo]
@@ -248,17 +242,17 @@
                                     $svcCredTopo->aplicarRecargaInicialSeAplicavel('professor', $uidTopo);
                                     $teacherSaldoCreditosTopo = $svcCredTopo->getSaldo('professor', $uidTopo);
                                 } else {
-                                    $dbCredTopo = Database::getInstance();
+                                    $dbCredTopo = \App\Core\Database::getInstance();
                                     $rCredTopo = $dbCredTopo->fetch(
                                         'SELECT saldo FROM carteira_usuarios WHERE user_type = ? AND user_id = ? LIMIT 1',
                                         ['professor', $uidTopo]
                                     );
-                                    $teacherSaldoCreditosTopo = CreditosDecimalHelper::fromScalar(
+                                    $teacherSaldoCreditosTopo = \App\Core\CreditosDecimalHelper::fromScalar(
                                         is_array($rCredTopo) ? ($rCredTopo['saldo'] ?? 0) : 0,
                                         0.0
                                     );
                                 }
-                            } catch (Throwable $e) {
+                            } catch (\Throwable $e) {
                                 $teacherSaldoCreditosTopo = null;
                             }
                         }
@@ -273,11 +267,10 @@
                         
                         if (isset($user['id'])) {
                             try {
-                                require_once __DIR__ . '/../../Models/Notifications/Notification.php';
-                                $notificacaoModel = new Notification();
+                                $notificacaoModel = new \App\Models\Notifications\Notification();
                                 $notificacoesNaoLidas = $notificacaoModel->getNaoLidas($user['id'], 'professor');
                                 $notificacoesRecentes = $notificacaoModel->getByDestinatario($user['id'], 'professor', 5);
-                            } catch (Exception $e) {
+                            } catch (\Exception $e) {
                                 // Se houver erro, usar valores padrão
                                 $notificacoesNaoLidas = 0;
                                 $notificacoesRecentes = [];
@@ -292,7 +285,7 @@
                             <svg class="w-4 h-4 text-amber-700 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
-                            <span class="text-xs font-semibold tabular-nums leading-none"><?= htmlspecialchars(CreditosDecimalHelper::formatDisplay((float) $teacherSaldoCreditosTopo)) ?></span>
+                            <span class="text-xs font-semibold tabular-nums leading-none"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay((float) $teacherSaldoCreditosTopo)) ?></span>
                             <span class="hidden sm:inline text-xs text-amber-800/90 font-medium leading-none">créditos</span>
                         </a>
                         <?php endif; ?>
@@ -324,8 +317,7 @@
     $needsConsent = false;
     if (!empty($user['id'])) {
         if (!isset($db) || $db === null) {
-            require_once __DIR__ . '/../../Core/Database.php';
-            $db = Database::getInstance();
+            $db = \App\Core\Database::getInstance();
         }
         $docs = ['terms', 'privacy'];
         $version = 'v1.0';
@@ -803,8 +795,7 @@
     <?php endif; ?>
     <?php
     $base_url = defined('URL') ? URL : '';
-    if (!class_exists('LayoutHelper')) { require_once __DIR__ . '/../Core/LayoutHelper.php'; }
-    $onesignal_app_id = class_exists('LayoutHelper') ? trim(LayoutHelper::get('onesignal_app_id', '')) : '';
+    $onesignal_app_id = trim(\App\Core\LayoutHelper::get('onesignal_app_id', ''));
     if ($onesignal_app_id === '' && function_exists('env')) { $onesignal_app_id = trim(env('ONESIGNAL_APP_ID', '')); }
     include __DIR__ . '/../components/onesignal-init.php';
     ?>

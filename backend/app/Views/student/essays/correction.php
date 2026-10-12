@@ -1,15 +1,13 @@
 <?php
-require_once __DIR__ . '/../../../Helpers/EssayTextStructureHelper.php';
-require_once __DIR__ . '/../../../Helpers/EssayCriteriaDisplayHelper.php';
 ?>
 <?php
-$primaryColor = LayoutHelper::get('primary_color', '#6366f1');
+$primaryColor = \App\Core\LayoutHelper::get('primary_color', '#6366f1');
 $boardName = $submission['board_name'] ?? $proposal['board_name'] ?? 'Banca';
 $boardSlug = $proposal['board_slug'] ?? '';
-$isEnemBoard = EssayCriteriaDisplayHelper::isEnemBoard($boardName, $boardSlug);
+$isEnemBoard = \App\Helpers\EssayCriteriaDisplayHelper::isEnemBoard($boardName, $boardSlug);
 $contentText = !empty($submission['content_text']) ? $submission['content_text'] : ($submission['ocr_text'] ?? '');
-$structuredText = EssayTextStructureHelper::decode((string) ($submission['ocr_text_structure_json'] ?? ''));
-$flattenedStructuredLines = !empty($structuredText) ? EssayTextStructureHelper::flatten($structuredText) : [];
+$structuredText = \App\Helpers\EssayTextStructureHelper::decode((string) ($submission['ocr_text_structure_json'] ?? ''));
+$flattenedStructuredLines = !empty($structuredText) ? \App\Helpers\EssayTextStructureHelper::flatten($structuredText) : [];
 $gradesJson = [];
 $teacherGradesJson = [];
 if ($correction && !empty($correction['grades_json'])) {
@@ -20,13 +18,13 @@ if ($correction && !empty($correction['teacher_grades_json'])) {
     $decoded = json_decode($correction['teacher_grades_json'], true);
     $teacherGradesJson = is_array($decoded) ? $decoded : [];
 }
-$criteriaDisplay = EssayCriteriaDisplayHelper::buildCriteriaDisplay(
+$criteriaDisplay = \App\Helpers\EssayCriteriaDisplayHelper::buildCriteriaDisplay(
     isset($criteria) && is_array($criteria) ? $criteria : [],
     $gradesJson,
     $isEnemBoard
 );
-$criteriaSectionTitle = EssayCriteriaDisplayHelper::getSectionTitle($isEnemBoard);
-$maxTotal = EssayCriteriaDisplayHelper::calculateMaxTotal($criteriaDisplay, $isEnemBoard);
+$criteriaSectionTitle = \App\Helpers\EssayCriteriaDisplayHelper::getSectionTitle($isEnemBoard);
+$maxTotal = \App\Helpers\EssayCriteriaDisplayHelper::calculateMaxTotal($criteriaDisplay, $isEnemBoard);
 $lines = $contentText ? explode("\n", $contentText) : [];
 $lineCount = !empty($flattenedStructuredLines) ? count($flattenedStructuredLines) : count($lines);
 if (!function_exists('normalizeEssayTextForDisplay')) {
@@ -296,8 +294,8 @@ $aiAnnotationsByLine = groupEssayAnnotationsByLine($allAnnotations);
 $displayStructuredLines = $flattenedStructuredLines;
 $useParagraphVisualMode = true;
 if (empty($allAnnotations) && empty($flattenedStructuredLines) && trim((string) $contentTextNormalized) !== '') {
-    $displayStructuredLines = EssayTextStructureHelper::flatten(
-        EssayTextStructureHelper::buildFromPlainText((string) $contentTextNormalized)
+    $displayStructuredLines = \App\Helpers\EssayTextStructureHelper::flatten(
+        \App\Helpers\EssayTextStructureHelper::buildFromPlainText((string) $contentTextNormalized)
     );
 }
 $aiC5Elements = !empty($rawResponsePayload['c5_elements']) && is_array($rawResponsePayload['c5_elements'])
@@ -671,7 +669,7 @@ $hasAudioProfessor = $correction && !empty(trim($correction['teacher_feedback_au
         ?>
         <div class="p-4 bg-gray-50 rounded-lg">
             <div class="flex items-center justify-between mb-2">
-                <p class="font-medium text-gray-900"><?= htmlspecialchars(EssayCriteriaDisplayHelper::formatCriterionLabel($pos, $name, $isEnemBoard)) ?></p>
+                <p class="font-medium text-gray-900"><?= htmlspecialchars(\App\Helpers\EssayCriteriaDisplayHelper::formatCriterionLabel($pos, $name, $isEnemBoard)) ?></p>
                 <span class="font-bold text-primary"><?= $score !== null ? number_format($score, 0, ',', '.') : '—' ?>/<?= number_format($max, 0, ',', '.') ?></span>
             </div>
             <div class="w-full bg-gray-200 rounded-full h-2 mb-2">

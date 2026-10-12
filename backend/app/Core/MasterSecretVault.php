@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Core;
 /**
  * Criptografia simples para secrets no Master (API keys).
  * Usa AES-256-CBC; chave derivada de MASTER_ENCRYPTION_KEY ou APP_KEY no .env.
@@ -201,4 +203,8 @@ class MasterSecretVault
         $plain = self::decrypt(substr($stored, strlen(self::DB_PREFIX)));
         return $plain ?? '';
     }
+}
+
+if (!class_exists('MasterSecretVault', false) && class_exists(__NAMESPACE__ . '\\MasterSecretVault', false)) {
+    class_alias(__NAMESPACE__ . '\\MasterSecretVault', 'MasterSecretVault');
 }

@@ -155,3 +155,7 @@ final class IndexAdvisor
         return array_values(array_unique($cols));
     }
 }
+
+if (!class_exists('IndexAdvisor', false) && class_exists(__NAMESPACE__ . '\\IndexAdvisor', false)) {
+    class_alias(__NAMESPACE__ . '\\IndexAdvisor', 'IndexAdvisor');
+}

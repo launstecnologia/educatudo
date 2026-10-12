@@ -1,6 +1,5 @@
 <?php
 if (!class_exists('LayoutHelper')) {
-    require_once __DIR__ . '/../../../Core/LayoutHelper.php';
 }
 $preview = isset($preview) && $preview;
 ?>
@@ -39,7 +38,7 @@ $preview = isset($preview) && $preview;
                     ?>
                 </span>
             </div>
-            <div class="text-gray-700 mb-4 text-lg"><?= isset($questao['enunciado']) ? LayoutHelper::renderEnunciadoProva($questao['enunciado']) : '' ?></div>
+            <div class="text-gray-700 mb-4 text-lg"><?= isset($questao['enunciado']) ? \App\Core\LayoutHelper::renderEnunciadoProva($questao['enunciado']) : '' ?></div>
             <?php if (!empty($questao['imagem_url'])): ?>
             <div class="mb-4">
                 <img src="<?= htmlspecialchars($questao['imagem_url']) ?>" alt="Imagem da questão" class="max-w-full rounded-lg border border-gray-300">
@@ -50,7 +49,7 @@ $preview = isset($preview) && $preview;
                 <?php foreach ($questao['alternativas'] as $alt): ?>
                 <div class="flex items-start p-4 border-2 border-gray-200 rounded-lg bg-gray-50">
                     <span class="mr-3 w-5 h-5 rounded-full border-2 border-gray-400 flex-shrink-0 mt-0.5"></span>
-                    <span class="text-gray-700 text-base"><?= isset($alt['texto']) ? LayoutHelper::renderEnunciadoProva($alt['texto']) : '' ?></span>
+                    <span class="text-gray-700 text-base"><?= isset($alt['texto']) ? \App\Core\LayoutHelper::renderEnunciadoProva($alt['texto']) : '' ?></span>
                 </div>
                 <?php endforeach; ?>
             </div>

@@ -9,7 +9,6 @@
  * - $edicaoSimulacao (array|null) — usado só quando o evento não tem quadro
  */
 if (!class_exists('BoletimQuadroLayoutHelper', false)) {
-    require_once dirname(__DIR__, 2) . '/Helpers/BoletimQuadroLayoutHelper.php';
 }
 
 $colsSim = is_array($cols ?? null) ? $cols : [];
@@ -20,7 +19,7 @@ if ($colsSim === [] || $linhasSim === []) {
 }
 
 $decSim = ((int) ($decimalPlaces ?? 2) === 1) ? 1 : 2;
-$ehQuadroSim = BoletimQuadroLayoutHelper::partirTabelas($colsSim) !== [];
+$ehQuadroSim = \App\Helpers\BoletimQuadroLayoutHelper::partirTabelas($colsSim) !== [];
 $edicaoGuardada = is_array($edicaoSimulacao ?? null) ? $edicaoSimulacao : null;
 $cols = $colsSim;
 $linhas = $linhasSim;

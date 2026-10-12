@@ -1,5 +1,7 @@
 <?php
 
+namespace App\Helpers;
+
 class EssayTextStructureHelper
 {
     public static function decode(?string $json): array
@@ -189,4 +191,8 @@ class EssayTextStructureHelper
 
         return $structure;
     }
+}
+
+if (!class_exists('EssayTextStructureHelper', false) && class_exists(__NAMESPACE__ . '\\EssayTextStructureHelper', false)) {
+    class_alias(__NAMESPACE__ . '\\EssayTextStructureHelper', 'EssayTextStructureHelper');
 }

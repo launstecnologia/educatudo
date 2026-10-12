@@ -10,11 +10,10 @@
     $avatar_url = null;
     if (isset($user['id']) && ($user['tipo'] ?? '') === 'aluno') {
         if (!class_exists('ContextoAluno')) {
-            require_once __DIR__ . '/../../Core/ContextoAluno.php';
         }
         try {
-            $avatar_url = ContextoAluno::getAvatarUrl(Database::getInstance());
-        } catch (Exception $e) {
+            $avatar_url = \App\Core\ContextoAluno::getAvatarUrl(\App\Core\Database::getInstance());
+        } catch (\Exception $e) {
             $avatar_url = $_SESSION['avatar_url'] ?? null;
             if (is_string($avatar_url)) {
                 $avatar_url = str_replace('/public/assets/', '/assets/', $avatar_url);
@@ -43,15 +42,13 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Lexend:wght@400;500;600;700&display=swap">
     <?php 
     // Incluir LayoutHelper
-    require_once __DIR__ . '/../../Core/LayoutHelper.php';
-    require_once __DIR__ . '/../../Core/GamesAccessSchedule.php';
     // Games deve seguir apenas as regras de módulo/horário configuradas.
     $gamesBloqueadoAluno = false;
-    $gamesHorarioLiberadoAluno = GamesAccessSchedule::isAccessAllowedNow();
+    $gamesHorarioLiberadoAluno = \App\Core\GamesAccessSchedule::isAccessAllowedNow();
     if ($gamesBloqueadoAluno) {
         $gamesHorarioLiberadoAluno = false;
     }
-    $gamesHorarioBloqueioMsgJs = json_encode(GamesAccessSchedule::studentBlockedMessage(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE);
+    $gamesHorarioBloqueioMsgJs = json_encode(\App\Core\GamesAccessSchedule::studentBlockedMessage(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE);
 
     $mobileDefaults = [
         'enabled' => false,
@@ -68,7 +65,7 @@
             'items' => [
                 ['label' => 'Dashboard', 'route' => '/dashboard', 'icon' => 'home'],
                 ['label' => 'Exercícios', 'route' => '/exercicios-personalizados/minhas-listas', 'icon' => 'books'],
-                ['label' => LayoutHelper::getIaName(), 'route' => '/chat', 'icon' => 'chat'],
+                ['label' => \App\Core\LayoutHelper::getIaName(), 'route' => '/chat', 'icon' => 'chat'],
                 ['label' => 'Redações', 'route' => '/redacoes', 'icon' => 'pencil'],
                 ['label' => 'Jogos', 'route' => '/jogos/access', 'icon' => 'game']
             ]
@@ -83,7 +80,7 @@
         ]
     ];
 
-    $mobileConfig = json_decode(LayoutHelper::get('mobile_layout_aluno', ''), true);
+    $mobileConfig = json_decode(\App\Core\LayoutHelper::get('mobile_layout_aluno', ''), true);
     $mobileConfig = is_array($mobileConfig) ? array_replace_recursive($mobileDefaults, $mobileConfig) : $mobileDefaults;
     $mobileEnabled = !empty($mobileConfig['enabled']);
     $mobileBreakpoint = (int) ($mobileConfig['breakpoint'] ?? 768);
@@ -132,7 +129,7 @@
             if ($modulo === null) {
                 return true;
             }
-            return LayoutHelper::isModuleEnabled($modulo);
+            return \App\Core\LayoutHelper::isModuleEnabled($modulo);
         }));
     }
     $mobileBottomNavHighlightIndex = (int) ($mobileConfig['bottom_nav']['highlight_index'] ?? 2);
@@ -162,11 +159,11 @@
     }
     ?>
     <style>
-        <?= LayoutHelper::generateCustomCSS() ?>
+        <?= \App\Core\LayoutHelper::generateCustomCSS() ?>
 
         /* SIDEBAR-FIX-20260731-v5 — override local do layout aluno (só item ativo destaca) */
         <?php
-        $__sb = LayoutHelper::getSidebarColors();
+        $__sb = \App\Core\LayoutHelper::getSidebarColors();
         $__sbText = htmlspecialchars($__sb['text'], ENT_QUOTES, 'UTF-8');
         $__sbBg = htmlspecialchars($__sb['bg'], ENT_QUOTES, 'UTF-8');
         ?>
@@ -519,7 +516,7 @@
     
     <div class="flex flex-1 relative" style="height: 100vh; overflow: hidden;">
         <!-- Sidebar: no mobile fica fixo e desliza (igual ao Professor) -->
-        <?php $__sbInline = LayoutHelper::getSidebarColors(); ?>
+        <?php $__sbInline = \App\Core\LayoutHelper::getSidebarColors(); ?>
         <aside id="sidebar"
                class="w-72 md:w-72 sidebar-custom shadow-[4px_0_10px_-6px_rgba(0,0,0,0.25)] h-screen max-h-screen flex flex-col transition-all duration-300 ease-in-out fixed md:relative md:left-0 left-0 z-50"
                style="color: <?= htmlspecialchars($__sbInline['text'], ENT_QUOTES, 'UTF-8') ?>; --sidebar-text-color: <?= htmlspecialchars($__sbInline['text'], ENT_QUOTES, 'UTF-8') ?>; --sidebar-bg-color: <?= htmlspecialchars($__sbInline['bg'], ENT_QUOTES, 'UTF-8') ?>;"
@@ -537,15 +534,15 @@
                         </div>
                         <div class="sidebar-text-container logo-navbar-wrap">
                             <?php
-                            $logoSidebar = LayoutHelper::getContextualLogo('sidebar', 'max-h-full w-auto', 'Logo');
+                            $logoSidebar = \App\Core\LayoutHelper::getContextualLogo('sidebar', 'max-h-full w-auto', 'Logo');
                             if ($logoSidebar): ?>
                                 <?= $logoSidebar ?>
                                 <div class="sidebar-logo-fallback hidden">
-                                    <h1 class="text-xl font-bold text-white sidebar-text"><?= htmlspecialchars(LayoutHelper::getSystemTitle()) ?></h1>
+                                    <h1 class="text-xl font-bold text-white sidebar-text"><?= htmlspecialchars(\App\Core\LayoutHelper::getSystemTitle()) ?></h1>
                                     <p class="text-sm text-purple-100 sidebar-text">Ecossistema Educacional</p>
                                 </div>
                             <?php else: ?>
-                                <h1 class="text-xl font-bold text-white sidebar-text"><?= htmlspecialchars(LayoutHelper::getSystemTitle()) ?></h1>
+                                <h1 class="text-xl font-bold text-white sidebar-text"><?= htmlspecialchars(\App\Core\LayoutHelper::getSystemTitle()) ?></h1>
                                 <p class="text-sm text-purple-100 sidebar-text">Ecossistema Educacional</p>
                             <?php endif; ?>
                         </div>
@@ -568,7 +565,7 @@
                         <?php endif; ?>
                     </div>
                     <div class="sidebar-text-container min-w-0">
-                        <p id="sidebar-user-name" class="text-sm font-medium text-white sidebar-text truncate"><?= htmlspecialchars(LayoutHelper::saudacaoPrimeiroNome($user['nome'] ?? '')) ?></p>
+                        <p id="sidebar-user-name" class="text-sm font-medium text-white sidebar-text truncate"><?= htmlspecialchars(\App\Core\LayoutHelper::saudacaoPrimeiroNome($user['nome'] ?? '')) ?></p>
                         <p class="text-xs text-purple-100 sidebar-text">Aluno</p>
                     </div>
                 </div>
@@ -607,7 +604,7 @@
                      */
                     function educatudo_render_external_apps_aluno_rows(array $items): void
                     {
-                        $gamesHorarioMsgJs = json_encode(GamesAccessSchedule::studentBlockedMessage(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE);
+                        $gamesHorarioMsgJs = json_encode(\App\Core\GamesAccessSchedule::studentBlockedMessage(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE);
                         $iconDs = [
                             'link' => ['M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14'],
                             'book' => ['M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5-1.253'],
@@ -683,15 +680,15 @@
                     'educa_hits' => 'educa_hits',
                     'notes' => 'aluno_caderno_novo',
                 ];
-                $rawExtAppsMenu = json_decode((string) LayoutHelper::get('external_apps_links', '[]'), true);
+                $rawExtAppsMenu = json_decode((string) \App\Core\LayoutHelper::get('external_apps_links', '[]'), true);
                 if (!is_array($rawExtAppsMenu)) {
                     $rawExtAppsMenu = [];
                 }
                 if ($rawExtAppsMenu === []) {
                     $legacyExternalForMenu = [
-                        ['id' => 'educalabs', 'nome' => 'EducaLabs', 'menu_grupo' => 'estudo', 'menu_icone' => 'sparkles', 'substituir_nativo' => 'educalabs', 'aluno' => true, 'nova_guia' => true, 'url' => trim((string) LayoutHelper::get('educalabs_external_url', ''))],
-                        ['id' => 'games', 'nome' => 'Games', 'menu_grupo' => 'entretenimento', 'menu_icone' => 'game', 'substituir_nativo' => 'jogos', 'aluno' => true, 'nova_guia' => true, 'url' => trim((string) LayoutHelper::get('games_external_url', ''))],
-                        ['id' => 'notes', 'nome' => 'Notes', 'menu_grupo' => 'estudo', 'menu_icone' => 'document', 'substituir_nativo' => 'notes', 'aluno' => true, 'nova_guia' => true, 'url' => trim((string) LayoutHelper::get('notes_external_url', ''))],
+                        ['id' => 'educalabs', 'nome' => 'EducaLabs', 'menu_grupo' => 'estudo', 'menu_icone' => 'sparkles', 'substituir_nativo' => 'educalabs', 'aluno' => true, 'nova_guia' => true, 'url' => trim((string) \App\Core\LayoutHelper::get('educalabs_external_url', ''))],
+                        ['id' => 'games', 'nome' => 'Games', 'menu_grupo' => 'entretenimento', 'menu_icone' => 'game', 'substituir_nativo' => 'jogos', 'aluno' => true, 'nova_guia' => true, 'url' => trim((string) \App\Core\LayoutHelper::get('games_external_url', ''))],
+                        ['id' => 'notes', 'nome' => 'Notes', 'menu_grupo' => 'estudo', 'menu_icone' => 'document', 'substituir_nativo' => 'notes', 'aluno' => true, 'nova_guia' => true, 'url' => trim((string) \App\Core\LayoutHelper::get('notes_external_url', ''))],
                     ];
                     foreach ($legacyExternalForMenu as $legacyLink) {
                         if (trim((string) ($legacyLink['url'] ?? '')) !== '') {
@@ -750,7 +747,7 @@
                         $mic = 'link';
                     }
                     $subNat = strtolower(trim((string) ($link['substituir_nativo'] ?? '')));
-                    if ($subNat !== '' && isset($moduloNativoPorSubstituicao[$subNat]) && !LayoutHelper::isModuleEnabled($moduloNativoPorSubstituicao[$subNat])) {
+                    if ($subNat !== '' && isset($moduloNativoPorSubstituicao[$subNat]) && !\App\Core\LayoutHelper::isModuleEnabled($moduloNativoPorSubstituicao[$subNat])) {
                         continue;
                     }
                     $externalAppsAlunoByMenu[$mg][] = [
@@ -758,7 +755,7 @@
                         'nome' => $nome,
                         'nova_guia' => !empty($link['nova_guia']),
                         'menu_icone' => $mic,
-                        'fora_do_horario_games' => GamesAccessSchedule::shouldBlockStudentGamesLink($link),
+                        'fora_do_horario_games' => \App\Core\GamesAccessSchedule::shouldBlockStudentGamesLink($link),
                     ];
                     $nu = $normExtUrlAluno($url);
                     if ($nu !== '') {
@@ -785,7 +782,7 @@
 
                 <!-- Colag (Nome configurável) -->
                 <?php 
-                $menuColagNome = LayoutHelper::get('menu_colag_nome', 'Colag');
+                $menuColagNome = \App\Core\LayoutHelper::get('menu_colag_nome', 'Colag');
                 ?>
                 <div class="menu-group">
                     <button type="button" onclick="toggleMenuGroup('colag')" class="w-full flex items-center justify-between px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200 hover:scale-105">
@@ -803,16 +800,16 @@
                         <?php 
                         // Verificar módulos do aluno (Colag) — habilitado = só 1
                         $modulosAlunoColag = [
-                            'planos_aula' => LayoutHelper::isModuleEnabled('aluno_planos_aula'),
-                            'jornadas' => LayoutHelper::isModuleEnabled('jornadas'),
-                            'provas' => LayoutHelper::isModuleEnabled('aluno_provas'),
-                            'chat_professor' => LayoutHelper::isModuleEnabled('chat_professor'),
-                            'redacao_configuravel' => LayoutHelper::isModuleEnabled('redacao_configuravel') && LayoutHelper::isModuleEnabled('aluno_redacao_configuravel'),
+                            'planos_aula' => \App\Core\LayoutHelper::isModuleEnabled('aluno_planos_aula'),
+                            'jornadas' => \App\Core\LayoutHelper::isModuleEnabled('jornadas'),
+                            'provas' => \App\Core\LayoutHelper::isModuleEnabled('aluno_provas'),
+                            'chat_professor' => \App\Core\LayoutHelper::isModuleEnabled('chat_professor'),
+                            'redacao_configuravel' => \App\Core\LayoutHelper::isModuleEnabled('redacao_configuravel') && \App\Core\LayoutHelper::isModuleEnabled('aluno_redacao_configuravel'),
                         ];
                         ?>
 
-<?php if (LayoutHelper::isModuleEnabled('expo_colag')): ?>
-                        <?php $expoColagEnabled = LayoutHelper::isModuleEnabled('expo_colag'); ?>
+<?php if (\App\Core\LayoutHelper::isModuleEnabled('expo_colag')): ?>
+                        <?php $expoColagEnabled = \App\Core\LayoutHelper::isModuleEnabled('expo_colag'); ?>
                         <a href="<?= $expoColagEnabled ? URL . '/expo-colag' : '#' ?>"
                            onclick="<?= $expoColagEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Expo Colag\'); return false;' ?>"
                            class="flex items-center px-4 py-2 <?= (($current_page ?? '') === 'expo-colag') || strpos($_SERVER['REQUEST_URI'] ?? '', '/expo-colag') !== false ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$expoColagEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
@@ -823,8 +820,8 @@
                         </a>
                         <?php endif; ?>
 
-<?php if (LayoutHelper::isModuleEnabled('aluno_arquivos')): ?>
-                        <?php $arquivosColagEnabled = LayoutHelper::isModuleEnabled('aluno_arquivos'); ?>
+<?php if (\App\Core\LayoutHelper::isModuleEnabled('aluno_arquivos')): ?>
+                        <?php $arquivosColagEnabled = \App\Core\LayoutHelper::isModuleEnabled('aluno_arquivos'); ?>
                         <a href="<?= $arquivosColagEnabled ? URL . '/aluno/arquivos' : '#' ?>"
                            onclick="<?= $arquivosColagEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Arquivos\'); return false;' ?>"
                            class="flex items-center px-4 py-2 <?= (($current_page ?? '') === 'arquivos') || ((($current_page ?? '') !== 'recuperacao') && strpos($_SERVER['REQUEST_URI'] ?? '', '/aluno/arquivos') !== false) ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$arquivosColagEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
@@ -834,8 +831,8 @@
                             <span class="sidebar-text text-sm">Arquivos</span>
                         </a>
                         <?php endif; ?>
-<?php if (LayoutHelper::isModuleEnabled('aluno_recuperacao')): ?>
-                        <?php $recuperacaoEnabled = LayoutHelper::isModuleEnabled('aluno_recuperacao'); ?>
+<?php if (\App\Core\LayoutHelper::isModuleEnabled('aluno_recuperacao')): ?>
+                        <?php $recuperacaoEnabled = \App\Core\LayoutHelper::isModuleEnabled('aluno_recuperacao'); ?>
                         <a href="<?= $recuperacaoEnabled ? URL . '/aluno/recuperacao' : '#' ?>"
                            onclick="<?= $recuperacaoEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Recuperação\'); return false;' ?>"
                            class="flex items-center px-4 py-2 <?= (($current_page ?? '') === 'recuperacao') || strpos($_SERVER['REQUEST_URI'] ?? '', '/aluno/recuperacao') !== false ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$recuperacaoEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
@@ -846,7 +843,7 @@
                         </a>
                         <?php endif; ?>
 
-<?php if (LayoutHelper::isModuleEnabled('chat_professor')): ?>
+<?php if (\App\Core\LayoutHelper::isModuleEnabled('chat_professor')): ?>
                         <?php $chatProfessorEnabled = $modulosAlunoColag['chat_professor']; ?>
                         <a href="<?= $chatProfessorEnabled ? URL . '/chat-professor' : '#' ?>" 
                            onclick="<?= $chatProfessorEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Chat com Professor\'); return false;' ?>"
@@ -858,7 +855,7 @@
                         </a>
                         <?php endif; ?>
 
-<?php if (LayoutHelper::isModuleEnabled('redacao_configuravel') && LayoutHelper::isModuleEnabled('aluno_redacao_configuravel')): ?>
+<?php if (\App\Core\LayoutHelper::isModuleEnabled('redacao_configuravel') && \App\Core\LayoutHelper::isModuleEnabled('aluno_redacao_configuravel')): ?>
                         <?php $jornadaRedacaoEnabled = $modulosAlunoColag['redacao_configuravel']; ?>
                         <a href="<?= $jornadaRedacaoEnabled ? URL . '/jornada-redacao' : '#' ?>"
                            hx-boost="false"
@@ -871,7 +868,7 @@
                         </a>
                         <?php endif; ?>
 
-<?php if (LayoutHelper::isModuleEnabled('jornadas')): ?>
+<?php if (\App\Core\LayoutHelper::isModuleEnabled('jornadas')): ?>
                         <?php $jornadasEnabled = $modulosAlunoColag['jornadas']; ?>
                         <?php $jornadasAtivoMenu = (bool) preg_match('#/jornadas(/|\\?|$)#', (string) ($_SERVER['REQUEST_URI'] ?? '')); ?>
                         <a href="<?= $jornadasEnabled ? URL . '/jornadas' : '#' ?>" 
@@ -884,7 +881,7 @@
                         </a>
                         <?php endif; ?>
 
-<?php if (LayoutHelper::isModuleEnabled('aluno_apostilas')): ?>
+<?php if (\App\Core\LayoutHelper::isModuleEnabled('aluno_apostilas')): ?>
                         <?php $apostilasEnabled = true; ?>
                         <!-- Meu Material substitui a antiga entrada "Apostilas" (mesmo lugar no menu,
                              agora aponta para o módulo com IA, igual ao que aparece para o professor). -->
@@ -898,7 +895,7 @@
                         </a>
                         <?php endif; ?>
 
-                        <?php if (LayoutHelper::isModuleEnabled('aluno_provas')): ?>
+                        <?php if (\App\Core\LayoutHelper::isModuleEnabled('aluno_provas')): ?>
                         <?php $provasEnabled = $modulosAlunoColag['provas']; ?>
                         <a href="<?= $provasEnabled ? URL . '/notas-boletins#boletim' : '#' ?>"
                            onclick="<?= $provasEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Boletim\'); return false;' ?>"
@@ -910,7 +907,7 @@
                         </a>
                         <?php endif; ?>
 
-<?php if (LayoutHelper::isModuleEnabled('aluno_planos_aula')): ?>
+<?php if (\App\Core\LayoutHelper::isModuleEnabled('aluno_planos_aula')): ?>
                         <?php $planosAulaEnabled = $modulosAlunoColag['planos_aula']; ?>
                         <a href="<?= $planosAulaEnabled ? URL . '/aluno/planos-aula' : '#' ?>" 
                            onclick="<?= $planosAulaEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Plano de Aula\'); return false;' ?>"
@@ -922,7 +919,7 @@
                         </a>
                         <?php endif; ?>
 
-                        <?php if (LayoutHelper::isModuleEnabled('aluno_provas')): ?>
+                        <?php if (\App\Core\LayoutHelper::isModuleEnabled('aluno_provas')): ?>
                         <?php $provasEnabled = $modulosAlunoColag['provas']; ?>
                         <a href="<?= $provasEnabled ? URL . '/aluno/provas' : '#' ?>" 
                            onclick="<?= $provasEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Prova Online\'); return false;' ?>"
@@ -934,11 +931,11 @@
                         </a>
                         <?php endif; ?>
 
-<?php if (LayoutHelper::isModuleEnabled('aluno_links_uteis')): ?>
+<?php if (\App\Core\LayoutHelper::isModuleEnabled('aluno_links_uteis')): ?>
                         <?php
-                        $linksUteisAlunoEnabled = LayoutHelper::isModuleEnabled('aluno_links_uteis');
-                        $customMenuLinks = json_decode(LayoutHelper::get('menu_links_submenu', '[]'), true);
-                        $externalAppsLinks = json_decode(LayoutHelper::get('external_apps_links', '[]'), true);
+                        $linksUteisAlunoEnabled = \App\Core\LayoutHelper::isModuleEnabled('aluno_links_uteis');
+                        $customMenuLinks = json_decode(\App\Core\LayoutHelper::get('menu_links_submenu', '[]'), true);
+                        $externalAppsLinks = json_decode(\App\Core\LayoutHelper::get('external_apps_links', '[]'), true);
                         if (!is_array($customMenuLinks)) {
                             $customMenuLinks = [];
                         }
@@ -947,9 +944,9 @@
                         }
                         if (empty($externalAppsLinks)) {
                             $legacyExternalLinks = [
-                                ['id' => 'educalabs', 'url' => trim((string) LayoutHelper::get('educalabs_external_url', ''))],
-                                ['id' => 'games', 'url' => trim((string) LayoutHelper::get('games_external_url', ''))],
-                                ['id' => 'notes', 'url' => trim((string) LayoutHelper::get('notes_external_url', ''))],
+                                ['id' => 'educalabs', 'url' => trim((string) \App\Core\LayoutHelper::get('educalabs_external_url', ''))],
+                                ['id' => 'games', 'url' => trim((string) \App\Core\LayoutHelper::get('games_external_url', ''))],
+                                ['id' => 'notes', 'url' => trim((string) \App\Core\LayoutHelper::get('notes_external_url', ''))],
                             ];
                             foreach ($legacyExternalLinks as $legacyLink) {
                                 if (trim((string) ($legacyLink['url'] ?? '')) !== '') {
@@ -1020,7 +1017,7 @@
                     </div>
                 </div>
 
-                <?php if (LayoutHelper::get('creditos_habilitado', '0') === '1' && LayoutHelper::creditosExibirMenuComprarAluno()): ?>
+                <?php if (\App\Core\LayoutHelper::get('creditos_habilitado', '0') === '1' && \App\Core\LayoutHelper::creditosExibirMenuComprarAluno()): ?>
                 <a href="<?= URL ?>/educashop" class="flex items-center px-4 py-3 <?= ($current_page ?? '') === 'educashop' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105">
                     <svg class="w-6 h-6 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
@@ -1043,10 +1040,9 @@
                         </svg>
                     </button>
                     <div id="entretenimento-submenu" class="hidden ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
-<?php if (LayoutHelper::isModuleEnabled('educa_hits') && !$nativoSubstituido['educa_hits']): ?>
+<?php if (\App\Core\LayoutHelper::isModuleEnabled('educa_hits') && !$nativoSubstituido['educa_hits']): ?>
                         <?php
-                        require_once __DIR__ . '/../../Core/EducaHitsConfig.php';
-                        $educaHitsEnabled = LayoutHelper::isModuleEnabled('educa_hits');
+                        $educaHitsEnabled = \App\Core\LayoutHelper::isModuleEnabled('educa_hits');
                         $ehEscutarUrl = URL . '/hits';
                         $ehPedirUrl = URL . '/hits/request';
                         ?>
@@ -1088,9 +1084,9 @@
                             </a>
                         </div>
                         <?php endif; ?>
-                        <?php if (!$gamesBloqueadoAluno && LayoutHelper::isModuleEnabled('jogos') && !$nativoSubstituido['jogos']): ?>
+                        <?php if (!$gamesBloqueadoAluno && \App\Core\LayoutHelper::isModuleEnabled('jogos') && !$nativoSubstituido['jogos']): ?>
                         <?php
-                        $jogosEnabled = LayoutHelper::isModuleEnabled('jogos');
+                        $jogosEnabled = \App\Core\LayoutHelper::isModuleEnabled('jogos');
                         $jogosPodeHorario = $jogosEnabled && $gamesHorarioLiberadoAluno;
                         $jogosOnclick = '';
                         if (!$jogosEnabled) {
@@ -1134,22 +1130,20 @@
                     </button>
                     <div id="estudo-submenu" class="hidden ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
                         <?php 
-                        require_once __DIR__ . '/../../Core/FeatureGate.php';
-                        require_once __DIR__ . '/../../Core/LayoutHelper.php';
                         
                         // Menu do aluno: só módulos habilitados (status 1). Desativado/inativo somem.
                         $modulosAluno = [
-                            'chat' => LayoutHelper::isModuleEnabled('chat'),
+                            'chat' => \App\Core\LayoutHelper::isModuleEnabled('chat'),
                             // O link do menu vai pra /exercicios-personalizados/minhas-listas
                             // (geração por IA) — o módulo certo a checar é 'exercicios_ia', não
                             // 'exercicios' (que é o módulo separado "Banco de Dados").
-                            'exercicios' => LayoutHelper::isModuleEnabled('exercicios_ia'),
-                            'simulados' => LayoutHelper::isModuleEnabled('simulados'),
-                            'redacoes' => LayoutHelper::isModuleEnabled('redacoes'),
-                            'ingles' => LayoutHelper::isModuleEnabled('ingles'),
-                            'educa_livros' => LayoutHelper::isModuleEnabled('educa_livros'),
-                            'educalabs' => LayoutHelper::isModuleEnabled('educalabs'),
-                            'aluno_flashcards' => LayoutHelper::isModuleEnabled('aluno_flashcards'),
+                            'exercicios' => \App\Core\LayoutHelper::isModuleEnabled('exercicios_ia'),
+                            'simulados' => \App\Core\LayoutHelper::isModuleEnabled('simulados'),
+                            'redacoes' => \App\Core\LayoutHelper::isModuleEnabled('redacoes'),
+                            'ingles' => \App\Core\LayoutHelper::isModuleEnabled('ingles'),
+                            'educa_livros' => \App\Core\LayoutHelper::isModuleEnabled('educa_livros'),
+                            'educalabs' => \App\Core\LayoutHelper::isModuleEnabled('educalabs'),
+                            'aluno_flashcards' => \App\Core\LayoutHelper::isModuleEnabled('aluno_flashcards'),
                         ];
 
                         // Ordem e nomes customizáveis por escola (drag-and-drop + renomear em
@@ -1229,11 +1223,11 @@
                                 }
                             }
                         }
-                        $menuLabels = json_decode((string) LayoutHelper::get('menu_labels', '[]'), true);
+                        $menuLabels = json_decode((string) \App\Core\LayoutHelper::get('menu_labels', '[]'), true);
                         if (!is_array($menuLabels)) {
                             $menuLabels = [];
                         }
-                        $menuOrderEstudo = json_decode((string) LayoutHelper::get('menu_order_estudo', '[]'), true);
+                        $menuOrderEstudo = json_decode((string) \App\Core\LayoutHelper::get('menu_order_estudo', '[]'), true);
                         if (!is_array($menuOrderEstudo)) {
                             $menuOrderEstudo = [];
                         }
@@ -1251,7 +1245,7 @@
                         $flashcardsEnabled = $modulosAluno['aluno_flashcards'];
                         ?>
                         <?php ob_start(); ?>
-                        <?php if (LayoutHelper::isModuleEnabled('educa_livros')): ?>
+                        <?php if (\App\Core\LayoutHelper::isModuleEnabled('educa_livros')): ?>
                         <a href="<?= $educaLivrosEnabled ? URL . '/livros' : '#' ?>"
                            onclick="<?= $educaLivrosEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Educa Livros\'); return false;' ?>"
                            class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'livros' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$educaLivrosEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
@@ -1262,7 +1256,7 @@
                         </a>
                         <?php endif; ?>
                         <?php $itemsEstudo['educa_livros'] = ob_get_clean(); ob_start(); ?>
-                        <?php if (LayoutHelper::isModuleEnabled('educalabs') && !$nativoSubstituido['educalabs']): ?>
+                        <?php if (\App\Core\LayoutHelper::isModuleEnabled('educalabs') && !$nativoSubstituido['educalabs']): ?>
                         <a href="<?= $educaLabsEnabled ? URL . '/educalabs/access' : '#' ?>"
                            onclick="<?= $educaLabsEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'EducaLabs\'); return false;' ?>"
                            target="<?= $educaLabsEnabled ? '_blank' : '' ?>" rel="<?= $educaLabsEnabled ? 'noopener noreferrer' : '' ?>"
@@ -1274,7 +1268,7 @@
                         </a>
                         <?php endif; ?>
                         <?php $itemsEstudo['educalabs'] = ob_get_clean(); ob_start(); ?>
-                        <?php if (LayoutHelper::isModuleEnabled('aluno_flashcards')): ?>
+                        <?php if (\App\Core\LayoutHelper::isModuleEnabled('aluno_flashcards')): ?>
                         <a href="<?= $flashcardsEnabled ? URL . '/flashcards' : '#' ?>"
                            onclick="<?= $flashcardsEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Flash Cards\'); return false;' ?>"
                            class="flex items-center px-4 py-2 <?= strpos($_SERVER['REQUEST_URI'] ?? '', '/flashcards') !== false ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$flashcardsEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
@@ -1285,7 +1279,7 @@
                         </a>
                         <?php endif; ?>
                         <?php $itemsEstudo['aluno_flashcards'] = ob_get_clean(); ob_start(); ?>
-                        <?php if (LayoutHelper::isModuleEnabled('exercicios_ia')): ?>
+                        <?php if (\App\Core\LayoutHelper::isModuleEnabled('exercicios_ia')): ?>
                         <a href="<?= $exerciciosEnabled ? URL . '/exercicios-personalizados/minhas-listas' : '#' ?>"
                            onclick="<?= $exerciciosEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Exercícios\'); return false;' ?>"
                            class="flex items-center px-4 py-2 <?= strpos($_SERVER['REQUEST_URI'] ?? '', '/exercicios') !== false ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$exerciciosEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
@@ -1296,7 +1290,7 @@
                         </a>
                         <?php endif; ?>
                         <?php $itemsEstudo['exercicios'] = ob_get_clean(); ob_start(); ?>
-                        <?php if (LayoutHelper::isModuleEnabled('ingles')): ?>
+                        <?php if (\App\Core\LayoutHelper::isModuleEnabled('ingles')): ?>
                         <a href="<?= $inglesEnabled ? URL . '/ingles' : '#' ?>"
                            onclick="<?= $inglesEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Inglês\'); return false;' ?>"
                            class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'ingles' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$inglesEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
@@ -1307,7 +1301,7 @@
                         </a>
                         <?php endif; ?>
                         <?php $itemsEstudo['ingles'] = ob_get_clean(); ob_start(); ?>
-                        <?php if (LayoutHelper::isModuleEnabled('redacoes')): ?>
+                        <?php if (\App\Core\LayoutHelper::isModuleEnabled('redacoes')): ?>
                         <a href="<?= $redacoesEnabled ? URL . '/redacoes' : '#' ?>"
                            onclick="<?= $redacoesEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Redação\'); return false;' ?>"
                            class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'redacoes' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$redacoesEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
@@ -1318,7 +1312,7 @@
                         </a>
                         <?php endif; ?>
                         <?php $itemsEstudo['redacoes'] = ob_get_clean(); ob_start(); ?>
-                        <?php if (LayoutHelper::isModuleEnabled('simulados')): ?>
+                        <?php if (\App\Core\LayoutHelper::isModuleEnabled('simulados')): ?>
                         <a href="<?= $simuladosEnabled ? URL . '/simulados' : '#' ?>"
                            onclick="<?= $simuladosEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Simulados\'); return false;' ?>"
                            class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'simulados' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$simuladosEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
@@ -1329,7 +1323,7 @@
                         </a>
                         <?php endif; ?>
                         <?php $itemsEstudo['simulados'] = ob_get_clean(); ob_start(); ?>
-                        <?php if (LayoutHelper::isModuleEnabled('aulas_online')): ?>
+                        <?php if (\App\Core\LayoutHelper::isModuleEnabled('aulas_online')): ?>
                         <a href="<?= URL ?>/aluno/aulas-online"
                            class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'aulas_online' || strpos($_SERVER['REQUEST_URI'] ?? '', '/aluno/aulas-online') !== false ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
                             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1339,8 +1333,8 @@
                         </a>
                         <?php endif; ?>
                         <?php $itemsEstudo['aulas_online'] = ob_get_clean(); ob_start(); ?>
-                        <?php if (LayoutHelper::isModuleEnabled('aluno_minicursos')): ?>
-                        <?php $minicursosAlunoEnabled = LayoutHelper::isModuleEnabled('aluno_minicursos'); ?>
+                        <?php if (\App\Core\LayoutHelper::isModuleEnabled('aluno_minicursos')): ?>
+                        <?php $minicursosAlunoEnabled = \App\Core\LayoutHelper::isModuleEnabled('aluno_minicursos'); ?>
                         <a href="<?= $minicursosAlunoEnabled ? URL . '/minicursos' : '#' ?>"
                            onclick="<?= $minicursosAlunoEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'EducaCursos\'); return false;' ?>"
                            class="flex items-center px-4 py-2 <?= strpos($_SERVER['REQUEST_URI'] ?? '', '/minicursos') !== false ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$minicursosAlunoEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
@@ -1351,8 +1345,8 @@
                         </a>
                         <?php endif; ?>
                         <?php $itemsEstudo['aluno_minicursos'] = ob_get_clean(); ob_start(); ?>
-                        <?php if (LayoutHelper::isModuleEnabled('ead')): ?>
-                        <?php $eadEnabled = LayoutHelper::isModuleEnabled('ead'); ?>
+                        <?php if (\App\Core\LayoutHelper::isModuleEnabled('ead')): ?>
+                        <?php $eadEnabled = \App\Core\LayoutHelper::isModuleEnabled('ead'); ?>
                         <a href="<?= $eadEnabled ? URL . '/cursos' : '#' ?>"
                            onclick="<?= $eadEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Meus Cursos\'); return false;' ?>"
                            class="flex items-center px-4 py-2 <?= strpos($_SERVER['REQUEST_URI'] ?? '', '/cursos') !== false ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$eadEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
@@ -1364,8 +1358,8 @@
                         </a>
                         <?php endif; ?>
                         <?php $itemsEstudo['ead'] = ob_get_clean(); ob_start(); ?>
-                        <?php if (LayoutHelper::isModuleEnabled('forum')): ?>
-                        <?php $forumEnabled = LayoutHelper::isModuleEnabled('forum'); ?>
+                        <?php if (\App\Core\LayoutHelper::isModuleEnabled('forum')): ?>
+                        <?php $forumEnabled = \App\Core\LayoutHelper::isModuleEnabled('forum'); ?>
                         <a href="<?= $forumEnabled ? URL . '/forum' : '#' ?>"
                            onclick="<?= $forumEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Fórum\'); return false;' ?>"
                            class="flex items-center px-4 py-2 <?= strpos($_SERVER['REQUEST_URI'] ?? '', '/forum') !== false ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$forumEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
@@ -1376,8 +1370,8 @@
                         </a>
                         <?php endif; ?>
                         <?php $itemsEstudo['forum'] = ob_get_clean(); ob_start(); ?>
-                        <?php if (LayoutHelper::isModuleEnabled('drive')): ?>
-                        <?php $driveEnabled = LayoutHelper::isModuleEnabled('drive'); ?>
+                        <?php if (\App\Core\LayoutHelper::isModuleEnabled('drive')): ?>
+                        <?php $driveEnabled = \App\Core\LayoutHelper::isModuleEnabled('drive'); ?>
                         <a href="<?= $driveEnabled ? URL . '/drive' : '#' ?>"
                            onclick="<?= $driveEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Drive\'); return false;' ?>"
                            class="flex items-center px-4 py-2 <?= strpos($_SERVER['REQUEST_URI'] ?? '', '/drive') !== false ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 <?= !$driveEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
@@ -1441,7 +1435,7 @@
                     </div>
                 </div>
 
-                <?php if (LayoutHelper::get('creditos_habilitado', '0') === '1' && LayoutHelper::creditosExibirMenuCarteiraAluno()): ?>
+                <?php if (\App\Core\LayoutHelper::get('creditos_habilitado', '0') === '1' && \App\Core\LayoutHelper::creditosExibirMenuCarteiraAluno()): ?>
                 <a href="<?= URL ?>/carteira" class="flex items-center px-4 py-3 <?= ($current_page ?? '') === 'carteira' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105">
                     <svg class="w-6 h-6 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
@@ -1552,7 +1546,7 @@
                     </button>
                     <div class="flex-1 min-w-0">
                         <h1 class="text-lg md:text-2xl font-bold text-gray-900 truncate"><?= htmlspecialchars($page_title ?? 'Portal do Aluno') ?></h1>
-                        <p class="text-xs md:text-sm text-gray-600 truncate"><?= htmlspecialchars(LayoutHelper::saudacaoPrimeiroNome($user['nome'] ?? 'Aluno')) ?></p>
+                        <p class="text-xs md:text-sm text-gray-600 truncate"><?= htmlspecialchars(\App\Core\LayoutHelper::saudacaoPrimeiroNome($user['nome'] ?? 'Aluno')) ?></p>
                     </div>
                     <div class="flex items-center gap-2 md:gap-4 flex-shrink-0">
                         <div class="flex items-center gap-1.5 md:gap-2 flex-shrink-0">
@@ -1565,11 +1559,10 @@
                         
                         if (isset($user['id'])) {
                             try {
-                                require_once __DIR__ . '/../../Models/Notifications/Notification.php';
-                                $notificacaoModel = new Notification();
+                                $notificacaoModel = new \App\Models\Notifications\Notification();
                                 $notificacoesNaoLidas = $notificacaoModel->getNaoLidas($user['id'], 'aluno');
                                 $notificacoesRecentes = $notificacaoModel->getByDestinatario($user['id'], 'aluno', 5);
-                            } catch (Exception $e) {
+                            } catch (\Exception $e) {
                                 $notificacoesNaoLidas = 0;
                                 $notificacoesRecentes = [];
                             }
@@ -1578,33 +1571,30 @@
                         include __DIR__ . '/components/notification-banner.php';
                         ?>
                         <?php
-                        $mostrarCreditosTopo = LayoutHelper::creditosExibirSaldoTopoAluno()
+                        $mostrarCreditosTopo = \App\Core\LayoutHelper::creditosExibirSaldoTopoAluno()
                             && empty($preview)
                             && isset($user['id'])
                             && ($user['tipo'] ?? '') === 'aluno';
                         $studentSaldoCreditosTopo = null;
                         if ($mostrarCreditosTopo) {
                             try {
-                                require_once __DIR__ . '/../../Core/CreditosDecimalHelper.php';
                                 $uidTopo = (int) $user['id'];
-                                $creditosSvcPath = __DIR__ . '/../../Services/CreditosService.php';
-                                if (is_file($creditosSvcPath)) {
-                                    require_once $creditosSvcPath;
+                                if (class_exists(\App\Services\CreditosService::class)) {
                                     $svcCredTopo = new \App\Services\CreditosService();
                                     $svcCredTopo->aplicarRecargaInicialSeAplicavel('aluno', $uidTopo);
                                     $studentSaldoCreditosTopo = $svcCredTopo->getSaldo('aluno', $uidTopo);
                                 } else {
-                                    $dbCredTopo = Database::getInstance();
+                                    $dbCredTopo = \App\Core\Database::getInstance();
                                     $rCredTopo = $dbCredTopo->fetch(
                                         'SELECT saldo FROM carteira_usuarios WHERE user_type = ? AND user_id = ? LIMIT 1',
                                         ['aluno', $uidTopo]
                                     );
-                                    $studentSaldoCreditosTopo = CreditosDecimalHelper::fromScalar(
+                                    $studentSaldoCreditosTopo = \App\Core\CreditosDecimalHelper::fromScalar(
                                         is_array($rCredTopo) ? ($rCredTopo['saldo'] ?? 0) : 0,
                                         0.0
                                     );
                                 }
-                            } catch (Throwable $e) {
+                            } catch (\Throwable $e) {
                                 $studentSaldoCreditosTopo = null;
                             }
                         }
@@ -1614,7 +1604,7 @@
                             <svg class="w-4 h-4 text-amber-700 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
-                            <span class="text-xs font-semibold tabular-nums leading-none"><?= htmlspecialchars(CreditosDecimalHelper::formatDisplay((float) $studentSaldoCreditosTopo)) ?></span>
+                            <span class="text-xs font-semibold tabular-nums leading-none"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay((float) $studentSaldoCreditosTopo)) ?></span>
                             <span class="hidden sm:inline text-xs text-amber-800/90 font-medium leading-none">TudiCoins</span>
                         </a>
                         <?php endif; ?>
@@ -1671,7 +1661,7 @@
             </div>
         </main>
         <?php if (empty($preview)): ?>
-        <?php $navPrimary = LayoutHelper::getButtonPrimaryColor(); ?>
+        <?php $navPrimary = \App\Core\LayoutHelper::getButtonPrimaryColor(); ?>
         <nav class="mobile-bottom-nav hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-2 flex justify-center items-stretch gap-0 z-40 safe-area-pb">
             <?php foreach ($mobileBottomNavItems as $idx => $item): ?>
                 <?php
@@ -1716,7 +1706,7 @@
     if (!empty($preview)) {
         $needsConsent = false;
     } elseif (!empty($user['id'])) {
-        $db = Database::getInstance();
+        $db = \App\Core\Database::getInstance();
         $docs = ['terms', 'privacy', 'retention'];
         $version = 'v1.0';
         foreach ($docs as $doc) {
@@ -2654,8 +2644,7 @@
     </script>
     <?php
     $base_url = defined('URL') ? URL : '';
-    if (!class_exists('LayoutHelper')) { require_once __DIR__ . '/../Core/LayoutHelper.php'; }
-    $onesignal_app_id = class_exists('LayoutHelper') ? trim(LayoutHelper::get('onesignal_app_id', '')) : '';
+    $onesignal_app_id = trim(\App\Core\LayoutHelper::get('onesignal_app_id', ''));
     if ($onesignal_app_id === '' && function_exists('env')) { $onesignal_app_id = trim(env('ONESIGNAL_APP_ID', '')); }
     include __DIR__ . '/../components/onesignal-init.php';
     ?>
@@ -2679,7 +2668,7 @@
     <?php endif; ?>
     <?php include __DIR__ . '/components/websocket-presence.php'; ?>
 
-    <?php if (LayoutHelper::isModuleEnabled('vlibras')): ?>
+    <?php if (\App\Core\LayoutHelper::isModuleEnabled('vlibras')): ?>
     <!-- VLibras (tradução para Libras, acessibilidade) -->
     <!--
         O widget usa `position: fixed` internamente (botão, balão de intro,
@@ -2987,7 +2976,7 @@
 
     <?php
     // CSS final (depois de tudo) + JS: garante sidebar legível mesmo se outro CSS ganhar a briga
-    $__sbEnd = LayoutHelper::getSidebarColors();
+    $__sbEnd = \App\Core\LayoutHelper::getSidebarColors();
     $__sbEndText = htmlspecialchars($__sbEnd['text'], ENT_QUOTES, 'UTF-8');
     ?>
     <style id="sidebar-fix-final-v5">

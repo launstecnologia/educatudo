@@ -2,8 +2,7 @@
 
 namespace App\Modulos\VidaEscolar\Models;
 
-use Database;
-
+use App\Core\Database;
 /**
  * Ofícios da secretaria (numeração anual, PDF no papel timbrado).
  */
@@ -242,4 +241,8 @@ class Oficio
         $sql = $where === [] ? '' : (' WHERE ' . implode(' AND ', $where));
         return [$sql, $params];
     }
+}
+
+if (!class_exists('Oficio', false) && class_exists(__NAMESPACE__ . '\\Oficio', false)) {
+    class_alias(__NAMESPACE__ . '\\Oficio', 'Oficio');
 }

@@ -6,6 +6,7 @@
 return [
     'chave' => 'ocorrencias',
     'label' => 'Ocorrências do aluno',
+    'namespace' => 'App\\Modulos\\Ocorrencias',
     'grupo' => 'gestao_escolar',
     'feature_keys' => [
         'admin' => 'ocorrencias',

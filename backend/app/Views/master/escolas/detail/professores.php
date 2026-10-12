@@ -14,7 +14,6 @@ $base_url = URL . '/master/escolas/' . (int) $escola_id . '/professores';
 $entrar_como_base = URL . '/master/entrar-como?escola_id=' . (int) $escola_id . '&tipo=professor';
 $has_filtros = $filtro_busca !== '' || $filtro_status !== '';
 if (!class_exists('CreditosDecimalHelper')) {
-    require_once __DIR__ . '/../../../../Core/CreditosDecimalHelper.php';
 }
 
 $query_params = [];
@@ -123,7 +122,7 @@ $renderAcoesProfessor = static function (array $p, string $suffix) use ($entrar_
                             <?php endif; ?>
                             <?php if ($creditos_disponiveis): ?>
                             <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-800">
-                                <?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay(\CreditosDecimalHelper::fromSignedScalar($p['saldo_creditos'] ?? 0, 0.0))) ?>
+                                <?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay(\App\Core\CreditosDecimalHelper::fromSignedScalar($p['saldo_creditos'] ?? 0, 0.0))) ?>
                             </span>
                             <?php endif; ?>
                         </div>
@@ -155,7 +154,7 @@ $renderAcoesProfessor = static function (array $p, string $suffix) use ($entrar_
                         <?php endif; ?>
                         <?php if ($creditos_disponiveis): ?>
                         <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-800">
-                            <?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay(\CreditosDecimalHelper::fromSignedScalar($p['saldo_creditos'] ?? 0, 0.0))) ?>
+                            <?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay(\App\Core\CreditosDecimalHelper::fromSignedScalar($p['saldo_creditos'] ?? 0, 0.0))) ?>
                         </span>
                         <?php endif; ?>
                     </div>
@@ -209,7 +208,7 @@ $renderAcoesProfessor = static function (array $p, string $suffix) use ($entrar_
             <div>
                 <label for="modal-tudicoins-professor-valor" class="block text-sm font-medium text-slate-700 mb-1">Quantidade</label>
                 <div class="relative">
-                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-sm font-medium text-slate-500 pointer-events-none"><?= \CreditosDecimalHelper::PREFIXO ?></span>
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-sm font-medium text-slate-500 pointer-events-none"><?= \App\Core\CreditosDecimalHelper::PREFIXO ?></span>
                     <input type="text" id="modal-tudicoins-professor-valor" name="valor" value="100,00"
                            inputmode="decimal" autocomplete="off" required
                            class="w-full min-w-0 px-3 py-2 pl-12 border border-slate-300 rounded-lg text-sm bg-white tabular-nums">

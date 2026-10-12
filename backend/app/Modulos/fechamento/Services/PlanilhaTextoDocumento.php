@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Modulos\Fechamento\Services;
 /**
  * Planilha (xlsx) e texto de apoio à digitação.
  * Células saem como texto para o Excel não cortar zero à esquerda.
@@ -19,7 +21,7 @@ class PlanilhaTextoDocumento
     {
         $dir = dirname($caminho);
         if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
-            throw new RuntimeException('Não foi possível criar a pasta da planilha.');
+            throw new \RuntimeException('Não foi possível criar a pasta da planilha.');
         }
         if (self::zipDisponivel()) {
             self::gravarXlsx($caminho, $colunas, $linhas, $orientacao);
@@ -37,11 +39,11 @@ class PlanilhaTextoDocumento
     {
         $dir = dirname($caminho);
         if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
-            throw new RuntimeException('Não foi possível criar a pasta do texto.');
+            throw new \RuntimeException('Não foi possível criar a pasta do texto.');
         }
         $conteudo = implode("\n", $linhas) . "\n";
         if (file_put_contents($caminho, $conteudo) === false) {
-            throw new RuntimeException('Não foi possível gravar o TXT.');
+            throw new \RuntimeException('Não foi possível gravar o TXT.');
         }
     }
 
@@ -53,7 +55,7 @@ class PlanilhaTextoDocumento
     {
         $out = fopen($caminho, 'wb');
         if ($out === false) {
-            throw new RuntimeException('Não foi possível gravar a planilha.');
+            throw new \RuntimeException('Não foi possível gravar a planilha.');
         }
         fwrite($out, "\xEF\xBB\xBF");
         fputcsv($out, $colunas, ';');
@@ -82,9 +84,9 @@ class PlanilhaTextoDocumento
      */
     private static function gravarXlsx(string $caminho, array $colunas, array $linhas, array $orientacao): void
     {
-        $zip = new ZipArchive();
-        if ($zip->open($caminho, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-            throw new RuntimeException('Não foi possível criar a planilha.');
+        $zip = new \ZipArchive();
+        if ($zip->open($caminho, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+            throw new \RuntimeException('Não foi possível criar a planilha.');
         }
         $zip->addFromString('[Content_Types].xml', self::contentTypes());
         $zip->addFromString('_rels/.rels', self::relsRaiz());
@@ -226,6 +228,10 @@ class PlanilhaTextoDocumento
     private static function xml(string $valor): string
     {
         $valor = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $valor) ?? '';
-        return htmlspecialchars($valor, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+        return htmlspecialchars($valor, ENT_XML1 | \ENT_QUOTES, 'UTF-8');
     }
+}
+
+if (!class_exists('PlanilhaTextoDocumento', false) && class_exists(__NAMESPACE__ . '\\PlanilhaTextoDocumento', false)) {
+    class_alias(__NAMESPACE__ . '\\PlanilhaTextoDocumento', 'PlanilhaTextoDocumento');
 }

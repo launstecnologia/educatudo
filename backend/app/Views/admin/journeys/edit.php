@@ -151,11 +151,10 @@
 
         <?php
         if (!class_exists('PeriodoLetivo')) {
-            require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
         }
         $anoJornada = (int) ($jornada['ano_letivo'] ?? date('Y'));
         $bimJornada = (int) ($jornada['bimestre'] ?? 0);
-        $periodoJornada = PeriodoLetivo::doAno($anoJornada);
+        $periodoJornada = \App\Core\PeriodoLetivo::doAno($anoJornada);
         ?>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -174,7 +173,7 @@
                 <select id="bimestre" name="bimestre" required
                         data-periodo-letivo-select data-periodo-vazio="1" data-periodo-selecionado="<?= $bimJornada ?>"
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors">
-                    <?= PeriodoLetivo::optionsHtml($anoJornada, $bimJornada, ['vazio' => true]) ?>
+                    <?= \App\Core\PeriodoLetivo::optionsHtml($anoJornada, $bimJornada, ['vazio' => true]) ?>
                 </select>
             </div>
         </div>

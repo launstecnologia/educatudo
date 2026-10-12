@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Core;
 /**
  * EducaTudo - Registry de módulos físicos (app/Modulos/<chave>/manifest.php).
  * Fonte única para FeatureGate (rotas) dos módulos migrados.
@@ -69,7 +71,7 @@ class ModuloRegistry
 
     /**
      * Resolve caminho absoluto do controller em um módulo.
-     * Ex.: Modulos/arquivos/ArquivosAlunoController → .../Modulos/arquivos/Controllers/ArquivosAlunoController.php
+     * Ex.: \Modulos/arquivos/ArquivosAlunoController → .../Modulos/arquivos/Controllers/ArquivosAlunoController.php
      */
     public static function resolveControllerPath(string $handlerController): ?string
     {
@@ -196,4 +198,8 @@ class ModuloRegistry
         }
         return $items;
     }
+}
+
+if (!class_exists('ModuloRegistry', false) && class_exists(__NAMESPACE__ . '\\ModuloRegistry', false)) {
+    class_alias(__NAMESPACE__ . '\\ModuloRegistry', 'ModuloRegistry');
 }

@@ -1,13 +1,15 @@
 <?php
+
+namespace App\Modulos\Arquivos\Controllers;
 /**
  * EducaTudo - Módulo de Arquivos (Admin)
  */
 
-require_once __DIR__ . '/../Services/ArquivosService.php';
-require_once __DIR__ . '/../../../Helpers/AdminPasswordHelper.php';
 
-if (!class_exists('ArquivosAdminController')) {
-class ArquivosAdminController extends BaseController
+use App\Modulos\Arquivos\Services\ArquivosService;
+
+if (!class_exists(__NAMESPACE__ . '\\ArquivosAdminController', false)) {
+class ArquivosAdminController extends \App\Core\BaseController
 {
     private ArquivosService $arquivosService;
     private $auth;
@@ -15,7 +17,7 @@ class ArquivosAdminController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        $this->auth = new AuthManager();
+        $this->auth = new \App\Core\AuthManager();
         $this->arquivosService = new ArquivosService();
 
         if (!$this->auth->isLoggedIn()) {
@@ -327,7 +329,7 @@ class ArquivosAdminController extends BaseController
         }
 
         $user = $this->auth->getUser() ?? [];
-        if (!AdminPasswordHelper::verifyAdminPassword(Database::getInstance(), $user, $senha)) {
+        if (!\App\Helpers\AdminPasswordHelper::verifyAdminPassword(\App\Core\Database::getInstance(), $user, $senha)) {
             if ($wantsJson) {
                 $this->json(['error' => 'Senha incorreta.'], 400);
                 return;
@@ -386,8 +388,7 @@ class ArquivosAdminController extends BaseController
     {
         $contentType = ArquivosService::mimePorExtensao((string) ($anexo['extensao'] ?? ''));
         $filename = (string) ($anexo['nome_original'] ?? 'arquivo');
-        require_once __DIR__ . '/../../../Services/MediaStorageService.php';
-        $media = new MediaStorageService($this->config);
+        $media = new \App\Services\MediaStorageService($this->config);
         $mediaKey = ArquivosService::anexoPathToMediaKey((string) ($anexo['caminho'] ?? ''));
         if ($media->isS3() && $mediaKey !== '') {
             $signedUrl = $media->getViewUrl('arquivos', $mediaKey, $filename, 900);
@@ -450,4 +451,8 @@ class ArquivosAdminController extends BaseController
         return false;
     }
 }
+}
+
+if (!class_exists('ArquivosAdminController', false) && class_exists(__NAMESPACE__ . '\\ArquivosAdminController', false)) {
+    class_alias(__NAMESPACE__ . '\\ArquivosAdminController', 'ArquivosAdminController');
 }

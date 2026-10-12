@@ -9,11 +9,10 @@ $creditosExibirMenuCarteira = ($layout_config['creditos_exibir_menu_carteira'] ?
 $creditosExibirMenuComprar = ($layout_config['creditos_exibir_menu_comprar'] ?? '1') === '1';
 $creditosModoPoolEscola = ($layout_config['creditos_modo_pool_escola'] ?? '0') === '1';
 $creditosAlunoPodeComprar = ($layout_config['creditos_aluno_pode_comprar'] ?? '0') === '1';
-require_once __DIR__ . '/../../../../Core/CreditosDecimalHelper.php';
-$creditosMensalAluno = \CreditosDecimalHelper::fromScalar($layout_config['creditos_mensal_aluno'] ?? 0, 0.0);
-$creditosMensalProfessor = \CreditosDecimalHelper::fromScalar($layout_config['creditos_mensal_professor'] ?? 0, 0.0);
-$creditosMensalAdmin = \CreditosDecimalHelper::fromScalar($layout_config['creditos_mensal_admin'] ?? 0, 0.0);
-$creditosMensalEscola = \CreditosDecimalHelper::fromScalar($layout_config['creditos_mensal_escola'] ?? 0, 0.0);
+$creditosMensalAluno = \App\Core\CreditosDecimalHelper::fromScalar($layout_config['creditos_mensal_aluno'] ?? 0, 0.0);
+$creditosMensalProfessor = \App\Core\CreditosDecimalHelper::fromScalar($layout_config['creditos_mensal_professor'] ?? 0, 0.0);
+$creditosMensalAdmin = \App\Core\CreditosDecimalHelper::fromScalar($layout_config['creditos_mensal_admin'] ?? 0, 0.0);
+$creditosMensalEscola = \App\Core\CreditosDecimalHelper::fromScalar($layout_config['creditos_mensal_escola'] ?? 0, 0.0);
 
 $renderFlagToggle = static function (string $name, bool $enabled, bool $locked = false): void {
     ?>
@@ -130,15 +129,15 @@ $inputClass = 'w-full min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-
                         <div class="min-w-0">
                             <label for="<?= $campo['id'] ?>" class="block text-sm font-medium text-slate-700 mb-1"><?= htmlspecialchars($campo['label']) ?></label>
                             <div class="relative">
-                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-sm font-medium text-slate-500 pointer-events-none"><?= \CreditosDecimalHelper::PREFIXO ?></span>
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-sm font-medium text-slate-500 pointer-events-none"><?= \App\Core\CreditosDecimalHelper::PREFIXO ?></span>
                                 <input type="text" id="<?= $campo['id'] ?>" name="<?= $campo['id'] ?>"
-                                       value="<?= htmlspecialchars(\CreditosDecimalHelper::formatNumero($campo['valor'], 2)) ?>"
+                                       value="<?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatNumero($campo['valor'], 2)) ?>"
                                        inputmode="decimal" autocomplete="off"
                                        data-tudicoins-money
                                        class="<?= $inputClass ?> pl-12 tabular-nums">
                             </div>
                             <p class="text-xs text-slate-500 mt-1" data-tudicoins-brl-for="<?= $campo['id'] ?>">
-                                ≈ <?= htmlspecialchars(\CreditosDecimalHelper::formatReaisFromTudicoins($campo['valor'])) ?>
+                                ≈ <?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatReaisFromTudicoins($campo['valor'])) ?>
                             </p>
                             <?php if ($campo['hint'] !== ''): ?>
                             <p class="text-xs text-slate-400 mt-0.5"><?= htmlspecialchars($campo['hint']) ?></p>
@@ -229,7 +228,7 @@ $inputClass = 'w-full min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-
                                     <span class="min-w-0">
                                         <span class="font-medium text-slate-800"><?= htmlspecialchars($cpk['nome'] ?? '') ?></span>
                                         <span class="block text-xs text-slate-500">
-                                            <?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay(\CreditosDecimalHelper::fromScalar($cpk['creditos'] ?? 0, 0.0))) ?> ·
+                                            <?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay(\App\Core\CreditosDecimalHelper::fromScalar($cpk['creditos'] ?? 0, 0.0))) ?> ·
                                             R$ <?= number_format(((int) ($cpk['valor_centavos'] ?? 0)) / 100, 2, ',', '.') ?>
                                             <?= $ativoPk ? '' : ' · inativo' ?>
                                         </span>
@@ -331,7 +330,7 @@ $inputClass = 'w-full min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-
 
     <script>
     (function() {
-        var BRL = <?= json_encode(\CreditosDecimalHelper::BRL_POR_UNIDADE) ?>;
+        var BRL = <?= json_encode(\App\Core\CreditosDecimalHelper::BRL_POR_UNIDADE) ?>;
 
         function parseBr(str) {
             var s = String(str || '').replace(/[^\d,.-]/g, '').trim();

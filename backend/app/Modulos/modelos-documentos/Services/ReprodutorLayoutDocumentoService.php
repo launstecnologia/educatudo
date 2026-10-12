@@ -2,8 +2,6 @@
 
 namespace App\Modulos\ModelosDocumentos\Services;
 
-require_once __DIR__ . '/DocumentoRenderer.php';
-require_once __DIR__ . '/ModeloDocumentoService.php';
 
 /**
  * Converte a resposta da IA (foto de um documento) na estrutura do editor.
@@ -263,9 +261,9 @@ TXT;
             $nome = self::elementoHtml(self::htmlNomeEscola($esquerda !== [] ? $esquerda : ['{{escola_nome}}']));
             $caixaAno = self::elementoHtml(self::htmlCaixaAno($anoRotulo, $ano, $direito));
             $base['header']['sections'][] = self::secaoComColunas([
-                ['width' => 16, 'elements' => [$logo]],
-                ['width' => 50, 'elements' => [$nome]],
-                ['width' => 34, 'elements' => [$caixaAno]],
+                ['width' => 16, 'vAlign' => 'middle', 'elements' => [$logo]],
+                ['width' => 50, 'vAlign' => 'middle', 'elements' => [$nome]],
+                ['width' => 34, 'vAlign' => 'middle', 'elements' => [$caixaAno]],
             ], 'header');
         } else {
             $escola = ModeloDocumentoService::elementoEstrutura(
@@ -737,7 +735,7 @@ TXT;
             $colunas[] = [
                 'id' => ModeloDocumentoService::idEstrutura('c'),
                 'width' => (int) $col['width'],
-                'vAlign' => 'top',
+                'vAlign' => in_array(($col['vAlign'] ?? 'top'), ['top', 'middle', 'bottom'], true) ? $col['vAlign'] : 'top',
                 'elements' => $col['elements'],
             ];
         }
@@ -1014,4 +1012,8 @@ TXT;
         }
         return $html . '</table>';
     }
+}
+
+if (!class_exists('ReprodutorLayoutDocumentoService', false) && class_exists(__NAMESPACE__ . '\\ReprodutorLayoutDocumentoService', false)) {
+    class_alias(__NAMESPACE__ . '\\ReprodutorLayoutDocumentoService', 'ReprodutorLayoutDocumentoService');
 }

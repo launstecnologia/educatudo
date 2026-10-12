@@ -5,8 +5,7 @@
 </div>
 <?php endif; ?>
 <?php
-require_once __DIR__ . '/../../../Core/TenantRelease.php';
-$ocultarTituloJornada = TenantRelease::shouldUse('jornadas_ocultar_titulo_v1', false);
+$ocultarTituloJornada = \App\Core\TenantRelease::shouldUse('jornadas_ocultar_titulo_v1', false);
 ?>
 <!-- Header Section -->
 <div class="mb-8">

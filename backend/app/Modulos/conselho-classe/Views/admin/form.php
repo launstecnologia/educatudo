@@ -51,9 +51,8 @@ $csrf_token = $csrf_token ?? '';
                 <select name="bimestre" required data-periodo-letivo-select class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                     <?php
                     if (!class_exists('PeriodoLetivo')) {
-                        require_once dirname(__DIR__, 4) . '/Core/PeriodoLetivo.php';
                     }
-                    echo PeriodoLetivo::optionsHtml($anoLetivo, $bimestre);
+                    echo \App\Core\PeriodoLetivo::optionsHtml($anoLetivo, $bimestre);
                     ?>
                 </select>
             </div>

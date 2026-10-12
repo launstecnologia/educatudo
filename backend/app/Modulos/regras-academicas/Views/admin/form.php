@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Models/RegraAcademica.php';
 
 use App\Modulos\RegrasAcademicas\Models\RegraAcademica;
 
@@ -89,7 +88,7 @@ $val = static function (?array $item, string $key, $default = '') {
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Tipo de período</label>
                 <select name="periodo_tipo" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                    <?php foreach (RegraAcademica::PERIODO_TIPOS as $k => $lab): ?>
+                    <?php foreach (\App\Modulos\RegrasAcademicas\Models\RegraAcademica::PERIODO_TIPOS as $k => $lab): ?>
                         <option value="<?= htmlspecialchars($k) ?>" <?= (string) $val($item, 'periodo_tipo', 'bimestre') === $k ? 'selected' : '' ?>><?= htmlspecialchars($lab) ?></option>
                     <?php endforeach; ?>
                 </select>
@@ -143,7 +142,7 @@ $val = static function (?array $item, string $key, $default = '') {
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Tipo de recuperação</label>
                 <select name="recuperacao_tipo" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                    <?php foreach (RegraAcademica::RECUPERACAO_TIPOS as $k => $lab): ?>
+                    <?php foreach (\App\Modulos\RegrasAcademicas\Models\RegraAcademica::RECUPERACAO_TIPOS as $k => $lab): ?>
                         <option value="<?= htmlspecialchars($k) ?>" <?= (string) $val($item, 'recuperacao_tipo', 'periodo') === $k ? 'selected' : '' ?>><?= htmlspecialchars($lab) ?></option>
                     <?php endforeach; ?>
                 </select>
@@ -152,7 +151,7 @@ $val = static function (?array $item, string $key, $default = '') {
                 <label class="block text-sm font-medium text-gray-700 mb-2">Como a recuperação entra na média</label>
                 <select name="recuperacao_composicao" id="regra-recuperacao-composicao"
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                    <?php foreach (RegraAcademica::RECUPERACAO_COMPOSICOES as $k => $lab): ?>
+                    <?php foreach (\App\Modulos\RegrasAcademicas\Models\RegraAcademica::RECUPERACAO_COMPOSICOES as $k => $lab): ?>
                         <option value="<?= htmlspecialchars($k) ?>" <?= (string) $val($item, 'recuperacao_composicao', 'maior_nota') === $k ? 'selected' : '' ?>><?= htmlspecialchars($lab) ?></option>
                     <?php endforeach; ?>
                 </select>

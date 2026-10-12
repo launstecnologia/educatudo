@@ -1,5 +1,5 @@
 <?php
-$iaName = LayoutHelper::getIaName();
+$iaName = \App\Core\LayoutHelper::getIaName();
 $iaAvatarUrl = URL . '/public/assets/tudinha.png';
 $iaAvatarHtml = '<div class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-indigo-100 flex items-center justify-center self-end shadow-sm">'
     . '<img src="' . htmlspecialchars($iaAvatarUrl) . '" alt="' . htmlspecialchars($iaName) . '" class="w-full h-full object-cover" '

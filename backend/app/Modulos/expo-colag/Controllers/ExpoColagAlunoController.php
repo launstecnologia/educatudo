@@ -1,13 +1,16 @@
 <?php
+
+namespace App\Modulos\ExpoColag\Controllers;
 /**
  * Expo Colag — área do aluno (mural, detalhe e inscrição).
  */
 
-require_once __DIR__ . '/../Services/ExpoColagService.php';
-require_once __DIR__ . '/../Services/ExpoColagExecucaoService.php';
 
-if (!class_exists('ExpoColagAlunoController')) {
-class ExpoColagAlunoController extends BaseController
+use App\Modulos\ExpoColag\Services\ExpoColagExecucaoService;
+use App\Modulos\ExpoColag\Services\ExpoColagService;
+
+if (!class_exists(__NAMESPACE__ . '\\ExpoColagAlunoController', false)) {
+class ExpoColagAlunoController extends \App\Core\BaseController
 {
     private $auth;
     private ExpoColagService $service;
@@ -16,7 +19,7 @@ class ExpoColagAlunoController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        $this->auth = new AuthManager();
+        $this->auth = new \App\Core\AuthManager();
         $this->service = new ExpoColagService();
         $this->execucao = new ExpoColagExecucaoService();
     }
@@ -263,4 +266,8 @@ class ExpoColagAlunoController extends BaseController
         ]);
     }
 }
+}
+
+if (!class_exists('ExpoColagAlunoController', false) && class_exists(__NAMESPACE__ . '\\ExpoColagAlunoController', false)) {
+    class_alias(__NAMESPACE__ . '\\ExpoColagAlunoController', 'ExpoColagAlunoController');
 }

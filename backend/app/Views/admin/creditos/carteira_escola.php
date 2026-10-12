@@ -1,6 +1,5 @@
 <?php
 if (!class_exists('CreditosDecimalHelper')) {
-    require_once __DIR__ . '/../../../Core/CreditosDecimalHelper.php';
 }
 $wallet = $wallet ?? ['saldo_total' => 0, 'saldo_escola' => 0, 'saldo_comprado' => 0];
 $pacotes = $pacotes ?? [];
@@ -26,15 +25,15 @@ $csrf_token = $csrf_token ?? '';
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div class="bg-white rounded-xl shadow border border-gray-200 p-5">
             <p class="text-xs font-medium text-gray-500 uppercase">Saldo total</p>
-            <p class="text-2xl font-bold text-gray-900 mt-1"><?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay((float) ($wallet['saldo_total'] ?? 0))) ?></p>
+            <p class="text-2xl font-bold text-gray-900 mt-1"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay((float) ($wallet['saldo_total'] ?? 0))) ?></p>
         </div>
         <div class="bg-white rounded-xl shadow border border-gray-200 p-5">
             <p class="text-xs font-medium text-gray-500 uppercase">Cota / cortesia</p>
-            <p class="text-2xl font-bold text-slate-800 mt-1"><?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay((float) ($wallet['saldo_escola'] ?? 0))) ?></p>
+            <p class="text-2xl font-bold text-slate-800 mt-1"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay((float) ($wallet['saldo_escola'] ?? 0))) ?></p>
         </div>
         <div class="bg-white rounded-xl shadow border border-gray-200 p-5">
             <p class="text-xs font-medium text-gray-500 uppercase">Comprado</p>
-            <p class="text-2xl font-bold text-indigo-700 mt-1"><?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay((float) ($wallet['saldo_comprado'] ?? 0))) ?></p>
+            <p class="text-2xl font-bold text-indigo-700 mt-1"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay((float) ($wallet['saldo_comprado'] ?? 0))) ?></p>
         </div>
     </div>
 
@@ -54,7 +53,7 @@ $csrf_token = $csrf_token ?? '';
                         <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                         <input type="hidden" name="pacote_id" value="<?= (int) ($pk['id'] ?? 0) ?>">
                         <p class="font-semibold text-gray-900"><?= htmlspecialchars($pk['nome'] ?? '') ?></p>
-                        <p class="text-sm text-gray-600 mt-1"><?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay(\CreditosDecimalHelper::fromScalar($pk['creditos'] ?? 0, 0.0))) ?> TudiCoins</p>
+                        <p class="text-sm text-gray-600 mt-1"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay(\App\Core\CreditosDecimalHelper::fromScalar($pk['creditos'] ?? 0, 0.0))) ?> TudiCoins</p>
                         <p class="text-lg font-bold text-indigo-700 mt-2">R$ <?= number_format(((int) ($pk['valor_centavos'] ?? 0)) / 100, 2, ',', '.') ?></p>
                         <button type="submit" class="mt-4 w-full px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Comprar</button>
                     </form>
@@ -76,7 +75,7 @@ $csrf_token = $csrf_token ?? '';
                     <div class="flex justify-between gap-2">
                         <span class="font-medium text-gray-800"><?= htmlspecialchars((string) ($m['tipo'] ?? '')) ?></span>
                         <span class="<?= ((float) ($m['valor'] ?? 0)) < 0 ? 'text-red-600' : 'text-emerald-600' ?> font-semibold">
-                            <?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay((float) ($m['valor'] ?? 0))) ?>
+                            <?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay((float) ($m['valor'] ?? 0))) ?>
                         </span>
                     </div>
                     <p class="text-xs text-gray-500 mt-0.5">

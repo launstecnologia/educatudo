@@ -1,12 +1,15 @@
 <?php
+
+namespace App\Modulos\Arquivos\Controllers;
 /**
  * EducaTudo - Módulo de Arquivos (Professor)
  */
 
-require_once __DIR__ . '/../Services/ArquivosService.php';
 
-if (!class_exists('ArquivosProfessorController')) {
-class ArquivosProfessorController extends BaseController
+use App\Modulos\Arquivos\Services\ArquivosService;
+
+if (!class_exists(__NAMESPACE__ . '\\ArquivosProfessorController', false)) {
+class ArquivosProfessorController extends \App\Core\BaseController
 {
     private $auth;
     private ArquivosService $arquivosService;
@@ -14,7 +17,7 @@ class ArquivosProfessorController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        $this->auth = new AuthManager();
+        $this->auth = new \App\Core\AuthManager();
         $this->arquivosService = new ArquivosService();
         if (!$this->auth->isLoggedIn()) {
             $this->redirect('/');
@@ -25,8 +28,7 @@ class ArquivosProfessorController extends BaseController
             $this->redirectToCorrectDashboard($user['tipo']);
         }
         if ($user && $user['tipo'] === 'professor') {
-            require_once __DIR__ . '/../../../Core/LayoutHelper.php';
-            if (LayoutHelper::get('module_professor_arquivos', '1') !== '1') {
+            if (\App\Core\LayoutHelper::get('module_professor_arquivos', '1') !== '1') {
                 $this->setFlashMessage('O módulo Arquivos está desabilitado para o professor.', 'error');
                 $this->redirect('/professor/dashboard');
                 exit;
@@ -370,8 +372,7 @@ class ArquivosProfessorController extends BaseController
     {
         $ext = strtolower((string) $anexo['extensao']);
         $contentType = ArquivosService::mimePorExtensao($ext);
-        require_once __DIR__ . '/../../../Services/MediaStorageService.php';
-        $media = new MediaStorageService($this->config);
+        $media = new \App\Services\MediaStorageService($this->config);
         $mediaKey = ArquivosService::anexoPathToMediaKey((string) $anexo['caminho']);
         if ($media->isS3() && $mediaKey !== '') {
             $signedUrl = $media->getViewUrl('arquivos', $mediaKey, (string) $anexo['nome_original'], 900);
@@ -436,4 +437,8 @@ class ArquivosProfessorController extends BaseController
         return false;
     }
 }
+}
+
+if (!class_exists('ArquivosProfessorController', false) && class_exists(__NAMESPACE__ . '\\ArquivosProfessorController', false)) {
+    class_alias(__NAMESPACE__ . '\\ArquivosProfessorController', 'ArquivosProfessorController');
 }

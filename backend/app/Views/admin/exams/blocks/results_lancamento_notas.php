@@ -62,7 +62,6 @@ if ($fTransferido === '1') {
 }
 
 if (!class_exists('AlunoLancamentoNotaHelper', false)) {
-    require_once __DIR__ . '/../../../../Helpers/AlunoLancamentoNotaHelper.php';
 }
 $exportLinhas = [];
 foreach ($notas_linhas ?? [] as $ln) {
@@ -74,7 +73,7 @@ foreach ($notas_linhas ?? [] as $ln) {
         'materia' => (string) ($ln['materia_nome'] ?? ''),
         'professor' => (string) ($ln['professor_nome'] ?? ''),
         'turma' => (string) ($ln['turma_nome'] ?? ''),
-        'aluno' => AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+        'aluno' => \App\Helpers\AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
             (string) ($ln['aluno_nome'] ?? ''),
             !empty($ln['transferido'])
         ),
@@ -221,7 +220,7 @@ if ($slugArquivo === '') {
                         <?php foreach ($notas_linhas as $ln): ?>
                         <?php
                         $transferido = !empty($ln['transferido']);
-                        $nomeAluno = AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+                        $nomeAluno = \App\Helpers\AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
                             (string) ($ln['aluno_nome'] ?? ''),
                             $transferido
                         );

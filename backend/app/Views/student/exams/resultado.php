@@ -12,7 +12,6 @@
 
 <?php
 if (!class_exists('LayoutHelper')) {
-    require_once __DIR__ . '/../../../Core/LayoutHelper.php';
 }
 $acertos = 0;
 $erros = 0;
@@ -156,7 +155,7 @@ $tiposRes = ['multipla_escolha' => 'Múltipla Escolha', 'verdadeiro_falso' => 'V
                         <?php endif; ?>
                     </div>
 
-                    <div class="text-gray-700 mb-5 text-lg prose prose-sm max-w-none"><?= isset($questao['enunciado']) ? LayoutHelper::renderEnunciadoProva($questao['enunciado']) : '' ?></div>
+                    <div class="text-gray-700 mb-5 text-lg prose prose-sm max-w-none"><?= isset($questao['enunciado']) ? \App\Core\LayoutHelper::renderEnunciadoProva($questao['enunciado']) : '' ?></div>
 
                     <?php if (!empty($questao['imagem_url'])): ?>
                         <div class="mb-5">
@@ -187,7 +186,7 @@ $tiposRes = ['multipla_escolha' => 'Múltipla Escolha', 'verdadeiro_falso' => 'V
                                     <?php else: ?>
                                         <span class="flex-shrink-0 w-6 h-6 rounded-full border-2 border-gray-300 mr-3"></span>
                                     <?php endif; ?>
-                                    <span class="text-gray-700 flex-1 text-base"><?= isset($alt['texto']) ? LayoutHelper::renderEnunciadoProva($alt['texto']) : '' ?></span>
+                                    <span class="text-gray-700 flex-1 text-base"><?= isset($alt['texto']) ? \App\Core\LayoutHelper::renderEnunciadoProva($alt['texto']) : '' ?></span>
                                     <?php if ($ehCorreta): ?>
                                         <span class="text-green-700 font-semibold ml-2 flex-shrink-0">Correta</span>
                                     <?php elseif ($mostrarSuaResposta): ?>

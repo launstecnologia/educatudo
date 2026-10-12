@@ -1,16 +1,18 @@
 <?php
+
+namespace App\Modulos\Arquivos\Models;
 /**
  * Model — vídeos embutidos do módulo Arquivos (tabela modulos_arquivos_videos).
  */
 
-if (!class_exists('ModuloArquivoVideo')) {
+if (!class_exists('ModuloArquivoVideo', false)) {
 class ModuloArquivoVideo
 {
     private $db;
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     public function listByModuloArquivo(int $moduloArquivoId): array
@@ -20,7 +22,7 @@ class ModuloArquivoVideo
                 'SELECT * FROM modulos_arquivos_videos WHERE modulo_arquivo_id = :id ORDER BY ordem',
                 ['id' => $moduloArquivoId]
             ) ?: [];
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return [];
         }
     }
@@ -45,9 +47,13 @@ class ModuloArquivoVideo
                 'DELETE FROM modulos_arquivos_videos WHERE modulo_arquivo_id = :id',
                 ['id' => $moduloArquivoId]
             );
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             // tabela pode não existir em tenants antigos
         }
     }
 }
+}
+
+if (!class_exists('ModuloArquivoVideo', false) && class_exists(__NAMESPACE__ . '\\ModuloArquivoVideo', false)) {
+    class_alias(__NAMESPACE__ . '\\ModuloArquivoVideo', 'ModuloArquivoVideo');
 }

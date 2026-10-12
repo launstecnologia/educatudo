@@ -1,6 +1,5 @@
 <?php
 if (!class_exists('LayoutHelper')) {
-    require_once __DIR__ . '/../../../Core/LayoutHelper.php';
 }
 ?>
 <?php if (!empty($acessibilidade_style)): ?>
@@ -261,7 +260,7 @@ if (!class_exists('LayoutHelper')) {
                 </div>
             </div>
             
-            <div class="text-gray-700 mb-4 text-lg"><?= isset($questao['enunciado']) ? LayoutHelper::renderEnunciadoProva($questao['enunciado']) : '' ?></div>
+            <div class="text-gray-700 mb-4 text-lg"><?= isset($questao['enunciado']) ? \App\Core\LayoutHelper::renderEnunciadoProva($questao['enunciado']) : '' ?></div>
             
             <?php if (!empty($questao['imagem_url'])): ?>
                 <div class="mb-4 text-center">
@@ -288,7 +287,7 @@ if (!class_exists('LayoutHelper')) {
                                    data-alternativa-id="<?= $alt['id'] ?>"
                                    class="mr-3 w-5 h-5 flex-shrink-0"
                                    <?= isset($respostas[$questao['id']]) && $respostas[$questao['id']]['alternativa_id'] == $alt['id'] ? 'checked' : '' ?>>
-                            <span class="text-gray-700 text-base"><?= isset($alt['texto']) ? LayoutHelper::renderEnunciadoProva($alt['texto']) : '' ?></span>
+                            <span class="text-gray-700 text-base"><?= isset($alt['texto']) ? \App\Core\LayoutHelper::renderEnunciadoProva($alt['texto']) : '' ?></span>
                         </label>
                     <?php endforeach; ?>
                 </div>

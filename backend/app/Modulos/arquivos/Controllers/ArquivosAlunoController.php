@@ -1,13 +1,16 @@
 <?php
+
+namespace App\Modulos\Arquivos\Controllers;
 /**
  * EducaTudo - Módulo Arquivos (Aluno)
  * Controllers em app/Modulos/arquivos/Controllers/
  */
 
-require_once __DIR__ . '/../Services/ArquivosService.php';
 
-if (!class_exists('ArquivosAlunoController')) {
-class ArquivosAlunoController extends BaseController
+use App\Modulos\Arquivos\Services\ArquivosService;
+
+if (!class_exists(__NAMESPACE__ . '\\ArquivosAlunoController', false)) {
+class ArquivosAlunoController extends \App\Core\BaseController
 {
     private $auth;
     private $db;
@@ -59,8 +62,8 @@ class ArquivosAlunoController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        $this->auth = new AuthManager();
-        $this->db = Database::getInstance();
+        $this->auth = new \App\Core\AuthManager();
+        $this->db = \App\Core\Database::getInstance();
         $this->arquivosService = new ArquivosService();
         if (!$this->auth->isLoggedIn()) {
             $this->redirect('/');
@@ -92,16 +95,15 @@ class ArquivosAlunoController extends BaseController
 
     private function ensureModuleEnabled(bool $somenteRecuperacao = false): bool
     {
-        require_once __DIR__ . '/../../../Core/LayoutHelper.php';
         if ($somenteRecuperacao) {
-            if (!LayoutHelper::isModuleEnabled('aluno_recuperacao')) {
+            if (!\App\Core\LayoutHelper::isModuleEnabled('aluno_recuperacao')) {
                 $this->setFlashMessage('O módulo Recuperação está desabilitado.', 'error');
                 $this->redirect('/dashboard');
                 return false;
             }
             return true;
         }
-        if (!LayoutHelper::isModuleEnabled('aluno_arquivos')) {
+        if (!\App\Core\LayoutHelper::isModuleEnabled('aluno_arquivos')) {
             $this->setFlashMessage('O módulo Arquivos está desabilitado.', 'error');
             $this->redirect('/dashboard');
             return false;
@@ -112,8 +114,7 @@ class ArquivosAlunoController extends BaseController
     /** Detalhe/abrir anexo: libera se Arquivos ou Recuperação estiver on. */
     private function ensureAcessoArquivosOuRecuperacao(): bool
     {
-        require_once __DIR__ . '/../../../Core/LayoutHelper.php';
-        if (LayoutHelper::isModuleEnabled('aluno_arquivos') || LayoutHelper::isModuleEnabled('aluno_recuperacao')) {
+        if (\App\Core\LayoutHelper::isModuleEnabled('aluno_arquivos') || \App\Core\LayoutHelper::isModuleEnabled('aluno_recuperacao')) {
             return true;
         }
         $this->setFlashMessage('O módulo Arquivos está desabilitado.', 'error');
@@ -300,8 +301,7 @@ class ArquivosAlunoController extends BaseController
         $download = (!empty($_GET['download']) && $_GET['download'] === '1');
         $disposition = $download ? 'attachment' : 'inline';
 
-        require_once __DIR__ . '/../../../Services/MediaStorageService.php';
-        $media = new MediaStorageService($this->config);
+        $media = new \App\Services\MediaStorageService($this->config);
         $mediaKey = ArquivosService::anexoPathToMediaKey((string) $anexo['caminho']);
         if ($media->isS3() && $mediaKey !== '') {
             $signedUrl = $media->getViewUrl('arquivos', $mediaKey, (string) $anexo['nome_original'], 900);
@@ -388,4 +388,8 @@ class ArquivosAlunoController extends BaseController
         ]);
     }
 }
+}
+
+if (!class_exists('ArquivosAlunoController', false) && class_exists(__NAMESPACE__ . '\\ArquivosAlunoController', false)) {
+    class_alias(__NAMESPACE__ . '\\ArquivosAlunoController', 'ArquivosAlunoController');
 }

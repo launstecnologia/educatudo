@@ -10,7 +10,6 @@
  * - $ocultar_grupo_hierarquia (bool, opcional) — se true, omite linhas-mãe do group_line
  */
 if (!class_exists('BoletimQuadroLayoutHelper', false)) {
-    require_once dirname(__DIR__, 2) . '/Helpers/BoletimQuadroLayoutHelper.php';
 }
 
 $colsSimples = is_array($cols ?? null) ? $cols : [];
@@ -28,7 +27,7 @@ foreach ($colsSimples as $col) {
     if (!is_array($col)) {
         continue;
     }
-    if (BoletimQuadroLayoutHelper::colunaEhSemanaNq($col)) {
+    if (\App\Helpers\BoletimQuadroLayoutHelper::colunaEhSemanaNq($col)) {
         continue;
     }
     $colsVisiveis[] = $col;
@@ -74,7 +73,7 @@ $fmtNotaSimples = static function ($valor) use ($decSimples): string {
                 </th>
                 <?php foreach ($colsVisiveis as $oc):
                     $ltOc = strtolower(trim((string) ($oc['layout_type'] ?? '')));
-                    $isFaltasCab = BoletimQuadroLayoutHelper::colunaEhFaltas($oc);
+                    $isFaltasCab = \App\Helpers\BoletimQuadroLayoutHelper::colunaEhFaltas($oc);
                     $mostraValor10 = !$isFaltasCab && (
                         in_array($ltOc, ['media', 'media_sem', 'resultado', ''], true)
                         || $ltOc === 'other'
@@ -84,7 +83,7 @@ $fmtNotaSimples = static function ($valor) use ($decSimples): string {
                     );
                 ?>
                     <th class="boletim-quadro-th-border px-2 py-1 font-semibold align-middle leading-tight min-w-[4.5rem]">
-                        <?= htmlspecialchars(BoletimQuadroLayoutHelper::rotuloColunaQuadro($oc), ENT_QUOTES, 'UTF-8') ?>
+                        <?= htmlspecialchars(\App\Helpers\BoletimQuadroLayoutHelper::rotuloColunaQuadro($oc), ENT_QUOTES, 'UTF-8') ?>
                         <?php if ($mostraValor10): ?>
                             <div class="text-[10px] font-normal opacity-80">Valor 10</div>
                         <?php endif; ?>
@@ -112,7 +111,7 @@ $fmtNotaSimples = static function ($valor) use ($decSimples): string {
                         if (is_array($nv)) {
                             $nv = $nv['texto'] ?? $nv['valor'] ?? null;
                         }
-                        $isFaltas = BoletimQuadroLayoutHelper::colunaEhFaltas($oc);
+                        $isFaltas = \App\Helpers\BoletimQuadroLayoutHelper::colunaEhFaltas($oc);
                         $stCol = (string) ($oc['source_type'] ?? '');
                         $isManualCol = $stCol === 'manual';
                         $isPorMateriaCol = $edicaoSimples !== null

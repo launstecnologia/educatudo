@@ -134,7 +134,7 @@ $rotulosCab = [];
 foreach ($linhasPeriodo as $linhaP) {
     $anoL = (int) $linhaP['ano'];
     if ($anoL > 0) {
-        $rotulosCab[(string) PeriodoLetivo::doAno($anoL)['rotulo_campo']] = true;
+        $rotulosCab[(string) \App\Core\PeriodoLetivo::doAno($anoL)['rotulo_campo']] = true;
     }
 }
 if (count($rotulosCab) === 1) {
@@ -170,17 +170,17 @@ $obterMotorDemonstrativo = static function () use (&$motorDemonstrativo, $appDir
     if (!class_exists('BoletimConfigController', false)) {
         return null;
     }
-    $motorDemonstrativo = new BoletimConfigController(true);
+    $motorDemonstrativo = new \App\Controllers\Admin\BoletimConfigController(true);
     return $motorDemonstrativo;
 };
 $obterCfgBoletim = static function () use (&$cfgBoletimNotas, $appDirNotas) {
     if (is_object($cfgBoletimNotas)) {
         return $cfgBoletimNotas;
     }
-    if (!class_exists('BoletimConfig', false)) {
-        require_once $appDirNotas . '/Models/System/BoletimConfig.php';
+    if (!class_exists(\App\Models\System\BoletimConfig::class)) {
+        // autoload Compat → Modulos/boletins
     }
-    $cfgBoletimNotas = new BoletimConfig();
+    $cfgBoletimNotas = new \App\Models\System\BoletimConfig();
     return $cfgBoletimNotas;
 };
 $simulacaoQuadroCache = [];
@@ -248,7 +248,7 @@ $simularQuadroAluno = static function (
             if (is_array($simulacao) && is_array($matrizBoletim)) {
                 $simulacao['matriz_materias_boletim'] = $matrizBoletim;
             }
-        } catch (Throwable $eSimB) {
+        } catch (\Throwable $eSimB) {
             // Vista Boletim opcional; Demonstrativo segue.
         }
         if (!is_array($simulacao)) {
@@ -260,7 +260,7 @@ $simularQuadroAluno = static function (
         $simulacaoQuadroCache[$chaveSim] = $simulacao;
 
         return $simulacao;
-    } catch (Throwable $e) {
+    } catch (\Throwable $e) {
         error_log('Quadro demonstrativo aluno #' . $alunoId . ' regra #' . $regraId . ': ' . $e->getMessage());
 
         return null;
@@ -287,7 +287,7 @@ $renderQuadroDemonstrativo = static function (
         $decimalPlaces = ((int) ($simulacao['_decimal_places'] ?? 2) === 1) ? 1 : 2;
         $edicaoSimulacao = null;
         $htmlQuadroVivo = '';
-        if (BoletimQuadroLayoutHelper::partirTabelas($cols) !== []) {
+        if (\App\Helpers\BoletimQuadroLayoutHelper::partirTabelas($cols) !== []) {
             ob_start();
             include dirname(__DIR__, 2) . '/partials/boletim_quadro_tabela.php';
             $htmlQuadroVivo = (string) ob_get_clean();
@@ -317,7 +317,7 @@ $renderQuadroDemonstrativo = static function (
         require dirname(__DIR__, 2) . '/partials/boletins_gerados.php';
         $htmlGerado = (string) ob_get_clean();
         return stripos($htmlGerado, '<table') === false ? '' : $htmlGerado;
-    } catch (Throwable $e) {
+    } catch (\Throwable $e) {
         error_log('Quadro demonstrativo aluno #' . $alunoId . ' regra #' . $regraId . ': ' . $e->getMessage());
         return '';
     }
@@ -349,7 +349,7 @@ $renderNotasAoVivo = static function (
 };
 
 $renderNotasComoCoordenacao = static function (array $ev): string {
-    $cols = BoletimQuadroLayoutHelper::colunasDetalheCoordenacao(
+    $cols = \App\Helpers\BoletimQuadroLayoutHelper::colunasDetalheCoordenacao(
         is_array($ev['colunas'] ?? null) ? $ev['colunas'] : []
     );
     $linhasEv = is_array($ev['linhas'] ?? null) ? $ev['linhas'] : [];
@@ -500,7 +500,7 @@ foreach ($linhasPeriodo as &$linhaP) {
             }
             if (is_array($evGerado) && !empty($evGerado['linhas']) && !empty($evGerado['colunas'])) {
                 $colsGer = is_array($evGerado['colunas']) ? $evGerado['colunas'] : [];
-                if (BoletimQuadroLayoutHelper::ehLayoutQuadro($colsGer) || $ridP <= 0) {
+                if (\App\Helpers\BoletimQuadroLayoutHelper::ehLayoutQuadro($colsGer) || $ridP <= 0) {
                     $boletinsGeradosBackup = $boletins_gerados ?? [];
                     $boletimPodeExcluirBackup = $boletim_pode_excluir ?? false;
                     $boletimAlunoIdBackup = $boletim_aluno_id ?? 0;
@@ -520,7 +520,7 @@ foreach ($linhasPeriodo as &$linhaP) {
         // 3) Painel vivo legado só quando não há regra de notas (evita Semanais e Blocos no lugar do Demonstrativo).
         if (trim($htmlQuadroPorChave[$chaveQuadro]) === '' && $ridP <= 0) {
             if ($temPainelNotasService && $alunoIdNotas > 0 && $bimP > 0) {
-                $paineis_notas = PainelNotasService::paraAluno($alunoIdNotas, [
+                $paineis_notas = \App\Modulos\GruposRegrasNotas\Services\PainelNotasService::paraAluno($alunoIdNotas, [
                     'portal' => false,
                     'ano_letivo' => $anoP > 0 ? $anoP : null,
                     'bimestre' => $bimP,
@@ -546,7 +546,7 @@ foreach ($linhasPeriodo as &$linhaP) {
     $linhaP['tem_quadro'] = trim($htmlQuadro) !== '';
     if ($linhaP['descricao'] === '') {
         $linhaP['descricao'] = $anoP > 0 && $bimP > 0
-            ? PeriodoLetivo::rotulo($anoP, $bimP)
+            ? \App\Core\PeriodoLetivo::rotulo($anoP, $bimP)
             : 'Notas';
     }
     if ($linhaP['tem_resumo']) {
@@ -573,7 +573,7 @@ $celulaPeriodo = static function (int $ano, int $numero, string $cabPeriodo): st
         return '—';
     }
     if ($cabPeriodo === 'Período' || $cabPeriodo === 'Etapa única') {
-        return $ano > 0 ? PeriodoLetivo::rotulo($ano, $numero) : ($numero . 'º');
+        return $ano > 0 ? \App\Core\PeriodoLetivo::rotulo($ano, $numero) : ($numero . 'º');
     }
     return $numero . 'º';
 };
@@ -614,7 +614,7 @@ $ocultarRefNotas = !empty($ocultar_ref_notas);
                         $descricao = trim((string) $linhaP['descricao']);
                         $tituloModal = $descricao !== ''
                             ? $descricao
-                            : ($anoP > 0 && $bimP > 0 ? PeriodoLetivo::rotulo($anoP, $bimP) : 'Notas');
+                            : ($anoP > 0 && $bimP > 0 ? \App\Core\PeriodoLetivo::rotulo($anoP, $bimP) : 'Notas');
                         ?>
                         <tr class="hover:bg-gray-50">
                             <?php if (!$ocultarRefNotas): ?>

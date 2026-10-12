@@ -7,7 +7,7 @@
  * Cada execução é registrada em cron_execucoes (banco master) — ver painel Master → Fila IA.
  */
 
-// Composer PSR-4 (App\AI\AgenteIAInterface etc.) — necessário no CLI/cron,
+// Composer PSR-4 (App\Agentes\AgenteIAInterface etc.) — necessário no CLI/cron,
 // onde o index.php da web não roda e o autoload não está registrado.
 $autoload = __DIR__ . '/../vendor/autoload.php';
 if (!is_file($autoload)) {
@@ -18,13 +18,7 @@ require_once $autoload;
 
 require_once __DIR__ . '/../app/Core/Database.php';
 require_once __DIR__ . '/../app/Core/cron_multi_tenant_helper.php';
-require_once __DIR__ . '/../app/Services/AIJobService.php';
-require_once __DIR__ . '/../app/Services/CronExecucaoService.php';
-require_once __DIR__ . '/../app/Services/MetricsService.php';
-require_once __DIR__ . '/../app/Services/OpenAIService.php';
-require_once __DIR__ . '/../app/Services/EssayAIService.php';
-require_once __DIR__ . '/../app/Services/FlashcardService.php';
-require_once __DIR__ . '/../app/Services/CustomExerciseImportService.php';
+// Services/Agentes: PSR-4 + Compat (App\Services\* / App\AI\*) via vendor/autoload.php
 require_once __DIR__ . '/../app/Helpers/EssayTextStructureHelper.php';
 
 date_default_timezone_set('America/Sao_Paulo');

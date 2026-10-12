@@ -1,6 +1,4 @@
 <?php
-require_once __DIR__ . '/../../../Models/Education/ResultadoAcademico.php';
-require_once __DIR__ . '/../../../Services/ResultadoHomologacaoService.php';
 
 $paineis = is_array($paineis ?? null) ? $paineis : [];
 $anoLetivo = (int) ($ano_letivo ?? date('Y'));

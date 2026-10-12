@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Core;
 /**
  * Recalcula o status da jornada (aguardando / em_andamento / concluido) com base em data e hora
  * e persiste no banco quando diferente do armazenado. Assim o status é corrigido ao carregar
@@ -63,7 +65,7 @@ class JornadaStatusHelper
      * Recalcula o status da jornada e, se diferente do armazenado, atualiza a tabela jornadas.
      * Pode ser chamado ao listar ou abrir uma jornada para corrigir o status sem depender do CRON.
      *
-     * @param \Database $db Instância do banco
+     * @param \App\Core\Database $db Instância do banco
      * @param int $jornadaId ID da jornada
      * @param string $estruturaJson JSON da coluna estrutura
      * @param string|null $statusColunaAtual Valor atual da coluna status (ativa, pausada, finalizada)
@@ -114,4 +116,8 @@ class JornadaStatusHelper
 
         return $statusCalculado;
     }
+}
+
+if (!class_exists('JornadaStatusHelper', false) && class_exists(__NAMESPACE__ . '\\JornadaStatusHelper', false)) {
+    class_alias(__NAMESPACE__ . '\\JornadaStatusHelper', 'JornadaStatusHelper');
 }

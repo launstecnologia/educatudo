@@ -1,6 +1,4 @@
 <?php
-require_once __DIR__ . '/../../../Helpers/EssayTextStructureHelper.php';
-require_once __DIR__ . '/../../../Helpers/EssayCriteriaDisplayHelper.php';
 ?>
 <div class="mb-8">
     <div class="flex justify-between items-center">
@@ -14,8 +12,8 @@ require_once __DIR__ . '/../../../Helpers/EssayCriteriaDisplayHelper.php';
 
 <?php
 $contentText = !empty($submission['content_text']) ? $submission['content_text'] : ($submission['ocr_text'] ?? '');
-$structuredText = EssayTextStructureHelper::decode((string) ($submission['ocr_text_structure_json'] ?? ''));
-$ocrLayoutMeta = EssayTextStructureHelper::decode((string) ($submission['ocr_layout_json'] ?? ''));
+$structuredText = \App\Helpers\EssayTextStructureHelper::decode((string) ($submission['ocr_text_structure_json'] ?? ''));
+$ocrLayoutMeta = \App\Helpers\EssayTextStructureHelper::decode((string) ($submission['ocr_layout_json'] ?? ''));
 $transcriptionIdentifier = '';
 if (!empty($ocrLayoutMeta['record_code'])) {
     $transcriptionIdentifier = (string) $ocrLayoutMeta['record_code'];
@@ -26,10 +24,10 @@ if (!empty($ocrLayoutMeta['record_code'])) {
 } elseif (!empty($ocrLayoutMeta['id'])) {
     $transcriptionIdentifier = (string) $ocrLayoutMeta['id'];
 }
-$flattenedStructuredLines = !empty($structuredText) ? EssayTextStructureHelper::flatten($structuredText) : [];
+$flattenedStructuredLines = !empty($structuredText) ? \App\Helpers\EssayTextStructureHelper::flatten($structuredText) : [];
 if (empty($flattenedStructuredLines) && trim((string) $contentText) !== '') {
-    $structuredFromPlain = EssayTextStructureHelper::buildFromPlainText((string) $contentText);
-    $flattenedStructuredLines = !empty($structuredFromPlain) ? EssayTextStructureHelper::flatten($structuredFromPlain) : [];
+    $structuredFromPlain = \App\Helpers\EssayTextStructureHelper::buildFromPlainText((string) $contentText);
+    $flattenedStructuredLines = !empty($structuredFromPlain) ? \App\Helpers\EssayTextStructureHelper::flatten($structuredFromPlain) : [];
 }
 if (!function_exists('normalizeEssayTextForDisplay')) {
     /**
@@ -408,18 +406,18 @@ if ($correction && !empty($correction['teacher_grades_json'])) {
     $decoded = json_decode($correction['teacher_grades_json'], true);
     $teacherGradesJson = is_array($decoded) ? $decoded : [];
 }
-$isEnemBoard = EssayCriteriaDisplayHelper::isEnemBoard(
+$isEnemBoard = \App\Helpers\EssayCriteriaDisplayHelper::isEnemBoard(
     $proposal['board_name'] ?? '',
     $proposal['board_slug'] ?? ''
 );
-$criteriaDisplay = EssayCriteriaDisplayHelper::buildCriteriaDisplay(
+$criteriaDisplay = \App\Helpers\EssayCriteriaDisplayHelper::buildCriteriaDisplay(
     isset($criteria) && is_array($criteria) ? $criteria : [],
     $gradesJson,
     $isEnemBoard
 );
-$criteriaSectionTitle = EssayCriteriaDisplayHelper::getSectionTitle($isEnemBoard);
-$criteriaSectionTitleSingular = EssayCriteriaDisplayHelper::getSectionTitle($isEnemBoard, false);
-$maxTotalScore = EssayCriteriaDisplayHelper::calculateMaxTotal($criteriaDisplay, $isEnemBoard);
+$criteriaSectionTitle = \App\Helpers\EssayCriteriaDisplayHelper::getSectionTitle($isEnemBoard);
+$criteriaSectionTitleSingular = \App\Helpers\EssayCriteriaDisplayHelper::getSectionTitle($isEnemBoard, false);
+$maxTotalScore = \App\Helpers\EssayCriteriaDisplayHelper::calculateMaxTotal($criteriaDisplay, $isEnemBoard);
 $highlightFeedbackTexts = [];
 if ($correction) {
     if (!empty($correction['feedback_text'])) {
@@ -461,8 +459,8 @@ $displayStructuredLines = $flattenedStructuredLines;
 // Modo visual "bonito" (parágrafo contínuo) quando não há anotações a preservar por linha.
 $useParagraphVisualMode = true;
 if (empty($allAnnotations) && empty($flattenedStructuredLines) && trim((string) $contentTextNormalized) !== '') {
-    $displayStructuredLines = EssayTextStructureHelper::flatten(
-        EssayTextStructureHelper::buildFromPlainText((string) $contentTextNormalized)
+    $displayStructuredLines = \App\Helpers\EssayTextStructureHelper::flatten(
+        \App\Helpers\EssayTextStructureHelper::buildFromPlainText((string) $contentTextNormalized)
     );
 }
 $aiC5Elements = !empty($rawResponsePayload['c5_elements']) && is_array($rawResponsePayload['c5_elements'])
@@ -1625,7 +1623,7 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
             }
         ?>
         <div class="border-l-4 border-blue-200 pl-4 py-2">
-            <label for="grade_<?= htmlspecialchars($slug) ?>" class="block text-sm font-medium text-gray-900"><?= htmlspecialchars(EssayCriteriaDisplayHelper::formatCriterionLabel($pos, $name, $isEnemBoard)) ?> (máx. <?= number_format($max, 0, ',', '.') ?>)</label>
+            <label for="grade_<?= htmlspecialchars($slug) ?>" class="block text-sm font-medium text-gray-900"><?= htmlspecialchars(\App\Helpers\EssayCriteriaDisplayHelper::formatCriterionLabel($pos, $name, $isEnemBoard)) ?> (máx. <?= number_format($max, 0, ',', '.') ?>)</label>
             <div class="mt-1 flex flex-wrap items-center gap-4">
                 <?php if ($notaIa !== null): ?>
                 <div class="flex items-center gap-1">

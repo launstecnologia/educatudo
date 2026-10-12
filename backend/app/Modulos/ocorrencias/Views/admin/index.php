@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Models/Ocorrencia.php';
 
 use App\Modulos\Ocorrencias\Models\Ocorrencia;
 
@@ -48,8 +47,8 @@ $page_header_actions = ob_get_clean();
 include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
 include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 
-$statusLabel = Ocorrencia::STATUS;
-$gravidadeLabel = Ocorrencia::GRAVIDADES;
+$statusLabel = \App\Modulos\Ocorrencias\Models\Ocorrencia::STATUS;
+$gravidadeLabel = \App\Modulos\Ocorrencias\Models\Ocorrencia::GRAVIDADES;
 ?>
 
 <div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
@@ -292,7 +291,7 @@ $gravidadeLabel = Ocorrencia::GRAVIDADES;
                         <label for="oc_gravidade" class="block text-sm font-medium text-gray-700 mb-1">Gravidade <span class="text-red-500">*</span></label>
                         <select id="oc_gravidade" name="nivel_gravidade" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
                             <option value="">Selecione</option>
-                            <?php foreach (Ocorrencia::GRAVIDADES as $valor => $rotulo): ?>
+                            <?php foreach (\App\Modulos\Ocorrencias\Models\Ocorrencia::GRAVIDADES as $valor => $rotulo): ?>
                             <option value="<?= htmlspecialchars($valor) ?>"><?= htmlspecialchars($rotulo) ?></option>
                             <?php endforeach; ?>
                         </select>

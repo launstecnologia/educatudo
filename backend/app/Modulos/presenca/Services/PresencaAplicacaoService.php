@@ -1,9 +1,11 @@
 <?php
 
-require_once __DIR__ . '/../../../Core/Database.php';
-require_once __DIR__ . '/../../../Models/Education/ClassDiary.php';
-require_once __DIR__ . '/../Models/PresencaConfig.php';
-require_once __DIR__ . '/../Models/PresencaEvento.php';
+namespace App\Modulos\Presenca\Services;
+
+
+use App\Modulos\Diario\Models\ClassDiary;
+use App\Modulos\Presenca\Models\PresencaConfig;
+use App\Modulos\Presenca\Models\PresencaEvento;
 
 /**
  * Cruza entrada/saída do dia com a grade horária e grava diario_frequencias.
@@ -21,12 +23,12 @@ class PresencaAplicacaoService
     private $eventos;
 
     public function __construct(
-        ?Database $db = null,
+        ?\App\Core\Database $db = null,
         ?ClassDiary $diary = null,
         ?PresencaConfig $config = null,
         ?PresencaEvento $eventos = null
     ) {
-        $this->db = $db ?? Database::getInstance();
+        $this->db = $db ?? \App\Core\Database::getInstance();
         $this->diary = $diary ?? new ClassDiary();
         $this->configModel = $config ?? new PresencaConfig();
         $this->eventos = $eventos ?? new PresencaEvento();
@@ -73,7 +75,7 @@ class PresencaAplicacaoService
                 } else {
                     $out['puladas']++;
                 }
-            } catch (Throwable $e) {
+            } catch (\Throwable $e) {
                 $out['puladas']++;
                 $out['erro'] = $e->getMessage();
             }
@@ -87,13 +89,13 @@ class PresencaAplicacaoService
      *
      * @return array{turmas:int,alunos:int,aplicadas:int}
      */
-    public function processarCorteDoDia(string $data, ?DateTimeImmutable $agora = null): array
+    public function processarCorteDoDia(string $data, ?\DateTimeImmutable $agora = null): array
     {
         $out = ['turmas' => 0, 'alunos' => 0, 'aplicadas' => 0];
         if (!$this->db->tableExists('presenca_eventos') || !$this->db->tableExists('grade_horaria')) {
             return $out;
         }
-        $agora = $agora ?? new DateTimeImmutable('now');
+        $agora = $agora ?? new \DateTimeImmutable('now');
         if ($agora->format('Y-m-d') !== $data) {
             return $out;
         }
@@ -155,7 +157,7 @@ class PresencaAplicacaoService
                 } else {
                     $out['puladas']++;
                 }
-            } catch (Throwable $e) {
+            } catch (\Throwable $e) {
                 $out['puladas']++;
             }
         }
@@ -416,4 +418,8 @@ class PresencaAplicacaoService
         $cache[$key] = (bool) $row;
         return $cache[$key];
     }
+}
+
+if (!class_exists('PresencaAplicacaoService', false) && class_exists(__NAMESPACE__ . '\\PresencaAplicacaoService', false)) {
+    class_alias(__NAMESPACE__ . '\\PresencaAplicacaoService', 'PresencaAplicacaoService');
 }

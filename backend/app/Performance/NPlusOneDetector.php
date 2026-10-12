@@ -73,3 +73,7 @@ final class NPlusOneDetector
             . "uma única consulta com IN(...)/JOIN, ou usar cache/memoização.";
     }
 }
+
+if (!class_exists('NPlusOneDetector', false) && class_exists(__NAMESPACE__ . '\\NPlusOneDetector', false)) {
+    class_alias(__NAMESPACE__ . '\\NPlusOneDetector', 'NPlusOneDetector');
+}

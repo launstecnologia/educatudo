@@ -5,7 +5,6 @@ $schema_pronto = $schema_pronto ?? false;
 $layout_pronto = $layout_pronto ?? false;
 $categoria = (string) ($categoria ?? 'declaracao');
 $categorias = is_array($categorias ?? null) ? $categorias : [];
-require_once __DIR__ . '/../../Services/ModeloDocumentoService.php';
 
 use App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService;
 
@@ -114,8 +113,8 @@ if ($layoutsHistorico !== []):
                 <?php else: foreach ($lista as $row):
                     $rowId = (int) ($row['id'] ?? 0);
                     $codigo = (string) ($row['codigo'] ?? '');
-                    $codigoSistema = ModeloDocumentoService::isCodigoSistema($codigo);
-                    $catRow = ModeloDocumentoService::categoriaDoCodigo($codigo);
+                    $codigoSistema = \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService::isCodigoSistema($codigo);
+                    $catRow = \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService::categoriaDoCodigo($codigo);
                     $catLabel = $categorias[$catRow] ?? 'Outros';
                     $usaLayout = (int) ($row['usar_layout_padrao'] ?? 0) === 1;
                 ?>

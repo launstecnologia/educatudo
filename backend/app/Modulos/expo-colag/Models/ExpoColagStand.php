@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Modulos\ExpoColag\Models;
 /**
  * Stands e QR público da Expo Colag (S4).
  */
@@ -9,7 +11,7 @@ class ExpoColagStand
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     public function findById(int $id): ?array
@@ -136,7 +138,7 @@ class ExpoColagStand
                     'user_agent' => $userAgent,
                 ]
             );
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return 0;
         }
     }
@@ -150,7 +152,7 @@ class ExpoColagStand
                  WHERE stand_id = :stand_id',
                 ['stand_id' => $standId]
             ) ?: [];
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $row = [];
         }
 
@@ -185,4 +187,8 @@ class ExpoColagStand
         }
         return $out;
     }
+}
+
+if (!class_exists('ExpoColagStand', false) && class_exists(__NAMESPACE__ . '\\ExpoColagStand', false)) {
+    class_alias(__NAMESPACE__ . '\\ExpoColagStand', 'ExpoColagStand');
 }

@@ -5,6 +5,7 @@
  */
 return [
     'chave' => 'dashboard-gestao',
+    'namespace' => 'App\\Modulos\\DashboardGestao',
     'label' => 'Dashboard de Gestão Escolar',
     'grupo' => 'dashboard',
     'feature_keys' => [],

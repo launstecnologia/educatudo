@@ -2,11 +2,8 @@
 
 namespace App\Modulos\ModelosDocumentos\Services;
 
-require_once __DIR__ . '/../../../Core/Database.php';
-require_once __DIR__ . '/GradeSoltaService.php';
 
-use Database;
-
+use App\Core\Database;
 /**
  * Dados reais (turma, aluno, componentes e notas) para a folha do editor.
  * O HTML do modelo continua com {{tokens}}; só a demonstração substitui.
@@ -841,4 +838,8 @@ class DemonstracaoDocumentoService
         }
         return $this->colunas[$cacheKey];
     }
+}
+
+if (!class_exists('DemonstracaoDocumentoService', false) && class_exists(__NAMESPACE__ . '\\DemonstracaoDocumentoService', false)) {
+    class_alias(__NAMESPACE__ . '\\DemonstracaoDocumentoService', 'DemonstracaoDocumentoService');
 }

@@ -1,5 +1,7 @@
 <?php
 
+namespace App\Helpers;
+
 /**
  * Rótulos e totais de critérios de redação (ENEM usa "Competência"; demais bancas usam "Correção").
  */
@@ -141,4 +143,8 @@ class EssayCriteriaDisplayHelper
             ? ('Competência ' . $position)
             : ('Correção ' . $position);
     }
+}
+
+if (!class_exists('EssayCriteriaDisplayHelper', false) && class_exists(__NAMESPACE__ . '\\EssayCriteriaDisplayHelper', false)) {
+    class_alias(__NAMESPACE__ . '\\EssayCriteriaDisplayHelper', 'EssayCriteriaDisplayHelper');
 }

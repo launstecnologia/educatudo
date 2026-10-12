@@ -70,8 +70,7 @@ $clsCampo = static function (string $campo) use ($inputClass, $erroCampos): stri
     return $inputClass . (!empty($erroCampos[$campo]) ? ' campo-obrigatorio-vazio' : '');
 };
 
-require_once dirname(__DIR__, 4) . '/Helpers/StudentFormHelper.php';
-$ufsBrasil = \StudentFormHelper::ufsBrasil();
+$ufsBrasil = \App\Helpers\StudentFormHelper::ufsBrasil();
 $ufOptionsHtml = '<option value="">UF</option>';
 foreach ($ufsBrasil as $ufOpt) {
     $ufOptionsHtml .= '<option value="' . htmlspecialchars($ufOpt, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($ufOpt, ENT_QUOTES, 'UTF-8') . '</option>';

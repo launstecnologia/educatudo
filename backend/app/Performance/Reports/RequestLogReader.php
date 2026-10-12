@@ -325,3 +325,7 @@ final class RequestLogReader
         return true;
     }
 }
+
+if (!class_exists('RequestLogReader', false) && class_exists(__NAMESPACE__ . '\\RequestLogReader', false)) {
+    class_alias(__NAMESPACE__ . '\\RequestLogReader', 'RequestLogReader');
+}

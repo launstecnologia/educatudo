@@ -59,14 +59,14 @@ $engClass = $coresEng[$eng['cor'] ?? 'gray'] ?? $coresEng['gray'];
             }
         }
         $respondido = trim((string) $respostaAluno) !== '';
-        $resultadoEx = JornadaExercicioAvaliacao::classificar(
+        $resultadoEx = \App\Core\JornadaExercicioAvaliacao::classificar(
             $ex['tipo'] ?? '',
             $ex['pontuacao_aluno'] ?? null,
             $ex['resposta_aluno'] ?? '',
             $respondido
         );
-        $pendente = $resultadoEx === JornadaExercicioAvaliacao::STATUS_PENDENTE;
-        $correto = $resultadoEx === JornadaExercicioAvaliacao::STATUS_ACERTO;
+        $pendente = $resultadoEx === \App\Core\JornadaExercicioAvaliacao::STATUS_PENDENTE;
+        $correto = $resultadoEx === \App\Core\JornadaExercicioAvaliacao::STATUS_ACERTO;
         $border = $correto ? 'border-green-200' : ($pendente ? 'border-amber-200' : ($respondido ? 'border-red-200' : 'border-gray-200'));
         ?>
         <div class="bg-white rounded-xl shadow p-5 border-2 <?= $border ?>">

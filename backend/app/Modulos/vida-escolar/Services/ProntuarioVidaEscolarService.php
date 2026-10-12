@@ -2,19 +2,13 @@
 
 namespace App\Modulos\VidaEscolar\Services;
 
-require_once __DIR__ . '/../../../Helpers/StudentFormHelper.php';
-require_once __DIR__ . '/../../../Services/HistoricoEscolarService.php';
-require_once __DIR__ . '/../../../Models/User/StudentDocument.php';
-require_once __DIR__ . '/../../../Models/Education/HistoricoDocumento.php';
-require_once __DIR__ . '/../../../Models/Education/ResultadoAcademico.php';
 
 use App\Services\DeclarationService;
 use App\Services\HistoricoEscolarService;
-use Database;
-use HistoricoDocumento;
-use ResultadoAcademico;
-use StudentDocument;
-
+use App\Core\Database;
+use App\Models\Education\HistoricoDocumento;
+use App\Models\Education\ResultadoAcademico;
+use App\Models\User\StudentDocument;
 /**
  * Monta o prontuário do aluno: identidade, documentos, conferência SED/INEP
  * e pacote de transferência. Não recalcula nota.
@@ -130,7 +124,7 @@ class ProntuarioVidaEscolarService
         $historico = is_array($prontuario['historicos'][0] ?? null) ? $prontuario['historicos'][0] : [];
 
         return [
-            ['campo' => 'Nome do aluno', 'valor' => (string) (\StudentFormHelper::nomeExibicao($aluno))],
+            ['campo' => 'Nome do aluno', 'valor' => (string) (\App\Helpers\StudentFormHelper::nomeExibicao($aluno))],
             ['campo' => 'CPF / CIN', 'valor' => (string) ($aluno['cpf'] ?? '')],
             ['campo' => 'RG', 'valor' => (string) ($aluno['rg'] ?? '')],
             ['campo' => 'Data de nascimento', 'valor' => $this->dataBr($aluno['data_nasc'] ?? null)],
@@ -635,4 +629,8 @@ class ProntuarioVidaEscolarService
         }
         return date('d/m/Y', strtotime((string) $valor));
     }
+}
+
+if (!class_exists('ProntuarioVidaEscolarService', false) && class_exists(__NAMESPACE__ . '\\ProntuarioVidaEscolarService', false)) {
+    class_alias(__NAMESPACE__ . '\\ProntuarioVidaEscolarService', 'ProntuarioVidaEscolarService');
 }

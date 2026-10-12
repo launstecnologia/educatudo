@@ -2,13 +2,10 @@
 
 namespace App\Modulos\Ocorrencias\Services;
 
-require_once __DIR__ . '/../Models/Ocorrencia.php';
-require_once __DIR__ . '/../../../Models/Education/ClassDiary.php';
 
 use App\Modulos\Ocorrencias\Models\Ocorrencia;
-use ClassDiary;
-use Database;
-
+use App\Modulos\Diario\Models\ClassDiary;
+use App\Core\Database;
 /**
  * EducaTudo - Service de Ocorrência do aluno
  * Único ponto de criação/acompanhamento. Professor e admin gravam no mesmo registro.
@@ -387,4 +384,8 @@ class OcorrenciaService
             return 0;
         }
     }
+}
+
+if (!class_exists('OcorrenciaService', false) && class_exists(__NAMESPACE__ . '\\OcorrenciaService', false)) {
+    class_alias(__NAMESPACE__ . '\\OcorrenciaService', 'OcorrenciaService');
 }

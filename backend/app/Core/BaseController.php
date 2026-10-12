@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Core;
 /**
  * EducaTudo - Controller Base
  * Classe base para todos os controllers
@@ -40,7 +42,7 @@ abstract class BaseController
             error_reporting(E_ALL);
         }
 
-        // Carrega config a cada requisição para refletir o .env atual (ex.: SCHOOL_CODE)
+        // Carrega config a cada requisição para refletir o .env atual (ex.: \SCHOOL_CODE)
         $loaded = require __DIR__ . '/../../config/app.php';
         $this->config = is_array($loaded) ? $loaded : [];
     }
@@ -54,6 +56,28 @@ abstract class BaseController
         $legacy = __DIR__ . '/../Views/' . $view . '.php';
         if (is_file($legacy)) {
             return $legacy;
+        }
+
+        // Painel/<perfil>/Views/... (ex.: admin/students/index → Painel/Admin/Views/students/index.php)
+        if (preg_match('#^(aluno|professor|student|teacher|admin|master|parents|monitor)/(.+)$#', $view, $pm)) {
+            $perfil = $pm[1];
+            $map = [
+                'student' => 'Aluno',
+                'aluno' => 'Aluno',
+                'teacher' => 'Professor',
+                'professor' => 'Professor',
+                'admin' => 'Admin',
+                'master' => 'Master',
+                'parents' => 'Pais',
+                'monitor' => 'Monitor',
+            ];
+            $pasta = $map[$perfil] ?? null;
+            if ($pasta !== null) {
+                $painelView = __DIR__ . '/../Painel/' . $pasta . '/Views/' . $pm[2] . '.php';
+                if (is_file($painelView)) {
+                    return $painelView;
+                }
+            }
         }
 
         // Perfis em PT (aluno/professor) e legado EN (student/teacher)
@@ -81,7 +105,7 @@ abstract class BaseController
         $viewFile = $this->resolveViewPath($view);
 
         if ($viewFile === null) {
-            throw new Exception("View não encontrada: {$view}");
+            throw new \Exception("View não encontrada: {$view}");
         }
 
         // Extrai as variáveis para o escopo da view
@@ -122,11 +146,11 @@ abstract class BaseController
         $viewFile = $this->resolveViewPath($view);
 
         if (!file_exists($layoutFile)) {
-            throw new Exception("Layout não encontrado: {$layout}");
+            throw new \Exception("Layout não encontrado: {$layout}");
         }
 
         if ($viewFile === null) {
-            throw new Exception("View não encontrada: {$view}");
+            throw new \Exception("View não encontrada: {$view}");
         }
         
         // Limpa qualquer output anterior
@@ -151,12 +175,11 @@ abstract class BaseController
             extract($dataForView);
             include $viewFile;
             $content = ob_get_clean();
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             ob_end_clean();
             if ($profiler) {
                 \App\Performance\RequestProfiler::markViewEnd();
             }
-            require_once __DIR__ . '/../Core/Logger.php';
             Logger::error("Erro ao renderizar view {$view}: " . $e->getMessage(), [
                 'exception' => $e,
                 'view' => $view,
@@ -181,12 +204,11 @@ abstract class BaseController
             if ($profiler) {
                 \App\Performance\RequestProfiler::markViewEnd();
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             ob_end_clean();
             if ($profiler) {
                 \App\Performance\RequestProfiler::markViewEnd();
             }
-            require_once __DIR__ . '/../Core/Logger.php';
             Logger::error("Erro ao renderizar layout {$layout}: " . $e->getMessage(), [
                 'exception' => $e,
                 'view' => $view,
@@ -383,4 +405,8 @@ abstract class BaseController
         return ['message' => null, 'type' => 'info', 'meta' => null];
     }
     
+}
+
+if (!class_exists('BaseController', false) && class_exists(__NAMESPACE__ . '\\BaseController', false)) {
+    class_alias(__NAMESPACE__ . '\\BaseController', 'BaseController');
 }

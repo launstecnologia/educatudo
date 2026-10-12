@@ -1,5 +1,5 @@
 <?php
-$primaryColor = LayoutHelper::get('primary_color', '#6366f1');
+$primaryColor = \App\Core\LayoutHelper::get('primary_color', '#6366f1');
 $startsAt = !empty($proposal['starts_at']) ? $proposal['starts_at'] : null;
 ?>
 <style>

@@ -2,9 +2,6 @@
 
 namespace App\Modulos\CensoEscolar\Services;
 
-require_once __DIR__ . '/../Models/CensoEdicao.php';
-require_once __DIR__ . '/CensoNormalizador.php';
-require_once __DIR__ . '/CensoEtapaDePara.php';
 
 use App\Modulos\CensoEscolar\Models\CensoEdicao;
 
@@ -606,4 +603,8 @@ class CensoMapeadorTxt
         $d = json_decode($raw, true);
         return is_array($d) ? $d : [];
     }
+}
+
+if (!class_exists('CensoMapeadorTxt', false) && class_exists(__NAMESPACE__ . '\\CensoMapeadorTxt', false)) {
+    class_alias(__NAMESPACE__ . '\\CensoMapeadorTxt', 'CensoMapeadorTxt');
 }

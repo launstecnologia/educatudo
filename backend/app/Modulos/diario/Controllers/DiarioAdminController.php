@@ -1,17 +1,14 @@
 <?php
 
-require_once __DIR__ . '/../../../Core/BaseController.php';
-require_once __DIR__ . '/../../../Core/AuthManager.php';
-require_once __DIR__ . '/../../../Core/AdminSecretariaAccess.php';
-require_once __DIR__ . '/../Services/ClassDiaryService.php';
-require_once __DIR__ . '/../Services/ClassDiaryReportService.php';
-require_once __DIR__ . '/../../../Services/FrequencyService.php';
+namespace App\Modulos\Diario\Controllers;
 
 use App\Modulos\Diario\Services\ClassDiaryReportService;
 use App\Modulos\Diario\Services\ClassDiaryService;
+use Throwable;
 
-if (!class_exists('DiarioAdminController')) {
-class DiarioAdminController extends BaseController
+
+if (!class_exists(__NAMESPACE__ . '\\DiarioAdminController', false)) {
+class DiarioAdminController extends \App\Core\BaseController
 {
     private $auth;
     private $service;
@@ -19,10 +16,10 @@ class DiarioAdminController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        $this->auth = new AuthManager();
+        $this->auth = new \App\Core\AuthManager();
         $user = $this->auth->getUser();
         $allowed = $user && (($user['tipo'] ?? '') === 'admin' ||
-            (($user['tipo'] ?? '') === 'admin_escola' && in_array((string) ($user['perfil_admin'] ?? ''), AdminSecretariaAccess::perfisAdminEscolaGestaoPedagogica(), true)));
+            (($user['tipo'] ?? '') === 'admin_escola' && in_array((string) ($user['perfil_admin'] ?? ''), \App\Core\AdminSecretariaAccess::perfisAdminEscolaGestaoPedagogica(), true)));
         if (!$allowed) { $this->redirect('/admin'); exit; }
         $this->service = new ClassDiaryService();
     }
@@ -131,7 +128,7 @@ class DiarioAdminController extends BaseController
                 $dadosAba['aulas'] = $this->service->aulasDoDiario($turmaId, $materiaId, $professorId, $periodo['inicio'], $periodo['fim']);
                 break;
             case 'frequencia':
-                $freq = new FrequencyService();
+                $freq = new \App\Services\FrequencyService();
                 $dadosAba['frequencia_turma'] = $freq->turmaPercentual($turmaId, $periodo['inicio'], $periodo['fim'], $materiaId, $professorId);
                 $dadosAba['frequencia_alunos'] = $freq->alunosPercentual($turmaId, $periodo['inicio'], $periodo['fim'], $materiaId, $professorId);
                 break;
@@ -219,7 +216,7 @@ class DiarioAdminController extends BaseController
         $fechamentoId = (int) ($_POST['fechamento_id'] ?? 0);
         try {
             if ($fechamentoId <= 0) {
-                throw new RuntimeException('Fechamento inválido.');
+                throw new \RuntimeException('Fechamento inválido.');
             }
             $user = $this->auth->getUser();
             $this->service->reabrir($fechamentoId, (int) ($user['id'] ?? 0));
@@ -280,7 +277,7 @@ class DiarioAdminController extends BaseController
 
     private function data(string $value, string $fallback): string
     {
-        $dt = DateTime::createFromFormat('Y-m-d', $value);
+        $dt = \DateTime::createFromFormat('Y-m-d', $value);
         return ($dt && $dt->format('Y-m-d') === $value) ? $value : $fallback;
     }
 
@@ -288,7 +285,7 @@ class DiarioAdminController extends BaseController
     {
         $templateFile = $this->resolveViewPath($view);
         if ($templateFile === null) {
-            throw new RuntimeException('View não encontrada: ' . $view);
+            throw new \RuntimeException('View não encontrada: ' . $view);
         }
         ob_start();
         extract($viewData, EXTR_SKIP);
@@ -322,4 +319,8 @@ class DiarioAdminController extends BaseController
         }
     }
 }
+}
+
+if (!class_exists('DiarioAdminController', false) && class_exists(__NAMESPACE__ . '\\DiarioAdminController', false)) {
+    class_alias(__NAMESPACE__ . '\\DiarioAdminController', 'DiarioAdminController');
 }

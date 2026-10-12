@@ -1,8 +1,7 @@
 <?php
-require_once __DIR__ . '/../../Core/LayoutHelper.php';
-$logo_horizontal_url = LayoutHelper::getLoginLogoUrl();
-$system_title = LayoutHelper::getSystemTitle();
-$turma_obrigatoria = LayoutHelper::isPrimeiroAcessoTurmaObrigatoria();
+$logo_horizontal_url = \App\Core\LayoutHelper::getLoginLogoUrl();
+$system_title = \App\Core\LayoutHelper::getSystemTitle();
+$turma_obrigatoria = \App\Core\LayoutHelper::isPrimeiroAcessoTurmaObrigatoria();
 $error = $error ?? '';
 $matches = $matches ?? [];
 $turma_id_preselect = (int)($turma_id_preselect ?? 0);

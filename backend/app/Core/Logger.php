@@ -1,9 +1,13 @@
 <?php
+
+namespace App\Core;
 /**
  * EducaTudo - Sistema de Logging
  * Registra problemas e eventos em arquivos de log organizados
  */
 
+
+use App\Services\EvolutionApiService;
 class Logger
 {
     private static $logDir;
@@ -146,7 +150,7 @@ class Logger
             $maxTraceBytes = 8192;
             $maxContextBytes = 8192;
             if (!empty($context)) {
-                if (isset($context['exception']) && $context['exception'] instanceof Exception) {
+                if (isset($context['exception']) && $context['exception'] instanceof \Exception) {
                     $e = $context['exception'];
                     $contextData .= "\nException: " . get_class($e);
                     $msg = $e->getMessage();
@@ -304,14 +308,14 @@ class Logger
                         $last[$category] = time();
                         @file_put_contents($rateLimitFile, json_encode($last), LOCK_EX);
                     }
-                } catch (Throwable $e) {
+                } catch (\Throwable $e) {
                     // Não falhar o log por causa do WhatsApp
                 } finally {
                     self::$sendingWhatsApp = false;
                 }
             }
             
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             // Se falhar ao escrever log, usar error_log padrão com mais detalhes
             error_log("ERRO ao escrever log: " . $e->getMessage());
             if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
@@ -321,7 +325,7 @@ class Logger
             error_log("Diretório de log: " . (self::$logDir ?? 'N/A'));
             error_log("Diretório existe: " . (is_dir(self::$logDir ?? '') ? 'SIM' : 'NÃO'));
             error_log("Diretório gravável: " . (is_writable(self::$logDir ?? '') ? 'SIM' : 'NÃO'));
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log("ERRO FATAL ao escrever log: " . $e->getMessage());
             error_log("Mensagem original: {$message}");
         }
@@ -402,7 +406,6 @@ class Logger
         try {
             // Carregar Database se necessário
             if (!class_exists('Database')) {
-                require_once __DIR__ . '/Database.php';
             }
             
             $db = Database::getInstance();
@@ -447,7 +450,7 @@ class Logger
             
             $db->insert($sql, $params);
             
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             // Logar erro mas não interromper a experiência do usuário
             error_log("Erro ao registrar audit log: " . $e->getMessage());
             // Tentar logar no sistema de logs também
@@ -461,10 +464,10 @@ class Logger
                     ],
                     'audit'
                 );
-            } catch (Exception $logError) {
+            } catch (\Exception $logError) {
                 // Silenciosamente falhar se não conseguir logar
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             // Logar erro fatal mas não interromper
             error_log("Erro fatal ao registrar audit log: " . $e->getMessage());
         }
@@ -552,4 +555,8 @@ class Logger
         
         return $filtered;
     }
+}
+
+if (!class_exists('Logger', false) && class_exists(__NAMESPACE__ . '\\Logger', false)) {
+    class_alias(__NAMESPACE__ . '\\Logger', 'Logger');
 }

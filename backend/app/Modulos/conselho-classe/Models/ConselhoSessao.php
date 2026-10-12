@@ -1,8 +1,9 @@
 <?php
 
 namespace App\Modulos\ConselhoClasse\Models;
+use App\Helpers\AlunoLancamentoNotaHelper;
 
-use Database;
+use App\Core\Database;
 use Throwable;
 
 /**
@@ -319,7 +320,6 @@ class ConselhoSessao
             $out[] = $aluno;
         }
         if (!class_exists('AlunoLancamentoNotaHelper', false)) {
-            require_once __DIR__ . '/../../../Helpers/AlunoLancamentoNotaHelper.php';
         }
         $out = AlunoLancamentoNotaHelper::filtrarAlunosExibicao($out, 'nome');
         usort($out, static fn ($a, $b) => strcasecmp((string) ($a['nome'] ?? ''), (string) ($b['nome'] ?? '')));
@@ -710,4 +710,8 @@ class ConselhoSessao
         }
         return null;
     }
+}
+
+if (!class_exists('ConselhoSessao', false) && class_exists(__NAMESPACE__ . '\\ConselhoSessao', false)) {
+    class_alias(__NAMESPACE__ . '\\ConselhoSessao', 'ConselhoSessao');
 }

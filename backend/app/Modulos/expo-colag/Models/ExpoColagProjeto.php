@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Modulos\ExpoColag\Models;
 /**
  * Projeto da Expo Colag.
  */
@@ -21,7 +23,7 @@ class ExpoColagProjeto
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     public function findById(int $id): ?array
@@ -238,4 +240,8 @@ class ExpoColagProjeto
     {
         $this->db->query('UPDATE expo_colag_projetos SET ativo = 0 WHERE id = :id', ['id' => $id]);
     }
+}
+
+if (!class_exists('ExpoColagProjeto', false) && class_exists(__NAMESPACE__ . '\\ExpoColagProjeto', false)) {
+    class_alias(__NAMESPACE__ . '\\ExpoColagProjeto', 'ExpoColagProjeto');
 }

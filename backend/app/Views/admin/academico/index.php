@@ -1,6 +1,6 @@
 <?php
 $modOn = static function (string $key): bool {
-    return !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled($key);
+    return !class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled($key);
 };
 
 $hub_title = 'Acadêmico';
@@ -9,7 +9,7 @@ $hub_cards = [
     [
         'href' => URL . '/admin/implantar-academico',
         'title' => 'Implantar acadêmico',
-        'description' => 'Trilha com o que já está pronto nesta escola: matriz, quadro, regra, modelo, avaliações e fechamento.',
+        'description' => 'Trilha do ano letivo: estrutura, pessoas, turmas e como a escola avalia.',
         'icon' => 'fa-solid fa-list-check',
     ],
     [
@@ -59,17 +59,27 @@ $hub_cards[] = [
     'description' => 'Cadastro de professores e vínculos com turmas.',
     'icon' => 'fa-solid fa-chalkboard-user',
 ];
-$hub_cards[] = [
-    'href' => URL . '/admin/students',
-    'title' => 'Alunos',
-    'description' => 'Cadastro, matrícula e acompanhamento dos alunos da escola.',
-    'icon' => 'fa-solid fa-user-graduate',
-];
+
+if ($modOn('salas')) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/salas',
+        'title' => 'Salas / Ambientes',
+        'description' => 'Cadastre salas de aula, laboratórios, quadra e outros ambientes para usar como Sala Padrão da turma.',
+        'icon' => 'fa-solid fa-door-open',
+    ];
+}
+
 $hub_cards[] = [
     'href' => URL . '/admin/turmas',
     'title' => 'Turmas',
     'description' => 'Gerencie as turmas, vincule alunos e configure a grade horária.',
     'icon' => 'fa-solid fa-users',
+];
+$hub_cards[] = [
+    'href' => URL . '/admin/students',
+    'title' => 'Alunos',
+    'description' => 'Cadastro, matrícula e acompanhamento dos alunos da escola.',
+    'icon' => 'fa-solid fa-user-graduate',
 ];
 
 if ($modOn('grade_horaria')) {
@@ -78,15 +88,6 @@ if ($modOn('grade_horaria')) {
         'title' => 'Grade Horária',
         'description' => 'Monte os horários das turmas, professores e ambientes.',
         'icon' => 'fa-regular fa-calendar-days',
-    ];
-}
-
-if ($modOn('salas')) {
-    $hub_cards[] = [
-        'href' => URL . '/admin/salas',
-        'title' => 'Salas / Ambientes',
-        'description' => 'Cadastre salas de aula, laboratórios, quadra e outros ambientes para usar como Sala Padrão da turma.',
-        'icon' => 'fa-solid fa-door-open',
     ];
 }
 
@@ -99,7 +100,7 @@ if ($modOn('regras_academicas')) {
     ];
 }
 
-if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_provas') || LayoutHelper::isModuleEnabled('professor_provas')) {
+if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('aluno_provas') || \App\Core\LayoutHelper::isModuleEnabled('professor_provas')) {
     $hub_cards[] = [
         'href' => URL . '/admin/provas/tipos-avaliacao',
         'title' => 'Tipos de Nota',
@@ -108,7 +109,7 @@ if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_provas
     ];
 }
 
-if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('grupos_regras_notas')) {
+if (class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('grupos_regras_notas')) {
     $hub_cards[] = [
         'href' => URL . '/admin/quadros-notas',
         'title' => 'Quadro de Notas',
@@ -117,7 +118,7 @@ if (class_exists('LayoutHelper') && LayoutHelper::isModuleEnabled('grupos_regras
     ];
 }
 
-if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_provas') || LayoutHelper::isModuleEnabled('professor_provas')) {
+if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('aluno_provas') || \App\Core\LayoutHelper::isModuleEnabled('professor_provas')) {
     $hub_cards[] = [
         'href' => URL . '/admin/provas',
         'title' => 'Lançamento de Notas',

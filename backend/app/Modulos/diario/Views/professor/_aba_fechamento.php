@@ -1,15 +1,14 @@
 <div class="space-y-6">
     <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
         <div class="px-5 py-4 border-b border-gray-200">
-            <h2 class="text-base font-semibold text-gray-900"><?= htmlspecialchars(class_exists('PeriodoLetivo') ? PeriodoLetivo::doAno((int) $ano_letivo)['rotulo_campo_plural'] : 'Bimestres') ?> — <?= (int) $ano_letivo ?></h2>
+            <h2 class="text-base font-semibold text-gray-900"><?= htmlspecialchars(class_exists('PeriodoLetivo') ? \App\Core\PeriodoLetivo::doAno((int) $ano_letivo)['rotulo_campo_plural'] : 'Bimestres') ?> — <?= (int) $ano_letivo ?></h2>
             <p class="text-sm text-gray-500 mt-0.5">Cada período só pode ser fechado quando todas as chamadas do próprio intervalo estiverem registradas.</p>
         </div>
         <ul class="divide-y divide-gray-100">
             <?php
             if (!class_exists('PeriodoLetivo')) {
-                require_once dirname(__DIR__, 4) . '/Core/PeriodoLetivo.php';
             }
-            $qtdPeriodos = (int) PeriodoLetivo::doAno((int) $ano_letivo)['quantidade'];
+            $qtdPeriodos = (int) \App\Core\PeriodoLetivo::doAno((int) $ano_letivo)['quantidade'];
             for ($b = 1; $b <= $qtdPeriodos; $b++):
                 $info = $bimestres[$b] ?? null;
                 if (!$info) continue;
@@ -18,7 +17,7 @@
                 $pendentesB = (int) ($resumoB['chamadas_pendentes'] ?? 0);
                 $fechamento = $info['fechamento'];
                 $fechado = $fechamento && (string) $fechamento['status'] === 'fechado';
-                $rotuloPeriodo = PeriodoLetivo::rotulo((int) $ano_letivo, $b);
+                $rotuloPeriodo = \App\Core\PeriodoLetivo::rotulo((int) $ano_letivo, $b);
             ?>
                 <li class="px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>

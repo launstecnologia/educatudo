@@ -2,13 +2,9 @@
 
 namespace App\Modulos\ModelosDocumentos\Services;
 
-require_once __DIR__ . '/../../../Core/Database.php';
-require_once __DIR__ . '/ModeloDocumentoService.php';
-require_once __DIR__ . '/../../../Services/DeclarationService.php';
 
 use App\Services\DeclarationService;
-use Database;
-
+use App\Core\Database;
 /**
  * Emite um modelo com campos preenchidos na hora (um aluno ou a turma inteira).
  */
@@ -383,7 +379,6 @@ class EmissaoCampoVariavelService
             return;
         }
         try {
-            require_once __DIR__ . '/../../vida-escolar/Services/ArquivoPdfAlunoService.php';
             (new \App\Modulos\VidaEscolar\Services\ArquivoPdfAlunoService($this->db))->guardar(
                 (int) ($meta['aluno_id'] ?? 0),
                 'modelo',
@@ -398,4 +393,8 @@ class EmissaoCampoVariavelService
             error_log('Modelo do aluno arquivar PDF: ' . $e->getMessage());
         }
     }
+}
+
+if (!class_exists('EmissaoCampoVariavelService', false) && class_exists(__NAMESPACE__ . '\\EmissaoCampoVariavelService', false)) {
+    class_alias(__NAMESPACE__ . '\\EmissaoCampoVariavelService', 'EmissaoCampoVariavelService');
 }

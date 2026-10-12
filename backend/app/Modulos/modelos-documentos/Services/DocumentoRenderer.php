@@ -526,3 +526,7 @@ class DocumentoRenderer
         return $txt === '' || $txt === '—';
     }
 }
+
+if (!class_exists('DocumentoRenderer', false) && class_exists(__NAMESPACE__ . '\\DocumentoRenderer', false)) {
+    class_alias(__NAMESPACE__ . '\\DocumentoRenderer', 'DocumentoRenderer');
+}

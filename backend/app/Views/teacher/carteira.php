@@ -1,20 +1,17 @@
 <?php
 if (!class_exists('LayoutHelper')) {
-    require_once __DIR__ . '/../../Core/LayoutHelper.php';
 }
 if (!class_exists('CreditosDecimalHelper')) {
-    require_once __DIR__ . '/../../Core/CreditosDecimalHelper.php';
 }
 if (!class_exists('CreditosModuleRegistry')) {
-    require_once __DIR__ . '/../../Core/CreditosModuleRegistry.php';
 }
-$saldo = isset($saldo) ? \CreditosDecimalHelper::fromScalar($saldo, 0.0) : 0.0;
+$saldo = isset($saldo) ? \App\Core\CreditosDecimalHelper::fromScalar($saldo, 0.0) : 0.0;
 $wallet_saldos = $wallet_saldos ?? ['saldo_escola' => 0, 'saldo_comprado' => 0, 'saldo_total' => $saldo];
-$saldoEscola = \CreditosDecimalHelper::fromScalar($wallet_saldos['saldo_escola'] ?? 0, 0.0);
-$saldoComprado = \CreditosDecimalHelper::fromScalar($wallet_saldos['saldo_comprado'] ?? 0, 0.0);
+$saldoEscola = \App\Core\CreditosDecimalHelper::fromScalar($wallet_saldos['saldo_escola'] ?? 0, 0.0);
+$saldoComprado = \App\Core\CreditosDecimalHelper::fromScalar($wallet_saldos['saldo_comprado'] ?? 0, 0.0);
 $movimentacoes = $movimentacoes ?? [];
 $creditosHabilitado = (bool) ($creditos_habilitado ?? false);
-$creditosLiberarB2C = LayoutHelper::get('creditos_liberar_b2c', '0') === '1';
+$creditosLiberarB2C = \App\Core\LayoutHelper::get('creditos_liberar_b2c', '0') === '1';
 $primaryHex = $primary_color ?? '#4f46e5';
 $tabela_precos_modulos = $tabela_precos_modulos ?? [];
 $filtro_tipo = $filtro_tipo ?? '';
@@ -49,7 +46,7 @@ foreach ($tabela_precos_modulos as $row) {
     $grupo = trim((string) ($row['grupo'] ?? ''));
     $grupo = $grupo !== '' ? $grupo : 'Outros';
     $cobra = !empty($row['cobra']);
-    $custo = \CreditosDecimalHelper::fromScalar($row['custo'] ?? 0, 0.0);
+    $custo = \App\Core\CreditosDecimalHelper::fromScalar($row['custo'] ?? 0, 0.0);
 
     if (!isset($modulosPorGrupo[$grupo])) {
         $modulosPorGrupo[$grupo] = [
@@ -113,7 +110,7 @@ $formatarOrigem = static function ($origem): string {
             <div class="flex items-start justify-between gap-4">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Saldo atual</p>
-                    <p class="mt-1 text-3xl font-bold" style="color: <?= htmlspecialchars($primaryHex) ?>"><?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay($saldo)) ?></p>
+                    <p class="mt-1 text-3xl font-bold" style="color: <?= htmlspecialchars($primaryHex) ?>"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay($saldo)) ?></p>
                     <p class="mt-1 text-sm text-gray-500">Disponível para usar em recursos de IA.</p>
                 </div>
                 <span class="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-sky-50 text-sky-700">
@@ -130,7 +127,7 @@ $formatarOrigem = static function ($origem): string {
             <div class="flex items-start justify-between gap-4">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Créditos da escola</p>
-                    <p class="mt-1 text-2xl font-bold text-blue-700"><?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay($saldoEscola)) ?></p>
+                    <p class="mt-1 text-2xl font-bold text-blue-700"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay($saldoEscola)) ?></p>
                     <p class="mt-1 text-xs text-gray-500">Saldo liberado pela instituição.</p>
                 </div>
                 <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
@@ -150,7 +147,7 @@ $formatarOrigem = static function ($origem): string {
             <div class="flex items-start justify-between gap-4">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Créditos comprados</p>
-                    <p class="mt-1 text-2xl font-bold text-emerald-700"><?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay($saldoComprado)) ?></p>
+                    <p class="mt-1 text-2xl font-bold text-emerald-700"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay($saldoComprado)) ?></p>
                     <p class="mt-1 text-xs text-gray-500">Permanecem após recargas.</p>
                 </div>
                 <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
@@ -205,8 +202,8 @@ $formatarOrigem = static function ($origem): string {
                     $precoResumo = 'Varia conforme o uso';
                 } elseif ($info['cobrados'] > 0 && $menor !== null && $maior !== null) {
                     $precoResumo = abs($menor - $maior) < 0.00001
-                        ? \CreditosDecimalHelper::formatDisplay($menor)
-                        : \CreditosDecimalHelper::formatDisplay($menor) . ' – ' . \CreditosDecimalHelper::formatNumero($maior);
+                        ? \App\Core\CreditosDecimalHelper::formatDisplay($menor)
+                        : \App\Core\CreditosDecimalHelper::formatDisplay($menor) . ' – ' . \App\Core\CreditosDecimalHelper::formatNumero($maior);
                 }
             ?>
             <button type="button"
@@ -284,7 +281,7 @@ $formatarOrigem = static function ($origem): string {
                             <td class="px-5 py-4 font-mono text-xs text-gray-500"><?= htmlspecialchars($item['modulo_key'] ?? '') ?></td>
                             <td class="px-5 py-4 text-right">
                                 <?php if (!empty($item['_cobra_bool'])): ?>
-                                <span class="text-sm font-bold text-gray-900"><?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay($item['_custo_float'])) ?></span>
+                                <span class="text-sm font-bold text-gray-900"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay($item['_custo_float'])) ?></span>
                                 <span class="ml-1 text-xs text-gray-500">por uso</span>
                                 <?php else: ?>
                                 <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Sem custo</span>
@@ -357,8 +354,8 @@ $formatarOrigem = static function ($origem): string {
                 </thead>
                 <tbody class="divide-y divide-gray-200">
                     <?php foreach ($movimentacoes as $m): 
-                        $valor = \CreditosDecimalHelper::fromSignedScalar($m['valor'] ?? 0, 0.0);
-                        $exibicao = \CreditosModuleRegistry::formatMovimentacaoExibicao($m);
+                        $valor = \App\Core\CreditosDecimalHelper::fromSignedScalar($m['valor'] ?? 0, 0.0);
+                        $exibicao = \App\Core\CreditosModuleRegistry::formatMovimentacaoExibicao($m);
                         $tipoLabel = [
                             'recarga_mensal' => 'Recarga mensal',
                             'recarga_inicial' => 'Créditos iniciais (escola)',
@@ -374,7 +371,7 @@ $formatarOrigem = static function ($origem): string {
                         <td class="px-6 py-3 text-sm">
                             <span class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700"><?= htmlspecialchars($tipoLabel) ?></span>
                         </td>
-                        <td class="px-6 py-3 text-sm font-semibold <?= $valor >= 0 ? 'text-green-600' : 'text-red-600' ?>"><?= $valor >= 0 ? '+' : '' ?><?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay($valor)) ?></td>
+                        <td class="px-6 py-3 text-sm font-semibold <?= $valor >= 0 ? 'text-green-600' : 'text-red-600' ?>"><?= $valor >= 0 ? '+' : '' ?><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay($valor)) ?></td>
                         <td class="px-6 py-3 text-sm text-gray-600">
                             <span class="font-medium text-gray-800"><?= htmlspecialchars($exibicao['label'] ?? ($m['modulo_key'] ?? '-')) ?></span>
                             <?php if (!empty($exibicao['codigo'])): ?>
@@ -400,7 +397,7 @@ $formatarOrigem = static function ($origem): string {
 <?php
 $opcoesModuloExtrato = ['' => 'Todos'];
 foreach ($modulos_opcao_filtro as $mk => $mlab) {
-    if (in_array(\CreditosModuleRegistry::getGrupo((string) $mk), $gruposOcultosProfessor, true)) {
+    if (in_array(\App\Core\CreditosModuleRegistry::getGrupo((string) $mk), $gruposOcultosProfessor, true)) {
         continue;
     }
     $opcoesModuloExtrato[(string) $mk] = (string) $mlab;

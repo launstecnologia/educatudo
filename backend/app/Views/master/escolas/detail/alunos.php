@@ -13,7 +13,6 @@ $entrar_como_base = URL . '/master/entrar-como?escola_id=' . (int) $escola_id . 
 $base_url = URL . '/master/escolas/' . (int) $escola_id . '/alunos';
 $has_filtros = $filtro_nome !== '' || $filtro_turma > 0 || $filtro_creditos_ordem !== '';
 if (!class_exists('CreditosDecimalHelper')) {
-    require_once __DIR__ . '/../../../../Core/CreditosDecimalHelper.php';
 }
 ?>
 
@@ -104,7 +103,7 @@ if (!class_exists('CreditosDecimalHelper')) {
                             <span class="inline-flex px-2 py-0.5 rounded-full bg-blue-50 text-blue-700"><?= htmlspecialchars($a['turma_nome'] ?? 'Sem turma') ?></span>
                             <?php if ($creditos_disponiveis): ?>
                             <span class="inline-flex px-2 py-0.5 rounded-full bg-amber-50 text-amber-800">
-                                <?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay(\CreditosDecimalHelper::fromSignedScalar($a['saldo_creditos'] ?? 0, 0.0))) ?> créd.
+                                <?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay(\App\Core\CreditosDecimalHelper::fromSignedScalar($a['saldo_creditos'] ?? 0, 0.0))) ?> créd.
                             </span>
                             <?php endif; ?>
                         </div>
@@ -144,7 +143,7 @@ if (!class_exists('CreditosDecimalHelper')) {
                         <span class="inline-flex px-2 py-0.5 rounded-full bg-blue-50 text-blue-700"><?= htmlspecialchars($a['turma_nome'] ?? 'Sem turma') ?></span>
                         <?php if ($creditos_disponiveis): ?>
                         <span class="inline-flex px-2 py-0.5 rounded-full bg-amber-50 text-amber-800">
-                            <?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay(\CreditosDecimalHelper::fromSignedScalar($a['saldo_creditos'] ?? 0, 0.0))) ?> créd.
+                            <?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay(\App\Core\CreditosDecimalHelper::fromSignedScalar($a['saldo_creditos'] ?? 0, 0.0))) ?> créd.
                         </span>
                         <?php endif; ?>
                     </div>

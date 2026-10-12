@@ -128,3 +128,7 @@ final class PdfExporter
         HTML;
     }
 }
+
+if (!class_exists('PdfExporter', false) && class_exists(__NAMESPACE__ . '\\PdfExporter', false)) {
+    class_alias(__NAMESPACE__ . '\\PdfExporter', 'PdfExporter');
+}

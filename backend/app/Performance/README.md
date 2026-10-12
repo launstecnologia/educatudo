@@ -1,8 +1,8 @@
 # Performance Profiler — EducaTudo
 
 Diagnóstico de queries/páginas lentas, N+1, EXPLAIN automático e sugestão de
-índice (heurística). **Só existe pra achar gargalo — não é um teste de "quantos
-usuários aguenta"** (isso é o k6, em `loadtests/k6/`).
+índice (heurística). **Só existe pra achar gargalo — não mede quantos
+usuários a plataforma aguenta ao mesmo tempo.**
 
 ## Instalação
 
@@ -161,5 +161,5 @@ isso, sem reinventar a roda em userland PHP.
   `<?php` mal fechado).
 
 Nenhum desses é "não dá pra fazer" — são só cortes de escopo conscientes pra
-entregar o núcleo (profiler + dashboard + k6) testado de ponta a ponta em vez de
+entregar o núcleo (profiler + dashboard) testado de ponta a ponta em vez de
 20 itens pela metade.

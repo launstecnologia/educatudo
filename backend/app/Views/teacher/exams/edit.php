@@ -148,9 +148,8 @@
         <div class="flex flex-wrap items-center gap-3">
             <?php
             if (!class_exists('CreditosModuleRegistry', false)) {
-                require_once __DIR__ . '/../../../Core/CreditosModuleRegistry.php';
             }
-            $tudicoinsProvaIa = \CreditosModuleRegistry::acaoIaDisponivel('gerar_exercicio_ia_professor');
+            $tudicoinsProvaIa = \App\Core\CreditosModuleRegistry::acaoIaDisponivel('gerar_exercicio_ia_professor');
             ?>
             <?php if ($tudicoinsProvaIa): ?>
             <button onclick="abrirModalLerImagem()" class="px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">

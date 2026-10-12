@@ -99,10 +99,9 @@ if ($voltarRaw !== '' && preg_match('#^/admin/provas(?:\?[A-Za-z0-9_\-.&=%+]*)?$
 
         <?php
         if (!class_exists('PeriodoLetivo')) {
-            require_once __DIR__ . '/../../../../Core/PeriodoLetivo.php';
         }
         $anoEvento = (int) date('Y');
-        $periodoEvento = PeriodoLetivo::doAno($anoEvento);
+        $periodoEvento = \App\Core\PeriodoLetivo::doAno($anoEvento);
         ?>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
@@ -130,7 +129,7 @@ if ($voltarRaw !== '' && preg_match('#^/admin/provas(?:\?[A-Za-z0-9_\-.&=%+]*)?$
                         data-periodo-letivo-select
                         data-periodo-vazio="1"
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                    <?= PeriodoLetivo::optionsHtml($anoEvento, 0, ['vazio' => true]) ?>
+                    <?= \App\Core\PeriodoLetivo::optionsHtml($anoEvento, 0, ['vazio' => true]) ?>
                 </select>
             </div>
         </div>

@@ -41,7 +41,6 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
             <select name="bimestre" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm">
                 <?php
                 if (!class_exists('PeriodoLetivo')) {
-                    require_once dirname(__DIR__, 4) . '/Core/PeriodoLetivo.php';
                 }
                 $anoDash = (int) date('Y');
                 foreach ($anos as $anoRow) {
@@ -50,7 +49,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
                         break;
                     }
                 }
-                echo PeriodoLetivo::optionsHtml($anoDash, (int) ($filtro['bimestre'] ?? 0));
+                echo \App\Core\PeriodoLetivo::optionsHtml($anoDash, (int) ($filtro['bimestre'] ?? 0));
                 ?>
             </select>
         </div>

@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../../Core/CreditosDecimalHelper.php';
 
 $aluno = $aluno ?? [];
 $escola = $escola ?? [];
@@ -52,15 +51,15 @@ $tipos = [
 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
     <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
         <p class="text-sm text-slate-500">Entradas em <?= htmlspecialchars($mesLabel) ?></p>
-        <p class="text-2xl font-bold text-green-600 mt-1"><?= htmlspecialchars(CreditosDecimalHelper::formatDisplay($entradas)) ?></p>
+        <p class="text-2xl font-bold text-green-600 mt-1"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay($entradas)) ?></p>
     </div>
     <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
         <p class="text-sm text-slate-500">Saídas em <?= htmlspecialchars($mesLabel) ?></p>
-        <p class="text-2xl font-bold text-red-600 mt-1"><?= htmlspecialchars(CreditosDecimalHelper::formatDisplay($saidas)) ?></p>
+        <p class="text-2xl font-bold text-red-600 mt-1"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay($saidas)) ?></p>
     </div>
     <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
         <p class="text-sm text-slate-500">Saldo atual</p>
-        <p class="text-2xl font-bold text-amber-600 mt-1"><?= htmlspecialchars(CreditosDecimalHelper::formatDisplay($saldo)) ?></p>
+        <p class="text-2xl font-bold text-amber-600 mt-1"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay($saldo)) ?></p>
     </div>
 </div>
 
@@ -88,7 +87,7 @@ $tipos = [
                     <td class="px-6 py-4 text-sm text-slate-700"><?= htmlspecialchars($tipos[$mov['tipo'] ?? ''] ?? (string) ($mov['tipo'] ?? '—')) ?></td>
                     <td class="px-6 py-4 text-sm text-slate-900"><?= htmlspecialchars((string) ($mov['exibicao']['label'] ?? '')) ?></td>
                     <td class="px-6 py-4 text-sm text-right tabular-nums font-medium <?= $valor >= 0 ? 'text-green-600' : 'text-red-600' ?>">
-                        <?= $valor >= 0 ? '+' : '' ?><?= htmlspecialchars(CreditosDecimalHelper::formatDisplay($valor)) ?>
+                        <?= $valor >= 0 ? '+' : '' ?><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay($valor)) ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>

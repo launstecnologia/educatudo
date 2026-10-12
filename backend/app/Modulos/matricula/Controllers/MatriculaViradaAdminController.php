@@ -1,14 +1,13 @@
 <?php
 
-require_once __DIR__ . '/../../../Core/BaseController.php';
-require_once __DIR__ . '/../Services/MatriculaViradaService.php';
-require_once __DIR__ . '/../Services/MatriculaProcessoService.php';
+namespace App\Modulos\Matricula\Controllers;
+
 
 use App\Modulos\Matricula\Services\MatriculaViradaService;
 use App\Modulos\Matricula\Services\MatriculaProcessoService;
 
-if (!class_exists('MatriculaViradaAdminController')) {
-class MatriculaViradaAdminController extends BaseController
+if (!class_exists(__NAMESPACE__ . '\\MatriculaViradaAdminController', false)) {
+class MatriculaViradaAdminController extends \App\Core\BaseController
 {
     private $auth;
     private MatriculaViradaService $service;
@@ -17,7 +16,7 @@ class MatriculaViradaAdminController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        $this->auth = new AuthManager();
+        $this->auth = new \App\Core\AuthManager();
         $this->service = new MatriculaViradaService();
         $this->processoService = new MatriculaProcessoService();
         $user = $this->auth->getUser();
@@ -90,4 +89,8 @@ class MatriculaViradaAdminController extends BaseController
         return 'Não foi possível concluir. Tente de novo.';
     }
 }
+}
+
+if (!class_exists('MatriculaViradaAdminController', false) && class_exists(__NAMESPACE__ . '\\MatriculaViradaAdminController', false)) {
+    class_alias(__NAMESPACE__ . '\\MatriculaViradaAdminController', 'MatriculaViradaAdminController');
 }

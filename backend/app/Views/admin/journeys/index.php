@@ -6,9 +6,8 @@ foreach ([$filtro_professor ?? '', $filtro_turma ?? '', $filtro_materia ?? '', $
     }
 }
 if (!class_exists('PeriodoLetivo')) {
-    require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
 }
-$periodoFiltro = PeriodoLetivo::doAno((int) date('Y'));
+$periodoFiltro = \App\Core\PeriodoLetivo::doAno((int) date('Y'));
 ?>
 <!-- Header Section -->
 <div class="mb-8">
@@ -109,7 +108,7 @@ $periodoFiltro = PeriodoLetivo::doAno((int) date('Y'));
             <div>
                 <label for="bimestre" class="block text-sm font-medium text-gray-700 mb-1.5"><?= htmlspecialchars($periodoFiltro['rotulo_campo']) ?></label>
                 <select id="bimestre" name="bimestre" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <?= PeriodoLetivo::optionsHtml((int) date('Y'), (int) ($filtro_bimestre ?? 0), ['todos' => true, 'todos_label' => 'Todos']) ?>
+                    <?= \App\Core\PeriodoLetivo::optionsHtml((int) date('Y'), (int) ($filtro_bimestre ?? 0), ['todos' => true, 'todos_label' => 'Todos']) ?>
                 </select>
             </div>
             <div>

@@ -4,10 +4,7 @@ namespace App\Modulos\DashboardGestao\Widgets;
 
 use App\Modulos\DashboardGestao\Services\DashboardConsulta;
 use App\Modulos\DashboardGestao\Services\DashboardFiltro;
-use FrequencyService;
-
-require_once dirname(__DIR__, 3) . '/Services/FrequencyService.php';
-
+use App\Services\FrequencyService;
 class KpisWidget implements WidgetDashboard
 {
     private DashboardConsulta $consulta;
@@ -29,7 +26,7 @@ class KpisWidget implements WidgetDashboard
             ? null
             : (new FrequencyService())->percentualGeral($filtro->inicio, $filtro->fim, $filtro->turmaIds);
         $freqHref = defined('URL') ? URL . '/admin/presenca' : '/admin/presenca';
-        if (!class_exists('LayoutHelper', false) || !\LayoutHelper::isModuleEnabled('presenca')) {
+        if (!class_exists('LayoutHelper', false) || !\App\Core\LayoutHelper::isModuleEnabled('presenca')) {
             $freqHref = defined('URL') ? URL . '/admin/diario' : '/admin/diario';
         }
 
@@ -66,4 +63,8 @@ class KpisWidget implements WidgetDashboard
             ],
         ];
     }
+}
+
+if (!class_exists('KpisWidget', false) && class_exists(__NAMESPACE__ . '\\KpisWidget', false)) {
+    class_alias(__NAMESPACE__ . '\\KpisWidget', 'KpisWidget');
 }

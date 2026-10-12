@@ -15,12 +15,8 @@ use App\Modulos\DashboardGestao\Widgets\MatriculasWidget;
 use App\Modulos\DashboardGestao\Widgets\OcorrenciasWidget;
 use App\Modulos\DashboardGestao\Widgets\PendenciasWidget;
 use App\Modulos\DashboardGestao\Widgets\WidgetDashboard;
-use Database;
-use RedisCache;
-
-require_once dirname(__DIR__, 3) . '/Core/RedisCache.php';
-require_once dirname(__DIR__, 3) . '/Core/AdminPermissionMatrix.php';
-
+use App\Core\Database;
+use App\Core\RedisCache;
 /**
  * Orquestra widgets do Dashboard. Não calcula regra acadêmica — só lê serviços oficiais.
  */
@@ -183,17 +179,17 @@ class DashboardGestaoService
         if ($perm === null || $perm === 'dashboard') {
             return true;
         }
-        $permissions = \AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user);
-        if (\AdminPermissionMatrix::can($permissions, $perm, 'visualizar')) {
+        $permissions = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user);
+        if (\App\Core\AdminPermissionMatrix::can($permissions, $perm, 'visualizar')) {
             return true;
         }
-        if ($chave === 'calendario' && \AdminPermissionMatrix::can($permissions, 'calendario_letivo', 'visualizar')) {
+        if ($chave === 'calendario' && \App\Core\AdminPermissionMatrix::can($permissions, 'calendario_letivo', 'visualizar')) {
             return true;
         }
-        if ($chave === 'frequencia_hoje' && \AdminPermissionMatrix::can($permissions, 'presenca', 'visualizar')) {
+        if ($chave === 'frequencia_hoje' && \App\Core\AdminPermissionMatrix::can($permissions, 'presenca', 'visualizar')) {
             return true;
         }
-        if ($chave === 'pendencias' && \AdminPermissionMatrix::can($permissions, 'provas_online', 'visualizar')) {
+        if ($chave === 'pendencias' && \App\Core\AdminPermissionMatrix::can($permissions, 'provas_online', 'visualizar')) {
             return true;
         }
         return false;
@@ -222,4 +218,8 @@ class DashboardGestaoService
             $filtro->hoje,
         ]));
     }
+}
+
+if (!class_exists('DashboardGestaoService', false) && class_exists(__NAMESPACE__ . '\\DashboardGestaoService', false)) {
+    class_alias(__NAMESPACE__ . '\\DashboardGestaoService', 'DashboardGestaoService');
 }

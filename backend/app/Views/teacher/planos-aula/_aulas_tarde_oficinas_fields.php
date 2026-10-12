@@ -1,11 +1,10 @@
 <?php
-require_once __DIR__ . '/../../../Helpers/LessonPlanAfternoonHelper.php';
 
-$aulasTardeAtividades = $aulas_tarde_atividades ?? LessonPlanAfternoonHelper::parseList($aulas_tarde_raw ?? null);
+$aulasTardeAtividades = $aulas_tarde_atividades ?? \App\Helpers\LessonPlanAfternoonHelper::parseList($aulas_tarde_raw ?? null);
 if (!is_array($aulasTardeAtividades) || $aulasTardeAtividades === []) {
     $aulasTardeAtividades = [['tipo' => '']];
 }
-$aulasTardeTipos = LessonPlanAfternoonHelper::tipos();
+$aulasTardeTipos = \App\Helpers\LessonPlanAfternoonHelper::tipos();
 ?>
 
 <div class="border-b border-gray-200 pb-6">

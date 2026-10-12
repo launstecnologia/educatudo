@@ -39,16 +39,15 @@ if ($flash_message !== ''):
             <form id="modules-form" method="post" action="<?= URL ?>/admin/dev/modules" class="space-y-6">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                 <?php
-                    require_once __DIR__ . '/../../../Core/LayoutHelper.php';
                     $geralKeys = [
-                        'geral_planos_aula'   => LayoutHelper::getModuleStatus('aluno_planos_aula'),
-                        'geral_arquivos'      => LayoutHelper::getModuleStatus('aluno_arquivos'),
-                        'geral_jornada'       => LayoutHelper::getModuleStatus('jornadas'),
-                        'geral_provas'        => LayoutHelper::getModuleStatus('aluno_provas'),
-                        'geral_chat_professor'=> LayoutHelper::getModuleStatus('chat_professor'),
-                        'geral_redacao_orientada' => LayoutHelper::getModuleStatus('redacao_configuravel'),
-                        'geral_minicursos'    => LayoutHelper::getModuleStatus('aluno_minicursos'),
-                        'geral_aulas_online'  => LayoutHelper::getModuleStatus('aulas_online'),
+                        'geral_planos_aula'   => \App\Core\LayoutHelper::getModuleStatus('aluno_planos_aula'),
+                        'geral_arquivos'      => \App\Core\LayoutHelper::getModuleStatus('aluno_arquivos'),
+                        'geral_jornada'       => \App\Core\LayoutHelper::getModuleStatus('jornadas'),
+                        'geral_provas'        => \App\Core\LayoutHelper::getModuleStatus('aluno_provas'),
+                        'geral_chat_professor'=> \App\Core\LayoutHelper::getModuleStatus('chat_professor'),
+                        'geral_redacao_orientada' => \App\Core\LayoutHelper::getModuleStatus('redacao_configuravel'),
+                        'geral_minicursos'    => \App\Core\LayoutHelper::getModuleStatus('aluno_minicursos'),
+                        'geral_aulas_online'  => \App\Core\LayoutHelper::getModuleStatus('aulas_online'),
                     ];
                     $geralLabels = [
                         'geral_planos_aula'   => 'Plano de Aula',
@@ -61,28 +60,28 @@ if ($flash_message !== ''):
                         'geral_aulas_online' => 'Aulas Online',
                     ];
                     $profKeys = [
-                        'professor_ai_agents'   => LayoutHelper::getModuleStatus('professor_ai_agents'),
-                        'professor_gerar_slides'=> LayoutHelper::getModuleStatus('professor_gerar_slides'),
+                        'professor_ai_agents'   => \App\Core\LayoutHelper::getModuleStatus('professor_ai_agents'),
+                        'professor_gerar_slides'=> \App\Core\LayoutHelper::getModuleStatus('professor_gerar_slides'),
                     ];
                     $profLabels = [
                         'professor_ai_agents'   => 'Agentes de IA (Tudinha Prof)',
                         'professor_gerar_slides'=> 'Gerar Slider',
                     ];
                     $alunoKeys = [
-                        'educa_livros'      => LayoutHelper::getModuleStatus('educa_livros'),
-                        'educalabs'         => LayoutHelper::getModuleStatus('educalabs'),
-                        'aluno_flashcards'  => LayoutHelper::getModuleStatus('aluno_flashcards'),
-                        'exercicios'        => LayoutHelper::getModuleStatus('exercicios'),
-                        'exercicios_ia'     => LayoutHelper::getModuleStatus('exercicios_ia'),
-                        'ingles'            => LayoutHelper::getModuleStatus('ingles'),
-                        'redacoes'          => LayoutHelper::getModuleStatus('redacoes'),
-                        'simulados'         => LayoutHelper::getModuleStatus('simulados'),
-                        'chat'              => LayoutHelper::getModuleStatus('chat'),
-                        'aluno_caderno_novo'=> LayoutHelper::getModuleStatus('aluno_caderno_novo'),
-                        'forum'             => LayoutHelper::getModuleStatus('forum'),
-                        'drive'             => LayoutHelper::getModuleStatus('drive'),
-                        'jogos'             => LayoutHelper::getModuleStatus('jogos'),
-                        'educa_hits'        => LayoutHelper::getModuleStatus('educa_hits'),
+                        'educa_livros'      => \App\Core\LayoutHelper::getModuleStatus('educa_livros'),
+                        'educalabs'         => \App\Core\LayoutHelper::getModuleStatus('educalabs'),
+                        'aluno_flashcards'  => \App\Core\LayoutHelper::getModuleStatus('aluno_flashcards'),
+                        'exercicios'        => \App\Core\LayoutHelper::getModuleStatus('exercicios'),
+                        'exercicios_ia'     => \App\Core\LayoutHelper::getModuleStatus('exercicios_ia'),
+                        'ingles'            => \App\Core\LayoutHelper::getModuleStatus('ingles'),
+                        'redacoes'          => \App\Core\LayoutHelper::getModuleStatus('redacoes'),
+                        'simulados'         => \App\Core\LayoutHelper::getModuleStatus('simulados'),
+                        'chat'              => \App\Core\LayoutHelper::getModuleStatus('chat'),
+                        'aluno_caderno_novo'=> \App\Core\LayoutHelper::getModuleStatus('aluno_caderno_novo'),
+                        'forum'             => \App\Core\LayoutHelper::getModuleStatus('forum'),
+                        'drive'             => \App\Core\LayoutHelper::getModuleStatus('drive'),
+                        'jogos'             => \App\Core\LayoutHelper::getModuleStatus('jogos'),
+                        'educa_hits'        => \App\Core\LayoutHelper::getModuleStatus('educa_hits'),
                     ];
                     $alunoLabels = [
                         'educa_livros'      => 'Educa Livros',
@@ -179,8 +178,7 @@ if ($flash_message !== ''):
             <form id="valor-usuario-form" method="post" action="<?= URL ?>/admin/dev/valor-usuario/save" class="space-y-4">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                 <?php
-                require_once __DIR__ . '/../../../Core/LayoutHelper.php';
-                $valor_por_usuario = LayoutHelper::get('valor_por_usuario', '0.00');
+                $valor_por_usuario = \App\Core\LayoutHelper::get('valor_por_usuario', '0.00');
                 ?>
                 <div>
                     <label for="valor_por_usuario" class="block text-sm font-medium text-gray-700 mb-2">
@@ -216,10 +214,9 @@ if ($flash_message !== ''):
             <form id="financeiro-config-form" method="post" action="<?= URL ?>/admin/dev/financeiro/save" class="space-y-4">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                 <?php
-                require_once __DIR__ . '/../../../Core/LayoutHelper.php';
-                $financeiro_dia_fechamento = LayoutHelper::get('financeiro_dia_fechamento', '1');
-                $financeiro_dia_pagamento = LayoutHelper::get('financeiro_dia_pagamento', '5');
-                $financeiro_dia_vencimento = LayoutHelper::get('financeiro_dia_vencimento', '5');
+                $financeiro_dia_fechamento = \App\Core\LayoutHelper::get('financeiro_dia_fechamento', '1');
+                $financeiro_dia_pagamento = \App\Core\LayoutHelper::get('financeiro_dia_pagamento', '5');
+                $financeiro_dia_vencimento = \App\Core\LayoutHelper::get('financeiro_dia_vencimento', '5');
                 ?>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
@@ -267,13 +264,12 @@ if ($flash_message !== ''):
                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
 
                 <?php
-                require_once __DIR__ . '/../../../Core/LayoutHelper.php';
                 $limites = [
-                    'chat_interacoes' => LayoutHelper::get('limit_chat_interacoes', '0'),
-                    'gerar_tema_redacao' => LayoutHelper::get('limit_gerar_tema_redacao', '0'),
-                    'corrigir_redacao' => LayoutHelper::get('limit_corrigir_redacao', '0'),
-                    'exercicios' => LayoutHelper::get('limit_exercicios', '0'),
-                    'simulados' => LayoutHelper::get('limit_simulados', '0'),
+                    'chat_interacoes' => \App\Core\LayoutHelper::get('limit_chat_interacoes', '0'),
+                    'gerar_tema_redacao' => \App\Core\LayoutHelper::get('limit_gerar_tema_redacao', '0'),
+                    'corrigir_redacao' => \App\Core\LayoutHelper::get('limit_corrigir_redacao', '0'),
+                    'exercicios' => \App\Core\LayoutHelper::get('limit_exercicios', '0'),
+                    'simulados' => \App\Core\LayoutHelper::get('limit_simulados', '0'),
                 ];
                 $descricoes = [
                     'chat_interacoes' => 'Interações de Chat (1 mensagem enviada + 1 resposta = 1 interação)',

@@ -1,15 +1,14 @@
 <?php
+
+namespace App\Core;
 /**
  * EducaTudo - Classe principal da aplicação
  * Responsável pelo roteamento e inicialização do sistema
  */
 
 // Carregar classes necessárias
-require_once __DIR__ . '/Database.php';
-require_once __DIR__ . '/Router.php';
-require_once __DIR__ . '/Auth.php';
-require_once __DIR__ . '/AuthManager.php';
-require_once __DIR__ . '/BaseController.php';
+
+use App\Helpers\EstilosPlataforma;
 
 class App
 {
@@ -66,9 +65,9 @@ class App
             $this->handleMobileApiCors();
             $this->handleEducaProfCors();
             $this->router->dispatch();
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             $this->handleError($e);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $this->handleError($e);
         }
     }
@@ -113,7 +112,6 @@ class App
     private function logError($e)
     {
         try {
-            require_once __DIR__ . '/Logger.php';
             
             $context = [
                 'exception' => $e,
@@ -158,7 +156,7 @@ class App
                 $context,
                 'general'
             );
-        } catch (Exception $logError) {
+        } catch (\Exception $logError) {
             // Se falhar ao logar, usar error_log padrão
             error_log("Erro ao registrar log: " . $logError->getMessage());
             error_log("Erro original: " . $e->getMessage() . " em " . $e->getFile() . " linha " . $e->getLine());
@@ -188,7 +186,6 @@ class App
         }
         
         if (!class_exists('EstilosPlataforma', false)) {
-            require_once __DIR__ . '/../Helpers/EstilosPlataforma.php';
         }
 
         return '<!DOCTYPE html>
@@ -263,11 +260,11 @@ class App
         if ($allowAnyOrigin) {
             header('Access-Control-Allow-Origin: *');
         } else {
-            header('Vary: Origin');
+            header('Vary: \Origin');
             header('Access-Control-Allow-Origin: ' . $origin);
         }
-        header('Access-Control-Allow-Headers: Authorization, Content-Type, Accept, X-Request-ID, X-Device-ID, X-Device-Token');
-        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+        header('Access-Control-Allow-Headers: \Authorization, Content-Type, Accept, X-Request-ID, X-Device-ID, X-Device-Token');
+        header('Access-Control-Allow-Methods: \GET, POST, PUT, DELETE, OPTIONS');
         header('Access-Control-Max-Age: 86400');
     }
 
@@ -339,11 +336,11 @@ class App
             return;
         }
 
-        header('Vary: Origin');
+        header('Vary: \Origin');
         header('Access-Control-Allow-Origin: ' . $origin);
         header('Access-Control-Allow-Credentials: true');
-        header('Access-Control-Allow-Headers: Content-Type, Accept');
-        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+        header('Access-Control-Allow-Headers: \Content-Type, Accept');
+        header('Access-Control-Allow-Methods: \GET, POST, OPTIONS');
         header('Access-Control-Max-Age: 86400');
     }
 
@@ -383,4 +380,8 @@ class App
             'https://id-preview--7f1f23e7-7362-4734-89dd-c2aadc5ce35e.lovable.app',
         ];
     }
+}
+
+if (!class_exists('App', false) && class_exists(__NAMESPACE__ . '\\App', false)) {
+    class_alias(__NAMESPACE__ . '\\App', 'App');
 }

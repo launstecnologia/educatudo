@@ -2,8 +2,6 @@
 
 namespace App\Modulos\VidaEscolar\Services;
 
-require_once __DIR__ . '/../Models/Oficio.php';
-require_once __DIR__ . '/VidaEscolarPdfService.php';
 
 use App\Modulos\VidaEscolar\Models\Oficio;
 
@@ -179,4 +177,8 @@ class OficioService
         }
         return $valor;
     }
+}
+
+if (!class_exists('OficioService', false) && class_exists(__NAMESPACE__ . '\\OficioService', false)) {
+    class_alias(__NAMESPACE__ . '\\OficioService', 'OficioService');
 }

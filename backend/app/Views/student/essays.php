@@ -31,9 +31,8 @@
 <!-- Opções de Redação -->
 <?php
 if (!class_exists('CreditosModuleRegistry', false)) {
-    require_once __DIR__ . '/../../Core/CreditosModuleRegistry.php';
 }
-$tudicoinsTemaIa = \CreditosModuleRegistry::acaoIaDisponivel('redacao_gerar_tema_aluno');
+$tudicoinsTemaIa = \App\Core\CreditosModuleRegistry::acaoIaDisponivel('redacao_gerar_tema_aluno');
 ?>
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
     <?php if ($tudicoinsTemaIa): ?>

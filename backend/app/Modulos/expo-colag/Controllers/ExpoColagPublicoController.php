@@ -1,13 +1,16 @@
 <?php
+
+namespace App\Modulos\ExpoColag\Controllers;
 /**
  * Expo Colag — páginas públicas (QR do stand, sem login).
  */
 
-require_once __DIR__ . '/../Services/ExpoColagExecucaoService.php';
-require_once __DIR__ . '/../Services/ExpoColagService.php';
 
-if (!class_exists('ExpoColagPublicoController')) {
-class ExpoColagPublicoController extends BaseController
+use App\Modulos\ExpoColag\Services\ExpoColagExecucaoService;
+use App\Modulos\ExpoColag\Services\ExpoColagService;
+
+if (!class_exists(__NAMESPACE__ . '\\ExpoColagPublicoController', false)) {
+class ExpoColagPublicoController extends \App\Core\BaseController
 {
     private ExpoColagExecucaoService $execucao;
     private ExpoColagService $service;
@@ -24,7 +27,7 @@ class ExpoColagPublicoController extends BaseController
         $dados = $this->execucao->dadosStandPublico((string) $token);
         $escolaNome = '';
         if (class_exists('LayoutHelper')) {
-            $escolaNome = (string) LayoutHelper::getSystemTitle();
+            $escolaNome = (string) \App\Core\LayoutHelper::getSystemTitle();
         }
         if ($escolaNome === '') {
             $escolaNome = 'Expo Colag';
@@ -50,7 +53,7 @@ class ExpoColagPublicoController extends BaseController
         $escola_sistema = $escolaNome;
         $token_publico = $token;
         $logo_url = class_exists('LayoutHelper') && method_exists('LayoutHelper', 'getDocumentLogoUrl')
-            ? (string) LayoutHelper::getDocumentLogoUrl()
+            ? (string) \App\Core\LayoutHelper::getDocumentLogoUrl()
             : '';
         require $viewFile;
     }
@@ -78,7 +81,7 @@ class ExpoColagPublicoController extends BaseController
             exit;
         }
 
-        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
         $mime = $finfo->file($caminho) ?: 'application/octet-stream';
         $allowed = ['image/jpeg', 'image/png', 'image/webp'];
         if (!in_array($mime, $allowed, true)) {
@@ -97,4 +100,8 @@ class ExpoColagPublicoController extends BaseController
         exit;
     }
 }
+}
+
+if (!class_exists('ExpoColagPublicoController', false) && class_exists(__NAMESPACE__ . '\\ExpoColagPublicoController', false)) {
+    class_alias(__NAMESPACE__ . '\\ExpoColagPublicoController', 'ExpoColagPublicoController');
 }

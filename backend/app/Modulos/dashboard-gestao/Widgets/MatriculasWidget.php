@@ -27,7 +27,7 @@ class MatriculasWidget implements WidgetDashboard
         $cancelamentos = 0;
 
         if ($this->consulta->tabelaExiste('matricula') && !$filtro->semTurmas) {
-            $db = \Database::getInstance();
+            $db = \App\Core\Database::getInstance();
             $params = ['inicio' => $filtro->inicio, 'fim' => $filtro->fim];
             $anoSql = '';
             if ($filtro->anoLetivoId > 0) {
@@ -59,7 +59,7 @@ class MatriculasWidget implements WidgetDashboard
         }
 
         if ($this->consulta->tabelaExiste('matricula_transferencias')) {
-            $db = \Database::getInstance();
+            $db = \App\Core\Database::getInstance();
             $row = $db->fetch(
                 'SELECT COUNT(*) AS n FROM matricula_transferencias
                  WHERE data_transferencia BETWEEN :inicio AND :fim',
@@ -82,4 +82,8 @@ class MatriculasWidget implements WidgetDashboard
             'href_processos' => '/admin/enrollment',
         ];
     }
+}
+
+if (!class_exists('MatriculasWidget', false) && class_exists(__NAMESPACE__ . '\\MatriculasWidget', false)) {
+    class_alias(__NAMESPACE__ . '\\MatriculasWidget', 'MatriculasWidget');
 }

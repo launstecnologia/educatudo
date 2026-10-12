@@ -1,13 +1,16 @@
 <?php
+
+namespace App\Modulos\ExpoColag\Controllers;
 /**
  * Expo Colag — área do professor (wizard criar/editar + acompanhar).
  */
 
-require_once __DIR__ . '/../Services/ExpoColagService.php';
-require_once __DIR__ . '/../Services/ExpoColagExecucaoService.php';
 
-if (!class_exists('ExpoColagProfessorController')) {
-class ExpoColagProfessorController extends BaseController
+use App\Modulos\ExpoColag\Services\ExpoColagExecucaoService;
+use App\Modulos\ExpoColag\Services\ExpoColagService;
+
+if (!class_exists(__NAMESPACE__ . '\\ExpoColagProfessorController', false)) {
+class ExpoColagProfessorController extends \App\Core\BaseController
 {
     private $auth;
     private ExpoColagService $service;
@@ -16,7 +19,7 @@ class ExpoColagProfessorController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        $this->auth = new AuthManager();
+        $this->auth = new \App\Core\AuthManager();
         $this->service = new ExpoColagService();
         $this->execucao = new ExpoColagExecucaoService();
     }
@@ -45,7 +48,7 @@ class ExpoColagProfessorController extends BaseController
         $indicadores = $this->service->indicadoresProfessor((int) $user['id']);
         try {
             $indicadores = array_merge($indicadores, $this->execucao->indicadoresExtrasProfessor((int) $user['id']));
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $indicadores['tarefas_atrasadas'] = 0;
             $indicadores['entregas_avaliar'] = 0;
         }
@@ -489,10 +492,10 @@ class ExpoColagProfessorController extends BaseController
         $projeto = $completo['projeto'];
         $itens = $this->execucao->itensPdfAlmoxarifado((int) $id);
         $escola = class_exists('LayoutHelper')
-            ? (string) LayoutHelper::getSystemTitle()
+            ? (string) \App\Core\LayoutHelper::getSystemTitle()
             : 'Escola';
         $logo_url = class_exists('LayoutHelper') && method_exists('LayoutHelper', 'getDocumentLogoUrl')
-            ? (string) LayoutHelper::getDocumentLogoUrl()
+            ? (string) \App\Core\LayoutHelper::getDocumentLogoUrl()
             : '';
 
         $viewFile = $this->resolveViewPath('professor/expo-colag/materiais_pdf');
@@ -585,7 +588,7 @@ class ExpoColagProfessorController extends BaseController
         if ($professorId <= 0 || $senha === '') {
             return false;
         }
-        $professor = Database::getInstance()->fetch(
+        $professor = \App\Core\Database::getInstance()->fetch(
             'SELECT senha_hash FROM professores WHERE id = :id',
             ['id' => $professorId]
         );
@@ -619,4 +622,8 @@ class ExpoColagProfessorController extends BaseController
         $this->redirect('/professor/expo-colag/criar');
     }
 }
+}
+
+if (!class_exists('ExpoColagProfessorController', false) && class_exists(__NAMESPACE__ . '\\ExpoColagProfessorController', false)) {
+    class_alias(__NAMESPACE__ . '\\ExpoColagProfessorController', 'ExpoColagProfessorController');
 }

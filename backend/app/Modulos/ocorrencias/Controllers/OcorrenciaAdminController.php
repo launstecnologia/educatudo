@@ -1,17 +1,16 @@
 <?php
+
+namespace App\Modulos\Ocorrencias\Controllers;
+
+use App\Modulos\Ocorrencias\Services\OcorrenciaService;
+
 /**
  * EducaTudo - Ocorrências do aluno (admin / coordenação / secretaria)
  */
 
-require_once __DIR__ . '/../../../Controllers/Admin/AdminBaseController.php';
-require_once __DIR__ . '/../Models/Ocorrencia.php';
-require_once __DIR__ . '/../../../Models/Education/ClassDiary.php';
-require_once __DIR__ . '/../Services/OcorrenciaService.php';
 
-use App\Modulos\Ocorrencias\Services\OcorrenciaService;
-
-if (!class_exists('OcorrenciaAdminController')) {
-class OcorrenciaAdminController extends AdminBaseController
+if (!class_exists(__NAMESPACE__ . '\\OcorrenciaAdminController', false)) {
+class OcorrenciaAdminController extends \App\Controllers\Admin\AdminBaseController
 {
     private function service(): OcorrenciaService
     {
@@ -42,7 +41,7 @@ class OcorrenciaAdminController extends AdminBaseController
         $alunoId = (int) ($_GET['aluno_id'] ?? 0);
         $aulaId = (int) ($_GET['aula_id'] ?? 0);
         $aluno = $alunoId > 0 ? $model->dadosAluno($alunoId) : null;
-        $aula = $aulaId > 0 ? (new ClassDiary())->getAula($aulaId) : null;
+        $aula = $aulaId > 0 ? (new \App\Modulos\Diario\Models\ClassDiary())->getAula($aulaId) : null;
 
         $flash = $this->getFlashMessage();
         $this->viewWithLayout('admin', 'admin/ocorrencias/index', [
@@ -329,4 +328,8 @@ class OcorrenciaAdminController extends AdminBaseController
         return false;
     }
 }
+}
+
+if (!class_exists('OcorrenciaAdminController', false) && class_exists(__NAMESPACE__ . '\\OcorrenciaAdminController', false)) {
+    class_alias(__NAMESPACE__ . '\\OcorrenciaAdminController', 'OcorrenciaAdminController');
 }

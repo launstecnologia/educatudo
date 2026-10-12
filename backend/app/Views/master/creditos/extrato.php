@@ -1,6 +1,4 @@
 <?php
-require_once __DIR__ . '/../../../Core/CreditosDecimalHelper.php';
-require_once __DIR__ . '/../../../Core/CreditosModuleRegistry.php';
 
 $movimentacoes = $movimentacoes ?? [];
 $escolas = $escolas ?? [];
@@ -78,13 +76,13 @@ $limparDetalhe = static function (string $texto): string {
     </div>
     <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
         <p class="text-sm text-slate-500">TudiCoins no filtro</p>
-        <p class="text-2xl font-bold text-amber-600 mt-1"><?= htmlspecialchars(CreditosDecimalHelper::formatDisplay((float) ($totais['consumido_filtrado'] ?? 0))) ?></p>
-        <p class="text-xs text-slate-400 mt-1">≈ <?= htmlspecialchars(CreditosDecimalHelper::formatReaisFromTudicoins((float) ($totais['consumido_filtrado'] ?? 0))) ?></p>
+        <p class="text-2xl font-bold text-amber-600 mt-1"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay((float) ($totais['consumido_filtrado'] ?? 0))) ?></p>
+        <p class="text-xs text-slate-400 mt-1">≈ <?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatReaisFromTudicoins((float) ($totais['consumido_filtrado'] ?? 0))) ?></p>
     </div>
     <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
         <p class="text-sm text-slate-500">TudiCoins no total (todas as datas)</p>
-        <p class="text-2xl font-bold text-slate-800 mt-1"><?= htmlspecialchars(CreditosDecimalHelper::formatDisplay((float) ($totais['consumido_geral'] ?? 0))) ?></p>
-        <p class="text-xs text-slate-400 mt-1">≈ <?= htmlspecialchars(CreditosDecimalHelper::formatReaisFromTudicoins((float) ($totais['consumido_geral'] ?? 0))) ?></p>
+        <p class="text-2xl font-bold text-slate-800 mt-1"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay((float) ($totais['consumido_geral'] ?? 0))) ?></p>
+        <p class="text-xs text-slate-400 mt-1">≈ <?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatReaisFromTudicoins((float) ($totais['consumido_geral'] ?? 0))) ?></p>
     </div>
 </div>
 
@@ -115,7 +113,7 @@ $limparDetalhe = static function (string $texto): string {
                         $moduloLabel = $modulos[$moduloKey];
                     }
                     $isExterno = (($mov['origem_tipo'] ?? '') === 'app_externo')
-                        || CreditosModuleRegistry::isAppExterno($moduloKey);
+                        || \App\Core\CreditosModuleRegistry::isAppExterno($moduloKey);
                     $origemLabel = $isExterno ? 'App externo' : 'Plataforma';
                     $origemBadge = $isExterno
                         ? 'bg-violet-100 text-violet-800'
@@ -143,8 +141,8 @@ $limparDetalhe = static function (string $texto): string {
                         <?php endif; ?>
                     </td>
                     <td class="px-6 py-4 text-sm text-right whitespace-nowrap">
-                        <span class="block font-medium text-amber-600 tabular-nums"><?= htmlspecialchars(CreditosDecimalHelper::formatDisplay($valor)) ?></span>
-                        <span class="block text-xs text-slate-400 mt-0.5 tabular-nums"><?= htmlspecialchars(CreditosDecimalHelper::formatReaisFromTudicoins($valor)) ?></span>
+                        <span class="block font-medium text-amber-600 tabular-nums"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay($valor)) ?></span>
+                        <span class="block text-xs text-slate-400 mt-0.5 tabular-nums"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatReaisFromTudicoins($valor)) ?></span>
                     </td>
                 </tr>
                 <?php endforeach; ?>

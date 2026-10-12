@@ -25,8 +25,7 @@ $router->get('/external-apps/credit-context', 'ExternalApps/ExternalAppsControll
 $router->post('/external-apps/credit-context', 'ExternalApps/ExternalAppsController@creditContext');
 $router->post('/external-apps/consume', 'ExternalApps/ExternalAppsController@consumeCredit');
 $router->post('/external-apps/refund', 'ExternalApps/ExternalAppsController@refundCredit');
-// AVA / EAD - Validação pública de certificado por código (sem login)
-$router->get('/certificado/validar/{codigo}', 'Ava/CertificateValidationController@validate');
+// AVA certificados → Modulos/ava/routes.php
 
 // Histórico Escolar — validação pública por hash (sem login; sem expor notas)
 $router->get('/validar/historico/{hash}', 'Public/HistoricoValidacaoController@validar');
@@ -43,13 +42,10 @@ $router->get('/manifest-pais.json', 'Pwa/PwaController@manifestPais');
 
 // API de tracking de push (service worker - sem sessão)
 $router->post('/api/webhook/gravacao-jitsi', 'Webhooks/JitsiRecordingWebhookController@handle');
-$router->post('/api/notificacoes/visualizado', 'Api/PushTrackingController@visualizado');
-$router->post('/api/notificacoes/clicado', 'Api/PushTrackingController@clicado');
+// Notificações API → Modulos/notificacoes/routes.php
 
 // API Notícias (RSS) e Notificações manuais (API externa)
 $router->get('/api/noticias', 'Noticias/NoticiasController@index');
-$router->get('/api/notificacoes', 'Noticias/NotificacoesApiController@index');
-$router->post('/api/notificacoes', 'Noticias/NotificacoesApiController@store');
 
 // API REST Pais (Parent) - Login (público)
 $router->post('/api/auth/login', 'Api/AuthController@login');
@@ -82,7 +78,6 @@ $router->get('/media/serve', 'Media/MediaServeController@serve');
 $router->get('/uploads/jornadas/exercicios/{filename}', 'Education/ServeImagemExercicioController@serve');
 
 // Imagem de questão (provas) – rota pública para <img> no editor e na prova
-$router->get('/uploads/provas/questoes/{filename}', 'Exams/ServeExamQuestionImageController@serve');
 
 // Rotas de autenticação
 $router->get('/login/csrf-token', 'Auth/AuthController@getLoginCsrfTokenJson');

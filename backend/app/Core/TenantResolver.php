@@ -1,10 +1,11 @@
 <?php
+
+namespace App\Core;
 /**
  * EducaTudo - Resolução de tenant (escola) por requisição
  * Usado quando MULTI_TENANT=true. Consulta o banco master para obter escola_id por domínio ou slug.
  */
 
-require_once __DIR__ . '/RedisCache.php';
 
 class TenantResolver
 {
@@ -25,7 +26,7 @@ class TenantResolver
     /** @var PDO Conexão com o banco master (escolas, config_escolas_banco) */
     private $masterPdo;
 
-    public function __construct(PDO $masterPdo)
+    public function __construct(\PDO $masterPdo)
     {
         $this->masterPdo = $masterPdo;
     }
@@ -158,7 +159,7 @@ class TenantResolver
             "SELECT id, slug, dominio FROM escolas WHERE slug = :slug AND ativo = 1 LIMIT 1"
         );
         $stmt->execute(['slug' => $slug]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
         if (!$row) {
             return null;
         }
@@ -175,7 +176,7 @@ class TenantResolver
             "SELECT id, slug, dominio FROM escolas WHERE dominio = :dominio AND ativo = 1 LIMIT 1"
         );
         $stmt->execute(['dominio' => $dominio]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
         if (!$row) {
             return null;
         }
@@ -192,7 +193,7 @@ class TenantResolver
             "SELECT id, nome, slug, dominio, ativo FROM escolas WHERE slug = :slug LIMIT 1"
         );
         $stmt->execute(['slug' => $slug]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
         return $row ? $this->formatTenantWithStatus($row) : null;
     }
 
@@ -202,7 +203,7 @@ class TenantResolver
             "SELECT id, nome, slug, dominio, ativo FROM escolas WHERE dominio = :dominio LIMIT 1"
         );
         $stmt->execute(['dominio' => $dominio]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
         return $row ? $this->formatTenantWithStatus($row) : null;
     }
 
@@ -229,9 +230,13 @@ class TenantResolver
     {
         $stmt = $this->masterPdo->query("SELECT id FROM escolas WHERE ativo = 1 ORDER BY id");
         $ids = [];
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
             $ids[] = (int) $row['id'];
         }
         return $ids;
     }
+}
+
+if (!class_exists('TenantResolver', false) && class_exists(__NAMESPACE__ . '\\TenantResolver', false)) {
+    class_alias(__NAMESPACE__ . '\\TenantResolver', 'TenantResolver');
 }

@@ -1,6 +1,5 @@
 <?php
 if (!class_exists('AdminPermissionMatrix')) {
-    require_once dirname(__DIR__, 3) . '/Core/AdminPermissionMatrix.php';
 }
 
 $hub_title = 'Rotina';
@@ -9,8 +8,8 @@ $hub_cards = [];
 
 $permsHub = [];
 if (class_exists('AdminPermissionMatrix')) {
-    $permsHub = AdminPermissionMatrix::effectivePermissionsForUser(
-        Database::getInstance(),
+    $permsHub = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser(
+        \App\Core\Database::getInstance(),
         $user ?? []
     );
 }
@@ -18,7 +17,7 @@ $podeHub = static function (string $chave) use ($permsHub): bool {
     return !empty($permsHub[$chave]['visualizar']);
 };
 
-if ($podeHub('diario_classe') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('diario_classe'))) {
+if ($podeHub('diario_classe') && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('diario_classe'))) {
     $hub_cards[] = [
         'href' => URL . '/admin/diario',
         'title' => 'Diário de Classe',
@@ -27,8 +26,8 @@ if ($podeHub('diario_classe') && (!class_exists('LayoutHelper') || LayoutHelper:
     ];
 }
 
-if ((!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('faltas'))
-    || ($podeHub('presenca') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('presenca')))) {
+if ((!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('faltas'))
+    || ($podeHub('presenca') && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('presenca')))) {
     $hub_cards[] = [
         'href' => URL . '/admin/frequencia',
         'title' => 'Frequência',
@@ -37,7 +36,7 @@ if ((!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('faltas'))
     ];
 }
 
-if ($podeHub('ocorrencias') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('ocorrencias'))) {
+if ($podeHub('ocorrencias') && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('ocorrencias'))) {
     $hub_cards[] = [
         'href' => URL . '/admin/ocorrencias',
         'title' => 'Ocorrências',

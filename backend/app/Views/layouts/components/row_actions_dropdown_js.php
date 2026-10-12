@@ -1,7 +1,7 @@
 <?php
 /**
  * JS global do dropdown de ações de linha (listagens) — ver
- * _partials/row_actions_dropdown.php (design system: prompts/admin_ui_sistema/tabela-dropdown-paginacao.md).
+ * _partials/row_actions_dropdown.php (design system: especificacoes/admin_ui_sistema/tabela-dropdown-paginacao.md).
  *
  * Posicionamento via position:fixed calculado em JS (não absolute dentro do
  * wrapper da linha) porque a tabela tem overflow-x-auto, que corta qualquer

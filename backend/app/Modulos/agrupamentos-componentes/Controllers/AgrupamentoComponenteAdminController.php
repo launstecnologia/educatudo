@@ -1,16 +1,17 @@
 <?php
+
+namespace App\Modulos\AgrupamentosComponentes\Controllers;
+
+use App\Modulos\AgrupamentosComponentes\Services\AgrupamentoComponenteService;
+use Throwable;
+
 /**
  * Admin — cadastro de agrupamentos de componentes.
  */
 
-require_once __DIR__ . '/../../../Controllers/Admin/AdminBaseController.php';
-require_once __DIR__ . '/../Services/AgrupamentoComponenteService.php';
-require_once __DIR__ . '/../../../Models/Education/ComponenteCurricular.php';
 
-use App\Modulos\AgrupamentosComponentes\Services\AgrupamentoComponenteService;
-
-if (!class_exists('AgrupamentoComponenteAdminController')) {
-class AgrupamentoComponenteAdminController extends AdminBaseController
+if (!class_exists(__NAMESPACE__ . '\\AgrupamentoComponenteAdminController', false)) {
+class AgrupamentoComponenteAdminController extends \App\Controllers\Admin\AdminBaseController
 {
     /** @var AgrupamentoComponenteService */
     private $service;
@@ -77,7 +78,7 @@ class AgrupamentoComponenteAdminController extends AdminBaseController
         $pais = [];
         $filhosPorPai = [];
         try {
-            $model = new ComponenteCurricular();
+            $model = new \App\Models\Education\ComponenteCurricular();
             foreach ($model->getOficiaisParaMatriz(true) as $c) {
                 if (empty($c['eh_rotulo'])) {
                     continue;
@@ -107,4 +108,8 @@ class AgrupamentoComponenteAdminController extends AdminBaseController
         ]);
     }
 }
+}
+
+if (!class_exists('AgrupamentoComponenteAdminController', false) && class_exists(__NAMESPACE__ . '\\AgrupamentoComponenteAdminController', false)) {
+    class_alias(__NAMESPACE__ . '\\AgrupamentoComponenteAdminController', 'AgrupamentoComponenteAdminController');
 }

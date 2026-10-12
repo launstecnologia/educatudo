@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../../../Models/Education/ResultadoAcademico.php';
 
 $emissoes = is_array($emissoes ?? null) ? $emissoes : [];
 $paineis = is_array($paineis ?? null) ? $paineis : [];
@@ -97,7 +96,7 @@ include __DIR__ . '/../../../../Views/admin/resultados-finais/_filtros.php';
                 <?php else: foreach ($emissoes as $em): ?>
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4 text-sm text-gray-700"><?= htmlspecialchars((string) ($em['emitido_em'] ?? '')) ?></td>
-                    <td class="px-6 py-4 text-sm"><?= htmlspecialchars(ResultadoAcademico::DOCUMENTO_TIPOS[$em['tipo'] ?? ''] ?? (string) ($em['tipo'] ?? '')) ?></td>
+                    <td class="px-6 py-4 text-sm"><?= htmlspecialchars(\App\Models\Education\ResultadoAcademico::DOCUMENTO_TIPOS[$em['tipo'] ?? ''] ?? (string) ($em['tipo'] ?? '')) ?></td>
                     <td class="px-6 py-4 text-sm text-gray-700">
                         <?= htmlspecialchars((string) ($em['turma_nome'] ?? '—')) ?>
                         <?php if (!empty($em['aluno_nome'])): ?> · <?= htmlspecialchars((string) $em['aluno_nome']) ?><?php endif; ?>

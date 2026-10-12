@@ -1,17 +1,10 @@
 <?php
+
+namespace App\Modulos\Matricula\Controllers;
 /**
  * Admin — processos de matrícula/rematrícula.
  */
 
-require_once __DIR__ . '/../../../Core/BaseController.php';
-require_once __DIR__ . '/../../../Core/AuthManager.php';
-require_once __DIR__ . '/../../../Core/Database.php';
-require_once __DIR__ . '/../Models/MatriculaProcesso.php';
-require_once __DIR__ . '/../Services/MatriculaProcessoService.php';
-require_once __DIR__ . '/../Services/MatriculaScoreService.php';
-require_once __DIR__ . '/../Services/ZapSignService.php';
-require_once __DIR__ . '/../Services/MatriculaVagaService.php';
-require_once __DIR__ . '/../Services/MatriculaChecklistService.php';
 
 use App\Modulos\Matricula\Models\MatriculaProcesso;
 use App\Modulos\Matricula\Services\MatriculaProcessoService;
@@ -20,8 +13,8 @@ use App\Modulos\Matricula\Services\ZapSignService;
 use App\Modulos\Matricula\Services\MatriculaVagaService;
 use App\Modulos\Matricula\Services\MatriculaChecklistService;
 
-if (!class_exists('MatriculaAdminController')) {
-class MatriculaAdminController extends BaseController
+if (!class_exists(__NAMESPACE__ . '\\MatriculaAdminController', false)) {
+class MatriculaAdminController extends \App\Core\BaseController
 {
     private $auth;
     private $db;
@@ -31,8 +24,8 @@ class MatriculaAdminController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        $this->auth = new AuthManager();
-        $this->db = Database::getInstance();
+        $this->auth = new \App\Core\AuthManager();
+        $this->db = \App\Core\Database::getInstance();
         $this->service = new MatriculaProcessoService($this->db);
         $this->model = $this->service->getModel();
 
@@ -944,7 +937,6 @@ class MatriculaAdminController extends BaseController
 
         $alunoIdProc = (int) ($this->model->findById($id)['aluno_id'] ?? 0);
         if ($alunoIdProc > 0) {
-            require_once dirname(__DIR__, 2) . '/vida-escolar/Services/ProntuarioVidaEscolarService.php';
             (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())->reconhecerEntregasExternas($alunoIdProc);
         }
 
@@ -1263,4 +1255,8 @@ class MatriculaAdminController extends BaseController
         return $abs;
     }
 }
+}
+
+if (!class_exists('MatriculaAdminController', false) && class_exists(__NAMESPACE__ . '\\MatriculaAdminController', false)) {
+    class_alias(__NAMESPACE__ . '\\MatriculaAdminController', 'MatriculaAdminController');
 }

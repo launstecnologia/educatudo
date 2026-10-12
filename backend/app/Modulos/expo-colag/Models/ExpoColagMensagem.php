@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Modulos\ExpoColag\Models;
 /**
  * Mensagens do grupo do projeto (Expo Colag).
  */
@@ -9,7 +11,7 @@ class ExpoColagMensagem
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     /** @return list<array> */
@@ -48,4 +50,8 @@ class ExpoColagMensagem
             ]
         );
     }
+}
+
+if (!class_exists('ExpoColagMensagem', false) && class_exists(__NAMESPACE__ . '\\ExpoColagMensagem', false)) {
+    class_alias(__NAMESPACE__ . '\\ExpoColagMensagem', 'ExpoColagMensagem');
 }

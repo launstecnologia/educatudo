@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Services/ClassDiaryService.php';
 
 use App\Modulos\Diario\Services\ClassDiaryService;
 
@@ -54,7 +53,7 @@ foreach (['ano_letivo', 'turma_id', 'materia_id', 'situacao'] as $chave) {
                 <label class="block text-xs font-semibold text-gray-600 mb-1">Situação</label>
                 <select name="situacao" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
                     <option value="">Todas</option>
-                    <?php foreach (ClassDiaryService::SITUACAO_LABELS as $valor => $label): ?>
+                    <?php foreach (\App\Modulos\Diario\Services\ClassDiaryService::SITUACAO_LABELS as $valor => $label): ?>
                         <option value="<?= $valor ?>" <?= $filtros['situacao'] === $valor ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
                     <?php endforeach; ?>
                 </select>
@@ -105,7 +104,7 @@ foreach (['ano_letivo', 'turma_id', 'materia_id', 'situacao'] as $chave) {
                                 <td class="px-6 py-4 text-sm text-gray-700"><?= (int) $d['chamadas_pendentes'] ?></td>
                                 <td class="px-6 py-4">
                                     <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?= $situacaoClasses[$d['situacao']] ?? 'bg-slate-100 text-slate-700' ?>">
-                                        <?= htmlspecialchars(ClassDiaryService::situacaoLabel((string) $d['situacao'])) ?>
+                                        <?= htmlspecialchars(\App\Modulos\Diario\Services\ClassDiaryService::situacaoLabel((string) $d['situacao'])) ?>
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 text-right">

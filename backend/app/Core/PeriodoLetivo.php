@@ -1,10 +1,11 @@
 <?php
+
+namespace App\Core;
 /**
  * EducaTudo — divisão do ano letivo (bimestre / trimestre / semestre / etapa).
  * Fonte: coluna ano_letivo.periodo_tipo. Sem cadastro, assume bimestral.
  */
 
-require_once __DIR__ . '/Database.php';
 
 class PeriodoLetivo
 {
@@ -166,7 +167,7 @@ class PeriodoLetivo
                 }
                 $mapa[$ano] = self::doAno($ano);
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             // Sem tabela/coluna: só o ano corrente.
         }
         return $mapa;
@@ -382,7 +383,7 @@ class PeriodoLetivo
             if (is_array($row) && isset($row['periodo_tipo'])) {
                 return self::normalizarTipo((string) $row['periodo_tipo']);
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return self::tipoPadrao();
         }
         return self::tipoPadrao();
@@ -401,7 +402,7 @@ class PeriodoLetivo
                 self::$colunaExiste = true;
                 return true;
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             // tenta INFORMATION_SCHEMA abaixo
         }
         try {
@@ -411,9 +412,13 @@ class PeriodoLetivo
                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ano_letivo' AND COLUMN_NAME = 'periodo_tipo'"
             );
             self::$colunaExiste = is_array($row) && (int) ($row['n'] ?? 0) > 0;
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             self::$colunaExiste = false;
         }
         return self::$colunaExiste;
     }
+}
+
+if (!class_exists('PeriodoLetivo', false) && class_exists(__NAMESPACE__ . '\\PeriodoLetivo', false)) {
+    class_alias(__NAMESPACE__ . '\\PeriodoLetivo', 'PeriodoLetivo');
 }

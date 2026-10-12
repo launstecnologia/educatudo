@@ -86,7 +86,7 @@ $renderParticipacao = static function () use ($insc, $status, $projeto, $csrf_to
 
     <div class="rounded-xl border border-gray-200 bg-white p-6 space-y-4">
         <?php
-        $capaSrc = (string) ($projeto['capa_src'] ?? ExpoColagService::resolverUrlCapa((string) ($projeto['capa_url'] ?? ''), (int) ($projeto['id'] ?? 0)));
+        $capaSrc = (string) ($projeto['capa_src'] ?? \App\Modulos\ExpoColag\Services\ExpoColagService::resolverUrlCapa((string) ($projeto['capa_url'] ?? ''), (int) ($projeto['id'] ?? 0)));
         if ($capaSrc !== ''): ?>
             <img src="<?= htmlspecialchars($capaSrc) ?>" alt="" class="w-full aspect-[3/1] object-cover rounded-lg">
         <?php endif; ?>

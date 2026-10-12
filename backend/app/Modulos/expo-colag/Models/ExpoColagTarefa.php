@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Modulos\ExpoColag\Models;
 /**
  * Tarefas e atribuições do projeto (Expo Colag S4).
  */
@@ -9,7 +11,7 @@ class ExpoColagTarefa
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     public function findById(int $id): ?array
@@ -337,4 +339,8 @@ class ExpoColagTarefa
             ['id' => $etapaId]
         );
     }
+}
+
+if (!class_exists('ExpoColagTarefa', false) && class_exists(__NAMESPACE__ . '\\ExpoColagTarefa', false)) {
+    class_alias(__NAMESPACE__ . '\\ExpoColagTarefa', 'ExpoColagTarefa');
 }

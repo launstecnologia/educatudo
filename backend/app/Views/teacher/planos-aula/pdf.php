@@ -319,7 +319,7 @@
         <?php require_once __DIR__ . '/../../../Helpers/LessonPlanAfternoonHelper.php'; ?>
         <div class="section">
             <div class="section-title">Aulas da Tarde (Oficinas de Aprendizagem / Salas de Estudo)</div>
-            <div class="content-box"><?= nl2br(htmlspecialchars(LessonPlanAfternoonHelper::renderPlainText($plano['aulas_tarde_oficinas']))) ?></div>
+            <div class="content-box"><?= nl2br(htmlspecialchars(\App\Helpers\LessonPlanAfternoonHelper::renderPlainText($plano['aulas_tarde_oficinas']))) ?></div>
         </div>
         <?php endif; ?>
 

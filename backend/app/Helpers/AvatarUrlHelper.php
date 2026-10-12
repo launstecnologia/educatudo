@@ -1,8 +1,12 @@
 <?php
 
+namespace App\Helpers;
+
 /**
  * Normaliza URLs de avatar de usuários admin (tabela usuarios).
  */
+
+use App\Core\Database;
 class AvatarUrlHelper
 {
     /**
@@ -14,7 +18,6 @@ class AvatarUrlHelper
 
         if (!empty($user['id'])) {
             try {
-                require_once __DIR__ . '/../Core/Database.php';
                 $db = Database::getInstance();
                 $row = $db->fetch(
                     'SELECT avatar_url FROM usuarios WHERE id = :id',
@@ -23,7 +26,7 @@ class AvatarUrlHelper
                 if (!empty($row['avatar_url'])) {
                     $avatarUrl = (string) $row['avatar_url'];
                 }
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 // Mantém fallback da sessão.
             }
         }
@@ -156,4 +159,8 @@ class AvatarUrlHelper
 
         return '';
     }
+}
+
+if (!class_exists('AvatarUrlHelper', false) && class_exists(__NAMESPACE__ . '\\AvatarUrlHelper', false)) {
+    class_alias(__NAMESPACE__ . '\\AvatarUrlHelper', 'AvatarUrlHelper');
 }

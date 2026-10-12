@@ -1,9 +1,9 @@
 <?php
 
 namespace App\Modulos\VidaEscolar\Models;
+use App\Helpers\AlunoLancamentoNotaHelper;
 
-use Database;
-
+use App\Core\Database;
 /**
  * Persistência das fichas oficiais de boletim, escolarização e importação.
  */
@@ -225,7 +225,6 @@ class VidaEscolar
             return [];
         }
         if (!class_exists('AlunoLancamentoNotaHelper', false)) {
-            require_once __DIR__ . '/../../../Helpers/AlunoLancamentoNotaHelper.php';
         }
         // f.status (em_curso/fechada/homologada) não é status do aluno — evita falso positivo no filtro.
         $linhas = [];
@@ -1141,8 +1140,7 @@ class VidaEscolar
         if ($matrizId > 0) {
             $ok = $this->db->fetch("SHOW TABLES LIKE 'matrizes_curriculares_componentes'");
             if ($ok) {
-                require_once dirname(__DIR__, 3) . '/Models/Education/MatrizCurricular.php';
-                $matriz = new \MatrizCurricular();
+                $matriz = new \App\Models\Education\MatrizCurricular();
                 $oficiais = $matriz->getComponentesOficiais($matrizId);
                 if (!empty($oficiais)) {
                     $rows = [];
@@ -1297,4 +1295,8 @@ class VidaEscolar
 
         return $cache[$chave];
     }
+}
+
+if (!class_exists('VidaEscolar', false) && class_exists(__NAMESPACE__ . '\\VidaEscolar', false)) {
+    class_alias(__NAMESPACE__ . '\\VidaEscolar', 'VidaEscolar');
 }

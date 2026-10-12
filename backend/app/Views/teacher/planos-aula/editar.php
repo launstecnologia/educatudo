@@ -96,7 +96,7 @@ $voltarComFiltroAdmin = str_contains((string) $back_url, '/admin/planos-aula');
                                     <span class="dia-semana text-sm text-gray-600 font-medium">
                                         <?php if (!empty($dataItem)): ?>
                                             <?php
-                                            $dataObj = new DateTime($dataItem);
+                                            $dataObj = new \DateTime($dataItem);
                                             $diasSemana = ['Domingo', 'Segunda-Feira', 'Terça-Feira', 'Quarta-Feira', 'Quinta-Feira', 'Sexta-Feira', 'Sábado'];
                                             $diaSemana = $diasSemana[(int)$dataObj->format('w')];
                                             ?>
@@ -235,8 +235,7 @@ $voltarComFiltroAdmin = str_contains((string) $back_url, '/admin/planos-aula');
         </div>
 
         <?php
-        require_once __DIR__ . '/../../../Helpers/LessonPlanAfternoonHelper.php';
-        $aulas_tarde_atividades = LessonPlanAfternoonHelper::parseList($plano['aulas_tarde_oficinas'] ?? '');
+        $aulas_tarde_atividades = \App\Helpers\LessonPlanAfternoonHelper::parseList($plano['aulas_tarde_oficinas'] ?? '');
         include __DIR__ . '/_aulas_tarde_oficinas_fields.php';
         ?>
 

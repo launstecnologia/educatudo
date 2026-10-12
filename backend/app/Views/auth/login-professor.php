@@ -1,12 +1,11 @@
 <?php
-require_once __DIR__ . '/../../Core/LayoutHelper.php';
 
 // Buscar configurações de layout (logo na login conforme config Master: logo_use_login)
-$logo_url = LayoutHelper::getLogoUrl();
-$logo_horizontal_url = LayoutHelper::getLoginLogoUrl();
-$login_cover_url = LayoutHelper::getLoginCoverUrl();
-$system_title = LayoutHelper::getSystemTitle();
-$system_subtitle = LayoutHelper::getSystemSubtitle();
+$logo_url = \App\Core\LayoutHelper::getLogoUrl();
+$logo_horizontal_url = \App\Core\LayoutHelper::getLoginLogoUrl();
+$login_cover_url = \App\Core\LayoutHelper::getLoginCoverUrl();
+$system_title = \App\Core\LayoutHelper::getSystemTitle();
+$system_subtitle = \App\Core\LayoutHelper::getSystemSubtitle();
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -15,8 +14,8 @@ $system_subtitle = LayoutHelper::getSystemSubtitle();
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <title>Portal do Professor - <?= htmlspecialchars($system_title) ?></title>
     <?php
-        $pwaThemeColor = LayoutHelper::get('pwa_professor_theme_color', LayoutHelper::get('primary_color', '#a855f7'));
-        $pwaIcon192 = LayoutHelper::get('pwa_professor_icon_192', LayoutHelper::getLogo1x1Url());
+        $pwaThemeColor = \App\Core\LayoutHelper::get('pwa_professor_theme_color', \App\Core\LayoutHelper::get('primary_color', '#a855f7'));
+        $pwaIcon192 = \App\Core\LayoutHelper::get('pwa_professor_icon_192', \App\Core\LayoutHelper::getLogo1x1Url());
     ?>
     <link rel="manifest" href="<?= URL ?>/manifest-professor.json">
     <meta name="theme-color" content="<?= htmlspecialchars($pwaThemeColor) ?>">

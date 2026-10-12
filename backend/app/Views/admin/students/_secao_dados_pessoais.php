@@ -17,10 +17,10 @@
                                 <span class="student-field-label">Nome Completo</span>
                                 <p class="student-field-value"><?= safe_htmlspecialchars($student['nome_exibicao'] ?? $student['nome'] ?? '', '') ?></p>
                             </div>
-                            <?php if (\StudentFormHelper::temNomeSocial($student)): ?>
+                            <?php if (\App\Helpers\StudentFormHelper::temNomeSocial($student)): ?>
                             <div>
                                 <span class="student-field-label">Nome civil</span>
-                                <p class="student-field-value font-normal"><?= safe_htmlspecialchars(\StudentFormHelper::nomeCivil($student), '') ?></p>
+                                <p class="student-field-value font-normal"><?= safe_htmlspecialchars(\App\Helpers\StudentFormHelper::nomeCivil($student), '') ?></p>
                             </div>
                             <?php endif; ?>
                             <div>
@@ -211,7 +211,7 @@
                         </div>
                         <div>
                             <span class="student-field-label">WhatsApp</span>
-                            <p class="student-field-value font-normal"><?= safe_htmlspecialchars(\StudentFormHelper::formatTelefoneDisplay($student['whatsapp'] ?? '') ?: null, 'Não informado') ?></p>
+                            <p class="student-field-value font-normal"><?= safe_htmlspecialchars(\App\Helpers\StudentFormHelper::formatTelefoneDisplay($student['whatsapp'] ?? '') ?: null, 'Não informado') ?></p>
                         </div>
                         <div>
                             <span class="student-field-label">E-mail secundário</span>

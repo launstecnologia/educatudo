@@ -10,8 +10,7 @@ $turmas = $turmas ?? [];
 $anos_letivos = $anos_letivos ?? [];
 $inputClass = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500';
 
-require_once dirname(__DIR__, 4) . '/Helpers/StudentFormHelper.php';
-$ufsBrasil = \StudentFormHelper::ufsBrasil();
+$ufsBrasil = \App\Helpers\StudentFormHelper::ufsBrasil();
 $ufOptionsHtml = '<option value="">UF</option>';
 foreach ($ufsBrasil as $ufOpt) {
     $ufOptionsHtml .= '<option value="' . htmlspecialchars($ufOpt, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($ufOpt, ENT_QUOTES, 'UTF-8') . '</option>';

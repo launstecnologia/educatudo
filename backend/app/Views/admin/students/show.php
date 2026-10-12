@@ -183,8 +183,7 @@ $fcVal = static function ($key) use ($fc) {
     return $v !== '' ? $v : null;
 };
 
-require_once __DIR__ . '/../../../Models/User/StudentDocument.php';
-$docChecklist = \StudentDocument::checklist();
+$docChecklist = \App\Models\User\StudentDocument::checklist();
 $docsAluno = is_array($documentos_aluno ?? null) ? $documentos_aluno : [];
 $docsPorTipo = [];
 $docsOutros = [];
@@ -269,7 +268,7 @@ if (!empty($student['numero_chamada'])) {
 $metaLinhaAluno = implode(' | ', $metaPartesAluno);
 $statusMatriculaVisual = $matriculaEstado === 'vinculada' ? 'Ativa' : $statusMatriculaLabel;
 
-$moduloVidaEscolar = !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('vida_escolar');
+$moduloVidaEscolar = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('vida_escolar');
 $abasAluno = [
     'visao-geral' => ['label' => 'Visão geral', 'count' => null],
     'dados-pessoais' => ['label' => 'Dados pessoais', 'count' => null],

@@ -2,9 +2,9 @@
 
 namespace App\Modulos\Diario\Models;
 
-use Database;
+use App\Core\Database;
 use DateTime;
-use PeriodoLetivo;
+use App\Core\PeriodoLetivo;
 use RuntimeException;
 use Throwable;
 
@@ -504,7 +504,7 @@ class ClassDiary
         }
         require_once $path;
         try {
-            $model = new \FechamentoPeriodo();
+            $model = new \App\Modulos\Fechamento\Models\FechamentoPeriodo();
             if (!$model->schemaPronto()) {
                 return;
             }
@@ -892,7 +892,7 @@ class ClassDiary
     }
 
     // ── Diários de Classe (visão agregada por Turma+Componente+Professor) ──────
-    // Fase 1 da reestruturação (ver specs/PRD.md §9): um "diário lógico" é o
+    // Fase 1 da reestruturação (ver especificacoes/PRD.md §9): um "diário lógico" é o
     // agrupamento das linhas de grade_horaria que compartilham turma+matéria+
     // professor. Não duplica dado — só agrega o que já existe.
 
@@ -1404,7 +1404,6 @@ class ClassDiary
     private function garantirPeriodoLetivo(): void
     {
         if (!class_exists('PeriodoLetivo', false)) {
-            require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
         }
     }
 
@@ -1560,4 +1559,8 @@ class ClassDiary
         }
         return (int) round(($b - $a) / 60);
     }
+}
+
+if (!class_exists('ClassDiary', false) && class_exists(__NAMESPACE__ . '\\ClassDiary', false)) {
+    class_alias(__NAMESPACE__ . '\\ClassDiary', 'ClassDiary');
 }

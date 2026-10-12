@@ -1,14 +1,10 @@
 <?php
+
+namespace App\Modulos\ModelosDocumentos\Controllers;
 /**
  * Admin — CRUD de modelos de documentos (HTML editável + placeholders).
  */
 
-require_once __DIR__ . '/../../../Controllers/Admin/AdminBaseController.php';
-require_once __DIR__ . '/../Services/ModeloDocumentoService.php';
-require_once __DIR__ . '/../Services/ImportadorModeloPlanilhaService.php';
-require_once __DIR__ . '/../Services/DemonstracaoDocumentoService.php';
-require_once __DIR__ . '/../Services/EmissaoCampoVariavelService.php';
-require_once __DIR__ . '/../Services/LayoutsHistoricoEscolar.php';
 
 use App\Modulos\ModelosDocumentos\Services\DemonstracaoDocumentoService;
 use App\Modulos\ModelosDocumentos\Services\EmissaoCampoVariavelService;
@@ -16,8 +12,8 @@ use App\Modulos\ModelosDocumentos\Services\ImportadorModeloPlanilhaService;
 use App\Modulos\ModelosDocumentos\Services\LayoutsHistoricoEscolar;
 use App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService;
 
-if (!class_exists('ModeloDocumentoAdminController')) {
-class ModeloDocumentoAdminController extends AdminBaseController
+if (!class_exists(__NAMESPACE__ . '\\ModeloDocumentoAdminController', false)) {
+class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseController
 {
     private ModeloDocumentoService $service;
 
@@ -59,8 +55,7 @@ class ModeloDocumentoAdminController extends AdminBaseController
         $layout = $this->service->getLayoutPadrao();
         $unidades = [];
         try {
-            require_once BASE_PATH . '/app/Models/Education/SchoolUnit.php';
-            $unidades = (new \SchoolUnit())->getActive() ?: [];
+            $unidades = (new \App\Models\Education\SchoolUnit())->getActive() ?: [];
         } catch (\Throwable $e) {
             $unidades = [];
         }
@@ -183,12 +178,11 @@ class ModeloDocumentoAdminController extends AdminBaseController
     public function reproduzirImagem(): void
     {
         if (!class_exists('AdminPermissionMatrix')) {
-            require_once __DIR__ . '/../../../Core/AdminPermissionMatrix.php';
         }
         $user = $this->auth->getUser() ?: [];
-        $permissions = \AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user);
-        $pode = \AdminPermissionMatrix::can($permissions, 'modelos_documentos', 'alterar')
-            || \AdminPermissionMatrix::can($permissions, 'modelos_documentos', 'cadastrar');
+        $permissions = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user);
+        $pode = \App\Core\AdminPermissionMatrix::can($permissions, 'modelos_documentos', 'alterar')
+            || \App\Core\AdminPermissionMatrix::can($permissions, 'modelos_documentos', 'cadastrar');
         if (!$pode) {
             $this->json(['success' => false, 'error' => 'Sem permissão para esta ação.'], 403);
             return;
@@ -225,7 +219,6 @@ class ModeloDocumentoAdminController extends AdminBaseController
             return;
         }
 
-        require_once __DIR__ . '/../../../Services/AIJobService.php';
         try {
             $slug = defined('TENANT_SLUG') ? preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG) : 'tenant';
             if (!is_string($slug) || $slug === '') {
@@ -342,7 +335,6 @@ class ModeloDocumentoAdminController extends AdminBaseController
         $html = $this->service->renderHtml($modelo, $vars, $estilo, $this->config);
         $nome = preg_replace('/[^a-z0-9_-]+/i', '_', (string) ($modelo['codigo'] ?? 'modelo')) ?: 'modelo';
 
-        require_once __DIR__ . '/../Services/GeradorPdfFolhaService.php';
         $pdfBin = (new \App\Modulos\ModelosDocumentos\Services\GeradorPdfFolhaService())->gerarSeFolhaOficial($html);
 
         $oldDisplayErrors = ini_get('display_errors');
@@ -479,8 +471,7 @@ class ModeloDocumentoAdminController extends AdminBaseController
         $nome = $prefixo . '_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
         $key = $slug . '/modelos_documentos/' . $nome;
 
-        require_once BASE_PATH . '/app/Services/MediaStorageService.php';
-        $media = new \MediaStorageService($this->config);
+        $media = new \App\Services\MediaStorageService($this->config);
         if ($media->isS3() && $media->put('arquivos', $key, $file['tmp_name'], $mime)) {
             return $key;
         }
@@ -659,11 +650,10 @@ class ModeloDocumentoAdminController extends AdminBaseController
     {
         $user = $this->auth->getUser();
         if (!class_exists('AdminPermissionMatrix')) {
-            require_once __DIR__ . '/../../../Core/AdminPermissionMatrix.php';
         }
-        $permissions = \AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user ?? []);
-        return \AdminPermissionMatrix::can($permissions, 'modelos_documentos', 'visualizar')
-            || \AdminPermissionMatrix::can($permissions, 'declaracoes_aluno', 'visualizar');
+        $permissions = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user ?? []);
+        return \App\Core\AdminPermissionMatrix::can($permissions, 'modelos_documentos', 'visualizar')
+            || \App\Core\AdminPermissionMatrix::can($permissions, 'declaracoes_aluno', 'visualizar');
     }
 
     private function renderForm(?array $modelo): void
@@ -1048,4 +1038,8 @@ class ModeloDocumentoAdminController extends AdminBaseController
         return $tmp;
     }
 }
+}
+
+if (!class_exists('ModeloDocumentoAdminController', false) && class_exists(__NAMESPACE__ . '\\ModeloDocumentoAdminController', false)) {
+    class_alias(__NAMESPACE__ . '\\ModeloDocumentoAdminController', 'ModeloDocumentoAdminController');
 }

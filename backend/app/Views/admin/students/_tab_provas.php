@@ -2,8 +2,8 @@
 /**
  * Conteúdo da aba "Provas" do Detalhe do Aluno (admin/students/show.php).
  * Extraído para partial porque agora é carregado sob demanda via AJAX
- * (StudentAdminController::provasTabFragment) em vez de ir junto na carga
- * inicial da página — ver app/Services/AdminStudentProfileService::getProvasTabData().
+ * (\App\Controllers\Admin\StudentAdminController::provasTabFragment) em vez de ir junto na carga
+ * inicial da página — ver app/Services/\App\Services\AdminStudentProfileService::getProvasTabData().
  *
  * Espera: $provas_realizadas, $provas_matriz_blocos
  */

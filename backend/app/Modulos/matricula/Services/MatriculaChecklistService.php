@@ -2,8 +2,7 @@
 
 namespace App\Modulos\Matricula\Services;
 
-use Database;
-
+use App\Core\Database;
 class MatriculaChecklistService
 {
     private $db;
@@ -141,4 +140,8 @@ class MatriculaChecklistService
         $tipo = strtolower(trim($tipo));
         return in_array($tipo, ['nova', 'rematricula', 'transferencia'], true) ? $tipo : 'nova';
     }
+}
+
+if (!class_exists('MatriculaChecklistService', false) && class_exists(__NAMESPACE__ . '\\MatriculaChecklistService', false)) {
+    class_alias(__NAMESPACE__ . '\\MatriculaChecklistService', 'MatriculaChecklistService');
 }

@@ -1,19 +1,14 @@
 <?php
 
-require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
-require_once __DIR__ . '/../../../Core/BaseController.php';
-require_once __DIR__ . '/../../../Core/AuthManager.php';
-require_once __DIR__ . '/../Models/ClassDiary.php';
-require_once __DIR__ . '/../../../Models/Education/SchoolAbsence.php';
-require_once __DIR__ . '/../../../Models/User/Teacher.php';
-require_once __DIR__ . '/../Services/ClassDiaryService.php';
-require_once __DIR__ . '/../../../Services/FrequencyService.php';
+namespace App\Modulos\Diario\Controllers;
 
 use App\Modulos\Diario\Models\ClassDiary;
 use App\Modulos\Diario\Services\ClassDiaryService;
+use Throwable;
 
-if (!class_exists('DiarioProfessorController')) {
-class DiarioProfessorController extends BaseController
+
+if (!class_exists(__NAMESPACE__ . '\\DiarioProfessorController', false)) {
+class DiarioProfessorController extends \App\Core\BaseController
 {
     private $auth;
     private $diary;
@@ -24,10 +19,10 @@ class DiarioProfessorController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        $this->auth = new AuthManager();
+        $this->auth = new \App\Core\AuthManager();
         $this->diary = new ClassDiary();
-        $this->absence = new SchoolAbsence();
-        $this->teacherModel = new Teacher();
+        $this->absence = new \App\Models\Education\SchoolAbsence();
+        $this->teacherModel = new \App\Models\User\Teacher();
         $this->service = new ClassDiaryService($this->diary);
         if (!$this->auth->isLoggedIn() || (($this->auth->getUser()['tipo'] ?? '') !== 'professor')) {
             $this->redirect('/');
@@ -41,14 +36,14 @@ class DiarioProfessorController extends BaseController
         $user = $this->auth->getUser();
         $professor = $this->teacherModel->findById((int) ($user['id'] ?? 0));
         if (!$professor) {
-            throw new RuntimeException('Cadastro de professor não encontrado.');
+            throw new \RuntimeException('Cadastro de professor não encontrado.');
         }
         return $professor;
     }
 
     private function dataValida(string $data): string
     {
-        $dt = DateTime::createFromFormat('Y-m-d', $data);
+        $dt = \DateTime::createFromFormat('Y-m-d', $data);
         return ($dt && $dt->format('Y-m-d') === $data) ? $data : date('Y-m-d');
     }
 
@@ -81,7 +76,7 @@ class DiarioProfessorController extends BaseController
             $professor = $this->professor();
             $grade = $this->diary->getGradeDoProfessor($gradeId, (int) $professor['id']);
             if (!$grade || (int) date('N', strtotime($data)) !== (int) $grade['dia_semana']) {
-                throw new RuntimeException('Aula não encontrada na grade para essa data.');
+                throw new \RuntimeException('Aula não encontrada na grade para essa data.');
             }
             $plano = $this->diary->findPlanoParaAula((int) $professor['id'], (int) $grade['turma_id'], (int) $grade['materia_id'], $data);
             $aulaCriada = $this->diary->getOrCreateAula($grade, $data, $plano ? (int) $plano['id'] : null);
@@ -115,7 +110,7 @@ class DiarioProfessorController extends BaseController
             $professor = $this->professor();
             $aula = $this->diary->getAula($aulaId);
             if (!$aula || (int) $aula['professor_id'] !== (int) $professor['id']) {
-                throw new RuntimeException('Aula inválida ou sem permissão.');
+                throw new \RuntimeException('Aula inválida ou sem permissão.');
             }
             $execucao = (string) ($_POST['execucao'] ?? 'conforme_planejado');
             if (!in_array($execucao, ['conforme_planejado', 'parcial', 'alterado', 'nao_realizada'], true)) {
@@ -194,7 +189,7 @@ class DiarioProfessorController extends BaseController
             $professor = $this->professor();
             $professorId = (int) $professor['id'];
             if (!$this->service->professorLecionaDiario($turmaId, $materiaId, $professorId)) {
-                throw new RuntimeException('Diário não encontrado ou sem permissão.');
+                throw new \RuntimeException('Diário não encontrado ou sem permissão.');
             }
             $info = $this->diary->infoDiario($turmaId, $materiaId, $professorId);
             $anoLetivo = (int) ($info['ano_letivo'] ?? date('Y'));
@@ -207,7 +202,7 @@ class DiarioProfessorController extends BaseController
                     $dadosAba['aulas'] = $this->service->aulasDoDiario($turmaId, $materiaId, $professorId, $inicio, $fim);
                     break;
                 case 'frequencia':
-                    $freq = new FrequencyService();
+                    $freq = new \App\Services\FrequencyService();
                     $dadosAba['frequencia_turma'] = $freq->turmaPercentual($turmaId, $inicio, $fim, $materiaId, $professorId);
                     $dadosAba['frequencia_alunos'] = $freq->alunosPercentual($turmaId, $inicio, $fim, $materiaId, $professorId);
                     break;
@@ -223,7 +218,7 @@ class DiarioProfessorController extends BaseController
                     // do filtro da tela, pra não mostrar uma pendência diferente da que
                     // realmente bloqueia (ou libera) o fechamento.
                     $bimestres = [];
-                    $qtdPeriodos = (int) PeriodoLetivo::doAno($anoLetivo)['quantidade'];
+                    $qtdPeriodos = (int) \App\Core\PeriodoLetivo::doAno($anoLetivo)['quantidade'];
                     for ($b = 1; $b <= $qtdPeriodos; $b++) {
                         $periodo = $this->diary->periodoDoBimestre($anoLetivo, $b);
                         $resumoBimestre = $this->service->resumoDiario($turmaId, $materiaId, $professorId, $periodo['inicio'], $periodo['fim']);
@@ -269,13 +264,13 @@ class DiarioProfessorController extends BaseController
             $professor = $this->professor();
             $professorId = (int) $professor['id'];
             if (!$this->service->professorLecionaDiario($turmaId, $materiaId, $professorId)) {
-                throw new RuntimeException('Diário não encontrado ou sem permissão.');
+                throw new \RuntimeException('Diário não encontrado ou sem permissão.');
             }
             $info = $this->diary->infoDiario($turmaId, $materiaId, $professorId);
             $anoLetivo = (int) ($info['ano_letivo'] ?? 0);
             $bimestre = (int) ($_POST['bimestre'] ?? 0);
-            if (!PeriodoLetivo::numeroValido($anoLetivo, $bimestre)) {
-                throw new RuntimeException(PeriodoLetivo::mensagemNumeroInvalido($anoLetivo));
+            if (!\App\Core\PeriodoLetivo::numeroValido($anoLetivo, $bimestre)) {
+                throw new \RuntimeException(\App\Core\PeriodoLetivo::mensagemNumeroInvalido($anoLetivo));
             }
             $this->service->fechar($turmaId, $materiaId, $professorId, $anoLetivo, $bimestre, (int) ($user['id'] ?? 0));
             $this->setFlashMessage('Período fechado com sucesso.', 'success');
@@ -334,4 +329,8 @@ class DiarioProfessorController extends BaseController
         return '/professor/diarios/abrir?' . http_build_query($query);
     }
 }
+}
+
+if (!class_exists('DiarioProfessorController', false) && class_exists(__NAMESPACE__ . '\\DiarioProfessorController', false)) {
+    class_alias(__NAMESPACE__ . '\\DiarioProfessorController', 'DiarioProfessorController');
 }

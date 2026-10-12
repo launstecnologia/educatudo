@@ -1,5 +1,8 @@
 <?php
-require_once __DIR__ . '/../Services/FechamentoMaquinaEstados.php';
+
+namespace App\Modulos\Fechamento\Models;
+
+use App\Modulos\Fechamento\Services\FechamentoMaquinaEstados;
 
 /**
  * Persistência do fechamento oficial por turma × período.
@@ -10,7 +13,7 @@ class FechamentoPeriodo
 
     public function __construct()
     {
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
         $this->ensureSchema();
     }
 
@@ -62,7 +65,7 @@ class FechamentoPeriodo
                     KEY idx_fechamento_hist_fechamento (fechamento_id, id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
             );
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log('FechamentoPeriodo::ensureSchema: ' . $e->getMessage());
         }
     }
@@ -76,7 +79,7 @@ class FechamentoPeriodo
                 ['t' => $tabela]
             );
             return !empty($row['ok']);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return false;
         }
     }
@@ -166,13 +169,12 @@ class FechamentoPeriodo
             return true;
         }
         if (!class_exists('PeriodoLetivo', false)) {
-            require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
         }
-        $info = PeriodoLetivo::doAno($anoLetivo);
+        $info = \App\Core\PeriodoLetivo::doAno($anoLetivo);
         $tipo = (string) $info['tipo'];
         $quantidade = max(1, (int) $info['quantidade']);
         if ($dataYmd !== '' && ($bimestre < 1 || $bimestre > $quantidade)) {
-            $bimestre = PeriodoLetivo::numeroDaData($anoLetivo, $dataYmd);
+            $bimestre = \App\Core\PeriodoLetivo::numeroDaData($anoLetivo, $dataYmd);
         }
         if ($tipo !== 'ano' && $bimestre >= 1 && $bimestre <= $quantidade) {
             return $this->estaTravado($turmaId, $anoLetivo, $tipo, $bimestre);
@@ -373,4 +375,8 @@ class FechamentoPeriodo
     {
         return $turmaId . ':' . $anoLetivo . ':' . $periodoTipo . ':' . $periodoNumero;
     }
+}
+
+if (!class_exists('FechamentoPeriodo', false) && class_exists(__NAMESPACE__ . '\\FechamentoPeriodo', false)) {
+    class_alias(__NAMESPACE__ . '\\FechamentoPeriodo', 'FechamentoPeriodo');
 }

@@ -5,7 +5,6 @@ namespace App\Modulos\DashboardGestao\Widgets;
 use App\Modulos\DashboardGestao\Services\DashboardConsulta;
 use App\Modulos\DashboardGestao\Services\DashboardFiltro;
 
-require_once dirname(__DIR__, 3) . '/Models/Education/ResultadoAcademico.php';
 
 /**
  * Desempenho a partir do snapshot homologado (ResultadoAcademico).
@@ -27,7 +26,7 @@ class DesempenhoWidget implements WidgetDashboard
 
     public function montar(DashboardFiltro $filtro): array
     {
-        $model = new \ResultadoAcademico();
+        $model = new \App\Models\Education\ResultadoAcademico();
         if (!$model->schemaPronto()) {
             return [
                 'ok' => true,
@@ -54,7 +53,7 @@ class DesempenhoWidget implements WidgetDashboard
             ];
         }
 
-        $db = \Database::getInstance();
+        $db = \App\Core\Database::getInstance();
         $where = ['r.status = :status', 'r.ano_letivo = :ano', 'r.periodo_tipo = :periodo_tipo', 'r.periodo_numero = :periodo_numero'];
         $params = [
             'status' => 'homologado',
@@ -125,4 +124,8 @@ class DesempenhoWidget implements WidgetDashboard
         }
         return 'atencao';
     }
+}
+
+if (!class_exists('DesempenhoWidget', false) && class_exists(__NAMESPACE__ . '\\DesempenhoWidget', false)) {
+    class_alias(__NAMESPACE__ . '\\DesempenhoWidget', 'DesempenhoWidget');
 }

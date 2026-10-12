@@ -8,9 +8,9 @@ $apostila = (string) ($atividade['apostila'] ?? '');
 $exercicios = (string) ($atividade['exercicios'] ?? '');
 $jornadaNome = (string) ($atividade['jornada_nome'] ?? '');
 $descricao = (string) ($atividade['descricao'] ?? '');
-$showExercicios = $tipo === LessonPlanAfternoonHelper::TIPO_EXERCICIOS;
-$showJornadas = $tipo === LessonPlanAfternoonHelper::TIPO_JORNADAS;
-$showOutros = $tipo === LessonPlanAfternoonHelper::TIPO_OUTROS;
+$showExercicios = $tipo === \App\Helpers\LessonPlanAfternoonHelper::TIPO_EXERCICIOS;
+$showJornadas = $tipo === \App\Helpers\LessonPlanAfternoonHelper::TIPO_JORNADAS;
+$showOutros = $tipo === \App\Helpers\LessonPlanAfternoonHelper::TIPO_OUTROS;
 ?>
 <div class="aulas-tarde-atividade-item border border-gray-200 rounded-xl p-4 bg-gray-50/40 space-y-4">
     <div class="flex items-center justify-between gap-2">

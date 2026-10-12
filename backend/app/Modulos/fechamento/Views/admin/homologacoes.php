@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Services/FechamentoMaquinaEstados.php';
 
 $registros = is_array($registros ?? null) ? $registros : [];
 $historicos = is_array($historicos ?? null) ? $historicos : [];
@@ -65,14 +64,14 @@ if (!$schemaPronto):
                 <?php else: foreach ($registros as $reg):
                     $fid = (int) ($reg['id'] ?? 0);
                     $hist = $historicos[$fid] ?? [];
-                    $st = FechamentoMaquinaEstados::normalizar((string) ($reg['status'] ?? ''));
+                    $st = \App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::normalizar((string) ($reg['status'] ?? ''));
                 ?>
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4 text-sm font-medium text-gray-900"><?= htmlspecialchars((string) ($reg['turma_nome'] ?? '')) ?></td>
                     <td class="px-6 py-4 text-sm text-gray-700"><?= htmlspecialchars((string) ($reg['periodo_ref'] ?? '')) ?></td>
                     <td class="px-6 py-4">
                         <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                            <?= htmlspecialchars(FechamentoMaquinaEstados::rotulo($st)) ?>
+                            <?= htmlspecialchars(\App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::rotulo($st)) ?>
                         </span>
                     </td>
                     <td class="px-6 py-4 text-sm"><?= !empty($reg['vigente']) ? 'Sim' : 'Histórico' ?></td>

@@ -1,13 +1,14 @@
 <?php
 
-require_once __DIR__ . '/../../../Core/BaseController.php';
-require_once __DIR__ . '/../../../Core/LayoutHelper.php';
-require_once __DIR__ . '/../Models/PresencaIntegracao.php';
-require_once __DIR__ . '/../Services/PresencaConectorGenerico.php';
-require_once __DIR__ . '/../Services/PresencaEventoService.php';
+namespace App\Modulos\Presenca\Controllers;
 
-if (!class_exists('PresencaWebhookController')) {
-class PresencaWebhookController extends BaseController
+
+use App\Modulos\Presenca\Services\PresencaConectorGenerico;
+use App\Modulos\Presenca\Services\PresencaEventoService;
+use App\Modulos\Presenca\Models\PresencaIntegracao;
+
+if (!class_exists(__NAMESPACE__ . '\\PresencaWebhookController', false)) {
+class PresencaWebhookController extends \App\Core\BaseController
 {
     public function receber($provedor = null): void
     {
@@ -15,7 +16,7 @@ class PresencaWebhookController extends BaseController
             $this->json(['success' => false, 'error' => 'Método não permitido'], 405);
             return;
         }
-        if (!class_exists('LayoutHelper', false) || !LayoutHelper::isModuleEnabled('presenca')) {
+        if (!class_exists('LayoutHelper', false) || !\App\Core\LayoutHelper::isModuleEnabled('presenca')) {
             $this->json(['success' => false, 'error' => 'Módulo desabilitado'], 403);
             return;
         }
@@ -59,9 +60,9 @@ class PresencaWebhookController extends BaseController
                 'aluno_id' => $resultado['aluno_id'],
                 'aplicacao' => $resultado['aplicacao'],
             ]);
-        } catch (InvalidArgumentException $e) {
+        } catch (\InvalidArgumentException $e) {
             $this->json(['success' => false, 'error' => $e->getMessage()], 422);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             (new PresencaIntegracao())->registrarErro((int) $integracao['id'], $e->getMessage());
             $this->json(['success' => false, 'error' => 'Falha ao processar evento'], 500);
         }
@@ -83,4 +84,8 @@ class PresencaWebhookController extends BaseController
         return (new PresencaIntegracao())->findByTokenHash(hash('sha256', strtolower($token)));
     }
 }
+}
+
+if (!class_exists('PresencaWebhookController', false) && class_exists(__NAMESPACE__ . '\\PresencaWebhookController', false)) {
+    class_alias(__NAMESPACE__ . '\\PresencaWebhookController', 'PresencaWebhookController');
 }

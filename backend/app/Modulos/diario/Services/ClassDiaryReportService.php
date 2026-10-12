@@ -2,8 +2,6 @@
 
 namespace App\Modulos\Diario\Services;
 
-require_once __DIR__ . '/../Models/ClassDiary.php';
-require_once __DIR__ . '/ClassDiaryService.php';
 
 use App\Modulos\Diario\Models\ClassDiary;
 
@@ -98,4 +96,8 @@ class ClassDiaryReportService
         $ts = strtotime($data);
         return $ts !== false ? date('d/m/Y H:i', $ts) : '-';
     }
+}
+
+if (!class_exists('ClassDiaryReportService', false) && class_exists(__NAMESPACE__ . '\\ClassDiaryReportService', false)) {
+    class_alias(__NAMESPACE__ . '\\ClassDiaryReportService', 'ClassDiaryReportService');
 }

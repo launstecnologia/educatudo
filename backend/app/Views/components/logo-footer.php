@@ -4,13 +4,12 @@
  * Usa logo horizontal (ou branca com fundo escuro) do LayoutHelper.
  */
 if (!class_exists('LayoutHelper')) {
-    require_once __DIR__ . '/../../Core/LayoutHelper.php';
 }
 $logoUrl = '';
 if (class_exists('LayoutHelper')) {
-    $logoUrl = LayoutHelper::getLogoHorizontalUrl() ?: LayoutHelper::getLogoUrl();
+    $logoUrl = \App\Core\LayoutHelper::getLogoHorizontalUrl() ?: \App\Core\LayoutHelper::getLogoUrl();
     if (empty($logoUrl)) {
-        $logoUrl = LayoutHelper::getLogoHorizontalWhiteUrl() ?: LayoutHelper::getLogoWhiteUrl();
+        $logoUrl = \App\Core\LayoutHelper::getLogoHorizontalWhiteUrl() ?: \App\Core\LayoutHelper::getLogoWhiteUrl();
     }
 }
 if (empty($logoUrl)) {

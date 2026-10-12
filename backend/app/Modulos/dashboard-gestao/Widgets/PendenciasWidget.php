@@ -6,8 +6,6 @@ use App\Modulos\DashboardGestao\Services\DashboardFiltro;
 use App\Modulos\Diario\Services\ClassDiaryService;
 use App\Modulos\Ocorrencias\Services\OcorrenciaService;
 
-require_once dirname(__DIR__, 3) . '/Services/ClassDiaryService.php';
-require_once dirname(__DIR__, 3) . '/Models/Exams/ExamBlock.php';
 
 /**
  * Ações do recorte: diários em atraso (critério oficial), notas do bimestre, ocorrências da janela curta.
@@ -26,7 +24,7 @@ class PendenciasWidget implements WidgetDashboard
         $qsDiario = http_build_query(array_merge($filtro->queryModulo(), ['status' => 'pendente']));
         $cards = [];
 
-        if (!class_exists('LayoutHelper', false) || \LayoutHelper::isModuleEnabled('diario_classe')) {
+        if (!class_exists('LayoutHelper', false) || \App\Core\LayoutHelper::isModuleEnabled('diario_classe')) {
             $turmasAtraso = $janelaVazia ? 0 : $this->contarTurmasComDiarioAtrasado($filtro, $inicio, $fim);
             $cards[] = [
                 'label' => 'Diários em atraso',
@@ -97,7 +95,7 @@ class PendenciasWidget implements WidgetDashboard
     private function contarNotasPendentes(DashboardFiltro $filtro): int
     {
         try {
-            $blocos = new \ExamBlock();
+            $blocos = new \App\Models\Exams\ExamBlock();
         } catch (\Throwable $e) {
             return 0;
         }
@@ -114,7 +112,6 @@ class PendenciasWidget implements WidgetDashboard
             return 0;
         }
         try {
-            require_once dirname(__DIR__, 3) . '/Services/OcorrenciaService.php';
             $svc = new OcorrenciaService();
             if ($filtro->turmaId > 0) {
                 $base = [
@@ -156,28 +153,30 @@ class PendenciasWidget implements WidgetDashboard
         if ($svc->model()->schemaEstendido()) {
             $sql .= " AND o.status = 'aberta'";
         }
-        $row = \Database::getInstance()->fetch($sql, $params);
+        $row = \App\Core\Database::getInstance()->fetch($sql, $params);
 
         return (int) ($row['n'] ?? 0);
     }
 
     private function podeVerOcorrencias(): bool
     {
-        if (class_exists('LayoutHelper', false) && !\LayoutHelper::isModuleEnabled('ocorrencias')) {
+        if (class_exists('LayoutHelper', false) && !\App\Core\LayoutHelper::isModuleEnabled('ocorrencias')) {
             return false;
         }
         try {
             if (!class_exists('AdminPermissionMatrix', false)) {
-                require_once dirname(__DIR__, 3) . '/Core/AdminPermissionMatrix.php';
             }
             if (!class_exists('AuthManager', false)) {
-                require_once dirname(__DIR__, 3) . '/Core/AuthManager.php';
             }
-            $user = (new \AuthManager())->getUser() ?? [];
-            $perms = \AdminPermissionMatrix::effectivePermissionsForUser(\Database::getInstance(), $user);
-            return \AdminPermissionMatrix::can($perms, 'ocorrencias', 'visualizar');
+            $user = (new \App\Core\AuthManager())->getUser() ?? [];
+            $perms = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser(\App\Core\Database::getInstance(), $user);
+            return \App\Core\AdminPermissionMatrix::can($perms, 'ocorrencias', 'visualizar');
         } catch (\Throwable $e) {
             return false;
         }
     }
+}
+
+if (!class_exists('PendenciasWidget', false) && class_exists(__NAMESPACE__ . '\\PendenciasWidget', false)) {
+    class_alias(__NAMESPACE__ . '\\PendenciasWidget', 'PendenciasWidget');
 }

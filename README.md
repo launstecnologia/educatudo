@@ -12,19 +12,16 @@ Repositorio de trabalho do EducaTudo. A raiz funciona como um workspace: ela jun
 | `ws-server/` | Servidor WebSocket/Node separado da plataforma PHP. |
 | `database/` | SQL global do workspace, principalmente migracoes e arquivos compartilhados fora do backend. |
 | `docker/` + `docker-compose.yml` | Infra local (Nginx + PHP-FPM). Monta `./backend` em `/var/www/html`; docroot Nginx = `public/`. |
-| `docs/` | Documentacao tecnica e operacional geral. |
-| `specs/` | PRD, design e tarefas de produto. |
-| `prompts/` | Prompts e materiais de apoio para IA. |
+| `especificacoes/` | Especificacao do sistema: produto, arquitetura, modulos, layout admin e deploy. |
 | `.claude/` + `CLAUDE.md` | Contexto, comandos e padroes para agentes de IA. |
-| `package.json` | Testes E2E Playwright do workspace. |
-| `tmp/` | Rascunhos, auditorias temporarias e saidas descartaveis. |
+| `package.json` | Dependencias Node do workspace. |
 
 ## Regra de organizacao
 
 - Codigo de produto fica dentro da aplicacao dona: backend em `backend/`, mobile em `familia/`, servicos em `services/<nome>/`, WebSocket em `ws-server/`.
 - Arquivos de orquestracao que afetam mais de uma aplicacao ficam na raiz: `docker-compose.yml`, `package.json`, `playwright.config.ts`, `README.md`, `CLAUDE.md`.
-- Documentacao permanente fica em `docs/` ou `specs/`. Analises temporarias ficam em `tmp/`.
-- Saidas geradas nao devem competir com codigo na raiz. Use `tmp/`, `playwright-report/`, `test-results/`, `graphify-out/` ou a pasta de build da propria aplicacao.
+- Documentacao permanente fica em `especificacoes/`.
+- Saidas geradas nao devem competir com codigo na raiz. Use a pasta de build da propria aplicacao.
 - **Seguranca:** o servidor web deve apontar **somente** para `backend/public/`. Ver `backend/STRUCTURE.md`.
 
 ## Git
@@ -59,7 +56,7 @@ cp backend/.env.vps.example backend/.env   # editar DB_HOST e credenciais
 ./scripts/up-vps.sh --pull --composer
 ```
 
-Ver `docs/DEPLOY-VPS.md` e `docs/DEPLOY-DOMINIOS.md`.
+Ver `especificacoes/DEPLOY-VPS.md` e `especificacoes/DEPLOY-DOMINIOS.md`.
 
 O script configura `backend/.env`, sobe Docker na porta **80** e cria os bancos `educatudo_master` + `educatudo_colag`.
 
@@ -83,6 +80,6 @@ docker compose exec php php scripts/init_local_multitenant.php --force-school
 
 - `backend/STRUCTURE.md` — layout seguro e deploy.
 - `CLAUDE.md` para contexto tecnico, arquitetura multi-tenant e padroes de codigo.
-- `specs/PRD.md` para escopo de produto.
+- `especificacoes/PRD.md` para escopo de produto.
 - `familia/docs/` para arquitetura do app Flutter.
 - `services/apostila-ai/README.md` para o servico de apostilas com IA.

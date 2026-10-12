@@ -1,7 +1,7 @@
 <?php
 /**
  * Dropdown de ações de linha (listagens admin) — design system em
- * prompts/admin_ui_sistema/tabela-dropdown-paginacao.md, seção 4b.
+ * especificacoes/admin_ui_sistema/tabela-dropdown-paginacao.md, seção 4b.
  *
  * Uso:
  *   <?php ob_start(); ?>

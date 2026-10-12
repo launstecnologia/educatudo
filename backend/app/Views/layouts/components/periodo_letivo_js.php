@@ -1,9 +1,8 @@
 <?php
 if (!class_exists('PeriodoLetivo')) {
-    require_once dirname(__DIR__, 3) . '/Core/PeriodoLetivo.php';
 }
-$periodoLetivoMapa = PeriodoLetivo::mapaPorAno();
-$periodoLetivoPadrao = PeriodoLetivo::doAno((int) date('Y'));
+$periodoLetivoMapa = \App\Core\PeriodoLetivo::mapaPorAno();
+$periodoLetivoPadrao = \App\Core\PeriodoLetivo::doAno((int) date('Y'));
 ?>
 <script>
 window.PeriodoLetivoUI = {

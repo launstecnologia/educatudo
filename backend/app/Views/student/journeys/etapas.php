@@ -172,12 +172,12 @@
                                         global $jornada;
                                     }
                                     include 'etapa-conteudo.php'; 
-                                } catch (Exception $e) {
+                                } catch (\Exception $e) {
                                     error_log("Erro ao renderizar módulo {$modulo['id']}: " . $e->getMessage());
                                     echo '<div class="bg-red-50 border border-red-200 rounded-lg p-4">';
                                     echo '<p class="text-red-800 text-sm">Erro ao carregar conteúdo deste módulo. Por favor, tente novamente.</p>';
                                     echo '</div>';
-                                } catch (Error $e) {
+                                } catch (\Error $e) {
                                     error_log("Erro fatal ao renderizar módulo {$modulo['id']}: " . $e->getMessage());
                                     echo '<div class="bg-red-50 border border-red-200 rounded-lg p-4">';
                                     echo '<p class="text-red-800 text-sm">Erro ao carregar conteúdo deste módulo. Por favor, tente novamente.</p>';

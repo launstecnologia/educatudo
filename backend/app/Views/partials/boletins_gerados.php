@@ -114,13 +114,12 @@ $_mostrarHeaderRegra = (bool) ($boletim_pode_excluir ?? false);
             $_regraCodigoLinha = (string) ($ev['regra_codigo'] ?? '');
             $_mostrarHeaderInfo = $_mostrarHeaderRegra && $_regraIdLinha > 0;
             if (!class_exists('BoletimQuadroLayoutHelper', false)) {
-                require_once dirname(__DIR__, 2) . '/Helpers/BoletimQuadroLayoutHelper.php';
             }
             $exibirEmEv = strtolower(trim((string) ($ev['exibir_em'] ?? 'boletim')));
-            $groupedHeader = BoletimQuadroLayoutHelper::deveAgruparCabecalhoBoletimOficial($exibirEmEv)
+            $groupedHeader = \App\Helpers\BoletimQuadroLayoutHelper::deveAgruparCabecalhoBoletimOficial($exibirEmEv)
                 ? $buildGroupedBoletimHeader($cols)
                 : ['enabled' => false, 'groups' => []];
-            $ehQuadroSemanal = BoletimQuadroLayoutHelper::ehLayoutQuadro($cols);
+            $ehQuadroSemanal = \App\Helpers\BoletimQuadroLayoutHelper::ehLayoutQuadro($cols);
             ?>
             <div class="boletim-tabela-wrapper" data-regra-id="<?= $_regraIdLinha ?>" data-regra-nome="<?= htmlspecialchars($_regraNomeLinha, ENT_QUOTES, 'UTF-8') ?>">
                 <?php if ($_mostrarHeaderInfo): ?>

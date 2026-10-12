@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Services/FechamentoMaquinaEstados.php';
 
 $paineis = is_array($paineis ?? null) ? $paineis : [];
 $anoLetivo = (int) ($ano_letivo ?? date('Y'));
@@ -78,11 +77,11 @@ $filtros_offcanvas = true;
 include __DIR__ . '/../../../../Views/admin/resultados-finais/_filtros.php';
 
 $statusBadge = static function (string $status): string {
-    return match (FechamentoMaquinaEstados::normalizar($status)) {
-        FechamentoMaquinaEstados::HOMOLOGADO => 'bg-green-100 text-green-700',
-        FechamentoMaquinaEstados::RETIFICADO => 'bg-purple-100 text-purple-700',
-        FechamentoMaquinaEstados::EM_RECUPERACAO => 'bg-amber-100 text-amber-800',
-        FechamentoMaquinaEstados::EM_FECHAMENTO => 'bg-sky-100 text-sky-800',
+    return match (\App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::normalizar($status)) {
+        \App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::HOMOLOGADO => 'bg-green-100 text-green-700',
+        \App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::RETIFICADO => 'bg-purple-100 text-purple-700',
+        \App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::EM_RECUPERACAO => 'bg-amber-100 text-amber-800',
+        \App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::EM_FECHAMENTO => 'bg-sky-100 text-sky-800',
         default => 'bg-gray-100 text-gray-600',
     };
 };
@@ -124,7 +123,7 @@ $statusBadge = static function (string $status): string {
                     $totalAlunos = (int) ($resumo['total'] ?? 0);
                     $chamadasPendentes = (int) ($resumo['chamadas_pendentes'] ?? 0);
                     $urlTurma = URL . '/admin/fechamento/turma/' . $tid . '?' . htmlspecialchars($qs);
-                    $periodoEncerrado = $status === FechamentoMaquinaEstados::HOMOLOGADO;
+                    $periodoEncerrado = $status === \App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::HOMOLOGADO;
                 ?>
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4">

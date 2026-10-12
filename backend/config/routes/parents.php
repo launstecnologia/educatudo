@@ -33,27 +33,15 @@ $router->get('/pais/notificacoes', 'User/ParentController@notificacoes');
 // NOTIFICAÇÕES PUSH (OneSignal)
 // ==============================================
 $router->get('/api/notificacoes-push/meu-tags', 'Api/OneSignalTagsController@index');
-$router->get('/admin/notificacoes-push', 'Notifications/PushNotificationController@index');
-$router->get('/admin/notificacoes-push/criar', 'Notifications/PushNotificationController@create');
-$router->post('/admin/notificacoes-push/enviar', 'Notifications/PushNotificationController@enviar');
-$router->get('/admin/notificacoes-push/{id}', 'Notifications/PushNotificationController@show');
+// Notificações → Modulos/notificacoes/routes.php
 
 // ==============================================
 // SISTEMA DE NOTIFICAÇÕES
 // ==============================================
 
 // Rotas para Admin - Gerenciar Notificações
-$router->get('/admin/notifications', 'Notifications/NotificationController@index');
-$router->get('/admin/notifications/create', 'Notifications/NotificationController@create');
-$router->post('/admin/notifications/store', 'Notifications/NotificationController@store');
-$router->get('/admin/notifications/{id}', 'Notifications/NotificationController@show');
-$router->get('/admin/notifications/{id}/edit', 'Notifications/NotificationController@edit');
-$router->post('/admin/notifications/{id}/update', 'Notifications/NotificationController@update');
-$router->get('/admin/notifications/{id}/delete', 'Notifications/NotificationController@delete');
 
 // API para Admin - Notificações
-$router->get('/admin/notifications/api/nao-lidas', 'Notifications/NotificationController@apiNaoLidas');
-$router->post('/admin/notifications/api/marcar-lida', 'Notifications/NotificationController@apiMarcarLida');
 
 // Rotas para Professor - Notificações para Turma
 $router->get('/professor/notifications', 'Teacher/TeacherNotificationController@index');

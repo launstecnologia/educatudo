@@ -1,12 +1,9 @@
 <?php
 if (!class_exists('FeatureGate')) {
-    require_once dirname(__DIR__, 3) . '/Core/FeatureGate.php';
 }
 if (!class_exists('AdminPermissionMatrix')) {
-    require_once dirname(__DIR__, 3) . '/Core/AdminPermissionMatrix.php';
 }
 if (!class_exists('AdminSecretariaAccess')) {
-    require_once dirname(__DIR__, 3) . '/Core/AdminSecretariaAccess.php';
 }
 
 $hub_title = 'Pedagógico';
@@ -15,8 +12,8 @@ $hub_cards = [];
 
 $permsHub = [];
 if (class_exists('AdminPermissionMatrix')) {
-    $permsHub = AdminPermissionMatrix::effectivePermissionsForUser(
-        Database::getInstance(),
+    $permsHub = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser(
+        \App\Core\Database::getInstance(),
         $user ?? []
     );
 }
@@ -24,13 +21,13 @@ $podeHub = static function (string $chave) use ($permsHub): bool {
     return !empty($permsHub[$chave]['visualizar']);
 };
 $podePath = static function (string $path) use ($user): bool {
-    if (class_exists('AdminSecretariaAccess') && AdminSecretariaAccess::isSecretaria($user ?? [])) {
-        return AdminSecretariaAccess::requestPathIsAllowed($path);
+    if (class_exists('AdminSecretariaAccess') && \App\Core\AdminSecretariaAccess::isSecretaria($user ?? [])) {
+        return \App\Core\AdminSecretariaAccess::requestPathIsAllowed($path);
     }
     return true;
 };
 
-if ($podePath('/admin/aulas-online') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aulas_online'))) {
+if ($podePath('/admin/aulas-online') && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('aulas_online'))) {
     $hub_cards[] = [
         'href' => URL . '/admin/aulas-online',
         'title' => 'Aulas Online',
@@ -39,7 +36,7 @@ if ($podePath('/admin/aulas-online') && (!class_exists('LayoutHelper') || Layout
     ];
 }
 
-if ($podeHub('ava') && $podePath('/admin/ava') && class_exists('FeatureGate') && FeatureGate::isModuleEnabled('ead')) {
+if ($podeHub('ava') && $podePath('/admin/ava') && class_exists('FeatureGate') && \App\Core\FeatureGate::isModuleEnabled('ead')) {
     $hub_cards[] = [
         'href' => URL . '/admin/ava',
         'title' => 'AVA / EAD',
@@ -48,7 +45,7 @@ if ($podeHub('ava') && $podePath('/admin/ava') && class_exists('FeatureGate') &&
     ];
 }
 
-if ($podeHub('bncc') && $podePath('/admin/bncc') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('bncc'))) {
+if ($podeHub('bncc') && $podePath('/admin/bncc') && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('bncc'))) {
     $hub_cards[] = [
         'href' => URL . '/admin/bncc',
         'title' => 'BNCC / Plano de Curso',
@@ -57,7 +54,7 @@ if ($podeHub('bncc') && $podePath('/admin/bncc') && (!class_exists('LayoutHelper
     ];
 }
 
-if ($podeHub('minicursos') && $podePath('/admin/minicursos') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_minicursos'))) {
+if ($podeHub('minicursos') && $podePath('/admin/minicursos') && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('aluno_minicursos'))) {
     $hub_cards[] = [
         'href' => URL . '/admin/minicursos',
         'title' => 'EducaCursos',
@@ -66,7 +63,7 @@ if ($podeHub('minicursos') && $podePath('/admin/minicursos') && (!class_exists('
     ];
 }
 
-if ($podeHub('planos_aula') && $podePath('/admin/planos-aula') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('professor_planos_aula'))) {
+if ($podeHub('planos_aula') && $podePath('/admin/planos-aula') && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('professor_planos_aula'))) {
     $hub_cards[] = [
         'href' => URL . '/admin/planos-aula',
         'title' => 'Plano de Aula',
@@ -75,7 +72,7 @@ if ($podeHub('planos_aula') && $podePath('/admin/planos-aula') && (!class_exists
     ];
 }
 
-if ($podeHub('inclusao') && $podePath('/admin/inclusao') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('inclusao'))) {
+if ($podeHub('inclusao') && $podePath('/admin/inclusao') && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('inclusao'))) {
     $hub_cards[] = [
         'href' => URL . '/admin/inclusao/versoes',
         'title' => 'Avaliação Adaptativa',
@@ -84,7 +81,7 @@ if ($podeHub('inclusao') && $podePath('/admin/inclusao') && (!class_exists('Layo
     ];
 }
 
-if ($podeHub('redacao_professor') && $podePath('/admin/redacao-professor') && (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('redacao_configuravel'))) {
+if ($podeHub('redacao_professor') && $podePath('/admin/redacao-professor') && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('redacao_configuravel'))) {
     $hub_cards[] = [
         'href' => URL . '/admin/redacao-professor',
         'title' => 'Jornada da Redação',
@@ -93,7 +90,7 @@ if ($podeHub('redacao_professor') && $podePath('/admin/redacao-professor') && (!
     ];
 }
 
-if ($podeHub('jornadas_aluno') && $podePath('/admin/jornadas') && class_exists('FeatureGate') && FeatureGate::isModuleEnabled('jornadas')) {
+if ($podeHub('jornadas_aluno') && $podePath('/admin/jornadas') && class_exists('FeatureGate') && \App\Core\FeatureGate::isModuleEnabled('jornadas')) {
     $hub_cards[] = [
         'href' => URL . '/admin/jornadas',
         'title' => 'Jornada do Aluno',

@@ -1,5 +1,7 @@
 <?php
 
+namespace App\Helpers;
+
 /**
  * Estrutura e validação do bloco "Aulas da Tarde (Oficinas)" em planos de aula.
  */
@@ -246,4 +248,8 @@ class LessonPlanAfternoonHelper
 
         return implode("\n\n", $blocos);
     }
+}
+
+if (!class_exists('LessonPlanAfternoonHelper', false) && class_exists(__NAMESPACE__ . '\\LessonPlanAfternoonHelper', false)) {
+    class_alias(__NAMESPACE__ . '\\LessonPlanAfternoonHelper', 'LessonPlanAfternoonHelper');
 }

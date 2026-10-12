@@ -3,7 +3,6 @@ $lista = $lista ?? [];
 $erro_tabela = $erro_tabela ?? null;
 $flash = $flash ?? [];
 $csrf_token = $csrf_token ?? '';
-require_once __DIR__ . '/../../../Core/CreditosDecimalHelper.php';
 ?>
 <div class="mb-6 flex flex-wrap justify-between gap-4 items-start">
     <div>
@@ -47,7 +46,7 @@ require_once __DIR__ . '/../../../Core/CreditosDecimalHelper.php';
                 <?php $pacoteId = (int) ($p['id'] ?? 0); ?>
                 <tr class="hover:bg-slate-50">
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900"><?= htmlspecialchars($p['nome'] ?? '') ?></td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-700"><?= htmlspecialchars(\CreditosDecimalHelper::formatDisplay(\CreditosDecimalHelper::fromScalar($p['creditos'] ?? 0, 0.0))) ?></td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-700"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay(\App\Core\CreditosDecimalHelper::fromScalar($p['creditos'] ?? 0, 0.0))) ?></td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-700">R$ <?= number_format(((int) ($p['valor_centavos'] ?? 0)) / 100, 2, ',', '.') ?></td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm">
                         <?php if (!empty($p['ativo'])): ?>

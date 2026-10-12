@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Services/ClassDiaryService.php';
 
 use App\Modulos\Diario\Services\ClassDiaryService;
 $situacaoClasses = [
@@ -35,7 +34,7 @@ $sit = (string) ($resumo['situacao'] ?? 'em_dia');
         <div class="bg-white border border-gray-200 rounded-xl p-4">
             <p class="text-xs font-semibold text-gray-500 uppercase">Situação</p>
             <span class="inline-flex mt-2 px-2.5 py-1 rounded-full text-xs font-semibold <?= $situacaoClasses[$sit] ?? 'bg-slate-100 text-slate-700' ?>">
-                <?= htmlspecialchars(ClassDiaryService::situacaoLabel($sit)) ?>
+                <?= htmlspecialchars(\App\Modulos\Diario\Services\ClassDiaryService::situacaoLabel($sit)) ?>
             </span>
         </div>
     </div>

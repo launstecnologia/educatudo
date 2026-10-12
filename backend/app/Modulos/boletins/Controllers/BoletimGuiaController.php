@@ -1,0 +1,56 @@
+<?php
+
+namespace App\Modulos\Boletins\Controllers;
+
+
+use App\Core\AuthManager;
+use App\Core\BaseController;
+
+/**
+ * Hub modular + tutorial para coordenação montar o boletim (jornadas, provas, fórmula).
+ */
+class BoletimGuiaController extends BaseController
+{
+    private $auth;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->auth = new AuthManager();
+        $user = $this->auth->getUser();
+        if (!$this->auth->isLoggedIn() || !$this->usuarioPodeConfigurarBoletim($user)) {
+            $this->redirect(URL . '/admin');
+            exit;
+        }
+        if (($user['perfil_admin'] ?? '') === 'financeiro') {
+            $this->redirect(URL . '/admin/dashboard');
+            exit;
+        }
+    }
+
+    private function usuarioPodeConfigurarBoletim(?array $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+        if (($user['tipo'] ?? '') === 'admin') {
+            return true;
+        }
+        if (($user['tipo'] ?? '') === 'admin_escola'
+            && in_array($user['perfil_admin'] ?? '', ['dev', 'diretor', 'coordenador'], true)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public function index()
+    {
+        $this->redirect(URL . '/admin/boletins');
+        exit;
+    }
+}
+
+if (!class_exists('BoletimGuiaController', false) && class_exists(__NAMESPACE__ . '\\BoletimGuiaController', false)) {
+    class_alias(__NAMESPACE__ . '\\BoletimGuiaController', 'BoletimGuiaController');
+}

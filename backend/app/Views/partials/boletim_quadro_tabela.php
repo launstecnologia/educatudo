@@ -9,21 +9,20 @@
  * - $tituloRegraHtml (string, opcional)
  */
 if (!class_exists('BoletimQuadroLayoutHelper', false)) {
-    require_once dirname(__DIR__, 2) . '/Helpers/BoletimQuadroLayoutHelper.php';
 }
 
 $colsQuadro = is_array($cols ?? null) ? $cols : [];
 $grupoIdQuadro = (int) (($ev['grupo_regras_notas_id'] ?? 0));
 if ($grupoIdQuadro <= 0) {
-    $grupoIdQuadro = BoletimQuadroLayoutHelper::grupoIdDasColunas($colsQuadro);
+    $grupoIdQuadro = \App\Helpers\BoletimQuadroLayoutHelper::grupoIdDasColunas($colsQuadro);
 }
-$colsQuadro = BoletimQuadroLayoutHelper::alinharColunasAoQuadroCadastro(
+$colsQuadro = \App\Helpers\BoletimQuadroLayoutHelper::alinharColunasAoQuadroCadastro(
     $colsQuadro,
     $grupoIdQuadro > 0 ? $grupoIdQuadro : null
 );
 $linhasQuadro = is_array($linhas ?? null) ? $linhas : [];
 $decQuadro = ((int) ($decimalPlaces ?? 2) === 1) ? 1 : 2;
-$tabelasQuadro = BoletimQuadroLayoutHelper::partirTabelas($colsQuadro);
+$tabelasQuadro = \App\Helpers\BoletimQuadroLayoutHelper::partirTabelas($colsQuadro);
 
 $fmtNotaQuadro = static function ($valor) use ($decQuadro): string {
     return number_format((float) $valor, $decQuadro, ',', '.');
@@ -61,14 +60,14 @@ if ($tabelasQuadro === [] || $linhasQuadro === []) {
         $semanasCols = [];
         $outrasCols = [];
         foreach ($colsTab as $cq) {
-            if (BoletimQuadroLayoutHelper::colunaEhSemanaNq($cq)) {
+            if (\App\Helpers\BoletimQuadroLayoutHelper::colunaEhSemanaNq($cq)) {
                 $semanasCols[] = $cq;
             } else {
                 $outrasCols[] = $cq;
             }
         }
         // Semana sem nenhuma prova/nota no lote: some da tabela (ex.: S5/S6 vazias).
-        $semanasCols = BoletimQuadroLayoutHelper::filtrarSemanasComNota($semanasCols, $linhasQuadro);
+        $semanasCols = \App\Helpers\BoletimQuadroLayoutHelper::filtrarSemanasComNota($semanasCols, $linhasQuadro);
         $semanasPorBloco = ['a' => [], 'b' => []];
         foreach ($tabelasQuadro as $tabPre) {
             $kPre = strtolower((string) ($tabPre['key'] ?? ''));
@@ -76,7 +75,7 @@ if ($tabelasQuadro === [] || $linhasQuadro === []) {
                 continue;
             }
             foreach ((array) ($tabPre['cols'] ?? []) as $cPre) {
-                if (is_array($cPre) && BoletimQuadroLayoutHelper::colunaEhSemanaNq($cPre)) {
+                if (is_array($cPre) && \App\Helpers\BoletimQuadroLayoutHelper::colunaEhSemanaNq($cPre)) {
                     $semanasPorBloco[$kPre][] = $cPre;
                 }
             }
@@ -92,7 +91,7 @@ if ($tabelasQuadro === [] || $linhasQuadro === []) {
                 $paisPendentes[] = $linQ;
                 continue;
             }
-            if (!BoletimQuadroLayoutHelper::linhaVisivelNoQuadro($keyTab, $semanasCols, $semanasOutro, $outrasCols, $notasQ)) {
+            if (!\App\Helpers\BoletimQuadroLayoutHelper::linhaVisivelNoQuadro($keyTab, $semanasCols, $semanasOutro, $outrasCols, $notasQ)) {
                 continue;
             }
             if (!empty($linQ['eh_grupo_filho'])) {
@@ -109,7 +108,7 @@ if ($tabelasQuadro === [] || $linhasQuadro === []) {
             $temFilho = $gk !== '' && !empty($keysComFilho[$gk]);
             // A área (ex.: Língua Portuguesa) fica na tabela mesmo sem filha visível,
             // quando a própria linha-mãe já tem nota. Sem isso o aluno some do quadro.
-            $paiVisivel = BoletimQuadroLayoutHelper::linhaVisivelNoQuadro(
+            $paiVisivel = \App\Helpers\BoletimQuadroLayoutHelper::linhaVisivelNoQuadro(
                 $keyTab,
                 $semanasCols,
                 $semanasOutro,
@@ -179,7 +178,7 @@ if ($tabelasQuadro === [] || $linhasQuadro === []) {
                                 || $ltOc === 'other';
                         ?>
                             <th rowspan="2" class="boletim-quadro-th-border px-2 py-1 font-semibold align-middle leading-tight min-w-[4.5rem]">
-                                <?= htmlspecialchars(BoletimQuadroLayoutHelper::rotuloColunaQuadro($oc), ENT_QUOTES, 'UTF-8') ?>
+                                <?= htmlspecialchars(\App\Helpers\BoletimQuadroLayoutHelper::rotuloColunaQuadro($oc), ENT_QUOTES, 'UTF-8') ?>
                                 <?php if ($mostraValor10 && $ltOc !== 'faltas' && $ltOc !== 'rec'): ?>
                                     <div class="text-[10px] font-normal opacity-80">Valor 10</div>
                                 <?php endif; ?>
@@ -214,7 +213,7 @@ if ($tabelasQuadro === [] || $linhasQuadro === []) {
                             </td>
                             <?php foreach ($semanasCols as $sc):
                                 $codS = (string) ($sc['codigo'] ?? '');
-                                $nq = BoletimQuadroLayoutHelper::celulaNq($notasQ, $codS);
+                                $nq = \App\Helpers\BoletimQuadroLayoutHelper::celulaNq($notasQ, $codS);
                                 if ($nq['n'] !== null) {
                                     $totN += $nq['n'];
                                     $temTot = true;

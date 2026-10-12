@@ -6,6 +6,7 @@
 return [
     'chave' => 'censo-escolar',
     'label' => 'Censo Escolar',
+    'namespace' => 'App\\Modulos\\CensoEscolar',
     'grupo' => 'gestao_escolar',
     'feature_keys' => [
         'admin' => 'censo_escolar',

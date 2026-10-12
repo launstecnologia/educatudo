@@ -4,7 +4,6 @@
  * Imagens carregam pela URL no navegador; ao usar Imprimir → Salvar como PDF as imagens aparecem.
  */
 if (!class_exists('LayoutHelper')) {
-    require_once __DIR__ . '/../../../../Core/LayoutHelper.php';
 }
 $baseUrl = defined('URL') ? rtrim(URL, '/') : '';
 ?>
@@ -98,7 +97,7 @@ $baseUrl = defined('URL') ? rtrim(URL, '/') : '';
                         <span class="badge"><?= htmlspecialchars(ucfirst($q['dificuldade'] ?? '')) ?></span>
                         &nbsp;<?= number_format((float)($q['valor'] ?? 0), 1, ',', '') ?> pt(s)
                     </div>
-                    <div class="enunciado"><?= isset($q['enunciado']) ? LayoutHelper::renderEnunciadoProva($q['enunciado']) : '' ?></div>
+                    <div class="enunciado"><?= isset($q['enunciado']) ? \App\Core\LayoutHelper::renderEnunciadoProva($q['enunciado']) : '' ?></div>
                     <?php if (!empty($q['imagem_url'])): ?>
                         <img src="<?= htmlspecialchars(strpos($q['imagem_url'], 'http') === 0 ? $q['imagem_url'] : $baseUrl . '/' . ltrim($q['imagem_url'], '/')) ?>" alt="Imagem da questão">
                     <?php endif; ?>
@@ -110,7 +109,7 @@ $baseUrl = defined('URL') ? rtrim(URL, '/') : '';
                             $letraAlt = $letrasAlt[$aIdx] ?? '';
                         ?>
                         <div class="alternativa <?= !empty($alt['correta']) ? 'correta' : '' ?>">
-                            <?= !empty($alt['correta']) ? '<strong style="color:#16a34a;">✓ ' . htmlspecialchars($letraAlt) . ')</strong>' : '<strong>' . htmlspecialchars($letraAlt) . ')</strong>' ?> <?= isset($alt['texto']) ? LayoutHelper::renderEnunciadoProva($alt['texto']) : '' ?>
+                            <?= !empty($alt['correta']) ? '<strong style="color:#16a34a;">✓ ' . htmlspecialchars($letraAlt) . ')</strong>' : '<strong>' . htmlspecialchars($letraAlt) . ')</strong>' ?> <?= isset($alt['texto']) ? \App\Core\LayoutHelper::renderEnunciadoProva($alt['texto']) : '' ?>
                         </div>
                         <?php endforeach; ?>
                     </div>

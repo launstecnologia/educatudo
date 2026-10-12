@@ -4,6 +4,7 @@
  */
 return [
     'chave' => 'drive',
+    'namespace' => 'App\\Modulos\\Drive',
     'label' => 'Drive',
     'grupo' => 'aluno',
     'feature_keys' => [

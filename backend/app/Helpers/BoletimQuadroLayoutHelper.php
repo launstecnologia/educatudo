@@ -1,7 +1,13 @@
 <?php
+
+namespace App\Helpers;
 /**
  * Layout do boletim no modelo "quadro semanal" (S1–S8 com N/Q, dois blocos de matérias).
  */
+
+use App\Models\Education\ComponenteCurricular;
+use App\Modulos\GruposRegrasNotas\Services\GrupoRegrasNotasService;
+use App\Core\PeriodoLetivo;
 class BoletimQuadroLayoutHelper
 {
     public const SEMANA_MAX = 20;
@@ -132,7 +138,7 @@ class BoletimQuadroLayoutHelper
         }
         $nome = mb_strtolower(trim((string) ($col['nome'] ?? '')), 'UTF-8');
         if (class_exists('Normalizer', false)) {
-            $nomeNorm = Normalizer::normalize($nome, Normalizer::FORM_D);
+            $nomeNorm = \Normalizer::normalize($nome, \Normalizer::FORM_D);
             $nomeNorm = is_string($nomeNorm) ? preg_replace('/\p{Mn}/u', '', $nomeNorm) : $nome;
         } else {
             $nomeNorm = str_replace(
@@ -357,7 +363,7 @@ class BoletimQuadroLayoutHelper
             $a = is_array($sem['a'] ?? null) ? array_values(array_map('intval', $sem['a'])) : [];
             $b = is_array($sem['b'] ?? null) ? array_values(array_map('intval', $sem['b'])) : [];
             return $cache[$k] = ['a' => $a, 'b' => $b];
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return $cache[$k] = $vazio;
         }
     }
@@ -1171,7 +1177,6 @@ class BoletimQuadroLayoutHelper
         $ano = isset($evento['ano_letivo']) && $evento['ano_letivo'] !== null ? (int) $evento['ano_letivo'] : 0;
         if ($bimestre > 0 && $ano > 0) {
             if (!class_exists('PeriodoLetivo', false)) {
-                require_once dirname(__DIR__) . '/Core/PeriodoLetivo.php';
             }
             return PeriodoLetivo::rotulo($ano, $bimestre) . ' ' . $ano;
         }
@@ -1390,10 +1395,14 @@ class BoletimQuadroLayoutHelper
         try {
             $mapa = (new ComponenteCurricular())->mapaFilhosPorPai();
             $cache = is_array($mapa) ? $mapa : [];
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $cache = [];
         }
 
         return $cache;
     }
+}
+
+if (!class_exists('BoletimQuadroLayoutHelper', false) && class_exists(__NAMESPACE__ . '\\BoletimQuadroLayoutHelper', false)) {
+    class_alias(__NAMESPACE__ . '\\BoletimQuadroLayoutHelper', 'BoletimQuadroLayoutHelper');
 }

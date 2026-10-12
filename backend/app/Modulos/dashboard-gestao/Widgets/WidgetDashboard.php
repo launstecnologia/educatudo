@@ -13,3 +13,7 @@ interface WidgetDashboard
      */
     public function montar(DashboardFiltro $filtro): array;
 }
+
+if (!class_exists('WidgetDashboard', false) && class_exists(__NAMESPACE__ . '\\WidgetDashboard', false)) {
+    class_alias(__NAMESPACE__ . '\\WidgetDashboard', 'WidgetDashboard');
+}

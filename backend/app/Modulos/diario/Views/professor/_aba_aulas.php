@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Services/ClassDiaryService.php';
 
 use App\Modulos\Diario\Services\ClassDiaryService;
 $labels = [
@@ -41,7 +40,7 @@ $classes = [
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4 text-sm font-medium text-gray-900"><?= date('d/m/Y', strtotime((string) $a['data_aula'])) ?></td>
                             <td class="px-6 py-4 text-sm text-gray-700"><?= htmlspecialchars(substr((string) $a['horario_de'], 0, 5)) ?>–<?= htmlspecialchars(substr((string) $a['horario_ate'], 0, 5)) ?></td>
-                            <td class="px-6 py-4 text-sm text-gray-700"><?= htmlspecialchars(ClassDiaryService::tipoAulaLabel($tipo)) ?></td>
+                            <td class="px-6 py-4 text-sm text-gray-700"><?= htmlspecialchars(\App\Modulos\Diario\Services\ClassDiaryService::tipoAulaLabel($tipo)) ?></td>
                             <td class="px-6 py-4 text-sm text-gray-700"><?= $conteudo !== '' ? htmlspecialchars(mb_strimwidth($conteudo, 0, 60, '…')) : '<span class="text-gray-300">—</span>' ?></td>
                             <td class="px-6 py-4">
                                 <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?= $classes[$sit] ?? 'bg-slate-100 text-slate-700' ?>"><?= htmlspecialchars($labels[$sit] ?? $sit) ?></span>

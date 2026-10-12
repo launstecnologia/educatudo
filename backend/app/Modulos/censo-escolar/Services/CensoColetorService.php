@@ -2,9 +2,6 @@
 
 namespace App\Modulos\CensoEscolar\Services;
 
-require_once __DIR__ . '/../Models/CensoEdicao.php';
-require_once __DIR__ . '/CensoEtapaDePara.php';
-require_once __DIR__ . '/CensoNormalizador.php';
 
 use App\Modulos\CensoEscolar\Models\CensoEdicao;
 
@@ -371,4 +368,8 @@ class CensoColetorService
     {
         return trim((string) ($row[$coluna] ?? ''));
     }
+}
+
+if (!class_exists('CensoColetorService', false) && class_exists(__NAMESPACE__ . '\\CensoColetorService', false)) {
+    class_alias(__NAMESPACE__ . '\\CensoColetorService', 'CensoColetorService');
 }

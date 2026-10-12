@@ -105,7 +105,7 @@ $totPago     = array_sum(array_column(array_filter($bills, fn($b) => $b['status'
                 <td class="px-5 py-3 text-sm text-right font-bold text-gray-900"><?= $brl($b['valor']) ?></td>
                 <td class="px-5 py-3 text-sm text-center <?= $vencido ? 'text-red-600 font-semibold' : 'text-gray-600' ?>">
                     <?= $dt($b['data_vencimento']) ?>
-                    <?php if ($vencido): ?><span class="block text-xs"><?= (new DateTime())->diff(new DateTime($b['data_vencimento']))->days ?>d vencido</span><?php endif; ?>
+                    <?php if ($vencido): ?><span class="block text-xs"><?= (new \DateTime())->diff(new \DateTime($b['data_vencimento']))->days ?>d vencido</span><?php endif; ?>
                 </td>
                 <td class="px-5 py-3 text-center">
                     <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold <?= $stCls[$vencido ? 'vencido' : $b['status']] ?>">

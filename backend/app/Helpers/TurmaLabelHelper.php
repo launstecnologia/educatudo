@@ -1,5 +1,7 @@
 <?php
 
+namespace App\Helpers;
+
 /**
  * Formata rótulo de turma: "6º B do Ensino Fundamental II" ou "3ª A do Ensino Médio".
  */
@@ -145,4 +147,8 @@ class TurmaLabelHelper
 
         return '';
     }
+}
+
+if (!class_exists('TurmaLabelHelper', false) && class_exists(__NAMESPACE__ . '\\TurmaLabelHelper', false)) {
+    class_alias(__NAMESPACE__ . '\\TurmaLabelHelper', 'TurmaLabelHelper');
 }

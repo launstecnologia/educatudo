@@ -10,27 +10,22 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
     <?php 
     // Incluir LayoutHelper
-    require_once __DIR__ . '/../../Core/LayoutHelper.php';
-    require_once __DIR__ . '/../../Core/PeriodoLetivo.php';
-    require_once __DIR__ . '/../../Helpers/AvatarUrlHelper.php';
 
     if (isset($user) && is_array($user) && in_array($user['tipo'] ?? '', ['admin', 'admin_escola'], true)) {
-        $resolvedAvatar = AvatarUrlHelper::resolveAdminUserAvatar($user);
+        $resolvedAvatar = \App\Helpers\AvatarUrlHelper::resolveAdminUserAvatar($user);
         if ($resolvedAvatar !== null) {
             $user['avatar_url'] = $resolvedAvatar;
             $_SESSION['avatar_url'] = $resolvedAvatar;
         }
         try {
-            $creditosSvcPath = __DIR__ . '/../../Services/CreditosService.php';
-            if (is_file($creditosSvcPath)) {
-                require_once $creditosSvcPath;
+            if (class_exists(\App\Services\CreditosService::class)) {
                 $svcCredAdmin = new \App\Services\CreditosService();
                 $adminIdCarteira = (int) ($user['id'] ?? 0);
                 if ($adminIdCarteira > 0) {
                     $svcCredAdmin->aplicarRecargaInicialSeAplicavel('admin', $adminIdCarteira);
                 }
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             // Carteira indisponível não deve quebrar o painel admin.
         }
     }
@@ -62,7 +57,7 @@
         ]
     ];
 
-    $mobileConfig = json_decode(LayoutHelper::get('mobile_layout_admin', ''), true);
+    $mobileConfig = json_decode(\App\Core\LayoutHelper::get('mobile_layout_admin', ''), true);
     $mobileConfig = is_array($mobileConfig) ? array_replace_recursive($mobileDefaults, $mobileConfig) : $mobileDefaults;
     $mobileEnabled = !empty($mobileConfig['enabled']);
     $mobileBreakpoint = (int) ($mobileConfig['breakpoint'] ?? 768);
@@ -88,7 +83,7 @@
     }
     ?>
     <style>
-        <?= LayoutHelper::generateCustomCSS() ?>
+        <?= \App\Core\LayoutHelper::generateCustomCSS() ?>
 
         @media (min-width: 768px) {
             body {
@@ -177,11 +172,10 @@
                         
                         if (isset($user['id'])) {
                             try {
-                                require_once __DIR__ . '/../../Models/Notifications/Notification.php';
-                                $notificacaoModel = new Notification();
+                                $notificacaoModel = new \App\Models\Notifications\Notification();
                                 $notificacoesNaoLidas = $notificacaoModel->getNaoLidas($user['id'], 'admin');
                                 $notificacoesRecentes = $notificacaoModel->getByDestinatario($user['id'], 'admin', 5);
-                            } catch (Exception $e) {
+                            } catch (\Exception $e) {
                                 $notificacoesNaoLidas = 0;
                                 $notificacoesRecentes = [];
                             }
@@ -269,8 +263,7 @@
     $needsConsent = false;
     if (!empty($user['id'])) {
         if (!isset($db) || $db === null) {
-            require_once __DIR__ . '/../../Core/Database.php';
-            $db = Database::getInstance();
+            $db = \App\Core\Database::getInstance();
         }
         $docs = ['terms', 'privacy'];
         $version = 'v1.0';
@@ -292,7 +285,7 @@
                     break;
                 }
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $needsConsent = false;
         }
     }
@@ -559,8 +552,7 @@
     <?php endif; ?>
     <?php
     $base_url = defined('URL') ? URL : '';
-    if (!class_exists('LayoutHelper')) { require_once __DIR__ . '/../Core/LayoutHelper.php'; }
-    $onesignal_app_id = class_exists('LayoutHelper') ? trim(LayoutHelper::get('onesignal_app_id', '')) : '';
+    $onesignal_app_id = trim(\App\Core\LayoutHelper::get('onesignal_app_id', ''));
     if ($onesignal_app_id === '' && function_exists('env')) { $onesignal_app_id = trim(env('ONESIGNAL_APP_ID', '')); }
     include __DIR__ . '/../components/onesignal-init.php';
     ?>

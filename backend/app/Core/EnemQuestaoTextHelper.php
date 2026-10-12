@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Core;
 /**
  * Montagem de texto de questões ENEM a partir de context + alternatives_introduction.
  * Alinhado a src/database/migrations/041_import_enem_catalogo_master.sql (CASE do enunciado).
@@ -47,4 +49,8 @@ class EnemQuestaoTextHelper
         }
         return trim($s);
     }
+}
+
+if (!class_exists('EnemQuestaoTextHelper', false) && class_exists(__NAMESPACE__ . '\\EnemQuestaoTextHelper', false)) {
+    class_alias(__NAMESPACE__ . '\\EnemQuestaoTextHelper', 'EnemQuestaoTextHelper');
 }

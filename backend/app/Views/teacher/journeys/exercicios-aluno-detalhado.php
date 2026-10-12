@@ -1,7 +1,6 @@
 <?php
-require_once __DIR__ . '/../../../Core/TenantRelease.php';
-$ocultarTituloJornada = TenantRelease::shouldUse('jornadas_ocultar_titulo_v1', true);
-$ocultarTituloExercicioJornada = TenantRelease::shouldUse('jornadas_ocultar_titulo_exercicio_v1', true);
+$ocultarTituloJornada = \App\Core\TenantRelease::shouldUse('jornadas_ocultar_titulo_v1', true);
+$ocultarTituloExercicioJornada = \App\Core\TenantRelease::shouldUse('jornadas_ocultar_titulo_exercicio_v1', true);
 ?>
 <!-- Header -->
 <div class="mb-8">
@@ -113,14 +112,14 @@ $ocultarTituloExercicioJornada = TenantRelease::shouldUse('jornadas_ocultar_titu
         $respostaAlunoRaw = $exercicio['resposta_aluno'] ?? '';
         $pontuacao = $exercicio['pontuacao_aluno'] ?? null;
         $respondido = !empty($respostaAlunoRaw);
-        $resultadoEx = JornadaExercicioAvaliacao::classificar(
+        $resultadoEx = \App\Core\JornadaExercicioAvaliacao::classificar(
             $exercicio['tipo'] ?? '',
             $pontuacao,
             $respostaAlunoRaw,
             $respondido
         );
-        $pendente = $resultadoEx === JornadaExercicioAvaliacao::STATUS_PENDENTE;
-        $correto = $resultadoEx === JornadaExercicioAvaliacao::STATUS_ACERTO;
+        $pendente = $resultadoEx === \App\Core\JornadaExercicioAvaliacao::STATUS_PENDENTE;
+        $correto = $resultadoEx === \App\Core\JornadaExercicioAvaliacao::STATUS_ACERTO;
         $respostaAluno = $respostaAlunoRaw;
         
         // Decodifica resposta se for JSON

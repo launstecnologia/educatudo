@@ -1,5 +1,5 @@
 <?php
-$primaryColor = LayoutHelper::get('primary_color', '#6366f1');
+$primaryColor = \App\Core\LayoutHelper::get('primary_color', '#6366f1');
 $proposalId = (int)($proposal['id'] ?? 0);
 $proposalImages = [];
 if (!empty($proposal['images_json'])) {

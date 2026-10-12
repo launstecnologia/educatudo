@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../../Core/CreditosDecimalHelper.php';
 
 $alunos = $alunos ?? [];
 $escolas = $escolas ?? [];
@@ -58,8 +57,8 @@ if ($filtro_creditos_ordem !== 'nome') {
     </div>
     <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
         <p class="text-sm text-slate-500">TudiCoins no filtro</p>
-        <p class="text-2xl font-bold text-amber-600 mt-1"><?= htmlspecialchars(CreditosDecimalHelper::formatDisplay((float) ($totais['tudicoins'] ?? 0))) ?></p>
-        <p class="text-xs text-slate-400 mt-1"><?= htmlspecialchars(CreditosDecimalHelper::formatReaisFromTudicoins((float) ($totais['tudicoins'] ?? 0))) ?></p>
+        <p class="text-2xl font-bold text-amber-600 mt-1"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay((float) ($totais['tudicoins'] ?? 0))) ?></p>
+        <p class="text-xs text-slate-400 mt-1"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatReaisFromTudicoins((float) ($totais['tudicoins'] ?? 0))) ?></p>
     </div>
     <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
         <p class="text-sm text-slate-500">Filtros ativos</p>
@@ -134,7 +133,7 @@ if ($filtro_creditos_ordem !== 'nome') {
                 <?php
                     $alunoId = (int) ($aluno['aluno_id'] ?? 0);
                     $escolaId = (int) ($aluno['escola_id'] ?? 0);
-                    $saldo = CreditosDecimalHelper::fromSignedScalar($aluno['saldo_creditos'] ?? 0, 0.0);
+                    $saldo = \App\Core\CreditosDecimalHelper::fromSignedScalar($aluno['saldo_creditos'] ?? 0, 0.0);
                     $creditosDisponiveis = !empty($aluno['creditos_disponiveis']);
                 ?>
                 <tr class="hover:bg-slate-50">
@@ -157,8 +156,8 @@ if ($filtro_creditos_ordem !== 'nome') {
                         <span class="block text-xs text-slate-500 mt-0.5"><?= htmlspecialchars((string) ($aluno['escola_slug'] ?? '')) ?></span>
                     </td>
                     <td class="px-6 py-4 text-sm text-right whitespace-nowrap">
-                        <span class="block font-semibold text-amber-600 tabular-nums"><?= htmlspecialchars(CreditosDecimalHelper::formatDisplay($saldo)) ?></span>
-                        <span class="block text-xs text-slate-400 mt-0.5 tabular-nums"><?= htmlspecialchars(CreditosDecimalHelper::formatReaisFromTudicoins($saldo)) ?></span>
+                        <span class="block font-semibold text-amber-600 tabular-nums"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay($saldo)) ?></span>
+                        <span class="block text-xs text-slate-400 mt-0.5 tabular-nums"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatReaisFromTudicoins($saldo)) ?></span>
                     </td>
                     <td class="px-6 py-4 text-right whitespace-nowrap">
                         <?php if ($creditosDisponiveis): ?>
@@ -237,7 +236,7 @@ if ($filtro_creditos_ordem !== 'nome') {
             <div>
                 <label for="modal-tudicoins-aluno-valor" class="block text-sm font-medium text-slate-700 mb-1">Quantidade</label>
                 <div class="relative">
-                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-sm font-medium text-slate-500 pointer-events-none"><?= CreditosDecimalHelper::PREFIXO ?></span>
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-sm font-medium text-slate-500 pointer-events-none"><?= \App\Core\CreditosDecimalHelper::PREFIXO ?></span>
                     <input type="text" id="modal-tudicoins-aluno-valor" name="valor" value="100,00"
                            inputmode="decimal" autocomplete="off" required
                            class="w-full min-w-0 px-3 py-2 pl-12 border border-slate-300 rounded-lg text-sm bg-white tabular-nums focus:ring-2 focus:ring-blue-500 focus:border-blue-500">

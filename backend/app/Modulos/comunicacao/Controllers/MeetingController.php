@@ -7,7 +7,7 @@ use App\Core\LayoutHelper;
 /**
  * ATAs de reunião com pais e reuniões gerais (admin).
  */
-if (!class_exists('MeetingController', false)) {
+if (!class_exists(__NAMESPACE__ . '\\MeetingController', false)) {
 class MeetingController extends \App\Controllers\Admin\AdminBaseController
 {
     // ── Reunião com Pais (por aluno) ─────────────────────────────────────────

@@ -21,7 +21,7 @@ $kpiMedia = isset($kpisVe['media']) && $kpisVe['media'] !== null ? (float) $kpis
 $kpiFrequencia = isset($kpisVe['frequencia']) && $kpisVe['frequencia'] !== null ? (float) $kpisVe['frequencia'] : null;
 $kpisPorTurmaAno = is_array($kpis_por_turma_ano ?? null) ? $kpis_por_turma_ano : [];
 $ocorrenciasLista = is_array($ocorrencias ?? null) ? $ocorrencias : [];
-$moduloVidaEscolar = !class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('vida_escolar');
+$moduloVidaEscolar = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('vida_escolar');
 $podeVidaEscolar = !empty($admin_permissions['vida_escolar']['visualizar']);
 $matriculasVigentes = [];
 if (!empty($matriculas_schema_ready) && is_array($matriculas ?? null)) {

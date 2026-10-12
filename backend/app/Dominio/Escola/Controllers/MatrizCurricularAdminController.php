@@ -1,0 +1,177 @@
+<?php
+
+namespace App\Dominio\Escola\Controllers;
+
+use App\Painel\Admin\Controllers\AdminBaseController;
+/**
+ * EducaTudo - MatrizCurricularAdminController
+ * CRUD da Matriz Curricular: o que cada série de um curso deve cursar
+ * (Componentes Curriculares vinculados, aulas/semana, obrigatoriedade).
+ *
+ * Criar/editar em offcanvas único no index (decisão de produto — a tabela
+ * dinâmica de Componentes cabe no painel lateral); listagem/filtro/exclusão
+ * seguem como antes.
+ */
+
+
+use App\Models\Education\ClassRoom;
+use App\Models\Education\ComponenteCurricular;
+use App\Models\Education\MatrizCurricular;
+use App\Services\MatrizCurricularService;
+
+if (!class_exists(__NAMESPACE__ . '\\MatrizCurricularAdminController', false)) {
+class MatrizCurricularAdminController extends AdminBaseController
+{
+    private function model(): MatrizCurricular
+    {
+        return new MatrizCurricular();
+    }
+
+    private function service(): MatrizCurricularService
+    {
+        return new MatrizCurricularService();
+    }
+
+    public function index(): void
+    {
+        if (!$this->enforceAdminPermissionKey('matriz_curricular', 'visualizar', false)) {
+            return;
+        }
+
+        $filtros = [
+            'curso_id' => $_GET['curso_id'] ?? '',
+            'serie_id' => $_GET['serie_id'] ?? '',
+        ];
+
+        $classRoom = new ClassRoom();
+        $formulario = $this->dadosDoFormulario();
+
+        $data = array_merge($formulario, [
+            'title' => 'Matriz Curricular - EducaTudo',
+            'current_page' => 'matriz-curricular',
+            'itens' => $this->model()->getAll(array_filter($filtros, fn ($v) => $v !== '')),
+            'cursos' => $classRoom->getCursosNovo(),
+            'series' => $classRoom->getSeriesNovo(),
+            'filtros' => $filtros,
+            'status' => $_GET['status'] ?? '',
+            'message' => $_GET['message'] ?? '',
+        ]);
+
+        $this->viewWithLayout('admin', 'admin/matrizes-curriculares/index', $data);
+    }
+
+    /**
+     * Dados de uma Matriz Curricular (JSON) para popular o offcanvas de edição
+     */
+    public function dados($id): void
+    {
+        if (!$this->enforceAdminPermissionKey('matriz_curricular', 'alterar', true)) {
+            return;
+        }
+
+        $item = $this->model()->findById((int) $id);
+        if (!$item) {
+            $this->json(['error' => 'Matriz Curricular não encontrada.'], 404);
+            return;
+        }
+
+        $this->json([
+            'success' => true,
+            'item' => $item,
+            'componentes' => $this->service()->componentesParaFormulario((int) $id),
+        ]);
+    }
+
+    public function store(): void
+    {
+        if (!$this->enforceAdminPermissionKey('matriz_curricular', 'cadastrar', true)) {
+            return;
+        }
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->json(['error' => 'Token inválido.'], 400);
+            return;
+        }
+
+        $result = $this->service()->criar($_POST);
+        if (!$result['success']) {
+            $this->json(['error' => $result['error']], 400);
+            return;
+        }
+
+        $this->json(['success' => true, 'message' => 'Matriz Curricular cadastrada com sucesso.']);
+    }
+
+    public function update($id): void
+    {
+        if (!$this->enforceAdminPermissionKey('matriz_curricular', 'alterar', true)) {
+            return;
+        }
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->json(['error' => 'Token inválido.'], 400);
+            return;
+        }
+
+        $result = $this->service()->atualizar((int) $id, $_POST);
+        if (!$result['success']) {
+            $this->json(['error' => $result['error']], 400);
+            return;
+        }
+
+        $this->json(['success' => true, 'message' => 'Matriz Curricular atualizada com sucesso.']);
+    }
+
+    public function delete($id): void
+    {
+        if (!$this->enforceAdminPermissionKey('matriz_curricular', 'excluir', true)) {
+            return;
+        }
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->json(['error' => 'Token inválido'], 400);
+            return;
+        }
+
+        $result = $this->service()->excluir((int) $id);
+        if (!$result['success']) {
+            $this->json(['error' => $result['error']], 400);
+            return;
+        }
+
+        $this->json(['success' => true, 'message' => 'Matriz Curricular excluída com sucesso']);
+    }
+
+    /**
+     * Dados comuns aos formulários de criar/editar (dropdowns).
+     */
+    private function dadosDoFormulario(): array
+    {
+        $classRoom = new ClassRoom();
+        $componenteCurricular = new ComponenteCurricular();
+        $oficiais = $componenteCurricular->getOficiaisParaMatriz(true);
+        $filhosPorPai = $componenteCurricular->mapaFilhosPorPai();
+
+        $series = $classRoom->getSeriesNovo();
+        $seriesPorCurso = [];
+        foreach ($series as $s) {
+            $seriesPorCurso[(int) $s['curso_id']][] = $s;
+        }
+
+        return [
+            'title' => 'Cadastrar Matriz Curricular - EducaTudo',
+            'user' => $this->auth->getUser(),
+            'current_page' => 'matriz-curricular',
+            'cursos' => $classRoom->getCursosNovo(),
+            'series' => $series,
+            'series_por_curso' => $seriesPorCurso,
+            'componentes_disponiveis' => $oficiais,
+            'filhos_por_pai' => $filhosPorPai,
+            'csrf_token' => $this->generateCsrfToken(),
+            'status' => $_GET['status'] ?? '',
+            'message' => $_GET['message'] ?? '',
+        ];
+    }
+}
+}
+
+if (!class_exists('MatrizCurricularAdminController', false) && class_exists(__NAMESPACE__ . '\\MatrizCurricularAdminController', false)) {
+    class_alias(__NAMESPACE__ . '\\MatrizCurricularAdminController', 'MatrizCurricularAdminController');
+}

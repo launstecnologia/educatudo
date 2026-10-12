@@ -1,18 +1,19 @@
 <?php
+
+namespace App\Modulos\ExpoColag\Services;
 /**
  * Execução do projeto: tarefas, materiais, stand/QR e programação (S4).
  */
 
-require_once __DIR__ . '/../Models/ExpoColagProjeto.php';
-require_once __DIR__ . '/../Models/ExpoColagInscricao.php';
-require_once __DIR__ . '/../Models/ExpoColagTarefa.php';
-require_once __DIR__ . '/../Models/ExpoColagStand.php';
-require_once __DIR__ . '/../Models/ExpoColagProgramacao.php';
-require_once __DIR__ . '/../Models/ExpoColagEdicao.php';
-require_once __DIR__ . '/../Models/ExpoColagPedidoMaterial.php';
-require_once __DIR__ . '/../Models/ExpoColagMensagem.php';
-require_once __DIR__ . '/ExpoColagService.php';
-require_once dirname(__DIR__, 3) . '/Utils/HtmlSanitizer.php';
+
+use App\Modulos\ExpoColag\Models\ExpoColagEdicao;
+use App\Modulos\ExpoColag\Models\ExpoColagInscricao;
+use App\Modulos\ExpoColag\Models\ExpoColagMensagem;
+use App\Modulos\ExpoColag\Models\ExpoColagPedidoMaterial;
+use App\Modulos\ExpoColag\Models\ExpoColagProgramacao;
+use App\Modulos\ExpoColag\Models\ExpoColagProjeto;
+use App\Modulos\ExpoColag\Models\ExpoColagStand;
+use App\Modulos\ExpoColag\Models\ExpoColagTarefa;
 
 class ExpoColagExecucaoService
 {
@@ -43,7 +44,7 @@ class ExpoColagExecucaoService
         $this->pedidoModel = new ExpoColagPedidoMaterial();
         $this->mensagemModel = new ExpoColagMensagem();
         $this->expoService = new ExpoColagService();
-        $this->db = Database::getInstance();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     private function assertProjetoProfessor(int $projetoId, int $professorId): ?array
@@ -532,7 +533,7 @@ class ExpoColagExecucaoService
                 'quantidade' => $input['quantidade'] ?? null,
                 'observacao' => $input['observacao'] ?? null,
             ]);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return ['success' => false, 'error' => 'Não foi possível registrar o pedido. Peça à coordenação para atualizar o módulo.'];
         }
         return ['success' => true, 'id' => $id];
@@ -575,7 +576,7 @@ class ExpoColagExecucaoService
     {
         try {
             return $this->pedidoModel->listarPorAlunoProjeto($alunoId, $projetoId);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return [];
         }
     }
@@ -585,7 +586,7 @@ class ExpoColagExecucaoService
     {
         try {
             return $this->pedidoModel->listarPorProjeto($projetoId);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return [];
         }
     }
@@ -595,7 +596,7 @@ class ExpoColagExecucaoService
     {
         try {
             return $this->mensagemModel->listarPorProjeto($projetoId);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return [];
         }
     }
@@ -637,7 +638,7 @@ class ExpoColagExecucaoService
                 'autor_id' => $autorId,
                 'mensagem' => $texto,
             ]);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return ['success' => false, 'error' => 'Não foi possível enviar. Peça à coordenação para atualizar o módulo.'];
         }
         return ['success' => true];
@@ -896,8 +897,8 @@ class ExpoColagExecucaoService
             return true;
         }
         try {
-            return FeatureGate::isModuleEnabled('expo_colag');
-        } catch (Throwable $e) {
+            return \App\Core\FeatureGate::isModuleEnabled('expo_colag');
+        } catch (\Throwable $e) {
             return false;
         }
     }
@@ -1058,4 +1059,8 @@ class ExpoColagExecucaoService
         @chmod($dir, 0775);
         return true;
     }
+}
+
+if (!class_exists('ExpoColagExecucaoService', false) && class_exists(__NAMESPACE__ . '\\ExpoColagExecucaoService', false)) {
+    class_alias(__NAMESPACE__ . '\\ExpoColagExecucaoService', 'ExpoColagExecucaoService');
 }

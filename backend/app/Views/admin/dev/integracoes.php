@@ -32,33 +32,32 @@ if ($flash_message !== ''):
                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
 
                 <?php
-                require_once __DIR__ . '/../../../Core/LayoutHelper.php';
 
-                $openai_key = LayoutHelper::get('openai_api_key', '');
+                $openai_key = \App\Core\LayoutHelper::get('openai_api_key', '');
                 $openai_key_display = $openai_key ? (str_repeat('*', max(0, strlen($openai_key) - 4)) . substr($openai_key, -4)) : '';
 
-                $gamma_key = LayoutHelper::get('gamma_api_key', '');
+                $gamma_key = \App\Core\LayoutHelper::get('gamma_api_key', '');
                 $gamma_key_display = $gamma_key ? (str_repeat('*', max(0, strlen($gamma_key) - 4)) . substr($gamma_key, -4)) : '';
 
-                $nanobanana_key = LayoutHelper::get('nanobanana_api_key', '');
+                $nanobanana_key = \App\Core\LayoutHelper::get('nanobanana_api_key', '');
                 $nanobanana_key_display = $nanobanana_key ? (str_repeat('*', max(0, strlen($nanobanana_key) - 4)) . substr($nanobanana_key, -4)) : '';
 
-                $replicate_key = LayoutHelper::get('replicate_api_key', '');
+                $replicate_key = \App\Core\LayoutHelper::get('replicate_api_key', '');
                 $replicate_key_display = $replicate_key ? (str_repeat('*', max(0, strlen($replicate_key) - 4)) . substr($replicate_key, -4)) : '';
 
-                $replicate_model = LayoutHelper::get('replicate_model_version', '');
+                $replicate_model = \App\Core\LayoutHelper::get('replicate_model_version', '');
 
-                $elevenlabs_key = LayoutHelper::get('elevenlabs_api_key', '');
+                $elevenlabs_key = \App\Core\LayoutHelper::get('elevenlabs_api_key', '');
                 $elevenlabs_key_display = $elevenlabs_key ? (str_repeat('*', max(0, strlen($elevenlabs_key) - 4)) . substr($elevenlabs_key, -4)) : '';
 
-                $onesignal_app_id = LayoutHelper::get('onesignal_app_id', '');
+                $onesignal_app_id = \App\Core\LayoutHelper::get('onesignal_app_id', '');
                 $onesignal_app_id_display = $onesignal_app_id ? (str_repeat('*', max(0, strlen($onesignal_app_id) - 4)) . substr($onesignal_app_id, -4)) : '';
-                $onesignal_rest_key = LayoutHelper::get('onesignal_rest_api_key', '');
+                $onesignal_rest_key = \App\Core\LayoutHelper::get('onesignal_rest_api_key', '');
                 $onesignal_rest_key_display = $onesignal_rest_key ? (str_repeat('*', max(0, strlen($onesignal_rest_key) - 4)) . substr($onesignal_rest_key, -4)) : '';
-                $evolution_api_url = LayoutHelper::get('evolution_api_url', '');
-                $evolution_instance = LayoutHelper::get('evolution_instance', '');
-                $evolution_group_id = LayoutHelper::get('evolution_group_id', '');
-                $evolution_api_key = LayoutHelper::get('evolution_api_key', '');
+                $evolution_api_url = \App\Core\LayoutHelper::get('evolution_api_url', '');
+                $evolution_instance = \App\Core\LayoutHelper::get('evolution_instance', '');
+                $evolution_group_id = \App\Core\LayoutHelper::get('evolution_group_id', '');
+                $evolution_api_key = \App\Core\LayoutHelper::get('evolution_api_key', '');
                 $evolution_api_key_display = $evolution_api_key ? (str_repeat('*', max(0, strlen($evolution_api_key) - 4)) . substr($evolution_api_key, -4)) : '';
                 ?>
 

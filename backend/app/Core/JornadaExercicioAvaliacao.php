@@ -1,4 +1,6 @@
 <?php
+
+namespace App\Core;
 /**
  * Avaliação de exercícios da jornada: dissertativa fica neutra até o professor atribuir nota.
  */
@@ -224,4 +226,8 @@ class JornadaExercicioAvaliacao
 
         return "CASE WHEN {$pendente} THEN NULL WHEN {$colPontuacao} > 0 THEN 0 ELSE 1 END";
     }
+}
+
+if (!class_exists('JornadaExercicioAvaliacao', false) && class_exists(__NAMESPACE__ . '\\JornadaExercicioAvaliacao', false)) {
+    class_alias(__NAMESPACE__ . '\\JornadaExercicioAvaliacao', 'JornadaExercicioAvaliacao');
 }

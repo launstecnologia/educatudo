@@ -12,7 +12,6 @@
     <?php
     $domCfg = is_array($dominio_config ?? null) ? $dominio_config : [];
     $tenantBaseDomain = (string) ($domCfg['tenant_base_domain'] ?? 'localhost');
-    require_once __DIR__ . '/../../../Services/DominioEscolaService.php';
 
     $externalAppsLinksRaw = $layout['external_apps_links'] ?? '[]';
     $externalAppsLinks = json_decode((string) $externalAppsLinksRaw, true);
@@ -69,11 +68,11 @@
                     <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mb-4">
                         <div>
                             <dt class="text-slate-500">DNS</dt>
-                            <dd class="font-medium text-slate-900"><?= htmlspecialchars(DominioEscolaService::rotuloDnsStatus($escola['dns_status'] ?? null)) ?></dd>
+                            <dd class="font-medium text-slate-900"><?= htmlspecialchars(\App\Services\DominioEscolaService::rotuloDnsStatus($escola['dns_status'] ?? null)) ?></dd>
                         </div>
                         <div>
                             <dt class="text-slate-500">HTTPS</dt>
-                            <dd class="font-medium text-slate-900"><?= htmlspecialchars(DominioEscolaService::rotuloSslStatus($escola['ssl_status'] ?? null)) ?></dd>
+                            <dd class="font-medium text-slate-900"><?= htmlspecialchars(\App\Services\DominioEscolaService::rotuloSslStatus($escola['ssl_status'] ?? null)) ?></dd>
                         </div>
                         <?php if (!empty($escola['ssl_verificado_em'])): ?>
                         <div>
@@ -91,7 +90,7 @@
                     <?php if (!empty($escola['dominio_ultimo_erro']) && ($escola['ssl_status'] ?? '') !== 'ok'): ?>
                     <p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2 mb-3"><?= htmlspecialchars((string) $escola['dominio_ultimo_erro']) ?></p>
                     <?php endif; ?>
-                    <p class="text-xs text-slate-500 mb-3">DNS wildcard (<code>* .<?= htmlspecialchars($tenantBaseDomain === 'localhost' ? 'localhost' : $tenantBaseDomain) ?></code>) e certificado Let's Encrypt na origem são configurados no servidor. Ver <code>docs/DEPLOY-DOMINIOS.md</code>.</p>
+                    <p class="text-xs text-slate-500 mb-3">DNS wildcard (<code>* .<?= htmlspecialchars($tenantBaseDomain === 'localhost' ? 'localhost' : $tenantBaseDomain) ?></code>) e certificado Let's Encrypt na origem são configurados no servidor. Ver <code>especificacoes/DEPLOY-DOMINIOS.md</code>.</p>
                     <button type="submit" form="form-verificar-dominio-escola" class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Verificar HTTPS agora</button>
                 </div>
                 <?php endif; ?>
@@ -169,14 +168,13 @@
                 </div>
                 <?php
                 if (!class_exists('LayoutHelper', false)) {
-                    require_once dirname(__DIR__, 3) . '/Core/LayoutHelper.php';
                 }
                 $corPrimariaForm = (string) ($layout['primary_color'] ?? '#6366f1');
                 $botaoPrimarioForm = (string) ($layout['button_primary_color'] ?? $corPrimariaForm);
                 $navbarBgForm = (string) ($layout['navbar_bg_color'] ?? $corPrimariaForm);
                 $sidebarTextForm = trim((string) ($layout['sidebar_text_color'] ?? ''));
                 if ($sidebarTextForm === '') {
-                    $sidebarTextForm = LayoutHelper::resolveSidebarTextColor($navbarBgForm, '#ffffff');
+                    $sidebarTextForm = \App\Core\LayoutHelper::resolveSidebarTextColor($navbarBgForm, '#ffffff');
                 }
                 ?>
                 <div>
@@ -277,7 +275,6 @@
             $layout = $layout ?? [];
             $modulos_catalogo = $modulos_catalogo ?? [];
             if (!class_exists('ModuloCatalogo', false)) {
-                require_once dirname(__DIR__, 3) . '/Core/ModuloCatalogo.php';
             }
             ?>
             <div class="border border-slate-200 rounded-lg overflow-hidden">
@@ -288,7 +285,7 @@
                         $nome = (string) ($mod['nome'] ?? $chave);
                         $featureKeys = is_array($mod['feature_keys'] ?? null) ? $mod['feature_keys'] : [];
                         $firstKey = (string) ($featureKeys[0] ?? '');
-                        $defaultMod = $firstKey !== '' ? ModuloCatalogo::valorPadrao($mod) : '1';
+                        $defaultMod = $firstKey !== '' ? \App\Core\ModuloCatalogo::valorPadrao($mod) : '1';
                         $cur = $firstKey !== '' ? ($layout['module_' . $firstKey] ?? $defaultMod) : $defaultMod;
                     ?>
                     <div class="flex items-center justify-between gap-2">

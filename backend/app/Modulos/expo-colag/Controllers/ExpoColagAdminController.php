@@ -1,15 +1,16 @@
 <?php
+
+namespace App\Modulos\ExpoColag\Controllers;
 /**
  * Expo Colag — painel da coordenação (configuração da edição).
  */
 
-require_once __DIR__ . '/../Services/ExpoColagService.php';
-require_once __DIR__ . '/../Services/ExpoColagExecucaoService.php';
-require_once __DIR__ . '/../../../Core/FeatureGate.php';
-require_once __DIR__ . '/../../../Helpers/AdminPasswordHelper.php';
 
-if (!class_exists('ExpoColagAdminController')) {
-class ExpoColagAdminController extends BaseController
+use App\Modulos\ExpoColag\Services\ExpoColagExecucaoService;
+use App\Modulos\ExpoColag\Services\ExpoColagService;
+
+if (!class_exists(__NAMESPACE__ . '\\ExpoColagAdminController', false)) {
+class ExpoColagAdminController extends \App\Core\BaseController
 {
     private $auth;
     private ExpoColagService $service;
@@ -18,7 +19,7 @@ class ExpoColagAdminController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        $this->auth = new AuthManager();
+        $this->auth = new \App\Core\AuthManager();
         $this->service = new ExpoColagService();
         $this->execucao = new ExpoColagExecucaoService();
 
@@ -32,7 +33,7 @@ class ExpoColagAdminController extends BaseController
             $this->redirect('/admin/dashboard');
             exit;
         }
-        if (!FeatureGate::isModuleEnabled('expo_colag')) {
+        if (!\App\Core\FeatureGate::isModuleEnabled('expo_colag')) {
             $this->redirect('/admin/dashboard');
             exit;
         }
@@ -61,14 +62,14 @@ class ExpoColagAdminController extends BaseController
         $authResumo = [];
         try {
             $authResumo = $this->service->autorizacaoImagemResumo()['contagens'] ?? [];
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $authResumo = [];
         }
         $catalogos = $this->service->catalogosWizard();
         $indicadores = $this->service->indicadoresAdmin();
         try {
             $indicadores = array_merge($indicadores, $this->execucao->indicadoresExtrasAdmin());
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $indicadores['tarefas_atrasadas'] = 0;
             $indicadores['entregas_avaliar'] = 0;
         }
@@ -254,7 +255,7 @@ class ExpoColagAdminController extends BaseController
             $this->redirect('/admin/expo-colag');
             return;
         }
-        if (!AdminPasswordHelper::verifyAdminPassword(Database::getInstance(), $this->auth->getUser() ?? [], $senha)) {
+        if (!\App\Helpers\AdminPasswordHelper::verifyAdminPassword(\App\Core\Database::getInstance(), $this->auth->getUser() ?? [], $senha)) {
             $this->setFlashMessage('Senha incorreta.', 'error');
             $this->redirect('/admin/expo-colag');
             return;
@@ -298,9 +299,9 @@ class ExpoColagAdminController extends BaseController
 
         $projeto = $completo['projeto'];
         $itens = $this->execucao->itensPdfAlmoxarifado((int) $id);
-        $escola = class_exists('LayoutHelper') ? (string) LayoutHelper::getSystemTitle() : 'Escola';
+        $escola = class_exists('LayoutHelper') ? (string) \App\Core\LayoutHelper::getSystemTitle() : 'Escola';
         $logo_url = class_exists('LayoutHelper') && method_exists('LayoutHelper', 'getDocumentLogoUrl')
-            ? (string) LayoutHelper::getDocumentLogoUrl()
+            ? (string) \App\Core\LayoutHelper::getDocumentLogoUrl()
             : '';
         $viewFile = $this->resolveViewPath('professor/expo-colag/materiais_pdf');
         if ($viewFile === null) {
@@ -677,4 +678,8 @@ class ExpoColagAdminController extends BaseController
         }
     }
 }
+}
+
+if (!class_exists('ExpoColagAdminController', false) && class_exists(__NAMESPACE__ . '\\ExpoColagAdminController', false)) {
+    class_alias(__NAMESPACE__ . '\\ExpoColagAdminController', 'ExpoColagAdminController');
 }

@@ -2,19 +2,15 @@
 
 namespace App\Modulos\ConselhoClasse\Services;
 
-require_once __DIR__ . '/../Models/ConselhoSessao.php';
-require_once __DIR__ . '/../../diario/Models/ClassDiary.php';
-require_once __DIR__ . '/../../../Services/FrequencyService.php';
-require_once __DIR__ . '/../../../Core/PeriodoLetivo.php';
 
 use App\Modulos\ConselhoClasse\Models\ConselhoSessao;
 use App\Modulos\Diario\Models\ClassDiary;
-use Database;
-use FrequencyService;
-use PeriodoLetivo;
+use App\Core\Database;
+use App\Services\FrequencyService;
+use App\Core\PeriodoLetivo;
 use App\Modulos\Ocorrencias\Models\Ocorrencia;
 use App\Modulos\Ocorrencias\Services\OcorrenciaService;
-use LayoutHelper;
+use App\Core\LayoutHelper;
 use Throwable;
 
 /**
@@ -243,7 +239,6 @@ class ConselhoService
 
         $ocorrencias = [];
         if ($this->moduloOcorrenciasHabilitado() && $this->model->tabelaExiste('alunos_ocorrencias')) {
-            require_once __DIR__ . '/../../ocorrencias/Models/Ocorrencia.php';
             $ocorrencias = (new Ocorrencia())->listarPorAluno($alunoId, 50);
         }
 
@@ -332,7 +327,6 @@ class ConselhoService
 
         $ocorrenciaId = null;
         if (!empty($input['gerar_ocorrencia']) && $this->moduloOcorrenciasHabilitado() && $this->model->tabelaExiste('alunos_ocorrencias')) {
-            require_once __DIR__ . '/../../ocorrencias/Services/OcorrenciaService.php';
             $result = (new OcorrenciaService())->criar([
                 'aluno_id' => $alunoId,
                 'titulo' => 'Encaminhamento do Conselho de Classe (' . $this->periodoLabel((int) $sessao['bimestre']) . ') — ' . (ConselhoSessao::ENCAMINHAMENTOS[$tipo] ?? $tipo),
@@ -803,12 +797,6 @@ class ConselhoService
 
     private function moduloOcorrenciasHabilitado(): bool
     {
-        if (!class_exists('LayoutHelper', false)) {
-            require_once __DIR__ . '/../../../Core/LayoutHelper.php';
-        }
-        if (!class_exists('LayoutHelper')) {
-            return true;
-        }
         return LayoutHelper::isModuleEnabled('ocorrencias');
     }
 
@@ -822,4 +810,8 @@ class ConselhoService
         );
         return (int) ($row['id'] ?? 0);
     }
+}
+
+if (!class_exists('ConselhoService', false) && class_exists(__NAMESPACE__ . '\\ConselhoService', false)) {
+    class_alias(__NAMESPACE__ . '\\ConselhoService', 'ConselhoService');
 }

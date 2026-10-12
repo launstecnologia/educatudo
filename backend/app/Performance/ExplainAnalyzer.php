@@ -149,3 +149,7 @@ final class ExplainAnalyzer
         }
     }
 }
+
+if (!class_exists('ExplainAnalyzer', false) && class_exists(__NAMESPACE__ . '\\ExplainAnalyzer', false)) {
+    class_alias(__NAMESPACE__ . '\\ExplainAnalyzer', 'ExplainAnalyzer');
+}

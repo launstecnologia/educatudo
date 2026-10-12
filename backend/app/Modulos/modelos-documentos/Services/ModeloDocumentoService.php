@@ -2,11 +2,8 @@
 
 namespace App\Modulos\ModelosDocumentos\Services;
 
-require_once __DIR__ . '/../../../Core/Database.php';
-require_once __DIR__ . '/EstruturaDocumentosOficiais.php';
 
-use Database;
-
+use App\Core\Database;
 /**
  * Modelos editáveis de documentos (HTML + placeholders {{campo}}).
  */
@@ -1262,8 +1259,7 @@ class ModeloDocumentoService
         $unidadeId = (int) ($data['unidade_assinatura_id'] ?? 0);
         if ($unidadeId > 0) {
             try {
-                require_once BASE_PATH . '/app/Models/Education/SchoolUnit.php';
-                $unidadeOk = (new \SchoolUnit())->findById($unidadeId);
+                $unidadeOk = (new \App\Models\Education\SchoolUnit())->findById($unidadeId);
                 if (!$unidadeOk) {
                     $unidadeId = 0;
                 }
@@ -1640,7 +1636,6 @@ class ModeloDocumentoService
      */
     public function htmlDaEstrutura(array $estrutura, array $vars = []): array
     {
-        require_once __DIR__ . '/DocumentoRenderer.php';
         $renderer = new DocumentoRenderer();
         return $renderer->renderizarPartes($estrutura, $vars);
     }
@@ -2316,8 +2311,7 @@ class ModeloDocumentoService
             $unidadeId = (int) ($modelo['_layout_unidade_assinatura_id'] ?? 0);
             if ($unidadeId > 0) {
                 try {
-                    require_once BASE_PATH . '/app/Models/Education/SchoolUnit.php';
-                    $unidadeAssinatura = (new \SchoolUnit())->findById($unidadeId) ?: null;
+                    $unidadeAssinatura = (new \App\Models\Education\SchoolUnit())->findById($unidadeId) ?: null;
                 } catch (\Throwable $e) {
                     $unidadeAssinatura = null;
                 }
@@ -2340,8 +2334,7 @@ class ModeloDocumentoService
                 $unidadeIdLogo = (int) ($modelo['_layout_unidade_assinatura_id'] ?? 0);
                 if ($unidadeIdLogo > 0) {
                     try {
-                        require_once BASE_PATH . '/app/Models/Education/SchoolUnit.php';
-                        $unidadeParaLogo = (new \SchoolUnit())->findById($unidadeIdLogo) ?: null;
+                        $unidadeParaLogo = (new \App\Models\Education\SchoolUnit())->findById($unidadeIdLogo) ?: null;
                     } catch (\Throwable $e) {
                         $unidadeParaLogo = null;
                     }
@@ -2362,11 +2355,9 @@ class ModeloDocumentoService
             $htmlBrutoCab = $partes['cabecalho'];
             $htmlBrutoCorpo = $partes['corpo'];
             if (is_array($estruturaVisual['grade'] ?? null)) {
-                require_once __DIR__ . '/GradeSoltaService.php';
                 $vars = GradeSoltaService::completar($estruturaVisual['grade'], $vars);
             }
             if (!empty($vars['_pdf_teste']) && !isset($vars['_grade_fonte'])) {
-                require_once __DIR__ . '/GradeSoltaService.php';
                 $vars = GradeSoltaService::amostraDosTokens(
                     $partes['cabecalho'] . $partes['corpo'] . $partes['rodape'],
                     $vars
@@ -2391,7 +2382,6 @@ class ModeloDocumentoService
             $rodape = $this->garantirColunasFicha($rodape);
         }
         if (str_contains($cab . $corpo . $rodape, 'edoc-vert') || str_contains($cab . $corpo . $rodape, 'edoc-logo')) {
-            require_once __DIR__ . '/GiradorTextoVerticalDocumento.php';
             $cab = GiradorTextoVerticalDocumento::aplicar($cab);
             $corpo = GiradorTextoVerticalDocumento::aplicar($corpo);
             $rodape = GiradorTextoVerticalDocumento::aplicar($rodape);
@@ -2663,8 +2653,8 @@ HTML;
         // S3 key
         if (($bin === null || $bin === false || $bin === '') && is_array($config)) {
             try {
-                require_once $base . '/app/Services/MediaStorageService.php';
-                $media = new \MediaStorageService($config);
+                // MediaStorageService via Compat autoload
+                $media = new \App\Services\MediaStorageService($config);
                 $contents = $media->getContents('arquivos', $ref);
                 if (is_string($contents) && $contents !== '') {
                     $finfoBuf = finfo_open(FILEINFO_MIME_TYPE);
@@ -2709,11 +2699,11 @@ HTML;
             require_once $base . '/app/Core/LayoutHelper.php';
         }
         try {
-            $principal = trim((string) \LayoutHelper::getDocumentLogoUrl());
+            $principal = trim((string) \App\Core\LayoutHelper::getDocumentLogoUrl());
             if ($principal !== '') {
                 $urls[] = $principal;
             }
-            $login = trim((string) \LayoutHelper::getLoginLogoUrl());
+            $login = trim((string) \App\Core\LayoutHelper::getLoginLogoUrl());
             if ($login !== '' && !in_array($login, $urls, true)) {
                 $urls[] = $login;
             }
@@ -2723,8 +2713,7 @@ HTML;
 
         if ($unidadeLogo === '') {
             try {
-                require_once $base . '/app/Models/Education/SchoolUnit.php';
-                $ativas = (new \SchoolUnit())->getActive();
+                $ativas = (new \App\Models\Education\SchoolUnit())->getActive();
                 $matriz = $ativas[0] ?? null;
                 if (is_array($matriz)) {
                     $fallbackUnidade = trim((string) ($matriz['logo_url'] ?? ''));
@@ -2836,8 +2825,8 @@ HTML;
         }
 
         try {
-            require_once $base . '/app/Services/MediaStorageService.php';
-            $media = new \MediaStorageService($cfg);
+            // MediaStorageService via Compat autoload
+            $media = new \App\Services\MediaStorageService($cfg);
             $localPath = $media->getLocalPath('layout', $key);
             if ($localPath !== null && is_file($localPath) && is_readable($localPath)) {
                 $filePath = $localPath;
@@ -2958,7 +2947,6 @@ HTML;
         $fonte = is_array($vars['_grade_fonte']['componentes'] ?? null)
             ? $vars['_grade_fonte']['componentes']
             : [];
-        require_once __DIR__ . '/DemonstracaoDocumentoService.php';
         $vars['componentes_serie_html'] = DemonstracaoDocumentoService::htmlListaComponentes($fonte);
         return $vars;
     }
@@ -3009,9 +2997,8 @@ HTML;
             trim((string) ($unidade['telefone'] ?? '')) !== '' ? 'Tel.: ' . $unidade['telefone'] : '',
         ])));
 
-        require_once dirname(__DIR__, 3) . '/Helpers/StudentFormHelper.php';
-        $alunoNome = \StudentFormHelper::nomeOficialLinha($aluno);
-        $alunoNomeCivil = \StudentFormHelper::nomeCivil($aluno);
+        $alunoNome = \App\Helpers\StudentFormHelper::nomeOficialLinha($aluno);
+        $alunoNomeCivil = \App\Helpers\StudentFormHelper::nomeCivil($aluno);
         $alunoCpf = trim((string) ($aluno['cpf'] ?? ''));
         $alunoRg = trim((string) ($aluno['rg'] ?? $aluno['documento_rg'] ?? ''));
         $pickAluno = static function (array $arr, array $keys): string {
@@ -3080,7 +3067,7 @@ HTML;
                 require_once $declPath;
             }
         }
-        if (class_exists('\\DeclarationService', false) && in_array($tipo, \DeclarationService::TIPOS, true)) {
+        if (class_exists('\\DeclarationService', false) && in_array($tipo, \App\Services\DeclarationService::TIPOS, true)) {
             $docRotulo = 'Declaração';
         }
 
@@ -3807,6 +3794,31 @@ CSS;
     width: 38%;
   }
   body.folha-impressa table.doc-linha:has(table.edoc-grade-livre) { margin: 0 !important; }
+  body.folha-impressa table.edoc-grade-livre { margin: 0 !important; }
+  body.folha-impressa table.edoc-grade-livre p { margin: 0 !important; }
+  body.folha-impressa table.edoc-grade-livre td,
+  body.folha-impressa table.edoc-grade-livre th {
+    padding: 0.15mm 0.35mm !important;
+    line-height: 1 !important;
+    font-size: 6.5pt !important;
+    box-sizing: border-box;
+  }
+  body.folha-impressa table.edoc-grade-livre td.edoc-vert,
+  body.folha-impressa table.edoc-grade-livre th.edoc-vert,
+  body.folha-impressa table.edoc-grade-livre td.edoc-logo {
+    padding: 0 !important;
+  }
+  body.folha-impressa table.edoc-grade-livre td.edoc-logo {
+    line-height: 0 !important;
+  }
+  body.folha-impressa table.edoc-grade-livre td.edoc-titulo,
+  body.folha-impressa table.edoc-grade-livre th.edoc-titulo {
+    font-size: 9pt !important;
+  }
+  body.folha-impressa table.edoc-grade-livre td.edoc-sub,
+  body.folha-impressa table.edoc-grade-livre th.edoc-sub {
+    font-size: 7.5pt !important;
+  }
 CSS;
     }
 
@@ -3964,4 +3976,8 @@ CSS;
   .page-break { page-break-after: always; break-after: page; }
 CSS;
     }
+}
+
+if (!class_exists('ModeloDocumentoService', false) && class_exists(__NAMESPACE__ . '\\ModeloDocumentoService', false)) {
+    class_alias(__NAMESPACE__ . '\\ModeloDocumentoService', 'ModeloDocumentoService');
 }

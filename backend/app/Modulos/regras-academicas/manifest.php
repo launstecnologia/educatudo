@@ -7,6 +7,7 @@
 return [
     'chave' => 'regras-academicas',
     'label' => 'Regras de Aprovação',
+    'namespace' => 'App\\Modulos\\RegrasAcademicas',
     'grupo' => 'academico',
     'feature_keys' => [
         'admin' => 'regras_academicas',

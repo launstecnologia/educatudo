@@ -11,10 +11,8 @@ if (!in_array($release_channel, $release_channels, true)) {
 $release_version = (string)($layout_config['release_version'] ?? '');
 $release_flags = (string)($layout_config['release_flags'] ?? '');
 $csrf_token = $csrf_token ?? '';
-require_once __DIR__ . '/../../../../Core/CreditosModuleRegistry.php';
-require_once __DIR__ . '/../../../../Core/ModuloCatalogo.php';
 $tudicoinsOn = ($layout_config['creditos_habilitado'] ?? '0') === '1';
-$modulosExigemTudiCoins = array_fill_keys(\CreditosModuleRegistry::getFeatureModulesQueExigemTudiCoins(), true);
+$modulosExigemTudiCoins = array_fill_keys(\App\Core\CreditosModuleRegistry::getFeatureModulesQueExigemTudiCoins(), true);
 
 $renderModToggle = function (string $key, string $cur, bool $lockedOff = false) {
     $enabled = !$lockedOff && $cur !== '0';
@@ -62,7 +60,7 @@ $renderModToggle = function (string $key, string $cur, bool $lockedOff = false) 
                     $busca = mb_strtolower(trim($nome . ' ' . implode(' ', array_map('strval', $aliases))));
                     $featureKeys = is_array($mod['feature_keys'] ?? null) ? $mod['feature_keys'] : [];
                     $firstKey = (string) ($featureKeys[0] ?? '');
-                    $defaultMod = $firstKey !== '' ? ModuloCatalogo::valorPadrao($mod) : '1';
+                    $defaultMod = $firstKey !== '' ? \App\Core\ModuloCatalogo::valorPadrao($mod) : '1';
                     $cur = $firstKey !== '' ? ($layout_config['module_' . $firstKey] ?? $defaultMod) : $defaultMod;
                     $locked = false;
                     if (!$tudicoinsOn) {

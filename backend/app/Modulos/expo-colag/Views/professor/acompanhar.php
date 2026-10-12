@@ -19,7 +19,7 @@ $aba = in_array($aba ?? '', ['geral', 'participantes', 'grupo', 'tarefas', 'mate
     ? $aba : 'geral';
 $etapas = $relacoes['etapas'] ?? [];
 $aprovados = array_values(array_filter($inscricoes, static fn($i) => ($i['status'] ?? '') === 'Aprovada'));
-$listaAlmox = ExpoColagService::decodificarMateriaisNecessarios($projeto['materiais_necessarios'] ?? []);
+$listaAlmox = \App\Modulos\ExpoColag\Services\ExpoColagService::decodificarMateriaisNecessarios($projeto['materiais_necessarios'] ?? []);
 
 $badge = static function (string $st): string {
     $map = [

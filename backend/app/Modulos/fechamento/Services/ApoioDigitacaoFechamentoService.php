@@ -1,8 +1,6 @@
 <?php
-require_once __DIR__ . '/PlanilhaTextoDocumento.php';
-require_once __DIR__ . '/../../../Services/ResultadoHomologacaoService.php';
-require_once __DIR__ . '/../../../Services/FrequencyService.php';
-require_once __DIR__ . '/../../../Models/Education/ResultadoAcademico.php';
+
+namespace App\Modulos\Fechamento\Services;
 
 /**
  * Apoio à digitação do fechamento para SED (SP) e SERE (PR).
@@ -19,17 +17,17 @@ class ApoioDigitacaoFechamentoService
 
     private const UFS = ['SP', 'PR'];
 
-    private ResultadoHomologacaoService $homologacao;
+    private \App\Services\ResultadoHomologacaoService $homologacao;
     private $db;
     /** @var array<string, bool> */
     private array $colunas = [];
     /** @var array<string, bool> */
     private array $tabelas = [];
 
-    public function __construct(?ResultadoHomologacaoService $homologacao = null)
+    public function __construct(?\App\Services\ResultadoHomologacaoService $homologacao = null)
     {
-        $this->homologacao = $homologacao ?? new ResultadoHomologacaoService();
-        $this->db = Database::getInstance();
+        $this->homologacao = $homologacao ?? new \App\Services\ResultadoHomologacaoService();
+        $this->db = \App\Core\Database::getInstance();
     }
 
     public function schemaPronto(): bool
@@ -168,7 +166,7 @@ class ApoioDigitacaoFechamentoService
         if (!$this->turmaDoAno($turmaId, $anoLetivo)) {
             return ['success' => false, 'error' => 'Turma não encontrada neste ano letivo.'];
         }
-        if (!isset(ResultadoAcademico::PERIODO_TIPOS[$periodoTipo])) {
+        if (!isset(\App\Models\Education\ResultadoAcademico::PERIODO_TIPOS[$periodoTipo])) {
             $periodoTipo = 'ano';
             $periodoNumero = 0;
         }
@@ -222,7 +220,7 @@ class ApoioDigitacaoFechamentoService
                     'id' => $id,
                 ]
             );
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $this->db->query('DELETE FROM fechamento_apoio_digitacao WHERE id = :id', ['id' => $id]);
             return ['success' => false, 'error' => $e->getMessage()];
         }
@@ -407,7 +405,7 @@ class ApoioDigitacaoFechamentoService
             $avisosAluno = [];
             if (trim((string) ($aluno['ra'] ?? '')) === '') {
                 $avisosAluno[] = 'RA vazio';
-                $pendencias[] = $this->pendencia($this->nomeAluno($aluno) . ': RA vazio.', true);
+                $pendencias[] = $this->pendencia($this->nomeAluno($aluno) . ': \RA vazio.', true);
             } elseif ($ra['digito'] === '' || $ra['uf'] === '') {
                 $avisosAluno[] = 'Separar dígito e UF do RA';
                 $pendencias[] = $this->pendencia($this->nomeAluno($aluno) . ': dígito ou UF do RA em branco.', false);
@@ -525,7 +523,7 @@ class ApoioDigitacaoFechamentoService
         $blocosTxt = [];
         $ordem = 0;
         $periodoLabel = (string) ($periodo['label'] ?? '');
-        $frequencia = new FrequencyService();
+        $frequencia = new \App\Services\FrequencyService();
 
         foreach ($linhasPreview as $linha) {
             if (!is_array($linha)) {
@@ -546,7 +544,7 @@ class ApoioDigitacaoFechamentoService
             $avisosAluno = [];
             if ($cgm === '') {
                 $avisosAluno[] = 'CGM vazio';
-                $pendencias[] = $this->pendencia($nome . ': CGM vazio.', true);
+                $pendencias[] = $this->pendencia($nome . ': \CGM vazio.', true);
             }
             if (!$transferido && $this->semResultado($situacao)) {
                 $avisosAluno[] = 'Sem resultado — não lançar como aprovado';
@@ -598,9 +596,9 @@ class ApoioDigitacaoFechamentoService
                     $pendenciaLinha,
                 ];
                 $linhasTxtComp[] = '  COMPONENTE: ' . $nomeComp
-                    . ' | NOTA: ' . $this->nota($nota)
-                    . ' | FALTAS: ' . $faltas
-                    . ' | CH: ' . $chTxt
+                    . ' | \NOTA: ' . $this->nota($nota)
+                    . ' | \FALTAS: ' . $faltas
+                    . ' | \CH: ' . $chTxt
                     . ' | RECUPERAÇÃO: ' . $rec;
             }
             $blocosTxt[] = array_merge(
@@ -1026,14 +1024,14 @@ class ApoioDigitacaoFechamentoService
     /**
      * @return array<int, int>
      */
-    private function faltasPorComponente(FrequencyService $frequencia, int $alunoId, int $turmaId, string $inicio, string $fim): array
+    private function faltasPorComponente(\App\Services\FrequencyService $frequencia, int $alunoId, int $turmaId, string $inicio, string $fim): array
     {
         if ($alunoId <= 0 || $turmaId <= 0 || $inicio === '' || $fim === '') {
             return [];
         }
         try {
             $mapa = $frequencia->alunoPorComponente($alunoId, $turmaId, $inicio, $fim);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             return [];
         }
         $out = [];
@@ -1244,4 +1242,8 @@ class ApoioDigitacaoFechamentoService
         $this->colunas[$chave] = (int) ($row['n'] ?? 0) > 0;
         return $this->colunas[$chave];
     }
+}
+
+if (!class_exists('ApoioDigitacaoFechamentoService', false) && class_exists(__NAMESPACE__ . '\\ApoioDigitacaoFechamentoService', false)) {
+    class_alias(__NAMESPACE__ . '\\ApoioDigitacaoFechamentoService', 'ApoioDigitacaoFechamentoService');
 }

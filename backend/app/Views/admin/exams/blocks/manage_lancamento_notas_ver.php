@@ -69,7 +69,6 @@ $formatarNota = static function ($notaRaw): string {
 };
 
 if (!class_exists('AlunoLancamentoNotaHelper', false)) {
-    require_once __DIR__ . '/../../../../Helpers/AlunoLancamentoNotaHelper.php';
 }
 $exportLinhas = [];
 foreach ($linhasExportSrc as $ln) {
@@ -77,7 +76,7 @@ foreach ($linhasExportSrc as $ln) {
     $exportLinhas[] = [
         'turma' => (string) ($ln['turma_nome'] ?? ''),
         'numero' => $nChamada > 0 ? (string) $nChamada : '',
-        'aluno' => AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+        'aluno' => \App\Helpers\AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
             (string) ($ln['aluno_nome'] ?? ''),
             !empty($ln['transferido'])
         ),
@@ -94,7 +93,7 @@ if ($slugArquivo === '') {
 $renderLinha = static function (array $ln): void {
     $transferido = !empty($ln['transferido']);
     $nChamada = (int) ($ln['numero_chamada'] ?? 0);
-    $nomeAluno = AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+    $nomeAluno = \App\Helpers\AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
         (string) ($ln['aluno_nome'] ?? ''),
         $transferido
     );

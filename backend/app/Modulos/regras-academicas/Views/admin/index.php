@@ -1,5 +1,4 @@
 <?php
-require_once __DIR__ . '/../../Models/RegraAcademica.php';
 
 use App\Modulos\RegrasAcademicas\Models\RegraAcademica;
 
@@ -114,7 +113,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                             <?php endif; ?>
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-700">
-                            <?= htmlspecialchars(RegraAcademica::RECUPERACAO_TIPOS[$row['recuperacao_tipo'] ?? ''] ?? (string) ($row['recuperacao_tipo'] ?? '—')) ?>
+                            <?= htmlspecialchars(\App\Modulos\RegrasAcademicas\Models\RegraAcademica::RECUPERACAO_TIPOS[$row['recuperacao_tipo'] ?? ''] ?? (string) ($row['recuperacao_tipo'] ?? '—')) ?>
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-700">v<?= (int) ($row['versao'] ?? 1) ?></td>
                         <td class="px-6 py-4">

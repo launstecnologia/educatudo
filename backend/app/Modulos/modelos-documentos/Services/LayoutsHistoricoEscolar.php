@@ -2,7 +2,6 @@
 
 namespace App\Modulos\ModelosDocumentos\Services;
 
-require_once __DIR__ . '/ModeloDocumentoService.php';
 
 /**
  * Históricos escolares prontos para a escola escolher e editar no construtor.
@@ -503,4 +502,8 @@ class LayoutsHistoricoEscolar
 
         return '<td' . $attrs . '>' . $html . '</td>';
     }
+}
+
+if (!class_exists('LayoutsHistoricoEscolar', false) && class_exists(__NAMESPACE__ . '\\LayoutsHistoricoEscolar', false)) {
+    class_alias(__NAMESPACE__ . '\\LayoutsHistoricoEscolar', 'LayoutsHistoricoEscolar');
 }

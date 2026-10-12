@@ -21,9 +21,8 @@ $actionUrl = $isEdit ? (URL . '/master/usuarios/atualizar') : (URL . '/master/us
                 <?php
                 $avatarAtual = $usuario['avatar_url'] ?? '';
                 if (!class_exists('MasterAvatarService')) {
-                    require_once __DIR__ . '/../../../Services/MasterAvatarService.php';
                 }
-                $iniciaisPreview = MasterAvatarService::iniciais($usuario['nome'] ?? 'Master');
+                $iniciaisPreview = \App\Services\MasterAvatarService::iniciais($usuario['nome'] ?? 'Master');
                 ?>
                 <div id="avatar-preview" class="w-16 h-16 rounded-full shrink-0 overflow-hidden border border-slate-200 bg-slate-800 flex items-center justify-center text-white text-lg font-semibold">
                     <?php if (!empty($avatarAtual)): ?>

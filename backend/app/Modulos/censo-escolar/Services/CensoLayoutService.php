@@ -139,3 +139,7 @@ class CensoLayoutService
         ];
     }
 }
+
+if (!class_exists('CensoLayoutService', false) && class_exists(__NAMESPACE__ . '\\CensoLayoutService', false)) {
+    class_alias(__NAMESPACE__ . '\\CensoLayoutService', 'CensoLayoutService');
+}

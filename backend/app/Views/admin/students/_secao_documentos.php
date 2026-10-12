@@ -2,8 +2,7 @@
 /** Extraído de show.php — conteúdo existente, sem alteração de regra de negócio. */
 ?>
     <?php
-    require_once __DIR__ . '/../../../Models/User/StudentDocument.php';
-    $docChecklist = \StudentDocument::checklist();
+    $docChecklist = \App\Models\User\StudentDocument::checklist();
     $docsAluno = is_array($documentos_aluno ?? null) ? $documentos_aluno : [];
     $docsPorTipo = [];
     $docsOutros = [];
@@ -66,7 +65,7 @@
                             $linhasDoc[] = ['tipo' => $ckTipo, 'label' => $ckLabel, 'row' => $docsPorTipo[$ckTipo] ?? null];
                         }
                         foreach ($docsOutros as $outroRow) {
-                            $linhasDoc[] = ['tipo' => 'outros', 'label' => \StudentDocument::tipoLabel('outros', $outroRow['titulo'] ?? null), 'row' => $outroRow];
+                            $linhasDoc[] = ['tipo' => 'outros', 'label' => \App\Models\User\StudentDocument::tipoLabel('outros', $outroRow['titulo'] ?? null), 'row' => $outroRow];
                         }
                         foreach ($linhasDoc as $linha):
                             $row = $linha['row'];

@@ -28,11 +28,11 @@
                 <?php
                 $logoNavbarPreview = trim((string) ($config_layout['logo_navbar_url'] ?? ''));
                 if ($logoNavbarPreview === '') {
-                    $logoNavbarPreview = (string) LayoutHelper::getNavbarLogoUrl();
+                    $logoNavbarPreview = (string) \App\Core\LayoutHelper::getNavbarLogoUrl();
                 }
                 $logoLoginPreview = trim((string) ($config_layout['logo_login_url'] ?? ''));
                 if ($logoLoginPreview === '') {
-                    $logoLoginPreview = (string) LayoutHelper::getLoginLogoUrl();
+                    $logoLoginPreview = (string) \App\Core\LayoutHelper::getLoginLogoUrl();
                 }
                 $logoSlots = [
                     [
@@ -198,7 +198,7 @@
                     $navbarBgAtual = (string) ($config_layout['navbar_bg_color'] ?? $corPrimariaAtual);
                     $sidebarTextAtual = (string) ($config_layout['sidebar_text_color'] ?? '');
                     if ($sidebarTextAtual === '') {
-                        $sidebarTextAtual = LayoutHelper::getSidebarColors()['text'];
+                        $sidebarTextAtual = \App\Core\LayoutHelper::getSidebarColors()['text'];
                     }
                     $botaoPrimarioAtual = (string) ($config_layout['button_primary_color'] ?? $corPrimariaAtual);
                     ?>

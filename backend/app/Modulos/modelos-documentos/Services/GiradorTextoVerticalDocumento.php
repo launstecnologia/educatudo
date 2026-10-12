@@ -12,6 +12,9 @@ class GiradorTextoVerticalDocumento
     /** Largura útil da folha A4 com margem de 8 mm de cada lado, em mm. */
     private const LARGURA_MM = 190.0;
 
+    /** Soma das linhas que ainda cabe na área útil, com folga para borda e preenchimento. */
+    private const ALTURA_UTIL_MM = 248.0;
+
     public static function aplicar(string $html): string
     {
         if (!str_contains($html, 'edoc-vert') && !str_contains($html, 'edoc-logo')) {
@@ -70,6 +73,8 @@ class GiradorTextoVerticalDocumento
         foreach ($linhas as $i => $tr) {
             $alturas[$i] = self::alturaMm($tr->getAttribute('style'));
         }
+        $alturas = self::esticarTextoVertical($linhas, $alturas);
+        $alturas = self::encaixarNaFolha($linhas, $alturas);
 
         $ocupado = [];
         foreach ($linhas as $ri => $tr) {
@@ -86,6 +91,11 @@ class GiradorTextoVerticalDocumento
                     }
                 }
                 $classes = ' ' . $td->getAttribute('class') . ' ';
+                $altMm = 0.0;
+                for ($r = 0; $r < $rs; $r++) {
+                    $altMm += $alturas[$ri + $r] ?? 5.5;
+                }
+                self::travarCelula($td, $altMm);
                 if (str_contains($classes, ' edoc-logo ')) {
                     self::limitarLogo($td);
                 }
@@ -95,17 +105,7 @@ class GiradorTextoVerticalDocumento
                         $colMm += $larguras[$ci + $c] ?? self::larguraRestante($larguras);
                     }
                     $colMm = ($colMm / 100) * self::LARGURA_MM;
-                    $altMm = 0.0;
-                    for ($r = 0; $r < $rs; $r++) {
-                        $altMm += $alturas[$ri + $r] ?? 5.5;
-                    }
-                    $precisa = self::larguraTextoMm(self::textoDaCelula($td), 6.0) + 1.6;
-                    if ($rs === 1 && $precisa > $altMm) {
-                        $altMm = $precisa;
-                        $tr->setAttribute('style', self::definirAltura($tr->getAttribute('style'), $altMm));
-                        $alturas[$ri] = $altMm;
-                    }
-                    self::girar($td, $dom, $colMm, $altMm);
+                    self::girar($td, $dom, $colMm, $altMm, self::textoDaCelula($td));
                 }
                 $ci += $cs;
             }
@@ -214,6 +214,66 @@ class GiradorTextoVerticalDocumento
         return mb_strlen($texto) * $pt * 0.62 * 0.3528;
     }
 
+    /**
+     * Linha de uma célula só: se o texto vertical não cabe, a linha cresce.
+     * O encaixe na folha reduz tudo depois, se a soma passar da página.
+     *
+     * @param list<\DOMElement> $linhas
+     * @param list<float> $alturas
+     * @return list<float>
+     */
+    private static function esticarTextoVertical(array $linhas, array $alturas): array
+    {
+        $ocupado = [];
+        foreach ($linhas as $ri => $tr) {
+            $ci = 0;
+            foreach (self::celulas($tr) as $td) {
+                while (!empty($ocupado[$ri][$ci])) {
+                    $ci++;
+                }
+                $cs = max(1, (int) $td->getAttribute('colspan'));
+                $rs = max(1, (int) $td->getAttribute('rowspan'));
+                for ($r = 0; $r < $rs; $r++) {
+                    for ($c = 0; $c < $cs; $c++) {
+                        $ocupado[$ri + $r][$ci + $c] = true;
+                    }
+                }
+                $classes = ' ' . $td->getAttribute('class') . ' ';
+                if ($rs === 1 && str_contains($classes, ' edoc-vert ')) {
+                    $altMm = $alturas[$ri] ?? 5.5;
+                    $precisa = self::larguraTextoMm(self::textoDaCelula($td), 5.5) + 1.2;
+                    if ($precisa > $altMm) {
+                        $alturas[$ri] = min($precisa, 12.0);
+                        $tr->setAttribute('style', self::definirAltura($tr->getAttribute('style'), $alturas[$ri]));
+                    }
+                }
+                $ci += $cs;
+            }
+        }
+
+        return $alturas;
+    }
+
+    /**
+     * @param list<\DOMElement> $linhas
+     * @param list<float> $alturas
+     * @return list<float>
+     */
+    private static function encaixarNaFolha(array $linhas, array $alturas): array
+    {
+        $soma = array_sum($alturas);
+        if ($soma <= self::ALTURA_UTIL_MM || $soma <= 0) {
+            return $alturas;
+        }
+        $fator = self::ALTURA_UTIL_MM / $soma;
+        foreach ($linhas as $i => $tr) {
+            $alturas[$i] = max(3.4, ($alturas[$i] ?? 5.5) * $fator);
+            $tr->setAttribute('style', self::definirAltura($tr->getAttribute('style'), $alturas[$i]));
+        }
+
+        return $alturas;
+    }
+
     private static function definirAltura(string $style, float $mm): string
     {
         $valor = number_format($mm, 2, '.', '') . 'mm';
@@ -241,20 +301,26 @@ class GiradorTextoVerticalDocumento
         return false;
     }
 
-    private static function girar(\DOMElement $td, \DOMDocument $dom, float $colMm, float $altMm): void
+    private static function girar(\DOMElement $td, \DOMDocument $dom, float $colMm, float $altMm, string $texto): void
     {
         $colMm = max(4.0, $colMm);
-        $altMm = max(6.0, $altMm);
-        $esp = max(3.2, $colMm - 1.2);
-        $comp = max($esp + 2.0, $altMm - 0.4);
+        $altMm = max(4.0, $altMm);
+        $esp = max(3.0, $colMm - 1.2);
+        $comp = max($esp + 2.0, $altMm - 0.6);
+        $pt = 6.0;
+        $largura = self::larguraTextoMm($texto, $pt);
+        if ($largura > $comp && $largura > 0) {
+            $pt = max(4.2, $pt * ($comp / $largura));
+        }
         $mx = ($colMm - $comp) / 2;
         $my = ($altMm - $esp) / 2;
         $fmt = static fn (float $n): string => number_format($n, 2, '.', '');
+        $ptCss = number_format($pt, 2, '.', '');
         $style = 'display:block;width:' . $fmt($comp) . 'mm;height:' . $fmt($esp) . 'mm;'
             . 'margin:' . $fmt($my) . 'mm ' . $fmt($mx) . 'mm;'
             . 'transform:rotate(-90deg);transform-origin:center center;'
             . 'text-align:center;line-height:' . $fmt($esp) . 'mm;white-space:nowrap;'
-            . 'font-weight:700;font-size:6pt;letter-spacing:0.02em;';
+            . 'font-weight:700;font-size:' . $ptCss . 'pt;letter-spacing:0;overflow:hidden;';
 
         $div = $dom->createElement('div');
         $div->setAttribute('class', 'edoc-giro');
@@ -264,6 +330,46 @@ class GiradorTextoVerticalDocumento
         }
         $td->appendChild($div);
         $td->setAttribute('class', trim($td->getAttribute('class') . ' edoc-vert-caixa'));
+    }
+
+    /**
+     * O Dompdf trata a altura da linha como mínimo. Fonte e preenchimento
+     * herdados (11pt, entrelinha 1.5) esticam a grade e o fim sai da folha.
+     */
+    private static function travarCelula(\DOMElement $td, float $altMm): void
+    {
+        $classes = ' ' . $td->getAttribute('class') . ' ';
+        $pt = '6.5';
+        if (str_contains($classes, ' edoc-titulo ')) {
+            $pt = '9';
+        } elseif (str_contains($classes, ' edoc-sub ')) {
+            $pt = '7.5';
+        }
+        $vertical = str_contains($classes, ' edoc-vert ');
+        $pad = ($vertical || str_contains($classes, ' edoc-logo ')) ? '0' : '0.15mm 0.35mm';
+        $extra = 'box-sizing:border-box;height:' . number_format(max(3.4, $altMm), 2, '.', '') . 'mm;'
+            . 'padding:' . $pad . ';line-height:1;font-size:' . $pt . 'pt;overflow:' . ($vertical ? 'visible' : 'hidden') . ';';
+        $style = preg_replace(
+            '/(?:^|;)\s*(?:box-sizing|height|padding(?:-(?:top|right|bottom|left))?|line-height|font-size|overflow)\s*:[^;]*/i',
+            '',
+            $td->getAttribute('style')
+        );
+        $style = trim(is_string($style) ? $style : '', " \t;");
+        $td->setAttribute('style', ($style === '' ? '' : $style . ';') . $extra);
+        foreach (['p', 'div'] as $tag) {
+            foreach ($td->getElementsByTagName($tag) as $filho) {
+                if (!$filho instanceof \DOMElement) {
+                    continue;
+                }
+                if (str_contains(' ' . $filho->getAttribute('class') . ' ', ' edoc-giro ')) {
+                    continue;
+                }
+                $filhoStyle = trim($filho->getAttribute('style'), " \t;");
+                if (preg_match('/(?:^|;)\s*margin\s*:/i', $filhoStyle) !== 1) {
+                    $filho->setAttribute('style', ($filhoStyle === '' ? '' : $filhoStyle . ';') . 'margin:0;');
+                }
+            }
+        }
     }
 
     private static function limitarLogo(\DOMElement $td): void
@@ -280,4 +386,8 @@ class GiradorTextoVerticalDocumento
             );
         }
     }
+}
+
+if (!class_exists('GiradorTextoVerticalDocumento', false) && class_exists(__NAMESPACE__ . '\\GiradorTextoVerticalDocumento', false)) {
+    class_alias(__NAMESPACE__ . '\\GiradorTextoVerticalDocumento', 'GiradorTextoVerticalDocumento');
 }

@@ -2,12 +2,9 @@
 
 namespace App\Modulos\VidaEscolar\Services;
 
-require_once __DIR__ . '/../../../Services/DocumentProcessorService.php';
-require_once __DIR__ . '/../../../Services/OpenAIService.php';
 
 use App\Services\OpenAIService;
-use DocumentProcessorService;
-
+use App\Services\DocumentProcessorService;
 /**
  * Lê o PDF/imagem do histórico e monta um rascunho de importação.
  * A coordenação confere e só então valida.
@@ -440,4 +437,8 @@ class HistoricoOcrService
         $out = @shell_exec('command -v ' . escapeshellarg($cmd) . ' 2>/dev/null');
         return is_string($out) && trim($out) !== '';
     }
+}
+
+if (!class_exists('HistoricoOcrService', false) && class_exists(__NAMESPACE__ . '\\HistoricoOcrService', false)) {
+    class_alias(__NAMESPACE__ . '\\HistoricoOcrService', 'HistoricoOcrService');
 }

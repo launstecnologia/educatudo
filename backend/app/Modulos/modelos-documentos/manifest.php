@@ -5,6 +5,7 @@
  */
 return [
     'chave' => 'modelos-documentos',
+    'namespace' => 'App\\Modulos\\ModelosDocumentos',
     'label' => 'Layout de documentos',
     'grupo' => 'secretaria',
     'feature_keys' => [],

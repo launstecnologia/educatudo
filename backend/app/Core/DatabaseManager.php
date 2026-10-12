@@ -1,13 +1,12 @@
 <?php
+
+namespace App\Core;
 /**
  * EducaTudo - Gerenciador de conexões por tenant (escola)
  * Usado quando MULTI_TENANT=true. Obtém credenciais do banco master (config_escolas_banco)
  * e retorna instância de Database conectada ao banco do tenant.
  */
 
-require_once __DIR__ . '/Database.php';
-require_once __DIR__ . '/RedisCache.php';
-require_once __DIR__ . '/MasterSecretVault.php';
 
 class DatabaseManager
 {
@@ -17,7 +16,7 @@ class DatabaseManager
     /** @var Database[] Cache de conexões por escola_id na mesma requisição */
     private $tenantConnections = [];
 
-    public function __construct(?PDO $masterPdo = null)
+    public function __construct(?\PDO $masterPdo = null)
     {
         $this->masterPdo = $masterPdo;
     }
@@ -25,13 +24,13 @@ class DatabaseManager
     /**
      * Abre o MASTER somente sob demanda (cache miss ou serviços que precisam dele).
      */
-    public function ensureMasterPdo(): PDO
+    public function ensureMasterPdo(): \PDO
     {
-        if ($this->masterPdo instanceof PDO) {
+        if ($this->masterPdo instanceof \PDO) {
             return $this->masterPdo;
         }
         $global = $GLOBALS['_educatudo_master_pdo'] ?? null;
-        if ($global instanceof PDO) {
+        if ($global instanceof \PDO) {
             $this->masterPdo = $global;
             return $this->masterPdo;
         }
@@ -77,7 +76,7 @@ class DatabaseManager
 
         $config = $this->getConfigTenant($escolaId);
         if (!$config) {
-            throw new Exception("Configuração de banco não encontrada para a escola ID {$escolaId}. Verifique a tabela config_escolas_banco no banco master.");
+            throw new \Exception("Configuração de banco não encontrada para a escola ID {$escolaId}. Verifique a tabela config_escolas_banco no banco master.");
         }
 
         return $this->createConnectionFromConfig($config, $escolaId);
@@ -100,7 +99,7 @@ class DatabaseManager
              WHERE escola_id = :escola_id LIMIT 1"
         );
         $stmt->execute(['escola_id' => $escolaId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
         if ($row !== false && $row !== null) {
             RedisCache::set('tenant_config_' . $escolaId, json_encode($row), 300);
             return $row;
@@ -138,7 +137,7 @@ class DatabaseManager
         return $host !== '' && $nomeBanco !== '' && $usuario !== '';
     }
 
-    private function createPdoForTenant(array $config): PDO
+    private function createPdoForTenant(array $config): \PDO
     {
         $normalized = $this->normalizeDatabaseConfig($config);
         $host = $normalized['host'];
@@ -152,36 +151,36 @@ class DatabaseManager
         }
 
         if ($name === '') {
-            throw new Exception("Nome do banco do tenant não pode ser vazio (config_escolas_banco.nome_banco).");
+            throw new \Exception("Nome do banco do tenant não pode ser vazio (config_escolas_banco.nome_banco).");
         }
 
         $connectTimeout = Database::resolveConnectTimeout();
 
         $dsn = "mysql:host={$host};port={$port};dbname={$name};charset={$charset}";
         $options = [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+            \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
             // Emulado (padrão do PDO, igual ao Database.php single-tenant): 1 round-trip
             // por query em vez de 3 (PREPARE/EXECUTE/DEALLOCATE) — com o MySQL em outro
             // servidor, o modo nativo triplicava a latência de rede de toda query.
             // Também evita o erro HY093 com parâmetros nomeados repetidos.
             // Reativado em 2026-07-11 depois de corrigir Database::query() para fazer
-            // bind explícito de PDO::PARAM_INT/STR/NULL por parâmetro (ver
+            // bind explícito de \PDO::PARAM_INT/STR/NULL por parâmetro (ver
             // Database::bindParamsComTipo) — antes dessa correção, execute($params)
             // tratava todo valor como string e gerava "LIMIT '5'" (com aspas), que o
             // MySQL rejeita. Testado com LIMIT/OFFSET posicional, WHERE nomeado e
             // INSERT/UPDATE/DELETE antes de reativar.
-            PDO::ATTR_EMULATE_PREPARES => true,
+            \PDO::ATTR_EMULATE_PREPARES => true,
             // Conexão não-persistente evita "Packets out of order" quando o MySQL fecha conexões idle
-            PDO::ATTR_PERSISTENT => false,
+            \PDO::ATTR_PERSISTENT => false,
             // Timeout de conexão para reduzir falhas por oscilações curtas de rede
-            PDO::ATTR_TIMEOUT => $connectTimeout,
+            \PDO::ATTR_TIMEOUT => $connectTimeout,
         ];
 
-        $pdo = new PDO($dsn, $user, $pass, $options);
+        $pdo = new \PDO($dsn, $user, $pass, $options);
         $pdo->exec("SET time_zone = '-03:00'");
         $pdo->exec("SET NAMES {$charset} COLLATE {$charset}_unicode_ci");
-        $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+        $pdo->setAttribute(\PDO::ATTR_DEFAULT_FETCH_MODE, \PDO::FETCH_ASSOC);
 
         return $pdo;
     }
@@ -199,13 +198,17 @@ class DatabaseManager
                 ? strtolower((string) ($config['charset'] ?? 'utf8mb4'))
                 : 'utf8mb4',
             'options' => [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+                \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
                 // Reativado — ver comentário na outra conexão de tenant acima (getPdo())
-                PDO::ATTR_EMULATE_PREPARES => true,
-                PDO::ATTR_PERSISTENT => false,
-                PDO::ATTR_TIMEOUT => $connectTimeout,
+                \PDO::ATTR_EMULATE_PREPARES => true,
+                \PDO::ATTR_PERSISTENT => false,
+                \PDO::ATTR_TIMEOUT => $connectTimeout,
             ],
         ];
     }
+}
+
+if (!class_exists('DatabaseManager', false) && class_exists(__NAMESPACE__ . '\\DatabaseManager', false)) {
+    class_alias(__NAMESPACE__ . '\\DatabaseManager', 'DatabaseManager');
 }

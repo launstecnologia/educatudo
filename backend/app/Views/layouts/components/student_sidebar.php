@@ -31,9 +31,8 @@
                     $sidebarAvatarUrl = $avatar_url ?? null;
                     if (empty($sidebarAvatarUrl) && isset($aluno['id'])) {
                         try {
-                            require_once __DIR__ . '/../../../Core/ContextoAluno.php';
-                            $sidebarAvatarUrl = ContextoAluno::getAvatarUrl(Database::getInstance());
-                        } catch (Exception $e) {
+                            $sidebarAvatarUrl = \App\Core\ContextoAluno::getAvatarUrl(\App\Core\Database::getInstance());
+                        } catch (\Exception $e) {
                             $sidebarAvatarUrl = null;
                         }
                     }
@@ -69,7 +68,7 @@
                 <svg class="w-5 h-5 mr-3 sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
                 </svg>
-                <span class="sidebar-text">Chat <?= htmlspecialchars(LayoutHelper::getIaName()) ?></span>
+                <span class="sidebar-text">Chat <?= htmlspecialchars(\App\Core\LayoutHelper::getIaName()) ?></span>
             </a>
             
             <a href="<?= URL ?>/exercicios-personalizados/minhas-listas" class="flex items-center px-4 py-3 <?= $current_page === 'exercises' ? 'text-white bg-white/20' : 'text-green-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105 sidebar-nav-item">
@@ -100,7 +99,7 @@
                 <span class="sidebar-text">Jornadas</span>
             </a>
 
-            <?php require_once __DIR__ . '/../../../Core/FeatureGate.php'; if (FeatureGate::isModuleEnabled('ead')): ?>
+            <?php require_once __DIR__ . '/../../../Core/FeatureGate.php'; if (\App\Core\FeatureGate::isModuleEnabled('ead')): ?>
             <a href="<?= URL ?>/cursos" class="flex items-center px-4 py-3 <?= $current_page === 'cursos' ? 'text-white bg-white/20' : 'text-green-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105 sidebar-nav-item">
                 <svg class="w-5 h-5 mr-3 sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path>
@@ -131,7 +130,7 @@
                 <span class="sidebar-text">Mural de Recados</span>
             </a>
 
-            <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aulas_online')): ?>
+            <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('aulas_online')): ?>
             <a href="<?= URL ?>/aluno/aulas-online" class="flex items-center px-4 py-3 <?= $current_page === 'aulas_online' ? 'text-white bg-white/20' : 'text-green-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105 sidebar-nav-item">
                 <svg class="w-5 h-5 mr-3 sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14m-9 4h8a2 2 0 002-2V8a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
@@ -140,7 +139,7 @@
             </a>
             <?php endif; ?>
             
-            <?php if (!class_exists('LayoutHelper') || LayoutHelper::isModuleEnabled('aluno_apostilas')): ?>
+            <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('aluno_apostilas')): ?>
             <a href="<?= URL ?>/aluno/apostilas-ia" class="flex items-center px-4 py-3 <?= ($current_page ?? '') === 'apostilas-ia' ? 'text-white bg-white/20' : 'text-green-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105 sidebar-nav-item">
                 <svg class="w-5 h-5 mr-3 sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
@@ -164,11 +163,10 @@
             </a>
 
             <?php
-            require_once __DIR__ . '/../../../Core/EducaHitsConfig.php';
-            $educaHitsEnabled = LayoutHelper::isModuleEnabled('educa_hits');
+            $educaHitsEnabled = \App\Core\LayoutHelper::isModuleEnabled('educa_hits');
             $ehEscutarUrl = URL . '/hits';
             $educahitsEscutarNovaGuiaFromApps = false;
-            $rawExtAppsEh = json_decode((string) LayoutHelper::get('external_apps_links', '[]'), true);
+            $rawExtAppsEh = json_decode((string) \App\Core\LayoutHelper::get('external_apps_links', '[]'), true);
             if (!is_array($rawExtAppsEh)) {
                 $rawExtAppsEh = [];
             }
