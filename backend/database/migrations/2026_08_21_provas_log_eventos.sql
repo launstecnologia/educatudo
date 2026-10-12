@@ -1,4 +1,4 @@
--- Log de Provas (Master, somente leitura — ver specs/tasks.md "Log de Provas"):
+-- Log de Provas (Master, somente leitura — ver especificacoes/tasks.md "Log de Provas"):
 -- registra anomalias durante a realização de provas online pelo aluno (erro de
 -- sessão/salvar resposta/finalizar, tentativa de burlar o modo seguro/tela
 -- cheia). NÃO registra fluxo normal (acessar, responder, avançar, finalizar

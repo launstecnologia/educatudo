@@ -1,4 +1,4 @@
--- Diário de Classe (Fase 1 da reestruturação — ver specs/PRD.md §9):
+-- Diário de Classe (Fase 1 da reestruturação — ver especificacoes/PRD.md §9):
 -- 1) Tabela de fechamento por período (Turma + Componente Curricular +
 --    Professor + Ano Letivo + Bimestre), mesmo padrão simples de
 --    provas_blocos.ano_letivo/bimestre (sem catálogo à parte).

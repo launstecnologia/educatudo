@@ -52,3 +52,6 @@ backend/public/assets/guia-onboarding/
 # Claude Code — overrides pessoais e worktrees não versionam
 .claude/settings.local.json
 .claude/worktrees/
+
+# PDFs gerados em runtime
+backend/documentos/emissoes/

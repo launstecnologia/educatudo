@@ -4,9 +4,7 @@
   "description": "Assets (MathLive, Tailwind) para EducaTudo",
   "scripts": {
     "build:css": "tailwindcss -i ./assets/css/input.css -o ./public/static/css/tailwind.css --minify",
-    "watch:css": "tailwindcss -i ./assets/css/input.css -o ./public/static/css/tailwind.css --watch",
-    "test:admin-prova": "cd .. && npm run test:admin-prova",
-    "test:e2e": "cd .. && npm run test"
+    "watch:css": "tailwindcss -i ./assets/css/input.css -o ./public/static/css/tailwind.css --watch"
   },
   "dependencies": {
     "mathlive": "^0.98.2"

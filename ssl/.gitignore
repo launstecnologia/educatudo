@@ -1,5 +1,0 @@
-# Certificados SSL (não commitar)
-/cloudflare-origin.pem
-/cloudflare-origin.key
-*.pem
-*.key

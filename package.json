@@ -1,12 +1,12 @@
 {
   "name": "plataforma-educatudo-e2e",
   "private": true,
-  "scripts": {
-    "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed",
-    "test:e2e:report": "playwright show-report"
-  },
+  "scripts": {},
   "devDependencies": {
-    "@playwright/test": "^1.51.0"
+    "@playwright/test": "^1.51.0",
+    "@types/node": "^22.13.10",
+    "playwright": "^1.51.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
   }
 }
