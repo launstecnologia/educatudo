@@ -64,7 +64,7 @@ $tituloWiki = (string) ($wiki_titulo ?? 'Documentação');
                 <?php if (!empty($pagina['atualizado_em'])): ?>
                     <p class="text-xs text-slate-400 mb-4">Atualizado em <?= htmlspecialchars($pagina['atualizado_em'], ENT_QUOTES, 'UTF-8') ?></p>
                 <?php endif; ?>
-                <div id="doc-wiki-body" class="doc-wiki-prose max-w-3xl">
+                <div id="doc-wiki-body" class="doc-wiki-prose max-w-4xl">
                     <p class="text-slate-500 text-sm">Carregando documentação…</p>
                 </div>
             </article>
@@ -120,12 +120,18 @@ $tituloWiki = (string) ($wiki_titulo ?? 'Documentação');
 .doc-wiki-prose a:hover { opacity: 0.85; }
 .doc-wiki-prose hr { border: 0; border-top: 1px solid #e2e8f0; margin: 1.75rem 0; }
 .doc-wiki-prose strong { font-weight: 650; color: #0f172a; }
+.doc-wiki-prose .mermaid {
+    margin: 1.25rem 0; padding: 1rem; background: #f8fafc; border: 1px solid #e2e8f0;
+    border-radius: 0.75rem; overflow-x: auto; text-align: center;
+}
+.doc-wiki-prose .mermaid svg { max-width: 100%; height: auto; }
 #doc-wiki-toc a { display: block; padding: 0.2rem 0; border-radius: 0.25rem; color: #64748b; text-decoration: none; }
 #doc-wiki-toc a:hover { color: #0f172a; }
 #doc-wiki-toc a.toc-h3 { padding-left: 0.75rem; font-size: 0.7rem; }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
 <script>
 (function () {
     var root = document.getElementById('doc-wiki-root');
@@ -148,6 +154,30 @@ $tituloWiki = (string) ($wiki_titulo ?? 'Documentação');
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/^-+|-+$/g, '') || 'sec';
     }
+
+    // Preserve ```mermaid blocks as <pre class="mermaid"> for Mermaid.js
+    // marked v9+ passa token {text,lang}; versões antigas usam (code, infostring)
+    var renderer = new marked.Renderer();
+    var defaultCode = renderer.code.bind(renderer);
+    renderer.code = function (codeOrToken, infostring, escaped) {
+        var text = '';
+        var lang = '';
+        if (codeOrToken && typeof codeOrToken === 'object') {
+            text = String(codeOrToken.text || '');
+            lang = String(codeOrToken.lang || '').split(/\s+/)[0] || '';
+        } else {
+            text = String(codeOrToken || '');
+            lang = String(infostring || '').split(/\s+/)[0] || '';
+        }
+        if (lang === 'mermaid') {
+            return '<pre class="mermaid">' + text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;') + '</pre>';
+        }
+        return defaultCode(codeOrToken, infostring, escaped);
+    };
+    marked.use({ renderer: renderer });
 
     body.innerHTML = marked.parse(md);
 
@@ -175,10 +205,25 @@ $tituloWiki = (string) ($wiki_titulo ?? 'Documentação');
             var html = '';
             headings.forEach(function (el) {
                 var cls = el.tagName === 'H3' ? 'toc-h3' : '';
-                html += '<a class="' + cls + '" href="#' + el.id + '">' + (el.textContent || '') + '</a>';
+                var label = (el.textContent || '')
+                    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                var idSafe = String(el.id || '').replace(/[^a-zA-Z0-9_-]/g, '');
+                html += '<a class="' + cls + '" href="#' + idSafe + '">' + label + '</a>';
             });
             toc.innerHTML = html;
         }
+    }
+
+    if (typeof mermaid !== 'undefined' && body.querySelectorAll('.mermaid').length) {
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'neutral',
+            securityLevel: 'strict',
+            flowchart: { curve: 'basis', padding: 12 },
+        });
+        mermaid.run({ nodes: body.querySelectorAll('.mermaid') }).catch(function (err) {
+            console.warn('Mermaid wiki:', err);
+        });
     }
 })();
 </script>

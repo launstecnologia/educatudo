@@ -1,4 +1,3 @@
-<?php require_once __DIR__ . '/../../Core/CreditosDecimalHelper.php'; ?>
 <?php
 $kpis = $kpis ?? [
     'total_logins_sucesso' => 0,

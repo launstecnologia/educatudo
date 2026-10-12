@@ -631,7 +631,7 @@ class SlidesController extends BaseController
         // PRIORIDADE 2: \Tentar carregar do config/app.php
         if (empty($apiKey)) {
             try {
-                $config = require __DIR__ . '/../../../config/app.php';
+                $config = require __DIR__ . '/../../../../config/app.php';
                 $apiKey = $config['ai']['gamma_api_key'] ?? null;
             } catch (\Exception $e) {
                 error_log("Erro ao carregar config/app.php: " . $e->getMessage());

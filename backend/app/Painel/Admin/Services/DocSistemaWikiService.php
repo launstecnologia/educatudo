@@ -12,11 +12,12 @@ class DocSistemaWikiService
     /** Ordem preferencial no índice (slug => peso). */
     private const ORDEM = [
         'index' => 0,
-        'estrutura' => 1,
-        'multi-tenant' => 2,
-        'perfis' => 3,
-        'assistente' => 4,
-        'tool' => 5,
+        'mapa' => 1,
+        'estrutura' => 2,
+        'multi-tenant' => 3,
+        'perfis' => 4,
+        'assistente' => 5,
+        'tool' => 6,
     ];
 
     public function __construct(?string $dirBase = null)
@@ -25,7 +26,8 @@ class DocSistemaWikiService
             $this->dirBase = realpath($dirBase) ?: '';
             return;
         }
-        $this->dirBase = realpath(__DIR__ . '/../../doc_sistema') ?: '';
+        // Services → Admin → Painel → app → backend/doc_sistema
+        $this->dirBase = realpath(__DIR__ . '/../../../../doc_sistema') ?: '';
     }
 
     public function dirBase(): string
@@ -103,10 +105,11 @@ class DocSistemaWikiService
         }
         $doc = $slug !== '' ? $this->carregarPagina($slug) : null;
         if ($slug !== '' && $doc === null) {
+            $slugSeguro = preg_match('/^[a-z0-9][a-z0-9_-]*$/', $slug) ? $slug : 'pagina';
             return [
-                'slug' => $slug,
+                'slug' => $slugSeguro,
                 'titulo' => 'Página não encontrada',
-                'conteudo_md' => "# Página não encontrada\n\nO arquivo `{$slug}.md` não existe em `doc_sistema/`.",
+                'conteudo_md' => "# Página não encontrada\n\nO arquivo `{$slugSeguro}.md` não existe em `doc_sistema/`.",
                 'atualizado_em' => null,
             ];
         }

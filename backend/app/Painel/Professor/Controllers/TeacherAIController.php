@@ -626,7 +626,7 @@ class TeacherAIController extends BaseController
             );
             
             // Formatar mensagens da IA usando ChatFormatter
-            require_once __DIR__ . '/../../Utils/ChatFormatter.php';
+            require_once __DIR__ . '/../../../Utils/ChatFormatter.php';
             foreach ($mensagens as &$msg) {
                 if ($msg['role'] === 'assistant') {
                     $msg['conteudo_formatado'] = \ChatFormatter::formatMessageWithClasses($msg['conteudo'], true);
@@ -904,7 +904,7 @@ class TeacherAIController extends BaseController
             );
             
             // Formatar resposta usando ChatFormatter
-            require_once __DIR__ . '/../../Utils/ChatFormatter.php';
+            require_once __DIR__ . '/../../../Utils/ChatFormatter.php';
             $respostaFormatada = \ChatFormatter::formatMessageWithClasses($respostaRAG['resposta'], true);
             
             $this->json([

@@ -1207,7 +1207,7 @@ class ReportAdminController extends AdminBaseController
             'logo_data' => $logoData,
             'gerado_em' => date('d/m/Y H:i'),
         ], EXTR_SKIP);
-        require __DIR__ . '/../../Views/admin/reports/boletim_coordenacao_pdf.php';
+        require __DIR__ . '/../Views/reports/boletim_coordenacao_pdf.php';
         $html = (string) ob_get_clean();
 
         $oldDisplayErrors = ini_get('display_errors');

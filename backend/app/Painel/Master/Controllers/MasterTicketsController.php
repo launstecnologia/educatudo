@@ -27,7 +27,7 @@ class MasterTicketsController extends BaseController
         if (!class_exists('DatabaseManager', false)) {
         }
         if (!function_exists('rich_text_render')) {
-            require_once __DIR__ . '/../../Helpers/RichTextHelper.php';
+            require_once __DIR__ . '/../../../Helpers/RichTextHelper.php';
         }
     }
 
@@ -148,7 +148,7 @@ class MasterTicketsController extends BaseController
         $mensagens = [];
         foreach ($ctx['mensagens'] as $msg) {
             if (!function_exists('ticket_message_html')) {
-                require_once __DIR__ . '/../../Helpers/RichTextHelper.php';
+                require_once __DIR__ . '/../../../Helpers/RichTextHelper.php';
             }
             $mensagemHtml = ticket_message_html($msg['mensagem'] ?? '');
             // /media/serve é relativo ao domínio da própria escola (funciona sozinho

@@ -3146,7 +3146,7 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
             );
 
             // Formatar mensagens da IA usando ChatFormatter
-            require_once __DIR__ . '/../../Utils/ChatFormatter.php';
+            require_once __DIR__ . '/../../../Utils/ChatFormatter.php';
             
             $basePath = (defined('FOLDER') && FOLDER !== '') ? rtrim(FOLDER, '/') : '';
             foreach ($mensagens as &$mensagem) {
