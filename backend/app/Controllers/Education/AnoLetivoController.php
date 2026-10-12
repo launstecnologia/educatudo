@@ -91,14 +91,10 @@ class AnoLetivoController extends BaseController
         ]);
     }
 
+    /** @deprecated Hub movido para Modulos/comunicacao/ComunicacaoAdminController */
     public function comunicacao()
     {
-        $user = $this->auth->getUser();
-        $this->viewWithLayout('admin', 'admin/comunicacao/index', [
-            'title'        => 'Comunicação - EducaTudo',
-            'user'         => $user,
-            'current_page' => 'comunicacao',
-        ]);
+        $this->redirect(URL . '/admin/comunicacao');
     }
 
     public function conteudo()
@@ -200,7 +196,7 @@ class AnoLetivoController extends BaseController
 
         $totalGeral = (int)($this->db->fetch("SELECT COUNT(*) AS total FROM ano_letivo")['total'] ?? 0);
         $list = $this->db->fetchAll(
-            "SELECT * FROM ano_letivo ORDER BY ano DESC LIMIT $perPage OFFSET $offset"
+            "SELECT * FROM ano_letivo ORDER BY ano DESC LIMIT " . (int)$perPage . " OFFSET " . (int)$offset
         );
 
         $pagination = [

@@ -149,16 +149,7 @@ $router->post('/admin/students/{id}/historico-escolar/{historicoId}/resultado', 
 $router->post('/admin/students/{id}/documentos/salvar', 'Admin/StudentAdminController@salvarDocumentoAluno');
 $router->post('/admin/students/{id}/documentos/{docId}/remover', 'Admin/StudentAdminController@removerDocumentoAluno');
 $router->get('/admin/students/{id}/documentos/{docId}/baixar', 'Admin/StudentAdminController@baixarDocumentoAluno');
-// Reuniões (ATA com pais + reuniões gerais)
-$router->get('/admin/reunioes/aluno',           'Admin/MeetingController@alunoIndex');
-$router->post('/admin/reunioes/aluno/salvar',   'Admin/MeetingController@alunoSalvar');
-$router->post('/admin/reunioes/aluno/excluir',  'Admin/MeetingController@alunoExcluir');
-$router->get('/admin/reunioes/geral',           'Admin/MeetingController@geralIndex');
-$router->post('/admin/reunioes/geral/salvar',   'Admin/MeetingController@geralSalvar');
-$router->post('/admin/reunioes/geral/atualizar','Admin/MeetingController@geralAtualizar');
-$router->post('/admin/reunioes/geral/excluir',  'Admin/MeetingController@geralExcluir');
-$router->get('/admin/reunioes/geral/{id}/dados','Admin/MeetingController@geralDados');
-$router->get('/admin/reunioes/geral/{id}/pdf',  'Admin/MeetingController@geralPdf');
+// Reuniões → Modulos/comunicacao/routes.php
 
 $router->get('/admin/resultados-finais', 'Admin/ResultadoFinalAdminController@index');
 $router->get('/admin/resultados-finais/relatorios', 'Admin/ResultadoFinalAdminController@relatorios');
@@ -259,19 +250,7 @@ $router->get('/admin/mural-recados/editar', 'Admin/AdminMuralController@editar')
 $router->post('/admin/mural-recados/atualizar', 'Admin/AdminMuralController@atualizar');
 $router->post('/admin/mural-recados/excluir', 'Admin/AdminMuralController@excluir');
 
-// Comunicação Escolar (independente do mural professor -> aluno)
-$router->get('/admin/comunicacao-escolar', 'Admin/SchoolCommunicationController@index');
-$router->get('/admin/comunicacao-escolar/nova', 'Admin/SchoolCommunicationController@create');
-$router->post('/admin/comunicacao-escolar', 'Admin/SchoolCommunicationController@store');
-$router->get('/admin/comunicacao-escolar/{id}', 'Admin/SchoolCommunicationController@show');
-$router->post('/admin/comunicacao-escolar/{id}/responder', 'Admin/SchoolCommunicationController@reply');
-$router->get('/admin/calendario-escolar', 'Admin/SchoolCommunicationController@calendar');
-$router->get('/admin/calendario-escolar/novo', 'Admin/SchoolCommunicationController@calendarCreate');
-$router->get('/admin/calendario-escolar/{id}/dados', 'Admin/SchoolCommunicationController@calendarDados');
-$router->get('/admin/calendario-escolar/{id}/editar', 'Admin/SchoolCommunicationController@calendarEdit');
-$router->post('/admin/calendario-escolar', 'Admin/SchoolCommunicationController@calendarStore');
-$router->post('/admin/calendario-escolar/{id}', 'Admin/SchoolCommunicationController@calendarUpdate');
-$router->post('/admin/calendario-escolar/{id}/cancelar', 'Admin/SchoolCommunicationController@calendarCancel');
+// Comunicação escolar + calendário → Modulos/comunicacao/routes.php
 $router->get('/admin/aulas-online', 'Admin/OnlineClassController@index');
 $router->get('/admin/aulas-online/criar', 'Admin/OnlineClassController@criar');
 $router->get('/admin/aulas-online/editar', 'Admin/OnlineClassController@editar');
@@ -716,7 +695,7 @@ $router->get('/admin/avaliacoes',      'Education/AnoLetivoController@avaliacoes
 $router->get('/admin/rotina',          'Education/AnoLetivoController@rotina');
 $router->get('/admin/paineis',         'Education/AnoLetivoController@paineis');
 $router->get('/admin/gestao-escolar',  'Education/AnoLetivoController@gestaoEscolar');
-$router->get('/admin/comunicacao',     'Education/AnoLetivoController@comunicacao');
+// Hub Comunicação → Modulos/comunicacao/routes.php
 $router->get('/admin/conteudo',            'Education/AnoLetivoController@conteudo');
 $router->get('/admin/financeiro-escolar',  'Education/AnoLetivoController@financeiroEscolar');
 $router->get('/admin/monitoramento-escolar', 'Education/AnoLetivoController@monitoramento');
