@@ -68,8 +68,8 @@ $page_header_title = 'Acompanhamento do Diário';
 $page_header_subtitle = $abaAtual === 'fechados'
     ? 'Bimestres já fechados pelos professores. Visualize o diário ou reabra se precisar corrigir.'
     : 'Acompanhe chamadas pendentes, finalizadas e aulas não realizadas.';
-include dirname(__DIR__, 4) . '/Views/admin/_partials/page_header_list.php';
-include dirname(__DIR__, 4) . '/Views/admin/_partials/flash_message.php';
+include \App\Core\ViewPaths::adminPartial('page_header_list.php');
+include \App\Core\ViewPaths::adminPartial('flash_message.php');
 
 $pag = $pagination ?? [];
 $total = (int) ($pag['total'] ?? 0);
@@ -209,7 +209,7 @@ $totalPages = (int) ($pag['total_pages'] ?? 1);
                                 <?php
                                 $row_actions_dropdown_items = ob_get_clean();
                                 $row_actions_dropdown_id = 'row-fechamento-' . (int) $f['id'];
-                                include dirname(__DIR__, 4) . '/Views/admin/_partials/row_actions_dropdown.php';
+                                include \App\Core\ViewPaths::adminPartial('row_actions_dropdown.php');
                                 ?>
                             </td>
                         </tr>

@@ -40,7 +40,7 @@ class CertificateValidationController extends BaseController
             ob_end_clean();
         }
         extract($viewData, EXTR_SKIP);
-        require __DIR__ . '/../../Views/ava/certificado_validar.php';
+        require dirname(__DIR__) . '/Views/public/certificado_validar.php';
     }
 }
 }

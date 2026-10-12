@@ -1078,7 +1078,7 @@ class BoletimAssistenteController extends BaseController
     {
         $vazio = ['ids' => [], 'nomes' => []];
         $out = ['tem' => false, 'A' => $vazio, 'B' => $vazio];
-        $path = dirname(__DIR__, 3) . '/Modulos/grupos-regras-notas/Services/GrupoRegrasNotasService.php';
+        $path = \App\Core\ViewPaths::modulo('grupos-regras-notas/Services/GrupoRegrasNotasService.php');
         if (!class_exists('GrupoRegrasNotasService', false) && is_file($path)) {
             require_once $path;
         }

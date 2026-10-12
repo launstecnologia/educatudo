@@ -53,7 +53,7 @@ class ClassController extends BaseController
 
         // Adicionar contagem de alunos para cada turma
         $vagaSvc = null;
-        $vagaPath = dirname(__DIR__, 2) . '/Modulos/matricula/Services/MatriculaVagaService.php';
+        $vagaPath = \App\Core\ViewPaths::modulo('matricula/Services/MatriculaVagaService.php');
         if (is_file($vagaPath)) {
             require_once $vagaPath;
             $vagaSvc = new \App\Modulos\Matricula\Services\MatriculaVagaService($this->db);
@@ -582,7 +582,7 @@ class ClassController extends BaseController
         $vagasResumo = null;
         $filaEspera = [];
         try {
-            $vagaPath = dirname(__DIR__, 2) . '/Modulos/matricula/Services/MatriculaVagaService.php';
+            $vagaPath = \App\Core\ViewPaths::modulo('matricula/Services/MatriculaVagaService.php');
             if (is_file($vagaPath)) {
                 require_once $vagaPath;
                 $vagaSvc = new \App\Modulos\Matricula\Services\MatriculaVagaService($this->db);

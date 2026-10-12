@@ -7,13 +7,13 @@ $ehEdicao = !empty($item['id']);
 $marcasIni = is_array($item['marcas'] ?? null) ? $item['marcas'] : [];
 $tiposIni = is_array($item['tipos'] ?? null) ? $item['tipos'] : [];
 $tiposNota = is_array($tipos_nota ?? null) ? $tipos_nota : [];
-$ui = dirname(__DIR__, 4) . '/Views/admin/_partials/ui';
+$ui = \App\Core\ViewPaths::adminPartial('ui');
 
 $page_header_back_url = URL . '/admin/quadros-notas';
 $page_header_title = $ehEdicao ? 'Editar quadro de notas' : 'Novo quadro de notas';
 $page_header_subtitle = 'Molde anual: gere S1…SN do bimestre mais longo e intercale A/B. Em Lançamento de Notas você escolhe o bloco e a semana daquele período entra sozinha.';
-include dirname(__DIR__, 4) . '/Views/admin/_partials/page_header_form.php';
-include dirname(__DIR__, 4) . '/Views/admin/_partials/flash_message.php';
+include \App\Core\ViewPaths::adminPartial('page_header_form.php');
+include \App\Core\ViewPaths::adminPartial('flash_message.php');
 
 $steps = [
     ['label' => 'Identificação', 'sub' => 'Nome'],

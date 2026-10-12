@@ -17,8 +17,8 @@ $page_header_title = $editando ? 'Editar ofício' : 'Novo ofício';
 $page_header_subtitle = $editando && (int) ($oficio['numero'] ?? 0) > 0
     ? 'Ofício nº ' . (int) $oficio['numero'] . '/' . (int) ($oficio['ano'] ?? 0)
     : 'Correspondência oficial da secretaria. O número é gerado na primeira emissão do PDF.';
-include dirname(__DIR__, 5) . '/Views/admin/_partials/page_header_form.php';
-include dirname(__DIR__, 5) . '/Views/admin/_partials/flash_message.php';
+include \App\Core\ViewPaths::adminPartial('page_header_form.php');
+include \App\Core\ViewPaths::adminPartial('flash_message.php');
 ?>
 
 <?php if (empty($schema_pronto)): ?>

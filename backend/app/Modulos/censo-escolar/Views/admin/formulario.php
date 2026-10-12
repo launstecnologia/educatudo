@@ -39,8 +39,8 @@ ob_start();
 <a href="<?= URL ?>/admin/censo/<?= $eid ?>/<?= $entidade === 'gestor' ? 'gestores' : ($entidade === 'turma' ? 'turmas' : ($entidade === 'aluno' ? 'alunos' : ($entidade === 'profissional' ? 'profissionais' : ($entidade === 'matricula' ? 'matriculas' : 'escola')))) ?>" class="text-gray-600 hover:text-gray-900">← Voltar</a>
 <?php
 $page_header_actions = ob_get_clean();
-include dirname(__DIR__, 4) . '/Views/admin/_partials/page_header_list.php';
-include dirname(__DIR__, 4) . '/Views/admin/_partials/flash_message.php';
+include \App\Core\ViewPaths::adminPartial('page_header_list.php');
+include \App\Core\ViewPaths::adminPartial('flash_message.php');
 $nav_atual = $entidade === 'gestor' ? 'gestores' : ($entidade === 'turma' ? 'turmas' : ($entidade === 'aluno' ? 'alunos' : ($entidade === 'profissional' ? 'profissionais' : ($entidade === 'matricula' ? 'matriculas' : 'escola'))));
 include __DIR__ . '/_nav.php';
 ?>

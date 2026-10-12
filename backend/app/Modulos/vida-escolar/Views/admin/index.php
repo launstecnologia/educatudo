@@ -8,8 +8,8 @@ $qsBase = 'ano_letivo=' . $anoLetivo . ($turmaId > 0 ? '&turma_id=' . $turmaId :
 
 $page_header_title = 'Vida Escolar';
 $page_header_subtitle = 'Documentos oficiais da secretaria: histórico, boletim, ficha individual, prontuário e ofícios.';
-include dirname(__DIR__, 4) . '/Views/admin/_partials/page_header_list.php';
-include dirname(__DIR__, 4) . '/Views/admin/_partials/flash_message.php';
+include \App\Core\ViewPaths::adminPartial('page_header_list.php');
+include \App\Core\ViewPaths::adminPartial('flash_message.php');
 ?>
 
 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-8">
@@ -141,10 +141,10 @@ include dirname(__DIR__, 4) . '/Views/admin/_partials/flash_message.php';
                         <?php endif; ?>
                     </td>
                     <td class="px-6 py-4">
-                        <?php $ui_badge_variant = $fichaVar; $ui_badge_label = $fichaLabel; include dirname(__DIR__, 4) . '/Views/admin/_partials/ui/badge.php'; ?>
+                        <?php $ui_badge_variant = $fichaVar; $ui_badge_label = $fichaLabel; include \App\Core\ViewPaths::adminPartial('ui/badge.php'); ?>
                     </td>
                     <td class="px-6 py-4">
-                        <?php $ui_badge_variant = $histVar; $ui_badge_label = $histLabel; include dirname(__DIR__, 4) . '/Views/admin/_partials/ui/badge.php'; ?>
+                        <?php $ui_badge_variant = $histVar; $ui_badge_label = $histLabel; include \App\Core\ViewPaths::adminPartial('ui/badge.php'); ?>
                     </td>
                     <td class="px-6 py-4 text-right">
                         <?php ob_start(); ?>
@@ -172,7 +172,7 @@ include dirname(__DIR__, 4) . '/Views/admin/_partials/flash_message.php';
                         </a>
                         <?php $row_actions_dropdown_items = ob_get_clean(); ?>
                         <?php $row_actions_dropdown_id = 'row-actions-aluno-' . $aid; ?>
-                        <?php include dirname(__DIR__, 4) . '/Views/admin/_partials/row_actions_dropdown.php'; ?>
+                        <?php include \App\Core\ViewPaths::adminPartial('row_actions_dropdown.php'); ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>

@@ -37,8 +37,8 @@ ob_start();
 </a>
 <?php
 $page_header_actions = ob_get_clean();
-include dirname(__DIR__, 5) . '/Views/admin/_partials/page_header_list.php';
-include dirname(__DIR__, 5) . '/Views/admin/_partials/flash_message.php';
+include \App\Core\ViewPaths::adminPartial('page_header_list.php');
+include \App\Core\ViewPaths::adminPartial('flash_message.php');
 ?>
 
 <?php if (!$schemaPronto): ?>
@@ -140,7 +140,7 @@ include dirname(__DIR__, 5) . '/Views/admin/_partials/flash_message.php';
                         <td class="px-6 py-4 text-sm text-gray-700"><?= $esc($o['assunto'] ?? '') ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><?= $esc($dataFmt) ?></td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <?php include dirname(__DIR__, 5) . '/Views/admin/_partials/ui/badge.php'; ?>
+                            <?php include \App\Core\ViewPaths::adminPartial('ui/badge.php'); ?>
                         </td>
                         <td class="px-6 py-4 text-right">
                             <?php ob_start(); ?>
@@ -174,7 +174,7 @@ include dirname(__DIR__, 5) . '/Views/admin/_partials/flash_message.php';
                             <?php endif; ?>
                             <?php $row_actions_dropdown_items = ob_get_clean(); ?>
                             <?php $row_actions_dropdown_id = 'row-actions-oficio-' . (int) $o['id']; ?>
-                            <?php include dirname(__DIR__, 5) . '/Views/admin/_partials/row_actions_dropdown.php'; ?>
+                            <?php include \App\Core\ViewPaths::adminPartial('row_actions_dropdown.php'); ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>

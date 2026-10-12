@@ -1,0 +1,65 @@
+<?php
+if (!class_exists('AdminPermissionMatrix')) {
+}
+
+$hub_title = 'Painéis';
+$hub_subtitle = 'Indicadores, saúde acadêmica, conformidade e relatórios.';
+$hub_cards = [];
+
+$permsHub = [];
+if (class_exists('AdminPermissionMatrix')) {
+    $permsHub = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser(
+        \App\Core\Database::getInstance(),
+        $user ?? []
+    );
+}
+$podeHub = static function (string $chave) use ($permsHub): bool {
+    return !empty($permsHub[$chave]['visualizar']);
+};
+
+if ($podeHub('dashboard')) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/dashboard',
+        'title' => 'Dashboard',
+        'description' => 'Visão geral da escola e ponto de partida do painel.',
+        'icon' => 'fa-solid fa-gauge-high',
+    ];
+}
+
+if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('saude_academica')) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/saude-academica',
+        'title' => 'Saúde Acadêmica',
+        'description' => 'Desempenho, frequência e risco pedagógico.',
+        'icon' => 'fa-solid fa-heart-pulse',
+    ];
+}
+
+if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('conformidade')) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/conformidade',
+        'title' => 'Conformidade',
+        'description' => 'Pendências operacionais da escola.',
+        'icon' => 'fa-solid fa-clipboard-check',
+    ];
+}
+
+if ($podeHub('declaracoes_aluno')) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/paineis/documentos',
+        'title' => 'Documentos',
+        'description' => 'Declarações e autorizações por turma, série ou aluno, com versões guardadas.',
+        'icon' => 'fa-solid fa-file-lines',
+    ];
+}
+
+if ($podeHub('relatorios_gerais')) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/relatorios',
+        'title' => 'Relatórios',
+        'description' => 'Relatórios acadêmicos e da coordenação.',
+        'icon' => 'fa-solid fa-chart-column',
+    ];
+}
+
+include \App\Core\ViewPaths::adminPartial('hub_modulos.php');

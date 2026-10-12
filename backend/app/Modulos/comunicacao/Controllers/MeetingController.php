@@ -299,7 +299,7 @@ class MeetingController extends \App\Controllers\Admin\AdminBaseController
             'anexos' => $anexos,
             'escola' => $escola,
         ], EXTR_SKIP);
-        require __DIR__ . '/../../../Views/admin/reunioes/ata_pdf.php';
+        require dirname(__DIR__) . '/Views/admin/reunioes/ata_pdf.php';
         $html = (string) ob_get_clean();
 
         if (!class_exists('\Dompdf\Dompdf')) {

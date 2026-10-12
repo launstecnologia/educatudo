@@ -1,0 +1,5357 @@
+<?php
+$regra = $regra ?? [];
+if (!class_exists('PeriodoLetivo')) {
+}
+$componentes = $regra['componentes'] ?? [];
+$alunos = $alunos ?? [];
+$blocosProvas = $blocos_provas ?? [];
+$materias = $materias ?? [];
+$series = $series ?? [];
+$turmas = $turmas ?? [];
+$regrasCatalogo = $regras_catalogo ?? [];
+$faltasEventosCatalogo = $faltas_eventos_catalogo ?? [];
+$gruposRegrasNotas = is_array($grupos_regras_notas ?? null) ? $grupos_regras_notas : [];
+$agrupamentosComponentes = is_array($agrupamentos_componentes ?? null) ? $agrupamentos_componentes : [];
+$boletinsCadastro = is_array($boletins_cadastro ?? null) ? $boletins_cadastro : [];
+$grupoRegrasNotasId = (int) ($grupo_regras_notas_id ?? 0);
+$semanasPeriodo = (int) ($semanas_periodo ?? 0);
+$destinosQuadro = is_array($destinos_quadro ?? null) ? $destinos_quadro : [];
+$selectedRegraId = (int) ($selected_regra_id ?? 0);
+$materiasSelecionadasRegra = array_map('intval', (array) ($regra['materias_ids_array'] ?? []));
+$seriesSelecionadasRegra = array_map('intval', (array) ($regra['series_ids_array'] ?? []));
+$turmasSelecionadasRegra = array_map('intval', (array) ($regra['turmas_ids_array'] ?? []));
+$formulaMateriasMap = (array) ($regra['formula_materias_map'] ?? []);
+$selectedAlunoId = (int) ($selected_aluno_id ?? 0);
+$periodoRef = (string) ($periodo_ref ?? '');
+$dataInicio = (string) ($data_inicio ?? '');
+$dataFim = (string) ($data_fim ?? '');
+$simulacao = $simulacao ?? null;
+$modoArquivo = !empty($modo_arquivo);
+$flashMessage = (string) ($flash_message ?? '');
+$flashType = (string) ($flash_type ?? 'success');
+$csrfToken = (string) ($csrf_token ?? '');
+$somenteTabela = !empty($somente_tabela);
+$boletimAssistenteDisponivel = !empty($boletim_assistente_disponivel);
+$geracaoEmAndamento = !empty($geracao_em_andamento);
+$alunosTravados = is_array($alunos_travados ?? null) ? $alunos_travados : [];
+$alunoTravado = !empty($aluno_travado);
+$versoesAluno = is_array($versoes_aluno ?? null) ? $versoes_aluno : [];
+$roundModeSelected = strtolower(trim((string) ($regra['round_mode'] ?? 'none')));
+if (!in_array($roundModeSelected, ['none', 'half'], true)) {
+    $roundModeSelected = 'none';
+}
+$exibirEm = 'notas';
+$finalidade = strtolower(trim((string) ($regra['finalidade'] ?? 'oficial')));
+if (!in_array($finalidade, ['oficial', 'complementar'], true)) {
+    $finalidade = 'oficial';
+}
+$boletimIdSelecionado = (int) ($regra['boletim_id'] ?? 0);
+$decimalPlacesSelected = ((int) ($regra['decimal_places'] ?? 2) === 1) ? 1 : 2;
+if ($boletimIdSelecionado > 0) {
+    foreach ($boletinsCadastro as $bolOptDec) {
+        if ((int) ($bolOptDec['id'] ?? 0) !== $boletimIdSelecionado) {
+            continue;
+        }
+        $decimalPlacesSelected = ((int) ($bolOptDec['decimal_places'] ?? $decimalPlacesSelected) === 1) ? 1 : 2;
+        break;
+    }
+}
+$formatNotaBoletim = static function ($valor) use ($decimalPlacesSelected): string {
+    return number_format((float) $valor, $decimalPlacesSelected, ',', '.');
+};
+/**
+ * Monta layout agrupado tipo boletim oficial:
+ * 1º BIMESTRE | 2º BIMESTRE | 3º BIMESTRE | 4º BIMESTRE | FINAL
+ * com subcolunas (Média, Faltas, Rec., Resultado).
+ *
+ * @param array<int, array<string, mixed>> $cols
+ * @return array{enabled:bool,groups:array<int,array{key:string,label:string,cols:array<int,array<string,mixed>>}>}
+ */
+$buildGroupedBoletimHeader = static function (array $cols): array {
+    $groupOrder = ['b1', 'b2', 'b3', 'b4', 'final', 'outros'];
+    $groupLabel = [
+        'b1' => '1º BIMESTRE',
+        'b2' => '2º BIMESTRE',
+        'b3' => '3º BIMESTRE',
+        'b4' => '4º BIMESTRE',
+        'final' => 'FINAL',
+        'outros' => 'OUTROS',
+    ];
+    $subLabel = [
+        'media' => 'Média',
+        'faltas' => 'Faltas',
+        'rec' => 'Rec.',
+        'resultado' => 'Resultado',
+        'other' => '',
+    ];
+
+    $parse = static function (array $c) use ($subLabel): array {
+        $groupMeta = strtolower(trim((string) ($c['layout_group'] ?? '')));
+        $typeMeta = strtolower(trim((string) ($c['layout_type'] ?? '')));
+        $allowedGroups = ['b1', 'b2', 'b3', 'b4', 'final'];
+        $allowedTypes = ['media', 'faltas', 'rec', 'resultado', 'other'];
+        if (in_array($groupMeta, $allowedGroups, true)) {
+            $subMeta = in_array($typeMeta, $allowedTypes, true) ? $typeMeta : 'other';
+            $labelMeta = $subLabel[$subMeta] !== '' ? $subLabel[$subMeta] : (string) ($c['nome'] ?? $c['codigo'] ?? '');
+            return [$groupMeta, $subMeta, $labelMeta];
+        }
+        $nm = mb_strtolower(trim((string) ($c['nome'] ?? '')), 'UTF-8');
+        $cd = mb_strtolower(trim((string) ($c['codigo'] ?? '')), 'UTF-8');
+        $full = $nm . ' ' . $cd;
+        $full = str_replace(['_', '-'], ' ', $full);
+        $group = '';
+        if (preg_match('/(^|[^0-9])1[\sºo]*bim/', $full)) { $group = 'b1'; }
+        elseif (preg_match('/(^|[^0-9])2[\sºo]*bim/', $full)) { $group = 'b2'; }
+        elseif (preg_match('/(^|[^0-9])3[\sºo]*bim/', $full)) { $group = 'b3'; }
+        elseif (preg_match('/(^|[^0-9])4[\sºo]*bim/', $full)) { $group = 'b4'; }
+        elseif (strpos($full, 'final') !== false || strpos($full, 'semestre') !== false) { $group = 'final'; }
+
+        $sub = 'other';
+        if (strpos($full, 'falt') !== false) { $sub = 'faltas'; }
+        elseif (strpos($full, 'result') !== false || strpos($full, 'status') !== false) { $sub = 'resultado'; }
+        elseif (strpos($full, 'rec') !== false || strpos($full, 'recup') !== false) { $sub = 'rec'; }
+        elseif (strpos($full, 'média') !== false || strpos($full, 'media') !== false || strpos($full, 'nota') !== false) { $sub = 'media'; }
+        elseif ($group !== '') { $sub = 'media'; }
+
+        $label = $subLabel[$sub] !== '' ? $subLabel[$sub] : (string) ($c['nome'] ?? $c['codigo'] ?? '');
+        if ($group === '') {
+            $group = 'outros';
+        }
+        return [$group, $sub, $label];
+    };
+
+    $grouped = [];
+    $hasAnyGroup = false;
+    foreach ($cols as $c) {
+        [$g, $s, $label] = $parse((array) $c);
+        if ($g === '') {
+            continue;
+        }
+        $hasAnyGroup = true;
+        if (!isset($grouped[$g])) {
+            $grouped[$g] = [];
+        }
+        $c['_subkey'] = $s;
+        $c['_sublabel'] = $label;
+        $grouped[$g][] = $c;
+    }
+    if (!$hasAnyGroup) {
+        return ['enabled' => false, 'groups' => []];
+    }
+
+    $groupsOut = [];
+    foreach ($groupOrder as $gk) {
+        $arr = $grouped[$gk] ?? [];
+        if ($arr === []) {
+            continue;
+        }
+        // Mantém exatamente a ordem dos blocos cadastrados.
+        $groupsOut[] = ['key' => $gk, 'label' => $groupLabel[$gk], 'cols' => $arr];
+    }
+
+    return ['enabled' => true, 'groups' => $groupsOut];
+};
+
+$componentesInicial = [];
+$materiasById = [];
+foreach ($materias as $materiaItem) {
+    $materiaId = (int) ($materiaItem['id'] ?? 0);
+    if ($materiaId > 0) {
+        $materiasById[$materiaId] = (string) ($materiaItem['nome'] ?? ('Matéria #' . $materiaId));
+    }
+}
+
+if (!function_exists('boletim_comp_ids_lista')) {
+    /**
+     * @param mixed $raw
+     * @return list<int>
+     */
+    function boletim_comp_ids_lista($raw): array
+    {
+        if (is_array($raw)) {
+            $out = [];
+            foreach ($raw as $v) {
+                if (is_array($v)) {
+                    continue;
+                }
+                $n = (int) $v;
+                if ($n > 0) {
+                    $out[] = $n;
+                }
+            }
+            return array_values(array_unique($out));
+        }
+        $s = trim((string) ($raw ?? ''));
+        if ($s === '') {
+            return [];
+        }
+        $dec = json_decode($s, true);
+        if (is_array($dec)) {
+            return boletim_comp_ids_lista($dec);
+        }
+        $out = [];
+        foreach (explode(',', $s) as $part) {
+            $n = (int) trim($part);
+            if ($n > 0) {
+                $out[] = $n;
+            }
+        }
+        return array_values(array_unique($out));
+    }
+}
+
+foreach ($componentes as $comp) {
+    $blocosArr = boletim_comp_ids_lista($comp['blocos_ids'] ?? []);
+    $cfgJ = [
+        'jornada_ids' => [],
+        'data_ini' => '',
+        'data_fim' => '',
+        'faixas_percentuais' => [],
+        'expressao' => '',
+        'regra_codigo' => '',
+        'componente_codigo' => '',
+        'faltas_evento_id' => 0,
+        'formula_materias' => [],
+        'formula_mode' => 'single',
+        'group_line' => [
+            'enabled' => false,
+            'key' => '',
+            'label' => '',
+            'mode' => 'media',
+            'divisor' => 0,
+            'materias_ids' => [],
+            'aplicar_em' => 'boletim',
+            'agrupamento_id' => 0,
+            'arredondamento' => 'todos',
+        ],
+        'layout_group' => '',
+        'layout_type' => '',
+        'semana' => 0,
+        'agregar_nq' => [],
+        'tipo_avaliacao_id' => 0,
+        'tipo_avaliacao_nome' => '',
+        'traco_abaixo_minimo' => false,
+        'distribuicao_notas' => 'por_materia',
+        'nota_unica_omitir_materias' => [],
+        'nota_unica_fonte_por_materia' => [],
+        'nota_unica_fonte_por_grupo' => [],
+    ];
+    $materiasIdsComp = boletim_comp_ids_lista($comp['materias_ids'] ?? []);
+    $dec = null;
+    if (isset($comp['config']) && is_array($comp['config'])) {
+        $dec = $comp['config'];
+    } elseif (isset($comp['config_json']) && is_array($comp['config_json'])) {
+        $dec = $comp['config_json'];
+    } else {
+        $rawCj = is_string($comp['config_json'] ?? null) ? trim((string) $comp['config_json']) : '';
+        if ($rawCj !== '') {
+            $tmpCfg = json_decode($rawCj, true);
+            if (is_array($tmpCfg)) {
+                $dec = $tmpCfg;
+            }
+        }
+    }
+    if (is_array($dec)) {
+            $jids = [];
+            foreach ((array) ($dec['jornada_ids'] ?? []) as $jid) {
+                $jid = (int) $jid;
+                if ($jid > 0) {
+                    $jids[] = $jid;
+                }
+            }
+            $cfgJ['jornada_ids'] = array_values(array_unique($jids));
+            $cfgJ['data_ini'] = (string) ($dec['data_ini'] ?? '');
+            $cfgJ['data_fim'] = (string) ($dec['data_fim'] ?? '');
+            if (isset($dec['faixas_percentuais']) && is_array($dec['faixas_percentuais'])) {
+                $fx = [];
+                foreach ($dec['faixas_percentuais'] as $fItem) {
+                    if (!is_array($fItem)) {
+                        continue;
+                    }
+                    $pctMin = (int) ($fItem['percentual_min'] ?? 0);
+                    $nota = is_numeric($fItem['nota'] ?? null) ? (float) $fItem['nota'] : null;
+                    if ($pctMin >= 0 && $pctMin <= 100 && $nota !== null) {
+                        $fx[] = [
+                            'percentual_min' => $pctMin,
+                            'nota' => $nota,
+                        ];
+                    }
+                }
+                $cfgJ['faixas_percentuais'] = $fx;
+            }
+            $bimsJ = [];
+            foreach ((array) ($dec['jornada_bimestres'] ?? []) as $bJ) {
+                $bJ = (int) $bJ;
+                if ($bJ >= 1 && $bJ <= 4) {
+                    $bimsJ[] = $bJ;
+                }
+            }
+            if ($bimsJ !== []) {
+                $cfgJ['jornada_bimestres'] = array_values(array_unique($bimsJ));
+            }
+            $cfgJ['expressao'] = (string) ($dec['expressao'] ?? '');
+            $cfgJ['traco_abaixo_minimo'] = !empty($dec['traco_abaixo_minimo']);
+            $cfgJ['regra_codigo'] = (string) ($dec['regra_codigo'] ?? '');
+            $cfgJ['componente_codigo'] = (string) ($dec['componente_codigo'] ?? '');
+            $cfgJ['faltas_evento_id'] = (int) ($dec['faltas_evento_id'] ?? 0);
+            if (isset($dec['formula_materias']) && is_array($dec['formula_materias'])) {
+                $fm = [];
+                foreach ($dec['formula_materias'] as $midCfg => $exprCfg) {
+                    $midCfg = (int) $midCfg;
+                    $exprCfg = trim((string) $exprCfg);
+                    if ($midCfg > 0 && $exprCfg !== '') {
+                        $fm[$midCfg] = $exprCfg;
+                    }
+                }
+                $cfgJ['formula_materias'] = $fm;
+            }
+            $modeFm = strtolower(trim((string) ($dec['formula_mode'] ?? '')));
+            $hasFmEx = isset($cfgJ['formula_materias']) && is_array($cfgJ['formula_materias']) && $cfgJ['formula_materias'] !== [];
+            $cfgJ['formula_mode'] = ($modeFm === 'per_materia' || $hasFmEx) ? 'per_materia' : 'single';
+            if (isset($dec['group_line']) && is_array($dec['group_line'])) {
+                $g = $dec['group_line'];
+                $gm = [];
+                foreach ((array) ($g['materias_ids'] ?? []) as $gmid) {
+                    $gmid = (int) $gmid;
+                    if ($gmid > 0) {
+                        $gm[] = $gmid;
+                    }
+                }
+                $cfgJ['group_line'] = [
+                    'enabled' => !empty($g['enabled']),
+                    'key' => (string) ($g['key'] ?? ''),
+                    'label' => (string) ($g['label'] ?? ''),
+                    'mode' => (string) ($g['mode'] ?? 'media'),
+                    'divisor' => (float) ($g['divisor'] ?? 0),
+                    'materias_ids' => array_values(array_unique($gm)),
+                    'aplicar_em' => (strtolower(trim((string) ($g['aplicar_em'] ?? 'ambos'))) === 'boletim') ? 'boletim' : 'ambos',
+                    'agrupamento_id' => (int) ($g['agrupamento_id'] ?? 0),
+                    'arredondamento' => in_array(strtolower(trim((string) ($g['arredondamento'] ?? 'todos'))), ['filhas', 'mae'], true)
+                        ? strtolower(trim((string) $g['arredondamento']))
+                        : 'todos',
+                ];
+            }
+            if (isset($dec['layout']) && is_array($dec['layout'])) {
+                $cfgJ['layout_group'] = strtolower(trim((string) ($dec['layout']['group'] ?? '')));
+                $cfgJ['layout_type'] = strtolower(trim((string) ($dec['layout']['type'] ?? '')));
+                $cfgJ['layout_group_label'] = trim((string) ($dec['layout']['label'] ?? ''));
+            }
+            $cfgJ['semana'] = (int) ($dec['semana'] ?? 0);
+            $agNq = [];
+            foreach ((array) ($dec['agregar_nq'] ?? []) as $agItem) {
+                $agCod = strtolower(trim((string) $agItem));
+                if ($agCod !== '') {
+                    $agNq[] = $agCod;
+                }
+            }
+            $cfgJ['agregar_nq'] = $agNq;
+            $cfgJ['tipo_avaliacao_id'] = (int) ($dec['tipo_avaliacao_id'] ?? 0);
+            $cfgJ['tipo_avaliacao_nome'] = trim((string) ($dec['tipo_avaliacao_nome'] ?? ''));
+            $dNotas = strtolower(trim((string) ($dec['distribuicao_notas'] ?? '')));
+            $cfgJ['distribuicao_notas'] = ($dNotas === 'nota_unica_todas_linhas') ? 'nota_unica_todas_linhas' : 'por_materia';
+            $omits = [];
+            foreach ((array) ($dec['nota_unica_omitir_materias'] ?? []) as $omid) {
+                $omid = (int) $omid;
+                if ($omid !== 0) {
+                    $omits[] = $omid;
+                }
+            }
+            $cfgJ['nota_unica_omitir_materias'] = array_values(array_unique($omits));
+            $fpMat = [];
+            foreach ((array) ($dec['nota_unica_fonte_por_materia'] ?? []) as $tk => $list) {
+                $tki = (int) $tk;
+                if ($tki === 0) {
+                    continue;
+                }
+                $idsF = [];
+                foreach ((array) $list as $z) {
+                    $zi = (int) $z;
+                    if ($zi > 0) {
+                        $idsF[] = $zi;
+                    }
+                }
+                $idsF = array_values(array_unique($idsF));
+                if ($idsF !== []) {
+                    $fpMat[$tki] = $idsF;
+                }
+            }
+            $cfgJ['nota_unica_fonte_por_materia'] = $fpMat;
+            $fpGrp = [];
+            foreach ((array) ($dec['nota_unica_fonte_por_grupo'] ?? []) as $gk => $list) {
+                $gk = trim((string) $gk);
+                if ($gk === '') {
+                    continue;
+                }
+                $idsG = [];
+                foreach ((array) $list as $z) {
+                    $zi = (int) $z;
+                    if ($zi > 0) {
+                        $idsG[] = $zi;
+                    }
+                }
+                $idsG = array_values(array_unique($idsG));
+                if ($idsG !== []) {
+                    $fpGrp[$gk] = $idsG;
+                }
+            }
+            $cfgJ['nota_unica_fonte_por_grupo'] = $fpGrp;
+    }
+
+    $componentesInicial[] = [
+        'id' => (int) ($comp['id'] ?? 0),
+        'codigo' => (string) ($comp['codigo'] ?? ''),
+        'nome' => (string) ($comp['nome'] ?? ''),
+        'source_type' => (string) ($comp['source_type'] ?? 'provas_sistema'),
+        'calc_type' => (string) ($comp['calc_type'] ?? 'media'),
+        'peso' => (float) ($comp['peso'] ?? 1),
+        'filtro_titulo' => (string) ($comp['filtro_titulo'] ?? ''),
+        'bloco_id' => (int) ($comp['bloco_id'] ?? 0),
+        'blocos_ids' => $blocosArr,
+        'config' => $cfgJ,
+        'materia_id' => (int) ($comp['materia_id'] ?? 0),
+        'materias_ids' => $materiasIdsComp,
+        'materia_unica' => (int) ($comp['materia_unica'] ?? 0) === 1,
+        'materia_unica_modo' => (strtolower(trim((string) ($comp['materia_unica_modo'] ?? 'soma'))) === 'media') ? 'media' : 'soma',
+        'usar_percentual' => (int) ($comp['usar_percentual'] ?? 0) === 1,
+        'escala_max' => (float) ($comp['escala_max'] ?? 10),
+        'obrigatorio' => (int) ($comp['obrigatorio'] ?? 0) === 1,
+    ];
+}
+
+$manualRows = [];
+if (is_array($simulacao) && !empty($simulacao['componentes'])) {
+    foreach ($simulacao['componentes'] as $item) {
+        if (($item['source_type'] ?? '') !== 'manual') {
+            continue;
+        }
+        $manualRows[] = $item;
+    }
+}
+
+$regraIdBoletim = (int) ($regra['id'] ?? 0);
+$matrizSimGravar = is_array($simulacao) ? ($simulacao['matriz_materias'] ?? null) : null;
+$linhasBoletimGravar = is_array($matrizSimGravar) && !empty($matrizSimGravar['linhas']) ? $matrizSimGravar['linhas'] : [];
+$colunasBoletimGravar = is_array($matrizSimGravar) && !empty($matrizSimGravar['colunas']) ? $matrizSimGravar['colunas'] : [];
+$podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && $linhasBoletimGravar !== [] && $colunasBoletimGravar !== [];
+?>
+
+<?php if ($somenteTabela): ?>
+    <div class="p-3">
+        <?php if (is_array($simulacao)): ?>
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-200">
+                    <h2 class="text-base font-semibold text-gray-900">Resultado da Simulação</h2>
+                    <p class="text-xs text-gray-500 mt-1">
+                        Aluno: <strong><?= htmlspecialchars((string) (($simulacao['aluno']['nome'] ?? '-') )) ?></strong>
+                    </p>
+                </div>
+
+                <div class="p-4">
+                    <?php
+                    $matrizSim = $simulacao['matriz_materias'] ?? null;
+                    $matrizLinhas = is_array($matrizSim) && !empty($matrizSim['linhas']) ? $matrizSim['linhas'] : [];
+                    $matrizColunas = is_array($matrizSim) && !empty($matrizSim['colunas']) ? $matrizSim['colunas'] : [];
+                    if (!class_exists('BoletimQuadroLayoutHelper', false)) {
+                    }
+                    ?>
+                    <?php
+                    $cols = $matrizColunas;
+                    $linhas = $matrizLinhas;
+                    $linhasBoletim = is_array($simulacao['matriz_materias_boletim']['linhas'] ?? null)
+                        ? $simulacao['matriz_materias_boletim']['linhas']
+                        : $matrizLinhas;
+                    $decimalPlaces = $decimalPlacesSelected ?? 2;
+                    $simVistaId = 'sim-compacta';
+                    $edicaoSimulacao = null;
+                    include \App\Core\ViewPaths::partial('boletim_resultado_simulacao.php');
+                    unset($edicaoSimulacao);
+                    ?>
+                    <?php if ($podeGravarBoletimOficialAluno): ?>
+                        <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/publicar-boletim-aluno" class="mt-4 pt-4 border-t border-gray-200 space-y-2">
+                            <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                            <input type="hidden" name="regra_id" value="<?= $regraIdBoletim ?>">
+                            <input type="hidden" name="aluno_id" value="<?= $selectedAlunoId ?>">
+                            <input type="hidden" name="periodo_ref" value="<?= htmlspecialchars($periodoRef) ?>">
+                            <input type="hidden" name="data_inicio" value="<?= htmlspecialchars($dataInicio) ?>">
+                            <input type="hidden" name="data_fim" value="<?= htmlspecialchars($dataFim) ?>">
+                            <p class="text-xs text-gray-600">Grava no sistema o boletim <strong>oficial</strong> só deste aluno e período (substitui boletim anterior dele, se existir). Não gera para os demais alunos do evento.</p>
+                            <button type="submit" class="btn-primary-custom inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg hover:opacity-90 shadow-sm">
+                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                                Gravar boletim oficial (só este aluno)
+                            </button>
+                        </form>
+                    <?php endif; ?>
+                </div>
+            </div>
+        <?php else: ?>
+            <div class="p-3 text-sm text-gray-500 border border-gray-200 rounded-lg bg-white">Selecione um aluno e salve o evento para visualizar a tabela.</div>
+        <?php endif; ?>
+    </div>
+    <script>
+    (function () {
+        function ativar(root, vista) {
+            var navBg = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-bg-color').trim() || '#1e3a5f';
+            var navFg = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-text-color').trim() || '#fff';
+            root.querySelectorAll('[data-sim-vista]').forEach(function (btn) {
+                var on = btn.getAttribute('data-sim-vista') === vista;
+                if (on) {
+                    btn.style.background = navBg;
+                    btn.style.borderColor = navBg;
+                    btn.style.color = navFg;
+                    btn.classList.remove('bg-white', 'text-gray-700', 'border-gray-300', 'text-white');
+                } else {
+                    btn.style.background = '#fff';
+                    btn.style.borderColor = '#d1d5db';
+                    btn.style.color = '#374151';
+                    btn.classList.add('bg-white', 'text-gray-700', 'border-gray-300');
+                    btn.classList.remove('text-white');
+                }
+            });
+            root.querySelectorAll('[data-sim-panel]').forEach(function (panel) {
+                panel.classList.toggle('hidden', panel.getAttribute('data-sim-panel') !== vista);
+            });
+        }
+        document.querySelectorAll('.boletim-sim-vistas').forEach(function (root) {
+            root.querySelectorAll('[data-sim-vista]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    ativar(root, btn.getAttribute('data-sim-vista') || 'demonstrativo');
+                });
+            });
+        });
+    })();
+    </script>
+<?php else: ?>
+<div class="space-y-6">
+    <div class="flex items-start justify-between gap-3 flex-wrap">
+        <div class="min-w-0 flex-1">
+            <h1 class="text-2xl font-bold text-gray-900">Evento de Notas</h1>
+            <?php if ($selectedRegraId > 0 && !$modoArquivo): ?>
+            <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/renomear" class="mt-2 flex flex-wrap items-center gap-2">
+                <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                <input type="hidden" name="regra_id" value="<?= $selectedRegraId ?>">
+                <label for="titulo-evento" class="sr-only">Título do evento</label>
+                <input id="titulo-evento" type="text" name="regra_nome" required maxlength="150"
+                       value="<?= htmlspecialchars((string) ($regra['nome'] ?? '')) ?>"
+                       class="w-full sm:w-96 h-10 px-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                       placeholder="Nome que aparece no boletim">
+                <button type="submit" class="h-10 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">Salvar título</button>
+            </form>
+            <?php
+            $anoCab = (int) ($regra['ano_letivo'] ?? 0);
+            $bimCab = (int) ($regra['bimestre'] ?? 0);
+            $rotuloBimCab = ($anoCab > 0 && $bimCab > 0)
+                ? \App\Core\PeriodoLetivo::rotulo($anoCab, $bimCab)
+                : ($bimCab > 0 ? ($bimCab . 'º') : '—');
+            $detalheCab = trim((string) ($regra['descricao_curta'] ?? ''));
+            $nomeBoletimVinculado = '';
+            $seriesIdsCab = $seriesSelecionadasRegra;
+            foreach ($boletinsCadastro as $bolOptCab) {
+                if ((int) ($bolOptCab['id'] ?? 0) !== $boletimIdSelecionado) {
+                    continue;
+                }
+                $nomeBoletimVinculado = trim((string) ($bolOptCab['nome'] ?? ''));
+                if ($seriesIdsCab === []) {
+                    $seriesIdsCab = array_values(array_map('intval', (array) ($bolOptCab['series_ids'] ?? [])));
+                }
+                break;
+            }
+            if ($nomeBoletimVinculado === '' && $boletimIdSelecionado > 0) {
+                $nomeBoletimVinculado = 'Boletim #' . $boletimIdSelecionado;
+            }
+            $nomesSeriesCab = [];
+            $idsSeriesCab = array_fill_keys(array_filter($seriesIdsCab, static fn ($id) => (int) $id > 0), true);
+            foreach ($series as $serieCab) {
+                $sidCab = (int) ($serieCab['id'] ?? 0);
+                if ($sidCab <= 0 || !isset($idsSeriesCab[$sidCab])) {
+                    continue;
+                }
+                $nomeSerieCab = trim((string) ($serieCab['nome'] ?? ''));
+                $cursoSerieCab = trim((string) ($serieCab['curso_nome'] ?? ''));
+                if ($nomeSerieCab === '') {
+                    $nomeSerieCab = 'Série #' . $sidCab;
+                }
+                $nomesSeriesCab[] = $cursoSerieCab !== '' ? ($nomeSerieCab . ' - ' . $cursoSerieCab) : $nomeSerieCab;
+            }
+            $rotuloSeriesCab = $nomesSeriesCab !== [] ? implode(', ', $nomesSeriesCab) : 'Todas';
+            ?>
+            <dl class="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                <div>
+                    <dt class="text-gray-500">Detalhe</dt>
+                    <dd class="text-gray-900"><?= $detalheCab !== '' ? htmlspecialchars($detalheCab) : '—' ?></dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">Bimestre</dt>
+                    <dd class="text-gray-900"><?= htmlspecialchars($rotuloBimCab) ?></dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">Ano</dt>
+                    <dd class="text-gray-900"><?= $anoCab > 0 ? $anoCab : '—' ?></dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">Série</dt>
+                    <dd class="text-gray-900"><?= htmlspecialchars($rotuloSeriesCab) ?></dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">Boletim vinculado</dt>
+                    <dd class="text-gray-900"><?= $nomeBoletimVinculado !== '' ? htmlspecialchars($nomeBoletimVinculado) : '—' ?></dd>
+                </div>
+            </dl>
+            <?php elseif (trim((string) ($regra['nome'] ?? '')) !== ''): ?>
+            <p class="text-sm text-gray-700 mt-1"><?= htmlspecialchars((string) $regra['nome']) ?></p>
+            <?php endif; ?>
+            <p class="text-sm text-gray-500 mt-2">As fórmulas ficam em Configurar Notas. Depois gere o período em lote.</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <a href="<?= URL ?>/admin/boletim-configuracao/assistente<?= $selectedRegraId > 0 ? '?regra_id=' . $selectedRegraId : '' ?>"
+               class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium shrink-0">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                Configurar Notas
+            </a>
+            <a href="<?= URL ?>/admin/<?= $modoArquivo ? 'boletim/arquivo' : 'boletim' ?>"
+               class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-medium shrink-0">
+                <i class="fa-solid fa-arrow-left"></i>
+                <?= $modoArquivo ? 'Arquivo de fórmulas' : 'Todos os eventos' ?>
+            </a>
+            <a href="<?= URL ?>/admin/boletim-configuracao/gerados"
+               class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-6m4 6V7m4 10v-4M3 5h18v14H3V5z" />
+                </svg>
+                Boletins Gerados
+            </a>
+        </div>
+    </div>
+    <?php if ($flashMessage !== ''): ?>
+        <?php $bg = $flashType === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'; ?>
+        <div class="p-4 rounded-lg border <?= $bg ?>"><?= htmlspecialchars($flashMessage) ?></div>
+    <?php endif; ?>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <?php if ($modoArquivo): ?>
+        <div class="xl:col-span-3 mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            Configurador antigo, só para consultar a fórmula deste evento. Esta tela vai sair.
+        </div>
+        <?php endif; ?>
+        <div class="xl:col-span-3<?= $modoArquivo ? '' : ' hidden' ?>"<?= $modoArquivo ? '' : ' aria-hidden="true"' ?>>
+            <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/salvar" class="p-5 space-y-5 bg-white rounded-xl shadow-lg" id="form-regra-boletim"<?= $modoArquivo ? ' onsubmit="return false;"' : '' ?>>
+                <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                <input type="hidden" name="regra_id" value="<?= (int) ($regra['id'] ?? 0) ?>">
+                <input type="hidden" name="exibir_em" id="regra-exibir-em" value="<?= htmlspecialchars($modoArquivo ? (string) ($regra['exibir_em'] ?? 'notas') : 'notas') ?>">
+                <input type="hidden" name="finalidade" id="regra-finalidade" value="<?= htmlspecialchars($finalidade) ?>">
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Boletim</label>
+                    <select name="boletim_id" id="regra-boletim-id" class="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm">
+                        <option value="">Selecione um Boletim</option>
+                        <?php foreach ($boletinsCadastro as $bolOpt): ?>
+                            <?php
+                            $bolOptId = (int) ($bolOpt['id'] ?? 0);
+                            $bolLabel = (string) ($bolOpt['nome'] ?? '');
+                            $bolLabel .= (($bolOpt['finalidade'] ?? '') === 'complementar') ? ' · Extra' : ' · Oficial';
+                            if (!empty($bolOpt['ano_letivo'])) {
+                                $bolLabel .= ' · ' . (int) $bolOpt['ano_letivo'];
+                            }
+                            ?>
+                            <option
+                                value="<?= $bolOptId ?>"
+                                data-finalidade="<?= htmlspecialchars((string) ($bolOpt['finalidade'] ?? 'oficial')) ?>"
+                                data-materias="<?= htmlspecialchars(json_encode(array_values(array_map('intval', (array) ($bolOpt['materias_ids'] ?? [])))), ENT_QUOTES, 'UTF-8') ?>"
+                                data-series="<?= htmlspecialchars(json_encode(array_values(array_map('intval', (array) ($bolOpt['series_ids'] ?? [])))), ENT_QUOTES, 'UTF-8') ?>"
+                                data-turmas="<?= htmlspecialchars(json_encode(array_values(array_map('intval', (array) ($bolOpt['turmas_ids'] ?? [])))), ENT_QUOTES, 'UTF-8') ?>"
+                                data-nota-min="<?= htmlspecialchars((string) ($bolOpt['nota_minima_aprovacao'] ?? '')) ?>"
+                                data-round="<?= htmlspecialchars((string) ($bolOpt['round_mode'] ?? '')) ?>"
+                                data-decimal="<?= htmlspecialchars((string) ($bolOpt['decimal_places'] ?? '')) ?>"
+                                <?= $boletimIdSelecionado === $bolOptId ? 'selected' : '' ?>
+                            ><?= htmlspecialchars($bolLabel) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <?php if ($boletinsCadastro === []): ?>
+                        <p class="text-xs text-amber-800 mt-1">Cadastre o modelo em <a href="<?= URL ?>/admin/boletins" class="underline">Acadêmico → Modelo de Boletim</a> antes de criar a avaliação.</p>
+                    <?php endif; ?>
+                </div>
+                <input type="hidden" name="componentes_json" id="componentes-json" value="<?= htmlspecialchars(json_encode($componentesInicial, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) ?>">
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="flex flex-col">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nome do evento</label>
+                        <input type="text" id="regra-nome" name="regra_nome" required value="<?= htmlspecialchars((string) ($regra['nome'] ?? 'Evento padrão da escola')) ?>" class="w-full h-10 px-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Bimestral 1 - Ensino Médio 2026">
+                        <div class="mt-1 min-h-[2.75rem]" aria-hidden="true"></div>
+                    </div>
+                    <div class="flex flex-col">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Código do evento (slug)
+                            <span class="text-xs font-normal text-gray-400">— gerado automaticamente</span>
+                        </label>
+                        <input type="text" id="regra-codigo" name="regra_codigo" value="<?= htmlspecialchars((string) ($regra['codigo'] ?? '')) ?>" readonly class="w-full h-10 px-3 border border-gray-200 bg-gray-50 text-gray-600 rounded-lg" placeholder="bimestral-1-ensino-medio-2026">
+                        <button type="button" id="btn-editar-codigo-evento" class="text-xs text-indigo-600 hover:underline mt-1 text-left">Editar código manualmente</button>
+                        <p class="text-xs text-gray-500 mt-1 min-h-[1.5rem] leading-snug">Esse código é usado para outros eventos buscarem a nota deste aqui (ex.: o Boletim final busca a nota no evento bimestral).</p>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Descrição curta (opcional)</label>
+                        <input type="text" id="regra-descricao-curta" name="regra_descricao_curta" maxlength="255" value="<?= htmlspecialchars((string) ($regra['descricao_curta'] ?? '')) ?>" class="w-full h-10 px-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Ex.: Evento do 1º bimestre para composição da média">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Quadro de Notas</label>
+                        <select id="grupo-regras-notas-id" name="grupo_regras_notas_id" class="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm">
+                            <option value="">Selecione o quadro</option>
+                            <?php foreach ($gruposRegrasNotas as $grn): ?>
+                                <option value="<?= (int) ($grn['id'] ?? 0) ?>" <?= $grupoRegrasNotasId === (int) ($grn['id'] ?? 0) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars((string) ($grn['nome'] ?? '')) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php if ($gruposRegrasNotas === []): ?>
+                        <p class="text-xs text-amber-800 mt-1">Cadastre o molde em <a href="<?= URL ?>/admin/quadros-notas" class="underline">Acadêmico → Quadro de Notas</a> antes de salvar a avaliação.</p>
+                        <?php endif; ?>
+                        <p class="text-xs text-gray-500 mt-1">Ao escolher, as colunas S1/S2… e os blocos (A/B, Humanas…) nascem do quadro. <a href="<?= URL ?>/admin/quadros-notas" class="text-indigo-600 underline">Cadastrar quadros</a>.</p>
+                        <div id="wrap-semanas-periodo" class="hidden mt-3">
+                            <label for="semanas-periodo" class="block text-xs font-medium text-gray-700 mb-1">Semanas deste período</label>
+                            <input type="number" id="semanas-periodo" name="semanas_periodo" min="1" max="20"
+                                   value="<?= $semanasPeriodo > 0 ? $semanasPeriodo : '' ?>"
+                                   class="w-28 h-10 px-3 border border-gray-300 rounded-lg text-sm"
+                                   placeholder="Todas">
+                            <p class="text-xs text-gray-500 mt-1">Deixe em branco para usar todas as colunas do quadro. Ex.: molde com 6 semanas, este bimestre só tem 4.</p>
+                        </div>
+                        <div id="grupo-regras-notas-preview" class="hidden mt-3 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm text-indigo-950"></div>
+                        <div class="mt-4">
+                            <div class="flex items-center justify-between gap-3 mb-2">
+                                <span class="block text-sm font-medium text-gray-700">Esta avaliação também conta para…</span>
+                                <button type="button" id="btn-add-destino-quadro" class="btn-primary-custom px-3 py-1.5 text-xs font-semibold rounded-lg hover:opacity-90">+ Destino</button>
+                            </div>
+                            <p class="text-xs text-gray-500 mb-2">Além do quadro principal, esta avaliação também conta para outras colunas (ex.: AV1 de outro quadro).</p>
+                            <div id="lista-destinos-quadro" class="space-y-3"></div>
+                            <input type="hidden" name="destinos_json" id="destinos-json" value="<?= htmlspecialchars(json_encode($destinosQuadro, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?>">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="campos-herdados-do-boletim" class="hidden" aria-hidden="true">
+                    <div id="wrap-exibicao-filtros" class="grid grid-cols-1 md:grid-cols-3 gap-4 md:items-start">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Ano letivo</label>
+                            <select name="ano_letivo" id="regra-ano-letivo" data-periodo-ano class="w-full h-10 px-3 border border-gray-300 rounded-lg">
+                                <?php $anoRegra = (int) ($regra['ano_letivo'] ?? (int) date('Y')); ?>
+                                <?php foreach (($anos_letivos_catalogo ?? []) as $anoOpt): ?>
+                                    <?php $anoOpt = (int) $anoOpt; if ($anoOpt <= 0) { continue; } ?>
+                                    <option value="<?= $anoOpt ?>" <?= $anoRegra === $anoOpt ? 'selected' : '' ?>><?= $anoOpt ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div id="wrap-exibicao-bimestre">
+                            <?php $bimRegra = (int) ($regra['bimestre'] ?? 0); ?>
+                            <label class="block text-sm font-medium text-gray-700 mb-1" data-periodo-label>Bimestre</label>
+                            <select name="bimestre" id="regra-bimestre" class="w-full h-10 px-3 border border-gray-300 rounded-lg" data-periodo-letivo-select data-periodo-vazio="1">
+                                <?php
+                                if (!class_exists('PeriodoLetivo')) {
+                                }
+                                echo \App\Core\PeriodoLetivo::optionsHtml($anoRegra, $bimRegra, ['vazio' => true]);
+                                ?>
+                            </select>
+                        </div>
+                        <div class="flex items-end pb-1">
+                            <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                                <input type="checkbox" name="usar_resultado_aprovacao" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" <?= !isset($regra['usar_resultado_aprovacao']) || (int) $regra['usar_resultado_aprovacao'] === 1 ? 'checked' : '' ?>>
+                                <span>Mostrar aprovado/reprovado</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div data-herda-boletim>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nota mínima para passar</label>
+                        <input type="number" name="nota_minima_aprovacao" min="0" max="10" step="0.01" value="<?= htmlspecialchars(number_format((float) (($regra['nota_minima_aprovacao'] ?? 6)), 2, '.', '')) ?>" class="w-full sm:w-32 h-10 px-3 border border-gray-300 rounded-lg box-border">
+                    </div>
+                    <div data-herda-boletim>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Arredondamento final</label>
+                        <select name="round_mode" class="w-full h-10 px-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="none" <?= $roundModeSelected === 'none' ? 'selected' : '' ?>>Sem arredondamento especial (2 casas)</option>
+                            <option value="half" <?= $roundModeSelected === 'half' ? 'selected' : '' ?>>Faixa .00 / .50 / próximo inteiro</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1 min-h-[2.75rem] leading-snug">Regra: decimal &lt; 0,25 = .00, de 0,25 a &lt; 0,75 = .50, e ≥ 0,75 sobe para o próximo inteiro.</p>
+                    </div>
+                    <div data-herda-boletim>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Casas decimais no boletim</label>
+                        <select name="decimal_places" class="w-full h-10 px-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="2" <?= $decimalPlacesSelected === 2 ? 'selected' : '' ?>>2 casas (ex.: 9,00)</option>
+                            <option value="1" <?= $decimalPlacesSelected === 1 ? 'selected' : '' ?>>1 casa (ex.: 9,0)</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1 min-h-[2.75rem] leading-snug">Define a exibição das notas geradas para alunos, pais e coordenação.</p>
+                    </div>
+
+                <div data-herda-boletim>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Matérias que entram no boletim (opcional)</label>
+                    <div class="border border-gray-300 rounded-lg p-3 max-h-64 overflow-y-auto bg-white">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            <?php foreach ($materias as $materia): ?>
+                                <?php $mid = (int) ($materia['id'] ?? 0); ?>
+                                <?php if ($mid <= 0) { continue; } ?>
+                                <label class="inline-flex items-center gap-2 text-sm text-gray-800">
+                                    <input
+                                        type="checkbox"
+                                        name="materias_ids[]"
+                                        value="<?= $mid ?>"
+                                        class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                        <?= in_array($mid, $materiasSelecionadasRegra, true) ? 'checked' : '' ?>
+                                    >
+                                    <span><?= htmlspecialchars((string) ($materia['nome'] ?? ('Matéria #' . $mid))) ?></span>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">
+                        Se não selecionar nenhuma, o sistema usa todas as matérias.
+                    </p>
+                </div>
+
+                <div data-herda-boletim>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Séries que podem usar este evento (opcional)</label>
+                    <div class="border border-gray-300 rounded-lg p-3 max-h-64 overflow-y-auto bg-white">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            <?php foreach ($series as $serie): ?>
+                                <?php $sid = (int) ($serie['id'] ?? 0); ?>
+                                <?php if ($sid <= 0) { continue; } ?>
+                                <?php
+                                $nomeSerie = trim((string) ($serie['nome'] ?? ('Série #' . $sid)));
+                                $cursoSerie = trim((string) ($serie['curso_nome'] ?? ''));
+                                ?>
+                                <label class="inline-flex items-center gap-2 text-sm text-gray-800">
+                                    <input
+                                        type="checkbox"
+                                        name="series_ids[]"
+                                        value="<?= $sid ?>"
+                                        class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                        <?= in_array($sid, $seriesSelecionadasRegra, true) ? 'checked' : '' ?>
+                                    >
+                                    <span><?= htmlspecialchars($nomeSerie . ($cursoSerie !== '' ? (' - ' . $cursoSerie) : '')) ?></span>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Se não selecionar nenhuma, o evento fica disponível para todas as séries.</p>
+                </div>
+
+                <div data-herda-boletim>
+                    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-2">
+                        <label class="block text-sm font-medium text-gray-700">Turmas que podem usar este evento (opcional)</label>
+                        <input type="search" id="filtro-turmas-regra" placeholder="Buscar turma"
+                               class="w-full sm:w-64 h-9 px-3 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                    <div class="border border-gray-300 rounded-lg p-3 max-h-64 overflow-y-auto bg-white" id="lista-turmas-regra">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            <?php foreach ($turmas as $turma): ?>
+                                <?php
+                                $tid = (int) ($turma['id'] ?? 0);
+                                if ($tid <= 0) { continue; }
+                                $turmaNome = trim((string) ($turma['nome'] ?? ('Turma #' . $tid)));
+                                $serieNome = trim((string) ($turma['serie_nome'] ?? ''));
+                                $cursoNome = trim((string) ($turma['curso_nome'] ?? ''));
+                                $anoTurma = (int) ($turma['ano_letivo'] ?? 0);
+                                $rotuloTurma = $turmaNome;
+                                if ($serieNome !== '' && stripos($turmaNome, $serieNome) === false) {
+                                    $rotuloTurma .= ' · ' . $serieNome;
+                                }
+                                if ($cursoNome !== '' && stripos($rotuloTurma, $cursoNome) === false) {
+                                    $rotuloTurma .= ' · ' . $cursoNome;
+                                }
+                                if ($serieNome === '') {
+                                    $rotuloTurma .= ' · Sem série';
+                                }
+                                if ($anoTurma > 0) {
+                                    $rotuloTurma .= ' · ' . $anoTurma;
+                                }
+                                ?>
+                                <label class="turma-regra-item inline-flex items-center gap-2 text-sm text-gray-800"
+                                       data-serie-id="<?= (int) ($turma['serie_id'] ?? 0) ?>"
+                                       data-busca="<?= htmlspecialchars(mb_strtolower($rotuloTurma, 'UTF-8')) ?>">
+                                    <input type="checkbox" name="turmas_ids[]" value="<?= $tid ?>"
+                                           class="turma-regra-checkbox rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                           <?= in_array($tid, $turmasSelecionadasRegra, true) ? 'checked' : '' ?>>
+                                    <span><?= htmlspecialchars($rotuloTurma) ?></span>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Turmas sem série continuam disponíveis para seleção. Quando selecionar uma ou mais turmas, elas terão prioridade sobre o filtro de séries.</p>
+                </div>
+                </div>
+
+                <script>
+                (function () {
+                    var busca = document.getElementById('filtro-turmas-regra');
+                    var itens = Array.prototype.slice.call(document.querySelectorAll('.turma-regra-item'));
+                    var seriesChecks = Array.prototype.slice.call(document.querySelectorAll('input[name="series_ids[]"]'));
+                    function normalizar(valor) {
+                        return String(valor || '').toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    }
+                    function filtrarTurmas() {
+                        var termo = normalizar(busca ? busca.value : '');
+                        var seriesAtivas = {};
+                        seriesChecks.forEach(function (el) { if (el.checked) seriesAtivas[String(el.value)] = true; });
+                        var temSerie = Object.keys(seriesAtivas).length > 0;
+                        itens.forEach(function (item) {
+                            var checkbox = item.querySelector('.turma-regra-checkbox');
+                            var serieId = String(item.dataset.serieId || '');
+                            var semSerie = serieId === '' || serieId === '0';
+                            var atendeSerie = !temSerie || semSerie || !!seriesAtivas[serieId] || (checkbox && checkbox.checked);
+                            var atendeBusca = termo === '' || normalizar(item.dataset.busca).indexOf(termo) !== -1;
+                            item.style.display = atendeSerie && atendeBusca ? '' : 'none';
+                        });
+                    }
+                    if (busca) busca.addEventListener('input', filtrarTurmas);
+                    seriesChecks.forEach(function (el) { el.addEventListener('change', filtrarTurmas); });
+                    filtrarTurmas();
+                })();
+                </script>
+
+                <div class="rounded-lg border border-gray-200 bg-white p-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Visível para</label>
+                    <div class="flex flex-wrap gap-4">
+                        <label class="inline-flex items-center gap-2 text-sm text-gray-800">
+                            <input type="checkbox" name="vis_aluno" id="vis-aluno-regra" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" <?= !isset($regra['vis_aluno']) || (int) $regra['vis_aluno'] === 1 ? 'checked' : '' ?>>
+                            <span>Aluno</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2 text-sm text-gray-800">
+                            <input type="checkbox" name="vis_pais" id="vis-pais-regra" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" <?= !isset($regra['vis_pais']) || (int) $regra['vis_pais'] === 1 ? 'checked' : '' ?>>
+                            <span>Pais</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2 text-sm text-gray-800">
+                            <input type="checkbox" name="vis_coordenacao" id="vis-coordenacao-regra" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" <?= !isset($regra['vis_coordenacao']) || (int) $regra['vis_coordenacao'] === 1 ? 'checked' : '' ?>>
+                            <span>Coordenação</span>
+                        </label>
+                    </div>
+                    <?php if ($modoArquivo && (int) ($regra['id'] ?? 0) > 0): ?>
+                    <p class="text-xs text-gray-500 mt-3">Use o botão <strong>Salvar visibilidade</strong> abaixo desta caixa (neste modo a fórmula não é editável).</p>
+                    <?php endif; ?>
+                </div>
+
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-900">Blocos da regra</h3>
+                    </div>
+                    <?php if (!$modoArquivo): ?>
+                    <button type="button" id="btn-add-bloco" class="btn-primary-custom shrink-0 h-10 px-3 rounded-lg hover:opacity-90 text-sm font-medium inline-flex items-center justify-center">+ Adicionar bloco</button>
+                    <?php endif; ?>
+                </div>
+
+                <div id="wrap-semanas-quadro" class="hidden rounded-lg border border-indigo-100 bg-indigo-50 p-4">
+                    <div class="flex flex-col gap-1 mb-3">
+                        <h4 class="text-sm font-semibold text-indigo-950">Semanas do quadro semanal</h4>
+                        <p class="text-xs text-indigo-800">Marque quais colunas S1–S20 aparecem no boletim e entram na Média Sem.</p>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+                        <?php for ($semanaQuadro = 1; $semanaQuadro <= 20; $semanaQuadro++): ?>
+                            <label class="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm text-indigo-950">
+                                <input type="checkbox" class="semana-quadro-toggle rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" value="s<?= $semanaQuadro ?>" data-semana="<?= $semanaQuadro ?>">
+                                <span>S<?= $semanaQuadro ?></span>
+                            </label>
+                        <?php endfor; ?>
+                    </div>
+                </div>
+
+                <div id="lista-blocos" class="space-y-3"></div>
+
+                <?php if (!$modoArquivo): ?>
+                <div class="pt-2">
+                    <button type="submit" id="btn-salvar-regra-boletim" class="btn-primary-custom px-4 py-2 rounded-lg hover:opacity-90 font-medium">Salvar evento</button>
+                </div>
+                <?php endif; ?>
+            </form>
+            <?php if ($modoArquivo && (int) ($regra['id'] ?? 0) > 0): ?>
+            <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/visibilidade-regra" class="mt-3 p-4 bg-white rounded-xl border border-indigo-100 shadow-sm" id="form-salvar-visibilidade-arquivo">
+                <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                <input type="hidden" name="regra_id" value="<?= (int) $regra['id'] ?>">
+                <input type="hidden" name="retorno" value="<?= htmlspecialchars('/admin/boletim-configuracao?regra_id=' . (int) $regra['id'] . '&arquivo=1', ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="vis_aluno" id="vis-aluno-hidden" value="0">
+                <input type="hidden" name="vis_pais" id="vis-pais-hidden" value="0">
+                <input type="hidden" name="vis_coordenacao" id="vis-coordenacao-hidden" value="0">
+                <button type="submit" class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">Salvar visibilidade</button>
+                <p class="text-xs text-gray-500 mt-2">Grava só Aluno / Pais / Coordenação. A fórmula desta tela não é alterada.</p>
+            </form>
+            <script>
+            (function () {
+                var form = document.getElementById('form-salvar-visibilidade-arquivo');
+                if (!form) return;
+                form.addEventListener('submit', function () {
+                    var a = document.getElementById('vis-aluno-regra');
+                    var p = document.getElementById('vis-pais-regra');
+                    var c = document.getElementById('vis-coordenacao-regra');
+                    document.getElementById('vis-aluno-hidden').value = (a && a.checked) ? '1' : '0';
+                    document.getElementById('vis-pais-hidden').value = (p && p.checked) ? '1' : '0';
+                    document.getElementById('vis-coordenacao-hidden').value = (c && c.checked) ? '1' : '0';
+                });
+            })();
+            </script>
+            <?php endif; ?>
+        </div>
+
+        <div class="xl:col-span-3 bg-white rounded-xl shadow-sm border border-gray-200">
+            <div class="px-5 py-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">Geração em lote</h2>
+                    <p class="text-sm text-gray-500 mt-1">Simule um aluno e depois gere o período. Alunos travados não entram.</p>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button type="button" id="btn-abrir-conferir-boletim"
+                            class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
+                        <i class="fa-solid fa-flask mr-2"></i>Simular boletim
+                    </button>
+                    <?php if ($geracaoEmAndamento): ?>
+                    <a href="<?= URL ?>/admin/boletim"
+                       class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        Ver status
+                    </a>
+                    <?php else: ?>
+                    <button type="submit" form="form-gerar-lote-boletim"
+                            class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
+                        Gerar boletins
+                    </button>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <div class="p-5 space-y-4">
+                <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/gerar-boletins" id="form-gerar-lote-boletim" class="space-y-3">
+                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                    <input type="hidden" name="regra_id" value="<?= (int) ($regra['id'] ?? 0) ?>">
+                    <input type="hidden" name="periodo_ref" value="<?= htmlspecialchars($periodoRef) ?>">
+                    <input type="hidden" name="data_inicio" value="<?= htmlspecialchars($dataInicio) ?>">
+                    <input type="hidden" name="data_fim" value="<?= htmlspecialchars($dataFim) ?>">
+                    <label class="flex items-start gap-2.5 text-sm text-gray-800 cursor-pointer">
+                        <input type="checkbox" id="incluir-novos-boletim" name="incluir_novos" value="1" class="mt-1 w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                        <span>Incluir alunos que ainda não têm boletim neste período</span>
+                    </label>
+                    <p class="text-xs text-gray-500">Cada geração cria um boletim novo. As notas já gravadas não são substituídas. Roda em segundo plano.</p>
+                    <?php if ($geracaoEmAndamento): ?>
+                    <p class="text-sm text-amber-800 font-medium">Já existe uma geração em andamento para este evento.</p>
+                    <?php endif; ?>
+                </form>
+
+                <?php if (!empty($regra['id'])): ?>
+                <?php if ($alunosTravados !== []): ?>
+                <div class="border-t border-gray-200 pt-4 space-y-2">
+                    <p class="text-sm font-semibold text-gray-900">Alunos travados neste período</p>
+                    <p class="text-xs text-gray-500">Não entram no recálculo em lote.</p>
+                    <ul class="text-sm space-y-2">
+                        <?php foreach ($alunosTravados as $tr): ?>
+                            <li class="flex items-start justify-between gap-2">
+                                <span class="text-gray-800">
+                                    <?= htmlspecialchars((string) ($tr['aluno_nome'] ?? ('#' . (int) ($tr['aluno_id'] ?? 0)))) ?>
+                                    <?php if (!empty($tr['motivo'])): ?>
+                                        <span class="block text-xs text-gray-500"><?= htmlspecialchars((string) $tr['motivo']) ?></span>
+                                    <?php endif; ?>
+                                </span>
+                                <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/destravar-aluno" class="shrink-0">
+                                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                                    <input type="hidden" name="regra_id" value="<?= (int) ($regra['id'] ?? 0) ?>">
+                                    <input type="hidden" name="aluno_id" value="<?= (int) ($tr['aluno_id'] ?? 0) ?>">
+                                    <input type="hidden" name="periodo_ref" value="<?= htmlspecialchars($periodoRef) ?>">
+                                    <input type="hidden" name="data_inicio" value="<?= htmlspecialchars($dataInicio) ?>">
+                                    <input type="hidden" name="data_fim" value="<?= htmlspecialchars($dataFim) ?>">
+                                    <button type="submit" class="text-xs text-gray-600 hover:underline">Destravar</button>
+                                </form>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+                <?php endif; ?>
+                <div class="border-t border-gray-200 pt-4">
+                    <div class="flex items-center justify-between">
+                        <p class="text-sm font-semibold text-gray-900">Histórico de versões</p>
+                        <button type="button" id="btn-ver-logs-geracao" class="text-xs text-gray-600 hover:underline">Ver gerações</button>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">A vigente é a que vale para aluno, pais e ficha. Dá para voltar para qualquer versão.</p>
+                    <form id="form-restaurar-geracao" method="POST" action="<?= URL ?>/admin/boletim-configuracao/restaurar-geracao" class="hidden">
+                        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                        <input type="hidden" name="geracao_id" id="restaurar-geracao-id" value="">
+                        <input type="hidden" name="regra_id" value="<?= (int) ($regra['id'] ?? 0) ?>">
+                    </form>
+                    <div id="logs-geracao-resultado" class="hidden mt-2 text-sm space-y-1.5"></div>
+                    <div id="geracao-detalhe-resultado" class="hidden mt-3 text-sm border-t border-gray-100 pt-2"></div>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
+    <div id="boletimConferirBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="fecharConferirBoletim()"></div>
+    <aside id="boletimConferirDrawer"
+           class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
+           aria-hidden="true">
+        <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
+            <h2 class="text-xl font-bold text-gray-900">Simular boletim</h2>
+            <button type="button" onclick="fecharConferirBoletim()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-8">
+            <section>
+                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Ver um aluno</h3>
+                <form method="GET" action="<?= URL ?>/admin/boletim-configuracao" class="space-y-4">
+                    <input type="hidden" name="regra_id" value="<?= (int) ($regra['id'] ?? 0) ?>">
+                    <input type="hidden" name="periodo_ref" value="<?= htmlspecialchars($periodoRef) ?>">
+                    <div>
+                        <label for="conferir-aluno-id" class="block text-sm font-medium text-gray-700 mb-1">Aluno <span class="text-red-500">*</span></label>
+                        <select name="aluno_id" id="conferir-aluno-id" required class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                            <option value="">Selecione</option>
+                            <?php foreach ($alunos as $aluno): ?>
+                                <?php $label = trim((string) ($aluno['nome'] ?? '')) . ' (' . ((string) ($aluno['turma_nome'] ?? 'Sem turma')) . ')'; ?>
+                                <option value="<?= (int) ($aluno['id'] ?? 0) ?>" <?= ((int) ($aluno['id'] ?? 0) === $selectedAlunoId) ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 shadow-sm">Ver simulação</button>
+                </form>
+            </section>
+            <section>
+                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Simular lote</h3>
+                <p class="text-sm text-gray-500 mb-4">Valida até 60 alunos sem gravar. A turma é opcional.</p>
+                <div class="space-y-4">
+                    <div>
+                        <label for="lote-turma-id" class="block text-sm font-medium text-gray-700 mb-1">Turma</label>
+                        <select id="lote-turma-id" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                            <option value="">Todo o escopo do evento</option>
+                            <?php foreach ($turmas as $turmaOpt): ?>
+                                <option value="<?= (int) ($turmaOpt['id'] ?? 0) ?>"><?= htmlspecialchars((string) ($turmaOpt['nome'] ?? '')) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="flex flex-col-reverse sm:flex-row gap-3">
+                        <button type="button" id="btn-checklist-pre-geracao" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium">Verificar problemas</button>
+                        <button type="button" id="btn-simular-lote" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 shadow-sm text-sm">Simular lote</button>
+                    </div>
+                    <div id="lote-resultado" class="hidden max-h-72 overflow-y-auto border border-gray-200 rounded-lg bg-white"></div>
+                    <div id="checklist-resultado" class="hidden space-y-2 text-sm"></div>
+                </div>
+            </section>
+        </div>
+        <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex justify-end">
+            <button type="button" onclick="fecharConferirBoletim()" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Fechar</button>
+        </div>
+    </aside>
+
+    <?php if (is_array($simulacao)): ?>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900">Resultado da Simulação</h2>
+                <p class="text-xs text-gray-500 mt-1">Somente o <strong>Demonstrativo de Notas</strong>, com blocos, semanas e médias.</p>
+                <p class="text-sm text-gray-500 mt-1">
+                    Aluno: <strong><?= htmlspecialchars((string) (($simulacao['aluno']['nome'] ?? '-') )) ?></strong>
+                </p>
+            </div>
+
+            <div class="p-5">
+                <?php
+                $matrizSim = $simulacao['matriz_materias'] ?? null;
+                $matrizLinhas = is_array($matrizSim) && !empty($matrizSim['linhas']) ? $matrizSim['linhas'] : [];
+                $matrizColunas = is_array($matrizSim) && !empty($matrizSim['colunas']) ? $matrizSim['colunas'] : [];
+                if (!class_exists('BoletimQuadroLayoutHelper', false)) {
+                }
+                ?>
+                <?php
+                $cols = $matrizColunas;
+                $linhas = $matrizLinhas;
+                $linhasBoletim = is_array($simulacao['matriz_materias_boletim']['linhas'] ?? null)
+                    ? $simulacao['matriz_materias_boletim']['linhas']
+                    : $matrizLinhas;
+                $decimalPlaces = $decimalPlacesSelected ?? 2;
+                $simVistaId = 'sim-principal';
+                $edicaoSimulacao = [
+                    'regra_id' => (int) ($regra['id'] ?? 0),
+                    'aluno_id' => (int) $selectedAlunoId,
+                    'periodo_ref' => (string) $periodoRef,
+                ];
+                include \App\Core\ViewPaths::partial('boletim_resultado_simulacao.php');
+                unset($edicaoSimulacao);
+                ?>
+
+                <?php if ($podeGravarBoletimOficialAluno): ?>
+                    <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/publicar-boletim-aluno" class="mt-6 pt-5 border-t border-gray-200 space-y-3">
+                        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                        <input type="hidden" name="regra_id" value="<?= $regraIdBoletim ?>">
+                        <input type="hidden" name="aluno_id" value="<?= $selectedAlunoId ?>">
+                        <input type="hidden" name="periodo_ref" value="<?= htmlspecialchars($periodoRef) ?>">
+                        <input type="hidden" name="data_inicio" value="<?= htmlspecialchars($dataInicio) ?>">
+                        <input type="hidden" name="data_fim" value="<?= htmlspecialchars($dataFim) ?>">
+                        <p class="text-sm text-gray-600">Grava uma <strong>nova versão vigente</strong> só deste aluno e período. Os demais não mudam. Use para aluno novo (vem zerado) ou ajuste pontual.</p>
+                        <label class="flex items-start gap-2 text-sm text-gray-800">
+                            <input type="checkbox" name="travar_aluno" value="1" class="mt-1 rounded border-gray-300" <?= $alunoTravado ? 'checked' : '' ?>>
+                            <span>Não recalcular este aluno nas próximas gerações em lote (trava). Desmarque se depois quiser incluir ele no “ajustar todos”.</span>
+                        </label>
+                        <button type="submit" class="btn-primary-custom inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-lg hover:opacity-90 shadow-sm">
+                            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                            Gravar boletim oficial (só este aluno)
+                        </button>
+                    </form>
+                    <?php if ($alunoTravado): ?>
+                        <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/destravar-aluno" class="mt-2">
+                            <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                            <input type="hidden" name="regra_id" value="<?= $regraIdBoletim ?>">
+                            <input type="hidden" name="aluno_id" value="<?= $selectedAlunoId ?>">
+                            <input type="hidden" name="periodo_ref" value="<?= htmlspecialchars($periodoRef) ?>">
+                            <input type="hidden" name="data_inicio" value="<?= htmlspecialchars($dataInicio) ?>">
+                            <input type="hidden" name="data_fim" value="<?= htmlspecialchars($dataFim) ?>">
+                            <button type="submit" class="text-sm text-amber-800 hover:underline">Este aluno está travado — clicar para destravar</button>
+                        </form>
+                    <?php else: ?>
+                        <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/travar-aluno" class="mt-2">
+                            <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                            <input type="hidden" name="regra_id" value="<?= $regraIdBoletim ?>">
+                            <input type="hidden" name="aluno_id" value="<?= $selectedAlunoId ?>">
+                            <input type="hidden" name="periodo_ref" value="<?= htmlspecialchars($periodoRef) ?>">
+                            <input type="hidden" name="data_inicio" value="<?= htmlspecialchars($dataInicio) ?>">
+                            <input type="hidden" name="data_fim" value="<?= htmlspecialchars($dataFim) ?>">
+                            <input type="hidden" name="motivo" value="Ajuste manual — não recalcular em lote">
+                            <button type="submit" class="text-sm text-gray-600 hover:underline">Travar este aluno sem gravar de novo</button>
+                        </form>
+                    <?php endif; ?>
+                    <?php if ($versoesAluno !== []): ?>
+                        <div class="mt-4 p-3 rounded-lg bg-slate-50 border border-slate-200">
+                            <p class="text-sm font-semibold text-slate-900 mb-2">Versões deste aluno</p>
+                            <ul class="text-sm space-y-1.5">
+                                <?php foreach ($versoesAluno as $vAl): ?>
+                                    <?php
+                                    $vNum = (int) ($vAl['versao'] ?? 0);
+                                    $vId = (int) ($vAl['config_id'] ?? 0);
+                                    $vRotulo = (int) ($vAl['config_versao'] ?? 0);
+                                    if ($vId <= 0) {
+                                        $vId = (int) ($vAl['geracao_id'] ?? 0);
+                                    }
+                                    if ($vId <= 0) {
+                                        $vId = (int) ($vAl['id'] ?? 0);
+                                    }
+                                    if ($vRotulo <= 0) {
+                                        $vRotulo = $vNum;
+                                    }
+                                    $vVig = (int) ($vAl['vigente'] ?? 0) === 1;
+                                    $vQuando = !empty($vAl['created_at']) ? date('d/m/Y H:i', strtotime((string) $vAl['created_at'])) : '';
+                                    $previewUrl = URL . '/admin/boletim-configuracao/gerados/preview?' . http_build_query([
+                                        'aluno_id' => $selectedAlunoId,
+                                        'regra_id' => $regraIdBoletim,
+                                        'periodo_ref' => $periodoRef,
+                                        'versao' => $vNum,
+                                    ]);
+                                    ?>
+                                    <li class="flex items-center justify-between gap-2">
+                                        <span>
+                                            <?= $vId > 0 ? 'ID ' . $vId . ' · ' : '' ?>Versão <?= $vRotulo ?>
+                                            <?php if ($vVig): ?>
+                                                <span class="inline-block ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-emerald-100 text-emerald-800">vigente</span>
+                                            <?php endif; ?>
+                                            <span class="text-xs text-slate-500"><?= htmlspecialchars($vQuando) ?><?= !empty($vAl['usuario_nome']) ? ' · ' . htmlspecialchars((string) $vAl['usuario_nome']) : '' ?></span>
+                                        </span>
+                                        <a href="<?= htmlspecialchars($previewUrl) ?>" target="_blank" rel="noopener" class="text-xs text-indigo-600 hover:underline">Ver tabela</a>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
+                        </div>
+                    <?php endif; ?>
+                <?php endif; ?>
+
+
+                <?php if (!empty($simulacao['faltantes_obrigatorios'])): ?>
+                    <div class="mt-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+                        Faltam componentes obrigatórios: <?= htmlspecialchars(implode(', ', $simulacao['faltantes_obrigatorios'])) ?>
+                    </div>
+                <?php endif; ?>
+
+                <?php if (!empty($simulacao['erro_formula'])): ?>
+                    <div class="mt-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                        <?= htmlspecialchars((string) $simulacao['erro_formula']) ?>
+                    </div>
+                <?php endif; ?>
+
+            </div>
+        </div>
+
+        <?php if (!empty($manualRows)): ?>
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+                <div class="px-5 py-4 border-b border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-900">Notas Manuais Complementares</h2>
+                    <p class="text-sm text-gray-500 mt-1">Use para ENAC, trabalho, atividade extra. Ao travar, o valor não poderá mais ser editado.</p>
+                </div>
+                <form method="POST" action="<?= URL ?>/admin/boletim-configuracao/notas-manuais" class="p-5 space-y-4" id="form-notas-manuais">
+                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                    <input type="hidden" name="regra_id" value="<?= (int) ($regra['id'] ?? 0) ?>">
+                    <input type="hidden" name="aluno_id" value="<?= $selectedAlunoId ?>">
+                    <input type="hidden" name="periodo_ref" value="<?= htmlspecialchars($periodoRef) ?>">
+                    <input type="hidden" name="data_inicio" value="<?= htmlspecialchars($dataInicio) ?>">
+                    <input type="hidden" name="data_fim" value="<?= htmlspecialchars($dataFim) ?>">
+
+                    <?php foreach ($manualRows as $item): ?>
+                        <?php
+                        $compId = (int) ($item['id'] ?? 0);
+                        $locked = !empty($item['bloqueado']);
+                        $valor = is_numeric($item['valor'] ?? null) ? (float) $item['valor'] : null;
+                        $escalaMax = max(0.01, (float) ($item['escala_max'] ?? 10));
+                        ?>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 border border-gray-200 rounded-lg p-3">
+                            <div class="md:col-span-2">
+                                <p class="text-sm font-semibold text-gray-900"><?= htmlspecialchars((string) ($item['nome'] ?? 'Componente manual')) ?></p>
+                                <p class="text-xs text-gray-500">Código: <?= htmlspecialchars((string) ($item['codigo'] ?? '-')) ?> | Escala: <?= htmlspecialchars(number_format($escalaMax, 2, ',', '.')) ?></p>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Nota</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    max="<?= htmlspecialchars(number_format($escalaMax, 2, '.', '')) ?>"
+                                    step="0.01"
+                                    data-lock-target="<?= $compId ?>"
+                                    name="manual_notas[<?= $compId ?>]"
+                                    value="<?= $valor !== null ? htmlspecialchars(number_format($valor, 2, '.', '')) : '' ?>"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
+                                    <?= $locked ? 'disabled' : '' ?>
+                                >
+                            </div>
+                            <div class="flex items-end">
+                                <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                                    <input type="checkbox" class="rounded border-gray-300" name="manual_lock[<?= $compId ?>]" value="1" <?= $locked ? 'checked disabled' : '' ?>>
+                                    Travar nota
+                                </label>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+
+                    <button type="submit" class="btn-primary-custom px-4 py-2 rounded-lg hover:opacity-90 font-medium">Salvar notas manuais</button>
+                </form>
+            </div>
+        <?php endif; ?>
+
+    <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<div id="modal-bloco" class="hidden fixed inset-0 z-50 p-3 sm:p-6 overflow-y-auto">
+    <div class="absolute inset-0 z-0 bg-black/50" data-close-modal="1" aria-hidden="true"></div>
+    <div class="relative z-10 mx-auto my-4 sm:my-8 max-w-4xl bg-white rounded-xl shadow-xl border border-gray-200 pointer-events-auto max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)] flex flex-col">
+        <div class="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-900" id="modal-titulo">Novo bloco</h3>
+            <button type="button" class="text-gray-500 hover:text-gray-700" data-close-modal="1">Fechar</button>
+        </div>
+
+        <form id="form-modal-bloco" class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4 overflow-y-auto">
+            <input type="hidden" id="bloco-edit-index" value="-1">
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nome</label>
+                <input id="bloco-nome" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Prova semanal" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Código (fórmula)</label>
+                <input id="bloco-codigo" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="semanal">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Origem</label>
+                <select id="bloco-source" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    <option value="nenhuma">-</option>
+                    <option value="provas_sistema">Provas do sistema</option>
+                    <option value="jornadas">Jornadas (automático)</option>
+                    <option value="evento_boletim">Evento de boletim (por código)</option>
+                    <option value="faltas_evento">Faltas (evento)</option>
+                    <option value="calculado">Coluna calculada (fórmula por código)</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Regra de cálculo</label>
+                <select id="bloco-calc" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    <option value="media">Média</option>
+                    <option value="soma">Soma</option>
+                    <option value="maior">Maior nota</option>
+                    <option value="ultima">Última prova</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Peso</label>
+                <input id="bloco-peso" type="number" step="0.01" min="0.01" value="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Valor máximo (escala)</label>
+                <input id="bloco-escala" type="number" step="0.01" min="0.01" max="999" value="10" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                <p class="text-xs text-gray-500 mt-1">Teto da coluna. Em fórmula tipo <code class="bg-gray-100 px-1 rounded">Resultado Final × 2</code>, use <strong>20</strong> (senão corta em 10).</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Grupo no boletim (layout)</label>
+                <select id="bloco-layout-group" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="">Automático pelo nome</option>
+                    <option value="b1">1º Bimestre</option>
+                    <option value="b2">2º Bimestre</option>
+                    <option value="b3">3º Bimestre</option>
+                    <option value="b4">4º Bimestre</option>
+                    <option value="final">Final</option>
+                    <option value="quadro_a">Quadro — Bloco A (S1/S3/S5/S7)</option>
+                    <option value="quadro_b">Quadro — Bloco B (S2/S4/S6/S8)</option>
+                    <option value="quadro_comum">Quadro — colunas comuns</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Tipo da coluna (layout)</label>
+                <select id="bloco-layout-type" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="">Automático pelo nome</option>
+                    <option value="media">Média</option>
+                    <option value="faltas">Faltas</option>
+                    <option value="rec">Rec.</option>
+                    <option value="resultado">Resultado</option>
+                    <option value="semana_nq">Semana (N e Q)</option>
+                    <option value="media_sem">Média semanal</option>
+                    <option value="other">Outro</option>
+                </select>
+            </div>
+            <div class="md:col-span-2 hidden" id="wrap-calculado">
+                <div class="mb-2 flex flex-wrap gap-4">
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                        <input type="radio" name="bloco-calculado-modo" id="bloco-calculado-modo-geral" value="geral" class="border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                        Usar a mesma expressão em todas as matérias
+                    </label>
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                        <input type="radio" name="bloco-calculado-modo" id="bloco-calculado-modo-materia" value="materia" class="border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        Definir exceções por matéria
+                    </label>
+                </div>
+                <div id="wrap-calculado-geral">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Expressão (códigos dos blocos)</label>
+                <textarea id="bloco-expressao-calculado" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm" placeholder="(semanal + bimestral) / 2"></textarea>
+                <p class="text-xs text-gray-500 mt-1">Use os mesmos nomes do campo <strong>Código (fórmula)</strong> dos outros blocos. Operadores <code class="bg-gray-100 px-1 rounded">+ - * / ( )</code> e funções <code class="bg-gray-100 px-1 rounded">max(a,b)</code>, <code class="bg-gray-100 px-1 rounded">min(a,b)</code>. Exemplos: <code class="bg-gray-100 px-1 rounded">(semanal + bimestral + jornadas) / 3</code>, <code class="bg-gray-100 px-1 rounded">max(media,(media+enac)/2)</code>. A expressão é avaliada <strong>por matéria</strong> na simulação; blocos calculados devem ficar <strong>depois</strong> na lista dos que eles referenciam.</p>
+                <label class="block text-sm font-medium text-gray-700 mt-3 mb-1">Média por acertos/questões (quadro semanal)</label>
+                <input id="bloco-agregar-nq" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm" placeholder="s1, s3, s5, s7, s2, s4, s6, s8">
+                <p class="text-xs text-gray-500 mt-1">Se preencher, a nota desta coluna vira (soma N ÷ soma Q) × 10 das semanas listadas — use na <strong>Média Sem</strong>. A expressão acima pode ficar vazia.</p>
+                <label class="mt-3 inline-flex items-start gap-2 text-sm text-gray-800">
+                    <input type="checkbox" id="bloco-calculado-traco-abaixo-minimo" class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <span class="text-sm leading-snug">Se a <strong>nota desta coluna calculada</strong> ficar <strong>abaixo da nota mínima para aprovação</strong> deste evento, exibir <strong>“-”</strong> aqui (o cálculo interno continua com o valor numérico para outras fórmulas e para o resultado aprovado/reprovado). Para ocultar a <strong>jornada</strong> abaixo do mínimo, use a opção homônima no bloco <strong>Jornadas</strong>.</span>
+                </label>
+                </div>
+                <div id="wrap-calculado-por-materia" class="hidden border border-indigo-100 bg-indigo-50 rounded-lg p-3 mt-2">
+                    <div class="flex items-center justify-between gap-3 mb-2">
+                        <label class="text-sm font-medium text-indigo-900">Exceções por matéria</label>
+                        <button type="button" id="btn-add-formula-materia-modal" class="btn-primary-custom text-xs px-2.5 py-1 rounded hover:opacity-90">+ adicionar matéria</button>
+                    </div>
+                    <div id="lista-formulas-materia-modal" class="space-y-2"></div>
+                    <p class="text-xs text-indigo-800 mt-2">A expressão geral será usada em todas as matérias; aqui você informa apenas as matérias que terão fórmula diferente.</p>
+                </div>
+            </div>
+            <div class="md:col-span-2 hidden" id="wrap-evento-boletim">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Evento de origem (código)</label>
+                <?php
+                $seriesNomesPorIdModal = [];
+                foreach ($series as $serieOpt) {
+                    $sidOpt = (int) ($serieOpt['id'] ?? 0);
+                    if ($sidOpt > 0) {
+                        $seriesNomesPorIdModal[$sidOpt] = trim((string) ($serieOpt['nome'] ?? ''));
+                    }
+                }
+                $bimestreLabelModal = ['', '1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre'];
+                ?>
+                <select id="evento-regra-codigo" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="">Selecione o evento</option>
+                    <?php foreach ($regrasCatalogo as $regCat): ?>
+                        <?php $codCat = trim((string) ($regCat['codigo'] ?? '')); ?>
+                        <?php if ($codCat === '') { continue; } ?>
+                        <?php
+                        $bimCat = (int) ($regCat['bimestre'] ?? 0);
+                        $bimLabelCat = ($bimCat >= 1 && $bimCat <= 4) ? $bimestreLabelModal[$bimCat] : 'sem bimestre definido';
+                        $seriesIdsCat = [];
+                        $rawSeriesCat = json_decode((string) ($regCat['series_ids'] ?? ''), true);
+                        if (is_array($rawSeriesCat)) {
+                            $seriesIdsCat = array_map('intval', $rawSeriesCat);
+                        }
+                        $seriesNomesCat = array_filter(array_map(static function ($sid) use ($seriesNomesPorIdModal) {
+                            return $seriesNomesPorIdModal[$sid] ?? null;
+                        }, $seriesIdsCat));
+                        $seriesLabelCat = $seriesNomesCat !== [] ? implode('/', $seriesNomesCat) : 'todas as séries';
+                        $contextoCat = $bimLabelCat . ' · ' . $seriesLabelCat;
+                        ?>
+                        <option value="<?= htmlspecialchars($codCat) ?>"
+                                data-bimestre="<?= $bimCat ?>"
+                                data-series-ids="<?= htmlspecialchars(json_encode($seriesIdsCat)) ?>"
+                                data-contexto="<?= htmlspecialchars($contextoCat) ?>">
+                            <?= htmlspecialchars($codCat . ' - ' . ((string) ($regCat['nome'] ?? 'Evento')) . ' (' . $contextoCat . ')') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p id="evento-regra-codigo-aviso" class="hidden text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mt-1">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span id="evento-regra-codigo-aviso-texto"></span>
+                </p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Bloco/coluna do evento</label>
+                        <select id="evento-componente-codigo" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="">Selecione primeiro o evento</option>
+                        </select>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">Selecione o evento e depois escolha o bloco/coluna que deseja usar.</p>
+            </div>
+            <div class="md:col-span-2 hidden" id="wrap-faltas-evento">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Evento de faltas</label>
+                <select id="faltas-evento-id" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="">Selecione o evento de faltas</option>
+                    <?php foreach ($faltasEventosCatalogo as $evf): ?>
+                        <?php
+                        $evfId = (int) ($evf['id'] ?? 0);
+                        if ($evfId <= 0) { continue; }
+                        $evfNome = trim((string) ($evf['nome'] ?? 'Evento'));
+                        $evfB = trim((string) ($evf['bimestre'] ?? ''));
+                        $evfAno = (int) ($evf['ano_letivo'] ?? 0);
+                        ?>
+                        <option value="<?= $evfId ?>"><?= htmlspecialchars($evfNome . ' | ' . $evfB . ' | ' . $evfAno) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="text-xs text-gray-500 mt-2">Usa as faltas lançadas no módulo de faltas para o aluno selecionado na simulação.</p>
+            </div>
+            <div class="md:col-span-2 hidden" id="wrap-jornadas">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Data início (filtro da jornada)</label>
+                        <input id="jornada-data-ini" type="date" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Data fim (filtro da jornada)</label>
+                        <input id="jornada-data-fim" type="date" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Como aplicar a nota no boletim</label>
+                    <select id="jornada-distribuicao-notas" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="por_materia">Por matéria (cada linha conforme as jornadas daquela matéria)</option>
+                        <option value="nota_unica_todas_linhas">Uma nota em todas as linhas (concluídas no escopo ÷ jornadas no escopo; repetida em cada matéria exibida)</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">No modo &quot;uma nota em todas as linhas&quot;, média/soma/maior/última do bloco não se aplica: usa só o percentual global de jornadas concluídas (mesma regra de escala ou faixas do bloco).</p>
+                </div>
+                <div id="wrap-jornada-nota-unica-extras" class="hidden mt-4 border border-slate-200 bg-slate-50 rounded-lg p-3 space-y-4">
+                    <p class="text-xs font-medium text-slate-800">Nota única: exceções por linha do boletim</p>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Matérias com coluna Jornadas (nota única)</label>
+                        <div id="jornada-nota-unica-materias-wrap" class="border border-gray-300 rounded-lg p-3 max-h-44 overflow-y-auto bg-white">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                <?php foreach ($materias as $materiaJu): ?>
+                                    <?php
+                                    $midJu = (int) ($materiaJu['id'] ?? 0);
+                                    if ($midJu <= 0) {
+                                        continue;
+                                    }
+                                    $nomJu = htmlspecialchars((string) ($materiaJu['nome'] ?? ('Matéria #' . $midJu)));
+                                    ?>
+                                    <label class="inline-flex items-center gap-2 text-sm text-gray-800">
+                                        <input type="checkbox" class="jornada-nota-unica-materia-checkbox rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" value="<?= $midJu ?>" checked>
+                                        <span><?= $nomJu ?></span>
+                                    </label>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-2 mt-1">
+                            <button type="button" id="btn-jornada-nota-unica-materias-todas" class="text-xs px-2 py-1 rounded-md bg-indigo-50 text-indigo-900 border border-indigo-100 hover:bg-indigo-100 font-medium">Marcar todas</button>
+                            <button type="button" id="btn-jornada-nota-unica-materias-nenhuma" class="text-xs px-2 py-1 rounded-md bg-gray-100 text-gray-800 border border-gray-200 hover:bg-gray-200 font-medium">Desmarcar todas</button>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Igual a &quot;Matérias deste bloco&quot;: <strong>desmarque</strong> uma matéria (ex.: Educação Física) para ela <strong>não</strong> receber nota na coluna Jornadas (fica vazio no boletim). Com todas marcadas, todas recebem a nota única.</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Fonte alternativa por matéria do catálogo</label>
+                        <p class="text-xs text-gray-500 mb-2">Para a linha escolhida, a nota de Jornadas usa só as jornadas cuja matéria está na lista (útil quando a disciplina não tem jornada própria).</p>
+                        <div id="lista-jornada-fonte-por-materia" class="space-y-2"></div>
+                        <button type="button" id="btn-jornada-fonte-materia-add" class="mt-2 text-xs px-2.5 py-1 rounded-md bg-white text-slate-800 border border-slate-200 hover:bg-slate-100 font-medium">+ Linha (matéria)</button>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Fonte alternativa por grupo (linha única)</label>
+                        <p class="text-xs text-gray-500 mb-2">Use o mesmo <strong>código do grupo</strong> configurado em &quot;Agrupar em linha única&quot; em qualquer bloco (ex.: Língua Portuguesa).</p>
+                        <div id="lista-jornada-fonte-por-grupo" class="space-y-2"></div>
+                        <button type="button" id="btn-jornada-fonte-grupo-add" class="mt-2 text-xs px-2.5 py-1 rounded-md bg-white text-slate-800 border border-slate-200 hover:bg-slate-100 font-medium">+ Linha de grupo</button>
+                    </div>
+                </div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Jornadas no escopo (opcional)</label>
+                <select id="jornada-ids" multiple class="hidden"></select>
+
+                <div class="flex flex-wrap items-end gap-2 mb-2 bg-gray-50 border border-gray-200 rounded-lg p-2.5">
+                    <div class="flex-1 min-w-[160px]">
+                        <label for="jornada-tabela-filtro-titulo" class="block text-xs font-medium text-gray-600 mb-1">Buscar</label>
+                        <input id="jornada-tabela-filtro-titulo" type="text" placeholder="Título, matéria ou professor" class="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm">
+                    </div>
+                    <div class="min-w-[160px]">
+                        <label for="jornada-tabela-filtro-materia" class="block text-xs font-medium text-gray-600 mb-1">Matéria</label>
+                        <select id="jornada-tabela-filtro-materia" class="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm">
+                            <option value="">Todas</option>
+                        </select>
+                    </div>
+                    <div class="min-w-[140px]">
+                        <label for="jornada-tabela-filtro-bimestre" class="block text-xs font-medium text-gray-600 mb-1" data-periodo-label>Bimestre</label>
+                        <select id="jornada-tabela-filtro-bimestre" class="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm">
+                            <?= \App\Core\PeriodoLetivo::optionsHtml((int) date('Y'), 0, ['todos' => true]) ?>
+                        </select>
+                    </div>
+                    <div class="min-w-[120px]">
+                        <label for="jornada-tabela-filtro-ano" class="block text-xs font-medium text-gray-600 mb-1">Ano letivo</label>
+                        <select id="jornada-tabela-filtro-ano" class="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <button type="button" id="btn-jornada-tabela-limpar-filtros" class="text-xs px-2.5 py-1.5 rounded-md bg-white text-gray-700 border border-gray-300 hover:bg-gray-100 font-medium">Limpar filtros</button>
+                </div>
+
+                <div class="border border-gray-300 rounded-lg overflow-hidden">
+                    <div class="max-h-64 overflow-y-auto">
+                        <table class="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead class="bg-gray-50 sticky top-0">
+                                <tr>
+                                    <th class="px-3 py-2 w-8"></th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jornada</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Matéria</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Professor</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bimestre</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ano</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data fim</th>
+                                </tr>
+                            </thead>
+                            <tbody id="jornada-tabela-corpo" class="bg-white divide-y divide-gray-100">
+                                <tr><td colspan="7" class="px-3 py-6 text-center text-gray-400">Carregando jornadas...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 mt-2">
+                    <button type="button" id="btn-jornadas-marcar-todas" class="text-xs px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-900 border border-indigo-100 hover:bg-indigo-100 font-medium">Marcar todas</button>
+                    <button type="button" id="btn-jornadas-selecionar-filtradas" class="text-xs px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-900 border border-indigo-100 hover:bg-indigo-100 font-medium">Selecionar todas filtradas</button>
+                    <button type="button" id="btn-jornadas-limpar" class="text-xs px-2.5 py-1 rounded-md bg-gray-100 text-gray-800 border border-gray-200 hover:bg-gray-200 font-medium">Limpar seleção</button>
+                    <span id="jornada-tabela-contador" class="text-xs text-gray-600 font-medium">0 selecionada(s)</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Vazio = todas as jornadas da turma do aluno que couberem no intervalo de datas. Marque na tabela ou use <strong>Marcar todas</strong>. A pontuação é por <strong>jornada concluída</strong> (não por desempenho nas questões). Com <strong>por matéria</strong>, a simulação agrupa por matéria da jornada; várias jornadas na mesma matéria usam média/soma/maior/última do bloco. Com <strong>uma nota em todas as linhas</strong>, calcula-se um percentual global no escopo e a mesma nota aparece em cada matéria da tabela.</p>
+                <p class="text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded px-2 py-1.5 mt-2">Ao preencher as datas acima, a lista mostra somente jornadas nesse intervalo (início e encerramento da jornada). O <strong>bimestre</strong> e o <strong>ano letivo</strong> exibidos são os mesmos cadastrados na jornada (não são calculados pela data).</p>
+                <label class="mt-3 inline-flex items-start gap-2 text-sm text-gray-800">
+                    <input type="checkbox" id="bloco-jornada-traco-abaixo-minimo" class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <span class="text-sm leading-snug">Se a <strong>nota da jornada</strong> ficar <strong>abaixo da nota mínima para aprovação</strong> deste evento, exibir <strong>“-”</strong> nesta coluna (o valor numérico continua disponível para fórmulas de outras colunas, ex.: média com <code class="bg-gray-100 px-1 rounded text-xs">max()</code>).</span>
+                </label>
+                <div id="wrap-jornadas-faixas" class="hidden mt-3 border border-amber-200 bg-amber-50 rounded-lg p-3">
+                    <label class="block text-sm font-medium text-amber-900 mb-2">Tabela por conclusão de jornadas</label>
+                    <p class="text-xs text-amber-800 mb-2">Preencha a nota para cada faixa mínima de conclusão (10%, 20%, ... 100%). O aluno recebe a nota da maior faixa atingida.</p>
+                    <div id="lista-jornadas-faixas" class="grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
+                </div>
+            </div>
+            <div class="md:col-span-2" id="wrap-filtro-titulo">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Filtro por título da prova (opcional)</label>
+                <input id="bloco-filtro" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Ex: semanal, bimestral, simulado">
+                <p id="hint-filtro-blocos" class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded px-2 py-1.5 mt-1 hidden">Com <strong>blocos de prova</strong> selecionados, este filtro <strong>não é aplicado</strong> na busca (o título da prova costuma ser diferente do nome do bloco). Use só blocos para bimestrais por bloco, ou só o filtro quando não marcar blocos.</p>
+            </div>
+            <div id="wrap-semana-quadro">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Semana no quadro (S1–S20)</label>
+                <select id="bloco-semana" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="">Nenhuma</option>
+                    <?php for ($si = 1; $si <= 20; $si++): ?>
+                        <option value="<?= $si ?>">S<?= $si ?></option>
+                    <?php endfor; ?>
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Filtra o evento de prova marcado com essa semana. Use junto com o tipo Semanal.</p>
+            </div>
+            <div class="md:col-span-2" id="wrap-bloco-prova">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Blocos de prova (opcional)</label>
+                <select id="bloco-ids" multiple class="hidden">
+                    <?php foreach ($blocosProvas as $bloco): ?>
+                        <?php
+                        $blocoTitulo = (string) ($bloco['titulo'] ?? ('Bloco #' . (int) ($bloco['id'] ?? 0)));
+                        $blocoData = !empty($bloco['data_prova']) ? (' - ' . $bloco['data_prova']) : '';
+                        ?>
+                        <option value="<?= (int) ($bloco['id'] ?? 0) ?>"><?= htmlspecialchars('#' . (int) ($bloco['id'] ?? 0) . ' - ' . $blocoTitulo . $blocoData) ?></option>
+                    <?php endforeach; ?>
+                </select>
+
+                <?php
+                $tiposAvaliacaoBlocos = [];
+                foreach ($blocosProvas as $bloco) {
+                    $tipoNome = trim((string) ($bloco['tipo_avaliacao_nome'] ?? ''));
+                    if ($tipoNome !== '') {
+                        $tiposAvaliacaoBlocos[$tipoNome] = true;
+                    }
+                }
+                $tiposAvaliacaoBlocos = array_keys($tiposAvaliacaoBlocos);
+                sort($tiposAvaliacaoBlocos);
+                ?>
+                <div class="flex flex-wrap items-end gap-2 mb-2 bg-gray-50 border border-gray-200 rounded-lg p-2.5">
+                    <div class="flex-1 min-w-[160px]">
+                        <label for="bloco-tabela-filtro-titulo" class="block text-xs font-medium text-gray-600 mb-1">Buscar título</label>
+                        <input id="bloco-tabela-filtro-titulo" type="text" placeholder="Ex: simulado" class="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm">
+                    </div>
+                    <div class="min-w-[160px]">
+                        <label for="bloco-tabela-filtro-tipo" class="block text-xs font-medium text-gray-600 mb-1">Tipo de avaliação</label>
+                        <select id="bloco-tabela-filtro-tipo" class="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm">
+                            <option value="">Todos</option>
+                            <?php foreach ($tiposAvaliacaoBlocos as $tipoNome): ?>
+                                <option value="<?= htmlspecialchars($tipoNome) ?>"><?= htmlspecialchars($tipoNome) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="min-w-[140px]">
+                        <label for="bloco-tabela-filtro-bimestre" class="block text-xs font-medium text-gray-600 mb-1" data-periodo-label>Bimestre</label>
+                        <select id="bloco-tabela-filtro-bimestre" class="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm">
+                            <?= \App\Core\PeriodoLetivo::optionsHtml((int) date('Y'), 0, ['todos' => true]) ?>
+                        </select>
+                    </div>
+                    <div class="min-w-[120px]">
+                        <label for="bloco-tabela-filtro-ano" class="block text-xs font-medium text-gray-600 mb-1">Ano letivo</label>
+                        <input id="bloco-tabela-filtro-ano" type="number" placeholder="Ex: 2026" class="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm">
+                    </div>
+                    <button type="button" id="btn-bloco-tabela-limpar-filtros" class="text-xs px-2.5 py-1.5 rounded-md bg-white text-gray-700 border border-gray-300 hover:bg-gray-100 font-medium">Limpar filtros</button>
+                </div>
+
+                <div class="border border-gray-300 rounded-lg overflow-hidden">
+                    <div class="max-h-64 overflow-y-auto">
+                        <table class="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead class="bg-gray-50 sticky top-0">
+                                <tr>
+                                    <th class="px-3 py-2 w-8"></th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bloco</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo de avaliação</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bimestre</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ano</th>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bloco-tabela-corpo" class="bg-white divide-y divide-gray-100">
+                                <?php foreach ($blocosProvas as $bloco): ?>
+                                    <?php
+                                    $blocoIdRow = (int) ($bloco['id'] ?? 0);
+                                    $blocoTitulo = (string) ($bloco['titulo'] ?? ('Bloco #' . $blocoIdRow));
+                                    $blocoDataRaw = (string) ($bloco['data_prova'] ?? '');
+                                    $blocoData = $blocoDataRaw !== '' && strtotime($blocoDataRaw) !== false ? date('d/m/Y', strtotime($blocoDataRaw)) : '';
+                                    $blocoAno = (string) ($bloco['ano_letivo'] ?? '');
+                                    $blocoBimestre = (string) ($bloco['bimestre'] ?? '');
+                                    $blocoTipo = trim((string) ($bloco['tipo_avaliacao_nome'] ?? ''));
+                                    ?>
+                                    <tr class="bloco-tabela-row hover:bg-gray-50 cursor-pointer"
+                                        data-bloco-id="<?= $blocoIdRow ?>"
+                                        data-titulo="<?= htmlspecialchars(mb_strtolower($blocoTitulo)) ?>"
+                                        data-tipo="<?= htmlspecialchars($blocoTipo) ?>"
+                                        data-bimestre="<?= htmlspecialchars($blocoBimestre) ?>"
+                                        data-ano="<?= htmlspecialchars($blocoAno) ?>">
+                                        <td class="px-3 py-2">
+                                            <input type="checkbox" class="bloco-tabela-checkbox rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" value="<?= $blocoIdRow ?>">
+                                        </td>
+                                        <td class="px-3 py-2 whitespace-nowrap text-gray-900">#<?= $blocoIdRow ?> - <?= htmlspecialchars($blocoTitulo) ?></td>
+                                        <td class="px-3 py-2 whitespace-nowrap text-gray-600"><?= $blocoTipo !== '' ? htmlspecialchars($blocoTipo) : 'N/A' ?></td>
+                                        <td class="px-3 py-2 whitespace-nowrap text-gray-600"><?= $blocoBimestre !== '' ? $blocoBimestre . 'º' : 'N/A' ?></td>
+                                        <td class="px-3 py-2 whitespace-nowrap text-gray-600"><?= $blocoAno !== '' ? $blocoAno : 'N/A' ?></td>
+                                        <td class="px-3 py-2 whitespace-nowrap text-gray-600"><?= $blocoData !== '' ? htmlspecialchars($blocoData) : 'N/A' ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                <?php if (empty($blocosProvas)): ?>
+                                    <tr><td colspan="6" class="px-3 py-6 text-center text-gray-400">Nenhum bloco de prova encontrado</td></tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 mt-1">
+                    <p class="text-xs text-gray-500 flex-1 min-w-[200px]">Marque um ou mais blocos (clique na linha ou no checkbox). Entram provas vinculadas a <strong>qualquer</strong> bloco escolhido (união). Se houver blocos marcados, o filtro por título acima <strong>não vale</strong> para esta busca.</p>
+                    <span id="bloco-tabela-contador" class="text-xs text-gray-600 font-medium shrink-0">0 selecionado(s)</span>
+                    <button type="button" id="btn-blocos-selecionar-filtrados" class="text-xs text-indigo-600 hover:underline shrink-0">Selecionar todos filtrados</button>
+                    <button type="button" id="btn-blocos-limpar" class="text-xs text-indigo-600 hover:underline shrink-0">Limpar seleção</button>
+                </div>
+            </div>
+            <div class="md:col-span-2" id="wrap-materia">
+                <label id="bloco-materias-label" class="block text-sm font-medium text-gray-700 mb-1">Matérias deste bloco (opcional)</label>
+                <div id="bloco-materias-checkboxes" class="border border-gray-300 rounded-lg p-3 max-h-44 overflow-y-auto bg-white">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                        <?php foreach ($materias as $materia): ?>
+                            <?php $midModal = (int) ($materia['id'] ?? 0); ?>
+                            <?php if ($midModal <= 0) { continue; } ?>
+                            <label class="inline-flex items-center gap-2 text-sm text-gray-800">
+                                <input type="checkbox" class="bloco-materia-checkbox rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" value="<?= $midModal ?>">
+                                <span><?= htmlspecialchars((string) ($materia['nome'] ?? ('Matéria #' . $midModal))) ?></span>
+                            </label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <p id="bloco-materias-hint" class="text-xs text-gray-500 mt-1">Se não marcar nenhuma, usa todas as matérias no escopo.</p>
+                <input type="hidden" id="bloco-materia-id" value="">
+            </div>
+            <div class="md:col-span-2 border border-indigo-100 bg-indigo-50 rounded-lg p-3" id="wrap-group-line">
+                <label class="inline-flex items-center gap-2 text-sm text-indigo-900 font-medium">
+                    <input id="bloco-group-enabled" type="checkbox" class="rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500">
+                    Agrupar em linha única (ex.: Língua Portuguesa)
+                </label>
+                <div id="bloco-group-fields" class="hidden mt-3 space-y-3">
+                    <div class="hidden">
+                        <select id="bloco-group-agrupamento">
+                            <option value="0">Montar na hora</option>
+                            <?php foreach ($agrupamentosComponentes as $agOpt): ?>
+                                <?php $agOptId = (int) ($agOpt['id'] ?? 0); ?>
+                                <?php if ($agOptId <= 0) { continue; } ?>
+                                <option value="<?= $agOptId ?>"
+                                        data-nome="<?= htmlspecialchars((string) ($agOpt['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                                        data-modo="<?= htmlspecialchars((string) ($agOpt['modo'] ?? 'media'), ENT_QUOTES, 'UTF-8') ?>"
+                                        data-aplicar="<?= htmlspecialchars((string) ($agOpt['aplicar_em'] ?? 'boletim'), ENT_QUOTES, 'UTF-8') ?>"
+                                        data-divisor="<?= htmlspecialchars((string) ($agOpt['divisor'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                                        data-materias="<?= htmlspecialchars(json_encode(array_values(array_map('intval', (array) ($agOpt['materias_ids'] ?? [])))), ENT_QUOTES, 'UTF-8') ?>">
+                                    <?= htmlspecialchars((string) ($agOpt['nome'] ?? ('Agrupamento #' . $agOptId))) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-indigo-900 mb-1">Código do grupo</label>
+                            <input id="bloco-group-key" type="text" class="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm" placeholder="lingua_portuguesa">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-indigo-900 mb-1">Nome da linha</label>
+                            <input id="bloco-group-label" type="text" class="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm" placeholder="Língua Portuguesa">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-indigo-900 mb-1">Cálculo no grupo</label>
+                            <select id="bloco-group-mode" class="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm">
+                                <option value="media">Média</option>
+                                <option value="soma">Soma</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-indigo-900 mb-1">Arredondamento</label>
+                            <select id="bloco-group-arredondamento" class="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm">
+                                <option value="todos">Todos (filhas + mãe)</option>
+                                <option value="filhas">Só filhas</option>
+                                <option value="mae">Só mãe</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-indigo-900 mb-1">Divisor fixo (opcional)</label>
+                            <input id="bloco-group-divisor" type="number" min="0" step="0.01" class="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm" placeholder="4">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-indigo-900 mb-1">Matérias do grupo</label>
+                        <div id="bloco-group-materias-checkboxes" class="border border-indigo-200 rounded-lg p-3 max-h-44 overflow-y-auto bg-white">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                <?php foreach ($materias as $materia): ?>
+                                    <?php $midGroup = (int) ($materia['id'] ?? 0); ?>
+                                    <?php if ($midGroup <= 0) { continue; } ?>
+                                    <label class="inline-flex items-center gap-2 text-sm text-gray-800">
+                                        <input type="checkbox" class="bloco-group-materia-checkbox rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" value="<?= $midGroup ?>">
+                                        <span><?= htmlspecialchars((string) ($materia['nome'] ?? ('Matéria #' . $midGroup))) ?></span>
+                                    </label>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-xs text-indigo-800">Use para montar linha única por área. Cada bloco pode usar cálculo diferente para o mesmo grupo.</p>
+                    <div>
+                        <label class="block text-xs font-medium text-indigo-900 mb-1">Onde agrupar</label>
+                        <select id="bloco-group-aplicar-em" class="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm">
+                            <option value="ambos">No boletim e nas notas</option>
+                            <option value="boletim">Só no boletim (nas notas as matérias ficam separadas)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="space-y-1">
+                <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input id="bloco-percentual" type="checkbox" class="rounded border-gray-300" checked>
+                    <span id="bloco-percentual-label">Calcular por acertos/questões</span>
+                </label>
+                <p id="hint-percentual-jornadas" class="text-xs text-slate-600 hidden pl-7">Marcado: nota = (% de jornadas <strong>concluídas</strong> no escopo) ÷ 100 × escala máx. Desmarcado: <strong>tabela por faixas</strong> sobre esse mesmo percentual (ex.: 40%–100% → 5–10). Em ambos os casos vale só conclusão da jornada, não acerto em questões.</p>
+                </div>
+                <div id="wrap-materia-unica" class="space-y-2">
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                        <input id="bloco-materia-unica" type="checkbox" class="rounded border-gray-300">
+                        Juntar matérias iguais (mesma matéria, vários professores)
+                    </label>
+                    <div id="wrap-materia-unica-modo" class="hidden ml-6 pl-2 border-l-2 border-gray-200 space-y-1">
+                        <span class="text-xs font-medium text-gray-600">Como juntar</span>
+                        <div class="flex flex-wrap gap-3 text-sm text-gray-700">
+                            <label class="inline-flex items-center gap-1.5">
+                                <input type="radio" name="bloco-materia-unica-modo" value="soma" class="bloco-materia-unica-modo" checked>
+                                Somar
+                            </label>
+                            <label class="inline-flex items-center gap-1.5">
+                                <input type="radio" name="bloco-materia-unica-modo" value="media" class="bloco-materia-unica-modo">
+                                Média
+                            </label>
+                        </div>
+                        <p class="text-xs text-gray-500">Somar: 3+4+3=10. Média: 10+10+10÷3=10.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input id="bloco-obrigatorio" type="checkbox" class="rounded border-gray-300">
+                    Componente obrigatório
+                </label>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Arredondamento deste bloco</label>
+                    <select id="bloco-round-mode-override" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="herdar">Herdar do evento (padrão)</option>
+                        <option value="none">Sem arredondamento especial (2 casas)</option>
+                        <option value="half">Faixa .00/.50/próximo inteiro</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">Sobrescreve só esse bloco. Por padrão, usa o mesmo arredondamento configurado no evento.</p>
+                </div>
+            </div>
+
+            <div class="md:col-span-2 flex justify-end gap-2 pt-2 border-t border-gray-100">
+                <button type="button" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200" data-close-modal="1">Cancelar</button>
+                <button type="submit" class="btn-primary-custom px-4 py-2 rounded-lg hover:opacity-90">Salvar bloco</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.bloco-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 0.875rem;
+    background: #ffffff;
+}
+.bloco-card.dragging {
+    opacity: 0.5;
+}
+.bloco-handle {
+    cursor: grab;
+}
+</style>
+
+<script>
+(function () {
+    const lista = document.getElementById('lista-blocos');
+    const inputJson = document.getElementById('componentes-json');
+    const modal = document.getElementById('modal-bloco');
+    const formModal = document.getElementById('form-modal-bloco');
+    const btnAdd = document.getElementById('btn-add-bloco');
+    const formRegra = document.getElementById('form-regra-boletim');
+
+    if (!lista || !inputJson || !modal || !formModal || !btnAdd || !formRegra) {
+        return;
+    }
+
+    let componentes = [];
+    try {
+        componentes = JSON.parse(inputJson.value || '[]');
+        if (!Array.isArray(componentes)) {
+            componentes = [];
+        }
+    } catch (e) {
+        componentes = [];
+    }
+
+    const JORNADAS_JSON_URL = <?= json_encode(URL . '/admin/boletim-configuracao/jornadas', JSON_UNESCAPED_SLASHES) ?>;
+    const EVENTO_COMPONENTES_JSON_URL = <?= json_encode(URL . '/admin/boletim-configuracao/evento-componentes', JSON_UNESCAPED_SLASHES) ?>;
+    const CHECKLIST_PRE_GERACAO_URL = <?= json_encode(URL . '/admin/boletim-configuracao/checklist-pre-geracao', JSON_UNESCAPED_SLASHES) ?>;
+    const LOGS_GERACAO_URL = <?= json_encode(URL . '/admin/boletim-configuracao/logs-geracao', JSON_UNESCAPED_SLASHES) ?>;
+    const GERACAO_DETALHE_URL = <?= json_encode(URL . '/admin/boletim-configuracao/geracao-detalhe', JSON_UNESCAPED_SLASHES) ?>;
+    const GERADOS_PREVIEW_URL = <?= json_encode(URL . '/admin/boletim-configuracao/gerados/preview', JSON_UNESCAPED_SLASHES) ?>;
+    const PERIODO_REF_ATUAL = <?= json_encode($periodoRef, JSON_UNESCAPED_UNICODE) ?>;
+    const SIMULAR_LOTE_URL = <?= json_encode(URL . '/admin/boletim-configuracao/simular-lote', JSON_UNESCAPED_SLASHES) ?>;
+    const REGRA_ATUAL_ID = <?= (int) ($regra['id'] ?? 0) ?>;
+    const REGRA_ATUAL_BIMESTRE = <?= (int) ($regra['bimestre'] ?? 0) ?>;
+    const REGRA_ATUAL_SERIES_IDS = <?= json_encode(array_values(array_map('intval', $seriesSelecionadasRegra))) ?>;
+
+    const MODELOS_BOLETIM = {
+        media3: {
+            regra_nome: 'Boletim — semanal, bimestral e jornadas',
+            formula_final: '(semanal + bimestral + jornadas) / 3',
+            componentes: [
+                { id: 0, codigo: 'semanal', nome: 'Prova semanal', source_type: 'provas_sistema', calc_type: 'media', peso: 1, filtro_titulo: 'semanal', bloco_id: 0, blocos_ids: [], materia_id: 0, materia_unica: 0, usar_percentual: 1, escala_max: 10, obrigatorio: 0 },
+                { id: 0, codigo: 'bimestral', nome: 'Prova bimestral', source_type: 'provas_sistema', calc_type: 'media', peso: 1, filtro_titulo: 'bimestral', bloco_id: 0, blocos_ids: [], materia_id: 0, materia_unica: 0, usar_percentual: 1, escala_max: 10, obrigatorio: 0 },
+                { id: 0, codigo: 'jornadas', nome: 'Jornadas', source_type: 'jornadas', calc_type: 'media', peso: 1, filtro_titulo: '', bloco_id: 0, blocos_ids: [], materia_id: 0, materia_unica: 0, usar_percentual: 1, escala_max: 10, obrigatorio: 0, config: { jornada_ids: [], data_ini: '', data_fim: '' } }
+            ]
+        },
+        media3_enac: {
+            regra_nome: 'Boletim — média 3 + ENAC (só melhora)',
+            formula_final: 'max((semanal + bimestral + jornadas) / 3, ((semanal + bimestral + jornadas) / 3 + enac) / 2)',
+            componentes: [
+                { id: 0, codigo: 'semanal', nome: 'Prova semanal', source_type: 'provas_sistema', calc_type: 'media', peso: 1, filtro_titulo: 'semanal', bloco_id: 0, blocos_ids: [], materia_id: 0, materia_unica: 0, usar_percentual: 1, escala_max: 10, obrigatorio: 0 },
+                { id: 0, codigo: 'bimestral', nome: 'Prova bimestral', source_type: 'provas_sistema', calc_type: 'media', peso: 1, filtro_titulo: 'bimestral', bloco_id: 0, blocos_ids: [], materia_id: 0, materia_unica: 0, usar_percentual: 1, escala_max: 10, obrigatorio: 0 },
+                { id: 0, codigo: 'jornadas', nome: 'Jornadas', source_type: 'jornadas', calc_type: 'media', peso: 1, filtro_titulo: '', bloco_id: 0, blocos_ids: [], materia_id: 0, materia_unica: 0, usar_percentual: 1, escala_max: 10, obrigatorio: 0, config: { jornada_ids: [], data_ini: '', data_fim: '' } },
+                { id: 0, codigo: 'enac', nome: 'ENAC', source_type: 'provas_sistema', calc_type: 'media', peso: 1, filtro_titulo: 'enac', bloco_id: 0, blocos_ids: [], materia_id: 0, materia_unica: 0, usar_percentual: 1, escala_max: 10, obrigatorio: 0 }
+            ]
+        },
+        quadro_semanal: (function () {
+            function sem(cod, nome, semana, grupo) {
+                return {
+                    id: 0, codigo: cod, nome: nome, source_type: 'provas_sistema', calc_type: 'media', peso: 1,
+                    filtro_titulo: '', bloco_id: 0, blocos_ids: [], materia_id: 0, materia_unica: 1,
+                    usar_percentual: 1, escala_max: 10, obrigatorio: 0,
+                    config: { semana: semana, layout_group: grupo, layout_type: 'semana_nq', tipo_avaliacao_nome: 'Semanal' }
+                };
+            }
+            function tipo(cod, nome, filtro, percentual, layoutType) {
+                return {
+                    id: 0, codigo: cod, nome: nome, source_type: 'provas_sistema', calc_type: 'media', peso: 1,
+                    filtro_titulo: filtro, bloco_id: 0, blocos_ids: [], materia_id: 0, materia_unica: 1,
+                    usar_percentual: percentual, escala_max: 10, obrigatorio: 0,
+                    config: { layout_group: 'quadro_comum', layout_type: layoutType, tipo_avaliacao_nome: nome }
+                };
+            }
+            function calc(cod, nome, expressao, agregar, layoutType) {
+                return {
+                    id: 0, codigo: cod, nome: nome, source_type: 'calculado', calc_type: 'media', peso: 1,
+                    filtro_titulo: '', bloco_id: 0, blocos_ids: [], materia_id: 0, materia_unica: 0,
+                    usar_percentual: 0, escala_max: 10, obrigatorio: 0,
+                    config: {
+                        expressao: expressao || '',
+                        formula_mode: 'single',
+                        agregar_nq: agregar || [],
+                        layout_group: 'quadro_comum',
+                        layout_type: layoutType
+                    }
+                };
+            }
+            var comps = [
+                sem('s1', 'S1', 1, 'quadro_a'), sem('s3', 'S3', 3, 'quadro_a'),
+                sem('s5', 'S5', 5, 'quadro_a'), sem('s7', 'S7', 7, 'quadro_a'),
+                sem('s2', 'S2', 2, 'quadro_b'), sem('s4', 'S4', 4, 'quadro_b'),
+                sem('s6', 'S6', 6, 'quadro_b'), sem('s8', 'S8', 8, 'quadro_b'),
+                calc('media_sem', 'Média Sem', '', ['s1', 's3', 's5', 's7', 's2', 's4', 's6', 's8'], 'media_sem'),
+                tipo('prova_bim', 'Prova Bim', 'bimestral', 0, 'media'),
+                tipo('enac', 'ENAC', 'enac', 1, 'media'),
+                tipo('part', 'Part', 'participa', 1, 'media'),
+                tipo('trab', 'Trab', 'trabalho', 1, 'media'),
+                calc('media_bim', 'Média Bim', '(media_sem + prova_bim + enac + part + trab) / 5', [], 'media'),
+                tipo('rec', 'Rec', 'recupera', 0, 'rec'),
+                calc('media_final', 'Resultado Final', 'max(media_bim, rec)', [], 'resultado')
+            ];
+            return {
+                regra_nome: 'Quadro semanal — S1 a S8',
+                formula_final: 'media_final',
+                componentes: comps
+            };
+        })()
+    };
+
+    try {
+        var modeloKey = sessionStorage.getItem('boletim_aplicar_modelo');
+        if (modeloKey && MODELOS_BOLETIM[modeloKey]) {
+            sessionStorage.removeItem('boletim_aplicar_modelo');
+            var md = MODELOS_BOLETIM[modeloKey];
+            var nomeRegraEl = document.querySelector('input[name="regra_nome"]');
+            var formFormulaEl = document.querySelector('input[name="formula_final"]');
+            if (nomeRegraEl) {
+                nomeRegraEl.value = md.regra_nome;
+            }
+            if (formFormulaEl) {
+                formFormulaEl.value = md.formula_final;
+            }
+            componentes = JSON.parse(JSON.stringify(md.componentes));
+        }
+    } catch (eModelo) {
+        /* ignore */
+    }
+
+    try {
+        var rascunhoWizardRaw = sessionStorage.getItem('boletim_assistente_rascunho');
+        if (rascunhoWizardRaw) {
+            sessionStorage.removeItem('boletim_assistente_rascunho');
+            var rascunhoWizard = JSON.parse(rascunhoWizardRaw);
+            if (rascunhoWizard && typeof rascunhoWizard === 'object') {
+                var nomeWizardEl = document.querySelector('input[name="regra_nome"]');
+                var codigoWizardEl = document.querySelector('input[name="codigo"]') || document.getElementById('regra-codigo');
+                var descWizardEl = document.getElementById('regra-descricao-curta');
+                var formulaWizardEl = document.querySelector('input[name="formula_final"]');
+                var anoWizardEl = document.querySelector('[name="ano_letivo"]');
+                var bimWizardEl = document.querySelector('[name="bimestre"]');
+                var notaMinWizardEl = document.querySelector('[name="nota_minima_aprovacao"]');
+                var roundWizardEl = document.querySelector('[name="round_mode"]');
+
+                if (nomeWizardEl && rascunhoWizard.nome) nomeWizardEl.value = rascunhoWizard.nome;
+                if (codigoWizardEl && rascunhoWizard.codigo) {
+                    codigoWizardEl.readOnly = false;
+                    codigoWizardEl.value = rascunhoWizard.codigo;
+                }
+                if (descWizardEl && rascunhoWizard.descricao_curta != null) descWizardEl.value = rascunhoWizard.descricao_curta;
+                if (formulaWizardEl && rascunhoWizard.formula_final != null) formulaWizardEl.value = rascunhoWizard.formula_final;
+                if (rascunhoWizard.exibir_em) {
+                    var exibirValorWizard = 'notas';
+                    var exibirWizardEl = document.getElementById('regra-exibir-em');
+                    if (exibirWizardEl) exibirWizardEl.value = exibirValorWizard;
+                }
+                if (rascunhoWizard.boletim_id) {
+                    var bolWizardEl = document.getElementById('regra-boletim-id');
+                    if (bolWizardEl) bolWizardEl.value = String(rascunhoWizard.boletim_id);
+                }
+                if (rascunhoWizard.grupo_regras_notas_id) {
+                    var quadroWizardEl = document.getElementById('grupo-regras-notas-id');
+                    if (quadroWizardEl) quadroWizardEl.value = String(rascunhoWizard.grupo_regras_notas_id);
+                }
+                if (rascunhoWizard.finalidade) {
+                    var finWizardEl = document.getElementById('regra-finalidade');
+                    if (finWizardEl) {
+                        finWizardEl.value = rascunhoWizard.finalidade === 'complementar' ? 'complementar' : 'oficial';
+                    }
+                }
+                if (anoWizardEl && rascunhoWizard.ano_letivo) anoWizardEl.value = rascunhoWizard.ano_letivo;
+                if (bimWizardEl) {
+                    if (rascunhoWizard.bimestre != null && rascunhoWizard.bimestre !== '') bimWizardEl.value = rascunhoWizard.bimestre;
+                    else if (rascunhoWizard.exibir_em === 'boletim') bimWizardEl.value = '';
+                }
+                if (notaMinWizardEl && rascunhoWizard.nota_minima_aprovacao != null) notaMinWizardEl.value = rascunhoWizard.nota_minima_aprovacao;
+                if (roundWizardEl && rascunhoWizard.round_mode) roundWizardEl.value = rascunhoWizard.round_mode;
+
+                function marcarChecksWizard(name, ids) {
+                    var set = {};
+                    (Array.isArray(ids) ? ids : []).forEach(function (id) { set[String(id)] = true; });
+                    document.querySelectorAll('input[name="' + name + '"]').forEach(function (el) {
+                        el.checked = !!set[el.value];
+                    });
+                }
+                marcarChecksWizard('series_ids[]', rascunhoWizard.series_ids);
+                marcarChecksWizard('turmas_ids[]', rascunhoWizard.turmas_ids);
+                marcarChecksWizard('materias_ids[]', rascunhoWizard.materias_ids);
+
+                if (Array.isArray(rascunhoWizard.componentes)) {
+                    componentes = rascunhoWizard.componentes;
+                }
+            }
+        }
+    } catch (eWizard) {
+        /* ignore */
+    }
+
+    const fields = {
+        idx: document.getElementById('bloco-edit-index'),
+        nome: document.getElementById('bloco-nome'),
+        codigo: document.getElementById('bloco-codigo'),
+        source: document.getElementById('bloco-source'),
+        calc: document.getElementById('bloco-calc'),
+        peso: document.getElementById('bloco-peso'),
+        escala: document.getElementById('bloco-escala'),
+        layoutGroup: document.getElementById('bloco-layout-group'),
+        layoutType: document.getElementById('bloco-layout-type'),
+        semana: document.getElementById('bloco-semana'),
+        agregarNq: document.getElementById('bloco-agregar-nq'),
+        wrapSemana: document.getElementById('wrap-semana-quadro'),
+        filtro: document.getElementById('bloco-filtro'),
+        blocoIds: document.getElementById('bloco-ids'),
+        materiaId: document.getElementById('bloco-materia-id'),
+        materiaUnica: document.getElementById('bloco-materia-unica'),
+        wrapMateriaUnicaModo: document.getElementById('wrap-materia-unica-modo'),
+        percentual: document.getElementById('bloco-percentual'),
+        obrigatorio: document.getElementById('bloco-obrigatorio'),
+        roundModeOverride: document.getElementById('bloco-round-mode-override'),
+        wrapFiltro: document.getElementById('wrap-filtro-titulo'),
+        wrapBloco: document.getElementById('wrap-bloco-prova'),
+        wrapMateria: document.getElementById('wrap-materia'),
+        wrapGroupLine: document.getElementById('wrap-group-line'),
+        wrapMateriaUnica: document.getElementById('wrap-materia-unica'),
+        wrapJornadas: document.getElementById('wrap-jornadas'),
+        wrapEventoBoletim: document.getElementById('wrap-evento-boletim'),
+        wrapFaltasEvento: document.getElementById('wrap-faltas-evento'),
+        wrapCalculado: document.getElementById('wrap-calculado'),
+        wrapCalculadoGeral: document.getElementById('wrap-calculado-geral'),
+        wrapCalculadoPorMateria: document.getElementById('wrap-calculado-por-materia'),
+        expressaoCalculado: document.getElementById('bloco-expressao-calculado'),
+        calcModoGeral: document.getElementById('bloco-calculado-modo-geral'),
+        calcModoMateria: document.getElementById('bloco-calculado-modo-materia'),
+        calculadoTracoAbaixoMinimo: document.getElementById('bloco-calculado-traco-abaixo-minimo'),
+        jornadaTracoAbaixoMinimo: document.getElementById('bloco-jornada-traco-abaixo-minimo'),
+        btnAddFormulaMateriaModal: document.getElementById('btn-add-formula-materia-modal'),
+        listaFormulasMateriaModal: document.getElementById('lista-formulas-materia-modal'),
+        eventoRegraCodigo: document.getElementById('evento-regra-codigo'),
+        eventoComponenteCodigo: document.getElementById('evento-componente-codigo'),
+        faltasEventoId: document.getElementById('faltas-evento-id'),
+        jornadaIds: document.getElementById('jornada-ids'),
+        jornadaDataIni: document.getElementById('jornada-data-ini'),
+        jornadaDataFim: document.getElementById('jornada-data-fim'),
+        jornadaDistribuicaoNotas: document.getElementById('jornada-distribuicao-notas'),
+        wrapJornadasFaixas: document.getElementById('wrap-jornadas-faixas'),
+        listaJornadasFaixas: document.getElementById('lista-jornadas-faixas'),
+        modalTitulo: document.getElementById('modal-titulo'),
+        hintPercentualJornadas: document.getElementById('hint-percentual-jornadas'),
+        percentualLabel: document.getElementById('bloco-percentual-label')
+        ,materiasLabel: document.getElementById('bloco-materias-label')
+        ,materiasHint: document.getElementById('bloco-materias-hint')
+        ,groupEnabled: document.getElementById('bloco-group-enabled')
+        ,groupFields: document.getElementById('bloco-group-fields')
+        ,groupAgrupamento: document.getElementById('bloco-group-agrupamento')
+        ,groupKey: document.getElementById('bloco-group-key')
+        ,groupLabel: document.getElementById('bloco-group-label')
+        ,groupMode: document.getElementById('bloco-group-mode')
+        ,groupArredondamento: document.getElementById('bloco-group-arredondamento')
+        ,groupDivisor: document.getElementById('bloco-group-divisor')
+        ,groupAplicarEm: document.getElementById('bloco-group-aplicar-em')
+        ,wrapJornadaNotaUnicaExtras: document.getElementById('wrap-jornada-nota-unica-extras')
+        ,listaJornadaFontePorMateria: document.getElementById('lista-jornada-fonte-por-materia')
+        ,btnJornadaFonteMateriaAdd: document.getElementById('btn-jornada-fonte-materia-add')
+        ,listaJornadaFontePorGrupo: document.getElementById('lista-jornada-fonte-por-grupo')
+        ,btnJornadaFonteGrupoAdd: document.getElementById('btn-jornada-fonte-grupo-add')
+    };
+
+    var jornadasOptionsCacheKey = '';
+    var eventoComponentesCache = {};
+    var jornadasFaixas = [];
+    var jornadaFontePorMateriaRows = [];
+    var jornadaFontePorGrupoRows = [];
+
+    function defaultJornadasFaixas() {
+        return [10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map(function (p) {
+            return { percentual_min: p, nota: '' };
+        });
+    }
+
+    function renderJornadasFaixas() {
+        if (!fields.listaJornadasFaixas) {
+            return;
+        }
+        fields.listaJornadasFaixas.innerHTML = '';
+        jornadasFaixas.forEach(function (item, idx) {
+            var row = document.createElement('div');
+            row.className = 'flex items-center gap-2';
+
+            var lb = document.createElement('span');
+            lb.className = 'text-xs text-amber-900 min-w-[6rem] font-medium';
+            lb.textContent = item.percentual_min + '%';
+
+            var inp = document.createElement('input');
+            inp.type = 'number';
+            inp.min = '0';
+            inp.step = '0.01';
+            inp.className = 'w-full px-2 py-1.5 border border-amber-200 rounded text-sm';
+            inp.placeholder = 'Nota';
+            inp.value = item.nota === '' ? '' : String(item.nota);
+            inp.addEventListener('input', function () {
+                jornadasFaixas[idx].nota = inp.value;
+            });
+
+            row.appendChild(lb);
+            row.appendChild(inp);
+            fields.listaJornadasFaixas.appendChild(row);
+        });
+    }
+
+    function collectGroupKeysFromRule() {
+        var keys = [];
+        if (!Array.isArray(componentes)) {
+            return keys;
+        }
+        componentes.forEach(function (c) {
+            if (c.config && c.config.group_line && c.config.group_line.enabled) {
+                var k = String(c.config.group_line.key || '').trim();
+                if (k && keys.indexOf(k) === -1) {
+                    keys.push(k);
+                }
+            }
+        });
+        return keys;
+    }
+
+    function fillMateriaMultiSelect(sel, selectedIds) {
+        if (!sel) {
+            return;
+        }
+        var set = {};
+        (selectedIds || []).forEach(function (x) {
+            set[String(Number(x) || 0)] = true;
+        });
+        sel.innerHTML = '';
+        Object.keys(materiaNames).forEach(function (mid) {
+            var op = document.createElement('option');
+            op.value = String(mid);
+            op.textContent = materiaNames[mid];
+            if (set[String(mid)]) {
+                op.selected = true;
+            }
+            sel.appendChild(op);
+        });
+    }
+
+    function setJornadaNotaUnicaMateriasCheckboxesAll(checked) {
+        document.querySelectorAll('.jornada-nota-unica-materia-checkbox').forEach(function (el) {
+            el.checked = !!checked;
+        });
+    }
+
+    function getJornadaNotaUnicaOmitirFromCheckboxes() {
+        var omit = [];
+        document.querySelectorAll('.jornada-nota-unica-materia-checkbox').forEach(function (el) {
+            var id = Number(el.value || 0);
+            if (id > 0 && !el.checked) {
+                omit.push(id);
+            }
+        });
+        return omit;
+    }
+
+    function loadJornadaNotaUnicaMateriasFromOmitList(omitList) {
+        var omitSet = {};
+        (omitList || []).forEach(function (x) {
+            omitSet[String(Number(x) || 0)] = true;
+        });
+        document.querySelectorAll('.jornada-nota-unica-materia-checkbox').forEach(function (el) {
+            var id = String(el.value || '');
+            el.checked = !omitSet[id];
+        });
+    }
+
+    function loadJornadaNotaUnicaExtrasFromConfig(cfg) {
+        cfg = cfg && typeof cfg === 'object' ? cfg : {};
+        loadJornadaNotaUnicaMateriasFromOmitList(cfg.nota_unica_omitir_materias || []);
+        jornadaFontePorMateriaRows = [];
+        var fm = cfg.nota_unica_fonte_por_materia || {};
+        Object.keys(fm).forEach(function (k) {
+            var tid = Number(k);
+            var arr = (fm[k] || []).map(function (x) { return Number(x); }).filter(function (x) { return x > 0; });
+            if (tid !== 0 && arr.length > 0) {
+                jornadaFontePorMateriaRows.push({ materia_id: tid, fonte_ids: arr });
+            }
+        });
+        jornadaFontePorGrupoRows = [];
+        var fg = cfg.nota_unica_fonte_por_grupo || {};
+        Object.keys(fg).forEach(function (gk) {
+            var arr = (fg[gk] || []).map(function (x) { return Number(x); }).filter(function (x) { return x > 0; });
+            if (String(gk).trim() !== '' && arr.length > 0) {
+                jornadaFontePorGrupoRows.push({ grupo_key: String(gk), fonte_ids: arr });
+            }
+        });
+        renderJornadaNotaUnicaFonteRows();
+    }
+
+    function renderJornadaNotaUnicaFonteRows() {
+        if (fields.listaJornadaFontePorMateria) {
+            fields.listaJornadaFontePorMateria.innerHTML = '';
+            if (jornadaFontePorMateriaRows.length === 0) {
+                var em = document.createElement('p');
+                em.className = 'text-xs text-slate-600';
+                em.textContent = 'Nenhuma linha extra. A nota padrão (escopo inteiro) vale para todas, exceto omissões abaixo.';
+                fields.listaJornadaFontePorMateria.appendChild(em);
+            } else {
+                jornadaFontePorMateriaRows.forEach(function (row, idx) {
+                    var wrap = document.createElement('div');
+                    wrap.className = 'grid grid-cols-1 md:grid-cols-12 gap-2 items-start border border-slate-200 rounded p-2 bg-white';
+
+                    var lb1 = document.createElement('label');
+                    lb1.className = 'md:col-span-3 text-xs text-slate-700 font-medium pt-1';
+                    lb1.textContent = 'Linha (matéria)';
+
+                    var selT = document.createElement('select');
+                    selT.className = 'md:col-span-3 px-2 py-1.5 border border-slate-200 rounded text-sm';
+                    var o0 = document.createElement('option');
+                    o0.value = '';
+                    o0.textContent = 'Selecione';
+                    selT.appendChild(o0);
+                    Object.keys(materiaNames).forEach(function (mid) {
+                        var op = document.createElement('option');
+                        op.value = String(mid);
+                        op.textContent = materiaNames[mid];
+                        if (Number(mid) === Number(row.materia_id || 0)) {
+                            op.selected = true;
+                        }
+                        selT.appendChild(op);
+                    });
+                    selT.addEventListener('change', function () {
+                        jornadaFontePorMateriaRows[idx].materia_id = Number(selT.value || 0);
+                    });
+
+                    var lb2 = document.createElement('label');
+                    lb2.className = 'md:col-span-2 text-xs text-slate-700 font-medium pt-1';
+                    lb2.textContent = 'Jornadas destas matérias';
+
+                    var selF = document.createElement('select');
+                    selF.multiple = true;
+                    selF.size = 4;
+                    selF.className = 'md:col-span-3 px-2 py-1 border border-slate-200 rounded text-sm';
+                    fillMateriaMultiSelect(selF, row.fonte_ids);
+                    selF.addEventListener('change', function () {
+                        jornadaFontePorMateriaRows[idx].fonte_ids = Array.from(selF.selectedOptions)
+                            .map(function (o) { return Number(o.value || 0); })
+                            .filter(function (x) { return x > 0; });
+                    });
+
+                    var del = document.createElement('button');
+                    del.type = 'button';
+                    del.className = 'md:col-span-1 px-2 py-1 text-xs rounded bg-red-50 text-red-700 hover:bg-red-100 self-center';
+                    del.textContent = 'Remover';
+                    del.addEventListener('click', function () {
+                        jornadaFontePorMateriaRows.splice(idx, 1);
+                        renderJornadaNotaUnicaFonteRows();
+                    });
+
+                    wrap.appendChild(lb1);
+                    wrap.appendChild(selT);
+                    wrap.appendChild(lb2);
+                    wrap.appendChild(selF);
+                    wrap.appendChild(del);
+                    fields.listaJornadaFontePorMateria.appendChild(wrap);
+                });
+            }
+        }
+        if (fields.listaJornadaFontePorGrupo) {
+            fields.listaJornadaFontePorGrupo.innerHTML = '';
+            if (jornadaFontePorGrupoRows.length === 0) {
+                var eg = document.createElement('p');
+                eg.className = 'text-xs text-slate-600';
+                eg.textContent = 'Nenhum mapeamento por grupo.';
+                fields.listaJornadaFontePorGrupo.appendChild(eg);
+            } else {
+                var gkeys = collectGroupKeysFromRule();
+                jornadaFontePorGrupoRows.forEach(function (row, idx) {
+                    var wrap = document.createElement('div');
+                    wrap.className = 'grid grid-cols-1 md:grid-cols-12 gap-2 items-start border border-slate-200 rounded p-2 bg-white';
+
+                    var lb1 = document.createElement('label');
+                    lb1.className = 'md:col-span-3 text-xs text-slate-700 font-medium pt-1';
+                    lb1.textContent = 'Código do grupo';
+
+                    var selG = document.createElement('select');
+                    selG.className = 'md:col-span-3 px-2 py-1.5 border border-slate-200 rounded text-sm';
+                    var o0g = document.createElement('option');
+                    o0g.value = '';
+                    o0g.textContent = gkeys.length ? 'Selecione' : 'Nenhum grupo na regra';
+                    selG.appendChild(o0g);
+                    gkeys.forEach(function (gk) {
+                        var op = document.createElement('option');
+                        op.value = String(gk);
+                        op.textContent = String(gk);
+                        if (String(row.grupo_key || '') === String(gk)) {
+                            op.selected = true;
+                        }
+                        selG.appendChild(op);
+                    });
+                    if (gkeys.length === 0 && String(row.grupo_key || '').trim() !== '') {
+                        var opx = document.createElement('option');
+                        opx.value = String(row.grupo_key);
+                        opx.textContent = String(row.grupo_key) + ' (salvo)';
+                        opx.selected = true;
+                        selG.appendChild(opx);
+                    }
+                    selG.addEventListener('change', function () {
+                        jornadaFontePorGrupoRows[idx].grupo_key = String(selG.value || '').trim();
+                    });
+
+                    var lb2g = document.createElement('label');
+                    lb2g.className = 'md:col-span-2 text-xs text-slate-700 font-medium pt-1';
+                    lb2g.textContent = 'Jornadas destas matérias';
+
+                    var selFg = document.createElement('select');
+                    selFg.multiple = true;
+                    selFg.size = 4;
+                    selFg.className = 'md:col-span-3 px-2 py-1 border border-slate-200 rounded text-sm';
+                    fillMateriaMultiSelect(selFg, row.fonte_ids);
+                    selFg.addEventListener('change', function () {
+                        jornadaFontePorGrupoRows[idx].fonte_ids = Array.from(selFg.selectedOptions)
+                            .map(function (o) { return Number(o.value || 0); })
+                            .filter(function (x) { return x > 0; });
+                    });
+
+                    var delg = document.createElement('button');
+                    delg.type = 'button';
+                    delg.className = 'md:col-span-1 px-2 py-1 text-xs rounded bg-red-50 text-red-700 hover:bg-red-100 self-center';
+                    delg.textContent = 'Remover';
+                    delg.addEventListener('click', function () {
+                        jornadaFontePorGrupoRows.splice(idx, 1);
+                        renderJornadaNotaUnicaFonteRows();
+                    });
+
+                    wrap.appendChild(lb1);
+                    wrap.appendChild(selG);
+                    wrap.appendChild(lb2g);
+                    wrap.appendChild(selFg);
+                    wrap.appendChild(delg);
+                    fields.listaJornadaFontePorGrupo.appendChild(wrap);
+                });
+            }
+        }
+    }
+
+    function normalizeJornadasFaixas(raw) {
+        var base = defaultJornadasFaixas();
+        if (!Array.isArray(raw) || raw.length === 0) {
+            return base;
+        }
+        var map = {};
+        raw.forEach(function (it) {
+            if (!it || typeof it !== 'object') {
+                return;
+            }
+            var p = Number(it.percentual_min || 0);
+            if (!Number.isFinite(p)) {
+                return;
+            }
+            p = Math.max(0, Math.min(100, Math.round(p)));
+            if (p % 10 !== 0 || p < 10) {
+                return;
+            }
+            var n = (it.nota === '' || it.nota === null || typeof it.nota === 'undefined') ? '' : String(it.nota);
+            map[p] = n;
+        });
+        return base.map(function (b) {
+            return { percentual_min: b.percentual_min, nota: Object.prototype.hasOwnProperty.call(map, b.percentual_min) ? map[b.percentual_min] : '' };
+        });
+    }
+
+    function getJornadasFaixasFromModal() {
+        return jornadasFaixas
+            .map(function (it) {
+                var notaRaw = String(it.nota === undefined || it.nota === null ? '' : it.nota).trim();
+                if (notaRaw === '') {
+                    return null;
+                }
+                var nota = Number(notaRaw.replace(',', '.'));
+                if (!Number.isFinite(nota) || nota < 0) {
+                    return null;
+                }
+                return { percentual_min: Number(it.percentual_min || 0), nota: nota };
+            })
+            .filter(function (it) { return !!it; });
+    }
+
+    function loadJornadasOptionsIfNeeded(done) {
+        if (!fields.jornadaIds) {
+            if (done) {
+                done();
+            }
+            return;
+        }
+        var ini = fields.jornadaDataIni ? String(fields.jornadaDataIni.value || '').trim() : '';
+        var fim = fields.jornadaDataFim ? String(fields.jornadaDataFim.value || '').trim() : '';
+        var cacheKey = [ini, fim].join('|');
+        if (jornadasOptionsCacheKey === cacheKey) {
+            if (done) {
+                done();
+            }
+            return;
+        }
+        var url = JORNADAS_JSON_URL;
+        var qs = [];
+        if (ini) {
+            qs.push('data_ini=' + encodeURIComponent(ini));
+        }
+        if (fim) {
+            qs.push('data_fim=' + encodeURIComponent(fim));
+        }
+        if (qs.length > 0) {
+            url += '?' + qs.join('&');
+        }
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                var sel = fields.jornadaIds;
+                sel.innerHTML = '';
+                var lista = data.jornadas || [];
+                lista.forEach(function (j) {
+                    var opt = document.createElement('option');
+                    opt.value = String(j.id);
+                    var rotulo = String(j.rotulo || '').trim();
+                    if (!rotulo) {
+                        var materia = String(j.materia_nome || '').trim().toUpperCase() || 'SEM MATERIA';
+                        var prof = String(j.professor_nome || '').trim().toUpperCase() || 'SEM PROFESSOR';
+                        var dataTxt = String(j.data_fim_jornada || '').trim().toUpperCase() || 'SEM DATA FINAL';
+                        rotulo = ('#' + j.id + ' - ' + materia + ' - ' + prof + ' - ' + dataTxt).toUpperCase();
+                    }
+                    opt.textContent = rotulo;
+                    sel.appendChild(opt);
+                });
+                renderJornadaTabela(lista);
+                jornadasOptionsCacheKey = cacheKey;
+                if (done) {
+                    done();
+                }
+            })
+            .catch(function () {
+                jornadasOptionsCacheKey = '';
+                if (done) {
+                    done();
+                }
+            });
+    }
+
+    function formatarDataBr(dataYmd) {
+        var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(dataYmd || ''));
+        if (!m) {
+            return '';
+        }
+        return m[3] + '/' + m[2] + '/' + m[1];
+    }
+
+    function renderJornadaTabela(lista) {
+        var corpo = document.getElementById('jornada-tabela-corpo');
+        if (!corpo) {
+            return;
+        }
+        corpo.innerHTML = '';
+        if (!lista || lista.length === 0) {
+            corpo.innerHTML = '<tr><td colspan="7" class="px-3 py-6 text-center text-gray-400">Nenhuma jornada encontrada</td></tr>';
+        }
+
+        var materiasSet = {};
+        var anosSet = {};
+
+        (lista || []).forEach(function (j) {
+            var jid = parseInt(j.id, 10);
+            var materiaNome = String(j.materia_nome || 'SEM MATERIA').trim();
+            var profNome = String(j.professor_nome || 'SEM PROFESSOR').trim();
+            var dataFim = String(j.data_fim_jornada || '').trim();
+            var bimestre = (j.bimestre !== null && j.bimestre !== undefined && j.bimestre !== '') ? String(j.bimestre) : '';
+            var ano = (j.ano_letivo !== null && j.ano_letivo !== undefined && j.ano_letivo !== '')
+                ? String(j.ano_letivo)
+                : (/^\d{4}/.exec(dataFim) ? dataFim.substring(0, 4) : '');
+            var titulo = String(j.titulo || ('Jornada #' + jid)).trim();
+            var tituloBusca = (titulo + ' ' + materiaNome + ' ' + profNome).toLowerCase();
+
+            if (materiaNome) { materiasSet[materiaNome] = true; }
+            if (ano) { anosSet[ano] = true; }
+
+            var tr = document.createElement('tr');
+            tr.className = 'jornada-tabela-row hover:bg-gray-50 cursor-pointer';
+            tr.dataset.jornadaId = String(jid);
+            tr.dataset.titulo = tituloBusca;
+            tr.dataset.materia = materiaNome;
+            tr.dataset.bimestre = bimestre;
+            tr.dataset.ano = ano;
+            tr.innerHTML =
+                '<td class="px-3 py-2"><input type="checkbox" class="jornada-tabela-checkbox rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" value="' + jid + '"></td>' +
+                '<td class="px-3 py-2 whitespace-nowrap text-gray-900">#' + jid + '</td>' +
+                '<td class="px-3 py-2 whitespace-nowrap text-gray-600">' + escapeHtml(materiaNome) + '</td>' +
+                '<td class="px-3 py-2 whitespace-nowrap text-gray-600">' + escapeHtml(profNome) + '</td>' +
+                '<td class="px-3 py-2 whitespace-nowrap text-gray-600">' + (bimestre ? bimestre + 'º' : 'N/A') + '</td>' +
+                '<td class="px-3 py-2 whitespace-nowrap text-gray-600">' + (ano || 'N/A') + '</td>' +
+                '<td class="px-3 py-2 whitespace-nowrap text-gray-600">' + (formatarDataBr(dataFim) || 'N/A') + '</td>';
+            corpo.appendChild(tr);
+        });
+
+        var filtroMateria = document.getElementById('jornada-tabela-filtro-materia');
+        if (filtroMateria) {
+            var valorAtualMateria = filtroMateria.value;
+            filtroMateria.innerHTML = '<option value="">Todas</option>';
+            Object.keys(materiasSet).sort().forEach(function (m) {
+                var opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = m;
+                filtroMateria.appendChild(opt);
+            });
+            filtroMateria.value = valorAtualMateria;
+        }
+        var filtroAno = document.getElementById('jornada-tabela-filtro-ano');
+        if (filtroAno) {
+            var valorAtualAno = filtroAno.value;
+            filtroAno.innerHTML = '<option value="">Todos</option>';
+            Object.keys(anosSet).sort().forEach(function (a) {
+                var opt = document.createElement('option');
+                opt.value = a;
+                opt.textContent = a;
+                filtroAno.appendChild(opt);
+            });
+            filtroAno.value = valorAtualAno;
+        }
+
+        syncJornadaTabelaFromSelect();
+        aplicarFiltrosJornadaTabela();
+    }
+
+    function escapeHtml(str) {
+        var div = document.createElement('div');
+        div.textContent = String(str || '');
+        return div.innerHTML;
+    }
+
+    function syncJornadaTabelaFromSelect() {
+        if (!fields.jornadaIds) {
+            return;
+        }
+        var selecionados = getSelectedJornadaIdsFromModal();
+        var set = {};
+        selecionados.forEach(function (id) { set[id] = true; });
+        document.querySelectorAll('.jornada-tabela-checkbox').forEach(function (cb) {
+            cb.checked = !!set[parseInt(cb.value, 10)];
+        });
+        var contador = document.getElementById('jornada-tabela-contador');
+        if (contador) {
+            contador.textContent = selecionados.length + ' selecionada(s)';
+        }
+    }
+
+    function toggleJornadaTabelaRow(jornadaId) {
+        if (!fields.jornadaIds) {
+            return;
+        }
+        var opt = Array.from(fields.jornadaIds.options).find(function (o) {
+            return parseInt(o.value, 10) === jornadaId;
+        });
+        if (!opt) {
+            return;
+        }
+        opt.selected = !opt.selected;
+        syncJornadaTabelaFromSelect();
+    }
+
+    function aplicarFiltrosJornadaTabela() {
+        var filtroTitulo = (document.getElementById('jornada-tabela-filtro-titulo') || {}).value || '';
+        var filtroMateria = (document.getElementById('jornada-tabela-filtro-materia') || {}).value || '';
+        var filtroBimestre = (document.getElementById('jornada-tabela-filtro-bimestre') || {}).value || '';
+        var filtroAno = (document.getElementById('jornada-tabela-filtro-ano') || {}).value || '';
+        var tituloLower = filtroTitulo.trim().toLowerCase();
+        document.querySelectorAll('.jornada-tabela-row').forEach(function (row) {
+            var visivel = true;
+            if (tituloLower && row.dataset.titulo.indexOf(tituloLower) === -1) {
+                visivel = false;
+            }
+            if (filtroMateria && row.dataset.materia !== filtroMateria) {
+                visivel = false;
+            }
+            if (filtroBimestre && row.dataset.bimestre !== filtroBimestre) {
+                visivel = false;
+            }
+            if (filtroAno && row.dataset.ano !== filtroAno) {
+                visivel = false;
+            }
+            row.classList.toggle('hidden', !visivel);
+        });
+    }
+
+    function selecionarJornadasFiltradas() {
+        if (!fields.jornadaIds) {
+            return;
+        }
+        var idsVisiveis = {};
+        document.querySelectorAll('.jornada-tabela-row:not(.hidden)').forEach(function (row) {
+            idsVisiveis[parseInt(row.dataset.jornadaId, 10)] = true;
+        });
+        Array.from(fields.jornadaIds.options).forEach(function (opt) {
+            var v = parseInt(opt.value, 10);
+            if (idsVisiveis[v]) {
+                opt.selected = true;
+            }
+        });
+        syncJornadaTabelaFromSelect();
+    }
+
+    function selectEventoComponenteValue(selectEl, codigo) {
+        if (!selectEl) {
+            return;
+        }
+        var target = String(codigo || '').trim();
+        if (!target) {
+            selectEl.value = '';
+            return;
+        }
+        var found = Array.from(selectEl.options).some(function (opt) {
+            return String(opt.value || '').trim() === target;
+        });
+        if (!found) {
+            var custom = document.createElement('option');
+            custom.value = target;
+            custom.textContent = target + ' (não encontrado na lista)';
+            selectEl.appendChild(custom);
+        }
+        selectEl.value = target;
+    }
+
+    function fillEventoComponentesSelect(componentes, selectedCode) {
+        if (!fields.eventoComponenteCodigo) {
+            return;
+        }
+        var sel = fields.eventoComponenteCodigo;
+        sel.innerHTML = '';
+        var opt0 = document.createElement('option');
+        opt0.value = '';
+        opt0.textContent = 'Selecione o bloco/coluna';
+        sel.appendChild(opt0);
+
+        (componentes || []).forEach(function (c) {
+            var cod = String((c && c.codigo) || '').trim();
+            if (!cod) {
+                return;
+            }
+            var nome = String((c && c.nome) || cod).trim();
+            var op = document.createElement('option');
+            op.value = cod;
+            op.textContent = cod + ' - ' + nome;
+            sel.appendChild(op);
+        });
+
+        selectEventoComponenteValue(sel, selectedCode || '');
+    }
+
+    function loadEventoComponentesOptions(regraCodigo, selectedCode) {
+        if (!fields.eventoComponenteCodigo) {
+            return;
+        }
+        var codRegra = String(regraCodigo || '').trim();
+        if (!codRegra) {
+            fillEventoComponentesSelect([], '');
+            return;
+        }
+        if (eventoComponentesCache[codRegra]) {
+            fillEventoComponentesSelect(eventoComponentesCache[codRegra], selectedCode || '');
+            return;
+        }
+        fillEventoComponentesSelect([], '');
+        fields.eventoComponenteCodigo.disabled = true;
+        fetch(EVENTO_COMPONENTES_JSON_URL + '?regra_codigo=' + encodeURIComponent(codRegra), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                var comps = Array.isArray(data.componentes) ? data.componentes : [];
+                eventoComponentesCache[codRegra] = comps;
+                fillEventoComponentesSelect(comps, selectedCode || '');
+            })
+            .catch(function () {
+                fillEventoComponentesSelect([], selectedCode || '');
+            })
+            .finally(function () {
+                fields.eventoComponenteCodigo.disabled = false;
+            });
+    }
+
+    function getSelectedJornadaIdsFromModal() {
+        if (!fields.jornadaIds) {
+            return [];
+        }
+        return Array.from(fields.jornadaIds.selectedOptions)
+            .map(function (o) { return parseInt(o.value, 10); })
+            .filter(function (id) { return id > 0; });
+    }
+
+    function setJornadaIdsModalSelection(ids) {
+        if (!fields.jornadaIds) {
+            return;
+        }
+        var set = {};
+        (ids || []).forEach(function (id) {
+            if (id > 0) {
+                set[id] = true;
+            }
+        });
+        Array.from(fields.jornadaIds.options).forEach(function (opt) {
+            var v = parseInt(opt.value, 10);
+            opt.selected = !!set[v];
+        });
+        syncJornadaTabelaFromSelect();
+    }
+
+    const calcLabel = {
+        media: 'Média',
+        soma: 'Soma',
+        maior: 'Maior',
+        ultima: 'Última'
+    };
+    const materiaNames = <?= json_encode($materiasById, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+    const formulaMateriasInicial = <?= json_encode($formulaMateriasMap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+    const formulaMateriasJsonInput = document.getElementById('formula-materias-json');
+    const listaFormulasMateria = document.getElementById('lista-formulas-materia');
+    const btnAddFormulaMateria = document.getElementById('btn-add-formula-materia');
+    let formulasMateriaRows = [];
+    let formulasMateriaModalRows = [];
+
+    function slugify(text) {
+        return (text || '')
+            .toString()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .substring(0, 120);
+    }
+
+    const regraNomeInput = document.getElementById('regra-nome');
+    const regraCodigoInput = document.getElementById('regra-codigo');
+    const wrapExibicaoBimestre = document.getElementById('wrap-exibicao-bimestre');
+    const regraBimestreSelect = document.getElementById('regra-bimestre');
+    let regraCodigoEditadoManual = false;
+    if (regraCodigoInput) {
+        regraCodigoInput.addEventListener('input', function () {
+            var atual = String(regraCodigoInput.value || '').trim();
+            regraCodigoEditadoManual = atual !== '';
+        });
+    }
+    var btnEditarCodigoEvento = document.getElementById('btn-editar-codigo-evento');
+    if (btnEditarCodigoEvento && regraCodigoInput) {
+        btnEditarCodigoEvento.addEventListener('click', function () {
+            regraCodigoInput.readOnly = false;
+            regraCodigoInput.classList.remove('bg-gray-50', 'text-gray-600', 'border-gray-200');
+            regraCodigoInput.classList.add('bg-white', 'border-gray-300');
+            regraCodigoInput.focus();
+            btnEditarCodigoEvento.classList.add('hidden');
+        });
+    }
+    if (regraNomeInput && regraCodigoInput) {
+        var inicialCodigo = String(regraCodigoInput.value || '').trim();
+        if (inicialCodigo === '') {
+            var sugIni = slugify(String(regraNomeInput.value || '').trim());
+            if (sugIni !== '') {
+                regraCodigoInput.value = sugIni;
+            }
+        } else {
+            var nomeSlug = slugify(String(regraNomeInput.value || '').trim());
+            regraCodigoEditadoManual = nomeSlug !== '' && inicialCodigo !== nomeSlug;
+        }
+        regraNomeInput.addEventListener('input', function () {
+            if (regraCodigoEditadoManual) {
+                return;
+            }
+            regraCodigoInput.value = slugify(String(regraNomeInput.value || '').trim());
+        });
+    }
+
+    function syncExibicaoCampos() {
+        var exibirSel = document.querySelector('input[name="exibir_em"]:checked') || document.querySelector('[name="exibir_em"]');
+        var exibirVal = exibirSel ? String(exibirSel.value || 'boletim') : 'boletim';
+        var isNotas = exibirVal === 'notas';
+        if (wrapExibicaoBimestre) {
+            wrapExibicaoBimestre.classList.toggle('hidden', !isNotas);
+        }
+        if (regraBimestreSelect) {
+            regraBimestreSelect.disabled = !isNotas;
+            if (!isNotas) {
+                regraBimestreSelect.value = '';
+            }
+        }
+    }
+    document.querySelectorAll('[name="exibir_em"]').forEach(function (el) {
+        el.addEventListener('change', syncExibicaoCampos);
+    });
+    syncExibicaoCampos();
+
+    function parseJsonIds(raw) {
+        try {
+            var arr = JSON.parse(raw || '[]');
+            return Array.isArray(arr) ? arr.map(Number).filter(function (n) { return n > 0; }) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+    function marcarChecksSeVazio(name, ids, forcar) {
+        var checks = Array.from(document.querySelectorAll('input[name="' + name + '"]'));
+        if (!checks.length) return;
+        var algum = checks.some(function (c) { return c.checked; });
+        if (!forcar && algum) return;
+        var set = {};
+        (ids || []).forEach(function (id) { set[Number(id)] = true; });
+        checks.forEach(function (c) { c.checked = !!set[Number(c.value)]; });
+    }
+    function sincronizarCamposHerdadosDoBoletim() {
+        var wrap = document.getElementById('campos-herdados-do-boletim');
+        if (wrap) wrap.classList.add('hidden');
+        document.querySelectorAll('[data-herda-boletim]').forEach(function (el) {
+            el.classList.add('hidden');
+        });
+    }
+    function aplicarBoletimNoFormulario(forcarEscopo, forcarCriterios) {
+        var sel = document.getElementById('regra-boletim-id');
+        if (!sel || !sel.value) return;
+        var opt = sel.options[sel.selectedIndex];
+        if (!opt) return;
+        var finEl = document.getElementById('regra-finalidade');
+        if (finEl) {
+            finEl.value = opt.getAttribute('data-finalidade') === 'complementar' ? 'complementar' : 'oficial';
+        }
+        marcarChecksSeVazio('materias_ids[]', parseJsonIds(opt.getAttribute('data-materias')), !!forcarEscopo);
+        marcarChecksSeVazio('series_ids[]', parseJsonIds(opt.getAttribute('data-series')), !!forcarEscopo);
+        marcarChecksSeVazio('turmas_ids[]', parseJsonIds(opt.getAttribute('data-turmas')), !!forcarEscopo);
+        var notaEl = document.querySelector('[name="nota_minima_aprovacao"]');
+        var roundEl = document.querySelector('[name="round_mode"]');
+        var decEl = document.querySelector('[name="decimal_places"]');
+        var notaCad = opt.getAttribute('data-nota-min');
+        var roundCad = opt.getAttribute('data-round');
+        var decCad = opt.getAttribute('data-decimal');
+        if (notaEl && notaCad && (forcarCriterios || String(notaEl.value || '').trim() === '')) {
+            notaEl.value = notaCad;
+        }
+        if (roundEl && roundCad && (forcarCriterios || String(roundEl.value || '').trim() === '')) {
+            roundEl.value = roundCad;
+        }
+        if (decEl && decCad && (forcarCriterios || String(decEl.value || '').trim() === '')) {
+            decEl.value = decCad;
+        }
+    }
+    var boletimSelEl = document.getElementById('regra-boletim-id');
+    if (boletimSelEl) {
+        boletimSelEl.addEventListener('change', function () {
+            aplicarBoletimNoFormulario(true, true);
+            sincronizarCamposHerdadosDoBoletim();
+        });
+        if (boletimSelEl.value) aplicarBoletimNoFormulario(true, true);
+        sincronizarCamposHerdadosDoBoletim();
+    }
+
+    function syncJson() {
+        inputJson.value = JSON.stringify(componentes);
+    }
+
+    var wrapSemanasQuadro = document.getElementById('wrap-semanas-quadro');
+    var semanasQuadroChecks = Array.from(document.querySelectorAll('.semana-quadro-toggle'));
+    var ordemSemanasQuadro = ['s1', 's3', 's5', 's7', 's2', 's4', 's6', 's8'];
+
+    function codigoSemanaQuadro(semana) {
+        var n = Number(semana || 0);
+        return n >= 1 && n <= 20 ? ('s' + n) : '';
+    }
+
+    function criarComponenteSemanaQuadro(semana) {
+        var n = Number(semana || 0);
+        var cod = codigoSemanaQuadro(n);
+        var grupo = (n % 2 === 1) ? 'quadro_a' : 'quadro_b';
+        return {
+            id: 0,
+            codigo: cod,
+            nome: 'S' + n,
+            source_type: 'provas_sistema',
+            calc_type: 'media',
+            peso: 1,
+            filtro_titulo: '',
+            bloco_id: 0,
+            blocos_ids: [],
+            materia_id: 0,
+            materias_ids: [],
+            materia_unica: 1,
+            usar_percentual: 1,
+            escala_max: 10,
+            obrigatorio: 0,
+            config: {
+                semana: n,
+                layout_group: grupo,
+                layout_type: 'semana_nq',
+                tipo_avaliacao_nome: 'Semanal'
+            }
+        };
+    }
+
+    function isComponenteSemanaQuadro(comp) {
+        var cod = String((comp && comp.codigo) || '').toLowerCase().trim();
+        var cfg = (comp && comp.config && typeof comp.config === 'object') ? comp.config : {};
+        return /^s([1-9]|[1-9]\d)$/.test(cod) || String(cfg.layout_type || '').toLowerCase() === 'semana_nq';
+    }
+
+    function isMediaSemQuadro(comp) {
+        var cod = String((comp && comp.codigo) || '').toLowerCase().trim();
+        var cfg = (comp && comp.config && typeof comp.config === 'object') ? comp.config : {};
+        var agregacaoSemanas = Array.isArray(cfg.agregar_nq) && cfg.agregar_nq.some(function (x) {
+            return /^s([1-9]|[1-9]\d)$/.test(String(x || '').toLowerCase().trim());
+        });
+        return cod === 'media_sem' || String(cfg.layout_type || '').toLowerCase() === 'media_sem' || agregacaoSemanas;
+    }
+
+    var selGrupoRegras = document.getElementById('grupo-regras-notas-id');
+    var previewGrupoRegras = document.getElementById('grupo-regras-notas-preview');
+    var wrapSemanasPeriodo = document.getElementById('wrap-semanas-periodo');
+    var inputSemanasPeriodo = document.getElementById('semanas-periodo');
+    var ultimoGrupoQuadro = null;
+
+    function recortarComponentesQuadro(comps, semanas) {
+        semanas = parseInt(semanas, 10) || 0;
+        if (!Array.isArray(comps) || semanas <= 0) return comps || [];
+        var out = [];
+        comps.forEach(function (c) {
+            var copy = Object.assign({}, c);
+            var cfg = (c && c.config && typeof c.config === 'object') ? Object.assign({}, c.config) : {};
+            copy.config = cfg;
+            var sem = parseInt(cfg.semana, 10) || 0;
+            if (sem > semanas) return;
+            if (Array.isArray(cfg.agregar_nq)) {
+                cfg.agregar_nq = cfg.agregar_nq.filter(function (cod) {
+                    var m = String(cod || '').toLowerCase().match(/^s([1-9]|1\d|20)$/);
+                    if (!m) return true;
+                    return parseInt(m[1], 10) <= semanas;
+                });
+            }
+            out.push(copy);
+        });
+        return out;
+    }
+
+    function ajustarWrapSemanasPeriodo(grupo) {
+        if (!wrapSemanasPeriodo || !inputSemanasPeriodo) return;
+        var max = grupo ? (parseInt(grupo.quantidade_semanas, 10) || 0) : 0;
+        if (max > 0) {
+            wrapSemanasPeriodo.classList.remove('hidden');
+            inputSemanasPeriodo.max = String(max);
+            inputSemanasPeriodo.placeholder = 'Até ' + max;
+        } else {
+            wrapSemanasPeriodo.classList.add('hidden');
+        }
+    }
+    function renderPreviewGrupoRegras(grupo) {
+        if (!previewGrupoRegras) return;
+        if (!grupo) {
+            previewGrupoRegras.classList.add('hidden');
+            previewGrupoRegras.innerHTML = '';
+            return;
+        }
+        var comps = Array.isArray(grupo.componentes_sugeridos) ? grupo.componentes_sugeridos : [];
+        var nomes = comps.map(function (c) {
+            return String((c && (c.nome || c.codigo)) || '').trim();
+        }).filter(Boolean);
+        previewGrupoRegras.classList.remove('hidden');
+        if (!nomes.length) {
+            previewGrupoRegras.innerHTML = '<strong>Este quadro ainda não gera colunas.</strong> Revise o cadastro antes de usar neste modelo.';
+            return;
+        }
+        previewGrupoRegras.innerHTML = '<strong>Ao usar este quadro, seu boletim terá as colunas:</strong><br>' + nomes.map(escHtml).join(' · ');
+    }
+
+    function escHtml(str) {
+        return String(str == null ? '' : str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function aplicarComponentesDoGrupo(compsSugeridos) {
+        if (!Array.isArray(compsSugeridos)) return;
+        var outros = componentes.filter(function (c) {
+            return !isComponenteSemanaQuadro(c) && !isMediaSemQuadro(c);
+        });
+        componentes = compsSugeridos.concat(outros);
+        syncJson();
+        if (typeof renderLista === 'function') renderLista();
+        else if (typeof renderBlocos === 'function') renderBlocos();
+        if (typeof syncSemanasQuadroPanel === 'function') syncSemanasQuadroPanel();
+    }
+
+    (function initDestinosQuadro() {
+        var catalogo = <?= json_encode($gruposRegrasNotas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) ?> || [];
+        var destinosIni = <?= json_encode($destinosQuadro, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) ?> || [];
+        var lista = document.getElementById('lista-destinos-quadro');
+        var hid = document.getElementById('destinos-json');
+        var btnAdd = document.getElementById('btn-add-destino-quadro');
+        if (!lista || !hid) return;
+
+        function quadroPorId(id) {
+            id = Number(id) || 0;
+            for (var i = 0; i < catalogo.length; i++) {
+                if (Number(catalogo[i].id) === id) return catalogo[i];
+            }
+            return null;
+        }
+        function fillSelect(sel, placeholder, itens, selectedId, labelKey) {
+            sel.innerHTML = '<option value="">' + placeholder + '</option>';
+            (itens || []).forEach(function (item) {
+                var opt = document.createElement('option');
+                opt.value = item.id;
+                opt.textContent = item[labelKey] || item.nome || item.codigo || ('#' + item.id);
+                if (Number(item.id) === Number(selectedId)) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        }
+        function syncLinha(row) {
+            var selG = row.querySelector('.sel-destino-quadro');
+            var selT = row.querySelector('.sel-destino-bloco');
+            var selM = row.querySelector('.sel-destino-coluna');
+            var wrapT = row.querySelector('.wrap-destino-bloco');
+            var wrapM = row.querySelector('.wrap-destino-coluna');
+            var g = quadroPorId(selG.value);
+            var tipos = (g && Array.isArray(g.tipos)) ? g.tipos : ((g && Array.isArray(g.blocos)) ? g.blocos : []);
+            var marcas = (g && Array.isArray(g.marcas)) ? g.marcas : ((g && Array.isArray(g.colunas)) ? g.colunas : []);
+            if (wrapT) wrapT.classList.toggle('hidden', tipos.length === 0);
+            if (wrapM) wrapM.classList.toggle('hidden', marcas.length === 0);
+            var tipoSel = parseInt(selT.getAttribute('data-keep') || selT.value, 10) || 0;
+            fillSelect(selT, 'Bloco', tipos, tipoSel, 'nome');
+            selT.removeAttribute('data-keep');
+            var tipo = null;
+            tipos.forEach(function (t) { if (Number(t.id) === (parseInt(selT.value, 10) || 0)) tipo = t; });
+            var idsOk = tipo && Array.isArray(tipo.marcas_ids) && tipo.marcas_ids.length
+                ? tipo.marcas_ids.map(Number)
+                : marcas.map(function (m) { return Number(m.id); });
+            var marcasOk = marcas.filter(function (m) {
+                return idsOk.indexOf(Number(m.id)) >= 0 && m.papel !== 'calculada';
+            });
+            fillSelect(selM, 'Coluna', marcasOk, parseInt(selM.getAttribute('data-keep') || selM.value, 10) || 0, 'nome');
+            selM.removeAttribute('data-keep');
+            syncHid();
+        }
+        function syncHid() {
+            var out = [];
+            lista.querySelectorAll('.destino-quadro-row').forEach(function (row) {
+                var g = parseInt(row.querySelector('.sel-destino-quadro').value, 10) || 0;
+                if (!g) return;
+                var t = parseInt(row.querySelector('.sel-destino-bloco').value, 10) || 0;
+                var m = parseInt(row.querySelector('.sel-destino-coluna').value, 10) || 0;
+                out.push({
+                    grupo_id: g,
+                    tipo_id: t > 0 ? t : null,
+                    marca_id: m > 0 ? m : null
+                });
+            });
+            hid.value = JSON.stringify(out);
+        }
+        function addLinha(data) {
+            data = data || {};
+            var wrap = document.createElement('div');
+            wrap.className = 'destino-quadro-row grid grid-cols-1 md:grid-cols-12 gap-3 items-end border border-gray-200 rounded-lg p-3';
+            wrap.innerHTML =
+                '<div class="md:col-span-4"><label class="block text-xs font-medium text-gray-500 mb-1">Quadro</label>' +
+                '<select class="sel-destino-quadro w-full h-10 px-3 border border-gray-300 rounded-lg text-sm"></select></div>' +
+                '<div class="md:col-span-3 wrap-destino-bloco hidden"><label class="block text-xs font-medium text-gray-500 mb-1">Bloco</label>' +
+                '<select class="sel-destino-bloco w-full h-10 px-3 border border-gray-300 rounded-lg text-sm"><option value="">Bloco</option></select></div>' +
+                '<div class="md:col-span-3 wrap-destino-coluna hidden"><label class="block text-xs font-medium text-gray-500 mb-1">Coluna</label>' +
+                '<select class="sel-destino-coluna w-full h-10 px-3 border border-gray-300 rounded-lg text-sm"><option value="">Coluna</option></select></div>' +
+                '<div class="md:col-span-2"><button type="button" class="btn-rm-destino w-full px-3 py-2 border border-red-200 text-red-700 rounded-lg text-sm hover:bg-red-50">Remover</button></div>';
+            var selG = wrap.querySelector('.sel-destino-quadro');
+            fillSelect(selG, 'Nenhum', catalogo, data.grupo_id || '', 'nome');
+            wrap.querySelector('.sel-destino-bloco').setAttribute('data-keep', data.tipo_id || '');
+            wrap.querySelector('.sel-destino-coluna').setAttribute('data-keep', data.marca_id || '');
+            selG.addEventListener('change', function () {
+                wrap.querySelector('.sel-destino-bloco').value = '';
+                wrap.querySelector('.sel-destino-bloco').removeAttribute('data-keep');
+                wrap.querySelector('.sel-destino-coluna').setAttribute('data-keep', '');
+                syncLinha(wrap);
+            });
+            wrap.querySelector('.sel-destino-bloco').addEventListener('change', function () { syncLinha(wrap); });
+            wrap.querySelector('.sel-destino-coluna').addEventListener('change', syncHid);
+            wrap.querySelector('.btn-rm-destino').addEventListener('click', function () {
+                wrap.remove();
+                syncHid();
+            });
+            lista.appendChild(wrap);
+            syncLinha(wrap);
+        }
+        if (btnAdd) btnAdd.addEventListener('click', function () { addLinha({}); });
+        if (destinosIni.length) {
+            destinosIni.forEach(function (v) { addLinha(v); });
+        }
+        syncHid();
+        var formRegra = document.getElementById('form-regra-boletim');
+        if (formRegra) formRegra.addEventListener('submit', syncHid);
+    })();
+
+    if (selGrupoRegras) {
+        function carregarGrupoRegras(aplicar) {
+            var id = parseInt(selGrupoRegras.value, 10) || 0;
+            if (id <= 0) {
+                renderPreviewGrupoRegras(null);
+                ajustarWrapSemanasPeriodo(null);
+                ultimoGrupoQuadro = null;
+                return;
+            }
+            fetch(<?= json_encode(URL . '/admin/grupos-regras-notas/', JSON_UNESCAPED_SLASHES) ?> + id + '/dados', {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+            }).then(function (r) { return r.json(); }).then(function (data) {
+                if (!data || !data.ok || !data.grupo) {
+                    alert((data && data.error) ? data.error : 'Não foi possível carregar o grupo.');
+                    return;
+                }
+                renderPreviewGrupoRegras(data.grupo);
+                ajustarWrapSemanasPeriodo(data.grupo);
+                ultimoGrupoQuadro = data.grupo;
+                if (aplicar) {
+                    if (!confirm('Substituir as colunas semanais pelas colunas e blocos deste quadro?')) {
+                        return;
+                    }
+                    var comps = recortarComponentesQuadro(
+                        data.grupo.componentes_sugeridos || [],
+                        inputSemanasPeriodo ? inputSemanasPeriodo.value : 0
+                    );
+                    aplicarComponentesDoGrupo(comps);
+                }
+                var lg = document.getElementById('bloco-layout-group');
+                if (lg && Array.isArray(data.grupo.tipos)) {
+                    data.grupo.tipos.forEach(function (t) {
+                        var val = String(t.layout_group || '');
+                        if (!val) return;
+                        var exists = false;
+                        for (var i = 0; i < lg.options.length; i++) {
+                            if (lg.options[i].value === val) { exists = true; break; }
+                        }
+                        if (!exists) {
+                            var opt = document.createElement('option');
+                            opt.value = val;
+                            opt.textContent = 'Quadro — ' + (t.layout_group_label || t.nome || val);
+                            lg.appendChild(opt);
+                        }
+                    });
+                }
+            }).catch(function () {
+                alert('Falha ao carregar o Quadro de Notas.');
+            });
+        }
+        selGrupoRegras.addEventListener('change', function () {
+            carregarGrupoRegras(true);
+        });
+        if (inputSemanasPeriodo) {
+            inputSemanasPeriodo.addEventListener('change', function () {
+                if (!ultimoGrupoQuadro) return;
+                var comps = recortarComponentesQuadro(
+                    ultimoGrupoQuadro.componentes_sugeridos || [],
+                    inputSemanasPeriodo.value
+                );
+                aplicarComponentesDoGrupo(comps);
+            });
+        }
+        if (parseInt(selGrupoRegras.value, 10) > 0) {
+            carregarGrupoRegras(false);
+        }
+        var formRegraQuadro = document.getElementById('form-regra-boletim');
+        if (formRegraQuadro) {
+            formRegraQuadro.addEventListener('submit', function () {
+                if (!inputSemanasPeriodo) return;
+                var n = parseInt(inputSemanasPeriodo.value, 10) || 0;
+                if (n <= 0) return;
+                componentes = recortarComponentesQuadro(componentes, n);
+                if (typeof syncJson === 'function') syncJson();
+            });
+        }
+    }
+
+    function ordenarComponentesQuadroSemanal() {
+        componentes.sort(function (a, b) {
+            var ac = String((a && a.codigo) || '').toLowerCase().trim();
+            var bc = String((b && b.codigo) || '').toLowerCase().trim();
+            var ai = ordemSemanasQuadro.indexOf(ac);
+            var bi = ordemSemanasQuadro.indexOf(bc);
+            if (ai >= 0 && bi >= 0) return ai - bi;
+            if (ai >= 0 && bi < 0) return -1;
+            if (ai < 0 && bi >= 0) return 1;
+            return 0;
+        });
+    }
+
+    function syncSemanasQuadroPanel() {
+        if (!wrapSemanasQuadro || semanasQuadroChecks.length === 0) {
+            return;
+        }
+        var codigosAtivos = {};
+        var temQuadro = false;
+        componentes.forEach(function (comp) {
+            if (isComponenteSemanaQuadro(comp)) {
+                var cfg = (comp.config && typeof comp.config === 'object') ? comp.config : {};
+                var cod = String(comp.codigo || '').toLowerCase().trim();
+                if (!/^s([1-9]|[1-9]\d)$/.test(cod)) {
+                    cod = codigoSemanaQuadro(cfg.semana || 0);
+                }
+                if (cod !== '') {
+                    codigosAtivos[cod] = true;
+                    temQuadro = true;
+                }
+            } else if (isMediaSemQuadro(comp)) {
+                temQuadro = true;
+            }
+        });
+        wrapSemanasQuadro.classList.toggle('hidden', !temQuadro);
+        semanasQuadroChecks.forEach(function (check) {
+            check.checked = !!codigosAtivos[String(check.value || '').toLowerCase()];
+        });
+    }
+
+    function atualizarMediaSemComSemana(codigo, ativo) {
+        componentes.forEach(function (comp) {
+            if (!isMediaSemQuadro(comp)) {
+                return;
+            }
+            if (!comp.config || typeof comp.config !== 'object') {
+                comp.config = {};
+            }
+            var lista = Array.isArray(comp.config.agregar_nq)
+                ? comp.config.agregar_nq.map(function (x) { return String(x || '').toLowerCase().trim(); }).filter(Boolean)
+                : [];
+            if (ativo) {
+                if (lista.indexOf(codigo) < 0) {
+                    lista.push(codigo);
+                }
+            } else {
+                lista = lista.filter(function (x) { return x !== codigo; });
+            }
+            comp.config.agregar_nq = ordemSemanasQuadro.filter(function (x) { return lista.indexOf(x) >= 0; });
+        });
+    }
+
+    function setSemanaQuadroAtiva(semana, ativo) {
+        var cod = codigoSemanaQuadro(semana);
+        if (!cod) {
+            return;
+        }
+        var idx = componentes.findIndex(function (comp) {
+            var cc = String((comp && comp.codigo) || '').toLowerCase().trim();
+            var cfg = (comp && comp.config && typeof comp.config === 'object') ? comp.config : {};
+            return cc === cod || (String(cfg.layout_type || '').toLowerCase() === 'semana_nq' && Number(cfg.semana || 0) === Number(semana));
+        });
+        if (ativo && idx < 0) {
+            componentes.push(criarComponenteSemanaQuadro(semana));
+        } else if (!ativo && idx >= 0) {
+            componentes.splice(idx, 1);
+        }
+        atualizarMediaSemComSemana(cod, ativo);
+        ordenarComponentesQuadroSemanal();
+        renderLista();
+    }
+
+    semanasQuadroChecks.forEach(function (check) {
+        check.addEventListener('change', function () {
+            setSemanaQuadroAtiva(Number(check.dataset.semana || 0), !!check.checked);
+        });
+    });
+
+    function getSelectedMateriasFromModal() {
+        return Array.from(document.querySelectorAll('.bloco-materia-checkbox:checked'))
+            .map(function (el) { return parseInt(el.value, 10); })
+            .filter(function (id) { return id > 0; });
+    }
+
+    function setSelectedMateriasOnModal(ids) {
+        const set = {};
+        (ids || []).forEach(function (id) {
+            if (id > 0) {
+                set[id] = true;
+            }
+        });
+        Array.from(document.querySelectorAll('.bloco-materia-checkbox')).forEach(function (el) {
+            var id = parseInt(el.value, 10);
+            el.checked = !!set[id];
+        });
+    }
+
+    function getSelectedGroupMateriasFromModal() {
+        return Array.from(document.querySelectorAll('.bloco-group-materia-checkbox:checked'))
+            .map(function (el) { return parseInt(el.value, 10); })
+            .filter(function (id) { return id > 0; });
+    }
+
+    function setSelectedGroupMateriasOnModal(ids) {
+        const set = {};
+        (ids || []).forEach(function (id) {
+            if (id > 0) {
+                set[id] = true;
+            }
+        });
+        Array.from(document.querySelectorAll('.bloco-group-materia-checkbox')).forEach(function (el) {
+            var id = parseInt(el.value, 10);
+            el.checked = !!set[id];
+        });
+    }
+
+    function toggleGroupLineFields() {
+        if (!fields.groupFields || !fields.groupEnabled) {
+            return;
+        }
+        var ativo = !!fields.groupEnabled.checked;
+        fields.groupFields.classList.toggle('hidden', !ativo);
+    }
+
+    function getMateriaUnicaModoFromModal() {
+        var el = document.querySelector('input[name="bloco-materia-unica-modo"]:checked');
+        return (el && el.value === 'media') ? 'media' : 'soma';
+    }
+
+    function setMateriaUnicaModoOnModal(modo) {
+        var alvo = (String(modo || '').toLowerCase() === 'media') ? 'media' : 'soma';
+        document.querySelectorAll('input[name="bloco-materia-unica-modo"]').forEach(function (el) {
+            el.checked = el.value === alvo;
+        });
+    }
+
+    function toggleMateriaUnicaModoFields() {
+        if (!fields.wrapMateriaUnicaModo || !fields.materiaUnica) {
+            return;
+        }
+        fields.wrapMateriaUnicaModo.classList.toggle('hidden', !fields.materiaUnica.checked);
+    }
+
+    function aplicarAgrupamentoCadastroNoModal() {
+        if (!fields.groupAgrupamento) {
+            return;
+        }
+        var opt = fields.groupAgrupamento.options[fields.groupAgrupamento.selectedIndex];
+        var id = Number(fields.groupAgrupamento.value || 0);
+        if (!opt || id <= 0) {
+            return;
+        }
+        var nome = String(opt.getAttribute('data-nome') || '').trim();
+        var modo = String(opt.getAttribute('data-modo') || 'media').trim();
+        var aplicar = String(opt.getAttribute('data-aplicar') || 'boletim').trim();
+        var divisor = String(opt.getAttribute('data-divisor') || '').trim();
+        var mats = [];
+        try {
+            mats = JSON.parse(opt.getAttribute('data-materias') || '[]') || [];
+        } catch (eAg) {
+            mats = [];
+        }
+        if (fields.groupEnabled) {
+            fields.groupEnabled.checked = true;
+        }
+        if (fields.groupLabel && nome) {
+            fields.groupLabel.value = nome;
+        }
+        if (fields.groupKey && nome) {
+            fields.groupKey.value = slugify(nome).replace(/-/g, '_') || fields.groupKey.value;
+        }
+        if (fields.groupMode) {
+            fields.groupMode.value = modo === 'soma' ? 'soma' : 'media';
+        }
+        if (fields.groupAplicarEm) {
+            fields.groupAplicarEm.value = aplicar === 'ambos' ? 'ambos' : 'boletim';
+        }
+        if (fields.groupDivisor) {
+            fields.groupDivisor.value = divisor !== '' && Number(divisor) > 0 ? String(Number(divisor)) : '';
+        }
+        setSelectedGroupMateriasOnModal(Array.isArray(mats) ? mats : []);
+        toggleGroupLineFields();
+    }
+
+    function syncFormulaMateriasJson() {
+        if (!formulaMateriasJsonInput) {
+            return;
+        }
+        var payload = formulasMateriaRows
+            .filter(function (row) { return row && row.materia_id > 0 && String(row.formula || '').trim() !== ''; })
+            .map(function (row) {
+                return {
+                    materia_id: Number(row.materia_id || 0),
+                    formula: String(row.formula || '').trim()
+                };
+            });
+        formulaMateriasJsonInput.value = JSON.stringify(payload);
+    }
+
+    function getCalcModoModal() {
+        return fields.calcModoMateria && fields.calcModoMateria.checked ? 'materia' : 'geral';
+    }
+
+    function renderFormulasMateriaModal() {
+        if (!fields.listaFormulasMateriaModal) {
+            return;
+        }
+        fields.listaFormulasMateriaModal.innerHTML = '';
+        if (!formulasMateriaModalRows.length) {
+            var empty = document.createElement('p');
+            empty.className = 'text-xs text-indigo-700';
+            empty.textContent = 'Sem exceções por matéria.';
+            fields.listaFormulasMateriaModal.appendChild(empty);
+            return;
+        }
+        formulasMateriaModalRows.forEach(function (row, idx) {
+            var wrap = document.createElement('div');
+            wrap.className = 'grid grid-cols-1 md:grid-cols-12 gap-2 items-center';
+
+            var sel = document.createElement('select');
+            sel.className = 'md:col-span-4 px-2 py-1.5 border border-indigo-200 rounded bg-white text-sm';
+            var opt0 = document.createElement('option');
+            opt0.value = '';
+            opt0.textContent = 'Selecione a matéria';
+            sel.appendChild(opt0);
+            Object.keys(materiaNames).forEach(function (mid) {
+                var op = document.createElement('option');
+                op.value = String(mid);
+                op.textContent = materiaNames[mid];
+                if (Number(mid) === Number(row.materia_id || 0)) {
+                    op.selected = true;
+                }
+                sel.appendChild(op);
+            });
+            sel.addEventListener('change', function () {
+                formulasMateriaModalRows[idx].materia_id = Number(sel.value || 0);
+            });
+
+            var inp = document.createElement('input');
+            inp.type = 'text';
+            inp.className = 'md:col-span-7 px-2 py-1.5 border border-indigo-200 rounded bg-white text-sm font-mono';
+            inp.placeholder = 'ex.: max(media, (media + enac) / 2)';
+            inp.setAttribute('data-fm-modal-idx', String(idx));
+            inp.value = String(row.formula || '');
+            inp.addEventListener('input', function () {
+                formulasMateriaModalRows[idx].formula = inp.value;
+            });
+
+            var del = document.createElement('button');
+            del.type = 'button';
+            del.className = 'md:col-span-1 px-2 py-1.5 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200';
+            del.textContent = 'Remover';
+            del.addEventListener('click', function () {
+                formulasMateriaModalRows.splice(idx, 1);
+                renderFormulasMateriaModal();
+            });
+
+            wrap.appendChild(sel);
+            wrap.appendChild(inp);
+            wrap.appendChild(del);
+            fields.listaFormulasMateriaModal.appendChild(wrap);
+        });
+    }
+
+    function syncCalculadoModoView() {
+        var byMateria = getCalcModoModal() === 'materia';
+        if (fields.wrapCalculadoGeral) {
+            // A expressão geral é sempre a base para todas as matérias.
+            // O modo "por matéria" adiciona apenas exceções.
+            fields.wrapCalculadoGeral.classList.remove('hidden');
+        }
+        if (fields.wrapCalculadoPorMateria) {
+            fields.wrapCalculadoPorMateria.classList.toggle('hidden', !byMateria);
+        }
+        if (byMateria && formulasMateriaModalRows.length === 0) {
+            formulasMateriaModalRows.push({ materia_id: 0, formula: '' });
+            renderFormulasMateriaModal();
+        }
+    }
+
+    function renderFormulaMaterias() {
+        if (!listaFormulasMateria) {
+            return;
+        }
+        listaFormulasMateria.innerHTML = '';
+        if (!formulasMateriaRows.length) {
+            var empty = document.createElement('p');
+            empty.className = 'text-xs text-indigo-700';
+            empty.textContent = 'Sem override por matéria. A fórmula final geral será usada para todas.';
+            listaFormulasMateria.appendChild(empty);
+            syncFormulaMateriasJson();
+            return;
+        }
+        formulasMateriaRows.forEach(function (row, idx) {
+            var wrap = document.createElement('div');
+            wrap.className = 'grid grid-cols-1 md:grid-cols-12 gap-2 items-center';
+
+            var sel = document.createElement('select');
+            sel.className = 'md:col-span-4 px-2 py-1.5 border border-indigo-200 rounded bg-white text-sm';
+            var opt0 = document.createElement('option');
+            opt0.value = '';
+            opt0.textContent = 'Selecione a matéria';
+            sel.appendChild(opt0);
+            Object.keys(materiaNames).forEach(function (mid) {
+                var op = document.createElement('option');
+                op.value = String(mid);
+                op.textContent = materiaNames[mid];
+                if (Number(mid) === Number(row.materia_id || 0)) {
+                    op.selected = true;
+                }
+                sel.appendChild(op);
+            });
+            sel.addEventListener('change', function () {
+                formulasMateriaRows[idx].materia_id = Number(sel.value || 0);
+                syncFormulaMateriasJson();
+            });
+
+            var inp = document.createElement('input');
+            inp.type = 'text';
+            inp.className = 'md:col-span-7 px-2 py-1.5 border border-indigo-200 rounded bg-white text-sm';
+            inp.placeholder = 'ex.: max(media, (media + enac) / 2)';
+            inp.value = String(row.formula || '');
+            inp.addEventListener('input', function () {
+                formulasMateriaRows[idx].formula = inp.value;
+                syncFormulaMateriasJson();
+            });
+
+            var del = document.createElement('button');
+            del.type = 'button';
+            del.className = 'md:col-span-1 px-2 py-1.5 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200';
+            del.textContent = 'Remover';
+            del.addEventListener('click', function () {
+                formulasMateriaRows.splice(idx, 1);
+                renderFormulaMaterias();
+            });
+
+            wrap.appendChild(sel);
+            wrap.appendChild(inp);
+            wrap.appendChild(del);
+            listaFormulasMateria.appendChild(wrap);
+        });
+        syncFormulaMateriasJson();
+    }
+
+    function getSelectedBlocoIdsFromModal() {
+        if (!fields.blocoIds) {
+            return [];
+        }
+        return Array.from(fields.blocoIds.selectedOptions)
+            .map(function (o) { return parseInt(o.value, 10); })
+            .filter(function (id) { return id > 0; });
+    }
+
+    function setBlocoIdsModalSelection(ids) {
+        if (!fields.blocoIds) {
+            return;
+        }
+        const set = {};
+        (ids || []).forEach(function (id) {
+            if (id > 0) {
+                set[id] = true;
+            }
+        });
+        Array.from(fields.blocoIds.options).forEach(function (opt) {
+            const v = parseInt(opt.value, 10);
+            opt.selected = !!set[v];
+        });
+        syncBlocoTabelaFromSelect();
+        updateFiltroBlocoHint();
+    }
+
+    function syncBlocoTabelaFromSelect() {
+        if (!fields.blocoIds) {
+            return;
+        }
+        const selecionados = getSelectedBlocoIdsFromModal();
+        const set = {};
+        selecionados.forEach(function (id) { set[id] = true; });
+        document.querySelectorAll('.bloco-tabela-checkbox').forEach(function (cb) {
+            cb.checked = !!set[parseInt(cb.value, 10)];
+        });
+        const contador = document.getElementById('bloco-tabela-contador');
+        if (contador) {
+            contador.textContent = selecionados.length + ' selecionado(s)';
+        }
+    }
+
+    function toggleBlocoTabelaRow(blocoId) {
+        if (!fields.blocoIds) {
+            return;
+        }
+        const opt = Array.from(fields.blocoIds.options).find(function (o) {
+            return parseInt(o.value, 10) === blocoId;
+        });
+        if (!opt) {
+            return;
+        }
+        opt.selected = !opt.selected;
+        syncBlocoTabelaFromSelect();
+        fields.blocoIds.dispatchEvent(new Event('change'));
+    }
+
+    function aplicarFiltrosBlocoTabela() {
+        const filtroTitulo = (document.getElementById('bloco-tabela-filtro-titulo') || {}).value || '';
+        const filtroTipo = (document.getElementById('bloco-tabela-filtro-tipo') || {}).value || '';
+        const filtroBimestre = (document.getElementById('bloco-tabela-filtro-bimestre') || {}).value || '';
+        const filtroAno = (document.getElementById('bloco-tabela-filtro-ano') || {}).value || '';
+        const tituloLower = filtroTitulo.trim().toLowerCase();
+        document.querySelectorAll('.bloco-tabela-row').forEach(function (row) {
+            let visivel = true;
+            if (tituloLower && row.dataset.titulo.indexOf(tituloLower) === -1) {
+                visivel = false;
+            }
+            if (filtroTipo && row.dataset.tipo !== filtroTipo) {
+                visivel = false;
+            }
+            if (filtroBimestre && row.dataset.bimestre !== filtroBimestre) {
+                visivel = false;
+            }
+            if (filtroAno && row.dataset.ano !== String(filtroAno)) {
+                visivel = false;
+            }
+            row.classList.toggle('hidden', !visivel);
+        });
+    }
+
+    function selecionarBlocosFiltrados() {
+        if (!fields.blocoIds) {
+            return;
+        }
+        var idsVisiveis = {};
+        document.querySelectorAll('.bloco-tabela-row:not(.hidden)').forEach(function (row) {
+            idsVisiveis[parseInt(row.dataset.blocoId, 10)] = true;
+        });
+        Array.from(fields.blocoIds.options).forEach(function (opt) {
+            var v = parseInt(opt.value, 10);
+            if (idsVisiveis[v]) {
+                opt.selected = true;
+            }
+        });
+        syncBlocoTabelaFromSelect();
+        fields.blocoIds.dispatchEvent(new Event('change'));
+    }
+
+    function updateFiltroBlocoHint() {
+        var hint = document.getElementById('hint-filtro-blocos');
+        if (!hint || !fields.blocoIds) {
+            return;
+        }
+        var jorn = fields.source.value === 'jornadas';
+        var evento = fields.source.value === 'evento_boletim';
+        var faltasEvento = fields.source.value === 'faltas_evento';
+        var calc = fields.source.value === 'calculado';
+        var temBlocos = getSelectedBlocoIdsFromModal().length > 0;
+        hint.classList.toggle('hidden', jorn || evento || faltasEvento || calc || !temBlocos);
+    }
+
+    var pendingJornadaSel = [];
+
+    function renderLista() {
+        lista.innerHTML = '';
+
+        if (componentes.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'p-4 rounded-lg border border-dashed border-gray-300 text-sm text-gray-500';
+            empty.textContent = 'Nenhum bloco adicionado ainda. Clique em "Adicionar bloco".';
+            lista.appendChild(empty);
+            syncSemanasQuadroPanel();
+            syncJson();
+            return;
+        }
+
+        componentes.forEach((item, index) => {
+            const card = document.createElement('div');
+            card.className = 'bloco-card flex items-center justify-between gap-3';
+            card.setAttribute('draggable', 'true');
+            card.dataset.index = String(index);
+
+            const left = document.createElement('div');
+            left.className = 'min-w-0';
+
+            const nome = document.createElement('div');
+            nome.className = 'text-sm font-semibold text-gray-900';
+            nome.textContent = item.nome || 'Sem nome';
+
+            const meta = document.createElement('div');
+            meta.className = 'text-xs text-gray-500 mt-1';
+            let tipo = 'Provas';
+            if (item.source_type === 'nenhuma') {
+                tipo = '-';
+            } else if (item.source_type === 'jornadas') {
+                tipo = 'Jornadas';
+            } else if (item.source_type === 'evento_boletim') {
+                tipo = 'Evento';
+            } else if (item.source_type === 'faltas_evento') {
+                tipo = 'Faltas';
+            } else if (item.source_type === 'calculado') {
+                tipo = 'Calculada';
+            }
+            const calc = calcLabel[item.calc_type] || 'Média';
+            let blocoTxt = '';
+            if (item.source_type === 'calculado' && item.config && item.config.expressao) {
+                var exs = String(item.config.expressao).trim();
+                if (exs.length > 48) {
+                    exs = exs.substring(0, 48) + '…';
+                }
+                blocoTxt = ' | ' + exs;
+                if (item.config.formula_materias && typeof item.config.formula_materias === 'object' && Object.keys(item.config.formula_materias).length > 0) {
+                    blocoTxt += ' | com fórmulas por matéria';
+                }
+            }
+            if (item.source_type === 'jornadas' && item.config && item.config.distribuicao_notas === 'nota_unica_todas_linhas') {
+                blocoTxt += ' | nota única em todas as linhas';
+            }
+            if (item.source_type === 'jornadas' && item.config && Array.isArray(item.config.jornada_ids) && item.config.jornada_ids.length > 0) {
+                blocoTxt += ' | jornadas selecionadas';
+            }
+            if (item.source_type === 'evento_boletim' && item.config) {
+                var evCode = String(item.config.regra_codigo || '').trim();
+                var evComp = String(item.config.componente_codigo || '').trim();
+                if (evCode || evComp) {
+                    blocoTxt += ' | evento: ' + (evCode || '-') + ' | coluna: ' + (evComp || '-');
+                }
+            }
+            if (item.source_type === 'faltas_evento' && item.config) {
+                var evf = Number(item.config.faltas_evento_id || 0);
+                if (evf > 0) {
+                    blocoTxt += ' | evento faltas: #' + evf;
+                }
+            }
+            if (Array.isArray(item.blocos_ids) && item.blocos_ids.length >= 2) {
+                blocoTxt += ' | blocos: #' + item.blocos_ids.join(', #');
+            } else if (Array.isArray(item.blocos_ids) && item.blocos_ids.length === 1) {
+                blocoTxt += ' | bloco: #' + item.blocos_ids[0];
+            } else if (Number(item.bloco_id || 0) > 0) {
+                blocoTxt += ' | bloco: #' + Number(item.bloco_id);
+            }
+            const materiaId = Number(item.materia_id || 0);
+            const materiaTxt = materiaId > 0 ? ' | matéria: ' + (materiaNames[String(materiaId)] || ('Matéria #' + materiaId)) : '';
+            var materiasTxt = '';
+            if (Array.isArray(item.materias_ids) && item.materias_ids.length > 0) {
+                var nomesMat = item.materias_ids
+                    .map(function (mid) {
+                        var n = materiaNames[String(Number(mid) || 0)] || '';
+                        return n !== '' ? n : ('#' + Number(mid));
+                    })
+                    .filter(function (v) { return String(v).trim() !== ''; });
+                if (nomesMat.length > 0) {
+                    materiasTxt = ' | matérias: ' + nomesMat.join(', ');
+                }
+            }
+            const materiaUnicaTxt = item.materia_unica
+                ? (' | matérias únicas (' + ((item.materia_unica_modo === 'media') ? 'média' : 'soma') + ')')
+                : '';
+            var groupTxt = '';
+            if (item.config && item.config.group_line && item.config.group_line.enabled) {
+                var gl = item.config.group_line;
+                var glNome = String(gl.label || gl.key || '').trim();
+                var glModo = String(gl.mode || 'media').trim();
+                groupTxt = ' | grupo: ' + glNome + ' (' + glModo + ')';
+            }
+            var layoutTxt = '';
+            if (item.config && (item.config.layout_group || item.config.layout_type)) {
+                layoutTxt = ' | layout: ' + (item.config.layout_group || 'auto') + '/' + (item.config.layout_type || 'auto');
+            }
+            if (item.config && Number(item.config.semana || 0) >= 1) {
+                layoutTxt += ' | S' + Number(item.config.semana);
+            }
+            meta.textContent = 'codigo: ' + (item.codigo || '-') + ' | tipo: ' + tipo + ' | calculo: ' + calc + ' | peso: ' + (item.peso || 1) + blocoTxt + materiaTxt + materiasTxt + materiaUnicaTxt + groupTxt + layoutTxt;
+
+            left.appendChild(nome);
+            left.appendChild(meta);
+
+            const right = document.createElement('div');
+            right.className = 'flex items-center gap-2 flex-shrink-0';
+
+            const handle = document.createElement('span');
+            handle.className = 'bloco-handle text-gray-400 text-lg';
+            handle.textContent = '::';
+
+            const editBtn = document.createElement('button');
+            editBtn.type = 'button';
+            editBtn.className = 'px-2 py-1 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200';
+            editBtn.textContent = 'Editar';
+            editBtn.addEventListener('click', () => openModal(index));
+
+            const delBtn = document.createElement('button');
+            delBtn.type = 'button';
+            delBtn.className = 'px-2 py-1 text-xs rounded bg-red-50 text-red-700 hover:bg-red-100';
+            delBtn.textContent = 'Remover';
+            delBtn.addEventListener('click', () => {
+                componentes.splice(index, 1);
+                renderLista();
+            });
+
+            right.appendChild(handle);
+            right.appendChild(editBtn);
+            right.appendChild(delBtn);
+
+            card.appendChild(left);
+            card.appendChild(right);
+
+            card.addEventListener('dragstart', () => card.classList.add('dragging'));
+            card.addEventListener('dragend', () => card.classList.remove('dragging'));
+            card.addEventListener('dragover', (e) => e.preventDefault());
+            card.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const from = Number(document.querySelector('.bloco-card.dragging')?.dataset.index || -1);
+                const to = Number(card.dataset.index || -1);
+                if (from < 0 || to < 0 || from === to) {
+                    return;
+                }
+                const [moved] = componentes.splice(from, 1);
+                componentes.splice(to, 0, moved);
+                renderLista();
+            });
+
+            lista.appendChild(card);
+        });
+
+        syncSemanasQuadroPanel();
+        syncJson();
+    }
+
+    function sugerirProximoCodigoComponente() {
+        var usados = {};
+        (componentes || []).forEach(function (c) {
+            var cod = String((c && c.codigo) || '').trim();
+            if (cod !== '') {
+                usados[cod] = true;
+            }
+        });
+        var n = 1;
+        while (usados['c' + n]) {
+            n++;
+        }
+        return 'c' + n;
+    }
+
+    function resetModal() {
+        fields.idx.value = '-1';
+        fields.nome.value = '';
+        fields.codigo.value = sugerirProximoCodigoComponente();
+        fields.source.value = 'provas_sistema';
+        fields.calc.value = 'media';
+        fields.peso.value = '1';
+        fields.escala.value = '10';
+        if (fields.layoutGroup) {
+            fields.layoutGroup.value = '';
+        }
+        if (fields.layoutType) {
+            fields.layoutType.value = '';
+        }
+        if (fields.semana) {
+            fields.semana.value = '';
+        }
+        if (fields.agregarNq) {
+            fields.agregarNq.value = '';
+        }
+        fields.filtro.value = '';
+        setBlocoIdsModalSelection([]);
+        fields.materiaId.value = '';
+        setSelectedMateriasOnModal([]);
+        fields.materiaUnica.checked = false;
+        setMateriaUnicaModoOnModal('soma');
+        toggleMateriaUnicaModoFields();
+        fields.percentual.checked = true;
+        fields.obrigatorio.checked = false;
+        if (fields.roundModeOverride) {
+            fields.roundModeOverride.value = 'herdar';
+        }
+        fields.modalTitulo.textContent = 'Novo bloco';
+        pendingJornadaSel = [];
+        jornadasFaixas = defaultJornadasFaixas();
+        renderJornadasFaixas();
+        if (fields.jornadaDataIni) {
+            fields.jornadaDataIni.value = '';
+        }
+        if (fields.jornadaDataFim) {
+            fields.jornadaDataFim.value = '';
+        }
+        if (fields.jornadaDistribuicaoNotas) {
+            fields.jornadaDistribuicaoNotas.value = 'por_materia';
+        }
+        loadJornadaNotaUnicaExtrasFromConfig({});
+        setJornadaIdsModalSelection([]);
+        if (fields.expressaoCalculado) {
+            fields.expressaoCalculado.value = '';
+        }
+        if (fields.calculadoTracoAbaixoMinimo) {
+            fields.calculadoTracoAbaixoMinimo.checked = false;
+        }
+        if (fields.jornadaTracoAbaixoMinimo) {
+            fields.jornadaTracoAbaixoMinimo.checked = false;
+        }
+        formulasMateriaModalRows = [];
+        if (fields.calcModoGeral) {
+            fields.calcModoGeral.checked = true;
+        }
+        if (fields.calcModoMateria) {
+            fields.calcModoMateria.checked = false;
+        }
+        renderFormulasMateriaModal();
+        syncCalculadoModoView();
+        if (fields.eventoRegraCodigo) {
+            fields.eventoRegraCodigo.value = '';
+        }
+        if (fields.eventoComponenteCodigo) {
+            fillEventoComponentesSelect([], '');
+        }
+        if (fields.faltasEventoId) {
+            fields.faltasEventoId.value = '';
+        }
+        if (fields.groupEnabled) {
+            fields.groupEnabled.checked = false;
+        }
+        if (fields.groupAgrupamento) {
+            fields.groupAgrupamento.value = '0';
+        }
+        if (fields.groupKey) {
+            fields.groupKey.value = '';
+        }
+        if (fields.groupLabel) {
+            fields.groupLabel.value = '';
+        }
+        if (fields.groupMode) {
+            fields.groupMode.value = 'media';
+        }
+        if (fields.groupArredondamento) {
+            fields.groupArredondamento.value = 'todos';
+        }
+        if (fields.groupDivisor) {
+            fields.groupDivisor.value = '';
+        }
+        if (fields.groupAplicarEm) {
+            fields.groupAplicarEm.value = 'boletim';
+        }
+        setSelectedGroupMateriasOnModal([]);
+        toggleGroupLineFields();
+        toggleBySource();
+    }
+
+    function openModal(index) {
+        if (typeof index === 'number' && index >= 0 && componentes[index]) {
+            const item = componentes[index];
+            const cfg = item.config && typeof item.config === 'object' ? item.config : {};
+            pendingJornadaSel = (item.source_type === 'jornadas' && Array.isArray(cfg.jornada_ids))
+                ? cfg.jornada_ids.map(function (x) { return parseInt(x, 10); }).filter(function (x) { return x > 0; })
+                : [];
+            fields.idx.value = String(index);
+            fields.nome.value = item.nome || '';
+            fields.codigo.value = item.codigo || '';
+            if (item.source_type === 'nenhuma') {
+                fields.source.value = 'nenhuma';
+            } else if (item.source_type === 'jornadas') {
+                fields.source.value = 'jornadas';
+            } else if (item.source_type === 'evento_boletim') {
+                fields.source.value = 'evento_boletim';
+            } else if (item.source_type === 'faltas_evento') {
+                fields.source.value = 'faltas_evento';
+            } else if (item.source_type === 'calculado') {
+                fields.source.value = 'calculado';
+            } else {
+                fields.source.value = 'provas_sistema';
+            }
+            if (fields.expressaoCalculado) {
+                fields.expressaoCalculado.value = (cfg.expressao || '').toString();
+            }
+            if (fields.calculadoTracoAbaixoMinimo) {
+                fields.calculadoTracoAbaixoMinimo.checked = (item.source_type === 'calculado') && !!cfg.traco_abaixo_minimo;
+            }
+            if (fields.jornadaTracoAbaixoMinimo) {
+                fields.jornadaTracoAbaixoMinimo.checked = (item.source_type === 'jornadas') && !!cfg.traco_abaixo_minimo;
+            }
+            var fmMap = (cfg.formula_materias && typeof cfg.formula_materias === 'object') ? cfg.formula_materias : {};
+            formulasMateriaModalRows = [];
+            Object.keys(fmMap).forEach(function (mid) {
+                var mInt = Number(mid || 0);
+                var fExp = String(fmMap[mid] || '').trim();
+                if (mInt > 0 && fExp !== '') {
+                    formulasMateriaModalRows.push({ materia_id: mInt, formula: fExp });
+                }
+            });
+            if (fields.calcModoMateria && fields.calcModoGeral) {
+                var modeCfg = String(cfg.formula_mode || '').toLowerCase().trim();
+                if (modeCfg === 'per_materia' || formulasMateriaModalRows.length > 0) {
+                    fields.calcModoMateria.checked = true;
+                    fields.calcModoGeral.checked = false;
+                } else {
+                    fields.calcModoMateria.checked = false;
+                    fields.calcModoGeral.checked = true;
+                }
+            }
+            renderFormulasMateriaModal();
+            syncCalculadoModoView();
+            if (fields.eventoRegraCodigo) {
+                fields.eventoRegraCodigo.value = (cfg.regra_codigo || '').toString();
+                checarCompatibilidadeEventoOrigem();
+            }
+            if (fields.eventoComponenteCodigo) {
+                loadEventoComponentesOptions((cfg.regra_codigo || '').toString(), (cfg.componente_codigo || '').toString());
+            }
+            if (fields.faltasEventoId) {
+                fields.faltasEventoId.value = String(Number(cfg.faltas_evento_id || 0) || '');
+            }
+            var grp = (cfg.group_line && typeof cfg.group_line === 'object') ? cfg.group_line : {};
+            if (fields.groupEnabled) {
+                fields.groupEnabled.checked = !!grp.enabled;
+            }
+            if (fields.groupKey) {
+                fields.groupKey.value = String(grp.key || '');
+            }
+            if (fields.groupLabel) {
+                fields.groupLabel.value = String(grp.label || '');
+            }
+            if (fields.groupMode) {
+                fields.groupMode.value = (String(grp.mode || 'media') === 'soma') ? 'soma' : 'media';
+            }
+            if (fields.groupArredondamento) {
+                var arG = String(grp.arredondamento || 'todos').toLowerCase();
+                fields.groupArredondamento.value = (arG === 'filhas' || arG === 'mae') ? arG : 'todos';
+            }
+            if (fields.groupDivisor) {
+                fields.groupDivisor.value = (grp.divisor && Number(grp.divisor) > 0) ? String(Number(grp.divisor)) : '';
+            }
+            if (fields.groupAplicarEm) {
+                fields.groupAplicarEm.value = (String(grp.aplicar_em || 'ambos') === 'boletim') ? 'boletim' : 'ambos';
+            }
+            if (fields.groupAgrupamento) {
+                fields.groupAgrupamento.value = String(Number(grp.agrupamento_id || 0) || 0);
+            }
+            setSelectedGroupMateriasOnModal(Array.isArray(grp.materias_ids) ? grp.materias_ids : []);
+            toggleGroupLineFields();
+            fields.calc.value = item.calc_type || 'media';
+            fields.peso.value = String(item.peso || 1);
+            fields.escala.value = String(item.escala_max || 10);
+            if (fields.layoutGroup) {
+                fields.layoutGroup.value = String(cfg.layout_group || '');
+            }
+            if (fields.layoutType) {
+                fields.layoutType.value = String(cfg.layout_type || '');
+            }
+            if (fields.semana) {
+                var semV = Number(cfg.semana || 0);
+                fields.semana.value = (semV >= 1 && semV <= 20) ? String(semV) : '';
+            }
+            if (fields.agregarNq) {
+                var ag = Array.isArray(cfg.agregar_nq) ? cfg.agregar_nq : [];
+                fields.agregarNq.value = ag.join(', ');
+            }
+            fields.filtro.value = item.filtro_titulo || '';
+            let blSel = [];
+            if (Array.isArray(item.blocos_ids) && item.blocos_ids.length) {
+                blSel = item.blocos_ids.map(function (x) { return parseInt(x, 10); }).filter(function (x) { return x > 0; });
+            } else if (Number(item.bloco_id || 0) > 0) {
+                blSel = [Number(item.bloco_id)];
+            }
+            setBlocoIdsModalSelection(blSel);
+            fields.materiaId.value = item.materia_id ? String(item.materia_id) : '';
+            setSelectedMateriasOnModal(Array.isArray(item.materias_ids) ? item.materias_ids : []);
+            fields.materiaUnica.checked = !!item.materia_unica;
+            setMateriaUnicaModoOnModal(item.materia_unica_modo || 'soma');
+            toggleMateriaUnicaModoFields();
+            fields.percentual.checked = !!item.usar_percentual;
+            fields.obrigatorio.checked = !!item.obrigatorio;
+            if (fields.roundModeOverride) {
+                var rmOverride = String(cfg.round_mode_override || 'herdar').toLowerCase();
+                fields.roundModeOverride.value = (rmOverride === 'none' || rmOverride === 'half') ? rmOverride : 'herdar';
+            }
+            fields.modalTitulo.textContent = 'Editar bloco';
+            if (fields.jornadaDataIni) {
+                fields.jornadaDataIni.value = (cfg.data_ini || '').toString().substring(0, 10);
+            }
+            if (fields.jornadaDataFim) {
+                fields.jornadaDataFim.value = (cfg.data_fim || '').toString().substring(0, 10);
+            }
+            if (fields.jornadaDistribuicaoNotas) {
+                var distN = String(cfg.distribuicao_notas || '').trim();
+                fields.jornadaDistribuicaoNotas.value = (distN === 'nota_unica_todas_linhas') ? 'nota_unica_todas_linhas' : 'por_materia';
+            }
+            jornadasFaixas = normalizeJornadasFaixas(cfg.faixas_percentuais);
+            renderJornadasFaixas();
+            loadJornadaNotaUnicaExtrasFromConfig(cfg);
+        } else {
+            resetModal();
+        }
+
+        toggleBySource();
+        updateFiltroBlocoHint();
+        modal.classList.remove('hidden');
+    }
+
+    function closeModal() {
+        modal.classList.add('hidden');
+    }
+
+    function toggleBySource() {
+        const v = fields.source.value;
+        const isJornadas = v === 'jornadas';
+        const isEvento = v === 'evento_boletim';
+        const isFaltasEvento = v === 'faltas_evento';
+        const isCalculado = v === 'calculado';
+        const isNenhuma = v === 'nenhuma';
+        const hideProvasUi = isJornadas || isEvento || isFaltasEvento || isCalculado || isNenhuma;
+        const showMateriaFilter = !hideProvasUi || isFaltasEvento;
+        fields.wrapFiltro.style.display = hideProvasUi ? 'none' : 'block';
+        fields.wrapBloco.style.display = hideProvasUi ? 'none' : 'block';
+        if (fields.wrapSemana) {
+            fields.wrapSemana.style.display = hideProvasUi ? 'none' : 'block';
+        }
+        fields.wrapMateria.style.display = showMateriaFilter ? 'block' : 'none';
+        fields.wrapMateriaUnica.style.display = hideProvasUi ? 'none' : 'inline-flex';
+        if (fields.materiasLabel) {
+            fields.materiasLabel.textContent = isFaltasEvento
+                ? 'Matérias que aparecem neste bloco de faltas (opcional)'
+                : 'Matérias deste bloco (opcional)';
+        }
+        if (fields.materiasHint) {
+            fields.materiasHint.textContent = isFaltasEvento
+                ? 'Marque as matérias que devem aparecer na coluna de faltas. Se não marcar nenhuma, usa todas com lançamento no evento.'
+                : 'Se não marcar nenhuma, usa todas as matérias no escopo.';
+        }
+        if (fields.wrapGroupLine) {
+            fields.wrapGroupLine.style.display = (isCalculado ? 'none' : 'block');
+        }
+        if (fields.wrapJornadas) {
+            fields.wrapJornadas.classList.toggle('hidden', !isJornadas);
+        }
+        if (fields.wrapEventoBoletim) {
+            fields.wrapEventoBoletim.classList.toggle('hidden', !isEvento);
+        }
+        if (fields.wrapFaltasEvento) {
+            fields.wrapFaltasEvento.classList.toggle('hidden', !isFaltasEvento);
+        }
+        if (fields.wrapCalculado) {
+            fields.wrapCalculado.classList.toggle('hidden', !isCalculado);
+        }
+        if (isCalculado && fields.jornadaTracoAbaixoMinimo) {
+            fields.jornadaTracoAbaixoMinimo.checked = false;
+        }
+        if (isJornadas && fields.calculadoTracoAbaixoMinimo) {
+            fields.calculadoTracoAbaixoMinimo.checked = false;
+        }
+        syncCalculadoModoView();
+        var jornadasNotaUnicaLinhas = isJornadas && fields.jornadaDistribuicaoNotas
+            && fields.jornadaDistribuicaoNotas.value === 'nota_unica_todas_linhas';
+        fields.calc.disabled = isCalculado || isNenhuma || jornadasNotaUnicaLinhas;
+        fields.percentual.disabled = isEvento || isFaltasEvento || isCalculado || isNenhuma;
+        if (fields.hintPercentualJornadas) {
+            fields.hintPercentualJornadas.classList.toggle('hidden', !isJornadas);
+        }
+        if (fields.wrapJornadasFaixas) {
+            fields.wrapJornadasFaixas.classList.toggle('hidden', !isJornadas);
+        }
+        if (fields.wrapJornadaNotaUnicaExtras) {
+            fields.wrapJornadaNotaUnicaExtras.classList.toggle('hidden', !jornadasNotaUnicaLinhas);
+        }
+        if (fields.percentualLabel) {
+            fields.percentualLabel.textContent = isJornadas
+                ? 'Usar nota proporcional ao % de jornadas concluídas'
+                : 'Calcular por acertos/questões';
+        }
+        if (fields.blocoIds) {
+            fields.blocoIds.disabled = hideProvasUi;
+        }
+        fields.materiaId.disabled = !showMateriaFilter;
+        fields.materiaUnica.disabled = hideProvasUi;
+        if (isJornadas) {
+            if (fields.idx.value === '-1') {
+                fields.percentual.checked = true;
+            }
+            fields.filtro.value = '';
+            setBlocoIdsModalSelection([]);
+            fields.materiaId.value = '';
+            setSelectedMateriasOnModal([]);
+            fields.materiaUnica.checked = false;
+            if (fields.expressaoCalculado) {
+                fields.expressaoCalculado.value = '';
+            }
+            loadJornadasOptionsIfNeeded(function () {
+                setJornadaIdsModalSelection(pendingJornadaSel);
+            });
+            if (fields.idx.value === '-1') {
+                loadJornadaNotaUnicaExtrasFromConfig({});
+            }
+        } else if (isEvento) {
+            fields.percentual.checked = false;
+            fields.filtro.value = '';
+            setBlocoIdsModalSelection([]);
+            fields.materiaId.value = '';
+            setSelectedMateriasOnModal([]);
+            fields.materiaUnica.checked = false;
+            if (fields.expressaoCalculado) {
+                fields.expressaoCalculado.value = '';
+            }
+            if (fields.jornadaIds) {
+                setJornadaIdsModalSelection([]);
+            }
+            if (fields.eventoRegraCodigo) {
+                loadEventoComponentesOptions(fields.eventoRegraCodigo.value || '', fields.eventoComponenteCodigo ? fields.eventoComponenteCodigo.value : '');
+            }
+        } else if (isFaltasEvento) {
+            fields.percentual.checked = false;
+            fields.filtro.value = '';
+            setBlocoIdsModalSelection([]);
+            fields.materiaId.value = '';
+            fields.materiaUnica.checked = false;
+            if (fields.expressaoCalculado) {
+                fields.expressaoCalculado.value = '';
+            }
+            if (fields.jornadaIds) {
+                setJornadaIdsModalSelection([]);
+            }
+        } else if (isCalculado) {
+            fields.percentual.checked = false;
+            fields.filtro.value = '';
+            setBlocoIdsModalSelection([]);
+            fields.materiaId.value = '';
+            setSelectedMateriasOnModal([]);
+            fields.materiaUnica.checked = false;
+            if (fields.jornadaIds) {
+                setJornadaIdsModalSelection([]);
+            }
+        } else if (fields.jornadaIds) {
+            setJornadaIdsModalSelection([]);
+        }
+        updateFiltroBlocoHint();
+    }
+
+    btnAdd.addEventListener('click', () => openModal(-1));
+
+    modal.querySelectorAll('[data-close-modal="1"]').forEach((el) => {
+        el.addEventListener('click', closeModal);
+    });
+
+    fields.source.addEventListener('change', toggleBySource);
+    if (fields.jornadaDistribuicaoNotas) {
+        fields.jornadaDistribuicaoNotas.addEventListener('change', toggleBySource);
+    }
+    function checarCompatibilidadeEventoOrigem() {
+        var aviso = document.getElementById('evento-regra-codigo-aviso');
+        var avisoTexto = document.getElementById('evento-regra-codigo-aviso-texto');
+        if (!fields.eventoRegraCodigo || !aviso || !avisoTexto) {
+            return;
+        }
+        var opt = fields.eventoRegraCodigo.options[fields.eventoRegraCodigo.selectedIndex];
+        if (!opt || !opt.value) {
+            aviso.classList.add('hidden');
+            return;
+        }
+        var bimOrigem = parseInt(opt.getAttribute('data-bimestre') || '0', 10);
+        var seriesOrigem = [];
+        try {
+            seriesOrigem = JSON.parse(opt.getAttribute('data-series-ids') || '[]');
+        } catch (e) {
+            seriesOrigem = [];
+        }
+        var motivos = [];
+        if (REGRA_ATUAL_BIMESTRE > 0 && bimOrigem > 0 && bimOrigem !== REGRA_ATUAL_BIMESTRE) {
+            motivos.push('o evento de origem é do ' + bimOrigem + 'º bimestre, diferente do bimestre deste evento (' + REGRA_ATUAL_BIMESTRE + 'º)');
+        }
+        if (REGRA_ATUAL_SERIES_IDS.length > 0 && seriesOrigem.length > 0) {
+            var temInterseccao = seriesOrigem.some(function (sid) { return REGRA_ATUAL_SERIES_IDS.indexOf(sid) !== -1; });
+            if (!temInterseccao) {
+                motivos.push('o evento de origem não cobre as mesmas séries deste evento');
+            }
+        }
+        if (motivos.length > 0) {
+            avisoTexto.textContent = 'Atenção: ' + motivos.join('; ') + '. Confirme se é mesmo este o evento que você quer usar.';
+            aviso.classList.remove('hidden');
+        } else {
+            aviso.classList.add('hidden');
+        }
+    }
+    if (fields.eventoRegraCodigo) {
+        fields.eventoRegraCodigo.addEventListener('change', function () {
+            loadEventoComponentesOptions(fields.eventoRegraCodigo.value || '', '');
+            checarCompatibilidadeEventoOrigem();
+        });
+    }
+    if (fields.jornadaDataIni) {
+        fields.jornadaDataIni.addEventListener('change', function () {
+            jornadasOptionsCacheKey = '';
+            if (fields.source.value === 'jornadas') {
+                loadJornadasOptionsIfNeeded(function () {
+                    setJornadaIdsModalSelection(pendingJornadaSel);
+                });
+            }
+        });
+    }
+    if (fields.jornadaDataFim) {
+        fields.jornadaDataFim.addEventListener('change', function () {
+            jornadasOptionsCacheKey = '';
+            if (fields.source.value === 'jornadas') {
+                loadJornadasOptionsIfNeeded(function () {
+                    setJornadaIdsModalSelection(pendingJornadaSel);
+                });
+            }
+        });
+    }
+    fields.percentual.addEventListener('change', function () {
+        toggleBySource();
+    });
+    if (fields.materiaUnica) {
+        fields.materiaUnica.addEventListener('change', toggleMateriaUnicaModoFields);
+    }
+    if (fields.groupEnabled) {
+        fields.groupEnabled.addEventListener('change', toggleGroupLineFields);
+    }
+    if (fields.groupAgrupamento) {
+        fields.groupAgrupamento.addEventListener('change', aplicarAgrupamentoCadastroNoModal);
+    }
+    if (fields.blocoIds) {
+        fields.blocoIds.addEventListener('change', function () {
+            if (getSelectedBlocoIdsFromModal().length > 0 && fields.source.value === 'provas_sistema') {
+                fields.materiaUnica.checked = true;
+            }
+            updateFiltroBlocoHint();
+        });
+    }
+    var btnBlocosLimpar = document.getElementById('btn-blocos-limpar');
+    if (btnBlocosLimpar && fields.blocoIds) {
+        btnBlocosLimpar.addEventListener('click', function () {
+            setBlocoIdsModalSelection([]);
+        });
+    }
+    var btnBlocosSelecionarFiltrados = document.getElementById('btn-blocos-selecionar-filtrados');
+    if (btnBlocosSelecionarFiltrados && fields.blocoIds) {
+        btnBlocosSelecionarFiltrados.addEventListener('click', function () {
+            selecionarBlocosFiltrados();
+        });
+    }
+    document.querySelectorAll('.bloco-tabela-row').forEach(function (row) {
+        row.addEventListener('click', function (e) {
+            if (e.target && e.target.classList.contains('bloco-tabela-checkbox')) {
+                return;
+            }
+            toggleBlocoTabelaRow(parseInt(row.dataset.blocoId, 10));
+        });
+    });
+    document.querySelectorAll('.bloco-tabela-checkbox').forEach(function (cb) {
+        cb.addEventListener('change', function () {
+            toggleBlocoTabelaRow(parseInt(cb.value, 10));
+        });
+    });
+    ['bloco-tabela-filtro-titulo', 'bloco-tabela-filtro-tipo', 'bloco-tabela-filtro-bimestre', 'bloco-tabela-filtro-ano'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', aplicarFiltrosBlocoTabela);
+            el.addEventListener('change', aplicarFiltrosBlocoTabela);
+        }
+    });
+    var btnBlocoTabelaLimparFiltros = document.getElementById('btn-bloco-tabela-limpar-filtros');
+    if (btnBlocoTabelaLimparFiltros) {
+        btnBlocoTabelaLimparFiltros.addEventListener('click', function () {
+            var t = document.getElementById('bloco-tabela-filtro-titulo');
+            var tp = document.getElementById('bloco-tabela-filtro-tipo');
+            var b = document.getElementById('bloco-tabela-filtro-bimestre');
+            var a = document.getElementById('bloco-tabela-filtro-ano');
+            if (t) { t.value = ''; }
+            if (tp) { tp.value = ''; }
+            if (b) { b.value = ''; }
+            if (a) { a.value = ''; }
+            aplicarFiltrosBlocoTabela();
+        });
+    }
+    syncBlocoTabelaFromSelect();
+    var btnJornadasMarcarTodas = document.getElementById('btn-jornadas-marcar-todas');
+    if (btnJornadasMarcarTodas && fields.jornadaIds) {
+        btnJornadasMarcarTodas.addEventListener('click', function () {
+            loadJornadasOptionsIfNeeded(function () {
+                Array.from(fields.jornadaIds.options).forEach(function (o) {
+                    var v = parseInt(o.value, 10);
+                    o.selected = v > 0;
+                });
+                syncJornadaTabelaFromSelect();
+            });
+        });
+    }
+    var btnJornadasLimpar = document.getElementById('btn-jornadas-limpar');
+    if (btnJornadasLimpar && fields.jornadaIds) {
+        btnJornadasLimpar.addEventListener('click', function () {
+            setJornadaIdsModalSelection([]);
+        });
+    }
+    var btnJornadasSelecionarFiltradas = document.getElementById('btn-jornadas-selecionar-filtradas');
+    if (btnJornadasSelecionarFiltradas && fields.jornadaIds) {
+        btnJornadasSelecionarFiltradas.addEventListener('click', function () {
+            selecionarJornadasFiltradas();
+        });
+    }
+    var jornadaTabelaCorpo = document.getElementById('jornada-tabela-corpo');
+    if (jornadaTabelaCorpo) {
+        jornadaTabelaCorpo.addEventListener('click', function (e) {
+            var checkbox = e.target.closest('.jornada-tabela-checkbox');
+            if (checkbox) {
+                toggleJornadaTabelaRow(parseInt(checkbox.value, 10));
+                return;
+            }
+            var row = e.target.closest('.jornada-tabela-row');
+            if (row) {
+                toggleJornadaTabelaRow(parseInt(row.dataset.jornadaId, 10));
+            }
+        });
+    }
+    ['jornada-tabela-filtro-titulo', 'jornada-tabela-filtro-materia', 'jornada-tabela-filtro-bimestre', 'jornada-tabela-filtro-ano'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', aplicarFiltrosJornadaTabela);
+            el.addEventListener('change', aplicarFiltrosJornadaTabela);
+        }
+    });
+    var btnJornadaTabelaLimparFiltros = document.getElementById('btn-jornada-tabela-limpar-filtros');
+    if (btnJornadaTabelaLimparFiltros) {
+        btnJornadaTabelaLimparFiltros.addEventListener('click', function () {
+            var t = document.getElementById('jornada-tabela-filtro-titulo');
+            var m = document.getElementById('jornada-tabela-filtro-materia');
+            var b = document.getElementById('jornada-tabela-filtro-bimestre');
+            var a = document.getElementById('jornada-tabela-filtro-ano');
+            if (t) { t.value = ''; }
+            if (m) { m.value = ''; }
+            if (b) { b.value = ''; }
+            if (a) { a.value = ''; }
+            aplicarFiltrosJornadaTabela();
+        });
+    }
+    if (fields.btnJornadaFonteMateriaAdd) {
+        fields.btnJornadaFonteMateriaAdd.addEventListener('click', function () {
+            jornadaFontePorMateriaRows.push({ materia_id: 0, fonte_ids: [] });
+            renderJornadaNotaUnicaFonteRows();
+        });
+    }
+    if (fields.btnJornadaFonteGrupoAdd) {
+        fields.btnJornadaFonteGrupoAdd.addEventListener('click', function () {
+            jornadaFontePorGrupoRows.push({ grupo_key: '', fonte_ids: [] });
+            renderJornadaNotaUnicaFonteRows();
+        });
+    }
+    var btnJnMatTodas = document.getElementById('btn-jornada-nota-unica-materias-todas');
+    var btnJnMatNenhuma = document.getElementById('btn-jornada-nota-unica-materias-nenhuma');
+    if (btnJnMatTodas) {
+        btnJnMatTodas.addEventListener('click', function () {
+            setJornadaNotaUnicaMateriasCheckboxesAll(true);
+        });
+    }
+    if (btnJnMatNenhuma) {
+        btnJnMatNenhuma.addEventListener('click', function () {
+            setJornadaNotaUnicaMateriasCheckboxesAll(false);
+        });
+    }
+
+    if (fields.calcModoGeral) {
+        fields.calcModoGeral.addEventListener('change', syncCalculadoModoView);
+    }
+    if (fields.calcModoMateria) {
+        fields.calcModoMateria.addEventListener('change', function () {
+            if (fields.calcModoMateria.checked && formulasMateriaModalRows.length === 0) {
+                formulasMateriaModalRows.push({ materia_id: 0, formula: '' });
+                renderFormulasMateriaModal();
+            }
+            syncCalculadoModoView();
+        });
+    }
+    if (fields.btnAddFormulaMateriaModal) {
+        fields.btnAddFormulaMateriaModal.addEventListener('click', function () {
+            formulasMateriaModalRows.push({ materia_id: 0, formula: '' });
+            renderFormulasMateriaModal();
+        });
+    }
+
+    formModal.addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        const nome = (fields.nome.value || '').trim();
+        if (!nome) {
+            alert('Informe o nome do bloco.');
+            return;
+        }
+
+        let codigo = (fields.codigo.value || '').trim();
+        if (!codigo) {
+            codigo = slugify(nome);
+        }
+
+        const selBlocos = getSelectedBlocoIdsFromModal();
+        const srcVal = fields.source.value;
+        var stType = srcVal === 'nenhuma'
+            ? 'nenhuma'
+            : (srcVal === 'jornadas'
+                ? 'jornadas'
+                : (srcVal === 'evento_boletim'
+                    ? 'evento_boletim'
+                    : (srcVal === 'faltas_evento'
+                        ? 'faltas_evento'
+                        : (srcVal === 'calculado' ? 'calculado' : 'provas_sistema'))));
+        const payload = {
+            codigo,
+            nome,
+            source_type: stType,
+            calc_type: fields.calc.value || 'media',
+            peso: Number(fields.peso.value || 1),
+            filtro_titulo: fields.filtro.value || '',
+            blocos_ids: selBlocos,
+            bloco_id: selBlocos.length === 1 ? selBlocos[0] : 0,
+            materia_id: Number(fields.materiaId.value || 0),
+            materias_ids: getSelectedMateriasFromModal(),
+            materia_unica: fields.materiaUnica.checked,
+            materia_unica_modo: fields.materiaUnica.checked ? getMateriaUnicaModoFromModal() : 'soma',
+            usar_percentual: fields.percentual.checked,
+            escala_max: Number(fields.escala.value || 10),
+            obrigatorio: fields.obrigatorio.checked
+        };
+        var layoutGroupVal = fields.layoutGroup ? String(fields.layoutGroup.value || '').trim() : '';
+        var layoutTypeVal = fields.layoutType ? String(fields.layoutType.value || '').trim() : '';
+        var groupLinePayload = null;
+        if (fields.groupEnabled && fields.groupEnabled.checked) {
+            var gMats = getSelectedGroupMateriasFromModal();
+            var gKey = fields.groupKey ? String(fields.groupKey.value || '').trim() : '';
+            var gLabel = fields.groupLabel ? String(fields.groupLabel.value || '').trim() : '';
+            var gMode = fields.groupMode ? String(fields.groupMode.value || 'media').trim() : 'media';
+            var gArred = fields.groupArredondamento ? String(fields.groupArredondamento.value || 'todos').trim() : 'todos';
+            if (gArred !== 'filhas' && gArred !== 'mae') {
+                gArred = 'todos';
+            }
+            var gDiv = fields.groupDivisor ? Number(fields.groupDivisor.value || 0) : 0;
+            var gAplicar = fields.groupAplicarEm ? String(fields.groupAplicarEm.value || 'boletim').trim() : 'boletim';
+            if (gAplicar !== 'boletim') {
+                gAplicar = 'ambos';
+            }
+            if (!gKey) {
+                gKey = slugify(gLabel);
+            }
+            if (!gLabel) {
+                gLabel = gKey;
+            }
+            if (!gKey || gMats.length === 0) {
+                alert('No agrupamento em linha única, informe código/nome e selecione as matérias do grupo.');
+                return;
+            }
+            if (gMode !== 'soma') {
+                gMode = 'media';
+            }
+            var gAgrupamentoId = fields.groupAgrupamento ? Number(fields.groupAgrupamento.value || 0) : 0;
+            groupLinePayload = {
+                enabled: true,
+                key: gKey,
+                label: gLabel,
+                mode: gMode,
+                arredondamento: gArred,
+                divisor: gDiv > 0 ? gDiv : 0,
+                materias_ids: gMats,
+                aplicar_em: gAplicar
+            };
+            if (gAgrupamentoId > 0) {
+                groupLinePayload.agrupamento_id = gAgrupamentoId;
+            }
+        }
+        if (payload.source_type === 'jornadas') {
+            var distJn = (fields.jornadaDistribuicaoNotas && fields.jornadaDistribuicaoNotas.value)
+                ? String(fields.jornadaDistribuicaoNotas.value).trim()
+                : 'por_materia';
+            if (distJn !== 'nota_unica_todas_linhas') {
+                distJn = 'por_materia';
+            }
+            payload.config = {
+                jornada_ids: getSelectedJornadaIdsFromModal(),
+                data_ini: (fields.jornadaDataIni && fields.jornadaDataIni.value) ? fields.jornadaDataIni.value.trim() : '',
+                data_fim: (fields.jornadaDataFim && fields.jornadaDataFim.value) ? fields.jornadaDataFim.value.trim() : '',
+                faixas_percentuais: getJornadasFaixasFromModal(),
+                distribuicao_notas: distJn,
+                traco_abaixo_minimo: !!(fields.jornadaTracoAbaixoMinimo && fields.jornadaTracoAbaixoMinimo.checked),
+                group_line: groupLinePayload,
+                layout_group: layoutGroupVal,
+                layout_type: layoutTypeVal
+            };
+            if (distJn === 'nota_unica_todas_linhas') {
+                payload.config.nota_unica_omitir_materias = getJornadaNotaUnicaOmitirFromCheckboxes();
+                var fpMat = {};
+                jornadaFontePorMateriaRows.forEach(function (r) {
+                    var tid = Number(r.materia_id || 0);
+                    var fids = (r.fonte_ids || []).map(function (x) { return Number(x); }).filter(function (x) { return x > 0; });
+                    if (tid > 0 && fids.length > 0) {
+                        fpMat[String(tid)] = fids;
+                    }
+                });
+                if (Object.keys(fpMat).length > 0) {
+                    payload.config.nota_unica_fonte_por_materia = fpMat;
+                }
+                var fpGrp = {};
+                jornadaFontePorGrupoRows.forEach(function (r) {
+                    var gk = String(r.grupo_key || '').trim();
+                    var fids = (r.fonte_ids || []).map(function (x) { return Number(x); }).filter(function (x) { return x > 0; });
+                    if (gk !== '' && fids.length > 0) {
+                        fpGrp[gk] = fids;
+                    }
+                });
+                if (Object.keys(fpGrp).length > 0) {
+                    payload.config.nota_unica_fonte_por_grupo = fpGrp;
+                }
+            }
+        } else if (payload.source_type === 'evento_boletim') {
+            payload.config = {
+                regra_codigo: fields.eventoRegraCodigo ? String(fields.eventoRegraCodigo.value || '').trim() : '',
+                componente_codigo: fields.eventoComponenteCodigo ? String(fields.eventoComponenteCodigo.value || '').trim() : '',
+                group_line: groupLinePayload,
+                layout_group: layoutGroupVal,
+                layout_type: layoutTypeVal
+            };
+            if (!payload.config.regra_codigo) {
+                alert('Informe o código (slug) do evento de boletim.');
+                return;
+            }
+            payload.filtro_titulo = '';
+            payload.blocos_ids = [];
+            payload.bloco_id = 0;
+            payload.materia_id = 0;
+            payload.materia_unica = false;
+            payload.usar_percentual = false;
+        } else if (payload.source_type === 'faltas_evento') {
+            payload.config = {
+                faltas_evento_id: fields.faltasEventoId ? Number(fields.faltasEventoId.value || 0) : 0,
+                group_line: groupLinePayload,
+                layout_group: layoutGroupVal,
+                layout_type: layoutTypeVal
+            };
+            if (!payload.config.faltas_evento_id) {
+                alert('Selecione o evento de faltas.');
+                return;
+            }
+            payload.filtro_titulo = '';
+            payload.blocos_ids = [];
+            payload.bloco_id = 0;
+            payload.materia_id = 0;
+            payload.materia_unica = false;
+            payload.usar_percentual = false;
+        } else if (payload.source_type === 'calculado') {
+            var exCalc = fields.expressaoCalculado ? String(fields.expressaoCalculado.value || '').trim() : '';
+            var useFormulaByMateria = !!(fields.calcModoMateria && fields.calcModoMateria.checked);
+            var fmCalc = {};
+            if (useFormulaByMateria) {
+                formulasMateriaModalRows.forEach(function (row) {
+                    var mid = Number(row.materia_id || 0);
+                    var fexp = String(row.formula || '').trim();
+                    if (mid > 0 && fexp !== '') {
+                        fmCalc[mid] = fexp;
+                    }
+                });
+            }
+            payload.config = {
+                expressao: exCalc,
+                formula_materias: fmCalc,
+                formula_mode: useFormulaByMateria ? 'per_materia' : 'single',
+                traco_abaixo_minimo: !!(fields.calculadoTracoAbaixoMinimo && fields.calculadoTracoAbaixoMinimo.checked),
+                jornada_ids: [],
+                data_ini: '',
+                data_fim: '',
+                group_line: groupLinePayload,
+                layout_group: layoutGroupVal,
+                layout_type: layoutTypeVal,
+                agregar_nq: (fields.agregarNq ? String(fields.agregarNq.value || '') : '').split(/[,\s;]+/).map(function (x) { return x.trim(); }).filter(Boolean)
+            };
+            payload.filtro_titulo = '';
+            payload.blocos_ids = [];
+            payload.bloco_id = 0;
+            payload.materia_id = 0;
+            payload.materias_ids = [];
+            payload.materia_unica = false;
+            payload.usar_percentual = false;
+            if (Object.keys(fmCalc).length === 0 && !exCalc && (!payload.config.agregar_nq || payload.config.agregar_nq.length === 0)) {
+                alert('Informe a expressão geral, os códigos das semanas (média N/Q) ou cadastre expressão por matéria.');
+                return;
+            }
+        } else if (groupLinePayload) {
+            payload.config = {
+                group_line: groupLinePayload,
+                layout_group: layoutGroupVal,
+                layout_type: layoutTypeVal
+            };
+        } else if (layoutGroupVal || layoutTypeVal) {
+            payload.config = {
+                layout_group: layoutGroupVal,
+                layout_type: layoutTypeVal
+            };
+        }
+        var roundModeOverrideVal = fields.roundModeOverride ? String(fields.roundModeOverride.value || 'herdar').trim() : 'herdar';
+        if (roundModeOverrideVal === 'none' || roundModeOverrideVal === 'half') {
+            if (!payload.config) {
+                payload.config = {};
+            }
+            payload.config.round_mode_override = roundModeOverrideVal;
+        }
+        if (payload.source_type === 'provas_sistema') {
+            if (!payload.config) {
+                payload.config = {};
+            }
+            var semVal = fields.semana ? Number(fields.semana.value || 0) : 0;
+            if (semVal >= 1 && semVal <= 20) {
+                payload.config.semana = semVal;
+            } else if (payload.config.semana) {
+                delete payload.config.semana;
+            }
+        }
+
+        const editIndex = Number(fields.idx.value || -1);
+        if (payload.source_type === 'provas_sistema' && editIndex >= 0 && componentes[editIndex] && componentes[editIndex].config && typeof componentes[editIndex].config === 'object') {
+            payload.config = Object.assign({}, componentes[editIndex].config, payload.config || {});
+        }
+        if (editIndex >= 0 && componentes[editIndex]) {
+            const merged = Object.assign({}, componentes[editIndex], payload);
+            if (merged.source_type === 'provas_sistema') {
+                var semMerged = fields.semana ? Number(fields.semana.value || 0) : 0;
+                if (!merged.config || typeof merged.config !== 'object') {
+                    merged.config = {};
+                }
+                if (semMerged >= 1 && semMerged <= 20) {
+                    merged.config.semana = semMerged;
+                    if (!merged.config.layout_group) {
+                        merged.config.layout_group = (semMerged % 2 === 1) ? 'quadro_a' : 'quadro_b';
+                    }
+                    if (!merged.config.layout_type) {
+                        merged.config.layout_type = 'semana_nq';
+                    }
+                } else {
+                    delete merged.config.semana;
+                    if (String(merged.config.layout_type || '').toLowerCase() === 'semana_nq') {
+                        delete merged.config.layout_type;
+                    }
+                    if (['quadro_a', 'quadro_b'].indexOf(String(merged.config.layout_group || '').toLowerCase()) >= 0) {
+                        delete merged.config.layout_group;
+                    }
+                    if (merged.config.layout && typeof merged.config.layout === 'object'
+                        && String(merged.config.layout.type || '').toLowerCase() === 'semana_nq') {
+                        delete merged.config.layout;
+                    }
+                }
+            }
+            if (merged.source_type === 'nenhuma') {
+                merged.filtro_titulo = '';
+                merged.blocos_ids = [];
+                merged.bloco_id = 0;
+                merged.materia_id = 0;
+                merged.materias_ids = [];
+                merged.usar_percentual = false;
+                if (payload.config && (payload.config.group_line || payload.config.layout_group || payload.config.layout_type)) {
+                    merged.config = payload.config;
+                } else {
+                    delete merged.config;
+                }
+            } else if (merged.source_type === 'jornadas') {
+                /* config já veio no payload */
+            } else if (merged.source_type === 'evento_boletim') {
+                merged.config = payload.config;
+            } else if (merged.source_type === 'faltas_evento') {
+                merged.config = payload.config;
+            } else if (merged.source_type === 'calculado') {
+                merged.config = payload.config;
+            } else if (payload.config && (payload.config.group_line || payload.config.layout_group || payload.config.layout_type)) {
+                merged.config = payload.config;
+            } else {
+                delete merged.config;
+            }
+            componentes[editIndex] = merged;
+        } else {
+            if (payload.source_type === 'nenhuma') {
+                payload.filtro_titulo = '';
+                payload.blocos_ids = [];
+                payload.bloco_id = 0;
+                payload.materia_id = 0;
+                payload.materias_ids = [];
+                payload.usar_percentual = false;
+                if (!(payload.config && (payload.config.group_line || payload.config.layout_group || payload.config.layout_type))) {
+                    delete payload.config;
+                }
+            } else if (payload.source_type !== 'jornadas' && payload.source_type !== 'evento_boletim' && payload.source_type !== 'faltas_evento' && payload.source_type !== 'calculado' && !(payload.config && (payload.config.group_line || payload.config.layout_group || payload.config.layout_type))) {
+                delete payload.config;
+            }
+            componentes.push(payload);
+        }
+
+        renderLista();
+        closeModal();
+    });
+
+    formRegra.addEventListener('submit', function (e) {
+        if (componentes.length === 0) {
+            e.preventDefault();
+            alert('Adicione pelo menos um bloco para salvar a regra.');
+            return;
+        }
+        var seenCodes = {};
+        for (var i = 0; i < componentes.length; i++) {
+            var c = componentes[i] || {};
+            var code = String(c.codigo || '').trim().toLowerCase();
+            if (!code) {
+                e.preventDefault();
+                alert('Existe bloco sem código. Edite o bloco e preencha o campo código.');
+                return;
+            }
+            if (seenCodes[code]) {
+                e.preventDefault();
+                alert('Existem blocos com código repetido: "' + code + '". Cada bloco precisa de código único.');
+                return;
+            }
+            seenCodes[code] = true;
+        }
+        syncFormulaMateriasJson();
+        syncJson();
+        const submitBtn = document.getElementById('btn-salvar-regra-boletim');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Salvando...';
+        }
+    });
+
+    if (btnAddFormulaMateria) {
+        btnAddFormulaMateria.addEventListener('click', function () {
+            formulasMateriaRows.push({ materia_id: 0, formula: '' });
+            renderFormulaMaterias();
+        });
+    }
+
+    if (formulaMateriasInicial && typeof formulaMateriasInicial === 'object') {
+        Object.keys(formulaMateriasInicial).forEach(function (mid) {
+            var v = String(formulaMateriasInicial[mid] || '').trim();
+            var midInt = Number(mid || 0);
+            if (midInt > 0 && v !== '') {
+                formulasMateriaRows.push({ materia_id: midInt, formula: v });
+            }
+        });
+    }
+    renderFormulaMaterias();
+    renderLista();
+
+    window.boletimRenderComponentes = function (novos) {
+        if (!Array.isArray(novos)) return;
+        componentes = novos;
+        renderLista();
+        syncJson();
+    };
+
+    // Mantém sessão ativa enquanto coordenação passa tempo montando o evento.
+    const keepaliveUrl = <?= json_encode(URL . '/admin/boletim-configuracao/keepalive', JSON_UNESCAPED_SLASHES) ?>;
+    function boletimKeepalive() {
+        fetch(keepaliveUrl, {
+            method: 'GET',
+            credentials: 'same-origin',
+            cache: 'no-store'
+        }).catch(function () {});
+    }
+    setInterval(boletimKeepalive, 2 * 60 * 1000);
+
+    var URL_GERAR_LOTE = <?= json_encode(URL . '/admin/boletim-configuracao/gerar-boletins', JSON_UNESCAPED_SLASHES) ?>;
+    var URL_ATUALIZAR_LOTE = <?= json_encode(URL . '/admin/boletim-configuracao/atualizar-boletins-gravados', JSON_UNESCAPED_SLASHES) ?>;
+    var formGerarLote = document.getElementById('form-gerar-lote-boletim');
+    var chkIncluirNovos = document.getElementById('incluir-novos-boletim');
+    function aplicarAcaoGerarLote() {
+        if (!formGerarLote) return;
+        formGerarLote.action = (chkIncluirNovos && chkIncluirNovos.checked) ? URL_GERAR_LOTE : URL_ATUALIZAR_LOTE;
+    }
+    if (formGerarLote) {
+        aplicarAcaoGerarLote();
+        if (chkIncluirNovos) {
+            chkIncluirNovos.addEventListener('change', aplicarAcaoGerarLote);
+        }
+        formGerarLote.addEventListener('submit', aplicarAcaoGerarLote);
+    }
+
+    window.abrirConferirBoletim = function () {
+        var backdrop = document.getElementById('boletimConferirBackdrop');
+        var drawer = document.getElementById('boletimConferirDrawer');
+        if (!backdrop || !drawer) return;
+        backdrop.classList.remove('hidden');
+        drawer.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('overflow-hidden');
+        requestAnimationFrame(function () {
+            drawer.classList.remove('translate-x-full');
+        });
+    };
+    window.fecharConferirBoletim = function () {
+        var backdrop = document.getElementById('boletimConferirBackdrop');
+        var drawer = document.getElementById('boletimConferirDrawer');
+        if (!backdrop || !drawer) return;
+        drawer.classList.add('translate-x-full');
+        drawer.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('overflow-hidden');
+        setTimeout(function () {
+            backdrop.classList.add('hidden');
+        }, 300);
+    };
+    var btnAbrirConferir = document.getElementById('btn-abrir-conferir-boletim');
+    if (btnAbrirConferir) {
+        btnAbrirConferir.addEventListener('click', function () {
+            window.abrirConferirBoletim();
+        });
+    }
+    if (new URLSearchParams(window.location.search).get('simular') === '1') {
+        window.abrirConferirBoletim();
+    }
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        var drawer = document.getElementById('boletimConferirDrawer');
+        if (!drawer || drawer.getAttribute('aria-hidden') === 'true') return;
+        window.fecharConferirBoletim();
+    });
+
+    var btnChecklist = document.getElementById('btn-checklist-pre-geracao');
+    if (btnChecklist) {
+        btnChecklist.addEventListener('click', function () {
+            var resultadoBox = document.getElementById('checklist-resultado');
+            btnChecklist.disabled = true;
+            btnChecklist.textContent = 'Verificando...';
+            var qs = 'regra_id=' + encodeURIComponent(REGRA_ATUAL_ID)
+                + '&periodo_ref=' + encodeURIComponent(<?= json_encode($periodoRef) ?>)
+                + '&data_inicio=' + encodeURIComponent(<?= json_encode($dataInicio) ?>)
+                + '&data_fim=' + encodeURIComponent(<?= json_encode($dataFim) ?>);
+            fetch(CHECKLIST_PRE_GERACAO_URL + '?' + qs, { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    renderChecklistResultado(data, resultadoBox);
+                })
+                .catch(function () {
+                    resultadoBox.classList.remove('hidden');
+                    resultadoBox.innerHTML = '<p class="text-red-700">Erro ao verificar. Tente novamente.</p>';
+                })
+                .finally(function () {
+                    btnChecklist.disabled = false;
+                    btnChecklist.textContent = 'Verificar problemas';
+                });
+        });
+    }
+
+    function renderChecklistResultado(data, box) {
+        if (!box) { return; }
+        box.classList.remove('hidden');
+        if (data.erro) {
+            box.innerHTML = '<p class="text-red-700">' + data.erro + '</p>';
+            return;
+        }
+        var html = '';
+        var orfas = data.materias_orfas || [];
+        var incompat = data.eventos_incompativeis || [];
+        var cobertura = data.cobertura || { total: 0, completos: 0, incompletos: [] };
+
+        if (orfas.length === 0 && incompat.length === 0) {
+            html += '<p class="text-emerald-700"><i class="fa-solid fa-circle-check"></i> Nenhuma matéria órfã nem evento de origem incompatível encontrado.</p>';
+        }
+        if (orfas.length > 0) {
+            html += '<div class="text-amber-800"><strong>⚠️ ' + orfas.length + ' matéria(s) ausente(s) em algum bloco:</strong><ul class="list-disc pl-5 mt-1">';
+            orfas.slice(0, 10).forEach(function (o) {
+                html += '<li>' + o.materia_nome + ' não está na lista do bloco "' + o.componente_nome + '" (' + o.componente_codigo + ')</li>';
+            });
+            html += '</ul></div>';
+        }
+        if (incompat.length > 0) {
+            html += '<div class="text-red-800"><strong>⚠️ ' + incompat.length + ' bloco(s) com evento de origem incompatível:</strong><ul class="list-disc pl-5 mt-1">';
+            incompat.forEach(function (i) {
+                html += '<li>Bloco "' + i.componente_nome + '" usa o evento "' + i.evento_origem_nome + '" (' + i.evento_origem_codigo + '), que ' + i.motivo + '</li>';
+            });
+            html += '</ul></div>';
+        }
+        html += '<p class="text-gray-700 mt-2"><strong>Cobertura:</strong> ' + cobertura.completos + ' de ' + cobertura.total + ' aluno(s) testado(s) com todos os componentes preenchidos.</p>';
+        if ((cobertura.incompletos || []).length > 0) {
+            html += '<details class="mt-1"><summary class="cursor-pointer text-gray-600">Ver alunos com lacunas (' + cobertura.incompletos.length + ')</summary><ul class="list-disc pl-5 mt-1 text-gray-700">';
+            cobertura.incompletos.slice(0, 20).forEach(function (a) {
+                html += '<li>' + a.nome + ' — ' + a.lacunas + ' componente(s) vazio(s)</li>';
+            });
+            html += '</ul></details>';
+        }
+        box.innerHTML = html;
+    }
+
+    var btnSimularLote = document.getElementById('btn-simular-lote');
+    if (btnSimularLote) {
+        btnSimularLote.addEventListener('click', function () {
+            var loteBox = document.getElementById('lote-resultado');
+            var turmaSelect = document.getElementById('lote-turma-id');
+            btnSimularLote.disabled = true;
+            btnSimularLote.textContent = 'Simulando...';
+            var body = new URLSearchParams();
+            body.set('_token', <?= json_encode($csrfToken) ?>);
+            body.set('regra_id', String(REGRA_ATUAL_ID));
+            body.set('turma_id', turmaSelect ? turmaSelect.value : '');
+            body.set('periodo_ref', <?= json_encode($periodoRef) ?>);
+            body.set('data_inicio', <?= json_encode($dataInicio) ?>);
+            body.set('data_fim', <?= json_encode($dataFim) ?>);
+            fetch(SIMULAR_LOTE_URL, { method: 'POST', credentials: 'same-origin', body: body })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    renderLoteResultado(data, loteBox);
+                })
+                .catch(function () {
+                    loteBox.classList.remove('hidden');
+                    loteBox.innerHTML = '<p class="p-3 text-red-700">Erro ao simular. Tente novamente.</p>';
+                })
+                .finally(function () {
+                    btnSimularLote.disabled = false;
+                    btnSimularLote.textContent = 'Simular lote';
+                });
+        });
+    }
+
+    function renderLoteResultado(data, box) {
+        if (!box) { return; }
+        box.classList.remove('hidden');
+        var alunosLote = data.alunos || [];
+        if (alunosLote.length === 0) {
+            box.innerHTML = '<p class="p-3 text-gray-500">Nenhum aluno encontrado para simular.</p>';
+            return;
+        }
+        var html = '<table class="min-w-full text-sm"><thead class="bg-gray-50 sticky top-0"><tr>'
+            + '<th class="px-3 py-2 text-left font-medium text-gray-500">Aluno</th>'
+            + '<th class="px-3 py-2 text-left font-medium text-gray-500">Nota final (média)</th>'
+            + '<th class="px-3 py-2 text-left font-medium text-gray-500">Status</th>'
+            + '</tr></thead><tbody class="divide-y divide-gray-100">';
+        alunosLote.forEach(function (a) {
+            var status = a.erro
+                ? '<span class="text-red-700">Erro: ' + a.erro + '</span>'
+                : (a.tem_lacuna ? '<span class="text-amber-700">Tem componente vazio</span>' : '<span class="text-emerald-700">Completo</span>');
+            html += '<tr><td class="px-3 py-2 text-gray-900">' + a.nome + '</td>'
+                + '<td class="px-3 py-2 text-gray-700">' + (a.media_final !== null && a.media_final !== undefined ? a.media_final : '—') + '</td>'
+                + '<td class="px-3 py-2">' + status + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        box.innerHTML = html;
+    }
+
+    var btnVerLogs = document.getElementById('btn-ver-logs-geracao');
+    if (btnVerLogs) {
+        btnVerLogs.addEventListener('click', function () {
+            var logsBox = document.getElementById('logs-geracao-resultado');
+            var detalheBox = document.getElementById('geracao-detalhe-resultado');
+            var url = LOGS_GERACAO_URL + '?regra_id=' + encodeURIComponent(REGRA_ATUAL_ID);
+            fetch(url, { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    logsBox.classList.remove('hidden');
+                    var geracoes = data.geracoes || [];
+                    var logs = data.logs || [];
+                    if (geracoes.length === 0 && logs.length === 0) {
+                        logsBox.innerHTML = '<p class="text-gray-500">Nenhuma geração registrada ainda.</p>';
+                        return;
+                    }
+                    var html = '';
+                    if (geracoes.length > 0) {
+                        geracoes.forEach(function (g) {
+                            var vigente = parseInt(g.vigente, 10) === 1
+                                ? ' <span class="px-1.5 py-0.5 text-[10px] rounded-full bg-emerald-100 text-emerald-800">vigente</span>'
+                                : '';
+                            var preservados = parseInt(g.alunos_preservados, 10) || 0;
+                            var voltar = parseInt(g.vigente, 10) === 1
+                                ? ''
+                                : ' <button type="button" class="btn-restaurar-geracao ml-2 text-indigo-600 hover:underline" data-geracao-id="' + g.id + '" data-versao="' + (parseInt(g.config_versao, 10) > 0 ? g.config_versao : g.versao) + '">Usar esta versão</button>';
+                            html += '<div class="border-b border-gray-100 pb-1.5">'
+                                + '<button type="button" class="btn-geracao-detalhe text-left" data-geracao-id="' + g.id + '">'
+                                + '<span class="text-gray-900 font-medium">ID ' + (parseInt(g.config_id, 10) > 0 ? g.config_id : g.id) + ' · Versão ' + (parseInt(g.config_versao, 10) > 0 ? g.config_versao : g.versao) + vigente + '</span>'
+                                + ' — ' + (g.created_at_fmt || '')
+                                + ' · ' + (g.usuario_nome || 'usuário desconhecido')
+                                + ' · ' + g.alunos_processados + ' aluno(s)'
+                                + (preservados > 0 ? ', ' + preservados + ' travado(s)' : '')
+                                + (parseInt(g.erros, 10) > 0 ? ', <span class="text-red-700">' + g.erros + ' erro(s)</span>' : '')
+                                + '</button>' + voltar + '</div>';
+                        });
+                    } else {
+                        logs.forEach(function (l) {
+                            html += '<div class="border-b border-gray-100 pb-1.5">'
+                                + '<span class="text-gray-900 font-medium">' + (l.created_at_fmt || '') + '</span>'
+                                + ' — ' + (l.usuario_nome || 'usuário desconhecido')
+                                + ' · ' + l.alunos_processados + ' aluno(s), ' + l.linhas_geradas + ' linha(s)'
+                                + (parseInt(l.erros, 10) > 0 ? ', <span class="text-red-700">' + l.erros + ' erro(s)</span>' : '')
+                                + '</div>';
+                        });
+                    }
+                    logsBox.innerHTML = html;
+                    logsBox.querySelectorAll('.btn-restaurar-geracao').forEach(function (btn) {
+                        btn.addEventListener('click', function () {
+                            var gid = btn.getAttribute('data-geracao-id');
+                            var versao = btn.getAttribute('data-versao') || '';
+                            if (!gid) return;
+                            if (!window.confirm('Voltar para a versão ' + versao + '? Ela passa a valer para aluno, pais e ficha. As notas gravadas não são apagadas.')) {
+                                return;
+                            }
+                            var form = document.getElementById('form-restaurar-geracao');
+                            var input = document.getElementById('restaurar-geracao-id');
+                            if (!form || !input) return;
+                            input.value = gid;
+                            form.submit();
+                        });
+                    });
+                    logsBox.querySelectorAll('.btn-geracao-detalhe').forEach(function (btn) {
+                        btn.addEventListener('click', function () {
+                            var gid = btn.getAttribute('data-geracao-id');
+                            if (!detalheBox || !gid) return;
+                            fetch(GERACAO_DETALHE_URL + '?id=' + encodeURIComponent(gid), { credentials: 'same-origin' })
+                                .then(function (r) { return r.json(); })
+                                .then(function (det) {
+                                    detalheBox.classList.remove('hidden');
+                                    if (det.erro) {
+                                        detalheBox.innerHTML = '<p class="text-red-700">' + det.erro + '</p>';
+                                        return;
+                                    }
+                                    var alunos = det.alunos || [];
+                                    var ge = det.geracao || {};
+                                    var h = '<p class="font-medium text-gray-900 mb-1">Alunos da versão ' + (ge.versao || '') + '</p>';
+                                    if (alunos.length === 0) {
+                                        h += '<p class="text-gray-500">Nenhum aluno gravado nesta geração (todos travados ou só metadado).</p>';
+                                    } else {
+                                        h += '<ul class="space-y-1">';
+                                        alunos.forEach(function (a) {
+                                            var href = GERADOS_PREVIEW_URL + '?aluno_id=' + encodeURIComponent(a.aluno_id)
+                                                + '&regra_id=' + encodeURIComponent(REGRA_ATUAL_ID)
+                                                + '&periodo_ref=' + encodeURIComponent(ge.periodo_ref || PERIODO_REF_ATUAL)
+                                                + '&versao=' + encodeURIComponent(a.versao);
+                                            h += '<li><a class="text-indigo-600 hover:underline" href="' + href + '" target="_blank" rel="noopener">'
+                                                + (a.nome || ('#' + a.aluno_id)) + '</a> · v' + a.versao + '</li>';
+                                        });
+                                        h += '</ul>';
+                                    }
+                                    detalheBox.innerHTML = h;
+                                })
+                                .catch(function () {
+                                    detalheBox.classList.remove('hidden');
+                                    detalheBox.innerHTML = '<p class="text-red-700">Erro ao carregar o detalhe.</p>';
+                                });
+                        });
+                    });
+                })
+                .catch(function () {
+                    logsBox.classList.remove('hidden');
+                    logsBox.innerHTML = '<p class="text-red-700">Erro ao carregar.</p>';
+                });
+        });
+    }
+
+    // Edição inline das células calculadas na tabela "Notas por matéria":
+    // sobrescreve a fórmula só naquela matéria, só para o aluno selecionado.
+    (function () {
+        var csrfTokenCell = <?= json_encode($csrfToken ?? '', JSON_UNESCAPED_UNICODE) ?>;
+        var ajaxUrlCell = <?= json_encode(URL . '/admin/boletim-configuracao/nota-manual-materia-ajax', JSON_UNESCAPED_SLASHES) ?>;
+
+        function parseValorAtual(td) {
+            var txt = (td.querySelector('.boletim-cell-valor') || {}).textContent || '';
+            txt = txt.trim().replace(/\./g, '').replace(',', '.');
+            var n = parseFloat(txt);
+            return isNaN(n) ? '' : n;
+        }
+
+        function enterEditMode(td) {
+            if (td.querySelector('.boletim-cell-edit-form')) {
+                return;
+            }
+            var valorAtual = parseValorAtual(td);
+            var escalaMax = td.getAttribute('data-escala-max') || '10';
+            var wrap = document.createElement('div');
+            wrap.className = 'boletim-cell-edit-form flex items-center gap-1 justify-center';
+            wrap.innerHTML = ''
+                + '<input type="number" step="0.01" min="0" max="' + escalaMax + '" value="' + valorAtual + '" '
+                + 'class="w-16 px-1 py-0.5 border border-indigo-300 rounded text-center text-sm" />'
+                + '<button type="button" class="btn-ok text-emerald-600 hover:text-emerald-800" title="Salvar"><i class="fa-solid fa-check"></i></button>'
+                + '<button type="button" class="btn-cancel text-gray-400 hover:text-gray-600" title="Cancelar"><i class="fa-solid fa-xmark"></i></button>'
+                + '<button type="button" class="btn-clear text-amber-600 hover:text-amber-800" title="Remover sobrescrita (voltar a usar a fórmula)"><i class="fa-solid fa-rotate-left"></i></button>';
+            td.dataset.originalHtml = td.innerHTML;
+            td.innerHTML = '';
+            td.appendChild(wrap);
+            var input = wrap.querySelector('input');
+            input.focus();
+            input.select();
+
+            function close() {
+                td.innerHTML = td.dataset.originalHtml;
+                delete td.dataset.originalHtml;
+            }
+
+            function postCell(payload) {
+                var fd = new FormData();
+                fd.append('_token', csrfTokenCell);
+                fd.append('regra_id', td.getAttribute('data-regra-id'));
+                fd.append('componente_id', td.getAttribute('data-componente-id'));
+                fd.append('aluno_id', td.getAttribute('data-aluno-id'));
+                fd.append('materia_id', td.getAttribute('data-materia-id'));
+                fd.append('periodo_ref', td.getAttribute('data-periodo-ref'));
+                Object.keys(payload).forEach(function (k) { fd.append(k, payload[k]); });
+                return fetch(ajaxUrlCell, { method: 'POST', credentials: 'same-origin', body: fd })
+                    .then(function (r) { return r.json(); });
+            }
+
+            wrap.querySelector('.btn-cancel').addEventListener('click', function (e) {
+                e.stopPropagation();
+                close();
+            });
+
+            wrap.querySelector('.btn-ok').addEventListener('click', function (e) {
+                e.stopPropagation();
+                var val = input.value.trim();
+                // Campo deixado em branco = força "sem nota" (traço), mesmo que
+                // exista dado real (prova/jornada) por trás. Diferente do botão
+                // ↺, que remove a sobrescrita e volta a usar o dado real/fórmula.
+                var payload = (val === '') ? { vazio: '1' } : { valor: val };
+                postCell(payload).then(function (res) {
+                    if (!res || !res.success) {
+                        alert((res && res.message) || 'Erro ao salvar.');
+                        return;
+                    }
+                    location.reload();
+                });
+            });
+
+            wrap.querySelector('.btn-clear').addEventListener('click', function (e) {
+                e.stopPropagation();
+                postCell({ limpar: '1' }).then(function (res) {
+                    if (!res || !res.success) {
+                        alert((res && res.message) || 'Erro ao remover.');
+                        return;
+                    }
+                    location.reload();
+                });
+            });
+
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    wrap.querySelector('.btn-ok').click();
+                } else if (e.key === 'Escape') {
+                    close();
+                }
+            });
+        }
+
+        document.querySelectorAll('[data-cell-editavel="1"]').forEach(function (td) {
+            td.addEventListener('click', function () {
+                enterEditMode(td);
+            });
+        });
+    })();
+
+    (function initSimulacaoVistas() {
+        function ativar(root, vista) {
+            var navBg = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-bg-color').trim() || '#1e3a5f';
+            var navFg = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-text-color').trim() || '#fff';
+            root.querySelectorAll('[data-sim-vista]').forEach(function (btn) {
+                var on = btn.getAttribute('data-sim-vista') === vista;
+                if (on) {
+                    btn.style.background = navBg;
+                    btn.style.borderColor = navBg;
+                    btn.style.color = navFg;
+                    btn.classList.remove('bg-white', 'text-gray-700', 'border-gray-300', 'text-white');
+                } else {
+                    btn.style.background = '#fff';
+                    btn.style.borderColor = '#d1d5db';
+                    btn.style.color = '#374151';
+                    btn.classList.add('bg-white', 'text-gray-700', 'border-gray-300');
+                    btn.classList.remove('text-white');
+                }
+            });
+            root.querySelectorAll('[data-sim-panel]').forEach(function (panel) {
+                var on = panel.getAttribute('data-sim-panel') === vista;
+                panel.classList.toggle('hidden', !on);
+            });
+        }
+        document.querySelectorAll('.boletim-sim-vistas').forEach(function (root) {
+            root.querySelectorAll('[data-sim-vista]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    ativar(root, btn.getAttribute('data-sim-vista') || 'demonstrativo');
+                });
+            });
+        });
+    })();
+})();
+</script>

@@ -857,7 +857,7 @@ class StudentAdminController extends AdminBaseController
         $tabData = $service->getProvasTabData($id);
 
         extract($tabData);
-        require __DIR__ . '/../../Views/admin/students/_tab_provas.php';
+        require \App\Core\ViewPaths::dominio('Pessoas', 'Views/admin/students/_tab_provas.php');
         exit;
     }
 
@@ -3955,7 +3955,7 @@ class StudentAdminController extends AdminBaseController
             'gerado_em' => date('d/m/Y H:i'),
         ];
         extract($viewData, EXTR_SKIP);
-        require __DIR__ . '/../../Views/admin/students/boletim_pdf.php';
+        require \App\Core\ViewPaths::dominio('Pessoas', 'Views/admin/students/boletim_pdf.php');
         $html = (string) ob_get_clean();
 
         $oldDisplayErrors = ini_get('display_errors');

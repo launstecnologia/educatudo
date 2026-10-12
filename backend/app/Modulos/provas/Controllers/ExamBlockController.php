@@ -1423,7 +1423,7 @@ class ExamBlockController extends BaseController
 
     private function obterServicoGrupoRegrasNotas()
     {
-        $path = dirname(__DIR__, 3) . '/Modulos/grupos-regras-notas/Services/GrupoRegrasNotasService.php';
+        $path = \App\Core\ViewPaths::modulo('grupos-regras-notas/Services/GrupoRegrasNotasService.php');
         if (!is_file($path)) {
             return null;
         }

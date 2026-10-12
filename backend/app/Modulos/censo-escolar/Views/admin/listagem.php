@@ -24,8 +24,8 @@ $formMap = [
 ];
 $page_header_title = $labels[$entidade] ?? 'Censo Escolar';
 $page_header_subtitle = 'Completude e pendências da categoria na edição atual.';
-include dirname(__DIR__, 4) . '/Views/admin/_partials/page_header_list.php';
-include dirname(__DIR__, 4) . '/Views/admin/_partials/flash_message.php';
+include \App\Core\ViewPaths::adminPartial('page_header_list.php');
+include \App\Core\ViewPaths::adminPartial('flash_message.php');
 include __DIR__ . '/_contexto.php';
 $nav_atual = $entidade;
 include __DIR__ . '/_nav.php';
@@ -106,7 +106,7 @@ $statusBadge = static function (string $s): string {
                         <?php endif; ?>
                         <?php $row_actions_dropdown_items = ob_get_clean(); ?>
                         <?php $row_actions_dropdown_id = 'censo-row-' . $entidade . '-' . (int) $row['id']; ?>
-                        <?php include dirname(__DIR__, 4) . '/Views/admin/_partials/row_actions_dropdown.php'; ?>
+                        <?php include \App\Core\ViewPaths::adminPartial('row_actions_dropdown.php'); ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>

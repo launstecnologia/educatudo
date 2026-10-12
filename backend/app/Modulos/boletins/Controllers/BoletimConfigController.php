@@ -1012,9 +1012,9 @@ class BoletimConfigController extends BaseController
 
         echo $cabecalho;
         if ((int) ($evento['preview'] ?? 0) !== 1) {
-            require __DIR__ . '/../../Views/partials/boletim_versoes_historico.php';
+            require \App\Core\ViewPaths::partial('boletim_versoes_historico.php');
         }
-        require __DIR__ . '/../../Views/partials/boletins_gerados.php';
+        require \App\Core\ViewPaths::partial('boletins_gerados.php');
     }
 
     /**
@@ -11402,7 +11402,7 @@ class BoletimConfigController extends BaseController
         }
         $a = [];
         $b = [];
-        $path = dirname(__DIR__, 3) . '/Modulos/grupos-regras-notas/Services/GrupoRegrasNotasService.php';
+        $path = \App\Core\ViewPaths::modulo('grupos-regras-notas/Services/GrupoRegrasNotasService.php');
         if (!class_exists('GrupoRegrasNotasService', false) && is_file($path)) {
             require_once $path;
         }
@@ -12696,7 +12696,7 @@ class BoletimConfigController extends BaseController
      */
     private function listarAgrupamentosComponentesCatalogo(): array
     {
-        $path = dirname(__DIR__, 3) . '/Modulos/agrupamentos-componentes/Services/AgrupamentoComponenteService.php';
+        $path = \App\Core\ViewPaths::modulo('agrupamentos-componentes/Services/AgrupamentoComponenteService.php');
         if (!is_file($path)) {
             return [];
         }
@@ -12796,7 +12796,7 @@ class BoletimConfigController extends BaseController
             return $this->agrupamentoCadastroCache[$id];
         }
         $this->agrupamentoCadastroCache[$id] = null;
-        $path = dirname(__DIR__, 3) . '/Modulos/agrupamentos-componentes/Services/AgrupamentoComponenteService.php';
+        $path = \App\Core\ViewPaths::modulo('agrupamentos-componentes/Services/AgrupamentoComponenteService.php');
         if (!is_file($path)) {
             return null;
         }
@@ -12825,7 +12825,7 @@ class BoletimConfigController extends BaseController
 
     private function listarGruposRegrasNotasCatalogo(): array
     {
-        $path = dirname(__DIR__, 3) . '/Modulos/grupos-regras-notas/Services/GrupoRegrasNotasService.php';
+        $path = \App\Core\ViewPaths::modulo('grupos-regras-notas/Services/GrupoRegrasNotasService.php');
         if (!is_file($path)) {
             return [];
         }

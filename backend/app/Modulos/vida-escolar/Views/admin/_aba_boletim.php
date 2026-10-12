@@ -178,10 +178,7 @@ $fmtNota = static function ($c): string {
             </div>
             <?php endif; ?>
         <?php else:
-            $obsPartial = dirname(__DIR__, 4) . '/Views/admin/students/_bloco_observacao_boletim.php';
-            if (!is_file($obsPartial)) {
-                $obsPartial = __DIR__ . '/../../../../Views/admin/students/_bloco_observacao_boletim.php';
-            }
+            $obsPartial = \App\Core\ViewPaths::dominio('Pessoas', 'Views/admin/students/_bloco_observacao_boletim.php');
             if (is_file($obsPartial)) {
                 include $obsPartial;
             }

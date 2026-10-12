@@ -10,8 +10,8 @@ $eid = (int) ($edicao['id'] ?? 0);
 
 $page_header_title = 'Censo Escolar';
 $page_header_subtitle = 'Reaproveita os cadastros da escola e solicita só o que falta para o Educacenso.';
-include dirname(__DIR__, 4) . '/Views/admin/_partials/page_header_list.php';
-include dirname(__DIR__, 4) . '/Views/admin/_partials/flash_message.php';
+include \App\Core\ViewPaths::adminPartial('page_header_list.php');
+include \App\Core\ViewPaths::adminPartial('flash_message.php');
 include __DIR__ . '/_contexto.php';
 
 $nav_atual = 'visao';

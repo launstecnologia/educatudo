@@ -149,7 +149,7 @@ class AvaCertificateService
             'validation_url' => $validationUrl,
             'emitido_em' => !empty($cert['emitido_em']) ? date('d/m/Y', strtotime((string) $cert['emitido_em'])) : date('d/m/Y'),
         ];
-        $templateFile = __DIR__ . '/../Views/ava/certificado_pdf.php';
+        $templateFile = __DIR__ . '/../Views/public/certificado_pdf.php';
         ob_start();
         extract($viewData, EXTR_SKIP);
         require $templateFile;

@@ -1912,7 +1912,7 @@ class ReportAdminController extends AdminBaseController
                 'exibir_em' => 'notas',
             ];
             ob_start();
-            include __DIR__ . '/../../Views/partials/boletim_quadro_tabela.php';
+            include \App\Core\ViewPaths::partial('boletim_quadro_tabela.php');
             $html = (string) ob_get_clean();
             if (stripos($html, '<table') !== false) {
                 return $html;
@@ -1920,7 +1920,7 @@ class ReportAdminController extends AdminBaseController
             $tituloTabelaSimples = 'Matéria';
             $ocultar_grupo_hierarquia = false;
             ob_start();
-            include __DIR__ . '/../../Views/partials/boletim_quadro_tabela_simples.php';
+            include \App\Core\ViewPaths::partial('boletim_quadro_tabela_simples.php');
             $html = (string) ob_get_clean();
 
             return stripos($html, '<table') === false ? '' : $html;

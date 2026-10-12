@@ -48,17 +48,150 @@ abstract class BaseController
     }
     
     /**
-     * Resolve caminho da view em Views/ legado ou em Modulos/<chave>/Views/<perfil>/.
-     * Ex.: student/arquivos/index → Modulos/arquivos/Views/student/index.php
+     * Prefixo legado da view (2º segmento) → chave física em Modulos/<chave>/.
+     * Ex.: admin/exams/index → Modulos/provas/Views/admin/index.php
+     *
+     * @var array<string, string>
+     */
+    private const VIEW_PREFIX_TO_MODULE = [
+        'exams' => 'provas',
+        'essays' => 'redacoes',
+        'essays-analytics' => 'redacoes',
+        'journeys' => 'jornadas',
+        'flashcards' => 'flashcards',
+        'tickets' => 'tickets',
+        'forum' => 'forum',
+        'minicursos' => 'minicursos',
+        'ava' => 'ava',
+        'educalabs' => 'educalabs',
+        'educa-hits' => 'educahits',
+        'jogos' => 'jogos',
+        'jogo-milhao' => 'jogos',
+        'notes' => 'notes',
+        'aulas-online' => 'aulas-online',
+        'apostilas' => 'apostilas',
+        'apostilas-ia' => 'apostilas',
+        'exercises' => 'exercicios',
+        'exercises-personalizados' => 'exercicios',
+        'mural-recados' => 'mural',
+        'finance' => 'financeiro',
+        'financeiro' => 'financeiro',
+        'notifications' => 'notificacoes',
+        'push-notifications' => 'notificacoes',
+        'conformidade' => 'conformidade',
+        'patrimony' => 'patrimonio',
+        'inventory' => 'patrimonio',
+        'inclusao' => 'educainclui',
+        'school-communication' => 'comunicacao',
+        'reunioes' => 'comunicacao',
+        'comunicacao' => 'comunicacao',
+        'external-apps' => 'external-apps',
+        'noticias' => 'noticias',
+        'simulations' => 'provas',
+        'blocos-modelo' => 'provas',
+        'planos-aula' => 'jornadas',
+        'caderno' => 'notes',
+        'livros' => 'apostilas',
+        'materiais' => 'arquivos',
+        'ingles' => 'minicursos',
+        'chat' => 'comunicacao',
+        'redacao_livre' => 'redacoes',
+        'ai-agent' => 'jornadas',
+        'questoes' => 'provas',
+        'enrollment' => 'matricula',
+        'boletim' => 'boletins',
+        'boletim_guia' => 'boletins',
+        'declarations' => 'modelos-documentos',
+        'resultados-finais' => 'modelos-documentos',
+        'historico-escolar' => 'modelos-documentos',
+        'ui-modelos' => 'modelos-documentos',
+        'documentos-institucionais' => 'modelos-documentos',
+        'facial-recognition' => 'presenca',
+        'faltas' => 'presenca',
+        'patrimonio' => 'patrimonio',
+        'almoxarifado' => 'patrimonio',
+        'saude-academica' => 'dashboard-gestao',
+        'assistente' => 'dashboard-gestao',
+        'escrever-redacao' => 'redacoes',
+        'escrever-redacao-livre' => 'redacoes',
+        'historico-redacoes' => 'redacoes',
+        'ver-redacao' => 'redacoes',
+        'transcrever-imagem' => 'redacoes',
+        'desempenho-jornadas' => 'jornadas',
+        'desempenho-provas' => 'provas',
+        'notas' => 'boletins',
+        'notas-boletins' => 'boletins',
+        'educashop' => 'educahits',
+        'jornadas-aluno' => 'jornadas',
+        'jornadas-relatorio' => 'jornadas',
+        'student-exams' => 'provas',
+        'student-journey' => 'jornadas',
+    ];
+
+    /**
+     * Prefixo legado → Domínio (Pessoas|Escola). Mantém o prefixo no path.
+     * Ex.: admin/students/index → Dominio/Pessoas/Views/admin/students/index.php
+     *
+     * @var array<string, string>
+     */
+    private const VIEW_PREFIX_TO_DOMINIO = [
+        'students' => 'Pessoas',
+        'teachers' => 'Pessoas',
+        'teachers-documentos' => 'Pessoas',
+        'avatares-alunos' => 'Pessoas',
+        'monitores' => 'Pessoas',
+        'users' => 'Pessoas',
+        'classes' => 'Escola',
+        'turmas' => 'Escola',
+        'units' => 'Escola',
+        'ano-letivo' => 'Escola',
+        'cursos' => 'Escola',
+        'curso' => 'Escola',
+        'cursos-series' => 'Escola',
+        'componentes-curriculares' => 'Escola',
+        'matrizes-curriculares' => 'Escola',
+        'bncc' => 'Escola',
+        'grade-horaria' => 'Escola',
+        'settings' => 'Escola',
+        'school-calendar' => 'Escola',
+        'school-settings' => 'Escola',
+    ];
+
+    /**
+     * Resolve caminho da view:
+     * 1) Views/ legado
+     * 2) Painel/<perfil>/Views/
+     * 3) Dominio/<Pessoas|Escola>/Views/
+     * 4) Modulos/<chave>/Views/<perfil>/ (chave = 2º segmento ou alias)
+     *
+     * Ex.: student/arquivos/index → Modulos/arquivos/Views/aluno/index.php
+     * Ex.: admin/exams/index → Modulos/provas/Views/admin/index.php
      */
     protected function resolveViewPath(string $view): ?string
     {
+        $view = str_replace('\\', '/', $view);
         $legacy = __DIR__ . '/../Views/' . $view . '.php';
         if (is_file($legacy)) {
             return $legacy;
         }
 
-        // Painel/<perfil>/Views/... (ex.: admin/students/index → Painel/Admin/Views/students/index.php)
+        // Notificações do usuário (sem prefixo de perfil): notifications/index
+        if (preg_match('#^notifications/(.+)$#', $view, $nm)) {
+            $notifView = __DIR__ . '/../Modulos/notificacoes/Views/shared/' . $nm[1] . '.php';
+            if (is_file($notifView)) {
+                return $notifView;
+            }
+        }
+
+        // AVA público (sem perfil): ava/certificado_validar
+        if (preg_match('#^ava/(.+)$#', $view, $am)) {
+            $avaView = __DIR__ . '/../Modulos/ava/Views/public/' . $am[1] . '.php';
+            if (is_file($avaView)) {
+                return $avaView;
+            }
+        }
+
+        // Painel/<perfil>/Views/... (ex.: admin/hub → Painel/Admin/Views/hub.php)
         if (preg_match('#^(aluno|professor|student|teacher|admin|master|parents|monitor)/(.+)$#', $view, $pm)) {
             $perfil = $pm[1];
             $map = [
@@ -80,15 +213,48 @@ abstract class BaseController
             }
         }
 
-        // Perfis em PT (aluno/professor) e legado EN (student/teacher)
-        if (preg_match('#^(aluno|professor|student|teacher|admin|master|parents|monitor)/([^/]+)/(.+)$#', $view, $m)) {
-            $perfilView = $m[1];
-            if ($perfilView === 'student') {
-                $perfilView = 'aluno';
-            } elseif ($perfilView === 'teacher') {
-                $perfilView = 'professor';
+        if (!preg_match('#^(aluno|professor|student|teacher|admin|master|parents|monitor)/([^/]+)(?:/(.+))?$#', $view, $m)) {
+            return null;
+        }
+
+        $perfilView = $m[1];
+        if ($perfilView === 'student') {
+            $perfilView = 'aluno';
+        } elseif ($perfilView === 'teacher') {
+            $perfilView = 'professor';
+        }
+        $prefix = $m[2];
+        $rest = $m[3] ?? 'index';
+
+        // Domínio: mantém o prefixo no path (students/index.php)
+        if (isset(self::VIEW_PREFIX_TO_DOMINIO[$prefix])) {
+            $dominio = self::VIEW_PREFIX_TO_DOMINIO[$prefix];
+            $dominioView = __DIR__ . '/../Dominio/' . $dominio . '/Views/' . $perfilView . '/' . $prefix . '/' . $rest . '.php';
+            if (is_file($dominioView)) {
+                return $dominioView;
             }
-            $moduloView = __DIR__ . '/../Modulos/' . $m[2] . '/Views/' . $perfilView . '/' . $m[3] . '.php';
+            // fallback: arquivo direto sob o prefixo
+            $dominioFile = __DIR__ . '/../Dominio/' . $dominio . '/Views/' . $perfilView . '/' . $prefix . '.php';
+            if ($rest === 'index' && is_file($dominioFile)) {
+                return $dominioFile;
+            }
+        }
+
+        // Módulo: alias do prefixo legado → chave física
+        $chave = self::VIEW_PREFIX_TO_MODULE[$prefix] ?? $prefix;
+        $candidates = [
+            // com prefixo preservado (ex.: admin/reunioes/geral → .../Views/admin/reunioes/geral.php)
+            __DIR__ . '/../Modulos/' . $chave . '/Views/' . $perfilView . '/' . $prefix . '/' . $rest . '.php',
+            // achatado (ex.: admin/exams/index → .../Views/admin/index.php)
+            __DIR__ . '/../Modulos/' . $chave . '/Views/' . $perfilView . '/' . $rest . '.php',
+            // view de um único arquivo: student/essays → .../Views/aluno/essays.php
+            __DIR__ . '/../Modulos/' . $chave . '/Views/' . $perfilView . '/' . $prefix . '.php',
+            // controller já usa a chave PT: admin/provas/index
+            __DIR__ . '/../Modulos/' . $prefix . '/Views/' . $perfilView . '/' . $rest . '.php',
+            __DIR__ . '/../Modulos/' . $prefix . '/Views/' . $perfilView . '/' . $prefix . '/' . $rest . '.php',
+            __DIR__ . '/../Modulos/' . $prefix . '/Views/' . $perfilView . '/' . $prefix . '.php',
+        ];
+        foreach ($candidates as $moduloView) {
             if (is_file($moduloView)) {
                 return $moduloView;
             }

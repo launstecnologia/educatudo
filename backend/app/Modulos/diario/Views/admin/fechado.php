@@ -54,7 +54,7 @@ $periodoFim = (string) ($periodo['fim'] ?? '');
     </div>
 </div>
 
-<?php include dirname(__DIR__, 4) . '/Views/admin/_partials/flash_message.php'; ?>
+<?php include \App\Core\ViewPaths::adminPartial('flash_message.php'); ?>
 
 <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-6">
     Visualização somente leitura. Para corrigir chamadas, reabra o diário.

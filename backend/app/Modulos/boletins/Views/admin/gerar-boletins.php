@@ -220,7 +220,7 @@ $alunoSimNome = trim((string) ($simulacao['aluno']['nome'] ?? ''));
                 : $matrizLinhas;
             $decimalPlaces = 1;
             $simVistaId = 'gerar-boletins-sim';
-            include dirname(__DIR__, 4) . '/Views/partials/boletim_simulacao_vistas.php';
+            include \App\Core\ViewPaths::partial('boletim_simulacao_vistas.php');
             ?>
         <?php else: ?>
             <?php
@@ -229,7 +229,7 @@ $alunoSimNome = trim((string) ($simulacao['aluno']['nome'] ?? ''));
             $decimalPlaces = 1;
             $tituloTabelaSimples = 'Matérias';
             $ocultar_grupo_hierarquia = false;
-            include dirname(__DIR__, 4) . '/Views/partials/boletim_quadro_tabela_simples.php';
+            include \App\Core\ViewPaths::partial('boletim_quadro_tabela_simples.php');
             ?>
         <?php endif; ?>
     </div>
