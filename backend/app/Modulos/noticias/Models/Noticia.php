@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Painel\Noticias\Models;
+namespace App\Modulos\Noticias\Models;
 /**
  * Model para a tabela noticias (ingestão RSS).
  */

@@ -165,7 +165,7 @@ return [
     'App\\Models\\ModuloArquivoVideo' => ['App\\Modulos\\Arquivos\\Models\\ModuloArquivoVideo', 'Modulos/arquivos/Models/ModuloArquivoVideo.php'],
     'App\\Models\\Monitor' => ['App\\Dominio\\Pessoas\\Models\\Monitor', 'Dominio/Pessoas/Models/Monitor.php'],
     'App\\Models\\NotaTipoFinal' => ['App\\Modulos\\Provas\\Models\\NotaTipoFinal', 'Modulos/provas/Models/NotaTipoFinal.php'],
-    'App\\Models\\Noticia' => ['App\\Painel\\Noticias\\Models\\Noticia', 'Painel/Noticias/Models/Noticia.php'],
+    'App\\Models\\Noticia' => ['App\\Modulos\\Noticias\\Models\\Noticia', 'Modulos/noticias/Models/Noticia.php'],
     'App\\Models\\NotificacaoApi' => ['App\\Modulos\\Notificacoes\\Models\\NotificacaoApi', 'Modulos/notificacoes/Models/NotificacaoApi.php'],
     'App\\Models\\Notification' => ['App\\Modulos\\Notificacoes\\Models\\Notification', 'Modulos/notificacoes/Models/Notification.php'],
     'App\\Models\\NotificationRecipient' => ['App\\Modulos\\Notificacoes\\Models\\NotificationRecipient', 'Modulos/notificacoes/Models/NotificationRecipient.php'],

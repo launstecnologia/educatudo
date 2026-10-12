@@ -4,7 +4,7 @@ namespace App\Core;
 
 /**
  * Resolve handlers de rota (ex.: Admin/StudentAdminController) sem app/Controllers.
- * Procura em Modulos/, Dominio/, Painel/, API/, PWA/ e Publico/.
+ * Procura em Modulos/, Dominio/, Painel/, API/, PWA/, Publico/, Webhooks/ e Infra/Media/.
  */
 class ControllerLocator
 {
@@ -31,6 +31,9 @@ class ControllerLocator
         'Games/MillionGameController' => 'Modulos/jogos/MillionGameController',
         'Notes/NotesController' => 'Modulos/notes/NotesController',
         'Notes/NotesTokenController' => 'Modulos/notes/NotesTokenController',
+        'Noticias/NoticiasController' => 'Modulos/noticias/NoticiasController',
+        'Support/SupportTicketController' => 'Modulos/tickets/TicketController',
+        'Tickets/TicketController' => 'Modulos/tickets/TicketController',
     ];
 
     /**
@@ -133,9 +136,7 @@ class ControllerLocator
                 'User' => 'User',
                 'Teacher' => 'Professor',
                 'Student' => 'Aluno',
-                'Media' => 'Media',
                 'Integrations' => 'Integrations',
-                'Webhooks' => 'Webhooks',
                 'Admin' => 'Admin',
             ];
             foreach ($legacy as $old => $painelDir) {
@@ -154,8 +155,14 @@ class ControllerLocator
             }
         }
 
-        // Fora do Painel: API, PWA, Publico (rotas legadas Api/*, Pwa/*, Public/*)
-        foreach (['API' => 'Api', 'PWA' => 'Pwa', 'Publico' => 'Public'] as $dir => $routePrefix) {
+        // Fora do Painel: API, PWA, Publico, Webhooks, Infra/Media (rotas legadas Api/*, Pwa/*, Public/*, Webhooks/*, Media/*)
+        foreach ([
+            'API' => 'Api',
+            'PWA' => 'Pwa',
+            'Publico' => 'Public',
+            'Webhooks' => 'Webhooks',
+            'Infra/Media' => 'Media',
+        ] as $dir => $routePrefix) {
             $ctrlDir = $app . '/' . $dir . '/Controllers';
             if (!is_dir($ctrlDir)) {
                 continue;

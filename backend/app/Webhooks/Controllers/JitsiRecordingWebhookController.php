@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Painel\Webhooks\Controllers;
+namespace App\Webhooks\Controllers;
 /**
  * Webhook do Jibri (Jitsi self-hosted) para gravações automáticas.
  *

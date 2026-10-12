@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Painel\Media\Controllers;
+namespace App\Infra\Media\Controllers;
 /**
  * Serve mídia (layout, essays, etc.) por type + key.
  * S3/local: streaming pelo backend com fallback de keys legadas.
@@ -12,7 +12,7 @@ namespace App\Painel\Media\Controllers;
  */
 
 use App\Core\BaseController;
-use App\Services\MediaStorageService;
+use App\Infra\Services\MediaStorageService;
 
 class MediaServeController extends BaseController
 {

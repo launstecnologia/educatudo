@@ -29,7 +29,11 @@
             "app/Compat/services_autoload.php",
             "app/Compat/ai_autoload.php",
             "app/Compat/api_autoload.php",
-            "app/Compat/pwa_autoload.php"
+            "app/Compat/pwa_autoload.php",
+            "app/Compat/webhooks_autoload.php",
+            "app/Compat/noticias_autoload.php",
+            "app/Compat/media_autoload.php",
+            "app/Compat/tickets_autoload.php"
         ],
         "psr-4": {
             "App\\": "app/",
@@ -73,6 +77,8 @@
             "App\\Modulos\\ExternalApps\\": "app/Modulos/external-apps/",
             "App\\Modulos\\Jogos\\": "app/Modulos/jogos/",
             "App\\Modulos\\Notes\\": "app/Modulos/notes/",
+            "App\\Modulos\\Noticias\\": "app/Modulos/noticias/",
+            "App\\Modulos\\Tickets\\": "app/Modulos/tickets/",
             "App\\Dominio\\Pessoas\\": "app/Dominio/Pessoas/",
             "App\\Dominio\\Escola\\": "app/Dominio/Escola/",
             "App\\Painel\\": "app/Painel/"

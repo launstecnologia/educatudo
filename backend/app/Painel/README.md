@@ -12,7 +12,11 @@ Painel/
 
 - Negócio essencial → `Dominio/`
 - Feature opcional → `Modulos/` (EducaHits, EducaLabs, Apps Externos, Jogos, Notes…)
-- API HTTP (JWT/mobile) → `Api/` (fora do Painel)
+- API HTTP (JWT/mobile) → `API/` (fora do Painel)
 - Manifests PWA → `PWA/` (fora do Painel)
 - Endpoints públicos sem login → `Publico/` (ex.: validar histórico)
+- Webhooks externos → `Webhooks/` (fora do Painel)
+- Notícias (feed RSS) → `Modulos/noticias/`
+- Serve de mídia (`/media/serve`) → `Infra/Media/`
+- Tickets de suporte (aluno) → `Modulos/tickets/`
 - Layout HTML chrome → `Views/layouts/`

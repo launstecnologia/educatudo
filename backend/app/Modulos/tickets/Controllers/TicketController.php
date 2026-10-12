@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Painel\Support\Controllers;
+namespace App\Modulos\Tickets\Controllers;
 /**
  * Controller para Sistema de Tickets de Suporte
  * Permite que alunos criem e gerenciem tickets de suporte
@@ -10,10 +10,10 @@ namespace App\Painel\Support\Controllers;
 use App\Core\AuthManager;
 use App\Core\BaseController;
 use App\Core\Database;
-use App\Services\MediaStorageService;
+use App\Infra\Services\MediaStorageService;
 
-if (!class_exists(__NAMESPACE__ . '\\SupportTicketController', false)) {
-class SupportTicketController extends BaseController
+if (!class_exists(__NAMESPACE__ . '\\TicketController', false)) {
+class TicketController extends BaseController
 {
     private $authManager;
     private $db;
@@ -463,6 +463,6 @@ class SupportTicketController extends BaseController
 }
 }
 
-if (!class_exists('SupportTicketController', false) && class_exists(__NAMESPACE__ . '\\SupportTicketController', false)) {
-    class_alias(__NAMESPACE__ . '\\SupportTicketController', 'SupportTicketController');
+if (!class_exists('TicketController', false) && class_exists(__NAMESPACE__ . '\\TicketController', false)) {
+    class_alias(__NAMESPACE__ . '\\TicketController', 'TicketController');
 }

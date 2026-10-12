@@ -134,13 +134,13 @@ $router->post('/onboarding/salvar', 'User/OnboardingController@salvar');
 $router->get('/onboarding/buscar', 'User/OnboardingController@buscar');
 
 // Tickets de Suporte (Aluno)
-$router->get('/tickets', 'Support/SupportTicketController@index');
-$router->get('/tickets/criar', 'Support/SupportTicketController@criar');
-$router->post('/tickets/processar-criar', 'Support/SupportTicketController@processarCriar');
-$router->get('/tickets/visualizar', 'Support/SupportTicketController@visualizar');
-$router->post('/tickets/enviar-mensagem', 'Support/SupportTicketController@enviarMensagem');
-$router->post('/tickets/upload-arquivo', 'Support/SupportTicketController@uploadArquivo');
-$router->post('/tickets/upload-imagem', 'Support/SupportTicketController@uploadImagem');
+$router->get('/tickets', 'Tickets/TicketController@index');
+$router->get('/tickets/criar', 'Tickets/TicketController@criar');
+$router->post('/tickets/processar-criar', 'Tickets/TicketController@processarCriar');
+$router->get('/tickets/visualizar', 'Tickets/TicketController@visualizar');
+$router->post('/tickets/enviar-mensagem', 'Tickets/TicketController@enviarMensagem');
+$router->post('/tickets/upload-arquivo', 'Tickets/TicketController@uploadArquivo');
+$router->post('/tickets/upload-imagem', 'Tickets/TicketController@uploadImagem');
 
 // Exercícios
 $router->get('/exercicios', 'Exercises/ExerciseController@index');

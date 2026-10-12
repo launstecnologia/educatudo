@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Painel\Noticias\Controllers;
+namespace App\Modulos\Noticias\Controllers;
 /**
  * API REST - Notícias (feed RSS).
  * GET /api/noticias?categoria=educacao&limit=20
  */
 
 use App\Core\BaseController;
-use App\Models\Noticia;
+use App\Modulos\Noticias\Models\Noticia;
 
 class NoticiasController extends BaseController
 {

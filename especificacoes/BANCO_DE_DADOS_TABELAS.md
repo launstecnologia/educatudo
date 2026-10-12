@@ -343,8 +343,8 @@ Este documento descreve **todas as tabelas** do banco `educatudo_bd_educatudo`, 
 | **valores_cobrados_mensais** | Valores financeiros mensais (cobrança). | AdminController (financeiro). |
 | **ocorrencias_aluno** | Ocorrências disciplinares/pedagógicas do aluno. | AdminController, ParentController. |
 | **ocorrencias_aluno_itens** | Itens/alunos vinculados à ocorrência. | AdminController. |
-| **tickets** | Tickets de suporte. | SupportTicketController. |
-| **ticket_mensagens** | Mensagens do ticket. | SupportTicketController. |
+| **tickets** | Tickets de suporte. | TicketController (`Modulos/tickets`). |
+| **ticket_mensagens** | Mensagens do ticket. | TicketController (`Modulos/tickets`). |
 | **noticias** | Notícias/avisos do sistema. | NoticiasController, RssService. |
 | **sessoes_acesso_alunos** | Registro de acessos do aluno (sessão, IP, etc.). | Controle de acesso/auditoria. |
 | **pontuacao_alunos** | Pontuação/gamificação do aluno. | MillionGameController, relatórios. |

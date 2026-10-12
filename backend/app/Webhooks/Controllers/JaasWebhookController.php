@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Painel\Webhooks\Controllers;
+namespace App\Webhooks\Controllers;
 
 
 use App\Core\BaseController;
