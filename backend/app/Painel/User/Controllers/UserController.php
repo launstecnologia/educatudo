@@ -684,8 +684,9 @@ class UsuarioController extends BaseController
                 throw new \Exception('Senhas não coincidem');
             }
 
-            if (strlen($novaSenha) < 6) {
-                throw new \Exception('Senha deve ter pelo menos 6 caracteres');
+            $passwordValidation = (new Auth())->validateStrongPassword($novaSenha);
+            if ($passwordValidation !== true) {
+                throw new \Exception($passwordValidation);
             }
 
             // Atualizar senha

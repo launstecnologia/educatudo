@@ -118,7 +118,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                         </button>
-                        <button type="button" onclick="changePassword(<?= (int) $usuario['id'] ?>)"
+                        <button type="button" onclick="abrirAlterarSenha(<?= (int) $usuario['id'] ?>)"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-key text-gray-400 w-4 text-center"></i> Alterar Senha
                         </button>
@@ -344,15 +344,47 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
                     <div>
                         <label for="senha" class="block text-sm font-medium text-gray-700 mb-1">Senha *</label>
-                        <input type="password" id="senha" name="senha"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                               placeholder="Mínimo 6 caracteres">
+                        <div class="relative">
+                            <input type="password" id="senha" name="senha" minlength="8" autocomplete="new-password"
+                                   class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                   placeholder="Mínimo 8 caracteres">
+                            <button type="button" onclick="alternarVisibilidadeSenha('senha')"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    aria-label="Mostrar senha">
+                                <svg id="senha-eye" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                </svg>
+                                <svg id="senha-eye-off" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                     <div>
                         <label for="confirmar_senha" class="block text-sm font-medium text-gray-700 mb-1">Confirmar Senha *</label>
-                        <input type="password" id="confirmar_senha" name="confirmar_senha"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                               placeholder="Digite a senha novamente">
+                        <div class="relative">
+                            <input type="password" id="confirmar_senha" name="confirmar_senha" minlength="8" autocomplete="new-password"
+                                   class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                   placeholder="Digite a senha novamente">
+                            <button type="button" onclick="alternarVisibilidadeSenha('confirmar_senha')"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    aria-label="Mostrar confirmação da senha">
+                                <svg id="confirmar_senha-eye" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                </svg>
+                                <svg id="confirmar_senha-eye-off" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <?php
+                        $senha_forca_prefix = 'senha';
+                        include __DIR__ . '/_senha_forca.php';
+                        ?>
                     </div>
                 </div>
             </section>
@@ -417,10 +449,72 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
 
             <section id="user-trocar-senha-section" class="hidden">
                 <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Alterar Senha</h3>
-                <p class="text-sm text-gray-600 mb-3">Define uma nova senha para este usuário.</p>
+                <p class="text-sm text-gray-600 mb-3">Define uma nova senha para este usuário. A senha atual permanece até você salvar a nova.</p>
                 <button type="button" id="btn-trocar-senha" class="btn-secondary-custom px-4 py-2 rounded-lg text-sm hover:opacity-90 transition-colors">
                     <i class="fa-solid fa-key mr-2"></i> Alterar Senha
                 </button>
+                <div id="user-trocar-senha-campos" class="hidden mt-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+                        <div>
+                            <label for="edit_senha" class="block text-sm font-medium text-gray-700 mb-1">Nova senha *</label>
+                            <div class="relative">
+                                <input type="password" id="edit_senha" autocomplete="new-password" disabled
+                                       class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                       placeholder="Mínimo 8 caracteres">
+                                <button type="button" onclick="alternarVisibilidadeSenha('edit_senha')"
+                                        class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                        aria-label="Mostrar nova senha">
+                                    <svg id="edit_senha-eye" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                    </svg>
+                                    <svg id="edit_senha-eye-off" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="edit_confirmar_senha" class="block text-sm font-medium text-gray-700 mb-1">Confirmar senha *</label>
+                            <div class="relative">
+                                <input type="password" id="edit_confirmar_senha" autocomplete="new-password" disabled
+                                       class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                       placeholder="Digite a senha novamente">
+                                <button type="button" onclick="alternarVisibilidadeSenha('edit_confirmar_senha')"
+                                        class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                        aria-label="Mostrar confirmação da nova senha">
+                                    <svg id="edit_confirmar_senha-eye" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                    </svg>
+                                    <svg id="edit_confirmar_senha-eye-off" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <?php
+                            $senha_forca_prefix = 'edit-senha';
+                            include __DIR__ . '/_senha_forca.php';
+                            ?>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label for="edit_motivo" class="block text-sm font-medium text-gray-700 mb-1">Motivo (opcional)</label>
+                            <input type="text" id="edit_motivo" maxlength="255" disabled
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                   placeholder="Por que a senha está sendo alterada">
+                        </div>
+                    </div>
+                    <div class="mt-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+                        <button type="button" id="btn-cancelar-senha" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">
+                            Cancelar
+                        </button>
+                        <button type="button" id="btn-salvar-senha" class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
+                            Salvar senha
+                        </button>
+                    </div>
+                </div>
             </section>
 
             <section id="user-system-info-section" class="hidden border-t border-gray-200 pt-6">
@@ -567,6 +661,103 @@ document.getElementById('btn-carregar-perfil').addEventListener('click', functio
     fillPermissionsByType(tipo);
 });
 
+const SENHA_ESPECIAL = /[!@#$%^&*()_+\-=[\]{}|;:,.<>?]/;
+
+function alternarVisibilidadeSenha(inputId) {
+    const input = document.getElementById(inputId);
+    const eye = document.getElementById(inputId + '-eye');
+    const eyeOff = document.getElementById(inputId + '-eye-off');
+    if (!input || !eye || !eyeOff) return;
+    const mostrar = input.type === 'password';
+    input.type = mostrar ? 'text' : 'password';
+    eye.classList.toggle('hidden', mostrar);
+    eyeOff.classList.toggle('hidden', !mostrar);
+    const botao = eye.parentElement;
+    if (botao) botao.setAttribute('aria-label', mostrar ? 'Ocultar senha' : 'Mostrar senha');
+}
+
+function resetarVisibilidadeSenha(inputId) {
+    const input = document.getElementById(inputId);
+    const eye = document.getElementById(inputId + '-eye');
+    const eyeOff = document.getElementById(inputId + '-eye-off');
+    if (input) input.type = 'password';
+    if (eye) eye.classList.remove('hidden');
+    if (eyeOff) eyeOff.classList.add('hidden');
+}
+
+function requisitosSenha(valor) {
+    return {
+        length: valor.length >= 8,
+        upper: /[A-Z]/.test(valor),
+        lower: /[a-z]/.test(valor),
+        number: /[0-9]/.test(valor),
+        special: SENHA_ESPECIAL.test(valor)
+    };
+}
+
+function senhaAtendeRequisitos(valor) {
+    return Object.values(requisitosSenha(valor)).every(Boolean);
+}
+
+function atualizarForcaSenha(prefix, valor) {
+    const checks = requisitosSenha(valor || '');
+    const mapa = {
+        length: prefix + '-req-length',
+        upper: prefix + '-req-upper',
+        lower: prefix + '-req-lower',
+        number: prefix + '-req-number',
+        special: prefix + '-req-special'
+    };
+    Object.keys(mapa).forEach(function (chave) {
+        const item = document.getElementById(mapa[chave]);
+        if (!item) return;
+        const icon = item.querySelector('.req-icon');
+        const ok = checks[chave];
+        item.classList.toggle('text-green-600', ok);
+        item.classList.toggle('text-gray-500', !ok);
+        if (icon) {
+            icon.classList.toggle('fa-check', ok);
+            icon.classList.toggle('fa-circle', !ok);
+            icon.classList.toggle('text-[10px]', ok);
+            icon.classList.toggle('text-[7px]', !ok);
+        }
+    });
+
+    const score = Object.values(checks).filter(Boolean).length;
+    const bar = document.getElementById(prefix + '-strength-bar');
+    const text = document.getElementById(prefix + '-strength-text');
+    if (!bar || !text) return;
+    bar.style.width = ((score / 5) * 100) + '%';
+    if (!valor) {
+        bar.className = 'h-full rounded-full transition-all duration-300 bg-gray-300';
+        text.textContent = 'Fraca';
+        text.className = 'text-xs font-medium text-gray-500 w-12 text-right';
+    } else if (score <= 2) {
+        bar.className = 'h-full rounded-full transition-all duration-300 bg-red-500';
+        text.textContent = 'Fraca';
+        text.className = 'text-xs font-medium text-red-600 w-12 text-right';
+    } else if (score <= 4) {
+        bar.className = 'h-full rounded-full transition-all duration-300 bg-amber-500';
+        text.textContent = 'Média';
+        text.className = 'text-xs font-medium text-amber-600 w-12 text-right';
+    } else {
+        bar.className = 'h-full rounded-full transition-all duration-300 bg-green-500';
+        text.textContent = 'Forte';
+        text.className = 'text-xs font-medium text-green-600 w-12 text-right';
+    }
+}
+
+function mensagemSenhaInvalida() {
+    return 'A senha precisa de 8 caracteres, com letra maiúscula, minúscula, número e caractere especial.';
+}
+
+document.getElementById('senha').addEventListener('input', function () {
+    atualizarForcaSenha('senha', this.value);
+});
+document.getElementById('edit_senha').addEventListener('input', function () {
+    atualizarForcaSenha('edit-senha', this.value);
+});
+
 document.getElementById('confirmar_senha').addEventListener('input', function () {
     const senha = document.getElementById('senha').value;
     if (this.value && senha !== this.value) {
@@ -639,11 +830,56 @@ function closeUserDrawer() {
     document.body.style.overflow = '';
 }
 
+let abrirPainelSenhaAoCarregar = false;
+
+function camposTrocaSenha() {
+    return ['edit_senha', 'edit_confirmar_senha', 'edit_motivo'].map(function (id) {
+        return document.getElementById(id);
+    });
+}
+
+function ocultarPainelTrocaSenha() {
+    const painel = document.getElementById('user-trocar-senha-campos');
+    const botao = document.getElementById('btn-trocar-senha');
+    if (painel) painel.classList.add('hidden');
+    if (botao) botao.classList.remove('hidden');
+    camposTrocaSenha().forEach(function (campo) {
+        if (!campo) return;
+        campo.value = '';
+        campo.disabled = true;
+    });
+    resetarVisibilidadeSenha('edit_senha');
+    resetarVisibilidadeSenha('edit_confirmar_senha');
+    atualizarForcaSenha('edit-senha', '');
+}
+
+function mostrarPainelTrocaSenha() {
+    const painel = document.getElementById('user-trocar-senha-campos');
+    const botao = document.getElementById('btn-trocar-senha');
+    if (botao) botao.classList.add('hidden');
+    if (painel) painel.classList.remove('hidden');
+    camposTrocaSenha().forEach(function (campo) {
+        if (campo) campo.disabled = false;
+    });
+    const campo = document.getElementById('edit_senha');
+    if (painel) painel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (campo) campo.focus();
+}
+
+function abrirAlterarSenha(id) {
+    abrirPainelSenhaAoCarregar = true;
+    openUserDrawer(id);
+}
+
 function openUserDrawer(id) {
     const form = document.getElementById('user-form');
     form.reset();
     document.getElementById('user_id').value = '';
     document.getElementById('confirmar_senha').classList.remove('border-red-500');
+    resetarVisibilidadeSenha('senha');
+    resetarVisibilidadeSenha('confirmar_senha');
+    atualizarForcaSenha('senha', '');
+    ocultarPainelTrocaSenha();
 
     const avatarSection = document.getElementById('user-avatar-section');
     const statusSection = document.getElementById('user-status-section');
@@ -663,8 +899,11 @@ function openUserDrawer(id) {
         trocarSenhaSection.classList.add('hidden');
         systemInfoSection.classList.add('hidden');
         senhaSection.classList.remove('hidden');
+        senhaInput.disabled = false;
+        confirmarSenhaInput.disabled = false;
         senhaInput.required = true;
         confirmarSenhaInput.required = true;
+        abrirPainelSenhaAoCarregar = false;
         selectPerfil.querySelectorAll('option[data-inactive="1"]').forEach((opt) => { opt.hidden = true; });
         applyPermissionsMatrix({});
         showUserDrawer();
@@ -677,6 +916,8 @@ function openUserDrawer(id) {
     senhaSection.classList.add('hidden');
     senhaInput.required = false;
     confirmarSenhaInput.required = false;
+    senhaInput.disabled = true;
+    confirmarSenhaInput.disabled = true;
     avatarSection.classList.remove('hidden');
     statusSection.classList.remove('hidden');
     trocarSenhaSection.classList.remove('hidden');
@@ -688,6 +929,7 @@ function openUserDrawer(id) {
         .then((response) => response.json())
         .then((data) => {
             if (!data.success) {
+                abrirPainelSenhaAoCarregar = false;
                 alert('Erro: ' + (data.error || 'Não foi possível carregar o usuário'));
                 closeUserDrawer();
                 return;
@@ -713,11 +955,15 @@ function openUserDrawer(id) {
                 ev.preventDefault();
                 uploadAvatar(usuario.id, ev);
             };
-            document.getElementById('btn-trocar-senha').onclick = function () { changePassword(usuario.id); };
 
             applyPermissionsMatrix(data.selected_permissions || {});
+            if (abrirPainelSenhaAoCarregar) {
+                abrirPainelSenhaAoCarregar = false;
+                mostrarPainelTrocaSenha();
+            }
         })
         .catch(() => {
+            abrirPainelSenhaAoCarregar = false;
             alert('Erro de conexão ao carregar usuário.');
             closeUserDrawer();
         });
@@ -736,8 +982,8 @@ document.getElementById('user-form').addEventListener('submit', async function (
     if (mode === 'create') {
         const senha = formData.get('senha');
         const confirmarSenha = formData.get('confirmar_senha');
-        if (!senha || senha.length < 6) {
-            alert('A senha deve ter pelo menos 6 caracteres!');
+        if (!senhaAtendeRequisitos(String(senha || ''))) {
+            alert(mensagemSenhaInvalida());
             return;
         }
         if (senha !== confirmarSenha) {
@@ -767,14 +1013,18 @@ document.getElementById('user-form').addEventListener('submit', async function (
     }
 });
 
+document.getElementById('btn-trocar-senha').addEventListener('click', mostrarPainelTrocaSenha);
+document.getElementById('btn-cancelar-senha').addEventListener('click', ocultarPainelTrocaSenha);
+
 function changePassword(id) {
-    const motivo = prompt('Motivo da alteração de senha (opcional):');
-    if (motivo === null) return;
+    const novaSenha = document.getElementById('edit_senha').value;
+    const confirmarSenha = document.getElementById('edit_confirmar_senha').value;
+    const motivo = document.getElementById('edit_motivo').value.trim();
 
-    const novaSenha = prompt('Nova senha:');
-    if (!novaSenha) return;
-
-    const confirmarSenha = prompt('Confirmar nova senha:');
+    if (!senhaAtendeRequisitos(novaSenha)) {
+        alert(mensagemSenhaInvalida());
+        return;
+    }
     if (novaSenha !== confirmarSenha) {
         alert('Senhas não coincidem!');
         return;
@@ -787,6 +1037,9 @@ function changePassword(id) {
     formData.append('confirmar_senha', confirmarSenha);
     formData.append('motivo', motivo);
 
+    const botao = document.getElementById('btn-salvar-senha');
+    botao.disabled = true;
+
     fetch(URL_BASE + '/admin/usuarios/' + id + '/senha?_token=' + encodeURIComponent(token), {
         method: 'POST',
         body: formData,
@@ -796,12 +1049,20 @@ function changePassword(id) {
         .then((data) => {
             if (data.success) {
                 alert('Senha alterada com sucesso!');
+                ocultarPainelTrocaSenha();
             } else {
                 alert('Erro: ' + data.error);
             }
         })
-        .catch(() => alert('Erro de conexão'));
+        .catch(() => alert('Erro de conexão'))
+        .finally(() => { botao.disabled = false; });
 }
+
+document.getElementById('btn-salvar-senha').addEventListener('click', function () {
+    const id = document.getElementById('user_id').value;
+    if (!id) return;
+    changePassword(id);
+});
 
 function excluirUsuario(id) {
     if (!confirm('O usuário sairá da listagem, mas os dados permanecem no banco. Continuar?')) {
