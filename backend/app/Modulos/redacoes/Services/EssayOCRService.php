@@ -107,7 +107,7 @@ class EssayOCRService
             $apiKey = getenv('SUPABASE_TRANSCRIBE_API_KEY');
         }
         if ($apiKey === false || $apiKey === '') {
-            $envPath = __DIR__ . '/../../.env';
+            $envPath = dirname(__DIR__, 4) . '/.env';
             if (file_exists($envPath)) {
                 $content = @file_get_contents($envPath);
                 if ($content !== false) {

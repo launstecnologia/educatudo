@@ -35,11 +35,14 @@ class EssayAIService
             }
         }
         if (empty($apiKey)) {
-            $config = @require __DIR__ . '/../../config/app.php';
-            $apiKey = $config['ai']['openai_api_key'] ?? null;
+            $configPath = dirname(__DIR__, 4) . '/config/app.php';
+            if (is_file($configPath)) {
+                $config = require $configPath;
+                $apiKey = is_array($config) ? ($config['ai']['openai_api_key'] ?? null) : null;
+            }
         }
         if (empty($apiKey)) {
-            $envPath = __DIR__ . '/../../.env';
+            $envPath = dirname(__DIR__, 4) . '/.env';
             if (file_exists($envPath)) {
                 $lines = @file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
                 foreach ($lines as $line) {
@@ -448,7 +451,7 @@ class EssayAIService
         }
 
         $this->envCache = [];
-        $envPath = __DIR__ . '/../../.env';
+        $envPath = dirname(__DIR__, 4) . '/.env';
         if (!file_exists($envPath)) {
             return $this->envCache;
         }
