@@ -118,6 +118,7 @@ class FechamentoService
             'justificativa' => $justificativa !== '' ? $justificativa : null,
             'usuario_id' => $usuarioId,
         ]);
+        $this->homologacao->invalidarCachePeriodo();
         $atualizado = $this->model->findById((int) $atual['id']);
         return ['success' => true, 'fechamento' => $atualizado ?: $atual];
     }
@@ -479,7 +480,7 @@ class FechamentoService
                 ];
                 continue;
             }
-            $preview = $this->homologacao->previewTurma($tid, $anoLetivo, $periodoTipo, $periodoNumero);
+            $preview = $this->homologacao->previewTurma($tid, $anoLetivo, $periodoTipo, $periodoNumero, true);
             $linhas[] = [
                 'turma' => $preview['turma'] ?: $turma,
                 'periodo' => $preview['periodo'],

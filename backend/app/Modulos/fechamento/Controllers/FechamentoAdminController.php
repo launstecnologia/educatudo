@@ -85,15 +85,15 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
             return;
         }
         $preview = $svc->homologacao()->previewTurma($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
-        if ($this->podeAlterarResultadosFinais()) {
-            $svc->concluirSeAlunosHomologados(
-                $turmaId,
-                $anoLetivo,
-                $periodoTipo,
-                $periodoNumero,
-                $preview,
-                (int) ($this->auth->getUser()['id'] ?? 0)
-            );
+        if ($this->podeAlterarResultadosFinais() && $svc->concluirSeAlunosHomologados(
+            $turmaId,
+            $anoLetivo,
+            $periodoTipo,
+            $periodoNumero,
+            $preview,
+            (int) ($this->auth->getUser()['id'] ?? 0)
+        )) {
+            $preview = $svc->homologacao()->previewTurma($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
         }
         $fechamento = $svc->model()->findVigente($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
         $historico = $fechamento ? $svc->model()->listarHistorico((int) $fechamento['id']) : [];

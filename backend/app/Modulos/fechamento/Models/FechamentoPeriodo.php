@@ -72,15 +72,21 @@ class FechamentoPeriodo
 
     public function tabelaExiste(string $tabela): bool
     {
+        static $cache = [];
+        $tenantKey = defined('TENANT_ID') ? ('t' . TENANT_ID) : 'no_tenant';
+        $key = $tenantKey . ':' . $tabela;
+        if (array_key_exists($key, $cache)) {
+            return $cache[$key];
+        }
         try {
             $row = $this->db->fetch(
                 'SELECT 1 AS ok FROM information_schema.tables
                  WHERE table_schema = DATABASE() AND table_name = :t LIMIT 1',
                 ['t' => $tabela]
             );
-            return !empty($row['ok']);
+            return $cache[$key] = !empty($row['ok']);
         } catch (\Throwable $e) {
-            return false;
+            return $cache[$key] = false;
         }
     }
 

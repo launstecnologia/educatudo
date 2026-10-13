@@ -25,6 +25,11 @@ class ResultadoHomologacaoService
     private FrequencyService $frequencia;
     private ClassDiary $diario;
     private $db;
+    /** @var array<string,bool> */
+    private array $snapshotPeriodoCache = [];
+    /** @var array<int,?int> */
+    private array $cargaHorariaCache = [];
+    private ?FechamentoPeriodo $periodoModel = null;
 
     public function __construct(
         ?ResultadoAcademico $model = null,
@@ -59,7 +64,7 @@ class ResultadoHomologacaoService
      *   pode_homologar:bool
      * }
      */
-    public function previewTurma(int $turmaId, int $anoLetivo, string $periodoTipo = 'ano', int $periodoNumero = 0): array
+    public function previewTurma(int $turmaId, int $anoLetivo, string $periodoTipo = 'ano', int $periodoNumero = 0, bool $somenteResumo = false): array
     {
         $turma = $this->turma($turmaId);
         $periodo = $this->resolverPeriodo($anoLetivo, $periodoTipo, $periodoNumero);
@@ -98,16 +103,20 @@ class ResultadoHomologacaoService
                 $conselho,
                 $homologados,
                 $especiaisTurma[(int) $aluno['id']] ?? [],
-                $config
+                $config,
+                $somenteResumo
             );
-            $linhas[] = $linha;
+            if (!$somenteResumo) {
+                $linhas[] = $linha;
+            }
             $resumo['total']++;
-            if (($linha['status'] ?? '') === 'homologado') {
+            $persistido = ($linha['status'] ?? '') === 'homologado' || !empty($linha['_persistido_homologado']);
+            if ($persistido) {
                 $resumo['homologados']++;
             }
             if (!empty($linha['pendencias_criticas'])) {
                 $resumo['pendencias']++;
-            } elseif (($linha['status'] ?? '') !== 'homologado'
+            } elseif (!$persistido
                 && FechamentoGates::situacaoPermiteHomologar((string) ($linha['situacao'] ?? ''))) {
                 $resumo['elegiveis']++;
             }
@@ -423,6 +432,16 @@ class ResultadoHomologacaoService
         );
     }
 
+    public function invalidarCachePeriodo(): void
+    {
+        $this->snapshotPeriodoCache = [];
+    }
+
+    private function periodoModel(): FechamentoPeriodo
+    {
+        return $this->periodoModel ??= new FechamentoPeriodo();
+    }
+
     private function periodoEstaTravado(
         int $turmaId,
         int $anoLetivo,
@@ -430,7 +449,7 @@ class ResultadoHomologacaoService
         int $periodoNumero
     ): bool {
         try {
-            $model = new FechamentoPeriodo();
+            $model = $this->periodoModel();
             return $model->schemaPronto()
                 && $model->estaTravado($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
         } catch (\Throwable $e) {
@@ -446,30 +465,32 @@ class ResultadoHomologacaoService
      */
     private function periodoUsaSnapshot(array $turma, int $anoLetivo, array $periodo): bool
     {
+        $turmaId = (int) ($turma['id'] ?? 0);
+        $tipo = (string) ($periodo['tipo'] ?? 'ano');
+        $numero = (int) ($periodo['numero'] ?? 0);
+        $chave = $turmaId . ':' . $anoLetivo . ':' . $tipo . ':' . $numero;
+        if (array_key_exists($chave, $this->snapshotPeriodoCache)) {
+            return $this->snapshotPeriodoCache[$chave];
+        }
         try {
-            $model = new FechamentoPeriodo();
+            $model = $this->periodoModel();
             if (!$model->schemaPronto()) {
-                return true;
+                return $this->snapshotPeriodoCache[$chave] = true;
             }
-            $row = $model->findVigente(
-                (int) ($turma['id'] ?? 0),
-                $anoLetivo,
-                (string) ($periodo['tipo'] ?? 'ano'),
-                (int) ($periodo['numero'] ?? 0)
-            );
+            $row = $model->findVigente($turmaId, $anoLetivo, $tipo, $numero);
             if (!$row) {
-                return true;
+                return $this->snapshotPeriodoCache[$chave] = true;
             }
             $st = FechamentoMaquinaEstados::normalizar((string) ($row['status'] ?? ''));
             if ($st === FechamentoMaquinaEstados::HOMOLOGADO) {
-                return true;
+                return $this->snapshotPeriodoCache[$chave] = true;
             }
             if ($st === FechamentoMaquinaEstados::RETIFICADO || !empty($row['retificado_de_id'])) {
-                return false;
+                return $this->snapshotPeriodoCache[$chave] = false;
             }
-            return true;
+            return $this->snapshotPeriodoCache[$chave] = true;
         } catch (\Throwable $e) {
-            return true;
+            return $this->snapshotPeriodoCache[$chave] = true;
         }
     }
 
@@ -542,7 +563,8 @@ class ResultadoHomologacaoService
         array $conselho,
         array $homologados,
         array $especiais,
-        array $config
+        array $config,
+        bool $somenteResumo = false
     ): array {
         $alunoId = (int) $aluno['id'];
         $transferido = !empty($aluno['transferido']);
@@ -559,6 +581,7 @@ class ResultadoHomologacaoService
                 $snap['pendencias'] = [];
                 $snap['pendencias_criticas'] = [];
                 $snap['_homologado'] = true;
+                $snap['_persistido_homologado'] = true;
                 $snap['_resultado_id'] = (int) ($homolog['id'] ?? 0);
                 if (!isset($snap['notas_completas'])) {
                     $snap['notas_completas'] = true;
@@ -628,7 +651,7 @@ class ResultadoHomologacaoService
             $componentes[] = [
                 'materia_id' => $mid > 0 ? $mid : null,
                 'materia_nome' => (string) ($comp['nome'] ?? 'Componente'),
-                'carga_horaria' => $this->cargaHoraria($mid),
+                'carga_horaria' => $somenteResumo ? null : $this->cargaHoraria($mid),
                 'media' => $media,
                 'recuperacao' => $recItem,
                 'media_final' => $avaliadoItem['media_final'],
@@ -702,8 +725,10 @@ class ResultadoHomologacaoService
         $status = 'em_andamento';
         $versaoProxima = 1;
         $usouSituacaoGravada = false;
+        $persistidoHomologado = false;
         if (is_array($homolog)) {
             $status = (string) ($homolog['status'] ?? 'em_andamento');
+            $persistidoHomologado = $status === 'homologado';
             $versaoProxima = (int) ($homolog['versao'] ?? 1);
             if ($status === 'reaberto') {
                 $versaoProxima++;
@@ -781,6 +806,7 @@ class ResultadoHomologacaoService
             'rotulo' => $avaliado['rotulo'],
             'pendencias' => $pendencias,
             'pendencias_criticas' => $pendenciasCriticas,
+            '_persistido_homologado' => $persistidoHomologado,
         ];
     }
 
@@ -1136,19 +1162,26 @@ class ResultadoHomologacaoService
 
     private function cargaHoraria(int $materiaId): ?int
     {
-        if ($materiaId <= 0 || !$this->model->tabelaExiste('plano_curso')) {
+        if ($materiaId <= 0) {
             return null;
+        }
+        if (array_key_exists($materiaId, $this->cargaHorariaCache)) {
+            return $this->cargaHorariaCache[$materiaId];
+        }
+        if (!$this->model->tabelaExiste('plano_curso')) {
+            return $this->cargaHorariaCache[$materiaId] = null;
         }
         try {
             $row = $this->db->fetch(
                 'SELECT carga_horaria_prevista FROM plano_curso WHERE materia_id = :id LIMIT 1',
                 ['id' => $materiaId]
             );
-            return isset($row['carga_horaria_prevista']) && is_numeric($row['carga_horaria_prevista'])
+            $valor = isset($row['carga_horaria_prevista']) && is_numeric($row['carga_horaria_prevista'])
                 ? (int) $row['carga_horaria_prevista']
                 : null;
+            return $this->cargaHorariaCache[$materiaId] = $valor;
         } catch (\Throwable $e) {
-            return null;
+            return $this->cargaHorariaCache[$materiaId] = null;
         }
     }
 }
