@@ -129,7 +129,7 @@ class JourneyController extends BaseController
         if (class_exists('RedisCache')) {
             return true;
         }
-        $cachePath = __DIR__ . '/../../Core/RedisCache.php';
+        $cachePath = __DIR__ . '/../../../Core/RedisCache.php';
         if (is_file($cachePath)) {
             require_once $cachePath;
         }
@@ -2505,7 +2505,7 @@ class JourneyController extends BaseController
     private function processarAnexos($mensagemId, $arquivos)
     {
         $anexosIds = [];
-        $uploadDir = __DIR__ . '/../../public/uploads/mensagens/';
+        $uploadDir = __DIR__ . '/../../../../public/uploads/mensagens/';
         
         if (!is_dir($uploadDir)) {
             mkdir($uploadDir, 0755, true);

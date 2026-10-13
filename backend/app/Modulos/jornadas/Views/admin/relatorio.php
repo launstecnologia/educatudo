@@ -18,7 +18,7 @@ $reports_filter_base_url = URL . '/admin/jornadas/relatorio';
 
 <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
     <div class="p-6">
-        <?php require __DIR__ . '/../reports/_tab_jornadas.php'; ?>
+        <?php require \App\Core\ViewPaths::painel('Admin', 'Views/reports/_tab_jornadas.php'); ?>
     </div>
 </div>
 

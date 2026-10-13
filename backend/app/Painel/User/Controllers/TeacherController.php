@@ -1853,6 +1853,14 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
     }
     
     /**
+     * Jornadas dos alunos (rota /professor/jornadas-aluno).
+     */
+    public function jornadasAluno()
+    {
+        $this->studentJourney();
+    }
+
+    /**
      * Student Journey (visão do professor)
      */
     public function studentJourney()

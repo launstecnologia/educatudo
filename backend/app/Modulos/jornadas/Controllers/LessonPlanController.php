@@ -614,7 +614,7 @@ class LessonPlanController extends BaseController
             $normalizados[] = $files;
         }
 
-        $dir = realpath(__DIR__ . '/../../../storage') ?: (__DIR__ . '/../../../storage');
+        $dir = realpath(__DIR__ . '/../../../../storage') ?: (__DIR__ . '/../../../../storage');
         $dir .= '/tmp/planos_aula_copiloto';
         if (!is_dir($dir) && !mkdir($dir, 0700, true) && !is_dir($dir)) {
             throw new \Exception('Não foi possível preparar o envio dos arquivos.');

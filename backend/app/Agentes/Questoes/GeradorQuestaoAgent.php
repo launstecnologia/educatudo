@@ -77,7 +77,7 @@ class GeradorQuestaoAgent implements AgenteIAInterface
             throw new Exception('OPENAI_API_KEY não configurada.');
         }
 
-        $promptSistema = file_get_contents(__DIR__ . '/../../Prompts/Questoes/gerador-questao.md');
+        $promptSistema = file_get_contents(__DIR__ . '/../Prompts/Questoes/gerador-questao.md');
         if ($promptSistema === false || trim($promptSistema) === '') {
             throw new Exception('GeradorQuestaoAgent: prompt.md não encontrado');
         }

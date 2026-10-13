@@ -40,7 +40,7 @@ class ConstrutorPromptImagemAgent implements AgenteIAInterface
             throw new Exception('OPENAI_API_KEY não configurada.');
         }
 
-        $promptSistema = file_get_contents(__DIR__ . '/../Prompts/construtor-prompt-imagem.md');
+        $promptSistema = file_get_contents(__DIR__ . '/Prompts/construtor-prompt-imagem.md');
         if ($promptSistema === false || trim($promptSistema) === '') {
             throw new Exception('ConstrutorPromptImagemAgent: prompt.md não encontrado');
         }

@@ -18,7 +18,7 @@ trait RevisaoQuestaoTrait
     {
         static $promptSistema = null;
         if ($promptSistema === null) {
-            $promptSistema = file_get_contents(__DIR__ . '/../../Prompts/Questoes/revisor-questao.md');
+            $promptSistema = file_get_contents(__DIR__ . '/../Prompts/Questoes/revisor-questao.md');
         }
         if ($promptSistema === false || trim($promptSistema) === '') {
             throw new \Exception('RevisaoQuestaoTrait: revisor-questao.md não encontrado');

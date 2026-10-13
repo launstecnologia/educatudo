@@ -224,7 +224,10 @@ abstract class BaseController
             $perfilView = 'professor';
         }
         $prefix = $m[2];
-        $rest = $m[3] ?? 'index';
+        // student/essays não tem 3º segmento: o arquivo é essays.php, não index.php.
+        // student/journeys/index pede index de propósito e não pode cair em journeys.php.
+        $restExplicito = isset($m[3]) && $m[3] !== '';
+        $rest = $restExplicito ? $m[3] : 'index';
 
         // Domínio: mantém o prefixo no path (students/index.php)
         if (isset(self::VIEW_PREFIX_TO_DOMINIO[$prefix])) {
@@ -242,18 +245,19 @@ abstract class BaseController
 
         // Módulo: alias do prefixo legado → chave física
         $chave = self::VIEW_PREFIX_TO_MODULE[$prefix] ?? $prefix;
-        $candidates = [
-            // com prefixo preservado (ex.: admin/reunioes/geral → .../Views/admin/reunioes/geral.php)
-            __DIR__ . '/../Modulos/' . $chave . '/Views/' . $perfilView . '/' . $prefix . '/' . $rest . '.php',
-            // achatado (ex.: admin/exams/index → .../Views/admin/index.php)
-            __DIR__ . '/../Modulos/' . $chave . '/Views/' . $perfilView . '/' . $rest . '.php',
-            // view de um único arquivo: student/essays → .../Views/aluno/essays.php
-            __DIR__ . '/../Modulos/' . $chave . '/Views/' . $perfilView . '/' . $prefix . '.php',
-            // controller já usa a chave PT: admin/provas/index
+        $comPrefixo = __DIR__ . '/../Modulos/' . $chave . '/Views/' . $perfilView . '/' . $prefix . '/' . $rest . '.php';
+        $achatado = __DIR__ . '/../Modulos/' . $chave . '/Views/' . $perfilView . '/' . $rest . '.php';
+        $arquivoUnico = __DIR__ . '/../Modulos/' . $chave . '/Views/' . $perfilView . '/' . $prefix . '.php';
+        $chaveComoPasta = [
             __DIR__ . '/../Modulos/' . $prefix . '/Views/' . $perfilView . '/' . $rest . '.php',
             __DIR__ . '/../Modulos/' . $prefix . '/Views/' . $perfilView . '/' . $prefix . '/' . $rest . '.php',
             __DIR__ . '/../Modulos/' . $prefix . '/Views/' . $perfilView . '/' . $prefix . '.php',
         ];
+        // Sem 3º segmento, o nome do arquivo é o prefixo (student-journey.php).
+        // Com 3º segmento, index.php da listagem vem antes de um eventual journeys.php.
+        $candidates = $restExplicito
+            ? array_merge([$comPrefixo, $achatado, $arquivoUnico], $chaveComoPasta)
+            : array_merge([$comPrefixo, $arquivoUnico, $achatado], $chaveComoPasta);
         foreach ($candidates as $moduloView) {
             if (is_file($moduloView)) {
                 return $moduloView;

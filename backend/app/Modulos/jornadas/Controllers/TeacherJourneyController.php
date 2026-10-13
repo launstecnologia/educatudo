@@ -2968,7 +2968,7 @@ class TeacherJourneyController extends BaseController
      */
     public function corrigirRedacaoJornada()
     {
-        $logFile = __DIR__ . '/../../storage/logs/correcao_redacao.log';
+        $logFile = __DIR__ . '/../../../../storage/logs/correcao_redacao.log';
         $logDir = dirname($logFile);
         if (!is_dir($logDir)) {
             mkdir($logDir, 0755, true);
@@ -7430,7 +7430,7 @@ Retorne APENAS um JSON válido no seguinte formato:
     public function salvarTemaRedacaoModulo()
     {
         // Log em arquivo separado para garantir que seja escrito
-        $logDir = __DIR__ . '/../../storage/logs';
+        $logDir = __DIR__ . '/../../../../storage/logs';
         $logFile = $logDir . '/documento_upload_' . date('Y-m-d') . '.log';
         
         // Garante que o diretório de logs existe
@@ -9328,7 +9328,7 @@ Formato: \Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutu
     private function processarAnexosMensagem($mensagemId, $arquivos)
     {
         $anexosIds = [];
-        $uploadDir = __DIR__ . '/../../public/uploads/mensagens/';
+        $uploadDir = __DIR__ . '/../../../../public/uploads/mensagens/';
         
         if (!is_dir($uploadDir)) {
             mkdir($uploadDir, 0755, true);

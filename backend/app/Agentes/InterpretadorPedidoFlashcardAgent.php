@@ -41,7 +41,7 @@ class InterpretadorPedidoFlashcardAgent implements AgenteIAInterface
             throw new Exception('OPENAI_API_KEY não configurada.');
         }
 
-        $promptSistema = file_get_contents(__DIR__ . '/../Prompts/interpretador-pedido-flashcard.md');
+        $promptSistema = file_get_contents(__DIR__ . '/Prompts/interpretador-pedido-flashcard.md');
         if ($promptSistema === false || trim($promptSistema) === '') {
             throw new Exception('InterpretadorPedidoFlashcardAgent: prompt.md não encontrado');
         }
