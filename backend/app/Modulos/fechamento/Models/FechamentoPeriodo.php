@@ -9,6 +9,9 @@ use App\Modulos\Fechamento\Services\FechamentoMaquinaEstados;
  */
 class FechamentoPeriodo
 {
+    /** @var array<string,bool> */
+    private static array $tabelasCache = [];
+
     private $db;
 
     public function __construct()
@@ -51,6 +54,7 @@ class FechamentoPeriodo
                     KEY idx_fechamento_turma_periodo (turma_id, ano_letivo, periodo_tipo, periodo_numero, vigente)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
             );
+            $this->lembrarTabela('fechamento_periodo');
             $this->db->query(
                 "CREATE TABLE IF NOT EXISTS fechamento_periodo_historico (
                     id INT NOT NULL AUTO_INCREMENT,
@@ -65,6 +69,7 @@ class FechamentoPeriodo
                     KEY idx_fechamento_hist_fechamento (fechamento_id, id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
             );
+            $this->lembrarTabela('fechamento_periodo_historico');
         } catch (\Throwable $e) {
             error_log('FechamentoPeriodo::ensureSchema: ' . $e->getMessage());
         }
@@ -72,11 +77,9 @@ class FechamentoPeriodo
 
     public function tabelaExiste(string $tabela): bool
     {
-        static $cache = [];
-        $tenantKey = defined('TENANT_ID') ? ('t' . TENANT_ID) : 'no_tenant';
-        $key = $tenantKey . ':' . $tabela;
-        if (array_key_exists($key, $cache)) {
-            return $cache[$key];
+        $key = $this->chaveTabela($tabela);
+        if (array_key_exists($key, self::$tabelasCache)) {
+            return self::$tabelasCache[$key];
         }
         try {
             $row = $this->db->fetch(
@@ -84,10 +87,21 @@ class FechamentoPeriodo
                  WHERE table_schema = DATABASE() AND table_name = :t LIMIT 1',
                 ['t' => $tabela]
             );
-            return $cache[$key] = !empty($row['ok']);
+            return self::$tabelasCache[$key] = !empty($row['ok']);
         } catch (\Throwable $e) {
-            return $cache[$key] = false;
+            return self::$tabelasCache[$key] = false;
         }
+    }
+
+    private function lembrarTabela(string $tabela): void
+    {
+        self::$tabelasCache[$this->chaveTabela($tabela)] = true;
+    }
+
+    private function chaveTabela(string $tabela): string
+    {
+        $tenantKey = defined('TENANT_ID') ? ('t' . TENANT_ID) : 'no_tenant';
+        return $tenantKey . ':' . $tabela;
     }
 
     /**

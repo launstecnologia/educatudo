@@ -36,9 +36,7 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
         $anoLetivo = $this->anoDaRequest($anos);
         [$periodoTipo, $periodoNumero] = $this->periodoDaRequest();
         $turmaId = (int) ($_GET['turma_id'] ?? 0);
-        $paineis = $svc->painel($anoLetivo, $periodoTipo, $periodoNumero, $turmaId);
         $flash = $this->getFlashMessage();
-        $lote = new ImpressaoLoteFechamentoService();
 
         $this->viewWithLayout('admin', 'admin/fechamento/index', [
             'title' => 'Fechamento - EducaTudo',
@@ -50,13 +48,50 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
             'periodo_numero' => $periodoNumero,
             'turma_id' => $turmaId,
             'turmas' => $svc->homologacao()->model()->turmasAtivas($anoLetivo),
-            'paineis' => $paineis,
-            'impressao_lote' => $lote->resumo($paineis),
             'schema_pronto' => $svc->model()->schemaPronto(),
             'simular_regra_id' => $this->simularRegraId(),
             'csrf_token' => $this->generateCsrfToken(),
             'flash_status' => $flash['type'] === 'success' ? 'success' : ($flash['message'] ? 'error' : ''),
             'flash_message' => $flash['message'] ?? '',
+        ]);
+    }
+
+    public function painelLista(): void
+    {
+        if (!$this->enforceAdminPermissionKey('resultados_finais', 'visualizar', true)) {
+            return;
+        }
+        $svc = $this->service();
+        $anos = $svc->homologacao()->model()->anosLetivosTurmas();
+        $anoLetivo = $this->anoDaRequest($anos);
+        [$periodoTipo, $periodoNumero] = $this->periodoDaRequest();
+        $turmaId = (int) ($_GET['turma_id'] ?? 0);
+        $paineis = $svc->painel($anoLetivo, $periodoTipo, $periodoNumero, $turmaId);
+        $lote = (new ImpressaoLoteFechamentoService())->resumo($paineis);
+        $loteQs = http_build_query([
+            'ano_letivo' => $anoLetivo,
+            'periodo_tipo' => $periodoTipo,
+            'periodo_numero' => $periodoNumero,
+            'turma_id' => $turmaId,
+        ]);
+        $homologadas = (int) ($lote['homologadas'] ?? 0);
+        $total = (int) ($lote['total_turmas'] ?? 0);
+        ob_start();
+        $ano_letivo = $anoLetivo;
+        $periodo_tipo = $periodoTipo;
+        $periodo_numero = $periodoNumero;
+        include __DIR__ . '/../Views/admin/_painel_linhas.php';
+        $html = ob_get_clean();
+
+        $this->json([
+            'html' => $html ?: '',
+            'lote' => [
+                'pode' => !empty($lote['pode']),
+                'titulo' => !empty($lote['pode'])
+                    ? 'Gerar a consolidação final das turmas homologadas'
+                    : ('Homologue todas as turmas deste filtro para gerar a consolidação final (' . $homologadas . ' de ' . $total . ').'),
+                'href' => (defined('URL') ? URL : '') . '/admin/fechamento/impressao-lote?' . $loteQs,
+            ],
         ]);
     }
 
