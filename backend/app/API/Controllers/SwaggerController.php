@@ -6,9 +6,9 @@ use App\API\Services\EspecificacaoOpenApiService;
 use App\Core\BaseController;
 
 /**
- * Documentação da API única do responsável.
- * GET /api/docs — Swagger UI
- * GET /api/openapi.json — OpenAPI 3, com exemplos do sandbox
+ * Documentação da API real do responsável.
+ * GET /api/docs — Swagger UI, com o passo a passo de cada rota
+ * GET /api/openapi.json — OpenAPI 3
  */
 class SwaggerController extends BaseController
 {
@@ -50,7 +50,7 @@ class SwaggerController extends BaseController
 
     public function openapi()
     {
-        $baseUrl = rtrim(defined('URL') ? (string) URL : '', '/') . '/api/sandbox';
+        $baseUrl = rtrim(defined('URL') ? (string) URL : '', '/');
         $spec = (new EspecificacaoOpenApiService())->montar($baseUrl);
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode($spec, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);

@@ -32,7 +32,7 @@ class MobileAuthController extends BaseController
 
         $input = $this->jsonInput();
         $cpf = preg_replace('/\D+/', '', (string) ($input['cpf'] ?? ''));
-        $password = (string) ($input['password'] ?? '');
+        $password = (string) ($input['password'] ?? $input['senha'] ?? '');
 
         if (strlen($cpf) !== 11 || $password === '') {
             $this->apiError('validation_error', 'CPF e senha são obrigatórios.', 422, [
@@ -82,7 +82,8 @@ class MobileAuthController extends BaseController
         if ($this->jwt === null || !MobileApiAuthMiddleware::hasSecureJwtSecret()) {
             $this->apiError('mobile_api_not_configured', 'API mobile temporariamente indisponível.', 503);
         }
-        $refreshToken = trim((string) ($this->jsonInput()['refresh_token'] ?? ''));
+        $entrada = $this->jsonInput();
+        $refreshToken = trim((string) ($entrada['refresh_token'] ?? $entrada['token_atualizacao'] ?? ''));
         $parts = explode('.', $refreshToken, 2);
         if (count($parts) !== 2 || !preg_match('/^[a-f0-9-]{36}$/', $parts[0])) {
             $this->apiError('invalid_refresh_token', 'Refresh token inválido.', 401);

@@ -237,6 +237,16 @@ class MobileFinanceController extends BaseController
         }, $rows);
     }
 
+    public function pagamento($id, $origem, $faturaId): void
+    {
+        $mapa = [
+            'cobranca' => 'charge',
+            'parcela' => 'contract_installment',
+        ];
+        $origem = strtolower(trim((string) $origem));
+        $this->payment($id, $mapa[$origem] ?? $origem, $faturaId);
+    }
+
     public function payment($id, $source, $invoiceId): void
     {
         $studentId = $this->authorizedStudentId($id);

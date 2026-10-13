@@ -68,7 +68,7 @@ class MobileSchoolCommunicationController extends BaseController
         $student=$this->student($studentId);
         $item=$this->communicationFor($student,$id);
         if(empty($item['permite_resposta']))$this->fail('replies_disabled','Esta comunicação não permite resposta.',422);
-        $input=$this->input(); $message=trim((string)($input['message']??''));
+        $input=$this->input(); $message=trim((string)($input['message'] ?? $input['mensagem'] ?? ''));
         if($message===''||mb_strlen($message)>4000)$this->fail('invalid_message','Informe uma mensagem com até 4.000 caracteres.',422);
         $replyId=(int)$this->db->insert("INSERT INTO school_communication_replies (communication_id,responsavel_id,aluno_id,sender_type,sender_id,mensagem) VALUES (:communication,:parent,:student,'responsavel',:sender,:message)",['communication'=>$item['id'],'parent'=>$this->parentId(),'student'=>$student['id'],'sender'=>$this->parentId(),'message'=>$message]);
         $this->json(['data'=>['id'=>$replyId,'sender_type'=>'responsavel','message'=>$message,'created_at'=>date(DATE_ATOM)]],201);
@@ -77,7 +77,7 @@ class MobileSchoolCommunicationController extends BaseController
     public function calendar($studentId): void
     {
         $student=$this->student($studentId);
-        $from=$this->date($_GET['from']??'',date('Y-m-01',strtotime('-1 month'))); $to=$this->date($_GET['to']??'',date('Y-m-t',strtotime('+6 months')));
+        $from=$this->date($_GET['de'] ?? $_GET['from'] ?? '',date('Y-m-01',strtotime('-1 month'))); $to=$this->date($_GET['ate'] ?? $_GET['to'] ?? '',date('Y-m-t',strtotime('+6 months')));
         $rows=$this->db->fetchAll(
             "SELECT e.*,r.lido_em FROM school_calendar_events e LEFT JOIN school_calendar_event_reads r ON r.event_id=e.id AND r.responsavel_id=:parent AND r.aluno_id=:read_student
              WHERE e.status IN('publicado','cancelado') AND DATE(e.inicio_em) BETWEEN :date_from AND :date_to

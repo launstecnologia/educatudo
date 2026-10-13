@@ -27,11 +27,12 @@ class MobileAcademicController extends BaseController
     public function essays($id): void { $this->respond($id, 'essays', true); }
     public function notices($id): void { $this->respond($id, 'notices', true); }
     public function reportCard($id): void { $this->respond($id, 'reportCard', true); }
+    public function exercises($id): void { $this->respond($id, 'exercises'); }
 
     public function accessEvents($id): void
     {
         $studentId = $this->authorizedStudentId($id);
-        $data = $this->service->accessEvents($studentId, $_GET['from'] ?? null, $_GET['to'] ?? null);
+        $data = $this->service->accessEvents($studentId, $_GET['de'] ?? $_GET['from'] ?? null, $_GET['ate'] ?? $_GET['to'] ?? null);
         $this->json(['data'=>$data,'meta'=>['count'=>count($data['events'] ?? [])]]);
     }
 

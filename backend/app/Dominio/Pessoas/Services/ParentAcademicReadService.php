@@ -429,6 +429,47 @@ class ParentAcademicReadService
         ]; }, $rows);
     }
 
+    public function exercises(int $studentId): array
+    {
+        $totais = $this->db->fetch(
+            "SELECT COUNT(*) AS total,
+                    SUM(CASE WHEN pontuacao > 0 THEN 1 ELSE 0 END) AS acertos
+             FROM jornadas_progresso_alunos
+             WHERE aluno_id = :aluno_id AND atividade_tipo IN ('exercicio', 'exercicio_modulo')",
+            ['aluno_id' => $studentId]
+        );
+        $total = (int) ($totais['total'] ?? 0);
+        $acertos = (int) ($totais['acertos'] ?? 0);
+
+        $ultimos = $this->db->fetchAll(
+            "SELECT jpa.id, jpa.jornada_id, jpa.pontuacao, jpa.data_conclusao, j.titulo AS jornada_titulo
+             FROM jornadas_progresso_alunos jpa
+             INNER JOIN jornadas j ON j.id = jpa.jornada_id
+             WHERE jpa.aluno_id = :aluno_id AND jpa.atividade_tipo IN ('exercicio', 'exercicio_modulo')
+             ORDER BY jpa.data_conclusao DESC, jpa.created_at DESC
+             LIMIT 10",
+            ['aluno_id' => $studentId]
+        );
+
+        $lista = [];
+        foreach ($ultimos as $item) {
+            $lista[] = [
+                'id' => (int) $item['id'],
+                'journey_id' => (int) $item['jornada_id'],
+                'journey_title' => (string) $item['jornada_titulo'],
+                'score' => $item['pontuacao'] !== null ? (float) $item['pontuacao'] : null,
+                'completed_at' => $this->isoDate($item['data_conclusao'] ?? null),
+            ];
+        }
+
+        return [
+            'total_completed' => $total,
+            'correct_count' => $acertos,
+            'accuracy_percent' => $total > 0 ? round(($acertos / $total) * 100, 1) : 0.0,
+            'latest' => $lista,
+        ];
+    }
+
     private function isoDate($value): ?string
     {
         if ($value === null || $value === '') return null;

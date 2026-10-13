@@ -28,6 +28,9 @@ $router->get('/api/v1/facial-device/events',                          'Api/V1/Fa
 $router->post('/api/v1/auth/login', 'Api/V1/MobileAuthController@login');
 $router->post('/api/v1/auth/refresh', 'Api/V1/MobileAuthController@refresh');
 
+$router->post('/api/autenticacao/entrar', 'Api/V1/MobileAuthController@login');
+$router->post('/api/autenticacao/renovar', 'Api/V1/MobileAuthController@refresh');
+
 $router->middleware('MobileApiAuth', function ($router) {
     $router->get('/api/v1/me', 'Api/V1/MobileParentController@me');
     $router->get('/api/v1/students', 'Api/V1/MobileParentController@students');
@@ -54,4 +57,29 @@ $router->middleware('MobileApiAuth', function ($router) {
     $router->post('/api/v1/auth/logout', 'Api/V1/MobileAuthController@logout');
     $router->put('/api/v1/devices/{deviceId}', 'Api/V1/MobileDeviceController@upsert');
     $router->delete('/api/v1/devices/{deviceId}', 'Api/V1/MobileDeviceController@delete');
+
+    $router->post('/api/autenticacao/sair', 'Api/V1/MobileAuthController@logout');
+    $router->get('/api/eu', 'Api/V1/MobileParentController@me');
+    $router->get('/api/alunos', 'Api/V1/MobileParentController@students');
+    $router->get('/api/alunos/{id}/painel', 'Api/V1/MobileAcademicController@dashboard');
+    $router->get('/api/alunos/{id}/provas', 'Api/V1/MobileAcademicController@exams');
+    $router->get('/api/alunos/{id}/exercicios', 'Api/V1/MobileAcademicController@exercises');
+    $router->get('/api/alunos/{id}/jornadas', 'Api/V1/MobileAcademicController@journeys');
+    $router->get('/api/alunos/{id}/planos-de-aula', 'Api/V1/MobileAcademicController@lessonPlans');
+    $router->get('/api/alunos/{id}/planos-de-aula/{planId}', 'Api/V1/MobileAcademicController@lessonPlan');
+    $router->get('/api/alunos/{id}/jornadas-de-redacao', 'Api/V1/MobileAcademicController@writingJourneys');
+    $router->get('/api/alunos/{id}/redacoes', 'Api/V1/MobileAcademicController@essays');
+    $router->get('/api/alunos/{id}/avisos', 'Api/V1/MobileAcademicController@notices');
+    $router->get('/api/alunos/{id}/boletim', 'Api/V1/MobileAcademicController@reportCard');
+    $router->get('/api/alunos/{id}/acessos', 'Api/V1/MobileAcademicController@accessEvents');
+    $router->get('/api/alunos/{id}/financeiro', 'Api/V1/MobileFinanceController@student');
+    $router->get('/api/alunos/{id}/financeiro/faturas/{origem}/{faturaId}/pagamento', 'Api/V1/MobileFinanceController@pagamento');
+    $router->get('/api/alunos/{id}/comunicados', 'Api/V1/MobileSchoolCommunicationController@index');
+    $router->get('/api/alunos/{id}/comunicados/{communicationId}', 'Api/V1/MobileSchoolCommunicationController@show');
+    $router->post('/api/alunos/{id}/comunicados/{communicationId}/lido', 'Api/V1/MobileSchoolCommunicationController@read');
+    $router->post('/api/alunos/{id}/comunicados/{communicationId}/respostas', 'Api/V1/MobileSchoolCommunicationController@reply');
+    $router->get('/api/alunos/{id}/calendario', 'Api/V1/MobileSchoolCommunicationController@calendar');
+    $router->post('/api/alunos/{id}/calendario/{eventId}/lido', 'Api/V1/MobileSchoolCommunicationController@calendarRead');
+    $router->get('/api/notificacoes', 'Api/V1/MobileNotificationController@index');
+    $router->post('/api/notificacoes/{id}/lida', 'Api/V1/MobileNotificationController@read');
 });
