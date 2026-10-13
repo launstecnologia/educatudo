@@ -24,7 +24,7 @@ class OpenAIService
     public function __construct()
     {
         // Definir caminho das credenciais do Google Vision
-        $this->visionCredentialsPath = __DIR__ . '/../../storage/educatudo-ai-476501-d0f26dcde160.json';
+        $this->visionCredentialsPath = dirname(__DIR__, 3) . '/storage/educatudo-ai-476501-d0f26dcde160.json';
         
         $apiKey = null;
         
@@ -53,7 +53,8 @@ class OpenAIService
         // PRIORIDADE 2: Tentar carregar do config/app.php
         if (empty($apiKey)) {
             try {
-                $config = require __DIR__ . '/../../config/app.php';
+                $configPath = dirname(__DIR__, 3) . '/config/app.php';
+                $config = is_file($configPath) ? require $configPath : [];
                 $apiKey = $config['ai']['openai_api_key'] ?? null;
             } catch (\Exception $e) {
                 $apiKey = null;
@@ -62,7 +63,7 @@ class OpenAIService
         
         // PRIORIDADE 3: Carregar .env diretamente
         if (empty($apiKey)) {
-            $envPath = __DIR__ . '/../../.env';
+            $envPath = dirname(__DIR__, 3) . '/.env';
             if (file_exists($envPath)) {
                 $content = file_get_contents($envPath);
                 
@@ -1238,7 +1239,7 @@ Responda APENAS com um JSON válido, sem texto antes ou depois: {"apropriado": t
      */
     private function logProvaIAInput($tema, $materia, $quantidade, $nivel, $contextoAdicional, $tipo, $vars, $prompt, $requestData)
     {
-        $logDir = __DIR__ . '/../../storage/logs';
+        $logDir = dirname(__DIR__, 3) . '/storage/logs';
         if (!is_dir($logDir)) {
             @mkdir($logDir, 0755, true);
         }
@@ -1274,7 +1275,7 @@ Responda APENAS com um JSON válido, sem texto antes ou depois: {"apropriado": t
      */
     private function logProvaIAOutput($response)
     {
-        $logDir = __DIR__ . '/../../storage/logs';
+        $logDir = dirname(__DIR__, 3) . '/storage/logs';
         if (!is_dir($logDir)) {
             @mkdir($logDir, 0755, true);
         }
@@ -1490,7 +1491,7 @@ Responda APENAS com um JSON válido, sem texto antes ou depois: {"apropriado": t
     {
         $apiKey = getenv('SUPABASE_TRANSCRIBE_API_KEY');
         if ($apiKey === false || $apiKey === '') {
-            $envPath = __DIR__ . '/../../.env';
+            $envPath = dirname(__DIR__, 3) . '/.env';
             if (file_exists($envPath)) {
                 $content = @file_get_contents($envPath);
                 if ($content !== false && preg_match('/SUPABASE_TRANSCRIBE_API_KEY\s*=\s*["\']?([^"\s\r\n]+)/', $content, $m)) {
@@ -1574,7 +1575,7 @@ Responda APENAS com um JSON válido, sem texto antes ou depois: {"apropriado": t
      */
     public function transcreverComGoogleVision($imageData, $returnEmptyIfNoText = false)
     {
-        $logFile = __DIR__ . '/../../storage/logs/transcricao_' . date('Y-m-d') . '.log';
+        $logFile = dirname(__DIR__, 3) . '/storage/logs/transcricao_' . date('Y-m-d') . '.log';
         $log = function($message) use ($logFile) {
             $timestamp = date('Y-m-d H:i:s');
             $logMessage = "[{$timestamp}] {$message}\n";
@@ -2368,7 +2369,7 @@ Adapte a estrutura da questão estritamente ao nível de dificuldade exigido:
     {
         error_log("[ANALYZE_IMAGE] Pipeline OCR literal (sem GPT) - " . date('Y-m-d H:i:s'));
         
-        $logFile = __DIR__ . '/../../storage/logs/transcricao_' . date('Y-m-d') . '.log';
+        $logFile = dirname(__DIR__, 3) . '/storage/logs/transcricao_' . date('Y-m-d') . '.log';
         $log = function($message) use ($logFile) {
             $timestamp = date('Y-m-d H:i:s');
             $logMessage = "[{$timestamp}] {$message}\n";
@@ -3451,7 +3452,7 @@ You MUST respond with a valid JSON object only, no other text, with exactly thes
         if ($audioData === false) {
             throw new \Exception('Erro ao decodificar áudio gerado');
         }
-        $audioDir = __DIR__ . '/../../storage/audio/';
+        $audioDir = dirname(__DIR__, 3) . '/storage/audio/';
         if (!is_dir($audioDir)) {
             @mkdir($audioDir, 0755, true);
         }
@@ -3497,7 +3498,8 @@ You MUST respond with a valid JSON object only, no other text, with exactly thes
         // PRIORIDADE 2: Tentar carregar do config/app.php
         if (empty($apiKey)) {
             try {
-                $config = require __DIR__ . '/../../config/app.php';
+                $configPath = dirname(__DIR__, 3) . '/config/app.php';
+                $config = is_file($configPath) ? require $configPath : [];
                 $apiKey = $config['ai']['elevenlabs_api_key'] ?? null;
             } catch (\Exception $e) {
                 $apiKey = null;
@@ -3506,7 +3508,7 @@ You MUST respond with a valid JSON object only, no other text, with exactly thes
         
         // PRIORIDADE 3: Carregar .env diretamente
         if (empty($apiKey)) {
-            $envPath = __DIR__ . '/../../.env';
+            $envPath = dirname(__DIR__, 3) . '/.env';
             if (file_exists($envPath)) {
                 $content = file_get_contents($envPath);
                 if (substr($content, 0, 3) === "\xEF\xBB\xBF") {

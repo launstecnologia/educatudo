@@ -420,7 +420,7 @@ class EssayAIService
         try {
             $openai = new \App\Services\OpenAIService();
             $openai->logUsageToDatabase($model, $promptTokens, $completionTokens, $totalTokens, $costUsd, 'correcao_redacao');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Logger::error('EssayAIService logUsageToLlmUsageLog failed: ' . $e->getMessage(), [], 'essays');
         }
     }
