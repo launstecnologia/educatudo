@@ -11,14 +11,14 @@ use App\Modulos\Fechamento\Models\FechamentoPeriodo;
 class FechamentoService
 {
     private FechamentoPeriodo $model;
-    private \App\Services\ResultadoHomologacaoService $homologacao;
+    private ResultadoHomologacaoService $homologacao;
 
     public function __construct(
         ?FechamentoPeriodo $model = null,
-        ?\App\Services\ResultadoHomologacaoService $homologacao = null
+        ?ResultadoHomologacaoService $homologacao = null
     ) {
         $this->model = $model ?? new FechamentoPeriodo();
-        $this->homologacao = $homologacao ?? new \App\Services\ResultadoHomologacaoService();
+        $this->homologacao = $homologacao ?? new ResultadoHomologacaoService();
     }
 
     public function model(): FechamentoPeriodo
@@ -26,7 +26,7 @@ class FechamentoService
         return $this->model;
     }
 
-    public function homologacao(): \App\Services\ResultadoHomologacaoService
+    public function homologacao(): ResultadoHomologacaoService
     {
         return $this->homologacao;
     }
@@ -234,20 +234,125 @@ class FechamentoService
             return;
         }
 
+        $chamadas = (int) ($resumo['chamadas_pendentes'] ?? 0);
+        $pendencias = (int) ($resumo['pendencias'] ?? 0);
         $destino = $status;
-        if ($total > 0 && $homologados >= $total && $recuperacao === 0) {
+        if ($total > 0 && $homologados >= $total && $recuperacao === 0 && $chamadas === 0 && $pendencias === 0) {
             $destino = FechamentoMaquinaEstados::HOMOLOGADO;
         } elseif ($recuperacao > 0 && $homologados > 0) {
             $destino = FechamentoMaquinaEstados::EM_RECUPERACAO;
-        } elseif ($homologados > 0 || $status === FechamentoMaquinaEstados::ABERTO) {
+        } elseif ($homologados > 0 && $status !== FechamentoMaquinaEstados::EM_FECHAMENTO) {
             $destino = FechamentoMaquinaEstados::EM_FECHAMENTO;
         }
 
-        if ($destino !== $status && FechamentoMaquinaEstados::podeTransitar($status, $destino)) {
-            $this->transitar($turmaId, $anoLetivo, $periodoTipo, $periodoNumero, $destino, $usuarioId, 'Sincronização após homologação de alunos', $regraId ?: null);
+        $justificativa = 'Sincronização após homologação de alunos';
+        if (
+            $destino === FechamentoMaquinaEstados::HOMOLOGADO
+            && $status === FechamentoMaquinaEstados::ABERTO
+        ) {
+            $this->transitarAbertoParaHomologado(
+                $turmaId,
+                $anoLetivo,
+                $periodoTipo,
+                $periodoNumero,
+                $usuarioId,
+                $justificativa,
+                $regraId ?: null
+            );
+        } elseif ($destino !== $status && FechamentoMaquinaEstados::podeTransitar($status, $destino)) {
+            $this->transitar($turmaId, $anoLetivo, $periodoTipo, $periodoNumero, $destino, $usuarioId, $justificativa, $regraId ?: null);
         } elseif ($regraId > 0) {
             $this->model->atualizar((int) $atual['id'], ['regra_academica_id' => $regraId]);
         }
+    }
+
+    private function transitarAbertoParaHomologado(
+        int $turmaId,
+        int $anoLetivo,
+        string $periodoTipo,
+        int $periodoNumero,
+        int $usuarioId,
+        string $justificativa,
+        ?int $regraId
+    ): void {
+        $db = \App\Core\Database::getInstance();
+        $db->beginTransaction();
+        try {
+            $meio = $this->transitar(
+                $turmaId,
+                $anoLetivo,
+                $periodoTipo,
+                $periodoNumero,
+                FechamentoMaquinaEstados::EM_FECHAMENTO,
+                $usuarioId,
+                $justificativa,
+                $regraId
+            );
+            if (empty($meio['success'])) {
+                $db->rollback();
+                return;
+            }
+            $fim = $this->transitar(
+                $turmaId,
+                $anoLetivo,
+                $periodoTipo,
+                $periodoNumero,
+                FechamentoMaquinaEstados::HOMOLOGADO,
+                $usuarioId,
+                $justificativa,
+                $regraId
+            );
+            if (empty($fim['success'])) {
+                $db->rollback();
+                return;
+            }
+            $db->commit();
+        } catch (\Throwable $e) {
+            if ($db->inTransaction()) {
+                $db->rollback();
+            }
+            error_log('FechamentoService::transitarAbertoParaHomologado: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Fecha o período quando todos os alunos já estão homologados e ninguém está em recuperação.
+     *
+     * @param array<string,mixed> $preview
+     */
+    public function concluirSeAlunosHomologados(
+        int $turmaId,
+        int $anoLetivo,
+        string $periodoTipo,
+        int $periodoNumero,
+        array $preview,
+        int $usuarioId
+    ): bool {
+        $resumo = is_array($preview['resumo'] ?? null) ? $preview['resumo'] : [];
+        $total = (int) ($resumo['total'] ?? 0);
+        $homologados = (int) ($resumo['homologados'] ?? 0);
+        $recuperacao = (int) ($resumo['recuperacao'] ?? 0);
+        $chamadas = (int) ($resumo['chamadas_pendentes'] ?? 0);
+        $pendencias = (int) ($resumo['pendencias'] ?? 0);
+        if ($turmaId <= 0 || $total <= 0 || $homologados < $total || $recuperacao > 0 || $chamadas > 0 || $pendencias > 0) {
+            return false;
+        }
+        $antes = $this->model->findVigente($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
+        $statusAntes = FechamentoMaquinaEstados::normalizar((string) ($antes['status'] ?? FechamentoMaquinaEstados::ABERTO));
+        if (FechamentoMaquinaEstados::estaTravado($statusAntes)) {
+            return false;
+        }
+        $this->sincronizarAposHomologacaoAlunos(
+            $turmaId,
+            $anoLetivo,
+            $periodoTipo,
+            $periodoNumero,
+            $preview,
+            $usuarioId
+        );
+        $depois = $this->model->findVigente($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
+        $statusDepois = FechamentoMaquinaEstados::normalizar((string) ($depois['status'] ?? ''));
+        return $statusDepois === FechamentoMaquinaEstados::HOMOLOGADO && $statusDepois !== $statusAntes;
     }
 
     public function estaTravado(int $turmaId, int $anoLetivo, string $periodoTipo, int $periodoNumero): bool

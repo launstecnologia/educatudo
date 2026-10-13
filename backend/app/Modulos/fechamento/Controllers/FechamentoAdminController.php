@@ -19,6 +19,13 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
         return new FechamentoService();
     }
 
+    private function podeAlterarResultadosFinais(): bool
+    {
+        $user = $this->auth->getUser() ?? [];
+        $permissions = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user);
+        return \App\Core\AdminPermissionMatrix::can($permissions, 'resultados_finais', 'alterar');
+    }
+
     public function index(): void
     {
         if (!$this->enforceAdminPermissionKey('resultados_finais', 'visualizar', false)) {
@@ -78,6 +85,16 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
             return;
         }
         $preview = $svc->homologacao()->previewTurma($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
+        if ($this->podeAlterarResultadosFinais()) {
+            $svc->concluirSeAlunosHomologados(
+                $turmaId,
+                $anoLetivo,
+                $periodoTipo,
+                $periodoNumero,
+                $preview,
+                (int) ($this->auth->getUser()['id'] ?? 0)
+            );
+        }
         $fechamento = $svc->model()->findVigente($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
         $historico = $fechamento ? $svc->model()->listarHistorico((int) $fechamento['id']) : [];
         $especiais = $model->listarEspeciaisTurma($turmaId, $anoLetivo);
@@ -194,6 +211,8 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
         );
         if (empty($result['success'])) {
             $this->setFlashMessage($result['error'] ?? 'Não foi possível homologar.', 'error');
+        } elseif (!empty($result['periodo_concluido']) && (int) ($result['homologados'] ?? 0) === 0) {
+            $this->setFlashMessage('Os alunos já estavam homologados. O período foi homologado.', 'success');
         } else {
             $this->setFlashMessage(
                 'Homologados: ' . (int) ($result['homologados'] ?? 0)

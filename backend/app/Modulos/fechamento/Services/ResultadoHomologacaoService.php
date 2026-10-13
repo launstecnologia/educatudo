@@ -212,11 +212,29 @@ class ResultadoHomologacaoService
 
         if ($homologados === 0) {
             $total = (int) ($preview['resumo']['total'] ?? count($preview['linhas'] ?? []));
+            $jaHomologados = (int) ($preview['resumo']['homologados'] ?? 0);
             $emRec = (int) ($preview['resumo']['recuperacao'] ?? 0);
             if ($total <= 0) {
                 return [
                     'success' => false,
                     'error' => 'Nenhum aluno nesta turma para o ano/período enviado. Confira o filtro (ex.: 2025) e tente de novo.',
+                ];
+            }
+            if ($jaHomologados >= $total && $emRec === 0
+                && (int) ($preview['resumo']['chamadas_pendentes'] ?? 0) === 0
+                && (int) ($preview['resumo']['pendencias'] ?? 0) === 0) {
+                $this->sincronizarFechamentoPeriodo($turmaId, $anoLetivo, $periodoTipo, $periodoNumero, $usuarioId);
+                if (!$this->periodoEstaTravado($turmaId, $anoLetivo, $periodoTipo, $periodoNumero)) {
+                    return [
+                        'success' => false,
+                        'error' => 'Os alunos estão homologados, mas o período não pôde ser concluído.',
+                    ];
+                }
+                return [
+                    'success' => true,
+                    'homologados' => 0,
+                    'ignorados' => $ignorados,
+                    'periodo_concluido' => true,
                 ];
             }
             return [
@@ -344,11 +362,6 @@ class ResultadoHomologacaoService
         int $periodoNumero,
         int $usuarioId
     ): void {
-        $path = __DIR__ . '/../Modulos/fechamento/Services/FechamentoService.php';
-        if (!is_file($path)) {
-            return;
-        }
-        require_once $path;
         try {
             $preview = $this->previewTurma($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
             (new FechamentoService(null, $this))->sincronizarAposHomologacaoAlunos(
@@ -416,11 +429,6 @@ class ResultadoHomologacaoService
         string $periodoTipo,
         int $periodoNumero
     ): bool {
-        $path = __DIR__ . '/../Modulos/fechamento/Models/FechamentoPeriodo.php';
-        if (!is_file($path)) {
-            return false;
-        }
-        require_once $path;
         try {
             $model = new FechamentoPeriodo();
             return $model->schemaPronto()
@@ -438,11 +446,6 @@ class ResultadoHomologacaoService
      */
     private function periodoUsaSnapshot(array $turma, int $anoLetivo, array $periodo): bool
     {
-        $path = __DIR__ . '/../Modulos/fechamento/Models/FechamentoPeriodo.php';
-        if (!is_file($path)) {
-            return true;
-        }
-        require_once $path;
         try {
             $model = new FechamentoPeriodo();
             if (!$model->schemaPronto()) {
