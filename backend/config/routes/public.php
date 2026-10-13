@@ -50,9 +50,35 @@ $router->get('/api/noticias', 'Noticias/NoticiasController@index');
 // API REST Pais (Parent) - Login (público)
 $router->post('/api/auth/login', 'Api/AuthController@login');
 
-// API REST Pais - Documentação Swagger (público)
+// API do responsável — Swagger (público) e sandbox com dados fictícios
 $router->get('/api/docs', 'Api/SwaggerController@index');
 $router->get('/api/openapi.json', 'Api/SwaggerController@openapi');
+$router->post('/api/sandbox/auth/login', 'Api/HomologacaoApiController@login');
+$router->post('/api/sandbox/auth/refresh', 'Api/HomologacaoApiController@renovar');
+$router->post('/api/sandbox/auth/logout', 'Api/HomologacaoApiController@sair');
+$router->get('/api/sandbox/me', 'Api/HomologacaoApiController@eu');
+$router->get('/api/sandbox/students', 'Api/HomologacaoApiController@alunos');
+$router->get('/api/sandbox/students/{id}/dashboard', 'Api/HomologacaoApiController@painel');
+$router->get('/api/sandbox/students/{id}/exams', 'Api/HomologacaoApiController@provas');
+$router->get('/api/sandbox/students/{id}/exercises', 'Api/HomologacaoApiController@exercicios');
+$router->get('/api/sandbox/students/{id}/journeys', 'Api/HomologacaoApiController@jornadas');
+$router->get('/api/sandbox/students/{id}/lesson-plans', 'Api/HomologacaoApiController@planosAula');
+$router->get('/api/sandbox/students/{id}/lesson-plans/{planId}', 'Api/HomologacaoApiController@planoAula');
+$router->get('/api/sandbox/students/{id}/writing-journeys', 'Api/HomologacaoApiController@jornadasRedacao');
+$router->get('/api/sandbox/students/{id}/essays', 'Api/HomologacaoApiController@redacoes');
+$router->get('/api/sandbox/students/{id}/notices', 'Api/HomologacaoApiController@avisos');
+$router->get('/api/sandbox/students/{id}/report-card', 'Api/HomologacaoApiController@boletim');
+$router->get('/api/sandbox/students/{id}/access-events', 'Api/HomologacaoApiController@acessos');
+$router->get('/api/sandbox/students/{id}/finance', 'Api/HomologacaoApiController@financeiro');
+$router->get('/api/sandbox/students/{id}/finance/invoices/{source}/{invoiceId}/payment', 'Api/HomologacaoApiController@pagamento');
+$router->get('/api/sandbox/students/{id}/school-communications', 'Api/HomologacaoApiController@comunicados');
+$router->get('/api/sandbox/students/{id}/school-communications/{communicationId}', 'Api/HomologacaoApiController@comunicado');
+$router->post('/api/sandbox/students/{id}/school-communications/{communicationId}/read', 'Api/HomologacaoApiController@comunicadoLido');
+$router->post('/api/sandbox/students/{id}/school-communications/{communicationId}/replies', 'Api/HomologacaoApiController@comunicadoResposta');
+$router->get('/api/sandbox/students/{id}/calendar-events', 'Api/HomologacaoApiController@calendario');
+$router->post('/api/sandbox/students/{id}/calendar-events/{eventId}/read', 'Api/HomologacaoApiController@calendarioLido');
+$router->get('/api/sandbox/notifications', 'Api/HomologacaoApiController@notificacoes');
+$router->post('/api/sandbox/notifications/{id}/read', 'Api/HomologacaoApiController@notificacaoLida');
 
 // API de geração de imagens educacionais (OpenAI Images)
 $router->post('/api/generate-image', 'Api/GenerateImageController@generate');
