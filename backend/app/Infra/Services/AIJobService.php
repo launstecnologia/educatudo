@@ -157,7 +157,7 @@ class AIJobService
                 return false; // estratégia abaixo é específica para *nix
             }
 
-            $script = realpath(__DIR__ . '/../../cron/process_ai_jobs.php');
+            $script = realpath(dirname(__DIR__, 3) . '/cron/process_ai_jobs.php');
             if ($script === false) {
                 return false;
             }

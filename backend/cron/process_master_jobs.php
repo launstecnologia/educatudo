@@ -27,7 +27,7 @@ if (is_file($autoload)) {
 
 require_once $basePath . '/config/app.php';
 require_once $basePath . '/app/Core/Database.php';
-require_once $basePath . '/app/Services/MasterFilaService.php';
+require_once $basePath . '/app/Painel/Master/Services/MasterFilaService.php';
 
 if (function_exists('set_time_limit')) {
     @set_time_limit(0);

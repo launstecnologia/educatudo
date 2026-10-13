@@ -349,6 +349,11 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
             return;
         }
 
+        $jobs = $this->jobsDaQuery();
+        if ($jobs !== []) {
+            \App\Services\AIJobService::tentarDispararWorker();
+        }
+
         $flash = $this->getFlashMessage();
         $this->viewWithLayout('admin', 'admin/fechamento/impressao-lote', [
             'title' => 'Impressão em lote - EducaTudo',
@@ -363,7 +368,7 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
             'turmas' => $turmas,
             'escopo_ok' => $escopoOk,
             'linhas' => $this->linhasImpressao($paineis, $lote, $anoLetivo, $periodoTipo, $periodoNumero),
-            'jobs' => $this->jobsDaQuery(),
+            'jobs' => $jobs,
             'impressao_lote' => $resumo,
             'documentos' => ImpressaoLoteFechamentoService::DOCUMENTOS,
             'pacote' => ImpressaoLoteFechamentoService::PACOTE,

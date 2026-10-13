@@ -102,6 +102,14 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             item.textContent = doc + ' — ' + ((dados && dados.error) ? dados.error : 'a geração falhou. Tente de novo.');
             return 'failed';
         }
+        if (status === 'processing') {
+            item.textContent = doc + ' — ' + ((dados && dados.andamento) ? dados.andamento : 'gerando…');
+            return 'pending';
+        }
+        if (dados && dados.error) {
+            item.textContent = doc + ' — na fila. Última tentativa: ' + dados.error;
+            return 'pending';
+        }
         item.textContent = doc + ' — ' + ((dados && dados.andamento) ? dados.andamento : 'na fila');
         return 'pending';
     }

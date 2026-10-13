@@ -104,6 +104,8 @@ class AIJobController
 
             if ($job['status'] === 'failed') {
                 $response['error'] = (string) ($job['error_message'] ?? 'Falha ao processar.');
+            } elseif ($job['status'] === 'pending' && !empty($job['error_message'])) {
+                $response['error'] = (string) $job['error_message'];
             }
 
             $this->jsonResponse($response);

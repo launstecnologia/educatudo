@@ -455,7 +455,7 @@ class MasterFilaService
             if (stripos(PHP_OS, 'WIN') === 0) {
                 return false;
             }
-            $script = realpath(__DIR__ . '/../../cron/process_master_jobs.php');
+            $script = realpath(dirname(__DIR__, 4) . '/cron/process_master_jobs.php');
             if ($script === false) {
                 return false;
             }
