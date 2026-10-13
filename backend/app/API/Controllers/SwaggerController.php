@@ -7,44 +7,16 @@ use App\Core\BaseController;
 
 /**
  * Documentação da API real do responsável.
- * GET /api/docs — Swagger UI, com o passo a passo de cada rota
+ * GET /api/docs — guia com menu lateral
  * GET /api/openapi.json — OpenAPI 3
  */
 class SwaggerController extends BaseController
 {
     public function index()
     {
-        $openApiUrl = (defined('URL') ? URL : '') . '/api/openapi.json';
+        $openapiUrl = (defined('URL') ? URL : '') . '/api/openapi.json';
         header('Content-Type: text/html; charset=utf-8');
-        echo '<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API do responsável — EducaTudo</title>
-    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css">
-</head>
-<body>
-    <div id="swagger-ui"></div>
-    <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js" charset="UTF-8"></script>
-    <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-standalone-preset.js" charset="UTF-8"></script>
-    <script>
-        window.onload = function() {
-            window.ui = SwaggerUIBundle({
-                url: "' . htmlspecialchars($openApiUrl, ENT_QUOTES, 'UTF-8') . '",
-                dom_id: "#swagger-ui",
-                deepLinking: true,
-                persistAuthorization: true,
-                presets: [
-                    SwaggerUIBundle.presets.apis,
-                    SwaggerUIStandalonePreset
-                ],
-                layout: "StandaloneLayout"
-            });
-        };
-    </script>
-</body>
-</html>';
+        require __DIR__ . '/../Views/documentacao.php';
         exit;
     }
 

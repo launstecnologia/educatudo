@@ -39,7 +39,7 @@ class EspecificacaoOpenApiService
                         'type' => 'http',
                         'scheme' => 'bearer',
                         'bearerFormat' => 'JWT',
-                        'description' => 'Cole só o access_token devolvido em /api/autenticacao/entrar. O Swagger acrescenta o prefixo Bearer.',
+                        'description' => 'Cole só o access_token devolvido em /api/autenticacao/entrar. A documentação envia o prefixo Bearer.',
                     ],
                 ],
             ],
@@ -57,7 +57,7 @@ Passo a passo
 
 1. Chame POST /api/autenticacao/entrar com o CPF (11 dígitos) e a senha do responsável.
 2. Na resposta, copie data.access_token. Guarde também data.refresh_token.
-3. Clique em Authorize e cole o access_token.
+3. Cole o access_token no campo Token, no menu lateral.
 4. Chame GET /api/alunos. Cada item traz o id do filho vinculado a esse responsável.
 5. Use esse id no lugar de {id} nas rotas /api/alunos/{id}/...
 6. Quando o access_token expirar, chame POST /api/autenticacao/renovar com o refresh_token. A resposta traz um par novo: passe a usar o access_token novo e o refresh_token novo.
