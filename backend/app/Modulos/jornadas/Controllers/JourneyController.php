@@ -1572,7 +1572,7 @@ class JourneyController extends BaseController
     private function renderJornadasCardsPartial(array $jornadas): string
     {
         ob_start();
-        include __DIR__ . '/../../Views/student/journeys/_cards.php';
+        include \App\Core\ViewPaths::modulo('jornadas', 'Views/aluno/_cards.php');
         return (string) ob_get_clean();
     }
 
