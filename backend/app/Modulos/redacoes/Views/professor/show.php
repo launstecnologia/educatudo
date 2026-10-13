@@ -1,7 +1,6 @@
 <?php
-$basePrefix = $base_prefix ?? '/professor/redacao-configuravel';
+$basePrefix = isset($base_prefix) ? rtrim((string) $base_prefix, '/') : '/professor/redacao-configuravel';
 $permissionBasePrefix = $permission_base_prefix ?? $basePrefix;
-$isAdminView = !empty($is_admin_view);
 $canManagePermissions = !empty($can_manage_permissions);
 $repertoriosList = [];
 if (!empty($proposal['repertoire'])) {
@@ -28,13 +27,11 @@ $hasColetanea = !empty($proposal['theme']) || !empty($proposal['contexto']) || !
             <p class="text-gray-600"><?= htmlspecialchars($proposal['board_name']) ?> — <?= htmlspecialchars($proposal['text_type_name']) ?></p>
         </div>
         <div class="flex space-x-2">
-            <?php if (!$isAdminView): ?>
             <a href="<?= URL . $basePrefix ?>/<?= (int)$proposal['id'] ?>/editar" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Editar</a>
-            <?php endif; ?>
             <?php if ($hasColetanea): ?>
             <button type="button" id="btnColetaneaAbrir" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">Coletânea</button>
             <?php endif; ?>
-            <a href="<?= URL . ($isAdminView ? '/admin/redacao-configuravel' : '/professor/redacao-configuravel') ?>" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">Voltar</a>
+            <a href="<?= URL . $basePrefix ?>" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">Voltar</a>
         </div>
     </div>
 </div>
@@ -43,12 +40,10 @@ $hasColetanea = !empty($proposal['theme']) || !empty($proposal['contexto']) || !
     <div class="p-6 border-b border-gray-200 flex flex-wrap items-center justify-between gap-4">
         <h3 class="text-lg font-semibold text-gray-900">Envios dos alunos</h3>
         <div class="flex items-center gap-2">
-            <?php if (!$isAdminView): ?>
             <a href="<?= URL . $basePrefix . '/' . (int)$proposal['id'] . '/exportar-excel' ?>"
                class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium">
                 Exportar Excel
             </a>
-            <?php endif; ?>
             <?php if (!empty($studentsWithAccess)): ?>
             <button type="button" id="btnEnviarLote" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium">Enviar redações em bloco</button>
             <?php endif; ?>
@@ -119,7 +114,6 @@ $hasColetanea = !empty($proposal['theme']) || !empty($proposal['contexto']) || !
                         <td class="px-6 py-4 text-sm font-semibold text-gray-800"><?= ($row['nota_final'] ?? '') !== '' ? htmlspecialchars((string)$row['nota_final']) : '—' ?></td>
                         <td class="px-6 py-4 text-sm font-medium">
                             <div class="flex items-center gap-3">
-                            <?php if (!$isAdminView): ?>
                             <button type="button"
                                     class="btn-transcrever text-purple-600 hover:text-purple-900"
                                     title="Transcrever"
@@ -131,9 +125,8 @@ $hasColetanea = !empty($proposal['theme']) || !empty($proposal['contexto']) || !
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h10"/>
                                 </svg>
                             </button>
-                            <?php endif; ?>
-                            <?php if ($row['submission_id'] && !$isAdminView): ?>
-                            <a href="<?= URL ?>/professor/redacao-configuravel/propostas/<?= (int)$proposal['id'] ?>/envios/<?= (int)$row['submission_id'] ?>/corrigir"
+                            <?php if ($row['submission_id']): ?>
+                            <a href="<?= URL . $basePrefix ?>/propostas/<?= (int)$proposal['id'] ?>/envios/<?= (int)$row['submission_id'] ?>/corrigir"
                                class="text-indigo-600 hover:text-indigo-900"
                                title="Visualizar">
                                 <span class="sr-only">Visualizar</span>
@@ -421,7 +414,7 @@ $hasColetanea = !empty($proposal['theme']) || !empty($proposal['contexto']) || !
             var fd = new FormData(formModalTranscrever);
             btn.disabled = true;
             btn.textContent = 'Enviando...';
-            fetch(baseUrl + '/professor/redacao-configuravel/propostas/' + proposalId + '/enviar-aluno', { method: 'POST', body: fd })
+            fetch(baseUrl + basePrefix + '/propostas/' + proposalId + '/enviar-aluno', { method: 'POST', body: fd })
                 .then(function(r) { return r.json(); })
                 .then(function(d) {
                     if (d.success) {
@@ -463,7 +456,7 @@ $hasColetanea = !empty($proposal['theme']) || !empty($proposal['contexto']) || !
         btn.disabled = true;
         btn.textContent = 'Processando...';
         loteResultados.classList.add('hidden');
-        fetch(baseUrl + '/professor/redacao-configuravel/propostas/' + proposalId + '/enviar-lote', { method: 'POST', body: fd })
+        fetch(baseUrl + basePrefix + '/propostas/' + proposalId + '/enviar-lote', { method: 'POST', body: fd })
             .then(function(r) { return r.json(); })
             .then(function(d) {
                 btn.disabled = false;

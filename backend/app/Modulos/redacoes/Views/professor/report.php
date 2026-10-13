@@ -1,4 +1,5 @@
 <?php
+$basePrefix = isset($base_prefix) ? rtrim((string) $base_prefix, '/') : '/professor/redacao-configuravel';
 $filters = $filters ?? [];
 $pagination = $pagination ?? ['page' => 1, 'per_page' => 10, 'total' => 0, 'total_pages' => 1];
 $rows = $rows ?? [];
@@ -51,7 +52,7 @@ ob_start();
 $ui_btn_variant = 'complementar';
 $ui_btn_label = 'Voltar para propostas';
 $ui_btn_icon = 'fa-solid fa-arrow-left';
-$ui_btn_href = URL . '/professor/redacao-configuravel';
+$ui_btn_href = URL . $basePrefix;
 $ui_btn_type = 'button';
 $ui_btn_onclick = '';
 $ui_btn_id = '';
@@ -138,7 +139,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                         <td class="px-6 py-4 text-sm font-semibold text-gray-800"><?= isset($row['nota_final']) && $row['nota_final'] !== null ? number_format((float) $row['nota_final'], 0, ',', '.') : '—' ?></td>
                         <td class="px-6 py-4 text-sm text-right">
                             <?php if (!empty($row['submission_id'])): ?>
-                                <?php $baseDetailUrl = URL . '/professor/redacao-configuravel/propostas/' . (int) ($row['proposal_id'] ?? 0) . '/envios/' . (int) $row['submission_id'] . '/corrigir'; ?>
+                                <?php $baseDetailUrl = URL . $basePrefix . '/propostas/' . (int) ($row['proposal_id'] ?? 0) . '/envios/' . (int) $row['submission_id'] . '/corrigir'; ?>
                                 <div class="inline-flex flex-col items-stretch gap-2">
                                     <a href="<?= htmlspecialchars($baseDetailUrl . '#redacao') ?>" class="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100">
                                         Ver redação
@@ -170,7 +171,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
         if ($currentPage > 1):
             $prevQuery = $baseQuery;
             $prevQuery['page'] = $currentPage - 1;
-            $prevUrl = URL . '/professor/redacao-configuravel/relatorio?' . http_build_query($prevQuery);
+            $prevUrl = URL . $basePrefix . '/relatorio?' . http_build_query($prevQuery);
         ?>
         <a href="<?= htmlspecialchars($prevUrl) ?>"
            class="px-3.5 py-2 rounded-lg text-sm border bg-white text-gray-700 border-gray-200 hover:bg-gray-50">
@@ -185,7 +186,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                 <?php
                 $pageQuery = $baseQuery;
                 $pageQuery['page'] = $item;
-                $pageUrl = URL . '/professor/redacao-configuravel/relatorio?' . http_build_query($pageQuery);
+                $pageUrl = URL . $basePrefix . '/relatorio?' . http_build_query($pageQuery);
                 ?>
             <a href="<?= htmlspecialchars($pageUrl) ?>"
                class="min-w-[42px] px-3 py-2 rounded-lg text-sm border text-center <?= $item === $currentPage ? 'bg-primary text-primary border-primary shadow-sm' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50' ?>">
@@ -198,7 +199,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
         if ($currentPage < $totalPages):
             $nextQuery = $baseQuery;
             $nextQuery['page'] = $currentPage + 1;
-            $nextUrl = URL . '/professor/redacao-configuravel/relatorio?' . http_build_query($nextQuery);
+            $nextUrl = URL . $basePrefix . '/relatorio?' . http_build_query($nextQuery);
         ?>
         <a href="<?= htmlspecialchars($nextUrl) ?>"
            class="px-3.5 py-2 rounded-lg text-sm border bg-white text-gray-700 border-gray-200 hover:bg-gray-50">
@@ -244,7 +245,7 @@ $opcoesOrdem = [
 ];
 ob_start();
 ?>
-<form method="get" action="<?= URL ?>/professor/redacao-configuravel/relatorio" class="flex flex-col flex-1 overflow-hidden">
+<form method="get" action="<?= URL . $basePrefix ?>/relatorio" class="flex flex-col flex-1 overflow-hidden">
     <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6">
         <?php
         $ui_form_campo_label = 'Título da proposta';
@@ -339,7 +340,7 @@ ob_start();
         <?php
         $ui_btn_variant = 'complementar';
         $ui_btn_label = 'Limpar';
-        $ui_btn_href = URL . '/professor/redacao-configuravel/relatorio';
+        $ui_btn_href = URL . $basePrefix . '/relatorio';
         $ui_btn_class = 'flex-1 justify-center';
         $ui_btn_type = 'button';
         $ui_btn_onclick = '';

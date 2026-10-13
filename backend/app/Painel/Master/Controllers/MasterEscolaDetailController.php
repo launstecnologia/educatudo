@@ -2082,7 +2082,7 @@ class MasterEscolaDetailController extends BaseController
             [$id]
         )->fetchAll(\PDO::FETCH_COLUMN);
 
-        $migrationDir = __DIR__ . '/../../../database/migrations';
+        $migrationDir = (defined('BASE_PATH') ? BASE_PATH : dirname(__DIR__, 4)) . '/database/migrations';
         $migrationFiles = [];
         if (is_dir($migrationDir)) {
             $files = scandir($migrationDir);

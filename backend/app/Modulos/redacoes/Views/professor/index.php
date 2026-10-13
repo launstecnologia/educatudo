@@ -1,4 +1,5 @@
 <?php
+$basePrefix = isset($base_prefix) ? rtrim((string) $base_prefix, '/') : '/professor/redacao-configuravel';
 $ui = \App\Core\ViewPaths::adminPartial('ui');
 $filtros = $filtros ?? ['titulo' => '', 'status' => '', 'banca' => ''];
 $filtrosAtivos = 0;
@@ -29,14 +30,14 @@ $ui_btn_variant = 'complementar';
 $ui_btn_label = 'Relatório';
 $ui_btn_icon = 'fa-solid fa-chart-column';
 $ui_btn_onclick = '';
-$ui_btn_href = URL . '/professor/redacao-configuravel/relatorio';
+$ui_btn_href = URL . $basePrefix . '/relatorio';
 $ui_btn_filter_count = 0;
 include $ui . '/btn.php';
 
 $ui_btn_variant = 'primary';
 $ui_btn_label = 'Nova Proposta';
 $ui_btn_icon = 'fa-solid fa-plus';
-$ui_btn_href = URL . '/professor/redacao-configuravel/novo';
+$ui_btn_href = URL . $basePrefix . '/novo';
 include $ui . '/btn.php';
 $page_header_actions = ob_get_clean();
 $page_header_title = 'Jornada da Redação';
@@ -74,7 +75,7 @@ if (!empty($_SESSION['flash_message'])) {
                         <td colspan="7" class="px-6 py-12 text-center text-gray-500">
                             <?= $filtrosAtivos > 0 ? 'Nenhuma proposta com esse filtro.' : 'Nenhuma proposta.' ?>
                             <?php if ($filtrosAtivos === 0): ?>
-                            <a href="<?= URL ?>/professor/redacao-configuravel/novo" class="text-gray-900 font-semibold hover:underline">Criar primeira proposta</a>
+                            <a href="<?= URL . $basePrefix ?>/novo" class="text-gray-900 font-semibold hover:underline">Criar primeira proposta</a>
                             <?php endif; ?>
                         </td>
                     </tr>
@@ -82,7 +83,7 @@ if (!empty($_SESSION['flash_message'])) {
                     <?php foreach ($proposals as $p): ?>
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4 text-sm font-medium text-gray-900">
-                            <a href="<?= URL ?>/professor/redacao-configuravel/<?= (int)$p['id'] ?>" class="hover:underline"><?= htmlspecialchars($p['title']) ?></a>
+                            <a href="<?= URL . $basePrefix ?>/<?= (int)$p['id'] ?>" class="hover:underline"><?= htmlspecialchars($p['title']) ?></a>
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-500"><?= htmlspecialchars($p['board_name']) ?> — <?= htmlspecialchars($p['text_type_name']) ?></td>
                         <td class="px-6 py-4 text-sm text-gray-700"><?= (int)($p['qtd_alunos'] ?? 0) ?></td>
@@ -100,7 +101,7 @@ if (!empty($_SESSION['flash_message'])) {
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div class="flex items-center gap-3">
-                                <a href="<?= URL ?>/professor/redacao-configuravel/<?= (int)$p['id'] ?>"
+                                <a href="<?= URL . $basePrefix ?>/<?= (int)$p['id'] ?>"
                                    class="text-gray-700 hover:text-gray-900"
                                    title="Ver">
                                     <span class="sr-only">Ver</span>
@@ -109,7 +110,7 @@ if (!empty($_SESSION['flash_message'])) {
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                     </svg>
                                 </a>
-                                <a href="<?= URL ?>/professor/redacao-configuravel/<?= (int)$p['id'] ?>/editar"
+                                <a href="<?= URL . $basePrefix ?>/<?= (int)$p['id'] ?>/editar"
                                    class="text-gray-600 hover:text-gray-900"
                                    title="Editar">
                                     <span class="sr-only">Editar</span>
@@ -179,7 +180,7 @@ foreach ($bancas ?? [] as $banca) {
 }
 ob_start();
 ?>
-<form method="get" action="<?= URL ?>/professor/redacao-configuravel" class="flex flex-col flex-1 overflow-hidden">
+<form method="get" action="<?= URL . $basePrefix ?>" class="flex flex-col flex-1 overflow-hidden">
     <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6">
         <?php
         $ui_form_campo_label = 'Título';
@@ -213,7 +214,7 @@ ob_start();
         <?php
         $ui_btn_variant = 'complementar';
         $ui_btn_label = 'Limpar';
-        $ui_btn_href = URL . '/professor/redacao-configuravel';
+        $ui_btn_href = URL . $basePrefix;
         $ui_btn_class = 'flex-1 justify-center';
         $ui_btn_type = 'button';
         $ui_btn_onclick = '';
@@ -289,7 +290,7 @@ include $ui . '/offcanvas.php';
             body.append('_token', csrfToken);
             body.append('senha', senha);
 
-            fetch(<?= json_encode(URL . '/professor/redacao-configuravel/') ?> + pendingId + '/toggle-status', {
+            fetch(<?= json_encode(URL . $basePrefix . '/') ?> + pendingId + '/toggle-status', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: body.toString()

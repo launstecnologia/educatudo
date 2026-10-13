@@ -523,9 +523,18 @@ class MasterMigrationsController extends BaseController
         }
     }
 
+    private function migrationsDir(): string
+    {
+        if (defined('BASE_PATH')) {
+            return BASE_PATH . '/database/migrations';
+        }
+
+        return dirname(__DIR__, 4) . '/database/migrations';
+    }
+
     private function getMigrationFiles(): array
     {
-        $dir = dirname(dirname(dirname(__DIR__))) . '/database/migrations';
+        $dir = $this->migrationsDir();
         if (!is_dir($dir)) {
             return [];
         }
@@ -543,7 +552,7 @@ class MasterMigrationsController extends BaseController
 
     private function getMasterMigrationFiles(): array
     {
-        $dir = dirname(dirname(dirname(__DIR__))) . '/database/migrations';
+        $dir = $this->migrationsDir();
         if (!is_dir($dir)) {
             return [];
         }

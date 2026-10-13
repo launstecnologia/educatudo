@@ -91,71 +91,90 @@ class AdminEssayController extends BaseController
     public function proposalsIndex()
     {
         $user = $this->authManager->getUser();
-        $message = $this->getFlashMessage();
         $db = Database::getInstance();
 
-        $filtros = [
-            'titulo' => trim((string) ($_GET['titulo'] ?? '')),
-            'professor_id' => trim((string) ($_GET['professor_id'] ?? '')),
-            'status' => trim((string) ($_GET['status'] ?? '')),
-        ];
+        $filtroTitulo = trim((string) ($_GET['titulo'] ?? ''));
+        $filtroStatus = trim((string) ($_GET['status'] ?? ''));
+        $filtroBanca = trim((string) ($_GET['banca'] ?? ''));
+        if (!in_array($filtroStatus, ['', 'published', 'draft'], true)) {
+            $filtroStatus = '';
+        }
 
-        $where = [];
-        $params = [];
-        if ($filtros['titulo'] !== '') {
-            $where[] = 'p.title LIKE :titulo';
-            $params['titulo'] = '%' . $filtros['titulo'] . '%';
-        }
-        if ($filtros['professor_id'] !== '') {
-            $where[] = 'p.teacher_id = :professor_id';
-            $params['professor_id'] = $filtros['professor_id'];
-        }
-        if ($filtros['status'] !== '') {
-            $where[] = 'p.status = :status';
-            $params['status'] = $filtros['status'];
-        }
-        $whereSql = !empty($where) ? ('WHERE ' . implode(' AND ', $where)) : '';
-
-        // Busca tudo filtrado e ordena pela mesma regra numérica de título antes
-        // de paginar em PHP — sortProposalsByTitleNumeric() extrai o número do
-        // título via regex, não é traduzível pra SQL diretamente.
-        $proposalsFiltradas = $db->fetchAll(
-            "SELECT p.id, p.title, p.status, p.ativo, p.created_at, p.updated_at,
-                    b.name AS board_name, t.name AS text_type_name,
-                    prof.nome AS professor_nome
+        $proposals = $db->fetchAll(
+            "SELECT p.*, b.name AS board_name, t.name AS text_type_name
              FROM redacoes_orientadas_propostas p
              LEFT JOIN redacoes_orientadas_quadros b ON b.id = p.board_id
              LEFT JOIN redacoes_orientadas_tipos_texto t ON t.id = p.text_type_id
-             LEFT JOIN professores prof ON prof.id = p.teacher_id
-             $whereSql
-             ORDER BY p.id ASC",
-            $params
+             ORDER BY p.id ASC"
         );
-        $proposalsFiltradas = $this->proposalModel->sortProposalsByTitleNumeric($proposalsFiltradas);
+        $proposals = $this->proposalModel->sortProposalsByTitleNumeric($proposals);
+        $bancas = [];
+        foreach ($proposals as &$proposal) {
+            $nomeBanca = trim((string) ($proposal['board_name'] ?? ''));
+            if ($nomeBanca !== '') {
+                $bancas[$nomeBanca] = $nomeBanca;
+            }
+            $proposalId = (int) ($proposal['id'] ?? 0);
+            $studentsWithAccess = $this->proposalModel->getStudentsWithAccess($proposalId);
+            $submissions = $this->submissionModel->findByProposal($proposalId);
+            $submissionIds = array_values(array_filter(array_map(static function ($submission): int {
+                return (int) ($submission['id'] ?? 0);
+            }, $submissions)));
+            $correctionBySubmission = [];
+            if (!empty($submissionIds)) {
+                $placeholders = implode(',', array_fill(0, count($submissionIds), '?'));
+                $corrections = $db->fetchAll(
+                    "SELECT submission_id FROM redacoes_orientadas_correcoes WHERE submission_id IN ($placeholders)",
+                    $submissionIds
+                );
+                foreach ($corrections as $correction) {
+                    $correctionBySubmission[(int) $correction['submission_id']] = $correction;
+                }
+            }
+            $proposal['qtd_alunos'] = is_array($studentsWithAccess) ? count($studentsWithAccess) : 0;
+            $proposal['qtd_enviados'] = 0;
+            $proposal['qtd_corrigidos'] = 0;
+            foreach ($submissions as $submission) {
+                $status = (string) ($submission['status'] ?? '');
+                $submissionId = (int) ($submission['id'] ?? 0);
+                if (in_array($status, ['submitted', 'corrected'], true)) {
+                    $proposal['qtd_enviados']++;
+                }
+                if ($status === 'corrected' || isset($correctionBySubmission[$submissionId])) {
+                    $proposal['qtd_corrigidos']++;
+                }
+            }
+        }
+        unset($proposal);
+        ksort($bancas, SORT_NATURAL | SORT_FLAG_CASE);
+        if ($filtroTitulo !== '' || $filtroStatus !== '' || $filtroBanca !== '') {
+            $proposals = array_values(array_filter($proposals, static function (array $proposal) use ($filtroTitulo, $filtroStatus, $filtroBanca): bool {
+                if ($filtroTitulo !== '' && stripos((string) ($proposal['title'] ?? ''), $filtroTitulo) === false) {
+                    return false;
+                }
+                if ($filtroStatus !== '' && (string) ($proposal['status'] ?? '') !== $filtroStatus) {
+                    return false;
+                }
+                if ($filtroBanca !== '' && (string) ($proposal['board_name'] ?? '') !== $filtroBanca) {
+                    return false;
+                }
+                return true;
+            }));
+        }
 
-        $perPage = 10;
-        $page = max(1, (int) ($_GET['page'] ?? 1));
-        $total = count($proposalsFiltradas);
-        $totalPages = $total > 0 ? (int) ceil($total / $perPage) : 1;
-        $page = min($page, max(1, $totalPages));
-        $proposals = array_slice($proposalsFiltradas, ($page - 1) * $perPage, $perPage);
-
-        $professores = $db->fetchAll("SELECT id, nome FROM professores WHERE ativo = 1 ORDER BY nome ASC");
-
-        $this->viewWithLayout('admin', 'admin/essays/proposals', [
-            'title' => 'Redação do Professor - EducaTudo',
+        $this->viewWithLayout('admin', 'teacher/essays/index', [
+            'title' => 'Jornada da Redação - EducaTudo',
+            'page_title' => 'Jornada da Redação',
             'user' => $user,
             'proposals' => $proposals,
-            'professores' => $professores,
-            'filtros' => $filtros,
-            'csrf_token' => $this->generateCsrfToken(),
-            'pagination' => [
-                'page' => $page,
-                'per_page' => $perPage,
-                'total' => $total,
-                'total_pages' => $totalPages,
+            'bancas' => array_values($bancas),
+            'filtros' => [
+                'titulo' => $filtroTitulo,
+                'status' => $filtroStatus,
+                'banca' => $filtroBanca,
             ],
-            'message' => $message,
+            'csrf_token' => $this->generateCsrfToken(),
+            'base_prefix' => '/admin/redacao-professor',
             'current_page' => 'essays_teacher'
         ]);
     }
@@ -732,7 +751,8 @@ class AdminEssayController extends BaseController
         if (!empty($submissionIds)) {
             $placeholders = implode(',', array_fill(0, count($submissionIds), '?'));
             $corrections = Database::getInstance()->fetchAll(
-                "SELECT submission_id, teacher_adjusted_at
+                "SELECT submission_id, teacher_adjusted_at, updated_at,
+                        COALESCE(teacher_total_score, total_score, ai_total_score) AS nota_final
                  FROM redacoes_orientadas_correcoes
                  WHERE submission_id IN ($placeholders)",
                 $submissionIds
@@ -750,12 +770,20 @@ class AdminEssayController extends BaseController
             $submissionStatus = (string) ($sub['status'] ?? '');
             if (!$sub) {
                 $statusList = 'nao_enviado';
-            } elseif ($submissionStatus === 'corrected') {
+            } elseif ($submissionStatus === 'corrected' || $correction) {
                 $statusList = 'corrigido';
             } elseif ($submissionStatus === 'submitted') {
                 $statusList = 'enviado';
             } else {
                 $statusList = 'visualizado';
+            }
+            $correctedAt = null;
+            $notaFinal = '';
+            if ($correction) {
+                $correctedAt = $correction['teacher_adjusted_at'] ?? $correction['updated_at'] ?? null;
+                if (isset($correction['nota_final']) && $correction['nota_final'] !== null && $correction['nota_final'] !== '') {
+                    $notaFinal = number_format((float) $correction['nota_final'], 0, ',', '.');
+                }
             }
 
             $enviosList[] = [
@@ -763,9 +791,10 @@ class AdminEssayController extends BaseController
                 'nome' => $a['nome'],
                 'status' => $statusList,
                 'submitted_at' => $sub ? ($sub['submitted_at'] ?? null) : null,
-                'corrected_at' => $correction['teacher_adjusted_at'] ?? null,
+                'corrected_at' => $correctedAt,
+                'nota_final' => $notaFinal,
                 'submission_id' => $subId > 0 ? $subId : null,
-                'has_submitted' => $sub && ($sub['status'] ?? '') === 'submitted',
+                'has_submitted' => $sub && in_array((string) ($sub['status'] ?? ''), ['submitted', 'corrected'], true),
             ];
         }
         $allowedProfessors = $this->proposalModel->getAllowedProfessors($id);
@@ -783,7 +812,7 @@ class AdminEssayController extends BaseController
             // Permissões de professores: apenas admin master (não admin_escola).
             'can_manage_permissions' => $isMasterAdmin,
             'is_admin_view' => true,
-            'base_prefix' => '/admin/redacao-configuravel',
+            'base_prefix' => '/admin/redacao-professor',
             'permission_base_prefix' => '/admin/redacao-configuravel/propostas',
             'csrf_token' => $this->generateCsrfToken(),
             'current_page' => 'essays_teacher'

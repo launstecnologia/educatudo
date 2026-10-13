@@ -55,9 +55,42 @@ class TeacherEssayController extends BaseController
             $this->redirect('/');
         }
         $user = $this->authManager->getUser();
-        if ($user && $user['tipo'] !== 'professor') {
-            $this->redirectToCorrectDashboard($user['tipo']);
+        if (!$user) {
+            return;
         }
+        $tipo = (string) ($user['tipo'] ?? '');
+        $path = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH) ?: '');
+        $rotaGestao = str_contains($path, '/admin/redacao-professor') || str_contains($path, '/admin/redacao-configuravel');
+        if ($rotaGestao) {
+            if (!in_array($tipo, ['admin', 'admin_escola'], true)) {
+                $this->redirectToCorrectDashboard($tipo);
+            }
+            return;
+        }
+        if ($tipo !== 'professor') {
+            $this->redirectToCorrectDashboard($tipo);
+        }
+    }
+
+    private function isGestaoEscola(): bool
+    {
+        $tipo = (string) ($this->authManager->getUser()['tipo'] ?? '');
+        return in_array($tipo, ['admin', 'admin_escola'], true);
+    }
+
+    private function essayBasePath(): string
+    {
+        return $this->isGestaoEscola() ? '/admin/redacao-professor' : '/professor/redacao-configuravel';
+    }
+
+    private function essayLayout(): string
+    {
+        return $this->isGestaoEscola() ? 'admin' : 'professor';
+    }
+
+    private function essayCurrentPage(string $professorPage, string $adminPage): string
+    {
+        return $this->isGestaoEscola() ? $adminPage : $professorPage;
     }
 
     private function redirectToCorrectDashboard($tipo)
@@ -86,6 +119,9 @@ class TeacherEssayController extends BaseController
 
     private function canAccessProposal(array $proposal, int $teacherId): bool
     {
+        if ($this->isGestaoEscola()) {
+            return true;
+        }
         return ((int) $proposal['teacher_id'] === $teacherId) || $this->proposalModel->hasProfessorAccess((int) $proposal['id'], $teacherId);
     }
 
@@ -96,7 +132,18 @@ class TeacherEssayController extends BaseController
 
     private function buildProposalReportRows(int $teacherId): array
     {
-        $proposals = $this->proposalModel->findByTeacherOrShared($teacherId);
+        if ($this->isGestaoEscola()) {
+            $proposals = $this->db->fetchAll(
+                "SELECT p.*, b.name AS board_name, t.name AS text_type_name
+                 FROM redacoes_orientadas_propostas p
+                 LEFT JOIN redacoes_orientadas_quadros b ON b.id = p.board_id
+                 LEFT JOIN redacoes_orientadas_tipos_texto t ON t.id = p.text_type_id
+                 ORDER BY p.id ASC"
+            );
+            $proposals = $this->proposalModel->sortProposalsByTitleNumeric($proposals);
+        } else {
+            $proposals = $this->proposalModel->findByTeacherOrShared($teacherId);
+        }
         $rows = [];
 
         foreach ($proposals as $proposal) {
@@ -396,7 +443,7 @@ class TeacherEssayController extends BaseController
                 $this->json(['error' => 'O módulo de Redações está desabilitado.'], 403);
             }
             $this->setFlashMessage('O módulo Jornada da Redação está desabilitado.', 'error');
-            $this->redirect(URL . '/professor/dashboard');
+            $this->redirect(URL . ($this->isGestaoEscola() ? '/admin/dashboard' : '/professor/dashboard'));
         }
     }
 
@@ -630,7 +677,7 @@ class TeacherEssayController extends BaseController
         ksort($boardOptions);
         ksort($turmaOptions);
 
-        $this->viewWithLayout('professor', 'teacher/essays/report', [
+        $this->viewWithLayout($this->essayLayout(), 'teacher/essays/report', [
             'title' => 'Relatório de Redações - EducaTudo',
             'page_title' => 'Relatório de Redações',
             'user' => $user,
@@ -658,7 +705,8 @@ class TeacherEssayController extends BaseController
                 'total' => $total,
                 'total_pages' => $totalPages,
             ],
-            'current_page' => 'essays-report'
+            'base_prefix' => $this->essayBasePath(),
+            'current_page' => $this->essayCurrentPage('essays-report', 'essays_teacher_report')
         ]);
     }
 
@@ -769,7 +817,7 @@ class TeacherEssayController extends BaseController
         $proposal = $this->proposalModel->findById($id);
         if (!$proposal || !$this->canAccessProposal($proposal, $teacherId)) {
             $this->setFlashMessage('Proposta não encontrada', 'error');
-            $this->redirect(URL . '/professor/redacao-configuravel');
+            $this->redirect(URL . $this->essayBasePath());
         }
         $submissions = $this->submissionModel->findByProposal($id);
         $studentsWithAccess = $this->proposalModel->getStudentsWithAccess($id);
@@ -831,7 +879,7 @@ class TeacherEssayController extends BaseController
             // Gestão de permissões é exclusiva do admin/coordenacao.
             'can_manage_permissions' => false,
             'is_admin_view' => false,
-            'base_prefix' => '/professor/redacao-configuravel',
+            'base_prefix' => $this->essayBasePath(),
             'csrf_token' => $this->generateCsrfToken(),
             'current_page' => 'essays'
         ]);
@@ -843,7 +891,7 @@ class TeacherEssayController extends BaseController
         $proposal = $this->proposalModel->findById((int) $id);
         if (!$proposal || !$this->canAccessProposal($proposal, $teacherId)) {
             $this->setFlashMessage('Proposta não encontrada', 'error');
-            $this->redirect(URL . '/professor/redacao-configuravel');
+            $this->redirect(URL . $this->essayBasePath());
         }
 
         $rows = $this->buildProposalExportRows((int) $id);
@@ -986,26 +1034,30 @@ class TeacherEssayController extends BaseController
         $proposal = $this->proposalModel->findById($id);
         if (!$proposal || !$this->canAccessProposal($proposal, $teacherId)) {
             $this->setFlashMessage('Proposta não encontrada ou sem permissão de acesso', 'error');
-            $this->redirect(URL . '/professor/redacao-configuravel');
+            $this->redirect(URL . $this->essayBasePath());
         }
         // Rascunho continua editável mesmo se a coluna ativo faltar/vier 0;
         // só proposta publicada desativada pela coordenação fica bloqueada.
         if (($proposal['status'] ?? '') !== 'draft' && !$this->proposalModel->propostaEstaAtiva($proposal)) {
             $this->setFlashMessage('Proposta não encontrada ou desativada pela coordenação', 'error');
-            $this->redirect(URL . '/professor/redacao-configuravel');
+            $this->redirect(URL . $this->essayBasePath());
         }
         $boards = $this->boardModel->all(true);
         $textTypes = $this->textTypeModel->allByBoard($proposal['board_id']);
-        $professor = $this->db->fetch("SELECT * FROM professores WHERE id = :id", ['id' => $teacherId]);
-        $turmasIds = json_decode($professor['turmas'] ?? '[]', true) ?: [];
         $turmas = [];
-        if (!empty($turmasIds)) {
-            $placeholders = implode(',', array_fill(0, count($turmasIds), '?'));
-            $turmas = $this->db->fetchAll("SELECT id, nome FROM turmas WHERE id IN ($placeholders) ORDER BY nome", $turmasIds);
+        if ($this->isGestaoEscola()) {
+            $turmas = $this->db->fetchAll("SELECT id, nome FROM turmas WHERE ativo = 1 ORDER BY nome");
+        } else {
+            $professor = $this->db->fetch("SELECT * FROM professores WHERE id = :id", ['id' => $teacherId]);
+            $turmasIds = json_decode($professor['turmas'] ?? '[]', true) ?: [];
+            if (!empty($turmasIds)) {
+                $placeholders = implode(',', array_fill(0, count($turmasIds), '?'));
+                $turmas = $this->db->fetchAll("SELECT id, nome FROM turmas WHERE id IN ($placeholders) ORDER BY nome", $turmasIds);
+            }
         }
         $proposalTurmas = array_column($this->proposalModel->getTurmas($id), 'turma_id');
         $proposalStudents = $this->proposalModel->getStudentIds($id);
-        $this->viewWithLayout('professor', 'teacher/essays/form', [
+        $this->viewWithLayout($this->essayLayout(), 'teacher/essays/form', [
             'title' => 'Jornada da Redação - Editar proposta',
             'user' => $user,
             'proposal' => $proposal,
@@ -1014,7 +1066,9 @@ class TeacherEssayController extends BaseController
             'turmas' => $turmas,
             'proposalTurmas' => $proposalTurmas,
             'proposalStudents' => $proposalStudents,
-            'csrf_token' => $this->generateCsrfToken()
+            'csrf_token' => $this->generateCsrfToken(),
+            'base_prefix' => $this->essayBasePath(),
+            'current_page' => $this->essayCurrentPage('essays', 'essays_teacher'),
         ]);
     }
 
@@ -1193,9 +1247,14 @@ class TeacherEssayController extends BaseController
                     : 'Este aluno já enviou redação. Confirme sua senha para sobrescrever.';
                 $this->json(['error' => $mensagem], 400);
             }
-            $professor = $this->db->fetch("SELECT senha_hash FROM professores WHERE id = :id", ['id' => $teacherId]);
-            if (!$professor || !password_verify($senha, $professor['senha_hash'] ?? '')) {
-                $this->json(['error' => 'Senha do professor inválida.'], 403);
+            if ($this->isGestaoEscola()) {
+                $senhaOk = \App\Helpers\AdminPasswordHelper::verifyAdminPassword($this->db, $this->authManager->getUser(), $senha);
+            } else {
+                $professor = $this->db->fetch("SELECT senha_hash FROM professores WHERE id = :id", ['id' => $teacherId]);
+                $senhaOk = $professor && password_verify($senha, $professor['senha_hash'] ?? '');
+            }
+            if (!$senhaOk) {
+                $this->json(['error' => 'Senha inválida.'], 403);
             }
         }
         if ($existing) {
@@ -1351,12 +1410,12 @@ class TeacherEssayController extends BaseController
         $proposal = $this->proposalModel->findById($proposalId);
         if (!$proposal || !$this->canAccessProposal($proposal, $teacherId)) {
             $this->setFlashMessage('Proposta não encontrada', 'error');
-            $this->redirect(URL . '/professor/redacao-configuravel');
+            $this->redirect(URL . $this->essayBasePath());
         }
         $submission = $this->submissionModel->findById($submissionId);
         if (!$submission || (int) $submission['proposal_id'] !== (int) $proposalId) {
             $this->setFlashMessage('Envio não encontrado', 'error');
-            $this->redirect(URL . '/professor/redacao-configuravel/propostas/' . $proposalId);
+            $this->redirect(URL . $this->essayBasePath() . '/propostas/' . $proposalId);
         }
         $this->correctionModel->ensureTeacherFeedbackAudioColumn();
         $this->correctionModel->ensureTeacherAnnotationsColumn();
@@ -1368,7 +1427,7 @@ class TeacherEssayController extends BaseController
             (int) $proposal['text_type_id']
         );
         $hasActivePrompt = $activePrompt && trim((string) ($activePrompt['prompt_text'] ?? '')) !== '';
-        $this->viewWithLayout('professor', 'teacher/essays/correct', [
+        $this->viewWithLayout($this->essayLayout(), 'teacher/essays/correct', [
             'title' => 'Corrigir redação - ' . $submission['student_name'],
             'user' => $user,
             'proposal' => $proposal,
@@ -1376,7 +1435,9 @@ class TeacherEssayController extends BaseController
             'correction' => $correction,
             'criteria' => $criteria,
             'has_active_prompt' => $hasActivePrompt,
-            'csrf_token' => $this->generateCsrfToken()
+            'csrf_token' => $this->generateCsrfToken(),
+            'base_prefix' => $this->essayBasePath(),
+            'current_page' => $this->essayCurrentPage('essays', 'essays_teacher'),
         ]);
     }
 
@@ -1470,7 +1531,7 @@ class TeacherEssayController extends BaseController
         $this->json([
             'success' => true,
             'message' => 'Áudio enviado ao aluno com sucesso.',
-            'listen_url' => URL . '/professor/redacao-configuravel/envios/' . (int) $submissionId . '/audio-feedback',
+            'listen_url' => URL . $this->essayBasePath() . '/envios/' . (int) $submissionId . '/audio-feedback',
         ]);
     }
 
@@ -1987,7 +2048,13 @@ class TeacherEssayController extends BaseController
         } else {
             $totalScore = $aiTotal;
         }
-        $this->correctionModel->updateTeacherAdjustment($correction['id'], $teacherId, [
+        $professorRegistroId = $this->isGestaoEscola()
+            ? (int) ($proposal['teacher_id'] ?? 0)
+            : $teacherId;
+        if ($professorRegistroId <= 0) {
+            $professorRegistroId = $teacherId;
+        }
+        $this->correctionModel->updateTeacherAdjustment($correction['id'], $professorRegistroId, [
             'teacher_grades_json' => $teacherGradesJson,
             'teacher_total_score' => $teacherTotal,
             'use_average' => $useAverage,

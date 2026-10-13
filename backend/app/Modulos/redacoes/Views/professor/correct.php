@@ -1,4 +1,8 @@
 <?php
+$essayBase = isset($base_prefix) ? rtrim((string) $base_prefix, '/') : '/professor/redacao-configuravel';
+$aiJobStatusUrl = (strpos($essayBase, '/admin/') === 0)
+    ? (URL . '/admin/ai-job/{id}/status')
+    : (URL . '/professor/ai-job/{id}/status');
 ?>
 <div class="mb-8">
     <div class="flex justify-between items-center">
@@ -6,7 +10,7 @@
             <h2 class="text-2xl font-bold text-gray-900 mb-2">Corrigir redação — <?= htmlspecialchars($submission['student_name']) ?></h2>
             <p class="text-gray-600"><?= htmlspecialchars($proposal['title']) ?> (<?= htmlspecialchars($proposal['board_name']) ?>)</p>
         </div>
-        <a href="<?= URL ?>/professor/redacao-configuravel/<?= (int)$proposal['id'] ?>" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">Voltar</a>
+        <a href="<?= URL . $essayBase ?>/<?= (int)$proposal['id'] ?>" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">Voltar</a>
     </div>
 </div>
 
@@ -709,7 +713,7 @@ usort($issueTextsForReview, function ($a, $b) {
     }
 </style>
 <?php
-$originalSubmissionUrl = URL . '/professor/redacao-configuravel/envios/' . (int) ($submission['id'] ?? 0) . '/original';
+$originalSubmissionUrl = URL . $essayBase . '/envios/' . (int) ($submission['id'] ?? 0) . '/original';
 $submissionImagePath = strtolower((string) ($submission['content_image_path'] ?? ''));
 $isOriginalPdf = (bool) preg_match('/\.pdf(\?.*)?$/', $submissionImagePath);
 $submissionMode = $proposal['submission_mode'] ?? 'texto';
@@ -736,7 +740,7 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
     $initial_annotations = is_array($imageAnnotations) ? $imageAnnotations : null;
     $readonly = false;
     $submission_id = (int) ($submission['id'] ?? 0);
-    $save_url = URL . '/professor/redacao-configuravel/envios/' . $submission_id . '/anotacoes-imagem';
+    $save_url = URL . $essayBase . '/envios/' . $submission_id . '/anotacoes-imagem';
     include \App\Core\ViewPaths::component('essay_image_annotator.php');
     ?>
 </div>
@@ -751,7 +755,7 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
             <?php endif; ?>
         </div>
         <div class="flex items-center gap-2">
-            <a href="<?= URL ?>/professor/redacao-configuravel/<?= (int)$proposal['id'] ?>" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 text-sm font-medium">
+            <a href="<?= URL . $essayBase ?>/<?= (int)$proposal['id'] ?>" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 text-sm font-medium">
                 <i class="fas fa-book-open"></i> Ver tema e repertório
             </a>
             <button type="button" id="btnEditarRedacao" class="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-100 text-amber-800 rounded-lg hover:bg-amber-200 text-sm font-medium">
@@ -764,7 +768,7 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
                 Cancelar
             </button>
             <?php if (!empty($submission['content_image_path'])): ?>
-            <a href="<?= URL ?>/professor/redacao-configuravel/envios/<?= (int)$submission['id'] ?>/original" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 text-sm font-medium">
+            <a href="<?= URL . $essayBase ?>/envios/<?= (int)$submission['id'] ?>/original" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 text-sm font-medium">
                 <i class="fas fa-external-link-alt"></i> Visualizar original
             </a>
             <?php endif; ?>
@@ -1232,7 +1236,7 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
         var fd = new FormData();
         fd.append('_token', token);
         fd.append('content_text', textarea.value);
-        fetch('<?= URL ?>/professor/redacao-configuravel/envios/' + submissionId + '/atualizar-texto', { method: 'POST', body: fd })
+        fetch('<?= URL . $essayBase ?>/envios/' + submissionId + '/atualizar-texto', { method: 'POST', body: fd })
             .then(function(r) { return r.json(); })
             .then(function(d) {
                 btn.disabled = false;
@@ -1356,7 +1360,7 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
             fd.append('replacement', anotacaoReplacement ? anotacaoReplacement.value.trim() : '');
             fd.append('comment', commentValue);
             fd.append('color', anotacaoColor ? anotacaoColor.value : 'blue');
-            fetch('<?= URL ?>/professor/redacao-configuravel/envios/' + submissionId + '/anotacoes', { method: 'POST', body: fd })
+            fetch('<?= URL . $essayBase ?>/envios/' + submissionId + '/anotacoes', { method: 'POST', body: fd })
                 .then(function(r) { return r.json(); })
                 .then(function(d) {
                     btn.disabled = false;
@@ -1387,7 +1391,7 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
             var fd = new FormData();
             fd.append('_token', token);
             fd.append('annotation_id', annotationId);
-            fetch('<?= URL ?>/professor/redacao-configuravel/envios/' + submissionId + '/anotacoes/remover', { method: 'POST', body: fd })
+            fetch('<?= URL . $essayBase ?>/envios/' + submissionId + '/anotacoes/remover', { method: 'POST', body: fd })
                 .then(function(r) { return r.json(); })
                 .then(function(d) {
                     if (d.success) {
@@ -1412,7 +1416,7 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
     $hasAiCorrection = $correction && !empty(trim($correction['grades_json'] ?? '')) && trim($correction['grades_json']) !== '[]';
     $canUseAiCorrection = $hasActivePrompt || $hasAiCorrection;
     $hasTeacherAudio = $correction && !empty(trim($correction['teacher_feedback_audio_key'] ?? ''));
-    $audioFeedbackListenUrl = URL . '/professor/redacao-configuravel/envios/' . (int) $submission['id'] . '/audio-feedback';
+    $audioFeedbackListenUrl = URL . $essayBase . '/envios/' . (int) $submission['id'] . '/audio-feedback';
     ?>
     <div class="flex flex-wrap gap-3 mb-4 items-center">
         <?php if ($hasActivePrompt): ?>
@@ -1831,7 +1835,7 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
             btn.textContent = 'Removendo...';
             var fd = new FormData();
             fd.append('_token', token);
-            fetch('<?= URL ?>/professor/redacao-configuravel/envios/' + submissionId + '/remover-correcao-ia', { method: 'POST', body: fd })
+            fetch('<?= URL . $essayBase ?>/envios/' + submissionId + '/remover-correcao-ia', { method: 'POST', body: fd })
                 .then(function(r) { return r.json(); })
                 .then(function(d) {
                     if (d.success) {
@@ -1876,7 +1880,7 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
             openCorrecaoIaModal();
             const fd = new FormData();
             fd.append('_token', token);
-            fetch('<?= URL ?>/professor/redacao-configuravel/envios/' + submissionId + '/corrigir-ia', { method: 'POST', body: fd })
+            fetch('<?= URL . $essayBase ?>/envios/' + submissionId + '/corrigir-ia', { method: 'POST', body: fd })
                 .then(parseJsonResponse)
                 .then(result => {
                     if (!result.ok || !result.data || !result.data.job_id) {
@@ -1889,7 +1893,7 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
                     }
                     btn.textContent = 'Processando...';
                     new AIJobPoller(result.data.job_id, {
-                        statusUrl: '<?= URL ?>/professor/ai-job/{id}/status',
+                        statusUrl: '<?= $aiJobStatusUrl ?>',
                         onDone: function() {
                             closeCorrecaoIaModal();
                             window.location.reload();
@@ -1916,7 +1920,7 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
         document.getElementById('formError').classList.add('hidden');
         document.getElementById('formSuccess').classList.add('hidden');
         const fd = new FormData(this);
-        fetch('<?= URL ?>/professor/redacao-configuravel/envios/' + submissionId + '/salvar-correcao', { method: 'POST', body: fd })
+        fetch('<?= URL . $essayBase ?>/envios/' + submissionId + '/salvar-correcao', { method: 'POST', body: fd })
             .then(r => r.json())
             .then(d => {
                 if (d.success) {
@@ -2141,7 +2145,7 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
             fd.append('audio_file', fileToSend);
             btnConfirm.disabled = true;
             btnConfirm.textContent = 'Enviando…';
-            fetch('<?= URL ?>/professor/redacao-configuravel/envios/' + submissionId + '/audio-feedback', {
+            fetch('<?= URL . $essayBase ?>/envios/' + submissionId + '/audio-feedback', {
                 method: 'POST',
                 body: fd
             })
@@ -2168,7 +2172,7 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
             if (!confirm('Remover o áudio enviado ao aluno?')) return;
             var fd = new FormData();
             fd.append('_token', token);
-            fetch('<?= URL ?>/professor/redacao-configuravel/envios/' + submissionId + '/audio-feedback/remover', {
+            fetch('<?= URL . $essayBase ?>/envios/' + submissionId + '/audio-feedback/remover', {
                 method: 'POST',
                 body: fd
             })

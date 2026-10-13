@@ -1400,8 +1400,7 @@ class DevAdminController extends AdminBaseController
         );
         
         // Buscar todas as migrations disponíveis
-        // Caminho correto: de app/Controllers/User para database/migrations (3 níveis acima)
-        $migrationsDir = dirname(dirname(dirname(__DIR__))) . '/database/migrations';
+        $migrationsDir = (defined('BASE_PATH') ? BASE_PATH : dirname(__DIR__, 4)) . '/database/migrations';
         $migrations = [];
         
         if (is_dir($migrationsDir)) {
@@ -1597,7 +1596,7 @@ class DevAdminController extends AdminBaseController
             }
             
             // Ler arquivo de migration
-            $migrationsDir = dirname(dirname(dirname(__DIR__))) . '/database/migrations';
+            $migrationsDir = (defined('BASE_PATH') ? BASE_PATH : dirname(__DIR__, 4)) . '/database/migrations';
             $migrationPath = $migrationsDir . '/' . $migration_file;
             
             if (!file_exists($migrationPath)) {
