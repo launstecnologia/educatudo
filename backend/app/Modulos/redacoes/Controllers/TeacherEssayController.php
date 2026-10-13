@@ -2022,14 +2022,39 @@ class TeacherEssayController extends BaseController
         $feedbackText = trim($_POST['feedback_text'] ?? '');
         $suggestionsText = trim($_POST['suggestions_text'] ?? '');
         $useAverage = isset($_POST['use_average']) && (string) $_POST['use_average'] === '1';
+        $criterios = $this->criterionModel->allByTextType($proposal['text_type_id'] ?? 0);
         $teacherGradesJson = [];
-        foreach ($_POST as $k => $v) {
-            if (strpos($k, 'grade_') === 0) {
-                $slug = substr($k, 6);
-                $score = is_numeric($v) ? (float) $v : null;
-                $fb = trim($_POST['feedback_' . $slug] ?? '');
-                $teacherGradesJson[$slug] = ['score' => $score, 'feedback' => $fb];
+        $faltando = [];
+        foreach ($criterios as $criterio) {
+            if (!is_array($criterio)) {
+                continue;
             }
+            $slug = trim((string) ($criterio['slug'] ?? ''));
+            if ($slug === '') {
+                continue;
+            }
+            $nome = trim((string) ($criterio['name'] ?? $slug));
+            $maximo = (float) ($criterio['max_score'] ?? 0);
+            $bruto = $_POST['grade_' . $slug] ?? null;
+            if ($bruto === null || trim((string) $bruto) === '' || !is_numeric($bruto)) {
+                $faltando[] = $nome;
+                continue;
+            }
+            $score = (float) $bruto;
+            if ($score < 0 || ($maximo > 0 && $score > $maximo)) {
+                $this->json(['error' => 'A nota de "' . $nome . '" deve ficar entre 0 e ' . $maximo . '.'], 400);
+                return;
+            }
+            $fb = trim($_POST['feedback_' . $slug] ?? '');
+            $teacherGradesJson[$slug] = ['score' => $score, 'feedback' => $fb];
+        }
+        if ($faltando !== []) {
+            $this->json(['error' => 'Preencha a sua nota em cada campo. Falta: ' . implode(', ', $faltando) . '.'], 400);
+            return;
+        }
+        if ($teacherGradesJson === [] && $criterios !== []) {
+            $this->json(['error' => 'Preencha a sua nota em cada campo. Esse preenchimento é obrigatório para salvar a correção.'], 400);
+            return;
         }
         $teacherTotal = null;
         if (!empty($teacherGradesJson)) {

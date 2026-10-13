@@ -1613,6 +1613,9 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
         <?php endif; ?>
 
         <h4 class="text-md font-semibold text-gray-800 border-b pb-2"><?= htmlspecialchars($criteriaSectionTitle) ?> — preencha sua nota em cada campo</h4>
+        <div class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            Preencha a sua nota em cada <?= htmlspecialchars(mb_strtolower($criteriaSectionTitleSingular)) ?>. Esse preenchimento é obrigatório para salvar a correção.
+        </div>
         <?php
         $pos = 0;
         foreach ($criteriaDisplay as $c):
@@ -1653,10 +1656,14 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
                     <span class="text-sm font-semibold text-amber-700"><?= \App\Helpers\EssayCriteriaDisplayHelper::formatScore($notaIa) ?></span>
                 </div>
                 <?php endif; ?>
-                <div class="flex items-center gap-2">
-                    <label for="grade_<?= htmlspecialchars($slug) ?>" class="text-xs text-gray-500 whitespace-nowrap">Sua nota:</label>
-                    <input type="number" step="0.01" id="grade_<?= htmlspecialchars($slug) ?>" name="grade_<?= htmlspecialchars($slug) ?>" value="<?= htmlspecialchars($scoreVal) ?>"
-                           class="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500" min="0" max="<?= $max ?>" placeholder="0–<?= (int)$max ?>">
+                <div class="campo-nota-professor">
+                    <div class="flex items-center gap-2">
+                        <label for="grade_<?= htmlspecialchars($slug) ?>" class="text-xs text-gray-500 whitespace-nowrap">Sua nota <span class="text-red-600" title="Obrigatório">*</span></label>
+                        <input type="number" step="0.01" required id="grade_<?= htmlspecialchars($slug) ?>" name="grade_<?= htmlspecialchars($slug) ?>" value="<?= htmlspecialchars((string) $scoreVal) ?>"
+                               class="grade-professor w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500" min="0" max="<?= $max ?>" placeholder="0–<?= (int)$max ?>"
+                               aria-required="true" aria-describedby="erro-grade-<?= htmlspecialchars($slug) ?>">
+                    </div>
+                    <p id="erro-grade-<?= htmlspecialchars($slug) ?>" class="grade-professor-erro hidden mt-1 text-sm font-medium text-red-600">Preenchimento obrigatório.</p>
                 </div>
             </div>
             <label for="feedback_<?= htmlspecialchars($slug) ?>" class="block text-sm font-medium text-gray-700 mt-2">Descrição / feedback (pode editar)</label>
@@ -1824,6 +1831,11 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
         let hasTeacherScore = false;
         document.querySelectorAll('input[name^="grade_"]').forEach(function(inp) {
             if (String(inp.value).trim() === '') return;
+            inp.classList.remove('border-red-500');
+            inp.setCustomValidity('');
+            const aviso = inp.closest('.campo-nota-professor');
+            const texto = aviso ? aviso.querySelector('.grade-professor-erro') : null;
+            if (texto) texto.classList.add('hidden');
             const v = parseFloat(inp.value);
             if (!isNaN(v)) {
                 sum += v;
@@ -1943,25 +1955,58 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
         });
     }
 
+    function focarNotaObrigatoria() {
+        const vazios = [];
+        document.querySelectorAll('input.grade-professor').forEach(function(inp) {
+            const vazio = String(inp.value).trim() === '';
+            const aviso = inp.closest('.campo-nota-professor');
+            const texto = aviso ? aviso.querySelector('.grade-professor-erro') : null;
+            inp.classList.toggle('border-red-500', vazio);
+            inp.setCustomValidity(vazio ? 'Preenchimento obrigatório.' : '');
+            if (texto) texto.classList.toggle('hidden', !vazio);
+            if (vazio) vazios.push(inp);
+        });
+        if (!vazios.length) return false;
+        const campo = vazios[0];
+        campo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        campo.focus();
+        return true;
+    }
+
     document.getElementById('correctionForm').addEventListener('submit', function(e) {
         e.preventDefault();
-        document.getElementById('formError').classList.add('hidden');
-        document.getElementById('formSuccess').classList.add('hidden');
+        const formError = document.getElementById('formError');
+        const formSuccess = document.getElementById('formSuccess');
+        formError.classList.add('hidden');
+        formSuccess.classList.add('hidden');
+        if (focarNotaObrigatoria()) {
+            formError.textContent = 'Preencha a sua nota em cada campo. Esse preenchimento é obrigatório para salvar a correção.';
+            formError.classList.remove('hidden');
+            return;
+        }
+        if (!this.checkValidity()) {
+            this.reportValidity();
+            return;
+        }
         const fd = new FormData(this);
         fetch('<?= URL . $essayBase ?>/envios/' + submissionId + '/salvar-correcao', { method: 'POST', body: fd })
             .then(r => r.json())
             .then(d => {
                 if (d.success) {
-                    document.getElementById('formSuccess').textContent = d.message;
-                    document.getElementById('formSuccess').classList.remove('hidden');
+                    formSuccess.textContent = d.message;
+                    formSuccess.classList.remove('hidden');
                 } else {
-                    document.getElementById('formError').textContent = d.error || 'Erro';
-                    document.getElementById('formError').classList.remove('hidden');
+                    const focouCampo = focarNotaObrigatoria();
+                    formError.textContent = d.error || 'Preenchimento obrigatório.';
+                    formError.classList.remove('hidden');
+                    if (!focouCampo) {
+                        formError.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
                 }
             })
             .catch(function() {
-                document.getElementById('formError').textContent = 'Erro de conexão';
-                document.getElementById('formError').classList.remove('hidden');
+                formError.textContent = 'Erro de conexão';
+                formError.classList.remove('hidden');
             });
     });
 })();
