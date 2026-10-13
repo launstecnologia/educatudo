@@ -320,7 +320,7 @@ class EssayAIService
                 CURLOPT_HTTPHEADER => [
                     'Content-Type: application/json',
                     'x-api-key: ' . $config['api_key'],
-                    'User-Agent: \EducaTudo-EssayCorrection/1.0',
+                    'User-Agent: EducaTudo-EssayCorrection/1.0',
                 ],
                 CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                 CURLOPT_TIMEOUT => 180,
@@ -377,7 +377,7 @@ class EssayAIService
             CURLOPT_POST => true,
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/json',
-                'Authorization: \Bearer ' . $this->apiKey
+                'Authorization: Bearer ' . $this->apiKey
             ],
             CURLOPT_POSTFIELDS => json_encode($payload),
             CURLOPT_TIMEOUT => 120
