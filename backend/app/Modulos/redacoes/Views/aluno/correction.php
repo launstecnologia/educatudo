@@ -617,7 +617,7 @@ $percentage = ($totalScore !== null && $maxTotal > 0) ? ($totalScore / $maxTotal
     <div class="flex items-center justify-between">
         <div>
             <h3 class="text-sm font-medium text-gray-600 mb-1">Nota Final</h3>
-            <p class="text-4xl font-bold" style="color: <?= htmlspecialchars($primaryColor) ?>;"><?= $totalScore !== null ? number_format($totalScore, 0, ',', '.') : '—' ?><span class="text-lg font-normal text-gray-500">/<?= number_format($maxTotal, 0, ',', '.') ?></span></p>
+            <p class="text-4xl font-bold" style="color: <?= htmlspecialchars($primaryColor) ?>;"><?= $totalScore !== null ? \App\Helpers\EssayCriteriaDisplayHelper::formatScore($totalScore) : '—' ?><span class="text-lg font-normal text-gray-500">/<?= \App\Helpers\EssayCriteriaDisplayHelper::formatScore($maxTotal) ?></span></p>
         </div>
         <?php if ($totalScore !== null): ?>
         <div class="w-20 h-20 relative">
@@ -670,7 +670,7 @@ $hasAudioProfessor = $correction && !empty(trim($correction['teacher_feedback_au
         <div class="p-4 bg-gray-50 rounded-lg">
             <div class="flex items-center justify-between mb-2">
                 <p class="font-medium text-gray-900"><?= htmlspecialchars(\App\Helpers\EssayCriteriaDisplayHelper::formatCriterionLabel($pos, $name, $isEnemBoard)) ?></p>
-                <span class="font-bold text-primary"><?= $score !== null ? number_format($score, 0, ',', '.') : '—' ?>/<?= number_format($max, 0, ',', '.') ?></span>
+                <span class="font-bold text-primary"><?= $score !== null ? \App\Helpers\EssayCriteriaDisplayHelper::formatScore($score) : '—' ?>/<?= \App\Helpers\EssayCriteriaDisplayHelper::formatScore($max) ?></span>
             </div>
             <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
                 <div class="h-2 rounded-full" style="width: <?= $pct ?>%; background-color: <?= htmlspecialchars($primaryColor) ?>;"></div>

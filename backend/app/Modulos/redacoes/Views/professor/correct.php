@@ -1571,7 +1571,9 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
         <?php endif; ?>
 
         <?php
-        $aiTotal = isset($correction['ai_total_score']) ? (float)$correction['ai_total_score'] : null;
+        $aiTotal = isset($correction['ai_total_score']) && $correction['ai_total_score'] !== null && $correction['ai_total_score'] !== ''
+            ? (float) $correction['ai_total_score']
+            : null;
         if ($aiTotal === null && !empty($gradesJson)) {
             $aiTotal = 0;
             foreach ($gradesJson as $item) {
@@ -1579,23 +1581,31 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
                 elseif (is_numeric($item)) $aiTotal += (float)$item;
             }
         }
-        $teacherTotal = isset($correction['teacher_total_score']) ? (float)$correction['teacher_total_score'] : null;
-        $displayTotal = isset($correction['total_score']) ? (float)$correction['total_score'] : null;
+        $teacherTotal = isset($correction['teacher_total_score']) && $correction['teacher_total_score'] !== null && $correction['teacher_total_score'] !== ''
+            ? (float) $correction['teacher_total_score']
+            : null;
+        $useAverageChecked = $correction && !empty($correction['use_average']);
+        $displayTotal = null;
+        if ($teacherTotal !== null) {
+            $displayTotal = ($useAverageChecked && $aiTotal !== null)
+                ? (($aiTotal + $teacherTotal) / 2)
+                : $teacherTotal;
+        }
         ?>
         <div id="resumoNotas" class="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200 grid grid-cols-1 sm:grid-cols-<?= $canUseAiCorrection ? '3' : '2' ?> gap-4">
             <?php if ($canUseAiCorrection): ?>
             <div class="text-center p-3 bg-amber-50 rounded-lg border border-amber-200">
                 <p class="text-xs font-medium text-amber-800 uppercase tracking-wide">Nota da IA</p>
-                <p id="displayNotaIa" class="text-2xl font-bold text-amber-700"><?= $aiTotal !== null ? number_format($aiTotal, 0, ',', '.') : '—' ?></p>
+                <p id="displayNotaIa" class="text-2xl font-bold text-amber-700"><?= $aiTotal !== null ? \App\Helpers\EssayCriteriaDisplayHelper::formatScore($aiTotal) : '—' ?></p>
             </div>
             <?php endif; ?>
             <div class="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <p class="text-xs font-medium text-blue-800 uppercase tracking-wide">Minha nota</p>
-                <p id="displayMinhaNota" class="text-2xl font-bold text-blue-700"><?= $teacherTotal !== null ? number_format($teacherTotal, 0, ',', '.') : '—' ?></p>
+                <p id="displayMinhaNota" class="text-2xl font-bold text-blue-700"><?= $teacherTotal !== null ? \App\Helpers\EssayCriteriaDisplayHelper::formatScore($teacherTotal) : '—' ?></p>
             </div>
             <div class="text-center p-3 bg-green-50 rounded-lg border border-green-200">
                 <p class="text-xs font-medium text-green-800 uppercase tracking-wide"><?= $canUseAiCorrection ? 'Nota final (média)' : 'Nota final' ?></p>
-                <p id="displayMedia" class="text-2xl font-bold text-green-700"><?= $displayTotal !== null ? number_format($displayTotal, 0, ',', '.') : '—' ?></p>
+                <p id="displayMedia" class="text-2xl font-bold text-green-700"><?= $displayTotal !== null ? \App\Helpers\EssayCriteriaDisplayHelper::formatScore($displayTotal) : '—' ?></p>
             </div>
         </div>
         <?php if ($canUseAiCorrection): ?>
@@ -1610,14 +1620,22 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
             $name = $c['name'];
             $max = (float)$c['max_score'];
             $pos++;
-            $val = $teacherGradesJson[$slug] ?? $gradesJson[$slug] ?? null;
+            $teacherItem = $teacherGradesJson[$slug] ?? null;
+            $aiItem = $gradesJson[$slug] ?? null;
             $scoreVal = '';
             $feedbackVal = '';
-            if (is_array($val)) {
-                $scoreVal = isset($val['score']) ? $val['score'] : (isset($val['nota']) ? $val['nota'] : '');
-                $feedbackVal = $val['feedback'] ?? $val['explicacao'] ?? '';
-            } elseif ($val !== null && $val !== '') {
-                $scoreVal = $val;
+            if (is_array($teacherItem)) {
+                if (isset($teacherItem['score']) && $teacherItem['score'] !== '') {
+                    $scoreVal = $teacherItem['score'];
+                } elseif (isset($teacherItem['nota']) && $teacherItem['nota'] !== '') {
+                    $scoreVal = $teacherItem['nota'];
+                }
+                $feedbackVal = $teacherItem['feedback'] ?? $teacherItem['explicacao'] ?? '';
+            } elseif ($teacherItem !== null && $teacherItem !== '') {
+                $scoreVal = $teacherItem;
+            }
+            if ($feedbackVal === '' && is_array($aiItem)) {
+                $feedbackVal = $aiItem['feedback'] ?? $aiItem['explicacao'] ?? '';
             }
             $notaIa = null;
             if (!empty($gradesJson[$slug])) {
@@ -1632,7 +1650,7 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
                 <?php if ($notaIa !== null): ?>
                 <div class="flex items-center gap-1">
                     <span class="text-xs text-amber-700 font-medium">Nota da IA:</span>
-                    <span class="text-sm font-semibold text-amber-700"><?= number_format($notaIa, 0, ',', '.') ?></span>
+                    <span class="text-sm font-semibold text-amber-700"><?= \App\Helpers\EssayCriteriaDisplayHelper::formatScore($notaIa) ?></span>
                 </div>
                 <?php endif; ?>
                 <div class="flex items-center gap-2">
@@ -1792,24 +1810,34 @@ $isPhotoCentric = in_array($submissionMode, ['foto', 'texto_ou_foto'], true) && 
         }
     }
 
+    function formatEssayScore(value) {
+        const number = Number(value);
+        if (!isFinite(number)) return '—';
+        return number.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    }
+
     function updateResumo() {
         const displayMinha = document.getElementById('displayMinhaNota');
         const displayMedia = document.getElementById('displayMedia');
         if (!displayMinha || !displayMedia) return;
         let sum = 0;
+        let hasTeacherScore = false;
         document.querySelectorAll('input[name^="grade_"]').forEach(function(inp) {
+            if (String(inp.value).trim() === '') return;
             const v = parseFloat(inp.value);
-            if (!isNaN(v)) sum += v;
+            if (!isNaN(v)) {
+                sum += v;
+                hasTeacherScore = true;
+            }
         });
-        displayMinha.textContent = sum > 0 ? sum.toLocaleString('pt-BR', { maximumFractionDigits: 0 }) : '—';
+        displayMinha.textContent = hasTeacherScore ? formatEssayScore(sum) : '—';
         const useAverage = document.getElementById('use_average') && document.getElementById('use_average').checked;
-        if (useAverage && aiTotal != null) {
-            const media = (aiTotal + sum) / 2;
-            displayMedia.textContent = media.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
-        } else if (sum > 0) {
-            displayMedia.textContent = sum.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+        if (hasTeacherScore && useAverage && aiTotal != null) {
+            displayMedia.textContent = formatEssayScore((aiTotal + sum) / 2);
+        } else if (hasTeacherScore) {
+            displayMedia.textContent = formatEssayScore(sum);
         } else {
-            displayMedia.textContent = aiTotal != null ? aiTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 }) : '—';
+            displayMedia.textContent = '—';
         }
     }
 

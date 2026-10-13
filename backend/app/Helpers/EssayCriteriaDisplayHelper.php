@@ -137,6 +137,26 @@ class EssayCriteriaDisplayHelper
         return $isEnem ? 1000.0 : 100.0;
     }
 
+    /**
+     * Exibe a nota gravada, sem arredondar para inteiro. Remove zeros à direita.
+     */
+    public static function formatScore($score): string
+    {
+        if ($score === null || $score === '') {
+            return '—';
+        }
+        if (!is_numeric($score)) {
+            return '—';
+        }
+
+        $formatted = number_format((float) $score, 2, ',', '.');
+        if (strpos($formatted, ',') !== false) {
+            $formatted = rtrim(rtrim($formatted, '0'), ',');
+        }
+
+        return $formatted;
+    }
+
     private static function defaultCriterionName(int $position, bool $isEnem): string
     {
         return $isEnem
