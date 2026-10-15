@@ -212,8 +212,8 @@ $etapasWizard = [
                                 <p class="mt-1 text-xs text-gray-500">Código interno da escola.</p>
                             </div>
                             <div>
-                                <label for="ra" class="block text-sm font-medium text-gray-700 mb-2">RA</label>
-                                <input type="text" id="ra" name="ra" value="<?= $escw($student['ra'] ?? '') ?>"
+                                <label for="ra" class="block text-sm font-medium text-gray-700 mb-2">RA <span class="text-red-600">*</span></label>
+                                <input type="text" id="ra" name="ra" required value="<?= $escw($student['ra'] ?? '') ?>"
                                        class="<?= $inputClass ?>" placeholder="Número do RA, sem o dígito">
                                 <p class="mt-1 text-xs text-gray-500">Número do registro. O dígito e a UF ficam nos campos ao lado.</p>
                             </div>
@@ -348,9 +348,13 @@ $etapasWizard = [
                                        class="<?= $inputClass ?>" placeholder="Ex: joao.silva">
                             </div>
                             <div>
-                                <label for="senha" class="block text-sm font-medium text-gray-700 mb-2"><?= $modoEdicao ? 'Nova senha' : 'Senha' ?></label>
+                                <label for="senha" class="block text-sm font-medium text-gray-700 mb-2"><?= $modoEdicao ? 'Nova senha' : 'Senha' ?><?php if (!$modoEdicao): ?> <span class="text-red-600">*</span><?php endif; ?></label>
                                 <input type="password" id="senha" name="senha" autocomplete="new-password" class="<?= $inputClass ?>"
-                                       placeholder="<?= $modoEdicao ? 'Deixe em branco para manter a atual' : 'Senha para login' ?>">
+                                       <?= $modoEdicao ? '' : 'required' ?>
+                                       placeholder="<?= $modoEdicao ? 'Deixe em branco para manter a atual' : 'Senha para o primeiro acesso' ?>">
+                                <?php if (!$modoEdicao): ?>
+                                <p class="text-xs text-gray-500 mt-1">Obrigatória no cadastro. O aluno entra com nickname e esta senha.</p>
+                                <?php endif; ?>
                                 <?php if ($modoEdicao): ?>
                                 <p class="text-xs text-gray-500 mt-1">Se preencher e marcar "Já fez primeiro acesso", o aluno poderá entrar com nickname e esta senha.</p>
                                 <?php endif; ?>
@@ -433,9 +437,13 @@ $etapasWizard = [
                 <h3 class="text-red-600 mb-3">Campos obrigatórios</h3>
                 <ul class="aluno-wizard-obr space-y-2 text-sm text-gray-700">
                     <li data-obr="nome"><i class="fa-solid fa-asterisk text-red-500 text-[10px] mr-1"></i> Nome completo</li>
+                    <li data-obr="ra"><i class="fa-solid fa-asterisk text-red-500 text-[10px] mr-1"></i> RA</li>
                     <li data-obr="data_nasc"><i class="fa-solid fa-asterisk text-red-500 text-[10px] mr-1"></i> Data de nascimento</li>
                     <?php if (!empty($units)): ?>
                     <li data-obr="unidade_id"><i class="fa-solid fa-asterisk text-red-500 text-[10px] mr-1"></i> Unidade</li>
+                    <?php endif; ?>
+                    <?php if (!$modoEdicao): ?>
+                    <li data-obr="senha"><i class="fa-solid fa-asterisk text-red-500 text-[10px] mr-1"></i> Senha de acesso</li>
                     <?php endif; ?>
                 </ul>
             </div>
@@ -649,7 +657,10 @@ $etapasWizard = [
         textoResumo('contato', contatoResumo());
         textoResumo('status', statusResumo());
 
-        var obrigatorios = ['nome', 'data_nasc', 'unidade_id'];
+        var obrigatorios = ['nome', 'ra', 'data_nasc', 'unidade_id'];
+        if (document.getElementById('senha') && document.getElementById('senha').required) {
+            obrigatorios.push('senha');
+        }
         var feitosObr = 0;
         var totalObr = 0;
         obrigatorios.forEach(function (id) {

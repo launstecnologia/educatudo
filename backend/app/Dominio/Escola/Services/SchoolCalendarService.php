@@ -1242,6 +1242,11 @@ class SchoolCalendarService
             if ($f < $ini) {
                 continue;
             }
+            $anoIni = (int) $ini->format('Y');
+            $anoFim = (int) $f->format('Y');
+            if ($anoIni < 2000 || $anoFim < 2000 || $anoIni > 2100 || $anoFim > 2100 || $ini->diff($f)->days > 370) {
+                continue;
+            }
             for ($d = clone $ini; $d <= $f; $d->modify('+1 day')) {
                 if ((int) $d->format('Y') !== $ano) {
                     continue;
@@ -1288,6 +1293,11 @@ class SchoolCalendarService
                 continue;
             }
             if ($f < $ini) {
+                continue;
+            }
+            $anoIni = (int) $ini->format('Y');
+            $anoFim = (int) $f->format('Y');
+            if ($anoIni < 2000 || $anoFim < 2000 || $anoIni > 2100 || $anoFim > 2100 || $ini->diff($f)->days > 370) {
                 continue;
             }
             for ($d = clone $ini; $d <= $f; $d->modify('+1 day')) {

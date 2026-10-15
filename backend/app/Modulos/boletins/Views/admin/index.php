@@ -92,7 +92,7 @@ if (!class_exists('PeriodoLetivo')) {
                             <?php $minRa = (float) (($item['criterios']['nota_minima_aprovacao'] ?? 6)); ?>
                             <div class="text-xs text-gray-500">mín. <?= htmlspecialchars(number_format($minRa, 2, ',', ''), ENT_QUOTES, 'UTF-8') ?></div>
                         <?php else: ?>
-                            <span class="text-gray-400">Motor (fallback 6,0)</span>
+                            <span class="text-gray-400">Mínima 6,0 até vincular uma regra</span>
                         <?php endif; ?>
                     </td>
                     <td class="px-6 py-4 text-sm text-gray-600"><?= count($item['materias_ids'] ?? []) ?></td>

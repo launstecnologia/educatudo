@@ -214,7 +214,7 @@ class BoletimAssistenteWizard
      */
     private function catalogoBoletins(): array
     {
-        $path = dirname(__DIR__) . '/Modulos/boletins/Services/BoletimCadastroService.php';
+        $path = __DIR__ . '/BoletimCadastroService.php';
         if (!is_file($path)) {
             return [];
         }
@@ -232,7 +232,7 @@ class BoletimAssistenteWizard
      */
     private function catalogoQuadrosNotas(): array
     {
-        $path = dirname(__DIR__) . '/Modulos/grupos-regras-notas/Services/GrupoRegrasNotasService.php';
+        $path = dirname(__DIR__, 2) . '/grupos-regras-notas/Services/GrupoRegrasNotasService.php';
         if (!is_file($path)) {
             return [];
         }
@@ -312,7 +312,7 @@ class BoletimAssistenteWizard
             ));
         }
         if (!isset($estado['nota_minima_aprovacao']) || $estado['nota_minima_aprovacao'] === '' || $estado['nota_minima_aprovacao'] === null) {
-            $estado['nota_minima_aprovacao'] = $bol['nota_minima_aprovacao'] ?? 7;
+            $estado['nota_minima_aprovacao'] = $bol['nota_minima_aprovacao'] ?? 6;
         }
         if (($estado['round_mode'] ?? '') === '') {
             $estado['round_mode'] = (string) ($bol['round_mode'] ?? 'half');
@@ -330,7 +330,7 @@ class BoletimAssistenteWizard
         if ($grupoId <= 0) {
             return [];
         }
-        $path = dirname(__DIR__) . '/Modulos/grupos-regras-notas/Services/GrupoRegrasNotasService.php';
+        $path = dirname(__DIR__, 2) . '/grupos-regras-notas/Services/GrupoRegrasNotasService.php';
         if (!class_exists('GrupoRegrasNotasService', false) && is_file($path)) {
             require_once $path;
         }
@@ -374,7 +374,7 @@ class BoletimAssistenteWizard
      */
     private function catalogoAgrupamentos(): array
     {
-        $path = dirname(__DIR__) . '/Modulos/agrupamentos-componentes/Services/AgrupamentoComponenteService.php';
+        $path = dirname(__DIR__, 2) . '/agrupamentos-componentes/Services/AgrupamentoComponenteService.php';
         if (!is_file($path)) {
             return [];
         }
@@ -4095,7 +4095,7 @@ class BoletimAssistenteWizard
     private function semanasQuadroConfig(?int $grupoId = null): array
     {
         $vazio = ['a' => [], 'b' => []];
-        $path = dirname(__DIR__) . '/Modulos/grupos-regras-notas/Services/GrupoRegrasNotasService.php';
+        $path = dirname(__DIR__, 2) . '/grupos-regras-notas/Services/GrupoRegrasNotasService.php';
         if (!class_exists('GrupoRegrasNotasService', false) && is_file($path)) {
             require_once $path;
         }

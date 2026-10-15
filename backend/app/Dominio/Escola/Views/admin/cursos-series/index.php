@@ -143,5 +143,5 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
 <?php
 $somente_drawers = true;
 include __DIR__ . '/../curso/index.php';
-include __DIR__ . '/../serie/index.php';
+include \App\Core\ViewPaths::painel('Admin', 'Views/serie/index.php');
 ?>

@@ -540,8 +540,9 @@ class VidaEscolarService
         }
         if ($nota === null && $conceito === null) {
             $origem = 'vazia';
-        } elseif ($origem === 'vazia') {
-            $origem = 'calculada';
+        } elseif ($origem !== 'externa') {
+            // Lançamento da secretaria. 'calculada' sem evento gerado é escondida na leitura da ficha e no PDF.
+            $origem = 'mista';
         }
 
         $this->model->atualizarCelula($celulaId, [
@@ -3694,7 +3695,8 @@ class VidaEscolarService
             }
             $status = (string) ($c['status'] ?? '');
             $aberta = in_array($status, ['aberta', 'reaberta'], true);
-            $apagarDemo = $origem === 'calculada' && ($linhaOrfa || !$aberta);
+            // Célula aberta ou reaberta mostra o que foi lançado. Só esconde sobra de demonstração já fechada.
+            $apagarDemo = $origem === 'calculada' && !$aberta && $linhaOrfa;
             if (!$apagarDemo) {
                 continue;
             }

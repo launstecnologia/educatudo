@@ -390,10 +390,25 @@ class VidaEscolarPdfService
     private function quadroHtml(array $quadro, array $periodos): string
     {
         $grid = is_array($quadro['grid'] ?? null) ? $quadro['grid'] : [];
-        $cols = [1, 2, 3, 4];
+        $anoQuadro = (int) ($quadro['ficha']['ano_letivo'] ?? 0);
+        $infoQuadro = $anoQuadro > 0 ? \App\Core\PeriodoLetivo::doAno($anoQuadro) : null;
+        $rotulosAno = is_array($infoQuadro['rotulos'] ?? null) ? $infoQuadro['rotulos'] : $periodos;
+        $cols = [];
         $rotulos = [];
-        foreach ($cols as $p) {
-            $rotulos[] = (string) ($periodos[$p] ?? (string) $p);
+        foreach ($rotulosAno as $numPeriodo => $rotuloPeriodo) {
+            $nPeriodo = (int) $numPeriodo;
+            if ($nPeriodo < 1) {
+                continue;
+            }
+            $cols[] = $nPeriodo;
+            $rotulos[] = (string) $rotuloPeriodo;
+        }
+        if ($cols === []) {
+            $cols = [1, 2, 3, 4];
+            $rotulos = [];
+            foreach ($cols as $p) {
+                $rotulos[] = (string) ($periodos[$p] ?? (string) $p);
+            }
         }
         $linhas = [];
         foreach ($grid as $row) {

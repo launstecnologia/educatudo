@@ -31,10 +31,11 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 
     <?php if ($eventosModelo === []): ?>
         <div class="p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm mb-6">
-            Não há evento vigente de notas para usar como modelo. Gere um em
-            <a href="<?= URL ?>/admin/boletim-configuracao" class="underline">Notas da Coordenação</a>
-            ou cadastre a primeira avaliação em
-            <a href="<?= URL ?>/admin/boletim-configuracao?novo=1" class="underline">Avaliações</a>.
+            Ainda não há um evento de notas ligado a este modelo. Abra
+            <a href="<?= URL ?>/admin/boletim-configuracao/assistente?boletim_id=<?= $boletimId ?>" class="underline">Configurar Notas</a>,
+            escolha este boletim na identidade e salve o primeiro período. Depois volte aqui para copiar os demais.
+            Se o seletor só mostrar “Nenhum”, o modelo precisa estar ativo em
+            <a href="<?= URL ?>/admin/boletins" class="underline">Modelo de Boletim</a>.
         </div>
     <?php endif; ?>
 

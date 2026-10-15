@@ -451,11 +451,14 @@ class CursoController extends BaseController
 
             if (count($alunos) === 0) {
                 $nickname = $this->gerarNicknameUnico($nome, $studentModel);
+                $raGerado = $this->gerarRaImportacao($studentModel, $rowNum);
                 try {
                     $alunoId = $studentModel->create([
                         'nome' => $nome,
                         'email' => $email,
                         'nickname' => $nickname,
+                        'senha' => '123456',
+                        'ra' => $raGerado,
                         'turma_id' => $turma_id,
                         'serie' => $serie,
                         'data_nasc' => $data_nasc,
@@ -464,8 +467,9 @@ class CursoController extends BaseController
                     ]);
                     $cadastrados++;
                     $movimentacao->vincularAlunoTurma($alunoId, $turma_id, $ano_letivo_id, true);
-                } catch (\Exception $e) {
-                    $erros[] = "Linha {$rowNum} ({$nome}): " . $e->getMessage();
+                } catch (\Throwable $e) {
+                    error_log('Importar alunos linha ' . $rowNum . ': ' . $e->getMessage());
+                    $erros[] = "Linha {$rowNum} ({$nome}): não foi possível cadastrar. Confira o nome e o e-mail.";
                 }
                 continue;
             }
@@ -479,12 +483,16 @@ class CursoController extends BaseController
             try {
                 $movimentacao->vincularAlunoTurma($alunoId, $turma_id, $ano_letivo_id, false);
                 $matriculados++;
-            } catch (\Exception $e) {
-                $erros[] = "Linha {$rowNum} ({$nome}): " . $e->getMessage();
+            } catch (\Throwable $e) {
+                error_log('Importar alunos matrícula linha ' . $rowNum . ': ' . $e->getMessage());
+                $erros[] = "Linha {$rowNum} ({$nome}): não foi possível matricular na turma.";
             }
         }
 
         $msg = "Importação concluída: {$cadastrados} cadastrados, {$matriculados} matriculados.";
+        if ($cadastrados > 0) {
+            $msg .= ' Quem não veio com RA na planilha recebeu um RA automático. A senha inicial é 123456.';
+        }
         if (!empty($erros)) {
             $msg .= ' Erros: ' . count($erros) . ' — ' . implode(' ', array_slice($erros, 0, 3));
             if (count($erros) > 3) {
@@ -493,7 +501,8 @@ class CursoController extends BaseController
         } elseif ($cadastrados === 0 && $matriculados === 0) {
             $msg .= ' Nenhum dado importado: confira se o arquivo tem mais de uma linha (cabeçalho "nome" e depois os nomes dos alunos). Se exportou do Excel, salve como "CSV UTF-8" ou "CSV".';
         }
-        $this->redirect('/admin/curso/' . $id . '/importar-alunos?status=success&message=' . rawurlencode($msg) . '&cadastrados=' . $cadastrados . '&matriculados=' . $matriculados . '&erros=' . count($erros));
+        $statusUrl = ($cadastrados === 0 && $matriculados === 0) ? 'error' : 'success';
+        $this->redirect('/admin/curso/' . $id . '/importar-alunos?status=' . $statusUrl . '&message=' . rawurlencode($msg) . '&cadastrados=' . $cadastrados . '&matriculados=' . $matriculados . '&erros=' . count($erros));
     }
 
     private function listarTurmasDoCurso(int $cursoId): array
@@ -514,6 +523,22 @@ class CursoController extends BaseController
         }
 
         return $this->db->fetchAll('SELECT id, nome FROM turmas WHERE ativo = 1 ORDER BY nome ASC') ?: [];
+    }
+
+    private function gerarRaImportacao(Student $studentModel, int $linha): string
+    {
+        $base = 'IMP' . date('ymd') . str_pad((string) max(1, $linha), 3, '0', STR_PAD_LEFT);
+        $ra = $base;
+        $n = 0;
+        while ($studentModel->raExists($ra)) {
+            $n++;
+            $ra = $base . $n;
+            if ($n > 50) {
+                $ra = $base . substr(uniqid(), -4);
+                break;
+            }
+        }
+        return substr($ra, 0, 50);
     }
 
     private function gerarNicknameUnico($nome, Student $studentModel)

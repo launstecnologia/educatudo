@@ -1415,9 +1415,11 @@ class StudentAdminController extends AdminBaseController
             if (empty($nome)) {
                 throw new \Exception('Nome é obrigatório');
             }
-
-            if (empty($senha)) {
-                $senha = null;
+            if ($ra === '') {
+                throw new \Exception('Informe o RA do aluno.');
+            }
+            if (trim((string) $senha) === '') {
+                throw new \Exception('Informe a senha de acesso. O aluno entra com nickname e esta senha.');
             }
             
             $serie = 'Não informada';
@@ -1436,7 +1438,7 @@ class StudentAdminController extends AdminBaseController
             }
             
             // Cria aluno usando o modelo
-            $pagante = isset($_POST['pagante']) ? 1 : 1; // Padrão: pagante
+            $pagante = !empty($_POST['pagante']) ? 1 : 0;
             $sexo = $this->normalizarSexoAluno($_POST['sexo'] ?? null);
             $createPayload = [
                 'nome' => $nome,

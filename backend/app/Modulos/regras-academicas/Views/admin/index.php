@@ -11,7 +11,7 @@ $schemaPronto = !empty($schema_pronto);
 $csrf_token = $csrf_token ?? '';
 
 $page_header_title = 'Regras de Aprovação';
-$page_header_subtitle = 'Critérios de aprovação, recuperação e frequência. O boletim consulta este motor — não recodifique média 6 na tela.';
+$page_header_subtitle = 'Critérios de aprovação, recuperação e frequência. O boletim usa esta regra para definir a situação do aluno.';
 ob_start();
 ?>
 <a href="<?= URL ?>/admin/regras-academicas/nova"

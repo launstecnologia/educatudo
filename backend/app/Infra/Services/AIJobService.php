@@ -712,11 +712,23 @@ class AIJobService
     {
         $path = (string) ($payload['arquivo']['path'] ?? '');
         $mime = (string) ($payload['arquivo']['mime'] ?? 'image/png');
-        if ($path === '' || !is_file($path)) {
+        $slug = strtolower((string) ($payload['arquivo']['slug'] ?? ''));
+        if (defined('TENANT_SLUG')) {
+            $slugTenant = strtolower((string) preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG));
+            if ($slugTenant !== '' && $slug !== $slugTenant) {
+                throw new \RuntimeException('Arquivo da grade horária não encontrado.');
+            }
+        }
+        if (!preg_match('/^[a-z0-9_-]+$/', $slug)) {
+            throw new \RuntimeException('Arquivo da grade horária não encontrado.');
+        }
+        $base = realpath(dirname(__DIR__, 3) . '/storage/tmp/grade_horaria_ia/' . $slug);
+        $real = $path !== '' ? realpath($path) : false;
+        if ($base === false || $real === false || !is_file($real) || !str_starts_with($real, $base . DIRECTORY_SEPARATOR)) {
             throw new \RuntimeException('Arquivo da grade horária não encontrado.');
         }
 
-        $bytes = file_get_contents($path);
+        $bytes = file_get_contents($real);
         if ($bytes === false || $bytes === '') {
             throw new \RuntimeException('Não foi possível ler a imagem da grade horária.');
         }
@@ -725,7 +737,7 @@ class AIJobService
         try {
             $resposta = trim((string) $openai->extrairGradeHorariaImagemOpenAI(base64_encode($bytes), $mime));
         } finally {
-            @unlink($path);
+            @unlink($real);
         }
 
         $itens = self::extrairItensGradeDaResposta($resposta);

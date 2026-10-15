@@ -25,16 +25,29 @@ if ($tipoLabels === []) {
 $podeCadastrarTipo = !empty($pode_cadastrar_tipo);
 $podeExcluirTipo = !empty($pode_excluir_tipo);
 $podeAlterarEvento = !empty($pode_alterar_evento);
-$eventoParaJs = static function (array $e) use ($tipoLabels): array {
+$dataCalendario = static function ($raw): ?int {
+    $ts = strtotime((string) $raw);
+    if ($ts === false) {
+        return null;
+    }
+    $ano = (int) date('Y', $ts);
+    if ($ano < 2000 || $ano > 2100) {
+        return null;
+    }
+    return $ts;
+};
+$eventoParaJs = static function (array $e) use ($tipoLabels, $dataCalendario): array {
+    $ini = $dataCalendario($e['data_inicio'] ?? '');
+    $fim = $dataCalendario($e['data_fim'] ?? '');
     return [
         'id' => (int) $e['id'],
         'tipo' => $e['tipo'],
         'label' => $tipoLabels[$e['tipo']] ?? $e['tipo'],
         'descricao' => $e['descricao'],
-        'inicio' => date('d/m/Y', strtotime((string) $e['data_inicio'])),
-        'fim' => date('d/m/Y', strtotime((string) $e['data_fim'])),
-        'data_inicio' => date('Y-m-d', strtotime((string) $e['data_inicio'])),
-        'data_fim' => date('Y-m-d', strtotime((string) $e['data_fim'])),
+        'inicio' => $ini ? date('d/m/Y', $ini) : 'Data inválida',
+        'fim' => $fim ? date('d/m/Y', $fim) : 'Data inválida',
+        'data_inicio' => $ini ? date('Y-m-d', $ini) : '',
+        'data_fim' => $fim ? date('Y-m-d', $fim) : '',
         'link_reuniao' => $e['link_reuniao'] ?? '',
         'local_evento' => $e['local_evento'] ?? '',
         'visivel_aluno' => (int) ($e['visivel_aluno'] ?? 0),
@@ -59,8 +72,14 @@ $rotuloCal = trim((string) ($config['rotulo'] ?? ''));
 // Monta mapa de datas com eventos: ['2026-04-21'] = [['tipo'=>..,'descricao'=>..], ...]
 $eventMap = [];
 foreach ($eventos as $ev) {
-    $start = strtotime((string) $ev['data_inicio']);
-    $end   = strtotime((string) $ev['data_fim']);
+    $start = $dataCalendario($ev['data_inicio'] ?? '');
+    $end   = $dataCalendario($ev['data_fim'] ?? '');
+    if ($start === null || $end === null || $end < $start) {
+        continue;
+    }
+    if (($end - $start) > 370 * 86400) {
+        continue;
+    }
     for ($d = $start; $d <= $end; $d += 86400) {
         $key = date('Y-m-d', $d);
         $eventMap[$key][] = $ev;
@@ -126,7 +145,12 @@ if (!($schema_pronto ?? false)): ?>
 $counts = ['feriado'=>0,'recesso'=>0,'reposicao'=>0,'evento'=>0,'suspensao'=>0,'avaliacao'=>0];
 foreach ($eventos as $ev) {
     $tipo = (string)$ev['tipo'];
-    $days = (int)((strtotime($ev['data_fim']) - strtotime($ev['data_inicio'])) / 86400) + 1;
+    $iniDias = $dataCalendario($ev['data_inicio'] ?? '');
+    $fimDias = $dataCalendario($ev['data_fim'] ?? '');
+    $days = 1;
+    if ($iniDias !== null && $fimDias !== null && $fimDias >= $iniDias && ($fimDias - $iniDias) <= 370 * 86400) {
+        $days = (int) (($fimDias - $iniDias) / 86400) + 1;
+    }
     $counts[$tipo] = ($counts[$tipo] ?? 0) + $days;
 }
 $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
@@ -277,8 +301,10 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
     <div class="divide-y divide-gray-100">
     <?php foreach ($eventos as $ev):
         $t = (string) $ev['tipo'];
-        $dtI = date('d/m/Y', strtotime((string) $ev['data_inicio']));
-        $dtF = date('d/m/Y', strtotime((string) $ev['data_fim']));
+        $tsI = $dataCalendario($ev['data_inicio'] ?? '');
+        $tsF = $dataCalendario($ev['data_fim'] ?? '');
+        $dtI = $tsI ? date('d/m/Y', $tsI) : 'Data inválida';
+        $dtF = $tsF ? date('d/m/Y', $tsF) : 'Data inválida';
         $periodo = ($ev['data_inicio'] === $ev['data_fim']) ? $dtI : "$dtI – $dtF";
     ?>
         <div class="flex items-center gap-4 px-6 py-3 hover:bg-gray-50">
@@ -1019,9 +1045,15 @@ document.addEventListener('keydown', function(e) {
 document.getElementById('modalDia').addEventListener('click', function(e) {
     if (e.target === this) closeDayModal();
 });
+function dataEventoCompleta(valor) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(valor || '');
+    if (!m) return false;
+    var ano = parseInt(m[1], 10);
+    return ano >= 2000 && ano <= 2100;
+}
 document.getElementById('evento_data_inicio').addEventListener('change', function() {
     var fim = document.getElementById('evento_data_fim');
-    if (!fim.value) fim.value = this.value;
+    if (!fim.value && dataEventoCompleta(this.value)) fim.value = this.value;
 });
 
 function toggleNovoTipo(show) {

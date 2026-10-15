@@ -410,10 +410,14 @@ class GradeHorariaController extends BaseController
         }
 
         try {
-            $dir = realpath(__DIR__ . '/../../../storage') ?: (__DIR__ . '/../../../storage');
-            $dir .= '/tmp/grade_horaria_ia';
+            $slug = defined('TENANT_SLUG') ? (string) TENANT_SLUG : '';
+            $slug = strtolower((string) (preg_replace('/[^a-z0-9_-]/i', '', $slug) ?? ''));
+            if ($slug === '') {
+                throw new \Exception('Não foi possível preparar o envio da imagem. Cadastre as aulas manualmente ou tente de novo.');
+            }
+            $dir = dirname(__DIR__, 4) . '/storage/tmp/grade_horaria_ia/' . $slug;
             if (!is_dir($dir) && !mkdir($dir, 0700, true) && !is_dir($dir)) {
-                throw new \Exception('Não foi possível preparar o envio da imagem.');
+                throw new \Exception('Não foi possível preparar o envio da imagem. Cadastre as aulas manualmente ou tente de novo.');
             }
 
             $nomeSeguro = preg_replace('/[^a-zA-Z0-9_.-]+/', '-', basename((string) ($file['name'] ?? 'grade')));
@@ -428,6 +432,7 @@ class GradeHorariaController extends BaseController
             $jobId = \App\Services\AIJobService::enqueue('grade_horaria_importar_imagem', [
                 'arquivo' => [
                     'path' => $path,
+                    'slug' => $slug,
                     'nome' => substr((string) ($file['name'] ?? 'grade'), 0, 180),
                     'mime' => $mime,
                     'tamanho' => (int) ($file['size'] ?? 0),
@@ -440,8 +445,12 @@ class GradeHorariaController extends BaseController
                 'message' => 'Imagem enviada. A IA está lendo a grade em segundo plano.',
             ]);
         } catch (\Exception $e) {
-            error_log("Grade horária IA: " . $e->getMessage());
-            echo json_encode(['success' => false, 'error' => 'Erro ao processar imagem: ' . $e->getMessage()]);
+            error_log('Grade horária IA: ' . $e->getMessage());
+            $msgGrade = $e->getMessage();
+            if (!str_contains($msgGrade, 'Não foi possível') && !str_contains($msgGrade, 'Arquivo inválido')) {
+                $msgGrade = 'Não foi possível ler a imagem. Cadastre as aulas manualmente ou envie outra foto (JPG, PNG ou WEBP).';
+            }
+            echo json_encode(['success' => false, 'error' => $msgGrade]);
         }
     }
 

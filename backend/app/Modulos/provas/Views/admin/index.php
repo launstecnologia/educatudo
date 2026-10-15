@@ -438,7 +438,16 @@ document.addEventListener('keydown', function(e) {
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm text-gray-900">
-                                    <?= !empty($bloco['data_prova']) ? date('d/m/Y', strtotime($bloco['data_prova'])) : (!empty($bloco['created_at']) ? date('d/m/Y', strtotime($bloco['created_at'])) : '—') ?>
+                                    <?php
+                                    $anoLista = (int) ($bloco['ano_letivo'] ?? 0);
+                                    if (!empty($bloco['data_prova'])) {
+                                        echo date('d/m/Y', strtotime($bloco['data_prova']));
+                                    } elseif ($anoLista > 0) {
+                                        echo 'Ano ' . $anoLista;
+                                    } else {
+                                        echo '—';
+                                    }
+                                    ?>
                                 </div>
                                 <div class="text-sm text-gray-500">
                                     <?= date('H:i', strtotime($bloco['hora_inicio'])) ?> - <?= date('H:i', strtotime($bloco['hora_fim'])) ?>

@@ -5093,7 +5093,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         box.classList.remove('hidden');
         var alunosLote = data.alunos || [];
         if (alunosLote.length === 0) {
-            box.innerHTML = '<p class="p-3 text-gray-500">Nenhum aluno encontrado para simular.</p>';
+            box.innerHTML = '<p class="p-3 text-gray-500">Nenhum aluno encontrado para simular. Matricule a turma ou importe os alunos em Cursos e Séries.</p>';
             return;
         }
         var html = '<table class="min-w-full text-sm"><thead class="bg-gray-50 sticky top-0"><tr>'

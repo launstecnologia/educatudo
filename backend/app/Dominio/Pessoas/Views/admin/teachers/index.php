@@ -1,4 +1,5 @@
 <?php
+$materias_por_id = is_array($materias_por_id ?? null) ? $materias_por_id : [];
 $filters = $filters ?? [];
 $q = $filters['q'] ?? '';
 $status = $filters['status'] ?? '';
@@ -90,7 +91,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                                 <?php if (!empty($teacher['avatar_url'])): ?>
                                     <img src="<?= htmlspecialchars($teacher['avatar_url']) ?>" alt="" class="w-full h-full object-cover rounded-full">
                                 <?php else: ?>
-                                    <span class="text-sm font-medium text-gray-600"><?= strtoupper(substr($teacher['nome'] ?? '', 0, 2)) ?></span>
+                                    <span class="text-sm font-medium text-gray-600"><?= htmlspecialchars(mb_strtoupper(mb_substr((string) ($teacher['nome'] ?? ''), 0, 2, 'UTF-8'), 'UTF-8'), ENT_QUOTES, 'UTF-8') ?></span>
                                 <?php endif; ?>
                             </div>
                             <div class="ml-4">
@@ -103,8 +104,14 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                         <?php if (!empty($materias)): ?>
                             <div class="flex flex-wrap gap-1">
                                 <?php foreach (array_slice($materias, 0, 3) as $materia): ?>
+                                    <?php
+                                    $rotuloMateria = (string) $materia;
+                                    if ($rotuloMateria !== '' && ctype_digit($rotuloMateria) && isset($materias_por_id[$rotuloMateria])) {
+                                        $rotuloMateria = (string) $materias_por_id[$rotuloMateria];
+                                    }
+                                    ?>
                                     <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                                        <?= htmlspecialchars($materia) ?>
+                                        <?= htmlspecialchars($rotuloMateria) ?>
                                     </span>
                                 <?php endforeach; ?>
                                 <?php if (count($materias) > 3): ?>

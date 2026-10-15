@@ -1379,7 +1379,7 @@ $boletimWizardSteps = [
             finalidade: 'oficial',
             boletim_id: 0,
             grupo_regras_notas_id: 0,
-            nota_minima_aprovacao: 7,
+            nota_minima_aprovacao: 6,
             round_mode: 'half',
             decimal_places: 2,
             pecas: [],
@@ -3157,7 +3157,7 @@ $boletimWizardSteps = [
                 { codigo: 'resultado', nome: 'Resultado', layout_type: 'resultado', source_type: 'nenhuma' }
             ]
         });
-        var notaMin = Number((estado && estado.nota_minima_aprovacao) != null ? estado.nota_minima_aprovacao : 7);
+        var notaMin = Number((estado && estado.nota_minima_aprovacao) != null ? estado.nota_minima_aprovacao : 6);
         function notasLinha(nome) {
             var h = hashNome(nome) + hashPreviewAluno();
             var notas = {};
@@ -4251,7 +4251,10 @@ $boletimWizardSteps = [
         estado.materia_unica_modo = materiaUnicaModoDoRascunho(r);
         estado.materia_unica_tocada = false;
         aplicarMateriaUnicaNasPecas();
-        if (r.nome) estado.nome = r.nome;
+        if (r.nome) {
+            estado.nome = r.nome;
+            estado.nome_automatico = false;
+        }
         if (r.bimestre != null) estado.bimestre = r.bimestre;
         if (r.ano_letivo) estado.ano_letivo = r.ano_letivo;
         if (Array.isArray(r.series_ids)) {
@@ -4750,8 +4753,10 @@ $boletimWizardSteps = [
                 html += '<option value="' + Number(b.id) + '"' + (Number(estado.boletim_id) === Number(b.id) ? ' selected' : '') + '>' + esc(label) + '</option>';
             });
             html += '</select>';
-            if (!(catalogo.boletins || []).length && estado.exibir_em !== 'notas') {
-                html += '<p class="text-xs text-amber-800 mt-1">Cadastre o modelo em <a href="<?= URL ?>/admin/boletins" class="underline">Acadêmico → Modelo de Boletim</a> antes de criar a avaliação.</p>';
+            if (!(catalogo.boletins || []).length) {
+                html += '<p class="text-xs text-amber-800 mt-1">Nenhum modelo apareceu. Cadastre em <a href="<?= URL ?>/admin/boletins" class="underline">Acadêmico → Modelo de Boletim</a>. Sem vínculo, a mínima sugerida fica 6 e o público é o que você marcar nesta identidade — não o da turma do modelo.</p>';
+            } else if (boletimOpcional) {
+                html += '<p class="text-xs text-gray-500 mt-1">Nenhum deixa este evento fora do boletim oficial. Escolha o modelo para levar a mínima, as matérias e as turmas dele para a vida escolar e para a geração dos períodos.</p>';
             }
             html += '</div>';
             html += '<div><label class="text-sm font-medium text-gray-700">Quadro de Notas <span class="font-normal text-gray-400">(opcional)</span></label>'
@@ -4981,6 +4986,9 @@ $boletimWizardSteps = [
             html += '<p class="text-sm text-gray-700">' + (ehEventoNotasPreview()
                 ? 'Confira o <strong>demonstrativo de notas</strong>'
                 : 'Confira o <strong>exemplo</strong> do boletim') + '</p>';
+            if (!Number(estado.boletim_id)) {
+                html += '<p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 mt-2">Sem boletim vinculado, os números abaixo são exemplo e o público ainda não é o de uma turma específica.</p>';
+            }
             html += '<p class="text-xs text-gray-500 mt-1">' + (ehBoletimComposto()
                 ? 'Layout oficial: 1º–4º bimestre (Média e Faltas) e FINAL (Média, Rec., Faltas, Resultado). Dados fictícios.'
                 : (ehEventoNotasPreview()
@@ -5164,6 +5172,13 @@ $boletimWizardSteps = [
                     return;
                 }
                 if ((id === 'bw-ano' || id === 'bw-clonar-ano') && Number(anoAntes) !== Number(estado.ano_letivo)) {
+                    if (estado.nome_automatico !== false && anoAntes && estado.nome && String(estado.nome).indexOf(String(anoAntes)) !== -1) {
+                        estado.nome = String(estado.nome).split(String(anoAntes)).join(String(estado.ano_letivo));
+                        estado._ajustandoNome = true;
+                        var nomeAuto = document.getElementById('bw-nome');
+                        if (nomeAuto) nomeAuto.value = estado.nome;
+                        estado._ajustandoNome = false;
+                    }
                     if (!periodoNumeroValido(estado.bimestre)) {
                         estado.bimestre = maxPeriodo();
                     }
@@ -5180,6 +5195,7 @@ $boletimWizardSteps = [
                 agendarMontar();
             });
             el.addEventListener('input', function () {
+                if (id === 'bw-nome' && !estado._ajustandoNome) estado.nome_automatico = false;
                 syncIdentidadeFromDom();
                 agendarMontar();
             });

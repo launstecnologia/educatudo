@@ -89,7 +89,7 @@ $criterios = is_array($criterios ?? null) ? $criterios : ['nota_minima_aprovacao
         <div class="mb-6">
             <label class="block text-sm font-medium text-gray-700 mb-2">Regra de aprovação</label>
             <select name="regra_academica_id" id="boletim-regra-academica" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                <option value="">Nenhuma — o motor escolhe pela série/curso na geração (fallback 6,0)</option>
+                <option value="">Nenhuma — na geração, a mínima segue a regra da série ou do curso (6,0 se não houver regra)</option>
                 <?php foreach ($regrasAcademicas as $ra): ?>
                     <?php
                     $raId = (int) ($ra['id'] ?? 0);

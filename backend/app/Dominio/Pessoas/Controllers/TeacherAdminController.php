@@ -76,12 +76,20 @@ class TeacherAdminController extends AdminBaseController
         }
 
         $teacherModel = new Teacher();
+        $materiasPorId = [];
+        foreach ($this->db->fetchAll('SELECT id, nome FROM materias') ?: [] as $materiaRow) {
+            $mid = (int) ($materiaRow['id'] ?? 0);
+            if ($mid > 0) {
+                $materiasPorId[(string) $mid] = (string) ($materiaRow['nome'] ?? '');
+            }
+        }
 
         $data = [
             'title' => 'Gestão de Professores - EducaTudo',
             'teachers' => $professores,
             'turmas_map' => $turmasMap,
             'materias_disponiveis' => $teacherModel->getSubjectsForForm(),
+            'materias_por_id' => $materiasPorId,
             'turmas_disponiveis' => $this->db->fetchAll("SELECT * FROM turmas WHERE ativo = 1 ORDER BY nome ASC"),
             'user' => $this->auth->getUser(),
             'current_page' => 'teachers',

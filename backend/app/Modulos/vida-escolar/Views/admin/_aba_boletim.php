@@ -10,7 +10,17 @@ if (!class_exists('PeriodoLetivo')) {
 $anoFicha = (int) ($ficha['ano_letivo'] ?? date('Y'));
 $infoPeriodo = \App\Core\PeriodoLetivo::doAno($anoFicha);
 $periodos = $infoPeriodo['rotulos'];
-$periodosQuadro = [1, 2, 3, 4];
+$periodosQuadro = [];
+foreach ($periodos as $numPeriodo => $rotuloPeriodo) {
+    $nPeriodo = (int) $numPeriodo;
+    if ($nPeriodo >= 1) {
+        $periodosQuadro[] = $nPeriodo;
+    }
+}
+if ($periodosQuadro === []) {
+    $periodosQuadro = [1, 2, 3, 4];
+}
+$rotuloPeriodoCampo = mb_strtolower((string) ($infoPeriodo['rotulo_campo'] ?? 'bimestre'), 'UTF-8');
 $fichas = is_array($fichas ?? null) ? $fichas : [];
 $somenteLeitura = !empty($boletim_somente_leitura);
 $editavelFicha = !$somenteLeitura && $ficha && ($ficha['status'] ?? '') !== 'homologada';
@@ -72,7 +82,7 @@ $fmtNota = static function ($c): string {
                 } else {
                     echo 'Conforme o modelo de boletim oficial da turma. ';
                 }
-            ?>Cada bimestre: nota à esquerda, falta à direita. <span class="text-violet-700">¹</span> = escola anterior.</p>
+            ?>Cada <?= $esc($rotuloPeriodoCampo) ?>: nota à esquerda, falta à direita. <span class="text-violet-700">¹</span> = escola anterior.</p>
             <?php if ($fichaHomologada && !$somenteLeitura): ?>
             <p class="mt-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Boletim homologado — notas travadas. Para corrigir, reabra o período abaixo (motivo obrigatório; fica na auditoria).</p>
             <?php elseif ($fichaHomologada): ?>
@@ -163,7 +173,7 @@ $fmtNota = static function ($c): string {
                     </tr>
                     <?php endforeach; ?>
                     <?php if ($grid === []): ?>
-                    <tr><td colspan="9" class="px-3 py-6 text-center text-gray-500">Ficha sem componentes. Vincule uma matriz curricular à turma.</td></tr>
+                    <tr><td colspan="<?= 1 + (count($periodosQuadro) * 2) ?>" class="px-3 py-6 text-center text-gray-500">Ficha sem componentes. Vincule uma matriz curricular à turma.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -189,7 +199,7 @@ $fmtNota = static function ($c): string {
             <?php if ($editavelFicha): ?>
             <div class="rounded-xl border border-gray-200 bg-slate-50 p-4">
                 <h4 class="text-sm font-semibold text-gray-900">Encerrar período</h4>
-                <p class="text-xs text-gray-500 mt-0.5 mb-3">Fecha um bimestre ou homologa o ano e trava as notas.</p>
+                <p class="text-xs text-gray-500 mt-0.5 mb-3">Fecha um <?= $esc($rotuloPeriodoCampo) ?> ou homologa o ano e trava as notas.</p>
                 <div class="flex flex-col sm:flex-row sm:items-end gap-3">
                     <form method="post" action="<?= $base ?>/fechar-bimestre" class="flex-1 min-w-0 flex items-end gap-2">
                         <input type="hidden" name="_token" value="<?= $esc($token) ?>">

@@ -175,7 +175,13 @@ class SchoolCalendarController extends AdminBaseController
             $this->redirectCalendario($ano, $calendarioId);
             return;
         }
+        if ($fim !== '' && $inicio !== '' && $fim < $inicio) {
+            $this->setFlashMessage('A data final não pode ser anterior à data inicial.', 'error');
+            $this->redirectCalendario($ano, $calendarioId);
+            return;
+        }
         $atualizando = $eventoId > 0;
+        try {
         if ($atualizando) {
             $ok = $service->atualizarEvento(
                 $eventoId,
@@ -229,6 +235,11 @@ class SchoolCalendarController extends AdminBaseController
         }
         $this->setFlashMessage($msg, $publicarEscolar && $escolarId <= 0 ? 'error' : 'success');
         $this->redirectCalendario($ano, $calendarioId);
+        } catch (\Throwable $e) {
+            error_log('Calendário letivo salvar evento: ' . $e->getMessage());
+            $this->setFlashMessage('Não foi possível salvar o evento. Use datas entre 2000 e 2100.', 'error');
+            $this->redirectCalendario($ano, $calendarioId);
+        }
     }
 
     public function excluirEvento(): void
@@ -301,7 +312,14 @@ class SchoolCalendarController extends AdminBaseController
     {
         $raw = trim($raw);
         $dt = \DateTime::createFromFormat('Y-m-d', $raw);
-        return ($dt && $dt->format('Y-m-d') === $raw) ? $raw : '';
+        if (!$dt || $dt->format('Y-m-d') !== $raw) {
+            return '';
+        }
+        $ano = (int) $dt->format('Y');
+        if ($ano < 2000 || $ano > 2100) {
+            return '';
+        }
+        return $raw;
     }
 
     private function podePublicarCalendarioEscolar(SchoolCalendarService $service): bool

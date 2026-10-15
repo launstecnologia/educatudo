@@ -1145,6 +1145,23 @@ class ExamBlockController extends BaseController
                     'prazo_entrega_professor' => $bloco['prazo_entrega_professor'] ?? null
                 ]
             );
+
+            $copiarCols = ['ano_letivo', 'bimestre', 'formato_evento', 'visivel_no_portal_aluno', 'tipo_avaliacao_id', 'semana', 'bloco_modelo_id'];
+            $setsCopia = [];
+            $paramsCopia = ['id' => $novoBlocoId];
+            foreach ($copiarCols as $colCopia) {
+                if (!$this->blocoModel->columnExistsOnBloco($colCopia) || !array_key_exists($colCopia, $bloco)) {
+                    continue;
+                }
+                $setsCopia[] = $colCopia . ' = :' . $colCopia;
+                $paramsCopia[$colCopia] = $bloco[$colCopia];
+            }
+            if ($setsCopia !== []) {
+                $this->db->update(
+                    'UPDATE provas_blocos SET ' . implode(', ', $setsCopia) . ' WHERE id = :id',
+                    $paramsCopia
+                );
+            }
             
             $turmas = $this->db->fetchAll("SELECT turma_id FROM provas_blocos_turmas WHERE bloco_id = :bloco_id", ['bloco_id' => $id]);
             foreach ($turmas as $row) {

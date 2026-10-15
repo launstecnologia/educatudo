@@ -84,8 +84,8 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                     <?php endif; ?>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Turma</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Série</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alunos</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vagas</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" title="Vínculos da turma, inclusive quem ainda não tem matrícula ativa">Alunos</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" title="Só matrícula ativa, sem data de saída, sobre a capacidade">Vagas</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                 </tr>
@@ -130,7 +130,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                             $tot = (int) ($vr['vagas'] ?? 0);
                             $fila = (int) ($vr['fila'] ?? 0);
                             $cls = !empty($vr['lotada']) ? 'text-red-700 font-semibold' : 'text-gray-700';
-                            echo '<span class="' . $cls . '">' . $ocup . '/' . $tot . '</span>';
+                            echo '<span class="' . $cls . '" title="Matrículas ativas / capacidade. A coluna Alunos também conta vínculo sem matrícula ativa.">' . $ocup . '/' . $tot . '</span>';
                             if ($fila > 0) {
                                 echo ' <span class="text-xs text-purple-700">+' . $fila . ' fila</span>';
                             }

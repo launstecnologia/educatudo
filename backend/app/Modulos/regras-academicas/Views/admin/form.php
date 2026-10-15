@@ -78,6 +78,7 @@ $val = static function (?array $item, string $key, $default = '') {
         </div>
         <div class="mb-8">
             <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input type="hidden" name="ativo" value="0">
                 <input type="checkbox" name="ativo" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" <?= !$isEdit || !empty($item['ativo']) ? 'checked' : '' ?>>
                 Regra ativa
             </label>
