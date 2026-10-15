@@ -12,6 +12,7 @@ namespace App\Modulos\Provas\Services;
 
 
 use App\Controllers\Media\MediaServeController;
+use App\Services\MediaStorageService;
 class ExamImageService
 {
     private $apiKey;
@@ -25,7 +26,7 @@ class ExamImageService
         $this->config = $config;
         $this->apiKey = $this->resolveApiKey();
 
-        $logDir = __DIR__ . '/../../storage/logs';
+        $logDir = __DIR__ . '/../../../../storage/logs';
         if (!is_dir($logDir)) {
             @mkdir($logDir, 0755, true);
         }
@@ -435,8 +436,8 @@ class ExamImageService
             return trim($key);
         }
 
-        $envPath = defined('ENV_FILE_PATH') ? ENV_FILE_PATH : (__DIR__ . '/../../.env');
-        $paths = [$envPath, __DIR__ . '/../../.env'];
+        $envPath = defined('ENV_FILE_PATH') ? ENV_FILE_PATH : (__DIR__ . '/../../../../.env');
+        $paths = [$envPath, __DIR__ . '/../../../../.env'];
         foreach ($paths as $p) {
             if (!is_file($p)) continue;
             $lines = @file($p, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
