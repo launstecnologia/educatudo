@@ -89,11 +89,14 @@ $arquivosDisco = $diagnostico['arquivos'] ?? [];
 <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
         <h3 class="text-sm font-semibold text-slate-800">Arquivos no disco</h3>
-        <form method="POST" action="<?= URL ?>/master/logs/excluir" onsubmit="return confirm('Excluir TODOS os <?= count($arquivosDisco) ?> arquivos de log desta pasta?');">
-            <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
-            <input type="hidden" name="arquivo" value="todos">
-            <button type="submit" class="px-3 py-1.5 border border-red-300 text-red-700 bg-white rounded-lg text-xs font-medium hover:bg-red-50">Excluir todos</button>
-        </form>
+        <div class="flex flex-wrap items-center gap-2">
+            <a href="<?= URL ?>/master/logs/baixar-todos" class="px-3 py-1.5 border border-blue-300 text-blue-700 bg-white rounded-lg text-xs font-medium hover:bg-blue-50">Baixar todos</a>
+            <form method="POST" action="<?= URL ?>/master/logs/excluir" onsubmit="return confirm('Excluir TODOS os <?= count($arquivosDisco) ?> arquivos de log desta pasta?');">
+                <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                <input type="hidden" name="arquivo" value="todos">
+                <button type="submit" class="px-3 py-1.5 border border-red-300 text-red-700 bg-white rounded-lg text-xs font-medium hover:bg-red-50">Excluir todos</button>
+            </form>
+        </div>
     </div>
     <ul class="divide-y divide-slate-100">
         <?php foreach ($arquivosDisco as $arq): ?>
@@ -102,11 +105,14 @@ $arquivosDisco = $diagnostico['arquivos'] ?? [];
                 <p class="text-sm font-mono text-slate-800 truncate"><?= htmlspecialchars((string) $arq['nome']) ?></p>
                 <p class="text-xs text-slate-400"><?= number_format((int) ($arq['bytes'] ?? 0) / 1024, 1, ',', '.') ?> KB</p>
             </div>
-            <form method="POST" action="<?= URL ?>/master/logs/excluir" class="shrink-0" onsubmit="return confirm('Excluir <?= htmlspecialchars((string) $arq['nome'], ENT_QUOTES) ?>?');">
-                <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
-                <input type="hidden" name="arquivo" value="<?= htmlspecialchars((string) $arq['nome']) ?>">
-                <button type="submit" class="px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 rounded-lg">Excluir</button>
-            </form>
+            <div class="flex items-center gap-1 shrink-0">
+                <a href="<?= URL ?>/master/logs/baixar?arquivo=<?= rawurlencode((string) $arq['nome']) ?>" class="px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 rounded-lg">Baixar</a>
+                <form method="POST" action="<?= URL ?>/master/logs/excluir" onsubmit="return confirm('Excluir <?= htmlspecialchars((string) $arq['nome'], ENT_QUOTES) ?>?');">
+                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                    <input type="hidden" name="arquivo" value="<?= htmlspecialchars((string) $arq['nome']) ?>">
+                    <button type="submit" class="px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 rounded-lg">Excluir</button>
+                </form>
+            </div>
         </li>
         <?php endforeach; ?>
     </ul>

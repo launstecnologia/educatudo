@@ -54,6 +54,35 @@ class MasterLogsController extends BaseController
         ]);
     }
 
+    public function baixar(): void
+    {
+        $this->requireMaster();
+
+        $alvo = basename(trim((string) ($_GET['arquivo'] ?? '')));
+        $path = (new LogsAplicacaoService())->caminhoArquivo($alvo);
+        if ($path === '' || !is_readable($path)) {
+            $this->setFlashMessage('Não foi possível baixar o arquivo de log.', 'error');
+            $this->redirect('/master/logs');
+            return;
+        }
+
+        $this->enviarArquivo($path, basename($path), 'text/plain; charset=UTF-8', false);
+    }
+
+    public function baixarTodos(): void
+    {
+        $this->requireMaster();
+
+        $zipPath = (new LogsAplicacaoService())->empacotarTodos();
+        if ($zipPath === '') {
+            $this->setFlashMessage('Não foi possível gerar o arquivo com os logs.', 'error');
+            $this->redirect('/master/logs');
+            return;
+        }
+
+        $this->enviarArquivo($zipPath, 'logs-' . date('Y-m-d-His') . '.zip', 'application/zip', true);
+    }
+
     public function excluir(): void
     {
         $this->requireMaster();
@@ -94,6 +123,27 @@ class MasterLogsController extends BaseController
             $this->setFlashMessage('Não foi possível excluir ' . $alvo . '.', 'error');
         }
         $this->redirect('/master/logs');
+    }
+
+    private function enviarArquivo(string $path, string $nome, string $contentType, bool $apagarDepois): void
+    {
+        $nome = str_replace(['"', "\r", "\n"], '', basename($nome));
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        header('Content-Type: ' . $contentType);
+        header('Content-Disposition: attachment; filename="' . $nome . '"');
+        $tamanho = @filesize($path);
+        if ($tamanho !== false) {
+            header('Content-Length: ' . (string) $tamanho);
+        }
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: no-store');
+        readfile($path);
+        if ($apagarDepois) {
+            @unlink($path);
+        }
+        exit;
     }
 }
 

@@ -121,6 +121,8 @@ $router->get('/master/escolas/{id}/prompts', 'Master/MasterEscolaDetailControlle
 $router->post('/master/escolas/{id}/prompts', 'Master/MasterEscolaDetailController@promptsSalvar');
 $router->get('/master/entrar-como', 'Master/MasterEscolaDetailController@entrarComo');
 $router->get('/master/logs', 'Master/MasterLogsController@index');
+$router->get('/master/logs/baixar', 'Master/MasterLogsController@baixar');
+$router->get('/master/logs/baixar-todos', 'Master/MasterLogsController@baixarTodos');
 $router->post('/master/logs/excluir', 'Master/MasterLogsController@excluir');
 $router->get('/master/log-provas', 'Master/MasterLogProvasController@index');
 $router->get('/master/tickets', 'Master/MasterTicketsController@index');

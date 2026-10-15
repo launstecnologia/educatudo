@@ -76,6 +76,58 @@ class LogsAplicacaoService
         return $out;
     }
 
+    public function caminhoArquivo(string $nome): string
+    {
+        $nome = basename(trim($nome));
+        if ($nome === '' || $nome === self::ARQUIVO_TODOS) {
+            return '';
+        }
+        return $this->caminhoSeguro($nome);
+    }
+
+    /**
+     * Junta os logs listados num zip temporário. Devolve o caminho, ou vazio se não houver arquivo.
+     */
+    public function empacotarTodos(): string
+    {
+        if (!class_exists(\ZipArchive::class)) {
+            return '';
+        }
+        $arquivos = $this->listarArquivosDisco();
+        if ($arquivos === []) {
+            return '';
+        }
+
+        $tmp = tempnam(sys_get_temp_dir(), 'logs_');
+        if ($tmp === false) {
+            return '';
+        }
+        $zipPath = $tmp . '.zip';
+        @unlink($tmp);
+
+        $zip = new \ZipArchive();
+        if ($zip->open($zipPath, \ZipArchive::CREATE) !== true) {
+            return '';
+        }
+        foreach ($arquivos as $nome => $meta) {
+            $path = (string) ($meta['path'] ?? '');
+            if ($path === '' || !is_readable($path) || !$this->caminhoPermitido($path)) {
+                continue;
+            }
+            $zip->addFile($path, $nome);
+        }
+        if ($zip->numFiles === 0) {
+            $zip->close();
+            @unlink($zipPath);
+            return '';
+        }
+        $zip->close();
+        if (!is_file($zipPath)) {
+            return '';
+        }
+        return $zipPath;
+    }
+
     public function excluirArquivo(string $nome): bool
     {
         $this->arquivosCache = null;
