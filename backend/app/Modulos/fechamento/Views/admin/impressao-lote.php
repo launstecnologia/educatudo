@@ -5,6 +5,9 @@ $periodoTipo = (string) ($periodo_tipo ?? 'ano');
 $periodoNumero = (int) ($periodo_numero ?? 0);
 $turmaId = (int) ($turma_id ?? 0);
 $serie = trim((string) ($serie ?? ''));
+$serieBruta = trim((string) ($serie_bruta ?? $serie));
+$segmento = trim((string) ($segmento ?? ''));
+$segmentos = is_array($segmentos ?? null) ? $segmentos : [];
 $series = is_array($series ?? null) ? $series : [];
 $turmas = is_array($turmas ?? null) ? $turmas : [];
 $escopoOk = !empty($escopo_ok);
@@ -19,7 +22,7 @@ $painelQs = http_build_query([
 ]);
 $homologadas = (int) ($resumo['homologadas'] ?? 0);
 $page_header_title = 'Impressão em lote';
-$page_header_subtitle = 'Escolha a série, emita os três documentos e baixe cada um no menu da turma.';
+$page_header_subtitle = 'Escolha a série ou a etapa inteira, emita os três documentos e baixe cada um no menu da turma.';
 ob_start();
 ?>
 <a href="<?= URL ?>/admin/fechamento?<?= htmlspecialchars($painelQs) ?>" class="text-gray-600 hover:text-gray-900 text-sm">← Fechamento</a>
@@ -38,18 +41,29 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             <label for="serie" class="block text-sm font-medium text-gray-700 mb-1.5">Série</label>
             <select id="serie" name="serie" onchange="var turma=document.getElementById('turma_id'); if(turma){ turma.disabled=false; turma.value='0'; } this.form.submit();" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
                 <option value="">Escolha a série</option>
+                <?php foreach ($segmentos as $opcaoSegmento):
+                    $valorSegmento = 'etapa:' . (string) $opcaoSegmento;
+                ?>
+                <option value="<?= htmlspecialchars($valorSegmento, ENT_QUOTES, 'UTF-8') ?>" <?= $serieBruta === $valorSegmento ? 'selected' : '' ?>><?= htmlspecialchars((string) $opcaoSegmento) ?> inteiro</option>
+                <?php endforeach; ?>
                 <?php foreach ($series as $opcao): ?>
-                <option value="<?= htmlspecialchars((string) $opcao, ENT_QUOTES, 'UTF-8') ?>" <?= $serie === (string) $opcao ? 'selected' : '' ?>><?= htmlspecialchars((string) $opcao) ?></option>
+                <option value="<?= htmlspecialchars((string) $opcao, ENT_QUOTES, 'UTF-8') ?>" <?= $serieBruta === (string) $opcao ? 'selected' : '' ?>><?= htmlspecialchars((string) $opcao) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
         <div>
             <label for="turma_id" class="block text-sm font-medium text-gray-700 mb-1.5">Turma</label>
-            <select id="turma_id" name="turma_id" onchange="this.form.submit()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white" <?= $serie === '' ? 'disabled' : '' ?>>
-                <option value="0">Todas as turmas desta série</option>
+            <select id="turma_id" name="turma_id" onchange="this.form.submit()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white" <?= ($serie === '' && $segmento === '') ? 'disabled' : '' ?>>
+                <option value="0"><?= $segmento !== '' && $serie === '' ? 'Todas as turmas desta etapa' : 'Todas as turmas desta série' ?></option>
                 <?php foreach ($turmas as $turma):
                     $serieTurma = trim((string) ($turma['serie'] ?? ''));
-                    if ($serie === '' || $serieTurma !== $serie) {
+                    if ($serie !== '' && $serieTurma !== $serie) {
+                        continue;
+                    }
+                    if ($serie === '' && $segmento !== '' && \App\Modulos\Fechamento\Services\ImpressaoLoteFechamentoService::segmentoDaTurma($turma) !== $segmento) {
+                        continue;
+                    }
+                    if ($serie === '' && $segmento === '') {
                         continue;
                     }
                 ?>
@@ -58,7 +72,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             </select>
         </div>
     </div>
-    <p class="text-sm text-gray-500 mt-4">Cada turma ganha o próprio PDF. Trocar a turma mostra o download dela. Ficha e histórico aceitam até <?= (int) \App\Modulos\Fechamento\Services\ImpressaoLoteFechamentoService::MAX_ALUNOS ?> alunos por turma.</p>
+    <p class="text-sm text-gray-500 mt-4">Cada turma ganha o próprio PDF. Para o ensino médio de uma vez, escolha a opção “inteiro”. Ficha e histórico aceitam até <?= (int) \App\Modulos\Fechamento\Services\ImpressaoLoteFechamentoService::MAX_ALUNOS ?> alunos por turma.</p>
 </form>
 
 <?php if ($jobs !== []): ?>
@@ -152,7 +166,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
     <div class="p-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-gray-100">
         <div>
-            <h3 class="text-lg font-semibold text-gray-900"><?= $turmaId > 0 ? 'Esta turma' : htmlspecialchars($serie) ?></h3>
+            <h3 class="text-lg font-semibold text-gray-900"><?= $turmaId > 0 ? 'Esta turma' : htmlspecialchars($segmento !== '' ? $segmento : $serie) ?></h3>
             <p class="text-sm text-gray-500 mt-1">
                 <?= $homologadas ?> de <?= count($linhas) ?> turma(s) homologada(s).
                 Emite ficha, histórico e consolidado final só do que ainda não tem PDF. O histórico sai emitido, com as escolas dos anos anteriores.
@@ -166,7 +180,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                 <input type="hidden" name="periodo_tipo" value="<?= htmlspecialchars($periodoTipo, ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="periodo_numero" value="<?= $periodoNumero ?>">
                 <input type="hidden" name="turma_id" value="<?= $turmaId ?>">
-                <input type="hidden" name="serie" value="<?= htmlspecialchars($serie, ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="serie" value="<?= htmlspecialchars($serieBruta, ENT_QUOTES, 'UTF-8') ?>">
                 <button type="submit" class="inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 w-full sm:w-auto">
                     Preparar históricos
                 </button>
@@ -179,7 +193,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                 <input type="hidden" name="periodo_tipo" value="<?= htmlspecialchars($periodoTipo, ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="periodo_numero" value="<?= $periodoNumero ?>">
                 <input type="hidden" name="turma_id" value="<?= $turmaId ?>">
-                <input type="hidden" name="serie" value="<?= htmlspecialchars($serie, ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="serie" value="<?= htmlspecialchars($serieBruta, ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="documento" value="pacote">
                 <button type="submit" class="btn-primary-custom inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold">
                     <i class="fa-solid fa-print mr-2"></i> Gerar Documento em Lote
@@ -243,7 +257,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                                 <input type="hidden" name="periodo_tipo" value="<?= htmlspecialchars($periodoTipo, ENT_QUOTES, 'UTF-8') ?>">
                                 <input type="hidden" name="periodo_numero" value="<?= $periodoNumero ?>">
                                 <input type="hidden" name="turma_id" value="<?= $tid ?>">
-                                <input type="hidden" name="serie" value="<?= htmlspecialchars($serie, ENT_QUOTES, 'UTF-8') ?>">
+                                <input type="hidden" name="serie" value="<?= htmlspecialchars($serieBruta, ENT_QUOTES, 'UTF-8') ?>">
                                 <input type="hidden" name="documento" value="<?= htmlspecialchars((string) $chave, ENT_QUOTES, 'UTF-8') ?>">
                                 <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                     <i class="fa-solid fa-print text-gray-400 w-4 text-center"></i> Gerar <?= htmlspecialchars((string) $rotulo) ?>
@@ -258,7 +272,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                             <input type="hidden" name="periodo_tipo" value="<?= htmlspecialchars($periodoTipo, ENT_QUOTES, 'UTF-8') ?>">
                             <input type="hidden" name="periodo_numero" value="<?= $periodoNumero ?>">
                             <input type="hidden" name="turma_id" value="<?= $tid ?>">
-                            <input type="hidden" name="serie" value="<?= htmlspecialchars($serie, ENT_QUOTES, 'UTF-8') ?>">
+                            <input type="hidden" name="serie" value="<?= htmlspecialchars($serieBruta, ENT_QUOTES, 'UTF-8') ?>">
                             <input type="hidden" name="documento" value="pacote">
                             <input type="hidden" name="regenerar" value="1">
                             <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">

@@ -782,7 +782,7 @@ class ResultadoAcademico
      */
     public function turmasAtivas(int $anoLetivo = 0): array
     {
-        $sql = 'SELECT id, nome, serie, ano_letivo, turno FROM turmas WHERE ativo = 1';
+        $sql = 'SELECT id, nome, serie, ano_letivo, turno, tipo_ensino FROM turmas WHERE ativo = 1';
         $params = [];
         if ($anoLetivo > 0) {
             $sql .= ' AND ano_letivo = :ano';

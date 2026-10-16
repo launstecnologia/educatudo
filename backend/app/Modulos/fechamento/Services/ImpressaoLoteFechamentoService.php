@@ -28,6 +28,11 @@ class ImpressaoLoteFechamentoService
     /** Acima disso a geração pede uma turma, para não montar a escola inteira. */
     public const MAX_ALUNOS = 80;
 
+    /** Uma etapa inteira (ensino médio, por exemplo) cabe neste recorte. A escola toda, não. */
+    public const MAX_TURMAS_GERACAO = 40;
+
+    public const PREFIXO_ETAPA = 'etapa:';
+
     private string $rotuloJob = '';
 
     private \App\Services\DocumentoOficialService $documentos;
@@ -73,9 +78,101 @@ class ImpressaoLoteFechamentoService
         ];
     }
 
-    public function escopoInformado(int $turmaId, string $serie): bool
+    public function escopoInformado(int $turmaId, string $serie, string $segmento = ''): bool
     {
-        return $turmaId > 0 || trim($serie) !== '';
+        return $turmaId > 0 || trim($serie) !== '' || trim($segmento) !== '';
+    }
+
+    /**
+     * @return array{serie:string,segmento:string}
+     */
+    public function interpretarSerie(string $serieBruta): array
+    {
+        $serieBruta = trim($serieBruta);
+        $prefixo = self::PREFIXO_ETAPA;
+        if (str_starts_with($serieBruta, $prefixo)) {
+            $segmento = trim(substr($serieBruta, strlen($prefixo)));
+            if ($segmento !== '') {
+                return ['serie' => '', 'segmento' => $segmento];
+            }
+        }
+
+        return ['serie' => $serieBruta, 'segmento' => ''];
+    }
+
+    /**
+     * Etapa da turma: tipo de ensino gravado, senão o curso, senão o sufixo da série (EM/EF).
+     *
+     * @param array<string,mixed> $turma
+     */
+    public static function segmentoDaTurma(array $turma): string
+    {
+        $tipo = trim((string) ($turma['tipo_ensino'] ?? ''));
+        if ($tipo !== '') {
+            return $tipo;
+        }
+        $curso = trim((string) ($turma['curso_nome'] ?? ''));
+        if ($curso !== '') {
+            return $curso;
+        }
+        $serie = trim((string) ($turma['serie'] ?? ''));
+        if (preg_match('/(?:^|[^a-z])em(?:[^a-z]|$)|m[eé]dio/ui', $serie) === 1) {
+            return 'Ensino Médio';
+        }
+        if (preg_match('/(?:^|[^a-z])ef(?:[^a-z]|$)|fundamental/ui', $serie) === 1) {
+            return 'Ensino Fundamental';
+        }
+
+        return '';
+    }
+
+    /**
+     * Etapas com mais de uma série, para a opção "inteiro".
+     *
+     * @param list<array<string,mixed>> $turmas
+     * @return list<string>
+     */
+    public function segmentosDasTurmas(array $turmas): array
+    {
+        $porSegmento = [];
+        foreach ($turmas as $turma) {
+            $segmento = self::segmentoDaTurma($turma);
+            $serie = trim((string) ($turma['serie'] ?? ''));
+            if ($segmento === '' || $serie === '') {
+                continue;
+            }
+            $porSegmento[$segmento][$serie] = true;
+        }
+        $lista = [];
+        foreach ($porSegmento as $segmento => $series) {
+            if (count($series) >= 2) {
+                $lista[] = $segmento;
+            }
+        }
+        sort($lista, SORT_NATURAL);
+
+        return $lista;
+    }
+
+    /**
+     * PDFs do período já salvos. ok=false quando o storage não deixou listar de uma vez.
+     *
+     * @return array{ok:bool,chaves:array<string,true>}
+     */
+    public function mapaChavesDoPeriodo(int $ano, string $periodoTipo, int $periodoNumero, string $slug): array
+    {
+        $periodoTipo = strtolower(preg_replace('/[^a-z]/i', '', $periodoTipo) ?: 'ano');
+        $prefixo = $ano . '/' . $periodoTipo . '-' . $periodoNumero;
+        $lista = $this->media($slug)->listarChaves(self::TIPO_ARQUIVO, $prefixo);
+        if ($lista === null) {
+            return ['ok' => false, 'chaves' => []];
+        }
+        $chaves = [];
+        foreach ($lista as $chave) {
+            $chaves[$chave] = true;
+        }
+
+        return ['ok' => true, 'chaves' => $chaves];
     }
 
     /**
@@ -263,9 +360,10 @@ class ImpressaoLoteFechamentoService
         array $painel,
         int $anoLetivo,
         string $periodoTipo,
-        int $periodoNumero
+        int $periodoNumero,
+        bool $arquivoJaVisto = false
     ): bool {
-        if (!$this->pdfSalvo($chave, $slug)) {
+        if ($arquivoJaVisto !== true && !$this->pdfSalvo($chave, $slug)) {
             return false;
         }
         if ($documento !== 'historico') {

@@ -326,23 +326,23 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
         if (!$this->enforceAdminPermissionKey('resultados_finais', 'visualizar', false)) {
             return;
         }
-        $svc = $this->service();
-        $anos = $svc->homologacao()->model()->anosLetivosTurmas();
-        $anoLetivo = $this->anoDaRequest($anos);
-        [$periodoTipo, $periodoNumero] = $this->periodoDaRequest();
-        $turmaId = (int) ($_GET['turma_id'] ?? 0);
-        $serie = trim((string) ($_GET['serie'] ?? ''));
-        $turmas = $svc->homologacao()->model()->turmasAtivas($anoLetivo);
-        if ($turmaId > 0 && $serie === '') {
-            $serie = $this->serieDaTurma($turmas, $turmaId);
-        }
-        $lote = new ImpressaoLoteFechamentoService();
-        $escopoOk = $lote->escopoInformado($turmaId, $serie);
+        $recorte = $this->recorteImpressao(false);
+        $svc = $recorte['svc'];
+        $lote = $recorte['lote'];
+        $anoLetivo = $recorte['ano'];
+        $periodoTipo = $recorte['tipo'];
+        $periodoNumero = $recorte['numero'];
+        $turmaId = $recorte['turma_id'];
+        $serie = $recorte['serie'];
+        $segmento = $recorte['segmento'];
+        $serieBruta = $recorte['serie_bruta'];
+        $turmas = $recorte['turmas'];
+        $escopoOk = $lote->escopoInformado($turmaId, $serie, $segmento);
         $paineis = $escopoOk
-            ? $svc->painel($anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serie)
+            ? $svc->painelImpressao($anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serie, $segmento)
             : [];
         $resumo = $lote->resumo($paineis);
-        $voltar = $this->urlImpressaoLote($anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serie);
+        $voltar = $recorte['voltar'];
         if ((string) ($_GET['documento'] ?? '') !== '') {
             $this->setFlashMessage('Escolha a série e clique em Emitir tudo. Cada turma ganha o próprio PDF.', 'success');
             $this->redirect($voltar);
@@ -364,6 +364,9 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
             'periodo_numero' => $periodoNumero,
             'turma_id' => $turmaId,
             'serie' => $serie,
+            'serie_bruta' => $serieBruta,
+            'segmento' => $segmento,
+            'segmentos' => $lote->segmentosDasTurmas($turmas),
             'series' => $this->seriesDasTurmas($turmas),
             'turmas' => $turmas,
             'escopo_ok' => $escopoOk,
@@ -384,22 +387,21 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
         if (!$this->enforceAdminPermissionKey('resultados_finais', 'alterar', false)) {
             return;
         }
-        $svc = $this->service();
-        $anos = $svc->homologacao()->model()->anosLetivosTurmas();
-        $anoLetivo = (int) ($_POST['ano_letivo'] ?? 0);
-        if (!in_array($anoLetivo, $anos, true)) {
-            $anoLetivo = (int) ($anos[0] ?? date('Y'));
-        }
-        [$periodoTipo, $periodoNumero] = $this->periodoDoPost();
-        $turmaId = (int) ($_POST['turma_id'] ?? 0);
-        $serie = trim((string) ($_POST['serie'] ?? ''));
-        $voltar = $this->urlImpressaoLote($anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serie);
+        $recorte = $this->recorteImpressao(true);
+        $svc = $recorte['svc'];
+        $lote = $recorte['lote'];
+        $anoLetivo = $recorte['ano'];
+        $periodoTipo = $recorte['tipo'];
+        $periodoNumero = $recorte['numero'];
+        $turmaId = $recorte['turma_id'];
+        $serie = $recorte['serie'];
+        $segmento = $recorte['segmento'];
+        $voltar = $recorte['voltar'];
         if (!$this->csrfOuRedirect($voltar)) {
             return;
         }
-        $paineis = $svc->painel($anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serie);
-        $lote = new ImpressaoLoteFechamentoService();
-        if (!$lote->escopoInformado($turmaId, $serie)) {
+        $paineis = $svc->painelImpressao($anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serie, $segmento);
+        if (!$lote->escopoInformado($turmaId, $serie, $segmento)) {
             $this->setFlashMessage('Escolha uma turma ou uma série antes de preparar os históricos.', 'error');
             $this->redirect($voltar);
             return;
@@ -430,22 +432,21 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
         if (!$this->enforceAdminPermissionKey('resultados_finais', 'visualizar', false)) {
             return;
         }
-        $svc = $this->service();
-        $anos = $svc->homologacao()->model()->anosLetivosTurmas();
-        $anoLetivo = (int) ($_POST['ano_letivo'] ?? 0);
-        if (!in_array($anoLetivo, $anos, true)) {
-            $anoLetivo = (int) ($anos[0] ?? date('Y'));
-        }
-        [$periodoTipo, $periodoNumero] = $this->periodoDoPost();
-        $turmaId = (int) ($_POST['turma_id'] ?? 0);
-        $serie = trim((string) ($_POST['serie'] ?? ''));
-        $voltar = $this->urlImpressaoLote($anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serie);
+        $recorte = $this->recorteImpressao(true);
+        $anoLetivo = $recorte['ano'];
+        $periodoTipo = $recorte['tipo'];
+        $periodoNumero = $recorte['numero'];
+        $turmaId = $recorte['turma_id'];
+        $serie = $recorte['serie'];
+        $segmento = $recorte['segmento'];
+        $voltar = $recorte['voltar'];
+        $lote = $recorte['lote'];
+        $svc = $recorte['svc'];
         if (!$this->csrfOuRedirect($voltar)) {
             return;
         }
-        $lote = new ImpressaoLoteFechamentoService();
-        if (!$lote->escopoInformado($turmaId, $serie)) {
-            $this->setFlashMessage('Escolha uma série ou uma turma. A escola inteira de uma vez deixa a geração pesada.', 'error');
+        if (!$lote->escopoInformado($turmaId, $serie, $segmento)) {
+            $this->setFlashMessage('Escolha uma série, uma etapa ou uma turma. A escola inteira de uma vez deixa a geração pesada.', 'error');
             $this->redirect($voltar);
             return;
         }
@@ -458,7 +459,7 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
                 return;
             }
         }
-        $paineis = $svc->painel($anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serie);
+        $paineis = $svc->painelImpressao($anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serie, $segmento);
         $alvos = [];
         $fora = [];
         foreach ($paineis as $painel) {
@@ -478,8 +479,12 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
             $this->redirect($voltar);
             return;
         }
-        if (count($alvos) > 12) {
-            $this->setFlashMessage('Escolha uma série com até 12 turmas homologadas. Este recorte tem ' . count($alvos) . '.', 'error');
+        if (count($alvos) > ImpressaoLoteFechamentoService::MAX_TURMAS_GERACAO) {
+            $this->setFlashMessage(
+                'Este recorte tem ' . count($alvos) . ' turmas homologadas. O limite de uma geração é '
+                . ImpressaoLoteFechamentoService::MAX_TURMAS_GERACAO . '.',
+                'error'
+            );
             $this->redirect($voltar);
             return;
         }
@@ -507,6 +512,7 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
         }
         $jobs = [];
         $jaSalvos = 0;
+        $mapa = $lote->mapaChavesDoPeriodo($anoLetivo, $periodoTipo, $periodoNumero, $tenantSlug);
         try {
             foreach ($alvos as $alvo) {
                 foreach ($documentos as $documento) {
@@ -516,12 +522,13 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
                         $avisos[] = $alvo['nome'] . ': ' . $e->getMessage();
                         continue;
                     }
-                    $chave = $lote->chaveJaSalva(
+                    $chave = $this->chavePdfSalva(
+                        $lote,
+                        $mapa,
                         $anoLetivo,
                         $periodoTipo,
                         $periodoNumero,
                         (int) $alvo['id'],
-                        '',
                         $documento,
                         $tenantSlug
                     );
@@ -532,7 +539,8 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
                         $alvo['painel'],
                         $anoLetivo,
                         $periodoTipo,
-                        $periodoNumero
+                        $periodoNumero,
+                        true
                     )) {
                         $jaSalvos++;
                         continue;
@@ -966,6 +974,52 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
         return [$tipo, $numero];
     }
 
+    /**
+     * @return array{
+     *   ano:int,tipo:string,numero:int,turma_id:int,serie:string,segmento:string,serie_bruta:string,
+     *   turmas:list<array<string,mixed>>,voltar:string,svc:FechamentoService,lote:ImpressaoLoteFechamentoService
+     * }
+     */
+    private function recorteImpressao(bool $post): array
+    {
+        $svc = $this->service();
+        $anos = $svc->homologacao()->model()->anosLetivosTurmas();
+        $fonte = $post ? $_POST : $_GET;
+        if ($post) {
+            $anoLetivo = (int) ($fonte['ano_letivo'] ?? 0);
+            if (!in_array($anoLetivo, $anos, true)) {
+                $anoLetivo = (int) ($anos[0] ?? date('Y'));
+            }
+            [$periodoTipo, $periodoNumero] = $this->periodoDoPost();
+        } else {
+            $anoLetivo = $this->anoDaRequest($anos);
+            [$periodoTipo, $periodoNumero] = $this->periodoDaRequest();
+        }
+        $turmaId = (int) ($fonte['turma_id'] ?? 0);
+        $serieBruta = trim((string) ($fonte['serie'] ?? ''));
+        $lote = new ImpressaoLoteFechamentoService();
+        $partes = $lote->interpretarSerie($serieBruta);
+        $turmas = $svc->homologacao()->model()->turmasAtivas($anoLetivo);
+        if ($turmaId > 0 && $partes['serie'] === '' && $partes['segmento'] === '') {
+            $partes['serie'] = $this->serieDaTurma($turmas, $turmaId);
+            $serieBruta = $partes['serie'];
+        }
+
+        return [
+            'ano' => $anoLetivo,
+            'tipo' => $periodoTipo,
+            'numero' => $periodoNumero,
+            'turma_id' => $turmaId,
+            'serie' => $partes['serie'],
+            'segmento' => $partes['segmento'],
+            'serie_bruta' => $serieBruta,
+            'turmas' => $turmas,
+            'svc' => $svc,
+            'lote' => $lote,
+            'voltar' => $this->urlImpressaoLote($anoLetivo, $periodoTipo, $periodoNumero, $turmaId, $serieBruta),
+        ];
+    }
+
     private function urlImpressaoLote(int $ano, string $tipo, int $numero, int $turmaId = 0, string $serie = ''): string
     {
         $qs = [
@@ -1031,6 +1085,16 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
         int $periodoNumero
     ): array {
         $slug = $this->slugEscola();
+        $temHomologada = false;
+        foreach ($paineis as $painel) {
+            if (($painel['status'] ?? '') === FechamentoMaquinaEstados::HOMOLOGADO) {
+                $temHomologada = true;
+                break;
+            }
+        }
+        $mapa = ($slug !== '' && $temHomologada)
+            ? $lote->mapaChavesDoPeriodo($ano, $periodoTipo, $periodoNumero, $slug)
+            : ['ok' => true, 'chaves' => []];
         $linhas = [];
         foreach ($paineis as $painel) {
             $tid = (int) ($painel['turma']['id'] ?? 0);
@@ -1041,7 +1105,7 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
             $pdfs = [];
             if ($homologada && $slug !== '') {
                 foreach (array_keys(ImpressaoLoteFechamentoService::DOCUMENTOS) as $documento) {
-                    $chave = $lote->chaveJaSalva($ano, $periodoTipo, $periodoNumero, $tid, '', $documento, $slug);
+                    $chave = $this->chavePdfSalva($lote, $mapa, $ano, $periodoTipo, $periodoNumero, $tid, $documento, $slug);
                     if ($chave !== '') {
                         $pdfs[$documento] = $chave;
                     }
@@ -1060,6 +1124,34 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
         }
 
         return $linhas;
+    }
+
+    /**
+     * @param array{ok:bool,chaves:array<string,true>} $mapa
+     */
+    private function chavePdfSalva(
+        ImpressaoLoteFechamentoService $lote,
+        array $mapa,
+        int $ano,
+        string $periodoTipo,
+        int $periodoNumero,
+        int $turmaId,
+        string $documento,
+        string $slug
+    ): string {
+        foreach (ImpressaoLoteFechamentoService::chavesPdf($ano, $periodoTipo, $periodoNumero, $turmaId, '', $documento) as $chave) {
+            if (!empty($mapa['ok'])) {
+                if (!empty($mapa['chaves'][$chave])) {
+                    return $chave;
+                }
+                continue;
+            }
+            if ($lote->pdfSalvo($chave, $slug)) {
+                return $chave;
+            }
+        }
+
+        return '';
     }
 
     private function slugEscola(): string

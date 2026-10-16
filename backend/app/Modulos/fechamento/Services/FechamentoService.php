@@ -497,6 +497,74 @@ class FechamentoService
     }
 
     /**
+     * Lista da impressão em lote, sem montar nota e frequência de cada aluno.
+     * A homologação já gravada basta para saber se a turma pode emitir PDF.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function painelImpressao(
+        int $anoLetivo,
+        string $periodoTipo,
+        int $periodoNumero,
+        int $turmaFiltro = 0,
+        string $serieFiltro = '',
+        string $segmentoFiltro = ''
+    ): array {
+        $turmas = $this->homologacao->model()->turmasAtivas($anoLetivo);
+        $periodo = $this->homologacao->resolverPeriodo($anoLetivo, $periodoTipo, $periodoNumero);
+        $vigentes = $this->model->listarVigentes(
+            $anoLetivo,
+            (string) ($periodo['tipo'] ?? $periodoTipo),
+            (int) ($periodo['numero'] ?? $periodoNumero)
+        );
+        $contagens = $this->homologacao->model()->contarAlunosPorTurma($anoLetivo);
+        $linhas = [];
+        foreach ($turmas as $turma) {
+            $tid = (int) ($turma['id'] ?? 0);
+            if ($tid <= 0) {
+                continue;
+            }
+            if ($turmaFiltro > 0 && $tid !== $turmaFiltro) {
+                continue;
+            }
+            if ($serieFiltro !== '' && trim((string) ($turma['serie'] ?? '')) !== $serieFiltro) {
+                continue;
+            }
+            if ($segmentoFiltro !== '' && ImpressaoLoteFechamentoService::segmentoDaTurma($turma) !== $segmentoFiltro) {
+                continue;
+            }
+            $fechamento = $vigentes[$tid] ?? null;
+            $status = $fechamento
+                ? FechamentoMaquinaEstados::normalizar((string) $fechamento['status'])
+                : FechamentoMaquinaEstados::ABERTO;
+            $total = (int) ($contagens[$tid] ?? 0);
+            $linhas[] = [
+                'turma' => $turma,
+                'periodo' => $periodo,
+                'resumo' => [
+                    'total' => $total,
+                    'homologados' => FechamentoMaquinaEstados::estaTravado($status) ? $total : 0,
+                    'pendencias' => 0,
+                    'elegiveis' => 0,
+                    'aprovados' => 0,
+                    'reprovados' => 0,
+                    'recuperacao' => 0,
+                    'outros' => 0,
+                    'chamadas_pendentes' => 0,
+                ],
+                'fechamento' => $fechamento,
+                'status' => $status,
+                'status_rotulo' => FechamentoMaquinaEstados::rotulo($status),
+                'travado' => FechamentoMaquinaEstados::estaTravado($status),
+                'pendencias' => 0,
+                'pode_homologar' => false,
+            ];
+        }
+
+        return $linhas;
+    }
+
+    /**
      * Livro de homologações para o offcanvas (por turma ou ano inteiro).
      *
      * @return array{schema_pronto:bool,registros:list<array<string,mixed>>}

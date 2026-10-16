@@ -316,6 +316,103 @@ class MediaStorageService
     }
 
     /**
+     * Chaves relativas já gravadas sob um prefixo, numa única ida ao storage.
+     * null quando a listagem falha — o chamador decide se consulta arquivo a arquivo.
+     *
+     * @return list<string>|null
+     */
+    public function listarChaves(string $type, string $prefixo): ?array
+    {
+        $prefixo = $this->normalizeKey($prefixo);
+        if ($prefixo === '') {
+            return [];
+        }
+        try {
+            if ($this->useS3 && !$this->useLocalFilesForType($type)) {
+                return $this->listarChavesS3($type, $prefixo);
+            }
+
+            return $this->listarChavesLocal($type, $prefixo);
+        } catch (\Throwable $e) {
+            error_log('MediaStorageService listarChaves: ' . $e->getMessage());
+
+            return null;
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function listarChavesLocal(string $type, string $prefixo): array
+    {
+        $dir = $this->getLocalPath($type, $prefixo);
+        if ($dir === null || !is_dir($dir)) {
+            return [];
+        }
+        $base = rtrim(str_replace('\\', '/', $dir), '/');
+        $chaves = [];
+        $itens = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS)
+        );
+        foreach ($itens as $arquivo) {
+            if (!$arquivo->isFile()) {
+                continue;
+            }
+            $full = str_replace('\\', '/', $arquivo->getPathname());
+            if (!str_starts_with($full, $base . '/')) {
+                continue;
+            }
+            $rel = substr($full, strlen($base) + 1);
+            if ($rel !== '') {
+                $chaves[] = $prefixo . '/' . $rel;
+            }
+        }
+
+        return $chaves;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function listarChavesS3(string $type, string $prefixo): array
+    {
+        if ($this->s3Client === null) {
+            return [];
+        }
+        $s3Prefix = rtrim($this->buildS3ObjectKey($type, $prefixo), '/') . '/';
+        $fullPrefix = trim($this->fullPrefix($type, $prefixo), '/');
+        $corte = $fullPrefix !== '' ? strlen($fullPrefix) + 1 : 0;
+        $chaves = [];
+        $token = null;
+        do {
+            $params = [
+                'Bucket' => $this->bucket,
+                'Prefix' => $s3Prefix,
+                'MaxKeys' => 1000,
+            ];
+            if ($token !== null) {
+                $params['ContinuationToken'] = $token;
+            }
+            $res = $this->s3Client->listObjectsV2($params);
+            foreach ($res['Contents'] ?? [] as $obj) {
+                $s3Key = (string) ($obj['Key'] ?? '');
+                $rel = $corte > 0 && str_starts_with($s3Key, $fullPrefix . '/')
+                    ? substr($s3Key, $corte)
+                    : '';
+                if ($rel !== '' && str_starts_with($rel, $prefixo . '/')) {
+                    $chaves[] = $rel;
+                }
+            }
+            $token = !empty($res['IsTruncated']) ? (string) ($res['NextContinuationToken'] ?? '') : null;
+            if ($token === '') {
+                $token = null;
+            }
+        } while ($token !== null && count($chaves) < 5000);
+
+        return $chaves;
+    }
+
+    /**
      * Verifica se o arquivo existe.
      */
     public function exists(string $type, string $key): bool
