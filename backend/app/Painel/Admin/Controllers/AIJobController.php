@@ -87,6 +87,21 @@ class AIJobController
                 }
             }
 
+            if ((string) ($job['job_type'] ?? '') === \App\Modulos\Fechamento\Services\ImpressaoLoteFechamentoService::TIPO_JOB) {
+                $payload = json_decode((string) ($job['payload'] ?? ''), true);
+                if (is_array($payload)) {
+                    if (empty($response['documento']) && !empty($payload['documento'])) {
+                        $response['documento'] = (string) $payload['documento'];
+                    }
+                    if (empty($response['rotulo'])) {
+                        $turmaNome = trim((string) ($payload['turma_nome'] ?? ''));
+                        if ($turmaNome !== '') {
+                            $response['rotulo'] = $turmaNome;
+                        }
+                    }
+                }
+            }
+
             if (!empty($_GET['debug']) && $_GET['debug'] === '1') {
                 $response['debug'] = [
                     'job_id' => $jobId,

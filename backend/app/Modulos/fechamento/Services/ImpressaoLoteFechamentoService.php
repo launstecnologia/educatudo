@@ -91,7 +91,7 @@ class ImpressaoLoteFechamentoService
         $serieBruta = trim($serieBruta);
         $prefixo = self::PREFIXO_ETAPA;
         if (str_starts_with($serieBruta, $prefixo)) {
-            $segmento = trim(substr($serieBruta, strlen($prefixo)));
+            $segmento = self::rotuloCurso(trim(substr($serieBruta, strlen($prefixo))));
             if ($segmento !== '') {
                 return ['serie' => '', 'segmento' => $segmento];
             }
@@ -101,19 +101,54 @@ class ImpressaoLoteFechamentoService
     }
 
     /**
-     * Etapa da turma: tipo de ensino gravado, senão o curso, senão o sufixo da série (EM/EF).
+     * Nome do curso no cadastro (Cursos e Séries). "medio" vira "Ensino Médio".
+     */
+    public static function rotuloCurso(string $nome): string
+    {
+        $limpo = trim($nome);
+        if ($limpo === '') {
+            return '';
+        }
+        $chave = mb_strtolower($limpo);
+        $chave = strtr($chave, [
+            'á' => 'a', 'à' => 'a', 'â' => 'a', 'ã' => 'a',
+            'é' => 'e', 'ê' => 'e',
+            'í' => 'i',
+            'ó' => 'o', 'ô' => 'o', 'õ' => 'o',
+            'ú' => 'u',
+            'ç' => 'c',
+        ]);
+        $mapa = [
+            'medio' => 'Ensino Médio',
+            'ensino medio' => 'Ensino Médio',
+            'fundamental' => 'Ensino Fundamental',
+            'ensino fundamental' => 'Ensino Fundamental',
+            'fundamental ii' => 'Ensino Fundamental II',
+            'fundamental 2' => 'Ensino Fundamental II',
+            'fundamental i' => 'Ensino Fundamental I',
+            'fundamental 1' => 'Ensino Fundamental I',
+            'infantil' => 'Educação Infantil',
+            'educacao infantil' => 'Educação Infantil',
+            'eja' => 'EJA',
+        ];
+
+        return $mapa[$chave] ?? $limpo;
+    }
+
+    /**
+     * Etapa da turma: nome do curso, senão o tipo de ensino, senão o sufixo da série (EM/EF).
      *
      * @param array<string,mixed> $turma
      */
     public static function segmentoDaTurma(array $turma): string
     {
-        $tipo = trim((string) ($turma['tipo_ensino'] ?? ''));
-        if ($tipo !== '') {
-            return $tipo;
-        }
         $curso = trim((string) ($turma['curso_nome'] ?? ''));
         if ($curso !== '') {
-            return $curso;
+            return self::rotuloCurso($curso);
+        }
+        $tipo = trim((string) ($turma['tipo_ensino'] ?? ''));
+        if ($tipo !== '') {
+            return self::rotuloCurso($tipo);
         }
         $serie = trim((string) ($turma['serie'] ?? ''));
         if (preg_match('/(?:^|[^a-z])em(?:[^a-z]|$)|m[eé]dio/ui', $serie) === 1) {

@@ -999,6 +999,9 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
         $serieBruta = trim((string) ($fonte['serie'] ?? ''));
         $lote = new ImpressaoLoteFechamentoService();
         $partes = $lote->interpretarSerie($serieBruta);
+        if ($partes['segmento'] !== '') {
+            $serieBruta = ImpressaoLoteFechamentoService::PREFIXO_ETAPA . $partes['segmento'];
+        }
         $turmas = $svc->homologacao()->model()->turmasAtivas($anoLetivo);
         if ($turmaId > 0 && $partes['serie'] === '' && $partes['segmento'] === '') {
             $partes['serie'] = $this->serieDaTurma($turmas, $turmaId);

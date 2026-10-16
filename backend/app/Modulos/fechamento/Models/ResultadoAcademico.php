@@ -782,14 +782,41 @@ class ResultadoAcademico
      */
     public function turmasAtivas(int $anoLetivo = 0): array
     {
-        $sql = 'SELECT id, nome, serie, ano_letivo, turno, tipo_ensino FROM turmas WHERE ativo = 1';
+        $joins = '';
+        $nomesCurso = [];
+        if ($this->tabelaExiste('curso')) {
+            $nomesCurso[] = 'c_turma.nome';
+            $joins .= ' LEFT JOIN curso c_turma ON c_turma.id = t.curso_novo_id';
+        }
+        if ($this->tabelaExiste('serie') && $this->tabelaExiste('curso')) {
+            $nomesCurso[] = 'c_serie.nome';
+            $joins .= ' LEFT JOIN serie s ON s.id = t.serie_id';
+            $joins .= ' LEFT JOIN curso c_serie ON c_serie.id = s.curso_id';
+        }
+        $cursoNome = $nomesCurso === []
+            ? 'NULL AS curso_nome'
+            : 'COALESCE(' . implode(', ', $nomesCurso) . ') AS curso_nome';
+        $sql = 'SELECT t.id, t.nome, t.serie, t.ano_letivo, t.turno, t.tipo_ensino, ' . $cursoNome
+            . ' FROM turmas t' . $joins . ' WHERE t.ativo = 1';
         $params = [];
         if ($anoLetivo > 0) {
-            $sql .= ' AND ano_letivo = :ano';
+            $sql .= ' AND t.ano_letivo = :ano';
             $params['ano'] = $anoLetivo;
         }
-        $sql .= ' ORDER BY nome ASC';
-        return $this->db->fetchAll($sql, $params) ?: [];
+        $sql .= ' ORDER BY t.nome ASC';
+        try {
+            return $this->db->fetchAll($sql, $params) ?: [];
+        } catch (\Throwable $e) {
+            $sql = 'SELECT id, nome, serie, ano_letivo, turno, tipo_ensino, NULL AS curso_nome FROM turmas WHERE ativo = 1';
+            $params = [];
+            if ($anoLetivo > 0) {
+                $sql .= ' AND ano_letivo = :ano';
+                $params['ano'] = $anoLetivo;
+            }
+            $sql .= ' ORDER BY nome ASC';
+
+            return $this->db->fetchAll($sql, $params) ?: [];
+        }
     }
 
     /**

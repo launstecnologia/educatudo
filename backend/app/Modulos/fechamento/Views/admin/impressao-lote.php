@@ -44,7 +44,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                 <?php foreach ($segmentos as $opcaoSegmento):
                     $valorSegmento = 'etapa:' . (string) $opcaoSegmento;
                 ?>
-                <option value="<?= htmlspecialchars($valorSegmento, ENT_QUOTES, 'UTF-8') ?>" <?= $serieBruta === $valorSegmento ? 'selected' : '' ?>><?= htmlspecialchars((string) $opcaoSegmento) ?> inteiro</option>
+                <option value="<?= htmlspecialchars($valorSegmento, ENT_QUOTES, 'UTF-8') ?>" <?= $serieBruta === $valorSegmento ? 'selected' : '' ?>><?= htmlspecialchars((string) $opcaoSegmento) ?> — todas as séries</option>
                 <?php endforeach; ?>
                 <?php foreach ($series as $opcao): ?>
                 <option value="<?= htmlspecialchars((string) $opcao, ENT_QUOTES, 'UTF-8') ?>" <?= $serieBruta === (string) $opcao ? 'selected' : '' ?>><?= htmlspecialchars((string) $opcao) ?></option>
@@ -72,70 +72,156 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             </select>
         </div>
     </div>
-    <p class="text-sm text-gray-500 mt-4">Cada turma ganha o próprio PDF. Para o ensino médio de uma vez, escolha a opção “inteiro”. Ficha e histórico aceitam até <?= (int) \App\Modulos\Fechamento\Services\ImpressaoLoteFechamentoService::MAX_ALUNOS ?> alunos por turma.</p>
+    <p class="text-sm text-gray-500 mt-4">Cada turma ganha o próprio PDF. Para gerar um curso inteiro, escolha a opção com todas as séries. Ficha e histórico aceitam até <?= (int) \App\Modulos\Fechamento\Services\ImpressaoLoteFechamentoService::MAX_ALUNOS ?> alunos por turma.</p>
 </form>
 
 <?php if ($jobs !== []): ?>
-<div id="lote-jobs" class="mb-6 p-4 rounded-lg bg-sky-50 border border-sky-200 text-sky-900 text-sm"
+<div id="lote-jobs" class="mb-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
      data-jobs="<?= htmlspecialchars(implode(',', $jobs), ENT_QUOTES, 'UTF-8') ?>"
      data-status="<?= URL ?>/admin/ai-job/"
      data-pdf="<?= URL ?>/admin/fechamento/impressao-lote/pdf?chave=">
-    Geração em andamento. Pode deixar esta página aberta. Quando terminar, o download fica em Ações na turma.
-    <ul class="mt-2 space-y-1" id="lote-jobs-lista"></ul>
+    <div class="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+            <h3 class="text-base font-semibold text-gray-900">Geração em andamento</h3>
+            <p class="text-sm text-gray-500 mt-0.5">Pode deixar esta página aberta. O download fica em Ações na turma.</p>
+        </div>
+        <p id="lote-jobs-resumo" class="text-sm font-medium text-gray-700 shrink-0">Lendo a fila…</p>
+    </div>
+    <div class="px-6 py-3 bg-gray-50 border-b border-gray-100">
+        <div class="h-2 rounded-full bg-gray-200 overflow-hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="lote-jobs-barra-caixa">
+            <div id="lote-jobs-barra" class="h-full rounded-full bg-purple-600 transition-all duration-500" style="width:0%"></div>
+        </div>
+    </div>
+    <div id="lote-jobs-lista" class="divide-y divide-gray-100"></div>
 </div>
 <script>
 (function () {
     var caixa = document.getElementById('lote-jobs');
     var lista = document.getElementById('lote-jobs-lista');
-    if (!caixa || !lista) return;
+    var resumo = document.getElementById('lote-jobs-resumo');
+    var barra = document.getElementById('lote-jobs-barra');
+    var barraCaixa = document.getElementById('lote-jobs-barra-caixa');
+    if (!caixa || !lista || !resumo || !barra) return;
     var ids = (caixa.getAttribute('data-jobs') || '').split(',').filter(Boolean);
     var baseStatus = caixa.getAttribute('data-status') || '';
     var basePdf = caixa.getAttribute('data-pdf') || '';
     var nomes = <?= json_encode(\App\Modulos\Fechamento\Services\ImpressaoLoteFechamentoService::DOCUMENTOS, JSON_UNESCAPED_UNICODE) ?>;
+    var ordemDocs = <?= json_encode(\App\Modulos\Fechamento\Services\ImpressaoLoteFechamentoService::PACOTE, JSON_UNESCAPED_UNICODE) ?>;
+    var estado = {};
     var recarregou = false;
-    function desenhar(id, dados) {
-        var item = document.getElementById('job-' + id);
-        if (!item) {
-            item = document.createElement('li');
-            item.id = 'job-' + id;
-            lista.appendChild(item);
-        }
-        var doc = (dados && dados.documento && nomes[dados.documento]) ? nomes[dados.documento] : ('Documento ' + id);
-        if (dados && dados.rotulo) doc = dados.rotulo + ' — ' + doc;
-        var status = dados && dados.status ? dados.status : 'pending';
+    function escapar(texto) {
+        return String(texto == null ? '' : texto).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function progresso(andamento) {
+        var match = String(andamento || '').match(/(\d+)\s+de\s+(\d+)/);
+        if (!match) return null;
+        var feito = parseInt(match[1], 10);
+        var total = parseInt(match[2], 10);
+        if (!total) return null;
+        return {
+            feito: feito,
+            total: total,
+            pct: Math.max(4, Math.min(100, Math.round(feito / total * 100)))
+        };
+    }
+    function lado(dados, status) {
         if (status === 'done') {
-            var chave = dados && (dados.arquivo_key || (dados.result && dados.result.arquivo_key)) ? (dados.arquivo_key || dados.result.arquivo_key) : '';
+            var chave = dados.arquivo_key || (dados.result && dados.result.arquivo_key) || '';
             if (chave) {
-                item.innerHTML = doc + ' — <a class="underline font-medium" target="_blank" rel="noopener" href="' + basePdf + encodeURIComponent(chave) + '">Abrir PDF</a>';
-            } else {
-                item.textContent = doc + ' — pronto, mas o PDF não foi localizado.';
+                return '<a class="shrink-0 text-sm font-semibold text-purple-700 hover:text-purple-900" target="_blank" rel="noopener" href="' + basePdf + encodeURIComponent(chave) + '">Abrir PDF</a>';
             }
-            return 'done';
+            return '<span class="shrink-0 text-sm text-amber-700">PDF não localizado</span>';
         }
-        if (status === 'failed') {
-            item.textContent = doc + ' — ' + ((dados && dados.error) ? dados.error : 'a geração falhou. Tente de novo.');
-            return 'failed';
+        if (status === 'failed' || status === 'not_found') {
+            return '<span class="shrink-0 text-sm text-red-700">' + escapar(dados.error || 'A geração falhou') + '</span>';
         }
         if (status === 'processing') {
-            item.textContent = doc + ' — ' + ((dados && dados.andamento) ? dados.andamento : 'gerando…');
-            return 'pending';
+            var barraDoc = progresso(dados.andamento);
+            if (barraDoc) {
+                return '<div class="w-40 shrink-0">'
+                    + '<div class="flex justify-between text-xs text-gray-500 mb-1"><span>' + barraDoc.feito + ' de ' + barraDoc.total + '</span><span>' + barraDoc.pct + '%</span></div>'
+                    + '<div class="h-1.5 rounded-full bg-gray-200 overflow-hidden"><div class="h-full rounded-full bg-purple-600" style="width:' + barraDoc.pct + '%"></div></div>'
+                    + '</div>';
+            }
+            return '<span class="shrink-0 text-sm text-purple-700">' + escapar(dados.andamento || 'Gerando…') + '</span>';
         }
-        if (dados && dados.error) {
-            item.textContent = doc + ' — na fila. Última tentativa: ' + dados.error;
-            return 'pending';
+        if (dados.error) {
+            return '<span class="shrink-0 text-sm text-amber-700">Na fila · ' + escapar(dados.error) + '</span>';
         }
-        item.textContent = doc + ' — ' + ((dados && dados.andamento) ? dados.andamento : 'na fila');
-        return 'pending';
+        return '<span class="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Na fila</span>';
+    }
+    function desenhar() {
+        var grupos = {};
+        var ordem = [];
+        var prontos = 0;
+        var falhas = 0;
+        ids.forEach(function (id) {
+            var dados = estado[id] || { status: 'pending' };
+            var status = dados.status || 'pending';
+            if (status === 'done') prontos++;
+            if (status === 'failed' || status === 'not_found') falhas++;
+            var rotulo = String(dados.rotulo || '').trim() || 'Aguardando identificação';
+            if (!grupos[rotulo]) {
+                grupos[rotulo] = [];
+                ordem.push(rotulo);
+            }
+            grupos[rotulo].push(dados);
+        });
+        ordem.sort(function (a, b) {
+            if (a === 'Aguardando identificação') return 1;
+            if (b === 'Aguardando identificação') return -1;
+            return 0;
+        });
+        var html = '';
+        ordem.forEach(function (rotulo) {
+            var itens = grupos[rotulo].slice().sort(function (a, b) {
+                var ia = ordemDocs.indexOf(a.documento || '');
+                var ib = ordemDocs.indexOf(b.documento || '');
+                return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+            });
+            var prontosGrupo = itens.filter(function (item) { return item.status === 'done'; }).length;
+            html += '<section class="px-6 py-4">';
+            html += '<div class="flex items-center justify-between gap-3 mb-3">';
+            html += '<h4 class="text-sm font-semibold text-gray-900">' + escapar(rotulo) + '</h4>';
+            html += '<span class="text-xs font-medium text-gray-500">' + prontosGrupo + ' de ' + itens.length + '</span>';
+            html += '</div><ul class="space-y-2.5">';
+            itens.forEach(function (dados) {
+                var status = dados.status || 'pending';
+                var doc = (dados.documento && nomes[dados.documento]) ? nomes[dados.documento] : 'Documento';
+                html += '<li class="flex items-center justify-between gap-4">';
+                html += '<span class="text-sm text-gray-700">' + escapar(doc) + '</span>';
+                html += lado(dados, status);
+                html += '</li>';
+            });
+            html += '</ul></section>';
+        });
+        lista.innerHTML = html;
+        var pct = ids.length ? Math.round(prontos / ids.length * 100) : 0;
+        barra.style.width = pct + '%';
+        if (barraCaixa) barraCaixa.setAttribute('aria-valuenow', String(pct));
+        var texto = prontos + ' de ' + ids.length + ' pronto' + (prontos === 1 ? '' : 's');
+        if (falhas) texto += ' · ' + falhas + ' com falha';
+        resumo.textContent = texto;
+        return prontos;
     }
     function consultar() {
-        var estados = {};
         var faltam = ids.length;
+        var estados = {};
         ids.forEach(function (id) {
             fetch(baseStatus + id + '/status', { credentials: 'same-origin' })
                 .then(function (r) { return r.json(); })
-                .then(function (dados) { estados[id] = desenhar(id, dados); })
-                .catch(function () { estados[id] = desenhar(id, { status: 'pending', andamento: 'aguardando o servidor' }); })
+                .then(function (dados) {
+                    estado[id] = dados || { status: 'pending' };
+                    estados[id] = (dados && dados.status) ? dados.status : 'pending';
+                })
+                .catch(function () {
+                    estado[id] = estado[id] || { status: 'pending', andamento: 'Aguardando o servidor' };
+                    estados[id] = 'pending';
+                })
                 .then(function () {
+                    desenhar();
                     faltam--;
                     if (faltam > 0 || recarregou) return;
                     var todosProntos = ids.every(function (jobId) { return estados[jobId] === 'done'; });
@@ -143,11 +229,10 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                     recarregou = true;
                     var url = new URL(window.location.href);
                     url.searchParams.delete('jobs');
-                    window.setTimeout(function () { window.location.replace(url.toString()); }, 600);
+                    window.setTimeout(function () { window.location.replace(url.toString()); }, 800);
                 });
         });
     }
-    ids.forEach(function (id) { desenhar(id, { status: 'pending' }); });
     consultar();
     setInterval(consultar, 4000);
 })();
