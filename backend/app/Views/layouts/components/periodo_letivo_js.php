@@ -48,18 +48,19 @@ window.PeriodoLetivoUI = {
         var campo = info.rotulo_campo || 'Bimestre';
         (root || document).querySelectorAll('[data-periodo-label]').forEach(function (el) {
             var sufixo = el.getAttribute('data-periodo-label-suffix') || '';
-            var required = el.querySelector('span.text-red-500');
-            el.childNodes.forEach(function (n) {
-                if (n.nodeType === 3) {
-                    n.textContent = campo + (sufixo ? ' ' + sufixo : ' ');
+            var texto = campo + (sufixo ? ' ' + sufixo : '');
+            var required = null;
+            Array.prototype.forEach.call(el.children, function (child) {
+                if (!required && child.classList && child.classList.contains('text-red-500')) {
+                    required = child;
                 }
             });
-            if (!Array.prototype.some.call(el.childNodes, function (n) { return n.nodeType === 3 && String(n.textContent).trim() !== ''; })) {
-                el.insertBefore(document.createTextNode(campo + (sufixo ? ' ' + sufixo : ' ')), el.firstChild);
-            }
-            if (required && required.parentNode !== el) {
-                el.appendChild(required);
-            }
+            Array.prototype.slice.call(el.childNodes).forEach(function (n) {
+                if (n.nodeType === 3) {
+                    el.removeChild(n);
+                }
+            });
+            el.insertBefore(document.createTextNode(texto + ' '), required);
         });
     },
     ligar: function (anoInput, select) {

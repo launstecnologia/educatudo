@@ -1,6 +1,6 @@
 <?php
 $page_header_title = 'Tipos de Nota';
-$page_header_subtitle = 'Cadastre os tipos e como cada um fecha a nota final. O boletim só lê essa nota.';
+$page_header_subtitle = 'Cadastre todos os eventos avaliativos.';
 ob_start();
 ?>
 <a href="<?= URL ?>/admin/provas/tipos-avaliacao/criar"

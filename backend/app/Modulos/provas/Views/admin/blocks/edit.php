@@ -396,11 +396,11 @@ $chkLancProf = $isFmtLanc && $cfgNota === 'professor_por_questao';
                        class="mt-1 w-4 h-4 text-violet-600 border-gray-300 rounded focus:ring-violet-500">
                 <span class="ml-3">
                     <span class="block text-sm font-medium text-violet-900">Mesma nota em todas as matérias do evento</span>
-                    <span class="block text-xs text-violet-800 mt-1">Use para ENAC: ao lançar a nota do aluno em uma matéria, o sistema replica a mesma nota para as demais matérias do evento.</span>
+                    <span class="block text-xs text-violet-800 mt-1">Ao lançar a nota do aluno em uma matéria, a mesma nota vale para as demais matérias do evento.</span>
                 </span>
             </label>
             <p id="msgCoordenacaoLanca" class="text-xs text-violet-900 mt-2 hidden">
-                Coordenação lança notas: você pode usar nota única para aplicar a mesma nota do aluno em todas as matérias.
+                A nota lançada pela coordenação se repete nas outras matérias somente com esta opção marcada.
             </p>
         </div>
 
