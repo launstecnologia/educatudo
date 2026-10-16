@@ -36,5 +36,21 @@ class GeradorAvaliacoesAnualServiceTest extends TestCase
         $this->assertSame(3, GeradorAvaliacoesAnualService::bimestreDaDescricao('Provas do 3º bimestre', 1));
         $this->assertSame(4, GeradorAvaliacoesAnualService::bimestreDaDescricao('b4 final', 1));
         $this->assertSame(2, GeradorAvaliacoesAnualService::bimestreDaDescricao('sem pista', 2));
+        $this->assertSame(1, GeradorAvaliacoesAnualService::bimestreDaDescricao('1º trimestre', 3));
+        $this->assertSame(2, GeradorAvaliacoesAnualService::bimestreDaDescricao('2º semestre', 1));
+    }
+
+    public function testRecorteDoAnoLetivoFicaExplicito(): void
+    {
+        $eventos = [
+            ['descricao' => '1º trimestre', 'data_inicio' => '2026-01-10', 'data_fim' => '2026-04-20'],
+        ];
+        $periodos = GeradorAvaliacoesAnualService::periodosPrevistos(2026, $eventos, '2026-02-01', '2026-11-30');
+        $this->assertNotEmpty($periodos);
+        $this->assertTrue(!empty($periodos[0]['recortado']));
+        $this->assertSame('2026-02-01', $periodos[0]['inicio']);
+        $this->assertSame('2026-01-10', $periodos[0]['inicio_original']);
+        $avisos = GeradorAvaliacoesAnualService::avisosDeDatas($periodos, true, '2026-02-01', '2026-11-30', count($periodos));
+        $this->assertNotEmpty($avisos);
     }
 }

@@ -22,7 +22,7 @@ return [
     'menu' => [
         'admin' => [
             [
-                'label' => 'Modelo de Boletim',
+                'label' => 'Boletins',
                 'path' => '/admin/boletins',
                 'feature_key' => 'boletim',
             ],

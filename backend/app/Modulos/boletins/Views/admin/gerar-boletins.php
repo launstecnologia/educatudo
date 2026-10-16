@@ -182,6 +182,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
     </div>
 </div>
 
+<?php include \App\Core\ViewPaths::modulo('boletins/Views/partials/boletim_simulacao_contexto.php'); ?>
 <?php if (is_array($simulacao)): ?>
 <?php
 $matrizSim = $simulacao['matriz_materias'] ?? null;
@@ -267,7 +268,7 @@ $alunoSimNome = trim((string) ($simulacao['aluno']['nome'] ?? ''));
                     </select>
                 </div>
                 <button type="submit" class="btn-primary-custom w-full px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 shadow-sm">
-                    Ver simulação
+                    <?= !empty($simulacao_tem_vigente) ? 'Simular com as notas atuais' : 'Ver simulação' ?>
                 </button>
             </form>
         </section>

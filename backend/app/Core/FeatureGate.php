@@ -106,6 +106,10 @@ class FeatureGate
         if (LayoutHelper::isModuleEnabled($module)) {
             return null; // habilitado: permite acesso
         }
+        // Quadro de Notas explica na própria tela em vez de voltar ao Dashboard sem aviso.
+        if ($module === 'grupos_regras_notas') {
+            return null;
+        }
         // desabilitado, inativo ou bloqueado por TudiCoins: redireciona
 
         if (strpos($path, '/admin') === 0) {

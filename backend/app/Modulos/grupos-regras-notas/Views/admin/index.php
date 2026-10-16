@@ -2,21 +2,42 @@
 $itens = is_array($itens ?? null) ? $itens : [];
 $schemaPronto = !empty($schema_pronto);
 $csrf_token = $csrf_token ?? '';
+$podeCadastrar = !empty($pode_cadastrar);
+$retorno = (string) ($retorno ?? '');
+$acessoBloqueado = !empty($acesso_bloqueado);
+$urlNovo = URL . '/admin/quadros-notas/novo' . ($retorno !== '' ? '?retorno=' . rawurlencode($retorno) : '');
 
 $page_header_title = 'Quadro de Notas';
-$page_header_subtitle = 'Molde das notas: quantas semanas (4, 6…), colunas S1…SN e, se a escola separar matérias, blocos intercalados (A na S1, B na S2). As provas são criadas em Lançamento de Notas.';
+$page_header_subtitle = 'O quadro define as colunas usadas no lançamento de notas, como Prova, Trabalho e outras avaliações.';
 ob_start();
+if (!$acessoBloqueado && $podeCadastrar):
 ?>
-<a href="<?= URL ?>/admin/grupos-regras-notas/novo"
+<a href="<?= htmlspecialchars($urlNovo, ENT_QUOTES, 'UTF-8') ?>"
    class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
     <i class="fa-solid fa-plus mr-2"></i>
-    Novo quadro
+    Criar Quadro de Notas
 </a>
 <?php
+endif;
 $page_header_actions = ob_get_clean();
 include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
 include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 ?>
+
+<?php if ($acessoBloqueado): ?>
+<div class="rounded-xl border border-amber-200 bg-amber-50 p-6 text-amber-950">
+    <p class="font-semibold"><?= htmlspecialchars((string) ($acesso_titulo ?? 'Acesso indisponível.')) ?></p>
+    <p class="text-sm mt-2"><?= htmlspecialchars((string) ($acesso_detalhe ?? '')) ?></p>
+    <p class="text-sm mt-2">O quadro define as colunas usadas no lançamento de notas, como Prova, Trabalho e outras avaliações.</p>
+    <a href="<?= URL ?>/admin/academico" class="inline-flex mt-4 text-sm font-semibold underline">Voltar ao Acadêmico</a>
+</div>
+<?php return; endif; ?>
+
+<p class="text-sm text-gray-600 mb-4">O Lançamento de Notas é outra etapa: é nele que a nota é digitada e que aponta este quadro.</p>
+<?php if ($retorno !== ''): ?>
+<p class="text-sm text-gray-700 mb-4">Você veio de uma avaliação em andamento. Ao salvar o quadro, a volta leva para essa avaliação e não gera as notas dos alunos.</p>
+<p class="mb-4"><a href="<?= htmlspecialchars(URL . $retorno, ENT_QUOTES, 'UTF-8') ?>" class="text-sm font-semibold text-indigo-700 underline">Voltar à avaliação</a></p>
+<?php endif; ?>
 
 <?php if (!$schemaPronto): ?>
 <div class="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
@@ -42,8 +63,14 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                 <tr>
                     <td colspan="6" class="px-6 py-12 text-center text-gray-500">
                         <i class="fa-solid fa-layer-group text-4xl text-gray-300 mb-4"></i>
-                        <p>Nenhum quadro cadastrado</p>
-                        <p class="text-sm mt-1">Comece pelas colunas (S1, AV1…). Blocos de disciplinas são opcionais.</p>
+                        <p class="font-medium text-gray-700">Nenhum quadro cadastrado</p>
+                        <p class="text-sm mt-1">O quadro define as colunas usadas no lançamento de notas, como Prova, Trabalho e outras avaliações.</p>
+                        <?php if ($podeCadastrar): ?>
+                        <a href="<?= htmlspecialchars($urlNovo, ENT_QUOTES, 'UTF-8') ?>"
+                           class="btn-primary-custom inline-flex items-center px-4 py-2 mt-4 rounded-lg text-sm font-semibold">
+                            Criar Quadro de Notas
+                        </a>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php else: ?>

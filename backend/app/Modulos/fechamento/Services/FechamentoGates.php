@@ -11,9 +11,9 @@ class FechamentoGates
         return 'Selecione em qual modelo esta avaliação entra. Cadastre o modelo em Acadêmico → Modelo de Boletim.';
     }
 
-    public static function mensagemAvaliacaoSemQuadro(): string
+    public static function mensagemQuadroInvalido(): string
     {
-        return 'Selecione o Quadro de Notas antes de salvar a avaliação. O campo fica em Configurar Notas → Identidade. Se a lista estiver vazia, cadastre o molde em Acadêmico → Quadro de Notas.';
+        return 'O Quadro de Notas escolhido não existe nesta escola ou está inativo.';
     }
 
     /**
@@ -47,10 +47,8 @@ class FechamentoGates
             $bloqueios[] = 'Vincule uma Regra de Aprovação ao Modelo de Boletim antes do fechamento.';
         }
 
-        if ($quadroId <= 0) {
-            $bloqueios[] = 'Selecione o Quadro de Notas da avaliação antes de gerar.';
-        } elseif (!$quadroAtivo) {
-            $bloqueios[] = 'O Quadro de Notas vinculado está inválido ou inativo.';
+        if ($quadroId > 0 && !$quadroAtivo) {
+            $bloqueios[] = self::mensagemQuadroInvalido();
         }
 
         return [

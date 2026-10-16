@@ -24,7 +24,7 @@ $modOn = is_callable($modOn ?? null) ? $modOn : static function (string $key): b
 $academicoOpen = in_array($cur, [
     'academico', 'students', 'ano_letivo', 'calendario_letivo', 'componentes-curriculares',
     'agrupamentos-componentes', 'curso', 'cursos-series', 'grade_horaria', 'matriz-curricular',
-    'teachers', 'salas', 'serie', 'turmas', 'tipos_avaliacao', 'boletins', 'boletim_guia',
+    'teachers', 'salas', 'serie', 'turmas', 'tipos_avaliacao', 'boletins', 'boletim_guia', 'boletim_config', 'reports_boletim_coordenacao',
     'grupos-regras-notas', 'quadros-notas', 'regras-academicas', 'implantar-academico',
     'provas', 'provas_blocos',
 ], true);
@@ -37,6 +37,7 @@ $avaliacoesOpen = $rotinaOpen;
 $pedagogicoOpen = in_array($cur, [
     'pedagogico',
     'journeys', 'journeys_relatorio', 'essays_teacher', 'essays_teacher_report',
+    'relatorios', 'reports_boletim_coordenacao',
 ], true);
 $fechamentoOpen = in_array($cur, [
     'fechamento', 'homologacoes', 'documentos-periodo', 'resultados-finais', 'apoio-digitacao',
@@ -44,13 +45,19 @@ $fechamentoOpen = in_array($cur, [
 ], true);
 $secretariaNavOpen = in_array($cur, [
     'gestao_escolar', 'secretaria', 'censo_escolar', 'modelos_documentos',
-    'vida_escolar', 'vida_escolar_oficios', 'almoxarifado', 'patrimonio',
+    'vida_escolar', 'vida_escolar_oficios', 'almoxarifado', 'patrimonio', 'paineis_documentos',
 ], true) || $curMovimentacao;
 $paineisOpen = in_array($cur, [
     'paineis', 'dashboard', 'saude_academica', 'relatorios', 'reports_boletim_coordenacao', 'paineis_documentos',
 ], true);
 $gestaoOpen = $secretariaNavOpen;
 ?>
+<?php if ($secCan(['dashboard'])): ?>
+<a href="<?= $urlBase ?>/admin/dashboard" class="flex items-center px-4 py-3 <?= $cur === 'dashboard' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200">
+    <i class="fa-solid fa-gauge-high w-5 h-5 mr-3 flex-shrink-0"></i>
+    <span class="sidebar-text">Dashboard</span>
+</a>
+<?php endif; ?>
 <?php if ($secCan(['alunos', 'ano_letivo', 'curso', 'series', 'matriz_curricular', 'regras_academicas', 'agrupamentos_componentes', 'turmas', 'salas', 'professores', 'grade_horaria', 'materias', 'grupos_regras_notas', 'configuracao_boletim', 'provas_online'])): ?>
 <div class="menu-group">
     <div class="flex items-center rounded-xl <?= $cur === 'academico' ? 'bg-white/20' : '' ?>">
@@ -65,12 +72,6 @@ $gestaoOpen = $secretariaNavOpen;
         </button>
     </div>
     <div id="sec-academico-submenu" class="<?= $academicoOpen ? '' : 'hidden' ?> ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
-        <?php if ($secCan(['configuracao_boletim']) && $modOn('boletim')): ?>
-        <a href="<?= $urlBase ?>/admin/implantar-academico" class="<?= $linkCls($cur === 'implantar-academico') ?>">
-            <i class="fa-solid fa-list-check w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Implantar acadêmico</span>
-        </a>
-        <?php endif; ?>
         <?php $menu_subcab_titulo = 'Estrutura'; $menu_subcab_ordenar = true; $menu_subcab_id = 'estrutura'; $menu_subcab_aberto = !empty($estruturaNestedOpen); require __DIR__ . '/admin_sidebar_subcabecalho.php'; ?>
         <div id="estrutura-nested" class="<?= !empty($estruturaNestedOpen) ? '' : 'hidden' ?>">
         <div class="sidebar-sublista">
@@ -163,9 +164,9 @@ $gestaoOpen = $secretariaNavOpen;
         </a>
         <?php endif; ?>
         <?php if ($secCan(['configuracao_boletim']) && $modOn('boletim')): ?>
-        <a href="<?= $urlBase ?>/admin/boletins" class="<?= $linkCls($cur === 'boletins') ?>">
+        <a href="<?= $urlBase ?>/admin/boletins" class="<?= $linkCls(in_array($cur, ['boletins', 'boletim_config', 'boletim_guia', 'reports_boletim_coordenacao'], true)) ?>">
             <i class="fa-solid fa-file-circle-check w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Modelo de Boletim</span>
+            <span class="sidebar-text text-sm">Boletins</span>
         </a>
         <?php endif; ?>
         </div>
@@ -213,7 +214,7 @@ $gestaoOpen = $secretariaNavOpen;
 </div>
 <?php endif; ?>
 
-<?php if ($secCan(['redacao_professor', 'jornadas_aluno'])): ?>
+<?php if ($secCan(['redacao_professor', 'jornadas_aluno', 'relatorios_gerais'])): ?>
 <div class="menu-group">
     <div class="flex items-center rounded-xl <?= $cur === 'pedagogico' ? 'bg-white/20' : '' ?>">
         <a href="<?= $urlBase ?>/admin/pedagogico" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
@@ -238,6 +239,12 @@ $gestaoOpen = $secretariaNavOpen;
         <a href="<?= $urlBase ?>/admin/jornadas" class="<?= $linkCls(in_array($cur, ['journeys', 'journeys_relatorio'], true)) ?>">
             <i class="fa-solid fa-route w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Jornada do Aluno</span>
+        </a>
+        <?php endif; ?>
+        <?php if ($secCan(['relatorios_gerais'])): ?>
+        <a href="<?= $urlBase ?>/admin/relatorios" class="<?= $linkCls(in_array($cur, ['relatorios', 'reports_boletim_coordenacao'], true)) ?>">
+            <i class="fa-solid fa-chart-column w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Relatórios</span>
         </a>
         <?php endif; ?>
     </div>
@@ -277,7 +284,7 @@ $gestaoOpen = $secretariaNavOpen;
 </div>
 <?php endif; ?>
 
-<?php if ($secCan(['faltas', 'presenca', 'diario_classe', 'censo_escolar', 'modelos_documentos', 'transferencia', 'vida_escolar', 'almoxarifado', 'patrimonio'])): ?>
+<?php if ($secCan(['faltas', 'presenca', 'diario_classe', 'censo_escolar', 'modelos_documentos', 'transferencia', 'almoxarifado', 'patrimonio', 'declaracoes_aluno'])): ?>
 <div class="menu-group">
     <div class="flex items-center rounded-xl <?= in_array($cur, ['gestao_escolar', 'secretaria'], true) ? 'bg-white/20' : '' ?>">
         <a href="<?= $urlBase ?>/admin/gestao-escolar" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
@@ -297,12 +304,6 @@ $gestaoOpen = $secretariaNavOpen;
             <span class="sidebar-text text-sm">Movimentação de alunos</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['vida_escolar']) && $modOn('vida_escolar')): ?>
-        <a href="<?= $urlBase ?>/admin/vida-escolar" class="<?= $linkCls(in_array($cur, ['vida_escolar', 'vida_escolar_oficios'], true)) ?>">
-            <i class="fa-solid fa-scroll w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Vida Escolar</span>
-        </a>
-        <?php endif; ?>
         <?php if ($secCan(['modelos_documentos'])): ?>
         <a href="<?= $urlBase ?>/admin/modelos-documentos" class="<?= $linkCls($cur === 'modelos_documentos') ?>">
             <i class="fa-solid fa-file-contract w-4 h-4 mr-3 flex-shrink-0"></i>
@@ -315,72 +316,45 @@ $gestaoOpen = $secretariaNavOpen;
             <span class="sidebar-text text-sm">Censo Escolar</span>
         </a>
         <?php endif; ?>
-        <?php
-        $secAlmoxarifadoOk = $modOn('recursos_fisicos') && $secCan(['almoxarifado']) && class_exists('AdminSecretariaAccess') && \App\Core\AdminSecretariaAccess::requestPathIsAllowed('/admin/almoxarifado');
-        $secPatrimonioOk = $modOn('recursos_fisicos') && $secCan(['patrimonio']) && class_exists('AdminSecretariaAccess') && \App\Core\AdminSecretariaAccess::requestPathIsAllowed('/admin/patrimonio');
-        if ($secAlmoxarifadoOk || $secPatrimonioOk):
-        ?>
-        <?php $menu_subcab_titulo = 'Outros da escola'; $menu_subcab_periodo = ''; require __DIR__ . '/admin_sidebar_subcabecalho.php'; ?>
-        <button type="button" onclick="toggleNestedMenu('recursos-fisicos')" class="w-full flex items-center px-4 py-2 <?= !empty($recursosNestedOpen) ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 text-left">
-            <i class="fa-solid fa-boxes-stacked w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm flex-1">Recursos Físicos</span>
-            <svg id="recursos-fisicos-arrow" class="w-3 h-3 flex-shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-            </svg>
-        </button>
-        <div id="recursos-fisicos-nested" class="<?= !empty($recursosNestedOpen) ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
-            <?php if ($secAlmoxarifadoOk): ?>
-            <a href="<?= $urlBase ?>/admin/almoxarifado" class="<?= $linkCls($cur === 'almoxarifado') ?>">
-                <span class="sidebar-text text-sm">Almoxarifado</span>
-            </a>
-            <?php endif; ?>
-            <?php if ($secPatrimonioOk): ?>
-            <a href="<?= $urlBase ?>/admin/patrimonio" class="<?= $linkCls($cur === 'patrimonio') ?>">
-                <span class="sidebar-text text-sm">Patrimônio</span>
-            </a>
-            <?php endif; ?>
-        </div>
-        <?php endif; ?>
-    </div>
-</div>
-<?php endif; ?>
-
-<?php if ($secCan(['dashboard', 'saude_academica', 'relatorios_gerais', 'declaracoes_aluno'])): ?>
-<div class="menu-group">
-    <div class="flex items-center rounded-xl <?= $cur === 'paineis' ? 'bg-white/20' : '' ?>">
-        <a href="<?= $urlBase ?>/admin/paineis" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
-            <i class="fa-solid fa-chart-pie w-5 h-5 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text">Painéis</span>
-        </a>
-        <button type="button" onclick="toggleMenuGroup('sec-paineis')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
-            <svg id="sec-paineis-arrow" class="w-4 h-4 flex-shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-            </svg>
-        </button>
-    </div>
-    <div id="sec-paineis-submenu" class="<?= $paineisOpen ? '' : 'hidden' ?> ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
-        <?php if ($secCan(['dashboard'])): ?>
-        <a href="<?= $urlBase ?>/admin/dashboard" class="<?= $linkCls($cur === 'dashboard') ?>">
-            <i class="fa-solid fa-gauge-high w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Dashboard</span>
-        </a>
-        <?php endif; ?>
-        <?php if ($secCan(['saude_academica']) && $modOn('saude_academica') && class_exists('AdminSecretariaAccess') && \App\Core\AdminSecretariaAccess::requestPathIsAllowed('/admin/saude-academica')): ?>
-        <a href="<?= $urlBase ?>/admin/saude-academica" class="<?= $linkCls($cur === 'saude_academica') ?>">
-            <i class="fa-solid fa-heart-pulse w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Saúde Acadêmica</span>
-        </a>
-        <?php endif; ?>
         <?php if ($secCan(['declaracoes_aluno'])): ?>
         <a href="<?= $urlBase ?>/admin/paineis/documentos" class="<?= $linkCls($cur === 'paineis_documentos') ?>">
             <i class="fa-solid fa-file-lines w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Documentos</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['relatorios_gerais'])): ?>
-        <a href="<?= $urlBase ?>/admin/relatorios" class="<?= $linkCls(in_array($cur, ['relatorios', 'reports_boletim_coordenacao'], true)) ?>">
-            <i class="fa-solid fa-chart-column w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Relatórios</span>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php
+$secAlmoxarifadoOk = $modOn('recursos_fisicos') && $secCan(['almoxarifado']) && class_exists('AdminSecretariaAccess') && \App\Core\AdminSecretariaAccess::requestPathIsAllowed('/admin/almoxarifado');
+$secPatrimonioOk = $modOn('recursos_fisicos') && $secCan(['patrimonio']) && class_exists('AdminSecretariaAccess') && \App\Core\AdminSecretariaAccess::requestPathIsAllowed('/admin/patrimonio');
+if ($secAlmoxarifadoOk || $secPatrimonioOk):
+    $urlRecursosEscolares = $secAlmoxarifadoOk ? ($urlBase . '/admin/almoxarifado') : ($urlBase . '/admin/patrimonio');
+?>
+<div class="menu-group">
+    <div class="flex items-center rounded-xl <?= !empty($recursosEscolaresOpen) ? 'bg-white/20' : '' ?>">
+        <a href="<?= $urlRecursosEscolares ?>" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
+            <i class="fa-solid fa-boxes-stacked w-5 h-5 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text">Recursos</span>
+        </a>
+        <button type="button" onclick="toggleMenuGroup('recursos-escolares')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+            <svg id="recursos-escolares-arrow" class="w-4 h-4 flex-shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+        </button>
+    </div>
+    <div id="recursos-escolares-submenu" class="<?= !empty($recursosEscolaresOpen) ? '' : 'hidden' ?> ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
+        <?php if ($secAlmoxarifadoOk): ?>
+        <a href="<?= $urlBase ?>/admin/almoxarifado" class="<?= $linkCls($cur === 'almoxarifado') ?>">
+            <i class="fa-solid fa-box-open w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Almoxarifado</span>
+        </a>
+        <?php endif; ?>
+        <?php if ($secPatrimonioOk): ?>
+        <a href="<?= $urlBase ?>/admin/patrimonio" class="<?= $linkCls($cur === 'patrimonio') ?>">
+            <i class="fa-solid fa-barcode w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Patrimônio</span>
         </a>
         <?php endif; ?>
     </div>

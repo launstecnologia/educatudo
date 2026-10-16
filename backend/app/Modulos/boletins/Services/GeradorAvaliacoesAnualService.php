@@ -11,7 +11,9 @@ use App\Services\SchoolCalendarService;
 use Throwable;
 
 /**
- * Gera os 4 eventos de avaliação do ano a partir de um modelo, respeitando o calendário letivo.
+ * Cria as configurações de avaliação dos períodos do ano a partir de um modelo.
+ * A quantidade segue o regime do ano letivo. As datas vêm do calendário (tipo Avaliação)
+ * ou dos períodos padrão, limitados ao intervalo do ano letivo.
  */
 class GeradorAvaliacoesAnualService
 {
@@ -19,6 +21,9 @@ class GeradorAvaliacoesAnualService
     private BoletimConfig $boletimConfig;
     private SchoolCalendarService $calendario;
     private Database $db;
+
+    /** @var list<array<string,mixed>>|null */
+    private ?array $cacheEventosVigentes = null;
 
     public function __construct()
     {
@@ -149,7 +154,7 @@ class GeradorAvaliacoesAnualService
     public static function bimestreDaDescricao(string $descricao, int $fallback): int
     {
         $fallback = ($fallback >= 1 && $fallback <= 4) ? $fallback : 1;
-        if (preg_match('/\b([1-4])\s*[ºo]?\s*(bim|bimestre)\b/i', $descricao, $m)) {
+        if (preg_match('/\b([1-4])\s*[ºo]?\s*(bim(?:estre)?|tri(?:mestre)?|sem(?:estre)?)\b/iu', $descricao, $m)) {
             return (int) $m[1];
         }
         if (preg_match('/\bb([1-4])\b/i', $descricao, $m)) {
@@ -159,6 +164,80 @@ class GeradorAvaliacoesAnualService
             return (int) $m[1];
         }
         return $fallback;
+    }
+
+    public static function rotuloCampoMinusculo(int $ano, bool $plural = false): string
+    {
+        $info = PeriodoLetivo::doAno($ano > 0 ? $ano : (int) date('Y'));
+        $texto = $plural
+            ? (string) ($info['rotulo_campo_plural'] ?? 'Períodos')
+            : (string) ($info['rotulo_campo'] ?? 'Período');
+
+        return function_exists('mb_strtolower')
+            ? mb_strtolower($texto, 'UTF-8')
+            : strtolower($texto);
+    }
+
+    /**
+     * Orientações visíveis quando a origem das datas não cobre o regime ou o ano letivo recorta o intervalo.
+     *
+     * @param list<array<string,mixed>> $periodos
+     * @return list<string>
+     */
+    public static function avisosDeDatas(
+        array $periodos,
+        bool $usouCalendario,
+        ?string $anoInicio,
+        ?string $anoFim,
+        int $quantidadeRegime
+    ): array {
+        $avisos = [];
+        $qtdTabela = count($periodos);
+        if ($quantidadeRegime > 0 && $qtdTabela > 0 && $qtdTabela !== $quantidadeRegime) {
+            $avisos[] = 'A tabela tem ' . $qtdTabela . ' períodos e o ano letivo está dividido em '
+                . $quantidadeRegime . '. Confira o tipo de período em Ano Letivo.';
+        }
+        $temPadrao = false;
+        $temCalendario = false;
+        $recortados = [];
+        $colapsados = [];
+        foreach ($periodos as $periodo) {
+            if (!is_array($periodo)) {
+                continue;
+            }
+            $origem = (string) ($periodo['origem'] ?? '');
+            if ($origem === 'padrao') {
+                $temPadrao = true;
+            }
+            if ($origem === 'calendario') {
+                $temCalendario = true;
+            }
+            if (!empty($periodo['recortado'])) {
+                $nome = trim((string) ($periodo['nome'] ?? 'Período'));
+                $recortados[] = $nome;
+                if ((string) ($periodo['inicio'] ?? '') !== '' && (string) ($periodo['inicio'] ?? '') === (string) ($periodo['fim'] ?? '')) {
+                    $colapsados[] = $nome;
+                }
+            }
+        }
+        if (!$usouCalendario || ($temPadrao && !$temCalendario)) {
+            $avisos[] = 'O calendário letivo não tem eventos do tipo Avaliação para estes períodos. As datas são os períodos padrão do regime'
+                . self::textoLimiteAno($anoInicio, $anoFim)
+                . '. O calendário não foi alterado.';
+        } elseif ($temPadrao && $temCalendario) {
+            $avisos[] = 'O calendário letivo não cobre todos os períodos. Os marcados como Padrão usam as datas padrão do regime. O calendário não foi alterado.';
+        }
+        if ($recortados !== []) {
+            $avisos[] = 'As datas de ' . self::listaNomes($recortados) . ' foram limitadas ao ano letivo'
+                . self::textoLimiteAno($anoInicio, $anoFim)
+                . '. O calendário letivo permanece como está.';
+        }
+        if ($colapsados !== []) {
+            $verbo = count($colapsados) === 1 ? ' ficou' : ' ficaram';
+            $avisos[] = self::listaNomes($colapsados) . $verbo . ' com a mesma data de início e de fim depois desse limite. Confira as datas do ano letivo e os eventos de Avaliação no calendário.';
+        }
+
+        return $avisos;
     }
 
     /**
@@ -182,12 +261,23 @@ class GeradorAvaliacoesAnualService
         $eventos = $this->eventosAvaliacaoDoAno($ano, $seriesBoletim);
         $periodos = self::periodosPrevistos($ano, $eventos, $datasAno['inicio'], $datasAno['fim']);
         $existentes = $this->boletimConfig->fontesBimestresDoBoletim($boletimId);
+        $idsExistentes = [];
         foreach ($periodos as &$p) {
             $bim = (int) $p['bimestre'];
             $p['regra_id'] = (int) ($existentes[$bim] ?? 0);
             $p['ja_existe'] = $p['regra_id'] > 0;
+            if ($p['regra_id'] > 0) {
+                $idsExistentes[$p['regra_id']] = $p['regra_id'];
+            }
         }
         unset($p);
+        $qtdGerados = $this->contarBoletinsGeradosPorRegra(array_values($idsExistentes));
+        foreach ($periodos as &$p) {
+            $rid = (int) ($p['regra_id'] ?? 0);
+            $p['boletins_gerados'] = (int) ($qtdGerados[$rid] ?? 0);
+        }
+        unset($p);
+        $regime = PeriodoLetivo::doAno($ano);
 
         return [
             'ok' => true,
@@ -197,7 +287,61 @@ class GeradorAvaliacoesAnualService
             'eventos_existentes' => $existentes,
             'datas_ano' => $datasAno,
             'usou_calendario' => $eventos !== [],
+            'regime' => $regime,
+            'avisos_datas' => self::avisosDeDatas(
+                $periodos,
+                $eventos !== [],
+                $datasAno['inicio'],
+                $datasAno['fim'],
+                (int) ($regime['quantidade'] ?? 0)
+            ),
         ];
+    }
+
+    /**
+     * Há evento que pode ser copiado para os demais períodos: ligado a este modelo
+     * ou com boletins vigentes do mesmo ano e da mesma série.
+     *
+     * @param list<int> $seriesIds
+     */
+    public function temEventoUtilizavel(int $boletimId, int $anoLetivo, array $seriesIds, bool $temVinculado): bool
+    {
+        if ($boletimId <= 0) {
+            return false;
+        }
+        if ($temVinculado) {
+            return true;
+        }
+        $ano = $anoLetivo > 0 ? $anoLetivo : (int) date('Y');
+        $series = [];
+        foreach ($seriesIds as $sid) {
+            $id = (int) $sid;
+            if ($id > 0) {
+                $series[$id] = $id;
+            }
+        }
+        $series = array_values($series);
+        foreach ($this->linhasEventosVigentes() as $ev) {
+            if (!is_array($ev)) {
+                continue;
+            }
+            $rid = (int) ($ev['id'] ?? 0);
+            if ($rid <= 0) {
+                continue;
+            }
+            $anoEv = (int) ($ev['ano_letivo'] ?? 0);
+            if ($ano > 0 && $anoEv > 0 && $anoEv !== $ano) {
+                continue;
+            }
+            $seriesEv = $this->parseIdsJson($ev['series_ids'] ?? '');
+            if ($series !== [] && $seriesEv !== [] && count(array_intersect($series, $seriesEv)) === 0) {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -232,30 +376,7 @@ class GeradorAvaliacoesAnualService
             $porId[$rid]['_origem'] = 'boletim';
         }
 
-        // Eventos com geração vigente (mesmo critério da coordenação).
-        try {
-            $temBoletimCol = (bool) $this->db->fetch("SHOW COLUMNS FROM boletim_regras LIKE 'boletim_id'");
-            $selBoletim = $temBoletimCol ? 'r.boletim_id' : 'NULL AS boletim_id';
-            $groupBoletim = $temBoletimCol ? ', r.boletim_id' : '';
-            $temVigente = (bool) $this->db->fetch(
-                "SHOW COLUMNS FROM boletim_resultados_gerados LIKE 'vigente'"
-            );
-            $filtroVigente = $temVigente ? ' AND g.vigente = 1' : '';
-            $rowsGerados = $this->db->fetchAll(
-                "SELECT r.id, r.nome, r.codigo, r.bimestre, r.ano_letivo, r.series_ids, {$selBoletim},
-                        r.default_data_inicio, r.default_data_fim,
-                        MAX(g.updated_at) AS gerado_em
-                 FROM boletim_resultados_gerados g
-                 INNER JOIN boletim_regras r ON r.id = g.regra_id
-                 WHERE g.preview = 0 AND r.ativo = 1 AND r.exibir_em = 'notas'{$filtroVigente}
-                 GROUP BY r.id, r.nome, r.codigo, r.bimestre, r.ano_letivo, r.series_ids{$groupBoletim},
-                          r.default_data_inicio, r.default_data_fim
-                 ORDER BY gerado_em DESC"
-            ) ?: [];
-        } catch (Throwable $e) {
-            error_log('[GeradorAvaliacoesAnual] listarEventosModelo vigentes: ' . $e->getMessage());
-            $rowsGerados = [];
-        }
+        $rowsGerados = $this->linhasEventosVigentes();
 
         foreach ($rowsGerados as $ev) {
             if (!is_array($ev)) {
@@ -454,7 +575,9 @@ class GeradorAvaliacoesAnualService
             }
         }
         if ($idsPermitidos === []) {
-            return ['success' => false, 'error' => 'Escolha um evento modelo para duplicar (crie a primeira avaliação do modelo).'];
+            $rotulo = self::rotuloCampoMinusculo($anoLetivo > 0 ? $anoLetivo : (int) date('Y'));
+
+            return ['success' => false, 'error' => 'Configure o primeiro ' . $rotulo . ' antes de criar os demais períodos.'];
         }
 
         $filtroBim = null;
@@ -467,7 +590,9 @@ class GeradorAvaliacoesAnualService
                 }
             }
             if ($filtroBim === []) {
-                return ['success' => false, 'error' => 'Marque ao menos um bimestre para gerar.'];
+                $rotulo = self::rotuloCampoMinusculo($anoLetivo > 0 ? $anoLetivo : (int) date('Y'));
+
+                return ['success' => false, 'error' => 'Marque ao menos um ' . $rotulo . ' para criar.'];
             }
         }
 
@@ -507,7 +632,7 @@ class GeradorAvaliacoesAnualService
             if ($modeloRegraId <= 0 || !isset($idsPermitidos[$modeloRegraId])) {
                 return [
                     'success' => false,
-                    'error' => 'Escolha um evento modelo válido para o ' . self::nomeBimestre($bim, $ano) . '.',
+                    'error' => 'Escolha a configuração de origem do ' . self::nomeBimestre($bim, $ano) . '.',
                 ];
             }
             $modelo = $this->boletimConfig->getRuleById($modeloRegraId);
@@ -563,7 +688,7 @@ class GeradorAvaliacoesAnualService
             return ['success' => false, 'error' => 'Nenhum período para gerar.'];
         }
         if ($criados === [] && $substituidos === [] && $pulados !== [] && $ignorados === []) {
-            return ['success' => false, 'error' => 'Marque ao menos um bimestre para gerar.'];
+            return ['success' => false, 'error' => 'Marque ao menos um ' . self::rotuloCampoMinusculo($ano) . ' para criar.'];
         }
 
         return [
@@ -666,8 +791,10 @@ class GeradorAvaliacoesAnualService
      */
     private static function clipPeriodo(array $periodo, ?string $anoInicio, ?string $anoFim): array
     {
-        $inicio = $periodo['inicio'];
-        $fim = $periodo['fim'];
+        $inicioOriginal = (string) $periodo['inicio'];
+        $fimOriginal = (string) $periodo['fim'];
+        $inicio = $inicioOriginal;
+        $fim = $fimOriginal;
         if ($anoInicio !== null && $anoInicio !== '' && $inicio < $anoInicio) {
             $inicio = $anoInicio;
         }
@@ -679,7 +806,147 @@ class GeradorAvaliacoesAnualService
         }
         $periodo['inicio'] = $inicio;
         $periodo['fim'] = $fim;
+        $periodo['recortado'] = ($inicio !== $inicioOriginal || $fim !== $fimOriginal);
+        if ($periodo['recortado']) {
+            $periodo['inicio_original'] = $inicioOriginal;
+            $periodo['fim_original'] = $fimOriginal;
+        }
+
         return $periodo;
+    }
+
+    private static function textoLimiteAno(?string $anoInicio, ?string $anoFim): string
+    {
+        $ini = self::soData((string) $anoInicio);
+        $fim = self::soData((string) $anoFim);
+        if ($ini === '' && $fim === '') {
+            return '';
+        }
+        if ($ini !== '' && $fim !== '') {
+            return ' (' . self::dataBr($ini) . ' a ' . self::dataBr($fim) . ')';
+        }
+        if ($ini !== '') {
+            return ' (a partir de ' . self::dataBr($ini) . ')';
+        }
+
+        return ' (até ' . self::dataBr($fim) . ')';
+    }
+
+    /**
+     * @param list<string> $nomes
+     */
+    private static function listaNomes(array $nomes): string
+    {
+        $nomes = array_values(array_unique(array_filter(array_map('strval', $nomes), static fn ($n) => $n !== '')));
+        $qtd = count($nomes);
+        if ($qtd === 0) {
+            return 'alguns períodos';
+        }
+        if ($qtd === 1) {
+            return $nomes[0];
+        }
+        $ultimo = array_pop($nomes);
+
+        return implode(', ', $nomes) . ' e ' . $ultimo;
+    }
+
+    private static function dataBr(string $ymd): string
+    {
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $ymd, $m)) {
+            return $ymd;
+        }
+
+        return $m[3] . '/' . $m[2] . '/' . $m[1];
+    }
+
+    /**
+     * @param list<int> $regraIds
+     * @return array<int,int> regra_id => quantidade de boletins gravados
+     */
+    private function contarBoletinsGeradosPorRegra(array $regraIds): array
+    {
+        $ids = [];
+        foreach ($regraIds as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $ids[$id] = $id;
+            }
+        }
+        $ids = array_values($ids);
+        if ($ids === []) {
+            return [];
+        }
+        try {
+            if (!$this->db->fetch("SHOW TABLES LIKE 'boletim_resultados_gerados'")) {
+                return [];
+            }
+            $params = [];
+            $holders = [];
+            foreach ($ids as $i => $id) {
+                $chave = 'r' . $i;
+                $holders[] = ':' . $chave;
+                $params[$chave] = $id;
+            }
+            $rows = $this->db->fetchAll(
+                'SELECT regra_id, COUNT(*) AS qtd
+                 FROM boletim_resultados_gerados
+                 WHERE preview = 0 AND regra_id IN (' . implode(', ', $holders) . ')
+                 GROUP BY regra_id',
+                $params
+            ) ?: [];
+        } catch (Throwable $e) {
+            error_log('[GeradorAvaliacoesAnual] contar boletins gerados: ' . $e->getMessage());
+
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $rid = (int) ($row['regra_id'] ?? 0);
+            if ($rid > 0) {
+                $out[$rid] = (int) ($row['qtd'] ?? 0);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    private function linhasEventosVigentes(): array
+    {
+        if ($this->cacheEventosVigentes !== null) {
+            return $this->cacheEventosVigentes;
+        }
+        try {
+            $temBoletimCol = (bool) $this->db->fetch("SHOW COLUMNS FROM boletim_regras LIKE 'boletim_id'");
+            $selBoletim = $temBoletimCol ? 'r.boletim_id' : 'NULL AS boletim_id';
+            $groupBoletim = $temBoletimCol ? ', r.boletim_id' : '';
+            $temVigente = (bool) $this->db->fetch(
+                "SHOW COLUMNS FROM boletim_resultados_gerados LIKE 'vigente'"
+            );
+            $filtroVigente = $temVigente ? ' AND g.vigente = 1' : '';
+            $rows = $this->db->fetchAll(
+                "SELECT r.id, r.nome, r.codigo, r.bimestre, r.ano_letivo, r.series_ids, {$selBoletim},
+                        r.default_data_inicio, r.default_data_fim,
+                        MAX(g.updated_at) AS gerado_em
+                 FROM boletim_resultados_gerados g
+                 INNER JOIN boletim_regras r ON r.id = g.regra_id
+                 WHERE g.preview = 0 AND r.ativo = 1 AND r.exibir_em = 'notas'{$filtroVigente}
+                 GROUP BY r.id, r.nome, r.codigo, r.bimestre, r.ano_letivo, r.series_ids{$groupBoletim},
+                          r.default_data_inicio, r.default_data_fim
+                 ORDER BY gerado_em DESC"
+            ) ?: [];
+        } catch (Throwable $e) {
+            error_log('[GeradorAvaliacoesAnual] listarEventosModelo vigentes: ' . $e->getMessage());
+            $rows = [];
+        }
+        $this->cacheEventosVigentes = is_array($rows) ? $rows : [];
+
+        return $this->cacheEventosVigentes;
     }
 
     private static function soData(string $valor): string

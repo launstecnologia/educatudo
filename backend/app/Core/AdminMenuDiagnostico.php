@@ -25,7 +25,7 @@ class AdminMenuDiagnostico
             ['grupo' => 'Acadêmico · Como avalia', 'label' => 'Tipos de Nota', 'path' => '/admin/provas/tipos-avaliacao', 'permissao' => 'provas_online', 'feature' => 'professor_provas', 'secretaria' => true],
             ['grupo' => 'Acadêmico · Como avalia', 'label' => 'Quadro de Notas', 'path' => '/admin/quadros-notas', 'permissao' => 'grupos_regras_notas', 'feature' => 'grupos_regras_notas', 'secretaria' => true],
             ['grupo' => 'Acadêmico · Como avalia', 'label' => 'Lançamento de Notas', 'path' => '/admin/provas', 'permissao' => 'provas_online', 'feature' => 'professor_provas', 'secretaria' => true],
-            ['grupo' => 'Acadêmico · Como avalia', 'label' => 'Modelo de Boletim', 'path' => '/admin/boletins', 'permissao' => 'configuracao_boletim', 'feature' => 'boletim', 'secretaria' => true],
+            ['grupo' => 'Acadêmico · Como avalia', 'label' => 'Boletins', 'path' => '/admin/boletins', 'permissao' => 'configuracao_boletim', 'feature' => 'boletim', 'secretaria' => true],
             ['grupo' => 'Rotina', 'label' => 'Diário de Classe', 'path' => '/admin/diario', 'permissao' => 'diario_classe', 'feature' => 'diario_classe', 'secretaria' => true],
             ['grupo' => 'Rotina', 'label' => 'Frequência', 'path' => '/admin/frequencia', 'permissao' => 'faltas', 'feature' => 'faltas', 'secretaria' => true],
             ['grupo' => 'Fechamento', 'label' => 'Painel de Fechamento', 'path' => '/admin/fechamento', 'permissao' => 'resultados_finais', 'feature' => 'resultados_finais', 'secretaria' => true],
@@ -33,7 +33,6 @@ class AdminMenuDiagnostico
             ['grupo' => 'Fechamento', 'label' => 'Resultados Finais', 'path' => '/admin/resultados-finais', 'permissao' => 'resultados_finais', 'feature' => 'resultados_finais', 'secretaria' => true],
             ['grupo' => 'Secretaria', 'label' => 'Layout de Documentos', 'path' => '/admin/modelos-documentos', 'permissao' => 'modelos_documentos', 'feature' => null, 'secretaria' => true],
             ['grupo' => 'Painéis', 'label' => 'Relatórios', 'path' => '/admin/relatorios', 'permissao' => 'relatorios_gerais', 'feature' => null, 'secretaria' => true],
-            ['grupo' => 'Acadêmico', 'label' => 'Implantar acadêmico', 'path' => '/admin/implantar-academico', 'permissao' => 'configuracao_boletim', 'feature' => 'boletim', 'secretaria' => true],
         ];
     }
 

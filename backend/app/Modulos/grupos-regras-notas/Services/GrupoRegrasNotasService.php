@@ -929,8 +929,10 @@ class GrupoRegrasNotasService
                     return $completo;
                 }
             } catch (Throwable $e) {
-                return $this->primeiroQuadroAtivo();
+                return null;
             }
+
+            return null;
         }
 
         return $this->primeiroQuadroAtivo();

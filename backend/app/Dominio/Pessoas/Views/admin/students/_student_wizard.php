@@ -375,14 +375,16 @@ $etapasWizard = [
                                 <span class="ml-2 text-sm text-gray-700">Aluno ativo</span>
                             </label>
                         </div>
+                        <?php if ($modoEdicao): ?>
                         <div>
                             <label class="flex items-center">
-                                <input type="checkbox" name="pagante" value="1" <?= !$modoEdicao || !isset($student['pagante']) || !empty($student['pagante']) ? 'checked' : '' ?>
+                                <input type="checkbox" name="pagante" value="1" <?= !isset($student['pagante']) || !empty($student['pagante']) ? 'checked' : '' ?>
                                        class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
                                 <span class="ml-2 text-sm text-gray-700">Aluno pagante</span>
                             </label>
                             <p class="ml-6 text-xs text-gray-500 mt-1">Indica se a escola paga por este aluno</p>
                         </div>
+                        <?php endif; ?>
                         <?php if ($modoEdicao): ?>
                         <div class="pt-2 border-t border-gray-200">
                             <input type="hidden" name="primeiro_acesso" value="1">
@@ -627,7 +629,7 @@ $etapasWizard = [
         var pagante = form.querySelector('input[type="checkbox"][name="pagante"]');
         var acesso = form.querySelector('input[type="checkbox"][name="primeiro_acesso"]');
         if (ativo) partes.push(ativo.checked ? 'Ativo' : 'Inativo');
-        if (pagante) partes.push(pagante.checked ? 'Pagante' : 'Não pagante');
+        if (modoEdicao && pagante) partes.push(pagante.checked ? 'Pagante' : 'Não pagante');
         if (acesso) partes.push(acesso.checked ? 'Já acessou' : 'Primeiro acesso pendente');
         return partes.join(' · ') || '—';
     }

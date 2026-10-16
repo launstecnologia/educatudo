@@ -1437,8 +1437,9 @@ class StudentAdminController extends AdminBaseController
                 throw new \Exception('Apelido (nickname) já está em uso por outro aluno');
             }
             
-            // Cria aluno usando o modelo
-            $pagante = !empty($_POST['pagante']) ? 1 : 0;
+            // Cria aluno usando o modelo. Todo aluno novo é pagante:
+            // a ausência do campo, ou um valor falso na requisição, não altera isso.
+            $pagante = 1;
             $sexo = $this->normalizarSexoAluno($_POST['sexo'] ?? null);
             $createPayload = [
                 'nome' => $nome,
@@ -2633,6 +2634,21 @@ class StudentAdminController extends AdminBaseController
         return StudentFormHelper::extractDocumentoEnderecoFromPost($_POST);
     }
 
+    private function colunaAlunoPaganteExiste(): bool
+    {
+        static $cache = null;
+        if ($cache !== null) {
+            return $cache;
+        }
+        $row = $this->db->fetch(
+            "SELECT COUNT(*) AS total FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'alunos' AND COLUMN_NAME = 'pagante'"
+        );
+        $cache = !empty($row['total']);
+
+        return $cache;
+    }
+
     private function colunaAlunoStatusExiste(): bool
     {
         static $cache = null;
@@ -3042,9 +3058,14 @@ class StudentAdminController extends AdminBaseController
                 // Criar aluno
                 $senhaHash = password_hash('123456', PASSWORD_DEFAULT);
                 
+                $colunasInsert = 'nome, email, ra, password, serie, turma_id, ativo, created_at';
+                $valoresInsert = ':nome, :email, :ra, :senha, :serie, :turma_id, 1, NOW()';
+                if ($this->colunaAlunoPaganteExiste()) {
+                    $colunasInsert = 'nome, email, ra, password, serie, turma_id, ativo, pagante, created_at';
+                    $valoresInsert = ':nome, :email, :ra, :senha, :serie, :turma_id, 1, 1, NOW()';
+                }
                 $this->db->query(
-                    "INSERT INTO alunos (nome, email, ra, password, serie, turma_id, ativo, created_at) 
-                     VALUES (:nome, :email, :ra, :senha, :serie, :turma_id, 1, NOW())",
+                    "INSERT INTO alunos ({$colunasInsert}) VALUES ({$valoresInsert})",
                     [
                         'nome' => $nome,
                         'email' => $email ?: null,

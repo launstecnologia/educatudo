@@ -437,6 +437,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
 
 <?php if ($somenteTabela): ?>
     <div class="p-3">
+        <?php include \App\Core\ViewPaths::modulo('boletins/Views/partials/boletim_simulacao_contexto.php'); ?>
         <?php if (is_array($simulacao)): ?>
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div class="px-4 py-3 border-b border-gray-200">
@@ -573,27 +574,76 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                 $nomesSeriesCab[] = $cursoSerieCab !== '' ? ($nomeSerieCab . ' - ' . $cursoSerieCab) : $nomeSerieCab;
             }
             $rotuloSeriesCab = $nomesSeriesCab !== [] ? implode(', ', $nomesSeriesCab) : 'Todas';
+            $idsTurmasCab = [];
+            foreach ($turmasSelecionadasRegra as $tidCab) {
+                $tidCab = (int) $tidCab;
+                if ($tidCab > 0) {
+                    $idsTurmasCab[$tidCab] = true;
+                }
+            }
+            if ($idsTurmasCab === []) {
+                foreach ($boletinsCadastro as $bolTurmasCab) {
+                    if ((int) ($bolTurmasCab['id'] ?? 0) !== $boletimIdSelecionado) {
+                        continue;
+                    }
+                    foreach ((array) ($bolTurmasCab['turmas_ids'] ?? []) as $tidBolCab) {
+                        $tidBolCab = (int) $tidBolCab;
+                        if ($tidBolCab > 0) {
+                            $idsTurmasCab[$tidBolCab] = true;
+                        }
+                    }
+                    break;
+                }
+            }
+            $nomesTurmasCab = [];
+            foreach ($turmas as $turmaCab) {
+                $tidNomeCab = (int) ($turmaCab['id'] ?? 0);
+                if ($tidNomeCab <= 0 || !isset($idsTurmasCab[$tidNomeCab])) {
+                    continue;
+                }
+                $nomeTurmaCab = trim((string) ($turmaCab['nome'] ?? ''));
+                $nomesTurmasCab[] = $nomeTurmaCab !== '' ? $nomeTurmaCab : ('Turma #' . $tidNomeCab);
+            }
+            $campoPeriodoCab = 'Período';
+            if ($anoCab > 0) {
+                $campoPeriodoCab = (string) (\App\Core\PeriodoLetivo::doAno($anoCab)['rotulo_campo'] ?? 'Período');
+            }
             ?>
-            <dl class="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+            <p class="mt-3 text-base font-semibold text-gray-900">
+                <?= $nomeBoletimVinculado !== '' ? htmlspecialchars($nomeBoletimVinculado) : 'Modelo não vinculado' ?>
+                <span class="text-gray-400 font-normal">·</span>
+                <?= $anoCab > 0 ? (int) $anoCab : 'Ano não informado' ?>
+                <span class="text-gray-400 font-normal">·</span>
+                <?= htmlspecialchars($rotuloBimCab !== '' ? $rotuloBimCab : 'Período não informado') ?>
+            </p>
+            <dl class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
                 <div>
-                    <dt class="text-gray-500">Detalhe</dt>
-                    <dd class="text-gray-900"><?= $detalheCab !== '' ? htmlspecialchars($detalheCab) : '—' ?></dd>
-                </div>
-                <div>
-                    <dt class="text-gray-500">Bimestre</dt>
-                    <dd class="text-gray-900"><?= htmlspecialchars($rotuloBimCab) ?></dd>
+                    <dt class="text-gray-500">Modelo</dt>
+                    <dd class="font-medium text-gray-900"><?= $nomeBoletimVinculado !== '' ? htmlspecialchars($nomeBoletimVinculado) : '—' ?></dd>
                 </div>
                 <div>
                     <dt class="text-gray-500">Ano</dt>
-                    <dd class="text-gray-900"><?= $anoCab > 0 ? $anoCab : '—' ?></dd>
+                    <dd class="font-medium text-gray-900"><?= $anoCab > 0 ? (int) $anoCab : '—' ?></dd>
                 </div>
+                <div>
+                    <dt class="text-gray-500"><?= htmlspecialchars($campoPeriodoCab) ?></dt>
+                    <dd class="font-medium text-gray-900"><?= htmlspecialchars($rotuloBimCab !== '' ? $rotuloBimCab : '—') ?></dd>
+                </div>
+                <?php if ($nomesTurmasCab !== []): ?>
+                <div>
+                    <dt class="text-gray-500">Turmas</dt>
+                    <dd class="font-medium text-gray-900"><?= htmlspecialchars(implode(', ', $nomesTurmasCab)) ?></dd>
+                </div>
+                <?php endif; ?>
+                <?php if ($detalheCab !== ''): ?>
+                <div>
+                    <dt class="text-gray-500">Detalhe</dt>
+                    <dd class="text-gray-900"><?= htmlspecialchars($detalheCab) ?></dd>
+                </div>
+                <?php endif; ?>
                 <div>
                     <dt class="text-gray-500">Série</dt>
                     <dd class="text-gray-900"><?= htmlspecialchars($rotuloSeriesCab) ?></dd>
-                </div>
-                <div>
-                    <dt class="text-gray-500">Boletim vinculado</dt>
-                    <dd class="text-gray-900"><?= $nomeBoletimVinculado !== '' ? htmlspecialchars($nomeBoletimVinculado) : '—' ?></dd>
                 </div>
             </dl>
             <?php elseif (trim((string) ($regra['nome'] ?? '')) !== ''): ?>
@@ -601,24 +651,96 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
             <?php endif; ?>
             <p class="text-sm text-gray-500 mt-2">As fórmulas ficam em Configurar Notas. Depois gere o período em lote.</p>
         </div>
-        <div class="flex items-center gap-2">
-            <a href="<?= URL ?>/admin/boletim-configuracao/assistente<?= $selectedRegraId > 0 ? '?regra_id=' . $selectedRegraId : '' ?>"
-               class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium shrink-0">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-                Configurar Notas
-            </a>
-            <a href="<?= URL ?>/admin/<?= $modoArquivo ? 'boletim/arquivo' : 'boletim' ?>"
-               class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-medium shrink-0">
-                <i class="fa-solid fa-arrow-left"></i>
-                <?= $modoArquivo ? 'Arquivo de fórmulas' : 'Todos os eventos' ?>
-            </a>
-            <a href="<?= URL ?>/admin/boletim-configuracao/gerados"
-               class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-6m4 6V7m4 10v-4M3 5h18v14H3V5z" />
-                </svg>
-                Boletins Gerados
-            </a>
+        <?php
+        $anoAcaoPeriodo = (int) ($regra['ano_letivo'] ?? 0);
+        $bimAcaoPeriodo = (int) ($regra['bimestre'] ?? 0);
+        $queryConfigurarNotas = ['voltar' => 'boletins'];
+        if ($selectedRegraId > 0) {
+            $queryConfigurarNotas['regra_id'] = $selectedRegraId;
+        }
+        if ($boletimIdSelecionado > 0) {
+            $queryConfigurarNotas['boletim_id'] = $boletimIdSelecionado;
+        }
+        if ($anoAcaoPeriodo > 0) {
+            $queryConfigurarNotas['ano_letivo'] = $anoAcaoPeriodo;
+        }
+        if ($bimAcaoPeriodo > 0) {
+            $queryConfigurarNotas['bimestre'] = $bimAcaoPeriodo;
+        }
+        $urlConfigurarNotas = URL . '/admin/boletim-configuracao/assistente?' . http_build_query($queryConfigurarNotas);
+        $urlVoltarModelo = URL . '/admin/boletins';
+        $urlAdicionarPeriodosPagina = $boletimIdSelecionado > 0
+            ? (URL . '/admin/boletins/' . $boletimIdSelecionado . '/gerar-avaliacoes' . ($anoAcaoPeriodo > 0 ? ('?ano_letivo=' . $anoAcaoPeriodo) : ''))
+            : '';
+        $gatesGeracaoPagina = is_array($gates_geracao ?? null) ? $gates_geracao : [];
+        $bloqueiosGeracao = is_array($gatesGeracaoPagina['bloqueios'] ?? null) ? $gatesGeracaoPagina['bloqueios'] : [];
+        $temFormulaPeriodo = is_array($componentes) && $componentes !== [];
+        ?>
+        <div class="flex flex-col items-stretch sm:items-end gap-2 min-w-0">
+            <div class="flex flex-wrap items-center justify-end gap-2">
+                <a href="<?= htmlspecialchars($urlConfigurarNotas, ENT_QUOTES, 'UTF-8') ?>"
+                   class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium">
+                    <i class="fa-solid fa-sliders"></i>
+                    Configurar notas
+                </a>
+                <button type="button" id="btn-abrir-conferir-boletim"
+                        class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    <i class="fa-solid fa-flask mr-2"></i>Simular boletim
+                </button>
+                <?php if ($geracaoEmAndamento): ?>
+                <a href="<?= URL ?>/admin/boletim"
+                   class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    Ver status
+                </a>
+                <?php else: ?>
+                <button type="submit" form="form-gerar-lote-boletim"
+                        class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
+                    Gerar boletins
+                </button>
+                <?php endif; ?>
+            </div>
+            <?php if (!$temFormulaPeriodo && $selectedRegraId > 0): ?>
+            <p class="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 max-w-xl text-left">
+                A fórmula deste período ainda não foi salva.
+                <a href="<?= htmlspecialchars($urlConfigurarNotas, ENT_QUOTES, 'UTF-8') ?>" class="font-semibold underline">Configurar notas</a>
+                antes de simular ou gerar. A geração continua exigindo um modelo de boletim.
+            </p>
+            <?php endif; ?>
+            <?php if ($bloqueiosGeracao !== []): ?>
+            <ul class="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 max-w-xl text-left space-y-1">
+                <?php foreach ($bloqueiosGeracao as $bloqueioGeracao): ?>
+                <li>
+                    <?= htmlspecialchars((string) $bloqueioGeracao, ENT_QUOTES, 'UTF-8') ?>
+                    <?php if (stripos((string) $bloqueioGeracao, 'Quadro') !== false): ?>
+                        <a href="<?= htmlspecialchars($urlConfigurarNotas, ENT_QUOTES, 'UTF-8') ?>" class="font-semibold underline">Configurar notas</a>
+                        · <a href="<?= URL ?>/admin/quadros-notas" class="font-semibold underline">Quadro de Notas</a>
+                    <?php elseif ($boletimIdSelecionado > 0 && (stripos((string) $bloqueioGeracao, 'Modelo') !== false || stripos((string) $bloqueioGeracao, 'Aprovação') !== false)): ?>
+                        <a href="<?= URL ?>/admin/boletins/<?= $boletimIdSelecionado ?>/editar" class="font-semibold underline">Editar modelo</a>
+                    <?php endif; ?>
+                </li>
+                <?php endforeach; ?>
+            </ul>
+            <?php endif; ?>
+            <?php if ($boletimIdSelecionado > 0): ?>
+            <div class="flex flex-wrap items-center justify-end gap-3 text-sm">
+                <a href="<?= htmlspecialchars($urlVoltarModelo, ENT_QUOTES, 'UTF-8') ?>" class="font-semibold text-indigo-700 underline">Voltar ao modelo</a>
+                <?php if ($urlAdicionarPeriodosPagina !== ''): ?>
+                <a href="<?= htmlspecialchars($urlAdicionarPeriodosPagina, ENT_QUOTES, 'UTF-8') ?>" class="font-semibold text-indigo-700 underline">Adicionar períodos</a>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+            <div class="flex flex-wrap items-center justify-end gap-2">
+                <a href="<?= URL ?>/admin/<?= $modoArquivo ? 'boletim/arquivo' : 'boletim' ?>"
+                   class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-medium">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    <?= $modoArquivo ? 'Arquivo de fórmulas' : 'Todos os eventos' ?>
+                </a>
+                <a href="<?= URL ?>/admin/boletim-configuracao/gerados"
+                   class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium">
+                    <i class="fa-solid fa-chart-column"></i>
+                    Boletins gerados
+                </a>
+            </div>
         </div>
     </div>
     <?php if ($flashMessage !== ''): ?>
@@ -690,19 +812,60 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                         <input type="text" id="regra-descricao-curta" name="regra_descricao_curta" maxlength="255" value="<?= htmlspecialchars((string) ($regra['descricao_curta'] ?? '')) ?>" class="w-full h-10 px-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Ex.: Evento do 1º bimestre para composição da média">
                     </div>
                     <div class="md:col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Quadro de Notas</label>
+                        <?php
+                        $podeVerQuadroPagina = !empty($pode_ver_quadro);
+                        $podeCadastrarQuadroPagina = !empty($pode_cadastrar_quadro);
+                        $quadrosSituacaoPagina = (string) ($quadros_situacao ?? '');
+                        $retornoQuadroPagina = (string) ($_SERVER['REQUEST_URI'] ?? '/admin/boletim-configuracao');
+                        $pathRetornoQuadro = parse_url($retornoQuadroPagina, PHP_URL_PATH);
+                        $queryRetornoQuadro = parse_url($retornoQuadroPagina, PHP_URL_QUERY);
+                        $retornoQuadroPagina = is_string($pathRetornoQuadro) ? $pathRetornoQuadro : '/admin/boletim-configuracao';
+                        if (is_string($queryRetornoQuadro) && $queryRetornoQuadro !== '') {
+                            $retornoQuadroPagina .= '?' . $queryRetornoQuadro;
+                        }
+                        $urlCriarQuadroPagina = URL . '/admin/quadros-notas/novo?retorno=' . rawurlencode($retornoQuadroPagina);
+                        $urlGerirQuadroPagina = URL . '/admin/quadros-notas?retorno=' . rawurlencode($retornoQuadroPagina);
+                        $quadroIdRetorno = (int) ($_GET['quadro_id'] ?? 0);
+                        if ($quadroIdRetorno > 0) {
+                            foreach ($gruposRegrasNotas as $grnRetorno) {
+                                if ((int) ($grnRetorno['id'] ?? 0) === $quadroIdRetorno) {
+                                    $grupoRegrasNotasId = $quadroIdRetorno;
+                                    break;
+                                }
+                            }
+                        }
+                        $rotuloQuadroVazio = 'Selecione o quadro';
+                        if ($gruposRegrasNotas === []) {
+                            $rotuloQuadroVazio = match ($quadrosSituacaoPagina) {
+                                'sem_permissao' => 'Sem permissão para consultar quadros',
+                                'sem_elegivel' => 'Nenhum quadro elegível para esta avaliação',
+                                'desabilitado' => 'Quadro de Notas indisponível nesta escola',
+                                default => 'Nenhum quadro cadastrado',
+                            };
+                        }
+                        ?>
+                        <label class="block text-sm font-medium text-gray-700 mb-1" for="grupo-regras-notas-id">Quadro de Notas (opcional)</label>
                         <select id="grupo-regras-notas-id" name="grupo_regras_notas_id" class="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm">
-                            <option value="">Selecione o quadro</option>
+                            <option value=""><?= htmlspecialchars($rotuloQuadroVazio) ?></option>
                             <?php foreach ($gruposRegrasNotas as $grn): ?>
                                 <option value="<?= (int) ($grn['id'] ?? 0) ?>" <?= $grupoRegrasNotasId === (int) ($grn['id'] ?? 0) ? 'selected' : '' ?>>
                                     <?= htmlspecialchars((string) ($grn['nome'] ?? '')) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
-                        <?php if ($gruposRegrasNotas === []): ?>
-                        <p class="text-xs text-amber-800 mt-1">Cadastre o molde em <a href="<?= URL ?>/admin/quadros-notas" class="underline">Acadêmico → Quadro de Notas</a> antes de salvar a avaliação.</p>
-                        <?php endif; ?>
-                        <p class="text-xs text-gray-500 mt-1">Ao escolher, as colunas S1/S2… e os blocos (A/B, Humanas…) nascem do quadro. <a href="<?= URL ?>/admin/quadros-notas" class="text-indigo-600 underline">Cadastrar quadros</a>.</p>
+                        <p class="text-xs text-gray-500 mt-1">
+                            Selecione um quadro se quiser usar suas colunas nesta avaliação. Você também pode configurar fórmulas e gerar notas e boletins sem quadro.
+                            O Lançamento de Notas continua sendo onde a nota é digitada.
+                            <?php if ($podeCadastrarQuadroPagina): ?>
+                            <a href="<?= htmlspecialchars($urlCriarQuadroPagina, ENT_QUOTES, 'UTF-8') ?>" class="text-indigo-600 underline font-medium">Criar quadro</a>
+                            <?php endif; ?>
+                            <?php if ($podeVerQuadroPagina): ?>
+                            · <a href="<?= htmlspecialchars($urlGerirQuadroPagina, ENT_QUOTES, 'UTF-8') ?>" class="text-indigo-600 underline font-medium">Gerenciar quadros</a>
+                            <?php endif; ?>
+                            <?php if (!$podeVerQuadroPagina && !$podeCadastrarQuadroPagina): ?>
+                            Peça a quem administra o Quadro de Notas para cadastrar o molde.
+                            <?php endif; ?>
+                        </p>
                         <div id="wrap-semanas-periodo" class="hidden mt-3">
                             <label for="semanas-periodo" class="block text-xs font-medium text-gray-700 mb-1">Semanas deste período</label>
                             <input type="number" id="semanas-periodo" name="semanas_periodo" min="1" max="20"
@@ -987,23 +1150,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                     <h2 class="text-lg font-semibold text-gray-900">Geração em lote</h2>
                     <p class="text-sm text-gray-500 mt-1">Simule um aluno e depois gere o período. Alunos travados não entram.</p>
                 </div>
-                <div class="flex items-center gap-2 shrink-0">
-                    <button type="button" id="btn-abrir-conferir-boletim"
-                            class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
-                        <i class="fa-solid fa-flask mr-2"></i>Simular boletim
-                    </button>
-                    <?php if ($geracaoEmAndamento): ?>
-                    <a href="<?= URL ?>/admin/boletim"
-                       class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
-                        Ver status
-                    </a>
-                    <?php else: ?>
-                    <button type="submit" form="form-gerar-lote-boletim"
-                            class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
-                        Gerar boletins
-                    </button>
-                    <?php endif; ?>
-                </div>
+                <p class="text-sm text-gray-500 shrink-0">As ações ficam no topo: configurar notas, simular e gerar.</p>
             </div>
 
             <div class="p-5 space-y-4">
@@ -1096,7 +1243,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <button type="submit" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 shadow-sm">Ver simulação</button>
+                    <button type="submit" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 shadow-sm"><?= !empty($simulacao_tem_vigente) ? 'Simular com as notas atuais' : 'Ver simulação' ?></button>
                 </form>
             </section>
             <section>
@@ -1126,6 +1273,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         </div>
     </aside>
 
+    <?php include \App\Core\ViewPaths::modulo('boletins/Views/partials/boletim_simulacao_contexto.php'); ?>
     <?php if (is_array($simulacao)): ?>
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div class="px-5 py-4 border-b border-gray-200">
@@ -4951,7 +5099,51 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         if (chkIncluirNovos) {
             chkIncluirNovos.addEventListener('change', aplicarAcaoGerarLote);
         }
-        formGerarLote.addEventListener('submit', aplicarAcaoGerarLote);
+        document.addEventListener('click', function (ev) {
+            var link = ev.target && ev.target.closest ? ev.target.closest('a') : null;
+            if (!link) return;
+            var href = link.getAttribute('href') || '';
+            if (href.indexOf('/admin/quadros-notas') === -1) return;
+            var formRegra = document.getElementById('form-regra-boletim');
+            if (!formRegra) return;
+            var dados = new FormData(formRegra);
+            function campo(nome) {
+                var valor = dados.get(nome);
+                return valor == null ? '' : String(valor);
+            }
+            function marcados(nome) {
+                return Array.prototype.map.call(
+                    formRegra.querySelectorAll('input[name="' + nome + '"]:checked'),
+                    function (el) { return el.value; }
+                );
+            }
+            var rascunhoSaida = {
+                nome: campo('regra_nome'),
+                codigo: campo('regra_codigo') || campo('codigo'),
+                descricao_curta: campo('regra_descricao_curta'),
+                formula_final: campo('formula_final'),
+                ano_letivo: campo('ano_letivo'),
+                bimestre: campo('bimestre'),
+                nota_minima_aprovacao: campo('nota_minima_aprovacao'),
+                round_mode: campo('round_mode'),
+                boletim_id: campo('boletim_id'),
+                grupo_regras_notas_id: campo('grupo_regras_notas_id'),
+                finalidade: campo('finalidade'),
+                exibir_em: 'notas',
+                series_ids: marcados('series_ids[]'),
+                turmas_ids: marcados('turmas_ids[]'),
+                materias_ids: marcados('materias_ids[]')
+            };
+            if (typeof componentes !== 'undefined' && Array.isArray(componentes)) {
+                rascunhoSaida.componentes = componentes;
+            }
+            try {
+                sessionStorage.setItem('boletim_assistente_rascunho', JSON.stringify(rascunhoSaida));
+            } catch (erroRascunho) { /* a saída segue; o retorno usa a URL */ }
+        }, true);
+        formGerarLote.addEventListener('submit', function () {
+            aplicarAcaoGerarLote();
+        });
     }
 
     window.abrirConferirBoletim = function () {

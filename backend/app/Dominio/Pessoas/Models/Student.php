@@ -245,7 +245,9 @@ class Student
             'serie' => $data['serie'] ?? null,
             'responsavel_id' => $data['responsavel_id'] ?? null,
             'ativo' => $data['ativo'] ?? 1,
-            'pagante' => $data['pagante'] ?? 1,
+            // Cadastro novo é sempre pagante, mesmo se o payload omitir ou enviar 0.
+            // Isso não gera cobrança: é só a classificação do aluno.
+            'pagante' => 1,
         ];
         if ($dataNasc !== null) {
             $params['data_nasc'] = $dataNasc;

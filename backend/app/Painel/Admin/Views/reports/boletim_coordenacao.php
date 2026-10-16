@@ -57,10 +57,23 @@ $zipPedido = (string) ($zipJob['pedido_em'] ?? '');
 $zipDuracao = (string) ($zipJob['duracao'] ?? '');
 include \App\Core\ViewPaths::adminPartial('flash_message.php');
 ?>
+<?php $boletins_aba = 'relatorios'; include \App\Core\ViewPaths::adminPartial('boletins_area_nav.php'); ?>
 <div class="mb-6">
-    <h1 class="text-2xl font-bold text-gray-900">Notas da Coordenação</h1>
+    <h2 class="text-lg font-semibold text-gray-900">Relatórios</h2>
     <p class="text-gray-600 mt-1">Escolha o boletim ou o demonstrativo de notas. O demonstrativo usa a versão vigente.</p>
 </div>
+<?php
+$boletimContextoId = max(0, (int) ($_GET['boletim_id'] ?? 0));
+if ($boletimContextoId > 0):
+    $paramsSemModeloRel = $_GET;
+    unset($paramsSemModeloRel['boletim_id']);
+    $urlSemModeloRel = URL . '/admin/reports/boletim-coordenacao' . ($paramsSemModeloRel !== [] ? ('?' . http_build_query($paramsSemModeloRel)) : '');
+?>
+<div class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-purple-100 bg-purple-50 px-3 py-2 text-sm text-purple-950">
+    <span>Contexto do modelo #<?= $boletimContextoId ?>. Os filtros desta tela continuam definindo o relatório.</span>
+    <a href="<?= htmlspecialchars($urlSemModeloRel, ENT_QUOTES, 'UTF-8') ?>" class="font-semibold text-purple-800 underline">Limpar contexto</a>
+</div>
+<?php endif; ?>
 
 <?php
 $periodoSelecionado = max(0, (int) ($periodo ?? 0));
@@ -75,6 +88,9 @@ $campoClasse = 'w-full h-11 rounded-lg border border-gray-300 bg-white px-3 text
 $alunoQFiltro = trim((string) ($aluno_q ?? ''));
 ?>
 <form method="GET" action="<?= URL ?>/admin/reports/boletim-coordenacao" id="form-boletim-coordenacao" class="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
+    <?php if ($boletimContextoId > 0): ?>
+    <input type="hidden" name="boletim_id" value="<?= $boletimContextoId ?>">
+    <?php endif; ?>
     <div class="p-5 md:p-6 space-y-5">
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <label class="block">

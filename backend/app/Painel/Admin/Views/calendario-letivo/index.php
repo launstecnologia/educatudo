@@ -139,6 +139,10 @@ if (!($schema_pronto ?? false)): ?>
         <i class="fa-solid fa-triangle-exclamation mr-2"></i> Para cadastrar um calendário por curso ou série, rode a migration <code>2026_10_01_calendario_letivo_varios.sql</code> no painel Master.
     </div>
 <?php endif; ?>
+<?php
+$flash_status = (string) ($flash_type ?? '');
+include \App\Core\ViewPaths::adminPartial('flash_message.php');
+?>
 
 <!-- Cartões de resumo -->
 <?php
@@ -305,7 +309,18 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
         $tsF = $dataCalendario($ev['data_fim'] ?? '');
         $dtI = $tsI ? date('d/m/Y', $tsI) : 'Data inválida';
         $dtF = $tsF ? date('d/m/Y', $tsF) : 'Data inválida';
-        $periodo = ($ev['data_inicio'] === $ev['data_fim']) ? $dtI : "$dtI – $dtF";
+        if ($tsI === null || $tsF === null || $tsF < $tsI) {
+            $brutoInicio = trim((string) ($ev['data_inicio'] ?? ''));
+            $brutoFim = trim((string) ($ev['data_fim'] ?? ''));
+            $periodo = 'Data inválida';
+            if ($brutoInicio !== '' || $brutoFim !== '') {
+                $periodo .= ' (' . $brutoInicio . ' – ' . $brutoFim . ')';
+            }
+            $periodo .= '. O calendário continua disponível; este cadastro antigo não foi alterado.';
+            $periodo = htmlspecialchars($periodo);
+        } else {
+            $periodo = ($ev['data_inicio'] === $ev['data_fim']) ? $dtI : "$dtI – $dtF";
+        }
     ?>
         <div class="flex items-center gap-4 px-6 py-3 hover:bg-gray-50">
             <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:<?= $tipoText[$t] ?? '#6b7280' ?>"></span>
@@ -472,11 +487,12 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
-    <form id="evento-form" method="post" action="<?= URL ?>/admin/calendario-letivo/salvar-evento" class="flex flex-col flex-1 overflow-hidden">
+    <form id="evento-form" method="post" action="<?= URL ?>/admin/calendario-letivo/salvar-evento" novalidate class="flex flex-col flex-1 overflow-hidden">
         <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
         <input type="hidden" name="ano" value="<?= $ano ?>">
         <input type="hidden" name="calendario_id" value="<?= $calendarioId ?>">
         <input type="hidden" name="id" id="evento_id" value="">
+        <input type="hidden" name="envio_token" id="evento_envio_token" value="">
         <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-8">
             <section>
                 <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Dados do evento</h3>
@@ -484,10 +500,12 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
                     <div>
                         <label for="evento_data_inicio" class="block text-sm font-medium text-gray-700 mb-1">Início <span class="text-red-500">*</span></label>
                         <input type="date" id="evento_data_inicio" name="data_inicio" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                        <p id="erro_evento_data_inicio" class="hidden mt-1 text-xs text-red-600" role="alert"></p>
                     </div>
                     <div>
                         <label for="evento_data_fim" class="block text-sm font-medium text-gray-700 mb-1">Fim</label>
                         <input type="date" id="evento_data_fim" name="data_fim" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                        <p id="erro_evento_data_fim" class="hidden mt-1 text-xs text-red-600" role="alert"></p>
                     </div>
                     <div class="sm:col-span-2">
                         <label class="block text-sm font-medium text-gray-700 mb-1.5">Tipo</label>
@@ -554,6 +572,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
                     <div class="sm:col-span-2">
                         <label for="evento_descricao" class="block text-sm font-medium text-gray-700 mb-1">Descrição <span class="text-red-500">*</span></label>
                         <input type="text" id="evento_descricao" name="descricao" required maxlength="255" placeholder="Ex: Feriado Nacional - Tiradentes" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                        <p id="erro_evento_descricao" class="hidden mt-1 text-xs text-red-600" role="alert"></p>
                     </div>
                     <div>
                         <label for="evento_local" class="block text-sm font-medium text-gray-700 mb-1"><i class="fa-solid fa-location-dot mr-1 text-gray-400"></i>Local</label>
@@ -562,6 +581,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
                     <div>
                         <label for="evento_link" class="block text-sm font-medium text-gray-700 mb-1"><i class="fa-solid fa-link mr-1 text-gray-400"></i>Link (reunião / meet)</label>
                         <input type="url" id="evento_link" name="link_reuniao" placeholder="https://meet.google.com/..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm">
+                        <p id="erro_evento_link" class="hidden mt-1 text-xs text-red-600" role="alert"></p>
                     </div>
                 </div>
             </section>
@@ -593,11 +613,14 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
                 <?php endif; ?>
             </section>
         </div>
-        <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
+        <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col gap-3">
+            <p id="erro_evento_formulario" tabindex="-1" class="hidden text-sm text-red-600" role="alert"></p>
+            <div class="flex flex-col-reverse sm:flex-row justify-end gap-3">
             <button type="button" onclick="closeEventoDrawer()" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
             <button type="submit" id="eventoSubmitBtn" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 transition-colors shadow-sm">
                 <i class="fa-solid fa-plus mr-2"></i>Adicionar
             </button>
+            </div>
         </div>
     </form>
 </aside>
@@ -978,6 +1001,8 @@ function definirModoEvento(editando) {
 }
 
 function preencherFormEvento(ev) {
+    fimSegueAutomatico = false;
+    ultimoFimAutomatico = '';
     document.getElementById('evento_id').value = ev.id;
     document.getElementById('evento_data_inicio').value = ev.data_inicio || '';
     document.getElementById('evento_data_fim').value = ev.data_fim || '';
@@ -1021,7 +1046,15 @@ function openEventoDrawer(opts) {
     } else if (opts.keepDates) {
         document.getElementById('evento_data_inicio').value = savedInicio;
         document.getElementById('evento_data_fim').value = savedFim;
+        fimSegueAutomatico = savedInicio !== '' && savedInicio === savedFim;
+        ultimoFimAutomatico = fimSegueAutomatico ? savedFim : '';
+    } else {
+        fimSegueAutomatico = true;
+        ultimoFimAutomatico = '';
     }
+    var tokenEnvio = document.getElementById('evento_envio_token');
+    if (tokenEnvio) tokenEnvio.value = novoTokenEnvio();
+    limparErrosEvento();
     showDrawer('eventoDrawerBackdrop', 'eventoDrawer');
 }
 function closeEventoDrawer() { hideDrawer('eventoDrawerBackdrop', 'eventoDrawer'); }
@@ -1045,15 +1078,219 @@ document.addEventListener('keydown', function(e) {
 document.getElementById('modalDia').addEventListener('click', function(e) {
     if (e.target === this) closeDayModal();
 });
-function dataEventoCompleta(valor) {
-    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(valor || '');
-    if (!m) return false;
-    var ano = parseInt(m[1], 10);
-    return ano >= 2000 && ano <= 2100;
+var fimSegueAutomatico = true;
+var ultimoFimAutomatico = '';
+var escrevendoFimAuto = false;
+var enviandoEvento = false;
+var camposErroEvento = {
+    data_inicio: 'evento_data_inicio',
+    data_fim: 'evento_data_fim',
+    descricao: 'evento_descricao',
+    link: 'evento_link',
+    formulario: 'erro_evento_formulario'
+};
+
+function novoTokenEnvio() {
+    if (window.crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    return 'env-' + Date.now().toString(36) + '-' + Math.random().toString(16).slice(2);
 }
-document.getElementById('evento_data_inicio').addEventListener('change', function() {
+
+function classificarDataEvento(valor) {
+    if (!valor) return { estado: 'vazia', mensagem: '' };
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(valor);
+    if (!m) return { estado: 'invalida', mensagem: 'Informe uma data válida.' };
+    var ano = parseInt(m[1], 10);
+    var mes = parseInt(m[2], 10);
+    var dia = parseInt(m[3], 10);
+    var dt = new Date(ano, mes - 1, dia);
+    if (dt.getFullYear() !== ano || dt.getMonth() !== mes - 1 || dt.getDate() !== dia) {
+        return { estado: 'invalida', mensagem: 'Informe uma data válida.' };
+    }
+    if (ano < 2000 || ano > 2100) return { estado: 'ano', mensagem: 'O ano deve estar entre 2000 e 2100.' };
+    return { estado: 'ok', mensagem: '' };
+}
+
+function limparErroCampoEvento(campo) {
+    var inputId = camposErroEvento[campo];
+    var erro = document.getElementById(campo === 'formulario' ? 'erro_evento_formulario' : 'erro_' + inputId);
+    if (erro) {
+        erro.textContent = '';
+        erro.classList.add('hidden');
+    }
+    if (campo !== 'formulario' && inputId) {
+        var input = document.getElementById(inputId);
+        if (input) input.removeAttribute('aria-invalid');
+    }
+}
+
+function limparErrosEvento() {
+    Object.keys(camposErroEvento).forEach(limparErroCampoEvento);
+}
+
+function mostrarErroCampoEvento(campo, mensagem) {
+    var inputId = camposErroEvento[campo];
+    var erro = document.getElementById(campo === 'formulario' ? 'erro_evento_formulario' : 'erro_' + inputId);
+    if (erro) {
+        erro.textContent = mensagem;
+        erro.classList.remove('hidden');
+    }
+    if (campo !== 'formulario' && inputId) {
+        var input = document.getElementById(inputId);
+        if (input) input.setAttribute('aria-invalid', 'true');
+    }
+}
+
+function aplicarErrosEvento(erros) {
+    limparErrosEvento();
+    var ordem = ['data_inicio', 'data_fim', 'descricao', 'link', 'formulario'];
+    var primeiro = '';
+    ordem.forEach(function (campo) {
+        if (!erros[campo]) return;
+        mostrarErroCampoEvento(campo, erros[campo]);
+        if (!primeiro) primeiro = campo;
+    });
+    if (!primeiro) return;
+    var alvo = primeiro === 'formulario'
+        ? document.getElementById('erro_evento_formulario')
+        : document.getElementById(camposErroEvento[primeiro]);
+    if (alvo && alvo.focus) alvo.focus();
+}
+
+function errosDatasEvento(aoEnviar) {
+    var inicioEl = document.getElementById('evento_data_inicio');
+    var fimEl = document.getElementById('evento_data_fim');
+    var descEl = document.getElementById('evento_descricao');
+    var erros = {};
+    var ini = classificarDataEvento(inicioEl.value);
+    var fim = classificarDataEvento(fimEl.value);
+    if (ini.estado === 'vazia') {
+        if (aoEnviar) erros.data_inicio = 'Informe uma data válida.';
+    } else if (ini.estado !== 'ok') {
+        erros.data_inicio = ini.mensagem;
+    }
+    if (fim.estado !== 'vazia' && fim.estado !== 'ok') {
+        erros.data_fim = fim.mensagem;
+    } else if (ini.estado === 'ok' && fim.estado === 'ok' && fimEl.value < inicioEl.value) {
+        erros.data_fim = 'A data final deve ser igual ou posterior à data inicial.';
+    }
+    if (aoEnviar && descEl.value.trim() === '') {
+        erros.descricao = 'Informe a descrição do evento.';
+    }
+    if (aoEnviar) {
+        var link = document.getElementById('evento_link');
+        if (link && link.value.trim() !== '' && link.validity && link.validity.typeMismatch) {
+            erros.link = 'Informe um link válido.';
+        }
+    }
+    return erros;
+}
+
+function atualizarErrosDatasAoVivo() {
+    var erros = errosDatasEvento(false);
+    ['data_inicio', 'data_fim'].forEach(function (campo) {
+        if (erros[campo]) mostrarErroCampoEvento(campo, erros[campo]);
+        else limparErroCampoEvento(campo);
+    });
+}
+
+function sincronizarFimAutomatico() {
+    var inicio = document.getElementById('evento_data_inicio');
     var fim = document.getElementById('evento_data_fim');
-    if (!fim.value && dataEventoCompleta(this.value)) fim.value = this.value;
+    if (!inicio || !fim || escrevendoFimAuto) return;
+    if (classificarDataEvento(inicio.value).estado !== 'ok') return;
+    var acompanha = fimSegueAutomatico && (!fim.value || fim.value === ultimoFimAutomatico);
+    if (!acompanha) return;
+    if (fim.value === inicio.value) {
+        ultimoFimAutomatico = inicio.value;
+        fimSegueAutomatico = true;
+        return;
+    }
+    escrevendoFimAuto = true;
+    fim.value = inicio.value;
+    ultimoFimAutomatico = inicio.value;
+    fimSegueAutomatico = true;
+    escrevendoFimAuto = false;
+    limparErroCampoEvento('data_fim');
+}
+
+function aoAlterarInicioEvento() {
+    sincronizarFimAutomatico();
+    atualizarErrosDatasAoVivo();
+}
+
+function aoAlterarFimEvento() {
+    if (escrevendoFimAuto) return;
+    var fim = document.getElementById('evento_data_fim');
+    if (!fim.value) {
+        fimSegueAutomatico = true;
+        ultimoFimAutomatico = '';
+        sincronizarFimAutomatico();
+        atualizarErrosDatasAoVivo();
+        return;
+    }
+    if (fim.value !== ultimoFimAutomatico) fimSegueAutomatico = false;
+    atualizarErrosDatasAoVivo();
+}
+
+var campoInicioEvento = document.getElementById('evento_data_inicio');
+var campoFimEvento = document.getElementById('evento_data_fim');
+campoInicioEvento.addEventListener('input', sincronizarFimAutomatico);
+campoInicioEvento.addEventListener('change', aoAlterarInicioEvento);
+campoFimEvento.addEventListener('input', function () {
+    if (escrevendoFimAuto) return;
+    var fim = document.getElementById('evento_data_fim');
+    if (!fim.value) {
+        fimSegueAutomatico = true;
+        ultimoFimAutomatico = '';
+        sincronizarFimAutomatico();
+        return;
+    }
+    if (fim.value !== ultimoFimAutomatico) fimSegueAutomatico = false;
+});
+campoFimEvento.addEventListener('change', aoAlterarFimEvento);
+
+document.getElementById('evento-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (enviandoEvento) return;
+    var erros = errosDatasEvento(true);
+    if (Object.keys(erros).length) {
+        aplicarErrosEvento(erros);
+        return;
+    }
+    limparErrosEvento();
+    enviandoEvento = true;
+    var form = this;
+    var btn = document.getElementById('eventoSubmitBtn');
+    var htmlBtn = btn ? btn.innerHTML : '';
+    if (btn) btn.disabled = true;
+    fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+        credentials: 'same-origin'
+    }).then(function (res) {
+        return res.text().then(function (texto) {
+            var json = null;
+            try { json = JSON.parse(texto); } catch (err) { json = null; }
+            return json;
+        });
+    }).then(function (json) {
+        if (json && json.ok && json.redirect) {
+            window.location.href = json.redirect.indexOf('http') === 0 ? json.redirect : (baseUrl + json.redirect);
+            return;
+        }
+        enviandoEvento = false;
+        if (btn) { btn.disabled = false; btn.innerHTML = htmlBtn; }
+        if (json && json.erros) {
+            aplicarErrosEvento(json.erros);
+            return;
+        }
+        aplicarErrosEvento({ formulario: 'Não foi possível salvar agora. Os dados continuam aqui. Tente novamente.' });
+    }).catch(function () {
+        enviandoEvento = false;
+        if (btn) { btn.disabled = false; btn.innerHTML = htmlBtn; }
+        aplicarErrosEvento({ formulario: 'Não foi possível salvar agora. Os dados continuam aqui. Tente novamente.' });
+    });
 });
 
 function toggleNovoTipo(show) {

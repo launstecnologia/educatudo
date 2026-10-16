@@ -105,8 +105,8 @@
         ]);
         $showFechamentoGroup = $canViewSidebar(['resultados_finais', 'conselho_classe']);
         $showSecretariaNavGroup = $canViewSidebar([
-            'processos_matricula', 'transferencia', 'vida_escolar', 'modelos_documentos',
-            'censo_escolar', 'documentos_institucionais', 'almoxarifado', 'patrimonio',
+            'processos_matricula', 'transferencia',
+            'censo_escolar', 'declaracoes_aluno',
         ]);
         $showPaineisGroup = $canViewSidebar(['dashboard', 'saude_academica', 'conformidade', 'relatorios_gerais', 'declaracoes_aluno']);
         $showInventoryGroup = $modOn('recursos_fisicos') && $canViewSidebar(['almoxarifado', 'patrimonio']);
@@ -135,10 +135,8 @@
             'resultados-finais', 'conselho_classe',
         ], true);
         $secretariaNavOpen = in_array($cp, [
-            'gestao_escolar', 'secretaria', 'censo_escolar', 'documentos_institucionais',
-            'assinatura_digital', 'modelos_documentos', 'enrollment', 'enrollment_config',
-            'vida_escolar', 'vida_escolar_oficios', 'almoxarifado', 'patrimonio',
-            'tudicoins_escola', 'creditos_pacotes',
+            'gestao_escolar', 'secretaria', 'censo_escolar', 'enrollment', 'enrollment_config',
+            'paineis_documentos',
         ], true) || $curMovimentacao;
         $paineisOpen = in_array($cp, [
             'paineis', 'dashboard', 'saude_academica', 'conformidade',
@@ -155,10 +153,15 @@
         $pedagogicoOpen = in_array($cp, [
             'pedagogico', 'aulas_online', 'planos-aula', 'ava', 'minicursos', 'bncc',
             'inclusao', 'journeys', 'journeys_relatorio', 'essays_teacher', 'essays_teacher_report',
+            'relatorios', 'reports_boletim_coordenacao',
         ], true);
         $sistemaOpen = in_array($cp, ['sistema', 'avatares_alunos', 'essays_config', 'dev_tickets'], true);
         $usuariosOpen = in_array($cp, ['gestao_usuarios', 'usuarios', 'monitors'], true) || $permissoesAtivo;
-        $zConfigOpen = in_array($cp, ['z_configuracao', 'dev', 'unidades', 'maintenance_panel', 'settings', 'ui_modelos', 'layouts_documentos'], true);
+        $zConfigOpen = in_array($cp, [
+            'z_configuracao', 'dev', 'unidades', 'maintenance_panel', 'settings', 'ui_modelos', 'layouts_documentos',
+            'documentos_institucionais', 'assinatura_digital', 'modelos_documentos',
+            'tudicoins_escola', 'creditos_pacotes',
+        ], true);
         $boletimNestedOpen = in_array($cp, ['boletim_config', 'boletim_guia'], true);
         $estruturaNestedOpen = in_array($cp, [
             'ano_letivo', 'calendario_letivo', 'componentes-curriculares',
@@ -169,7 +172,8 @@
         ], true);
         $avaliaNestedOpen = in_array($cp, [
             'grupos-regras-notas', 'quadros-notas', 'regras-academicas',
-            'tipos_avaliacao', 'boletins', 'boletim_guia',
+            'tipos_avaliacao', 'boletins', 'boletim_guia', 'boletim_config',
+            'reports_boletim_coordenacao',
             'provas', 'provas_blocos',
         ], true);
         $forumNestedOpen = $forumDenunciasAtivo;
@@ -177,7 +181,7 @@
         $diarioNestedOpen = in_array($cp, ['diario_classe', 'faltas', 'presenca'], true);
         $documentosNestedOpen = in_array($cp, ['documentos_institucionais', 'assinatura_digital', 'modelos_documentos'], true);
         $matriculasNestedOpen = in_array($cp, ['enrollment', 'enrollment_config'], true) || $curMovimentacao;
-        $recursosNestedOpen = in_array($cp, ['almoxarifado', 'patrimonio'], true);
+        $recursosEscolaresOpen = in_array($cp, ['almoxarifado', 'patrimonio'], true);
         $tudicoinsNestedOpen = in_array($cp, ['tudicoins_escola', 'creditos_pacotes'], true);
         $vidaEscolarNestedOpen = in_array($cp, ['vida_escolar', 'vida_escolar_oficios'], true);
         $cobrancasNestedOpen = in_array($cp, ['finance_charges', 'finance_charge_batch'], true);
@@ -757,7 +761,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Ensure compact mode always starts with closed groups (visual cleanliness)
     function closeAllMenuGroupsWhenCollapsed() {
         if (!sidebar.classList.contains('collapsed')) return;
-        const menuGroups = ['academico', 'rotina', 'fechamento', 'secretaria', 'paineis', 'avaliacoes', 'escola', 'comunicacao', 'conteudo', 'financeiro', 'financeiro-escolar', 'gestao-escolar', 'monitoramento', 'pedagogico', 'sistema', 'usuarios', 'z-configuracao', 'sec-academico', 'sec-rotina', 'sec-fechamento', 'sec-pedagogico', 'sec-secretaria', 'sec-paineis', 'sec-avaliacoes', 'sec-gestao-escolar'];
+        const menuGroups = ['academico', 'rotina', 'fechamento', 'secretaria', 'recursos-escolares', 'paineis', 'avaliacoes', 'escola', 'comunicacao', 'conteudo', 'financeiro', 'financeiro-escolar', 'gestao-escolar', 'monitoramento', 'pedagogico', 'sistema', 'usuarios', 'z-configuracao', 'sec-academico', 'sec-rotina', 'sec-fechamento', 'sec-pedagogico', 'sec-secretaria', 'sec-paineis', 'sec-avaliacoes', 'sec-gestao-escolar'];
         menuGroups.forEach(group => {
             const submenu = document.getElementById(`${group}-submenu`);
             const arrow = document.getElementById(`${group}-arrow`);
@@ -802,7 +806,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Menu groups functionality
-    const menuGroups = ['academico', 'rotina', 'fechamento', 'secretaria', 'paineis', 'avaliacoes', 'escola', 'comunicacao', 'conteudo', 'financeiro', 'financeiro-escolar', 'gestao-escolar', 'monitoramento', 'pedagogico', 'sistema', 'usuarios', 'z-configuracao', 'sec-academico', 'sec-rotina', 'sec-fechamento', 'sec-pedagogico', 'sec-secretaria', 'sec-paineis', 'sec-avaliacoes', 'sec-gestao-escolar'];
+    const menuGroups = ['academico', 'rotina', 'fechamento', 'secretaria', 'recursos-escolares', 'paineis', 'avaliacoes', 'escola', 'comunicacao', 'conteudo', 'financeiro', 'financeiro-escolar', 'gestao-escolar', 'monitoramento', 'pedagogico', 'sistema', 'usuarios', 'z-configuracao', 'sec-academico', 'sec-rotina', 'sec-fechamento', 'sec-pedagogico', 'sec-secretaria', 'sec-paineis', 'sec-avaliacoes', 'sec-gestao-escolar'];
 
     // Auto-open menu group if current page is inside it
     const currentPage = '<?= addslashes($current_page ?? '') ?>';
@@ -860,30 +864,23 @@ document.addEventListener('DOMContentLoaded', function() {
         'gestao_escolar': 'secretaria',
         'secretaria': 'secretaria',
         'censo_escolar': 'secretaria',
-        'documentos_institucionais': 'secretaria',
-        'assinatura_digital': 'secretaria',
-        'modelos_documentos': 'secretaria',
         'enrollment': 'secretaria',
         'enrollment_config': 'secretaria',
         'students_remanejamento': 'secretaria',
         'students_transferencia_escolar': 'secretaria',
         'vida_escolar': 'secretaria',
         'vida_escolar_oficios': 'secretaria',
-        'almoxarifado': 'secretaria',
-        'patrimonio': 'secretaria',
-        'tudicoins_escola': 'secretaria',
-        'creditos_pacotes': 'secretaria',
-        'paineis': 'paineis',
-        'dashboard': 'paineis',
-        'saude_academica': 'paineis',
-        'conformidade': 'paineis',
-        'relatorios': 'paineis',
-        'reports_boletim_coordenacao': 'paineis',
-        'paineis_documentos': 'paineis',
+        'paineis_documentos': 'secretaria',
+        'almoxarifado': 'recursos-escolares',
+        'patrimonio': 'recursos-escolares',
+        'tudicoins_escola': 'z-configuracao',
+        'creditos_pacotes': 'z-configuracao',
         'monitoramento': 'monitoramento',
         'monitoramento_alertas': 'monitoramento',
         'tentativas_login': 'monitoramento',
         'pedagogico': 'pedagogico',
+        'relatorios': 'pedagogico',
+        'reports_boletim_coordenacao': 'pedagogico',
         'aulas_online': 'pedagogico',
         'planos-aula': 'pedagogico',
         'ava': 'pedagogico',
@@ -900,6 +897,9 @@ document.addEventListener('DOMContentLoaded', function() {
         'gestao_usuarios': 'usuarios',
         'usuarios': 'usuarios',
         'monitors': 'usuarios',
+        'documentos_institucionais': 'z-configuracao',
+        'assinatura_digital': 'z-configuracao',
+        'modelos_documentos': 'z-configuracao',
         'layouts_documentos': 'z-configuracao',
         'z_configuracao': 'z-configuracao',
         'dev': 'z-configuracao',

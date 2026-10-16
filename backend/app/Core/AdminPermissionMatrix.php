@@ -379,6 +379,9 @@ class AdminPermissionMatrix
         if (preg_match('#/(create|store|new|novo|criar|salvar|cadastrar)(/|$)#i', $path)) {
             return 'cadastrar';
         }
+        if ($m === 'POST' && preg_match('#^/admin/(quadros-notas|grupos-regras-notas)$#', $path)) {
+            return 'cadastrar';
+        }
 
         return 'alterar';
     }

@@ -7,12 +7,6 @@ $hub_title = 'Acadêmico';
 $hub_subtitle = 'Estrutura da escola, pessoas e como a escola avalia — nesta ordem.';
 $hub_cards = [
     [
-        'href' => URL . '/admin/implantar-academico',
-        'title' => 'Implantar acadêmico',
-        'description' => 'Trilha do ano letivo: estrutura, pessoas, turmas e como a escola avalia.',
-        'icon' => 'fa-solid fa-list-check',
-    ],
-    [
         'href' => URL . '/admin/ano-letivo',
         'title' => 'Ano Letivo',
         'description' => 'Crie e gerencie os anos letivos da escola, períodos e datas.',
@@ -130,8 +124,8 @@ if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('al
 if ($modOn('boletim')) {
     $hub_cards[] = [
         'href' => URL . '/admin/boletins',
-        'title' => 'Modelo de Boletim',
-        'description' => 'Documento oficial e vínculo com a regra de aprovação.',
+        'title' => 'Boletins',
+        'description' => 'Configure os períodos, acompanhe os resultados e emita relatórios.',
         'icon' => 'fa-solid fa-file-circle-check',
     ];
 }

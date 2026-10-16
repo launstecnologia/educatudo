@@ -74,11 +74,11 @@ Tela: `/admin/quadros-notas`
 
 Coluna de **lançamento** recebe a nota digitada. Coluna **calculada** fecha a nota da matéria. `vai_para_boletim` marca o que o documento oficial pode ler.
 
-O modelo de boletim não tem campo de quadro. O quadro é apontado no evento, no passo seguinte e no lançamento.
+O modelo de boletim não tem campo de quadro. Na avaliação e no lançamento, o quadro é opcional. Sem ele, a fórmula usa as peças, os tipos de nota e os vínculos gravados na própria configuração. Com ele, as colunas do molde entram nessa avaliação. Um quadro escolhido que não existe nesta escola ou está inativo não é tratado como “sem quadro”.
 
 ## 4. Modelo de Boletim
 
-Tela: `/admin/boletins`
+No menu, a área se chama **Boletins** (`/admin/boletins`). Esta tela é a aba Modelos. As outras abas reutilizam os períodos e fórmulas (`/admin/boletim`), os resultados gerados (`/admin/boletim-configuracao/gerados`) e os relatórios (`/admin/reports/boletim-coordenacao`).
 
 É o documento: nome, ano impresso, oficial ou extra, regra de aprovação, disciplinas e o público (série, turma, quem vê).
 
@@ -96,7 +96,7 @@ Tela: `/admin/boletim-configuracao/assistente`
 Abre pelo modelo (Fórmulas) ou por um evento já salvo. Este assistente grava o **evento de notas**: a receita da média de um período. Os passos são:
 
 1. **Começar** — origem do evento.
-2. **Identidade** — nome, ano, período e em qual boletim ele entra. O quadro também é escolhido aqui.
+2. **Identidade** — nome, ano, período e em qual boletim ele entra. O quadro, se a escola quiser usar as colunas dele, também é escolhido aqui. “Sem quadro” é válido.
 3. **Tipo de Notas** — as peças que compõem a média (bimestral, jornada, ENAC e o que a escola marcou).
 4. **Agrupar** — se disciplinas viram uma linha só no boletim.
 5. **Fórmula** — como as colunas viram a média.
@@ -112,9 +112,9 @@ O primeiro período é montado aqui. Os demais períodos do ano são cópia dest
 
 Tela: `/admin/provas`
 
-É o evento em que a nota é digitada ou a prova online acontece. Na criação, a escola aponta o **quadro** e a **coluna**. Turma e professores vêm juntos.
+É o evento em que a nota é digitada ou a prova online acontece. Na criação, a escola pode apontar o **quadro** e a **coluna**. Turma e professores vêm juntos. O quadro continua opcional.
 
-A nota lançada preenche a célula do quadro. A fórmula do passo 5 lê essa célula. Sem o quadro apontado, a nota existe no lançamento e não chega no boletim.
+A nota lançada pode preencher a célula do quadro, quando houver um. A fórmula do passo 5 lê as peças da configuração. Sem quadro, a nota lançada pelo tipo de nota continua disponível para essa fórmula. O quadro não é requisito para simular nem para gerar.
 
 A lista abre em “Todos (exceto concluídos)”. O número do topo conta o estoque inteiro, inclusive os já encerrados. São duas contagens de propósito.
 
@@ -144,7 +144,7 @@ Tela: `/admin/boletins/{id}/gerar-boletins`
 
 A coordenação escolhe o evento do período e gera em lote. O sistema:
 
-1. Lê as notas lançadas nas colunas do quadro e as outras peças da fórmula.
+1. Lê as notas lançadas nas peças da fórmula. Se a avaliação tiver quadro, também lê as colunas desse molde.
 2. Calcula a média do período.
 3. Aplica a regra de aprovação (média, frequência, recuperação, arredondamento).
 4. Grava o resultado do aluno. Esse registro é o boletim do período. Gerar de novo atualiza; não cria uma segunda conta paralela.

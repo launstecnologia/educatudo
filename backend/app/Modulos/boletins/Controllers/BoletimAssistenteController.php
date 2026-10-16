@@ -1085,8 +1085,11 @@ class BoletimAssistenteController extends BaseController
         if (!class_exists('GrupoRegrasNotasService', false)) {
             return $out;
         }
+        if ($grupoId <= 0) {
+            return $out;
+        }
         try {
-            $bruto = (new GrupoRegrasNotasService())->materiasQuadroPadrao($grupoId > 0 ? $grupoId : null);
+            $bruto = (new GrupoRegrasNotasService())->materiasQuadroPadrao($grupoId);
         } catch (\Throwable $e) {
             return $out;
         }

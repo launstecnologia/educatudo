@@ -16,11 +16,9 @@ class FechamentoGatesTest extends TestCase
         $this->assertStringContainsString('Modelo de Boletim', $erros[0]);
     }
 
-    public function testSalvarAvaliacaoSemQuadroBloqueia(): void
+    public function testSalvarAvaliacaoSemQuadroPassa(): void
     {
-        $erros = FechamentoGates::errosSalvarAvaliacao(7, 0);
-        $this->assertNotEmpty($erros);
-        $this->assertStringContainsString('Quadro de Notas', $erros[0]);
+        $this->assertSame([], FechamentoGates::errosSalvarAvaliacao(7, 0));
     }
 
     public function testSalvarAvaliacaoComModeloEQuadroPassa(): void
@@ -43,16 +41,18 @@ class FechamentoGatesTest extends TestCase
         $this->assertStringContainsString('Modelo de Boletim', $diag['bloqueios'][0]);
     }
 
-    public function testGerarBoletimSemQuadroBloqueia(): void
+    public function testGerarBoletimSemQuadroPassa(): void
     {
         $diag = FechamentoGates::diagnosticarGeracao(7, 0, 3, true, true);
+        $this->assertTrue($diag['ok']);
+        $this->assertSame([], $diag['bloqueios']);
+    }
+
+    public function testGerarBoletimQuadroInvalidoBloqueia(): void
+    {
+        $diag = FechamentoGates::diagnosticarGeracao(7, 12, 3, true, false);
         $this->assertFalse($diag['ok']);
-        $this->assertTrue(
-            (bool) array_filter(
-                $diag['bloqueios'],
-                static fn (string $msg): bool => str_contains($msg, 'Quadro de Notas')
-            )
-        );
+        $this->assertStringContainsString('não existe nesta escola ou está inativo', $diag['bloqueios'][0]);
     }
 
     public function testGerarBoletimCompletoPassa(): void

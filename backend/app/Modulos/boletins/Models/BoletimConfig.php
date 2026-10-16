@@ -636,6 +636,11 @@ class BoletimConfig
             $where[] = 'g.regra_id = :regra_id';
             $params['regra_id'] = $regraId;
         }
+        $boletimId = isset($filters['boletim_id']) ? (int) $filters['boletim_id'] : 0;
+        if ($boletimId > 0 && $this->hasColumn('boletim_regras', 'boletim_id')) {
+            $where[] = 'r.boletim_id = :boletim_id';
+            $params['boletim_id'] = $boletimId;
+        }
         $alunoId = isset($filters['aluno_id']) ? (int) $filters['aluno_id'] : 0;
         if ($alunoId > 0) {
             $where[] = 'g.aluno_id = :aluno_id';

@@ -14,7 +14,8 @@ $showPedagogicoGroup = $modOn('aulas_online')
     || $modOn('professor_planos_aula')
     || ($canViewSidebar(['inclusao']) && $modOn('inclusao'))
     || $modOn('redacao_configuravel')
-    || \App\Core\FeatureGate::isModuleEnabled('jornadas');
+    || \App\Core\FeatureGate::isModuleEnabled('jornadas')
+    || $canViewSidebar(['relatorios_gerais']);
 $showSistemaGroup = $canViewSidebar(['avatares_alunos'])
     || $modOn('redacao_configuravel')
     || (($user['perfil_admin'] ?? '') === 'dev');
@@ -30,6 +31,12 @@ if ($nomeMenuEscola === '') {
     $nomeMenuEscola = 'Escola';
 }
 ?>
+<?php if ($showDashboardMenu): ?>
+<a href="<?= URL ?>/admin/dashboard" class="flex items-center px-4 py-3 <?= $cp === 'dashboard' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200">
+    <i class="fa-solid fa-gauge-high w-5 h-5 mr-3"></i>
+    <span class="sidebar-text">Dashboard</span>
+</a>
+<?php endif; ?>
 <?php if ($modOn('assistente') && in_array(($user['perfil_admin'] ?? ''), ['dev', 'diretor', 'coordenador'], true)): ?>
 <a href="<?= URL ?>/admin/assistente" class="flex items-center px-4 py-3 <?= $cp === 'assistente' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200">
     <i class="fa-solid fa-comments w-5 h-5 mr-3"></i>
@@ -52,12 +59,6 @@ if ($nomeMenuEscola === '') {
         </button>
     </div>
     <div id="academico-submenu" class="<?= $academicoOpen ? '' : 'hidden' ?> ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
-        <?php if ($modOn('boletim') && $canViewSidebar(['configuracao_boletim'])): ?>
-        <a href="<?= URL ?>/admin/implantar-academico" class="<?= $linkCls($cp === 'implantar-academico') ?>">
-            <i class="fa-solid fa-list-check w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Implantar acadêmico</span>
-        </a>
-        <?php endif; ?>
         <?php $menu_subcab_titulo = 'Estrutura'; $menu_subcab_ordenar = true; $menu_subcab_id = 'estrutura'; $menu_subcab_aberto = !empty($estruturaNestedOpen); require __DIR__ . '/admin_sidebar_subcabecalho.php'; ?>
         <div id="estrutura-nested" class="<?= !empty($estruturaNestedOpen) ? '' : 'hidden' ?>">
         <div class="sidebar-sublista">
@@ -150,9 +151,9 @@ if ($nomeMenuEscola === '') {
         </a>
         <?php endif; ?>
         <?php if ($modOn('boletim') && $canViewSidebar(['configuracao_boletim'])): ?>
-        <a href="<?= URL ?>/admin/boletins" class="<?= $linkCls($cp === 'boletins') ?>">
+        <a href="<?= URL ?>/admin/boletins" class="<?= $linkCls(in_array($cp, ['boletins', 'boletim_config', 'boletim_guia', 'reports_boletim_coordenacao'], true)) ?>">
             <i class="fa-solid fa-file-circle-check w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Modelo de Boletim</span>
+            <span class="sidebar-text text-sm">Boletins</span>
         </a>
         <?php endif; ?>
         </div>
@@ -413,35 +414,6 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::i
             <span class="sidebar-text text-sm">Censo Escolar</span>
         </a>
         <?php endif; ?>
-        <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('documentos_institucionais')): ?>
-        <div class="flex items-center rounded-lg <?= $cp === 'documentos_institucionais' ? 'bg-white/20' : '' ?>">
-            <a href="<?= URL ?>/admin/documentos-institucionais" class="flex-1 <?= $linkCls($cp === 'documentos_institucionais') ?>">
-                <i class="fa-solid fa-file-shield w-4 h-4 mr-3 flex-shrink-0"></i>
-                <span class="sidebar-text text-sm">Documentos Institucionais</span>
-            </a>
-            <?php if ((class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('processo_matricula') && $canViewSidebar(['processos_matricula'])) || $canViewSidebar(['modelos_documentos'])): ?>
-            <button type="button" onclick="toggleNestedMenu('documentos-institucionais')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
-                <svg id="documentos-institucionais-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-            </button>
-            <?php endif; ?>
-        </div>
-        <?php if ((class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('processo_matricula') && $canViewSidebar(['processos_matricula'])) || $canViewSidebar(['modelos_documentos'])): ?>
-        <div id="documentos-institucionais-nested" class="<?= $documentosNestedOpen ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
-            <?php if (class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('processo_matricula') && $canViewSidebar(['processos_matricula'])): ?>
-            <a href="<?= URL ?>/admin/configuracao/assinatura-digital" class="<?= $linkCls($cp === 'assinatura_digital') ?>">
-                <span class="sidebar-text text-sm">Assinatura Digital</span>
-            </a>
-            <?php endif; ?>
-            <?php if ($canViewSidebar(['modelos_documentos'])): ?>
-            <a href="<?= URL ?>/admin/modelos-documentos" class="<?= $linkCls($cp === 'modelos_documentos') ?>">
-                <span class="sidebar-text text-sm">Layout de documentos</span>
-            </a>
-            <?php endif; ?>
-        </div>
-        <?php endif; ?>
-        <?php endif; ?>
         <?php if (class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('processo_matricula')): ?>
         <div class="flex items-center rounded-lg <?= $cp === 'enrollment' ? 'bg-white/20' : '' ?>">
             <a href="<?= URL ?>/admin/enrollment" class="flex-1 <?= $linkCls($cp === 'enrollment') ?>">
@@ -456,6 +428,9 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::i
         </div>
         <div id="matriculas-nested" class="<?= $matriculasNestedOpen ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
             <?php if ($canViewSidebar(['processos_matricula'])): ?>
+            <a href="<?= URL ?>/admin/enrollment" class="<?= $linkCls($cp === 'enrollment') ?>">
+                <span class="sidebar-text text-sm">Nova Matrícula</span>
+            </a>
             <a href="<?= URL ?>/admin/enrollment/config" class="<?= $linkCls($cp === 'enrollment_config') ?>">
                 <span class="sidebar-text text-sm">Configuração de Matrícula</span>
             </a>
@@ -472,96 +447,44 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::i
             <span class="sidebar-text text-sm">Movimentação de alunos</span>
         </a>
         <?php endif; ?>
-        <?php if ($canViewSidebar(['vida_escolar']) && $modOn('vida_escolar')): ?>
-        <a href="<?= URL ?>/admin/vida-escolar" class="<?= $linkCls(in_array($cp, ['vida_escolar', 'vida_escolar_oficios'], true)) ?>">
-            <i class="fa-solid fa-scroll w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Vida Escolar</span>
-        </a>
-        <?php endif; ?>
-        <?php $menu_subcab_titulo = 'Outros da escola'; $menu_subcab_periodo = ''; require __DIR__ . '/admin_sidebar_subcabecalho.php'; ?>
-        <?php if ($showInventoryGroup): ?>
-        <button type="button" onclick="toggleNestedMenu('recursos-fisicos')" class="w-full flex items-center px-4 py-2 <?= $recursosNestedOpen ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200 text-left">
-            <i class="fa-solid fa-boxes-stacked w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm flex-1">Recursos Físicos</span>
-            <svg id="recursos-fisicos-arrow" class="w-3 h-3 flex-shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-            </svg>
-        </button>
-        <div id="recursos-fisicos-nested" class="<?= $recursosNestedOpen ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
-            <?php if ($canViewSidebar(['almoxarifado'])): ?>
-            <a href="<?= URL ?>/admin/almoxarifado" class="<?= $linkCls($cp === 'almoxarifado') ?>">
-                <span class="sidebar-text text-sm">Almoxarifado</span>
-            </a>
-            <?php endif; ?>
-            <?php if ($canViewSidebar(['patrimonio'])): ?>
-            <a href="<?= URL ?>/admin/patrimonio" class="<?= $linkCls($cp === 'patrimonio') ?>">
-                <span class="sidebar-text text-sm">Patrimônio</span>
-            </a>
-            <?php endif; ?>
-        </div>
-        <?php endif; ?>
-        <div class="flex items-center rounded-lg <?= $cp === 'tudicoins_escola' ? 'bg-white/20' : '' ?>">
-            <a href="<?= URL ?>/admin/tudicoins" class="flex-1 <?= $linkCls($cp === 'tudicoins_escola') ?>">
-                <i class="fa-solid fa-wallet w-4 h-4 mr-3 flex-shrink-0"></i>
-                <span class="sidebar-text text-sm">TudiCoins da Escola</span>
-            </a>
-            <button type="button" onclick="toggleNestedMenu('tudicoins')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
-                <svg id="tudicoins-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-            </button>
-        </div>
-        <div id="tudicoins-nested" class="<?= $tudicoinsNestedOpen ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
-            <a href="<?= URL ?>/admin/creditos/pacotes" class="<?= $linkCls($cp === 'creditos_pacotes') ?>">
-                <span class="sidebar-text text-sm">Pacotes de TudiCoins</span>
-            </a>
-        </div>
-    </div>
-</div>
-
-<!-- Painéis -->
-<?php if (!empty($showPaineisGroup) || $showDashboardMenu || $modOn('saude_academica')): ?>
-<div class="menu-group">
-    <div class="flex items-center rounded-xl <?= $cp === 'paineis' ? 'bg-white/20' : '' ?>">
-        <a href="<?= URL ?>/admin/paineis" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
-            <i class="fa-solid fa-chart-pie w-5 h-5 mr-3"></i>
-            <span class="sidebar-text">Painéis</span>
-        </a>
-        <button type="button" onclick="toggleMenuGroup('paineis')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
-            <svg id="paineis-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-            </svg>
-        </button>
-    </div>
-    <div id="paineis-submenu" class="<?= !empty($paineisOpen) ? '' : 'hidden' ?> ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
-        <?php if ($showDashboardMenu): ?>
-        <a href="<?= URL ?>/admin/dashboard" class="<?= $linkCls($cp === 'dashboard') ?>">
-            <i class="fa-solid fa-gauge-high w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Dashboard</span>
-        </a>
-        <?php endif; ?>
-        <?php if ($modOn('saude_academica')): ?>
-        <a href="<?= URL ?>/admin/saude-academica" class="<?= $linkCls($cp === 'saude_academica') ?>">
-            <i class="fa-solid fa-heart-pulse w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Saúde Acadêmica</span>
-        </a>
-        <?php endif; ?>
-        <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('conformidade')): ?>
-        <a href="<?= URL ?>/admin/conformidade" class="<?= $linkCls($cp === 'conformidade') ?>">
-            <i class="fa-solid fa-clipboard-check w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Conformidade</span>
-        </a>
-        <?php endif; ?>
         <?php if ($canViewSidebar(['declaracoes_aluno'])): ?>
         <a href="<?= URL ?>/admin/paineis/documentos" class="<?= $linkCls($cp === 'paineis_documentos') ?>">
             <i class="fa-solid fa-file-lines w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Documentos</span>
         </a>
         <?php endif; ?>
-        <?php if ($canViewSidebar(['relatorios_gerais'])): ?>
-        <a href="<?= URL ?>/admin/relatorios" class="<?= $linkCls(in_array($cp, ['relatorios', 'reports_boletim_coordenacao'], true)) ?>">
-            <i class="fa-solid fa-chart-column w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Relatórios</span>
+    </div>
+</div>
+
+<?php if ($showInventoryGroup): ?>
+<?php
+$urlRecursosEscolares = $canViewSidebar(['almoxarifado'])
+    ? URL . '/admin/almoxarifado'
+    : URL . '/admin/patrimonio';
+?>
+<div class="menu-group">
+    <div class="flex items-center rounded-xl <?= !empty($recursosEscolaresOpen) ? 'bg-white/20' : '' ?>">
+        <a href="<?= $urlRecursosEscolares ?>" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
+            <i class="fa-solid fa-boxes-stacked w-5 h-5 mr-3"></i>
+            <span class="sidebar-text">Recursos</span>
+        </a>
+        <button type="button" onclick="toggleMenuGroup('recursos-escolares')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+            <svg id="recursos-escolares-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+        </button>
+    </div>
+    <div id="recursos-escolares-submenu" class="<?= !empty($recursosEscolaresOpen) ? '' : 'hidden' ?> ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
+        <?php if ($canViewSidebar(['almoxarifado'])): ?>
+        <a href="<?= URL ?>/admin/almoxarifado" class="<?= $linkCls($cp === 'almoxarifado') ?>">
+            <i class="fa-solid fa-box-open w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Almoxarifado</span>
+        </a>
+        <?php endif; ?>
+        <?php if ($canViewSidebar(['patrimonio'])): ?>
+        <a href="<?= URL ?>/admin/patrimonio" class="<?= $linkCls($cp === 'patrimonio') ?>">
+            <i class="fa-solid fa-barcode w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Patrimônio</span>
         </a>
         <?php endif; ?>
     </div>
@@ -668,6 +591,12 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::i
             <span class="sidebar-text text-sm">Jornada do Aluno</span>
         </a>
         <?php endif; ?>
+        <?php if ($canViewSidebar(['relatorios_gerais'])): ?>
+        <a href="<?= URL ?>/admin/relatorios" class="<?= $linkCls(in_array($cp, ['relatorios', 'reports_boletim_coordenacao'], true)) ?>">
+            <i class="fa-solid fa-chart-column w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Relatórios</span>
+        </a>
+        <?php endif; ?>
     </div>
 </div>
 <?php endif; ?>
@@ -758,6 +687,51 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::i
         </button>
     </div>
     <div id="z-configuracao-submenu" class="<?= $zConfigOpen ? '' : 'hidden' ?> ml-4 mt-1 space-y-1 border-l-2 border-white/20 pl-2">
+        <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('documentos_institucionais')): ?>
+        <div class="flex items-center rounded-lg <?= $cp === 'documentos_institucionais' ? 'bg-white/20' : '' ?>">
+            <a href="<?= URL ?>/admin/documentos-institucionais" class="flex-1 <?= $linkCls($cp === 'documentos_institucionais') ?>">
+                <i class="fa-solid fa-file-shield w-4 h-4 mr-3 flex-shrink-0"></i>
+                <span class="sidebar-text text-sm">Documentos Institucionais</span>
+            </a>
+            <?php if ((class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('processo_matricula') && $canViewSidebar(['processos_matricula'])) || $canViewSidebar(['modelos_documentos'])): ?>
+            <button type="button" onclick="toggleNestedMenu('documentos-institucionais')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                <svg id="documentos-institucionais-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </button>
+            <?php endif; ?>
+        </div>
+        <?php if ((class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('processo_matricula') && $canViewSidebar(['processos_matricula'])) || $canViewSidebar(['modelos_documentos'])): ?>
+        <div id="documentos-institucionais-nested" class="<?= $documentosNestedOpen ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
+            <?php if (class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('processo_matricula') && $canViewSidebar(['processos_matricula'])): ?>
+            <a href="<?= URL ?>/admin/configuracao/assinatura-digital" class="<?= $linkCls($cp === 'assinatura_digital') ?>">
+                <span class="sidebar-text text-sm">Assinatura Digital</span>
+            </a>
+            <?php endif; ?>
+            <?php if ($canViewSidebar(['modelos_documentos'])): ?>
+            <a href="<?= URL ?>/admin/modelos-documentos" class="<?= $linkCls($cp === 'modelos_documentos') ?>">
+                <span class="sidebar-text text-sm">Layout de documentos</span>
+            </a>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+        <?php endif; ?>
+        <div class="flex items-center rounded-lg <?= $cp === 'tudicoins_escola' ? 'bg-white/20' : '' ?>">
+            <a href="<?= URL ?>/admin/tudicoins" class="flex-1 <?= $linkCls($cp === 'tudicoins_escola') ?>">
+                <i class="fa-solid fa-wallet w-4 h-4 mr-3 flex-shrink-0"></i>
+                <span class="sidebar-text text-sm">TudiCoins da Escola</span>
+            </a>
+            <button type="button" onclick="toggleNestedMenu('tudicoins')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                <svg id="tudicoins-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="tudicoins-nested" class="<?= $tudicoinsNestedOpen ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
+            <a href="<?= URL ?>/admin/creditos/pacotes" class="<?= $linkCls($cp === 'creditos_pacotes') ?>">
+                <span class="sidebar-text text-sm">Pacotes de TudiCoins</span>
+            </a>
+        </div>
         <?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
         <a href="<?= URL ?>/admin/dev" class="<?= $linkCls($cp === 'dev') ?>">
             <i class="fa-solid fa-code w-4 h-4 mr-3"></i>

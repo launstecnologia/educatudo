@@ -41,6 +41,14 @@ $boletimWizardSteps = [
      data-url-salvar="<?= htmlspecialchars(URL . '/admin/boletim-configuracao/salvar', ENT_QUOTES, 'UTF-8') ?>"
      data-csrf="<?= htmlspecialchars((string) $csrfToken, ENT_QUOTES, 'UTF-8') ?>"
      data-regra-id="<?= $assistenteRegraId ?>"
+     data-boletim-id="<?= (int) ($boletimId ?? $boletim_id ?? 0) ?>"
+     data-ano-letivo="<?= (int) ($anoAssistente ?? $ano_letivo_assistente ?? 0) ?>"
+     data-bimestre="<?= (int) ($bimestreAssistente ?? $bimestre_assistente ?? 0) ?>"
+     data-retorno-fluxo="<?= !empty($voltarGerarAvaliacoes) ? 'gerar-avaliacoes' : (!empty($voltarBoletins) ? 'boletins' : '') ?>"
+     data-continuar="<?= !empty($continuarRascunhoAssistente) ? '1' : '0' ?>"
+     data-url-quadros="<?= htmlspecialchars(URL . '/admin/quadros-notas', ENT_QUOTES, 'UTF-8') ?>"
+     data-pode-ver-quadro="<?= !empty($podeVerQuadro) ? '1' : '0' ?>"
+     data-pode-cadastrar-quadro="<?= !empty($podeCadastrarQuadro) ? '1' : '0' ?>"
      data-config-versoes="<?= htmlspecialchars(json_encode($boletimConfigVersoes, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>">
 
     <!-- Overlay wizard -->
@@ -208,6 +216,10 @@ $boletimWizardSteps = [
     var urlSalvar = root.getAttribute('data-url-salvar');
     var csrf = root.getAttribute('data-csrf');
     var regraId = parseInt(root.getAttribute('data-regra-id') || '0', 10) || 0;
+    var retornoFluxo = root.getAttribute('data-retorno-fluxo') || '';
+    var urlQuadros = root.getAttribute('data-url-quadros') || '';
+    var podeVerQuadro = root.getAttribute('data-pode-ver-quadro') === '1';
+    var podeCadastrarQuadro = root.getAttribute('data-pode-cadastrar-quadro') === '1';
 
     var overlay = document.getElementById('boletim-wizard-overlay');
     var toggle = document.getElementById('boletim-assistente-toggle');
@@ -1506,9 +1518,6 @@ $boletimWizardSteps = [
         }
         if (!estado.boletim_id && catalogo.boletins && catalogo.boletins.length === 1) {
             estado.boletim_id = Number(catalogo.boletins[0].id || 0) || 0;
-        }
-        if (!estado.grupo_regras_notas_id && catalogo.quadros_notas && catalogo.quadros_notas.length === 1) {
-            estado.grupo_regras_notas_id = Number(catalogo.quadros_notas[0].id || 0) || 0;
         }
         window.boletimWizardEstadoAtual = function () { return estado; };
         return estado;
@@ -4257,6 +4266,12 @@ $boletimWizardSteps = [
         }
         if (r.bimestre != null) estado.bimestre = r.bimestre;
         if (r.ano_letivo) estado.ano_letivo = r.ano_letivo;
+        if (Number(r.boletim_id || 0) > 0) estado.boletim_id = Number(r.boletim_id);
+        if (Number(r.grupo_regras_notas_id || 0) > 0) estado.grupo_regras_notas_id = Number(r.grupo_regras_notas_id);
+        if (Number(r.regra_id || 0) > 0) {
+            estado.regra_id = Number(r.regra_id);
+            estado.modo = 'editar';
+        }
         if (Array.isArray(r.series_ids)) {
             estado.series_ids = r.series_ids.map(Number).filter(function (id) { return id > 0; });
         }
@@ -4682,6 +4697,124 @@ $boletimWizardSteps = [
             + (desc ? '<p class="text-xs text-gray-500 mt-1">' + desc + '</p>' : '') + '</div>';
     }
 
+    function pecasUsamQuadro() {
+        return (estado && estado.pecas || []).indexOf('semanal') >= 0;
+    }
+
+    function urlCriarQuadro() {
+        var retorno = window.location.pathname + window.location.search;
+        return String(urlQuadros || '').replace(/\/$/, '') + '/novo?retorno=' + encodeURIComponent(retorno);
+    }
+
+    function htmlAcoesQuadro() {
+        if (!urlQuadros || (!podeVerQuadro && !podeCadastrarQuadro)) {
+            return ' Peça a quem administra o Quadro de Notas para cadastrar o molde. O quadro é o molde das colunas; o Lançamento de Notas é onde a nota é digitada.';
+        }
+        var partes = [];
+        if (podeCadastrarQuadro) partes.push('<a class="underline font-medium" href="' + esc(urlCriarQuadro()) + '">Criar quadro</a>');
+        if (podeVerQuadro) {
+            var retornoGestao = window.location.pathname + window.location.search;
+            partes.push('<a class="underline font-medium" href="' + esc(urlQuadros) + '?retorno=' + encodeURIComponent(retornoGestao) + '">Gerenciar quadros</a>');
+        }
+        return ' ' + partes.join(' · ') + '. O quadro é o molde das colunas; o Lançamento de Notas é onde a nota é digitada. Sair para cadastrar não apaga esta configuração nem gera notas.';
+    }
+
+    function rotuloOpcaoQuadro() {
+        var situacao = catalogo && catalogo.quadros_notas_situacao ? catalogo.quadros_notas_situacao : '';
+        if ((catalogo.quadros_notas || []).length) return 'Sem quadro';
+        if (situacao === 'sem_permissao') return 'Sem permissão para consultar quadros';
+        if (situacao === 'sem_elegivel') return 'Nenhum quadro elegível para esta avaliação';
+        if (situacao === 'desabilitado') return 'Quadro de Notas indisponível nesta escola';
+        return 'Nenhum quadro cadastrado';
+    }
+
+    function htmlAvisoQuadro() {
+        if (!catalogo || !Array.isArray(catalogo.quadros_notas)) return '';
+        var quadros = catalogo.quadros_notas;
+        var situacao = catalogo.quadros_notas_situacao || '';
+        var temQuadro = Number(estado && estado.grupo_regras_notas_id || 0) > 0;
+        var usaMolde = pecasUsamQuadro();
+        if (situacao === 'sem_permissao') {
+            return '<p class="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mt-2">Você não tem permissão para consultar os quadros desta escola. A fórmula, a simulação e a geração seguem sem quadro.</p>';
+        }
+        if (!quadros.length && situacao === 'sem_elegivel') {
+            return '<p class="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mt-2">Há quadros cadastrados, mas nenhum está ativo para esta avaliação. Você pode configurar fórmulas e gerar notas e boletins sem quadro.' + htmlAcoesQuadro() + '</p>';
+        }
+        if (!quadros.length) {
+            return '<p class="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mt-2">Nenhum quadro cadastrado. Você pode configurar fórmulas e gerar notas e boletins sem quadro.' + htmlAcoesQuadro() + '</p>';
+        }
+        if (usaMolde && !temQuadro) {
+            return '<p class="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">Esta fórmula cita colunas do Quadro de Notas (S1, AV1). Sem um quadro escolhido, essas colunas não são resolvidas por um molde. As demais peças da configuração continuam valendo na simulação e na geração.' + htmlAcoesQuadro() + '</p>';
+        }
+        if (!temQuadro) {
+            return '<p class="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mt-2">Selecione um quadro se quiser usar suas colunas nesta avaliação. Você também pode configurar fórmulas e gerar notas e boletins sem quadro.</p>';
+        }
+        return '<p class="text-xs text-gray-500 mt-1">O quadro escolhido é o molde das colunas deste evento. O Lançamento de Notas continua sendo o lugar onde a nota é digitada.' + htmlAcoesQuadro() + '</p>';
+    }
+
+    function aplicarQuadroRecemCriado() {
+        if (!estado) return;
+        var id = Number(new URLSearchParams(window.location.search).get('quadro_id') || 0);
+        if (id <= 0) return;
+        var existe = (catalogo.quadros_notas || []).some(function (q) { return Number(q.id) === id; });
+        if (!existe) return;
+        estado.grupo_regras_notas_id = id;
+    }
+
+    function contextoNavegacaoCompativel(salvo) {
+        if (!salvo || typeof salvo !== 'object') return false;
+        var bol = Number(root.getAttribute('data-boletim-id') || 0);
+        var ano = Number(root.getAttribute('data-ano-letivo') || 0);
+        var bim = Number(root.getAttribute('data-bimestre') || 0);
+        if (bol > 0 && Number(salvo.boletim_id || 0) !== bol) return false;
+        if (ano > 0 && Number(salvo.ano_letivo || 0) !== ano) return false;
+        if (bim > 0 && Number(salvo.bimestre || 0) !== bim) return false;
+        if (regraId > 0 && Number(salvo.regra_id || 0) > 0 && Number(salvo.regra_id) !== regraId) return false;
+        return true;
+    }
+
+    function guardarEstadoParaQuadro() {
+        if (!estado) return;
+        try { syncIdentidadeFromDom(); } catch (e) { /* campos ainda não montados */ }
+        try {
+            sessionStorage.setItem('boletim_assistente_estado_navegacao', JSON.stringify(estado));
+        } catch (e2) { /* navegação segue mesmo sem rascunho local */ }
+    }
+
+    function restaurarEstadoNavegacao() {
+        try {
+            var bruto = sessionStorage.getItem('boletim_assistente_estado_navegacao');
+            if (!bruto) return false;
+            sessionStorage.removeItem('boletim_assistente_estado_navegacao');
+            var salvo = JSON.parse(bruto);
+            if (!contextoNavegacaoCompativel(salvo)) return false;
+            estado = salvo;
+            garantirEstado();
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function rascunhoSessaoCompativel() {
+        try {
+            var bruto = sessionStorage.getItem('boletim_assistente_rascunho');
+            if (!bruto) return null;
+            var r = JSON.parse(bruto);
+            if (!r || typeof r !== 'object' || !Array.isArray(r.componentes) || !r.componentes.length) return null;
+            var bol = Number(root.getAttribute('data-boletim-id') || 0);
+            var ano = Number(root.getAttribute('data-ano-letivo') || 0);
+            var bim = Number(root.getAttribute('data-bimestre') || 0);
+            if (bol > 0 && Number(r.boletim_id || 0) !== bol) return null;
+            if (ano > 0 && Number(r.ano_letivo || 0) !== ano) return null;
+            if (bim > 0 && Number(r.bimestre || 0) !== bim) return null;
+            if (regraId > 0 && Number(r.regra_id || 0) > 0 && Number(r.regra_id) !== regraId) return null;
+            return r;
+        } catch (e) {
+            return null;
+        }
+    }
+
     function renderBody() {
         if (!estado) {
             bodyEl.innerHTML = '<p class="text-sm text-gray-500">Carregando…</p>';
@@ -4759,14 +4892,14 @@ $boletimWizardSteps = [
                 html += '<p class="text-xs text-gray-500 mt-1">Nenhum deixa este evento fora do boletim oficial. Escolha o modelo para levar a mínima, as matérias e as turmas dele para a vida escolar e para a geração dos períodos.</p>';
             }
             html += '</div>';
-            html += '<div><label class="text-sm font-medium text-gray-700">Quadro de Notas <span class="font-normal text-gray-400">(opcional)</span></label>'
+            html += '<div><label class="text-sm font-medium text-gray-700" for="bw-quadro">Quadro de Notas (opcional)</label>'
                 + '<select id="bw-quadro" class="mt-1 w-full h-10 border rounded-lg px-3 text-sm">';
-            html += '<option value="">Sem quadro</option>';
+            html += '<option value="">' + esc(rotuloOpcaoQuadro()) + '</option>';
             (catalogo.quadros_notas || []).forEach(function (q) {
                 html += '<option value="' + Number(q.id) + '"' + (Number(estado.grupo_regras_notas_id) === Number(q.id) ? ' selected' : '') + '>' + esc(q.nome || ('Quadro #' + q.id)) + '</option>';
             });
             html += '</select>';
-            html += '<p class="text-xs text-gray-500 mt-1">Só use se este evento tiver colunas do molde (S1, AV1…).</p>';
+            html += htmlAvisoQuadro();
             html += '</div>';
             html += '</div>';
             if (ehBoletimComposto()) html += htmlFontesBimestres();
@@ -4996,10 +5129,14 @@ $boletimWizardSteps = [
                     : 'Dados fictícios. Para mudar ordem ou fórmula, volte em <strong>Fórmula</strong>.')) + '</p>';
             html += '<div class="mt-3">' + htmlEscopoPecasSelecionadas() + '</div>';
             html += '<div id="bw-preview-wrap" class="mt-4"></div>';
+            html += htmlAvisoQuadro();
+            if (retornoFluxo === 'gerar-avaliacoes' && returnUrl) {
+                html += '<p class="text-sm text-gray-700 mt-3"><a class="font-semibold text-indigo-700 underline" href="' + esc(returnUrl) + '">Voltar e configurar os demais períodos</a></p>';
+            }
             html += '<div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">';
             if (ehEventoNotasPreview()) {
                 html += '<p class="text-sm text-gray-800"><strong>Salvar sem gerar notas</strong><span class="block text-xs text-gray-600 font-normal mt-1">Grava só a versão da configuração. O detalhe do aluno e o boletim oficial continuam com as notas que já estão vigentes.</span></p>';
-                html += '<p class="text-sm text-gray-800"><strong>Concluir e aplicar</strong><span class="block text-xs text-gray-600 font-normal mt-1">Grava a configuração e gera as notas. Essa versão passa a ser a do detalhe do aluno e substitui a nota no boletim oficial da vida escolar. A anterior fica no histórico.</span></p>';
+                html += '<p class="text-sm text-gray-800"><strong>Concluir e aplicar</strong><span class="block text-xs text-gray-600 font-normal mt-1">Grava a configuração e inicia a geração das notas. O boletim oficial só muda quando essa geração terminar. Se ela não concluir, a configuração salva permanece e a geração pode ser retomada na página do evento.</span></p>';
             } else {
                 html += '<p class="text-sm text-gray-800"><strong>Esta versão entra no aluno</strong><span class="block text-xs text-gray-600 font-normal mt-1">Ao salvar, ela passa a ser a do detalhe do aluno e substitui a nota no boletim oficial da vida escolar. A anterior fica no histórico.</span></p>';
             }
@@ -5521,10 +5658,8 @@ $boletimWizardSteps = [
         var nome = String((estado && estado.nome) || '').trim();
         var ref = Number((estado && estado.regra_id) || regraId || 0);
         var titulo = nome || 'Evento de Notas';
-        var h1 = document.getElementById('admin-page-title');
         var h2 = document.getElementById('evento-notas-titulo');
         var sub = document.getElementById('evento-notas-ref');
-        if (h1) h1.textContent = titulo;
         if (h2) h2.textContent = titulo;
         if (sub) sub.textContent = ref > 0 ? ('Ref ' + ref) : 'Novo evento, ainda sem ref';
         if (nome || ref > 0) document.title = titulo + ' - EducaTudo';
@@ -5753,11 +5888,26 @@ $boletimWizardSteps = [
             document.body.style.overflow = 'hidden';
         }
         garantirEstado();
+        if (root.getAttribute('data-continuar') === '1') {
+            restaurarEstadoNavegacao();
+        }
         renderAll();
         atualizarCabecalhoEvento();
         if (iniciado) return;
         iniciado = true;
         if (dadosIniciais.estado) {
+            if (root.getAttribute('data-continuar') === '1') {
+                var rascunhoLocal = rascunhoSessaoCompativel();
+                if (rascunhoLocal) {
+                    aplicarRascunhoNoWizard(rascunhoLocal);
+                    aplicarQuadroRecemCriado();
+                    renderAll();
+                    renderResumo('Esta é a configuração já iniciada neste navegador. Confira e salve. Salvar atualiza este evento e não cria outro.', []);
+                    return;
+                }
+            }
+            aplicarQuadroRecemCriado();
+            renderAll();
             renderResumo(dadosIniciais.resumo, dadosIniciais.erros || []);
             return;
         }
@@ -5886,6 +6036,11 @@ $boletimWizardSteps = [
             add('componentes_json', JSON.stringify(comps));
             add('assistente_rascunho', JSON.stringify(r));
             add('origem_assistente', '1');
+            if (retornoFluxo === 'gerar-avaliacoes' || retornoFluxo === 'boletins') {
+                add('retorno_fluxo', retornoFluxo);
+                add('retorno_boletim_id', root.getAttribute('data-boletim-id') || (r.boletim_id || ''));
+                add('retorno_ano_letivo', r.ano_letivo || root.getAttribute('data-ano-letivo') || '');
+            }
             if (gerarNotas === true && ehEventoNotasPreview()) add('gerar_nova_versao', '1');
             document.body.appendChild(form);
             form.submit();
@@ -6188,6 +6343,13 @@ $boletimWizardSteps = [
         });
     }
 
+    document.addEventListener('click', function (ev) {
+        var link = ev.target && ev.target.closest ? ev.target.closest('a') : null;
+        if (!link || !root.contains(link)) return;
+        var href = link.getAttribute('href') || '';
+        if (href.indexOf('/admin/quadros-notas') === -1) return;
+        guardarEstadoParaQuadro();
+    }, true);
     if (toggle) toggle.addEventListener('click', abrirWizard);
     if (btnFechar) btnFechar.addEventListener('click', fecharWizard);
     if (btnVoltar) btnVoltar.addEventListener('click', voltar);

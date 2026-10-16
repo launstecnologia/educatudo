@@ -49,6 +49,38 @@ class BoletimCadastroAdminController extends \App\Controllers\Admin\AdminBaseCon
             $item['eventos_notas'] = $eventosDoItem;
             $item['eventos_notas_qtd'] = count($eventosDoItem);
             $item['evento_notas_id'] = (int) ($eventosDoItem[0]['id'] ?? 0);
+            $anoPeriodos = (int) ($item['ano_letivo'] ?? 0);
+            if ($anoPeriodos <= 0) {
+                $anoPeriodos = (int) date('Y');
+            }
+            $periodosDistintos = [];
+            foreach ($eventosDoItem as $eventoPeriodo) {
+                if (!is_array($eventoPeriodo)) {
+                    continue;
+                }
+                $numeroPeriodo = (int) ($eventoPeriodo['bimestre'] ?? 0);
+                $regraPeriodoId = (int) ($eventoPeriodo['id'] ?? 0);
+                if ($numeroPeriodo <= 0 || $regraPeriodoId <= 0) {
+                    continue;
+                }
+                // A consulta ordena por id: o último do mesmo número fica no menu. Os anteriores continuam no banco.
+                $periodosDistintos[$numeroPeriodo] = [
+                    'bimestre' => $numeroPeriodo,
+                    'regra_id' => $regraPeriodoId,
+                    'ano_letivo' => $anoPeriodos,
+                    'rotulo' => \App\Core\PeriodoLetivo::rotulo($anoPeriodos, $numeroPeriodo),
+                ];
+            }
+            ksort($periodosDistintos);
+            $item['periodos'] = array_values($periodosDistintos);
+            $item['periodos_qtd'] = count($periodosDistintos);
+            $rotulosRegime = \App\Core\PeriodoLetivo::doAno($anoPeriodos)['rotulos'] ?? [];
+            $primeiroPeriodo = 1;
+            foreach ($rotulosRegime as $numeroRegime => $rotuloRegime) {
+                $primeiroPeriodo = (int) $numeroRegime;
+                break;
+            }
+            $item['primeiro_periodo'] = $primeiroPeriodo > 0 ? $primeiroPeriodo : 1;
             $rid = (int) ($item['regra_academica_id'] ?? 0);
             $item['regra_academica_nome'] = $rid > 0 ? ($nomesRegra[$rid] ?? '') : '';
             $item['criterios'] = $this->service->criteriosDoBoletim($item);
@@ -57,8 +89,8 @@ class BoletimCadastroAdminController extends \App\Controllers\Admin\AdminBaseCon
 
         $usuario = $this->auth->getUser();
         $this->viewWithLayout('admin', 'admin/boletins/index', [
-            'title' => 'Modelo de Boletim — EducaTudo',
-            'page_title' => 'Painel Administrativo',
+            'title' => 'Boletins — EducaTudo',
+            'page_title' => 'Boletins',
             'user' => $usuario,
             'pode_dev' => is_array($usuario) && (string) ($usuario['perfil_admin'] ?? '') === 'dev',
             'current_page' => 'boletins',
@@ -208,6 +240,20 @@ class BoletimCadastroAdminController extends \App\Controllers\Admin\AdminBaseCon
             $modelosPorBimestre[$bimPrev] = $gerador->modeloPadraoParaBimestre($eventos, $bimPrev);
         }
         $flash = $this->getFlashMessage();
+        $anoTela = (int) ($prev['ano'] ?? date('Y'));
+        $regime = is_array($prev['regime'] ?? null)
+            ? $prev['regime']
+            : \App\Core\PeriodoLetivo::doAno($anoTela);
+        $primeiroPeriodo = null;
+        foreach (($prev['periodos'] ?? []) as $periodoTela) {
+            if (!is_array($periodoTela)) {
+                continue;
+            }
+            if ((int) ($periodoTela['bimestre'] ?? 0) >= 1) {
+                $primeiroPeriodo = $periodoTela;
+                break;
+            }
+        }
         $this->viewWithLayout('admin', 'admin/boletins/gerar-avaliacoes', [
             'title' => 'Gerar avaliações do ano — EducaTudo',
             'user' => $this->auth->getUser(),
@@ -216,8 +262,11 @@ class BoletimCadastroAdminController extends \App\Controllers\Admin\AdminBaseCon
             'periodos' => $prev['periodos'] ?? [],
             'eventos_modelo' => $eventos,
             'modelos_por_bimestre' => $modelosPorBimestre,
-            'ano_letivo' => (int) ($prev['ano'] ?? date('Y')),
+            'ano_letivo' => $anoTela,
             'usou_calendario' => !empty($prev['usou_calendario']),
+            'regime' => $regime,
+            'primeiro_periodo' => $primeiroPeriodo,
+            'avisos_datas' => is_array($prev['avisos_datas'] ?? null) ? $prev['avisos_datas'] : [],
             'csrf_token' => $this->generateCsrfToken(),
             'flash_status' => $flash['type'] === 'success' ? 'success' : ($flash['message'] ? 'error' : ''),
             'flash_message' => $flash['message'] ?? '',
@@ -272,24 +321,26 @@ class BoletimCadastroAdminController extends \App\Controllers\Admin\AdminBaseCon
         $nSubst = count($result['substituidos'] ?? []);
         $nIgn = count($result['ignorados'] ?? []);
         $nPulados = count($result['pulados'] ?? []);
+        $rotulo = \App\Modulos\Boletins\Services\GeradorAvaliacoesAnualService::rotuloCampoMinusculo($ano);
         $partes = [];
         if ($nCriados > 0) {
-            $partes[] = $nCriados . ' avaliação(ões) criada(s)';
+            $partes[] = $nCriados . ' configuração(ões) de ' . $rotulo . ' criada(s)';
         }
         if ($nSubst > 0) {
-            $partes[] = $nSubst . ' substituída(s)';
+            $partes[] = $nSubst . ' substituída(s). A configuração anterior foi desativada e o histórico deixa de ficar vigente';
         }
         $msg = $partes !== []
             ? (implode(', ', $partes) . '.')
-            : 'Nenhum evento novo foi criado.';
+            : 'Nenhuma configuração nova foi criada.';
         if ($nIgn > 0 && ($nCriados > 0 || $nSubst > 0)) {
-            $msg .= ' ' . $nIgn . ' bimestre(s) já cadastrado(s) foram mantidos.';
+            $msg .= ' ' . $nIgn . ' ' . $rotulo . '(s) já configurado(s) foram mantidos.';
         }
         if ($nPulados > 0 && ($nCriados > 0 || $nSubst > 0)) {
-            $msg .= ' ' . $nPulados . ' bimestre(s) ficaram de fora desta geração.';
+            $msg .= ' ' . $nPulados . ' ' . $rotulo . '(s) ficaram de fora desta criação.';
         }
+        $msg .= ' Os boletins dos alunos não foram gerados.';
         $this->setFlashMessage($msg, 'success');
-        $this->redirect('/admin/boletins');
+        $this->redirect('/admin/boletins/' . $id . '/gerar-avaliacoes?ano_letivo=' . $ano);
     }
 
     public function simularBoletim($id): void
@@ -369,82 +420,28 @@ class BoletimCadastroAdminController extends \App\Controllers\Admin\AdminBaseCon
         }
 
         $regra = $regraId > 0 ? $cfg->getRuleById($regraId) : null;
-        if ($regra && (int) ($regra['boletim_id'] ?? 0) !== $id) {
-            $regra = null;
-            $regraId = 0;
-        }
-
-        $ano = (int) ($regra['ano_letivo'] ?? ($item['ano_letivo'] ?? date('Y')));
-        if ($ano < 2000) {
-            $ano = (int) date('Y');
-        }
-        $dataInicio = $this->dataYmd((string) ($_GET['data_inicio'] ?? ($regra['default_data_inicio'] ?? '')));
-        $dataFim = $this->dataYmd((string) ($_GET['data_fim'] ?? ($regra['default_data_fim'] ?? '')));
-        if ($dataInicio === null) {
-            $dataInicio = sprintf('%04d-01-01', $ano);
-        }
-        if ($dataFim === null) {
-            $dataFim = sprintf('%04d-12-31', $ano);
-        }
-        if ($dataInicio > $dataFim) {
-            [$dataInicio, $dataFim] = [$dataFim, $dataInicio];
-        }
-        $periodoRef = 'RANGE:' . $dataInicio . ':' . $dataFim;
+        $selectedAlunoId = isset($_GET['aluno_id']) ? (int) $_GET['aluno_id'] : 0;
+        $motor = new BoletimConfigController(true);
+        $consultaSimulacao = $motor->consultarSimulacaoAluno(
+            $item,
+            is_array($regra) ? $regra : null,
+            $selectedAlunoId,
+            $this->dataYmd((string) ($_GET['data_inicio'] ?? '')),
+            $this->dataYmd((string) ($_GET['data_fim'] ?? ''))
+        );
+        $dataInicio = (string) ($consultaSimulacao['data_inicio'] ?? '');
+        $dataFim = (string) ($consultaSimulacao['data_fim'] ?? '');
+        $periodoRef = (string) ($consultaSimulacao['periodo_ref'] ?? '');
+        $simulacao = $consultaSimulacao['simulacao'] ?? null;
 
         $alunos = [];
         $turmas = [];
-        $simulacao = null;
-        $selectedAlunoId = isset($_GET['aluno_id']) ? (int) $_GET['aluno_id'] : 0;
         $geracaoEmAndamento = false;
-        if (is_array($regra)) {
-            $alunos = $this->alunosVinculadosRegra($cfg, $regra);
+        $regraDoModelo = is_array($regra) && (int) ($regra['boletim_id'] ?? 0) === $id ? $regra : null;
+        if (is_array($regraDoModelo)) {
+            $alunos = $this->alunosVinculadosRegra($cfg, $regraDoModelo);
             $turmas = $cfg->getAvailableClasses(1000);
-            $geracaoEmAndamento = $cfg->temGeracaoEmAndamento($regraId);
-            if ($selectedAlunoId > 0) {
-                $permitido = false;
-                foreach ($alunos as $alunoRow) {
-                    if ((int) ($alunoRow['id'] ?? 0) === $selectedAlunoId) {
-                        $permitido = true;
-                        break;
-                    }
-                }
-                if ($permitido) {
-                    $motor = new \App\Controllers\Admin\BoletimConfigController(true);
-                    // Igual ao Evento de Notas: Demonstrativo com mãe + filhas (ex.: Língua Portuguesa).
-                    $simulacao = $motor->simularRegraAluno(
-                        $regra,
-                        $selectedAlunoId,
-                        $periodoRef,
-                        $dataInicio,
-                        $dataFim,
-                        [],
-                        false,
-                        true
-                    );
-                    try {
-                        $simBoletim = $motor->simularRegraAluno(
-                            $regra,
-                            $selectedAlunoId,
-                            $periodoRef,
-                            $dataInicio,
-                            $dataFim,
-                            [],
-                            true
-                        );
-                        $matrizBoletim = is_array($simBoletim) ? ($simBoletim['matriz_materias'] ?? null) : null;
-                        if (is_array($simulacao) && is_array($matrizBoletim)) {
-                            $simulacao['matriz_materias_boletim'] = $matrizBoletim;
-                        }
-                    } catch (Throwable $e) {
-                        error_log('Gerar boletins simulação agrupada aluno #' . $selectedAlunoId . ': ' . $e->getMessage());
-                    }
-                    if (is_array($simulacao)) {
-                        $simulacao = $motor->montarMatrizDemonstrativoComGrupoHierarquico($simulacao, $regra);
-                    }
-                } else {
-                    $selectedAlunoId = 0;
-                }
-            }
+            $geracaoEmAndamento = $cfg->temGeracaoEmAndamento((int) ($regraDoModelo['id'] ?? 0));
         }
 
         $flash = $this->getFlashMessage();
@@ -463,14 +460,21 @@ class BoletimCadastroAdminController extends \App\Controllers\Admin\AdminBaseCon
             'current_page' => 'boletins',
             'boletim' => $item,
             'eventos' => $eventos,
-            'regra' => $regra,
-            'selected_regra_id' => $regraId,
+            'regra' => $regraDoModelo,
+            'selected_regra_id' => is_array($regraDoModelo) ? (int) ($regraDoModelo['id'] ?? 0) : 0,
             'alunos' => array_slice($alunos, 0, 400),
             'turmas' => $turmas,
             'periodo_ref' => $periodoRef,
             'data_inicio' => $dataInicio,
             'data_fim' => $dataFim,
             'simulacao' => $simulacao,
+            'simulacao_mensagem' => (string) ($consultaSimulacao['mensagem'] ?? ''),
+            'simulacao_avisos' => is_array($consultaSimulacao['avisos'] ?? null) ? $consultaSimulacao['avisos'] : [],
+            'simulacao_rotulo_periodo' => (string) ($consultaSimulacao['rotulo_periodo'] ?? ''),
+            'simulacao_configuracao' => (string) ($consultaSimulacao['configuracao'] ?? ''),
+            'simulacao_url_vigente' => (string) ($consultaSimulacao['url_vigente'] ?? ''),
+            'simulacao_tem_vigente' => !empty($consultaSimulacao['boletim_vigente']),
+            'modelo_nome' => (string) ($item['nome'] ?? ''),
             'selected_aluno_id' => $selectedAlunoId,
             'geracao_em_andamento' => $geracaoEmAndamento,
             'abrir_simular' => $abrirSimular && $selectedAlunoId <= 0,

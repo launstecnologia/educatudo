@@ -266,6 +266,10 @@ class AuthMiddleware
             return true;
         }
 
+        if ($moduleKey === 'grupos_regras_notas') {
+            return true;
+        }
+
         http_response_code(302);
         header('Location: ' . URL . '/admin/dashboard');
         exit;

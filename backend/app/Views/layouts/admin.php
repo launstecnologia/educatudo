@@ -159,7 +159,7 @@
                         </svg>
                     </button>
                     <div class="flex-1 min-w-0">
-                        <h1 id="admin-page-title" class="text-lg md:text-2xl font-bold text-gray-900 truncate"><?= htmlspecialchars($page_title ?? 'Dashboard Admin') ?></h1>
+                        <h1 id="admin-page-title" class="text-lg md:text-2xl font-bold text-gray-900 truncate">Painel Administrativo</h1>
                         <p class="text-xs md:text-sm text-gray-600 truncate"><?= htmlspecialchars($page_subtitle ?? ('Bem-vindo, ' . ($user['nome'] ?? 'Administrador') . '!')) ?></p>
                     </div>
                     <div class="flex items-center space-x-2 md:space-x-4 flex-shrink-0">
@@ -568,7 +568,7 @@
     if ($ehTelaBoletim) {
         $csrfToken = (string) ($csrf_token ?? ($_SESSION['csrf_token'] ?? ''));
         $boletimAssistenteDisponivel = true;
-        include __DIR__ . '/../admin/boletim/_assistente_consulta.php';
+        include __DIR__ . '/../../Modulos/boletins/Views/admin/boletim/_assistente_consulta.php';
     }
     ?>
 </body>

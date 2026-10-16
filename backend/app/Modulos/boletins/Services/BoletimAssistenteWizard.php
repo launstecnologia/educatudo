@@ -639,12 +639,6 @@ class BoletimAssistenteWizard
                 $estado['boletim_id'] = (int) ($boletins[0]['id'] ?? 0);
             }
         }
-        if ((int) ($estado['grupo_regras_notas_id'] ?? 0) <= 0) {
-            $quadros = $this->catalogoQuadrosNotas();
-            if (count($quadros) === 1) {
-                $estado['grupo_regras_notas_id'] = (int) ($quadros[0]['id'] ?? 0);
-            }
-        }
         $this->aplicarEscopoDoBoletimCadastro($estado);
         if (($estado['pecas'] ?? []) === []) {
             $doQuadro = $this->inferirPecasDoQuadro((int) ($estado['grupo_regras_notas_id'] ?? 0));
@@ -4009,6 +4003,9 @@ class BoletimAssistenteWizard
         if ($this->ehBoletimComposto($estado)) {
             return false;
         }
+        if ((int) ($estado['grupo_regras_notas_id'] ?? 0) <= 0) {
+            return false;
+        }
         if (($estado['modelo_key'] ?? '') === 'quadro_semanal'
             && in_array('semanal', (array) ($estado['pecas'] ?? []), true)) {
             return true;
@@ -4059,7 +4056,8 @@ class BoletimAssistenteWizard
      */
     private function montarQuadroDoEstado(array $estado): array
     {
-        $semanas = $this->semanasQuadroConfig((int) ($estado['grupo_regras_notas_id'] ?? 0) ?: null);
+        $grupoQuadro = (int) ($estado['grupo_regras_notas_id'] ?? 0);
+        $semanas = $this->semanasQuadroConfig($grupoQuadro > 0 ? $grupoQuadro : 0);
         $rascunho = $this->ferramentas->montarRascunhoQuadroSemanal([
             'ano_letivo' => (int) ($estado['ano_letivo'] ?? date('Y')),
             'bimestre' => (int) ($estado['bimestre'] ?? 1),
@@ -4095,6 +4093,9 @@ class BoletimAssistenteWizard
     private function semanasQuadroConfig(?int $grupoId = null): array
     {
         $vazio = ['a' => [], 'b' => []];
+        if ($grupoId === null || $grupoId <= 0) {
+            return $vazio;
+        }
         $path = dirname(__DIR__, 2) . '/grupos-regras-notas/Services/GrupoRegrasNotasService.php';
         if (!class_exists('GrupoRegrasNotasService', false) && is_file($path)) {
             require_once $path;

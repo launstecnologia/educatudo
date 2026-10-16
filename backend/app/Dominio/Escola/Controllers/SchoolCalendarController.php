@@ -135,31 +135,76 @@ class SchoolCalendarController extends AdminBaseController
         if (!$this->enforceAdminPermissionKey('calendario_letivo', $acao, false)) {
             return;
         }
+        $ano = (int) ($_POST['ano'] ?? date('Y'));
+        $calendarioIdPedido = (int) ($_POST['calendario_id'] ?? 0);
         if (!$this->validateCsrf((string) ($_POST['csrf_token'] ?? ''))) {
-            $this->setFlashMessage('Sessão expirada.', 'error');
-            $this->redirect('/admin/calendario-letivo');
+            $this->responderEvento(
+                $ano,
+                $calendarioIdPedido,
+                false,
+                'Sessão expirada. Recarregue a página e tente novamente.',
+                ['formulario' => 'Sessão expirada. Recarregue a página e tente novamente.'],
+                403
+            );
             return;
         }
-        $ano = (int) ($_POST['ano'] ?? date('Y'));
-        $service = new SchoolCalendarService($this->db);
-        $calendarioId = (int) ($_POST['calendario_id'] ?? 0);
-        $cfg = $calendarioId > 0 ? $service->getPorId($calendarioId) : null;
-        if (!$cfg || (int) ($cfg['ano'] ?? 0) !== $ano) {
-            $cfg = $service->getAno($ano);
+
+        $datas = SchoolCalendarService::validarDatasEvento(
+            (string) ($_POST['data_inicio'] ?? ''),
+            (string) ($_POST['data_fim'] ?? '')
+        );
+        $descricao = trim((string) ($_POST['descricao'] ?? ''));
+        $erros = $datas['erros'];
+        if ($descricao === '') {
+            $erros['descricao'] = 'Informe a descrição do evento.';
         }
-        if (!$cfg && $eventoId <= 0) {
-            $service->salvarAno($ano, 200, 800, '');
-            $cfg = $service->getAno($ano);
+        if ($erros !== []) {
+            $this->responderEvento($ano, $calendarioIdPedido, false, (string) reset($erros), $erros, 422);
+            return;
+        }
+
+        $inicio = $datas['inicio'];
+        $fim = $datas['fim'];
+        try {
+            $service = new SchoolCalendarService($this->db);
+            $cfg = $calendarioIdPedido > 0 ? $service->getPorId($calendarioIdPedido) : null;
+            if (!$cfg || (int) ($cfg['ano'] ?? 0) !== $ano) {
+                $cfg = $service->getAno($ano);
+            }
+            if (!$cfg && $eventoId <= 0) {
+                $service->salvarAno($ano, 200, 800, '');
+                $cfg = $service->getAno($ano);
+            }
+        } catch (\Throwable $e) {
+            error_log('Calendário letivo preparar ano: ' . $e->getMessage());
+            $this->responderEvento(
+                $ano,
+                $calendarioIdPedido,
+                false,
+                'Não foi possível salvar agora. Os dados continuam aqui. Tente novamente.',
+                ['formulario' => 'Não foi possível salvar agora. Os dados continuam aqui. Tente novamente.'],
+                500
+            );
+            return;
         }
         if (!$cfg) {
-            $this->setFlashMessage('Não foi possível preparar o calendário do ano.', 'error');
-            $this->redirectCalendario($ano);
+            $this->responderEvento(
+                $ano,
+                0,
+                false,
+                'Não foi possível preparar o calendário do ano.',
+                ['formulario' => 'Não foi possível preparar o calendário do ano.'],
+                422
+            );
             return;
         }
         $calendarioId = (int) $cfg['id'];
-        $inicio = $this->sanitizeDate((string) ($_POST['data_inicio'] ?? ''));
-        $fim = $this->sanitizeDate((string) ($_POST['data_fim'] ?? '')) ?: $inicio;
-        $descricao = trim((string) ($_POST['descricao'] ?? ''));
+        $token = $eventoId > 0 ? '' : $this->tokenEnvioEvento();
+        if ($token !== '' && $this->eventoJaEnviado($token)) {
+            $this->responderEvento($ano, $calendarioId, true, 'Evento adicionado ao calendário letivo.', [], 200, 'success');
+            return;
+        }
+
         $tipo = (string) ($_POST['tipo'] ?? 'feriado');
         if (!$service->tipoValido($tipo)) {
             $tipo = 'feriado';
@@ -170,75 +215,97 @@ class SchoolCalendarController extends AdminBaseController
         $visivelPais = (isset($_POST['visivel_pais']) || $publicarEscolar) ? 1 : 0;
         $visivelAluno = isset($_POST['visivel_aluno']) ? 1 : 0;
         $visivelProfessor = isset($_POST['visivel_professor']) ? 1 : 0;
-        if ($inicio === '' || $descricao === '') {
-            $this->setFlashMessage('Informe data e descrição do evento.', 'error');
-            $this->redirectCalendario($ano, $calendarioId);
-            return;
-        }
-        if ($fim !== '' && $inicio !== '' && $fim < $inicio) {
-            $this->setFlashMessage('A data final não pode ser anterior à data inicial.', 'error');
-            $this->redirectCalendario($ano, $calendarioId);
-            return;
-        }
         $atualizando = $eventoId > 0;
         try {
-        if ($atualizando) {
-            $ok = $service->atualizarEvento(
-                $eventoId,
-                (int) $cfg['id'],
-                $inicio,
-                $fim,
-                $tipo,
-                $descricao,
-                $link,
-                $local,
-                $visivelAluno,
-                $visivelProfessor,
-                $visivelPais,
-            );
-            if (!$ok) {
-                $this->setFlashMessage('Não foi possível atualizar o evento.', 'error');
-                $this->redirectCalendario($ano, $calendarioId);
-                return;
+            if ($atualizando) {
+                $ok = $service->atualizarEvento(
+                    $eventoId,
+                    $calendarioId,
+                    $inicio,
+                    $fim,
+                    $tipo,
+                    $descricao,
+                    $link,
+                    $local,
+                    $visivelAluno,
+                    $visivelProfessor,
+                    $visivelPais,
+                );
+                if (!$ok) {
+                    $this->responderEvento(
+                        $ano,
+                        $calendarioId,
+                        false,
+                        'Não foi possível atualizar o evento.',
+                        ['formulario' => 'Não foi possível atualizar o evento.'],
+                        422
+                    );
+                    return;
+                }
+                $msg = 'Evento atualizado no calendário letivo.';
+            } else {
+                $gravou = $service->salvarEvento(
+                    $calendarioId,
+                    $inicio,
+                    $fim,
+                    $tipo,
+                    $descricao,
+                    $link,
+                    $local,
+                    $visivelAluno,
+                    $visivelProfessor,
+                    $visivelPais,
+                );
+                if (!$gravou) {
+                    $this->responderEvento(
+                        $ano,
+                        $calendarioId,
+                        false,
+                        'Não foi possível salvar o evento.',
+                        ['formulario' => 'Não foi possível salvar o evento.'],
+                        422
+                    );
+                    return;
+                }
+                $this->lembrarEnvioEvento($token);
+                $msg = 'Evento adicionado ao calendário letivo.';
             }
-            $msg = 'Evento atualizado no calendário letivo.';
-        } else {
-            $service->salvarEvento(
-                (int) $cfg['id'],
-                $inicio,
-                $fim,
-                $tipo,
-                $descricao,
-                $link,
-                $local,
-                $visivelAluno,
-                $visivelProfessor,
-                $visivelPais,
-            );
-            $msg = 'Evento adicionado ao calendário letivo.';
-        }
-        $escolarId = 0;
-        if ($publicarEscolar) {
-            $user = $this->auth->getUser();
-            $escolarId = $service->publicarNoCalendarioEscolar(
-                $descricao,
-                $inicio,
-                $fim,
-                $tipo,
-                $local,
-                (int) ($user['id'] ?? 0)
-            );
-            $verbo = $atualizando ? 'atualizado' : 'adicionado';
-            $msg = $escolarId > 0
-                ? 'Evento ' . $verbo . ' no calendário letivo e publicado no calendário escolar. Os responsáveis foram notificados.'
-                : 'Evento ' . $verbo . ' no calendário letivo. Não foi possível publicar no calendário escolar.';
-        }
-        $this->setFlashMessage($msg, $publicarEscolar && $escolarId <= 0 ? 'error' : 'success');
-        $this->redirectCalendario($ano, $calendarioId);
+            $escolarId = 0;
+            $tipoFlash = 'success';
+            if ($publicarEscolar) {
+                $user = $this->auth->getUser();
+                try {
+                    $escolarId = $service->publicarNoCalendarioEscolar(
+                        $descricao,
+                        $inicio,
+                        $fim,
+                        $tipo,
+                        $local,
+                        (int) ($user['id'] ?? 0)
+                    );
+                } catch (\Throwable $e) {
+                    error_log('Calendário letivo publicar evento escolar: ' . $e->getMessage());
+                    $escolarId = 0;
+                }
+                $verbo = $atualizando ? 'atualizado' : 'adicionado';
+                if ($escolarId > 0) {
+                    $msg = 'Evento ' . $verbo . ' no calendário letivo e publicado no calendário escolar. Os responsáveis foram notificados.';
+                } else {
+                    $msg = 'Evento ' . $verbo . ' no calendário letivo. Não foi possível publicar no calendário escolar.';
+                    $tipoFlash = 'error';
+                }
+            }
+            $this->responderEvento($ano, $calendarioId, true, $msg, [], 200, $tipoFlash);
         } catch (\Throwable $e) {
             error_log('Calendário letivo salvar evento: ' . $e->getMessage());
-            $this->setFlashMessage('Não foi possível salvar o evento. Use datas entre 2000 e 2100.', 'error');
-            $this->redirectCalendario($ano, $calendarioId);
+            $this->responderEvento(
+                $ano,
+                $calendarioId,
+                false,
+                'Não foi possível salvar agora. Os dados continuam aqui. Tente novamente.',
+                ['formulario' => 'Não foi possível salvar agora. Os dados continuam aqui. Tente novamente.'],
+                500
+            );
         }
     }
 
@@ -308,18 +375,85 @@ class SchoolCalendarController extends AdminBaseController
         $this->json($result, !empty($result['ok']) ? 200 : 422);
     }
 
-    private function sanitizeDate(string $raw): string
+    private function pedidoEventoJson(): bool
     {
-        $raw = trim($raw);
-        $dt = \DateTime::createFromFormat('Y-m-d', $raw);
-        if (!$dt || $dt->format('Y-m-d') !== $raw) {
+        $xhr = strtolower((string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? ''));
+        if ($xhr === 'xmlhttprequest') {
+            return true;
+        }
+
+        return str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json');
+    }
+
+    /**
+     * @param array<string,string> $erros
+     */
+    private function responderEvento(
+        int $ano,
+        int $calendarioId,
+        bool $ok,
+        string $mensagem,
+        array $erros = [],
+        int $status = 200,
+        string $tipoFlash = 'error'
+    ): void {
+        if ($this->pedidoEventoJson()) {
+            if ($ok) {
+                $this->setFlashMessage($mensagem, $tipoFlash === 'success' ? 'success' : 'error');
+                $this->json([
+                    'ok' => true,
+                    'mensagem' => $mensagem,
+                    'redirect' => $this->urlCalendario($ano, $calendarioId),
+                ]);
+            }
+            $this->json([
+                'ok' => false,
+                'erros' => $erros !== [] ? $erros : ['formulario' => $mensagem],
+            ], $status > 0 ? $status : 422);
+        }
+        $this->setFlashMessage($mensagem, $ok ? ($tipoFlash === 'success' ? 'success' : 'error') : 'error');
+        $this->redirectCalendario($ano, $calendarioId);
+    }
+
+    private function tokenEnvioEvento(): string
+    {
+        $token = trim((string) ($_POST['envio_token'] ?? ''));
+        if ($token === '' || strlen($token) > 80 || preg_match('/^[A-Za-z0-9\-]+$/', $token) !== 1) {
             return '';
         }
-        $ano = (int) $dt->format('Y');
-        if ($ano < 2000 || $ano > 2100) {
-            return '';
+
+        return $token;
+    }
+
+    private function eventoJaEnviado(string $token): bool
+    {
+        $mapa = $_SESSION['calendario_evento_envio'] ?? [];
+
+        return $token !== '' && is_array($mapa) && !empty($mapa[$token]);
+    }
+
+    private function lembrarEnvioEvento(string $token): void
+    {
+        if ($token === '') {
+            return;
         }
-        return $raw;
+        if (!isset($_SESSION['calendario_evento_envio']) || !is_array($_SESSION['calendario_evento_envio'])) {
+            $_SESSION['calendario_evento_envio'] = [];
+        }
+        $_SESSION['calendario_evento_envio'][$token] = 1;
+        if (count($_SESSION['calendario_evento_envio']) > 30) {
+            $_SESSION['calendario_evento_envio'] = array_slice($_SESSION['calendario_evento_envio'], -30, null, true);
+        }
+    }
+
+    private function urlCalendario(int $ano, int $id = 0): string
+    {
+        $url = '/admin/calendario-letivo?ano=' . $ano;
+        if ($id > 0) {
+            $url .= '&id=' . $id;
+        }
+
+        return $url;
     }
 
     private function podePublicarCalendarioEscolar(SchoolCalendarService $service): bool
@@ -346,11 +480,7 @@ class SchoolCalendarController extends AdminBaseController
 
     private function redirectCalendario(int $ano, int $id = 0): void
     {
-        $url = '/admin/calendario-letivo?ano=' . $ano;
-        if ($id > 0) {
-            $url .= '&id=' . $id;
-        }
-        $this->redirect($url);
+        $this->redirect($this->urlCalendario($ano, $id));
     }
 }
 }

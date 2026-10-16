@@ -3,7 +3,7 @@ if (!class_exists('AdminPermissionMatrix')) {
 }
 
 $hub_title = 'Secretaria';
-$hub_subtitle = 'Matrículas, movimentação, vida escolar, documentos e censo.';
+$hub_subtitle = 'Matrículas, movimentação, documentos e censo.';
 $hub_cards = [];
 
 $permsHub = [];
@@ -51,15 +51,6 @@ if ((!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('f
         'title' => 'Frequência',
         'description' => 'Faltas da sala de aula e presença na portaria.',
         'icon' => 'fa-solid fa-user-check',
-    ];
-}
-
-if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('documentos_institucionais')) {
-    $hub_cards[] = [
-        'href' => URL . '/admin/documentos-institucionais',
-        'title' => 'Documentos Institucionais',
-        'description' => 'Regimento, PPP e demais documentos oficiais da escola.',
-        'icon' => 'fa-solid fa-file-shield',
     ];
 }
 
@@ -116,39 +107,12 @@ if ($podeHub('ocorrencias') && (!class_exists('LayoutHelper') || \App\Core\Layou
     ];
 }
 
-if ((!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('recursos_fisicos')) && $podeHub('almoxarifado')) {
-    $hub_cards[] = [
-        'href' => URL . '/admin/almoxarifado',
-        'title' => 'Almoxarifado',
-        'description' => 'Controle de estoque e materiais da escola.',
-        'icon' => 'fa-solid fa-boxes-stacked',
-    ];
-}
-
-if ((!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('recursos_fisicos')) && $podeHub('patrimonio')) {
-    $hub_cards[] = [
-        'href' => URL . '/admin/patrimonio',
-        'title' => 'Patrimônio',
-        'description' => 'Cadastro e controle dos bens patrimoniais.',
-        'icon' => 'fa-solid fa-barcode',
-    ];
-}
-
 if ($podeHub('resultados_finais') && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('resultados_finais'))) {
     $hub_cards[] = [
         'href' => URL . '/admin/resultados-finais',
         'title' => 'Resultados Finais',
         'description' => 'Fechamento por turma, homologação, ficha, ata e boletim oficial.',
         'icon' => 'fa-solid fa-clipboard-check',
-    ];
-}
-
-if ($podeHub('vida_escolar') && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('vida_escolar'))) {
-    $hub_cards[] = [
-        'href' => URL . '/admin/vida-escolar',
-        'title' => 'Vida Escolar',
-        'description' => 'Histórico, boletim, ficha individual, prontuário e ofícios.',
-        'icon' => 'fa-solid fa-scroll',
     ];
 }
 
@@ -160,19 +124,5 @@ if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('sa
         'icon' => 'fa-solid fa-heart-pulse',
     ];
 }
-
-$hub_cards[] = [
-    'href' => URL . '/admin/tudicoins',
-    'title' => 'TudiCoins da Escola',
-    'description' => 'Saldo e uso de créditos de IA da escola.',
-    'icon' => 'fa-solid fa-wallet',
-];
-
-$hub_cards[] = [
-    'href' => URL . '/admin/creditos/pacotes',
-    'title' => 'Pacotes de TudiCoins',
-    'description' => 'Pacotes de créditos disponíveis para a escola.',
-    'icon' => 'fa-solid fa-coins',
-];
 
 include \App\Core\ViewPaths::adminPartial('hub_modulos.php');

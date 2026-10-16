@@ -115,6 +115,7 @@ return [
     'App\\Controllers\\BoletimAssistenteController' => ['App\\Modulos\\Boletins\\Controllers\\BoletimAssistenteController', 'Modulos/boletins/Controllers/BoletimAssistenteController.php'],
     'App\\Controllers\\BoletimCadastroAdminController' => ['App\\Modulos\\Boletins\\Controllers\\BoletimCadastroAdminController', 'Modulos/boletins/Controllers/BoletimCadastroAdminController.php'],
     'App\\Controllers\\BoletimConfigController' => ['App\\Modulos\\Boletins\\Controllers\\BoletimConfigController', 'Modulos/boletins/Controllers/BoletimConfigController.php'],
+    'App\\Controllers\\Admin\\BoletimConfigController' => ['App\\Modulos\\Boletins\\Controllers\\BoletimConfigController', 'Modulos/boletins/Controllers/BoletimConfigController.php'],
     'App\\Controllers\\BoletimGuiaController' => ['App\\Modulos\\Boletins\\Controllers\\BoletimGuiaController', 'Modulos/boletins/Controllers/BoletimGuiaController.php'],
     'App\\Controllers\\CadernoController' => ['App\\Painel\\User\\Controllers\\CadernoController', 'Painel/User/Controllers/CadernoController.php'],
     'App\\Controllers\\CensoAdminController' => ['App\\Modulos\\CensoEscolar\\Controllers\\CensoAdminController', 'Modulos/censo-escolar/Controllers/CensoAdminController.php'],

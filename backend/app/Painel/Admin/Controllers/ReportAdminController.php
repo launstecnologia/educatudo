@@ -403,7 +403,8 @@ class ReportAdminController extends AdminBaseController
         $flash = $this->getFlashMessage();
         $zipJob = $this->resolverZipJobBoletinsVidaEscolar();
         $this->viewWithLayout('admin', 'admin/reports/boletim_coordenacao', [
-            'title' => 'Notas da Coordenação - EducaTudo',
+            'title' => 'Boletins — Relatórios',
+            'page_title' => 'Boletins',
             'user' => $user,
             'current_page' => 'reports_boletim_coordenacao',
             'fonte' => $fonte,

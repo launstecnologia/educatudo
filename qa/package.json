@@ -1,0 +1,22 @@
+{
+  "name": "educatudo-qa",
+  "private": true,
+  "description": "Testes E2E, auditoria de UX e acessibilidade do EducaTudo. Sem chamadas de IA.",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report relatorios/playwright",
+    "report:qa": "python3 -m http.server 8765 --directory relatorios"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
+    "@playwright/test": "1.58.2",
+    "@types/node": "^22.13.10",
+    "dotenv": "^16.4.7",
+    "typescript": "^5.8.2"
+  },
+  "overrides": {
+    "playwright-core": "1.58.2"
+  }
+}

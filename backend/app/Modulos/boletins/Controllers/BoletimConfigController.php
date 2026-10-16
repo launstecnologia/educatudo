@@ -4,6 +4,7 @@ namespace App\Modulos\Boletins\Controllers;
 
 
 use App\Modulos\Boletins\Services\BoletimCadastroService;
+use App\Modulos\Boletins\Services\SimulacaoBoletimConsulta;
 
 use App\Core\AlunoTurmaHelper;
 use App\Core\App;
@@ -63,6 +64,8 @@ class BoletimConfigController extends BaseController
     private array $expansaoRegraCache = [];
     /** @var array<string, array<string, mixed>> */
     private array $simulacaoAlunoCache = [];
+    /** Simulação só lê o quadro; não grava extras_json da regra. */
+    private bool $simulacaoSomenteLeitura = false;
     /** @var list<int> */
     private array $turmasEscopoGeracao = [];
     /** @var list<int> */
@@ -132,6 +135,7 @@ class BoletimConfigController extends BaseController
         $filtroAno = trim((string) ($_GET['ano_letivo'] ?? ''));
         $filtroBimestre = trim((string) ($_GET['bimestre'] ?? ''));
         $filtroSerieId = (int) ($_GET['serie_id'] ?? 0);
+        $filtroBoletimId = max(0, (int) ($_GET['boletim_id'] ?? 0));
         $ordemLista = strtolower(trim((string) ($_GET['ordem'] ?? '')));
         if (!in_array($ordemLista, ['ref', 'serie', 'bimestre'], true)) {
             $ordemLista = '';
@@ -265,6 +269,12 @@ class BoletimConfigController extends BaseController
         }
         unset($ev);
 
+        if ($filtroBoletimId > 0) {
+            $eventos = array_values(array_filter($eventos, static function ($ev) use ($filtroBoletimId) {
+                return (int) ($ev['boletim_id'] ?? 0) === $filtroBoletimId;
+            }));
+        }
+
         if ($ordemLista !== '') {
             $multiplicador = $dirLista === 'desc' ? -1 : 1;
             usort($eventos, static function (array $a, array $b) use ($ordemLista, $multiplicador): int {
@@ -297,16 +307,18 @@ class BoletimConfigController extends BaseController
         $eventosPagina = array_slice($eventos, ($page - 1) * $perPage, $perPage);
 
         $data = [
-            'title' => 'Avaliações - EducaTudo',
-            'page_title' => 'Painel Administrativo',
+            'title' => 'Boletins — Períodos e fórmulas',
+            'page_title' => 'Boletins',
             'user' => $user,
-            'current_page' => 'boletim_config',
+            'current_page' => 'boletins',
             'csrf_token' => $this->generateCsrfToken(),
             'eventos' => $eventosPagina,
             'filtro_nome' => $filtroNome,
             'filtro_ano' => $filtroAno,
             'filtro_bimestre' => $filtroBimestre,
             'filtro_serie_id' => $filtroSerieId,
+            'filtro_boletim_id' => $filtroBoletimId,
+            'filtro_boletim_nome' => $filtroBoletimId > 0 ? (string) ($nomesBoletim[$filtroBoletimId] ?? '') : '',
             'series_catalogo' => $seriesCatalogo,
             'ordem_lista' => $ordemLista,
             'dir_lista' => $dirLista,
@@ -518,99 +530,17 @@ class BoletimConfigController extends BaseController
         $anosLetivosCatalogo = $this->listarAnosLetivosCatalogo();
 
         $selectedAlunoId = isset($_GET['aluno_id']) ? (int) $_GET['aluno_id'] : 0;
-        $dataInicio = $this->normalizarDataYmdOpcional((string) ($_GET['data_inicio'] ?? ''));
-        $dataFim = $this->normalizarDataYmdOpcional((string) ($_GET['data_fim'] ?? ''));
-        if ($dataInicio === null || $dataFim === null) {
-            $regraIni = $this->normalizarDataYmdOpcional((string) ($regra['default_data_inicio'] ?? ''));
-            $regraFim = $this->normalizarDataYmdOpcional((string) ($regra['default_data_fim'] ?? ''));
-            if ($regraIni !== null && $regraFim !== null) {
-                $dataInicio = $regraIni;
-                $dataFim = $regraFim;
-            } else {
-                $rangePadrao = $this->periodoToRange($this->periodoDefault());
-                $dataInicio = substr((string) ($rangePadrao['inicio'] ?? ''), 0, 10) ?: date('Y-01-01');
-                $dataFim = substr((string) ($rangePadrao['fim'] ?? ''), 0, 10) ?: date('Y-m-d');
-            }
-        }
-        if ($dataInicio > $dataFim) {
-            [$dataInicio, $dataFim] = [$dataFim, $dataInicio];
-        }
-
-        $periodoRef = trim((string) ($_GET['periodo_ref'] ?? ''));
-        if ($periodoRef === '') {
-            $periodoRef = $this->buildPeriodoRefFromDateRange($dataInicio, $dataFim);
-        }
-
-        $simulacao = null;
-        if ($selectedAlunoId > 0 && !empty($regra['componentes'])) {
-            // Igual ao Configurar Notas: provas/jornada/faltas vêm do evento salvo;
-            // o rascunho do assistente só manda fórmula/layout ainda não gravados.
-            $regra = $this->mesclarFontesSalvasNaRegraParaSimulacao($regra);
-            // Demonstrativo: matérias soltas + linha-mãe do group_line (ex.: Língua Portuguesa)
-            // com filhos aninhados. Boletim: só a linha agrupada.
-            $simulacao = $this->simularRegraAluno(
-                $regra,
-                $selectedAlunoId,
-                $periodoRef,
-                $dataInicio,
-                $dataFim,
-                [],
-                false,
-                true
-            );
-
-            // Vista "Boletim": mesma matriz com group_line forçado (aplicar_em=boletim).
-            try {
-                $simBoletim = $this->simularRegraAluno(
-                    $regra,
-                    $selectedAlunoId,
-                    $periodoRef,
-                    $dataInicio,
-                    $dataFim,
-                    [],
-                    true
-                );
-                $matrizBoletim = is_array($simBoletim) ? ($simBoletim['matriz_materias'] ?? null) : null;
-                if (is_array($simulacao) && is_array($matrizBoletim)) {
-                    $simulacao['matriz_materias_boletim'] = $matrizBoletim;
-                }
-            } catch (\Throwable $e) {
-                error_log('BoletimConfig simulação boletim agrupado aluno #' . $selectedAlunoId . ': ' . $e->getMessage());
-            }
-
-            if (is_array($simulacao)) {
-                $simulacao = $this->montarMatrizDemonstrativoComGrupoHierarquico($simulacao, $regra);
-            }
-
-            // Persistir a simulação como PREVIEW para o aluno selecionado.
-            // O preview NÃO é exibido para aluno/pais/coordenação (filtrado por preview=0
-            // em getGeneratedBoletinsByAluno / getGeneratedBoletimByAlunoAndRegra).
-            // Só vira oficial quando o admin clica em "Gerar boletins de todos os alunos vinculados".
-            $regraIdParaPreview = (int) ($regra['id'] ?? 0);
-            $matriz = is_array($simulacao) ? ($simulacao['matriz_materias'] ?? null) : null;
-            if ($regraIdParaPreview > 0 && is_array($matriz)) {
-                $colunasPreview = is_array($matriz['colunas'] ?? null) ? $matriz['colunas'] : [];
-                // Preview persistido usa a vista Boletim (agrupada) quando existir.
-                $matrizPersistir = is_array($simulacao['matriz_materias_boletim'] ?? null)
-                    ? $simulacao['matriz_materias_boletim']
-                    : $matriz;
-                $linhasPreview = is_array($matrizPersistir['linhas'] ?? null) ? $matrizPersistir['linhas'] : [];
-                try {
-                    $this->boletimConfig->replaceGeneratedResultsForAluno(
-                        $regraIdParaPreview,
-                        $selectedAlunoId,
-                        $periodoRef,
-                        $dataInicio,
-                        $dataFim,
-                        $colunasPreview,
-                        $linhasPreview,
-                        true
-                    );
-                } catch (\Throwable $e) {
-                    error_log('BoletimConfig preview save aluno #' . $selectedAlunoId . ': ' . $e->getMessage());
-                }
-            }
-        }
+        $consultaSimulacao = $this->consultarSimulacaoAluno(
+            null,
+            is_array($regra) ? $regra : null,
+            $selectedAlunoId,
+            $this->normalizarDataYmdOpcional((string) ($_GET['data_inicio'] ?? '')),
+            $this->normalizarDataYmdOpcional((string) ($_GET['data_fim'] ?? ''))
+        );
+        $dataInicio = (string) ($consultaSimulacao['data_inicio'] ?? '');
+        $dataFim = (string) ($consultaSimulacao['data_fim'] ?? '');
+        $periodoRef = (string) ($consultaSimulacao['periodo_ref'] ?? '');
+        $simulacao = $consultaSimulacao['simulacao'] ?? null;
 
         // [DEBUG TEMPORARIO] Dump na tela: acesse a mesma URL do boletim com &dbg_redacao=1
         if (isset($_GET['dbg_redacao'])) {
@@ -651,6 +581,7 @@ class BoletimConfigController extends BaseController
             exit;
         }
 
+        $contextoQuadrosPagina = $this->contextoQuadrosNotas();
         $data = [
             'title' => 'Evento de Notas - EducaTudo',
             'page_title' => 'Evento de Notas',
@@ -672,6 +603,13 @@ class BoletimConfigController extends BaseController
             'data_inicio' => $dataInicio,
             'data_fim' => $dataFim,
             'simulacao' => $simulacao,
+            'simulacao_mensagem' => (string) ($consultaSimulacao['mensagem'] ?? ''),
+            'simulacao_avisos' => is_array($consultaSimulacao['avisos'] ?? null) ? $consultaSimulacao['avisos'] : [],
+            'simulacao_rotulo_periodo' => (string) ($consultaSimulacao['rotulo_periodo'] ?? ''),
+            'simulacao_configuracao' => (string) ($consultaSimulacao['configuracao'] ?? ''),
+            'simulacao_url_vigente' => (string) ($consultaSimulacao['url_vigente'] ?? ''),
+            'simulacao_tem_vigente' => !empty($consultaSimulacao['boletim_vigente']),
+            'modelo_nome' => (string) ($consultaSimulacao['modelo_nome'] ?? ''),
             'flash_message' => $_SESSION['boletim_flash'] ?? '',
             'flash_type' => $_SESSION['boletim_flash_type'] ?? 'success',
             'somente_tabela' => $somenteTabela,
@@ -687,12 +625,18 @@ class BoletimConfigController extends BaseController
             'versoes_aluno' => ($selectedAlunoId > 0 && (int) ($regra['id'] ?? 0) > 0)
                 ? $this->boletimConfig->listarVersoesAluno((int) $regra['id'], $selectedAlunoId, $periodoRef)
                 : [],
-            'grupos_regras_notas' => $this->listarGruposRegrasNotasCatalogo(),
-            'grupo_regras_notas_id' => $this->grupoRegrasNotasIdDaRegra($regra),
+            'grupos_regras_notas' => $contextoQuadrosPagina['itens'],
+            'pode_ver_quadro' => $contextoQuadrosPagina['pode_ver'],
+            'pode_cadastrar_quadro' => $contextoQuadrosPagina['pode_cadastrar'],
+            'quadros_situacao' => $contextoQuadrosPagina['situacao'],
+            'grupo_regras_notas_id' => $this->quadroIdExplicito(is_array($regra) ? $regra : []),
             'semanas_periodo' => $this->semanasPeriodoDaRegra($regra),
             'destinos_quadro' => $this->destinosQuadroDaRegra($regra),
             'agrupamentos_componentes' => $this->listarAgrupamentosComponentesCatalogo(),
             'boletins_cadastro' => $this->listarBoletinsCadastro(),
+            'gates_geracao' => ((int) ($regra['id'] ?? 0) > 0)
+                ? $this->diagnosticarGatesFechamentoRegra($regra)
+                : ['ok' => true, 'bloqueios' => [], 'avisos' => []],
         ];
 
         if ($somenteTabela) {
@@ -709,8 +653,14 @@ class BoletimConfigController extends BaseController
         $user = $this->auth->getUser();
         $selectedRegraId = isset($_GET['regra_id']) ? (int) $_GET['regra_id'] : 0;
         $boletimId = isset($_GET['boletim_id']) ? (int) $_GET['boletim_id'] : 0;
-        $voltarBoletins = $boletimId > 0
-            || strtolower(trim((string) ($_GET['voltar'] ?? ''))) === 'boletins';
+        $anoGet = isset($_GET['ano_letivo']) ? (int) $_GET['ano_letivo'] : 0;
+        $bimestreGet = isset($_GET['bimestre']) ? (int) $_GET['bimestre'] : 0;
+        $voltar = strtolower(trim((string) ($_GET['voltar'] ?? '')));
+        $voltarGerar = $voltar === 'gerar-avaliacoes' && $boletimId > 0;
+        $voltarBoletins = !$voltarGerar && (
+            $boletimId > 0
+            || $voltar === 'boletins'
+        );
         $estadoInicial = null;
         $catalogoInicial = null;
         $rascunhoInicial = null;
@@ -722,8 +672,21 @@ class BoletimConfigController extends BaseController
 
         try {
             $wizard = new BoletimAssistenteWizard();
-            $formSeed = $boletimId > 0 ? ['boletim_id' => $boletimId] : null;
-            $estadoInicial = $wizard->estadoPadrao($formSeed, $selectedRegraId > 0 ? $selectedRegraId : null);
+            $formSeed = [];
+            if ($boletimId > 0) {
+                $formSeed['boletim_id'] = $boletimId;
+            }
+            // Com regra existente, ano e bimestre ficam só na volta.
+            // No seed, eles impedem o carregamento da configuração já salva.
+            if ($selectedRegraId <= 0) {
+                if ($anoGet > 2000 && $anoGet < 2100) {
+                    $formSeed['ano_letivo'] = $anoGet;
+                }
+                if ($bimestreGet > 0) {
+                    $formSeed['bimestre'] = $bimestreGet;
+                }
+            }
+            $estadoInicial = $wizard->estadoPadrao($formSeed !== [] ? $formSeed : null, $selectedRegraId > 0 ? $selectedRegraId : null);
             if ($selectedRegraId <= 0 && is_array($estadoInicial)) {
                 $selectedRegraId = (int) ($estadoInicial['regra_id'] ?? 0);
             }
@@ -749,6 +712,34 @@ class BoletimConfigController extends BaseController
 
         $nomeEvento = is_array($estadoInicial) ? trim((string) ($estadoInicial['nome'] ?? '')) : '';
         $tituloEvento = $nomeEvento !== '' ? $nomeEvento : 'Evento de Notas';
+        $anoRetorno = $anoGet > 0
+            ? $anoGet
+            : (int) (is_array($estadoInicial) ? ($estadoInicial['ano_letivo'] ?? 0) : 0);
+        $bimestreRetorno = $bimestreGet > 0
+            ? $bimestreGet
+            : (int) (is_array($estadoInicial) ? ($estadoInicial['bimestre'] ?? 0) : 0);
+        $urlRetornoGerar = $voltarGerar
+            ? $this->urlGerarAvaliacoes($boletimId, $anoRetorno)
+            : '';
+        $flashAssistente = (string) ($_SESSION['boletim_flash'] ?? '');
+        $flashTipoAssistente = (string) ($_SESSION['boletim_flash_type'] ?? '');
+        unset($_SESSION['boletim_flash'], $_SESSION['boletim_flash_type']);
+        $permissoes = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser(
+            Database::getInstance(),
+            is_array($user) ? $user : []
+        );
+        $podeVerQuadroAssistente = \App\Core\AdminPermissionMatrix::can($permissoes, 'grupos_regras_notas', 'visualizar');
+        $podeCadastrarQuadroAssistente = \App\Core\AdminPermissionMatrix::can($permissoes, 'grupos_regras_notas', 'cadastrar');
+        if (is_array($catalogoInicial)) {
+            if (!$podeVerQuadroAssistente) {
+                $catalogoInicial['quadros_notas'] = [];
+                $catalogoInicial['quadros_notas_situacao'] = 'sem_permissao';
+            } elseif (($catalogoInicial['quadros_notas'] ?? []) === []) {
+                $catalogoInicial['quadros_notas_situacao'] = $this->situacaoListaQuadrosVazia();
+            } else {
+                $catalogoInicial['quadros_notas_situacao'] = 'ok';
+            }
+        }
         $data = [
             'title' => $tituloEvento . ' - EducaTudo',
             'page_title' => $tituloEvento,
@@ -757,7 +748,18 @@ class BoletimConfigController extends BaseController
             'csrf_token' => $this->generateCsrfToken(),
             'selected_regra_id' => $selectedRegraId,
             'boletim_id' => $boletimId,
+            'ano_letivo_assistente' => $anoRetorno,
+            'bimestre_assistente' => $bimestreRetorno,
             'voltar_boletins' => $voltarBoletins,
+            'voltar_gerar_avaliacoes' => $voltarGerar,
+            'continuar_rascunho' => isset($_GET['continuar']) && (string) $_GET['continuar'] === '1',
+            'boletim_assistente_return_url' => $urlRetornoGerar,
+            'pode_ver_quadro' => $podeVerQuadroAssistente,
+            'pode_cadastrar_quadro' => $podeCadastrarQuadroAssistente,
+            'flash_status' => $flashAssistente === ''
+                ? ''
+                : (in_array($flashTipoAssistente, ['success', 'info'], true) ? 'success' : 'error'),
+            'flash_message' => $flashAssistente,
             'boletim_assistente_disponivel' => $this->boletimAssistenteDisponivel(),
             'boletim_assistente_estado_inicial' => $estadoInicial,
             'boletim_assistente_catalogo_inicial' => $catalogoInicial,
@@ -787,6 +789,23 @@ class BoletimConfigController extends BaseController
         $user = $this->auth->getUser();
 
         $regraId = isset($_GET['regra_id']) ? (int) $_GET['regra_id'] : 0;
+        $boletimId = max(0, (int) ($_GET['boletim_id'] ?? 0));
+        $boletimNome = '';
+        if ($boletimId > 0) {
+            try {
+                $cadastro = new BoletimCadastroService();
+                if ($cadastro->model()->tabelasProntas()) {
+                    foreach ($cadastro->model()->listar(false, true) as $bol) {
+                        if ((int) ($bol['id'] ?? 0) === $boletimId) {
+                            $boletimNome = trim((string) ($bol['nome'] ?? ''));
+                            break;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                $boletimNome = '';
+            }
+        }
         $alunoId = isset($_GET['aluno_id']) ? (int) $_GET['aluno_id'] : 0;
         $alunoQ = trim((string) ($_GET['aluno_q'] ?? ''));
         $exibirEm = strtolower(trim((string) ($_GET['exibir_em'] ?? '')));
@@ -807,6 +826,7 @@ class BoletimConfigController extends BaseController
 
         $filters = [
             'regra_id' => $regraId,
+            'boletim_id' => $boletimId,
             'aluno_id' => $alunoId,
             'aluno_q' => $alunoQ,
             'exibir_em' => $exibirEm,
@@ -822,10 +842,10 @@ class BoletimConfigController extends BaseController
         if ($totalPages < 1) { $totalPages = 1; }
 
         $data = [
-            'title' => 'Versão de Notas - EducaTudo',
-            'page_title' => 'Painel Administrativo',
+            'title' => 'Boletins — Resultados e versões',
+            'page_title' => 'Boletins',
             'user' => $user,
-            'current_page' => 'boletim_config',
+            'current_page' => 'boletins',
             'csrf_token' => $this->generateCsrfToken(),
             'regras_catalogo' => $this->boletimConfig->listRulesCatalog(300),
             'rows' => $rows,
@@ -835,6 +855,8 @@ class BoletimConfigController extends BaseController
             'total_pages' => $totalPages,
             'filters' => [
                 'regra_id' => $regraId,
+                'boletim_id' => $boletimId,
+                'boletim_nome' => $boletimNome,
                 'aluno_id' => $alunoId,
                 'aluno_q' => $alunoQ,
                 'exibir_em' => $exibirEm,
@@ -875,6 +897,7 @@ class BoletimConfigController extends BaseController
         }
         $filters = [
             'regra_id' => isset($_GET['regra_id']) ? (int) $_GET['regra_id'] : 0,
+            'boletim_id' => max(0, (int) ($_GET['boletim_id'] ?? 0)),
             'aluno_id' => isset($_GET['aluno_id']) ? (int) $_GET['aluno_id'] : 0,
             'aluno_q' => trim((string) ($_GET['aluno_q'] ?? '')),
             'exibir_em' => $exibirEm,
@@ -1832,7 +1855,7 @@ class BoletimConfigController extends BaseController
                 $payloadQuadro = null;
             }
             if (!is_array($payloadQuadro) || empty($payloadQuadro['ativo'])) {
-                $_SESSION['boletim_flash'] = 'Quadro de Notas inválido ou inativo. Revise o cadastro em Acadêmico → Quadro de Notas.';
+                $_SESSION['boletim_flash'] = FechamentoGates::mensagemQuadroInvalido();
                 $_SESSION['boletim_flash_type'] = 'error';
                 $this->redirectFalhaConfiguracao($regraId);
             }
@@ -1943,7 +1966,29 @@ class BoletimConfigController extends BaseController
             $redirId = (int) ($saved['id'] ?? 0);
         }
         if (!empty($_POST['origem_assistente']) && $redirId > 0) {
-            $this->redirect('/admin/boletim-configuracao/assistente?regra_id=' . $redirId);
+            $salvou = (string) ($_SESSION['boletim_flash_type'] ?? '') === 'success';
+            $pediuPublicar = (string) ($_POST['gerar_nova_versao'] ?? '') === '1';
+            if ($salvou && !$pediuPublicar && $this->retornoFluxoEhGerar()) {
+                $gravada = (string) ($_SESSION['boletim_flash'] ?? '');
+                $msgSalva = 'Configuração salva. As notas dos alunos não foram geradas. Escolha os períodos que devem receber uma cópia.';
+                if (preg_match('/versão\s+(\d+)/u', $gravada, $versaoSalva)) {
+                    $msgSalva = 'Configuração salva na versão ' . $versaoSalva[1] . '. As notas dos alunos não foram geradas. Escolha os períodos que devem receber uma cópia.';
+                }
+                unset($_SESSION['boletim_flash'], $_SESSION['boletim_flash_type']);
+                $this->setFlashMessage($msgSalva, 'success');
+                $this->redirect($this->urlGerarAvaliacoes($this->boletimIdRetorno(), $this->anoRetornoFluxo()));
+            }
+            if ($salvou && !$pediuPublicar && $this->retornoFluxoEhBoletins()) {
+                $gravada = (string) ($_SESSION['boletim_flash'] ?? '');
+                $msgSalva = 'Configuração salva. As notas dos alunos não foram geradas.';
+                if (preg_match('/versão\s+(\d+)/u', $gravada, $versaoSalvaLista)) {
+                    $msgSalva = 'Configuração salva na versão ' . $versaoSalvaLista[1] . '. As notas dos alunos não foram geradas.';
+                }
+                $_SESSION['boletim_flash'] = $msgSalva;
+                $_SESSION['boletim_flash_type'] = 'success';
+                $this->redirect($this->urlPeriodoConfigurado($redirId));
+            }
+            $this->redirect($this->urlAssistenteComRetorno($redirId));
         }
         $this->redirect('/admin/boletim-configuracao' . ($redirId > 0 ? ('?regra_id=' . $redirId) : ''));
     }
@@ -2040,7 +2085,7 @@ class BoletimConfigController extends BaseController
                 . ($versaoConfig > 0 ? (' na versão ' . $versaoConfig) : '')
                 . '. A nova versão das notas não foi gerada: ' . implode(' ', $gates['bloqueios']);
             $_SESSION['boletim_flash_type'] = 'error';
-            $this->redirect('/admin/boletim-configuracao/assistente?regra_id=' . $regraId);
+            $this->redirect($this->urlAssistenteComRetorno($regraId));
         }
         $alunos = $this->resolveAlunosVinculadosRegra($regra);
         if ($alunos === []) {
@@ -2048,15 +2093,17 @@ class BoletimConfigController extends BaseController
                 . ($versaoConfig > 0 ? (' na versão ' . $versaoConfig) : '')
                 . '. Não há aluno ativo nestas séries para gerar as notas.';
             $_SESSION['boletim_flash_type'] = 'error';
-            $this->redirect('/admin/boletim-configuracao/assistente?regra_id=' . $regraId);
+            $this->redirect($this->urlAssistenteComRetorno($regraId));
         }
-        $mensagem = 'Configuração salva'
+        $prefixoSalvo = 'Configuração salva'
             . ($versaoConfig > 0 ? (' na versão ' . $versaoConfig) : '')
-            . '. Esta versão passa a ser a vigente no detalhe do aluno e substitui a nota no boletim oficial. A anterior fica no histórico.';
-        if ($this->enfileirarGeracaoBoletim($regraId, $periodoRef, $dataInicio, $dataFim, 'gerar', $mensagem)) {
+            . '.';
+        $mensagemFila = $prefixoSalvo . ' A geração das notas foi iniciada. O boletim oficial só muda quando essa geração terminar.';
+        if ($this->enfileirarGeracaoBoletim($regraId, $periodoRef, $dataInicio, $dataFim, 'gerar', $mensagemFila)) {
             return true;
         }
         $resultado = $this->executarGeracaoMassaInterna($regra, $regraId, $periodoRef, $dataInicio, $dataFim, $alunos, 'gerar');
+        $mensagem = $prefixoSalvo . ' Esta versão passa a ser a vigente no detalhe do aluno e substitui a nota no boletim oficial. A anterior fica no histórico.';
         $_SESSION['boletim_flash'] = $mensagem . ' ' . (string) ($resultado['mensagem'] ?? '');
         $_SESSION['boletim_flash_type'] = ((int) ($resultado['erros'] ?? 0) > 0) ? 'error' : 'success';
         $this->redirect('/admin/boletim');
@@ -4165,6 +4212,300 @@ class BoletimConfigController extends BaseController
         } catch (\Throwable $e) {
             error_log('Vida escolar sync lote: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Calcula a simulação sem gravar boletim, nota ou trava.
+     *
+     * @param array<string,mixed>|null $modelo
+     * @param array<string,mixed>|null $regra
+     * @return array{
+     *   ok:bool,
+     *   mensagem:string,
+     *   avisos:list<string>,
+     *   simulacao:array<string,mixed>|null,
+     *   data_inicio:string,
+     *   data_fim:string,
+     *   periodo_ref:string,
+     *   rotulo_periodo:string,
+     *   boletim_vigente:bool,
+     *   url_vigente:string,
+     *   configuracao:string
+     * }
+     */
+    public function consultarSimulacaoAluno(?array $modelo, ?array $regra, int $alunoId, ?string $inicioInformado, ?string $fimInformado): array
+    {
+        $resposta = [
+            'ok' => false,
+            'mensagem' => '',
+            'avisos' => [],
+            'simulacao' => null,
+            'data_inicio' => '',
+            'data_fim' => '',
+            'periodo_ref' => '',
+            'rotulo_periodo' => '',
+            'boletim_vigente' => false,
+            'url_vigente' => '',
+            'configuracao' => 'Configuração vigente do evento',
+            'modelo_nome' => '',
+        ];
+
+        $this->simulacaoSomenteLeitura = true;
+        try {
+            if (is_array($regra) && (int) ($regra['id'] ?? 0) > 0 && !is_array($regra['componentes'] ?? null)) {
+                $carregada = $this->boletimConfig->getRuleById((int) $regra['id']);
+                if (is_array($carregada)) {
+                    $regra = $carregada;
+                }
+            }
+            if ($modelo === null && is_array($regra) && (int) ($regra['boletim_id'] ?? 0) > 0) {
+                $encontrado = (new BoletimCadastroService())->model()->findById((int) $regra['boletim_id']);
+                $modelo = is_array($encontrado) ? $encontrado : null;
+            }
+
+            $periodo = SimulacaoBoletimConsulta::resolverPeriodo(is_array($regra) ? $regra : [], $inicioInformado, $fimInformado);
+            $datas = $this->datasDoPeriodoSimulacao($periodo);
+            $resposta['data_inicio'] = $datas['inicio'];
+            $resposta['data_fim'] = $datas['fim'];
+            $resposta['periodo_ref'] = $datas['periodo_ref'];
+            $resposta['modelo_nome'] = trim((string) ($modelo['nome'] ?? ''));
+            $resposta['rotulo_periodo'] = SimulacaoBoletimConsulta::rotuloPeriodo(
+                (int) ($periodo['ano'] ?? 0) > 0 ? (int) $periodo['ano'] : (int) (is_array($regra) ? ($regra['ano_letivo'] ?? 0) : 0),
+                (int) ($periodo['bimestre'] ?? 0) > 0 ? (int) $periodo['bimestre'] : (int) (is_array($regra) ? ($regra['bimestre'] ?? 0) : 0),
+                $datas['inicio'],
+                $datas['fim']
+            );
+
+            if ($alunoId <= 0) {
+                $resposta['ok'] = true;
+                return $resposta;
+            }
+
+            $inconsistencia = SimulacaoBoletimConsulta::inconsistencia($modelo, $regra);
+            if ($inconsistencia !== null) {
+                $resposta['mensagem'] = $inconsistencia;
+                return $resposta;
+            }
+            if (($periodo['tipo'] ?? '') === 'indefinido') {
+                $resposta['mensagem'] = (string) ($periodo['mensagem'] ?? 'Este período ainda não tem ano letivo ou bimestre para simular.');
+                return $resposta;
+            }
+
+            $componentes = is_array($regra['componentes'] ?? null) ? $regra['componentes'] : [];
+            if ($componentes === []) {
+                $resposta['mensagem'] = 'Este período ainda não tem uma fórmula configurada.';
+                return $resposta;
+            }
+            $quadroExplicito = $this->quadroIdExplicito($regra);
+            if ($quadroExplicito > 0 && !$this->quadroExplicitoAtivo($quadroExplicito)) {
+                $resposta['mensagem'] = FechamentoGates::mensagemQuadroInvalido();
+                return $resposta;
+            }
+
+            $ano = (int) ($regra['ano_letivo'] ?? 0);
+            if ($ano < 2000) {
+                $ano = (int) ($modelo['ano_letivo'] ?? 0);
+            }
+            $matricula = $this->mensagemMatriculaSimulacao($alunoId, $ano, $regra, is_array($modelo) ? $modelo : []);
+            if (($matricula['mensagem'] ?? null) !== null) {
+                $resposta['mensagem'] = (string) $matricula['mensagem'];
+                return $resposta;
+            }
+            $turmaSimulacao = (string) ($matricula['turma'] ?? '');
+
+            $regra = $this->mesclarFontesSalvasNaRegraParaSimulacao($regra);
+            $simulacao = $this->simularRegraAluno(
+                $regra,
+                $alunoId,
+                $datas['periodo_ref'],
+                $datas['inicio'],
+                $datas['fim'],
+                [],
+                false,
+                true
+            );
+            try {
+                $simBoletim = $this->simularRegraAluno(
+                    $regra,
+                    $alunoId,
+                    $datas['periodo_ref'],
+                    $datas['inicio'],
+                    $datas['fim'],
+                    [],
+                    true
+                );
+                $matrizBoletim = is_array($simBoletim['matriz_materias'] ?? null) ? $simBoletim['matriz_materias'] : null;
+                if (is_array($matrizBoletim)) {
+                    $simulacao['matriz_materias_boletim'] = $matrizBoletim;
+                }
+            } catch (\Throwable $e) {
+                error_log('Simulação de boletim agrupada aluno #' . $alunoId . ': ' . $e->getMessage());
+            }
+            $simulacao = $this->montarMatrizDemonstrativoComGrupoHierarquico($simulacao, $regra);
+            if (is_array($simulacao['aluno'] ?? null) && $turmaSimulacao !== '') {
+                $simulacao['aluno']['turma_nome'] = $turmaSimulacao;
+            }
+
+            $regraId = (int) ($regra['id'] ?? 0);
+            $vigente = $regraId > 0 ? $this->boletimConfig->getGeneratedBoletimByAlunoAndRegra($alunoId, $regraId) : null;
+            $resposta['ok'] = true;
+            $resposta['simulacao'] = $simulacao;
+            $resposta['avisos'] = $this->avisosNotasSimulacao($simulacao);
+            $resposta['boletim_vigente'] = is_array($vigente);
+            $resposta['url_vigente'] = is_array($vigente)
+                ? ('/admin/boletim-configuracao/gerados?regra_id=' . $regraId . '&aluno_id=' . $alunoId . '&preview=0')
+                : '';
+            $nomeEvento = trim((string) ($regra['nome'] ?? ''));
+            $resposta['configuracao'] = $nomeEvento !== ''
+                ? ('Configuração vigente do evento ' . $nomeEvento)
+                : ('Configuração vigente do evento #' . $regraId);
+
+            return $resposta;
+        } catch (\Throwable $e) {
+            error_log('Simulação de boletim aluno #' . $alunoId . ': ' . $e->getMessage());
+            $resposta['mensagem'] = 'Não foi possível calcular a simulação. A tentativa foi registrada e o boletim oficial não foi alterado.';
+            $resposta['simulacao'] = null;
+
+            return $resposta;
+        } finally {
+            $this->simulacaoSomenteLeitura = false;
+        }
+    }
+
+    /**
+     * @param array{tipo?:string,inicio?:string,fim?:string,ano?:int,bimestre?:int} $periodo
+     * @return array{inicio:string,fim:string,periodo_ref:string}
+     */
+    private function datasDoPeriodoSimulacao(array $periodo): array
+    {
+        $tipo = (string) ($periodo['tipo'] ?? '');
+        $inicio = '';
+        $fim = '';
+        if ($tipo === 'datas') {
+            $inicio = (string) ($periodo['inicio'] ?? '');
+            $fim = (string) ($periodo['fim'] ?? '');
+        } elseif ($tipo === 'bimestre') {
+            $intervalo = PeriodoLetivo::intervalo((int) ($periodo['ano'] ?? 0), (int) ($periodo['bimestre'] ?? 0));
+            $inicio = (string) ($intervalo['inicio'] ?? '');
+            $fim = (string) ($intervalo['fim'] ?? '');
+        } elseif ($tipo === 'ano') {
+            $intervalo = PeriodoLetivo::intervalo((int) ($periodo['ano'] ?? 0), 1, 'etapa_unica');
+            $inicio = (string) ($intervalo['inicio'] ?? '');
+            $fim = (string) ($intervalo['fim'] ?? '');
+        }
+        if ($inicio === '' || $fim === '') {
+            return ['inicio' => '', 'fim' => '', 'periodo_ref' => ''];
+        }
+
+        return [
+            'inicio' => $inicio,
+            'fim' => $fim,
+            'periodo_ref' => 'RANGE:' . $inicio . ':' . $fim,
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $regra
+     * @param array<string,mixed> $modelo
+     * @return array{mensagem:?string,turma:string}
+     */
+    private function mensagemMatriculaSimulacao(int $alunoId, int $ano, array $regra, array $modelo): array
+    {
+        $aluno = Database::getInstance()->fetch(
+            'SELECT id FROM alunos WHERE id = :id LIMIT 1',
+            ['id' => $alunoId]
+        );
+        if (!$aluno) {
+            return ['mensagem' => 'Aluno não encontrado nesta escola.', 'turma' => ''];
+        }
+        if ($ano < 2000) {
+            return ['mensagem' => 'Informe o ano letivo da avaliação antes de simular.', 'turma' => ''];
+        }
+
+        $turmas = $this->parseTurmasIdsFromRegra($regra);
+        if ($turmas === []) {
+            $turmas = $this->parseTurmasIdsFromRegra($modelo);
+        }
+        $series = $this->parseSeriesIdsFromRegra($regra);
+        if ($series === []) {
+            $series = $this->parseSeriesIdsFromRegra($modelo);
+        }
+
+        $params = ['aluno' => $alunoId, 'ano' => $ano];
+        $sql = 'SELECT m.id, t.nome AS turma_nome
+                FROM matricula m
+                INNER JOIN ano_letivo al ON al.id = m.ano_letivo_id
+                INNER JOIN turmas t ON t.id = m.turma_id
+                WHERE m.aluno_id = :aluno
+                  AND al.ano = :ano
+                  AND m.status IN (\'ativa\', \'concluido\')
+                  AND (m.data_saida IS NULL OR m.status = \'concluido\')';
+        if ($turmas !== []) {
+            $marcas = [];
+            foreach (array_values($turmas) as $i => $turmaId) {
+                $chave = 'turma_' . $i;
+                $marcas[] = ':' . $chave;
+                $params[$chave] = $turmaId;
+            }
+            $sql .= ' AND t.id IN (' . implode(',', $marcas) . ')';
+        } elseif ($series !== []) {
+            $marcas = [];
+            foreach (array_values($series) as $i => $serieId) {
+                $chave = 'serie_' . $i;
+                $marcas[] = ':' . $chave;
+                $params[$chave] = $serieId;
+            }
+            $sql .= ' AND t.serie_id IN (' . implode(',', $marcas) . ')';
+        }
+        $sql .= ' LIMIT 1';
+
+        $row = Database::getInstance()->fetch($sql, $params);
+        if (!$row) {
+            return [
+                'mensagem' => 'O aluno não possui matrícula elegível para este modelo e ano.',
+                'turma' => '',
+            ];
+        }
+
+        return [
+            'mensagem' => null,
+            'turma' => trim((string) ($row['turma_nome'] ?? '')),
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $simulacao
+     * @return list<string>
+     */
+    private function avisosNotasSimulacao(array $simulacao): array
+    {
+        $faltantes = [];
+        foreach ((array) ($simulacao['componentes'] ?? []) as $comp) {
+            if (!is_array($comp)) {
+                continue;
+            }
+            $tipo = (string) ($comp['source_type'] ?? '');
+            if ($tipo === 'calculado' || $tipo === 'nenhuma') {
+                continue;
+            }
+            if (is_numeric($comp['valor'] ?? null)) {
+                continue;
+            }
+            $nome = trim((string) ($comp['nome'] ?? $comp['codigo'] ?? ''));
+            if ($nome !== '') {
+                $faltantes[$nome] = $nome;
+            }
+        }
+        $avisos = [];
+        if ($faltantes !== []) {
+            $avisos[] = 'Faltam notas em ' . implode(', ', $faltantes) . '. A ausência não foi convertida em zero.';
+        }
+        $erroFormula = trim((string) ($simulacao['erro_formula'] ?? ''));
+        if ($erroFormula !== '') {
+            $avisos[] = $erroFormula;
+        }
+
+        return $avisos;
     }
 
     public function simularRegraAluno(
@@ -11361,7 +11702,11 @@ class BoletimConfigController extends BaseController
             }
         }
 
-        $semanas = $this->semanasQuadroNaSimulacao($this->grupoRegrasNotasIdDaRegra($regra));
+        $quadroId = $this->quadroIdExplicito($regra);
+        if ($quadroId <= 0) {
+            return ['regra' => $regra, 'componentes' => $componentes];
+        }
+        $semanas = $this->semanasQuadroNaSimulacao($quadroId);
         $novos = BoletimQuadroLayoutHelper::expandirComponentesParaQuadroSemanal(
             $componentes,
             $semanas['a'],
@@ -11397,6 +11742,9 @@ class BoletimConfigController extends BaseController
      */
     private function semanasQuadroNaSimulacao(int $grupoId = 0): array
     {
+        if ($grupoId <= 0) {
+            return ['a' => [], 'b' => []];
+        }
         if (isset($this->semanasQuadroCache[$grupoId])) {
             return $this->semanasQuadroCache[$grupoId];
         }
@@ -11410,7 +11758,7 @@ class BoletimConfigController extends BaseController
             return $this->semanasQuadroCache[$grupoId] = ['a' => $a, 'b' => $b];
         }
         try {
-            $sem = (new GrupoRegrasNotasService())->semanasQuadroPadrao($grupoId > 0 ? $grupoId : null);
+            $sem = (new GrupoRegrasNotasService())->semanasQuadroPadrao($grupoId);
             $sa = is_array($sem['a'] ?? null) ? $sem['a'] : $a;
             $sb = is_array($sem['b'] ?? null) ? $sem['b'] : $b;
             $a = array_values(array_map('intval', $sa));
@@ -12134,10 +12482,101 @@ class BoletimConfigController extends BaseController
     private function redirectFalhaConfiguracao(?int $regraId): void
     {
         $id = (int) ($regraId ?? 0);
+        if (!empty($_POST['origem_assistente']) && $this->retornoFluxoAtual() !== '') {
+            $this->redirect($this->urlAssistenteComRetorno($id));
+        }
         if ($id <= 0 && !empty($_POST['origem_assistente'])) {
             $this->redirect('/admin/boletim-configuracao?novo=1');
         }
         $this->redirect('/admin/boletim-configuracao' . ($id > 0 ? ('?regra_id=' . $id) : ''));
+    }
+
+    private function retornoFluxoAtual(): string
+    {
+        $fluxo = strtolower(trim((string) ($_POST['retorno_fluxo'] ?? '')));
+
+        return in_array($fluxo, ['gerar-avaliacoes', 'boletins'], true) ? $fluxo : '';
+    }
+
+    private function retornoFluxoEhGerar(): bool
+    {
+        return $this->retornoFluxoAtual() === 'gerar-avaliacoes';
+    }
+
+    private function retornoFluxoEhBoletins(): bool
+    {
+        return $this->retornoFluxoAtual() === 'boletins';
+    }
+
+    private function boletimIdRetorno(): int
+    {
+        $id = (int) ($_POST['retorno_boletim_id'] ?? 0);
+        if ($id <= 0) {
+            $id = (int) ($_POST['boletim_id'] ?? 0);
+        }
+
+        return $id;
+    }
+
+    private function anoRetornoFluxo(): int
+    {
+        $ano = (int) ($_POST['retorno_ano_letivo'] ?? 0);
+        if ($ano <= 0) {
+            $ano = (int) ($_POST['ano_letivo'] ?? 0);
+        }
+
+        return $ano;
+    }
+
+    private function urlGerarAvaliacoes(int $boletimId, int $ano): string
+    {
+        $url = '/admin/boletins/' . max(0, $boletimId) . '/gerar-avaliacoes';
+        if ($ano > 0) {
+            $url .= '?ano_letivo=' . $ano;
+        }
+
+        return $url;
+    }
+
+    private function urlPeriodoConfigurado(int $regraId): string
+    {
+        $url = '/admin/boletim-configuracao?regra_id=' . max(0, $regraId);
+        $boletimId = $this->boletimIdRetorno();
+        $ano = $this->anoRetornoFluxo();
+        if ($boletimId > 0) {
+            $url .= '&boletim_id=' . $boletimId;
+        }
+        if ($ano > 0) {
+            $url .= '&ano_letivo=' . $ano;
+        }
+
+        return $url;
+    }
+
+    private function urlAssistenteComRetorno(int $regraId): string
+    {
+        $fluxo = $this->retornoFluxoAtual();
+        if ($fluxo === '') {
+            return '/admin/boletim-configuracao/assistente' . ($regraId > 0 ? ('?regra_id=' . $regraId) : '');
+        }
+        $query = ['voltar' => $fluxo === 'gerar-avaliacoes' ? 'gerar-avaliacoes' : 'boletins'];
+        if ($regraId > 0) {
+            $query['regra_id'] = $regraId;
+        }
+        $boletimId = $this->boletimIdRetorno();
+        if ($boletimId > 0) {
+            $query['boletim_id'] = $boletimId;
+        }
+        $ano = $this->anoRetornoFluxo();
+        if ($ano > 0) {
+            $query['ano_letivo'] = $ano;
+        }
+        $bimestre = (int) ($_POST['bimestre'] ?? 0);
+        if ($bimestre > 0) {
+            $query['bimestre'] = $bimestre;
+        }
+
+        return '/admin/boletim-configuracao/assistente?' . http_build_query($query);
     }
 
     /**
@@ -12160,16 +12599,15 @@ class BoletimConfigController extends BaseController
             $regraAprovacaoId = is_array($boletim) ? (int) ($boletim['regra_academica_id'] ?? 0) : 0;
         }
 
-        $quadroId = $this->grupoRegrasNotasIdDaRegra($regra);
-        $quadroAtivo = true;
-        if ($quadroId > 0) {
+        $quadroId = $this->quadroIdExplicito($regra);
+        $quadroAtivo = $quadroId <= 0 || $this->quadroExplicitoAtivo($quadroId);
+        if ($quadroId > 0 && $quadroAtivo) {
             try {
                 $quadro = (new GrupoRegrasNotasService())->payloadPublico($quadroId);
             } catch (\Throwable $e) {
                 $quadro = null;
             }
-            $quadroAtivo = is_array($quadro) && !empty($quadro['ativo']);
-            if ($quadroAtivo && (empty($quadro['componentes_sugeridos']) || !is_array($quadro['componentes_sugeridos']))) {
+            if (is_array($quadro) && (empty($quadro['componentes_sugeridos']) || !is_array($quadro['componentes_sugeridos']))) {
                 $avisos[] = 'O Quadro de Notas não possui colunas sugeridas; revise o cadastro antes do fechamento oficial.';
             }
         }
@@ -12823,6 +13261,58 @@ class BoletimConfigController extends BaseController
         return $this->agrupamentoCadastroCache[$id];
     }
 
+    /**
+     * @return array{itens:list<array<string,mixed>>,pode_ver:bool,pode_cadastrar:bool,situacao:string}
+     */
+    private function contextoQuadrosNotas(): array
+    {
+        $permissoes = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser(
+            Database::getInstance(),
+            $this->auth->getUser() ?? []
+        );
+        $podeVer = \App\Core\AdminPermissionMatrix::can($permissoes, 'grupos_regras_notas', 'visualizar');
+        $podeCadastrar = \App\Core\AdminPermissionMatrix::can($permissoes, 'grupos_regras_notas', 'cadastrar');
+        if (!$podeVer) {
+            return ['itens' => [], 'pode_ver' => false, 'pode_cadastrar' => $podeCadastrar, 'situacao' => 'sem_permissao'];
+        }
+        $itens = $this->listarGruposRegrasNotasCatalogo();
+        $situacao = $itens !== [] ? 'ok' : $this->situacaoListaQuadrosVazia();
+
+        return [
+            'itens' => $itens,
+            'pode_ver' => true,
+            'pode_cadastrar' => $podeCadastrar,
+            'situacao' => $situacao,
+        ];
+    }
+
+    private function situacaoListaQuadrosVazia(): string
+    {
+        $path = \App\Core\ViewPaths::modulo('grupos-regras-notas/Services/GrupoRegrasNotasService.php');
+        if (!is_file($path)) {
+            return 'vazio';
+        }
+        require_once $path;
+        try {
+            $svc = new GrupoRegrasNotasService();
+            if (!$svc->moduloAtivo()) {
+                return 'desabilitado';
+            }
+            if (!$svc->model()->tabelasProntas()) {
+                return 'vazio';
+            }
+            foreach ($svc->model()->listar(false) as $grupo) {
+                if (empty($grupo['ativo'])) {
+                    return 'sem_elegivel';
+                }
+            }
+        } catch (\Throwable $e) {
+            return 'vazio';
+        }
+
+        return 'vazio';
+    }
+
     private function listarGruposRegrasNotasCatalogo(): array
     {
         $path = \App\Core\ViewPaths::modulo('grupos-regras-notas/Services/GrupoRegrasNotasService.php');
@@ -12860,9 +13350,47 @@ class BoletimConfigController extends BaseController
     /**
      * @param array<string,mixed> $regra
      */
+    private function quadroIdExplicito(array $regra): int
+    {
+        $direto = (int) ($regra['grupo_regras_notas_id'] ?? $regra['quadro_notas_id'] ?? 0);
+        if ($direto > 0) {
+            return $direto;
+        }
+        $raw = $regra['extras_json'] ?? '';
+        if (is_array($raw)) {
+            return (int) ($raw['grupo_regras_notas_id'] ?? $raw['quadro_notas_id'] ?? 0);
+        }
+        if (!is_string($raw) || trim($raw) === '') {
+            return 0;
+        }
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return 0;
+        }
+
+        return (int) ($decoded['grupo_regras_notas_id'] ?? $decoded['quadro_notas_id'] ?? 0);
+    }
+
+    private function quadroExplicitoAtivo(int $quadroId): bool
+    {
+        if ($quadroId <= 0) {
+            return false;
+        }
+        try {
+            $quadro = (new GrupoRegrasNotasService())->payloadPublico($quadroId);
+        } catch (\Throwable $e) {
+            return false;
+        }
+
+        return is_array($quadro) && !empty($quadro['ativo']);
+    }
+
     private function grupoRegrasNotasIdDaRegra(array $regra): int
     {
         $regraId = (int) ($regra['id'] ?? 0);
+        if ($this->simulacaoSomenteLeitura) {
+            return $this->boletimConfig->resolverGrupoRegrasNotasId($regra, $regraId);
+        }
         if ($regraId > 0) {
             return $this->boletimConfig->garantirQuadroNotasNaRegra($regraId);
         }

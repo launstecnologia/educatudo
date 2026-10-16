@@ -9,7 +9,8 @@ $tiposIni = is_array($item['tipos'] ?? null) ? $item['tipos'] : [];
 $tiposNota = is_array($tipos_nota ?? null) ? $tipos_nota : [];
 $ui = \App\Core\ViewPaths::adminPartial('ui');
 
-$page_header_back_url = URL . '/admin/quadros-notas';
+$retorno = (string) ($retorno ?? '');
+$page_header_back_url = $retorno !== '' ? (URL . $retorno) : (URL . '/admin/quadros-notas');
 $page_header_title = $ehEdicao ? 'Editar quadro de notas' : 'Novo quadro de notas';
 $page_header_subtitle = 'Molde anual: gere S1…SN do bimestre mais longo e intercale A/B. Em Lançamento de Notas você escolhe o bloco e a semana daquele período entra sozinha.';
 include \App\Core\ViewPaths::adminPartial('page_header_form.php');
@@ -23,6 +24,9 @@ $steps = [
 ];
 ?>
 
+<?php if ($retorno !== ''): ?>
+<p class="text-sm text-gray-700 mb-4">Ao salvar, você volta para a avaliação de origem. Este cadastro não gera nem publica notas.</p>
+<?php endif; ?>
 <?php if (!$schemaPronto): ?>
 <div class="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-6">
     Rode as migrations <code class="text-sm">2026_09_01_grupos_regras_notas.sql</code>, <code class="text-sm">2026_09_10_quadros_notas.sql</code> e <code class="text-sm">2026_09_12_quadros_colunas_papel.sql</code> no painel Master.
@@ -38,6 +42,9 @@ $steps = [
     <form method="POST"
           action="<?= URL ?>/admin/grupos-regras-notas<?= $ehEdicao ? '/' . (int) $item['id'] . '/update' : '' ?>"
           id="form-grupo-regras">
+        <?php if ($retorno !== ''): ?>
+        <input type="hidden" name="retorno" value="<?= htmlspecialchars($retorno, ENT_QUOTES, 'UTF-8') ?>">
+        <?php endif; ?>
         <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? ''), ENT_QUOTES, 'UTF-8') ?>">
         <input type="hidden" name="ritmo_intervalo_semanas" id="ritmo-intervalo-semanas" value="<?= (int) (is_array($item) ? ($item['ritmo_intervalo_semanas'] ?? 2) : 2) ?>">
 

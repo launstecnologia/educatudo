@@ -294,7 +294,7 @@ A disponibilidade real por escola depende das flags do `FeatureGate` (`jornadas`
 
 ### Painel de notas (quadro)
 
-**Objetivo**: o Quadro de Notas é o molde do **painel** (grade de avaliações), não do boletim oficial. Aluno e pais veem tabelas por bloco (A/B), linhas nas matérias-filhas, células preenchidas automaticamente quando a prova ou o trabalho é lançado com o tipo/coluna certos. Coluna **calculada** fecha a nota da matéria (média ou pesos); `vai_para_boletim` marca o que o boletim oficial pode ler depois.
+**Objetivo**: o Quadro de Notas é o molde do **painel** (grade de avaliações), não do boletim oficial, e é opcional na avaliação. Sem quadro, fórmula, simulação e geração de notas e boletins usam as peças da própria configuração. Aluno e pais veem tabelas por bloco (A/B), linhas nas matérias-filhas, células preenchidas automaticamente quando a prova ou o trabalho é lançado com o tipo/coluna certos. Coluna **calculada** fecha a nota da matéria (média ou pesos); `vai_para_boletim` marca o que o boletim oficial pode ler depois.
 
 **Perfis**: Admin monta o quadro. Aluno em `/notas` e `/notas-boletins?secao=notas`. Pais em `/pais/filhos/{id}/notas`. Coordenação vê o mesmo painel na ficha do aluno.
 

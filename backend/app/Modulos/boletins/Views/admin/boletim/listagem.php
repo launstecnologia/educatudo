@@ -34,6 +34,11 @@ foreach ([$filtroNome, $filtroAno, $filtroBimestre] as $fv) {
 if ($filtroSerieId > 0) {
     $filtrosAtivosCount++;
 }
+$filtroBoletimId = (int) ($filtro_boletim_id ?? 0);
+$filtroBoletimNome = trim((string) ($filtro_boletim_nome ?? ''));
+if ($filtroBoletimId > 0) {
+    $filtrosAtivosCount++;
+}
 if ($exibirDesabilitados) {
     $filtrosAtivosCount++;
 }
@@ -52,36 +57,40 @@ $bimestreLabel = static function ($bimestre, $ano = 0) {
 ?>
 
 <!-- Header Section -->
-<div class="mb-8">
-    <h2 class="text-2xl font-bold text-gray-900 mb-4">Configurações de Notas</h2>
-    <div class="flex items-center justify-between flex-wrap gap-3">
-        <a href="<?= URL ?>/admin/avaliacoes"
-           class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-            <i class="fa-solid fa-arrow-left mr-2 text-gray-500"></i>
-            Voltar
+<?php $boletins_aba = 'periodos'; include \App\Core\ViewPaths::adminPartial('boletins_area_nav.php'); ?>
+<div class="mb-6 flex items-start justify-between gap-3 flex-wrap">
+    <div>
+        <h2 class="text-lg font-semibold text-gray-900">Períodos e fórmulas</h2>
+        <p class="text-sm text-gray-600 mt-1">Eventos de cada período e as fórmulas que calculam a média.</p>
+    </div>
+    <div class="flex items-center gap-3 flex-wrap">
+        <button type="button" onclick="openFilterDrawer()"
+                class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+            <i class="fa-solid fa-filter mr-2 text-gray-500" aria-hidden="true"></i>
+            Filtros
+            <?php if ($filtrosAtivosCount > 0): ?>
+            <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-purple-700 text-white text-xs font-semibold"><?= $filtrosAtivosCount ?></span>
+            <?php endif; ?>
+        </button>
+        <a href="<?= URL ?>/admin/boletim-configuracao?novo=1"
+           class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
+            <i class="fa-solid fa-plus mr-2" aria-hidden="true"></i>
+            Novo Evento
         </a>
-        <div class="flex items-center gap-3 flex-wrap">
-            <a href="<?= URL ?>/admin/boletim-configuracao/gerados"
-               class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-                <i class="fa-solid fa-file-lines mr-2 text-gray-500"></i>
-                Boletins Gerados
-            </a>
-            <button type="button" onclick="openFilterDrawer()"
-                    class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-                <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
-                Filtros
-                <?php if ($filtrosAtivosCount > 0): ?>
-                <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold"><?= $filtrosAtivosCount ?></span>
-                <?php endif; ?>
-            </button>
-            <a href="<?= URL ?>/admin/boletim-configuracao?novo=1"
-               class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
-                <i class="fa-solid fa-plus mr-2"></i>
-                Novo Evento
-            </a>
-        </div>
     </div>
 </div>
+<?php if ($filtroBoletimId > 0): ?>
+<?php
+$paramsSemModelo = $_GET ?? [];
+unset($paramsSemModelo['boletim_id'], $paramsSemModelo['page']);
+$urlSemModelo = URL . '/admin/boletim' . ($paramsSemModelo !== [] ? ('?' . http_build_query($paramsSemModelo)) : '');
+$rotuloModeloFiltro = $filtroBoletimNome !== '' ? $filtroBoletimNome : ('Modelo #' . $filtroBoletimId);
+?>
+<div class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-purple-100 bg-purple-50 px-3 py-2 text-sm text-purple-950">
+    <span>Filtro do modelo: <strong><?= htmlspecialchars($rotuloModeloFiltro, ENT_QUOTES, 'UTF-8') ?></strong></span>
+    <a href="<?= htmlspecialchars($urlSemModelo, ENT_QUOTES, 'UTF-8') ?>" class="font-semibold text-purple-800 underline">Limpar</a>
+</div>
+<?php endif; ?>
 
 <?php if ($flashMessage !== ''): ?>
     <?php
@@ -132,6 +141,9 @@ $bimestreLabel = static function ($bimestre, $ano = 0) {
         </button>
     </div>
     <form method="GET" action="<?= URL ?>/admin/boletim" class="flex flex-col flex-1 overflow-hidden">
+        <?php if ($filtroBoletimId > 0): ?>
+        <input type="hidden" name="boletim_id" value="<?= $filtroBoletimId ?>">
+        <?php endif; ?>
         <?php if ($ordemLista !== ''): ?>
         <input type="hidden" name="ordem" value="<?= htmlspecialchars($ordemLista) ?>">
         <input type="hidden" name="dir" value="<?= htmlspecialchars($dirLista) ?>">

@@ -23,6 +23,29 @@ if (($user['perfil_admin'] ?? '') === 'dev') {
     ];
 }
 
+if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('documentos_institucionais')) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/documentos-institucionais',
+        'title' => 'Documentos Institucionais',
+        'description' => 'Regimento, PPP e demais documentos oficiais da escola.',
+        'icon' => 'fa-solid fa-file-shield',
+    ];
+}
+
+$hub_cards[] = [
+    'href' => URL . '/admin/tudicoins',
+    'title' => 'TudiCoins da Escola',
+    'description' => 'Saldo e uso de créditos de IA da escola.',
+    'icon' => 'fa-solid fa-wallet',
+];
+
+$hub_cards[] = [
+    'href' => URL . '/admin/creditos/pacotes',
+    'title' => 'Pacotes de TudiCoins',
+    'description' => 'Pacotes de créditos disponíveis para a escola.',
+    'icon' => 'fa-solid fa-coins',
+];
+
 if ($podeHub('unidades')) {
     $hub_cards[] = [
         'href' => URL . '/admin/unidades',

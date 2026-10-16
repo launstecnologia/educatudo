@@ -977,6 +977,71 @@ class SchoolCalendarService
         ) ?: [];
     }
 
+    /**
+     * Datas do evento: dia existente, ano de 2000 a 2100 e fim igual ou posterior ao início.
+     * Fim vazio vale o mesmo dia. Data impossível não é convertida para outra.
+     *
+     * @return array{ok:bool,inicio:string,fim:string,erros:array<string,string>}
+     */
+    public static function validarDatasEvento(string $inicioRaw, string $fimRaw): array
+    {
+        $erros = [];
+        $inicio = self::interpretarDataEvento($inicioRaw, $erros, 'data_inicio');
+        if (trim($fimRaw) === '') {
+            $fim = $inicio;
+        } else {
+            $fim = self::interpretarDataEvento($fimRaw, $erros, 'data_fim');
+        }
+        if ($inicio !== null && $fim !== null && $fim < $inicio && !isset($erros['data_fim'])) {
+            $erros['data_fim'] = 'A data final deve ser igual ou posterior à data inicial.';
+        }
+        $aceito = $erros === [] && $inicio !== null && $fim !== null;
+
+        return [
+            'ok' => $aceito,
+            'inicio' => $aceito ? $inicio : '',
+            'fim' => $aceito ? $fim : '',
+            'erros' => $erros,
+        ];
+    }
+
+    /**
+     * @param array<string,string> $erros
+     */
+    private static function interpretarDataEvento(string $raw, array &$erros, string $campo): ?string
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            $erros[$campo] = 'Informe uma data válida.';
+            return null;
+        }
+        $dt = \DateTime::createFromFormat('!Y-m-d', $raw);
+        $falhas = \DateTime::getLastErrors();
+        $temFalha = $dt === false
+            || (is_array($falhas) && (((int) ($falhas['warning_count'] ?? 0)) > 0 || ((int) ($falhas['error_count'] ?? 0)) > 0))
+            || $dt->format('Y-m-d') !== $raw;
+        if ($temFalha) {
+            $erros[$campo] = 'Informe uma data válida.';
+            return null;
+        }
+        $ano = (int) $dt->format('Y');
+        if ($ano < 2000 || $ano > 2100) {
+            $erros[$campo] = 'O ano deve estar entre 2000 e 2100.';
+            return null;
+        }
+
+        return $raw;
+    }
+
+    private function datasEventoGravaveis(string $inicio, string $fim): bool
+    {
+        $checagem = self::validarDatasEvento($inicio, $fim);
+
+        return $checagem['ok'] === true
+            && $checagem['inicio'] === $inicio
+            && $checagem['fim'] === $fim;
+    }
+
     public function salvarEvento(
         int $calendarioId,
         string $inicio,
@@ -988,15 +1053,12 @@ class SchoolCalendarService
         int $visivelAluno = 0,
         int $visivelProfessor = 0,
         int $visivelPais = 0
-    ): void {
-        if ($calendarioId <= 0 || !$this->tableExists()) {
-            return;
+    ): bool {
+        if ($calendarioId <= 0 || !$this->tableExists() || !$this->datasEventoGravaveis($inicio, $fim)) {
+            return false;
         }
         if (!$this->tipoValido($tipo)) {
             $tipo = 'feriado';
-        }
-        if ($fim < $inicio) {
-            [$inicio, $fim] = [$fim, $inicio];
         }
         $this->db->insert(
             "INSERT INTO calendario_letivo_eventos
@@ -1015,6 +1077,8 @@ class SchoolCalendarService
                 'vpais' => $visivelPais ? 1 : 0,
             ]
         );
+
+        return true;
     }
 
     public function atualizarEvento(
@@ -1030,7 +1094,7 @@ class SchoolCalendarService
         int $visivelProfessor = 0,
         int $visivelPais = 0
     ): bool {
-        if ($eventoId <= 0 || $calendarioId <= 0 || !$this->tableExists()) {
+        if ($eventoId <= 0 || $calendarioId <= 0 || !$this->tableExists() || !$this->datasEventoGravaveis($inicio, $fim)) {
             return false;
         }
         $existente = $this->db->fetch(
@@ -1042,9 +1106,6 @@ class SchoolCalendarService
         }
         if (!$this->tipoValido($tipo)) {
             $tipo = 'feriado';
-        }
-        if ($fim < $inicio) {
-            [$inicio, $fim] = [$fim, $inicio];
         }
         $this->db->update(
             "UPDATE calendario_letivo_eventos

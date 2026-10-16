@@ -351,6 +351,9 @@ class BoletimQuadroLayoutHelper
             return $cache[$k];
         }
         $vazio = ['a' => [], 'b' => []];
+        if ($grupoId === null || $grupoId <= 0) {
+            return $cache[$k] = $vazio;
+        }
         $path = dirname(__DIR__) . '/Modulos/grupos-regras-notas/Services/GrupoRegrasNotasService.php';
         if (!class_exists('GrupoRegrasNotasService', false) && is_file($path)) {
             require_once $path;
