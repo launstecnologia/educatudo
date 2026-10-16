@@ -26,7 +26,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 
 $filtros_mostrar_turma = true;
 $filtros_action = URL . '/admin/documentos-periodo';
-include __DIR__ . '/../../../../Views/admin/resultados-finais/_filtros.php';
+include __DIR__ . '/../../../modelos-documentos/Views/admin/resultados-finais/_filtros.php';
 ?>
 
 <?php if ($turmaId > 0 && $paineis !== []):

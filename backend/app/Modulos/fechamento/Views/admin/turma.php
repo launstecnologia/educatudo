@@ -37,7 +37,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 
 $filtros_mostrar_turma = false;
 $filtros_action = URL . '/admin/fechamento/turma/' . $turmaId;
-include __DIR__ . '/../../../../Views/admin/resultados-finais/_filtros.php';
+include __DIR__ . '/../../../modelos-documentos/Views/admin/resultados-finais/_filtros.php';
 
 $statusBadge = static function (string $status): string {
     return match (\App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::normalizar($status)) {

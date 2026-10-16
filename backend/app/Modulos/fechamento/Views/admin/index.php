@@ -8,8 +8,10 @@ $schemaPronto = !empty($schema_pronto);
 $page_header_title = 'Fechamento';
 $page_header_subtitle = 'Painel por turma e período: pendências, recuperação, homologação e retificação.';
 $turmaIdFiltro = (int) ($turma_id ?? 0);
+$anosFiltro = is_array($anos ?? null) ? $anos : [];
+$anoPadrao = (int) ($anosFiltro[0] ?? date('Y'));
 $filtrosAtivosCount = 0;
-if ($anoLetivo !== (int) date('Y')) {
+if ($anoLetivo !== $anoPadrao) {
     $filtrosAtivosCount++;
 }
 if ($periodoTipo !== 'ano') {
@@ -50,7 +52,7 @@ if (!$schemaPronto):
 $filtros_mostrar_turma = true;
 $filtros_action = URL . '/admin/fechamento';
 $filtros_offcanvas = true;
-include __DIR__ . '/../../../../Views/admin/resultados-finais/_filtros.php';
+include __DIR__ . '/../../../modelos-documentos/Views/admin/resultados-finais/_filtros.php';
 ?>
 
 <div class="bg-white rounded-xl shadow-sm border border-gray-200">

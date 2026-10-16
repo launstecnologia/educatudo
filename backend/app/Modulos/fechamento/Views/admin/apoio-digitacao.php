@@ -39,7 +39,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 
 $filtros_mostrar_turma = true;
 $filtros_action = URL . '/admin/fechamento/apoio-digitacao';
-include __DIR__ . '/../../../../Views/admin/resultados-finais/_filtros.php';
+include __DIR__ . '/../../../modelos-documentos/Views/admin/resultados-finais/_filtros.php';
 
 $inputCls = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent';
 $statusBadge = static function (string $status): string {
