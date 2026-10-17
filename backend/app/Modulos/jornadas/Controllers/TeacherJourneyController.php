@@ -316,7 +316,7 @@ class TeacherJourneyController extends BaseController
                             ELSE 'nao_visualizado'
                         END as status_jornada
                      FROM alunos a
-                     \WHERE $whereTurma AND a.ativo = 1
+                     WHERE $whereTurma AND a.ativo = 1
                      ORDER BY a.nome ASC",
                     $params
                 );

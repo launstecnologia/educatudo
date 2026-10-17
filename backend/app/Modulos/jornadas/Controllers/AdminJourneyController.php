@@ -474,7 +474,7 @@ class AdminJourneyController extends BaseController
                         ELSE 'nao_visualizado'
                     END as status_jornada
                  FROM alunos a
-                 \WHERE $whereTurma AND a.ativo = 1",
+                 WHERE $whereTurma AND a.ativo = 1",
                 $paramsShow
             );
             $realizou = 0;

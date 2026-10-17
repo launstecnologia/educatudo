@@ -595,7 +595,7 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
                 $totalAlunos = (int)($this->db->fetch(
                     "SELECT COUNT(DISTINCT a.id) as total
                      FROM alunos a
-                     \WHERE $whereTurma AND a.ativo = 1",
+                     WHERE $whereTurma AND a.ativo = 1",
                     $paramsWhereTurma
                 )['total'] ?? 0);
 
@@ -611,7 +611,7 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
                      AND jpa.exercicio_id IS NULL
                      AND jpa.exercicio_modulo_id IS NULL
                      AND a.ativo = 1
-                     \AND $whereTurma",
+                     AND $whereTurma",
                     $paramsConcluido
                 )['total'] ?? 0);
 
@@ -627,7 +627,7 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
                          OR (jpa.atividade_tipo = 'exercicio_modulo' AND jpa.exercicio_modulo_id IS NOT NULL)
                      )
                      AND a.ativo = 1
-                     \AND $whereTurma
+                     AND $whereTurma
                      AND NOT EXISTS (
                          SELECT 1
                          FROM jornadas_progresso_alunos jc
