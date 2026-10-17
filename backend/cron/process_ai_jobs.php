@@ -41,18 +41,11 @@ try {
             $processed++;
         }
 
-        if ($processed > 0) {
-            echo date('Y-m-d H:i:s') . " [escola={$escolaId}] {$processed} job(s) processado(s)\n";
-        }
-
         // Resolve listas de Exercícios Personalizados presas em 'gerando' — importa as que
         // já têm job pronto/falho, ou marca erro por timeout. Não depende do navegador do
         // aluno estar aberto (ver CustomExerciseImportService).
         try {
-            $resolvidas = \App\Modulos\Exercicios\Services\CustomExerciseImportService::processarPendencias();
-            if ($resolvidas > 0) {
-                echo date('Y-m-d H:i:s') . " [escola={$escolaId}] {$resolvidas} lista(s) de exercícios resolvida(s)\n";
-            }
+            \App\Modulos\Exercicios\Services\CustomExerciseImportService::processarPendencias();
         } catch (\Throwable $eImport) {
             echo date('Y-m-d H:i:s') . " [escola={$escolaId}] erro ao resolver exercícios: " . $eImport->getMessage() . "\n";
         }
@@ -74,11 +67,10 @@ try {
         'jobs_processados' => (int) ($report['jobs_processados'] ?? 0),
     ]);
 
-    $jobs = (int) ($report['jobs_processados'] ?? 0);
     $erros = (int) ($report['escolas_erro'] ?? 0);
-    if ($jobs > 0 || $erros > 0) {
+    if ($erros > 0) {
         echo date('Y-m-d H:i:s')
-            . " [resumo] jobs={$jobs} escolas_ok={$report['escolas_ok']} escolas_erro={$erros}\n";
+            . " [resumo] escolas_erro={$erros} jobs={$report['jobs_processados']}\n";
     }
 } catch (Throwable $e) {
     \App\Services\CronExecucaoService::falhar($execucaoId, $e->getMessage());
