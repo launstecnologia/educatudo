@@ -49,7 +49,7 @@ try {
         // já têm job pronto/falho, ou marca erro por timeout. Não depende do navegador do
         // aluno estar aberto (ver CustomExerciseImportService).
         try {
-            $resolvidas = \CustomExerciseImportService::processarPendencias();
+            $resolvidas = \App\Modulos\Exercicios\Services\CustomExerciseImportService::processarPendencias();
             if ($resolvidas > 0) {
                 echo date('Y-m-d H:i:s') . " [escola={$escolaId}] {$resolvidas} lista(s) de exercícios resolvida(s)\n";
             }

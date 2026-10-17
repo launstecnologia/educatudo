@@ -4,6 +4,7 @@ namespace App\Dominio\Pessoas\Services;
 
 
 use App\Core\Database;
+use App\Dominio\Escola\Services\SchoolCalendarService;
 use App\Models\Essays\EssayProposal;
 
 /**
