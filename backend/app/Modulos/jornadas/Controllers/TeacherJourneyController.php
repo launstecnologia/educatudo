@@ -6970,20 +6970,7 @@ Retorne APENAS um JSON válido no seguinte formato:
             $titulo = $_POST['titulo'] ?? '';
             $obrigatorio = isset($_POST['obrigatorio']) ? 1 : 0;
             $ordem = $_POST['ordem'] ?? null;
-            
-            // Log dos dados recebidos - CRÍTICO para debug
-            if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                error_log("=== ADICIONAR MÓDULO - DADOS RECEBIDOS ===");
-            }
-            error_log("jornada_id: " . ($jornada_id ?? 'NULL'));
-            error_log("tipo_modulo (raw do _POST): " . var_export($_POST['tipo_modulo'] ?? 'NÃO EXISTE', true));
-            error_log("tipo_modulo (processado): " . var_export($tipo_modulo, true));
-            error_log("tipo_modulo (tipo): " . gettype($tipo_modulo));
-            error_log("tipo_modulo (vazio?): " . (empty($tipo_modulo) ? 'SIM' : 'NÃO'));
-            error_log("titulo (raw): " . var_export($titulo, true));
-            error_log("obrigatorio: " . ($obrigatorio ? '1' : '0'));
-            error_log("_POST completo: " . json_encode($_POST));
-            
+
             // Validação rigorosa
             if (!$jornada_id) {
                 error_log("ERRO: jornada_id está vazio!");
@@ -7026,24 +7013,7 @@ Retorne APENAS um JSON válido no seguinte formato:
             
             // Prepara o título final
             $tituloFinal = $titulo ? trim($titulo) : $this->getTituloPadraoModulo($tipo_modulo);
-            
-            // Log antes de inserir
-            error_log("Adicionando módulo - tipo_modulo: '{$tipo_modulo}', titulo: '{$tituloFinal}'");
-            error_log("Valores que serão inseridos: " . json_encode([
-                'jornada_id' => $jornada_id,
-                'aula_id' => null,
-                'tipo_modulo' => $tipo_modulo,
-                'titulo' => $tituloFinal,
-                'descricao' => null,
-                'ordem' => $ordem,
-                'obrigatorio' => $obrigatorio
-            ]));
-            
-            // CRÍTICO: \Verifica o tipo de dado antes de inserir
-            $tipoModuloType = gettype($tipo_modulo);
-            $tipoModuloLength = strlen($tipo_modulo);
-            error_log("tipo_modulo - tipo: {$tipoModuloType}, tamanho: {$tipoModuloLength}, valor: '{$tipo_modulo}'");
-            
+
             // CRÍTICO: \Tenta inserir usando PDO direto para debug
             try {
                 $pdo = $this->db->getPdo();
@@ -7063,22 +7033,16 @@ Retorne APENAS um JSON válido no seguinte formato:
                 $stmt->bindValue(':descricao', null, \PDO::PARAM_NULL);
                 $stmt->bindValue(':ordem', (int)$ordem, \PDO::PARAM_INT);
                 $stmt->bindValue(':obrigatorio', (int)$obrigatorio, \PDO::PARAM_INT);
-                
-                error_log("Valores bindados - tipo_modulo: '{$tipo_modulo}' (tipo: " . gettype($tipo_modulo) . ", tamanho: " . strlen($tipo_modulo) . ")");
-                
+
                 $stmt->execute();
                 $moduloId = $pdo->lastInsertId();
-                
-                error_log("✅ INSERT executado com sucesso. ID retornado: {$moduloId}");
-                
+
             } catch (\PDOException $e) {
                 error_log("❌ ERRO PDO na inserção: " . $e->getMessage());
                 error_log("Código do erro: " . $e->getCode());
                 error_log("Info do erro: " . print_r($e->errorInfo, true));
                 throw $e;
             }
-            
-            error_log("Módulo inserido com ID: {$moduloId}");
             
             // Verifica se foi inserido corretamente - CRÍTICO para debug
             $moduloInserido = $this->db->fetch(
@@ -7091,9 +7055,6 @@ Retorne APENAS um JSON válido no seguinte formato:
                 $tipoIsNull = is_null($moduloInserido['tipo_modulo']);
                 $tipoVazio = $tipoInserido === '' || trim($tipoInserido) === '';
                 
-                error_log("Módulo inserido - ID: {$moduloId}, tipo_modulo no banco: " . ($tipoIsNull ? 'NULL' : "'{$tipoInserido}'") . ", titulo: '{$moduloInserido['titulo']}'");
-                error_log("Valor que tentamos inserir: '{$tipo_modulo}'");
-                
                 // Se o tipo está NULL ou vazio no banco, isso é um problema crítico!
                 if ($tipoIsNull || $tipoVazio) {
                     error_log("⚠️⚠️⚠️ ERRO CRÍTICO: tipo_modulo está NULL ou vazio no banco após inserção!");
@@ -7104,16 +7065,14 @@ Retorne APENAS um JSON válido no seguinte formato:
                     if (!empty($tipo_modulo)) {
                         // FORÇA como string e tenta UPDATE direto
                         $tipoModuloForUpdate = (string)$tipo_modulo;
-                        error_log("Tentando corrigir com UPDATE - valor: '{$tipoModuloForUpdate}', tipo: " . gettype($tipoModuloForUpdate));
-                        
+
                         // Tenta UPDATE direto com SQL explícito
                         try {
-                            $rowsAffected = $this->db->update(
+                            $this->db->update(
                                 "UPDATE jornadas_modulos SET tipo_modulo = :tipo_modulo WHERE id = :id",
                                 ['tipo_modulo' => $tipoModuloForUpdate, 'id' => $moduloId]
                             );
-                            error_log("UPDATE executado - linhas afetadas: {$rowsAffected}");
-                            
+
                             // Verifica novamente
                             $moduloCorrigido = $this->db->fetch(
                                 "SELECT tipo_modulo, CHAR_LENGTH(tipo_modulo) as tamanho FROM jornadas_modulos WHERE id = :id",
@@ -7123,8 +7082,7 @@ Retorne APENAS um JSON válido no seguinte formato:
                             if ($moduloCorrigido) {
                                 $tipoAposCorrecao = $moduloCorrigido['tipo_modulo'] ?? 'AINDA NULL';
                                 $tamanhoAposCorrecao = $moduloCorrigido['tamanho'] ?? 0;
-                                error_log("Após correção, tipo_modulo: '{$tipoAposCorrecao}', tamanho: {$tamanhoAposCorrecao}");
-                                
+
                                 if ($tipoAposCorrecao === 'AINDA NULL' || trim($tipoAposCorrecao) === '' || $tamanhoAposCorrecao == 0) {
                                     error_log("❌ FALHA: Correção não funcionou! tipo_modulo ainda está vazio.");
                                     error_log("⚠️ POSSÍVEL CAUSA: \A coluna tipo_modulo pode ter constraint/trigger ou ser ENUM sem o valor 'dica_professor'");
@@ -7140,18 +7098,14 @@ Retorne APENAS um JSON válido no seguinte formato:
                                     if ($colunaInfo) {
                                         error_log("Estrutura da coluna tipo_modulo: " . json_encode($colunaInfo));
                                     }
-                                } else {
-                                    error_log("✅ SUCESSO: Correção funcionou! tipo_modulo agora é: '{$tipoAposCorrecao}'");
                                 }
                             }
                         } catch (\Exception $e) {
                             error_log("❌ ERRO ao tentar corrigir: " . $e->getMessage());
                         }
                     } else {
-                        error_log("❌ Não foi possível corrigir: tipo_modulo está vazio também na variável PHP!");
+                        error_log("Não foi possível corrigir: tipo_modulo está vazio também na variável PHP.");
                     }
-                } else {
-                    error_log("✅ Módulo inserido corretamente com tipo_modulo: '{$tipoInserido}'");
                 }
             } else {
                 error_log("ERRO: Módulo não encontrado após inserção - ID: {$moduloId}");
@@ -7288,37 +7242,18 @@ Retorne APENAS um JSON válido no seguinte formato:
                 ['jornada_id' => $id]
             );
             
-            // Log para debug - verifica se tipo_modulo está vindo do banco (valor RAW)
-            error_log("Total de módulos encontrados: " . count($modulos));
-            foreach ($modulos as $m) {
-                $tipoRaw = $m['tipo_modulo'] ?? 'NULL';
-                $tipoIsNull = is_null($m['tipo_modulo']);
-                error_log("Módulo ID {$m['id']}: tipo_modulo RAW do banco = " . ($tipoIsNull ? 'NULL' : "'{$tipoRaw}'") . ", tipo é NULL? " . ($tipoIsNull ? 'SIM' : 'NÃO') . ", titulo = '{$m['titulo']}'");
-            }
-            
-            // Garante que todos os campos estão presentes e limpos
             foreach ($modulos as &$modulo) {
-                // CRÍTICO: \Garante que tipo_modulo existe e está limpo
-                // Se for NULL do banco, mantém como string vazia para o JavaScript processar
                 if (!isset($modulo['tipo_modulo']) || $modulo['tipo_modulo'] === null) {
                     $modulo['tipo_modulo'] = '';
-                    error_log("⚠️ Módulo ID {$modulo['id']}: tipo_modulo estava NULL no banco! Título: '{$modulo['titulo']}'");
                 } else {
                     $modulo['tipo_modulo'] = trim((string)$modulo['tipo_modulo']);
                 }
-                
-                // Log ANTES de qualquer processamento
-                error_log("Módulo ID {$modulo['id']}: tipo_modulo após processamento='{$modulo['tipo_modulo']}', titulo='{$modulo['titulo']}'");
-                
-                // IMPORTANTE: NÃO sobrescreve o tipo baseado no título se o tipo já existe
-                // O tipo do banco é a fonte da verdade
-                // Só usa fallback se o tipo realmente estiver vazio
+
                 if (empty($modulo['tipo_modulo']) && !empty($modulo['titulo'])) {
                     $tituloLower = strtolower(trim($modulo['titulo']));
-                    if (strpos($tituloLower, 'dica do professor') !== false || 
+                    if (strpos($tituloLower, 'dica do professor') !== false ||
                         strpos($tituloLower, 'dica professor') !== false) {
                         $modulo['tipo_modulo'] = 'dica_professor';
-                        error_log("Módulo ID {$modulo['id']}: \Tipo definido como 'dica_professor' baseado no título (FALLBACK): '{$modulo['titulo']}'");
                     }
                 }
                 
@@ -7334,9 +7269,6 @@ Retorne APENAS um JSON válido no seguinte formato:
                 if (!isset($modulo['obrigatorio'])) {
                     $modulo['obrigatorio'] = 0;
                 }
-                
-                // Log FINAL para debug
-                error_log("Módulo ID {$modulo['id']}: tipo_modulo FINAL='{$modulo['tipo_modulo']}', titulo='{$modulo['titulo']}'");
             }
             unset($modulo);
             
