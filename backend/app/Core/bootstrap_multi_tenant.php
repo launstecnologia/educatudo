@@ -132,6 +132,44 @@ if (!function_exists('educatudo_responder_escola_inativa')) {
     }
 }
 
+if (!function_exists('educatudo_responder_host_desconhecido')) {
+    function educatudo_responder_host_desconhecido(string $host): void
+    {
+        $host = strtolower(trim($host));
+        $host = preg_replace('/[\r\n\t]/', '', $host) ?? '';
+        if ($host === '') {
+            $host = 'desconhecido';
+        }
+        if (strlen($host) > 253) {
+            $host = substr($host, 0, 253);
+        }
+        $uri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
+        $path = parse_url($uri, PHP_URL_PATH);
+        $path = is_string($path) && $path !== '' ? $path : '/';
+        $path = preg_replace('/[\r\n\t]/', '', $path) ?? '/';
+        if (strlen($path) > 200) {
+            $path = substr($path, 0, 200);
+        }
+        error_log('[bootstrap_multi_tenant] host sem escola: ' . $host . ' path=' . $path);
+
+        if (!headers_sent()) {
+            http_response_code(404);
+            header('Content-Type: text/html; charset=utf-8');
+            header('X-Robots-Tag: noindex, nofollow', true);
+        }
+
+        echo '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">';
+        echo '<meta name="viewport" content="width=device-width, initial-scale=1">';
+        echo '<title>Página não encontrada - EducaTudo</title>';
+        echo '<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f8fafc;color:#0f172a;font-family:Inter,Arial,sans-serif}.box{max-width:520px;padding:40px 28px;text-align:center}h1{margin:0 0 10px;font-size:28px;line-height:1.2}p{margin:0;color:#475569;font-size:16px;line-height:1.6}</style>';
+        echo '</head><body><main class="box">';
+        echo '<h1>Página não encontrada</h1>';
+        echo '<p>Não há uma escola do EducaTudo neste endereço.</p>';
+        echo '</main></body></html>';
+        exit;
+    }
+}
+
 // Rotas /master e domínio MASTER continuam no fluxo original (sempre abrem o MASTER).
 if ($isMasterPath || $isMasterDomain) {
     $masterPdo = Database::createMasterPdo();
@@ -193,7 +231,7 @@ if ($tenant === null) {
         $errorHost = explode(':', $errorHost, 2)[0];
     }
     $errorHost = strtolower($errorHost);
-    throw new Exception("Multi-tenant: nenhuma escola ativa encontrada para este domínio/host ({$errorHost}). Cadastre a escola e o domínio na tabela escolas (banco master) ou use o header X-Tenant com o slug da escola.");
+    educatudo_responder_host_desconhecido($errorHost);
 }
 
 if (!isset($GLOBALS['_educatudo_db_manager'])) {
