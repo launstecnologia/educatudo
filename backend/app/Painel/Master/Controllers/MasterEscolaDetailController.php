@@ -693,7 +693,7 @@ class MasterEscolaDetailController extends BaseController
         // Auditoria: registra qual admin master gerou acesso "Entrar como" e para quem.
         if (!class_exists('Logger')) {
         }
-        Logger::warning('Master gerou acesso "Entrar como"', [
+        Logger::info('Master gerou acesso "Entrar como"', [
             'master_user_id' => $_SESSION['master_user_id'] ?? null,
             'master_user_nome' => $_SESSION['master_user_nome'] ?? null,
             'escola_id' => $escolaId,
@@ -701,7 +701,7 @@ class MasterEscolaDetailController extends BaseController
             'user_id_alvo' => (int) $user['id'],
             'jti' => $jti,
             'exp' => $exp,
-        ], 'seguranca');
+        ], 'auditoria');
 
         $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $folder = defined('FOLDER') ? FOLDER : '';

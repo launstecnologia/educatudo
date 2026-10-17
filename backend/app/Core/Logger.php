@@ -102,117 +102,76 @@ class Logger
      */
     private static function write($level, $message, $context, $category)
     {
-        // SEMPRE logar no error_log do PHP primeiro (fallback garantido), exceto rotas_nao_encontrada para não poluir
-        if ($category !== 'rotas_nao_encontrada') {
-            $simpleMessage = "[{$level}] [{$category}] {$message}";
-            if (!empty($context)) {
-                $simpleContext = [];
-                if (isset($context['file'])) $simpleContext[] = "File: " . $context['file'];
-                if (isset($context['line'])) $simpleContext[] = "Line: " . $context['line'];
-                if (isset($context['request_uri'])) $simpleContext[] = "URI: " . $context['request_uri'];
-                if (isset($context['session']['user_id'])) $simpleContext[] = "User: " . $context['session']['user_id'];
-                if (!empty($simpleContext)) {
-                    $simpleMessage .= " | " . implode(" | ", $simpleContext);
-                }
-            }
-            error_log($simpleMessage);
-        }
-        
         try {
+            $message = self::mascararSegredosNoTexto((string) $message);
+            if (is_array($context)) {
+                $context = self::mascararContexto($context);
+            }
             $timestamp = date('Y-m-d H:i:s');
-            $date = date('Y-m-d');
             
-            // Garantir que o diretório existe e tem permissões
             if (!is_dir(self::$logDir)) {
                 @mkdir(self::$logDir, 0755, true);
             }
             
-            // Verificar se consegue escrever no diretório
             if (!is_writable(self::$logDir)) {
                 @chmod(self::$logDir, 0755);
             }
             
-            // Arquivo de log geral
-            $logFile = self::$logDir . '/app_' . $date . '.log';
+            $logFile = self::caminhoArquivoUnico();
+            self::rotacionarSePreciso($logFile);
             
-            // Arquivo de log app.data.log (sempre atualizado)
-            $appDataLogFile = self::$logDir . '/app.data.log';
-            
-            // Arquivo de log por categoria (erro crítico ou categorias para rastreio)
-            $categoryFile = null;
-            if ($category === 'push' || $category === 'evolution' || $category === 'jornadas' || $category === 'exercicios_personalizados' || $category === 'external_apps_credits' || ($level === 'error' && in_array($category, ['openai', 'database', 'auth', 'api', 'email']))) {
-                $categoryFile = self::$logDir . '/' . $category . '_' . $date . '.log';
-            }
-            
-            // Preparar dados do contexto (limitar tamanho para evitar Fatal memory exhausted)
             $contextData = '';
             $maxMessageBytes = 2048;
             $maxTraceBytes = 8192;
             $maxContextBytes = 8192;
             if (!empty($context)) {
-                if (isset($context['exception']) && $context['exception'] instanceof \Exception) {
+                if (isset($context['exception']) && $context['exception'] instanceof \Throwable) {
                     $e = $context['exception'];
                     $contextData .= "\nException: " . get_class($e);
-                    $msg = $e->getMessage();
-                    $contextData .= "\nMessage: " . (strlen($msg) > $maxMessageBytes ? substr($msg, 0, $maxMessageBytes) . '...[truncated]' : $msg);
+                    $msg = self::mascararSegredosNoTexto($e->getMessage());
+                    $jaNaMensagem = $msg !== '' && str_contains((string) $message, $msg);
+                    if (!$jaNaMensagem) {
+                        $contextData .= "\nMessage: " . (strlen($msg) > $maxMessageBytes ? substr($msg, 0, $maxMessageBytes) . '...[truncated]' : $msg);
+                    }
                     $contextData .= "\nFile: " . $e->getFile();
                     $contextData .= "\nLine: " . $e->getLine();
-                    $trace = $e->getTraceAsString();
+                    $trace = self::mascararSegredosNoTexto($e->getTraceAsString());
                     $contextData .= "\nStack Trace:\n" . (strlen($trace) > $maxTraceBytes ? substr($trace, 0, $maxTraceBytes) . "\n...[truncated]" : $trace);
                 }
                 $otherContext = array_filter($context, function($key) {
                     return $key !== 'exception';
                 }, ARRAY_FILTER_USE_KEY);
                 if (!empty($otherContext)) {
+                    $otherContext = self::mascararContexto($otherContext);
                     $encoded = json_encode($otherContext, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
                     $contextData .= "\nContext: " . (strlen($encoded) > $maxContextBytes ? substr($encoded, 0, $maxContextBytes) . '...[truncated]' : $encoded);
                 }
             }
             
-            // Informações da requisição
             $requestInfo = '';
             if (isset($_SERVER['REQUEST_URI'])) {
-                $requestInfo = "\nRequest URI: " . ($_SERVER['REQUEST_URI'] ?? 'N/A');
+                $requestInfo = "\nRequest URI: " . self::mascararUri((string) ($_SERVER['REQUEST_URI'] ?? ''));
                 $requestInfo .= "\nRequest Method: " . ($_SERVER['REQUEST_METHOD'] ?? 'N/A');
-                $requestInfo .= "\nIP Address: " . ($_SERVER['REMOTE_ADDR'] ?? 'N/A');
+                $requestInfo .= "\nIP Address: " . self::getRealIpAddress();
                 if (isset($_SESSION['user_id'])) {
                     $requestInfo .= "\nUser ID: " . $_SESSION['user_id'];
                     $requestInfo .= "\nUser Type: " . ($_SESSION['user_type'] ?? 'N/A');
                 }
             }
             
-            // Montar entrada do log (limitar tamanho da mensagem para evitar estouro de memória)
             $logEntry = strtoupper($level) . " [" . $timestamp . "] [{$category}]\n";
             $logEntry .= "Message: " . (strlen($message) > 8192 ? substr($message, 0, 8192) . '...[truncated]' : $message) . "\n";
             $logEntry .= $contextData;
             $logEntry .= $requestInfo;
             $logEntry .= "\n" . str_repeat('-', 80) . "\n\n";
             
-            // Rotas não encontradas: apenas em rotas_nao_encontrada.log (não suja app_*.log e não notifica WhatsApp)
-            if ($category === 'rotas_nao_encontrada') {
-                $rotasLogFile = self::$logDir . '/rotas_nao_encontrada.log';
-                @file_put_contents($rotasLogFile, $logEntry, FILE_APPEND | LOCK_EX);
-                return;
-            }
-            
-            // Escrever no log geral
             $written = @file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
             if ($written === false) {
                 error_log("FALHA ao escrever em {$logFile}. Verifique permissões.");
             }
-            
-            // Escrever no app.data.log (sempre atualizado)
-            $written = @file_put_contents($appDataLogFile, $logEntry, FILE_APPEND | LOCK_EX);
-            if ($written === false) {
-                error_log("FALHA ao escrever em {$appDataLogFile}. Verifique permissões.");
-            }
-            
-            // Escrever no log da categoria (se aplicável)
-            if ($categoryFile) {
-                $written = @file_put_contents($categoryFile, $logEntry, FILE_APPEND | LOCK_EX);
-                if ($written === false) {
-                    error_log("FALHA ao escrever em {$categoryFile}. Verifique permissões.");
-                }
+
+            if ($category === 'rotas_nao_encontrada') {
+                return;
             }
             
             // Enviar notificação de log para o grupo WhatsApp (Evolution API) em error, warning e info
@@ -251,6 +210,7 @@ class Logger
                 && $category !== 'evolution'
                 && $category !== 'database'
                 && $category !== 'rotas_nao_encontrada'
+                && $category !== 'auditoria'
                 && !$erroConexaoBanco
                 && !$erroQuotaOuCredits
                 && !$erroTtsChat
@@ -278,7 +238,7 @@ class Logger
                                     $partes[] = 'Exceção: ' . (strlen($v) <= 120 ? $v : substr($v, 0, 117) . '...');
                                     continue;
                                 }
-                                if ($k !== 'trace' && $v !== null && $v !== '') {
+                                if ($k !== 'trace' && !is_object($v) && $v !== null && $v !== '') {
                                     $partes[] = (is_string($v) && strlen($v) <= 80) ? $v : (is_scalar($v) ? (string)$v : json_encode($v));
                                 }
                             }
@@ -428,6 +388,9 @@ class Logger
             if ($resourceAccessed === null && isset($_SERVER['REQUEST_URI'])) {
                 $resourceAccessed = $_SERVER['REQUEST_URI'];
             }
+            if (is_string($resourceAccessed)) {
+                $resourceAccessed = self::mascararUri($resourceAccessed);
+            }
             
             // Filtrar campos sensíveis do payload
             $filteredPayload = self::filterSensitiveData($requestPayload);
@@ -473,6 +436,89 @@ class Logger
         }
     }
     
+    /**
+     * Arquivo único da aplicação. A categoria continua no texto da entrada.
+     */
+    private static function caminhoArquivoUnico(): string
+    {
+        return self::$logDir . '/app.log';
+    }
+
+    /**
+     * Quando o arquivo passa de 32 MB, guarda a geração anterior em app.1.log.
+     */
+    private static function rotacionarSePreciso(string $arquivo): void
+    {
+        $limite = 32 * 1024 * 1024;
+        clearstatcache(true, $arquivo);
+        if (!is_file($arquivo) || (int) filesize($arquivo) < $limite) {
+            return;
+        }
+        $backup = self::$logDir . '/app.1.log';
+        @unlink($backup);
+        @rename($arquivo, $backup);
+    }
+
+    /**
+     * @param array<string|int, mixed> $contexto
+     * @return array<string|int, mixed>
+     */
+    private static function mascararContexto(array $contexto): array
+    {
+        $sensiveis = ['token', '_token', 'access_token', 'refresh_token', 'password', 'senha', 'senha_hash', 'password_hash', 'csrf', 'csrf_token', 'authorization', 'api_key', 'secret', 'secret_key'];
+        foreach ($contexto as $chave => $valor) {
+            $nome = strtolower((string) $chave);
+            if (in_array($nome, $sensiveis, true)) {
+                $contexto[$chave] = '***';
+                continue;
+            }
+            if (is_string($valor) && in_array($nome, ['request_uri', 'uri', 'url', 'resource', 'resource_accessed'], true)) {
+                $contexto[$chave] = self::mascararUri($valor);
+                continue;
+            }
+            if (is_string($valor)) {
+                $contexto[$chave] = self::mascararSegredosNoTexto($valor);
+            }
+            if (is_array($valor)) {
+                $contexto[$chave] = self::mascararContexto($valor);
+            }
+        }
+        return $contexto;
+    }
+
+    private static function mascararUri(string $uri): string
+    {
+        $uri = str_replace(["\r", "\n", "\t"], '', $uri);
+        if ($uri === '') {
+            return '/';
+        }
+        $partes = explode('?', $uri, 2);
+        $path = $partes[0];
+        if (!isset($partes[1]) || $partes[1] === '') {
+            return strlen($path) > 500 ? substr($path, 0, 500) . '...[truncated]' : $path;
+        }
+        $query = [];
+        parse_str($partes[1], $query);
+        $sensiveis = ['token', '_token', 'access_token', 'refresh_token', 'password', 'senha', 'senha_hash', 'password_hash', 'csrf', 'csrf_token', 'authorization', 'api_key', 'secret', 'secret_key'];
+        $pares = [];
+        foreach ($query as $chave => $valor) {
+            $nome = strtolower((string) $chave);
+            $valorLog = in_array($nome, $sensiveis, true) ? '***' : rawurlencode(is_scalar($valor) ? (string) $valor : '');
+            $pares[] = rawurlencode((string) $chave) . '=' . $valorLog;
+        }
+        $montada = $path . '?' . implode('&', $pares);
+        return strlen($montada) > 500 ? substr($montada, 0, 500) . '...[truncated]' : $montada;
+    }
+
+    private static function mascararSegredosNoTexto(string $texto): string
+    {
+        return (string) preg_replace(
+            '/(^|[&?\s])(access_token|refresh_token|password_hash|senha_hash|csrf_token|api_key|secret_key|_token|token|password|senha|csrf|authorization|secret)=([^&\s]+)/i',
+            '$1$2=***',
+            $texto
+        );
+    }
+
     /**
      * Obtém o IP real do usuário (considerando proxies)
      * 

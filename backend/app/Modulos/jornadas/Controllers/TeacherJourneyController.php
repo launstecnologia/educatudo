@@ -6903,7 +6903,7 @@ Retorne APENAS um JSON válido no seguinte formato:
     public function corrigirRedacaoJornadaIAStatus($id)
     {
         if (class_exists('\App\Core\Logger')) {
-            \App\Core\Logger::info('Polling status correção IA jornada', [
+            \App\Core\Logger::debug('Polling status correção IA jornada', [
                 'job_id' => (int) $id,
                 'uri' => (string) ($_SERVER['REQUEST_URI'] ?? ''),
                 'user_id' => $_SESSION['user_id'] ?? null,

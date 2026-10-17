@@ -296,7 +296,7 @@ date_default_timezone_set('America/Sao_Paulo');
 if (ENVIRONMENT === 'production') {
     ini_set('display_errors', 0);
     ini_set('log_errors', 1);
-    ini_set('error_log', BASE_PATH . '/storage/logs/error.log');
+    ini_set('error_log', BASE_PATH . '/storage/logs/app.log');
 } else {
     ini_set('display_errors', 1);
     error_reporting(E_ALL);
@@ -463,17 +463,6 @@ if (!function_exists('ehErroDeBancoNaMensagem')) {
 register_shutdown_function(function() {
     $error = error_get_last();
     if ($error !== null && in_array($error['type'], [E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR, E_PARSE, E_RECOVERABLE_ERROR])) {
-        // SEMPRE logar no error_log primeiro (garantido)
-        $errorMsg = "ERRO FATAL PHP [{$error['type']}]: {$error['message']} em {$error['file']} linha {$error['line']}";
-        $errorMsg .= " | URI: " . ($_SERVER['REQUEST_URI'] ?? 'N/A');
-        $errorMsg .= " | Method: " . ($_SERVER['REQUEST_METHOD'] ?? 'N/A');
-        if (session_status() === PHP_SESSION_ACTIVE && isset($_SESSION['user_id'])) {
-            $errorMsg .= " | User: " . ($_SESSION['user_id'] ?? 'N/A');
-        }
-        error_log($errorMsg);
-        error_log(buildStructuredErrorLog($error['message'] . ' em ' . $error['file'] . ' linha ' . $error['line']));
-        
-        // Tentar usar o Logger se disponível
         try {
             if (file_exists(BASE_PATH . '/app/Core/Logger.php')) {
                 require_once BASE_PATH . '/app/Core/Logger.php';
@@ -486,7 +475,6 @@ register_shutdown_function(function() {
                     'request_uri' => $_SERVER['REQUEST_URI'] ?? 'N/A',
                     'request_method' => $_SERVER['REQUEST_METHOD'] ?? 'N/A',
                     'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'N/A',
-                    'ip_address' => $_SERVER['REMOTE_ADDR'] ?? 'N/A',
                     'folder' => defined('FOLDER') ? FOLDER : 'N/A',
                     'url' => defined('URL') ? URL : 'N/A',
                     'school' => inferSchoolForErrorLog(),
@@ -554,18 +542,6 @@ if (!$disableBootstrapMetrics) {
 
 // Configurar handler de exceções não capturadas
 set_exception_handler(function($e) {
-    // SEMPRE logar no error_log primeiro (garantido)
-    $errorMsg = "EXCEÇÃO NÃO CAPTURADA: {$e->getMessage()} em {$e->getFile()} linha {$e->getLine()}";
-    $errorMsg .= " | URI: " . ($_SERVER['REQUEST_URI'] ?? 'N/A');
-    $errorMsg .= " | Method: " . ($_SERVER['REQUEST_METHOD'] ?? 'N/A');
-    if (session_status() === PHP_SESSION_ACTIVE && isset($_SESSION['user_id'])) {
-        $errorMsg .= " | User: " . ($_SESSION['user_id'] ?? 'N/A');
-    }
-    error_log($errorMsg);
-    error_log(buildStructuredErrorLog($e->getMessage() . ' em ' . $e->getFile() . ' linha ' . $e->getLine()));
-    error_log("Stack trace: " . $e->getTraceAsString());
-    
-    // Tentar usar o Logger se disponível
     try {
         if (file_exists(BASE_PATH . '/app/Core/Logger.php')) {
             require_once BASE_PATH . '/app/Core/Logger.php';
@@ -578,7 +554,6 @@ set_exception_handler(function($e) {
                 'request_uri' => $_SERVER['REQUEST_URI'] ?? 'N/A',
                 'request_method' => $_SERVER['REQUEST_METHOD'] ?? 'N/A',
                 'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'N/A',
-                'ip_address' => $_SERVER['REMOTE_ADDR'] ?? 'N/A',
                 'folder' => defined('FOLDER') ? FOLDER : 'N/A',
                 'url' => defined('URL') ? URL : 'N/A',
                 'school' => inferSchoolForErrorLog(),

@@ -457,8 +457,9 @@ class LogsAplicacaoService
     private function partirConteudoLog(string $path, string $conteudo, int $maxLinhas, ?string $filtro): array
     {
         $nome = basename($path);
-        $ehBlocoLogger = (bool) preg_match('/^(app(\.data)?_|app\.data\.log$|database_|openai_|auth_|api_|email_|general_)/', $nome)
-            || $nome === 'app.data.log';
+        $ehBlocoLogger = (bool) preg_match('/^(app(\.data)?_|app\.data\.log$|app\.log$|app\.\d+\.log$|database_|openai_|auth_|api_|email_|general_)/', $nome)
+            || $nome === 'app.data.log'
+            || $nome === 'app.log';
 
         if ($ehBlocoLogger) {
             $itens = preg_split('/\n-{20,}\n?/', $conteudo) ?: [];

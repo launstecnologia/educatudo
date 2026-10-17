@@ -1307,7 +1307,7 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
         }
         Logger::logAudit(
             'entrar_como_master',
-            $_SERVER['REQUEST_URI'] ?? '/auth/entrar-como',
+            '/auth/entrar-como',
             [
                 'escola_id' => (int) $payload['escola_id'],
                 'tipo' => $user['tipo'],
@@ -1317,12 +1317,12 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
             (int) $user['id'],
             $user['tipo']
         );
-        Logger::warning('Sessão iniciada via "Entrar como" do Master', [
+        Logger::info('Sessão iniciada via "Entrar como" do Master', [
             'escola_id' => (int) $payload['escola_id'],
             'tipo' => $user['tipo'],
             'user_id' => $user['id'],
             'jti' => $jti,
-        ], 'seguranca');
+        ], 'auditoria');
 
         $url = defined('URL') ? URL : '';
         if ($user['tipo'] === 'admin') {

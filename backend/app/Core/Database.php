@@ -482,9 +482,6 @@ class Database
                     'params_count' => count($params)
                 ]
             );
-            
-            $errorMsg = $e->getMessage();
-            error_log("Erro na query: " . $errorMsg . " SQL: " . $sql . " Params: " . json_encode($params));
             throw new \Exception($this->buildQueryExceptionMessage($e, $sql, $params));
         }
     }

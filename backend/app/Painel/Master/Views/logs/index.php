@@ -26,7 +26,7 @@ $arquivosDisco = $diagnostico['arquivos'] ?? [];
 
 <div class="mb-6">
     <h2 class="text-2xl font-bold text-slate-900 mb-1">Logs do sistema</h2>
-    <p class="text-slate-500 text-sm">Todos os registros de <code>storage/logs</code> (incluindo <code>app.data.log</code> e <code>app_*.log</code>), com horário. Atualize depois de reproduzir o 500.</p>
+    <p class="text-slate-500 text-sm">Registros novos ficam em <code>storage/logs/app.log</code>. Arquivos antigos continuam na lista até serem apagados.</p>
     <p class="text-xs text-slate-400 mt-2 font-mono break-all">
         <?= htmlspecialchars((string) ($diagnostico['diretorio'] ?? '')) ?>
         · <?= !empty($diagnostico['gravavel']) ? 'gravável' : 'sem escrita' ?>
