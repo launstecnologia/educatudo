@@ -592,7 +592,7 @@ $urlRecursosEscolares = $canViewSidebar(['almoxarifado'])
         </a>
         <?php endif; ?>
         <?php if ($canViewSidebar(['relatorios_gerais'])): ?>
-        <a href="<?= URL ?>/admin/relatorios" class="<?= $linkCls(in_array($cp, ['relatorios', 'reports_boletim_coordenacao'], true)) ?>">
+        <a href="<?= URL ?>/admin/relatorios" class="<?= $linkCls($cp === 'relatorios') ?>">
             <i class="fa-solid fa-chart-column w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Relatórios</span>
         </a>

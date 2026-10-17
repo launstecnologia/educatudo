@@ -44,7 +44,8 @@ $boletimWizardSteps = [
      data-boletim-id="<?= (int) ($boletimId ?? $boletim_id ?? 0) ?>"
      data-ano-letivo="<?= (int) ($anoAssistente ?? $ano_letivo_assistente ?? 0) ?>"
      data-bimestre="<?= (int) ($bimestreAssistente ?? $bimestre_assistente ?? 0) ?>"
-     data-retorno-fluxo="<?= !empty($voltarGerarAvaliacoes) ? 'gerar-avaliacoes' : (!empty($voltarBoletins) ? 'boletins' : '') ?>"
+     data-retorno-fluxo="<?= htmlspecialchars(!empty($voltarGerarAvaliacoes) ? 'gerar-avaliacoes' : (!empty($voltarPeriodos) ? 'periodos' : (!empty($voltarEvento) ? 'evento' : (!empty($voltarBoletins) ? 'boletins' : ''))), ENT_QUOTES, 'UTF-8') ?>"
+     data-lista="<?= htmlspecialchars(json_encode(is_array($navegacaoLista ?? null) ? $navegacaoLista : [], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
      data-continuar="<?= !empty($continuarRascunhoAssistente) ? '1' : '0' ?>"
      data-url-quadros="<?= htmlspecialchars(URL . '/admin/quadros-notas', ENT_QUOTES, 'UTF-8') ?>"
      data-pode-ver-quadro="<?= !empty($podeVerQuadro) ? '1' : '0' ?>"
@@ -673,6 +674,57 @@ $boletimWizardSteps = [
             rotulo_campo_plural: 'Bimestres',
             rotulos: { '1': '1º Bimestre', '2': '2º Bimestre', '3': '3º Bimestre', '4': '4º Bimestre' }
         };
+    }
+
+    function nomePadraoEventoJs(ano, bimestre) {
+        var info = periodoInfo(ano);
+        var tipo = String(info.tipo || 'bimestre');
+        var adjetivo = tipo === 'trimestre' ? 'Trimestrais'
+            : (tipo === 'semestre' ? 'Semestrais' : (tipo === 'etapa_unica' ? '' : 'Bimestrais'));
+        var anoNum = Number(ano) || 0;
+        var bim = Number(bimestre) || 0;
+        if (bim <= 0 || adjetivo === '') return 'Notas — ' + anoNum;
+        var campo = String(info.rotulo_campo || 'Bimestre').toLocaleLowerCase('pt-BR');
+        return 'Notas ' + adjetivo + ' — ' + bim + 'º ' + campo + ' ' + anoNum;
+    }
+
+    function nomePareceSugestao(nome) {
+        return /^Notas(?: Bimestrais| Trimestrais| Semestrais)? — /.test(String(nome || '').trim());
+    }
+
+    var anoAntesPendente = null;
+    var bimAntesPendente = null;
+
+    function nomeSegueSugestao(anoAntes, bimAntes) {
+        if (!estado) return false;
+        if (estado.nome_automatico === false) return false;
+        if (estado.nome_automatico === true) return true;
+        var nome = String(estado.nome || '').trim();
+        if (nome === '') return true;
+        if (nome === nomePadraoEventoJs(anoAntes, bimAntes)) return true;
+        return false;
+    }
+
+    function sincronizarNomeSugerido(anoAntes, bimAntes) {
+        if (!estado) return;
+        var anoAgora = Number(estado.ano_letivo || 0);
+        var bimAgora = Number(estado.bimestre || 0);
+        anoAntes = Number(anoAntes || 0);
+        bimAntes = Number(bimAntes || 0);
+        if (anoAgora === anoAntes && bimAgora === bimAntes) return;
+        if (anoAgora < 2000 || anoAgora > 2100) return;
+        if (!nomeSegueSugestao(anoAntes, bimAntes)) return;
+        if (!periodoNumeroValido(bimAgora, anoAgora)) {
+            bimAgora = Math.max(1, maxPeriodo(anoAgora));
+            estado.bimestre = bimAgora;
+        }
+        estado.nome = nomePadraoEventoJs(anoAgora, bimAgora);
+        estado.nome_automatico = true;
+        estado._ajustandoNome = true;
+        var nomeAuto = document.getElementById('bw-nome');
+        if (nomeAuto) nomeAuto.value = estado.nome;
+        estado._ajustandoNome = false;
+        atualizarCabecalhoEvento();
     }
 
     function maxPeriodo(ano) {
@@ -1392,6 +1444,8 @@ $boletimWizardSteps = [
             boletim_id: 0,
             grupo_regras_notas_id: 0,
             nota_minima_aprovacao: 6,
+            nota_minima_origem: 'padrao',
+            nota_minima_regra_nome: '',
             round_mode: 'half',
             decimal_places: 2,
             pecas: [],
@@ -1504,7 +1558,25 @@ $boletimWizardSteps = [
             estado.pecas_opcoes[k].blocos_ids = normalizarIdsJs(estado.pecas_opcoes[k].blocos_ids);
             estado.pecas_opcoes[k].blocos_ids_manual = Number(estado.pecas_opcoes[k].blocos_ids_manual || 0) === 1 ? 1 : 0;
         });
-        if (!estado.ano_alinhado_eventos && estado.modo !== 'editar') {
+        var anoOrigem = Number(root.getAttribute('data-ano-letivo') || 0);
+        var bimOrigem = Number(root.getAttribute('data-bimestre') || 0);
+        var bolOrigem = Number(root.getAttribute('data-boletim-id') || 0);
+        var origemExplicita = anoOrigem >= 2000 && anoOrigem <= 2100 && bolOrigem > 0 && estado.modo !== 'editar';
+        if (origemExplicita && !estado.contexto_origem_aplicado) {
+            estado.contexto_origem_aplicado = true;
+            estado.ano_alinhado_eventos = true;
+            estado.ano_letivo = anoOrigem;
+            estado.boletim_id = bolOrigem;
+            if (bimOrigem > 0) estado.bimestre = bimOrigem;
+            if (estado.nome_automatico !== false) {
+                var nomeCtx = nomePadraoEventoJs(estado.ano_letivo, estado.bimestre);
+                var nomeAtual = String(estado.nome || '').trim();
+                if (nomeAtual === '' || nomeAtual === nomeCtx || nomePareceSugestao(nomeAtual)) {
+                    estado.nome = nomeCtx;
+                    estado.nome_automatico = true;
+                }
+            }
+        } else if (!estado.ano_alinhado_eventos && estado.modo !== 'editar') {
             estado.ano_alinhado_eventos = true;
             var anoAtual = Number(estado.ano_letivo || 0);
             var nAtual = 0;
@@ -1512,12 +1584,36 @@ $boletimWizardSteps = [
                 if (Number(ev.ano_letivo || 0) === anoAtual) nAtual++;
             });
             var padrao = anoLetivoPadraoJs();
-            if (anoAtual > 0 && nAtual === 0 && padrao > 0 && padrao !== anoAtual) {
+            if (anoAtual > 0 && nAtual === 0 && padrao > 0 && padrao !== anoAtual && anoOrigem <= 0) {
+                var nomeAntesAlinhar = String(estado.nome || '').trim();
+                var sugestaoAntes = nomePadraoEventoJs(anoAtual, estado.bimestre);
                 estado.ano_letivo = padrao;
+                if (estado.nome_automatico !== false && (nomeAntesAlinhar === '' || nomeAntesAlinhar === sugestaoAntes || nomePareceSugestao(nomeAntesAlinhar))) {
+                    estado.nome = nomePadraoEventoJs(estado.ano_letivo, estado.bimestre);
+                    estado.nome_automatico = true;
+                }
             }
         }
         if (!estado.boletim_id && catalogo.boletins && catalogo.boletins.length === 1) {
             estado.boletim_id = Number(catalogo.boletins[0].id || 0) || 0;
+        }
+        if (estado.nome_automatico !== true && estado.nome_automatico !== false) {
+            var editandoSalvo = estado.modo === 'editar' || Number(estado.regra_id || regraId || 0) > 0;
+            var sugeridoIni = nomePadraoEventoJs(estado.ano_letivo, estado.bimestre);
+            var nomeIni = String(estado.nome || '').trim();
+            if (nomeIni === '') {
+                if (!editandoSalvo) {
+                    estado.nome = sugeridoIni;
+                    estado.nome_automatico = true;
+                }
+            } else if (nomeIni === sugeridoIni) {
+                estado.nome_automatico = true;
+            } else if (!editandoSalvo && nomePareceSugestao(nomeIni)) {
+                estado.nome = sugeridoIni;
+                estado.nome_automatico = true;
+            } else if (editandoSalvo) {
+                estado.nome_automatico = false;
+            }
         }
         window.boletimWizardEstadoAtual = function () { return estado; };
         return estado;
@@ -3166,7 +3262,7 @@ $boletimWizardSteps = [
                 { codigo: 'resultado', nome: 'Resultado', layout_type: 'resultado', source_type: 'nenhuma' }
             ]
         });
-        var notaMin = Number((estado && estado.nota_minima_aprovacao) != null ? estado.nota_minima_aprovacao : 6);
+        var notaMin = Number(minimaExibida().valor);
         function notasLinha(nome) {
             var h = hashNome(nome) + hashPreviewAluno();
             var notas = {};
@@ -4267,6 +4363,25 @@ $boletimWizardSteps = [
         if (r.bimestre != null) estado.bimestre = r.bimestre;
         if (r.ano_letivo) estado.ano_letivo = r.ano_letivo;
         if (Number(r.boletim_id || 0) > 0) estado.boletim_id = Number(r.boletim_id);
+        if (Number(r.boletim_id || 0) > 0) {
+            var bolR = (catalogo.boletins || []).filter(function (b) { return Number(b.id) === Number(r.boletim_id); })[0];
+            if (bolR) {
+                estado.nota_minima_aprovacao = bolR.nota_minima_aprovacao != null ? bolR.nota_minima_aprovacao : 6;
+                estado.nota_minima_origem = bolR.minima_origem === 'regra' ? 'regra' : 'padrao';
+                estado.nota_minima_regra_nome = estado.nota_minima_origem === 'regra' ? (bolR.regra_nome || '') : '';
+            }
+        } else if (!(Number(r.regra_id || 0) > 0)) {
+            estado.nota_minima_aprovacao = 6;
+            estado.nota_minima_origem = 'padrao';
+            estado.nota_minima_regra_nome = '';
+        } else if (r.nota_minima_aprovacao != null && r.nota_minima_aprovacao !== '') {
+            estado.nota_minima_aprovacao = Number(r.nota_minima_aprovacao);
+            estado.nota_minima_origem = r.nota_minima_origem || 'evento';
+            estado.nota_minima_regra_nome = r.nota_minima_regra_nome || '';
+        }
+        r.nota_minima_aprovacao = estado.nota_minima_aprovacao;
+        r.nota_minima_origem = estado.nota_minima_origem;
+        r.nota_minima_regra_nome = estado.nota_minima_regra_nome;
         if (Number(r.grupo_regras_notas_id || 0) > 0) estado.grupo_regras_notas_id = Number(r.grupo_regras_notas_id);
         if (Number(r.regra_id || 0) > 0) {
             estado.regra_id = Number(r.regra_id);
@@ -4291,6 +4406,7 @@ $boletimWizardSteps = [
         rascunhoAtual = r;
         aplicarRascunho(r);
         renderAll();
+        atualizarCabecalhoEvento();
         renderResumo(
             'Ajuste do chat aplicado no formulário.\n\nRevise e salve o evento quando estiver ok.',
             []
@@ -4524,10 +4640,54 @@ $boletimWizardSteps = [
             estado.series_ids = (bol.series_ids || []).slice();
             estado.turmas_ids = (bol.turmas_ids || []).slice();
             estado.nota_minima_aprovacao = bol.nota_minima_aprovacao != null ? bol.nota_minima_aprovacao : 6;
+            estado.nota_minima_origem = bol.minima_origem === 'regra' ? 'regra' : 'padrao';
+            estado.nota_minima_regra_nome = estado.nota_minima_origem === 'regra' ? (bol.regra_nome || '') : '';
             estado.round_mode = bol.round_mode || 'none';
             estado.decimal_places = Number(bol.decimal_places) === 1 ? 1 : 2;
+        } else {
+            estado.nota_minima_aprovacao = 6;
+            estado.nota_minima_origem = 'padrao';
+            estado.nota_minima_regra_nome = '';
+        }
+        if (rascunhoAtual) {
+            rascunhoAtual.nota_minima_aprovacao = estado.nota_minima_aprovacao;
+            rascunhoAtual.nota_minima_origem = estado.nota_minima_origem;
+            rascunhoAtual.nota_minima_regra_nome = estado.nota_minima_regra_nome;
+            rascunhoAtual.boletim_id = estado.boletim_id;
         }
         if (reRender) renderAll();
+    }
+
+    function minimaExibida() {
+        var origem = (estado && estado.nota_minima_origem) || 'padrao';
+        var nome = (estado && estado.nota_minima_regra_nome) || '';
+        var valor = (estado && estado.nota_minima_aprovacao != null && estado.nota_minima_aprovacao !== '')
+            ? Number(estado.nota_minima_aprovacao)
+            : 6;
+        if (!isFinite(valor)) valor = 6;
+        if (origem !== 'regra' && origem !== 'evento') origem = 'padrao';
+        return { valor: valor, origem: origem, nome: nome };
+    }
+
+    function formatarMinima(valor) {
+        var n = Number(valor);
+        if (!isFinite(n)) n = 6;
+        var umaCasa = Math.abs(n - Math.round(n * 10) / 10) < 0.001;
+        return n.toFixed(umaCasa ? 1 : 2).replace('.', ',');
+    }
+
+    function rotuloMinima(info) {
+        if (info.origem === 'regra') {
+            return info.nome ? ('regra vinculada: ' + info.nome) : 'regra vinculada';
+        }
+        if (info.origem === 'evento') return 'valor deste evento';
+        return 'padrão';
+    }
+
+    function htmlMinimaAprovacao() {
+        var info = minimaExibida();
+        return '<p class="text-sm text-gray-800">Média mínima: <strong>' + esc(formatarMinima(info.valor)) + '</strong>'
+            + ' <span class="text-gray-500">(' + esc(rotuloMinima(info)) + ')</span></p>';
     }
 
     function htmlFontesBimestres() {
@@ -4886,6 +5046,7 @@ $boletimWizardSteps = [
                 html += '<option value="' + Number(b.id) + '"' + (Number(estado.boletim_id) === Number(b.id) ? ' selected' : '') + '>' + esc(label) + '</option>';
             });
             html += '</select>';
+            html += htmlMinimaAprovacao();
             if (!(catalogo.boletins || []).length) {
                 html += '<p class="text-xs text-amber-800 mt-1">Nenhum modelo apareceu. Cadastre em <a href="<?= URL ?>/admin/boletins" class="underline">Acadêmico → Modelo de Boletim</a>. Sem vínculo, a mínima sugerida fica 6 e o público é o que você marcar nesta identidade — não o da turma do modelo.</p>';
             } else if (boletimOpcional) {
@@ -5301,24 +5462,22 @@ $boletimWizardSteps = [
             var el = document.getElementById(id);
             if (!el) return;
             el.addEventListener('change', function () {
-                var anoAntes = estado.ano_letivo;
+                var anoAntes = anoAntesPendente != null ? Number(anoAntesPendente) : Number(estado.ano_letivo || 0);
+                var bimAntes = bimAntesPendente != null ? Number(bimAntesPendente) : Number(estado.bimestre || 0);
+                anoAntesPendente = null;
+                bimAntesPendente = null;
                 syncIdentidadeFromDom();
                 if (id === 'bw-boletim') {
                     aplicarBoletimCadastro(estado.boletim_id, true);
                     agendarMontar();
                     return;
                 }
-                if ((id === 'bw-ano' || id === 'bw-clonar-ano') && Number(anoAntes) !== Number(estado.ano_letivo)) {
-                    if (estado.nome_automatico !== false && anoAntes && estado.nome && String(estado.nome).indexOf(String(anoAntes)) !== -1) {
-                        estado.nome = String(estado.nome).split(String(anoAntes)).join(String(estado.ano_letivo));
-                        estado._ajustandoNome = true;
-                        var nomeAuto = document.getElementById('bw-nome');
-                        if (nomeAuto) nomeAuto.value = estado.nome;
-                        estado._ajustandoNome = false;
-                    }
-                    if (!periodoNumeroValido(estado.bimestre)) {
-                        estado.bimestre = maxPeriodo();
-                    }
+                var anoMudou = (id === 'bw-ano' || id === 'bw-clonar-ano') && anoAntes !== Number(estado.ano_letivo || 0);
+                var bimMudou = (id === 'bw-bim' || id === 'bw-clonar-bim') && bimAntes !== Number(estado.bimestre || 0);
+                if (anoMudou || bimMudou) {
+                    sincronizarNomeSugerido(anoAntes, bimAntes);
+                }
+                if (anoMudou) {
                     var idsOk = {};
                     turmasVisiveis().forEach(function (t) { idsOk[Number(t.id)] = true; });
                     estado.turmas_ids = (estado.turmas_ids || []).filter(function (idTurma) { return idsOk[Number(idTurma)]; });
@@ -5333,7 +5492,18 @@ $boletimWizardSteps = [
             });
             el.addEventListener('input', function () {
                 if (id === 'bw-nome' && !estado._ajustandoNome) estado.nome_automatico = false;
+                if ((id === 'bw-ano' || id === 'bw-clonar-ano') && anoAntesPendente == null) {
+                    anoAntesPendente = Number(estado.ano_letivo || 0);
+                }
+                if ((id === 'bw-bim' || id === 'bw-clonar-bim') && bimAntesPendente == null) {
+                    bimAntesPendente = Number(estado.bimestre || 0);
+                }
+                var anoAntes = anoAntesPendente != null ? Number(anoAntesPendente) : Number(estado.ano_letivo || 0);
+                var bimAntes = bimAntesPendente != null ? Number(bimAntesPendente) : Number(estado.bimestre || 0);
                 syncIdentidadeFromDom();
+                if (id === 'bw-ano' || id === 'bw-clonar-ano' || id === 'bw-bim' || id === 'bw-clonar-bim') {
+                    sincronizarNomeSugerido(anoAntes, bimAntes);
+                }
                 agendarMontar();
             });
         });
@@ -5661,8 +5831,31 @@ $boletimWizardSteps = [
         var h2 = document.getElementById('evento-notas-titulo');
         var sub = document.getElementById('evento-notas-ref');
         if (h2) h2.textContent = titulo;
-        if (sub) sub.textContent = ref > 0 ? ('Ref ' + ref) : 'Novo evento, ainda sem ref';
+        if (sub) sub.textContent = textoContextoEvento(ref);
         if (nome || ref > 0) document.title = titulo + ' - EducaTudo';
+    }
+
+    function textoContextoEvento(ref) {
+        var ano = Number((estado && estado.ano_letivo) || 0);
+        var bim = Number((estado && estado.bimestre) || 0);
+        var bolId = Number((estado && estado.boletim_id) || 0);
+        var nomeBol = 'Sem modelo';
+        var lista = (catalogo && catalogo.boletins) || [];
+        for (var i = 0; i < lista.length; i++) {
+            if (Number(lista[i].id) === bolId && bolId > 0) {
+                nomeBol = String(lista[i].nome || '').trim() || nomeBol;
+                break;
+            }
+        }
+        var periodo = 'Período não informado';
+        if (bim > 0) {
+            var info = periodoInfo(ano);
+            var rotulos = info.rotulos || {};
+            periodo = String(rotulos[String(bim)] || (bim + 'º ' + String(info.rotulo_campo || 'período').toLocaleLowerCase('pt-BR')));
+        }
+        var texto = nomeBol + ' · ' + (ano > 0 ? String(ano) : 'Ano não informado') + ' · ' + periodo;
+        if (Number(ref) > 0) texto += ' · Ref ' + ref;
+        return texto;
     }
 
     function renderResumo(resumo, erros) {
@@ -5718,6 +5911,7 @@ $boletimWizardSteps = [
         }
         renderSteps();
         renderBody();
+        atualizarCabecalhoEvento();
         aplicarScroll(scroll);
         requestAnimationFrame(function () { aplicarScroll(scroll); });
         setTimeout(function () { aplicarScroll(scroll); }, 0);
@@ -5848,8 +6042,18 @@ $boletimWizardSteps = [
                     if (!remoto.grupo_linha) remoto.grupo_linha = grupoLinhaPadrao();
                     remoto.grupo_linha.arredondamento = arredLocal;
                 }
+                var nomeManual = estado && estado.nome_automatico === false ? String(estado.nome || '') : null;
                 estado = remoto;
+                if (nomeManual !== null) {
+                    estado.nome = nomeManual;
+                    estado.nome_automatico = false;
+                }
                 garantirEstado();
+                atualizarCabecalhoEvento();
+                var campoNome = document.getElementById('bw-nome');
+                if (campoNome && document.activeElement !== campoNome) {
+                    campoNome.value = String(estado.nome || '');
+                }
             }
             rascunhoAtual = j.rascunho || null;
             garantirArredondamentoGrupoNoRascunho(rascunhoAtual);
@@ -5978,6 +6182,10 @@ $boletimWizardSteps = [
 
     function aplicarRascunhoNaConfiguracao(r, gerarNotas) {
         if (!r || typeof r !== 'object') return false;
+        var infoMinSalvar = minimaExibida();
+        r.nota_minima_aprovacao = infoMinSalvar.valor;
+        r.nota_minima_origem = infoMinSalvar.origem;
+        r.nota_minima_regra_nome = infoMinSalvar.nome || '';
         var comps = normalizarComponentesRascunho(r.componentes);
         if (!comps.length) {
             renderResumo('O assistente montou o evento, mas sem blocos.', ['Volte em Tipo de Notas, marque as colunas e monte a média em Fórmula. Depois clique de novo em Concluir e aplicar.']);
@@ -6023,7 +6231,11 @@ $boletimWizardSteps = [
             add('default_data_fim', r.default_data_fim || '');
             add('round_mode', r.round_mode || 'none');
             add('decimal_places', (Number(r.decimal_places) === 1 ? 1 : 2));
-            add('nota_minima_aprovacao', r.nota_minima_aprovacao != null ? r.nota_minima_aprovacao : 6);
+            var infoMin = minimaExibida();
+            r.nota_minima_aprovacao = infoMin.valor;
+            r.nota_minima_origem = infoMin.origem;
+            r.nota_minima_regra_nome = infoMin.nome || '';
+            add('nota_minima_aprovacao', infoMin.valor);
             if (r.usar_resultado_aprovacao == null || Number(r.usar_resultado_aprovacao) === 1) {
                 add('usar_resultado_aprovacao', '1');
             }
@@ -6036,10 +6248,19 @@ $boletimWizardSteps = [
             add('componentes_json', JSON.stringify(comps));
             add('assistente_rascunho', JSON.stringify(r));
             add('origem_assistente', '1');
-            if (retornoFluxo === 'gerar-avaliacoes' || retornoFluxo === 'boletins') {
+            if (retornoFluxo === 'gerar-avaliacoes' || retornoFluxo === 'boletins' || retornoFluxo === 'periodos' || retornoFluxo === 'evento') {
                 add('retorno_fluxo', retornoFluxo);
                 add('retorno_boletim_id', root.getAttribute('data-boletim-id') || (r.boletim_id || ''));
                 add('retorno_ano_letivo', r.ano_letivo || root.getAttribute('data-ano-letivo') || '');
+            }
+            if (retornoFluxo === 'periodos' || retornoFluxo === 'evento') {
+                var listaRetorno = {};
+                try { listaRetorno = JSON.parse(root.getAttribute('data-lista') || '{}'); } catch (eLista) { listaRetorno = {}; }
+                if (listaRetorno && typeof listaRetorno === 'object') {
+                    Object.keys(listaRetorno).forEach(function (chaveLista) {
+                        add(chaveLista, listaRetorno[chaveLista]);
+                    });
+                }
             }
             if (gerarNotas === true && ehEventoNotasPreview()) add('gerar_nova_versao', '1');
             document.body.appendChild(form);

@@ -316,6 +316,19 @@ class BoletimAssistenteFerramentas
         }
         $anoLetivo = (int) $anoLetivo;
         $bimestre = (int) $bimestre;
+        if ($anoLetivo > 0 && $bimestre > 0) {
+            foreach ($eventos as $ev) {
+                $idExato = (int) ($ev['id'] ?? 0);
+                if ($idExato <= 0) {
+                    continue;
+                }
+                if ((int) ($ev['ano_letivo'] ?? 0) === $anoLetivo && (int) ($ev['bimestre'] ?? 0) === $bimestre) {
+                    return $idExato;
+                }
+            }
+
+            return 0;
+        }
         $melhor = 0;
         $melhorPts = -1;
         foreach ($eventos as $ev) {

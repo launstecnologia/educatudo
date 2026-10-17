@@ -654,7 +654,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         <?php
         $anoAcaoPeriodo = (int) ($regra['ano_letivo'] ?? 0);
         $bimAcaoPeriodo = (int) ($regra['bimestre'] ?? 0);
-        $queryConfigurarNotas = ['voltar' => 'boletins'];
+        $queryConfigurarNotas = ['voltar' => 'evento'];
         if ($selectedRegraId > 0) {
             $queryConfigurarNotas['regra_id'] = $selectedRegraId;
         }
@@ -667,8 +667,41 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         if ($bimAcaoPeriodo > 0) {
             $queryConfigurarNotas['bimestre'] = $bimAcaoPeriodo;
         }
+        $navegacaoLista = is_array($navegacao_lista ?? null) ? $navegacao_lista : [];
+        foreach ($navegacaoLista as $chaveListaNav => $valorListaNav) {
+            if ((string) $valorListaNav === '') {
+                continue;
+            }
+            $queryConfigurarNotas[(string) $chaveListaNav] = $valorListaNav;
+        }
         $urlConfigurarNotas = URL . '/admin/boletim-configuracao/assistente?' . http_build_query($queryConfigurarNotas);
         $urlVoltarModelo = URL . '/admin/boletins';
+        $urlVoltarPeriodos = URL . (string) ($navegacao_url_periodos ?? '/admin/boletim');
+        $queryResultados = [];
+        if ($selectedRegraId > 0) {
+            $queryResultados['regra_id'] = $selectedRegraId;
+        }
+        if ($boletimIdSelecionado > 0) {
+            $queryResultados['boletim_id'] = $boletimIdSelecionado;
+        }
+        $urlResultadosEvento = URL . '/admin/boletim-configuracao/gerados' . ($queryResultados !== [] ? ('?' . http_build_query($queryResultados)) : '');
+        $querySimular = $queryResultados;
+        if ($anoAcaoPeriodo > 0) {
+            $querySimular['ano_letivo'] = $anoAcaoPeriodo;
+        }
+        $querySimular['simular'] = '1';
+        foreach ($navegacaoLista as $chaveListaSim => $valorListaSim) {
+            if ((string) $valorListaSim === '') {
+                continue;
+            }
+            $querySimular[(string) $chaveListaSim] = $valorListaSim;
+        }
+        if ((string) ($navegacao_origem ?? '') !== '') {
+            $querySimular['origem'] = (string) $navegacao_origem;
+        }
+        $urlSimularEvento = URL . '/admin/boletim-configuracao?' . http_build_query($querySimular);
+        $navegacaoSalvo = !empty($navegacao_salvo);
+        $navegacaoOrigem = (string) ($navegacao_origem ?? '');
         $urlAdicionarPeriodosPagina = $boletimIdSelecionado > 0
             ? (URL . '/admin/boletins/' . $boletimIdSelecionado . '/gerar-avaliacoes' . ($anoAcaoPeriodo > 0 ? ('?ano_letivo=' . $anoAcaoPeriodo) : ''))
             : '';
@@ -730,15 +763,15 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
             </div>
             <?php endif; ?>
             <div class="flex flex-wrap items-center justify-end gap-2">
-                <a href="<?= URL ?>/admin/<?= $modoArquivo ? 'boletim/arquivo' : 'boletim' ?>"
+                <a href="<?= htmlspecialchars($modoArquivo ? (URL . '/admin/boletim/arquivo') : $urlVoltarPeriodos, ENT_QUOTES, 'UTF-8') ?>"
                    class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-medium">
                     <i class="fa-solid fa-arrow-left"></i>
-                    <?= $modoArquivo ? 'Arquivo de fórmulas' : 'Todos os eventos' ?>
+                    <?= $modoArquivo ? 'Arquivo de fórmulas' : 'Voltar aos períodos' ?>
                 </a>
-                <a href="<?= URL ?>/admin/boletim-configuracao/gerados"
+                <a href="<?= htmlspecialchars($urlResultadosEvento, ENT_QUOTES, 'UTF-8') ?>"
                    class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium">
                     <i class="fa-solid fa-chart-column"></i>
-                    Boletins gerados
+                    Ver resultados e versões
                 </a>
             </div>
         </div>
@@ -746,6 +779,23 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
     <?php if ($flashMessage !== ''): ?>
         <?php $bg = $flashType === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'; ?>
         <div class="p-4 rounded-lg border <?= $bg ?>"><?= htmlspecialchars($flashMessage) ?></div>
+    <?php endif; ?>
+    <?php if ($navegacaoSalvo && !$modoArquivo): ?>
+        <?php
+        $rotuloVoltaSalvo = $navegacaoOrigem === 'boletins' ? 'Voltar ao modelo' : 'Voltar aos períodos';
+        $urlVoltaSalvo = $navegacaoOrigem === 'boletins' ? $urlVoltarModelo : $urlVoltarPeriodos;
+        ?>
+        <div class="p-4 rounded-lg border border-gray-200 bg-white text-sm text-gray-700">
+            <p>A configuração ficou salva neste evento. As notas dos alunos não foram publicadas.</p>
+            <div class="mt-3 flex flex-wrap gap-2">
+                <a href="<?= htmlspecialchars($urlVoltaSalvo, ENT_QUOTES, 'UTF-8') ?>"
+                   class="inline-flex items-center px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50"><?= htmlspecialchars($rotuloVoltaSalvo, ENT_QUOTES, 'UTF-8') ?></a>
+                <a href="<?= htmlspecialchars($urlSimularEvento, ENT_QUOTES, 'UTF-8') ?>"
+                   class="inline-flex items-center px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50">Simular boletim</a>
+                <a href="<?= htmlspecialchars($urlResultadosEvento, ENT_QUOTES, 'UTF-8') ?>"
+                   class="inline-flex items-center px-3 py-2 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-800 font-medium hover:bg-indigo-100">Ver resultados e versões</a>
+            </div>
+        </div>
     <?php endif; ?>
 
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">

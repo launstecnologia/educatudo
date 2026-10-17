@@ -637,6 +637,10 @@ class BoletimConfigController extends BaseController
             'gates_geracao' => ((int) ($regra['id'] ?? 0) > 0)
                 ? $this->diagnosticarGatesFechamentoRegra($regra)
                 : ['ok' => true, 'bloqueios' => [], 'avisos' => []],
+            'navegacao_origem' => $this->origemNavegacaoAtual($_GET),
+            'navegacao_lista' => $this->paramsListaNaQuery($this->filtrosListaPeriodos($_GET)),
+            'navegacao_url_periodos' => $this->urlListaPeriodos($this->filtrosListaPeriodos($_GET)),
+            'navegacao_salvo' => (string) ($_GET['salvo'] ?? '') === '1',
         ];
 
         if ($somenteTabela) {
@@ -657,7 +661,9 @@ class BoletimConfigController extends BaseController
         $bimestreGet = isset($_GET['bimestre']) ? (int) $_GET['bimestre'] : 0;
         $voltar = strtolower(trim((string) ($_GET['voltar'] ?? '')));
         $voltarGerar = $voltar === 'gerar-avaliacoes' && $boletimId > 0;
-        $voltarBoletins = !$voltarGerar && (
+        $voltarPeriodos = $voltar === 'periodos';
+        $voltarEvento = $voltar === 'evento';
+        $voltarBoletins = !$voltarGerar && !$voltarPeriodos && !$voltarEvento && (
             $boletimId > 0
             || $voltar === 'boletins'
         );
@@ -718,9 +724,28 @@ class BoletimConfigController extends BaseController
         $bimestreRetorno = $bimestreGet > 0
             ? $bimestreGet
             : (int) (is_array($estadoInicial) ? ($estadoInicial['bimestre'] ?? 0) : 0);
-        $urlRetornoGerar = $voltarGerar
-            ? $this->urlGerarAvaliacoes($boletimId, $anoRetorno)
-            : '';
+        $filtrosLista = $this->filtrosListaPeriodos($_GET);
+        if ($voltarGerar) {
+            $origemNav = 'gerar-avaliacoes';
+            $urlRetornoNav = $this->urlGerarAvaliacoes($boletimId, $anoRetorno);
+            $rotuloRetornoNav = 'Voltar e configurar os demais períodos';
+        } elseif ($voltarPeriodos) {
+            $origemNav = 'periodos';
+            $urlRetornoNav = $this->urlListaPeriodos($filtrosLista);
+            $rotuloRetornoNav = 'Voltar aos períodos';
+        } elseif ($voltarEvento) {
+            $origemNav = 'evento';
+            $urlRetornoNav = $this->urlEventoComNavegacao($selectedRegraId, 'evento', $filtrosLista, false);
+            $rotuloRetornoNav = 'Voltar ao evento';
+        } elseif ($voltarBoletins) {
+            $origemNav = 'boletins';
+            $urlRetornoNav = '/admin/boletins';
+            $rotuloRetornoNav = 'Voltar ao modelo';
+        } else {
+            $origemNav = '';
+            $urlRetornoNav = '/admin/boletim-configuracao' . ($selectedRegraId > 0 ? ('?regra_id=' . $selectedRegraId) : '?novo=1');
+            $rotuloRetornoNav = $selectedRegraId > 0 ? 'Voltar ao evento' : 'Voltar aos períodos';
+        }
         $flashAssistente = (string) ($_SESSION['boletim_flash'] ?? '');
         $flashTipoAssistente = (string) ($_SESSION['boletim_flash_type'] ?? '');
         unset($_SESSION['boletim_flash'], $_SESSION['boletim_flash_type']);
@@ -751,9 +776,14 @@ class BoletimConfigController extends BaseController
             'ano_letivo_assistente' => $anoRetorno,
             'bimestre_assistente' => $bimestreRetorno,
             'voltar_boletins' => $voltarBoletins,
+            'voltar_periodos' => $voltarPeriodos,
+            'voltar_evento' => $voltarEvento,
             'voltar_gerar_avaliacoes' => $voltarGerar,
             'continuar_rascunho' => isset($_GET['continuar']) && (string) $_GET['continuar'] === '1',
-            'boletim_assistente_return_url' => $urlRetornoGerar,
+            'boletim_assistente_return_url' => $urlRetornoNav,
+            'boletim_assistente_return_label' => $rotuloRetornoNav,
+            'navegacao_origem' => $origemNav,
+            'navegacao_lista' => $this->paramsListaNaQuery($filtrosLista),
             'pode_ver_quadro' => $podeVerQuadroAssistente,
             'pode_cadastrar_quadro' => $podeCadastrarQuadroAssistente,
             'flash_status' => $flashAssistente === ''
@@ -1978,7 +2008,7 @@ class BoletimConfigController extends BaseController
                 $this->setFlashMessage($msgSalva, 'success');
                 $this->redirect($this->urlGerarAvaliacoes($this->boletimIdRetorno(), $this->anoRetornoFluxo()));
             }
-            if ($salvou && !$pediuPublicar && $this->retornoFluxoEhBoletins()) {
+            if ($salvou && !$pediuPublicar && in_array($this->retornoFluxoAtual(), ['boletins', 'periodos', 'evento'], true)) {
                 $gravada = (string) ($_SESSION['boletim_flash'] ?? '');
                 $msgSalva = 'Configuração salva. As notas dos alunos não foram geradas.';
                 if (preg_match('/versão\s+(\d+)/u', $gravada, $versaoSalvaLista)) {
@@ -1986,7 +2016,12 @@ class BoletimConfigController extends BaseController
                 }
                 $_SESSION['boletim_flash'] = $msgSalva;
                 $_SESSION['boletim_flash_type'] = 'success';
-                $this->redirect($this->urlPeriodoConfigurado($redirId));
+                $this->redirect($this->urlEventoComNavegacao(
+                    $redirId,
+                    $this->retornoFluxoAtual(),
+                    $this->filtrosListaPeriodos($_POST),
+                    true
+                ));
             }
             $this->redirect($this->urlAssistenteComRetorno($redirId));
         }
@@ -12419,7 +12454,7 @@ class BoletimConfigController extends BaseController
                 'ano_letivo' => (int) ($post['ano_letivo'] ?? 0),
                 'bimestre' => (int) ($post['bimestre'] ?? 0),
                 'round_mode' => (string) ($post['round_mode'] ?? 'half'),
-                'nota_minima_aprovacao' => $post['nota_minima_aprovacao'] ?? 7,
+                'nota_minima_aprovacao' => $post['nota_minima_aprovacao'] ?? 6,
                 'componentes' => $comps,
             ];
         }
@@ -12495,7 +12530,7 @@ class BoletimConfigController extends BaseController
     {
         $fluxo = strtolower(trim((string) ($_POST['retorno_fluxo'] ?? '')));
 
-        return in_array($fluxo, ['gerar-avaliacoes', 'boletins'], true) ? $fluxo : '';
+        return in_array($fluxo, ['gerar-avaliacoes', 'boletins', 'periodos', 'evento'], true) ? $fluxo : '';
     }
 
     private function retornoFluxoEhGerar(): bool
@@ -12514,6 +12549,9 @@ class BoletimConfigController extends BaseController
         if ($id <= 0) {
             $id = (int) ($_POST['boletim_id'] ?? 0);
         }
+        if ($id <= 0) {
+            $id = (int) ($_GET['boletim_id'] ?? 0);
+        }
 
         return $id;
     }
@@ -12524,8 +12562,163 @@ class BoletimConfigController extends BaseController
         if ($ano <= 0) {
             $ano = (int) ($_POST['ano_letivo'] ?? 0);
         }
+        if ($ano <= 0) {
+            $ano = (int) ($_GET['ano_letivo'] ?? 0);
+        }
 
         return $ano;
+    }
+
+    private function origemNavegacaoAtual(array $fonte): string
+    {
+        $origem = strtolower(trim((string) ($fonte['origem'] ?? $fonte['voltar'] ?? '')));
+
+        return in_array($origem, ['periodos', 'evento', 'boletins', 'gerar-avaliacoes'], true) ? $origem : '';
+    }
+
+    /**
+     * Filtros da listagem de períodos, com chaves próprias para não misturar com o ano do evento.
+     *
+     * @param array<string,mixed> $fonte
+     * @return array{nome:string,ano:int,bimestre:int,serie:int,boletim:int,ordem:string,dir:string,page:int,desabilitados:string}
+     */
+    private function filtrosListaPeriodos(array $fonte): array
+    {
+        $nome = trim((string) ($fonte['lista_nome'] ?? ''));
+        $nome = preg_replace('/\s+/u', ' ', $nome) ?? '';
+        if (mb_strlen($nome) > 120) {
+            $nome = mb_substr($nome, 0, 120);
+        }
+        $ano = (int) ($fonte['lista_ano'] ?? 0);
+        if ($ano < 2000 || $ano > 2100) {
+            $ano = 0;
+        }
+        $bimestre = (int) ($fonte['lista_bimestre'] ?? 0);
+        if ($bimestre < 0 || $bimestre > 12) {
+            $bimestre = 0;
+        }
+        $ordem = strtolower(trim((string) ($fonte['lista_ordem'] ?? '')));
+        if (!in_array($ordem, ['ref', 'serie', 'bimestre'], true)) {
+            $ordem = '';
+        }
+
+        return [
+            'nome' => $nome,
+            'ano' => $ano,
+            'bimestre' => $bimestre,
+            'serie' => max(0, (int) ($fonte['lista_serie'] ?? 0)),
+            'boletim' => max(0, (int) ($fonte['lista_boletim'] ?? 0)),
+            'ordem' => $ordem,
+            'dir' => strtolower(trim((string) ($fonte['lista_dir'] ?? ''))) === 'desc' ? 'desc' : 'asc',
+            'page' => max(0, (int) ($fonte['lista_page'] ?? 0)),
+            'desabilitados' => (string) ($fonte['lista_desabilitados'] ?? '') === '1' ? '1' : '',
+        ];
+    }
+
+    /**
+     * @param array{nome:string,ano:int,bimestre:int,serie:int,boletim:int,ordem:string,dir:string,page:int,desabilitados:string} $filtros
+     * @return array<string,int|string>
+     */
+    private function queryListaPeriodos(array $filtros): array
+    {
+        $query = [];
+        if ($filtros['nome'] !== '') {
+            $query['nome'] = $filtros['nome'];
+        }
+        if ($filtros['ano'] > 0) {
+            $query['ano_letivo'] = $filtros['ano'];
+        }
+        if ($filtros['bimestre'] > 0) {
+            $query['bimestre'] = $filtros['bimestre'];
+        }
+        if ($filtros['serie'] > 0) {
+            $query['serie_id'] = $filtros['serie'];
+        }
+        if ($filtros['boletim'] > 0) {
+            $query['boletim_id'] = $filtros['boletim'];
+        }
+        if ($filtros['ordem'] !== '') {
+            $query['ordem'] = $filtros['ordem'];
+            $query['dir'] = $filtros['dir'] === 'desc' ? 'desc' : 'asc';
+        }
+        if ($filtros['page'] > 1) {
+            $query['page'] = $filtros['page'];
+        }
+        if ($filtros['desabilitados'] === '1') {
+            $query['desabilitados'] = '1';
+        }
+
+        return $query;
+    }
+
+    /**
+     * @param array{nome:string,ano:int,bimestre:int,serie:int,boletim:int,ordem:string,dir:string,page:int,desabilitados:string} $filtros
+     */
+    private function urlListaPeriodos(array $filtros): string
+    {
+        $query = $this->queryListaPeriodos($filtros);
+
+        return '/admin/boletim' . ($query === [] ? '' : ('?' . http_build_query($query)));
+    }
+
+    /**
+     * @param array{nome:string,ano:int,bimestre:int,serie:int,boletim:int,ordem:string,dir:string,page:int,desabilitados:string} $filtros
+     * @return array<string,int|string>
+     */
+    private function paramsListaNaQuery(array $filtros): array
+    {
+        $query = [];
+        if ($filtros['nome'] !== '') {
+            $query['lista_nome'] = $filtros['nome'];
+        }
+        if ($filtros['ano'] > 0) {
+            $query['lista_ano'] = $filtros['ano'];
+        }
+        if ($filtros['bimestre'] > 0) {
+            $query['lista_bimestre'] = $filtros['bimestre'];
+        }
+        if ($filtros['serie'] > 0) {
+            $query['lista_serie'] = $filtros['serie'];
+        }
+        if ($filtros['boletim'] > 0) {
+            $query['lista_boletim'] = $filtros['boletim'];
+        }
+        if ($filtros['ordem'] !== '') {
+            $query['lista_ordem'] = $filtros['ordem'];
+            $query['lista_dir'] = $filtros['dir'] === 'desc' ? 'desc' : 'asc';
+        }
+        if ($filtros['page'] > 1) {
+            $query['lista_page'] = $filtros['page'];
+        }
+        if ($filtros['desabilitados'] === '1') {
+            $query['lista_desabilitados'] = '1';
+        }
+
+        return $query;
+    }
+
+    /**
+     * @param array{nome:string,ano:int,bimestre:int,serie:int,boletim:int,ordem:string,dir:string,page:int,desabilitados:string} $filtros
+     */
+    private function urlEventoComNavegacao(int $regraId, string $origem, array $filtros, bool $salvo): string
+    {
+        if ($regraId > 0) {
+            $url = $this->urlPeriodoConfigurado($regraId);
+        } else {
+            $url = '/admin/boletim-configuracao?novo=1';
+        }
+        $extra = $this->paramsListaNaQuery($filtros);
+        if (in_array($origem, ['periodos', 'evento', 'boletins'], true)) {
+            $extra['origem'] = $origem;
+        }
+        if ($salvo) {
+            $extra['salvo'] = '1';
+        }
+        if ($extra === []) {
+            return $url;
+        }
+
+        return $url . (str_contains($url, '?') ? '&' : '?') . http_build_query($extra);
     }
 
     private function urlGerarAvaliacoes(int $boletimId, int $ano): string
@@ -12559,7 +12752,7 @@ class BoletimConfigController extends BaseController
         if ($fluxo === '') {
             return '/admin/boletim-configuracao/assistente' . ($regraId > 0 ? ('?regra_id=' . $regraId) : '');
         }
-        $query = ['voltar' => $fluxo === 'gerar-avaliacoes' ? 'gerar-avaliacoes' : 'boletins'];
+        $query = ['voltar' => $fluxo];
         if ($regraId > 0) {
             $query['regra_id'] = $regraId;
         }
@@ -12575,6 +12768,7 @@ class BoletimConfigController extends BaseController
         if ($bimestre > 0) {
             $query['bimestre'] = $bimestre;
         }
+        $query = array_merge($query, $this->paramsListaNaQuery($this->filtrosListaPeriodos($_POST)));
 
         return '/admin/boletim-configuracao/assistente?' . http_build_query($query);
     }

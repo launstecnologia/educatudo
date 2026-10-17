@@ -121,7 +121,7 @@
             'componentes-curriculares', 'curso', 'cursos-series', 'grade_horaria', 'matriz-curricular',
             'teachers', 'grupos-regras-notas', 'quadros-notas', 'implantar-academico',
             'agrupamentos-componentes', 'regras-academicas', 'salas', 'serie', 'turmas',
-            'tipos_avaliacao', 'boletins', 'boletim_guia',
+            'tipos_avaliacao', 'boletins', 'boletim_guia', 'reports_boletim_coordenacao',
             'provas', 'provas_blocos',
         ], true);
         $rotinaOpen = in_array($cp, [
@@ -140,7 +140,7 @@
         ], true) || $curMovimentacao;
         $paineisOpen = in_array($cp, [
             'paineis', 'dashboard', 'saude_academica', 'conformidade',
-            'relatorios', 'reports_boletim_coordenacao', 'paineis_documentos',
+            'relatorios', 'paineis_documentos',
         ], true);
         $comunicacaoOpen = in_array($cp, [
             'comunicacao', 'school-communication', 'school-calendar', 'mural-recados', 'notifications',
@@ -153,7 +153,7 @@
         $pedagogicoOpen = in_array($cp, [
             'pedagogico', 'aulas_online', 'planos-aula', 'ava', 'minicursos', 'bncc',
             'inclusao', 'journeys', 'journeys_relatorio', 'essays_teacher', 'essays_teacher_report',
-            'relatorios', 'reports_boletim_coordenacao',
+            'relatorios',
         ], true);
         $sistemaOpen = in_array($cp, ['sistema', 'avatares_alunos', 'essays_config', 'dev_tickets'], true);
         $usuariosOpen = in_array($cp, ['gestao_usuarios', 'usuarios', 'monitors'], true) || $permissoesAtivo;
@@ -833,6 +833,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'tipos_avaliacao': 'academico',
         'boletins': 'academico',
         'boletim_guia': 'academico',
+        'reports_boletim_coordenacao': 'academico',
         'provas': 'academico',
         'provas_blocos': 'academico',
         'rotina': 'rotina',
@@ -880,7 +881,6 @@ document.addEventListener('DOMContentLoaded', function() {
         'tentativas_login': 'monitoramento',
         'pedagogico': 'pedagogico',
         'relatorios': 'pedagogico',
-        'reports_boletim_coordenacao': 'pedagogico',
         'aulas_online': 'pedagogico',
         'planos-aula': 'pedagogico',
         'ava': 'pedagogico',
@@ -941,6 +941,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'tipos_avaliacao': 'como-avalia',
         'boletins': 'como-avalia',
         'boletim_guia': 'como-avalia',
+        'reports_boletim_coordenacao': 'como-avalia',
         'provas': 'como-avalia',
         'provas_blocos': 'como-avalia',
     };

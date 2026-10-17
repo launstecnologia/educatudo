@@ -205,6 +205,7 @@ class BoletimCadastroService
                 $ids = $componentes->expandirIdsComFilhos($ids);
             }
             $criterios = $this->criteriosDoBoletim($row);
+            $regra = is_array($criterios['regra'] ?? null) ? $criterios['regra'] : null;
             $out[] = [
                 'id' => (int) $row['id'],
                 'nome' => (string) $row['nome'],
@@ -214,6 +215,8 @@ class BoletimCadastroService
                 'series_ids' => $row['series_ids'],
                 'turmas_ids' => $row['turmas_ids'],
                 'regra_academica_id' => $row['regra_academica_id'] ?? null,
+                'regra_nome' => $regra !== null ? trim((string) ($regra['nome'] ?? '')) : '',
+                'minima_origem' => $regra !== null ? 'regra' : 'padrao',
                 'nota_minima_aprovacao' => $criterios['nota_minima_aprovacao'],
                 'round_mode' => $criterios['round_mode'],
                 'decimal_places' => $criterios['decimal_places'],

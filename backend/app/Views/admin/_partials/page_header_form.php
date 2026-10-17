@@ -14,13 +14,17 @@ $page_header_subtitle = (string) ($page_header_subtitle ?? '');
 $page_header_subtitle_html = (string) ($page_header_subtitle_html ?? '');
 $page_header_title_id = (string) ($page_header_title_id ?? '');
 $page_header_subtitle_id = (string) ($page_header_subtitle_id ?? '');
+$page_header_back_label = trim((string) ($page_header_back_label ?? ''));
 ?>
 <div class="mb-6">
     <div class="flex items-center gap-4">
-        <a href="<?= htmlspecialchars($page_header_back_url) ?>" class="text-gray-500 hover:text-gray-700 flex-shrink-0" aria-label="Voltar">
+        <a href="<?= htmlspecialchars($page_header_back_url) ?>" class="inline-flex items-center gap-2 text-gray-500 hover:text-gray-700 flex-shrink-0" aria-label="<?= htmlspecialchars($page_header_back_label !== '' ? $page_header_back_label : 'Voltar', ENT_QUOTES, 'UTF-8') ?>">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
             </svg>
+            <?php if ($page_header_back_label !== ''): ?>
+            <span class="text-sm font-medium"><?= htmlspecialchars($page_header_back_label, ENT_QUOTES, 'UTF-8') ?></span>
+            <?php endif; ?>
         </a>
         <div>
             <h2 class="text-2xl font-bold text-gray-900 mb-1"<?= $page_header_title_id !== '' ? ' id="' . htmlspecialchars($page_header_title_id, ENT_QUOTES, 'UTF-8') . '"' : '' ?>><?= htmlspecialchars($page_header_title) ?></h2>

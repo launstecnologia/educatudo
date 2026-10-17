@@ -37,7 +37,7 @@ $avaliacoesOpen = $rotinaOpen;
 $pedagogicoOpen = in_array($cur, [
     'pedagogico',
     'journeys', 'journeys_relatorio', 'essays_teacher', 'essays_teacher_report',
-    'relatorios', 'reports_boletim_coordenacao',
+    'relatorios',
 ], true);
 $fechamentoOpen = in_array($cur, [
     'fechamento', 'homologacoes', 'documentos-periodo', 'resultados-finais', 'apoio-digitacao',
@@ -48,7 +48,7 @@ $secretariaNavOpen = in_array($cur, [
     'vida_escolar', 'vida_escolar_oficios', 'almoxarifado', 'patrimonio', 'paineis_documentos',
 ], true) || $curMovimentacao;
 $paineisOpen = in_array($cur, [
-    'paineis', 'dashboard', 'saude_academica', 'relatorios', 'reports_boletim_coordenacao', 'paineis_documentos',
+    'paineis', 'dashboard', 'saude_academica', 'relatorios', 'paineis_documentos',
 ], true);
 $gestaoOpen = $secretariaNavOpen;
 ?>
@@ -242,7 +242,7 @@ $gestaoOpen = $secretariaNavOpen;
         </a>
         <?php endif; ?>
         <?php if ($secCan(['relatorios_gerais'])): ?>
-        <a href="<?= $urlBase ?>/admin/relatorios" class="<?= $linkCls(in_array($cur, ['relatorios', 'reports_boletim_coordenacao'], true)) ?>">
+        <a href="<?= $urlBase ?>/admin/relatorios" class="<?= $linkCls($cur === 'relatorios') ?>">
             <i class="fa-solid fa-chart-column w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Relatórios</span>
         </a>

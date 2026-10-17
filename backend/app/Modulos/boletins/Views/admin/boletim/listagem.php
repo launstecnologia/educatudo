@@ -350,9 +350,48 @@ $rotuloModeloFiltro = $filtroBoletimNome !== '' ? $filtroBoletimNome : ('Modelo 
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <?php ob_start(); ?>
-                        <a href="<?= URL ?>/admin/boletim-configuracao/assistente?regra_id=<?= $eventoId ?>"
+                        <?php
+                        $queryConfigurar = [
+                            'regra_id' => $eventoId,
+                            'voltar' => 'periodos',
+                        ];
+                        $boletimEventoId = (int) ($evento['boletim_id'] ?? 0);
+                        $anoEvento = (int) ($evento['ano_letivo'] ?? 0);
+                        $bimestreEvento = (int) ($evento['bimestre'] ?? 0);
+                        if ($boletimEventoId > 0) {
+                            $queryConfigurar['boletim_id'] = $boletimEventoId;
+                        }
+                        if ($anoEvento > 0) {
+                            $queryConfigurar['ano_letivo'] = $anoEvento;
+                        }
+                        if ($bimestreEvento > 0) {
+                            $queryConfigurar['bimestre'] = $bimestreEvento;
+                        }
+                        $mapaLista = [
+                            'nome' => 'lista_nome',
+                            'ano_letivo' => 'lista_ano',
+                            'bimestre' => 'lista_bimestre',
+                            'serie_id' => 'lista_serie',
+                            'boletim_id' => 'lista_boletim',
+                            'ordem' => 'lista_ordem',
+                            'dir' => 'lista_dir',
+                            'page' => 'lista_page',
+                            'desabilitados' => 'lista_desabilitados',
+                        ];
+                        foreach ($mapaLista as $chaveOrigem => $chaveLista) {
+                            $valorLista = trim((string) (($_GET ?? [])[$chaveOrigem] ?? ''));
+                            if ($valorLista === '') {
+                                continue;
+                            }
+                            $queryConfigurar[$chaveLista] = $valorLista;
+                        }
+                        if ((string) (($_GET ?? [])['bloqueados'] ?? '') === '1') {
+                            $queryConfigurar['lista_desabilitados'] = '1';
+                        }
+                        ?>
+                        <a href="<?= htmlspecialchars(URL . '/admin/boletim-configuracao/assistente?' . http_build_query($queryConfigurar), ENT_QUOTES, 'UTF-8') ?>"
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                            <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
+                            <i class="fa-solid fa-sliders text-gray-400 w-4 text-center"></i> Configurar notas
                         </a>
                         <button type="button" onclick="duplicarEventoBoletim(<?= $eventoId ?>)"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">

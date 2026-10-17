@@ -1,16 +1,7 @@
 <?php
 $hub_title = 'Relatórios';
-$hub_subtitle = 'Consultas e exportações para coordenação e censo escolar.';
+$hub_subtitle = 'Consultas e exportações da escola.';
 $hub_cards = [];
-
-if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('boletim')) {
-    $hub_cards[] = [
-        'href' => URL . '/admin/reports/boletim-coordenacao',
-        'title' => 'Notas da Coordenação',
-        'description' => 'Boletim ou demonstrativo de notas, sempre na versão vigente.',
-        'icon' => 'fa-solid fa-file-signature',
-    ];
-}
 
 if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('jornadas')) {
     $hub_cards[] = [

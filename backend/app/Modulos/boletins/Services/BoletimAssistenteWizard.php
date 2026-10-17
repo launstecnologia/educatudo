@@ -210,6 +210,32 @@ class BoletimAssistenteWizard
     }
 
     /**
+     * O nome sugerido acompanha ano, período e regime.
+     * Nome digitado ou já personalizado num evento salvo permanece.
+     *
+     * @param array<string,mixed> $estado
+     */
+    private function aplicarNomeAutomatico(array &$estado): void
+    {
+        $flag = $estado['nome_automatico'] ?? null;
+        $automatico = $flag === true || $flag === 1 || $flag === '1';
+        if (!$automatico) {
+            if ($flag === false || $flag === 0 || $flag === '0') {
+                $estado['nome_automatico'] = false;
+            } else {
+                unset($estado['nome_automatico']);
+            }
+
+            return;
+        }
+        $estado['nome_automatico'] = true;
+        if ((string) ($estado['origem'] ?? '') === 'clonar') {
+            return;
+        }
+        $estado['nome'] = $this->nomePadraoEvento((int) ($estado['ano_letivo'] ?? 0), (int) ($estado['bimestre'] ?? 0));
+    }
+
+    /**
      * @return list<array{id:int,nome:string,finalidade:string,ano_letivo:?int}>
      */
     private function catalogoBoletins(): array
@@ -225,6 +251,177 @@ class BoletimAssistenteWizard
             error_log('BoletimAssistenteWizard catalogo boletins: ' . $e->getMessage());
             return [];
         }
+    }
+
+    /**
+     * @return array<string,mixed>|null
+     */
+    private function buscarBoletimCatalogo(int $id): ?array
+    {
+        if ($id <= 0) {
+            return null;
+        }
+        foreach ($this->catalogoBoletins() as $boletim) {
+            if ((int) ($boletim['id'] ?? 0) === $id) {
+                return $boletim;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Sem boletim e sem regra aplicável, a mínima do rascunho novo é 6,0.
+     * Modelo vinculado usa a média da regra de aprovação daquele boletim.
+     * Evento já salvo e clonagem mantêm o número que o cálculo já usa.
+     *
+     * @param array<string,mixed> $estado
+     */
+    private function aplicarMinimaResolvida(array &$estado): void
+    {
+        $boletimId = (int) ($estado['boletim_id'] ?? 0);
+        $editando = ($estado['modo'] ?? '') === 'editar' && (int) ($estado['regra_id'] ?? 0) > 0;
+        $clonando = ($estado['origem'] ?? '') === 'clonar';
+
+        if ($boletimId > 0) {
+            $boletim = $this->buscarBoletimCatalogo($boletimId);
+            if (is_array($boletim)) {
+                $origem = (string) ($boletim['minima_origem'] ?? 'padrao') === 'regra' ? 'regra' : 'padrao';
+                $estado['nota_minima_aprovacao'] = (float) ($boletim['nota_minima_aprovacao'] ?? 6);
+                $estado['nota_minima_origem'] = $origem;
+                $estado['nota_minima_regra_nome'] = $origem === 'regra' ? (string) ($boletim['regra_nome'] ?? '') : '';
+                return;
+            }
+        }
+
+        if ($editando || $clonando) {
+            $this->rotularMinimaExistente($estado, $boletimId);
+            return;
+        }
+
+        $origem = (string) ($estado['nota_minima_origem'] ?? '');
+        $valor = $estado['nota_minima_aprovacao'] ?? null;
+        $vazio = $valor === null || $valor === '';
+        $legadoSete = $origem === '' && !$vazio && abs((float) $valor - 7.0) < 0.001;
+        $explicito = !$vazio
+            && abs((float) $valor - 6.0) >= 0.001
+            && abs((float) $valor - 7.0) >= 0.001;
+        if ($explicito && $origem !== 'regra') {
+            $estado['nota_minima_origem'] = 'evento';
+            $estado['nota_minima_regra_nome'] = '';
+            return;
+        }
+        if ($origem === 'padrao' || $origem === '' || $vazio || $legadoSete) {
+            $estado['nota_minima_aprovacao'] = 6.0;
+            $estado['nota_minima_origem'] = 'padrao';
+            $estado['nota_minima_regra_nome'] = '';
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $estado
+     */
+    private function rotularMinimaExistente(array &$estado, int $boletimId): void
+    {
+        if (!isset($estado['nota_minima_aprovacao']) || $estado['nota_minima_aprovacao'] === '' || $estado['nota_minima_aprovacao'] === null) {
+            $estado['nota_minima_aprovacao'] = 6.0;
+            $estado['nota_minima_origem'] = 'padrao';
+            $estado['nota_minima_regra_nome'] = '';
+            return;
+        }
+
+        $origem = (string) ($estado['nota_minima_origem'] ?? '');
+        if ($boletimId > 0 && $origem !== 'evento') {
+            $boletim = $this->buscarBoletimCatalogo($boletimId);
+            if (is_array($boletim) && (string) ($boletim['minima_origem'] ?? '') === 'regra') {
+                $daRegra = (float) ($boletim['nota_minima_aprovacao'] ?? 0);
+                if (abs((float) $estado['nota_minima_aprovacao'] - $daRegra) < 0.001) {
+                    $estado['nota_minima_origem'] = 'regra';
+                    $estado['nota_minima_regra_nome'] = (string) ($boletim['regra_nome'] ?? '');
+                    return;
+                }
+            }
+        }
+        if ($origem === 'padrao' || ($boletimId <= 0 && abs((float) $estado['nota_minima_aprovacao'] - 6.0) < 0.001 && $origem !== 'evento')) {
+            $estado['nota_minima_origem'] = 'padrao';
+            $estado['nota_minima_regra_nome'] = '';
+            return;
+        }
+        if (!in_array($origem, ['regra', 'evento'], true)) {
+            $estado['nota_minima_origem'] = 'evento';
+            $estado['nota_minima_regra_nome'] = '';
+        }
+    }
+
+    private function formatarMinima(float $valor): string
+    {
+        $casas = abs($valor - round($valor, 1)) < 0.001 ? 1 : 2;
+
+        return number_format($valor, $casas, ',', '');
+    }
+
+    /**
+     * @param array<string,mixed> $rascunho
+     */
+    private function sufixoOrigemMinima(array $rascunho): string
+    {
+        $origem = (string) ($rascunho['nota_minima_origem'] ?? '');
+        $nome = trim((string) ($rascunho['nota_minima_regra_nome'] ?? ''));
+        if ($origem === 'regra') {
+            return $nome !== '' ? ' (regra vinculada: ' . $nome . ')' : ' (regra vinculada)';
+        }
+        if ($origem === 'evento') {
+            return ' (valor deste evento)';
+        }
+        if ($origem === 'padrao') {
+            return ' (padrão)';
+        }
+
+        return '';
+    }
+
+    /**
+     * Clonagem usa a mínima do evento de origem, salvo quando o rascunho já
+     * apontou uma regra vinculada.
+     *
+     * @param array<string,mixed> $estado
+     * @param mixed $minimaFonte
+     */
+    private function minimaDaClonagem(array $estado, $minimaFonte): float
+    {
+        if (($estado['nota_minima_origem'] ?? '') === 'regra'
+            && isset($estado['nota_minima_aprovacao'])
+            && $estado['nota_minima_aprovacao'] !== ''
+        ) {
+            return (float) $estado['nota_minima_aprovacao'];
+        }
+        if ($minimaFonte !== null && $minimaFonte !== '' && is_numeric($minimaFonte)) {
+            return (float) $minimaFonte;
+        }
+        if (isset($estado['nota_minima_aprovacao']) && $estado['nota_minima_aprovacao'] !== '' && is_numeric($estado['nota_minima_aprovacao'])) {
+            return (float) $estado['nota_minima_aprovacao'];
+        }
+
+        return 6.0;
+    }
+
+    /**
+     * @param array<string,mixed> $estado
+     * @param mixed $minimaFonte
+     */
+    private function origemDaClonagem(array $estado, $minimaFonte): string
+    {
+        if (($estado['nota_minima_origem'] ?? '') === 'regra') {
+            return 'regra';
+        }
+        if ($minimaFonte !== null && $minimaFonte !== '' && is_numeric($minimaFonte)) {
+            return 'evento';
+        }
+        if (isset($estado['nota_minima_aprovacao']) && $estado['nota_minima_aprovacao'] !== '' && is_numeric($estado['nota_minima_aprovacao'])) {
+            return (string) (($estado['nota_minima_origem'] ?? '') !== '' ? $estado['nota_minima_origem'] : 'padrao');
+        }
+
+        return 'padrao';
     }
 
     /**
@@ -465,7 +662,10 @@ class BoletimAssistenteWizard
         $regraIdAtual = (int) $regraIdAtual;
         $boletimSeed = is_array($estadoFormulario) ? (int) ($estadoFormulario['boletim_id'] ?? 0) : 0;
         $anoPreferido = is_array($estadoFormulario) ? (int) ($estadoFormulario['ano_letivo'] ?? 0) : 0;
-        $ano = $this->ferramentas->anoLetivoPadrao($anoPreferido > 0 ? $anoPreferido : null);
+        $anoInformado = $anoPreferido >= 2000 && $anoPreferido <= 2100;
+        $ano = $anoInformado
+            ? $anoPreferido
+            : $this->ferramentas->anoLetivoPadrao(null);
         $bimSeed = is_array($estadoFormulario) ? (int) ($estadoFormulario['bimestre'] ?? 0) : 0;
         if ($regraIdAtual <= 0 && $boletimSeed > 0) {
             $regraIdAtual = $this->ferramentas->sugerirRegraIdDoBoletim($boletimSeed, $ano, $bimSeed);
@@ -485,7 +685,9 @@ class BoletimAssistenteWizard
             'finalidade' => 'oficial',
             'boletim_id' => 0,
             'grupo_regras_notas_id' => 0,
-            'nota_minima_aprovacao' => 7.0,
+            'nota_minima_aprovacao' => 6.0,
+            'nota_minima_origem' => 'padrao',
+            'nota_minima_regra_nome' => '',
             'round_mode' => 'half',
             'decimal_places' => 2,
             'pecas' => [],
@@ -547,9 +749,11 @@ class BoletimAssistenteWizard
                 $anoForm = (int) $estadoFormulario['ano_letivo'];
                 $editando = ($regraIdAtual !== null && $regraIdAtual > 0)
                     || (int) ($estadoFormulario['id'] ?? 0) > 0;
-                $estado['ano_letivo'] = $editando
-                    ? $anoForm
-                    : $this->ferramentas->anoLetivoPadrao($anoForm);
+                if ($editando || ($anoInformado && $anoForm === $anoPreferido)) {
+                    $estado['ano_letivo'] = $anoForm;
+                } else {
+                    $estado['ano_letivo'] = $this->ferramentas->anoLetivoPadrao($anoForm);
+                }
             }
             if (isset($estadoFormulario['bimestre']) && $estadoFormulario['bimestre'] !== '') {
                 $estado['bimestre'] = (int) $estadoFormulario['bimestre'];
@@ -568,6 +772,9 @@ class BoletimAssistenteWizard
             }
             if (isset($estadoFormulario['nota_minima_aprovacao']) && $estadoFormulario['nota_minima_aprovacao'] !== '') {
                 $estado['nota_minima_aprovacao'] = (float) $estadoFormulario['nota_minima_aprovacao'];
+                if ($regraIdAtual > 0) {
+                    $estado['nota_minima_origem'] = '';
+                }
             }
             if (!empty($estadoFormulario['round_mode'])) {
                 $estado['round_mode'] = (string) $estadoFormulario['round_mode'];
@@ -640,6 +847,12 @@ class BoletimAssistenteWizard
             }
         }
         $this->aplicarEscopoDoBoletimCadastro($estado);
+        $this->aplicarMinimaResolvida($estado);
+        if (is_array($estado['rascunho_preservado'] ?? null)) {
+            $estado['rascunho_preservado']['nota_minima_aprovacao'] = $estado['nota_minima_aprovacao'];
+            $estado['rascunho_preservado']['nota_minima_origem'] = $estado['nota_minima_origem'];
+            $estado['rascunho_preservado']['nota_minima_regra_nome'] = $estado['nota_minima_regra_nome'];
+        }
         if (($estado['pecas'] ?? []) === []) {
             $doQuadro = $this->inferirPecasDoQuadro((int) ($estado['grupo_regras_notas_id'] ?? 0));
             if ($doQuadro !== []) {
@@ -683,6 +896,8 @@ class BoletimAssistenteWizard
     public function montar(array $estado): array
     {
         $estado = $this->normalizarEstado($estado);
+        $this->aplicarNomeAutomatico($estado);
+        $this->aplicarMinimaResolvida($estado);
         $erros = $this->errosGrupoLinha($estado);
 
         if ($estado['origem'] === 'clonar' && !empty($estado['clonar_regra_id'])) {
@@ -698,6 +913,9 @@ class BoletimAssistenteWizard
                 ];
             }
             $rascunho = $this->rascunhoAPartirDeRegra($base, $estado);
+            $estado['nota_minima_aprovacao'] = $rascunho['nota_minima_aprovacao'];
+            $estado['nota_minima_origem'] = (string) ($rascunho['nota_minima_origem'] ?? 'evento');
+            $estado['nota_minima_regra_nome'] = (string) ($rascunho['nota_minima_regra_nome'] ?? '');
             if ($this->grupoLinhaEstaVazio($estado)) {
                 $this->aplicarGrupoLinhaDoFormulario(
                     $estado,
@@ -764,7 +982,9 @@ class BoletimAssistenteWizard
             $rascunho['grupo_regras_notas_id'] = (int) ($estado['grupo_regras_notas_id'] ?? $rascunho['grupo_regras_notas_id'] ?? 0);
             $rascunho['round_mode'] = (string) ($estado['round_mode'] ?? $rascunho['round_mode'] ?? 'half');
             $rascunho['decimal_places'] = ((int) ($estado['decimal_places'] ?? $rascunho['decimal_places'] ?? 2) === 1) ? 1 : 2;
-            $rascunho['nota_minima_aprovacao'] = $estado['nota_minima_aprovacao'] ?? $rascunho['nota_minima_aprovacao'] ?? 7;
+            $rascunho['nota_minima_aprovacao'] = $estado['nota_minima_aprovacao'] ?? $rascunho['nota_minima_aprovacao'] ?? 6;
+            $rascunho['nota_minima_origem'] = (string) ($estado['nota_minima_origem'] ?? $rascunho['nota_minima_origem'] ?? 'padrao');
+            $rascunho['nota_minima_regra_nome'] = (string) ($estado['nota_minima_regra_nome'] ?? $rascunho['nota_minima_regra_nome'] ?? '');
             $rascunho['series_ids'] = $estado['series_ids'] !== []
                 ? $estado['series_ids']
                 : ($rascunho['series_ids'] ?? []);
@@ -1054,7 +1274,7 @@ class BoletimAssistenteWizard
             $linhas[] = 'Datas de referência: ' . ($di !== '' ? $di : '—') . ' a ' . ($df !== '' ? $df : '—');
         }
         if ($notaMin !== null && $notaMin !== '') {
-            $linhas[] = 'Nota mínima para aprovação: ' . $notaMin;
+            $linhas[] = 'Nota mínima para aprovação: ' . $this->formatarMinima((float) $notaMin) . $this->sufixoOrigemMinima($rascunho);
         }
 
         $comps = is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : [];
@@ -1576,9 +1796,13 @@ class BoletimAssistenteWizard
         $merged['finalidade'] = $this->normalizarFinalidade($merged['finalidade'] ?? 'oficial');
         $merged['boletim_id'] = (int) ($merged['boletim_id'] ?? 0);
         $merged['grupo_regras_notas_id'] = (int) ($merged['grupo_regras_notas_id'] ?? 0);
-        $merged['nota_minima_aprovacao'] = isset($merged['nota_minima_aprovacao'])
+        $merged['nota_minima_origem'] = in_array((string) ($merged['nota_minima_origem'] ?? ''), ['padrao', 'regra', 'evento'], true)
+            ? (string) $merged['nota_minima_origem']
+            : '';
+        $merged['nota_minima_regra_nome'] = trim((string) ($merged['nota_minima_regra_nome'] ?? ''));
+        $merged['nota_minima_aprovacao'] = isset($merged['nota_minima_aprovacao']) && $merged['nota_minima_aprovacao'] !== ''
             ? (float) $merged['nota_minima_aprovacao']
-            : 7.0;
+            : 6.0;
         $merged['round_mode'] = in_array((string) ($merged['round_mode'] ?? ''), ['none', 'half'], true)
             ? (string) $merged['round_mode']
             : 'half';
@@ -2339,7 +2563,11 @@ class BoletimAssistenteWizard
             'series_ids' => $estado['series_ids'] !== [] ? $estado['series_ids'] : ($regra['series_ids'] ?? []),
             'round_mode' => (string) ($estado['round_mode'] ?? $regra['round_mode'] ?? 'half'),
             'decimal_places' => ((int) ($estado['decimal_places'] ?? $regra['decimal_places'] ?? 2) === 1) ? 1 : 2,
-            'nota_minima_aprovacao' => $estado['nota_minima_aprovacao'] ?? $regra['nota_minima_aprovacao'] ?? 7.0,
+            'nota_minima_aprovacao' => $this->minimaDaClonagem($estado, $regra['nota_minima_aprovacao'] ?? null),
+            'nota_minima_origem' => $this->origemDaClonagem($estado, $regra['nota_minima_aprovacao'] ?? null),
+            'nota_minima_regra_nome' => $this->origemDaClonagem($estado, $regra['nota_minima_aprovacao'] ?? null) === 'regra'
+                ? (string) ($estado['nota_minima_regra_nome'] ?? '')
+                : '',
             'componentes' => $this->ajustarComponentesClonados(
                 is_array($regra['componentes'] ?? null) ? $regra['componentes'] : [],
                 $estado
@@ -2408,7 +2636,9 @@ class BoletimAssistenteWizard
             'series_ids' => $estado['series_ids'],
             'round_mode' => (string) ($estado['round_mode'] ?? 'half'),
             'decimal_places' => ((int) ($estado['decimal_places'] ?? 2) === 1) ? 1 : 2,
-            'nota_minima_aprovacao' => (float) ($estado['nota_minima_aprovacao'] ?? 7),
+            'nota_minima_aprovacao' => (float) ($estado['nota_minima_aprovacao'] ?? 6),
+            'nota_minima_origem' => (string) ($estado['nota_minima_origem'] ?? 'padrao'),
+            'nota_minima_regra_nome' => (string) ($estado['nota_minima_regra_nome'] ?? ''),
             'componentes' => $componentes,
         ];
     }
@@ -2704,7 +2934,9 @@ class BoletimAssistenteWizard
             'series_ids' => $estado['series_ids'] ?? [],
             'round_mode' => (string) ($estado['round_mode'] ?? 'half'),
             'decimal_places' => ((int) ($estado['decimal_places'] ?? 2) === 1) ? 1 : 2,
-            'nota_minima_aprovacao' => (float) ($estado['nota_minima_aprovacao'] ?? 7),
+            'nota_minima_aprovacao' => (float) ($estado['nota_minima_aprovacao'] ?? 6),
+            'nota_minima_origem' => (string) ($estado['nota_minima_origem'] ?? 'padrao'),
+            'nota_minima_regra_nome' => (string) ($estado['nota_minima_regra_nome'] ?? ''),
             'componentes' => $componentes,
         ];
     }
@@ -4074,6 +4306,8 @@ class BoletimAssistenteWizard
             'round_mode' => (string) ($estado['round_mode'] ?? 'half'),
             'decimal_places' => ((int) ($estado['decimal_places'] ?? 2) === 1) ? 1 : 2,
             'nota_minima_aprovacao' => $estado['nota_minima_aprovacao'] ?? 6,
+            'nota_minima_origem' => (string) ($estado['nota_minima_origem'] ?? 'padrao'),
+            'nota_minima_regra_nome' => (string) ($estado['nota_minima_regra_nome'] ?? ''),
             'semanas_a' => $semanas['a'],
             'semanas_b' => $semanas['b'],
             'so_semanas_com_evento' => false,
@@ -5754,7 +5988,7 @@ class BoletimAssistenteWizard
             $comps = $this->componentesSinteticosPreviewBoletim($estado);
         }
         $grupos = $this->gruposPreviewBoletim($comps);
-        $notaMin = (float) ($estado['nota_minima_aprovacao'] ?? $rascunho['nota_minima_aprovacao'] ?? 7);
+        $notaMin = (float) ($rascunho['nota_minima_aprovacao'] ?? $estado['nota_minima_aprovacao'] ?? 6);
         $materias = $this->materiasPreview($estado, ['Língua Portuguesa', 'Matemática', 'História', 'Geografia', 'Ciências']);
         $linhas = [];
         foreach ($materias as $matNome) {
