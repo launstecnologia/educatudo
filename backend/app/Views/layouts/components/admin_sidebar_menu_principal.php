@@ -14,8 +14,10 @@ $showPedagogicoGroup = $modOn('aulas_online')
     || $modOn('professor_planos_aula')
     || ($canViewSidebar(['inclusao']) && $modOn('inclusao'))
     || $modOn('redacao_configuravel')
-    || \App\Core\FeatureGate::isModuleEnabled('jornadas')
-    || $canViewSidebar(['relatorios_gerais']);
+    || \App\Core\FeatureGate::isModuleEnabled('jornadas');
+$showRelatoriosMenu = $canViewSidebar(['relatorios_gerais'])
+    && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('jornadas'));
+$showPedagogicoGroup = $showPedagogicoGroup || $showRelatoriosMenu;
 $showSistemaGroup = $canViewSidebar(['avatares_alunos'])
     || $modOn('redacao_configuravel')
     || (($user['perfil_admin'] ?? '') === 'dev');
@@ -591,7 +593,7 @@ $urlRecursosEscolares = $canViewSidebar(['almoxarifado'])
             <span class="sidebar-text text-sm">Jornada do Aluno</span>
         </a>
         <?php endif; ?>
-        <?php if ($canViewSidebar(['relatorios_gerais'])): ?>
+        <?php if ($showRelatoriosMenu): ?>
         <a href="<?= URL ?>/admin/relatorios" class="<?= $linkCls($cp === 'relatorios') ?>">
             <i class="fa-solid fa-chart-column w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Relatórios</span>

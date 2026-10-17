@@ -214,7 +214,12 @@ $gestaoOpen = $secretariaNavOpen;
 </div>
 <?php endif; ?>
 
-<?php if ($secCan(['redacao_professor', 'jornadas_aluno', 'relatorios_gerais'])): ?>
+<?php
+$secRedacaoVisivel = $secCan(['redacao_professor']) && $modOn('redacao_configuravel');
+$secJornadasVisivel = $secCan(['jornadas_aluno']) && \App\Core\FeatureGate::isModuleEnabled('jornadas');
+$secRelatoriosVisivel = $secCan(['relatorios_gerais']) && $modOn('jornadas');
+?>
+<?php if ($secRedacaoVisivel || $secJornadasVisivel || $secRelatoriosVisivel): ?>
 <div class="menu-group">
     <div class="flex items-center rounded-xl <?= $cur === 'pedagogico' ? 'bg-white/20' : '' ?>">
         <a href="<?= $urlBase ?>/admin/pedagogico" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
@@ -241,7 +246,7 @@ $gestaoOpen = $secretariaNavOpen;
             <span class="sidebar-text text-sm">Jornada do Aluno</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['relatorios_gerais'])): ?>
+        <?php if ($secRelatoriosVisivel): ?>
         <a href="<?= $urlBase ?>/admin/relatorios" class="<?= $linkCls($cur === 'relatorios') ?>">
             <i class="fa-solid fa-chart-column w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Relatórios</span>
