@@ -211,12 +211,12 @@
                 if ((int) ($aluno['total_exercicios'] ?? 0) <= 0) continue;
             ?>
                 <div class="bg-white rounded-lg p-4 border border-yellow-200">
-                    <div class="flex items-start justify-between mb-2">
-                        <div class="flex-1">
-                            <p class="font-semibold text-gray-900 text-sm"><?= htmlspecialchars($aluno['nome'] ?? 'Sem nome') ?></p>
-                            <p class="text-xs text-gray-500">RA: <?= htmlspecialchars($aluno['ra'] ?? 'N/A') ?></p>
+                    <div class="flex items-start justify-between gap-2 mb-2">
+                        <div class="min-w-0 flex-1">
+                            <p class="font-semibold text-gray-900 text-sm truncate" title="<?= htmlspecialchars($aluno['nome'] ?? 'Sem nome') ?>"><?= htmlspecialchars($aluno['nome'] ?? 'Sem nome') ?></p>
+                            <p class="text-xs text-gray-500 truncate">Cód Aluno: <?= htmlspecialchars($aluno['ra'] ?? 'N/A') ?></p>
                         </div>
-                        <span class="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-semibold">
+                        <span class="shrink-0 px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-semibold">
                             <?= round($aluno['taxa_erro'] ?? 0, 1) ?>% erro
                         </span>
                     </div>

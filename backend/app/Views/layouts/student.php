@@ -1601,9 +1601,7 @@
                         ?>
                         <?php if ($studentSaldoCreditosTopo !== null): ?>
                         <a href="<?= URL ?>/carteira" class="flex items-center gap-1.5 shrink-0 px-2.5 py-1.5 rounded-lg border border-amber-200 bg-amber-50 text-amber-950 hover:bg-amber-100 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-1" title="Minha carteira de TudiCoins">
-                            <svg class="w-4 h-4 text-amber-700 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
+                            <i class="fa-solid fa-coins text-amber-600 text-sm leading-none" aria-hidden="true"></i>
                             <span class="text-xs font-semibold tabular-nums leading-none"><?= htmlspecialchars(\App\Core\CreditosDecimalHelper::formatDisplay((float) $studentSaldoCreditosTopo)) ?></span>
                             <span class="hidden sm:inline text-xs text-amber-800/90 font-medium leading-none">TudiCoins</span>
                         </a>
