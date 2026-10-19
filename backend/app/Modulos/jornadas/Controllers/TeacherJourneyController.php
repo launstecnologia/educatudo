@@ -1022,6 +1022,15 @@ class TeacherJourneyController extends BaseController
                 ['jornada_id' => $id]
             );
             
+            foreach ($exerciciosModulos as &$exercicioModulo) {
+                $exercicioModulo['origem'] = 'modulo';
+            }
+            unset($exercicioModulo);
+            foreach ($exerciciosAntigos as &$exercicioAntigo) {
+                $exercicioAntigo['origem'] = 'legado';
+            }
+            unset($exercicioAntigo);
+
             // Combina ambos os tipos
             $dashboard_exercicios = array_merge($exerciciosModulos, $exerciciosAntigos);
             // Sempre mostra o dashboard, mesmo sem exercícios com respostas
@@ -1068,9 +1077,10 @@ class TeacherJourneyController extends BaseController
                     return $taxaB <=> $taxaA;
                 });
                 $stats_exercicios['mais_errados'] = $maisErrados;
+                JornadaExercicioAvaliacao::anexarAlunosQueErraram($this->db, (int) $id, $stats_exercicios['mais_errados']);
             }
             
-            // Busca alunos que precisam de atenção (taxa de erro > 40%) – todas as turmas da jornada, módulos e estrutura antiga
+            // Busca alunos que precisam de atenção (taxa de erro > 40%) – só quem já respondeu exercício
             $alunos_atencao = [];
             if ($tem_exercicios) {
                 $turmasIds = array_values(array_unique(array_filter(
@@ -1096,21 +1106,25 @@ class TeacherJourneyController extends BaseController
                         COALESCE(ROUND(AVG({$sqlErroAlunoG}) * 100, 1), 0) as taxa_erro,
                         COALESCE(ROUND(AVG({$sqlAcertoAlunoG}) * 100, 1), 0) as taxa_acerto
                      FROM alunos a
-                     LEFT JOIN jornadas_progresso_alunos jpa ON jpa.aluno_id = a.id 
+                     INNER JOIN jornadas_progresso_alunos jpa ON jpa.aluno_id = a.id 
                          AND jpa.jornada_id = ?
                          AND jpa.resposta IS NOT NULL
+                         AND TRIM(jpa.resposta) <> ''
                          AND (jpa.atividade_tipo = 'exercicio_modulo' OR jpa.atividade_tipo = 'exercicio')
                      LEFT JOIN jornadas_modulos_exercicios jme ON jme.id = jpa.exercicio_modulo_id
                      LEFT JOIN jornadas_exercicios je ON je.id = jpa.exercicio_id
                      WHERE a.turma_id IN ($placeholders) AND a.ativo = 1
                      GROUP BY a.id, a.nome, a.ra
-                     HAVING total_erros > 0 AND taxa_erro > 40
+                     HAVING total_respostas > 0 AND taxa_erro > 40
                      ORDER BY taxa_erro DESC, total_erros DESC
                      LIMIT 10",
                     $params
                 );
                 
                 foreach ($alunosComBaixoDesempenho as $aluno) {
+                    if ((int) ($aluno['total_respostas'] ?? 0) <= 0) {
+                        continue;
+                    }
                     $alunos_atencao[] = [
                         'id' => $aluno['aluno_id'],
                         'nome' => $aluno['aluno_nome'],

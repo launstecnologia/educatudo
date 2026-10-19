@@ -167,23 +167,33 @@
                 <div class="space-y-3 max-h-[400px] overflow-y-auto">
                     <?php foreach ($stats_exercicios['mais_errados'] as $ex): 
                         if ((float)($ex['taxa_erro'] ?? 0) <= 0) continue;
+                        $alunosErraram = array_values($ex['alunos_erraram'] ?? []);
+                        $payloadAlunosErro = htmlspecialchars(json_encode([
+                            'titulo' => $ex['titulo'] ?? 'Sem título',
+                            'modulo' => $ex['modulo_nome'] ?? '',
+                            'alunos' => $alunosErraram,
+                        ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8');
                     ?>
-                        <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                            <div class="flex items-start justify-between mb-2">
-                                <div class="flex-1">
+                        <button type="button"
+                                class="w-full text-left bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-red-300 hover:bg-red-50/50 transition-colors cursor-pointer"
+                                data-alunos-erro="<?= $payloadAlunosErro ?>"
+                                title="Ver alunos que erraram">
+                            <div class="flex items-start justify-between mb-2 gap-3">
+                                <div class="flex-1 min-w-0">
                                     <p class="font-medium text-gray-900 text-sm"><?= htmlspecialchars($ex['titulo'] ?? 'Sem título') ?></p>
                                     <p class="text-xs text-gray-500 mt-1"><?= htmlspecialchars($ex['modulo_nome'] ?? '') ?></p>
                                 </div>
-                                <span class="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-semibold">
+                                <span class="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-semibold shrink-0">
                                     <?= round((float)($ex['taxa_erro'] ?? 0), 1) ?>%
                                 </span>
                             </div>
-                            <div class="flex items-center gap-4 text-xs text-gray-600 mt-2">
+                            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600 mt-2">
                                 <span>✓ <?= (int)($ex['total_acertos'] ?? 0) ?> acertos</span>
                                 <span>✗ <?= (int)($ex['total_erros'] ?? 0) ?> erros</span>
                                 <span>📊 <?= (int)($ex['total_respostas'] ?? 0) ?> respostas</span>
                             </div>
-                        </div>
+                            <p class="text-xs font-medium text-red-700 mt-3">Ver alunos que erraram (<?= count($alunosErraram) ?>)</p>
+                        </button>
                     <?php endforeach; ?>
                 </div>
             <?php else: ?>
@@ -197,7 +207,9 @@
         <h4 class="text-lg font-semibold text-yellow-900 mb-2">⚠️ Alunos que Precisam de Atenção</h4>
         <p class="text-sm text-yellow-800 mb-4">Alunos com mais de <strong>40% de taxa de erro</strong> nos exercícios da jornada:</p>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <?php foreach ($alunos_atencao as $aluno): ?>
+            <?php foreach ($alunos_atencao as $aluno):
+                if ((int) ($aluno['total_exercicios'] ?? 0) <= 0) continue;
+            ?>
                 <div class="bg-white rounded-lg p-4 border border-yellow-200">
                     <div class="flex items-start justify-between mb-2">
                         <div class="flex-1">
@@ -226,6 +238,79 @@
     <?php endif; ?>
     <?php endif; ?>
 </div>
+
+<div id="modalAlunosErro" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-900/50 p-4" role="dialog" aria-modal="true" aria-labelledby="modalAlunosErroTitulo">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+        <div class="flex items-start justify-between gap-4 p-5 border-b border-gray-200">
+            <div class="min-w-0">
+                <h3 id="modalAlunosErroTitulo" class="text-lg font-semibold text-gray-900"></h3>
+                <p id="modalAlunosErroModulo" class="text-sm text-gray-500 mt-1"></p>
+            </div>
+            <button type="button" id="modalAlunosErroFechar" class="text-gray-400 hover:text-gray-700 text-2xl leading-none" aria-label="Fechar">&times;</button>
+        </div>
+        <div id="modalAlunosErroLista" class="p-5 overflow-y-auto space-y-2"></div>
+    </div>
+</div>
+<script>
+(function () {
+    var modal = document.getElementById('modalAlunosErro');
+    if (!modal) return;
+    var titulo = document.getElementById('modalAlunosErroTitulo');
+    var modulo = document.getElementById('modalAlunosErroModulo');
+    var lista = document.getElementById('modalAlunosErroLista');
+    var base = <?= json_encode(rtrim((string) URL, '/') . '/admin/jornadas/' . (int) $jornada['id'] . '/aluno/') ?>;
+
+    function fechar() {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    function abrir(dados) {
+        titulo.textContent = dados.titulo || 'Exercício';
+        modulo.textContent = dados.modulo || '';
+        lista.replaceChildren();
+        var alunos = Array.isArray(dados.alunos) ? dados.alunos : [];
+        if (alunos.length === 0) {
+            var vazio = document.createElement('p');
+            vazio.className = 'text-sm text-gray-500';
+            vazio.textContent = 'Nenhum aluno com erro neste exercício.';
+            lista.appendChild(vazio);
+        } else {
+            alunos.forEach(function (aluno) {
+                var item = document.createElement('a');
+                item.className = 'flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2 hover:bg-gray-50';
+                item.href = base + encodeURIComponent(String(aluno.id || '')) + '/exercicios';
+                var nome = document.createElement('span');
+                nome.className = 'text-sm font-medium text-gray-900';
+                nome.textContent = aluno.nome || 'Sem nome';
+                var ra = document.createElement('span');
+                ra.className = 'text-xs text-gray-500 shrink-0';
+                ra.textContent = aluno.ra ? ('RA: ' + aluno.ra) : '';
+                item.appendChild(nome);
+                item.appendChild(ra);
+                lista.appendChild(item);
+            });
+        }
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    document.querySelectorAll('[data-alunos-erro]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            try {
+                abrir(JSON.parse(btn.getAttribute('data-alunos-erro') || '{}'));
+            } catch (e) {}
+        });
+    });
+    document.getElementById('modalAlunosErroFechar').addEventListener('click', fechar);
+    modal.addEventListener('click', function (ev) {
+        if (ev.target === modal) fechar();
+    });
+    document.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape') fechar();
+    });
+})();
+</script>
 
 <!-- Informações -->
 <div class="tab-content">

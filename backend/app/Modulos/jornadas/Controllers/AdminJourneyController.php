@@ -555,6 +555,14 @@ class AdminJourneyController extends BaseController
              HAVING total_respostas > 0",
             ['jornada_id' => $id]
         );
+        foreach ($exerciciosModulos as &$exercicioModulo) {
+            $exercicioModulo['origem'] = 'modulo';
+        }
+        unset($exercicioModulo);
+        foreach ($exerciciosAntigos as &$exercicioAntigo) {
+            $exercicioAntigo['origem'] = 'legado';
+        }
+        unset($exercicioAntigo);
         $dashboard_exercicios = array_merge($exerciciosModulos, $exerciciosAntigos);
         $tem_exercicios = true;
         $stats_exercicios = [
@@ -589,6 +597,7 @@ class AdminJourneyController extends BaseController
                 return ((float)($b['taxa_erro'] ?? 0)) <=> ((float)($a['taxa_erro'] ?? 0));
             });
             $stats_exercicios['mais_errados'] = $maisErrados;
+            JornadaExercicioAvaliacao::anexarAlunosQueErraram($this->db, (int) $id, $stats_exercicios['mais_errados']);
         }
         $alunos_atencao = [];
         if ($tem_exercicios) {
@@ -615,20 +624,24 @@ class AdminJourneyController extends BaseController
                     COALESCE(ROUND(AVG({$sqlErroAlunoG}) * 100, 1), 0) as taxa_erro,
                     COALESCE(ROUND(AVG({$sqlAcertoAlunoG}) * 100, 1), 0) as taxa_acerto
                  FROM alunos a
-                 LEFT JOIN jornadas_progresso_alunos jpa ON jpa.aluno_id = a.id 
+                 INNER JOIN jornadas_progresso_alunos jpa ON jpa.aluno_id = a.id 
                      AND jpa.jornada_id = ?
                      AND jpa.resposta IS NOT NULL
+                     AND TRIM(jpa.resposta) <> ''
                      AND (jpa.atividade_tipo = 'exercicio_modulo' OR jpa.atividade_tipo = 'exercicio')
                  LEFT JOIN jornadas_modulos_exercicios jme ON jme.id = jpa.exercicio_modulo_id
                  LEFT JOIN jornadas_exercicios je ON je.id = jpa.exercicio_id
                  WHERE a.turma_id IN ($placeholdersAtencao) AND a.ativo = 1
                  GROUP BY a.id, a.nome, a.ra
-                 HAVING total_erros > 0 AND taxa_erro > 40
+                 HAVING total_respostas > 0 AND taxa_erro > 40
                  ORDER BY taxa_erro DESC, total_erros DESC
                  LIMIT 10",
                 $paramsAtencao
             );
             foreach ($alunosComBaixoDesempenho as $aluno) {
+                if ((int) ($aluno['total_respostas'] ?? 0) <= 0) {
+                    continue;
+                }
                 $alunos_atencao[] = [
                     'id' => $aluno['aluno_id'],
                     'nome' => $aluno['aluno_nome'],

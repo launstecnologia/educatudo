@@ -226,6 +226,64 @@ class JornadaExercicioAvaliacao
 
         return "CASE WHEN {$pendente} THEN NULL WHEN {$colPontuacao} > 0 THEN 0 ELSE 1 END";
     }
+
+    /**
+     * Preenche alunos_erraram em cada exercício que já tem resposta errada.
+     *
+     * @param object $db
+     * @param array<int, array<string, mixed>> $exercicios
+     */
+    public static function anexarAlunosQueErraram($db, int $jornadaId, array &$exercicios): void
+    {
+        if ($jornadaId <= 0 || $exercicios === []) {
+            return;
+        }
+
+        $sqlErro = self::sqlCaseErro('COALESCE(jme.tipo, je.tipo)', 'jpa.pontuacao', 'jpa.resposta');
+        $quemErrou = $db->fetchAll(
+            "SELECT
+                jpa.atividade_tipo,
+                jpa.exercicio_modulo_id,
+                jpa.exercicio_id,
+                a.id AS aluno_id,
+                a.nome AS aluno_nome,
+                a.ra AS aluno_ra
+             FROM jornadas_progresso_alunos jpa
+             INNER JOIN alunos a ON a.id = jpa.aluno_id AND a.ativo = 1
+             LEFT JOIN jornadas_modulos_exercicios jme ON jme.id = jpa.exercicio_modulo_id
+             LEFT JOIN jornadas_exercicios je ON je.id = jpa.exercicio_id
+             WHERE jpa.jornada_id = :jornada_id
+               AND jpa.resposta IS NOT NULL
+               AND TRIM(jpa.resposta) <> ''
+               AND (jpa.atividade_tipo = 'exercicio_modulo' OR jpa.atividade_tipo = 'exercicio')
+               AND ({$sqlErro}) = 1
+             GROUP BY jpa.atividade_tipo, jpa.exercicio_modulo_id, jpa.exercicio_id, a.id, a.nome, a.ra
+             ORDER BY a.nome ASC",
+            ['jornada_id' => $jornadaId]
+        );
+
+        $alunosPorExercicio = [];
+        foreach ($quemErrou as $row) {
+            if (($row['atividade_tipo'] ?? '') === 'exercicio_modulo' && !empty($row['exercicio_modulo_id'])) {
+                $chave = 'modulo:' . (int) $row['exercicio_modulo_id'];
+            } elseif (!empty($row['exercicio_id'])) {
+                $chave = 'legado:' . (int) $row['exercicio_id'];
+            } else {
+                continue;
+            }
+            $alunosPorExercicio[$chave][] = [
+                'id' => (int) $row['aluno_id'],
+                'nome' => (string) ($row['aluno_nome'] ?? ''),
+                'ra' => (string) ($row['aluno_ra'] ?? ''),
+            ];
+        }
+
+        foreach ($exercicios as &$exercicio) {
+            $chave = ($exercicio['origem'] ?? 'modulo') . ':' . (int) ($exercicio['id'] ?? 0);
+            $exercicio['alunos_erraram'] = $alunosPorExercicio[$chave] ?? [];
+        }
+        unset($exercicio);
+    }
 }
 
 if (!class_exists('JornadaExercicioAvaliacao', false) && class_exists(__NAMESPACE__ . '\\JornadaExercicioAvaliacao', false)) {

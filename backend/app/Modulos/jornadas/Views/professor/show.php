@@ -86,31 +86,31 @@
 
 <!-- Dashboard de Exercícios -->
 <div class="mb-8 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-lg border border-blue-200 p-6">
-    <div class="flex items-center justify-between mb-6">
-        <div>
+    <div class="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
+        <div class="min-w-0">
             <h3 class="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-6 h-6 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                 </svg>
                 Dashboard de Exercícios
             </h3>
             <p class="text-sm text-gray-600 mt-1">Estatísticas e análise de desempenho dos alunos</p>
         </div>
-        <div class="bg-white rounded-lg px-4 py-2 shadow-sm">
-            <span class="text-sm text-gray-600">Total de exercícios com respostas:</span>
-            <span class="text-lg font-bold text-blue-600 ml-2"><?= $stats_exercicios['total_exercicios_com_respostas'] ?? 0 ?></span>
+        <div class="bg-white rounded-lg px-4 py-3 shadow-sm border border-blue-100 shrink-0">
+            <p class="text-xs text-gray-500">Total de exercícios com respostas</p>
+            <p class="text-2xl font-bold text-blue-600 leading-tight"><?= (int) ($stats_exercicios['total_exercicios_com_respostas'] ?? 0) ?></p>
         </div>
-        <?php if (($stats_exercicios['total_exercicios_com_respostas'] ?? 0) === 0): ?>
-            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
-                <p class="text-sm text-yellow-800">
-                    <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    As métricas aparecerão aqui assim que os alunos começarem a fazer os exercícios.
-                </p>
-            </div>
-        <?php endif; ?>
     </div>
+    <?php if (($stats_exercicios['total_exercicios_com_respostas'] ?? 0) === 0): ?>
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 flex items-start gap-3">
+            <svg class="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <p class="text-sm text-yellow-800">
+                As métricas aparecerão aqui assim que os alunos começarem a fazer os exercícios.
+            </p>
+        </div>
+    <?php endif; ?>
     
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <!-- Exercícios Mais Acertados -->
@@ -161,23 +161,33 @@
                 <div class="space-y-3 max-h-[400px] overflow-y-auto">
                     <?php foreach ($stats_exercicios['mais_errados'] as $index => $ex): 
                         if ((float)($ex['taxa_erro'] ?? 0) <= 0) continue;
+                        $alunosErraram = array_values($ex['alunos_erraram'] ?? []);
+                        $payloadAlunosErro = htmlspecialchars(json_encode([
+                            'titulo' => $ex['titulo'] ?? 'Sem título',
+                            'modulo' => $ex['modulo_nome'] ?? '',
+                            'alunos' => $alunosErraram,
+                        ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8');
                     ?>
-                        <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                            <div class="flex items-start justify-between mb-2">
-                                <div class="flex-1">
+                        <button type="button"
+                                class="w-full text-left bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-red-300 hover:bg-red-50/50 transition-colors cursor-pointer"
+                                data-alunos-erro="<?= $payloadAlunosErro ?>"
+                                title="Ver alunos que erraram">
+                            <div class="flex items-start justify-between mb-2 gap-3">
+                                <div class="flex-1 min-w-0">
                                     <p class="font-medium text-gray-900 text-sm"><?= htmlspecialchars($ex['titulo'] ?? 'Sem título') ?></p>
                                     <p class="text-xs text-gray-500 mt-1"><?= htmlspecialchars($ex['modulo_nome'] ?? '') ?></p>
                                 </div>
-                                <span class="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-semibold">
+                                <span class="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-semibold shrink-0">
                                     <?= round((float)($ex['taxa_erro'] ?? 0), 1) ?>%
                                 </span>
                             </div>
-                            <div class="flex items-center gap-4 text-xs text-gray-600 mt-2">
+                            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600 mt-2">
                                 <span>✓ <?= (int)($ex['total_acertos'] ?? 0) ?> acertos</span>
                                 <span>✗ <?= (int)($ex['total_erros'] ?? 0) ?> erros</span>
                                 <span>📊 <?= (int)($ex['total_respostas'] ?? 0) ?> respostas</span>
                             </div>
-                        </div>
+                            <p class="text-xs font-medium text-red-700 mt-3">Ver alunos que erraram (<?= count($alunosErraram) ?>)</p>
+                        </button>
                     <?php endforeach; ?>
                 </div>
             <?php else: ?>
@@ -199,7 +209,9 @@
                     Alunos com mais de <strong>40% de taxa de erro</strong> nos exercícios da jornada:
                 </p>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <?php foreach ($alunos_atencao as $aluno): ?>
+                    <?php foreach ($alunos_atencao as $aluno):
+                        if ((int) ($aluno['total_exercicios'] ?? 0) <= 0) continue;
+                    ?>
                         <div class="bg-white rounded-lg p-4 border border-yellow-200">
                             <div class="flex items-start justify-between mb-2">
                                 <div class="flex-1">
@@ -248,6 +260,79 @@
     </div>
     <?php endif; ?>
 </div>
+
+<div id="modalAlunosErro" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-900/50 p-4" role="dialog" aria-modal="true" aria-labelledby="modalAlunosErroTitulo">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+        <div class="flex items-start justify-between gap-4 p-5 border-b border-gray-200">
+            <div class="min-w-0">
+                <h3 id="modalAlunosErroTitulo" class="text-lg font-semibold text-gray-900"></h3>
+                <p id="modalAlunosErroModulo" class="text-sm text-gray-500 mt-1"></p>
+            </div>
+            <button type="button" id="modalAlunosErroFechar" class="text-gray-400 hover:text-gray-700 text-2xl leading-none" aria-label="Fechar">&times;</button>
+        </div>
+        <div id="modalAlunosErroLista" class="p-5 overflow-y-auto space-y-2"></div>
+    </div>
+</div>
+<script>
+(function () {
+    var modal = document.getElementById('modalAlunosErro');
+    if (!modal) return;
+    var titulo = document.getElementById('modalAlunosErroTitulo');
+    var modulo = document.getElementById('modalAlunosErroModulo');
+    var lista = document.getElementById('modalAlunosErroLista');
+    var base = <?= json_encode(rtrim((string) URL, '/') . '/professor/jornadas/' . (int) $jornada['id'] . '/aluno/') ?>;
+
+    function fechar() {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    function abrir(dados) {
+        titulo.textContent = dados.titulo || 'Exercício';
+        modulo.textContent = dados.modulo || '';
+        lista.replaceChildren();
+        var alunos = Array.isArray(dados.alunos) ? dados.alunos : [];
+        if (alunos.length === 0) {
+            var vazio = document.createElement('p');
+            vazio.className = 'text-sm text-gray-500';
+            vazio.textContent = 'Nenhum aluno com erro neste exercício.';
+            lista.appendChild(vazio);
+        } else {
+            alunos.forEach(function (aluno) {
+                var item = document.createElement('a');
+                item.className = 'flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2 hover:bg-gray-50';
+                item.href = base + encodeURIComponent(String(aluno.id || '')) + '/exercicios';
+                var nome = document.createElement('span');
+                nome.className = 'text-sm font-medium text-gray-900';
+                nome.textContent = aluno.nome || 'Sem nome';
+                var ra = document.createElement('span');
+                ra.className = 'text-xs text-gray-500 shrink-0';
+                ra.textContent = aluno.ra ? ('RA: ' + aluno.ra) : '';
+                item.appendChild(nome);
+                item.appendChild(ra);
+                lista.appendChild(item);
+            });
+        }
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    document.querySelectorAll('[data-alunos-erro]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            try {
+                abrir(JSON.parse(btn.getAttribute('data-alunos-erro') || '{}'));
+            } catch (e) {}
+        });
+    });
+    document.getElementById('modalAlunosErroFechar').addEventListener('click', fechar);
+    modal.addEventListener('click', function (ev) {
+        if (ev.target === modal) fechar();
+    });
+    document.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape') fechar();
+    });
+})();
+</script>
 
 <!-- Main Content -->
 <div class="space-y-6">
