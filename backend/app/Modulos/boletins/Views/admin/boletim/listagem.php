@@ -112,9 +112,18 @@ $rotuloModeloFiltro = $filtroBoletimNome !== '' ? $filtroBoletimNome : ('Modelo 
     <div class="mb-6 p-4 rounded-lg border border-amber-200 bg-amber-50 text-amber-900 flex items-start justify-between gap-3 flex-wrap">
         <div class="flex items-start gap-3">
             <i class="fa-solid fa-spinner fa-spin mt-0.5"></i>
-            <div>
+            <div class="min-w-[16rem] flex-1">
                 <p class="font-semibold">Gerando boletins em segundo plano</p>
                 <p class="text-sm mt-0.5">Você pode continuar na listagem. Esta página atualiza sozinha quando a geração terminar.</p>
+                <div id="boletim-geracao-progresso" class="mt-3 max-w-md">
+                    <div class="flex items-center justify-between text-xs mb-1">
+                        <span id="boletim-geracao-rotulo">Preparando o cálculo…</span>
+                        <span id="boletim-geracao-pct">0%</span>
+                    </div>
+                    <div class="h-2 rounded-full overflow-hidden" style="background-color:#fde68a;">
+                        <div id="boletim-geracao-barra" class="h-full rounded-full" style="width:0%;background-color:#d97706;"></div>
+                    </div>
+                </div>
             </div>
         </div>
         <form method="POST" action="<?= URL ?>/admin/boletim/cancelar-geracao" class="shrink-0"
@@ -304,8 +313,10 @@ $rotuloModeloFiltro = $filtroBoletimNome !== '' ? $filtroBoletimNome : ('Modelo 
                         <div class="text-xs text-gray-400 mt-1">Sem boletim na vida do estudante</div>
                         <?php endif; ?>
                         <?php if ($geracaoEmAndamento): ?>
-                        <span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
-                            <i class="fa-solid fa-spinner fa-spin"></i> Gerando…
+                        <span class="js-geracao-chip inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800"
+                              data-job-id="<?= (int) ($evento['geracao_job_id'] ?? 0) ?>">
+                            <i class="fa-solid fa-spinner fa-spin"></i>
+                            <span class="js-geracao-rotulo">Gerando…</span>
                         </span>
                         <?php elseif ($stGeracao === 'failed'): ?>
                         <span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800"
@@ -591,24 +602,63 @@ document.addEventListener('keydown', function (e) {
         });
     }
 
+    function atualizarBarra(jobs) {
+        let feitos = 0;
+        let total = 0;
+        ids.forEach(function (id) {
+            const st = jobs[String(id)] || jobs[id];
+            if (!st) {
+                return;
+            }
+            const f = Number(st.progresso_feitos || 0);
+            const t = Number(st.progresso_total || 0);
+            if (t > 0) {
+                feitos += f;
+                total += t;
+            }
+            const chip = document.querySelector('.js-geracao-chip[data-job-id="' + id + '"] .js-geracao-rotulo');
+            if (chip && t > 0) {
+                const pctChip = Math.max(0, Math.min(100, Math.round((f / t) * 100)));
+                chip.textContent = f + ' de ' + t + ' · ' + pctChip + '%';
+            }
+        });
+        const rotulo = document.getElementById('boletim-geracao-rotulo');
+        const pctEl = document.getElementById('boletim-geracao-pct');
+        const barra = document.getElementById('boletim-geracao-barra');
+        if (!rotulo || !pctEl || !barra) {
+            return;
+        }
+        if (total <= 0) {
+            rotulo.textContent = 'Preparando o cálculo…';
+            pctEl.textContent = '0%';
+            barra.style.width = '0%';
+            return;
+        }
+        const pct = Math.max(0, Math.min(100, Math.round((feitos / total) * 100)));
+        rotulo.textContent = feitos + ' de ' + total + ' alunos';
+        pctEl.textContent = pct + '%';
+        barra.style.width = pct + '%';
+    }
+
     function tick() {
         fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
             .then(function (res) { return res.json(); })
             .then(function (data) {
                 if (!data || !data.ok) {
-                    setTimeout(tick, 5000);
+                    setTimeout(tick, 4000);
                     return;
                 }
+                atualizarBarra(data.jobs || {});
                 if (!aindaRodando(data.jobs)) {
                     window.location.reload();
                     return;
                 }
-                setTimeout(tick, 3000);
+                setTimeout(tick, 2000);
             })
             .catch(function () {
-                setTimeout(tick, 5000);
+                setTimeout(tick, 4000);
             });
     }
-    setTimeout(tick, 2500);
+    setTimeout(tick, 1500);
 })();
 </script>

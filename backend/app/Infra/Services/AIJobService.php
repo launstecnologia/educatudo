@@ -71,6 +71,31 @@ class AIJobService
     }
 
     /**
+     * Grava o andamento enquanto o job segue em processing. O resultado final substitui este JSON.
+     */
+    public static function gravarProgresso(int $jobId, int $feitos, int $total): void
+    {
+        if ($jobId <= 0 || $total <= 0) {
+            return;
+        }
+        $feitos = max(0, min($feitos, $total));
+        $db = \App\Core\Database::getInstance();
+        if (!$db->tableExists('ai_jobs')) {
+            return;
+        }
+        $db->query(
+            "UPDATE ai_jobs SET result = ? WHERE id = ? AND status = 'processing'",
+            [
+                json_encode([
+                    'progresso_feitos' => $feitos,
+                    'progresso_total' => $total,
+                ], JSON_UNESCAPED_UNICODE),
+                $jobId,
+            ]
+        );
+    }
+
+    /**
      * Renova started_at para jobs longos não serem marcados como stale.
      */
     public static function renovarHeartbeat(int $jobId): void

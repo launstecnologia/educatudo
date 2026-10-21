@@ -72,6 +72,14 @@ class BoletimConfigController extends BaseController
     private array $seriesEscopoGeracao = [];
     /** @var array<string, list<int>> */
     private array $blocosFiltradosPorTurmaCache = [];
+    /** @var array<int, list<int>> */
+    private array $turmasDoAlunoGeracaoCache = [];
+    /** @var array<string, array<int, true>> */
+    private array $blocosDaTurmaDoAlunoCache = [];
+    /** @var array<int, string>|null */
+    private ?array $nomesMateriasCatalogoCache = null;
+    /** @var array<int, array<int, float>> */
+    private array $totaisFaltasEventoCache = [];
     /** @var array<string, list<int>> */
     private array $blocosSemanaAssistenteCache = [];
     /** @var array<int, array{a: list<int>, b: list<int>}> */
@@ -418,6 +426,8 @@ class BoletimConfigController extends BaseController
                     'status' => (string) ($st['status'] ?? ''),
                     'error' => (string) ($st['error'] ?? ''),
                     'mensagem' => (string) ($st['mensagem'] ?? ''),
+                    'progresso_feitos' => (int) ($st['progresso_feitos'] ?? 0),
+                    'progresso_total' => (int) ($st['progresso_total'] ?? 0),
                 ];
             }
         }
@@ -3037,6 +3047,14 @@ class BoletimConfigController extends BaseController
         \App\Services\AIJobService::renovarHeartbeat($this->jobIdHeartbeat);
     }
 
+    private function gravarProgressoGeracao(int $feitos, int $total): void
+    {
+        if ($this->jobIdHeartbeat <= 0 || $total <= 0) {
+            return;
+        }
+        \App\Services\AIJobService::gravarProgresso($this->jobIdHeartbeat, $feitos, $total);
+    }
+
     /**
      * @return list<array{id:int,nome?:string}>
      */
@@ -3193,11 +3211,11 @@ class BoletimConfigController extends BaseController
     }
 
     /**
-     * Quadro igual ao da montagem do assistente: \S1, S2 e N/Q atuais, com a linha da área.
+     * Quadro igual ao da montagem do assistente: S1, S2 e N/Q atuais, com a linha da área.
      *
-     * O lote filtra blocos pela união das turmas e reusa o cache de provas. Isso puxa
-     * eventos a mais da mesma semana e grava N/Q diferente do que a montagem mostrou.
-     * Aqui a simulação segue o caminho de um aluno só.
+     * O escopo de turmas fica vazio para não filtrar blocos pela união de todas as
+     * turmas (isso puxava eventos a mais da mesma semana). O cache de provas, carregado
+     * com a mesma lista de blocos, permanece — senão cada aluno refaz as consultas.
      *
      * @param array<string,mixed> $regra
      * @return array{colunas:list<array<string,mixed>>,linhas:list<array<string,mixed>>}
@@ -3211,12 +3229,8 @@ class BoletimConfigController extends BaseController
     ): array {
         $escopoTurmas = $this->turmasEscopoGeracao;
         $escopoSeries = $this->seriesEscopoGeracao;
-        $cacheProvas = $this->provasGeracaoCache;
-        $prefetch = $this->prefetchGeracaoPronto;
         $this->turmasEscopoGeracao = [];
         $this->seriesEscopoGeracao = [];
-        $this->provasGeracaoCache = [];
-        $this->prefetchGeracaoPronto = false;
         try {
             $sim = $this->simularRegraAluno(
                 $regra,
@@ -3228,27 +3242,29 @@ class BoletimConfigController extends BaseController
                 false,
                 true
             );
-            try {
-                $simBoletim = $this->simularRegraAluno(
-                    $regra,
-                    $alunoId,
-                    $periodoRef,
-                    $dataInicio,
-                    $dataFim,
-                    [],
-                    true,
-                    false
-                );
-                $matrizBoletim = is_array($simBoletim['matriz_materias'] ?? null)
-                    ? $simBoletim['matriz_materias']
-                    : null;
-                if (is_array($matrizBoletim)) {
-                    $sim['matriz_materias_boletim'] = $matrizBoletim;
+            if ($this->regraTemGrupoDeLinha($regra)) {
+                try {
+                    $simBoletim = $this->simularRegraAluno(
+                        $regra,
+                        $alunoId,
+                        $periodoRef,
+                        $dataInicio,
+                        $dataFim,
+                        [],
+                        true,
+                        false
+                    );
+                    $matrizBoletim = is_array($simBoletim['matriz_materias'] ?? null)
+                        ? $simBoletim['matriz_materias']
+                        : null;
+                    if (is_array($matrizBoletim)) {
+                        $sim['matriz_materias_boletim'] = $matrizBoletim;
+                    }
+                } catch (\App\Services\FilaJobCanceladaException $e) {
+                    throw $e;
+                } catch (\Throwable $e) {
+                    error_log('matriz demonstrativo boletim aluno #' . $alunoId . ': ' . $e->getMessage());
                 }
-            } catch (\App\Services\FilaJobCanceladaException $e) {
-                throw $e;
-            } catch (\Throwable $e) {
-                error_log('matriz demonstrativo boletim aluno #' . $alunoId . ': ' . $e->getMessage());
             }
             $sim = $this->montarMatrizDemonstrativoComGrupoHierarquico($sim, $regra);
             $matriz = is_array($sim['matriz_materias'] ?? null) ? $sim['matriz_materias'] : null;
@@ -3263,9 +3279,45 @@ class BoletimConfigController extends BaseController
         } finally {
             $this->turmasEscopoGeracao = $escopoTurmas;
             $this->seriesEscopoGeracao = $escopoSeries;
-            $this->provasGeracaoCache = $cacheProvas;
-            $this->prefetchGeracaoPronto = $prefetch;
         }
+    }
+
+    /**
+     * A segunda simulação (matriz do boletim) só entra quando há área agrupada.
+     *
+     * @param array<string,mixed> $regra
+     */
+    private function regraTemGrupoDeLinha(array $regra): bool
+    {
+        $componentes = $this->componentesParaSimulacao($regra)['componentes'] ?? [];
+        foreach ($componentes as $comp) {
+            if (is_array($comp) && $this->parseGroupLineConfigFromComponente($comp) !== null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function nomesMateriasCatalogo(): array
+    {
+        if ($this->nomesMateriasCatalogoCache !== null) {
+            return $this->nomesMateriasCatalogoCache;
+        }
+        $map = [];
+        foreach ($this->boletimConfig->getAvailableSubjects(2000) as $matF) {
+            $mid = (int) ($matF['id'] ?? 0);
+            $nome = trim((string) ($matF['nome'] ?? ''));
+            if ($mid > 0 && $nome !== '') {
+                $map[$mid] = $nome;
+            }
+        }
+        $this->nomesMateriasCatalogoCache = $map;
+
+        return $map;
     }
 
     /**
@@ -3312,10 +3364,22 @@ class BoletimConfigController extends BaseController
         $itensPersistir = [];
         $alunoIdsOk = [];
         $alunoIdsSync = [];
+        $totalAlunos = 0;
+        foreach ($alunos as $alunoContagem) {
+            if ((int) ($alunoContagem['id'] ?? 0) > 0) {
+                $totalAlunos++;
+            }
+        }
+        $avaliados = 0;
+        $this->gravarProgressoGeracao(0, $totalAlunos);
         foreach ($alunos as $aluno) {
             $alunoId = (int) ($aluno['id'] ?? 0);
             if ($alunoId <= 0) {
                 continue;
+            }
+            $avaliados++;
+            if ($avaliados === 1 || $avaliados % 8 === 0 || $avaliados === $totalAlunos) {
+                $this->gravarProgressoGeracao($avaliados, $totalAlunos);
             }
             if (isset($idsTravados[$alunoId])) {
                 $preservados++;
@@ -3669,6 +3733,10 @@ class BoletimConfigController extends BaseController
         $this->turmasEscopoGeracao = [];
         $this->seriesEscopoGeracao = [];
         $this->blocosFiltradosPorTurmaCache = [];
+        $this->turmasDoAlunoGeracaoCache = [];
+        $this->blocosDaTurmaDoAlunoCache = [];
+        $this->nomesMateriasCatalogoCache = null;
+        $this->totaisFaltasEventoCache = [];
 
         foreach ($alunos as $aluno) {
             $id = (int) ($aluno['id'] ?? 0);
@@ -3697,23 +3765,33 @@ class BoletimConfigController extends BaseController
         $chavesProvas = [];
         $absence = null;
         $visitados = [];
-        $this->acumularPrefetchDaRegra($regra, $range, $incluirPct, $chavesProvas, $compIdsManual, $absence, $visitados);
+        // Mesma lista de blocos da simulação de um aluno (sem o filtro da união das turmas).
+        $escopoTurmas = $this->turmasEscopoGeracao;
+        $escopoSeries = $this->seriesEscopoGeracao;
+        $this->turmasEscopoGeracao = [];
+        $this->seriesEscopoGeracao = [];
+        try {
+            $this->acumularPrefetchDaRegra($regra, $range, $incluirPct, $chavesProvas, $compIdsManual, $absence, $visitados);
 
-        foreach ($chavesProvas as $chave => $cfgP) {
-            $this->renovarHeartbeatGeracao();
-            $blocoIdsP = $cfgP['bloco_ids'];
-            if ($blocoIdsP !== []) {
-                $porAluno = $this->boletimConfig->getProvasFinalizadasPorAlunosAndBlocos(
-                    $alunoIds,
-                    $blocoIdsP,
-                    $cfgP['data_inicio'],
-                    $cfgP['data_fim'],
-                    $cfgP['filtro_titulo'],
-                    $cfgP['materia_id'],
-                    $incluirPct
-                );
-                $this->provasGeracaoCache[$chave] = $porAluno;
+            foreach ($chavesProvas as $chave => $cfgP) {
+                $this->renovarHeartbeatGeracao();
+                $blocoIdsP = $cfgP['bloco_ids'];
+                if ($blocoIdsP !== []) {
+                    $porAluno = $this->boletimConfig->getProvasFinalizadasPorAlunosAndBlocos(
+                        $alunoIds,
+                        $blocoIdsP,
+                        $cfgP['data_inicio'],
+                        $cfgP['data_fim'],
+                        $cfgP['filtro_titulo'],
+                        $cfgP['materia_id'],
+                        $incluirPct
+                    );
+                    $this->provasGeracaoCache[$chave] = $porAluno;
+                }
             }
+        } finally {
+            $this->turmasEscopoGeracao = $escopoTurmas;
+            $this->seriesEscopoGeracao = $escopoSeries;
         }
 
         if ($compIdsManual !== []) {
@@ -5071,10 +5149,8 @@ class BoletimConfigController extends BaseController
                                 }
                             }
                         }
-                        foreach ($this->boletimConfig->getAvailableSubjects(2000) as $matF) {
-                            $midNomeF = (int) ($matF['id'] ?? 0);
-                            $nomeF = trim((string) ($matF['nome'] ?? ''));
-                            if ($midNomeF > 0 && $nomeF !== '' && !isset($nomesFaltasPorMateria[$midNomeF])) {
+                        foreach ($this->nomesMateriasCatalogo() as $midNomeF => $nomeF) {
+                            if (!isset($nomesFaltasPorMateria[$midNomeF])) {
                                 $nomesFaltasPorMateria[$midNomeF] = $nomeF;
                             }
                         }
@@ -5088,7 +5164,10 @@ class BoletimConfigController extends BaseController
                         $valor = $faltasLegado;
                         $detalhes['faltas_legado_sem_materia'] = 1;
                     } else {
-                        $totaisFaltas = $absence->getTotalFaltasPorAlunoNoEvento($eventoIdFaltas);
+                        if (!isset($this->totaisFaltasEventoCache[$eventoIdFaltas])) {
+                            $this->totaisFaltasEventoCache[$eventoIdFaltas] = $absence->getTotalFaltasPorAlunoNoEvento($eventoIdFaltas);
+                        }
+                        $totaisFaltas = $this->totaisFaltasEventoCache[$eventoIdFaltas];
                         if (array_key_exists($alunoId, $totaisFaltas)) {
                             $valor = (float) ($totaisFaltas[$alunoId] ?? 0);
                             $detalhes['faltas_legado_sem_materia'] = 1;
@@ -9273,11 +9352,27 @@ class BoletimConfigController extends BaseController
         }
         if (!class_exists('AlunoTurmaHelper', false)) {
         }
-        $turmas = AlunoTurmaHelper::getTurmaIds(Database::getInstance(), $alunoId);
+        if (!isset($this->turmasDoAlunoGeracaoCache[$alunoId])) {
+            $this->turmasDoAlunoGeracaoCache[$alunoId] = AlunoTurmaHelper::getTurmaIds(Database::getInstance(), $alunoId);
+        }
+        $turmas = $this->turmasDoAlunoGeracaoCache[$alunoId];
         if ($turmas === []) {
             return $rows;
         }
-        $permitidos = array_fill_keys($this->boletimConfig->filtrarBlocoIdsPorTurmas($blocoIds, $turmas), true);
+        $idsBlocos = array_values(array_unique(array_filter(array_map('intval', $blocoIds), static function ($id) {
+            return $id > 0;
+        })));
+        sort($idsBlocos);
+        $turmasChave = $turmas;
+        sort($turmasChave);
+        $chaveBlocosTurma = implode(',', $idsBlocos) . '|' . implode(',', $turmasChave);
+        if (!isset($this->blocosDaTurmaDoAlunoCache[$chaveBlocosTurma])) {
+            $this->blocosDaTurmaDoAlunoCache[$chaveBlocosTurma] = array_fill_keys(
+                $this->boletimConfig->filtrarBlocoIdsPorTurmas($idsBlocos, $turmas),
+                true
+            );
+        }
+        $permitidos = $this->blocosDaTurmaDoAlunoCache[$chaveBlocosTurma];
         if ($permitidos === []) {
             return $rows;
         }
