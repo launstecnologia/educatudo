@@ -31,7 +31,7 @@ $flash = $flash ?? ['message' => null, 'type' => 'info'];
     <?php else: ?>
         <form method="post" action="<?= URL ?>/admin/z-configuracao/zerar-popular" class="mb-6">
             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
-            <button type="submit" class="px-6 py-3 bg-red-700 text-white rounded-lg hover:bg-red-800 text-base font-semibold">
+            <button type="submit" class="inline-flex items-center px-6 py-3 bg-red-600 text-white rounded-lg text-base font-semibold" style="background-color:#dc2626;color:#fff;">
                 Zerar e popular
             </button>
         </form>

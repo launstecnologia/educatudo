@@ -85,7 +85,7 @@ $flash = $flash ?? ['message' => null, 'type' => 'info'];
                 <span>Entendo que os cadastros deste banco serão apagados e substituídos pela carga de teste do Ensino Médio 2025.</span>
             </label>
 
-            <button type="submit" class="px-5 py-2.5 bg-red-700 text-white rounded-lg hover:bg-red-800 text-sm font-medium">
+            <button type="submit" class="px-5 py-2.5 bg-red-600 text-white rounded-lg text-sm font-medium" style="background-color:#dc2626;color:#fff;">
                 Zerar e popular este banco
             </button>
         </form>

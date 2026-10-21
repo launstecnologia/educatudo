@@ -80,7 +80,7 @@ $flash = $flash ?? ['message' => null, 'type' => 'info'];
                 <span>Entendo que alunos, professores e os demais cadastros deste banco serão apagados e que isso não pode ser desfeito por esta tela.</span>
             </label>
 
-            <button type="submit" class="px-5 py-2.5 bg-red-700 text-white rounded-lg hover:bg-red-800 text-sm font-medium">
+            <button type="submit" class="px-5 py-2.5 bg-red-600 text-white rounded-lg text-sm font-medium" style="background-color:#dc2626;color:#fff;">
                 Esvaziar este banco
             </button>
         </form>
