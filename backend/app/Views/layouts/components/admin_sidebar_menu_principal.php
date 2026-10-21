@@ -770,6 +770,23 @@ $urlRecursosEscolares = $canViewSidebar(['almoxarifado'])
             <span class="sidebar-text text-sm">UI Modelos</span>
         </a>
         <?php endif; ?>
+        <?php
+        $mostraZerarPopularEduca = false;
+        try {
+            $pdoMenuEduca = \App\Core\Database::getInstance()->getPdo();
+            if ($pdoMenuEduca instanceof \PDO) {
+                $mostraZerarPopularEduca = \App\Painel\Master\Services\LimparDadosEscolaEducaService::conexaoAtualPermitida($pdoMenuEduca);
+            }
+        } catch (\Throwable $e) {
+            $mostraZerarPopularEduca = false;
+        }
+        ?>
+        <?php if ($mostraZerarPopularEduca): ?>
+        <a href="<?= URL ?>/admin/z-configuracao/zerar-popular" class="<?= $linkCls($cp === 'zerar_popular_educa') ?>">
+            <i class="fa-solid fa-rotate-left w-4 h-4 mr-3"></i>
+            <span class="sidebar-text text-sm">Zerar e popular EM 2025</span>
+        </a>
+        <?php endif; ?>
     </div>
 </div>
 <?php endif; ?>

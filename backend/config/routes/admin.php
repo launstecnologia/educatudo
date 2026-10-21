@@ -394,6 +394,8 @@ $router->get('/admin/relatorios',          'Education/AnoLetivoController@relato
 $router->get('/admin/sistema',             'Education/AnoLetivoController@sistema');
 $router->get('/admin/gestao-usuarios',     'Education/AnoLetivoController@gestaoUsuarios');
 $router->get('/admin/z-configuracao',      'Education/AnoLetivoController@zConfiguracao');
+$router->get('/admin/z-configuracao/zerar-popular', 'Education/AnoLetivoController@zerarPopularEduca');
+$router->post('/admin/z-configuracao/zerar-popular', 'Education/AnoLetivoController@zerarPopularEducaExecutar');
 
 // Ano Letivo (CRUD - estrutura normalizada, offcanvas em index)
 $router->get('/admin/ano-letivo', 'Education/AnoLetivoController@index');

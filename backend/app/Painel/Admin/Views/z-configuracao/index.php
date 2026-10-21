@@ -91,4 +91,22 @@ if (($user['perfil_admin'] ?? '') === 'dev') {
     ];
 }
 
+$mostraZerarPopularEduca = false;
+try {
+    $pdoHubEduca = \App\Core\Database::getInstance()->getPdo();
+    if ($pdoHubEduca instanceof \PDO) {
+        $mostraZerarPopularEduca = \App\Painel\Master\Services\LimparDadosEscolaEducaService::conexaoAtualPermitida($pdoHubEduca);
+    }
+} catch (\Throwable $e) {
+    $mostraZerarPopularEduca = false;
+}
+if ($mostraZerarPopularEduca) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/z-configuracao/zerar-popular',
+        'title' => 'Zerar e popular EM 2025',
+        'description' => 'Esvazia os cadastros desta escola e carrega a base de teste do Ensino Médio 2025.',
+        'icon' => 'fa-solid fa-rotate-left',
+    ];
+}
+
 include \App\Core\ViewPaths::adminPartial('hub_modulos.php');

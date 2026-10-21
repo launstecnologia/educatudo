@@ -160,7 +160,7 @@
         $zConfigOpen = in_array($cp, [
             'z_configuracao', 'dev', 'unidades', 'maintenance_panel', 'settings', 'ui_modelos', 'layouts_documentos',
             'documentos_institucionais', 'assinatura_digital', 'modelos_documentos',
-            'tudicoins_escola', 'creditos_pacotes',
+            'tudicoins_escola', 'creditos_pacotes', 'zerar_popular_educa',
         ], true);
         $boletimNestedOpen = in_array($cp, ['boletim_config', 'boletim_guia'], true);
         $estruturaNestedOpen = in_array($cp, [
@@ -907,6 +907,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'maintenance_panel': 'z-configuracao',
         'settings': 'z-configuracao',
         'ui_modelos': 'z-configuracao',
+        'zerar_popular_educa': 'z-configuracao',
     };
     if (autoOpenMap[currentPage]) {
         let group = autoOpenMap[currentPage];

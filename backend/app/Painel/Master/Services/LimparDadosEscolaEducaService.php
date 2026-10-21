@@ -49,6 +49,12 @@ class LimparDadosEscolaEducaService
         return $nomeBanco === self::BANCO_PERMITIDO;
     }
 
+    public static function conexaoAtualPermitida(\PDO $pdo): bool
+    {
+        $nome = $pdo->query('SELECT DATABASE()')->fetchColumn();
+        return is_string($nome) && $nome === self::BANCO_PERMITIDO;
+    }
+
     /**
      * O seed EM 2025 recusa o banco se estes componentes não existirem.
      * Devolve a mensagem de recusa, ou null quando pode seguir.
@@ -261,13 +267,19 @@ class LimparDadosEscolaEducaService
 
     private static function bancoMasterAtual(): string
     {
-        $master = Database::getInstance();
-        $pdo = $master->getPdo();
-        if (!$pdo instanceof \PDO) {
+        static $nome = null;
+        if ($nome !== null) {
+            return $nome;
+        }
+        try {
+            $pdo = Database::createMasterPdo();
+        } catch (\Throwable $e) {
+            $nome = '';
             return '';
         }
-        $nome = $pdo->query('SELECT DATABASE()')->fetchColumn();
-        return is_string($nome) ? $nome : '';
+        $lido = $pdo->query('SELECT DATABASE()')->fetchColumn();
+        $nome = is_string($lido) ? $lido : '';
+        return $nome;
     }
 
     /**
