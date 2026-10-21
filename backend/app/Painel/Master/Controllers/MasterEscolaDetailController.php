@@ -14,6 +14,8 @@ use App\Services\MasterProvasAoVivoService;
 use App\Core\MasterSecretVault;
 use App\Services\MediaStorageService;
 use App\Core\ModuloCatalogo;
+use App\Painel\Master\Services\LimparDadosEscolaEducaService;
+use App\Painel\Master\Services\MasterFilaService;
 if (!class_exists(__NAMESPACE__ . '\\MasterEscolaDetailController', false)) {
 
 class MasterEscolaDetailController extends BaseController
@@ -2113,6 +2115,243 @@ class MasterEscolaDetailController extends BaseController
             'connection_ok'        => $connectionOk,
             'connection_error'     => $connectionError,
         ]);
+    }
+
+    /**
+     * Confirmação da limpeza. A tela só abre para o banco fixo no serviço.
+     */
+    public function limparDados($id)
+    {
+        $this->requireMaster();
+        $id = (int) $id;
+        $escola = $this->getEscolaOrFail($id);
+        $nomeBanco = (string) ($escola['db_nome_banco'] ?? '');
+        if (!LimparDadosEscolaEducaService::bancoPermitido($nomeBanco)) {
+            $this->setFlashMessage('Esta limpeza só existe para o banco ' . LimparDadosEscolaEducaService::BANCO_PERMITIDO . '.', 'error');
+            $this->redirect('/master/escolas/' . $id . '/banco');
+            return;
+        }
+
+        $inspecao = ['ok' => false, 'erro' => 'Não foi possível conectar ao banco da escola.'];
+        $pdo = $this->connectTenant($escola);
+        if ($pdo instanceof \PDO) {
+            $inspecao = LimparDadosEscolaEducaService::inspecionar($pdo);
+        }
+
+        $this->viewWithLayout('master', 'master/escolas/limpar-dados', [
+            'title' => 'Limpar dados — ' . ($escola['nome'] ?? ''),
+            'page_title' => 'Limpar dados',
+            'current_page' => 'escolas',
+            'master_nome' => $_SESSION['master_user_nome'] ?? 'Admin',
+            'escola' => $escola,
+            'escola_id' => $id,
+            'inspecao' => $inspecao,
+            'flash' => $this->getFlashMessage(),
+            'csrf_token' => $this->generateCsrfToken(),
+        ]);
+    }
+
+    /**
+     * Esvazia o banco somente se a confirmação e a conexão ativa forem o banco permitido.
+     */
+    public function limparDadosExecutar($id)
+    {
+        $this->requireMaster();
+        $id = (int) $id;
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Sessão expirada. Abra a tela de novo e confirme outra vez.', 'error');
+            $this->redirect('/master/escolas/' . $id . '/limpar-dados');
+            return;
+        }
+
+        $escola = $this->getEscolaOrFail($id);
+        $nomeBanco = (string) ($escola['db_nome_banco'] ?? '');
+        $volta = '/master/escolas/' . $id . '/limpar-dados';
+        if (!LimparDadosEscolaEducaService::bancoPermitido($nomeBanco)) {
+            $this->setFlashMessage('Recusado: esta escola não usa o banco permitido. Nada foi alterado.', 'error');
+            $this->redirect('/master/escolas/' . $id . '/banco');
+            return;
+        }
+
+        $confirmacao = trim((string) ($_POST['confirmacao_banco'] ?? ''));
+        $frase = trim((string) ($_POST['frase'] ?? ''));
+        $marcou = (string) ($_POST['confirmar_exclusao'] ?? '') === '1';
+        if ($confirmacao !== LimparDadosEscolaEducaService::BANCO_PERMITIDO
+            || $frase !== LimparDadosEscolaEducaService::FRASE_CONFIRMACAO
+            || !$marcou) {
+            $this->setFlashMessage('Confirmação incompleta. Nada foi alterado.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+
+        $pdo = $this->connectTenant($escola);
+        if (!$pdo instanceof \PDO) {
+            $this->setFlashMessage('Não foi possível conectar ao banco. Nada foi alterado.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+
+        @set_time_limit(0);
+        $resultado = LimparDadosEscolaEducaService::executar($pdo, $nomeBanco);
+        if (empty($resultado['ok'])) {
+            $detalhe = (string) ($resultado['erro'] ?? 'A limpeza foi recusada.');
+            $falhas = $resultado['falhas'] ?? [];
+            if (is_array($falhas) && $falhas !== []) {
+                $detalhe .= ' Falhas: ' . implode(' | ', array_slice($falhas, 0, 5));
+            }
+            $this->setFlashMessage($detalhe, 'error');
+            $this->redirect($volta);
+            return;
+        }
+
+        $this->setFlashMessage(
+            'Dados esvaziados em ' . LimparDadosEscolaEducaService::BANCO_PERMITIDO
+            . '. Tabelas limpas: ' . (int) ($resultado['tabelas_limpas'] ?? 0)
+            . '. Registros em usuarios preservados: ' . (int) ($resultado['usuarios'] ?? 0) . '.',
+            'success'
+        );
+        $this->redirect($volta);
+    }
+
+    /**
+     * Confirma zerar o banco permitido e em seguida popular a carga EM 2025.
+     */
+    public function zerarEPopular($id)
+    {
+        $this->requireMaster();
+        $id = (int) $id;
+        $escola = $this->getEscolaOrFail($id);
+        $nomeBanco = (string) ($escola['db_nome_banco'] ?? '');
+        if (!LimparDadosEscolaEducaService::bancoPermitido($nomeBanco)) {
+            $this->setFlashMessage('Esta ação só existe para o banco ' . LimparDadosEscolaEducaService::BANCO_PERMITIDO . '.', 'error');
+            $this->redirect('/master/escolas');
+            return;
+        }
+
+        $arquivo = LimparDadosEscolaEducaService::ARQUIVO_CARGA;
+        $caminho = (defined('BASE_PATH') ? BASE_PATH : dirname(__DIR__, 4)) . '/database/migrations/' . $arquivo;
+        $inspecao = ['ok' => false, 'erro' => 'Não foi possível conectar ao banco da escola.'];
+        if (!is_file($caminho)) {
+            $inspecao = ['ok' => false, 'erro' => 'Arquivo da carga não encontrado: ' . $arquivo];
+        } else {
+            $pdo = $this->connectTenant($escola);
+            if ($pdo instanceof \PDO) {
+                $catalogo = LimparDadosEscolaEducaService::catalogoProntoParaCarga($pdo);
+                if ($catalogo !== null) {
+                    $inspecao = ['ok' => false, 'erro' => $catalogo];
+                } else {
+                    $inspecao = LimparDadosEscolaEducaService::inspecionar(
+                        $pdo,
+                        LimparDadosEscolaEducaService::PRESERVAR_NA_CARGA
+                    );
+                }
+            }
+        }
+
+        $this->viewWithLayout('master', 'master/escolas/zerar-popular', [
+            'title' => 'Zerar e popular — ' . ($escola['nome'] ?? ''),
+            'page_title' => 'Zerar e popular',
+            'current_page' => 'escolas',
+            'master_nome' => $_SESSION['master_user_nome'] ?? 'Admin',
+            'escola' => $escola,
+            'escola_id' => $id,
+            'arquivo_carga' => $arquivo,
+            'inspecao' => $inspecao,
+            'flash' => $this->getFlashMessage(),
+            'csrf_token' => $this->generateCsrfToken(),
+        ]);
+    }
+
+    /**
+     * Enfileira limpeza + carga. O nome do banco e o arquivo não vêm do formulário.
+     */
+    public function zerarEPopularExecutar($id)
+    {
+        $this->requireMaster();
+        $id = (int) $id;
+        $volta = '/master/escolas/' . $id . '/zerar-e-popular';
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Sessão expirada. Abra a tela de novo e confirme outra vez.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+
+        $escola = $this->getEscolaOrFail($id);
+        $nomeBanco = (string) ($escola['db_nome_banco'] ?? '');
+        if (!LimparDadosEscolaEducaService::bancoPermitido($nomeBanco)) {
+            $this->setFlashMessage('Recusado: esta escola não usa o banco permitido. Nada foi alterado.', 'error');
+            $this->redirect('/master/escolas');
+            return;
+        }
+
+        $confirmacao = trim((string) ($_POST['confirmacao_banco'] ?? ''));
+        $frase = trim((string) ($_POST['frase'] ?? ''));
+        $marcou = (string) ($_POST['confirmar_exclusao'] ?? '') === '1';
+        if ($confirmacao !== LimparDadosEscolaEducaService::BANCO_PERMITIDO
+            || $frase !== LimparDadosEscolaEducaService::FRASE_CONFIRMACAO
+            || !$marcou) {
+            $this->setFlashMessage('Confirmação incompleta. Nada foi alterado.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+
+        $arquivo = LimparDadosEscolaEducaService::ARQUIVO_CARGA;
+        $caminho = (defined('BASE_PATH') ? BASE_PATH : dirname(__DIR__, 4)) . '/database/migrations/' . $arquivo;
+        if (!is_file($caminho)) {
+            $this->setFlashMessage('Arquivo da carga não encontrado. Nada foi alterado.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+
+        $pdo = $this->connectTenant($escola);
+        if (!$pdo instanceof \PDO) {
+            $this->setFlashMessage('Não foi possível conectar ao banco. Nada foi alterado.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+        $catalogo = LimparDadosEscolaEducaService::catalogoProntoParaCarga($pdo);
+        if ($catalogo !== null) {
+            $this->setFlashMessage($catalogo, 'error');
+            $this->redirect($volta);
+            return;
+        }
+
+        $masterPdo = Database::getInstance()->getPdo();
+        if (!$masterPdo instanceof \PDO || !MasterFilaService::tabelaExiste($masterPdo)) {
+            $this->setFlashMessage('A fila do Master não está configurada. Nada foi alterado.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+        if (MasterFilaService::temJobAbertoDaEscola(MasterFilaService::TIPO_MIGRATION_ESCOLA, $id)) {
+            $this->setFlashMessage('Já existe uma carga desta escola em andamento. Nada novo foi iniciado.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+
+        try {
+            $jobId = MasterFilaService::enfileirar(
+                MasterFilaService::TIPO_MIGRATION_ESCOLA,
+                [
+                    'escola_id' => $id,
+                    'migrations' => [$arquivo],
+                    'zerar_antes' => true,
+                ],
+                null,
+                $id,
+                (int) ($_SESSION[self::SESSION_MASTER_USER_ID] ?? 0)
+            );
+        } catch (\Throwable $e) {
+            $this->setFlashMessage('Não foi possível enfileirar: ' . $e->getMessage(), 'error');
+            $this->redirect($volta);
+            return;
+        }
+
+        $this->setFlashMessage(
+            'Limpeza e carga EM 2025 enfileiradas no banco ' . LimparDadosEscolaEducaService::BANCO_PERMITIDO
+            . ' (job ' . $jobId . '). Pode fechar esta janela; a carga segue em segundo plano.',
+            'success'
+        );
+        $this->redirect('/master/escolas');
     }
 
     /**

@@ -88,7 +88,10 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     <?php foreach ($escolas as $e): ?>
-                    <?php $emManutencao = (string) ($e['maintenance_mode'] ?? '0') === '1'; ?>
+                    <?php
+                    $emManutencao = (string) ($e['maintenance_mode'] ?? '0') === '1';
+                    $podeZerarPopular = (string) ($e['db_nome_banco'] ?? '') === \App\Painel\Master\Services\LimparDadosEscolaEducaService::BANCO_PERMITIDO;
+                    ?>
                     <tr class="hover:bg-slate-50">
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-700"><?= (int) $e['id'] ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900"><?= htmlspecialchars($e['nome']) ?></td>
@@ -143,9 +146,14 @@
                                 </button>
                             </form>
                             <?php endif; ?>
+                            <?php if ($podeZerarPopular): ?>
+                            <a href="<?= URL ?>/master/escolas/<?= (int) $e['id'] ?>/zerar-e-popular" class="flex items-center gap-2 px-4 py-2 text-sm text-red-700 hover:bg-red-50">
+                                <i class="fa-solid fa-rotate-left text-red-500 w-4 text-center"></i> Zerar e popular EM 2025
+                            </a>
+                            <?php endif; ?>
                             <?php $row_actions_dropdown_items = ob_get_clean(); ?>
                             <?php $row_actions_dropdown_id = 'row-actions-escola-' . (int) $e['id']; ?>
-                            <?php $row_actions_dropdown_menu_class = 'w-56'; ?>
+                            <?php $row_actions_dropdown_menu_class = $podeZerarPopular ? 'w-64' : 'w-56'; ?>
                             <?php include \App\Core\ViewPaths::adminPartial('row_actions_dropdown.php'); ?>
                         </td>
                     </tr>

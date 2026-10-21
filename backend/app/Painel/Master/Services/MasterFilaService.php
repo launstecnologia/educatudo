@@ -579,7 +579,41 @@ class MasterFilaService
         );
         $tenantPdo->exec('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci');
 
-        self::atualizarProgresso($jobId, 'Executando a carga. Pode levar vários minutos.', 15);
+        $zerarAntes = !empty($payload['zerar_antes']);
+        if ($zerarAntes) {
+            $arquivoUnico = count($files) === 1
+                && $files[0] === LimparDadosEscolaEducaService::ARQUIVO_CARGA;
+            if (!$arquivoUnico || !LimparDadosEscolaEducaService::bancoPermitido($dbName)) {
+                throw new \RuntimeException(
+                    'A limpeza antes da carga só roda no banco '
+                    . LimparDadosEscolaEducaService::BANCO_PERMITIDO
+                    . ' e só com o arquivo ' . LimparDadosEscolaEducaService::ARQUIVO_CARGA . '.'
+                );
+            }
+            $caminhoCarga = dirname(__DIR__, 4) . '/database/migrations/' . LimparDadosEscolaEducaService::ARQUIVO_CARGA;
+            $diretorio = realpath(dirname($caminhoCarga));
+            $arquivoReal = realpath($caminhoCarga);
+            if ($diretorio === false || $arquivoReal === false || !is_file($arquivoReal)
+                || strpos($arquivoReal, $diretorio . DIRECTORY_SEPARATOR) !== 0
+                || filesize($arquivoReal) < 1) {
+                throw new \RuntimeException('Arquivo da carga não encontrado no servidor. Nada foi alterado.');
+            }
+            $catalogo = LimparDadosEscolaEducaService::catalogoProntoParaCarga($tenantPdo);
+            if ($catalogo !== null) {
+                throw new \RuntimeException($catalogo);
+            }
+            self::atualizarProgresso($jobId, 'Esvaziando os dados da escola...', 10);
+            $limpeza = LimparDadosEscolaEducaService::executar(
+                $tenantPdo,
+                $dbName,
+                LimparDadosEscolaEducaService::PRESERVAR_NA_CARGA
+            );
+            if (empty($limpeza['ok'])) {
+                throw new \RuntimeException((string) ($limpeza['erro'] ?? 'A limpeza foi recusada. A carga não rodou.'));
+            }
+        }
+
+        self::atualizarProgresso($jobId, 'Executando a carga. Pode levar vários minutos.', 20);
         MysqlProvisioningService::runTenantMigrationsSelected($pdo, $tenantPdo, $escolaId, $files);
 
         return [

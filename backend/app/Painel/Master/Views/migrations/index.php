@@ -244,6 +244,13 @@ $masterPendentes = $master_pendentes ?? [];
                                 </button>
                                 <?php endif; ?>
                             </div>
+                            <?php if (($e['nome_banco'] ?? '') === \App\Painel\Master\Services\LimparDadosEscolaEducaService::BANCO_PERMITIDO): ?>
+                            <div class="mt-2">
+                                <a href="<?= URL ?>/master/escolas/<?= (int) $e['id'] ?>/limpar-dados" class="inline-flex border border-red-300 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-50 text-xs font-medium">
+                                    Limpar dados
+                                </a>
+                            </div>
+                            <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>

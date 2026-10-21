@@ -134,6 +134,10 @@ $router->post('/master/tickets/em-andamento', 'Master/MasterTicketsController@ma
 $router->get('/master/escolas/{id}/limites', 'Master/MasterEscolaDetailController@limites');
 $router->post('/master/escolas/{id}/limites', 'Master/MasterEscolaDetailController@limitesSalvar');
 $router->get('/master/escolas/{id}/banco', 'Master/MasterEscolaDetailController@banco');
+$router->get('/master/escolas/{id}/limpar-dados', 'Master/MasterEscolaDetailController@limparDados');
+$router->post('/master/escolas/{id}/limpar-dados', 'Master/MasterEscolaDetailController@limparDadosExecutar');
+$router->get('/master/escolas/{id}/zerar-e-popular', 'Master/MasterEscolaDetailController@zerarEPopular');
+$router->post('/master/escolas/{id}/zerar-e-popular', 'Master/MasterEscolaDetailController@zerarEPopularExecutar');
 
 // Master: teste de exercícios (página sem login)
 $router->get('/master/teste-exercicios', 'Master/MasterTesteExerciciosController@index');
