@@ -236,17 +236,6 @@ class AnoLetivoController extends BaseController
             return;
         }
 
-        $confirmacao = trim((string) ($_POST['confirmacao_banco'] ?? ''));
-        $frase = trim((string) ($_POST['frase'] ?? ''));
-        $marcou = (string) ($_POST['confirmar_exclusao'] ?? '') === '1';
-        if ($confirmacao !== LimparDadosEscolaEducaService::BANCO_PERMITIDO
-            || $frase !== LimparDadosEscolaEducaService::FRASE_CONFIRMACAO
-            || !$marcou) {
-            $this->setFlashMessage('Confirmação incompleta. Nada foi alterado.', 'error');
-            $this->redirect($volta);
-            return;
-        }
-
         $arquivo = LimparDadosEscolaEducaService::ARQUIVO_CARGA;
         $caminho = (defined('BASE_PATH') ? BASE_PATH : dirname(__DIR__, 4)) . '/database/migrations/' . $arquivo;
         if (!is_file($caminho)) {
