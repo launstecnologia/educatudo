@@ -1098,15 +1098,27 @@ BEGIN
       INSERT INTO boletim_componentes (regra_id, codigo, nome, source_type, calc_type, peso, blocos_ids, config_json, obrigatorio, ordem, ativo)
       SELECT v_regra, x.cod, x.nom, x.src, 'media', 1,
              CAST((SELECT pb.id FROM provas_blocos pb WHERE pb.titulo = CONCAT('ET25 ', x.nom, ' — ', v_turma_nome, ' T', v_bim) AND pb.deleted_at IS NULL LIMIT 1) AS CHAR),
-             x.cfg, x.obr, x.ord, 1
+             CASE
+               WHEN x.src = 'calculado' THEN x.cfg
+               ELSE JSON_OBJECT(
+                 'tipo_avaliacao_id', (SELECT t.id FROM provas_tipos_avaliacao t WHERE t.nome = x.nom AND t.deleted_at IS NULL LIMIT 1),
+                 'tipo_avaliacao_nome', x.nom,
+                 'blocos_ids_manual', 1,
+                 'prova_bimestres', JSON_ARRAY(v_bim),
+                 'layout_type', IF(x.cod = 'REC', 'rec', 'media'),
+                 'layout_group', 'quadro_comum',
+                 'papel_wizard', IF(x.cod = 'REC', 'exibe', 'media')
+               )
+             END,
+             x.obr, x.ord, 1
       FROM (
         SELECT 'SIM1' cod, 'Simulado 1' nom, 'provas_sistema' src, NULL cfg, 1 obr, 1 ord
         UNION ALL SELECT 'SIM2', 'Simulado 2', 'provas_sistema', NULL, 1, 2
         UNION ALL SELECT 'SIM3', 'Simulado 3', 'provas_sistema', NULL, 1, 3
         UNION ALL SELECT 'PROVA', 'Prova Bimestral', 'provas_sistema', NULL, 1, 4
         UNION ALL SELECT 'REC', 'Rec', 'provas_sistema', NULL, 0, 5
-        UNION ALL SELECT 'PROVA_POS', 'Prova após recuperação', 'calculado', '{"expressao":"max(PROVA, min(REC, 6))","formula_mode":"single"}', 0, 6
-        UNION ALL SELECT 'MEDIA', 'Média do trimestre', 'calculado', '{"expressao":"(SIM1 + SIM2 + SIM3 + PROVA_POS) / 4","formula_mode":"single"}', 0, 7
+        UNION ALL SELECT 'PROVA_POS', 'Prova após recuperação', 'calculado', '{"expressao":"max(prova, min(rec, 6))","formula_mode":"single","layout_type":"media","layout_group":"quadro_comum"}', 0, 6
+        UNION ALL SELECT 'MEDIA', 'Média do trimestre', 'calculado', '{"expressao":"(sim1 + sim2 + sim3 + prova_pos) / 4","formula_mode":"single","layout_type":"media","layout_group":"quadro_comum"}', 0, 7
       ) x;
       SET v_bim = v_bim + 1;
     END WHILE;
@@ -1196,7 +1208,19 @@ BEGIN
   SELECT r.id, x.cod, x.nom, x.src, 'media', 1,
          (SELECT GROUP_CONCAT(pb.id ORDER BY pb.id) FROM provas_blocos pb
            WHERE pb.deleted_at IS NULL AND pb.titulo LIKE CONCAT('ET25 ', x.nom, ' — % T', r.bimestre)),
-         x.cfg, x.obr, x.ord, 1
+         CASE
+           WHEN x.src = 'calculado' THEN x.cfg
+           ELSE JSON_OBJECT(
+             'tipo_avaliacao_id', (SELECT t.id FROM provas_tipos_avaliacao t WHERE t.nome = x.nom AND t.deleted_at IS NULL LIMIT 1),
+             'tipo_avaliacao_nome', x.nom,
+             'blocos_ids_manual', 1,
+             'prova_bimestres', JSON_ARRAY(r.bimestre),
+             'layout_type', IF(x.cod = 'REC', 'rec', 'media'),
+             'layout_group', 'quadro_comum',
+             'papel_wizard', IF(x.cod = 'REC', 'exibe', 'media')
+           )
+         END,
+         x.obr, x.ord, 1
   FROM boletim_regras r
   INNER JOIN (
     SELECT 'SIM1' cod, 'Simulado 1' nom, 'provas_sistema' src, NULL cfg, 1 obr, 1 ord
@@ -1204,47 +1228,42 @@ BEGIN
     UNION ALL SELECT 'SIM3', 'Simulado 3', 'provas_sistema', NULL, 1, 3
     UNION ALL SELECT 'PROVA', 'Prova Bimestral', 'provas_sistema', NULL, 1, 4
     UNION ALL SELECT 'REC', 'Rec', 'provas_sistema', NULL, 0, 5
-    UNION ALL SELECT 'PROVA_POS', 'Prova após recuperação', 'calculado', '{"expressao":"max(PROVA, min(REC, 6))","formula_mode":"single"}', 0, 6
-    UNION ALL SELECT 'MEDIA', 'Média do trimestre', 'calculado', '{"expressao":"(SIM1 + SIM2 + SIM3 + PROVA_POS) / 4","formula_mode":"single"}', 0, 7
+    UNION ALL SELECT 'PROVA_POS', 'Prova após recuperação', 'calculado', '{"expressao":"max(prova, min(rec, 6))","formula_mode":"single","layout_type":"media","layout_group":"quadro_comum"}', 0, 6
+    UNION ALL SELECT 'MEDIA', 'Média do trimestre', 'calculado', '{"expressao":"(sim1 + sim2 + sim3 + prova_pos) / 4","formula_mode":"single","layout_type":"media","layout_group":"quadro_comum"}', 0, 7
   ) x
   WHERE r.codigo IN ('et25-em-t1-notas', 'et25-em-t2-notas', 'et25-em-t3-notas');
 
+  INSERT INTO boletim_componentes (regra_id, codigo, nome, source_type, calc_type, peso, blocos_ids, config_json, obrigatorio, ordem, ativo)
+  SELECT r.id, 'faltas', 'Faltas', 'faltas_evento', 'soma', 1, NULL,
+         JSON_OBJECT(
+           'faltas_evento_id', e.id,
+           'layout_type', 'faltas',
+           'layout_group', CONCAT('b', r.bimestre)
+         ),
+         0, 8, 1
+  FROM boletim_regras r
+  INNER JOIN faltas_eventos e ON e.nome = CONCAT('ET25 Faltas ', r.bimestre, 'º trimestre 2025')
+  WHERE r.codigo IN ('et25-em-t1-notas', 'et25-em-t2-notas', 'et25-em-t3-notas');
+
+  -- Grade completa: cada aluno da turma, cada matéria e cada tipo
+  -- (Simulado 1, 2, 3, Prova Bimestral e Rec), nos três trimestres.
+  -- Não corta pela data de entrada ou saída da matrícula.
   INSERT IGNORE INTO provas_blocos_notas_lancadas (bloco_id, professor_id, materia_id, turma_id, aluno_id, nota)
   SELECT pb.id, bp.professor_id, bp.materia_id, pbt.turma_id, a.id,
     ROUND(CASE
+      WHEN ta.nome = 'Rec' THEN 3 + (CRC32(CONCAT(a.id,'|rec|',bp.materia_id,'|',pb.bimestre)) % 70) / 10
       WHEN RIGHT(a.nickname, 2) = '49' THEN 2 + (CRC32(CONCAT(a.id,'|',bp.materia_id,'|',pb.bimestre,'|',ta.nome)) % 36) / 10
       WHEN RIGHT(a.nickname, 2) = '43' THEN 5 + (CRC32(CONCAT(a.id,'|',bp.materia_id,'|',pb.bimestre,'|',ta.nome)) % 10) / 10
       ELSE 3.5 + (CRC32(CONCAT(a.id,'|',bp.materia_id,'|',pb.bimestre,'|',ta.nome)) % 66) / 10
     END, 2)
   FROM provas_blocos pb
-  INNER JOIN provas_tipos_avaliacao ta ON ta.id = pb.tipo_avaliacao_id AND ta.nome <> 'Rec'
+  INNER JOIN provas_tipos_avaliacao ta ON ta.id = pb.tipo_avaliacao_id
+    AND ta.nome IN ('Simulado 1', 'Simulado 2', 'Simulado 3', 'Prova Bimestral', 'Rec')
   INNER JOIN provas_blocos_professores bp ON bp.bloco_id = pb.id
   INNER JOIN provas_blocos_turmas pbt ON pbt.bloco_id = pb.id
   INNER JOIN matricula mt ON mt.turma_id = pbt.turma_id AND mt.ano_letivo_id = v_ano_id
   INNER JOIN alunos a ON a.id = mt.aluno_id AND a.nickname LIKE 'et25.%'
-  WHERE pb.titulo LIKE 'ET25 %' AND pb.deleted_at IS NULL
-    AND pb.data_prova >= mt.data_entrada
-    AND (mt.data_saida IS NULL OR pb.data_prova <= mt.data_saida);
-
-  INSERT IGNORE INTO provas_blocos_notas_lancadas (bloco_id, professor_id, materia_id, turma_id, aluno_id, nota)
-  SELECT rec.id, bp.professor_id, bp.materia_id, base.turma_id, base.aluno_id,
-         ROUND(3 + (CRC32(CONCAT(base.aluno_id,'|rec|',bp.materia_id,'|',base.bimestre)) % 70) / 10, 2)
-  FROM (
-    SELECT n.aluno_id, n.turma_id, n.materia_id, pb.bimestre, AVG(n.nota) media, COUNT(*) qtd
-    FROM provas_blocos_notas_lancadas n
-    INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.titulo LIKE 'ET25 %' AND pb.deleted_at IS NULL
-    INNER JOIN provas_tipos_avaliacao ta ON ta.id = pb.tipo_avaliacao_id AND ta.nome <> 'Rec'
-    GROUP BY n.aluno_id, n.turma_id, n.materia_id, pb.bimestre
-    HAVING qtd = 4 AND media < 6
-  ) base
-  INNER JOIN alunos a ON a.id = base.aluno_id AND RIGHT(a.nickname, 2) <> '43'
-  INNER JOIN provas_blocos rec ON rec.titulo = CONCAT('ET25 Rec — ',
-      (SELECT t.nome FROM turmas t WHERE t.id = base.turma_id LIMIT 1), ' T', base.bimestre)
-    AND rec.deleted_at IS NULL
-  INNER JOIN provas_blocos_professores bp ON bp.bloco_id = rec.id AND bp.materia_id = base.materia_id
-  INNER JOIN matricula mt ON mt.aluno_id = base.aluno_id AND mt.turma_id = base.turma_id AND mt.ano_letivo_id = v_ano_id
-  WHERE rec.data_prova >= mt.data_entrada
-    AND (mt.data_saida IS NULL OR rec.data_prova <= mt.data_saida);
+  WHERE pb.titulo LIKE 'ET25 %' AND pb.deleted_at IS NULL;
 
   INSERT INTO notas_tipo_finais (tipo_avaliacao_id, aluno_id, materia_id, turma_id, ano_letivo, periodo, nota_final, eventos_qtd)
   SELECT pb.tipo_avaliacao_id, n.aluno_id, n.materia_id, n.turma_id, 2025, pb.bimestre, n.nota, 1
@@ -1764,6 +1783,15 @@ BEGIN
 
   IF (SELECT COUNT(*) FROM alunos WHERE nickname LIKE 'et25.%') <> 600 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Seed ET25 incompleto: esperado 600 alunos.';
+  END IF;
+  -- 600 alunos × 8 matérias × 5 tipos × 3 trimestres.
+  IF (
+    SELECT COUNT(*)
+    FROM provas_blocos_notas_lancadas n
+    INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.titulo LIKE 'ET25 %' AND pb.deleted_at IS NULL
+    INNER JOIN alunos a ON a.id = n.aluno_id AND a.nickname LIKE 'et25.%'
+  ) <> 72000 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Seed ET25 incompleto: cada aluno precisa de nota em todas as matérias e tipos.';
   END IF;
 END$$
 

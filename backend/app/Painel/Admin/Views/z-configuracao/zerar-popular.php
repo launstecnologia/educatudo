@@ -31,6 +31,10 @@ $flash = $flash ?? ['message' => null, 'type' => 'info'];
     <?php else: ?>
         <form method="post" action="<?= URL ?>/admin/z-configuracao/zerar-popular" class="mb-6">
             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
+            <label for="senha" class="block text-sm font-medium text-slate-700 mb-1">Sua senha</label>
+            <input type="password" id="senha" name="senha" autocomplete="current-password" required
+                   class="w-full max-w-md px-3 py-2 mb-4 border border-slate-300 rounded-lg text-sm"
+                   placeholder="Digite sua senha para confirmar">
             <button type="submit" class="inline-flex items-center px-6 py-3 bg-red-600 text-white rounded-lg text-base font-semibold" style="background-color:#dc2626;color:#fff;">
                 Zerar e popular
             </button>

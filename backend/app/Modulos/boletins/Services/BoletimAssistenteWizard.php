@@ -6528,12 +6528,21 @@ class BoletimAssistenteWizard
             $nums[strtolower((string) $cod)] = (float) $n;
         }
         uksort($nums, static fn ($a, $b) => strlen((string) $b) <=> strlen((string) $a));
+        // Sem nota de recuperação, min(rec, 6) não pode anular a prova: entra como zero e o max fica com a prova.
+        $expr = preg_replace_callback(
+            '/\bmin\s*\(\s*([a-z_][a-z0-9_]*)/',
+            static function (array $m) use ($nums): string {
+                return isset($nums[$m[1]]) ? $m[0] : 'min(0';
+            },
+            $expr
+        ) ?? $expr;
         foreach ($nums as $cod => $n) {
             $expr = preg_replace('/\b' . preg_quote((string) $cod, '/') . '\b/', (string) $n, $expr) ?? $expr;
         }
         $guard = 0;
         while ($guard++ < 20 && preg_match('/\b(max|min)\s*\(/i', $expr)) {
-            if (!preg_match('/\b(max|min)\s*\(\s*([0-9.+\-*\/()\s]+)\s*,\s*([0-9.+\-*\/()\s]+)\s*\)/i', $expr, $m)) {
+            // Sem parêntese na classe: o mais interno casa primeiro e o de fora não come o ")" dele.
+            if (!preg_match('/\b(max|min)\s*\(\s*([0-9.+\-*\/\s]+)\s*,\s*([0-9.+\-*\/\s]+)\s*\)/i', $expr, $m)) {
                 break;
             }
             $l = $this->avaliarAritmeticaPreview($m[2]);

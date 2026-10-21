@@ -7,6 +7,7 @@ use App\Core\AuthManager;
 use App\Core\BaseController;
 use App\Core\Database;
 use App\Dominio\Escola\Services\AnoLetivoService;
+use App\Helpers\AdminPasswordHelper;
 use App\Painel\Master\Services\LimparDadosEscolaEducaService;
 use App\Painel\Master\Services\MasterFilaService;
 
@@ -233,6 +234,18 @@ class AnoLetivoController extends BaseController
         if (!$this->podeAbrirZerarPopular($user)) {
             $this->setFlashMessage('Recusado: esta escola não é o banco permitido. Nada foi alterado.', 'error');
             $this->redirect('/admin/z-configuracao');
+            return;
+        }
+
+        $senha = (string) ($_POST['senha'] ?? '');
+        if (trim($senha) === '') {
+            $this->setFlashMessage('Digite sua senha para confirmar.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+        if (!is_array($user) || !AdminPasswordHelper::verifyAdminPassword($this->db, $user, $senha)) {
+            $this->setFlashMessage('Senha incorreta. Nada foi alterado.', 'error');
+            $this->redirect($volta);
             return;
         }
 
