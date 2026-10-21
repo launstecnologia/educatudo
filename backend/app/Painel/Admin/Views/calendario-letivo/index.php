@@ -100,12 +100,14 @@ ob_start();
     <span class="text-sm font-semibold text-gray-700"><?= $ano ?></span>
     <a href="?ano=<?= $ano + 1 ?>" class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-right"></i></a>
     <?php if ($variosPronto): ?>
-    <select id="selCalendario" aria-label="Calendário" onchange="if (this.value) window.location = this.value;"
-            class="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white max-w-[16rem]">
-        <?php foreach ($calendarios as $cal): ?>
-        <option value="?ano=<?= $ano ?>&id=<?= (int) $cal['id'] ?>" <?= (int) $cal['id'] === $calendarioId ? 'selected' : '' ?>><?= htmlspecialchars((string) ($cal['nome'] ?? 'Geral')) ?></option>
-        <?php endforeach; ?>
-    </select>
+    <div class="inline-flex shrink-0 items-center rounded-lg border border-gray-300 bg-white">
+        <select id="selCalendario" aria-label="Calendário" onchange="if (this.value) window.location = this.value;"
+                class="max-w-[16rem] cursor-pointer border-0 bg-transparent py-2 pl-3 pr-9 text-sm text-gray-700 focus:outline-none focus:ring-0">
+            <?php foreach ($calendarios as $cal): ?>
+            <option value="?ano=<?= $ano ?>&id=<?= (int) $cal['id'] ?>" <?= (int) $cal['id'] === $calendarioId ? 'selected' : '' ?>><?= htmlspecialchars((string) ($cal['nome'] ?? 'Geral')) ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
     <button type="button" onclick="openNovoCalendario()" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50">
         <i class="fa-solid fa-plus mr-2"></i>Novo calendário
     </button>
@@ -123,6 +125,10 @@ ob_start();
     </div>
     <button type="button" onclick="openConfigDrawer()" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50"><i class="fa-solid fa-gear mr-2"></i>Configurar ano</button>
     <?php if ($config): ?>
+    <button type="button" onclick="openEventosDrawer()" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50">
+        <i class="fa-solid fa-list-ul mr-2"></i>Eventos
+        <span class="ml-2 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-gray-100 px-1.5 text-xs font-semibold text-gray-600"><?= count($eventos) ?></span>
+    </button>
     <button type="button" onclick="openEventoDrawer()" class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90"><i class="fa-solid fa-plus mr-2"></i>Adicionar evento</button>
     <?php endif; ?>
 </div>
@@ -296,58 +302,110 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
 <?php endfor; ?>
 </div><!-- /viewAno -->
 
-<!-- Lista de eventos -->
-<?php if ($config && !empty($eventos)): ?>
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-    <div class="px-6 py-4 border-b border-gray-100">
-        <h3 class="font-semibold text-gray-900">Eventos cadastrados</h3>
-    </div>
-    <div class="divide-y divide-gray-100">
-    <?php foreach ($eventos as $ev):
-        $t = (string) $ev['tipo'];
-        $tsI = $dataCalendario($ev['data_inicio'] ?? '');
-        $tsF = $dataCalendario($ev['data_fim'] ?? '');
-        $dtI = $tsI ? date('d/m/Y', $tsI) : 'Data inválida';
-        $dtF = $tsF ? date('d/m/Y', $tsF) : 'Data inválida';
-        if ($tsI === null || $tsF === null || $tsF < $tsI) {
-            $brutoInicio = trim((string) ($ev['data_inicio'] ?? ''));
-            $brutoFim = trim((string) ($ev['data_fim'] ?? ''));
-            $periodo = 'Data inválida';
-            if ($brutoInicio !== '' || $brutoFim !== '') {
-                $periodo .= ' (' . $brutoInicio . ' – ' . $brutoFim . ')';
-            }
-            $periodo .= '. O calendário continua disponível; este cadastro antigo não foi alterado.';
-            $periodo = htmlspecialchars($periodo);
-        } else {
-            $periodo = ($ev['data_inicio'] === $ev['data_fim']) ? $dtI : "$dtI – $dtF";
-        }
-    ?>
-        <div class="flex items-center gap-4 px-6 py-3 hover:bg-gray-50">
-            <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:<?= $tipoText[$t] ?? '#6b7280' ?>"></span>
-            <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-gray-900 truncate"><?= htmlspecialchars((string) $ev['descricao']) ?></p>
-                <p class="text-xs text-gray-500"><?= $periodo ?></p>
-            </div>
-            <span class="text-xs font-semibold px-2 py-1 rounded-full" style="background:<?= htmlspecialchars($tipoBg[$t] ?? '#f3f4f6') ?>;color:<?= htmlspecialchars($tipoText[$t] ?? '#374151') ?>"><?= htmlspecialchars($tipoLabels[$t] ?? $t) ?></span>
-            <?php if ($podeAlterarEvento): ?>
-            <button type="button" onclick="editarEvento(<?= (int) $ev['id'] ?>)" class="text-xs text-gray-500 hover:text-gray-800 font-medium" title="Editar"><i class="fa-solid fa-pen"></i></button>
-            <?php endif; ?>
-            <form method="post" action="<?= URL ?>/admin/calendario-letivo/excluir-evento" onsubmit="return confirm('Remover este evento?');" class="inline">
-                <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
-                <input type="hidden" name="ano" value="<?= $ano ?>">
-                <input type="hidden" name="calendario_id" value="<?= $calendarioId ?>">
-                <input type="hidden" name="id" value="<?= (int) $ev['id'] ?>">
-                <button type="submit" class="text-xs text-red-500 hover:text-red-700 font-medium"><i class="fa-solid fa-trash-can"></i></button>
-            </form>
+<?php if ($config): ?>
+<div id="eventosDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeEventosDrawer()"></div>
+<aside id="eventosDrawer"
+       class="fixed top-0 right-0 z-50 flex h-full w-full max-w-3xl translate-x-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-in-out"
+       aria-hidden="true">
+    <div class="flex items-center justify-between border-b border-gray-200 px-6 py-5 sm:px-8">
+        <div>
+            <h2 class="text-xl font-bold text-gray-900">Eventos cadastrados</h2>
+            <p class="mt-0.5 text-sm text-gray-500"><?= count($eventos) ?> neste calendário</p>
         </div>
-    <?php endforeach; ?>
+        <button type="button" onclick="closeEventosDrawer()" class="p-1 text-gray-400 hover:text-gray-600" aria-label="Fechar">
+            <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
     </div>
-</div>
-<?php elseif ($config): ?>
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 px-6 py-10 text-center text-gray-500 mb-6">
-    <i class="fa-regular fa-calendar-days text-3xl text-gray-300 mb-3 block"></i>
-    Nenhum evento cadastrado para <?= $ano ?>. Use o botão "Adicionar evento" para incluir feriados, recessos e reposições.
-</div>
+    <div class="flex-1 overflow-y-auto">
+        <?php if ($eventos === []): ?>
+        <div class="px-6 py-16 text-center text-gray-500">
+            <i class="fa-regular fa-calendar-days mb-3 block text-3xl text-gray-300"></i>
+            Nenhum evento cadastrado para <?= (int) $ano ?>. Use o botão "Adicionar evento" para incluir feriados, recessos e reposições.
+        </div>
+        <?php else: ?>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Evento</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Período</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Tipo</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="eventosTabela" class="divide-y divide-gray-200 bg-white">
+                <?php foreach ($eventos as $idx => $ev):
+                    $t = (string) $ev['tipo'];
+                    $tsI = $dataCalendario($ev['data_inicio'] ?? '');
+                    $tsF = $dataCalendario($ev['data_fim'] ?? '');
+                    $dtI = $tsI ? date('d/m/Y', $tsI) : 'Data inválida';
+                    $dtF = $tsF ? date('d/m/Y', $tsF) : 'Data inválida';
+                    $periodoTitle = '';
+                    if ($tsI === null || $tsF === null || $tsF < $tsI) {
+                        $brutoInicio = trim((string) ($ev['data_inicio'] ?? ''));
+                        $brutoFim = trim((string) ($ev['data_fim'] ?? ''));
+                        $periodo = 'Data inválida';
+                        if ($brutoInicio !== '' || $brutoFim !== '') {
+                            $periodo .= ' (' . $brutoInicio . ' – ' . $brutoFim . ')';
+                        }
+                        $periodoTitle = 'O calendário continua disponível; este cadastro antigo não foi alterado.';
+                    } else {
+                        $periodo = ($ev['data_inicio'] === $ev['data_fim']) ? $dtI : "$dtI – $dtF";
+                    }
+                    $eventoId = (int) $ev['id'];
+                ?>
+                    <tr class="hover:bg-gray-50 <?= $idx >= 10 ? 'hidden' : '' ?>" data-evento-linha>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-3">
+                                <span class="h-2.5 w-2.5 flex-shrink-0 rounded-full" style="background:<?= htmlspecialchars($tipoText[$t] ?? '#6b7280') ?>"></span>
+                                <p class="max-w-xs truncate text-sm font-medium text-gray-900"><?= htmlspecialchars((string) $ev['descricao']) ?></p>
+                            </div>
+                        </td>
+                        <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500"<?= $periodoTitle !== '' ? ' title="' . htmlspecialchars($periodoTitle) . '"' : '' ?>><?= htmlspecialchars($periodo) ?></td>
+                        <td class="whitespace-nowrap px-6 py-4">
+                            <span class="rounded-full px-2 py-1 text-xs font-semibold" style="background:<?= htmlspecialchars($tipoBg[$t] ?? '#f3f4f6') ?>;color:<?= htmlspecialchars($tipoText[$t] ?? '#374151') ?>"><?= htmlspecialchars($tipoLabels[$t] ?? $t) ?></span>
+                        </td>
+                        <td class="whitespace-nowrap px-6 py-4 text-right">
+                            <form id="form-excluir-evento-<?= $eventoId ?>" method="post" action="<?= URL ?>/admin/calendario-letivo/excluir-evento" class="hidden">
+                                <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
+                                <input type="hidden" name="ano" value="<?= $ano ?>">
+                                <input type="hidden" name="calendario_id" value="<?= $calendarioId ?>">
+                                <input type="hidden" name="id" value="<?= $eventoId ?>">
+                            </form>
+                            <?php if ($podeAlterarEvento): ?>
+                            <?php ob_start(); ?>
+                            <button type="button" onclick="editarEvento(<?= $eventoId ?>)"
+                                    class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">
+                                <i class="fa-solid fa-pen w-4 text-center text-gray-400"></i> Editar
+                            </button>
+                            <div class="my-1 border-t border-gray-100"></div>
+                            <button type="submit" form="form-excluir-evento-<?= $eventoId ?>" onclick="return confirm('Remover este evento?');"
+                                    class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50">
+                                <i class="fa-solid fa-trash-can w-4 text-center text-red-400"></i> Excluir
+                            </button>
+                            <?php
+                            $row_actions_dropdown_items = ob_get_clean();
+                            $row_actions_dropdown_id = 'evento-acoes-' . $eventoId;
+                            include \App\Core\ViewPaths::adminPartial('row_actions_dropdown.php');
+                            ?>
+                            <?php else: ?>
+                            <button type="submit" form="form-excluir-evento-<?= $eventoId ?>" onclick="return confirm('Remover este evento?');"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50">
+                                <i class="fa-solid fa-trash-can text-xs"></i> Excluir
+                            </button>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php if ($eventos !== []): ?>
+    <div id="eventosPaginacao" class="flex flex-wrap items-center justify-between gap-2 border-t border-gray-200 px-6 py-4"></div>
+    <?php endif; ?>
+</aside>
 <?php endif; ?>
 
 <!-- Offcanvas: Configurar ano -->
@@ -1024,11 +1082,79 @@ function preencherFormEvento(ev) {
     definirModoEvento(true);
 }
 
+function fecharMenusEventos() {
+    document.querySelectorAll('#eventosDrawer [data-dropdown-menu]').forEach(function (menu) {
+        menu.classList.add('hidden');
+    });
+}
+
 function editarEvento(id) {
     var ev = eventosPorId[id];
     if (!ev) return;
     closeDayModal();
+    fecharMenusEventos();
+    var lista = document.getElementById('eventosDrawer');
+    if (lista && !lista.classList.contains('translate-x-full')) {
+        document.getElementById('eventosDrawerBackdrop').classList.add('hidden');
+        lista.classList.add('translate-x-full');
+        lista.setAttribute('aria-hidden', 'true');
+    }
     openEventoDrawer({ evento: ev });
+}
+
+var eventosPaginaAtual = 1;
+var EVENTOS_POR_PAGINA = 10;
+
+function openEventosDrawer() {
+    renderEventosPagina(eventosPaginaAtual || 1);
+    showDrawer('eventosDrawerBackdrop', 'eventosDrawer');
+}
+function closeEventosDrawer() {
+    if (!document.getElementById('eventosDrawer')) return;
+    fecharMenusEventos();
+    hideDrawer('eventosDrawerBackdrop', 'eventosDrawer');
+}
+
+function renderEventosPagina(pagina) {
+    var linhas = document.querySelectorAll('#eventosTabela [data-evento-linha]');
+    var total = linhas.length;
+    var totalPaginas = Math.max(1, Math.ceil(total / EVENTOS_POR_PAGINA));
+    pagina = Math.min(Math.max(1, pagina), totalPaginas);
+    eventosPaginaAtual = pagina;
+    fecharMenusEventos();
+    var inicio = (pagina - 1) * EVENTOS_POR_PAGINA;
+    var fim = inicio + EVENTOS_POR_PAGINA;
+    linhas.forEach(function (linha, i) {
+        linha.classList.toggle('hidden', i < inicio || i >= fim);
+    });
+    var box = document.getElementById('eventosPaginacao');
+    if (!box) return;
+    if (total === 0) {
+        box.classList.add('hidden');
+        box.innerHTML = '';
+        return;
+    }
+    box.classList.remove('hidden');
+    var de = inicio + 1;
+    var ate = Math.min(fim, total);
+    var html = '<p class="text-sm text-gray-600">Exibindo ' + de + '–' + ate + ' de ' + total + ' registro(s)</p>';
+    if (totalPaginas > 1) {
+        html += '<div class="flex items-center gap-1">';
+        if (pagina > 1) {
+            html += '<button type="button" class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200" data-eventos-pagina="' + (pagina - 1) + '">Anterior</button>';
+        }
+        var i0 = Math.max(1, pagina - 2);
+        var i1 = Math.min(totalPaginas, pagina + 2);
+        for (var i = i0; i <= i1; i++) {
+            var ativo = i === pagina ? 'bg-primary text-white' : 'text-gray-700 bg-gray-100 hover:bg-gray-200';
+            html += '<button type="button" class="px-3 py-1.5 text-sm font-medium rounded-lg ' + ativo + '" data-eventos-pagina="' + i + '">' + i + '</button>';
+        }
+        if (pagina < totalPaginas) {
+            html += '<button type="button" class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200" data-eventos-pagina="' + (pagina + 1) + '">Próxima</button>';
+        }
+        html += '</div>';
+    }
+    box.innerHTML = html;
 }
 
 function openEventoDrawer(opts) {
@@ -1072,6 +1198,7 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         closeConfigDrawer();
         closeEventoDrawer();
+        closeEventosDrawer();
         closeDayModal();
     }
 });
@@ -1516,6 +1643,15 @@ if (novoTipoPanel) {
 var tipoGrid = document.getElementById('tipoGrid');
 if (tipoGrid) tipoGrid.addEventListener('change', atualizarHintEfeito);
 atualizarHintEfeito();
+var eventosPaginacao = document.getElementById('eventosPaginacao');
+if (eventosPaginacao) {
+    renderEventosPagina(1);
+    eventosPaginacao.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-eventos-pagina]');
+        if (!btn) return;
+        renderEventosPagina(parseInt(btn.getAttribute('data-eventos-pagina'), 10));
+    });
+}
 <?php if (!$config): ?>
 openConfigDrawer();
 <?php endif; ?>
