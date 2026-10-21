@@ -231,7 +231,7 @@ $masterPendentes = $master_pendentes ?? [];
                     <td class="px-4 py-3 text-center">
                             <div class="flex items-center justify-center gap-2 flex-wrap">
                                 <?php if ($e['pendentes'] > 0): ?>
-                                <button type="button" class="btn-executar-escola bg-blue-500 text-white px-3 py-1.5 rounded-lg hover:bg-blue-600 text-xs font-medium" data-escola-id="<?= (int)$e['id'] ?>">
+                                <button type="button" class="btn-executar-escola bg-blue-500 text-white px-3 py-1.5 rounded-lg hover:bg-blue-600 text-xs font-medium" data-escola-id="<?= (int)$e['id'] ?>" data-escola-nome="<?= htmlspecialchars($e['nome']) ?>">
                                     Executar todas
                                 </button>
                                 <?php endif; ?>
@@ -239,18 +239,11 @@ $masterPendentes = $master_pendentes ?? [];
                                     Escolher
                                 </button>
                                 <?php if ($e['pendentes'] > 0): ?>
-                                <button type="button" class="btn-marcar-executada bg-gray-200 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-gray-300 text-xs font-medium" data-escola-id="<?= (int)$e['id'] ?>" title="Marca como executada sem rodar SQL (para escolas que já tinham banco)">
+                                <button type="button" class="btn-marcar-executada bg-gray-200 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-gray-300 text-xs font-medium" data-escola-id="<?= (int)$e['id'] ?>" data-escola-nome="<?= htmlspecialchars($e['nome']) ?>" title="Marca como executada sem rodar SQL (para escolas que já tinham banco)">
                                     Ignorar
                                 </button>
                                 <?php endif; ?>
                             </div>
-                            <?php if (($e['nome_banco'] ?? '') === \App\Painel\Master\Services\LimparDadosEscolaEducaService::BANCO_PERMITIDO): ?>
-                            <div class="mt-2">
-                                <a href="<?= URL ?>/master/escolas/<?= (int) $e['id'] ?>/limpar-dados" class="inline-flex border border-red-300 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-50 text-xs font-medium">
-                                    Limpar dados
-                                </a>
-                            </div>
-                            <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -307,11 +300,135 @@ $masterPendentes = $master_pendentes ?? [];
     </div>
 </details>
 
+<div id="modal-confirmar-acao" class="fixed inset-0 z-[80] hidden items-center justify-center bg-black/50 p-4" aria-hidden="true">
+    <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md" role="dialog" aria-modal="true" aria-labelledby="modal-confirmar-acao-titulo">
+        <h4 id="modal-confirmar-acao-titulo" class="text-base font-semibold text-slate-900 mb-1">Confirme a ação</h4>
+        <p class="text-sm text-slate-500 mb-3">Leia o que será feito, confirme e digite a senha do seu acesso ao Painel Master.</p>
+        <p id="modal-confirmar-acao-texto" class="text-sm text-slate-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4 whitespace-pre-line max-h-40 overflow-y-auto"></p>
+        <label class="flex items-start gap-2 text-sm text-slate-700 mb-4">
+            <input type="checkbox" id="modal-confirmar-acao-aceite" class="mt-1 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+            <span>Confirmo que estou executando esta ação.</span>
+        </label>
+        <label for="modal-confirmar-acao-senha" class="block text-sm font-medium text-slate-700 mb-1">Senha de acesso</label>
+        <input type="password" id="modal-confirmar-acao-senha" autocomplete="current-password"
+               class="w-full px-3 py-2 border border-slate-300 rounded-lg mb-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Sua senha do Painel Master">
+        <p id="modal-confirmar-acao-erro" class="text-xs text-red-600 mb-3 hidden"></p>
+        <div class="flex gap-2 justify-end mt-2">
+            <button type="button" id="modal-confirmar-acao-cancelar" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Cancelar</button>
+            <button type="button" id="modal-confirmar-acao-ok" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Confirmar</button>
+        </div>
+    </div>
+</div>
+
 <script>
 (function() {
     var baseUrl = '<?= rtrim(URL, '/') ?>';
     var statusGeralEl = document.getElementById('status-geral');
     var resultadoExecucaoEl = document.getElementById('resultado-execucao');
+    var confirmacaoResolver = null;
+
+    function abrirConfirmacao(descricao) {
+        return new Promise(function(resolve) {
+            if (confirmacaoResolver) {
+                var anterior = confirmacaoResolver;
+                confirmacaoResolver = null;
+                anterior(null);
+            }
+            confirmacaoResolver = resolve;
+            var modal = document.getElementById('modal-confirmar-acao');
+            var texto = document.getElementById('modal-confirmar-acao-texto');
+            var aceite = document.getElementById('modal-confirmar-acao-aceite');
+            var senha = document.getElementById('modal-confirmar-acao-senha');
+            var erro = document.getElementById('modal-confirmar-acao-erro');
+            texto.textContent = descricao;
+            aceite.checked = false;
+            senha.value = '';
+            erro.classList.add('hidden');
+            erro.textContent = '';
+            if (modal.parentElement !== document.body) {
+                document.body.appendChild(modal);
+            }
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            modal.setAttribute('aria-hidden', 'false');
+            setTimeout(function() { senha.focus(); }, 50);
+        });
+    }
+
+    function fecharConfirmacao(valor) {
+        var modal = document.getElementById('modal-confirmar-acao');
+        var senha = document.getElementById('modal-confirmar-acao-senha');
+        if (senha) senha.value = '';
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+        var resolver = confirmacaoResolver;
+        confirmacaoResolver = null;
+        if (resolver) resolver(valor || null);
+    }
+
+    function validarConfirmacao() {
+        var aceite = document.getElementById('modal-confirmar-acao-aceite');
+        var senha = document.getElementById('modal-confirmar-acao-senha');
+        var erro = document.getElementById('modal-confirmar-acao-erro');
+        if (!aceite.checked) {
+            erro.textContent = 'Marque que você confirma esta ação.';
+            erro.classList.remove('hidden');
+            return;
+        }
+        if (senha.value === '') {
+            erro.textContent = 'Digite sua senha de acesso.';
+            erro.classList.remove('hidden');
+            senha.focus();
+            return;
+        }
+        var valor = senha.value;
+        fecharConfirmacao(valor);
+    }
+
+    document.getElementById('modal-confirmar-acao-cancelar').addEventListener('click', function() {
+        fecharConfirmacao(null);
+    });
+    document.getElementById('modal-confirmar-acao-ok').addEventListener('click', validarConfirmacao);
+    document.getElementById('modal-confirmar-acao').addEventListener('click', function(e) {
+        if (e.target === this) fecharConfirmacao(null);
+    });
+    document.getElementById('modal-confirmar-acao-senha').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            validarConfirmacao();
+        }
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && confirmacaoResolver) {
+            fecharConfirmacao(null);
+        }
+    });
+
+    function formComConfirmacao(senha, extras) {
+        var fd = new FormData();
+        fd.append('_token', getCsrfToken());
+        fd.append('confirm_senha', senha);
+        fd.append('confirmar_acao', '1');
+        if (!extras) return fd;
+        Object.keys(extras).forEach(function(chave) {
+            var valor = extras[chave];
+            if (Array.isArray(valor)) {
+                valor.forEach(function(item) { fd.append(chave, item); });
+            } else {
+                fd.append(chave, valor);
+            }
+        });
+        return fd;
+    }
+
+    function nomesMarcados(checkboxes) {
+        var nomes = [];
+        checkboxes.forEach(function(cb) { nomes.push(cb.value); });
+        return nomes.join('\n');
+    }
 
     function escapeHtml(str) {
         return String(str || '').replace(/[&<>"']/g, function(ch) {
@@ -382,11 +499,12 @@ $masterPendentes = $master_pendentes ?? [];
     var statusMasterEl = document.getElementById('status-master');
     if (btnExecutarMaster) {
         btnExecutarMaster.addEventListener('click', function() {
-            if (!confirm('Executar as migrations pendentes no banco master?')) return;
+            abrirConfirmacao('Executar todas as migrations pendentes no banco master.').then(function(senha) {
+            if (!senha) return;
             btnExecutarMaster.disabled = true;
             btnExecutarMaster.textContent = 'Executando...';
             if (statusMasterEl) statusMasterEl.textContent = 'Aguarde...';
-            fetch(baseUrl + '/master/migrations/executar-master', { method: 'POST', body: (function() { var fd = new FormData(); fd.append('_token', getCsrfToken()); return fd; })() })
+            fetch(baseUrl + '/master/migrations/executar-master', { method: 'POST', body: formComConfirmacao(senha) })
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     if (data.success) {
@@ -403,6 +521,7 @@ $masterPendentes = $master_pendentes ?? [];
                     btnExecutarMaster.disabled = false;
                     btnExecutarMaster.textContent = 'Executar todas';
                 });
+            });
         });
     }
 
@@ -472,9 +591,11 @@ $masterPendentes = $master_pendentes ?? [];
                 alert('Selecione ao menos uma migration.');
                 return;
             }
-            var formData = new FormData();
-            formData.append('_token', getCsrfToken());
-            checkboxes.forEach(function(cb) { formData.append('migrations[]', cb.value); });
+            var arquivos = [];
+            checkboxes.forEach(function(cb) { arquivos.push(cb.value); });
+            abrirConfirmacao('Executar no banco master:\n' + nomesMarcados(checkboxes)).then(function(senha) {
+            if (!senha) return;
+            var formData = formComConfirmacao(senha, { 'migrations[]': arquivos });
             var btnSubmit = formEscolherMaster.querySelector('button[type="submit"]');
             var origText = btnSubmit.textContent;
             btnSubmit.disabled = true;
@@ -497,17 +618,19 @@ $masterPendentes = $master_pendentes ?? [];
                     btnSubmit.disabled = false;
                     btnSubmit.textContent = origText;
                 });
+            });
         });
     }
 
     var btnTodas = document.getElementById('btn-executar-todas');
     if (btnTodas) {
         btnTodas.addEventListener('click', function() {
-            if (!confirm('Executar todas as migrations pendentes em todas as escolas ativas?')) return;
+            abrirConfirmacao('Executar todas as migrations pendentes em todas as escolas ativas.').then(function(senha) {
+            if (!senha) return;
             btnTodas.disabled = true;
             btnTodas.textContent = 'Executando...';
             if (statusGeralEl) statusGeralEl.textContent = 'Aguarde, pode levar alguns segundos...';
-            fetch(baseUrl + '/master/migrations/executar-todas', { method: 'POST', body: (function() { var fd = new FormData(); fd.append('_token', getCsrfToken()); return fd; })() })
+            fetch(baseUrl + '/master/migrations/executar-todas', { method: 'POST', body: formComConfirmacao(senha) })
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     if (data.success && data.resultados) {
@@ -530,20 +653,20 @@ $masterPendentes = $master_pendentes ?? [];
                     btnTodas.textContent = 'Executar migrations em todas as escolas';
                     if (statusGeralEl) statusGeralEl.textContent = '';
                 });
+            });
         });
     }
 
     document.querySelectorAll('.btn-executar-escola').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var escolaId = this.getAttribute('data-escola-id');
-            if (!confirm('Executar migrations pendentes nesta escola?')) return;
+            var escolaNome = this.getAttribute('data-escola-nome') || ('Escola #' + escolaId);
             var btnEl = this;
+            abrirConfirmacao('Executar todas as migrations pendentes na escola ' + escolaNome + '.').then(function(senha) {
+            if (!senha) return;
             btnEl.disabled = true;
             btnEl.textContent = '...';
-            var formData = new FormData();
-            formData.append('escola_id', escolaId);
-            formData.append('_token', getCsrfToken());
-            fetch(baseUrl + '/master/migrations/executar-escola', { method: 'POST', body: formData })
+            fetch(baseUrl + '/master/migrations/executar-escola', { method: 'POST', body: formComConfirmacao(senha, { escola_id: escolaId }) })
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     if (data.success && data.resultado) {
@@ -572,6 +695,7 @@ $masterPendentes = $master_pendentes ?? [];
                     btnEl.disabled = false;
                     btnEl.textContent = 'Executar';
                 });
+            });
         });
     });
     // Modal: escolher quais migrations executar
@@ -692,11 +816,14 @@ $masterPendentes = $master_pendentes ?? [];
                 alert('Selecione ao menos uma migration.');
                 return;
             }
-            var formData = new FormData();
-            formData.append('escola_id', modalEscolaId.value);
-            formData.append('_token', getCsrfToken());
-            checkboxes.forEach(function(cb) {
-                formData.append('migrations[]', cb.value);
+            var arquivos = [];
+            checkboxes.forEach(function(cb) { arquivos.push(cb.value); });
+            var escolaNome = modalNome.textContent || ('Escola #' + modalEscolaId.value);
+            abrirConfirmacao('Executar na escola ' + escolaNome + ':\n' + nomesMarcados(checkboxes)).then(function(senha) {
+            if (!senha) return;
+            var formData = formComConfirmacao(senha, {
+                escola_id: modalEscolaId.value,
+                'migrations[]': arquivos
             });
             var btnSubmit = formEscolher.querySelector('button[type="submit"]');
             var statusEl = document.getElementById('modal-escolher-status');
@@ -731,20 +858,20 @@ $masterPendentes = $master_pendentes ?? [];
                     btnSubmit.disabled = false;
                     btnSubmit.textContent = origText;
                 });
+            });
         });
     }
 
     document.querySelectorAll('.btn-marcar-executada').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var escolaId = this.getAttribute('data-escola-id');
-            if (!confirm('Marcar todas as migrations pendentes como executadas nesta escola?\n(Use para escolas que já tinham banco antes do sistema de migrations)')) return;
+            var escolaNome = this.getAttribute('data-escola-nome') || ('Escola #' + escolaId);
             var btnEl = this;
+            abrirConfirmacao('Marcar todas as migrations pendentes da escola ' + escolaNome + ' como executadas, sem rodar o SQL.').then(function(senha) {
+            if (!senha) return;
             btnEl.disabled = true;
             btnEl.textContent = '...';
-            var formData = new FormData();
-            formData.append('escola_id', escolaId);
-            formData.append('_token', getCsrfToken());
-            fetch(baseUrl + '/master/migrations/marcar-executadas', { method: 'POST', body: formData })
+            fetch(baseUrl + '/master/migrations/marcar-executadas', { method: 'POST', body: formComConfirmacao(senha, { escola_id: escolaId }) })
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     if (data.success) {
@@ -762,6 +889,7 @@ $masterPendentes = $master_pendentes ?? [];
                     btnEl.disabled = false;
                     btnEl.textContent = 'Ignorar';
                 });
+            });
         });
     });
 })();

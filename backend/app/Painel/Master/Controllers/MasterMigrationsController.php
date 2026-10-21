@@ -33,6 +33,34 @@ class MasterMigrationsController extends BaseController
     }
 
     /**
+     * Toda ação desta tela exige aceite explícito e a senha de acesso do master logado.
+     */
+    private function exigirConfirmacaoAcao(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        if (($_POST['confirmar_acao'] ?? '') !== '1') {
+            echo json_encode(['success' => false, 'error' => 'Confirme que deseja executar esta ação.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $senha = (string) ($_POST['confirm_senha'] ?? '');
+        if ($senha === '') {
+            echo json_encode(['success' => false, 'error' => 'Informe sua senha de acesso para confirmar a ação.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $masterUser = Database::getInstance()->query(
+            'SELECT senha_hash FROM usuarios_master WHERE id = :id AND ativo = 1',
+            ['id' => (int) ($_SESSION[self::SESSION_MASTER_USER_ID] ?? 0)]
+        )->fetch(\PDO::FETCH_ASSOC);
+
+        if (!$masterUser || !password_verify($senha, (string) ($masterUser['senha_hash'] ?? ''))) {
+            echo json_encode(['success' => false, 'error' => 'Senha incorreta. Nenhuma alteração foi feita.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+    }
+
+    /**
      * Lista migrations e status por escola.
      */
     public function index()
@@ -136,6 +164,7 @@ class MasterMigrationsController extends BaseController
             echo json_encode(['success' => false, 'error' => 'Token CSRF inválido. Recarregue a página.'], JSON_UNESCAPED_UNICODE);
             exit;
         }
+        $this->exigirConfirmacaoAcao();
         try {
             $db = Database::getInstance();
             $executed = MysqlProvisioningService::runMasterMigrations($db->getPdo());
@@ -167,6 +196,7 @@ class MasterMigrationsController extends BaseController
             echo json_encode(['success' => false, 'error' => 'Token CSRF inválido. Recarregue a página.'], JSON_UNESCAPED_UNICODE);
             exit;
         }
+        $this->exigirConfirmacaoAcao();
         $migrations = isset($_POST['migrations']) && is_array($_POST['migrations'])
             ? array_values(array_filter(array_map('trim', $_POST['migrations'])))
             : [];
@@ -209,6 +239,7 @@ class MasterMigrationsController extends BaseController
             echo json_encode(['success' => false, 'error' => 'Token CSRF inválido. Recarregue a página.'], JSON_UNESCAPED_UNICODE);
             exit;
         }
+        $this->exigirConfirmacaoAcao();
         $db = Database::getInstance();
         $masterPdo = $db->getPdo();
 
@@ -242,6 +273,7 @@ class MasterMigrationsController extends BaseController
             echo json_encode(['success' => false, 'error' => 'Token CSRF inválido. Recarregue a página.'], JSON_UNESCAPED_UNICODE);
             exit;
         }
+        $this->exigirConfirmacaoAcao();
         $escolaId = (int) ($_POST['escola_id'] ?? 0);
         if ($escolaId <= 0) {
             header('Content-Type: application/json; charset=utf-8');
@@ -285,6 +317,7 @@ class MasterMigrationsController extends BaseController
             echo json_encode(['success' => false, 'error' => 'Token CSRF inválido. Recarregue a página.'], JSON_UNESCAPED_UNICODE);
             exit;
         }
+        $this->exigirConfirmacaoAcao();
         $escolaId = (int) ($_POST['escola_id'] ?? 0);
         $migrations = isset($_POST['migrations']) && is_array($_POST['migrations'])
             ? array_values(array_filter(array_map('trim', $_POST['migrations'])))
@@ -442,6 +475,7 @@ class MasterMigrationsController extends BaseController
             echo json_encode(['success' => false, 'error' => 'Token CSRF inválido. Recarregue a página.'], JSON_UNESCAPED_UNICODE);
             exit;
         }
+        $this->exigirConfirmacaoAcao();
         $escolaId = (int) ($_POST['escola_id'] ?? 0);
         if ($escolaId <= 0) {
             header('Content-Type: application/json; charset=utf-8');
