@@ -308,7 +308,7 @@ if (!class_exists('LayoutHelper')) {
     <?php endforeach; ?>
     
     <!-- Navegação e Botões -->
-    <div class="bg-white rounded-xl shadow-lg p-6 flex justify-between items-center">
+    <div id="nav-prova" class="bg-white rounded-xl shadow-lg p-6 flex justify-between items-center">
         <div class="flex gap-4">
             <button type="button" 
                     onclick="questaoAnterior()"
@@ -673,8 +673,27 @@ function continuarFinalizarProva(comprovanteBase64) {
     });
 };
 
+// Um enunciado com <div> sem fechar faz o navegador engolir as questões seguintes
+// e a barra de navegação dentro do card anterior. Recoloca cada questão como filha
+// direta do formulário antes de exibir qualquer uma.
+function repararEstruturaQuestoes() {
+    var form = document.getElementById('provaForm');
+    if (!form) return;
+    var nav = document.getElementById('nav-prova');
+    Array.from(form.querySelectorAll('.questao-container')).forEach(function(el) {
+        if (el.parentElement !== form) {
+            form.insertBefore(el, (nav && nav.parentElement === form) ? nav : null);
+        }
+    });
+    if (nav && nav.parentElement !== form) {
+        form.appendChild(nav);
+    }
+}
+repararEstruturaQuestoes();
+
 // Inicialização
 document.addEventListener('DOMContentLoaded', function() {
+    repararEstruturaQuestoes();
     atualizarNavegacao();
     aplicarBloqueiosSeguranca();
     <?php if (!empty($modo_embed)): ?>
@@ -701,14 +720,16 @@ document.addEventListener('DOMContentLoaded', function() {
 // Navegação entre questões
 function irParaQuestao(index) {
     if (index < 0 || index >= totalQuestoes) return;
+
+    repararEstruturaQuestoes();
     
     // Esconde questão atual
-    document.querySelectorAll('.questao-container').forEach(function(container) {
+    document.querySelectorAll('#provaForm > .questao-container').forEach(function(container) {
         container.style.display = 'none';
     });
     
-    // Mostra questão selecionada
-    const questaoContainer = document.querySelector(`[data-questao-index="${index}"]`);
+    // Mostra questão selecionada (só o card, não um nó copiado dentro do enunciado)
+    const questaoContainer = document.querySelector('#provaForm > .questao-container[data-questao-index="' + index + '"]');
     if (questaoContainer) {
         questaoContainer.style.display = 'block';
         questaoAtual = index;

@@ -1246,7 +1246,11 @@ class LayoutHelper
                 return $src !== '' ? '<img src="' . $src . '" alt="' . $alt . '">' : '';
             }, $str);
             $str = preg_replace('/\$\$([^$]*?)\$\$/s', ' \\( $1 \\) ', $str);
-            return $str;
+            // <div> no meio da frase é texto da questão (ex.: "um elemento <div>").
+            // Se continuar tag, o </div> do card fecha ela e a questão seguinte entra
+            // dentro da anterior: ao selecionar, o card some.
+            $str = self::escaparDivLiteralNoTexto($str);
+            return self::equilibrarHtmlEnunciado($str);
         }
 
         // \Converte $$...$$ para \( ... \) para renderizar como fórmula inline (ex.: enunciado salvo com $$)
@@ -1265,6 +1269,161 @@ class LayoutHelper
         // Evita que cada fórmula inline fique em uma linha: colapsa espaços/quebras entre \) e \(
         $t = preg_replace('/(\\\\\))\s+(\\\\\()/', '$1 $2', $t);
         return nl2br($t);
+    }
+
+    /**
+     * <div> colado numa palavra é o texto da questão, não quebra de linha do editor.
+     * O editor abre <div> no começo do bloco; no meio da frase a tag engole o card.
+     */
+    private static function escaparDivLiteralNoTexto(string $html): string
+    {
+        $convertido = preg_replace(
+            '/(?<=[\p{L}\p{N}])\s*<div\b[^>]*>([^<]*)<\/div>/iu',
+            ' &lt;div&gt;$1&lt;/div&gt;',
+            $html
+        );
+        if (!is_string($convertido)) {
+            return $html;
+        }
+        $convertido = preg_replace(
+            '/(?<=[\p{L}\p{N}])\s*<div\b[^>]*>/iu',
+            ' &lt;div&gt;',
+            $convertido
+        );
+
+        return is_string($convertido) ? $convertido : $html;
+    }
+
+    /**
+     * Devolve o HTML do enunciado com as tags equilibradas, para não vazar para fora
+     * do card da questão. Remove </div> a mais (eles fechariam o card) e completa
+     * <div> que ficaram abertos.
+     */
+    private static function equilibrarHtmlEnunciado(string $html): string
+    {
+        $html = self::removerFechamentosDivExcedentes($html);
+        if ($html === '' || strpos($html, '<') === false) {
+            return $html;
+        }
+
+        $dom = new \DOMDocument();
+        $errosAnteriores = libxml_use_internal_errors(true);
+        $dom->loadHTML(
+            '<?xml encoding="UTF-8"><div id="enunciado-root">' . $html . '</div>',
+            LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD
+        );
+        libxml_clear_errors();
+        libxml_use_internal_errors($errosAnteriores);
+
+        $root = $dom->getElementById('enunciado-root');
+        if (!$root) {
+            return $html;
+        }
+
+        $proibidas = ['script', 'style', 'iframe', 'object', 'embed', 'form', 'button', 'input', 'textarea', 'select', 'link', 'meta'];
+        foreach ($proibidas as $tag) {
+            $nos = $root->getElementsByTagName($tag);
+            for ($i = $nos->length - 1; $i >= 0; $i--) {
+                $no = $nos->item($i);
+                if ($no && $no->parentNode) {
+                    $no->parentNode->removeChild($no);
+                }
+            }
+        }
+
+        $xpath = new \DOMXPath($dom);
+        foreach ($xpath->query('.//*', $root) ?: [] as $el) {
+            if (!$el instanceof \DOMElement) {
+                continue;
+            }
+            if ($el->hasAttribute('hidden')) {
+                $el->removeAttribute('hidden');
+            }
+            $classes = preg_split('/\s+/', trim($el->getAttribute('class'))) ?: [];
+            $classes = array_values(array_filter($classes, static function ($classe) {
+                return $classe !== '' && $classe !== 'hidden' && $classe !== 'questao-container';
+            }));
+            if ($classes === []) {
+                $el->removeAttribute('class');
+            } else {
+                $el->setAttribute('class', implode(' ', $classes));
+            }
+            if ($el->hasAttribute('data-questao-index') || $el->hasAttribute('data-questao-id')) {
+                $el->removeAttribute('data-questao-index');
+                $el->removeAttribute('data-questao-id');
+            }
+            if ($el->hasAttribute('style')) {
+                $style = preg_replace(
+                    '/(?:display|position|visibility|opacity|z-index|content|transform|top|left|right|bottom)\s*:[^;]*;?/i',
+                    '',
+                    $el->getAttribute('style')
+                );
+                $style = trim((string) $style, " \t\n\r;");
+                if ($style === '') {
+                    $el->removeAttribute('style');
+                } else {
+                    $el->setAttribute('style', $style);
+                }
+            }
+            $removerAtributos = [];
+            foreach ($el->attributes as $attr) {
+                $nome = strtolower($attr->name);
+                if (strpos($nome, 'on') === 0 || $nome === 'srcdoc' || $nome === 'formaction') {
+                    $removerAtributos[] = $attr->name;
+                }
+            }
+            foreach ($removerAtributos as $nome) {
+                $el->removeAttribute($nome);
+            }
+        }
+
+        foreach (iterator_to_array($root->getElementsByTagName('img')) as $img) {
+            if (!$img instanceof \DOMElement || !$img->parentNode) {
+                continue;
+            }
+            $src = $img->getAttribute('src');
+            $alt = $img->getAttribute('alt');
+            while ($img->attributes->length > 0) {
+                $img->removeAttribute($img->attributes->item(0)->name);
+            }
+            if ($src === '' || preg_match('/^\s*javascript:/i', $src)) {
+                $img->parentNode->removeChild($img);
+                continue;
+            }
+            $img->setAttribute('src', $src);
+            if ($alt !== '') {
+                $img->setAttribute('alt', $alt);
+            }
+        }
+
+        $saida = '';
+        foreach ($root->childNodes as $filho) {
+            $saida .= $dom->saveHTML($filho);
+        }
+
+        return $saida;
+    }
+
+    /**
+     * Um </div> a mais no enunciado fecha o card da questão no navegador.
+     * Descarta só os fechamentos que não têm <div> correspondente.
+     */
+    private static function removerFechamentosDivExcedentes(string $html): string
+    {
+        $profundidade = 0;
+        $resultado = preg_replace_callback('/<\/div\s*>|<div\b[^>]*>/i', static function ($m) use (&$profundidade) {
+            if (stripos($m[0], '</div') === 0) {
+                if ($profundidade <= 0) {
+                    return '';
+                }
+                $profundidade--;
+                return $m[0];
+            }
+            $profundidade++;
+            return $m[0];
+        }, $html);
+
+        return $resultado ?? $html;
     }
 
     /**
