@@ -1057,7 +1057,11 @@ class MasterEscolaDetailController extends BaseController
         $nome = trim($_POST['nome'] ?? '');
         $email = trim($_POST['email'] ?? '');
         $senha = $_POST['senha'] ?? '';
-        $perfilAdmin = trim($_POST['perfil_admin'] ?? 'admin');
+        $perfisValidos = ['dev', 'diretor', 'coordenador', 'secretaria'];
+        $perfilAdmin = trim($_POST['perfil_admin'] ?? 'coordenador');
+        if (!in_array($perfilAdmin, $perfisValidos, true)) {
+            $perfilAdmin = 'coordenador';
+        }
 
         if ($nome === '' || $email === '' || $senha === '') {
             $this->setFlashMessage('Preencha todos os campos obrigatórios.', 'error');

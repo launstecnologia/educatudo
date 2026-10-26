@@ -137,12 +137,48 @@ $render_dropdown_acoes = static function (array $u, string $suffix = '') use ($e
 ?>
 
 <div class="bg-white rounded-xl shadow border border-slate-200 p-4 sm:p-6">
-    <div class="mb-5">
+    <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h3 class="text-lg font-semibold text-slate-800">
             Usuários Administradores
             <span class="text-sm font-normal text-slate-500">(<?= (int) $total ?>)</span>
         </h3>
+        <button type="button" onclick="toggleCriarUsuario()" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+            <i class="fa-solid fa-plus text-xs"></i> Cadastrar
+        </button>
     </div>
+
+    <form id="form-criar-usuario" method="post" action="<?= URL ?>/master/escolas/<?= (int) $escola_id ?>/usuarios/criar" class="hidden mb-5 p-4 border border-slate-200 rounded-lg bg-slate-50">
+        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1" for="criar-nome">Nome</label>
+                <input type="text" id="criar-nome" name="nome" required
+                       class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1" for="criar-email">E-mail</label>
+                <input type="email" id="criar-email" name="email" required
+                       class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1" for="criar-senha">Senha</label>
+                <input type="password" id="criar-senha" name="senha" required autocomplete="new-password"
+                       class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1" for="criar-perfil">Perfil</label>
+                <select id="criar-perfil" name="perfil_admin" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <?php foreach ($labels_perfil as $valor => $rotulo): ?>
+                    <option value="<?= htmlspecialchars($valor) ?>" <?= $valor === 'coordenador' ? 'selected' : '' ?>><?= htmlspecialchars($rotulo) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        </div>
+        <div class="flex flex-col-reverse sm:flex-row gap-2">
+            <button type="button" onclick="toggleCriarUsuario()" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 text-sm">Cancelar</button>
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Salvar</button>
+        </div>
+    </form>
 
     <form method="GET" action="<?= $base_url ?>" class="mb-5 space-y-3">
         <div>
@@ -319,6 +355,15 @@ $render_dropdown_acoes = static function (array $u, string $suffix = '') use ($e
 </div>
 
 <script>
+function toggleCriarUsuario() {
+    var form = document.getElementById('form-criar-usuario');
+    if (!form) return;
+    form.classList.toggle('hidden');
+    if (!form.classList.contains('hidden')) {
+        var nome = document.getElementById('criar-nome');
+        if (nome) nome.focus();
+    }
+}
 function toggleEditUser(id) {
     var row = document.getElementById('edit-user-' + id);
     if (row) {
