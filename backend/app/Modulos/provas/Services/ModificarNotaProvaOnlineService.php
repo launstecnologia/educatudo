@@ -126,7 +126,7 @@ class ModificarNotaProvaOnlineService
         if (mb_strlen($observacao) < 10) {
             throw new \InvalidArgumentException('Descreva o motivo da alteração (mínimo de 10 caracteres).');
         }
-        $escopos = ['todos' => true, 'aluno' => true, 'questao' => true, 'manual' => true];
+        $escopos = ['todos' => true, 'aluno' => true, 'questao' => true, 'manual' => true, 'zerar' => true, 'zerar_aluno' => true];
         if (!isset($escopos[$escopo])) {
             $escopo = 'manual';
         }
@@ -365,11 +365,10 @@ class ModificarNotaProvaOnlineService
         $n = 0;
         foreach ($rows ?: [] as $row) {
             $n++;
-            $ordem = (int) ($row['ordem'] ?? 0);
             $enunciado = $this->textoPlano((string) ($row['enunciado'] ?? ''));
             $lista[] = [
                 'id' => (int) $row['id'],
-                'numero' => $ordem > 0 ? $ordem : $n,
+                'numero' => $n,
                 'enunciado' => $enunciado,
                 'enunciado_curto' => $this->cortar($enunciado, 90),
                 'tipo' => (string) ($row['tipo'] ?? ''),
@@ -668,6 +667,8 @@ class ModificarNotaProvaOnlineService
             'aluno' => 'Todas as questões de um aluno',
             'questao' => 'Uma questão para todos',
             'manual' => 'Questão a questão',
+            'zerar' => 'Nota zerada de todos os alunos',
+            'zerar_aluno' => 'Nota zerada de um aluno',
         ];
         $grupos = [];
         foreach ($rows as $row) {

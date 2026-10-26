@@ -84,6 +84,12 @@ $formatarNota = static function ($valor): string {
         <i class="fa-solid fa-check-double" aria-hidden="true"></i>
         Marcar todos os alunos como acerto total
     </button>
+    <button type="button" id="mn-zerar-todos"
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-gray-100 text-gray-800 text-sm font-medium hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            <?= $podeAlterar ? '' : 'disabled' ?>>
+        <i class="fa-solid fa-ban" aria-hidden="true"></i>
+        Zerar nota de todos
+    </button>
     <button type="button" id="mn-desfazer"
             class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50">
         Desfazer
@@ -138,11 +144,18 @@ $formatarNota = static function ($valor): string {
                             <?php endif; ?>
                         </div>
                         <?php if (!empty($aluno['editavel']) && $questoesEditaveis > 0): ?>
-                        <button type="button"
-                                class="mt-1 text-xs font-semibold text-indigo-700 hover:text-indigo-900"
-                                data-acertar-aluno="<?= (int) $aluno['id'] ?>">
-                            Acertar todas
-                        </button>
+                        <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                            <button type="button"
+                                    class="text-xs font-semibold text-indigo-700 hover:text-indigo-900"
+                                    data-acertar-aluno="<?= (int) $aluno['id'] ?>">
+                                Acertar todas
+                            </button>
+                            <button type="button"
+                                    class="text-xs font-semibold text-gray-600 hover:text-gray-900"
+                                    data-zerar-aluno="<?= (int) $aluno['id'] ?>">
+                                Zerar nota
+                            </button>
+                        </div>
                         <?php endif; ?>
                     </td>
                     <td class="px-3 py-3 whitespace-nowrap">
@@ -305,11 +318,14 @@ $formatarNota = static function ($valor): string {
     function pintar(btn) {
         var atual = btn.dataset.atual;
         var original = btn.dataset.original;
-        btn.classList.remove('bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800', 'bg-gray-100', 'text-gray-600', 'ring-2', 'ring-amber-400');
+        btn.classList.remove('bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800', 'bg-gray-100', 'text-gray-600', 'bg-gray-200', 'text-gray-700', 'ring-2', 'ring-amber-400');
         var label = 'Sem resposta';
         if (atual === '1') {
             btn.classList.add('bg-green-100', 'text-green-800');
             label = 'Acertou';
+        } else if (atual === '0' && btn.dataset.zerada === '1') {
+            btn.classList.add('bg-gray-200', 'text-gray-700');
+            label = 'Errou';
         } else if (atual === '0') {
             btn.classList.add('bg-red-100', 'text-red-800');
             label = 'Errou';
@@ -405,9 +421,10 @@ $formatarNota = static function ($valor): string {
         atualizarNotas();
     }
 
-    function marcar(lista, novoEscopo) {
+    function aplicarEm(lista, valor, novoEscopo, zerada) {
         lista.forEach(function (btn) {
-            btn.dataset.atual = '1';
+            btn.dataset.atual = valor;
+            btn.dataset.zerada = zerada ? '1' : '0';
             pintar(btn);
         });
         escopo = novoEscopo;
@@ -416,6 +433,7 @@ $formatarNota = static function ($valor): string {
 
     document.querySelectorAll('.mn-toggle').forEach(function (btn) {
         btn.addEventListener('click', function () {
+            btn.dataset.zerada = '0';
             btn.dataset.atual = btn.dataset.atual === '1' ? '0' : '1';
             escopo = 'manual';
             pintar(btn);
@@ -426,25 +444,38 @@ $formatarNota = static function ($valor): string {
     var btnTodos = document.getElementById('mn-acertar-todos');
     if (btnTodos) {
         btnTodos.addEventListener('click', function () {
-            marcar(Array.prototype.slice.call(document.querySelectorAll('.mn-toggle')), 'todos');
+            aplicarEm(Array.prototype.slice.call(document.querySelectorAll('.mn-toggle')), '1', 'todos', false);
+        });
+    }
+    var btnZerarTodos = document.getElementById('mn-zerar-todos');
+    if (btnZerarTodos) {
+        btnZerarTodos.addEventListener('click', function () {
+            aplicarEm(Array.prototype.slice.call(document.querySelectorAll('.mn-toggle')), '0', 'zerar', true);
         });
     }
     document.querySelectorAll('[data-acertar-aluno]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var id = btn.getAttribute('data-acertar-aluno');
-            marcar(Array.prototype.slice.call(document.querySelectorAll('.mn-toggle[data-aluno="' + id + '"]')), 'aluno');
+            aplicarEm(Array.prototype.slice.call(document.querySelectorAll('.mn-toggle[data-aluno="' + id + '"]')), '1', 'aluno', false);
+        });
+    });
+    document.querySelectorAll('[data-zerar-aluno]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var id = btn.getAttribute('data-zerar-aluno');
+            aplicarEm(Array.prototype.slice.call(document.querySelectorAll('.mn-toggle[data-aluno="' + id + '"]')), '0', 'zerar_aluno', true);
         });
     });
     document.querySelectorAll('[data-acertar-questao]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var id = btn.getAttribute('data-acertar-questao');
-            marcar(Array.prototype.slice.call(document.querySelectorAll('.mn-toggle[data-questao="' + id + '"]')), 'questao');
+            aplicarEm(Array.prototype.slice.call(document.querySelectorAll('.mn-toggle[data-questao="' + id + '"]')), '1', 'questao', false);
         });
     });
 
     function desfazer() {
         document.querySelectorAll('.mn-toggle').forEach(function (btn) {
             btn.dataset.atual = btn.dataset.original;
+            btn.dataset.zerada = '0';
             pintar(btn);
         });
         escopo = 'manual';
