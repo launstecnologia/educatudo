@@ -159,19 +159,18 @@ $normalizarDataYmd = static function (string $raw): ?string {
     }
     return null;
 };
-$obterMotorDemonstrativo = static function () use (&$motorDemonstrativo, $appDirNotas) {
+$obterMotorDemonstrativo = static function () use (&$motorDemonstrativo) {
     if (is_object($motorDemonstrativo)) {
         return $motorDemonstrativo;
     }
-    $ctrlPath = $appDirNotas . '/Controllers/Admin/BoletimConfigController.php';
-    if (!class_exists('BoletimConfigController', false) && is_file($ctrlPath)) {
-        require_once $ctrlPath;
+    try {
+        $motorDemonstrativo = new \App\Modulos\Boletins\Controllers\BoletimConfigController(true);
+    } catch (\Throwable $e) {
+        error_log('Quadro demonstrativo: ' . $e->getMessage());
+        $motorDemonstrativo = null;
     }
-    if (!class_exists('BoletimConfigController', false)) {
-        return null;
-    }
-    $motorDemonstrativo = new \App\Controllers\Admin\BoletimConfigController(true);
-    return $motorDemonstrativo;
+
+    return is_object($motorDemonstrativo) ? $motorDemonstrativo : null;
 };
 $obterCfgBoletim = static function () use (&$cfgBoletimNotas, $appDirNotas) {
     if (is_object($cfgBoletimNotas)) {

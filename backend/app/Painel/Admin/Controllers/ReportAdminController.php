@@ -1935,20 +1935,20 @@ class ReportAdminController extends AdminBaseController
         }
     }
 
-    private function motorDemonstrativoCoordenacao(): ?BoletimConfigController
+    private function motorDemonstrativoCoordenacao(): ?\App\Modulos\Boletins\Controllers\BoletimConfigController
     {
         static $motor = false;
         if ($motor !== false) {
-            return $motor instanceof BoletimConfigController ? $motor : null;
+            return $motor instanceof \App\Modulos\Boletins\Controllers\BoletimConfigController ? $motor : null;
         }
         try {
-            $motor = new BoletimConfigController(true);
+            $motor = new \App\Modulos\Boletins\Controllers\BoletimConfigController(true);
         } catch (\Throwable $e) {
             error_log('Demonstrativo coordenação: ' . $e->getMessage());
             $motor = null;
         }
 
-        return $motor instanceof BoletimConfigController ? $motor : null;
+        return $motor instanceof \App\Modulos\Boletins\Controllers\BoletimConfigController ? $motor : null;
     }
 
     /**

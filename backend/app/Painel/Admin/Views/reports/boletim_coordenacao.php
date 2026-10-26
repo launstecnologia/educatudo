@@ -346,13 +346,17 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
                         <button type="button" class="js-pdf-aluno no-print ml-auto inline-flex items-center justify-center w-9 h-9 rounded-lg bg-red-600 text-white hover:bg-red-700" title="<?= $fonteRelatorio === 'vida_escolar' ? 'PDF deste boletim' : 'PDF deste demonstrativo' ?>" aria-label="<?= $fonteRelatorio === 'vida_escolar' ? 'PDF deste boletim' : 'PDF deste demonstrativo' ?>"><i class="fa-solid fa-file-pdf"></i></button>
                     <?php endif; ?>
                 </div>
-                <?php if ($fonteRelatorio === 'demonstrativo'): ?>
+                <?php
+                $htmlDemonstrativo = trim((string) ($aluno['demonstrativo_html'] ?? ''));
+                $materiasAluno = (array) ($aluno['materias'] ?? []);
+                ?>
+                <?php if ($fonteRelatorio === 'demonstrativo' && $htmlDemonstrativo !== ''): ?>
                 <div class="p-4 overflow-x-auto">
-                    <?php if (trim((string) ($aluno['demonstrativo_html'] ?? '')) !== ''): ?>
-                        <?= $aluno['demonstrativo_html'] ?>
-                    <?php else: ?>
-                        <p class="text-sm text-gray-500">Não há demonstrativo de notas para este aluno neste evento.</p>
-                    <?php endif; ?>
+                    <?= $aluno['demonstrativo_html'] ?>
+                </div>
+                <?php elseif ($fonteRelatorio === 'demonstrativo' && $materiasAluno === []): ?>
+                <div class="p-4 overflow-x-auto">
+                    <p class="text-sm text-gray-500">Não há demonstrativo de notas para este aluno neste evento.</p>
                 </div>
                 <?php else: ?>
                 <div class="overflow-x-auto">
