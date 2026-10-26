@@ -20,7 +20,7 @@
         return htmlspecialchars((string) ($escola[$chave] ?? ''));
     };
     ?>
-    <form method="post" action="<?= !empty($escola['id']) ? (URL . '/master/escolas/atualizar') : (URL . '/master/escolas/salvar') ?>" class="space-y-8">
+    <form method="post" action="<?= !empty($escola['id']) ? (URL . '/master/escolas/atualizar') : (URL . '/master/escolas/salvar') ?>" class="space-y-8" autocomplete="off">
         <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
         <?php if (!empty($escola['id'])): ?>
         <input type="hidden" name="id" value="<?= (int) $escola['id'] ?>">
@@ -153,29 +153,33 @@
                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Nome do banco</label>
-                    <input type="text" name="db_nome_banco" value="<?= htmlspecialchars($banco['nome_banco'] ?? '') ?>"
-                           placeholder="educatudo_escola1" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <label class="block text-sm font-medium text-slate-700 mb-1" for="db_nome_banco">Nome do banco</label>
+                    <input type="text" name="db_nome_banco" id="db_nome_banco" value="<?= htmlspecialchars($banco['nome_banco'] ?? '') ?>"
+                           autocomplete="off" spellcheck="false" autocapitalize="off"
+                           placeholder="preenchido pelo slug" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Usuário</label>
-                    <input type="text" name="db_usuario" value="<?= htmlspecialchars($banco['usuario'] ?? '') ?>"
+                    <label class="block text-sm font-medium text-slate-700 mb-1" for="db_usuario">Usuário</label>
+                    <input type="text" name="db_usuario" id="db_usuario" value="<?= htmlspecialchars($banco['usuario'] ?? '') ?>"
+                           autocomplete="off" spellcheck="false" autocapitalize="off"
                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Senha</label>
-                    <input type="password" name="db_senha" value=""
-                           placeholder="<?= $banco ? 'Deixe em branco para não alterar' : 'Senha do banco' ?>"
+                    <label class="block text-sm font-medium text-slate-700 mb-1" for="db_senha">Senha</label>
+                    <input type="password" name="db_senha" id="db_senha" value="" autocomplete="new-password"
+                           placeholder="<?= $banco ? 'Deixe em branco para não alterar' : 'Senha do usuário novo' ?>"
                            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <p class="text-xs text-slate-500 mt-1">Ao salvar com host, banco, usuário e senha, o sistema aplica o schema atual e as migrations no banco informado — mesmo se ele já existir e estiver vazio.</p>
+                    <p class="text-xs text-slate-500 mt-1">Ao salvar, o MySQL cria esse banco e o usuário, aplica o schema atual e roda as migrations.</p>
                 </div>
                 <?php if (!empty($criar_banco_disponivel)): ?>
                 <div class="md:col-span-2">
                     <label class="inline-flex items-center gap-2">
-                        <input type="checkbox" name="criar_banco_automaticamente" value="1" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                        <input type="checkbox" name="criar_banco_automaticamente" id="criar_banco_automaticamente" value="1"
+                               <?= empty($escola['id']) ? 'checked' : '' ?>
+                               class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
                         <span class="text-sm text-slate-700">Criar banco e usuário MySQL automaticamente</span>
                     </label>
-                    <p class="text-xs text-slate-500 mt-1">Requer <code>DB_ADMIN_USER</code> e <code>DB_ADMIN_PASS</code> no .env. Esse usuário precisa ter permissão <strong>a partir da VPS</strong> (não vale só <code>root@localhost</code>). O sistema cria o banco, o usuário, aplica o schema e roda as migrations.</p>
+                    <p class="text-xs text-slate-500 mt-1">Já vem marcado na escola nova. O nome do banco acompanha o slug. Requer <code>DB_ADMIN_USER</code> e <code>DB_ADMIN_PASS</code> no .env, com permissão a partir da VPS.</p>
                 </div>
                 <?php endif; ?>
             </div>
@@ -202,6 +206,31 @@
     var campoSlug = document.getElementById('campo_slug');
     var campoDominio = document.getElementById('campo_dominio');
     var previewUrl = document.getElementById('preview_url_escola');
+    var criarNova = <?= empty($escola['id']) ? 'true' : 'false' ?>;
+    var campoBanco = document.getElementById('db_nome_banco');
+    var campoUsuario = document.getElementById('db_usuario');
+    var bancoAuto = campoBanco ? campoBanco.value : '';
+    var usuarioAuto = campoUsuario ? campoUsuario.value : '';
+
+    function identificadorDoSlug() {
+        var slug = (campoSlug && campoSlug.value || '').trim().toLowerCase().replace(/[^a-z0-9\-]/g, '');
+        return slug.replace(/-/g, '_').slice(0, 48);
+    }
+
+    function preencherBancoPeloSlug() {
+        if (!criarNova) return;
+        var base = identificadorDoSlug();
+        if (!base) return;
+        var nome = 'educatudo_' + base;
+        if (campoBanco && (campoBanco.value.trim() === '' || campoBanco.value === bancoAuto)) {
+            campoBanco.value = nome;
+            bancoAuto = nome;
+        }
+        if (campoUsuario && (campoUsuario.value.trim() === '' || campoUsuario.value === usuarioAuto)) {
+            campoUsuario.value = nome;
+            usuarioAuto = nome;
+        }
+    }
 
     function atualizarPreviewUrl() {
         if (!previewUrl) return;
@@ -222,7 +251,11 @@
             atualizarPreviewUrl();
         });
     }
-    if (campoSlug) campoSlug.addEventListener('input', atualizarPreviewUrl);
+    if (campoSlug) campoSlug.addEventListener('input', function() {
+        atualizarPreviewUrl();
+        preencherBancoPeloSlug();
+    });
+    preencherBancoPeloSlug();
     if (campoDominio) campoDominio.addEventListener('input', atualizarPreviewUrl);
     atualizarPreviewUrl();
 })();
