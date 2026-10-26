@@ -105,6 +105,7 @@ $pendentes = count($pendentes_list);
         <h3 class="text-lg font-semibold text-slate-800 mb-2">Schema para escola nova</h3>
         <p class="text-sm text-slate-600 mb-4">
             Pega a estrutura deste banco, sem alunos, notas ou qualquer outro dado.
+            Tabela que esta escola não tem, como as da Expo Colag, fica de fora.
             Grava <code class="bg-slate-100 px-1 rounded text-xs">database/educa_core.sql</code> no servidor
             e baixa o mesmo arquivo. A próxima escola criada no Master nasce com este schema.
         </p>

@@ -2117,6 +2117,9 @@ class MasterEscolaDetailController extends BaseController
             $executadasSet = array_fill_keys($migrationsExecutadas, true);
             $schemaPendentes = 0;
             foreach (MysqlProvisioningService::listarArquivosMigrationTenant() as $arquivo) {
+                if (!$this->migrationContaParaSchema((string) $arquivo['file'])) {
+                    continue;
+                }
                 if (!isset($executadasSet[$arquivo['file']])) {
                     $schemaPendentes++;
                 }
@@ -2243,8 +2246,14 @@ class MasterEscolaDetailController extends BaseController
 
     /**
      * Migrations de schema ainda não registradas nesta escola.
-     * Cargas pontuais (importar_dados_*) ficam de fora: não fazem parte do schema base.
+     * Cargas pontuais (importar_dados_*) e a Expo Colag ficam de fora:
+     * tabela que esta escola não tem simplesmente não entra no arquivo.
      */
+    private function migrationContaParaSchema(string $arquivo): bool
+    {
+        return stripos($arquivo, 'expo_colag') === false;
+    }
+
     private function contarMigrationsSchemaPendentes(int $escolaId): ?int
     {
         try {
@@ -2255,6 +2264,9 @@ class MasterEscolaDetailController extends BaseController
             $executadas = array_fill_keys($rows, true);
             $pendentes = 0;
             foreach (MysqlProvisioningService::listarArquivosMigrationTenant() as $arquivo) {
+                if (!$this->migrationContaParaSchema((string) $arquivo['file'])) {
+                    continue;
+                }
                 if (!isset($executadas[$arquivo['file']])) {
                     $pendentes++;
                 }
