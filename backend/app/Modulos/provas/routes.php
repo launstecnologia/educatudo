@@ -47,6 +47,8 @@ $router->post('/admin/provas/blocos/{id}/lancar-notas-coordenacao/desbloquear', 
 $router->get('/admin/provas/blocos/{id}/provas-disponiveis', 'Modulos/provas/TeacherExamController@provasDisponiveisParaVincular');
 $router->post('/admin/provas/blocos/{id}/vincular', 'Modulos/provas/TeacherExamController@vincularProva');
 $router->post('/admin/provas/blocos/{id}/trocar-prova', 'Modulos/provas/TeacherExamController@trocarProva');
+$router->get('/admin/provas/blocos/{id}/provas/{provaId}/modificar-notas', 'Modulos/provas/TeacherExamController@modificarNotasOnline');
+$router->post('/admin/provas/blocos/{id}/provas/{provaId}/modificar-notas', 'Modulos/provas/TeacherExamController@salvarModificarNotasOnline');
 $router->get('/admin/provas/blocos/{id}/visualizar-completo', 'Modulos/provas/TeacherExamController@visualizarCompleto');
 $router->get('/admin/provas/blocos/{id}/imprimir', 'Modulos/provas/ExamController@verImpressaoBlocoCompleto');
 $router->get('/admin/provas/blocos/{id}/pdf-completo', 'Modulos/provas/ExamController@gerarPdfBlocoCompleto');

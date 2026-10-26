@@ -541,47 +541,59 @@ $statusLabelsOnline = [
                         <?= (int) ($prova['numero_questoes'] ?? 0) ?>
                     </td>
                     <td class="px-6 py-3 text-right">
-                        <div class="inline-flex flex-wrap justify-end gap-2">
-                            <?php if (!empty($prova['prova_id'])): ?>
-                                <a href="<?= URL ?>/admin/provas/visualizar/<?= (int) $prova['prova_id'] ?>"
-                                   class="inline-flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700">
-                                    <i class="fa-solid fa-eye" aria-hidden="true"></i>
-                                    Ver prova
-                                </a>
-                                <?php if (!empty($prova['professor_id']) && !empty($prova['materia_id'])): ?>
-                                <button type="button"
-                                        onclick="abrirModalTrocar(<?= (int) $bloco['id'] ?>, <?= (int) $prova['professor_id'] ?>, <?= (int) $prova['materia_id'] ?>, '<?= htmlspecialchars(addslashes((string) ($prova['professor_nome'] ?? '')), ENT_QUOTES) ?>', '<?= htmlspecialchars(addslashes((string) ($prova['materia_nome'] ?? '')), ENT_QUOTES) ?>', <?= (int) $prova['prova_id'] ?>)"
-                                        class="inline-flex items-center gap-1.5 bg-amber-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-amber-700">
-                                    <i class="fa-solid fa-right-left" aria-hidden="true"></i>
-                                    Trocar
-                                </button>
-                                <?php endif; ?>
-                            <?php endif; ?>
-
-                            <?php if ($podeAprovarReprovar): ?>
-                                <button type="button" onclick="aprovarProva(<?= (int) $prova['prova_id'] ?>)"
-                                        class="inline-flex items-center gap-1.5 bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-green-700">
-                                    <i class="fa-solid fa-check" aria-hidden="true"></i>
-                                    Aprovar
-                                </button>
-                                <button type="button" onclick="reprovarProva(<?= (int) $prova['prova_id'] ?>)"
-                                        class="inline-flex items-center gap-1.5 bg-red-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-700">
-                                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-                                    Reprovar
-                                </button>
-                            <?php elseif (($prova['status'] ?? '') === 'nao_enviada'): ?>
-                                <?php if (!empty($prova['professor_id']) && !empty($prova['materia_id'])): ?>
-                                <button type="button"
-                                        onclick="abrirModalVincular(<?= (int) $bloco['id'] ?>, <?= (int) $prova['professor_id'] ?>, <?= (int) $prova['materia_id'] ?>, '<?= htmlspecialchars(addslashes((string) ($prova['professor_nome'] ?? '')), ENT_QUOTES) ?>', '<?= htmlspecialchars(addslashes((string) ($prova['materia_nome'] ?? '')), ENT_QUOTES) ?>')"
-                                        class="btn-primary-custom inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold hover:opacity-90">
-                                    <i class="fa-solid fa-link" aria-hidden="true"></i>
-                                    Vincular
-                                </button>
-                                <?php else: ?>
-                                <span class="text-sm text-gray-400 italic">Aguardando criação</span>
-                                <?php endif; ?>
-                            <?php endif; ?>
-                        </div>
+                        <?php ob_start(); ?>
+                        <?php if (!empty($prova['prova_id'])): ?>
+                        <a href="<?= URL ?>/admin/provas/visualizar/<?= (int) $prova['prova_id'] ?>"
+                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="fa-solid fa-eye text-gray-400 w-4 text-center" aria-hidden="true"></i>
+                            Ver prova
+                        </a>
+                        <?php if (!empty($prova['professor_id']) && !empty($prova['materia_id'])): ?>
+                        <button type="button"
+                                onclick="abrirModalTrocar(<?= (int) $bloco['id'] ?>, <?= (int) $prova['professor_id'] ?>, <?= (int) $prova['materia_id'] ?>, '<?= htmlspecialchars(addslashes((string) ($prova['professor_nome'] ?? '')), ENT_QUOTES) ?>', '<?= htmlspecialchars(addslashes((string) ($prova['materia_nome'] ?? '')), ENT_QUOTES) ?>', <?= (int) $prova['prova_id'] ?>)"
+                                class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="fa-solid fa-right-left text-gray-400 w-4 text-center" aria-hidden="true"></i>
+                            Trocar
+                        </button>
+                        <?php endif; ?>
+                        <a href="<?= URL ?>/admin/provas/blocos/<?= (int) $bloco['id'] ?>/provas/<?= (int) $prova['prova_id'] ?>/modificar-notas"
+                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="fa-solid fa-pen-to-square text-gray-400 w-4 text-center" aria-hidden="true"></i>
+                            Modificar nota
+                        </a>
+                        <?php endif; ?>
+                        <?php if ($podeAprovarReprovar): ?>
+                        <button type="button" onclick="aprovarProva(<?= (int) $prova['prova_id'] ?>)"
+                                class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="fa-solid fa-check text-green-600 w-4 text-center" aria-hidden="true"></i>
+                            Aprovar
+                        </button>
+                        <button type="button" onclick="reprovarProva(<?= (int) $prova['prova_id'] ?>)"
+                                class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                            <i class="fa-solid fa-xmark text-red-400 w-4 text-center" aria-hidden="true"></i>
+                            Reprovar
+                        </button>
+                        <?php elseif (($prova['status'] ?? '') === 'nao_enviada' && !empty($prova['professor_id']) && !empty($prova['materia_id'])): ?>
+                        <button type="button"
+                                onclick="abrirModalVincular(<?= (int) $bloco['id'] ?>, <?= (int) $prova['professor_id'] ?>, <?= (int) $prova['materia_id'] ?>, '<?= htmlspecialchars(addslashes((string) ($prova['professor_nome'] ?? '')), ENT_QUOTES) ?>', '<?= htmlspecialchars(addslashes((string) ($prova['materia_nome'] ?? '')), ENT_QUOTES) ?>')"
+                                class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="fa-solid fa-link text-gray-400 w-4 text-center" aria-hidden="true"></i>
+                            Vincular
+                        </button>
+                        <?php endif; ?>
+                        <?php $row_actions_dropdown_items = trim(ob_get_clean()); ?>
+                        <?php if ($row_actions_dropdown_items === ''): ?>
+                        <span class="text-sm text-gray-400 italic">Aguardando criação</span>
+                        <?php else: ?>
+                        <?php
+                        $sufixoAcao = !empty($prova['prova_id'])
+                            ? (string) (int) $prova['prova_id']
+                            : ((int) ($prova['professor_id'] ?? 0) . '-' . (int) ($prova['materia_id'] ?? 0));
+                        $row_actions_dropdown_id = 'row-actions-online-' . $sufixoAcao;
+                        $row_actions_dropdown_menu_class = 'w-52';
+                        include __DIR__ . '/../../../../../Views/admin/_partials/row_actions_dropdown.php';
+                        ?>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -617,6 +629,13 @@ $statusLabelsOnline = [
 </div>
 
 <script>
+document.querySelectorAll('[data-dropdown-menu] button, [data-dropdown-menu] a').forEach(function (el) {
+    el.addEventListener('click', function () {
+        document.querySelectorAll('[data-dropdown-menu]').forEach(function (menu) {
+            menu.classList.add('hidden');
+        });
+    });
+});
 var modalVincularBlocoId = null;
 var modalVincularProvaAtualId = null;
 

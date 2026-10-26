@@ -18,6 +18,7 @@ use App\Models\Exams\ExamBlockManualGrade;
 use App\Modulos\EducaInclui\Services\MascaraResolver;
 use App\Core\PeriodoLetivo;
 use App\Models\Exams\TeacherExam;
+use App\Modulos\Provas\Services\ModificarNotaProvaOnlineService;
 
 class TeacherExamController extends BaseController
 {
@@ -3684,6 +3685,104 @@ class TeacherExamController extends BaseController
             'evento_descricao' => $eventoDescricao,
             'flash_importacao_notas' => $flash,
         ];
+    }
+
+    /**
+     * Coordenação: acertos e nota de uma prova online do bloco.
+     */
+    public function modificarNotasOnline($blocoId, $provaId)
+    {
+        $user = $this->authManager->getUser();
+        if (!in_array($user['tipo'] ?? '', ['admin', 'admin_escola'], true)) {
+            $this->redirectToCorrectDashboard($user['tipo'] ?? '');
+            return;
+        }
+
+        $blocoId = (int) $blocoId;
+        $provaId = (int) $provaId;
+        $bloco = $this->blocoModel->findById($blocoId);
+        if (!$bloco) {
+            $this->redirect('/admin/provas');
+            return;
+        }
+
+        try {
+            $dados = (new ModificarNotaProvaOnlineService($this->db))->montar($blocoId, $provaId);
+        } catch (\Exception $e) {
+            error_log('modificarNotasOnline: ' . $e->getMessage());
+            $this->redirect('/admin/provas/blocos/' . $blocoId . '/gerenciar');
+            return;
+        }
+
+        $flash = $_SESSION['flash_modificar_nota'] ?? null;
+        unset($_SESSION['flash_modificar_nota']);
+
+        $this->viewWithLayout('admin', 'admin/exams/blocks/modificar-notas', [
+            'title' => 'Modificar notas - EducaTudo',
+            'user' => $user,
+            'bloco' => $bloco,
+            'prova' => $dados['prova'],
+            'questoes' => $dados['questoes'],
+            'alunos' => $dados['alunos'],
+            'historico' => $dados['historico'],
+            'flash' => is_array($flash) ? $flash : null,
+            'csrf_token' => $this->generateCsrfToken(),
+            'current_page' => 'provas_blocos',
+        ]);
+    }
+
+    /**
+     * Grava acertos alterados depois de senha, motivo e ciência.
+     */
+    public function salvarModificarNotasOnline($blocoId, $provaId)
+    {
+        $user = $this->authManager->getUser();
+        if (!in_array($user['tipo'] ?? '', ['admin', 'admin_escola'], true)) {
+            $this->json(['error' => 'Não autorizado'], 403);
+        }
+
+        $input = json_decode((string) file_get_contents('php://input'), true);
+        if (!is_array($input)) {
+            $input = $_POST;
+        }
+        if (!$this->verifyCsrfToken((string) ($input['_token'] ?? ''))) {
+            $this->json(['error' => 'Token inválido. Recarregue a página.'], 400);
+        }
+
+        $ciente = $input['ciente'] ?? false;
+        if ($ciente !== true && $ciente !== 1 && $ciente !== '1') {
+            $this->json(['error' => 'Confirme que está ciente de que está alterando uma nota.'], 400);
+        }
+        $observacao = trim((string) ($input['observacao'] ?? ''));
+        if (mb_strlen($observacao) < 10) {
+            $this->json(['error' => 'Descreva o motivo da alteração (mínimo de 10 caracteres).'], 400);
+        }
+        if (!$this->verificarSenhaUsuarioLogado($user, (string) ($input['senha'] ?? ''))) {
+            $this->json(['error' => 'Senha inválida.'], 400);
+        }
+
+        try {
+            $resultado = (new ModificarNotaProvaOnlineService($this->db))->aplicar(
+                (int) $blocoId,
+                (int) $provaId,
+                is_array($input['alteracoes'] ?? null) ? $input['alteracoes'] : [],
+                $user,
+                $observacao,
+                (string) ($input['escopo'] ?? 'manual'),
+                substr((string) ($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45)
+            );
+        } catch (\InvalidArgumentException $e) {
+            $this->json(['error' => $e->getMessage()], 400);
+        } catch (\Throwable $e) {
+            error_log('salvarModificarNotasOnline: ' . $e->getMessage());
+            $this->json(['error' => 'Não foi possível salvar a alteração.'], 500);
+        }
+
+        $_SESSION['flash_modificar_nota'] = [
+            'type' => 'success',
+            'message' => $resultado['mensagem'],
+        ];
+        $this->json(['success' => true, 'message' => $resultado['mensagem']]);
     }
 }
 

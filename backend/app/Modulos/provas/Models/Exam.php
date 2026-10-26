@@ -1280,22 +1280,32 @@ class Exam
     }
     
     /**
-     * Recalcula nota da prova após correção manual
+     * Recalcula e grava a nota da realização a partir das respostas e das questões invalidadas.
      */
-    private function recalcularNota($provaId, $alunoId)
+    public function recalcularNotaAluno($provaId, $alunoId): float
     {
         $notaTotal = $this->calcularNotaComQuestoesInvalidas($provaId, $alunoId);
-        
+
         $realizacao = $this->getRealizacao($provaId, $alunoId);
         if ($realizacao) {
             $this->db->update(
                 "UPDATE provas_realizacoes SET nota = :nota WHERE id = :id",
                 [
                     'nota' => $notaTotal,
-                    'id' => $realizacao['id']
+                    'id' => $realizacao['id'],
                 ]
             );
         }
+
+        return $notaTotal;
+    }
+
+    /**
+     * Recalcula nota da prova após correção manual
+     */
+    private function recalcularNota($provaId, $alunoId)
+    {
+        $this->recalcularNotaAluno($provaId, $alunoId);
     }
 
     /**
