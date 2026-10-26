@@ -99,6 +99,37 @@ $pendentes = count($pendentes_list);
     </div>
 
     <?php
+    $schemaPendentes = $schema_pendentes ?? null;
+    ?>
+    <div class="bg-white rounded-xl shadow border border-slate-200 p-6">
+        <h3 class="text-lg font-semibold text-slate-800 mb-2">Schema para escola nova</h3>
+        <p class="text-sm text-slate-600 mb-4">
+            Pega a estrutura deste banco, sem alunos, notas ou qualquer outro dado.
+            Grava <code class="bg-slate-100 px-1 rounded text-xs">database/educa_core.sql</code> no servidor
+            e baixa o mesmo arquivo. A próxima escola criada no Master nasce com este schema.
+        </p>
+        <?php if ($connection_ok !== true): ?>
+        <p class="text-sm text-amber-800">Conecte o banco desta escola antes de pegar o schema.</p>
+        <?php elseif ($schemaPendentes === null): ?>
+        <p class="text-sm text-amber-800">Não foi possível conferir as migrations. O schema fica bloqueado até essa conferência.</p>
+        <?php elseif ($schemaPendentes > 0): ?>
+        <p class="text-sm text-amber-800">Esta escola tem <?= (int) $schemaPendentes ?> migration(ões) de schema pendente(s). Rode as pendentes antes de pegar o schema.</p>
+        <?php else: ?>
+        <form method="post" action="<?= URL ?>/master/escolas/<?= (int) $escola_id ?>/schema" class="space-y-3 max-w-md">
+            <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
+            <div>
+                <label for="confirm_senha_schema" class="block text-sm font-medium text-slate-700 mb-1">Senha de acesso do Master</label>
+                <input type="password" id="confirm_senha_schema" name="confirm_senha" required autocomplete="current-password"
+                       class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <button type="submit" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
+                Baixar schema sem dados
+            </button>
+        </form>
+        <?php endif; ?>
+    </div>
+
+    <?php
     $nomeBancoLimpeza = (string) ($escola['db_nome_banco'] ?? $escola['nome_banco'] ?? '');
     if ($nomeBancoLimpeza === \App\Painel\Master\Services\LimparDadosEscolaEducaService::BANCO_PERMITIDO):
     ?>

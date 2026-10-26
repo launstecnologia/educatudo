@@ -14,8 +14,11 @@ use App\Services\MasterProvasAoVivoService;
 use App\Core\MasterSecretVault;
 use App\Services\MediaStorageService;
 use App\Core\ModuloCatalogo;
+use App\Core\MysqlProvisioningService;
 use App\Painel\Master\Services\LimparDadosEscolaEducaService;
 use App\Painel\Master\Services\MasterFilaService;
+use App\Painel\Master\Services\SchemaTenantService;
+
 if (!class_exists(__NAMESPACE__ . '\\MasterEscolaDetailController', false)) {
 
 class MasterEscolaDetailController extends BaseController
@@ -2109,12 +2112,157 @@ class MasterEscolaDetailController extends BaseController
             }
         }
 
+        $schemaPendentes = null;
+        try {
+            $executadasSet = array_fill_keys($migrationsExecutadas, true);
+            $schemaPendentes = 0;
+            foreach (MysqlProvisioningService::listarArquivosMigrationTenant() as $arquivo) {
+                if (!isset($executadasSet[$arquivo['file']])) {
+                    $schemaPendentes++;
+                }
+            }
+        } catch (\Throwable $e) {
+            $schemaPendentes = null;
+        }
+
         $this->renderDetail($id, 'banco', 'banco', [
             'migration_files'      => $migrationFiles,
             'migrations_executadas'=> $migrationsExecutadas,
             'connection_ok'        => $connectionOk,
             'connection_error'     => $connectionError,
+            'schema_pendentes'     => $schemaPendentes,
         ]);
+    }
+
+    /**
+     * Baixa a estrutura do banco da escola (sem dados) e grava database/educa_core.sql.
+     * Só segue com a senha do master logado e com as migrations de schema em dia.
+     */
+    public function baixarSchema($id)
+    {
+        $this->requireMaster();
+        $id = (int) $id;
+        $volta = '/master/escolas/' . $id . '/banco';
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Sessão expirada. Abra a tela de novo e confirme outra vez.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+
+        $senha = (string) ($_POST['confirm_senha'] ?? '');
+        if ($senha === '') {
+            $this->setFlashMessage('Informe sua senha de acesso para pegar o schema.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+        $bloqueioAte = (int) ($_SESSION['master_schema_senha_ate'] ?? 0);
+        if ($bloqueioAte > time()) {
+            $this->setFlashMessage('Senha incorreta várias vezes. Espere alguns minutos e tente de novo.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+
+        $masterUser = Database::getInstance()->query(
+            'SELECT senha_hash FROM usuarios_master WHERE id = :id AND ativo = 1',
+            ['id' => (int) ($_SESSION[self::SESSION_MASTER_USER_ID] ?? 0)]
+        )->fetch(\PDO::FETCH_ASSOC);
+        if (!$masterUser || !password_verify($senha, (string) ($masterUser['senha_hash'] ?? ''))) {
+            $falhas = (int) ($_SESSION['master_schema_senha_falhas'] ?? 0) + 1;
+            $_SESSION['master_schema_senha_falhas'] = $falhas;
+            if ($falhas >= 5) {
+                $_SESSION['master_schema_senha_ate'] = time() + 600;
+                $_SESSION['master_schema_senha_falhas'] = 0;
+            }
+            $this->setFlashMessage('Senha incorreta. O schema não foi gerado.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+        unset($_SESSION['master_schema_senha_falhas'], $_SESSION['master_schema_senha_ate']);
+
+        $escola = $this->getEscolaOrFail($id);
+        $pendentes = $this->contarMigrationsSchemaPendentes($id);
+        if ($pendentes === null) {
+            $this->setFlashMessage('Não foi possível conferir as migrations desta escola. O schema não foi gerado.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+        if ($pendentes > 0) {
+            $this->setFlashMessage('Esta escola ainda tem migrations pendentes. Rode as pendentes antes de pegar o schema.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+
+        $pdo = $this->connectTenant($escola);
+        if (!$pdo instanceof \PDO) {
+            $this->setFlashMessage('Não foi possível conectar ao banco da escola. O schema não foi gerado.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(120);
+        }
+
+        try {
+            $origem = trim((string) ($escola['nome'] ?? '')) . ' / ' . trim((string) ($escola['db_nome_banco'] ?? ''));
+            $sql = SchemaTenantService::gerar($pdo, $origem);
+        } catch (\Throwable $e) {
+            error_log('[baixarSchema] escola=' . $id . ' ' . $e->getMessage());
+            $this->setFlashMessage('Não foi possível ler o schema desta escola.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+
+        $destino = MysqlProvisioningService::caminhoSchemaBaseTenant();
+        $temporario = $destino . '.tmp.' . bin2hex(random_bytes(4));
+        $gravado = @file_put_contents($temporario, $sql, LOCK_EX);
+        if ($gravado !== strlen($sql) || !@rename($temporario, $destino)) {
+            if (is_file($temporario)) {
+                @unlink($temporario);
+            }
+            $this->setFlashMessage('O schema foi lido, mas não foi possível gravar database/educa_core.sql no servidor.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+        error_log(
+            '[baixarSchema] master=' . (int) ($_SESSION[self::SESSION_MASTER_USER_ID] ?? 0)
+            . ' escola=' . $id
+            . ' bytes=' . strlen($sql)
+        );
+
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/sql; charset=utf-8');
+        header('Content-Disposition: attachment; filename="educa_core.sql"');
+        header('Content-Length: ' . (string) strlen($sql));
+        header('Cache-Control: no-store');
+        echo $sql;
+        exit;
+    }
+
+    /**
+     * Migrations de schema ainda não registradas nesta escola.
+     * Cargas pontuais (importar_dados_*) ficam de fora: não fazem parte do schema base.
+     */
+    private function contarMigrationsSchemaPendentes(int $escolaId): ?int
+    {
+        try {
+            $rows = Database::getInstance()->query(
+                'SELECT migration_name FROM migrations_escolas WHERE escola_id = :escola_id',
+                ['escola_id' => $escolaId]
+            )->fetchAll(\PDO::FETCH_COLUMN);
+            $executadas = array_fill_keys($rows, true);
+            $pendentes = 0;
+            foreach (MysqlProvisioningService::listarArquivosMigrationTenant() as $arquivo) {
+                if (!isset($executadas[$arquivo['file']])) {
+                    $pendentes++;
+                }
+            }
+            return $pendentes;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /**
