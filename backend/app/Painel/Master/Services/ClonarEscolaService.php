@@ -137,8 +137,13 @@ class ClonarEscolaService
         }
 
         $ins = $pdo->prepare(
-            'INSERT INTO escolas (nome, slug, dominio, ativo, dns_status, ssl_status)
-             VALUES (:nome, :slug, :dominio, 0, :dns, :ssl)'
+            'INSERT INTO escolas (
+                nome, slug, dominio, ativo, dns_status, ssl_status,
+                rua, numero, complemento, bairro, cidade, uf, telefone, contato_nome, email
+             ) VALUES (
+                :nome, :slug, :dominio, 0, :dns, :ssl,
+                :rua, :numero, :complemento, :bairro, :cidade, :uf, :telefone, :contato_nome, :email
+             )'
         );
         $ins->execute([
             'nome' => $nome,
@@ -146,6 +151,15 @@ class ClonarEscolaService
             'dominio' => $dominio,
             'dns' => (string) ($domRes['dns_status'] ?? DominioEscolaService::DNS_NAO_CONFIGURADO),
             'ssl' => DominioEscolaService::SSL_NAO_VERIFICADO,
+            'rua' => (string) ($origem['rua'] ?? ''),
+            'numero' => (string) ($origem['numero'] ?? ''),
+            'complemento' => (string) ($origem['complemento'] ?? ''),
+            'bairro' => (string) ($origem['bairro'] ?? ''),
+            'cidade' => (string) ($origem['cidade'] ?? ''),
+            'uf' => (string) ($origem['uf'] ?? ''),
+            'telefone' => (string) ($origem['telefone'] ?? ''),
+            'contato_nome' => (string) ($origem['contato_nome'] ?? ''),
+            'email' => (string) ($origem['email'] ?? ''),
         ]);
         $destinoId = (int) $pdo->lastInsertId();
 
@@ -341,6 +355,7 @@ class ClonarEscolaService
     {
         $st = $pdo->prepare(
             'SELECT e.id, e.nome, e.slug, e.dominio, e.ativo,
+                    e.rua, e.numero, e.complemento, e.bairro, e.cidade, e.uf, e.telefone, e.contato_nome, e.email,
                     b.host, b.porta, b.nome_banco, b.usuario, b.senha_criptografada
                FROM escolas e
                INNER JOIN config_escolas_banco b ON b.escola_id = e.id

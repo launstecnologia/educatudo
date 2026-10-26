@@ -462,6 +462,12 @@ class MasterEscolasController extends BaseController
             header('Location: ' . URL . '/master/escolas/criar');
             exit;
         }
+        $instituicao = $this->dadosInstituicaoDoPost();
+        if ($instituicao['erro'] !== '') {
+            $this->setFlashMessage($instituicao['erro'], 'error');
+            header('Location: ' . URL . '/master/escolas/criar');
+            exit;
+        }
 
         $slug = preg_replace('/[^a-z0-9\-]/', '', strtolower($slug));
         if ($slug === '') {
@@ -494,8 +500,30 @@ class MasterEscolasController extends BaseController
         }
 
         $escolaId = (int) $db->insert(
-            "INSERT INTO escolas (nome, slug, dominio, ativo, dns_status, ssl_status) VALUES (?, ?, ?, ?, ?, ?)",
-            [$nome, $slug, $dominio, $ativo, $dnsStatus, DominioEscolaService::SSL_NAO_VERIFICADO]
+            'INSERT INTO escolas (
+                nome, slug, dominio, ativo, dns_status, ssl_status,
+                rua, numero, complemento, bairro, cidade, uf, telefone, contato_nome, email
+             ) VALUES (
+                :nome, :slug, :dominio, :ativo, :dns_status, :ssl_status,
+                :rua, :numero, :complemento, :bairro, :cidade, :uf, :telefone, :contato_nome, :email
+             )',
+            [
+                'nome' => $nome,
+                'slug' => $slug,
+                'dominio' => $dominio,
+                'ativo' => $ativo,
+                'dns_status' => $dnsStatus,
+                'ssl_status' => DominioEscolaService::SSL_NAO_VERIFICADO,
+                'rua' => $instituicao['rua'],
+                'numero' => $instituicao['numero'],
+                'complemento' => $instituicao['complemento'],
+                'bairro' => $instituicao['bairro'],
+                'cidade' => $instituicao['cidade'],
+                'uf' => $instituicao['uf'],
+                'telefone' => $instituicao['telefone'],
+                'contato_nome' => $instituicao['contato_nome'],
+                'email' => $instituicao['email'],
+            ]
         );
         $this->invalidarCacheResolucaoTenant(['id' => $escolaId, 'slug' => $slug, 'dominio' => $dominio]);
 
@@ -560,7 +588,6 @@ class MasterEscolasController extends BaseController
             }
         }
 
-        $this->saveLayoutFromPost($escolaId);
         try {
             $this->ensureEducaProfTokenForSchool($escolaId, $slug, $nome);
         } catch (\Exception $e) {
@@ -650,6 +677,12 @@ class MasterEscolasController extends BaseController
             header('Location: ' . URL . '/master/escolas/editar?id=' . $id);
             exit;
         }
+        $instituicao = $this->dadosInstituicaoDoPost();
+        if ($instituicao['erro'] !== '') {
+            $this->setFlashMessage($instituicao['erro'], 'error');
+            header('Location: ' . URL . '/master/escolas/editar?id=' . $id);
+            exit;
+        }
         $slug = preg_replace('/[^a-z0-9\-]/', '', strtolower($slug));
         if ($slug === '') {
             $this->setFlashMessage('Slug inválido.', 'error');
@@ -674,8 +707,28 @@ class MasterEscolasController extends BaseController
         }
 
         $db->query(
-            "UPDATE escolas SET nome = ?, slug = ?, dominio = ?, ativo = ?, dns_status = ? WHERE id = ?",
-            [$nome, $slug, $dominio, $ativo, $dnsStatus, $id]
+            'UPDATE escolas SET
+                nome = :nome, slug = :slug, dominio = :dominio, ativo = :ativo, dns_status = :dns_status,
+                rua = :rua, numero = :numero, complemento = :complemento, bairro = :bairro,
+                cidade = :cidade, uf = :uf, telefone = :telefone, contato_nome = :contato_nome, email = :email
+             WHERE id = :id',
+            [
+                'nome' => $nome,
+                'slug' => $slug,
+                'dominio' => $dominio,
+                'ativo' => $ativo,
+                'dns_status' => $dnsStatus,
+                'rua' => $instituicao['rua'],
+                'numero' => $instituicao['numero'],
+                'complemento' => $instituicao['complemento'],
+                'bairro' => $instituicao['bairro'],
+                'cidade' => $instituicao['cidade'],
+                'uf' => $instituicao['uf'],
+                'telefone' => $instituicao['telefone'],
+                'contato_nome' => $instituicao['contato_nome'],
+                'email' => $instituicao['email'],
+                'id' => $id,
+            ]
         );
         $this->invalidarCacheResolucaoTenant($escola);
         $this->invalidarCacheResolucaoTenant(['id' => $id, 'slug' => $slug, 'dominio' => $dominio]);
@@ -762,7 +815,6 @@ class MasterEscolasController extends BaseController
             }
         }
 
-        $this->saveLayoutFromPost($id);
         try {
             $this->ensureEducaProfTokenForSchool($id, $slug, $nome);
         } catch (\Exception $e) {
@@ -1113,6 +1165,62 @@ class MasterEscolasController extends BaseController
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['success' => true] + $result, JSON_UNESCAPED_UNICODE);
         exit;
+    }
+
+    /**
+     * @return array{erro:string,rua:string,numero:string,complemento:string,bairro:string,cidade:string,uf:string,telefone:string,contato_nome:string,email:string}
+     */
+    private function dadosInstituicaoDoPost(): array
+    {
+        $email = $this->textoLimitado('email', 255);
+        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+            return $this->dadosInstituicaoVazios('E-mail da instituição inválido.');
+        }
+        $uf = strtoupper($this->textoLimitado('uf', 2));
+        if ($uf !== '' && preg_match('/^[A-Z]{2}$/', $uf) !== 1) {
+            return $this->dadosInstituicaoVazios('UF inválida.');
+        }
+
+        return [
+            'erro' => '',
+            'rua' => $this->textoLimitado('rua', 255),
+            'numero' => $this->textoLimitado('numero', 20),
+            'complemento' => $this->textoLimitado('complemento', 120),
+            'bairro' => $this->textoLimitado('bairro', 120),
+            'cidade' => $this->textoLimitado('cidade', 120),
+            'uf' => $uf,
+            'telefone' => $this->textoLimitado('telefone', 30),
+            'contato_nome' => $this->textoLimitado('contato_nome', 255),
+            'email' => $email,
+        ];
+    }
+
+    /**
+     * @return array{erro:string,rua:string,numero:string,complemento:string,bairro:string,cidade:string,uf:string,telefone:string,contato_nome:string,email:string}
+     */
+    private function dadosInstituicaoVazios(string $erro): array
+    {
+        return [
+            'erro' => $erro,
+            'rua' => '',
+            'numero' => '',
+            'complemento' => '',
+            'bairro' => '',
+            'cidade' => '',
+            'uf' => '',
+            'telefone' => '',
+            'contato_nome' => '',
+            'email' => '',
+        ];
+    }
+
+    private function textoLimitado(string $campo, int $max): string
+    {
+        $valor = trim((string) ($_POST[$campo] ?? ''));
+        if (function_exists('mb_substr')) {
+            return mb_substr($valor, 0, $max);
+        }
+        return substr($valor, 0, $max);
     }
 }
 
