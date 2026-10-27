@@ -110,10 +110,8 @@ class LexLoginService
             $config['client_id'],
             $base . '/sso'
         );
-        if ($claims === [] || self::identificadoresEscola($claims) === []) {
-            $info = $cliente->getJson($base . '/sso/connect/userinfo', $tokens['access_token'], 20);
-            $claims = self::completarClaims($claims, $info);
-        }
+        $info = $cliente->getJson($base . '/sso/connect/userinfo', $tokens['access_token'], 20);
+        $claims = self::completarClaims($claims, $info);
 
         $vinculo = self::localizar(Database::getInstance()->getPdo(), $claims, self::PERFIS[$perfil]);
         if ($vinculo === null) {
@@ -172,6 +170,13 @@ class LexLoginService
             }
         }
 
+        $email = strtolower(trim((string) ($claims['email'] ?? '')));
+        if ($email !== '') {
+            foreach (self::locaisPorEmail($tenant, $tipoEntidade, $email) as $local) {
+                $encontrados[$local] = true;
+            }
+        }
+
         if (count($encontrados) !== 1) {
             return null;
         }
@@ -191,23 +196,7 @@ class LexLoginService
     }
 
     /**
-     * @param array<string,mixed> $claims
-     * @return array<string,string>
-     */
-    private static function identificadoresEscola(array $claims): array
-    {
-        $ids = [];
-        foreach (['user_id', 'account_id', 'accountId'] as $chave) {
-            $valor = trim((string) ($claims[$chave] ?? ''));
-            if ($valor !== '') {
-                $ids[$chave] = $valor;
-            }
-        }
-        return $ids;
-    }
-
-    /**
-     * O id_token prova o login. O userinfo traz user_id e account_id da escola.
+     * O id_token prova o login. O userinfo traz user_id, account_id e e-mail.
      *
      * @param array<string,mixed> $claims
      * @param array<string,mixed> $info
@@ -223,7 +212,7 @@ class LexLoginService
         if ($claims === []) {
             return $info;
         }
-        foreach (['user_id', 'account_id', 'accountId'] as $chave) {
+        foreach (['user_id', 'account_id', 'accountId', 'email'] as $chave) {
             $valor = trim((string) ($info[$chave] ?? ''));
             if ($valor !== '' && trim((string) ($claims[$chave] ?? '')) === '') {
                 $claims[$chave] = $valor;
@@ -280,6 +269,43 @@ class LexLoginService
             }
         }
         return false;
+    }
+
+    /**
+     * O id do sync e o id da tela da LEX nem sempre são o mesmo. O e-mail é o elo.
+     *
+     * @return list<int>
+     */
+    private static function locaisPorEmail(\PDO $tenant, string $tipoEntidade, string $email): array
+    {
+        $tabelas = [
+            'aluno' => 'alunos',
+            'professor' => 'professores',
+            'responsavel' => 'responsaveis',
+            'usuario' => 'usuarios',
+        ];
+        $tabela = $tabelas[$tipoEntidade] ?? '';
+        if ($tabela === '') {
+            return [];
+        }
+
+        $filtroTipo = $tipoEntidade === 'usuario' ? " AND pessoa.tipo = 'admin_escola'" : '';
+        $st = $tenant->prepare(
+            "SELECT vinculo.id_local
+               FROM lex_vinculos vinculo
+               INNER JOIN {$tabela} pessoa ON pessoa.id = vinculo.id_local AND pessoa.ativo = 1
+              WHERE vinculo.tipo_entidade = :tipo
+                AND vinculo.status = 'ativo'
+                AND LOWER(pessoa.email) = :email{$filtroTipo}"
+        );
+        $st->execute(['tipo' => $tipoEntidade, 'email' => $email]);
+        $locais = [];
+        foreach ($st->fetchAll(\PDO::FETCH_COLUMN) as $local) {
+            if ((int) $local > 0) {
+                $locais[] = (int) $local;
+            }
+        }
+        return $locais;
     }
 
     private static function tipoSessao(string $tipoEntidade): string

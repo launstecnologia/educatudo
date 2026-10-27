@@ -34,6 +34,21 @@ class LexLoginTest extends TestCase
         $this->assertNull($claimIdIgnorado);
     }
 
+    public function testLocalizaPeloEmailQuandoOIdDaLexNaoConfere(): void
+    {
+        $pdo = $this->banco();
+        $pdo->exec('CREATE TABLE alunos (id INTEGER, email TEXT, ativo INTEGER)');
+        $pdo->exec("INSERT INTO alunos (id, email, ativo) VALUES (7, 'educatudo.familia1.aluno@educa.tudo', 1)");
+        $pdo->exec("INSERT INTO lex_vinculos (tipo_entidade, id_local, id_lex, account_id, status) VALUES ('aluno', 7, 'user-1', 'acc-1', 'ativo')");
+
+        $porEmail = LexLoginService::localizar($pdo, [
+            'sub' => '82bf3094-5c0f-4a0a-a874-9777d0edc322',
+            'email' => 'educatudo.familia1.aluno@educa.tudo',
+        ], 'aluno');
+
+        $this->assertSame(7, $porEmail['id_local']);
+    }
+
     public function testRecusaQuandoDoisVinculosBatem(): void
     {
         $pdo = $this->banco();
