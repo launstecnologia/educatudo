@@ -117,6 +117,11 @@ $router->get('/master/escolas/{id}/links-uteis', 'Master/MasterEscolaDetailContr
 $router->post('/master/escolas/{id}/links-uteis', 'Master/MasterEscolaDetailController@linksUteisSalvar');
 $router->get('/master/escolas/{id}/apps-externos', 'Master/MasterEscolaDetailController@appsExternos');
 $router->post('/master/escolas/{id}/apps-externos', 'Master/MasterEscolaDetailController@appsExternosSalvar');
+$router->get('/master/escolas/{id}/lex', 'Master/MasterLexController@index');
+$router->post('/master/escolas/{id}/lex', 'Master/MasterLexController@salvar');
+$router->post('/master/escolas/{id}/lex/testar', 'Master/MasterLexController@testar');
+$router->post('/master/escolas/{id}/lex/simular', 'Master/MasterLexController@simular');
+$router->post('/master/escolas/{id}/lex/sincronizar', 'Master/MasterLexController@sincronizar');
 $router->get('/master/escolas/{id}/prompts', 'Master/MasterEscolaDetailController@prompts');
 $router->post('/master/escolas/{id}/prompts', 'Master/MasterEscolaDetailController@promptsSalvar');
 $router->get('/master/entrar-como', 'Master/MasterEscolaDetailController@entrarComo');

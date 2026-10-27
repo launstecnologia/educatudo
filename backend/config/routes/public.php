@@ -80,6 +80,8 @@ $router->get('/uploads/jornadas/exercicios/{filename}', 'Education/ServeImagemEx
 // Imagem de questão (provas) – rota pública para <img> no editor e na prova
 
 // Rotas de autenticação
+$router->get('/lex/entrar', 'Modulos/lex/LexLoginController@entrar');
+$router->get('/lex/retorno', 'Modulos/lex/LexLoginController@retorno');
 $router->get('/login/csrf-token', 'Auth/AuthController@getLoginCsrfTokenJson');
 $router->get('/login', 'Auth/AuthController@loginAluno');
 $router->post('/login', 'Auth/AuthController@autenticar');

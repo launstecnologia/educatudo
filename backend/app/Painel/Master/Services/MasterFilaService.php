@@ -18,6 +18,7 @@ class MasterFilaService
 {
     public const TIPO_CLONAR_ESCOLA = 'clonar_escola';
     public const TIPO_MIGRATION_ESCOLA = 'migration_escola';
+    public const TIPO_LEX_SINCRONIZAR = 'lex_sincronizar';
     public const MAX_TENTATIVAS = 2;
     public const STALE_MINUTOS = 120;
 
@@ -525,6 +526,17 @@ class MasterFilaService
         }
         if ($tipo === self::TIPO_MIGRATION_ESCOLA) {
             return self::executarMigrationEscola($payload);
+        }
+        if ($tipo === self::TIPO_LEX_SINCRONIZAR) {
+            $pdo = self::masterPdo();
+            if (!$pdo instanceof \PDO) {
+                throw new \RuntimeException('Não foi possível conectar ao banco master.');
+            }
+            return \App\Modulos\Lex\Services\LexSincronizacaoService::executar(
+                $pdo,
+                (int) ($payload['escola_id'] ?? 0),
+                (string) ($payload['modo'] ?? '')
+            );
         }
         throw new \RuntimeException('Tipo de job desconhecido: ' . $tipo);
     }

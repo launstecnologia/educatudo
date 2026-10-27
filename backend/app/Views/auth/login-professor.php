@@ -109,6 +109,9 @@ $system_subtitle = \App\Core\LayoutHelper::getSystemSubtitle();
                     </button>
                 </div>
             </form>
+            <?php if (!empty($lex_login)): ?>
+                <?php include __DIR__ . '/partials/botao_lex.php'; ?>
+            <?php endif; ?>
             
             <!-- Formulário de Alteração de Senha (inicialmente oculto) -->
             <div id="passwordChangeForm" class="hidden space-y-4 md:space-y-6">

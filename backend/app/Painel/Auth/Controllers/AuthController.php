@@ -16,6 +16,7 @@ use App\Core\LayoutHelper;
 use App\Core\Logger;
 use App\Core\RedisCache;
 use App\Helpers\StudentFormHelper;
+use App\Modulos\Lex\Services\LexLoginService;
 if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
     class AuthController extends BaseController
 {
@@ -61,6 +62,8 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
             'title' => $titles[$tipo] ?? 'Login - EducaTudo',
             'csrf_token' => $token,
             'flash' => $this->getFlashMessage(),
+            'lex_login' => $tipo !== 'monitor' && LexLoginService::disponivel(),
+            'lex_perfil' => $tipo,
         ];
         $this->view($viewName, $data);
     }

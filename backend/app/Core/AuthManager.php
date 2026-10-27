@@ -123,6 +123,85 @@ class AuthManager
             throw $e;
         }
     }
+
+    /**
+     * Abre a sessão de um cadastro já confirmado pela LEX. Não aceita senha.
+     */
+    public function entrarPorLex(string $tipo, int $id): void
+    {
+        if ($id < 1) {
+            throw new \Exception('Conta LEX inválida.');
+        }
+        $user = null;
+        if ($tipo === 'aluno') {
+            $aluno = $this->db->fetch(
+                "SELECT a.*, t.nome AS turma_nome
+                   FROM alunos a
+                   LEFT JOIN turmas t ON a.turma_id = t.id
+                  WHERE a.id = :id AND a.ativo = 1",
+                ['id' => $id]
+            );
+            if ($aluno) {
+                $user = [
+                    'id' => $aluno['id'],
+                    'nome' => StudentFormHelper::nomeExibicao($aluno),
+                    'email' => $aluno['email'],
+                    'ra' => $aluno['ra'],
+                    'turma_id' => $aluno['turma_id'],
+                    'turma_nome' => $aluno['turma_nome'],
+                    'serie' => $aluno['serie'],
+                    'tipo' => 'aluno',
+                ];
+            }
+        } elseif ($tipo === 'admin') {
+            $admin = $this->db->fetch(
+                "SELECT * FROM usuarios WHERE id = :id AND tipo = 'admin_escola' AND ativo = 1",
+                ['id' => $id]
+            );
+            if ($admin) {
+                $user = [
+                    'id' => $admin['id'],
+                    'nome' => $admin['nome'],
+                    'email' => $admin['email'],
+                    'perfil_admin' => $admin['perfil_admin'],
+                    'avatar_url' => $admin['avatar_url'] ?? null,
+                    'tipo' => 'admin',
+                ];
+            }
+        } elseif ($tipo === 'professor') {
+            $professor = $this->db->fetch(
+                'SELECT * FROM professores WHERE id = :id AND ativo = 1',
+                ['id' => $id]
+            );
+            if ($professor) {
+                $user = [
+                    'id' => $professor['id'],
+                    'nome' => $professor['nome'],
+                    'email' => $professor['email'],
+                    'tipo' => 'professor',
+                ];
+            }
+        } elseif ($tipo === 'pai') {
+            $pai = $this->db->fetch(
+                'SELECT * FROM responsaveis WHERE id = :id AND ativo = 1',
+                ['id' => $id]
+            );
+            if ($pai) {
+                $user = [
+                    'id' => $pai['id'],
+                    'nome' => $pai['nome'],
+                    'email' => $pai['email'] ?? '',
+                    'telefone' => $pai['telefone'] ?? '',
+                    'tipo' => 'pai',
+                    'must_change_password' => 0,
+                ];
+            }
+        }
+        if ($user === null) {
+            throw new \Exception('Esta conta LEX ainda não foi sincronizada nesta escola.');
+        }
+        $this->createSession($user, $user['tipo']);
+    }
     
     /**
      * Autenticar admin (usa tabela usuarios)

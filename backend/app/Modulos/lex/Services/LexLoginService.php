@@ -1,0 +1,304 @@
+<?php
+
+namespace App\Modulos\Lex\Services;
+
+use App\Core\Database;
+
+/**
+ * Inicia o login da pessoa na LEX (authorization code + PKCE).
+ * O token client_credentials da sincronização não vira sessão.
+ */
+class LexLoginService
+{
+    public const ESCOPOS = 'openid profile offline_access';
+
+    /** @var array<string, string> */
+    private const PERFIS = [
+        'aluno' => 'aluno',
+        'admin' => 'usuario',
+        'professor' => 'professor',
+        'pais' => 'responsavel',
+    ];
+
+    public static function perfilValido(string $perfil): bool
+    {
+        return isset(self::PERFIS[$perfil]);
+    }
+
+    public static function disponivel(): bool
+    {
+        if (!defined('TENANT_ID') || (int) TENANT_ID < 1) {
+            return false;
+        }
+        try {
+            $config = self::configuracao();
+        } catch (\Throwable $e) {
+            return false;
+        }
+        return $config !== null && $config['ativo'] && $config['client_id'] !== '' && $config['tem_segredo'];
+    }
+
+    /**
+     * @return array{url:string,state:string,verifier:string,nonce:string}
+     */
+    public static function iniciar(string $perfil, string $redirectUri): array
+    {
+        if (!self::perfilValido($perfil)) {
+            throw new \RuntimeException('Painel de login inválido.');
+        }
+        $config = self::configuracao();
+        if ($config === null || !$config['ativo'] || $config['client_id'] === '') {
+            throw new \RuntimeException('A integração LEX não está ativa nesta escola.');
+        }
+
+        $verifier = self::aleatorio(64);
+        $state = self::aleatorio(32);
+        $nonce = self::aleatorio(32);
+        $parametros = [
+            'response_type' => 'code',
+            'client_id' => $config['client_id'],
+            'redirect_uri' => $redirectUri,
+            'code_challenge_method' => 'S256',
+            'code_challenge' => self::desafio($verifier),
+            'scope' => self::ESCOPOS,
+            'state' => $state,
+            'nonce' => $nonce,
+        ];
+
+        return [
+            'url' => LexAutenticacaoService::urlBase($config['ambiente']) . '/sso/connect/authorize?' . http_build_query($parametros, '', '&', PHP_QUERY_RFC3986),
+            'state' => $state,
+            'verifier' => $verifier,
+            'nonce' => $nonce,
+        ];
+    }
+
+    /**
+     * @param array{state:string,verifier:string,nonce:string,perfil:string,expira:int} $sessao
+     * @return array{tipo:string,id_local:int}
+     */
+    public static function concluir(array $sessao, string $code, string $state, string $redirectUri): array
+    {
+        if (!hash_equals((string) ($sessao['state'] ?? ''), $state)) {
+            throw new \RuntimeException('O retorno da LEX não confere com o início do login.');
+        }
+        if ((int) ($sessao['expira'] ?? 0) < time()) {
+            throw new \RuntimeException('O login da LEX expirou. Tente de novo.');
+        }
+        $perfil = (string) ($sessao['perfil'] ?? '');
+        if (!self::perfilValido($perfil)) {
+            throw new \RuntimeException('Painel de login inválido.');
+        }
+        $config = self::configuracao();
+        if ($config === null || !$config['ativo'] || !$config['tem_segredo'] || $config['client_id'] === '') {
+            throw new \RuntimeException('A integração LEX não está ativa nesta escola.');
+        }
+
+        $cliente = new LexClienteHttp();
+        $base = LexAutenticacaoService::urlBase($config['ambiente']);
+        $tokens = $cliente->trocarCodigoAutorizacao(
+            $base,
+            $config['client_id'],
+            $config['client_secret'],
+            $code,
+            $redirectUri,
+            (string) $sessao['verifier']
+        );
+        $claims = self::claims(
+            $tokens['id_token'],
+            (string) $sessao['nonce'],
+            $config['client_id'],
+            $base . '/sso'
+        );
+        if ($claims === [] || self::identificadoresEscola($claims) === []) {
+            $info = $cliente->getJson($base . '/sso/connect/userinfo', $tokens['access_token'], 20);
+            $claims = self::completarClaims($claims, $info);
+        }
+
+        $vinculo = self::localizar(Database::getInstance()->getPdo(), $claims, self::PERFIS[$perfil]);
+        if ($vinculo === null) {
+            throw new \RuntimeException('Esta conta LEX ainda não foi sincronizada neste painel.');
+        }
+        return $vinculo;
+    }
+
+    public static function desafio(string $verifier): string
+    {
+        return self::base64Url(hash('sha256', $verifier, true));
+    }
+
+    /**
+     * @param array<string,mixed> $claims
+     * @return array{tipo:string,id_local:int}|null
+     */
+    public static function localizar(\PDO $tenant, array $claims, string $tipoEntidade): ?array
+    {
+        if (self::tipoSessao($tipoEntidade) === '') {
+            return null;
+        }
+
+        $encontrados = [];
+        $porIdLex = $tenant->prepare(
+            "SELECT id_local FROM lex_vinculos
+              WHERE tipo_entidade = :tipo AND status = 'ativo' AND id_lex = :id"
+        );
+        foreach (['sub', 'user_id'] as $chave) {
+            $valor = trim((string) ($claims[$chave] ?? ''));
+            if ($valor === '') {
+                continue;
+            }
+            $porIdLex->execute(['tipo' => $tipoEntidade, 'id' => $valor]);
+            foreach ($porIdLex->fetchAll(\PDO::FETCH_COLUMN) as $local) {
+                if ((int) $local > 0) {
+                    $encontrados[(int) $local] = true;
+                }
+            }
+        }
+
+        $porConta = $tenant->prepare(
+            "SELECT id_local FROM lex_vinculos
+              WHERE tipo_entidade = :tipo AND status = 'ativo' AND account_id = :account"
+        );
+        foreach (['account_id', 'accountId'] as $chave) {
+            $valor = trim((string) ($claims[$chave] ?? ''));
+            if ($valor === '') {
+                continue;
+            }
+            $porConta->execute(['tipo' => $tipoEntidade, 'account' => $valor]);
+            foreach ($porConta->fetchAll(\PDO::FETCH_COLUMN) as $local) {
+                if ((int) $local > 0) {
+                    $encontrados[(int) $local] = true;
+                }
+            }
+        }
+
+        if (count($encontrados) !== 1) {
+            return null;
+        }
+
+        return ['tipo' => self::tipoSessao($tipoEntidade), 'id_local' => (int) array_key_first($encontrados)];
+    }
+
+    /**
+     * @return array<string,mixed>|null
+     */
+    private static function configuracao(): ?array
+    {
+        if (!defined('TENANT_ID') || (int) TENANT_ID < 1) {
+            return null;
+        }
+        return LexSincronizacaoService::lerConfig(Database::createMasterPdo(), (int) TENANT_ID);
+    }
+
+    /**
+     * @param array<string,mixed> $claims
+     * @return array<string,string>
+     */
+    private static function identificadoresEscola(array $claims): array
+    {
+        $ids = [];
+        foreach (['user_id', 'account_id', 'accountId'] as $chave) {
+            $valor = trim((string) ($claims[$chave] ?? ''));
+            if ($valor !== '') {
+                $ids[$chave] = $valor;
+            }
+        }
+        return $ids;
+    }
+
+    /**
+     * O id_token prova o login. O userinfo traz user_id e account_id da escola.
+     *
+     * @param array<string,mixed> $claims
+     * @param array<string,mixed> $info
+     * @return array<string,mixed>
+     */
+    private static function completarClaims(array $claims, array $info): array
+    {
+        $subToken = trim((string) ($claims['sub'] ?? ''));
+        $subInfo = trim((string) ($info['sub'] ?? ''));
+        if ($subToken !== '' && $subInfo !== '' && !hash_equals($subToken, $subInfo)) {
+            throw new \RuntimeException('O retorno da LEX não confere com o início do login.');
+        }
+        if ($claims === []) {
+            return $info;
+        }
+        foreach (['user_id', 'account_id', 'accountId'] as $chave) {
+            $valor = trim((string) ($info[$chave] ?? ''));
+            if ($valor !== '' && trim((string) ($claims[$chave] ?? '')) === '') {
+                $claims[$chave] = $valor;
+            }
+        }
+        return $claims;
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private static function claims(string $idToken, string $nonce, string $clientId, string $issuer): array
+    {
+        if ($idToken === '') {
+            return [];
+        }
+        $partes = explode('.', $idToken);
+        if (count($partes) !== 3) {
+            throw new \RuntimeException('A LEX devolveu um identificador inválido.');
+        }
+        $json = base64_decode(strtr($partes[1], '-_', '+/'), true);
+        $claims = is_string($json) ? json_decode($json, true) : null;
+        if (!is_array($claims)) {
+            throw new \RuntimeException('A LEX devolveu um identificador inválido.');
+        }
+        $nonceToken = trim((string) ($claims['nonce'] ?? ''));
+        if ($nonceToken === '' || !hash_equals($nonce, $nonceToken)) {
+            throw new \RuntimeException('O retorno da LEX não confere com o início do login.');
+        }
+        if (!isset($claims['exp']) || !is_numeric($claims['exp']) || (int) $claims['exp'] < time()) {
+            throw new \RuntimeException('O login da LEX expirou. Tente de novo.');
+        }
+        if (!self::audienciaConfere($claims['aud'] ?? null, $clientId)) {
+            throw new \RuntimeException('A LEX devolveu um identificador inválido.');
+        }
+        $iss = rtrim(trim((string) ($claims['iss'] ?? '')), '/');
+        if ($iss === '' || !hash_equals(rtrim($issuer, '/'), $iss)) {
+            throw new \RuntimeException('A LEX devolveu um identificador inválido.');
+        }
+        return $claims;
+    }
+
+    private static function audienciaConfere(mixed $aud, string $clientId): bool
+    {
+        if (is_string($aud)) {
+            return $aud !== '' && hash_equals($clientId, $aud);
+        }
+        if (!is_array($aud)) {
+            return false;
+        }
+        foreach ($aud as $item) {
+            if (is_string($item) && hash_equals($clientId, $item)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static function tipoSessao(string $tipoEntidade): string
+    {
+        return [
+            'aluno' => 'aluno',
+            'usuario' => 'admin',
+            'professor' => 'professor',
+            'responsavel' => 'pai',
+        ][$tipoEntidade] ?? '';
+    }
+
+    private static function aleatorio(int $bytes): string
+    {
+        return self::base64Url(random_bytes($bytes));
+    }
+
+    private static function base64Url(string $binario): string
+    {
+        return rtrim(strtr(base64_encode($binario), '+/', '-_'), '=');
+    }
+}

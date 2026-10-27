@@ -86,6 +86,9 @@
                     </button>
                 </div>
             </form>
+            <?php if (!empty($lex_login)): ?>
+                <?php include __DIR__ . '/partials/botao_lex.php'; ?>
+            <?php endif; ?>
 
             <!-- Links -->
             <div class="mt-6 text-center space-y-2">
