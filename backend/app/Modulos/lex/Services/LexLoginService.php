@@ -75,7 +75,7 @@ class LexLoginService
 
     /**
      * @param array{state:string,verifier:string,nonce:string,perfil:string,expira:int} $sessao
-     * @return array{tipo:string,id_local:int}
+     * @return array{tipo:string,id_local:int,id_token:string}
      */
     public static function concluir(array $sessao, string $code, string $state, string $redirectUri): array
     {
@@ -123,7 +123,56 @@ class LexLoginService
             error_log('[lex] login sem vinculo chaves=' . implode(',', array_keys($claims)));
             throw new \RuntimeException('Esta conta LEX ainda não foi sincronizada neste painel.');
         }
+        $vinculo['id_token'] = trim((string) ($tokens['id_token'] ?? ''));
         return $vinculo;
+    }
+
+    /**
+     * Encerra a sessão na LEX. Sem o token do login, o EducaTudo sai só localmente.
+     */
+    public static function urlEncerrarSessao(string $ambiente, string $idToken, string $retorno): string
+    {
+        $idToken = trim($idToken);
+        $retorno = trim($retorno);
+        if ($idToken === '' || $retorno === '' || preg_match('/[\s\r\n]/', $idToken) === 1) {
+            return '';
+        }
+        $parametros = [
+            'id_token_hint' => $idToken,
+            'post_logout_redirect_uri' => $retorno,
+        ];
+        return LexAutenticacaoService::urlBase($ambiente)
+            . '/sso/connect/full-endsession?'
+            . http_build_query($parametros, '', '&', PHP_QUERY_RFC3986);
+    }
+
+    public static function urlSaida(string $idToken, string $retorno): string
+    {
+        $host = parse_url((string) (defined('URL') ? URL : ''), PHP_URL_HOST);
+        $config = self::configuracao();
+        if ($config === null || !$config['ativo'] || !is_string($host) || !self::retornoPermitido($retorno, $host)) {
+            return '';
+        }
+        return self::urlEncerrarSessao((string) $config['ambiente'], $idToken, $retorno);
+    }
+
+    public static function retornoPermitido(string $retorno, string $hostEsperado): bool
+    {
+        $partes = parse_url($retorno);
+        if (!is_array($partes)) {
+            return false;
+        }
+        $scheme = strtolower((string) ($partes['scheme'] ?? ''));
+        $host = strtolower((string) ($partes['host'] ?? ''));
+        $hostEsperado = strtolower($hostEsperado);
+        $local = in_array($host, ['localhost', '127.0.0.1'], true);
+        if ($host === '' || $host !== $hostEsperado || isset($partes['user']) || isset($partes['query']) || isset($partes['fragment'])) {
+            return false;
+        }
+        if ($scheme !== 'https' && !($scheme === 'http' && $local)) {
+            return false;
+        }
+        return ($partes['path'] ?? '') === '/lex/saida';
     }
 
     public static function desafio(string $verifier): string

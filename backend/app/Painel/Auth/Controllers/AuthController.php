@@ -1369,7 +1369,29 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
             error_log('[Logout] user_type vazio; usou Referer: ' . $referer . ' -> tipo=' . $userType);
         }
         
+        $tenantSessao = (int) ($_SESSION['lex_tenant_id'] ?? 0);
+        $tenantAtual = defined('TENANT_ID') ? (int) TENANT_ID : 0;
+        $idTokenLex = trim((string) ($_SESSION['lex_id_token'] ?? ''));
+        $saidaLex = ($idTokenLex !== '' && $tenantSessao > 0 && $tenantSessao === $tenantAtual)
+            ? LexLoginService::urlSaida($idTokenLex, rtrim((string) URL, '/') . '/lex/saida')
+            : '';
+        $portalLex = in_array((string) $userType, ['aluno', 'admin', 'professor', 'pai'], true)
+            ? (string) $userType
+            : 'aluno';
+        if ($saidaLex !== '') {
+            setcookie('lex_portal', $portalLex, [
+                'expires' => time() + 600,
+                'path' => '/lex',
+                'secure' => function_exists('educatudoDetectHttps') && educatudoDetectHttps(),
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]);
+        }
         $this->authManager->logout();
+        if ($saidaLex !== '') {
+            header('Location: ' . $saidaLex, true, 302);
+            exit;
+        }
         $this->redirect($this->getLoginPathForLogout($userType));
     }
     

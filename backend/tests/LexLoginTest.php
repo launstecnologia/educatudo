@@ -64,6 +64,25 @@ class LexLoginTest extends TestCase
         $this->assertSame(7, $porRa['id_local']);
     }
 
+    public function testMontaOEnderecoQueEncerraASessaoNaLex(): void
+    {
+        $url = LexLoginService::urlEncerrarSessao(
+            'homologacao',
+            'aaa.bbb.ccc',
+            'https://educa-lex.educatudo.com/lex/saida'
+        );
+
+        $this->assertSame(
+            'https://homolog-api.lex.education/sso/connect/full-endsession?id_token_hint=aaa.bbb.ccc&post_logout_redirect_uri=https%3A%2F%2Feduca-lex.educatudo.com%2Flex%2Fsaida',
+            $url
+        );
+        $this->assertSame('', LexLoginService::urlEncerrarSessao('homologacao', '', 'https://educa-lex.educatudo.com/lex/saida'));
+        $this->assertSame('', LexLoginService::urlEncerrarSessao('producao', "aaa\nbbb", 'https://educa-lex.educatudo.com/lex/saida'));
+        $this->assertTrue(LexLoginService::retornoPermitido('https://educa-lex.educatudo.com/lex/saida', 'educa-lex.educatudo.com'));
+        $this->assertFalse(LexLoginService::retornoPermitido('https://outra.educatudo.com/lex/saida', 'educa-lex.educatudo.com'));
+        $this->assertFalse(LexLoginService::retornoPermitido('http://educa-lex.educatudo.com/lex/saida', 'educa-lex.educatudo.com'));
+    }
+
     public function testRecusaQuandoDoisVinculosBatem(): void
     {
         $pdo = $this->banco();

@@ -75,6 +75,11 @@ class LexLoginController extends BaseController
         try {
             $vinculo = LexLoginService::concluir($sessao, $code, $state, $this->redirectUri());
             (new AuthManager())->entrarPorLex((string) $vinculo['tipo'], (int) $vinculo['id_local']);
+            $idToken = trim((string) ($vinculo['id_token'] ?? ''));
+            if ($idToken !== '' && defined('TENANT_ID') && (int) TENANT_ID > 0) {
+                $_SESSION['lex_id_token'] = $idToken;
+                $_SESSION['lex_tenant_id'] = (int) TENANT_ID;
+            }
         } catch (LexExcecaoHttp $e) {
             error_log('[lex] login recusado status=' . $e->httpStatus);
             $this->recusar($perfil);
@@ -92,6 +97,25 @@ class LexLoginController extends BaseController
             'pai' => '/pais/dashboard',
         ];
         $this->redirect($destinos[(string) $vinculo['tipo']] ?? '/');
+    }
+
+    public function saida(): void
+    {
+        $perfil = trim((string) ($_COOKIE['lex_portal'] ?? ''));
+        setcookie('lex_portal', '', [
+            'expires' => time() - 3600,
+            'path' => '/lex',
+            'secure' => function_exists('educatudoDetectHttps') && educatudoDetectHttps(),
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+        $destinos = [
+            'aluno' => '/',
+            'admin' => '/admin',
+            'professor' => '/professor',
+            'pai' => '/pais',
+        ];
+        $this->redirect(($destinos[$perfil] ?? '/') . '?t=' . time());
     }
 
     private function recusar(string $perfil, string $mensagem = ''): void

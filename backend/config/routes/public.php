@@ -82,6 +82,7 @@ $router->get('/uploads/jornadas/exercicios/{filename}', 'Education/ServeImagemEx
 // Rotas de autenticação
 $router->get('/lex/entrar', 'Modulos/lex/LexLoginController@entrar');
 $router->get('/lex/retorno', 'Modulos/lex/LexLoginController@retorno');
+$router->get('/lex/saida', 'Modulos/lex/LexLoginController@saida');
 $router->get('/login/csrf-token', 'Auth/AuthController@getLoginCsrfTokenJson');
 $router->get('/login', 'Auth/AuthController@loginAluno');
 $router->post('/login', 'Auth/AuthController@autenticar');
