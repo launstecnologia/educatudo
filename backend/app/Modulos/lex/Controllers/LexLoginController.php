@@ -103,8 +103,7 @@ class LexLoginController extends BaseController
 
     private function redirectUri(): string
     {
-        // Endereço cadastrado na LEX para o teste. Tem de ser idêntico, com a porta.
-        return 'http://localhost:8080/lex/retorno';
+        return rtrim((string) URL, '/') . '/lex/retorno';
     }
 
     private function rotaLogin(string $perfil): string
