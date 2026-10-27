@@ -82,6 +82,7 @@ $boletimWizardSteps = [
                     </button>
                     <div class="flex gap-2">
                         <button type="button" id="boletim-wizard-aplicar" class="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-semibold transition-colors">Aplicar na configuração</button>
+                        <button type="button" id="boletim-wizard-gerar-aluno" class="hidden px-4 py-2.5 border border-indigo-200 rounded-lg text-indigo-700 hover:bg-indigo-50 text-sm font-semibold transition-colors">Gerar só este aluno</button>
                         <button type="button" id="boletim-wizard-avancar" class="wizard-step-next btn-primary-custom inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
                             Continuar <i class="fa-solid fa-arrow-right ml-2"></i>
                         </button>
@@ -112,6 +113,7 @@ $boletimWizardSteps = [
                         <button type="button" id="boletim-wizard-voltar" class="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40">Voltar</button>
                         <div class="flex gap-2">
                             <button type="button" id="boletim-wizard-aplicar" class="px-3 py-2 text-sm rounded-lg border border-indigo-200 text-indigo-700 hover:bg-indigo-50"><?= $boletimAssistentePageMode ? 'Aplicar na configuração' : 'Aplicar no formulário' ?></button>
+                            <button type="button" id="boletim-wizard-gerar-aluno" class="hidden px-3 py-2 text-sm font-semibold rounded-lg border border-indigo-200 text-indigo-700 hover:bg-indigo-50">Gerar só este aluno</button>
                             <button type="button" id="boletim-wizard-avancar" class="px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">Continuar</button>
                         </div>
                     </div>
@@ -228,6 +230,7 @@ $boletimWizardSteps = [
     var btnVoltar = document.getElementById('boletim-wizard-voltar');
     var btnAvancar = document.getElementById('boletim-wizard-avancar');
     var btnAplicar = document.getElementById('boletim-wizard-aplicar');
+    var btnGerarAluno = document.getElementById('boletim-wizard-gerar-aluno');
     var btnCopiar = document.getElementById('boletim-wizard-copiar-receita');
     var stepsEl = document.getElementById('boletim-wizard-steps');
     var bodyEl = document.getElementById('boletim-wizard-body');
@@ -4187,6 +4190,7 @@ $boletimWizardSteps = [
             if (idItem <= 0) return;
             estado.aluno_preview_id = idItem;
             previewAtual = null;
+            atualizarBotaoGerarAluno();
             renderRevisarDinamico();
             agendarMontar();
         });
@@ -4201,6 +4205,7 @@ $boletimWizardSteps = [
             if (String(e.target.value || '').trim() === '' && Number(estado.aluno_preview_id || 0) > 0) {
                 estado.aluno_preview_id = 0;
                 previewAtual = null;
+                atualizarBotaoGerarAluno();
                 renderRevisarDinamico();
                 agendarMontar();
                 var campo = document.getElementById('bw-preview-aluno-busca');
@@ -4213,6 +4218,7 @@ $boletimWizardSteps = [
             if (!e.target || e.target.id !== 'bw-preview-aluno-limpar' || !estado) return;
             estado.aluno_preview_id = 0;
             previewAtual = null;
+            atualizarBotaoGerarAluno();
             renderRevisarDinamico();
             agendarMontar();
         });
@@ -4839,6 +4845,7 @@ $boletimWizardSteps = [
         if (btnAplicar && pageMode && ehEventoNotasPreview()) {
             btnAplicar.textContent = cur === 'revisar' ? 'Salvar sem gerar notas' : 'Aplicar na configuração';
         }
+        atualizarBotaoGerarAluno();
         if (pageMode) {
             btnAvancar.innerHTML = esc(label) + (cur === 'revisar' ? ' <i class="fa-solid fa-check ml-2"></i>' : ' <i class="fa-solid fa-arrow-right ml-2"></i>');
         } else {
@@ -5297,7 +5304,8 @@ $boletimWizardSteps = [
             html += '<div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">';
             if (ehEventoNotasPreview()) {
                 html += '<p class="text-sm text-gray-800"><strong>Salvar sem gerar notas</strong><span class="block text-xs text-gray-600 font-normal mt-1">Grava só a versão da configuração. O detalhe do aluno e o boletim oficial continuam com as notas que já estão vigentes.</span></p>';
-                html += '<p class="text-sm text-gray-800"><strong>Concluir e aplicar</strong><span class="block text-xs text-gray-600 font-normal mt-1">Grava a configuração e inicia a geração das notas. O boletim oficial só muda quando essa geração terminar. Se ela não concluir, a configuração salva permanece e a geração pode ser retomada na página do evento.</span></p>';
+                html += '<p class="text-sm text-gray-800"><strong>Concluir e aplicar</strong><span class="block text-xs text-gray-600 font-normal mt-1">Grava a configuração e inicia a geração das notas de todos os alunos do evento. O boletim oficial só muda quando essa geração terminar. Se ela não concluir, a configuração salva permanece e a geração pode ser retomada na página do evento.</span></p>';
+                html += '<p class="text-sm text-gray-800"><strong>Gerar só este aluno</strong><span class="block text-xs text-gray-600 font-normal mt-1">Aparece quando há um aluno no demonstrativo. Grava a configuração e publica notas e boletim oficial só dele. O restante da turma continua com as notas vigentes. A ficha da vida escolar usa a turma principal do cadastro.</span></p>';
             } else {
                 html += '<p class="text-sm text-gray-800"><strong>Esta versão entra no aluno</strong><span class="block text-xs text-gray-600 font-normal mt-1">Ao salvar, ela passa a ser a do detalhe do aluno e substitui a nota no boletim oficial da vida escolar. A anterior fica no histórico.</span></p>';
             }
@@ -6246,6 +6254,9 @@ $boletimWizardSteps = [
             addArray('series_ids[]', r.series_ids);
             addArray('turmas_ids[]', r.turmas_ids);
             add('componentes_json', JSON.stringify(comps));
+            var alunoSomenteId = Number(r._gerar_somente_aluno_id || 0);
+            delete r._gerar_somente_aluno;
+            delete r._gerar_somente_aluno_id;
             add('assistente_rascunho', JSON.stringify(r));
             add('origem_assistente', '1');
             if (retornoFluxo === 'gerar-avaliacoes' || retornoFluxo === 'boletins' || retornoFluxo === 'periodos' || retornoFluxo === 'evento') {
@@ -6262,7 +6273,12 @@ $boletimWizardSteps = [
                     });
                 }
             }
-            if (gerarNotas === true && ehEventoNotasPreview()) add('gerar_nova_versao', '1');
+            if (gerarNotas === true && ehEventoNotasPreview()) {
+                add('gerar_nova_versao', '1');
+                if (alunoSomenteId > 0) {
+                    add('gerar_somente_aluno_id', alunoSomenteId);
+                }
+            }
             document.body.appendChild(form);
             form.submit();
             return 'submit';
@@ -6274,6 +6290,12 @@ $boletimWizardSteps = [
             renderResumo('Não consegui levar o rascunho para a configuração.', ['Copie a receita e tente de novo.']);
             return false;
         }
+    }
+
+    function atualizarBotaoGerarAluno() {
+        if (!btnGerarAluno) return;
+        var mostrar = pageMode && ehEventoNotasPreview() && estado && estado.passo === 'revisar' && Number(estado.aluno_preview_id || 0) > 0;
+        btnGerarAluno.classList.toggle('hidden', !mostrar);
     }
 
     function aplicarRascunhoSeOk(j, msgOk, gerarNotas) {
@@ -6300,6 +6322,11 @@ $boletimWizardSteps = [
         if (!Number(j.rascunho.boletim_id || 0) && !(estado && estado.exibir_em === 'notas')) {
             renderResumo('Falta o modelo de boletim.', ['Volte em Identidade e selecione o Boletim.']);
             return false;
+        }
+        if (gerarNotas === true && Number(estado && estado.aluno_preview_id || 0) > 0 && j.rascunho._gerar_somente_aluno === true) {
+            j.rascunho._gerar_somente_aluno_id = Number(estado.aluno_preview_id);
+        } else {
+            delete j.rascunho._gerar_somente_aluno_id;
         }
         var aplicado = aplicarRascunhoNaConfiguracao(j.rascunho, gerarNotas === true);
         if (!aplicado) {
@@ -6575,6 +6602,30 @@ $boletimWizardSteps = [
     if (btnFechar) btnFechar.addEventListener('click', fecharWizard);
     if (btnVoltar) btnVoltar.addEventListener('click', voltar);
     if (btnAvancar) btnAvancar.addEventListener('click', avancar);
+    if (btnGerarAluno) {
+        btnGerarAluno.addEventListener('click', function () {
+            garantirEstado();
+            var aluno = alunoPreviewSelecionado();
+            if (!aluno || Number(aluno.id || 0) <= 0) {
+                renderResumo('Escolha o aluno no demonstrativo.', ['Use o campo Simular notas com aluno.']);
+                return;
+            }
+            var nome = labelAlunoPreview(aluno);
+            if (!confirm('Gerar notas e boletim só de ' + nome + '? Os outros alunos não serão recalculados.')) {
+                return;
+            }
+            btnGerarAluno.disabled = true;
+            renderResumo('Gerando só este aluno...', []);
+            montarAgora().then(function (j) {
+                if (j && j.rascunho) j.rascunho._gerar_somente_aluno = true;
+                var aplicado = aplicarRascunhoSeOk(j, 'Gerando só este aluno…', true);
+                if (!aplicado) btnGerarAluno.disabled = false;
+            }).catch(function () {
+                btnGerarAluno.disabled = false;
+                renderResumo('Não deu para gerar só este aluno.', ['Recarregue a página e tente de novo.']);
+            });
+        });
+    }
     if (btnAplicar) {
         btnAplicar.addEventListener('click', function () {
             garantirEstado();

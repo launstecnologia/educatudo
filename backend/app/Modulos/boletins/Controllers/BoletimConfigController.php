@@ -1981,6 +1981,11 @@ class BoletimConfigController extends BaseController
             }
             $publicarNotas = $exibirEm === 'notas'
                 && (string) ($_POST['gerar_nova_versao'] ?? '') === '1';
+            $alunoSomenteId = (int) ($_POST['gerar_somente_aluno_id'] ?? 0);
+            if ($savedId > 0 && $publicarNotas && $alunoSomenteId > 0) {
+                $this->iniciarNovaVersaoNotasDoAluno((int) $savedId, $versaoConfig, $alunoSomenteId);
+                return;
+            }
             if ($savedId > 0 && $publicarNotas && $this->iniciarNovaVersaoNotas((int) $savedId, $versaoConfig)) {
                 return;
             }
@@ -2153,6 +2158,201 @@ class BoletimConfigController extends BaseController
         $_SESSION['boletim_flash_type'] = ((int) ($resultado['erros'] ?? 0) > 0) ? 'error' : 'success';
         $this->redirect('/admin/boletim');
         return true;
+    }
+
+    /**
+     * Grava a configuração e publica notas + boletim oficial só de um aluno.
+     * Não enfileira a geração da turma e não troca a versão vigente dos demais.
+     */
+    private function iniciarNovaVersaoNotasDoAluno(int $regraId, int $versaoConfig, int $alunoId): void
+    {
+        $regra = $this->boletimConfig->getRuleById($regraId);
+        $prefixoSalvo = 'Configuração salva'
+            . ($versaoConfig > 0 ? (' na versão ' . $versaoConfig) : '')
+            . '.';
+        if (!is_array($regra) || $alunoId <= 0) {
+            $_SESSION['boletim_flash'] = $prefixoSalvo . ' Não foi possível gerar as notas deste aluno.';
+            $_SESSION['boletim_flash_type'] = 'error';
+            $this->redirect($this->urlAssistenteComRetorno($regraId));
+            return;
+        }
+        $dataInicio = $this->normalizarDataYmdOpcional((string) ($regra['default_data_inicio'] ?? ''));
+        $dataFim = $this->normalizarDataYmdOpcional((string) ($regra['default_data_fim'] ?? ''));
+        if ($dataInicio === null || $dataFim === null) {
+            $rangePadrao = $this->periodoToRange($this->periodoDefault());
+            $dataInicio = substr((string) ($rangePadrao['inicio'] ?? ''), 0, 10) ?: date('Y-01-01');
+            $dataFim = substr((string) ($rangePadrao['fim'] ?? ''), 0, 10) ?: date('Y-m-d');
+        }
+        if ($dataInicio > $dataFim) {
+            [$dataInicio, $dataFim] = [$dataFim, $dataInicio];
+        }
+        $periodoRef = $this->buildPeriodoRefFromDateRange($dataInicio, $dataFim);
+        if (strlen($periodoRef) > 60) {
+            $periodoRef = substr($periodoRef, 0, 60);
+        }
+        $gates = $this->diagnosticarGatesFechamentoRegra($regra);
+        if (!empty($gates['bloqueios'])) {
+            $_SESSION['boletim_flash'] = $prefixoSalvo . ' As notas deste aluno não foram geradas: ' . implode(' ', $gates['bloqueios']);
+            $_SESSION['boletim_flash_type'] = 'error';
+            $this->redirect($this->urlAssistenteComRetorno($regraId));
+            return;
+        }
+        $escolhido = null;
+        foreach ($this->resolveAlunosVinculadosRegra($regra) as $aluno) {
+            if ((int) ($aluno['id'] ?? 0) === $alunoId) {
+                $escolhido = $aluno;
+                break;
+            }
+        }
+        if (!is_array($escolhido)) {
+            $_SESSION['boletim_flash'] = $prefixoSalvo . ' Este aluno não está nas turmas deste evento.';
+            $_SESSION['boletim_flash_type'] = 'error';
+            $this->redirect($this->urlAssistenteComRetorno($regraId));
+            return;
+        }
+
+        $resultado = $this->executarGeracaoDeUmAluno($regra, $regraId, $periodoRef, $dataInicio, $dataFim, $escolhido);
+        $nome = trim((string) ($escolhido['nome'] ?? ''));
+        $quem = $nome !== '' ? $nome : ('aluno #' . $alunoId);
+        $_SESSION['boletim_flash'] = $prefixoSalvo . ' Notas e boletim gerados só para ' . $quem . '. Os outros alunos não foram recalculados. '
+            . (string) ($resultado['mensagem'] ?? '');
+        $_SESSION['boletim_flash_type'] = ((int) ($resultado['erros'] ?? 0) > 0) ? 'error' : 'success';
+        $this->redirect('/admin/boletim');
+    }
+
+    /**
+     * @param array<string,mixed> $regra
+     * @param array<string,mixed> $aluno
+     * @return array{gerados:int,linhas:int,erros:int,mensagem:string}
+     */
+    private function executarGeracaoDeUmAluno(
+        array $regra,
+        int $regraId,
+        string $periodoRef,
+        ?string $dataInicio,
+        ?string $dataFim,
+        array $aluno
+    ): array {
+        $alunoId = (int) ($aluno['id'] ?? 0);
+        $usuarioLog = $this->auth->getUser();
+        $usuarioIdLog = (int) (is_array($usuarioLog) ? ($usuarioLog['id'] ?? 0) : 0) ?: null;
+        $usuarioNomeLog = is_array($usuarioLog) ? ((string) ($usuarioLog['nome'] ?? '') ?: null) : null;
+        $geracaoId = $this->boletimConfig->criarGeracao(
+            $regraId,
+            $periodoRef,
+            'aluno',
+            $usuarioIdLog,
+            $usuarioNomeLog
+        );
+        $stats = $this->gravarBoletinsSimulacaoParaAlunos(
+            $regra,
+            $regraId,
+            $periodoRef,
+            $dataInicio,
+            $dataFim,
+            [$aluno],
+            'gerarAluno',
+            false,
+            $geracaoId
+        );
+        if ($geracaoId !== null) {
+            $this->boletimConfig->atualizarGeracaoTotais(
+                $geracaoId,
+                (int) ($stats['gerados'] ?? 0),
+                (int) ($stats['preservados'] ?? 0),
+                (int) ($stats['linhas'] ?? 0),
+                (int) ($stats['erros'] ?? 0),
+                0,
+                ['modo' => 'aluno', 'aluno_id' => $alunoId]
+            );
+        }
+        $this->boletimConfig->registrarLogGeracao(
+            $regraId,
+            $periodoRef,
+            $usuarioIdLog,
+            $usuarioNomeLog,
+            (int) ($stats['gerados'] ?? 0),
+            (int) ($stats['linhas'] ?? 0),
+            (int) ($stats['erros'] ?? 0),
+            0,
+            [
+                'modo' => 'aluno',
+                'aluno_id' => $alunoId,
+                'geracao_id' => $geracaoId,
+                'alunos_preservados' => (int) ($stats['preservados'] ?? 0),
+            ]
+        );
+        if ((int) ($stats['erros'] ?? 0) === 0 && (int) ($stats['gerados'] ?? 0) > 0) {
+            $this->atualizarBoletimDestinoDoAluno($regra, $alunoId, $periodoRef, $dataInicio, $dataFim);
+            $this->sincronizarFichaVidaEscolar(
+                $alunoId,
+                is_array($usuarioLog) ? $usuarioLog : [],
+                $periodoRef,
+                $regraId
+            );
+        }
+        $msg = 'Geração individual: ' . (int) ($stats['gerados'] ?? 0) . ' aluno, ' . (int) ($stats['linhas'] ?? 0) . ' linha(s) de matéria.';
+        if ((int) ($stats['preservados'] ?? 0) > 0) {
+            $msg .= ' O aluno está travado e não foi recalculado.';
+        }
+        if (!empty($stats['errosAmostra'])) {
+            $msg .= ' ' . implode(' | ', (array) $stats['errosAmostra']);
+        }
+
+        return [
+            'gerados' => (int) ($stats['gerados'] ?? 0),
+            'linhas' => (int) ($stats['linhas'] ?? 0),
+            'erros' => (int) ($stats['erros'] ?? 0),
+            'mensagem' => $msg,
+        ];
+    }
+
+    /**
+     * Atualiza o documento oficial do boletim só deste aluno, sem gerar a turma.
+     *
+     * @param array<string,mixed> $regra
+     */
+    private function atualizarBoletimDestinoDoAluno(
+        array $regra,
+        int $alunoId,
+        string $periodoRef,
+        ?string $dataInicio,
+        ?string $dataFim
+    ): void {
+        if ($alunoId <= 0 || strtolower(trim((string) ($regra['exibir_em'] ?? ''))) !== 'notas') {
+            return;
+        }
+        $boletimId = (int) ($regra['boletim_id'] ?? 0);
+        if ($boletimId <= 0) {
+            return;
+        }
+        try {
+            $sync = (new BoletimCadastroService())->sincronizarDocumento($boletimId);
+            $regraDocId = (int) ($sync['regra_id'] ?? 0);
+            if ($regraDocId <= 0) {
+                return;
+            }
+            $doc = $this->boletimConfig->getRuleById($regraDocId);
+            if (!is_array($doc)) {
+                return;
+            }
+            $usuario = $this->auth->getUser();
+            $usuario = is_array($usuario) ? $usuario : [];
+            $periodoDoc = $this->periodoRefOficialAluno($regraDocId, $alunoId);
+            $gravarPeriodo = $periodoDoc !== '' ? $periodoDoc : $periodoRef;
+            $simulado = $this->simularRegraAluno($doc, $alunoId, $periodoRef, $dataInicio, $dataFim);
+            $this->gravarSimulacaoOficial(
+                $regraDocId,
+                $alunoId,
+                $gravarPeriodo,
+                $dataInicio,
+                $dataFim,
+                $simulado,
+                $usuario
+            );
+        } catch (\Throwable $e) {
+            error_log('atualizarBoletimDestinoDoAluno #' . $alunoId . ': ' . $e->getMessage());
+        }
     }
 
     public function duplicarRegra()
@@ -3772,6 +3972,9 @@ class BoletimConfigController extends BaseController
         $this->seriesEscopoGeracao = [];
         try {
             $this->acumularPrefetchDaRegra($regra, $range, $incluirPct, $chavesProvas, $compIdsManual, $absence, $visitados);
+            // A consulta de um aluno sempre anexa acertos e questões. Sem isso, a coluna
+            // de semana e a média agregar_nq saem vazias quando usar_percentual está desligado.
+            $incluirPct = true;
 
             foreach ($chavesProvas as $chave => $cfgP) {
                 $this->renovarHeartbeatGeracao();
