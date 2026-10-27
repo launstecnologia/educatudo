@@ -26,13 +26,15 @@ class LexLoginController extends BaseController
             return;
         }
 
-        $_SESSION['lex_oauth'] = [
+        $inicioLocal = [
             'state' => $inicio['state'],
             'verifier' => $inicio['verifier'],
             'nonce' => $inicio['nonce'],
             'perfil' => $perfil,
             'expira' => time() + 600,
         ];
+        $_SESSION['lex_oauth'] = $inicioLocal;
+        $this->guardarInicio($inicioLocal);
         header('Location: ' . $inicio['url'], true, 302);
         exit;
     }
@@ -40,16 +42,22 @@ class LexLoginController extends BaseController
     public function retorno(): void
     {
         $sessao = $_SESSION['lex_oauth'] ?? null;
+        if (!is_array($sessao)) {
+            $sessao = $this->lerInicio();
+        }
         $perfil = is_array($sessao) ? (string) ($sessao['perfil'] ?? '') : '';
         $state = trim((string) ($_GET['state'] ?? ''));
         $stateSessao = is_array($sessao) ? (string) ($sessao['state'] ?? '') : '';
         if (!is_array($sessao) || $state === '' || $stateSessao === '' || !hash_equals($stateSessao, $state)) {
+            error_log('[lex] retorno sem o inicio do clique');
+            $this->limparInicio();
             $this->setFlashMessage('O retorno da LEX não confere com o início do login.', 'error');
             $this->redirect($this->rotaLogin($perfil) . '?t=' . time());
             return;
         }
 
         unset($_SESSION['lex_oauth']);
+        $this->limparInicio();
         $erroLex = trim((string) ($_GET['error'] ?? ''));
         if ($erroLex !== '') {
             $this->setFlashMessage('A LEX não autorizou a entrada.', 'error');
@@ -99,6 +107,56 @@ class LexLoginController extends BaseController
         $texto = in_array($mensagem, $conhecidas, true) ? $mensagem : 'Não foi possível entrar com a LEX.';
         $this->setFlashMessage($texto, 'error');
         $this->redirect($this->rotaLogin($perfil) . '?t=' . time());
+    }
+
+    /**
+     * @param array{state:string,verifier:string,nonce:string,perfil:string,expira:int} $inicio
+     */
+    private function guardarInicio(array $inicio): void
+    {
+        $json = json_encode($inicio);
+        if (!is_string($json)) {
+            return;
+        }
+        setcookie('lex_oauth', $json, $this->opcoesCookie(time() + 600));
+    }
+
+    /**
+     * @return array{state:string,verifier:string,nonce:string,perfil:string,expira:int}|null
+     */
+    private function lerInicio(): ?array
+    {
+        $json = (string) ($_COOKIE['lex_oauth'] ?? '');
+        $dados = $json !== '' ? json_decode($json, true) : null;
+        if (!is_array($dados) || !isset($dados['state'], $dados['verifier'], $dados['nonce'], $dados['perfil'], $dados['expira'])) {
+            return null;
+        }
+        return [
+            'state' => (string) $dados['state'],
+            'verifier' => (string) $dados['verifier'],
+            'nonce' => (string) $dados['nonce'],
+            'perfil' => (string) $dados['perfil'],
+            'expira' => (int) $dados['expira'],
+        ];
+    }
+
+    private function limparInicio(): void
+    {
+        setcookie('lex_oauth', '', $this->opcoesCookie(time() - 3600));
+    }
+
+    /**
+     * @return array{expires:int,path:string,secure:bool,httponly:bool,samesite:string}
+     */
+    private function opcoesCookie(int $expira): array
+    {
+        return [
+            'expires' => $expira,
+            'path' => '/lex',
+            'secure' => function_exists('educatudoDetectHttps') && educatudoDetectHttps(),
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ];
     }
 
     private function redirectUri(): string

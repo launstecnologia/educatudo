@@ -116,7 +116,7 @@ class LexLoginService
         $pdo = Database::getInstance()->getPdo();
         $vinculo = self::localizar($pdo, $claims, self::PERFIS[$perfil]);
         if ($vinculo === null) {
-            $claims = self::completarClaims($claims, self::contaDaPessoa($cliente, $config, $claims));
+            $claims = self::mesclarConta($claims, self::contaDaPessoa($cliente, $config, $claims));
             $vinculo = self::localizar($pdo, $claims, self::PERFIS[$perfil]);
         }
         if ($vinculo === null) {
@@ -227,6 +227,7 @@ class LexLoginService
         $subToken = trim((string) ($claims['sub'] ?? ''));
         $subInfo = trim((string) ($info['sub'] ?? ''));
         if ($subToken !== '' && $subInfo !== '' && !hash_equals($subToken, $subInfo)) {
+            error_log('[lex] userinfo com sub diferente do token');
             throw new \RuntimeException('O retorno da LEX não confere com o início do login.');
         }
         if ($claims === []) {
@@ -234,6 +235,31 @@ class LexLoginService
         }
         foreach (['user_id', 'userId', 'account_id', 'accountId', 'email', 'academic_email', 'academicEmail', 'login', 'preferred_username', 'preferredUsername'] as $chave) {
             $valor = trim((string) ($info[$chave] ?? ''));
+            if ($valor !== '' && trim((string) ($claims[$chave] ?? '')) === '') {
+                $claims[$chave] = $valor;
+            }
+        }
+        return $claims;
+    }
+
+    /**
+     * A conta do sync não é o token. O id dela pode ter outro nome e não invalida o login.
+     *
+     * @param array<string,mixed> $claims
+     * @param array<string,mixed> $conta
+     * @return array<string,mixed>
+     */
+    private static function mesclarConta(array $claims, array $conta): array
+    {
+        if ($conta === []) {
+            return $claims;
+        }
+        $idEscola = trim((string) ($conta['user_id'] ?? $conta['userId'] ?? $conta['id'] ?? ''));
+        if ($idEscola !== '' && trim((string) ($claims['user_id'] ?? '')) === '') {
+            $claims['user_id'] = $idEscola;
+        }
+        foreach (['account_id', 'accountId', 'email', 'academic_email', 'academicEmail', 'login', 'preferred_username', 'preferredUsername'] as $chave) {
+            $valor = trim((string) ($conta[$chave] ?? ''));
             if ($valor !== '' && trim((string) ($claims[$chave] ?? '')) === '') {
                 $claims[$chave] = $valor;
             }
