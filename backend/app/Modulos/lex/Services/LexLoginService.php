@@ -113,8 +113,14 @@ class LexLoginService
         $info = $cliente->getJson($base . '/sso/connect/userinfo', $tokens['access_token'], 20);
         $claims = self::completarClaims($claims, $info);
 
-        $vinculo = self::localizar(Database::getInstance()->getPdo(), $claims, self::PERFIS[$perfil]);
+        $pdo = Database::getInstance()->getPdo();
+        $vinculo = self::localizar($pdo, $claims, self::PERFIS[$perfil]);
         if ($vinculo === null) {
+            $claims = self::completarClaims($claims, self::contaDaPessoa($cliente, $config, $claims));
+            $vinculo = self::localizar($pdo, $claims, self::PERFIS[$perfil]);
+        }
+        if ($vinculo === null) {
+            error_log('[lex] login sem vinculo chaves=' . implode(',', array_keys($claims)));
             throw new \RuntimeException('Esta conta LEX ainda não foi sincronizada neste painel.');
         }
         return $vinculo;
@@ -140,7 +146,7 @@ class LexLoginService
             "SELECT id_local FROM lex_vinculos
               WHERE tipo_entidade = :tipo AND status = 'ativo' AND id_lex = :id"
         );
-        foreach (['sub', 'user_id'] as $chave) {
+        foreach (['sub', 'user_id', 'userId'] as $chave) {
             $valor = trim((string) ($claims[$chave] ?? ''));
             if ($valor === '') {
                 continue;
@@ -170,10 +176,24 @@ class LexLoginService
             }
         }
 
-        $email = strtolower(trim((string) ($claims['email'] ?? '')));
-        if ($email !== '') {
+        foreach (['email', 'academic_email', 'academicEmail'] as $chave) {
+            $email = strtolower(trim((string) ($claims[$chave] ?? '')));
+            if ($email === '') {
+                continue;
+            }
             foreach (self::locaisPorEmail($tenant, $tipoEntidade, $email) as $local) {
                 $encontrados[$local] = true;
+            }
+        }
+        if ($tipoEntidade === 'aluno') {
+            foreach (['login', 'preferred_username', 'preferredUsername'] as $chave) {
+                $login = strtolower(trim((string) ($claims[$chave] ?? '')));
+                if ($login === '') {
+                    continue;
+                }
+                foreach (self::locaisPorRa($tenant, $login) as $local) {
+                    $encontrados[$local] = true;
+                }
             }
         }
 
@@ -212,7 +232,7 @@ class LexLoginService
         if ($claims === []) {
             return $info;
         }
-        foreach (['user_id', 'account_id', 'accountId', 'email'] as $chave) {
+        foreach (['user_id', 'userId', 'account_id', 'accountId', 'email', 'academic_email', 'academicEmail', 'login', 'preferred_username', 'preferredUsername'] as $chave) {
             $valor = trim((string) ($info[$chave] ?? ''));
             if ($valor !== '' && trim((string) ($claims[$chave] ?? '')) === '') {
                 $claims[$chave] = $valor;
@@ -269,6 +289,75 @@ class LexLoginService
             }
         }
         return false;
+    }
+
+    /**
+     * O login devolve um id diferente do sync. A conta traz o e-mail que já está no aluno.
+     *
+     * @param array<string,mixed> $config
+     * @param array<string,mixed> $claims
+     * @return array<string,mixed>
+     */
+    private static function contaDaPessoa(LexClienteHttp $cliente, array $config, array $claims): array
+    {
+        $tenant = trim((string) ($config['tenant_id'] ?? ''));
+        if ($tenant === '') {
+            return [];
+        }
+        $ids = [];
+        foreach (['account_id', 'accountId', 'user_id', 'userId', 'sub'] as $chave) {
+            $valor = trim((string) ($claims[$chave] ?? ''));
+            if ($valor !== '' && preg_match('/^[0-9a-fA-F-]{32,40}$/', $valor) === 1) {
+                $ids[$valor] = true;
+            }
+        }
+        if ($ids === []) {
+            return [];
+        }
+
+        try {
+            $auth = new LexAutenticacaoService($cliente, new LexCacheTokenRedis(), dirname(__DIR__, 4) . '/storage/tmp');
+            $token = $auth->obterToken($config);
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        $base = LexAutenticacaoService::urlBase((string) ($config['ambiente'] ?? ''));
+        foreach (array_keys($ids) as $id) {
+            $url = $base . '/sync/v1/accounts/' . rawurlencode($id) . '?tenant_id=' . rawurlencode($tenant);
+            try {
+                $conta = $cliente->getJson($url, (string) ($token['access_token'] ?? ''), 20);
+            } catch (LexExcecaoHttp $e) {
+                continue;
+            }
+            if ($conta !== []) {
+                return $conta;
+            }
+        }
+        return [];
+    }
+
+    /**
+     * @return list<int>
+     */
+    private static function locaisPorRa(\PDO $tenant, string $login): array
+    {
+        $st = $tenant->prepare(
+            "SELECT vinculo.id_local
+               FROM lex_vinculos vinculo
+               INNER JOIN alunos pessoa ON pessoa.id = vinculo.id_local AND pessoa.ativo = 1
+              WHERE vinculo.tipo_entidade = 'aluno'
+                AND vinculo.status = 'ativo'
+                AND (LOWER(pessoa.ra) = :login OR LOWER(pessoa.nickname) = :login)"
+        );
+        $st->execute(['login' => $login]);
+        $locais = [];
+        foreach ($st->fetchAll(\PDO::FETCH_COLUMN) as $local) {
+            if ((int) $local > 0) {
+                $locais[] = (int) $local;
+            }
+        }
+        return $locais;
     }
 
     /**

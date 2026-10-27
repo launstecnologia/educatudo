@@ -49,6 +49,21 @@ class LexLoginTest extends TestCase
         $this->assertSame(7, $porEmail['id_local']);
     }
 
+    public function testLocalizaPeloRaQuandoOLoginConfere(): void
+    {
+        $pdo = $this->banco();
+        $pdo->exec('CREATE TABLE alunos (id INTEGER, email TEXT, ra TEXT, nickname TEXT, ativo INTEGER)');
+        $pdo->exec("INSERT INTO alunos (id, email, ra, nickname, ativo) VALUES (7, 'outro@educa.tudo', 'DDD81E91-F055-4F56-9754-937A0793813C', 'DDD81E91-F055-4F56-9754-937A0793813C', 1)");
+        $pdo->exec("INSERT INTO lex_vinculos (tipo_entidade, id_local, id_lex, account_id, status) VALUES ('aluno', 7, 'user-1', 'acc-1', 'ativo')");
+
+        $porRa = LexLoginService::localizar($pdo, [
+            'sub' => '82bf3094-5c0f-4a0a-a874-9777d0edc322',
+            'login' => 'ddd81e91-f055-4f56-9754-937a0793813c',
+        ], 'aluno');
+
+        $this->assertSame(7, $porRa['id_local']);
+    }
+
     public function testRecusaQuandoDoisVinculosBatem(): void
     {
         $pdo = $this->banco();
