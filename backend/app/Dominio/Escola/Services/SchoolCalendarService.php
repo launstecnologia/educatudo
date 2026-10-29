@@ -63,6 +63,12 @@ class SchoolCalendarService
     /** @var array<string,bool> */
     private $colunasCache = [];
 
+    /** @var array<int,string>|null */
+    private $coresCursoCache = null;
+
+    /** @var array<int,int>|null */
+    private $cursoPorSerieCache = null;
+
     /** @var array<string,bool> */
     private $tabelasCache = [];
 
@@ -364,13 +370,13 @@ class SchoolCalendarService
                  LIMIT 1",
                 ['ano' => $ano]
             );
-            return $geral ?: null;
+            return $geral ? $this->comAbrangencia($geral) : null;
         }
         $row = $this->db->fetch(
             "SELECT * FROM calendario_letivo WHERE ano = :ano ORDER BY id ASC LIMIT 1",
             ['ano' => $ano]
         );
-        return $row ?: null;
+        return $row ? $this->comAbrangencia($row) : null;
     }
 
     /** @return array<string,mixed>|null */
@@ -748,7 +754,131 @@ class SchoolCalendarService
             $row['nome'] = 'Geral';
         }
         $row['rotulo'] = $this->rotuloAbrangencia($row['curso_ids'], $row['serie_ids']);
+        $tom = $this->corDaAbrangencia($row['curso_ids'], $row['serie_ids']);
+        $row['cor'] = $tom['cor'];
+        $row['cor_texto'] = $tom['cor_texto'];
         return $row;
+    }
+
+    /**
+     * @param list<int> $cursoIds
+     * @param list<int> $serieIds
+     * @return array{cor:string,cor_texto:string}
+     */
+    private function corDaAbrangencia(array $cursoIds, array $serieIds): array
+    {
+        $vazio = ['cor' => '', 'cor_texto' => ''];
+        $ids = [];
+        foreach ($cursoIds as $cursoId) {
+            $cursoId = (int) $cursoId;
+            if ($cursoId > 0) {
+                $ids[$cursoId] = $cursoId;
+            }
+        }
+        if ($serieIds !== []) {
+            $porSerie = $this->cursoPorSerie();
+            foreach ($serieIds as $serieId) {
+                $cursoId = (int) ($porSerie[(int) $serieId] ?? 0);
+                if ($cursoId > 0) {
+                    $ids[$cursoId] = $cursoId;
+                }
+            }
+        }
+        $cores = $this->coresCurso();
+        $escolhida = '';
+        foreach ($ids as $id) {
+            $cor = $cores[$id] ?? '';
+            if ($cor === '') {
+                continue;
+            }
+            if ($escolhida === '') {
+                $escolhida = $cor;
+                continue;
+            }
+            if ($escolhida !== $cor) {
+                return $vazio;
+            }
+        }
+        if ($escolhida === '') {
+            return $vazio;
+        }
+
+        return ['cor' => $escolhida, 'cor_texto' => self::textoSobreCor($escolhida)];
+    }
+
+    /** @return array<int,string> */
+    private function coresCurso(): array
+    {
+        if ($this->coresCursoCache !== null) {
+            return $this->coresCursoCache;
+        }
+        $this->coresCursoCache = [];
+        if (!$this->tabelaExiste('curso') || !$this->colunaExiste('curso', 'cor')) {
+            return $this->coresCursoCache;
+        }
+        try {
+            $rows = $this->db->fetchAll('SELECT id, cor FROM curso') ?: [];
+        } catch (\Throwable $e) {
+            return $this->coresCursoCache;
+        }
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            $cor = self::hexCor((string) ($row['cor'] ?? ''));
+            if ($id > 0 && $cor !== '') {
+                $this->coresCursoCache[$id] = $cor;
+            }
+        }
+
+        return $this->coresCursoCache;
+    }
+
+    /** @return array<int,int> */
+    private function cursoPorSerie(): array
+    {
+        if ($this->cursoPorSerieCache !== null) {
+            return $this->cursoPorSerieCache;
+        }
+        $this->cursoPorSerieCache = [];
+        if (!$this->tabelaExiste('serie')) {
+            return $this->cursoPorSerieCache;
+        }
+        try {
+            $rows = $this->db->fetchAll('SELECT id, curso_id FROM serie') ?: [];
+        } catch (\Throwable $e) {
+            return $this->cursoPorSerieCache;
+        }
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            $cursoId = (int) ($row['curso_id'] ?? 0);
+            if ($id > 0 && $cursoId > 0) {
+                $this->cursoPorSerieCache[$id] = $cursoId;
+            }
+        }
+
+        return $this->cursoPorSerieCache;
+    }
+
+    public static function hexCor(string $cor): string
+    {
+        $cor = strtolower(trim($cor));
+        return preg_match('/^#[0-9a-f]{6}$/', $cor) ? $cor : '';
+    }
+
+    public static function textoSobreCor(string $hex): string
+    {
+        $hex = ltrim(self::hexCor($hex), '#');
+        if (strlen($hex) !== 6) {
+            return '#ffffff';
+        }
+        $canal = static function (string $par): float {
+            $c = hexdec($par) / 255;
+            return $c <= 0.03928 ? $c / 12.92 : (($c + 0.055) / 1.055) ** 2.4;
+        };
+        $luma = (0.2126 * $canal(substr($hex, 0, 2)))
+            + (0.7152 * $canal(substr($hex, 2, 2)))
+            + (0.0722 * $canal(substr($hex, 4, 2)));
+
+        return $luma > 0.55 ? '#111827' : '#ffffff';
     }
 
     /**

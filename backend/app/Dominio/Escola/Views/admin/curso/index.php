@@ -5,7 +5,17 @@ $status = (string) ($status ?? '');
 $message = (string) ($message ?? '');
 $csrf_token = $csrf_token ?? '';
 $has_tipo_possui_serie = (bool) ($has_tipo_possui_serie ?? false);
+$has_cor = (bool) ($has_cor ?? false);
 $somente_drawers = !empty($somente_drawers);
+$coresPreset = ['#0d9488', '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#16a34a', '#0891b2', '#b45309'];
+$coresUsadas = [];
+foreach (is_array($list ?? null) ? $list : [] as $rowCor) {
+    $hexCor = strtolower(trim((string) ($rowCor['cor'] ?? '')));
+    if (preg_match('/^#[0-9a-f]{6}$/', $hexCor)) {
+        $coresUsadas[$hexCor] = $hexCor;
+    }
+}
+$coresUsadas = array_values($coresUsadas);
 
 if (!$somente_drawers):
 $page_header_title = 'Cursos';
@@ -212,6 +222,23 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                     </div>
                     <?php endif; ?>
 
+                    <?php if ($has_cor): ?>
+                    <div class="sm:col-span-2">
+                        <label for="cu_cor" class="block text-sm font-medium text-gray-700 mb-1">Cor</label>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <input type="color" id="cu_cor" name="cor" value="#0d9488"
+                                   class="h-10 w-14 cursor-pointer rounded-lg border border-gray-300 bg-white p-1">
+                            <?php foreach ($coresPreset as $hex): ?>
+                            <button type="button" class="js-cor-preset h-7 w-7 rounded-full border border-black/10"
+                                    style="background:<?= htmlspecialchars($hex, ENT_QUOTES, 'UTF-8') ?>"
+                                    data-cor="<?= htmlspecialchars($hex, ENT_QUOTES, 'UTF-8') ?>"
+                                    title="<?= htmlspecialchars($hex, ENT_QUOTES, 'UTF-8') ?>"></button>
+                            <?php endforeach; ?>
+                        </div>
+                        <p class="mt-1 text-xs text-gray-500">O calendário letivo deste curso usa essa cor.</p>
+                    </div>
+                    <?php endif; ?>
+
                     <div class="sm:col-span-2">
                         <label for="cu_descricao" class="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
                         <textarea id="cu_descricao" name="descricao" rows="3"
@@ -273,6 +300,44 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
 })();
 <?php endif; ?>
 
+var coresPresetCurso = <?= json_encode($coresPreset, JSON_UNESCAPED_UNICODE) ?>;
+var coresUsadasCurso = <?= json_encode($coresUsadas, JSON_UNESCAPED_UNICODE) ?>;
+
+function proximaCorCurso() {
+    for (var i = 0; i < coresPresetCurso.length; i++) {
+        if (coresUsadasCurso.indexOf(coresPresetCurso[i]) === -1) {
+            return coresPresetCurso[i];
+        }
+    }
+    return coresPresetCurso[0] || '#0d9488';
+}
+
+function aplicarCorCurso(hex) {
+    var input = document.getElementById('cu_cor');
+    if (!input) return;
+    if (!/^#[0-9a-fA-F]{6}$/.test(hex || '')) {
+        hex = proximaCorCurso();
+    }
+    input.value = String(hex).toLowerCase();
+    document.querySelectorAll('.js-cor-preset').forEach(function (btn) {
+        var ativa = (btn.getAttribute('data-cor') || '').toLowerCase() === input.value;
+        btn.style.outline = ativa ? '2px solid #111827' : '';
+        btn.style.outlineOffset = ativa ? '2px' : '';
+    });
+}
+
+document.querySelectorAll('.js-cor-preset').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        aplicarCorCurso(btn.getAttribute('data-cor') || '');
+    });
+});
+var corInputCurso = document.getElementById('cu_cor');
+if (corInputCurso) {
+    corInputCurso.addEventListener('input', function () {
+        aplicarCorCurso(corInputCurso.value);
+    });
+}
+
 function openCursoDrawer(id) {
     var form = document.getElementById('curso-form');
     form.reset();
@@ -284,6 +349,7 @@ function openCursoDrawer(id) {
     if (possuiSerieWrap) { possuiSerieWrap.classList.remove('opacity-60'); }
 
     if (!id) {
+        aplicarCorCurso(proximaCorCurso());
         form.dataset.mode = 'create';
         document.getElementById('cursoDrawerTitle').textContent = 'Novo Curso';
         document.getElementById('cu-form-submit-label').textContent = 'Salvar';
@@ -305,6 +371,7 @@ function openCursoDrawer(id) {
             document.getElementById('cu_descricao').value = data.item.descricao || '';
             document.getElementById('cu_ordem').value = data.item.ordem;
             document.getElementById('cu_ativo').checked = !!parseInt(data.item.ativo, 10);
+            aplicarCorCurso(data.item.cor || '');
             var tipoSel = document.getElementById('cu_tipo');
             if (tipoSel) {
                 tipoSel.value = data.item.tipo || 'regular';

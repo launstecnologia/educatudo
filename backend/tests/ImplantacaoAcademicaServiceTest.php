@@ -1,48 +1,72 @@
 <?php
 
-require_once dirname(__DIR__) . '/app/Services/ImplantacaoAcademicaService.php';
+require_once dirname(__DIR__) . '/app/Dominio/Escola/Services/ImplantacaoAcademicaService.php';
 
 use PHPUnit\Framework\TestCase;
 
 class ImplantacaoAcademicaServiceTest extends TestCase
 {
-    public function testMontarPassosMarcaPendencias(): void
+    public function testMontarPassosMarcaPendenciasDaAvaliacao(): void
     {
         $passos = ImplantacaoAcademicaService::montarPassos([
-            'matrizes' => 1,
-            'quadros' => 0,
             'regras_aprovacao' => 2,
+            'eventos' => 0,
             'boletins' => 0,
-            'avaliacoes' => 0,
-            'calendario' => true,
-            'fechamento_schema' => false,
+            'boletim_layouts' => 0,
         ]);
         $porChave = [];
         foreach ($passos as $p) {
             $porChave[$p['chave']] = $p;
         }
-        $this->assertTrue($porChave['matriz']['ok']);
-        $this->assertFalse($porChave['quadro']['ok']);
         $this->assertTrue($porChave['regra']['ok']);
-        $this->assertFalse($porChave['modelo']['ok']);
-        $this->assertTrue($porChave['calendario']['ok']);
-        $this->assertFalse($porChave['fechamento']['ok']);
-        $this->assertSame('/admin/quadros-notas', $porChave['quadro']['href']);
+        $this->assertFalse($porChave['eventos']['ok']);
+        $this->assertFalse($porChave['demonstrativo']['ok']);
+        $this->assertFalse($porChave['boletim']['ok']);
+        $this->assertFalse($porChave['relatorio']['ok']);
+        $this->assertSame('/admin/eventos-avaliativos', $porChave['eventos']['href']);
+        $this->assertSame('/admin/boletins', $porChave['demonstrativo']['href']);
+        $this->assertSame('/admin/eventos-avaliativos/boletim', $porChave['boletim']['href']);
+        $this->assertArrayNotHasKey('quadro', $porChave);
+        $this->assertArrayNotHasKey('tipos_nota', $porChave);
+        $this->assertArrayNotHasKey('modelo', $porChave);
     }
 
-    public function testTrilhaCompletaComTudoPronto(): void
+    public function testRelatorioFicaProntoComDemonstrativoOuBoletim(): void
     {
-        $passos = ImplantacaoAcademicaService::montarPassos([
-            'matrizes' => 3,
-            'quadros' => 1,
-            'regras_aprovacao' => 1,
+        $soDemonstrativo = ImplantacaoAcademicaService::montarPassos([
             'boletins' => 1,
-            'avaliacoes' => 4,
-            'calendario' => 1,
-            'fechamento_schema' => 1,
+            'boletim_layouts' => 0,
         ]);
-        foreach ($passos as $p) {
-            $this->assertTrue($p['ok'], $p['chave']);
+        $soBoletim = ImplantacaoAcademicaService::montarPassos([
+            'boletins' => 0,
+            'boletim_layouts' => 1,
+        ]);
+        $porChave = static function (array $passos): array {
+            $mapa = [];
+            foreach ($passos as $p) {
+                $mapa[$p['chave']] = $p;
+            }
+            return $mapa;
+        };
+        $this->assertTrue($porChave($soDemonstrativo)['relatorio']['ok']);
+        $this->assertFalse($porChave($soDemonstrativo)['boletim']['ok']);
+        $this->assertTrue($porChave($soBoletim)['relatorio']['ok']);
+        $this->assertFalse($porChave($soBoletim)['demonstrativo']['ok']);
+    }
+
+    public function testGuiaPublicoNaoMarcaPassoComoPronto(): void
+    {
+        $guia = (new ImplantacaoAcademicaService())->guiaPublico();
+        $chaves = [];
+        foreach ($guia['passos'] as $passo) {
+            $chaves[] = $passo['chave'];
+            $this->assertFalse($passo['ok'], $passo['chave']);
         }
+        $this->assertContains('eventos', $chaves);
+        $this->assertContains('demonstrativo', $chaves);
+        $this->assertContains('boletim', $chaves);
+        $this->assertContains('relatorio', $chaves);
+        $this->assertNotContains('quadro', $chaves);
+        $this->assertNotContains('tipos_nota', $chaves);
     }
 }

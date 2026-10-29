@@ -41,6 +41,14 @@ class SchoolCalendarController extends AdminBaseController
             }
         }
         $eventos = $cfg ? $service->eventos((int) $cfg['id']) : [];
+        $gradesProvas = [];
+        if ($eventos !== [] && class_exists(\App\Modulos\EventosAvaliativos\Services\EventoAvaliativoService::class)) {
+            $gradesProvas = (new \App\Modulos\EventosAvaliativos\Services\EventoAvaliativoService())->gradesDosCompromissos(
+                $eventos,
+                array_map('intval', (array) ($cfg['curso_ids'] ?? [])),
+                array_map('intval', (array) ($cfg['serie_ids'] ?? []))
+            );
+        }
         $status = $cfg
             ? $service->status((int) $cfg['id'], $ano, (int) $cfg['dias_meta'], (int) $cfg['carga_horaria_meta'])
             : null;
@@ -58,6 +66,7 @@ class SchoolCalendarController extends AdminBaseController
             'varios_pronto' => $service->variosDisponivel(),
             'cursos_series' => $service->variosDisponivel() ? $service->cursosComSeries() : [],
             'eventos' => $eventos,
+            'grades_provas' => $gradesProvas,
             'status' => $status,
             'schema_pronto' => $service->tableExists(),
             'pode_publicar_escolar' => $this->podePublicarCalendarioEscolar($service),

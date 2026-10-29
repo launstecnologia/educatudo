@@ -1574,6 +1574,7 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
             $provasMatrizBlocos = ['tabelas' => [], 'tem_dados' => false];
         }
         $boletinsPortalNotas = $this->boletinsVisiveisNoPortal((int) $aluno['id'], 'aluno', 'notas');
+        $notasEventosAoVivo = $this->notasEventosAoVivoDoAluno($aluno, $boletinsPortalNotas);
         $fichaIdPortal = isset($_GET['ficha_id']) ? (int) $_GET['ficha_id'] : 0;
         $boletimOficial = $this->boletimOficialPortal((int) $aluno['id'], $fichaIdPortal);
 
@@ -1589,6 +1590,7 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
             'notas_lancamento_eventos' => [],
             'boletins_gerados' => [],
             'boletins_gerados_notas' => $boletinsPortalNotas,
+            'notas_eventos_ao_vivo' => $notasEventosAoVivo,
             'boletins_gerados_notas_extra' => [],
             'boletins_gerados_boletim' => [],
             'boletim_oficial' => $boletimOficial,
@@ -1604,6 +1606,46 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
         ];
 
         $this->viewWithLayout('student', 'student/notas-boletins', $data);
+    }
+
+    /**
+     * Notas lançadas dos eventos marcados. Some quando o boletim daquele período já está visível.
+     *
+     * @param array<string,mixed> $aluno
+     * @param list<array<string,mixed>> $boletinsVisiveis
+     * @return list<array<string,mixed>>
+     */
+    private function notasEventosAoVivoDoAluno(array $aluno, array $boletinsVisiveis): array
+    {
+        if (!LayoutHelper::isModuleEnabled('eventos_avaliativos')) {
+            return [];
+        }
+        try {
+            $periodos = (new \App\Modulos\EventosAvaliativos\Services\EventoAvaliativoService())
+                ->notasAoVivoDoAluno((int) ($aluno['id'] ?? 0), (int) ($aluno['turma_id'] ?? 0));
+        } catch (\Throwable $e) {
+            error_log('Notas ao vivo do aluno #' . (int) ($aluno['id'] ?? 0) . ': ' . $e->getMessage());
+            return [];
+        }
+        $fechados = [];
+        foreach ($boletinsVisiveis as $boletim) {
+            if (!is_array($boletim)) {
+                continue;
+            }
+            $ano = (int) ($boletim['ano_letivo'] ?? 0);
+            $bimestre = (int) ($boletim['bimestre'] ?? 0);
+            if ($ano > 0 && $bimestre > 0) {
+                $fechados[$ano . ':' . $bimestre] = true;
+            }
+        }
+        $abertos = [];
+        foreach ($periodos as $periodo) {
+            $chave = (int) ($periodo['ano'] ?? 0) . ':' . (int) ($periodo['bimestre'] ?? 0);
+            if (empty($fechados[$chave])) {
+                $abertos[] = $periodo;
+            }
+        }
+        return $abertos;
     }
 
     public function notas()
@@ -7984,6 +8026,8 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
             'tipoText' => $visuais['text'],
             'calendario_nome' => (string) ($cfg['nome'] ?? ''),
             'calendario_rotulo' => (string) ($cfg['rotulo'] ?? ''),
+            'calendario_cor' => (string) ($cfg['cor'] ?? ''),
+            'calendario_cor_texto' => (string) ($cfg['cor_texto'] ?? ''),
         ]);
     }
 }

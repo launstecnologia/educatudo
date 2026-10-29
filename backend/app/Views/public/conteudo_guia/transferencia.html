@@ -1,0 +1,115 @@
+<div class="guia-referencia"><div class="sec">
+  
+  <p class="s">Sim, o sistema registra a escola anterior. Cadastrar e matricular só coloca o aluno
+  na turma daqui. Os anos e as notas de fora entram na <b>Vida Escolar</b> da ficha (aba Vida escolar → Trajetória).
+  Sem isso, o papel sai só com o que ele cursar nesta instituição. Como abrir cada aba da ficha: seção “A ficha do aluno”.</p>
+
+  <div class="cadeia">
+    <h3>Dois atos diferentes</h3>
+    <p class="sub">Matricular como transferido não preenche sozinho o quadro de equivalência.</p>
+    <div class="elo"><span class="dot"></span><span class="tx"><span class="tt">1 · Entrar na escola</span>
+      <span class="dd">Cadastro + matrícula tipo Transferência (vindo de outra instituição).</span></span></div>
+    <div class="seta">↓</div>
+    <div class="elo hi"><span class="dot"></span><span class="tx"><span class="tt">2 · Registrar a escola anterior</span>
+      <span class="dd">Vida Escolar → Trajetória → Lançar Escola (anos fechados) e, se chegou no meio do ano, os bimestres no boletim.</span></span></div>
+    <div class="seta">↓</div>
+    <div class="elo"><span class="dot"></span><span class="tx"><span class="tt">3 · O histórico oficial puxa daqui</span>
+      <span class="dd">Gerar rascunho junta estes anos externos com os homologados nesta escola.</span></span></div>
+    <div class="alerta"><b>Não confundir com a saída.</b> Secretaria → Movimentação → Saída da escola (TR) é quando o aluno <i>deixa</i> o colégio. Aqui é o contrário: ele está chegando.</div>
+  </div>
+
+<details class="card num" id="ref-transferencia-t0">
+  <summary class="head">
+    <span class="n">1</span>
+    <span class="tit">
+      <b>Matricular como transferência</b>
+      <span class="ok">Alunos ou Matrículas · tipo Transferência</span>
+    </span>
+    <span class="chev">▸</span>
+  </summary>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Cadastre o aluno (nome, nascimento, documentos) se ele ainda não existe.</li>
+    <li>Na matrícula, escolha o tipo <b>Transferência</b> — “Vindo de outra instituição”. Também em Secretaria → Matrículas (<code>/admin/matricula</code>).</li>
+    <li>Informe ano letivo, turma e a data de entrada. Quem chegou depois do início do ano precisa dessa data certa, senão a frequência e o boletim distorcem.</li>
+    <li>Vincule o responsável. Sem ele não há app da família nem comunicação da secretaria.</li>
+  </ol>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Usar Matrícula nova para quem já cursou outra escola. O tipo Transferência marca a origem; o cadastro das notas de fora é o passo seguinte.</li>
+    <li>Parar aqui. O aluno já aparece na turma, mas o histórico ainda não tem o 1º, o 2º, o 5º…</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Vida Escolar, boletim desta escola e histórico oficial.</div></div>
+</details>
+
+<details class="card num" id="ref-transferencia-t1">
+  <summary class="head">
+    <span class="n">2</span>
+    <span class="tit">
+      <b>Anexar o papel da outra escola</b>
+      <span class="ok">Ficha do aluno → Vida Escolar → Histórico / emissões</span>
+    </span>
+    <span class="chev">▸</span>
+  </summary>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Abra a ficha: Secretaria → Vida Escolar, ou Acadêmico → Alunos → o aluno → aba Vida Escolar.</li>
+    <li>Vá em <b>Histórico / emissões</b>. No bloco <b>Recebidos de outra escola</b>, escolha o tipo (Histórico escolar, Ficha individual ou Declaração de transferência).</li>
+    <li>Informe a escola emissora, anexe o PDF ou a imagem e clique em <span class="btnex">Anexar</span>. Sem arquivo anexado, o botão de IA ainda não existe.</li>
+    <li><b>Onde está Ler com IA:</b> depois do Anexar, o arquivo aparece numa linha acima do formulário. Nessa linha, à direita, ficam <span class="btnex">Abrir</span> e o link roxo <span class="btnex">Ler com IA</span>. Não fica ao lado do botão Anexar.</li>
+    <li>O rascunho vai para a aba Trajetória. Só entra na trajetória oficial depois de <span class="btnex">Validar leitura</span>.</li>
+  </ol>
+  <div class="shots"><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/088-docs-outra-escola.jpg" data-print-legenda="Formulário de anexar — Ler com IA ainda não aparece" aria-label="Ampliar: Formulário de anexar — Ler com IA ainda não aparece" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/088-docs-outra-escola.jpg" alt="Recebidos de outra escola — anexar o PDF" loading="lazy" width="983" height="718"></button></figure></div>
+  <div class="nota">Neste print o bloco está vazio: só o formulário (Tipo, Escola, Arquivo, Anexar). O texto “Depois use Ler com IA” é instrução. O botão só nasce na <b>linha do PDF já anexado</b>. Tipo tem que ser Histórico, Ficha individual ou Declaração de transferência (Guia/Outro não mostram o botão). Se a escola não tiver crédito de IA para ler histórico, o link também não aparece — aí o caminho é Lançar Escola à mão.</div>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Procurar Ler com IA ao lado de Anexar. Ele não está no formulário; está na linha do arquivo, depois de anexar.</li>
+    <li>Achar que anexar o PDF já preenche o histórico oficial. O anexo é o comprovante; as notas entram em Lançar Escola ou na validação da leitura.</li>
+    <li>Validar a leitura da IA sem conferir nota a nota. A IA erra nomes de disciplina e vírgula de nota.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Lançar Escola (documento anexado aparece no seletor) e auditoria da transferência.</div></div>
+</details>
+
+<details class="card num" id="ref-transferencia-t2">
+  <summary class="head">
+    <span class="n">3</span>
+    <span class="tit">
+      <b>Lançar a escola anterior<span class="sel out">o essencial</span></b>
+      <span class="ok">Vida Escolar → Trajetória → Lançar Escola</span>
+    </span>
+    <span class="chev">▸</span>
+  </summary>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Na mesma ficha, aba <b>Trajetória</b>. Clique em <span class="btnex">Lançar Escola</span>.</li>
+    <li>Preencha a escola de origem: nome, município, UF e INEP (se tiver). Vincule o documento anexado no passo 2.</li>
+    <li>Informe o ano letivo, a série (ex.: 7º Ano) e o resultado (Aprovado, Transferido…).</li>
+    <li>Lance as disciplinas com nota e carga horária. Linhas em branco são ignoradas. Clique em <span class="btnex">Adicionar ano</span>.</li>
+    <li>Repita para cada ano fechado na outra instituição — 5º, 6º, 7º… Cada clique grava um ano na trajetória, com origem “externa”.</li>
+  </ol>
+  <div class="shots"><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/086-trajetoria-lancar-escola.jpg" data-print-legenda="Trajetória — Lançar Escola" aria-label="Ampliar: Trajetória — Lançar Escola" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/086-trajetoria-lancar-escola.jpg" alt="Trajetória escolar" loading="lazy" width="983" height="718"></button></figure><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/087-lancar-escola-drawer.jpg" data-print-legenda="Formulário da escola de origem" aria-label="Ampliar: Formulário da escola de origem" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/087-lancar-escola-drawer.jpg" alt="Lançar Escola" loading="lazy" width="983" height="718"></button></figure></div>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Lançar o ano em curso da outra escola aqui. Anos já fechados vão em Lançar Escola; bimestres do ano atual, se ele chegou no meio do ano, vão no passo 4.</li>
+    <li>Um único lançamento para vários anos. É um ano por vez, senão a série e o resultado misturam.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Quadro de equivalência do histórico oficial (escola de origem, município, estado, resultado).</div>
+  <div class="nota">É exatamente a tabela de estabelecimento do histórico: série, ano, escola, município, UF e resultado.</div></div>
+</details>
+
+<details class="card num" id="ref-transferencia-t3">
+  <summary class="head">
+    <span class="n">4</span>
+    <span class="tit">
+      <b>Chegou no meio do ano? Bimestres no boletim</b>
+      <span class="ok">Trajetória → Notas do ano em curso (outra escola)</span>
+    </span>
+    <span class="chev">▸</span>
+  </summary>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Só se ele já tem bimestre lançado na escola de origem neste mesmo ano letivo.</li>
+    <li>No bloco Notas do ano em curso (outra escola), informe a escola, a data da transferência e, se houver, o documento.</li>
+    <li>Preencha nota e faltas só dos bimestres que constam no papel da outra escola.</li>
+    <li>Esses lançamentos entram no <b>boletim desta escola</b> (origem externa). Os anos já fechados continuam em Lançar Escola.</li>
+  </ol>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Digitar o 6º e o 7º ano neste bloco. Aqui é só o ano em curso, bimestre a bimestre.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Boletim do ano em que ele chegou e fechamento desta turma.</div>
+  <div class="nota">Se ele chegou no 1º dia de aula, pule este passo. Não há bimestre de fora para importar.</div></div>
+</details>
+</div></div>

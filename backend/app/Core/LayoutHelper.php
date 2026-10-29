@@ -1317,7 +1317,7 @@ class LayoutHelper
 
         $root = $dom->getElementById('enunciado-root');
         if (!$root) {
-            return $html;
+            return htmlspecialchars($html, ENT_QUOTES, 'UTF-8');
         }
 
         $proibidas = ['script', 'style', 'iframe', 'object', 'embed', 'form', 'button', 'input', 'textarea', 'select', 'link', 'meta'];
@@ -1333,47 +1333,11 @@ class LayoutHelper
 
         $xpath = new \DOMXPath($dom);
         foreach ($xpath->query('.//*', $root) ?: [] as $el) {
-            if (!$el instanceof \DOMElement) {
+            if (!$el instanceof \DOMElement || strtolower($el->tagName) === 'img') {
                 continue;
             }
-            if ($el->hasAttribute('hidden')) {
-                $el->removeAttribute('hidden');
-            }
-            $classes = preg_split('/\s+/', trim($el->getAttribute('class'))) ?: [];
-            $classes = array_values(array_filter($classes, static function ($classe) {
-                return $classe !== '' && $classe !== 'hidden' && $classe !== 'questao-container';
-            }));
-            if ($classes === []) {
-                $el->removeAttribute('class');
-            } else {
-                $el->setAttribute('class', implode(' ', $classes));
-            }
-            if ($el->hasAttribute('data-questao-index') || $el->hasAttribute('data-questao-id')) {
-                $el->removeAttribute('data-questao-index');
-                $el->removeAttribute('data-questao-id');
-            }
-            if ($el->hasAttribute('style')) {
-                $style = preg_replace(
-                    '/(?:display|position|visibility|opacity|z-index|content|transform|top|left|right|bottom)\s*:[^;]*;?/i',
-                    '',
-                    $el->getAttribute('style')
-                );
-                $style = trim((string) $style, " \t\n\r;");
-                if ($style === '') {
-                    $el->removeAttribute('style');
-                } else {
-                    $el->setAttribute('style', $style);
-                }
-            }
-            $removerAtributos = [];
-            foreach ($el->attributes as $attr) {
-                $nome = strtolower($attr->name);
-                if (strpos($nome, 'on') === 0 || $nome === 'srcdoc' || $nome === 'formaction') {
-                    $removerAtributos[] = $attr->name;
-                }
-            }
-            foreach ($removerAtributos as $nome) {
-                $el->removeAttribute($nome);
+            while ($el->attributes->length > 0) {
+                $el->removeAttribute($el->attributes->item(0)->name);
             }
         }
 
@@ -1381,12 +1345,12 @@ class LayoutHelper
             if (!$img instanceof \DOMElement || !$img->parentNode) {
                 continue;
             }
-            $src = $img->getAttribute('src');
+            $src = trim($img->getAttribute('src'));
             $alt = $img->getAttribute('alt');
             while ($img->attributes->length > 0) {
                 $img->removeAttribute($img->attributes->item(0)->name);
             }
-            if ($src === '' || preg_match('/^\s*javascript:/i', $src)) {
+            if (!self::srcEnunciadoPermitido($src)) {
                 $img->parentNode->removeChild($img);
                 continue;
             }
@@ -1402,6 +1366,24 @@ class LayoutHelper
         }
 
         return $saida;
+    }
+
+    /**
+     * Imagem do enunciado só com http(s) ou caminho relativo. data:, javascript: e vbscript: saem.
+     */
+    private static function srcEnunciadoPermitido(string $src): bool
+    {
+        if ($src === '') {
+            return false;
+        }
+        if (preg_match('#^https?://#i', $src)) {
+            return true;
+        }
+        if (preg_match('#^[a-z][a-z0-9+.-]*:#i', $src) || strpos($src, '//') === 0) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

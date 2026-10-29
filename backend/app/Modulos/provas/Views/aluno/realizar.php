@@ -959,11 +959,30 @@ function registrarLogProvaEvento(tipoEvento, detalhe) {
 
 function aplicarBloqueiosSeguranca() {
     <?php if (!empty($modo_embed) && !empty($modo_seguro)): ?>
-    // Captura Esc e F11 no iframe para não sair do fullscreen do pai
+    // Abrir outra matéria navega o iframe e o navegador manda Esc ao sair da tela cheia.
+    // Nesses segundos o aviso de "saiu da prova" é falso.
+    (function() {
+        var paramsAbrindo = new URLSearchParams(window.location.search);
+        if (paramsAbrindo.get('abrindo') === '1') {
+            window._abrindoMateriaAte = Date.now() + 5000;
+            paramsAbrindo.delete('abrindo');
+            if (window.history && window.history.replaceState) {
+                var limpa = window.location.pathname + (paramsAbrindo.toString() ? '?' + paramsAbrindo.toString() : '') + window.location.hash;
+                window.history.replaceState({}, '', limpa);
+            }
+        }
+    })();
+    function trocaDeMateriaEmAndamento() {
+        return (window._trocandoMateriaAte && Date.now() < window._trocandoMateriaAte)
+            || (window._abrindoMateriaAte && Date.now() < window._abrindoMateriaAte);
+    }
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' || e.key === 'F11') {
             e.preventDefault();
-            e.stopPropagation();
+            e.stopImmediatePropagation();
+            if (trocaDeMateriaEmAndamento() || window._finalizandoProva || window._provaCancelada) {
+                return false;
+            }
             if (typeof registrarMotivoSaidaSeguro === 'function') {
                 registrarMotivoSaidaSeguro(e.key === 'Escape' ? 'tecla_esc' : 'tecla_f11');
             }
@@ -1005,6 +1024,12 @@ function aplicarBloqueiosSeguranca() {
         if (window._finalizandoProva || window._provaCancelada) {
             return;
         }
+        if (window._trocandoMateriaAte && Date.now() < window._trocandoMateriaAte) {
+            return;
+        }
+        if (window._abrindoMateriaAte && Date.now() < window._abrindoMateriaAte) {
+            return;
+        }
         <?php if (empty($modo_embed)): ?>
         var urlParamsUnload = new URLSearchParams(window.location.search);
         if (urlParamsUnload.get('modo_seguro') === '1' && typeof cancelarBlocoModoSeguroNoServidor === 'function') {
@@ -1031,8 +1056,9 @@ function aplicarBloqueiosSeguranca() {
     var mod = function(e) { return e.ctrlKey || e.metaKey; };
     document.addEventListener('keydown', function(e) {
         if (typeof registrarMotivoSaidaSeguro === 'function') {
-            if (e.key === 'Escape') registrarMotivoSaidaSeguro('tecla_esc');
-            else if (e.key === 'F11') registrarMotivoSaidaSeguro('tecla_f11');
+            var trocaMateria = typeof trocaDeMateriaEmAndamento === 'function' && trocaDeMateriaEmAndamento();
+            if (!trocaMateria && e.key === 'Escape') registrarMotivoSaidaSeguro('tecla_esc');
+            else if (!trocaMateria && e.key === 'F11') registrarMotivoSaidaSeguro('tecla_f11');
             else if (mod(e) && (e.key === 'w' || e.key === 'W')) registrarMotivoSaidaSeguro('atalho_fechar_aba');
             else if (mod(e) && (e.key === 't' || e.key === 'T')) registrarMotivoSaidaSeguro('atalho_nova_aba');
         }

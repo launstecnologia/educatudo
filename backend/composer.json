@@ -74,6 +74,7 @@
             "App\\Modulos\\AgrupamentosComponentes\\": "app/Modulos/agrupamentos-componentes/",
             "App\\Modulos\\EducaHits\\": "app/Modulos/educahits/",
             "App\\Modulos\\EducaLabs\\": "app/Modulos/educalabs/",
+            "App\\Modulos\\EventosAvaliativos\\": "app/Modulos/eventos-avaliativos/",
             "App\\Modulos\\ExternalApps\\": "app/Modulos/external-apps/",
             "App\\Modulos\\Lex\\": "app/Modulos/lex/",
             "App\\Modulos\\Jogos\\": "app/Modulos/jogos/",

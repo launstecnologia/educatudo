@@ -409,7 +409,7 @@ class ReportAdminController extends AdminBaseController
             'current_page' => 'reports_boletim_coordenacao',
             'fonte' => $fonte,
             'incluir_antigas' => $incluirAntigas,
-            'anos_letivos' => $anosLista = $this->listarAnosBoletimCoordenacao(),
+            'anos_letivos' => $anosLista = $this->listarAnosBoletimCoordenacao($anoLetivo),
             'periodos_por_ano' => $this->mapaPeriodosBoletimCoordenacao($anosLista),
             'periodo' => $periodo,
             'turmas' => $this->listarTurmasBoletimCoordenacao(),
@@ -1034,24 +1034,36 @@ class ReportAdminController extends AdminBaseController
     }
 
     /**
+     * Anos do cadastro de ano letivo. O ano pedido na URL entra na lista
+     * mesmo que o cadastro tenha sido removido.
+     *
      * @return list<int>
      */
-    private function listarAnosBoletimCoordenacao(): array
+    private function listarAnosBoletimCoordenacao(int $anoPedido = 0): array
     {
-        $rows = $this->db->fetchAll(
-            'SELECT DISTINCT ano_letivo FROM turmas WHERE ativo = 1 AND ano_letivo IS NOT NULL ORDER BY ano_letivo DESC'
-        ) ?: [];
         $anos = [];
-        foreach ($rows as $row) {
-            $ano = (int) ($row['ano_letivo'] ?? 0);
-            if ($ano > 0) {
-                $anos[] = $ano;
+        try {
+            $rows = $this->db->fetchAll(
+                'SELECT ano FROM ano_letivo WHERE ano IS NOT NULL ORDER BY ano DESC'
+            ) ?: [];
+            foreach ($rows as $row) {
+                $ano = (int) ($row['ano'] ?? 0);
+                if ($ano >= 2000 && $ano <= 2100) {
+                    $anos[$ano] = $ano;
+                }
             }
+        } catch (\Throwable $e) {
+            error_log('ReportAdminController::listarAnosBoletimCoordenacao: ' . $e->getMessage());
+        }
+        if ($anoPedido >= 2000 && $anoPedido <= 2100) {
+            $anos[$anoPedido] = $anoPedido;
         }
         if ($anos === []) {
-            $anos[] = (int) date('Y');
+            $anos[(int) date('Y')] = (int) date('Y');
         }
-        return $anos;
+        krsort($anos);
+
+        return array_values($anos);
     }
 
     /**
@@ -1448,7 +1460,7 @@ class ReportAdminController extends AdminBaseController
             $ano = (int) ($evento['ano_letivo'] ?? 0);
             $bimestre = (int) ($evento['bimestre'] ?? 0);
             $rotuloPeriodo = '';
-            if ($bimestre > 0 && class_exists('PeriodoLetivo')) {
+            if ($bimestre > 0) {
                 $rotuloPeriodo = PeriodoLetivo::rotulo($ano > 0 ? $ano : (int) date('Y'), $bimestre);
             }
             $detalhes = [$tipoLabel];
@@ -2312,17 +2324,9 @@ class ReportAdminController extends AdminBaseController
         if ($bimestre <= 0) {
             return '';
         }
-        $pathPeriodo = __DIR__ . '/../../Core/PeriodoLetivo.php';
-        if (is_file($pathPeriodo)) {
-            require_once $pathPeriodo;
-        }
-        if (class_exists('PeriodoLetivo', false)) {
-            $rotulo = PeriodoLetivo::rotulo($anoLetivo > 0 ? $anoLetivo : (int) date('Y'), $bimestre);
-            if ($rotulo !== '') {
-                return $rotulo;
-            }
-        }
-        return $bimestre . 'º Bimestre';
+        $rotulo = PeriodoLetivo::rotulo($anoLetivo > 0 ? $anoLetivo : (int) date('Y'), $bimestre);
+
+        return $rotulo !== '' ? $rotulo : ($bimestre . 'º Período');
     }
 
     /**
@@ -2588,13 +2592,7 @@ class ReportAdminController extends AdminBaseController
      */
     private function colunasFichaVidaEscolar(int $anoLetivo, int $periodoFiltro = 0): array
     {
-        $pathPeriodo = __DIR__ . '/../../Core/PeriodoLetivo.php';
-        if (is_file($pathPeriodo) && !class_exists('PeriodoLetivo', false)) {
-            require_once $pathPeriodo;
-        }
-        $info = class_exists('PeriodoLetivo', false)
-            ? PeriodoLetivo::doAno($anoLetivo > 0 ? $anoLetivo : (int) date('Y'))
-            : ['quantidade' => 4, 'rotulos' => [1 => '1º Bimestre', 2 => '2º Bimestre', 3 => '3º Bimestre', 4 => '4º Bimestre']];
+        $info = PeriodoLetivo::doAno($anoLetivo > 0 ? $anoLetivo : (int) date('Y'));
         $numeros = [];
         $quantidade = max(1, (int) ($info['quantidade'] ?? 4));
         for ($i = 1; $i <= $quantidade; $i++) {
@@ -2627,13 +2625,6 @@ class ReportAdminController extends AdminBaseController
         if ($numero <= 0) {
             return 0;
         }
-        $pathPeriodo = __DIR__ . '/../../Core/PeriodoLetivo.php';
-        if (is_file($pathPeriodo) && !class_exists('PeriodoLetivo', false)) {
-            require_once $pathPeriodo;
-        }
-        if (!class_exists('PeriodoLetivo', false)) {
-            return $numero >= 1 && $numero <= 4 ? $numero : 0;
-        }
         $ano = $anoLetivo > 0 ? $anoLetivo : (int) date('Y');
 
         return PeriodoLetivo::numeroValido($ano, $numero) ? $numero : 0;
@@ -2645,14 +2636,10 @@ class ReportAdminController extends AdminBaseController
      */
     private function mapaPeriodosBoletimCoordenacao(array $anos): array
     {
-        $pathPeriodo = __DIR__ . '/../../Core/PeriodoLetivo.php';
-        if (is_file($pathPeriodo) && !class_exists('PeriodoLetivo', false)) {
-            require_once $pathPeriodo;
-        }
         $mapa = [];
         foreach ($anos as $ano) {
             $ano = (int) $ano;
-            if ($ano <= 0 || !class_exists('PeriodoLetivo', false)) {
+            if ($ano <= 0) {
                 continue;
             }
             $info = PeriodoLetivo::doAno($ano);
@@ -2663,8 +2650,9 @@ class ReportAdminController extends AdminBaseController
                     'rotulo' => (string) $rotulo,
                 ];
             }
+            $rotuloCampo = trim((string) ($info['rotulo_campo'] ?? ''));
             $mapa[(string) $ano] = [
-                'rotulo' => (string) ($info['rotulo_campo'] ?? 'Bimestre'),
+                'rotulo' => $rotuloCampo !== '' ? $rotuloCampo : 'Período',
                 'opcoes' => $opcoes,
             ];
         }

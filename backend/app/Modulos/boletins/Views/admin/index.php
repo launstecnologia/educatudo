@@ -12,7 +12,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 
 <div class="mb-6 flex items-start justify-between gap-3 flex-wrap">
     <div>
-        <h2 class="text-lg font-semibold text-gray-900">Modelos de boletim</h2>
+        <h2 class="text-lg font-semibold text-gray-900"><?= !empty($modeloEvento) ? 'Modelos de Demonstrativo de Notas' : 'Modelos de boletim' ?></h2>
         <p class="text-sm text-gray-600 mt-1">Defina as matérias, as turmas e a regra de aprovação de cada modelo.</p>
     </div>
     <a href="<?= URL ?>/admin/boletins/novo"

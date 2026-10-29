@@ -127,6 +127,7 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
     var ignorarVisibilityAte = 0;
     var transicaoMateria = false;
     var aguardandoProximaMateria = false;
+    var folgaTelaCheiaAte = 0;
     var cargaIframeSeq = 0;
     var blocoIdCancelar = <?= (int)$blocoId ?>;
     // EducaInclui: acomodações do aluno (resolvidas no controller)
@@ -497,7 +498,13 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
             tela.style.display = 'block';
         }
         mostrarOverlayCarregandoMateria();
-        try { window.focus(); } catch (e) {}
+        if (!estaEmFullscreen()) {
+            mostrarOverlayTelaCheia();
+        }
+    }
+
+    function cobrarTelaCheiaDepoisDaTroca() {
+        if (permitirSair || !modoSeguroAtivo || cancelamentoIniciado || aguardandoProximaMateria) return;
         if (!estaEmFullscreen()) {
             mostrarOverlayTelaCheia();
         }
@@ -505,12 +512,16 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
 
     function abrirIframeProva(url) {
         aguardandoProximaMateria = false;
-        transicaoMateria = true;
-        ignorarVisibilityAte = Date.now() + 2000;
+        transicaoMateria = false;
+        ignorarVisibilityAte = 0;
+        // Só o fullscreenchange/Esc do iframe fica em silêncio, e no máximo 8s.
+        // Fechar a aba ou trocar de aba continua cancelando.
+        folgaTelaCheiaAte = Date.now() + 8000;
         var seq = ++cargaIframeSeq;
         var conteudo = document.getElementById('conteudo-prova-segura');
         var tela = document.getElementById('tela-iframe-prova');
         var iframe = document.getElementById('iframe-prova');
+        esconderOverlayTelaCheia();
         mostrarOverlayCarregandoMateria();
         if (tela) {
             tela.style.display = 'block';
@@ -525,28 +536,25 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
             conteudo.style.background = '';
             conteudo.style.overflow = '';
         }
-        if (!estaEmFullscreen()) {
-            entrarFullscreen();
-        }
+        entrarFullscreen();
         if (iframe) {
+            try {
+                if (iframe.contentWindow) iframe.contentWindow._trocandoMateriaAte = Date.now() + 5000;
+            } catch (e) {}
             iframe.onload = function() {
                 if (seq !== cargaIframeSeq) return;
-                requestAnimationFrame(function() {
-                    requestAnimationFrame(function() {
-                        if (seq !== cargaIframeSeq) return;
-                        esconderOverlayCarregandoMateria();
-                    });
-                });
+                esconderOverlayCarregandoMateria();
+                if (Date.now() >= folgaTelaCheiaAte) {
+                    cobrarTelaCheiaDepoisDaTroca();
+                }
             };
             iframe.src = url;
         }
         setTimeout(function() {
-            if (!aguardandoProximaMateria) transicaoMateria = false;
-        }, 2000);
-        setTimeout(function() {
-            if (seq === cargaIframeSeq) {
-                esconderOverlayCarregandoMateria();
-            }
+            if (seq !== cargaIframeSeq) return;
+            folgaTelaCheiaAte = 0;
+            esconderOverlayCarregandoMateria();
+            cobrarTelaCheiaDepoisDaTroca();
         }, 8000);
     }
 
@@ -568,6 +576,9 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
             return;
         }
         if (permitirSair || !modoSeguroAtivo) return;
+        if (Date.now() < folgaTelaCheiaAte) {
+            return;
+        }
         if (transicaoMateria || aguardandoProximaMateria || Date.now() < ignorarVisibilityAte) {
             mostrarOverlayTelaCheia();
             return;
@@ -666,7 +677,7 @@ if ($bloco && !empty($bloco['data_prova']) && !empty($bloco['hora_fim'])) {
                 e.preventDefault();
                 var provaId = btn.getAttribute('data-prova-id');
                 var blocoId = <?= (int)$blocoId ?>;
-                var url = '<?= URL ?>/aluno/provas/realizar/' + provaId + '?bloco_id=' + blocoId + '&modo_bloco=1&modo_seguro=<?= $acessibilidade_relax_secure ? '0' : '1' ?>&embed=1';
+                var url = '<?= URL ?>/aluno/provas/realizar/' + provaId + '?bloco_id=' + blocoId + '&modo_bloco=1&modo_seguro=<?= $acessibilidade_relax_secure ? '0' : '1' ?>&embed=1&abrindo=1';
                 abrirIframeProva(url);
             }
         }, true);

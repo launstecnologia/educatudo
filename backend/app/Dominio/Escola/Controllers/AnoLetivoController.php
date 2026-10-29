@@ -431,11 +431,11 @@ class AnoLetivoController extends BaseController
         try {
             $this->service->cadastrar($this->dadosDoPost());
             $this->json(['success' => true, 'message' => 'Ano letivo cadastrado com sucesso.']);
-        } catch (InvalidArgumentException $e) {
+        } catch (\InvalidArgumentException $e) {
             $this->json(['error' => $e->getMessage()], 400);
-        } catch (RuntimeException $e) {
+        } catch (\RuntimeException $e) {
             $this->json(['error' => $e->getMessage()], 400);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             error_log('AnoLetivo store: ' . $e->getMessage());
             $this->json(['error' => 'Não foi possível salvar o ano letivo. Tente novamente.'], 400);
         }
@@ -454,11 +454,11 @@ class AnoLetivoController extends BaseController
         try {
             $this->service->atualizar((int) $id, $this->dadosDoPost());
             $this->json(['success' => true, 'message' => 'Ano letivo atualizado com sucesso.']);
-        } catch (InvalidArgumentException $e) {
+        } catch (\InvalidArgumentException $e) {
             $this->json(['error' => $e->getMessage()], 400);
-        } catch (RuntimeException $e) {
+        } catch (\RuntimeException $e) {
             $this->json(['error' => $e->getMessage()], 400);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             error_log('AnoLetivo update: ' . $e->getMessage());
             $this->json(['error' => 'Não foi possível atualizar o ano letivo. Tente novamente.'], 400);
         }
@@ -475,14 +475,25 @@ class AnoLetivoController extends BaseController
             return;
         }
         try {
-            $item = $this->db->fetch("SELECT id FROM ano_letivo WHERE id = :id", ['id' => $id]);
+            $item = $this->db->fetch("SELECT id FROM ano_letivo WHERE id = :id", ['id' => (int) $id]);
             if (!$item) {
                 $this->redirect('/admin/ano-letivo?status=error&message=' . rawurlencode('Ano letivo não encontrado.'));
                 return;
             }
-            $this->db->delete("DELETE FROM ano_letivo WHERE id = :id", ['id' => $id]);
+            $this->db->beginTransaction();
+            if ($this->db->tableExists('ano_letivo_periodos')) {
+                $this->db->delete(
+                    'DELETE FROM ano_letivo_periodos WHERE ano_letivo_id = :id',
+                    ['id' => (int) $id]
+                );
+            }
+            $this->db->delete("DELETE FROM ano_letivo WHERE id = :id", ['id' => (int) $id]);
+            $this->db->commit();
             $this->redirect('/admin/ano-letivo?status=success&message=' . rawurlencode('Ano letivo excluído.'));
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollback();
+            }
             $this->redirect('/admin/ano-letivo?status=error&message=' . rawurlencode($e->getMessage()));
         }
     }
@@ -499,6 +510,7 @@ class AnoLetivoController extends BaseController
             'periodo_tipo' => (string) ($_POST['periodo_tipo'] ?? ''),
             'ativo' => isset($_POST['ativo']) ? 1 : 0,
             'mapeamento' => is_array($_POST['mapeamento'] ?? null) ? $_POST['mapeamento'] : [],
+            'periodos' => is_array($_POST['periodos'] ?? null) ? $_POST['periodos'] : [],
         ];
     }
 }

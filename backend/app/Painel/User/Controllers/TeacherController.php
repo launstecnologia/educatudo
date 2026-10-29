@@ -2437,6 +2437,8 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
             'calendario_id' => (int) ($cfg['id'] ?? 0),
             'calendario_nome' => (string) ($cfg['nome'] ?? ''),
             'calendario_rotulo' => (string) ($cfg['rotulo'] ?? ''),
+            'calendario_cor' => (string) ($cfg['cor'] ?? ''),
+            'calendario_cor_texto' => (string) ($cfg['cor_texto'] ?? ''),
         ]);
     }
 }

@@ -232,6 +232,15 @@ class BoletimCadastroService
     private function normalizar(array $input): array
     {
         $regraAcademicaId = (int) ($input['regra_academica_id'] ?? 0);
+        $regraModel = new RegraAcademica();
+        if ($regraModel->boletimPronto() && $regraAcademicaId > 0) {
+            $pacote = $regraModel->pacoteBoletim($regraAcademicaId);
+            if ($pacote !== null) {
+                $input = array_merge($input, $pacote);
+                $input['regra_academica_id'] = $regraAcademicaId;
+                $input['vis_coordenacao'] = 1;
+            }
+        }
         $data = [
             'nome' => trim((string) ($input['nome'] ?? '')),
             'finalidade' => (($input['finalidade'] ?? 'oficial') === 'complementar') ? 'complementar' : 'oficial',
@@ -255,17 +264,21 @@ class BoletimCadastroService
      */
     private function validar(array $data): ?string
     {
+        $regraAcadId = (int) ($data['regra_academica_id'] ?? 0);
+        $soRegra = (new RegraAcademica())->boletimPronto();
+        if ($soRegra && $regraAcadId <= 0) {
+            return 'Escolha a regra de aprovação.';
+        }
         if ($data['nome'] === '') {
-            return 'Informe o nome do boletim.';
+            return $soRegra ? 'A regra de aprovação precisa de um nome.' : 'Informe o nome do boletim.';
         }
         $ano = (int) ($data['ano_letivo'] ?? 0);
         if ($ano < 2000 || $ano > 2100) {
-            return 'Selecione um ano letivo válido.';
+            return $soRegra ? 'A regra de aprovação precisa de um ano letivo.' : 'Selecione um ano letivo válido.';
         }
         if ($data['materias_ids'] === []) {
-            return 'Marque pelo menos uma matéria deste boletim.';
+            return $soRegra ? 'Marque as disciplinas na regra de aprovação.' : 'Marque pelo menos uma matéria deste boletim.';
         }
-        $regraAcadId = (int) ($data['regra_academica_id'] ?? 0);
         if ($regraAcadId > 0 && $this->carregarRegraAcademica($regraAcadId) === null) {
             return 'Regra de aprovação inválida. Cadastre-a em Acadêmico → Regras de Aprovação.';
         }

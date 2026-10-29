@@ -557,13 +557,14 @@ class BoletimCadastroAdminController extends \App\Controllers\Admin\AdminBaseCon
             'materias' => $this->materiasOficiaisDoBoletim(),
             'series' => $cfg->getAvailableSeries(300),
             'turmas' => $cfg->getAvailableClasses(800),
-            'anos_letivos' => $this->anosLetivos(),
+            'anos_letivos' => $this->anosLetivos($item ? (int) ($item['ano_letivo'] ?? 0) : 0),
             'regras_academicas' => $this->service->listarRegrasAcademicas(
                 null,
                 (int) ($item['regra_academica_id'] ?? 0)
             ),
             'criterios' => $item ? $this->service->criteriosDoBoletim($item) : $this->service->criteriosDoBoletim([]),
             'schema_pronto' => $this->service->model()->tabelasProntas(),
+            'so_regra' => (new \App\Modulos\RegrasAcademicas\Models\RegraAcademica())->boletimPronto(),
             'csrf_token' => $this->generateCsrfToken(),
             'flash_status' => $flash['type'] === 'success' ? 'success' : ($flash['message'] ? 'error' : ''),
             'flash_message' => $flash['message'] ?? '',
@@ -598,16 +599,35 @@ class BoletimCadastroAdminController extends \App\Controllers\Admin\AdminBaseCon
     }
 
     /**
+     * Anos do cadastro de ano letivo. O ano já gravado no modelo entra na lista
+     * mesmo que o cadastro tenha sido removido.
+     *
      * @return list<int>
      */
-    private function anosLetivos(): array
+    private function anosLetivos(int $anoDoModelo = 0): array
     {
-        $ano = (int) date('Y');
         $out = [];
-        for ($a = $ano + 1; $a >= $ano - 4; $a--) {
-            $out[] = $a;
+        try {
+            $rows = \App\Core\Database::getInstance()->fetchAll(
+                'SELECT ano FROM ano_letivo WHERE ano IS NOT NULL ORDER BY ano DESC'
+            );
+            foreach ($rows ?: [] as $row) {
+                $ano = (int) ($row['ano'] ?? 0);
+                if ($ano >= 2000 && $ano <= 2100) {
+                    $out[$ano] = $ano;
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('BoletimCadastroAdminController::anosLetivos: ' . $e->getMessage());
         }
-        return $out;
+        if ($anoDoModelo >= 2000 && $anoDoModelo <= 2100) {
+            $out[$anoDoModelo] = $anoDoModelo;
+        }
+        if ($out === []) {
+            $out[(int) date('Y')] = (int) date('Y');
+        }
+        krsort($out);
+        return array_values($out);
     }
 }
 }

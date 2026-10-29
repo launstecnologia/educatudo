@@ -42,6 +42,13 @@ $rotuloAcao = [
     'alimentar' => 'Sincronizou eventos',
     'garantir_ficha' => 'Criou a ficha',
 ];
+$layoutExibicao = is_array($quadro['layout_exibicao'] ?? null) ? $quadro['layout_exibicao'] : null;
+$layoutFaixas = is_array($layoutExibicao['faixas'] ?? null) ? $layoutExibicao['faixas'] : [];
+$layoutMinima = (float) ($layoutExibicao['media_minima'] ?? 6);
+$layoutFormula = (string) ($layoutExibicao['formula_final_media'] ?? '');
+$layoutNome = trim((string) ($layoutExibicao['nome'] ?? ''));
+$escalaNota = (string) ($quadro['escala_nota'] ?? ($layoutExibicao['escala'] ?? '10'));
+$escalaMax = \App\Modulos\RegrasAcademicas\Services\EscalaNota::maximo($escalaNota);
 $fmtNota = static function ($c): string {
     if (!is_array($c)) {
         return '—';
@@ -74,15 +81,20 @@ $fmtNota = static function ($c): string {
 <div class="bg-white rounded-xl shadow-lg p-6">
     <div class="flex justify-between items-center mb-4 gap-3 flex-wrap">
         <div>
-            <h3 class="text-lg font-semibold text-gray-900">Boletim oficial</h3>
+            <h3 class="text-lg font-semibold text-gray-900"><?= $layoutNome !== '' ? $esc($layoutNome) : 'Boletim oficial' ?></h3>
             <p class="text-sm text-gray-500"><?php
-                $modeloNome = trim((string) ($quadro['modelo_nome'] ?? ''));
+                $modeloNome = $layoutNome !== '' ? $layoutNome : trim((string) ($quadro['modelo_nome'] ?? ''));
                 if ($modeloNome !== '') {
                     echo 'Modelo: <span class="font-medium text-gray-700">' . $esc($modeloNome) . '</span>. ';
                 } else {
                     echo 'Conforme o modelo de boletim oficial da turma. ';
                 }
-            ?>Cada <?= $esc($rotuloPeriodoCampo) ?>: nota à esquerda, falta à direita. <span class="text-violet-700">¹</span> = escola anterior.</p>
+                if ($layoutFaixas !== []) {
+                    echo 'As colunas seguem o layout deste boletim. ';
+                } else {
+                    echo 'Cada ' . $esc($rotuloPeriodoCampo) . ': nota à esquerda, falta à direita. ';
+                }
+            ?><span class="text-violet-700">¹</span> = escola anterior.</p>
             <?php if ($fichaHomologada && !$somenteLeitura): ?>
             <p class="mt-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Boletim homologado — notas travadas. Para corrigir, reabra o período abaixo (motivo obrigatório; fica na auditoria).</p>
             <?php elseif ($fichaHomologada): ?>
@@ -113,6 +125,139 @@ $fmtNota = static function ($c): string {
     <?php if (!$quadro): ?>
         <p class="text-sm text-gray-500"><?= $somenteLeitura ? 'Nenhum boletim disponível.' : 'Nenhuma ficha neste ano. Vincule o aluno a uma turma ou clique em “Criar ficha do ano”.' ?></p>
     <?php else: ?>
+        <?php if ($layoutFaixas !== []): ?>
+        <?php
+            $layoutCalc = new \App\Modulos\EventosAvaliativos\Models\BoletimLayout();
+            $layoutColunas = 0;
+            $pecasPorPeriodo = [];
+            foreach ($layoutFaixas as $faixaLayout) {
+                $layoutColunas += count($faixaLayout['colunas'] ?? []);
+                foreach ($faixaLayout['colunas'] ?? [] as $colPeriodo) {
+                    $periodoPeca = (int) ($colPeriodo['periodo'] ?? 0);
+                    $nomePeca = (string) ($colPeriodo['peca'] ?? '');
+                    if ($periodoPeca > 0 && $nomePeca !== '') {
+                        $pecasPorPeriodo[$periodoPeca][$nomePeca] = true;
+                    }
+                }
+            }
+            $txtSituacao = static function ($nota, float $minima) use ($esc): string {
+                $aprovado = \App\Modulos\RegrasAcademicas\Services\EscalaNota::aprovado(
+                    ($nota === null || $nota === '') ? null : (float) $nota,
+                    $minima
+                );
+                if ($aprovado === null) {
+                    return '—';
+                }
+                $classe = $aprovado ? 'text-emerald-700' : 'text-red-700';
+                return '<span class="font-medium ' . $classe . '">' . $esc($aprovado ? 'Aprovado' : 'Reprovado') . '</span>';
+            };
+        ?>
+        <div class="overflow-x-auto border border-gray-200 rounded-lg">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" rowspan="2">Componente</th>
+                        <?php foreach ($layoutFaixas as $faixaLayout): ?>
+                            <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase" colspan="<?= count($faixaLayout['colunas']) ?>"><?= $esc($faixaLayout['nome'] ?? '') ?></th>
+                        <?php endforeach; ?>
+                    </tr>
+                    <tr>
+                        <?php foreach ($layoutFaixas as $faixaLayout): ?>
+                            <?php foreach ($faixaLayout['colunas'] as $colLayout): ?>
+                                <th class="px-2 py-1 text-center text-[10px] text-gray-400"><?= $esc($colLayout['nome'] ?? '') ?></th>
+                            <?php endforeach; ?>
+                        <?php endforeach; ?>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    <?php foreach ($grid as $row):
+                        $linha = $row['linha'];
+                        $cels = $row['celulas'];
+                        $mediasPeriodo = [];
+                        $faltasPeriodo = [];
+                        foreach ($cels as $numCel => $celLayout) {
+                            $numCel = (int) $numCel;
+                            if ($numCel < 1 || !is_array($celLayout)) {
+                                continue;
+                            }
+                            $mediasPeriodo[$numCel] = ($celLayout['nota'] === null || $celLayout['nota'] === '') ? null : (float) $celLayout['nota'];
+                            $faltasPeriodo[$numCel] = ($celLayout['faltas'] === null || $celLayout['faltas'] === '') ? null : (int) $celLayout['faltas'];
+                        }
+                        $finalMedia = $layoutCalc->calcularFormula($layoutFormula, $mediasPeriodo);
+                        $faltasPreenchidas = array_filter($faltasPeriodo, static fn ($v) => $v !== null);
+                        $finalFaltas = $faltasPreenchidas === [] ? null : array_sum($faltasPreenchidas);
+                        $formsAbertos = [];
+                    ?>
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-3 py-2 font-medium text-gray-900 whitespace-nowrap"><?= $esc($linha['componente_nome'] ?? '') ?></td>
+                        <?php foreach ($layoutFaixas as $faixaLayout): ?>
+                            <?php foreach ($faixaLayout['colunas'] as $colLayout): ?>
+                            <?php
+                                $peca = (string) ($colLayout['peca'] ?? '');
+                                $periodoCol = (int) ($colLayout['periodo'] ?? 0);
+                                $c = $periodoCol > 0 ? ($cels[$periodoCol] ?? null) : null;
+                                $aberta = is_array($c) && in_array($c['status'] ?? '', ['aberta', 'reaberta'], true);
+                                $editavel = $aberta && $editavelFicha && in_array($peca, ['media', 'faltas'], true);
+                                $formId = is_array($c) ? ('ve-cel-' . (int) $c['id']) : '';
+                                $temMediaNoPeriodo = !empty($pecasPorPeriodo[$periodoCol]['media']);
+                                $temFaltasNoPeriodo = !empty($pecasPorPeriodo[$periodoCol]['faltas']);
+                                $abriuForm = false;
+                            ?>
+                            <td class="px-1.5 py-1.5 text-center whitespace-nowrap tabular-nums">
+                                <?php if ($editavel && $formId !== '' && !isset($formsAbertos[$periodoCol])): ?>
+                                    <?php $formsAbertos[$periodoCol] = true; $abriuForm = true; ?>
+                                    <form id="<?= $esc($formId) ?>" method="post" action="<?= $base ?>/celula/<?= (int) $c['id'] ?>"></form>
+                                    <input type="hidden" form="<?= $esc($formId) ?>" name="_token" value="<?= $esc($token) ?>">
+                                <?php endif; ?>
+                                <?php if ($peca === 'media' && $periodoCol > 0): ?>
+                                    <?php if ($editavel): ?>
+                                    <span class="inline-flex items-center justify-center gap-1">
+                                        <?php $notaCampo = $c['nota'] !== null && $c['nota'] !== '' ? number_format((float) $c['nota'], 1, ',', '') : ''; ?>
+                                        <input form="<?= $esc($formId) ?>" name="nota" value="<?= $esc($notaCampo) ?>"<?= $escalaMax === null ? '' : ' data-escala-max="' . (int) $escalaMax . '" data-nota-salva="' . $esc($notaCampo) . '"' ?> class="w-14 h-8 border border-gray-300 rounded-md px-1 text-center text-sm tabular-nums" placeholder="—" inputmode="decimal">
+                                        <?php if (($c['origem'] ?? '') === 'externa'): ?><sup class="text-violet-700">¹</sup><?php endif; ?>
+                                        <?php if ($abriuForm): ?><button type="submit" form="<?= $esc($formId) ?>" class="text-indigo-600 hover:text-indigo-800 p-0.5" title="Salvar" aria-label="Salvar"><i class="fa-solid fa-check text-xs"></i></button><?php endif; ?>
+                                    </span>
+                                    <?php if (!$temFaltasNoPeriodo): ?>
+                                    <input type="hidden" form="<?= $esc($formId) ?>" name="faltas" value="<?= $c['faltas'] !== null && $c['faltas'] !== '' ? (int) $c['faltas'] : '' ?>">
+                                    <?php endif; ?>
+                                    <?php else: ?>
+                                    <span class="font-medium text-gray-900"><?= $fmtNota($c) ?></span><?php if (is_array($c) && ($c['origem'] ?? '') === 'externa' && $fmtNota($c) !== '—'): ?><sup class="text-violet-700">¹</sup><?php endif; ?>
+                                    <?php endif; ?>
+                                <?php elseif ($peca === 'faltas' && $periodoCol > 0): ?>
+                                    <?php if ($editavel): ?>
+                                    <span class="inline-flex items-center justify-center gap-1">
+                                    <input form="<?= $esc($formId) ?>" name="faltas" value="<?= $c['faltas'] !== null && $c['faltas'] !== '' ? (int) $c['faltas'] : '' ?>" class="w-12 h-8 border border-gray-300 rounded-md px-1 text-center text-sm tabular-nums" placeholder="—">
+                                    <?php if ($abriuForm): ?><button type="submit" form="<?= $esc($formId) ?>" class="text-indigo-600 hover:text-indigo-800 p-0.5" title="Salvar" aria-label="Salvar"><i class="fa-solid fa-check text-xs"></i></button><?php endif; ?>
+                                    </span>
+                                    <?php if (!$temMediaNoPeriodo): ?>
+                                    <input type="hidden" form="<?= $esc($formId) ?>" name="nota" value="<?= $c['nota'] !== null && $c['nota'] !== '' ? $esc(number_format((float) $c['nota'], 1, ',', '')) : '' ?>">
+                                    <?php endif; ?>
+                                    <?php else: ?>
+                                    <?= ($faltasPeriodo[$periodoCol] ?? null) === null ? '—' : (int) $faltasPeriodo[$periodoCol] ?>
+                                    <?php endif; ?>
+                                <?php elseif ($peca === 'situacao' && $periodoCol > 0): ?>
+                                    <?= $txtSituacao($mediasPeriodo[$periodoCol] ?? null, $layoutMinima) ?>
+                                <?php elseif ($peca === 'media' && $periodoCol === 0): ?>
+                                    <span class="font-medium text-gray-900"><?= $finalMedia === null ? '—' : $esc(number_format($finalMedia, 1, ',', '')) ?></span>
+                                <?php elseif ($peca === 'faltas' && $periodoCol === 0): ?>
+                                    <?= $finalFaltas === null ? '—' : (int) $finalFaltas ?>
+                                <?php elseif ($peca === 'situacao' && $periodoCol === 0): ?>
+                                    <?= $txtSituacao($finalMedia, $layoutMinima) ?>
+                                <?php else: ?>
+                                    —
+                                <?php endif; ?>
+                            </td>
+                            <?php endforeach; ?>
+                        <?php endforeach; ?>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if ($grid === []): ?>
+                    <tr><td colspan="<?= 1 + $layoutColunas ?>" class="px-3 py-6 text-center text-gray-500">Ficha sem componentes. Vincule uma matriz curricular à turma.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php else: ?>
         <div class="overflow-x-auto border border-gray-200 rounded-lg">
             <table class="min-w-full text-sm">
                 <thead class="bg-gray-50">
@@ -151,7 +296,8 @@ $fmtNota = static function ($c): string {
                                 <form id="<?= $esc($formId) ?>" method="post" action="<?= $base ?>/celula/<?= (int) $c['id'] ?>"></form>
                                 <input type="hidden" form="<?= $esc($formId) ?>" name="_token" value="<?= $esc($token) ?>">
                                 <span class="inline-flex items-center justify-center gap-1">
-                                    <input form="<?= $esc($formId) ?>" name="nota" value="<?= $c['nota'] !== null && $c['nota'] !== '' ? $esc(number_format((float) $c['nota'], 1, ',', '')) : '' ?>" class="w-14 h-8 border border-gray-300 rounded-md px-1 text-center text-sm tabular-nums" placeholder="—">
+                                    <?php $notaCampo = $c['nota'] !== null && $c['nota'] !== '' ? number_format((float) $c['nota'], 1, ',', '') : ''; ?>
+                                    <input form="<?= $esc($formId) ?>" name="nota" value="<?= $esc($notaCampo) ?>"<?= $escalaMax === null ? '' : ' data-escala-max="' . (int) $escalaMax . '" data-nota-salva="' . $esc($notaCampo) . '"' ?> class="w-14 h-8 border border-gray-300 rounded-md px-1 text-center text-sm tabular-nums" placeholder="—" inputmode="decimal">
                                     <?php if ($origem === 'externa'): ?><sup class="text-violet-700">¹</sup><?php endif; ?>
                                     <button type="submit" form="<?= $esc($formId) ?>" class="text-indigo-600 hover:text-indigo-800 p-0.5" title="Salvar" aria-label="Salvar">
                                         <i class="fa-solid fa-check text-xs"></i>
@@ -178,6 +324,7 @@ $fmtNota = static function ($c): string {
                 </tbody>
             </table>
         </div>
+        <?php endif; ?>
 
         <?php if ($somenteLeitura): ?>
             <?php $obsLeitura = trim((string) (($boletim_observacao['conteudo'] ?? '') ?: '')); ?>
@@ -270,3 +417,45 @@ $fmtNota = static function ($c): string {
         <?php endif; ?>
     <?php endif; ?>
 </div>
+<?php if (!$somenteLeitura && $escalaMax !== null): ?>
+<script>
+(function () {
+    function lerNota(bruto) {
+        var texto = String(bruto == null ? '' : bruto).trim().replace(',', '.');
+        if (texto === '') return { vazia: true };
+        if (!/^-?\d+(?:\.\d+)?$/.test(texto)) return { invalida: true };
+        return { nota: Math.round(parseFloat(texto) * 100) / 100 };
+    }
+    function mostrarAviso(input, texto) {
+        var id = input.getAttribute('data-aviso-nota');
+        var el = id ? document.getElementById(id) : null;
+        if (!el) {
+            el = document.createElement('p');
+            el.id = 'aviso-nota-' + Math.random().toString(36).slice(2, 10);
+            el.className = 'mt-1 text-xs text-red-600 text-left';
+            input.setAttribute('data-aviso-nota', el.id);
+            input.insertAdjacentElement('afterend', el);
+        }
+        el.textContent = texto || '';
+        el.classList.toggle('hidden', !texto);
+    }
+    document.querySelectorAll('form[id^="ve-cel-"]').forEach(function (form) {
+        form.addEventListener('submit', function (evento) {
+            var nota = document.querySelector('input[name="nota"][form="' + form.id + '"]');
+            if (!nota || !nota.hasAttribute('data-escala-max')) return;
+            var maximo = parseFloat(nota.getAttribute('data-escala-max'));
+            var lida = lerNota(nota.value);
+            if (lida.vazia || !(lida.invalida || lida.nota < 0 || lida.nota > maximo)) {
+                mostrarAviso(nota, '');
+                return;
+            }
+            evento.preventDefault();
+            nota.value = nota.getAttribute('data-nota-salva') || '';
+            mostrarAviso(nota, lida.invalida
+                ? 'Informe a nota com número. A vírgula vale como decimal.'
+                : 'A nota precisa estar entre 0 e ' + String(maximo) + '.');
+        });
+    });
+})();
+</script>
+<?php endif; ?>

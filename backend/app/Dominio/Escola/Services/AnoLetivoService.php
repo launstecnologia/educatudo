@@ -36,6 +36,7 @@ class AnoLetivoService
             return null;
         }
         $item['periodo_tipo'] = PeriodoLetivo::normalizarTipo((string) ($item['periodo_tipo'] ?? PeriodoLetivo::tipoPadrao()));
+        $item['periodos'] = $this->listarPeriodos((int) $item['id']);
         return $item;
     }
 
@@ -46,6 +47,8 @@ class AnoLetivoService
     public function cadastrar(array $dados): array
     {
         $payload = $this->validarPayload($dados);
+        $periodos = $this->validarPeriodos($payload, $dados['periodos'] ?? null);
+        $payload = $this->aplicarDatasDosPeriodos($payload, $periodos);
         $existe = $this->db->fetch('SELECT id FROM ano_letivo WHERE ano = :ano', ['ano' => $payload['ano']]);
         if ($existe) {
             throw new \InvalidArgumentException('Já existe ano letivo para este ano.');
@@ -72,6 +75,7 @@ class AnoLetivoService
                 );
             }
             $this->conferirPeriodoGravado($id, $payload['periodo_tipo']);
+            $this->gravarPeriodos($id, $periodos);
             $this->db->commit();
         } catch (\Throwable $e) {
             if ($this->db->inTransaction()) {
@@ -94,6 +98,8 @@ class AnoLetivoService
             throw new \InvalidArgumentException('Ano letivo não encontrado.');
         }
         $payload = $this->validarPayload($dados);
+        $periodos = $this->validarPeriodos($payload, $dados['periodos'] ?? null);
+        $payload = $this->aplicarDatasDosPeriodos($payload, $periodos);
         $outro = $this->db->fetch(
             'SELECT id FROM ano_letivo WHERE ano = :ano AND id != :id',
             ['ano' => $payload['ano'], 'id' => $id]
@@ -142,6 +148,7 @@ class AnoLetivoService
                 );
             }
             $this->conferirPeriodoGravado($id, $payload['periodo_tipo']);
+            $this->gravarPeriodos($id, $periodos);
             $this->db->commit();
         } catch (\Throwable $e) {
             if ($this->db->inTransaction()) {
@@ -271,6 +278,193 @@ class AnoLetivoService
             'periodo_tipo' => $periodoTipo,
             'ativo' => !empty($dados['ativo']) ? 1 : 0,
         ];
+    }
+
+    /**
+     * @return list<array{numero:int,data_inicio:string,data_fim:string,dias_letivos:?int}>
+     */
+    public function listarPeriodos(int $anoLetivoId): array
+    {
+        if ($anoLetivoId <= 0 || !$this->tabelaPeriodosExiste()) {
+            return [];
+        }
+        $comDias = $this->colunaExiste('ano_letivo_periodos', 'dias_letivos');
+        $sql = $comDias
+            ? 'SELECT numero, data_inicio, data_fim, dias_letivos
+               FROM ano_letivo_periodos
+               WHERE ano_letivo_id = :id
+               ORDER BY numero'
+            : 'SELECT numero, data_inicio, data_fim
+               FROM ano_letivo_periodos
+               WHERE ano_letivo_id = :id
+               ORDER BY numero';
+        $rows = $this->db->fetchAll($sql, ['id' => $anoLetivoId]);
+        if (!is_array($rows)) {
+            return [];
+        }
+        $lista = [];
+        foreach ($rows as $row) {
+            $numero = (int) ($row['numero'] ?? 0);
+            if ($numero < 1) {
+                continue;
+            }
+            $dias = $row['dias_letivos'] ?? null;
+            $lista[] = [
+                'numero' => $numero,
+                'data_inicio' => substr((string) ($row['data_inicio'] ?? ''), 0, 10),
+                'data_fim' => substr((string) ($row['data_fim'] ?? ''), 0, 10),
+                'dias_letivos' => $dias === null || $dias === '' ? null : (int) $dias,
+            ];
+        }
+        return $lista;
+    }
+
+    /**
+     * @param array{ano:int,data_inicio:?string,data_fim:?string,periodo_tipo:string,ativo:int} $payload
+     * @return array<int, array{data_inicio:string,data_fim:string,dias_letivos:int}>
+     */
+    private function validarPeriodos(array $payload, mixed $bruto): array
+    {
+        if (!is_array($bruto)) {
+            $bruto = [];
+        }
+        $tipo = (string) $payload['periodo_tipo'];
+        $qtd = PeriodoLetivo::quantidade($tipo);
+        $rotulos = PeriodoLetivo::rotulosDoTipo($tipo);
+        $anoInicio = $payload['data_inicio'];
+        $anoFim = $payload['data_fim'];
+        $periodos = [];
+        $fimAnterior = null;
+        for ($n = 1; $n <= $qtd; $n++) {
+            $item = $bruto[$n] ?? $bruto[(string) $n] ?? [];
+            if (!is_array($item)) {
+                $item = [];
+            }
+            $inicio = trim((string) ($item['data_inicio'] ?? ''));
+            $fim = trim((string) ($item['data_fim'] ?? ''));
+            $rotulo = (string) ($rotulos[$n] ?? ($n . 'º período'));
+            if ($inicio === '' || $fim === '') {
+                throw new \InvalidArgumentException('Informe o início e o fim — ' . $rotulo . '.');
+            }
+            if (!$this->dataIsoValida($inicio) || !$this->dataIsoValida($fim)) {
+                throw new \InvalidArgumentException('Data inválida em ' . $rotulo . '.');
+            }
+            if ($fim < $inicio) {
+                throw new \InvalidArgumentException('Em ' . $rotulo . ', a data fim não pode ser anterior à data início.');
+            }
+            if ($anoInicio !== null && $inicio < $anoInicio) {
+                throw new \InvalidArgumentException($rotulo . ' começa antes da data início do ano letivo.');
+            }
+            if ($anoFim !== null && $fim > $anoFim) {
+                throw new \InvalidArgumentException($rotulo . ' termina depois da data fim do ano letivo.');
+            }
+            if ($fimAnterior !== null && $inicio <= $fimAnterior) {
+                throw new \InvalidArgumentException($rotulo . ' começa antes do fim do período anterior.');
+            }
+            $diasBruto = trim((string) ($item['dias_letivos'] ?? ''));
+            if ($diasBruto === '' || !preg_match('/^\d+$/', $diasBruto)) {
+                throw new \InvalidArgumentException('Informe os dias letivos — ' . $rotulo . '.');
+            }
+            $dias = (int) $diasBruto;
+            $diasCalendario = $this->diasEntre($inicio, $fim);
+            if ($dias < 1 || $dias > $diasCalendario) {
+                throw new \InvalidArgumentException(
+                    'Os dias letivos de ' . $rotulo . ' precisam ficar entre 1 e ' . $diasCalendario . '.'
+                );
+            }
+            $periodos[$n] = [
+                'data_inicio' => $inicio,
+                'data_fim' => $fim,
+                'dias_letivos' => $dias,
+            ];
+            $fimAnterior = $fim;
+        }
+        return $periodos;
+    }
+
+    /**
+     * @param array{ano:int,data_inicio:?string,data_fim:?string,periodo_tipo:string,ativo:int} $payload
+     * @param array<int, array{data_inicio:string,data_fim:string}> $periodos
+     * @return array{ano:int,data_inicio:?string,data_fim:?string,periodo_tipo:string,ativo:int}
+     */
+    private function aplicarDatasDosPeriodos(array $payload, array $periodos): array
+    {
+        if ($payload['data_inicio'] === null && isset($periodos[1]['data_inicio'])) {
+            $payload['data_inicio'] = $periodos[1]['data_inicio'];
+        }
+        $ultimo = $periodos === [] ? null : $periodos[array_key_last($periodos)];
+        if ($payload['data_fim'] === null && is_array($ultimo)) {
+            $payload['data_fim'] = $ultimo['data_fim'];
+        }
+        if (
+            $payload['data_inicio'] !== null
+            && $payload['data_fim'] !== null
+            && $payload['data_fim'] < $payload['data_inicio']
+        ) {
+            throw new \InvalidArgumentException('A data fim não pode ser anterior à data início.');
+        }
+        return $payload;
+    }
+
+    /**
+     * @param array<int, array{data_inicio:string,data_fim:string,dias_letivos:int}> $periodos
+     */
+    private function gravarPeriodos(int $anoLetivoId, array $periodos): void
+    {
+        if ($anoLetivoId <= 0) {
+            return;
+        }
+        if (!$this->tabelaPeriodosExiste()) {
+            throw new \RuntimeException(
+                'As datas dos períodos ainda não estão disponíveis neste banco. Execute a migration de períodos do ano letivo.'
+            );
+        }
+        if (!$this->colunaExiste('ano_letivo_periodos', 'dias_letivos')) {
+            throw new \RuntimeException(
+                'Os dias letivos ainda não estão disponíveis neste banco. Execute a migration de dias letivos do ano letivo.'
+            );
+        }
+        $this->db->delete(
+            'DELETE FROM ano_letivo_periodos WHERE ano_letivo_id = :id',
+            ['id' => $anoLetivoId]
+        );
+        foreach ($periodos as $numero => $periodo) {
+            $this->db->insert(
+                'INSERT INTO ano_letivo_periodos (ano_letivo_id, numero, data_inicio, data_fim, dias_letivos)
+                 VALUES (:ano_letivo_id, :numero, :data_inicio, :data_fim, :dias_letivos)',
+                [
+                    'ano_letivo_id' => $anoLetivoId,
+                    'numero' => (int) $numero,
+                    'data_inicio' => $periodo['data_inicio'],
+                    'data_fim' => $periodo['data_fim'],
+                    'dias_letivos' => (int) $periodo['dias_letivos'],
+                ]
+            );
+        }
+    }
+
+    private function diasEntre(string $inicio, string $fim): int
+    {
+        $a = \DateTimeImmutable::createFromFormat('!Y-m-d', $inicio);
+        $b = \DateTimeImmutable::createFromFormat('!Y-m-d', $fim);
+        if (!$a || !$b) {
+            return 0;
+        }
+        return (int) $a->diff($b)->days + 1;
+    }
+
+    private function tabelaPeriodosExiste(): bool
+    {
+        return $this->db->tableExists('ano_letivo_periodos');
+    }
+
+    private function dataIsoValida(string $valor): bool
+    {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $valor)) {
+            return false;
+        }
+        $partes = explode('-', $valor);
+        return checkdate((int) $partes[1], (int) $partes[2], (int) $partes[0]);
     }
 
     private function exigirColunaSeNaoPadrao(string $periodoTipo): void

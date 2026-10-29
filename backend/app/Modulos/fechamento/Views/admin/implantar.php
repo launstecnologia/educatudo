@@ -40,7 +40,7 @@ if (!$implantarPublico) {
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
         <p class="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">3 · Como a escola avalia</p>
         <p class="text-sm font-semibold text-gray-900">O boletim do seu jeito</p>
-        <p class="text-sm text-gray-600 mt-1">Regras de aprovação, tipos de nota, quadro e o modelo de boletim.</p>
+        <p class="text-sm text-gray-600 mt-1">Regras de aprovação, eventos avaliativos, demonstrativo, boletim e o relatório.</p>
     </div>
 </div>
 
@@ -55,8 +55,15 @@ if (!$implantarPublico) {
 </div>
 
 <div class="rounded-xl border border-green-200 bg-green-50 p-4 mb-6 text-sm text-green-900">
-    <strong>No fim destes passos:</strong> o boletim sai com a cara da escola, o diário funciona e a frequência tem onde se apoiar. Lançar notas e fechar o período são o dia a dia — entram nas próximas partes desta trilha.
+    <strong>No fim destes passos:</strong> a escola tem a regra, os eventos para lançar nota, o demonstrativo, o boletim e o relatório para emitir. O diário e a frequência se apoiam na grade. Fechar o período continua sendo o dia a dia, fora desta trilha.
 </div>
+
+<?php if (!$implantarPublico): ?>
+<p class="text-sm text-gray-600 mb-6">
+    Manual para compartilhar, sem login:
+    <a href="<?= URL ?>/guia/implantar-academico" class="font-medium text-blue-700 hover:underline" target="_blank" rel="noopener">/guia/implantar-academico</a>
+</p>
+<?php endif; ?>
 
 <div class="bg-white rounded-xl shadow-lg p-6 w-full mb-6">
     <?php if ($implantarPublico): ?>
@@ -98,6 +105,7 @@ if (!$implantarPublico) {
     <?php endif; ?>
 </div>
 
+<?php $numeroPasso = 0; ?>
 <?php foreach ($grupos as $grupo):
     $passosGrupo = is_array($grupo['passos'] ?? null) ? $grupo['passos'] : [];
     if ($passosGrupo === []) {
@@ -117,14 +125,16 @@ if (!$implantarPublico) {
         $printsVisiveis = array_values(array_filter($prints, static fn ($pr) => !empty($pr['existe'])));
         $nota = trim((string) ($p['nota'] ?? ''));
         $temProfundidade = $comoFazer !== [] || $erros !== [] || $printsVisiveis !== [] || !empty($p['usado_depois_em']) || $nota !== '';
-        $borda = $ok
-            ? 'border-green-200'
-            : ($atual ? 'border-gray-400 shadow-sm' : 'border-gray-200');
+        $borda = $implantarPublico
+            ? 'border-gray-200'
+            : ($ok ? 'border-green-200' : ($atual ? 'border-gray-400 shadow-sm' : 'border-gray-200'));
+        $numeroPasso++;
+        $detalhe = trim((string) ($p['detalhe'] ?? ''));
         ?>
     <article class="bg-white rounded-xl border <?= $borda ?> overflow-hidden">
         <div class="flex flex-col sm:flex-row sm:items-start gap-3 p-4">
-            <span class="mt-0.5 inline-flex w-6 h-6 items-center justify-center rounded-full text-xs font-bold shrink-0 <?= $ok ? 'bg-green-100 text-green-700' : ($atual ? 'bg-primary text-primary' : 'bg-gray-100 text-gray-500') ?>">
-                <?= $ok ? '✓' : ($atual ? '→' : '·') ?>
+            <span class="mt-0.5 inline-flex w-6 h-6 items-center justify-center rounded-full text-xs font-bold shrink-0 <?= $implantarPublico ? 'bg-gray-100 text-gray-700' : ($ok ? 'bg-green-100 text-green-700' : ($atual ? 'bg-primary text-primary' : 'bg-gray-100 text-gray-500')) ?>">
+                <?= $implantarPublico ? $numeroPasso : ($ok ? '✓' : ($atual ? '→' : '·')) ?>
             </span>
             <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-2">
@@ -133,25 +143,61 @@ if (!$implantarPublico) {
                     <span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-primary text-primary">Comece por aqui</span>
                     <?php endif; ?>
                 </div>
-                <p class="text-sm text-gray-600 mt-0.5"><?= htmlspecialchars((string) ($p['detalhe'] ?? ''), ENT_QUOTES, 'UTF-8') ?></p>
+                <?php if ($detalhe !== ''): ?>
+                <p class="text-sm text-gray-600 mt-0.5"><?= htmlspecialchars($detalhe, ENT_QUOTES, 'UTF-8') ?></p>
+                <?php endif; ?>
                 <?php if (!empty($p['aceite'])): ?>
                 <p class="text-xs text-gray-500 mt-1"><span class="font-medium text-gray-600">Como saber que deu certo:</span> <?= htmlspecialchars((string) $p['aceite'], ENT_QUOTES, 'UTF-8') ?></p>
                 <?php endif; ?>
+                <?php $introPasso = trim((string) ($p['intro'] ?? '')); ?>
+                <?php if ($introPasso !== ''): ?>
+                <p class="text-sm text-gray-700 leading-relaxed mt-2"><?= htmlspecialchars($introPasso, ENT_QUOTES, 'UTF-8') ?></p>
+                <?php endif; ?>
                 <?php if ($temProfundidade): ?>
-                <details class="mt-2 group" <?= $atual ? 'open' : '' ?>>
+                <details class="mt-2 group" <?= ($atual || $implantarPublico) ? 'open' : '' ?>>
                     <summary class="cursor-pointer text-xs font-semibold text-gray-700 hover:underline list-none flex items-center gap-1">
                         <i class="fa-solid fa-chevron-right text-[10px] text-gray-400 transition-transform group-open:rotate-90"></i>
-                        Como fazer
+                        Passo a passo
                     </summary>
-                    <div class="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-3">
+                    <div class="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-4 space-y-4">
                         <?php if ($comoFazer !== []): ?>
-                        <ol class="list-decimal list-inside space-y-1 text-xs text-gray-700">
-                            <?php foreach ($comoFazer as $passoTexto): ?>
-                            <li><?= htmlspecialchars((string) $passoTexto, ENT_QUOTES, 'UTF-8') ?></li>
+                        <ol class="space-y-4">
+                            <?php foreach ($comoFazer as $indice => $passoItem):
+                                $passoTexto = is_array($passoItem) ? (string) ($passoItem['texto'] ?? '') : (string) $passoItem;
+                                $printPasso = (is_array($passoItem) && is_array($passoItem['print'] ?? null)) ? $passoItem['print'] : null;
+                                $printSrc = is_array($printPasso) && !empty($printPasso['existe'])
+                                    ? URL . htmlspecialchars((string) ($printPasso['url'] ?? ''), ENT_QUOTES, 'UTF-8')
+                                    : '';
+                                $printCap = is_array($printPasso) ? (string) ($printPasso['rotulo'] ?? 'Print') : '';
+                                ?>
+                            <li class="space-y-2">
+                                <div class="flex gap-3 text-sm text-gray-800 leading-relaxed">
+                                    <span class="shrink-0 inline-flex w-6 h-6 items-center justify-center rounded-full bg-white border border-gray-200 text-xs font-bold text-gray-700"><?= (int) $indice + 1 ?></span>
+                                    <span><?= htmlspecialchars($passoTexto, ENT_QUOTES, 'UTF-8') ?></span>
+                                </div>
+                                <?php if ($printSrc !== ''): ?>
+                                <button type="button"
+                                        class="js-implantar-print block w-full text-left ml-9 rounded-lg border border-gray-200 overflow-hidden bg-white hover:border-gray-400"
+                                        style="width: calc(100% - 2.25rem)"
+                                        data-src="<?= $printSrc ?>"
+                                        data-cap="<?= htmlspecialchars($printCap, ENT_QUOTES, 'UTF-8') ?>">
+                                    <img src="<?= $printSrc ?>" alt="<?= htmlspecialchars($printCap, ENT_QUOTES, 'UTF-8') ?>" class="w-full h-auto">
+                                </button>
+                                <?php endif; ?>
+                            </li>
                             <?php endforeach; ?>
                         </ol>
                         <?php endif; ?>
-                        <?php if ($printsVisiveis !== []): ?>
+                        <?php
+                        $temPrintNoPasso = false;
+                        foreach ($comoFazer as $itemPrint) {
+                            if (is_array($itemPrint) && !empty($itemPrint['print']['existe'])) {
+                                $temPrintNoPasso = true;
+                                break;
+                            }
+                        }
+                        ?>
+                        <?php if ($printsVisiveis !== [] && !$temPrintNoPasso): ?>
                         <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
                             <?php foreach ($printsVisiveis as $pr):
                                 $src = URL . htmlspecialchars((string) ($pr['url'] ?? ''), ENT_QUOTES, 'UTF-8');
@@ -187,12 +233,14 @@ if (!$implantarPublico) {
                 </details>
                 <?php endif; ?>
             </div>
+            <?php if (!$implantarPublico): ?>
             <a href="<?= URL . htmlspecialchars((string) ($p['href'] ?? '/admin/academico'), ENT_QUOTES, 'UTF-8') ?>"
                class="<?= $atual && !$ok
                    ? 'btn-primary-custom'
                    : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50' ?> inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-medium shrink-0">
                 <?= $ok ? 'Abrir' : 'Configurar' ?>
             </a>
+            <?php endif; ?>
         </div>
     </article>
     <?php endforeach; ?>

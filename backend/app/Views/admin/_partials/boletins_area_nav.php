@@ -3,6 +3,7 @@
  * Cabeçalho e abas da área Boletins.
  * $boletins_aba: modelos | periodos | resultados | relatorios
  */
+$modeloEvento = class_exists(\App\Core\LayoutHelper::class) && \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos');
 $abaBoletins = (string) ($boletins_aba ?? 'modelos');
 $abasBoletins = [
     'modelos' => ['Modelos', URL . '/admin/boletins'],
@@ -14,8 +15,8 @@ $abasBoletins = [
 <div class="mb-6">
     <div class="flex items-start justify-between gap-3 flex-wrap mb-4">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900">Boletins</h1>
-            <p class="text-sm text-gray-600 mt-1">Configure os períodos, acompanhe os resultados e emita relatórios.</p>
+            <h1 class="text-2xl font-bold text-gray-900"><?= $modeloEvento ? 'Demonstrativo de notas' : 'Boletins' ?></h1>
+            <p class="text-sm text-gray-600 mt-1"><?= $modeloEvento ? 'Monte o quadro de notas: períodos, colunas e fórmulas. O boletim oficial tem o layout separado.' : 'Configure os períodos, acompanhe os resultados e emita relatórios.' ?></p>
         </div>
         <a href="<?= URL ?>/admin/academico"
            class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">

@@ -1,5 +1,10 @@
 # Tasks — backlog atual
 
+- [x] Guia público — Demonstrativo de Notas detalhado em sete partes: regra, períodos, eventos/subeventos, agrupamentos, colunas/fórmulas, simulação e salvar/gerar. Seis prints do usuário íntegros; PHP lint, code-reviewer, carregamento/ampliação e navegação validados. Boletim e Relatórios preservados. — 2026-10-29
+- [x] Guia público: cópia integral do guia GitHub Pages indicado, exceto Como a escola avalia; Estrutura, Pessoas e turmas, apresentação, ficha, rotina, transferência e fechamento/histórico, com 56 imagens locais. Comparação dos 16 textos no navegador, checksums, navegação, painéis expansíveis, ampliação dos prints, PHP lint e code-reviewer aprovados. — 2026-10-29
+- [x] Guia público de implantação — Demonstrativo focado em Modelos e vínculo com regra; Boletim com montagem por trimestre, média final e revisão; Relatório completo com filtros e exportações. Capturas reais dos controles, sem identificadores de alunos. — 2026-10-29
+- [x] Guia público de implantação — Eventos Avaliativos: revisão do fluxo real Identidade → Estrutura → Revisão, 19 capturas por ação sem identificadores de alunos, instruções de notas, importação, online e recuperação; validação PHP, revisão de código e navegação no navegador. — 2026-10-29
+
 - [x] Calendário letivo: vários calendários no mesmo ano, cada um para um curso (Fundamental, Ensino Médio) ou para séries. O existente permanece como Geral (toda a escola). Migration `2026_10_01_calendario_letivo_varios.sql`. — 2026-10-01
 
 

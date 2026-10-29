@@ -3,6 +3,7 @@ $csrfToken = (string) ($csrf_token ?? '');
 $selectedRegraId = (int) ($selected_regra_id ?? 0);
 $boletimId = (int) ($boletim_id ?? 0);
 $voltarBoletins = !empty($voltar_boletins);
+$voltarBoletimLayout = !empty($voltar_boletim_layout);
 $voltarGerarAvaliacoes = !empty($voltar_gerar_avaliacoes);
 $boletimAssistenteDisponivel = !empty($boletim_assistente_disponivel);
 $boletimAssistentePageMode = true;
@@ -81,10 +82,16 @@ $page_header_subtitle = $contextoEvento;
 $page_header_subtitle_id = 'evento-notas-ref';
 ?>
 <nav aria-label="Caminho" class="mb-3 text-sm text-gray-500 flex flex-wrap items-center gap-1">
+    <?php if ($voltarBoletimLayout): ?>
+    <a href="<?= URL ?>/admin/eventos-avaliativos/boletim?ano=<?= (int) $anoContexto ?>" class="hover:text-gray-800">Boletim</a>
+    <?php else: ?>
     <a href="<?= URL ?>/admin/boletins" class="hover:text-gray-800">Boletins</a>
+    <?php endif; ?>
     <span aria-hidden="true">/</span>
     <?php if ($voltarGerarAvaliacoes): ?>
     <a href="<?= htmlspecialchars($boletimAssistenteReturnUrl, ENT_QUOTES, 'UTF-8') ?>" class="hover:text-gray-800">Adicionar períodos</a>
+    <?php elseif ($voltarBoletimLayout): ?>
+    <a href="<?= htmlspecialchars($boletimAssistenteReturnUrl, ENT_QUOTES, 'UTF-8') ?>" class="hover:text-gray-800">Layout</a>
     <?php elseif ($voltarBoletins): ?>
     <a href="<?= htmlspecialchars($boletimAssistenteReturnUrl, ENT_QUOTES, 'UTF-8') ?>" class="hover:text-gray-800">Modelos</a>
     <?php else: ?>

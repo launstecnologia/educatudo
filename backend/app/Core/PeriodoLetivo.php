@@ -29,7 +29,12 @@ class PeriodoLetivo
     /** @var array<int, array<string,mixed>> */
     private static array $cachePorAno = [];
 
+    /** @var array<int, array<int, array{inicio:string,fim:string}>> */
+    private static array $intervalosPorAno = [];
+
     private static ?bool $colunaExiste = null;
+
+    private static ?bool $tabelaPeriodosExiste = null;
 
     public static function tipoPadrao(): string
     {
@@ -56,10 +61,12 @@ class PeriodoLetivo
     {
         if ($ano === null) {
             self::$cachePorAno = [];
+            self::$intervalosPorAno = [];
             self::$colunaExiste = null;
+            self::$tabelaPeriodosExiste = null;
             return;
         }
-        unset(self::$cachePorAno[$ano]);
+        unset(self::$cachePorAno[$ano], self::$intervalosPorAno[$ano]);
     }
 
     public static function quantidade(string $tipo): int
@@ -144,6 +151,33 @@ class PeriodoLetivo
     }
 
     /**
+     * Anos que a escola cadastrou em Ano Letivo, do mais recente ao mais antigo.
+     *
+     * @return list<int>
+     */
+    public static function anosCadastrados(): array
+    {
+        try {
+            $rows = Database::getInstance()->fetchAll('SELECT ano FROM ano_letivo ORDER BY ano DESC');
+        } catch (\Throwable $e) {
+            return [];
+        }
+        if (!is_array($rows)) {
+            return [];
+        }
+        $anos = [];
+        foreach ($rows as $row) {
+            $ano = (int) ($row['ano'] ?? 0);
+            if ($ano > 0) {
+                $anos[$ano] = $ano;
+            }
+        }
+        $lista = array_values($anos);
+        rsort($lista);
+        return $lista;
+    }
+
+    /**
      * @return array<int, array<string,mixed>>
      */
     public static function mapaPorAno(): array
@@ -194,6 +228,13 @@ class PeriodoLetivo
             : self::normalizarTipo($tipoInformado);
         $quantidade = self::quantidade($tipo);
         $numero = max(1, min($quantidade, $numero));
+        $tipoDoAno = (string) (self::doAno($ano)['tipo'] ?? self::tipoPadrao());
+        if ($tipo === $tipoDoAno) {
+            $salvos = self::periodosCompletos($ano);
+            if (isset($salvos[$numero])) {
+                return $salvos[$numero];
+            }
+        }
         if ($tipo === 'etapa_unica') {
             return [
                 'inicio' => sprintf('%04d-01-01', $ano),
@@ -219,6 +260,15 @@ class PeriodoLetivo
     public static function numeroDaData(int $ano, string $data): int
     {
         $ano = $ano > 0 ? $ano : (int) date('Y', strtotime($data) ?: time());
+        $salvos = self::periodosCompletos($ano);
+        if ($salvos !== []) {
+            $dia = date('Y-m-d', strtotime($data) ?: time());
+            foreach ($salvos as $numero => $intervalo) {
+                if ($dia >= $intervalo['inicio'] && $dia <= $intervalo['fim']) {
+                    return (int) $numero;
+                }
+            }
+        }
         $info = self::doAno($ano);
         $quantidade = max(1, (int) $info['quantidade']);
         $mes = (int) date('n', strtotime($data) ?: time());
@@ -387,6 +437,87 @@ class PeriodoLetivo
             return self::tipoPadrao();
         }
         return self::tipoPadrao();
+    }
+
+    /**
+     * Datas gravadas no cadastro do ano. Só vale quando todos os períodos da divisão estão preenchidos.
+     *
+     * @return array<int, array{inicio:string,fim:string}>
+     */
+    private static function periodosCompletos(int $ano): array
+    {
+        $salvos = self::intervalosSalvos($ano);
+        if ($salvos === []) {
+            return [];
+        }
+        $qtd = self::quantidade((string) (self::doAno($ano)['tipo'] ?? self::tipoPadrao()));
+        for ($i = 1; $i <= $qtd; $i++) {
+            if (!isset($salvos[$i])) {
+                return [];
+            }
+        }
+        return $salvos;
+    }
+
+    /**
+     * @return array<int, array{inicio:string,fim:string}>
+     */
+    private static function intervalosSalvos(int $ano): array
+    {
+        if ($ano <= 0) {
+            return [];
+        }
+        if (isset(self::$intervalosPorAno[$ano])) {
+            return self::$intervalosPorAno[$ano];
+        }
+        self::$intervalosPorAno[$ano] = [];
+        if (!self::temTabelaPeriodos()) {
+            return [];
+        }
+        try {
+            $db = Database::getInstance();
+            $rows = $db->fetchAll(
+                'SELECT p.numero, p.data_inicio, p.data_fim
+                 FROM ano_letivo_periodos p
+                 INNER JOIN ano_letivo a ON a.id = p.ano_letivo_id
+                 WHERE a.ano = :ano
+                 ORDER BY p.numero',
+                ['ano' => $ano]
+            );
+            if (!is_array($rows)) {
+                return [];
+            }
+            $mapa = [];
+            foreach ($rows as $row) {
+                $numero = (int) ($row['numero'] ?? 0);
+                $inicio = substr((string) ($row['data_inicio'] ?? ''), 0, 10);
+                $fim = substr((string) ($row['data_fim'] ?? ''), 0, 10);
+                if ($numero < 1 || $inicio === '' || $fim === '') {
+                    continue;
+                }
+                $mapa[$numero] = ['inicio' => $inicio, 'fim' => $fim];
+            }
+            self::$intervalosPorAno[$ano] = $mapa;
+        } catch (\Throwable $e) {
+            self::$intervalosPorAno[$ano] = [];
+        }
+        return self::$intervalosPorAno[$ano];
+    }
+
+    private static function temTabelaPeriodos(): bool
+    {
+        if (self::$tabelaPeriodosExiste !== null) {
+            return self::$tabelaPeriodosExiste;
+        }
+        self::$tabelaPeriodosExiste = false;
+        try {
+            $db = Database::getInstance();
+            $row = $db->fetch("SHOW TABLES LIKE 'ano_letivo_periodos'");
+            self::$tabelaPeriodosExiste = is_array($row) && $row !== [];
+        } catch (\Throwable $e) {
+            self::$tabelaPeriodosExiste = false;
+        }
+        return self::$tabelaPeriodosExiste;
     }
 
     private static function temColuna(): bool

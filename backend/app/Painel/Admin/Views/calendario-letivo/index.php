@@ -36,9 +36,11 @@ $dataCalendario = static function ($raw): ?int {
     }
     return $ts;
 };
-$eventoParaJs = static function (array $e) use ($tipoLabels, $dataCalendario): array {
+$gradesProvas = is_array($grades_provas ?? null) ? $grades_provas : [];
+$eventoParaJs = static function (array $e) use ($tipoLabels, $dataCalendario, $gradesProvas): array {
     $ini = $dataCalendario($e['data_inicio'] ?? '');
     $fim = $dataCalendario($e['data_fim'] ?? '');
+    $provas = $gradesProvas[(int) ($e['id'] ?? 0)] ?? [];
     return [
         'id' => (int) $e['id'],
         'tipo' => $e['tipo'],
@@ -53,6 +55,7 @@ $eventoParaJs = static function (array $e) use ($tipoLabels, $dataCalendario): a
         'visivel_aluno' => (int) ($e['visivel_aluno'] ?? 0),
         'visivel_professor' => (int) ($e['visivel_professor'] ?? 0),
         'visivel_pais' => (int) ($e['visivel_pais'] ?? 0),
+        'provas' => is_array($provas) ? array_values($provas) : [],
     ];
 };
 $coresTipoPreset = ['#0d9488', '#db2777', '#ea580c', '#0891b2', '#65a30d', '#e11d48', '#7c3aed', '#ca8a04'];
@@ -68,6 +71,13 @@ $cursoIdsSel = array_fill_keys(array_map('intval', (array) ($config['curso_ids']
 $serieIdsSel = array_fill_keys(array_map('intval', (array) ($config['serie_ids'] ?? [])), true);
 $nomeCal = trim((string) ($config['nome'] ?? ''));
 $rotuloCal = trim((string) ($config['rotulo'] ?? ''));
+$corCal = strtolower(trim((string) ($config['cor'] ?? '')));
+$textoCal = strtolower(trim((string) ($config['cor_texto'] ?? '')));
+if (!preg_match('/^#[0-9a-f]{6}$/', $corCal) || !preg_match('/^#[0-9a-f]{6}$/', $textoCal)) {
+    $corCal = '';
+    $textoCal = '';
+}
+$tomCal = $corCal !== '' ? '--button-primary-color:' . $corCal . ';--primary-text-color:' . $textoCal . ';' : '';
 
 // Monta mapa de datas com eventos: ['2026-04-21'] = [['tipo'=>..,'descricao'=>..], ...]
 $eventMap = [];
@@ -100,9 +110,12 @@ ob_start();
     <span class="text-sm font-semibold text-gray-700"><?= $ano ?></span>
     <a href="?ano=<?= $ano + 1 ?>" class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-right"></i></a>
     <?php if ($variosPronto): ?>
-    <div class="inline-flex shrink-0 items-center rounded-lg border border-gray-300 bg-white">
+    <div class="inline-flex shrink-0 items-center rounded-lg border border-gray-300 bg-white"<?= $corCal !== '' ? ' style="border-color:' . htmlspecialchars($corCal, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
+        <?php if ($corCal !== ''): ?>
+        <span class="ml-3 h-2.5 w-2.5 shrink-0 rounded-full" style="background:<?= htmlspecialchars($corCal, ENT_QUOTES, 'UTF-8') ?>"></span>
+        <?php endif; ?>
         <select id="selCalendario" aria-label="Calendário" onchange="if (this.value) window.location = this.value;"
-                class="max-w-[16rem] cursor-pointer border-0 bg-transparent py-2 pl-3 pr-9 text-sm text-gray-700 focus:outline-none focus:ring-0">
+                class="max-w-[16rem] cursor-pointer border-0 bg-transparent py-2 <?= $corCal !== '' ? 'pl-2' : 'pl-3' ?> pr-9 text-sm text-gray-700 focus:outline-none focus:ring-0">
             <?php foreach ($calendarios as $cal): ?>
             <option value="?ano=<?= $ano ?>&id=<?= (int) $cal['id'] ?>" <?= (int) $cal['id'] === $calendarioId ? 'selected' : '' ?>><?= htmlspecialchars((string) ($cal['nome'] ?? 'Geral')) ?></option>
             <?php endforeach; ?>
@@ -211,7 +224,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
 </div>
 
 <!-- View mensal (gerada via JS) -->
-<div id="viewMes" class="hidden mb-8">
+<div id="viewMes" class="hidden mb-8"<?= $tomCal !== '' ? ' style="' . htmlspecialchars($tomCal, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
     <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div id="mesCabecalho" class="px-6 py-4 border-b border-gray-100 flex items-center justify-between" style="background-color: var(--button-primary-color);">
             <span id="mesTitulo" class="text-base font-bold" style="color: var(--primary-text-color);"></span>
@@ -231,7 +244,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
 </div>
 
 <!-- Grade dos 12 meses -->
-<div id="viewAno" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
+<div id="viewAno" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8"<?= $tomCal !== '' ? ' style="' . htmlspecialchars($tomCal, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
 <?php for ($mes = 1; $mes <= 12; $mes++):
     $primeiroDia  = mktime(0, 0, 0, $mes, 1, $ano);
     $diasNoMes    = (int) date('t', $primeiroDia);
@@ -517,22 +530,25 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
 </form>
 <?php endif; ?>
 
-<!-- Modal: Detalhe do dia -->
-<div id="modalDia" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 hidden">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4">
-        <div id="modalDiaHeader" class="flex items-center justify-between px-6 py-4 rounded-t-2xl">
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-wider opacity-75" id="modalDiaTipoLabel"></p>
-                <h3 class="text-lg font-bold" id="modalDiaData"></h3>
-            </div>
-            <button onclick="closeDayModal()" class="opacity-75 hover:opacity-100 transition-opacity"><i class="fa-solid fa-xmark text-xl"></i></button>
+<!-- Offcanvas: provas e eventos do dia -->
+<div id="diaDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeDayModal()"></div>
+<aside id="diaDrawer"
+       class="fixed top-0 right-0 h-full w-full max-w-xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
+       aria-hidden="true">
+    <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-gray-500" id="modalDiaTipoLabel"></p>
+            <h2 id="modalDiaData" class="text-xl font-bold text-gray-900"></h2>
         </div>
-        <div id="modalDiaBody" class="px-6 pb-6 space-y-3 max-h-80 overflow-y-auto"></div>
-        <div class="px-6 pb-5">
-            <button type="button" onclick="closeDayModal(); openEventoDrawer({keepDates: true});" class="btn-primary-custom w-full px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors"><i class="fa-solid fa-plus mr-2"></i>Adicionar evento neste dia</button>
-        </div>
+        <button type="button" onclick="closeDayModal()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+            <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
     </div>
-</div>
+    <div id="modalDiaBody" class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-4"></div>
+    <div class="px-6 sm:px-8 py-5 border-t border-gray-200">
+        <button type="button" onclick="closeDayModal(); openEventoDrawer({keepDates: true});" class="btn-primary-custom w-full px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors"><i class="fa-solid fa-plus mr-2"></i>Adicionar evento neste dia</button>
+    </div>
+</aside>
 
 <!-- Offcanvas: Adicionar evento -->
 <div id="eventoDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeEventoDrawer()"></div>
@@ -912,14 +928,62 @@ Object.keys(eventData).forEach(function (k) {
     eventData[k].forEach(function (ev) { eventosPorId[ev.id] = ev; });
 });
 
+function htmlHorarioProva(prova) {
+    var inicio = prova.inicio || '';
+    var fim = prova.fim || '';
+    if (!inicio && !fim) return 'Horário a definir';
+    if (inicio === '00:00' && fim === '23:59') return 'Dia todo';
+    if (inicio && fim) return inicio + ' – ' + fim;
+    return inicio || fim;
+}
+
+function htmlProvasDoDia(ev) {
+    var provas = Array.isArray(ev.provas) ? ev.provas : [];
+    if (!provas.length) return '';
+    return provas.map(function (prova) {
+        var materias = Array.isArray(prova.materias) ? prova.materias.filter(Boolean) : [];
+        var series = Array.isArray(prova.series) ? prova.series : [];
+        var titulo = prova.titulo || '';
+        var descricao = ev.descricao || '';
+        var rotulo = descricao && titulo && descricao.indexOf(titulo) === -1
+            ? descricao + ' — ' + titulo
+            : (descricao || titulo || 'Avaliação');
+        var seriesHtml = series.map(function (serie) {
+            var turmas = Array.isArray(serie.turmas) ? serie.turmas.filter(Boolean) : [];
+            return '<div class="py-2">' +
+                '<p class="text-sm font-medium text-gray-900">' + escHtml(serie.nome || 'Série') + '</p>' +
+                '<p class="text-sm text-gray-600 mt-0.5">' + escHtml(turmas.join(', ') || 'Sem turma') + '</p>' +
+            '</div>';
+        }).join('');
+        return '<article class="rounded-xl border border-gray-200 overflow-hidden">' +
+            '<div class="px-4 py-3 bg-gray-50 border-b border-gray-100">' +
+                '<p class="text-base font-semibold text-gray-900">' + escHtml(htmlHorarioProva(prova)) + '</p>' +
+                '<p class="text-sm text-gray-800 mt-0.5">' + escHtml(rotulo) + '</p>' +
+                (materias.length ? '<p class="text-xs text-gray-500 mt-1">' + escHtml(materias.join(' · ')) + '</p>' : '') +
+            '</div>' +
+            '<div class="px-4 divide-y divide-gray-100">' + seriesHtml + '</div>' +
+        '</article>';
+    }).join('');
+}
+
+function htmlAcoesEvento(ev) {
+    var acoes = '';
+    if (podeAlterarEvento) {
+        acoes += '<button type="button" class="btn-editar-evento text-xs font-medium px-2 py-1 rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"><i class="fa-solid fa-pen mr-1"></i>Editar</button>';
+    }
+    acoes += '<form method="post" action="' + baseUrl + '/admin/calendario-letivo/excluir-evento" onsubmit="return confirm(\'Remover este evento?\')">' +
+        '<input type="hidden" name="csrf_token" value="' + escHtml(csrfToken) + '">' +
+        '<input type="hidden" name="ano" value="' + anoAtual + '">' +
+        '<input type="hidden" name="calendario_id" value="' + calendarioAtualId + '">' +
+        '<input type="hidden" name="id" value="' + ev.id + '">' +
+        '<button type="submit" class="text-xs font-medium px-2 py-1 rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"><i class="fa-solid fa-trash-can mr-1"></i>Remover</button>' +
+    '</form>';
+    return '<div class="flex flex-wrap justify-end gap-2">' + acoes + '</div>';
+}
+
 function openDayModal(payloadStr) {
     var data = JSON.parse(payloadStr);
     var events = data.events;
-    var primTipo = events.length ? events[0].tipo : 'evento';
-
-    var header = document.getElementById('modalDiaHeader');
-    header.style.backgroundColor = tipoBg[primTipo] || '#f3f4f6';
-    header.style.color = tipoText[primTipo] || '#111827';
     document.getElementById('modalDiaData').textContent = data.date;
 
     var tipos = [...new Set(events.map(function(e){ return e.label; }))];
@@ -928,34 +992,24 @@ function openDayModal(payloadStr) {
     var body = document.getElementById('modalDiaBody');
     body.innerHTML = '';
     events.forEach(function(ev) {
-        var periodo = ev.inicio === ev.fim ? ev.inicio : ev.inicio + ' – ' + ev.fim;
-        var div = document.createElement('div');
-        div.className = 'flex items-start gap-3 p-3 rounded-xl border';
-        div.style.backgroundColor = tipoBg[ev.tipo] || '#f9fafb';
-        div.style.borderColor = tipoText[ev.tipo] + '33' || '#e5e7eb';
-        var extras = '';
-        if (ev.local_evento) extras += '<span class="inline-flex items-center gap-1 mr-2"><i class="fa-solid fa-location-dot text-xs"></i>' + escHtml(ev.local_evento) + '</span>';
-        if (ev.link_reuniao) extras += '<a href="' + escHtml(ev.link_reuniao) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-1 underline hover:opacity-80"><i class="fa-solid fa-link text-xs"></i>Acessar link</a>';
-        var acoes = '';
-        if (podeAlterarEvento) {
-            acoes += '<button type="button" class="btn-editar-evento text-xs font-medium px-2 py-1 rounded-lg border hover:opacity-80" style="border-color:' + (tipoText[ev.tipo]||'#6b7280') + '; color:' + (tipoText[ev.tipo]||'#374151') + '; background:#fff;"><i class="fa-solid fa-pen mr-1"></i>Editar</button>';
+        var provasHtml = htmlProvasDoDia(ev);
+        var div = document.createElement('section');
+        div.className = 'space-y-3';
+        if (provasHtml) {
+            div.innerHTML = provasHtml + htmlAcoesEvento(ev);
+        } else {
+            var periodo = ev.inicio === ev.fim ? ev.inicio : ev.inicio + ' – ' + ev.fim;
+            var extras = '';
+            if (ev.local_evento) extras += '<span class="inline-flex items-center gap-1 mr-2"><i class="fa-solid fa-location-dot text-xs"></i>' + escHtml(ev.local_evento) + '</span>';
+            if (ev.link_reuniao) extras += '<a href="' + escHtml(ev.link_reuniao) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-1 underline hover:opacity-80"><i class="fa-solid fa-link text-xs"></i>Acessar link</a>';
+            div.innerHTML =
+                '<div class="rounded-xl border border-gray-200 p-4 space-y-2">' +
+                    '<p class="text-sm font-semibold text-gray-900">' + escHtml(ev.descricao) + '</p>' +
+                    '<p class="text-xs text-gray-500">' + escHtml(ev.label) + ' · ' + escHtml(periodo) + '</p>' +
+                    (extras ? '<p class="text-xs text-gray-600">' + extras + '</p>' : '') +
+                    htmlAcoesEvento(ev) +
+                '</div>';
         }
-        div.innerHTML =
-            '<div class="flex-1 min-w-0">' +
-                '<p class="text-sm font-semibold" style="color:' + (tipoText[ev.tipo]||'#111') + '">' + escHtml(ev.descricao) + '</p>' +
-                '<p class="text-xs mt-0.5" style="color:' + (tipoText[ev.tipo]||'#666') + '; opacity:0.75">' + escHtml(ev.label) + ' · ' + escHtml(periodo) + '</p>' +
-                (extras ? '<p class="text-xs mt-1" style="color:' + (tipoText[ev.tipo]||'#666') + '">' + extras + '</p>' : '') +
-            '</div>' +
-            '<div class="flex flex-col gap-1.5 flex-shrink-0">' +
-                acoes +
-                '<form method="post" action="' + baseUrl + '/admin/calendario-letivo/excluir-evento" onsubmit="return confirm(\'Remover este evento?\')">' +
-                    '<input type="hidden" name="csrf_token" value="' + escHtml(csrfToken) + '">' +
-                    '<input type="hidden" name="ano" value="' + anoAtual + '">' +
-                    '<input type="hidden" name="calendario_id" value="' + calendarioAtualId + '">' +
-                    '<input type="hidden" name="id" value="' + ev.id + '">' +
-                    '<button type="submit" class="text-xs font-medium px-2 py-1 rounded-lg hover:opacity-80 transition-opacity" style="background:' + (tipoText[ev.tipo]||'#ef4444') + '; color:#fff;"><i class="fa-solid fa-trash-can mr-1"></i>Remover</button>' +
-                '</form>' +
-            '</div>';
         var btnEditar = div.querySelector('.btn-editar-evento');
         if (btnEditar) {
             btnEditar.addEventListener('click', function () { editarEvento(ev.id); });
@@ -971,11 +1025,13 @@ function openDayModal(payloadStr) {
     if (inpInicio) inpInicio.value = isoDate;
     if (inpFim)    inpFim.value    = isoDate;
 
-    document.getElementById('modalDia').classList.remove('hidden');
+    showDrawer('diaDrawerBackdrop', 'diaDrawer');
 }
 
 function closeDayModal() {
-    document.getElementById('modalDia').classList.add('hidden');
+    var backdrop = document.getElementById('diaDrawerBackdrop');
+    if (!backdrop) return;
+    hideDrawer('diaDrawerBackdrop', 'diaDrawer');
 }
 
 function escHtml(str) {
@@ -1201,9 +1257,6 @@ document.addEventListener('keydown', function(e) {
         closeEventosDrawer();
         closeDayModal();
     }
-});
-document.getElementById('modalDia').addEventListener('click', function(e) {
-    if (e.target === this) closeDayModal();
 });
 var fimSegueAutomatico = true;
 var ultimoFimAutomatico = '';

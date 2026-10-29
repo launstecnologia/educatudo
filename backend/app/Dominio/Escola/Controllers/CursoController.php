@@ -51,6 +51,61 @@ class CursoController extends BaseController
         }
     }
 
+    private function hasCor(): bool
+    {
+        try {
+            $c = $this->db->fetch(
+                "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'curso' AND COLUMN_NAME = 'cor'"
+            );
+            return ($c['n'] ?? 0) > 0;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function corDoPost(): ?string
+    {
+        $cor = strtolower(trim((string) ($_POST['cor'] ?? '')));
+        if ($cor === '') {
+            return null;
+        }
+        if (!preg_match('/^#[0-9a-f]{6}$/', $cor)) {
+            throw new \Exception('Escolha uma cor válida.');
+        }
+        return $cor;
+    }
+
+    /**
+     * @param array<string,mixed> $campos
+     */
+    private function gravarCurso(?int $id, array $campos): void
+    {
+        $permitidas = ['nome', 'descricao', 'ativo', 'ordem', 'tipo', 'possui_serie', 'cor'];
+        foreach (array_keys($campos) as $col) {
+            if (!in_array($col, $permitidas, true)) {
+                throw new \Exception('Campo inválido.');
+            }
+        }
+        if ($id === null) {
+            $cols = array_keys($campos);
+            $vals = array_map(static fn (string $col): string => ':' . $col, $cols);
+            $this->db->insert(
+                'INSERT INTO curso (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ')',
+                $campos
+            );
+            return;
+        }
+        $sets = [];
+        foreach (array_keys($campos) as $col) {
+            $sets[] = $col . ' = :' . $col;
+        }
+        $campos['id'] = $id;
+        $this->db->update(
+            'UPDATE curso SET ' . implode(', ', $sets) . ' WHERE id = :id',
+            $campos
+        );
+    }
+
     public function index()
     {
         $this->redirect('/admin/cursos-series', 301);
@@ -69,6 +124,7 @@ class CursoController extends BaseController
                 'series_por_curso' => [],
                 'cursos' => [],
                 'has_tipo_possui_serie' => false,
+                'has_cor' => false,
             ]);
             return;
         }
@@ -110,6 +166,7 @@ class CursoController extends BaseController
             'status' => $_GET['status'] ?? '',
             'message' => $_GET['message'] ?? '',
             'has_tipo_possui_serie' => $this->hasTipoPossuiSerie(),
+            'has_cor' => $this->hasCor(),
         ]);
     }
 
@@ -154,17 +211,20 @@ class CursoController extends BaseController
             if ($existe) {
                 throw new \Exception('Já existe um curso com este nome.');
             }
+            $campos = [
+                'nome' => $nome,
+                'descricao' => $descricao,
+                'ativo' => $ativo,
+                'ordem' => $ordem,
+            ];
             if ($this->hasTipoPossuiSerie()) {
-                $this->db->insert(
-                    "INSERT INTO curso (nome, descricao, ativo, ordem, tipo, possui_serie) VALUES (:nome, :descricao, :ativo, :ordem, :tipo, :possui_serie)",
-                    ['nome' => $nome, 'descricao' => $descricao, 'ativo' => $ativo, 'ordem' => $ordem, 'tipo' => $tipo, 'possui_serie' => $possuiSerie]
-                );
-            } else {
-                $this->db->insert(
-                    "INSERT INTO curso (nome, descricao, ativo, ordem) VALUES (:nome, :descricao, :ativo, :ordem)",
-                    ['nome' => $nome, 'descricao' => $descricao, 'ativo' => $ativo, 'ordem' => $ordem]
-                );
+                $campos['tipo'] = $tipo;
+                $campos['possui_serie'] = $possuiSerie;
             }
+            if ($this->hasCor()) {
+                $campos['cor'] = $this->corDoPost();
+            }
+            $this->gravarCurso(null, $campos);
             $this->json(['success' => true, 'message' => 'Curso cadastrado com sucesso.']);
         } catch (\Exception $e) {
             $this->json(['error' => $e->getMessage()], 400);
@@ -195,17 +255,20 @@ class CursoController extends BaseController
             }
             $tipo = trim($_POST['tipo'] ?? '') === 'extra' ? 'extra' : 'regular';
             $possuiSerie = ($tipo === 'extra') ? 0 : (isset($_POST['possui_serie']) ? 1 : 0);
+            $campos = [
+                'nome' => $nome,
+                'descricao' => $descricao,
+                'ativo' => $ativo,
+                'ordem' => $ordem,
+            ];
             if ($this->hasTipoPossuiSerie()) {
-                $this->db->update(
-                    "UPDATE curso SET nome = :nome, descricao = :descricao, ativo = :ativo, ordem = :ordem, tipo = :tipo, possui_serie = :possui_serie WHERE id = :id",
-                    ['nome' => $nome, 'descricao' => $descricao, 'ativo' => $ativo, 'ordem' => $ordem, 'tipo' => $tipo, 'possui_serie' => $possuiSerie, 'id' => $id]
-                );
-            } else {
-                $this->db->update(
-                    "UPDATE curso SET nome = :nome, descricao = :descricao, ativo = :ativo, ordem = :ordem WHERE id = :id",
-                    ['nome' => $nome, 'descricao' => $descricao, 'ativo' => $ativo, 'ordem' => $ordem, 'id' => $id]
-                );
+                $campos['tipo'] = $tipo;
+                $campos['possui_serie'] = $possuiSerie;
             }
+            if ($this->hasCor()) {
+                $campos['cor'] = $this->corDoPost();
+            }
+            $this->gravarCurso((int) $id, $campos);
             $this->json(['success' => true, 'message' => 'Curso atualizado com sucesso.']);
         } catch (\Exception $e) {
             $this->json(['error' => $e->getMessage()], 400);

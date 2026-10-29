@@ -62,7 +62,7 @@ class AdminPermissionMatrix
 
             'exercicios' => ['label' => 'Exercícios', 'prefixes' => ['/admin/exercises']],
             'jornadas_aluno' => ['label' => 'Jornada do Aluno', 'prefixes' => ['/admin/consulta-jornadas-aluno', '/admin/jornadas']],
-            'provas_online' => ['label' => 'Lançamento de Notas', 'prefixes' => ['/admin/consulta-provas-aluno', '/admin/consulta-provas-professor', '/admin/provas', '/admin/provas-professor', '/admin/blocos-modelo']],
+            'provas_online' => ['label' => 'Lançamento de Notas', 'prefixes' => ['/admin/consulta-provas-aluno', '/admin/consulta-provas-professor', '/admin/provas', '/admin/provas-professor', '/admin/blocos-modelo', '/admin/eventos-avaliativos']],
             'assistente' => ['label' => 'Assistente', 'prefixes' => ['/admin/assistente', '/admin/assistente-provas', '/admin/consulta-assistente', '/admin/doc-sistema']],
             'redacao_professor' => ['label' => 'Jornada da Redação', 'prefixes' => ['/admin/redacao-professor']],
             'inclusao' => ['label' => 'EducaInclui (Acessibilidade)', 'prefixes' => ['/admin/inclusao']],
@@ -331,6 +331,17 @@ class AdminPermissionMatrix
             $path = '/';
         }
 
+        if ($path === '/admin/eventos-avaliativos/boletim' || str_starts_with($path, '/admin/eventos-avaliativos/boletim/')) {
+            $acao = self::resolveAction($path, $method);
+            if ($acao === 'cadastrar') {
+                $acao = 'alterar';
+            }
+            return [
+                'module_key' => 'configuracao_boletim',
+                'action_key' => $acao,
+            ];
+        }
+
         $moduleKey = null;
         foreach (self::moduleCatalog() as $key => $def) {
             foreach ($def['prefixes'] as $prefix) {
@@ -379,7 +390,7 @@ class AdminPermissionMatrix
         if (preg_match('#/(create|store|new|novo|criar|salvar|cadastrar)(/|$)#i', $path)) {
             return 'cadastrar';
         }
-        if ($m === 'POST' && preg_match('#^/admin/(quadros-notas|grupos-regras-notas)$#', $path)) {
+        if ($m === 'POST' && preg_match('#^/admin/(quadros-notas|grupos-regras-notas|eventos-avaliativos)$#', $path)) {
             return 'cadastrar';
         }
 

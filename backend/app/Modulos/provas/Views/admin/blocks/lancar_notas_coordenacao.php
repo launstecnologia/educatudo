@@ -26,15 +26,14 @@ $edicaoDesbloqueada = !empty($edicao_desbloqueada);
 $csrfToken = $csrf_token ?? '';
 $flash = $flash ?? [];
 $notaUnicaTodasMaterias = !empty($bloco['nota_unica_todas_materias']);
-$colunasTabela = ($notaUnicaTodasMaterias ? 4 : 6) + 1;
+$mostrarProfessor = !empty($mostrar_professor);
+$mostrarMateria = !$notaUnicaTodasMaterias && $materiaIdFiltro <= 0;
+$colunasTabela = 6 + ($mostrarMateria ? 1 : 0) + ($mostrarProfessor ? 1 : 0);
 $blocoId = (int) ($bloco['id'] ?? 0);
 $actionFiltro = URL . '/admin/provas/blocos/' . $blocoId . '/lancar-notas-coordenacao';
 $urlDesbloquear = URL . '/admin/provas/blocos/' . $blocoId . '/lancar-notas-coordenacao/desbloquear';
 
 $filtrosAtivos = [];
-if (!$notaUnicaTodasMaterias && $materiaIdFiltro > 0) {
-    $filtrosAtivos[] = 'Matéria: ' . ($materiasFiltro[$materiaIdFiltro] ?? ('#' . $materiaIdFiltro));
-}
 if (!$notaUnicaTodasMaterias && $professorIdFiltro > 0) {
     $filtrosAtivos[] = 'Professor: ' . ($professorNomeFiltro !== '' ? $professorNomeFiltro : ('#' . $professorIdFiltro));
 }
@@ -87,6 +86,11 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
             <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
             Histórico
         </button>
+        <button type="button" onclick="openImportarDrawer()"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 text-sm font-medium hover:bg-emerald-100">
+            <i class="fa-solid fa-file-import" aria-hidden="true"></i>
+            Importar planilha
+        </button>
         <?php if (!$edicaoDesbloqueada): ?>
         <button type="button" id="btnDesbloquearEdicao" onclick="abrirModalSenha()"
                 class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-amber-300 bg-amber-50 text-amber-900 text-sm font-semibold hover:bg-amber-100">
@@ -107,7 +111,16 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
 </div>
 
 <?php if (!empty($flash['message'])): ?>
-<div class="mb-6 px-4 py-3 rounded-lg <?= (!empty($flash['type']) && $flash['type'] === 'error') ? 'bg-red-100 border border-red-200 text-red-800' : 'bg-green-100 border border-green-200 text-green-800' ?>">
+<?php
+$tipoFlash = (string) ($flash['type'] ?? '');
+$classeFlash = 'bg-green-100 border border-green-200 text-green-800';
+if ($tipoFlash === 'error') {
+    $classeFlash = 'bg-red-100 border border-red-200 text-red-800';
+} elseif ($tipoFlash === 'warning') {
+    $classeFlash = 'bg-amber-50 border border-amber-200 text-amber-900';
+}
+?>
+<div class="mb-6 px-4 py-3 rounded-lg <?= $classeFlash ?>">
     <?= htmlspecialchars((string) $flash['message']) ?>
 </div>
 <?php endif; ?>
@@ -121,8 +134,9 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
 
 <p class="text-xs text-gray-500 mb-4">
     Notas novas podem ser lançadas normalmente. Notas já salvas ficam bloqueadas até você confirmar com a senha de acesso.
+    A planilha usa o código do aluno, a disciplina e a nota.
     <?php if ($notaUnicaTodasMaterias): ?>
-        <span class="text-violet-800">Neste evento a nota é única e replica para todas as matérias.</span>
+        <span class="text-violet-800">Neste evento a nota é única e replica para todas as matérias. Na planilha, a disciplina pode ficar em branco.</span>
     <?php endif; ?>
 </p>
 
@@ -138,16 +152,38 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
     <input type="hidden" name="senha_confirmacao" id="senhaConfirmacaoHidden" value="">
 
     <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+        <?php if (!$notaUnicaTodasMaterias && count($materiasFiltro) > 0): ?>
+        <div class="flex flex-wrap border-b border-gray-200 px-2" role="tablist">
+            <?php foreach ($materiasFiltro as $midAba => $nomeAba): ?>
+                <?php
+                $qAba = $qsBase;
+                $qAba['materia_id'] = (int) $midAba;
+                unset($qAba['pagina']);
+                $qsAba = http_build_query($qAba);
+                $ativa = (int) $midAba === $materiaIdFiltro;
+                ?>
+                <a href="<?= htmlspecialchars($qsAba !== '' ? $actionFiltro . '?' . $qsAba : $actionFiltro) ?>"
+                   role="tab"
+                   aria-selected="<?= $ativa ? 'true' : 'false' ?>"
+                   class="shrink-0 px-4 py-3 text-sm font-semibold border-b-2 -mb-px whitespace-nowrap <?= $ativa ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300' ?>">
+                    <?= htmlspecialchars((string) $nomeAba) ?>
+                </a>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200 text-sm">
                 <thead class="bg-gray-50">
                     <tr>
-                        <?php if (!$notaUnicaTodasMaterias): ?>
+                        <?php if ($mostrarMateria): ?>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Matéria</th>
+                        <?php endif; ?>
+                        <?php if ($mostrarProfessor): ?>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Professor</th>
                         <?php endif; ?>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Turma</th>
                         <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-16">Nº</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Aluno</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-40">Nota</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Observação</th>
@@ -176,15 +212,22 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
                                 (string) ($ln['aluno_nome'] ?? ''),
                                 $transferido
                             );
+                            $codigoAluno = trim((string) ($ln['codigo_aluno'] ?? ''));
+                            if ($codigoAluno === '') {
+                                $codigoAluno = trim((string) ($ln['ra'] ?? ''));
+                            }
                             $somenteLeitura = $bloqueada || $transferido;
                         ?>
                             <tr class="<?= $transferido ? 'bg-gray-100 text-gray-500' : 'hover:bg-gray-50' ?>" data-tem-nota="<?= $temNota ? '1' : '0' ?>">
-                                <?php if (!$notaUnicaTodasMaterias): ?>
+                                <?php if ($mostrarMateria): ?>
                                 <td class="px-4 py-3 <?= $transferido ? 'text-gray-500' : 'text-gray-700' ?>"><?= htmlspecialchars((string) ($ln['materia_nome'] ?? '')) ?></td>
+                                <?php endif; ?>
+                                <?php if ($mostrarProfessor): ?>
                                 <td class="px-4 py-3 <?= $transferido ? 'text-gray-500' : 'text-gray-700' ?>"><?= htmlspecialchars((string) ($ln['professor_nome'] ?? '')) ?></td>
                                 <?php endif; ?>
                                 <td class="px-4 py-3 <?= $transferido ? 'text-gray-500' : 'text-gray-700' ?>"><?= htmlspecialchars((string) ($ln['turma_nome'] ?? '')) ?></td>
                                 <td class="px-4 py-3 text-center <?= $transferido ? 'text-gray-500' : 'text-gray-700' ?> font-semibold"><?= $nChamada > 0 ? $nChamada : '—' ?></td>
+                                <td class="px-4 py-3 <?= $transferido ? 'text-gray-500' : 'text-gray-700' ?> font-mono text-xs"><?= $codigoAluno !== '' ? htmlspecialchars($codigoAluno) : '—' ?></td>
                                 <td class="px-4 py-3 font-medium <?= $transferido ? 'text-gray-500' : 'text-gray-900' ?>">
                                     <?= htmlspecialchars($nomeAluno) ?>
                                 </td>
@@ -284,6 +327,53 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
     <?php endif; ?>
 </form>
 
+<!-- Offcanvas importar planilha -->
+<div id="importarDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeImportarDrawer()"></div>
+<aside id="importarDrawer"
+       class="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-2xl transform translate-x-full transition-transform duration-200 ease-out flex flex-col"
+       aria-hidden="true">
+    <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-900">Importar notas</h3>
+        <button type="button" onclick="closeImportarDrawer()" class="text-gray-400 hover:text-gray-600" aria-label="Fechar">
+            <i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i>
+        </button>
+    </div>
+    <form method="post" enctype="multipart/form-data"
+          action="<?= URL ?>/admin/provas/blocos/<?= $blocoId ?>/importar-notas-planilha"
+          class="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+        <input type="hidden" name="_token" value="<?= htmlspecialchars((string) $csrfToken) ?>">
+        <input type="hidden" name="materia_id" value="<?= $materiaIdFiltro ?>">
+        <input type="hidden" name="professor_id" value="<?= $professorIdFiltro ?>">
+        <input type="hidden" name="turma_id" value="<?= $turmaIdFiltro ?>">
+        <input type="hidden" name="serie_id" value="<?= $serieIdFiltro ?>">
+        <input type="hidden" name="ordenar" value="<?= htmlspecialchars($ordenarFiltro) ?>">
+        <input type="hidden" name="por_pagina" value="<?= (int) $porPagina ?>">
+        <p class="text-sm text-gray-600">
+            A planilha precisa das colunas <strong>codigo</strong>, <strong>disciplina</strong> e <strong>nota</strong>.
+            O código é o código do aluno ou o RA. Aceita CSV e Excel (.xlsx).
+        </p>
+        <a href="<?= URL ?>/admin/provas/blocos/<?= $blocoId ?>/modelo-notas-planilha"
+           class="inline-flex items-center gap-2 text-sm font-medium text-indigo-700 hover:text-indigo-900">
+            <i class="fa-solid fa-download" aria-hidden="true"></i>
+            Baixar modelo preenchido com os alunos
+        </a>
+        <div>
+            <label for="planilha" class="block text-sm font-medium text-gray-700 mb-1">Arquivo</label>
+            <input type="file" id="planilha" name="planilha" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required
+                   class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-gray-100 file:text-gray-700">
+        </div>
+        <label class="flex items-start gap-2 text-sm text-gray-700">
+            <input type="checkbox" name="substituir" value="1" class="mt-1">
+            <span>Substituir notas já lançadas. Isso só vale depois de desbloquear a edição com a senha.</span>
+        </label>
+        <div class="pt-2">
+            <button type="submit" class="btn-primary-custom w-full px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90">
+                Importar
+            </button>
+        </div>
+    </form>
+</aside>
+
 <!-- Offcanvas filtros -->
 <div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
 <aside id="filterDrawer"
@@ -299,18 +389,8 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
         <?php if ($professorIdFiltro > 0): ?>
         <input type="hidden" name="professor_id" value="<?= $professorIdFiltro ?>">
         <?php endif; ?>
-        <?php if (!$notaUnicaTodasMaterias): ?>
-        <div>
-            <label for="materia_id" class="block text-sm font-medium text-gray-700 mb-1">Matéria</label>
-            <select id="materia_id" name="materia_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white">
-                <option value="0" <?= $materiaIdFiltro === 0 ? 'selected' : '' ?>>Todas as matérias</option>
-                <?php foreach ($materiasFiltro as $mid => $mnome): ?>
-                    <option value="<?= (int) $mid ?>" <?= $materiaIdFiltro === (int) $mid ? 'selected' : '' ?>>
-                        <?= htmlspecialchars((string) $mnome) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
+        <?php if ($materiaIdFiltro > 0): ?>
+        <input type="hidden" name="materia_id" value="<?= $materiaIdFiltro ?>">
         <?php endif; ?>
         <div>
             <label for="serie_id" class="block text-sm font-medium text-gray-700 mb-1">Série</label>
@@ -463,6 +543,20 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
         d.setAttribute('aria-hidden', 'true');
         document.body.style.overflow = '';
     };
+    window.openImportarDrawer = function () {
+        document.getElementById('importarDrawerBackdrop').classList.remove('hidden');
+        var d = document.getElementById('importarDrawer');
+        d.classList.remove('translate-x-full');
+        d.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+    };
+    window.closeImportarDrawer = function () {
+        document.getElementById('importarDrawerBackdrop').classList.add('hidden');
+        var d = document.getElementById('importarDrawer');
+        d.classList.add('translate-x-full');
+        d.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    };
     window.abrirModalSenha = function () {
         var m = document.getElementById('modalSenha');
         var err = document.getElementById('senhaDesbloqueioErro');
@@ -530,6 +624,7 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
         if (e.key === 'Escape') {
             closeFilterDrawer();
             closeHistoricoDrawer();
+            closeImportarDrawer();
             fecharModalSenha();
         }
     });

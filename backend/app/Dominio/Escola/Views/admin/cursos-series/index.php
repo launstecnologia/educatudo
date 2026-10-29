@@ -58,11 +58,18 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
         $tipoBadge = $tipo === 'extra' ? 'bg-indigo-100 text-indigo-800' : 'bg-blue-100 text-blue-800';
         $seriesDoCurso = $seriesPorCurso[$cid] ?? [];
         $importLabel = $tipo === 'extra' ? 'Importar / vincular' : 'Importar alunos';
+        $corCurso = strtolower(trim((string) ($row['cor'] ?? '')));
+        if (!preg_match('/^#[0-9a-f]{6}$/', $corCurso)) {
+            $corCurso = '';
+        }
         ?>
     <div class="bg-white rounded-xl shadow-sm border border-gray-200">
         <div class="px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-gray-100">
             <div>
                 <div class="flex flex-wrap items-center gap-2">
+                    <?php if ($corCurso !== ''): ?>
+                    <span class="inline-block h-3 w-3 rounded-full border border-black/10" style="background:<?= htmlspecialchars($corCurso, ENT_QUOTES, 'UTF-8') ?>"></span>
+                    <?php endif; ?>
                     <h3 class="text-base font-semibold text-gray-900"><?= htmlspecialchars((string) ($row['nome'] ?? '')) ?></h3>
                     <span class="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full <?= $tipoBadge ?>"><?= $tipoLabel ?></span>
                     <span class="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full <?= !empty($row['ativo']) ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' ?>">

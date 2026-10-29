@@ -128,35 +128,60 @@ if ($nomeMenuEscola === '') {
         <?php $menu_subcab_titulo = 'Como a escola avalia'; $menu_subcab_periodo = ''; $menu_subcab_ordenar = true; $menu_subcab_id = 'como-avalia'; $menu_subcab_aberto = !empty($avaliaNestedOpen); require __DIR__ . '/admin_sidebar_subcabecalho.php'; ?>
         <div id="como-avalia-nested" class="<?= !empty($avaliaNestedOpen) ? '' : 'hidden' ?>">
         <div class="sidebar-sublista">
+        <?php
+        $modeloEventoAvaliativo = class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos');
+        $provasMenuOn = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('aluno_provas') || \App\Core\LayoutHelper::isModuleEnabled('professor_provas');
+        ?>
         <?php if ($modOn('regras_academicas') && $canViewSidebar(['regras_academicas'])): ?>
         <a href="<?= URL ?>/admin/regras-academicas" class="<?= $linkCls($cp === 'regras-academicas') ?>">
             <i class="fa-solid fa-scale-balanced w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Regras de Aprovação</span>
         </a>
         <?php endif; ?>
-        <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('aluno_provas') || \App\Core\LayoutHelper::isModuleEnabled('professor_provas')): ?>
+        <?php if ($modeloEventoAvaliativo && $provasMenuOn): ?>
+        <a href="<?= URL ?>/admin/eventos-avaliativos" class="<?= $linkCls($cp === 'eventos-avaliativos') ?>">
+            <i class="fa-solid fa-clipboard-list w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Eventos Avaliativos</span>
+        </a>
+        <?php endif; ?>
+        <?php if (!$modeloEventoAvaliativo && $provasMenuOn): ?>
         <a href="<?= URL ?>/admin/provas/tipos-avaliacao" class="<?= $linkCls($cp === 'tipos_avaliacao') ?>">
             <i class="fa-solid fa-tags w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Tipos de Nota</span>
         </a>
         <?php endif; ?>
-        <?php if (class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('grupos_regras_notas') && $canViewSidebar(['grupos_regras_notas'])): ?>
+        <?php if (!$modeloEventoAvaliativo && class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('grupos_regras_notas') && $canViewSidebar(['grupos_regras_notas'])): ?>
         <a href="<?= URL ?>/admin/quadros-notas" class="<?= $linkCls(in_array($cp, ['grupos-regras-notas', 'quadros-notas'], true)) ?>">
             <i class="fa-solid fa-layer-group w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Quadro de Notas</span>
         </a>
         <?php endif; ?>
-        <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('aluno_provas') || \App\Core\LayoutHelper::isModuleEnabled('professor_provas')): ?>
+        <?php if (!$modeloEventoAvaliativo && $provasMenuOn): ?>
         <a href="<?= URL ?>/admin/provas" class="<?= $linkCls($cp === 'provas' || $cp === 'provas_blocos') ?>">
             <i class="fa-regular fa-clipboard w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Lançamento de Notas</span>
         </a>
         <?php endif; ?>
         <?php if ($modOn('boletim') && $canViewSidebar(['configuracao_boletim'])): ?>
+        <?php if ($modeloEventoAvaliativo): ?>
+        <a href="<?= URL ?>/admin/boletins" class="<?= $linkCls(in_array($cp, ['boletins', 'boletim_config', 'boletim_guia'], true)) ?>">
+            <i class="fa-solid fa-table-cells w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Demonstrativo de notas</span>
+        </a>
+        <a href="<?= URL ?>/admin/eventos-avaliativos/boletim" class="<?= $linkCls($cp === 'boletim-layout') ?>">
+            <i class="fa-solid fa-file-circle-check w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Boletim</span>
+        </a>
+        <a href="<?= URL ?>/admin/reports/boletim-coordenacao?fonte=vida_escolar" class="<?= $linkCls($cp === 'reports_boletim_coordenacao') ?>">
+            <i class="fa-solid fa-chart-column w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Relatórios</span>
+        </a>
+        <?php else: ?>
         <a href="<?= URL ?>/admin/boletins" class="<?= $linkCls(in_array($cp, ['boletins', 'boletim_config', 'boletim_guia', 'reports_boletim_coordenacao'], true)) ?>">
             <i class="fa-solid fa-file-circle-check w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Boletins</span>
         </a>
+        <?php endif; ?>
         <?php endif; ?>
         </div>
         </div>

@@ -673,7 +673,8 @@ class BoletimConfigController extends BaseController
         $voltarGerar = $voltar === 'gerar-avaliacoes' && $boletimId > 0;
         $voltarPeriodos = $voltar === 'periodos';
         $voltarEvento = $voltar === 'evento';
-        $voltarBoletins = !$voltarGerar && !$voltarPeriodos && !$voltarEvento && (
+        $voltarLayoutBoletim = $voltar === 'boletim-layout';
+        $voltarBoletins = !$voltarGerar && !$voltarPeriodos && !$voltarEvento && !$voltarLayoutBoletim && (
             $boletimId > 0
             || $voltar === 'boletins'
         );
@@ -747,6 +748,10 @@ class BoletimConfigController extends BaseController
             $origemNav = 'evento';
             $urlRetornoNav = $this->urlEventoComNavegacao($selectedRegraId, 'evento', $filtrosLista, false);
             $rotuloRetornoNav = 'Voltar ao evento';
+        } elseif ($voltarLayoutBoletim) {
+            $origemNav = 'boletim-layout';
+            $urlRetornoNav = '/admin/eventos-avaliativos/boletim' . ($anoRetorno > 0 ? ('?ano=' . $anoRetorno) : '');
+            $rotuloRetornoNav = 'Voltar ao boletim';
         } elseif ($voltarBoletins) {
             $origemNav = 'boletins';
             $urlRetornoNav = '/admin/boletins';
@@ -779,13 +784,14 @@ class BoletimConfigController extends BaseController
             'title' => $tituloEvento . ' - EducaTudo',
             'page_title' => $tituloEvento,
             'user' => $user,
-            'current_page' => 'boletim_config',
+            'current_page' => $voltarLayoutBoletim ? 'boletim-layout' : 'boletim_config',
             'csrf_token' => $this->generateCsrfToken(),
             'selected_regra_id' => $selectedRegraId,
             'boletim_id' => $boletimId,
             'ano_letivo_assistente' => $anoRetorno,
             'bimestre_assistente' => $bimestreRetorno,
             'voltar_boletins' => $voltarBoletins,
+            'voltar_boletim_layout' => $voltarLayoutBoletim,
             'voltar_periodos' => $voltarPeriodos,
             'voltar_evento' => $voltarEvento,
             'voltar_gerar_avaliacoes' => $voltarGerar,
@@ -1925,6 +1931,16 @@ class BoletimConfigController extends BaseController
             }
         } else {
             unset($decodedExtras['grupo_regras_notas_id'], $decodedExtras['quadro_notas_id'], $decodedExtras['destinos'], $decodedExtras['semanas_periodo']);
+        }
+
+        if (!empty($_POST['origem_assistente'])) {
+            $linhasLayout = $this->linhasLayoutDoRascunhoPost((string) ($_POST['assistente_rascunho'] ?? ''));
+            if ($linhasLayout === []) {
+                unset($decodedExtras['linhas_layout']);
+            } else {
+                $decodedExtras['linhas_layout'] = $linhasLayout;
+            }
+            $this->sincronizarLinhaCabecalho($componentesNormalizados, $linhasLayout);
         }
 
         if ($decodedExtras !== []) {
@@ -6909,7 +6925,12 @@ class BoletimConfigController extends BaseController
             }
             $stCol = (string) ($c['source_type'] ?? 'provas_sistema');
             $layoutMeta = $this->parseLayoutMetaFromComponente($c);
-            $colunas[] = [
+            $cfgCol = $this->decodeComponenteConfig($c);
+            $linhaCab = trim((string) ($cfgCol['linha_cabecalho'] ?? ''));
+            if ($linhaCab !== '') {
+                $linhaCab = function_exists('mb_substr') ? mb_substr($linhaCab, 0, 40) : substr($linhaCab, 0, 40);
+            }
+            $coluna = [
                 'id' => (int) ($c['id'] ?? 0),
                 'codigo' => $cod,
                 'nome' => (string) ($c['nome'] ?? $cod),
@@ -6920,6 +6941,10 @@ class BoletimConfigController extends BaseController
                 'layout_type' => $layoutMeta['type'],
                 'round_mode_efetivo' => $this->resolveRoundModeComponente($c, $roundMode),
             ];
+            if ($linhaCab !== '') {
+                $coluna['linha_cabecalho'] = $linhaCab;
+            }
+            $colunas[] = $coluna;
         }
         if ($colunas === []) {
             return null;
@@ -9106,7 +9131,7 @@ class BoletimConfigController extends BaseController
         $somaPesos = 0.0;
         $somaPonderada = 0.0;
         foreach ($componentesResultado as $comp) {
-            if ($this->componenteContaComoFalta($comp)) {
+            if ($this->componenteContaComoFalta($comp) || $this->componenteSoExibe($comp)) {
                 continue;
             }
             $cod = (string) ($comp['codigo'] ?? '');
@@ -9164,7 +9189,7 @@ class BoletimConfigController extends BaseController
         $somaPesos = 0.0;
         $somaPonderada = 0.0;
         foreach ($componentes as $comp) {
-            if ($this->componenteContaComoFalta($comp)) {
+            if ($this->componenteContaComoFalta($comp) || $this->componenteSoExibe($comp)) {
                 continue;
             }
             if (!is_numeric($comp['valor'] ?? null)) {
@@ -11945,6 +11970,25 @@ class BoletimConfigController extends BaseController
         return $lt === 'faltas';
     }
 
+    /** Coluna que só aparece no demonstrativo e não compõe a média. */
+    private function componenteSoExibe(array $comp): bool
+    {
+        $cfg = is_array($comp['config'] ?? null) ? $comp['config'] : [];
+        $raw = $comp['config_json'] ?? null;
+        if (is_string($raw) && trim($raw) !== '') {
+            $tmp = json_decode($raw, true);
+            if (is_array($tmp)) {
+                $cfg = array_replace($tmp, $cfg);
+            }
+        } elseif (is_array($raw)) {
+            $cfg = array_replace($raw, $cfg);
+        }
+        if (!empty($cfg['recuperacao_exibe'])) {
+            return true;
+        }
+        return strtolower(trim((string) ($cfg['papel_wizard'] ?? ''))) === 'exibe';
+    }
+
     /**
      * Evento de Notas sem bloco de faltas: puxa o lançamento do mesmo ano/bimestre.
      *
@@ -12508,8 +12552,108 @@ class BoletimConfigController extends BaseController
         if (!empty($cfgManual['blocos_ids_manual'])) {
             $payload['blocos_ids_manual'] = 1;
         }
+        $linhaCab = trim((string) ($cfgManual['linha_cabecalho'] ?? ''));
+        if ($linhaCab !== '') {
+            $payload['linha_cabecalho'] = function_exists('mb_substr')
+                ? mb_substr($linhaCab, 0, 40)
+                : substr($linhaCab, 0, 40);
+        }
+        if (strtolower(trim((string) ($cfgManual['papel_wizard'] ?? ''))) === 'exibe') {
+            $payload['papel_wizard'] = 'exibe';
+        }
 
         return $payload;
+    }
+
+    /**
+     * @return list<array{id:string,nome:string,colunas:list<string>}>
+     */
+    private function linhasLayoutDoRascunhoPost(string $raw): array
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return [];
+        }
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+        $out = [];
+        $usadas = [];
+        foreach ((array) ($decoded['linhas_layout'] ?? []) as $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            $nome = trim((string) ($linha['nome'] ?? ''));
+            $nome = function_exists('mb_substr') ? mb_substr($nome, 0, 40) : substr($nome, 0, 40);
+            if ($nome === '') {
+                continue;
+            }
+            $cols = [];
+            foreach ((array) ($linha['colunas'] ?? []) as $cod) {
+                $cod = strtolower(trim((string) $cod));
+                if ($cod === '' || isset($usadas[$cod]) || !preg_match('/^[a-z][a-z0-9_]{0,40}$/', $cod)) {
+                    continue;
+                }
+                $cols[] = $cod;
+                $usadas[$cod] = true;
+                if (count($cols) >= 12) {
+                    break;
+                }
+            }
+            if (count($cols) < 2) {
+                continue;
+            }
+            $id = strtolower(trim((string) ($linha['id'] ?? '')));
+            if (!preg_match('/^lin[a-z0-9_]{0,20}$/', $id)) {
+                $id = 'lin' . substr(sha1($nome . implode(',', $cols)), 0, 8);
+            }
+            $out[] = ['id' => $id, 'nome' => $nome, 'colunas' => $cols];
+            if (count($out) >= 8) {
+                break;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $componentes
+     * @param list<array{id:string,nome:string,colunas:list<string>}> $linhas
+     */
+    private function sincronizarLinhaCabecalho(array &$componentes, array $linhas): void
+    {
+        $porCodigo = [];
+        foreach ($linhas as $linha) {
+            $nome = (string) ($linha['nome'] ?? '');
+            foreach ((array) ($linha['colunas'] ?? []) as $cod) {
+                $porCodigo[(string) $cod] = $nome;
+            }
+        }
+        foreach ($componentes as &$componente) {
+            if (!is_array($componente)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($componente['codigo'] ?? '')));
+            $cfg = [];
+            $json = $componente['config_json'] ?? null;
+            if (is_string($json) && trim($json) !== '') {
+                $tmp = json_decode($json, true);
+                if (is_array($tmp)) {
+                    $cfg = $tmp;
+                }
+            }
+            if ($cod !== '' && isset($porCodigo[$cod])) {
+                $cfg['linha_cabecalho'] = $porCodigo[$cod];
+                $cfg['papel_wizard'] = 'exibe';
+            } else {
+                unset($cfg['linha_cabecalho']);
+            }
+            $componente['config_json'] = $cfg === []
+                ? null
+                : json_encode($cfg, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+        unset($componente);
     }
 
     /**

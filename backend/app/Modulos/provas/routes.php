@@ -44,6 +44,8 @@ $router->post('/admin/provas/blocos/{id}/importar-notas-internas', 'Modulos/prov
 $router->get('/admin/provas/blocos/{id}/lancar-notas-coordenacao', 'Modulos/provas/TeacherExamController@lancarNotasCoordenacao');
 $router->post('/admin/provas/blocos/{id}/lancar-notas-coordenacao', 'Modulos/provas/TeacherExamController@lancarNotasCoordenacaoSalvar');
 $router->post('/admin/provas/blocos/{id}/lancar-notas-coordenacao/desbloquear', 'Modulos/provas/TeacherExamController@desbloquearLancamentoNotasCoordenacao');
+$router->get('/admin/provas/blocos/{id}/modelo-notas-planilha', 'Modulos/provas/TeacherExamController@modeloNotasPlanilha');
+$router->post('/admin/provas/blocos/{id}/importar-notas-planilha', 'Modulos/provas/TeacherExamController@importarNotasPlanilha');
 $router->get('/admin/provas/blocos/{id}/provas-disponiveis', 'Modulos/provas/TeacherExamController@provasDisponiveisParaVincular');
 $router->post('/admin/provas/blocos/{id}/vincular', 'Modulos/provas/TeacherExamController@vincularProva');
 $router->post('/admin/provas/blocos/{id}/trocar-prova', 'Modulos/provas/TeacherExamController@trocarProva');

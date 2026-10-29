@@ -503,6 +503,96 @@ class BoletimAssistenteFerramentas
     }
 
     /**
+     * Eventos avaliativos do tenant, com sub-eventos, para o assistente de notas.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function listarEventosAvaliativosParaBoletim(): array
+    {
+        if (!$this->temTabela('eventos_avaliativos') || !$this->temColuna('provas_blocos', 'evento_avaliativo_id')) {
+            return [];
+        }
+        $selectCriterio = $this->temColuna('provas_tipos_avaliacao', 'criterio_professores_mesmo_componente')
+            ? 'pta.criterio_professores_mesmo_componente'
+            : 'NULL AS criterio_professores_mesmo_componente';
+        $selectSigla = $this->temColuna('eventos_avaliativos', 'sigla')
+            ? 'e.sigla'
+            : 'NULL AS sigla';
+        $joinTipo = $this->temTabela('provas_tipos_avaliacao')
+            ? 'LEFT JOIN provas_tipos_avaliacao pta ON pta.id = e.tipo_avaliacao_id AND pta.deleted_at IS NULL'
+            : '';
+        $eventos = $this->db->fetchAll(
+            'SELECT e.id, e.nome, ' . $selectSigla . ', e.descricao, e.ano_letivo, e.bimestre, e.tipo_avaliacao_id,
+                    ' . $selectCriterio . ',
+                    (SELECT COUNT(*) FROM provas_blocos pb
+                      WHERE pb.evento_avaliativo_id = e.id AND pb.deleted_at IS NULL) AS total_subeventos,
+                    (SELECT GROUP_CONCAT(DISTINCT t.nome ORDER BY t.nome SEPARATOR \', \')
+                       FROM provas_blocos pb4
+                       INNER JOIN provas_blocos_turmas pbt ON pbt.bloco_id = pb4.id
+                       INNER JOIN turmas t ON t.id = pbt.turma_id
+                      WHERE pb4.evento_avaliativo_id = e.id AND pb4.deleted_at IS NULL) AS turmas_nomes
+               FROM eventos_avaliativos e
+               ' . $joinTipo . '
+              WHERE e.deleted_at IS NULL AND e.ativo = 1' . ($this->temColuna('eventos_avaliativos', 'rascunho') ? ' AND e.rascunho = 0' : '') . '
+              ORDER BY e.ano_letivo DESC, e.bimestre ASC, e.nome ASC, e.id ASC
+              LIMIT 400'
+        ) ?: [];
+        $blocos = $this->db->fetchAll(
+            'SELECT pb.id, pb.evento_avaliativo_id, pb.titulo, pb.data_prova, pb.semana
+               FROM provas_blocos pb
+               INNER JOIN eventos_avaliativos e ON e.id = pb.evento_avaliativo_id
+              WHERE e.deleted_at IS NULL AND e.ativo = 1 AND pb.deleted_at IS NULL' . ($this->temColuna('eventos_avaliativos', 'rascunho') ? ' AND e.rascunho = 0' : '') . '
+              ORDER BY pb.semana ASC, pb.data_prova ASC, pb.id ASC'
+        ) ?: [];
+        $porEvento = [];
+        foreach ($blocos as $bloco) {
+            $eventoId = (int) ($bloco['evento_avaliativo_id'] ?? 0);
+            if ($eventoId <= 0) {
+                continue;
+            }
+            $porEvento[$eventoId][] = [
+                'id' => (int) ($bloco['id'] ?? 0),
+                'titulo' => trim((string) ($bloco['titulo'] ?? '')),
+                'data_prova' => isset($bloco['data_prova']) ? (string) $bloco['data_prova'] : '',
+                'semana' => (int) ($bloco['semana'] ?? 0),
+            ];
+        }
+        $out = [];
+        foreach ($eventos as $evento) {
+            $id = (int) ($evento['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $out[] = [
+                'id' => $id,
+                'nome' => trim((string) ($evento['nome'] ?? '')),
+                'sigla' => strtoupper(trim((string) ($evento['sigla'] ?? ''))),
+                'descricao' => trim((string) ($evento['descricao'] ?? '')),
+                'ano_letivo' => (int) ($evento['ano_letivo'] ?? 0),
+                'bimestre' => (int) ($evento['bimestre'] ?? 0),
+                'tipo_avaliacao_id' => (int) ($evento['tipo_avaliacao_id'] ?? 0),
+                'total_subeventos' => (int) ($evento['total_subeventos'] ?? 0),
+                'turmas_nomes' => trim((string) ($evento['turmas_nomes'] ?? '')),
+                'criterio_professores' => $this->criterioProfessoresDoEvento($evento),
+                'subeventos' => $porEvento[$id] ?? [],
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * @param array<string,mixed> $evento
+     */
+    private function criterioProfessoresDoEvento(array $evento): string
+    {
+        $criterio = strtolower(trim((string) ($evento['criterio_professores_mesmo_componente'] ?? '')));
+        if (in_array($criterio, ['nenhum', 'media', 'soma'], true)) {
+            return $criterio;
+        }
+        return 'nenhum';
+    }
+
+    /**
      * Completa bloco e semana (S1…S8) pelo vínculo do quadro de notas.
      *
      * @param list<array<string,mixed>> $eventos

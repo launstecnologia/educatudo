@@ -27,6 +27,7 @@ carregue tudo de uma vez.
 | Regra "uma tela, um cadastro"; quando usar offcanvas vs página própria; cabeçalho de listagem | `especificacoes/admin_ui_sistema/estrutura-e-cadastro.md` |
 | Tabela, dropdown de ações (`row_actions_dropdown.php`), badges de status, paginação | `especificacoes/admin_ui_sistema/tabela-dropdown-paginacao.md` |
 | Formulário em página própria (card `w-full`, campos, Safari, filtros) | `especificacoes/admin_ui_sistema/formularios-e-filtros.md` |
+| Vários cards de seção na mesma página (faixa de título no topo) | `especificacoes/admin_ui_sistema/formularios-e-filtros.md` §6c |
 | Wizard — fluxo em várias etapas (nav de passos, avançar/voltar, revisão) | `especificacoes/admin_ui_sistema/formularios-e-filtros.md` §6b |
 | Mensagens flash, abas/pills, ficha detalhada | `especificacoes/admin_ui_sistema/outros-padroes.md` |
 | Checklist final; modelo de prompt pra pedir uma tela nova | `especificacoes/admin_ui_sistema/checklist-e-modelo.md` |
@@ -41,6 +42,7 @@ carregue tudo de uma vez.
 - CSRF em todo POST não-API; `htmlspecialchars()` em toda saída PHP.
 - Font Awesome 6.5, nunca emoji no UI (exceto títulos legacy já existentes).
 - Formulário em página própria: **card largura total** (`w-full`, sem `max-w-*`/`mx-auto`) — referência `exams/blocks/create.php` — ver `formularios-e-filtros.md`.
+- Vários blocos na mesma página: cada um é um card com **faixa de título no topo** (número, título, ação à direita, corpo separado) — ver `formularios-e-filtros.md` §6c.
 
 ---
 

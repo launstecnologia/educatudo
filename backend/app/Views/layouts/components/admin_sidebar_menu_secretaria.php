@@ -24,9 +24,9 @@ $modOn = is_callable($modOn ?? null) ? $modOn : static function (string $key): b
 $academicoOpen = in_array($cur, [
     'academico', 'students', 'ano_letivo', 'calendario_letivo', 'componentes-curriculares',
     'agrupamentos-componentes', 'curso', 'cursos-series', 'grade_horaria', 'matriz-curricular',
-    'teachers', 'salas', 'serie', 'turmas', 'tipos_avaliacao', 'boletins', 'boletim_guia', 'boletim_config', 'reports_boletim_coordenacao',
-    'grupos-regras-notas', 'quadros-notas', 'regras-academicas', 'implantar-academico',
-    'provas', 'provas_blocos',
+    'teachers', 'salas', 'serie', 'turmas', 'tipos_avaliacao', 'boletins', 'boletim_guia', 'boletim_config', 'boletim-layout', 'reports_boletim_coordenacao',
+    'grupos-regras-notas', 'quadros-notas', 'regras-academicas', 'recuperacao', 'implantar-academico',
+    'provas', 'provas_blocos', 'eventos-avaliativos',
 ], true);
 $rotinaOpen = in_array($cur, [
     'rotina', 'exercises',
@@ -139,35 +139,60 @@ $gestaoOpen = $secretariaNavOpen;
         <?php $menu_subcab_titulo = 'Como a escola avalia'; $menu_subcab_periodo = ''; $menu_subcab_ordenar = true; $menu_subcab_id = 'como-avalia'; $menu_subcab_aberto = !empty($avaliaNestedOpen); require __DIR__ . '/admin_sidebar_subcabecalho.php'; ?>
         <div id="como-avalia-nested" class="<?= !empty($avaliaNestedOpen) ? '' : 'hidden' ?>">
         <div class="sidebar-sublista">
+        <?php
+        $modeloEventoAvaliativo = class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos');
+        $provasMenuOn = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('professor_provas');
+        ?>
         <?php if ($secCan(['regras_academicas']) && $modOn('regras_academicas')): ?>
         <a href="<?= $urlBase ?>/admin/regras-academicas" class="<?= $linkCls($cur === 'regras-academicas') ?>">
             <i class="fa-solid fa-scale-balanced w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Regras de Aprovação</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['provas_online']) && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('professor_provas'))): ?>
+        <?php if ($modeloEventoAvaliativo && $secCan(['provas_online']) && $provasMenuOn): ?>
+        <a href="<?= $urlBase ?>/admin/eventos-avaliativos" class="<?= $linkCls($cur === 'eventos-avaliativos') ?>">
+            <i class="fa-solid fa-clipboard-list w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Eventos Avaliativos</span>
+        </a>
+        <?php endif; ?>
+        <?php if (!$modeloEventoAvaliativo && $secCan(['provas_online']) && $provasMenuOn): ?>
         <a href="<?= $urlBase ?>/admin/provas/tipos-avaliacao" class="<?= $linkCls($cur === 'tipos_avaliacao') ?>">
             <i class="fa-solid fa-tags w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Tipos de Nota</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['grupos_regras_notas']) && $modOn('grupos_regras_notas')): ?>
+        <?php if (!$modeloEventoAvaliativo && $secCan(['grupos_regras_notas']) && $modOn('grupos_regras_notas')): ?>
         <a href="<?= $urlBase ?>/admin/quadros-notas" class="<?= $linkCls(in_array($cur, ['grupos-regras-notas', 'quadros-notas'], true)) ?>">
             <i class="fa-solid fa-layer-group w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Quadro de Notas</span>
         </a>
         <?php endif; ?>
-        <?php if ($secCan(['provas_online']) && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('professor_provas'))): ?>
+        <?php if (!$modeloEventoAvaliativo && $secCan(['provas_online']) && $provasMenuOn): ?>
         <a href="<?= $urlBase ?>/admin/provas" class="<?= $linkCls($cur === 'provas' || $cur === 'provas_blocos') ?>">
             <i class="fa-regular fa-clipboard w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Lançamento de Notas</span>
         </a>
         <?php endif; ?>
         <?php if ($secCan(['configuracao_boletim']) && $modOn('boletim')): ?>
+        <?php if ($modeloEventoAvaliativo): ?>
+        <a href="<?= $urlBase ?>/admin/boletins" class="<?= $linkCls(in_array($cur, ['boletins', 'boletim_config', 'boletim_guia'], true)) ?>">
+            <i class="fa-solid fa-table-cells w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Demonstrativo de notas</span>
+        </a>
+        <a href="<?= $urlBase ?>/admin/eventos-avaliativos/boletim" class="<?= $linkCls($cur === 'boletim-layout') ?>">
+            <i class="fa-solid fa-file-circle-check w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Boletim</span>
+        </a>
+        <a href="<?= $urlBase ?>/admin/reports/boletim-coordenacao?fonte=vida_escolar" class="<?= $linkCls($cur === 'reports_boletim_coordenacao') ?>">
+            <i class="fa-solid fa-chart-column w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Relatórios</span>
+        </a>
+        <?php else: ?>
         <a href="<?= $urlBase ?>/admin/boletins" class="<?= $linkCls(in_array($cur, ['boletins', 'boletim_config', 'boletim_guia', 'reports_boletim_coordenacao'], true)) ?>">
             <i class="fa-solid fa-file-circle-check w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Boletins</span>
         </a>
+        <?php endif; ?>
         <?php endif; ?>
         </div>
         </div>

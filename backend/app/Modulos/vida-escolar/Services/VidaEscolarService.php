@@ -5,6 +5,8 @@ use App\Core\PeriodoLetivo;
 
 
 use App\Modulos\Boletins\Services\BoletimCadastroService;
+use App\Modulos\RegrasAcademicas\Models\RegraAcademica;
+use App\Modulos\RegrasAcademicas\Services\EscalaNota;
 use App\Modulos\VidaEscolar\Models\VidaEscolar;
 use App\Core\Database;
 use App\Services\ResultadoAcademicoService;
@@ -484,6 +486,8 @@ class VidaEscolarService
             ];
         }
 
+        $layout = $this->layoutExibicaoDaFicha($ficha);
+
         return [
             'ficha' => $ficha,
             'grid' => $grid,
@@ -491,6 +495,8 @@ class VidaEscolarService
             'auditoria' => $this->model->listarAuditoria($fichaId, 40),
             'log_meio_ano' => $this->model->listarAuditoriaAcao($fichaId, 'importar_meio_ano', 50),
             'modelo_nome' => is_array($modelo) ? (string) ($modelo['nome'] ?? '') : '',
+            'layout_exibicao' => $layout,
+            'escala_nota' => $this->escalaDaFicha($ficha, $layout),
         ];
     }
 
@@ -531,7 +537,15 @@ class VidaEscolarService
             'origem' => $cel['origem'],
         ];
 
-        $nota = $this->notaOuNull($input['nota'] ?? null);
+        $lida = EscalaNota::ler($input['nota'] ?? null);
+        if (!$lida['ok']) {
+            return ['success' => false, 'error' => $lida['erro']];
+        }
+        $nota = $lida['nota'];
+        $erroEscala = EscalaNota::rejeitar($nota, $this->escalaDaFicha($ficha));
+        if ($erroEscala !== null) {
+            return ['success' => false, 'error' => $erroEscala];
+        }
         $conceito = trim((string) ($input['conceito'] ?? '')) ?: null;
         $faltas = isset($input['faltas']) && $input['faltas'] !== '' ? (int) $input['faltas'] : null;
         $origem = (string) ($input['origem'] ?? $cel['origem'] ?? 'calculada');
@@ -3424,6 +3438,45 @@ class VidaEscolarService
         }
 
         return $ids;
+    }
+
+    /**
+     * @param array<string,mixed> $ficha
+     * @param array<string,mixed>|null $layout
+     */
+    private function escalaDaFicha(array $ficha, ?array $layout = null): string
+    {
+        if ($layout === null) {
+            $layout = $this->layoutExibicaoDaFicha($ficha);
+        }
+        $escala = is_array($layout) ? trim((string) ($layout['escala'] ?? '')) : '';
+        if ($escala === '') {
+            $regra = $this->regraAcademicaDaFicha($ficha);
+            $escala = is_array($regra) ? trim((string) ($regra['escala'] ?? '')) : '';
+        }
+        if (!isset(RegraAcademica::ESCALAS[$escala])) {
+            $escala = '10';
+        }
+
+        return $escala;
+    }
+
+    /**
+     * @param array<string,mixed> $ficha
+     * @return array<string,mixed>|null
+     */
+    private function layoutExibicaoDaFicha(array $ficha): ?array
+    {
+        try {
+            $layout = new \App\Modulos\EventosAvaliativos\Models\BoletimLayout();
+            $turmaId = (int) ($ficha['turma_id'] ?? 0);
+            $turma = $turmaId > 0 ? $this->model->turmaPorId($turmaId) : null;
+            $serieId = (int) (is_array($turma) ? ($turma['serie_id'] ?? 0) : 0);
+
+            return $layout->exibicaoOficial((int) ($ficha['ano_letivo'] ?? 0), $turmaId, $serieId);
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     private function boletimCadastro(): BoletimCadastroService

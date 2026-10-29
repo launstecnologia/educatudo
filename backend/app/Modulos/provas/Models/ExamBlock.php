@@ -1024,19 +1024,30 @@ class ExamBlock
             // Adiciona professores com suas matérias e turmas
             if (!empty($data['professores']) && is_array($data['professores'])) {
                 $turmasDoBloco = isset($data['turmas']) && is_array($data['turmas']) ? $data['turmas'] : [];
+                $professorMateriaInseridos = [];
                 foreach ($data['professores'] as $professorData) {
+                    if (!is_array($professorData)) {
+                        continue;
+                    }
                     $qtdQuestoes = $this->resolverQuantidadeQuestoes($professorData, $data);
-                    // Insere relacionamento bloco-professor-matéria
-                    $blocoProfessorId = $this->db->insert(
-                        "INSERT INTO provas_blocos_professores (bloco_id, professor_id, materia_id, quantidade_questoes) 
-                         VALUES (:bloco_id, :professor_id, :materia_id, :quantidade_questoes)",
-                        [
-                            'bloco_id' => $blocoId,
-                            'professor_id' => !empty($professorData['professor_id']) ? (int) $professorData['professor_id'] : null,
-                            'materia_id' => $professorData['materia_id'],
-                            'quantidade_questoes' => $qtdQuestoes
-                        ]
-                    );
+                    $professorIdInsert = !empty($professorData['professor_id']) ? (int) $professorData['professor_id'] : null;
+                    $materiaIdInsert = (int) ($professorData['materia_id'] ?? 0);
+                    $chaveProfessorMateria = ($professorIdInsert ?? 0) . ':' . $materiaIdInsert;
+                    if (isset($professorMateriaInseridos[$chaveProfessorMateria])) {
+                        $blocoProfessorId = $professorMateriaInseridos[$chaveProfessorMateria];
+                    } else {
+                        $blocoProfessorId = $this->db->insert(
+                            "INSERT INTO provas_blocos_professores (bloco_id, professor_id, materia_id, quantidade_questoes) 
+                             VALUES (:bloco_id, :professor_id, :materia_id, :quantidade_questoes)",
+                            [
+                                'bloco_id' => $blocoId,
+                                'professor_id' => $professorIdInsert,
+                                'materia_id' => $materiaIdInsert,
+                                'quantidade_questoes' => $qtdQuestoes
+                            ]
+                        );
+                        $professorMateriaInseridos[$chaveProfessorMateria] = (int) $blocoProfessorId;
+                    }
                     // Turmas: por professor (form envia) ou turmas gerais do bloco (para edição vir preenchida)
                     $turmasParaProfessor = isset($professorData['turmas']) && is_array($professorData['turmas'])
                         ? $professorData['turmas']

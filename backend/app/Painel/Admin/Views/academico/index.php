@@ -94,7 +94,19 @@ if ($modOn('regras_academicas')) {
     ];
 }
 
-if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('aluno_provas') || \App\Core\LayoutHelper::isModuleEnabled('professor_provas')) {
+$modeloEventoAvaliativo = class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos');
+$provasHubOn = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('aluno_provas') || \App\Core\LayoutHelper::isModuleEnabled('professor_provas');
+
+if ($modeloEventoAvaliativo && $provasHubOn) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/eventos-avaliativos',
+        'title' => 'Eventos Avaliativos',
+        'description' => 'Crie o tipo de nota, o quadro e as datas no mesmo lugar. Depois lance a nota pelo evento.',
+        'icon' => 'fa-solid fa-clipboard-list',
+    ];
+}
+
+if (!$modeloEventoAvaliativo && $provasHubOn) {
     $hub_cards[] = [
         'href' => URL . '/admin/provas/tipos-avaliacao',
         'title' => 'Tipos de Nota',
@@ -103,7 +115,7 @@ if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('al
     ];
 }
 
-if (class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('grupos_regras_notas')) {
+if (!$modeloEventoAvaliativo && class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('grupos_regras_notas')) {
     $hub_cards[] = [
         'href' => URL . '/admin/quadros-notas',
         'title' => 'Quadro de Notas',
@@ -112,7 +124,7 @@ if (class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('gru
     ];
 }
 
-if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('aluno_provas') || \App\Core\LayoutHelper::isModuleEnabled('professor_provas')) {
+if (!$modeloEventoAvaliativo && $provasHubOn) {
     $hub_cards[] = [
         'href' => URL . '/admin/provas',
         'title' => 'Lançamento de Notas',
@@ -121,7 +133,26 @@ if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('al
     ];
 }
 
-if ($modOn('boletim')) {
+if ($modOn('boletim') && $modeloEventoAvaliativo) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/boletins',
+        'title' => 'Demonstrativo de notas',
+        'description' => 'Monte o quadro de notas: períodos, colunas e fórmulas.',
+        'icon' => 'fa-solid fa-table-cells',
+    ];
+    $hub_cards[] = [
+        'href' => URL . '/admin/eventos-avaliativos/boletim',
+        'title' => 'Boletim',
+        'description' => 'Layout oficial do boletim da vida escolar.',
+        'icon' => 'fa-solid fa-file-circle-check',
+    ];
+    $hub_cards[] = [
+        'href' => URL . '/admin/reports/boletim-coordenacao?fonte=vida_escolar',
+        'title' => 'Relatórios',
+        'description' => 'Emissão do boletim e do demonstrativo de notas.',
+        'icon' => 'fa-solid fa-chart-column',
+    ];
+} elseif ($modOn('boletim')) {
     $hub_cards[] = [
         'href' => URL . '/admin/boletins',
         'title' => 'Boletins',

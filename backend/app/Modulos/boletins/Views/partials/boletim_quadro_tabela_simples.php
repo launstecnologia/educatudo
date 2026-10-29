@@ -48,6 +48,35 @@ if ($colsVisiveis === [] || $linhasVisiveis === []) {
     return;
 }
 
+$faixasCab = [];
+$idxCab = 0;
+$totalCab = count($colsVisiveis);
+while ($idxCab < $totalCab) {
+    $rotuloCab = trim((string) ($colsVisiveis[$idxCab]['linha_cabecalho'] ?? ''));
+    $fimCab = $idxCab + 1;
+    if ($rotuloCab !== '') {
+        while (
+            $fimCab < $totalCab
+            && trim((string) ($colsVisiveis[$fimCab]['linha_cabecalho'] ?? '')) === $rotuloCab
+        ) {
+            $fimCab++;
+        }
+    }
+    $faixasCab[] = [
+        'rotulo' => $rotuloCab,
+        'ini' => $idxCab,
+        'fim' => $fimCab,
+    ];
+    $idxCab = $fimCab;
+}
+$temLinhaCab = false;
+foreach ($faixasCab as $faixaCab) {
+    if ($faixaCab['rotulo'] !== '' && ($faixaCab['fim'] - $faixaCab['ini']) >= 2) {
+        $temLinhaCab = true;
+        break;
+    }
+}
+
 $fmtNotaSimples = static function ($valor) use ($decSimples): string {
     return number_format((float) $valor, $decSimples, ',', '.');
 };
@@ -67,6 +96,67 @@ $fmtNotaSimples = static function ($valor) use ($decSimples): string {
 <div class="overflow-x-auto border border-gray-300 rounded-lg bg-white">
     <table class="boletim-quadro-tabela min-w-full border-collapse text-xs sm:text-sm text-center">
         <thead>
+            <?php if ($temLinhaCab): ?>
+            <tr class="boletim-quadro-th text-white">
+                <th class="boletim-quadro-th-border px-3 py-2 text-left font-semibold align-middle whitespace-nowrap" rowspan="2">
+                    <?= htmlspecialchars($tituloSimples, ENT_QUOTES, 'UTF-8') ?>
+                </th>
+                <?php foreach ($faixasCab as $faixaCab):
+                    $spanCab = (int) $faixaCab['fim'] - (int) $faixaCab['ini'];
+                    $agrupaCab = $faixaCab['rotulo'] !== '' && $spanCab >= 2;
+                    if ($agrupaCab):
+                ?>
+                    <th class="boletim-quadro-th-border px-2 py-1 font-semibold align-middle" colspan="<?= $spanCab ?>">
+                        <?= htmlspecialchars((string) $faixaCab['rotulo'], ENT_QUOTES, 'UTF-8') ?>
+                    </th>
+                <?php else:
+                    for ($kCab = (int) $faixaCab['ini']; $kCab < (int) $faixaCab['fim']; $kCab++):
+                        $oc = $colsVisiveis[$kCab];
+                        $ltOc = strtolower(trim((string) ($oc['layout_type'] ?? '')));
+                        $isFaltasCab = \App\Helpers\BoletimQuadroLayoutHelper::colunaEhFaltas($oc);
+                        $mostraValor10 = !$isFaltasCab && (
+                            in_array($ltOc, ['media', 'media_sem', 'resultado', ''], true)
+                            || $ltOc === 'other'
+                            || $ltOc === 'prova'
+                            || $ltOc === 'jornada'
+                            || $ltOc === 'enac'
+                        );
+                ?>
+                    <th class="boletim-quadro-th-border px-2 py-1 font-semibold align-middle leading-tight min-w-[4.5rem]" rowspan="2">
+                        <?= htmlspecialchars(\App\Helpers\BoletimQuadroLayoutHelper::rotuloColunaQuadro($oc), ENT_QUOTES, 'UTF-8') ?>
+                        <?php if ($mostraValor10): ?>
+                            <div class="text-[10px] font-normal opacity-80">Valor 10</div>
+                        <?php endif; ?>
+                    </th>
+                <?php endfor; endif; endforeach; ?>
+            </tr>
+            <tr class="boletim-quadro-th text-white">
+                <?php foreach ($faixasCab as $faixaCab):
+                    $spanCab = (int) $faixaCab['fim'] - (int) $faixaCab['ini'];
+                    if ($faixaCab['rotulo'] === '' || $spanCab < 2) {
+                        continue;
+                    }
+                    for ($kCab = (int) $faixaCab['ini']; $kCab < (int) $faixaCab['fim']; $kCab++):
+                        $oc = $colsVisiveis[$kCab];
+                        $ltOc = strtolower(trim((string) ($oc['layout_type'] ?? '')));
+                        $isFaltasCab = \App\Helpers\BoletimQuadroLayoutHelper::colunaEhFaltas($oc);
+                        $mostraValor10 = !$isFaltasCab && (
+                            in_array($ltOc, ['media', 'media_sem', 'resultado', ''], true)
+                            || $ltOc === 'other'
+                            || $ltOc === 'prova'
+                            || $ltOc === 'jornada'
+                            || $ltOc === 'enac'
+                        );
+                ?>
+                    <th class="boletim-quadro-th-border px-2 py-1 font-semibold align-middle leading-tight min-w-[4.5rem]">
+                        <?= htmlspecialchars(\App\Helpers\BoletimQuadroLayoutHelper::rotuloColunaQuadro($oc), ENT_QUOTES, 'UTF-8') ?>
+                        <?php if ($mostraValor10): ?>
+                            <div class="text-[10px] font-normal opacity-80">Valor 10</div>
+                        <?php endif; ?>
+                    </th>
+                <?php endfor; endforeach; ?>
+            </tr>
+            <?php else: ?>
             <tr class="boletim-quadro-th text-white">
                 <th class="boletim-quadro-th-border px-3 py-2 text-left font-semibold align-middle whitespace-nowrap">
                     <?= htmlspecialchars($tituloSimples, ENT_QUOTES, 'UTF-8') ?>
@@ -90,6 +180,7 @@ $fmtNotaSimples = static function ($valor) use ($decSimples): string {
                     </th>
                 <?php endforeach; ?>
             </tr>
+            <?php endif; ?>
         </thead>
         <tbody>
             <?php $iS = 0; foreach ($linhasVisiveis as $linS): $iS++;

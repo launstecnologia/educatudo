@@ -8,7 +8,16 @@ if ($anosLetivos === []) {
 }
 $anoSelecionado = (int) ($ano_letivo ?? 0);
 if ($anoSelecionado <= 0) {
-    $anoSelecionado = (int) $anosLetivos[0];
+    $hoje = (int) date('Y');
+    foreach ($anosLetivos as $anoOpt) {
+        $anoOpt = (int) $anoOpt;
+        if ($anoOpt <= $hoje && $anoOpt > $anoSelecionado) {
+            $anoSelecionado = $anoOpt;
+        }
+    }
+    if ($anoSelecionado <= 0) {
+        $anoSelecionado = (int) $anosLetivos[0];
+    }
 }
 $eventosSelecionados = [];
 foreach ((array) ($eventos_selecionados ?? []) as $valorSelecionado) {
@@ -79,9 +88,9 @@ if ($boletimContextoId > 0):
 $periodoSelecionado = max(0, (int) ($periodo ?? 0));
 $periodosPorAno = is_array($periodos_por_ano ?? null) ? $periodos_por_ano : [];
 $infoPeriodoAno = is_array($periodosPorAno[(string) $anoSelecionado] ?? null) ? $periodosPorAno[(string) $anoSelecionado] : [];
-$rotuloPeriodo = trim((string) ($infoPeriodoAno['rotulo'] ?? 'Bimestre'));
+$rotuloPeriodo = trim((string) ($infoPeriodoAno['rotulo'] ?? 'Período'));
 if ($rotuloPeriodo === '') {
-    $rotuloPeriodo = 'Bimestre';
+    $rotuloPeriodo = 'Período';
 }
 $opcoesPeriodo = is_array($infoPeriodoAno['opcoes'] ?? null) ? $infoPeriodoAno['opcoes'] : [];
 $campoClasse = 'w-full h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100';
@@ -336,7 +345,7 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
                         <?php if ($versaoNumero > 0 || $versaoVigente): ?>
                             <span class="text-sm text-gray-700">Versão<?= $versaoNumero > 0 ? ' ' . $versaoNumero : '' ?><?= $versaoVigente ? ' · Vigente' : '' ?></span>
                         <?php endif; ?>
-                        <span class="text-sm text-gray-500">Bimestre: <?= htmlspecialchars($bimestreGrupo !== '' ? $bimestreGrupo : '—', ENT_QUOTES, 'UTF-8') ?></span>
+                        <span class="text-sm text-gray-500"><?= htmlspecialchars($rotuloPeriodo, ENT_QUOTES, 'UTF-8') ?>: <?= htmlspecialchars($bimestreGrupo !== '' ? $bimestreGrupo : '—', ENT_QUOTES, 'UTF-8') ?></span>
                     <?php else: ?>
                         <?php if ((string) ($aluno['ra'] ?? '') !== ''): ?><span class="text-sm text-gray-500">RA: <?= htmlspecialchars((string) $aluno['ra'], ENT_QUOTES, 'UTF-8') ?></span><?php endif; ?>
                     <?php endif; ?>
@@ -509,8 +518,8 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
     }
     function preencherPeriodos() {
         if (!periodoSelect || !anoSelect) return;
-        var info = periodosPorAno[String(anoSelect.value)] || { rotulo: 'Bimestre', opcoes: [] };
-        var rotulo = info.rotulo || 'Bimestre';
+        var info = periodosPorAno[String(anoSelect.value)] || { rotulo: 'Período', opcoes: [] };
+        var rotulo = info.rotulo || 'Período';
         if (rotuloPeriodo) rotuloPeriodo.textContent = rotulo;
         if (cabPeriodo) cabPeriodo.textContent = rotulo;
         var atual = periodoSelect.value;
@@ -674,6 +683,7 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
     }
     if (anoSelect) {
         anoSelect.addEventListener('change', preencherPeriodos);
+        preencherPeriodos();
     }
     if (cursoSelect) {
         cursoSelect.addEventListener('change', filtrarTurmas);

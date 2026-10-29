@@ -44,6 +44,15 @@
 </div>
 ```
 
+### 6c. Vários cards de seção
+
+Página com mais de um bloco (identificação, critérios, lista) usa um card por seção, com a faixa de título no topo. Referência: `backend/app/Modulos/regras-academicas/Views/admin/form.php`. Regra do agente: `.cursor/rules/admin-card-secao.mdc`.
+
+- Cards empilhados, `w-full`, sem `max-w-*`.
+- Faixa: `bg-gray-50`, `border-b`, número teal (1, 2, 3), título, uma frase e a ação da seção à direita.
+- Corpo branco em `p-5`. O título não fica solto no miolo.
+- Formulário de um bloco só permanece no card único acima. Offcanvas, wizard e dashboard ficam de fora.
+
 **Partials reutilizáveis** (`backend/app/Views/admin/_partials/`):
 
 | Partial | Uso |

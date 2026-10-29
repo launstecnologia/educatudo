@@ -30,6 +30,9 @@ $router->post('/external-apps/refund', 'ExternalApps/ExternalAppsController@refu
 // Histórico Escolar — validação pública por hash (sem login; sem expor notas)
 $router->get('/validar/historico/{hash}', 'Public/HistoricoValidacaoController@validar');
 
+// Manual da implantação acadêmica (sem login; sem progresso nem dados da escola)
+$router->get('/guia/implantar-academico', 'Public/GuiaAcademicoController@index');
+
 // Expo Colag — página pública do stand via QR (sem login)
 $router->get('/expo-colag/s/{token}', 'Modulos/expo-colag/ExpoColagPublicoController@stand');
 $router->post('/expo-colag/s/{token}/avaliar', 'Modulos/expo-colag/ExpoColagPublicoController@avaliarStand');

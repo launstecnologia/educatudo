@@ -110,6 +110,10 @@ class FeatureGate
         if ($module === 'grupos_regras_notas') {
             return null;
         }
+        // Modelo novo desligado: volta para o lançamento clássico.
+        if ($module === 'eventos_avaliativos') {
+            return URL . '/admin/provas';
+        }
         // desabilitado, inativo ou bloqueado por TudiCoins: redireciona
 
         if (strpos($path, '/admin') === 0) {

@@ -120,9 +120,9 @@
             'academico', 'students', 'ano_letivo', 'calendario_letivo',
             'componentes-curriculares', 'curso', 'cursos-series', 'grade_horaria', 'matriz-curricular',
             'teachers', 'grupos-regras-notas', 'quadros-notas', 'implantar-academico',
-            'agrupamentos-componentes', 'regras-academicas', 'salas', 'serie', 'turmas',
-            'tipos_avaliacao', 'boletins', 'boletim_guia', 'reports_boletim_coordenacao',
-            'provas', 'provas_blocos',
+            'agrupamentos-componentes', 'regras-academicas', 'recuperacao', 'salas', 'serie', 'turmas',
+            'tipos_avaliacao', 'boletins', 'boletim_guia', 'boletim-layout', 'reports_boletim_coordenacao',
+            'provas', 'provas_blocos', 'eventos-avaliativos',
         ], true);
         $rotinaOpen = in_array($cp, [
             'rotina', 'exercises',
@@ -171,10 +171,10 @@
             'teachers', 'students', 'turmas', 'grade_horaria', 'salas',
         ], true);
         $avaliaNestedOpen = in_array($cp, [
-            'grupos-regras-notas', 'quadros-notas', 'regras-academicas',
-            'tipos_avaliacao', 'boletins', 'boletim_guia', 'boletim_config',
+            'grupos-regras-notas', 'quadros-notas', 'regras-academicas', 'recuperacao',
+            'tipos_avaliacao', 'boletins', 'boletim_guia', 'boletim_config', 'boletim-layout',
             'reports_boletim_coordenacao',
-            'provas', 'provas_blocos',
+            'provas', 'provas_blocos', 'eventos-avaliativos',
         ], true);
         $forumNestedOpen = $forumDenunciasAtivo;
         $notificacoesNestedOpen = in_array($cp, ['notifications', 'notificacoes-push'], true);
@@ -827,6 +827,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'implantar-academico': 'academico',
         'agrupamentos-componentes': 'academico',
         'regras-academicas': 'academico',
+        'recuperacao': 'academico',
         'salas': 'academico',
         'serie': 'academico',
         'turmas': 'academico',
@@ -939,6 +940,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'grupos-regras-notas': 'como-avalia',
         'quadros-notas': 'como-avalia',
         'regras-academicas': 'como-avalia',
+        'recuperacao': 'como-avalia',
         'tipos_avaliacao': 'como-avalia',
         'boletins': 'como-avalia',
         'boletim_guia': 'como-avalia',

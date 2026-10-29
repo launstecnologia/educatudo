@@ -21,6 +21,10 @@ $nomeAluno = htmlspecialchars((string) ($aluno['nome'] ?? 'o aluno'), ENT_QUOTES
 
     <div data-painel-portal="notas" id="notas" class="hidden">
         <?php
+        $arquivoNotasAoVivo = dirname(__DIR__, 3) . '/eventos-avaliativos/Views/aluno/notas_ao_vivo.php';
+        if (is_file($arquivoNotasAoVivo)) {
+            require $arquivoNotasAoVivo;
+        }
         $notas_perfil = 'aluno';
         require \App\Core\ViewPaths::partial('notas_portal_coordenacao.php');
         ?>

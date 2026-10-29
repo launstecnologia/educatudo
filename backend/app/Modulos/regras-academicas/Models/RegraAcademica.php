@@ -27,6 +27,48 @@ class RegraAcademica
         'final' => 'Recuperação final',
     ];
 
+    public const ESCALAS = [
+        '10' => 'Numérica (0 a 10)',
+        '100' => 'Numérica (0 a 100)',
+        'abcd' => 'Conceitual (A, B, C, D)',
+        'conceito' => 'Conceitual (A+, A, B, C...)',
+        'descritiva' => 'Conceitual (Descritiva)',
+    ];
+
+    /** Do melhor para o pior. Aprova quem ficar no mínimo ou em um melhor. */
+    public const CONCEITOS = [
+        'A+' => 'A+',
+        'A' => 'A',
+        'B' => 'B',
+        'C' => 'C',
+        'D' => 'D',
+    ];
+
+    public static function numerica(string $escala): bool
+    {
+        return $escala === '10' || $escala === '100';
+    }
+
+    /**
+     * Conceitos da escala, do melhor para o pior. Nulo quando a escala é numérica ou descritiva livre.
+     *
+     * @return array<string,string>|null
+     */
+    public static function conceitosDa(string $escala): ?array
+    {
+        if ($escala === 'abcd') {
+            return ['A' => 'A', 'B' => 'B', 'C' => 'C', 'D' => 'D'];
+        }
+        if ($escala === 'conceito') {
+            return self::CONCEITOS;
+        }
+        if ($escala === 'descritiva') {
+            return ['Excelente' => 'Excelente', 'Bom' => 'Bom', 'Regular' => 'Regular'];
+        }
+
+        return null;
+    }
+
     public const RECUPERACAO_COMPOSICOES = [
         'maior_nota' => 'Maior nota (substitui se for maior)',
         'substitui' => 'Substitui a média',
@@ -98,8 +140,18 @@ class RegraAcademica
             $params['curso_id'] = (int) $filtros['curso_id'];
         }
         if (!empty($filtros['serie_id'])) {
-            $sql .= " AND r.serie_id = :serie_id";
-            $params['serie_id'] = (int) $filtros['serie_id'];
+            $serieFiltro = (int) $filtros['serie_id'];
+            if ($this->seriesProntas()) {
+                $sql .= " AND (r.serie_id = :serie_id OR EXISTS (
+                    SELECT 1 FROM regras_academicas_series rs
+                    WHERE rs.regra_id = r.id AND rs.serie_id = :serie_id_lista
+                ))";
+                $params['serie_id'] = $serieFiltro;
+                $params['serie_id_lista'] = $serieFiltro;
+            } else {
+                $sql .= " AND r.serie_id = :serie_id";
+                $params['serie_id'] = $serieFiltro;
+            }
         }
         if (isset($filtros['ativo']) && $filtros['ativo'] !== '') {
             $sql .= " AND r.ativo = :ativo";
@@ -108,7 +160,7 @@ class RegraAcademica
 
         $sql .= " ORDER BY r.ano_letivo DESC, r.nome ASC";
 
-        return $this->db->fetchAll($sql, $params) ?: [];
+        return $this->comNomesDasSeries($this->db->fetchAll($sql, $params) ?: []);
     }
 
     /**
@@ -128,7 +180,7 @@ class RegraAcademica
         }
         $sql .= " ORDER BY updated_at DESC, id DESC";
 
-        return $this->db->fetchAll($sql, $params) ?: [];
+        return $this->comIdsDasSeries($this->db->fetchAll($sql, $params) ?: []);
     }
 
     public function findById(int $id): ?array
@@ -179,6 +231,14 @@ class RegraAcademica
 
     public function create(array $data): int
     {
+        $escala = $this->escalaPronta();
+        $boletim = $this->boletimPronto();
+        $cols = $escala ? ', escala, conceito_minimo' : '';
+        $vals = $escala ? ', :escala, :conceito_minimo' : '';
+        if ($boletim) {
+            $cols .= ', finalidade, vis_aluno, vis_pais';
+            $vals .= ', :finalidade, :vis_aluno, :vis_pais';
+        }
         return (int) $this->db->insert(
             "INSERT INTO regras_academicas (
                 nome, codigo, ano_letivo, curso_id, serie_id, matriz_curricular_id, materia_id, agrupamento_id,
@@ -186,23 +246,32 @@ class RegraAcademica
                 round_mode, decimal_places, formula_media, formula_final,
                 recuperacao_tipo, recuperacao_composicao, min_avaliacoes, max_avaliacoes,
                 componentes_sem_nota, aprovacao_so_frequencia, situacoes_json, observacoes,
-                versao, ativo
+                versao, ativo{$cols}
              ) VALUES (
                 :nome, :codigo, :ano_letivo, :curso_id, :serie_id, :matriz_curricular_id, :materia_id, :agrupamento_id,
                 :periodo_tipo, :periodo_numero, :media_minima, :frequencia_minima, :usar_frequencia,
                 :round_mode, :decimal_places, :formula_media, :formula_final,
                 :recuperacao_tipo, :recuperacao_composicao, :min_avaliacoes, :max_avaliacoes,
                 :componentes_sem_nota, :aprovacao_so_frequencia, :situacoes_json, :observacoes,
-                :versao, :ativo
+                :versao, :ativo{$vals}
              )",
-            $this->paramsFromData($data)
+            $this->paramsFromData($data, $escala, $boletim)
         );
     }
 
     public function update(int $id, array $data): bool
     {
-        $params = $this->paramsFromData($data);
+        $escala = $this->escalaPronta();
+        $boletim = $this->boletimPronto();
+        $params = $this->paramsFromData($data, $escala, $boletim);
         $params['id'] = $id;
+        $setEscala = $escala ? ",
+                escala = :escala,
+                conceito_minimo = :conceito_minimo" : '';
+        $setBoletim = $boletim ? ",
+                finalidade = :finalidade,
+                vis_aluno = :vis_aluno,
+                vis_pais = :vis_pais" : '';
         return (bool) $this->db->update(
             "UPDATE regras_academicas SET
                 nome = :nome,
@@ -231,7 +300,7 @@ class RegraAcademica
                 situacoes_json = :situacoes_json,
                 observacoes = :observacoes,
                 versao = :versao,
-                ativo = :ativo
+                ativo = :ativo{$setEscala}{$setBoletim}
              WHERE id = :id",
             $params
         );
@@ -282,12 +351,299 @@ class RegraAcademica
         );
     }
 
+    public function boletimPronto(): bool
+    {
+        if (!$this->schemaPronto() || !$this->temColuna('finalidade') || !$this->temColuna('vis_aluno') || !$this->temColuna('vis_pais')) {
+            return false;
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT 1 AS ok FROM information_schema.tables
+                 WHERE table_schema = DATABASE() AND table_name = 'regras_academicas_materias'
+                 LIMIT 1"
+            );
+            return !empty($row['ok']);
+        } catch (Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function listarMateriasIds(int $regraId): array
+    {
+        if ($regraId <= 0 || !$this->boletimPronto()) {
+            return [];
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT materia_id FROM regras_academicas_materias WHERE regra_id = :regra ORDER BY materia_id ASC',
+            ['regra' => $regraId]
+        ) ?: [];
+        $ids = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['materia_id'] ?? 0);
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+        return $ids;
+    }
+
+    /**
+     * @param list<int> $materiaIds
+     */
+    public function substituirMaterias(int $regraId, array $materiaIds): void
+    {
+        if ($regraId <= 0 || !$this->boletimPronto()) {
+            return;
+        }
+        $this->db->query(
+            'DELETE FROM regras_academicas_materias WHERE regra_id = :regra',
+            ['regra' => $regraId]
+        );
+        $vistos = [];
+        foreach ($materiaIds as $materiaId) {
+            $materiaId = (int) $materiaId;
+            if ($materiaId <= 0 || isset($vistos[$materiaId])) {
+                continue;
+            }
+            $vistos[$materiaId] = true;
+            $this->db->insert(
+                'INSERT INTO regras_academicas_materias (regra_id, materia_id) VALUES (:regra, :materia)',
+                ['regra' => $regraId, 'materia' => $materiaId]
+            );
+        }
+    }
+
+    /**
+     * Dados que o demonstrativo e o boletim copiam ao vincular a regra.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function pacoteBoletim(int $regraId): ?array
+    {
+        $regra = $this->findById($regraId);
+        if ($regra === null || !$this->boletimPronto()) {
+            return null;
+        }
+        $series = $this->listarSeriesIds($regraId);
+        if ($series === []) {
+            $serieId = (int) ($regra['serie_id'] ?? 0);
+            $series = $serieId > 0 ? [$serieId] : [];
+        }
+        $finalidade = ((string) ($regra['finalidade'] ?? '')) === 'complementar' ? 'complementar' : 'oficial';
+        return [
+            'nome' => trim((string) ($regra['nome'] ?? '')),
+            'ano_letivo' => (int) ($regra['ano_letivo'] ?? 0),
+            'finalidade' => $finalidade,
+            'vis_aluno' => (int) ($regra['vis_aluno'] ?? 0) === 1 ? 1 : 0,
+            'vis_pais' => (int) ($regra['vis_pais'] ?? 0) === 1 ? 1 : 0,
+            'ativo' => (int) ($regra['ativo'] ?? 0) === 1 ? 1 : 0,
+            'materias_ids' => $this->listarMateriasIds($regraId),
+            'series_ids' => $series,
+            'turmas_ids' => [],
+        ];
+    }
+
+    public function seriesProntas(): bool
+    {
+        if (!$this->schemaPronto()) {
+            return false;
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT 1 AS ok FROM information_schema.tables
+                 WHERE table_schema = DATABASE() AND table_name = 'regras_academicas_series'
+                 LIMIT 1"
+            );
+            return !empty($row['ok']);
+        } catch (Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function listarSeriesIds(int $regraId): array
+    {
+        if ($regraId <= 0 || !$this->seriesProntas()) {
+            return [];
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT serie_id FROM regras_academicas_series WHERE regra_id = :regra ORDER BY serie_id ASC',
+            ['regra' => $regraId]
+        ) ?: [];
+        $ids = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['serie_id'] ?? 0);
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+        return $ids;
+    }
+
+    /**
+     * @param list<int> $serieIds
+     */
+    public function substituirSeries(int $regraId, array $serieIds): void
+    {
+        if ($regraId <= 0 || !$this->seriesProntas()) {
+            return;
+        }
+        $this->db->query(
+            'DELETE FROM regras_academicas_series WHERE regra_id = :regra',
+            ['regra' => $regraId]
+        );
+        $vistos = [];
+        foreach ($serieIds as $serieId) {
+            $serieId = (int) $serieId;
+            if ($serieId <= 0 || isset($vistos[$serieId])) {
+                continue;
+            }
+            $vistos[$serieId] = true;
+            $this->db->insert(
+                'INSERT INTO regras_academicas_series (regra_id, serie_id) VALUES (:regra, :serie)',
+                ['regra' => $regraId, 'serie' => $serieId]
+            );
+        }
+    }
+
+    /**
+     * @param list<array<string,mixed>> $rows
+     * @return list<array<string,mixed>>
+     */
+    private function comIdsDasSeries(array $rows): array
+    {
+        $mapa = $this->mapaSeries($rows, false);
+        foreach ($rows as &$row) {
+            $id = (int) ($row['id'] ?? 0);
+            $ids = $mapa[$id]['ids'] ?? [];
+            if ($ids === [] && (int) ($row['serie_id'] ?? 0) > 0) {
+                $ids = [(int) $row['serie_id']];
+            }
+            $row['series_ids'] = $ids;
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $rows
+     * @return list<array<string,mixed>>
+     */
+    private function comNomesDasSeries(array $rows): array
+    {
+        $mapa = $this->mapaSeries($rows, true);
+        foreach ($rows as &$row) {
+            $id = (int) ($row['id'] ?? 0);
+            $nomes = $mapa[$id]['nomes'] ?? [];
+            if ($nomes !== []) {
+                $row['serie_nome'] = implode(', ', $nomes);
+            }
+            $row['series_ids'] = $mapa[$id]['ids'] ?? [];
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $rows
+     * @return array<int, array{ids:list<int>,nomes:list<string>}>
+     */
+    private function mapaSeries(array $rows, bool $comNome): array
+    {
+        if ($rows === [] || !$this->seriesProntas()) {
+            return [];
+        }
+        $ids = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $ids[$id] = $id;
+            }
+        }
+        if ($ids === []) {
+            return [];
+        }
+        $marcas = [];
+        $params = [];
+        $i = 0;
+        foreach ($ids as $id) {
+            $chave = 'regra' . $i;
+            $marcas[] = ':' . $chave;
+            $params[$chave] = $id;
+            $i++;
+        }
+        $selectNome = $comNome ? ', s.nome AS serie_nome' : '';
+        $joinNome = $comNome ? ' INNER JOIN serie s ON s.id = rs.serie_id' : '';
+        $ordem = $comNome ? ' ORDER BY s.nome ASC' : '';
+        $linhas = $this->db->fetchAll(
+            'SELECT rs.regra_id, rs.serie_id' . $selectNome . '
+             FROM regras_academicas_series rs' . $joinNome . '
+             WHERE rs.regra_id IN (' . implode(', ', $marcas) . ')' . $ordem,
+            $params
+        ) ?: [];
+        $mapa = [];
+        foreach ($linhas as $linha) {
+            $regraId = (int) ($linha['regra_id'] ?? 0);
+            $serieId = (int) ($linha['serie_id'] ?? 0);
+            if ($regraId <= 0 || $serieId <= 0) {
+                continue;
+            }
+            if (!isset($mapa[$regraId])) {
+                $mapa[$regraId] = ['ids' => [], 'nomes' => []];
+            }
+            $mapa[$regraId]['ids'][] = $serieId;
+            if ($comNome && trim((string) ($linha['serie_nome'] ?? '')) !== '') {
+                $mapa[$regraId]['nomes'][] = (string) $linha['serie_nome'];
+            }
+        }
+
+        return $mapa;
+    }
+
+    public function escalaPronta(): bool
+    {
+        if (!$this->schemaPronto()) {
+            return false;
+        }
+        try {
+            $col = $this->db->fetch("SHOW COLUMNS FROM regras_academicas LIKE 'escala'");
+            return !empty($col);
+        } catch (Throwable $e) {
+            return false;
+        }
+    }
+
+    public function conceitoMinimoCabe(string $valor): bool
+    {
+        if (strlen($valor) <= 8) {
+            return true;
+        }
+        try {
+            $col = $this->db->fetch("SHOW COLUMNS FROM regras_academicas LIKE 'conceito_minimo'");
+            $tipo = (string) ($col['Type'] ?? '');
+            if (preg_match('/varchar\((\d+)\)/i', $tipo, $m)) {
+                return (int) $m[1] >= strlen($valor);
+            }
+        } catch (Throwable $e) {
+            return false;
+        }
+
+        return false;
+    }
+
     /**
      * @return array<string, mixed>
      */
-    private function paramsFromData(array $data): array
+    private function paramsFromData(array $data, bool $comEscala = false, bool $comBoletim = false): array
     {
-        return [
+        $params = [
             'nome' => (string) ($data['nome'] ?? ''),
             'codigo' => $data['codigo'] ?? null,
             'ano_letivo' => $data['ano_letivo'] ?? null,
@@ -316,6 +672,34 @@ class RegraAcademica
             'versao' => (int) ($data['versao'] ?? 1),
             'ativo' => (int) ($data['ativo'] ?? 1),
         ];
+        if ($comEscala) {
+            $params['escala'] = (string) ($data['escala'] ?? '10');
+            $params['conceito_minimo'] = $data['conceito_minimo'] ?? null;
+        }
+        if ($comBoletim) {
+            $params['finalidade'] = ((string) ($data['finalidade'] ?? '')) === 'complementar' ? 'complementar' : 'oficial';
+            $params['vis_aluno'] = (int) ($data['vis_aluno'] ?? 0) === 1 ? 1 : 0;
+            $params['vis_pais'] = (int) ($data['vis_pais'] ?? 0) === 1 ? 1 : 0;
+        }
+        return $params;
+    }
+
+    private function temColuna(string $coluna): bool
+    {
+        if (!$this->schemaPronto()) {
+            return false;
+        }
+        try {
+            $col = $this->db->fetch(
+                'SELECT 1 AS ok FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c
+                 LIMIT 1',
+                ['t' => 'regras_academicas', 'c' => $coluna]
+            );
+            return !empty($col['ok']);
+        } catch (Throwable $e) {
+            return false;
+        }
     }
 
     private function ensureAgrupamentoColumn(): void

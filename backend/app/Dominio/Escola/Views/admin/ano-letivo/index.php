@@ -154,11 +154,11 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
         </button>
     </div>
 
-    <form id="ano-letivo-form" class="flex flex-col flex-1 overflow-hidden" data-mode="create">
+    <form id="ano-letivo-form" class="flex flex-col flex-1 min-h-0 overflow-hidden" data-mode="create">
         <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
         <input type="hidden" id="al_id" value="">
 
-        <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-8">
+        <div class="flex-1 min-h-0 overflow-y-auto px-6 sm:px-8 py-6 space-y-8">
             <section>
                 <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Dados do ano letivo</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
@@ -196,11 +196,16 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                         <p id="al_periodo_tipo_aviso" class="hidden mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"></p>
                         <div id="al-mapeamento-fields"></div>
                     </div>
+                    <div class="sm:col-span-2">
+                        <h4 id="al-periodos-titulo" class="text-sm font-medium text-gray-900">Datas de cada bimestre</h4>
+                        <p class="text-xs text-gray-500 mt-1 mb-3">Informe o início, o fim e os dias letivos de cada período. As datas precisam caber no ano letivo e não podem se sobrepor.</p>
+                        <div id="al-periodos" class="rounded-lg border border-gray-200 divide-y divide-gray-200"></div>
+                    </div>
                 </div>
             </section>
         </div>
 
-        <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
+        <div class="shrink-0 px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
             <button type="button" onclick="closeAnoLetivoDrawer()"
                     class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
                 Cancelar
@@ -247,14 +252,16 @@ var PERIODOS_LETIVOS = <?= json_encode((function () {
     foreach (\App\Core\PeriodoLetivo::TIPOS as $cod => $lab) {
         $mapa[$cod] = [
             'nome' => $lab,
+            'campo' => \App\Core\PeriodoLetivo::rotuloCampo($cod),
             'rotulos' => \App\Core\PeriodoLetivo::rotulosDoTipo($cod),
         ];
     }
     return $mapa;
 })(), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
 
-var anoLetivoEdicao = { original: 'bimestre', usados: [], mapaPronto: false };
+var anoLetivoEdicao = { original: 'bimestre', usados: [], mapaPronto: false, periodosSalvos: [] };
 var salvarAoConfirmarMapa = false;
+var periodosManuais = false;
 
 function limparMapeamento() {
     var box = document.getElementById('al-mapeamento-fields');
@@ -262,14 +269,223 @@ function limparMapeamento() {
     anoLetivoEdicao.mapaPronto = false;
 }
 
-function prepararDivisao(tipo, temCadastros, usados) {
+function soData(valor) {
+    return String(valor || '').substring(0, 10);
+}
+
+function parseIso(iso) {
+    var partes = String(iso || '').split('-');
+    if (partes.length !== 3) { return null; }
+    var ano = parseInt(partes[0], 10);
+    var mes = parseInt(partes[1], 10);
+    var dia = parseInt(partes[2], 10);
+    if (!ano || !mes || !dia) { return null; }
+    return new Date(ano, mes - 1, dia);
+}
+
+function formatIso(data) {
+    var mes = data.getMonth() + 1;
+    var dia = data.getDate();
+    return data.getFullYear()
+        + '-' + (mes < 10 ? '0' : '') + mes
+        + '-' + (dia < 10 ? '0' : '') + dia;
+}
+
+function dividirIntervalo(inicio, fim, quantidade) {
+    var a = parseIso(inicio);
+    var b = parseIso(fim);
+    if (!a || !b || b < a || quantidade < 1) { return []; }
+    var total = Math.round((b.getTime() - a.getTime()) / 86400000) + 1;
+    if (total < quantidade) { return []; }
+    var base = Math.floor(total / quantidade);
+    var extra = total % quantidade;
+    var cursor = new Date(a.getTime());
+    var saida = [];
+    for (var i = 0; i < quantidade; i++) {
+        var tamanho = base + (i < extra ? 1 : 0);
+        var ini = new Date(cursor.getTime());
+        var end = new Date(cursor.getTime());
+        end.setDate(end.getDate() + tamanho - 1);
+        if (i === quantidade - 1 || end > b) { end = new Date(b.getTime()); }
+        saida.push({ data_inicio: formatIso(ini), data_fim: formatIso(end) });
+        cursor = new Date(end.getTime());
+        cursor.setDate(cursor.getDate() + 1);
+    }
+    return saida;
+}
+
+function calendarioPadrao(tipo, ano, quantidade) {
+    var saida = [];
+    for (var n = 1; n <= quantidade; n++) {
+        var mesInicio;
+        var alcance;
+        if (tipo === 'etapa_unica') {
+            mesInicio = 1;
+            alcance = 11;
+        } else if (tipo === 'semestre') {
+            mesInicio = n === 1 ? 1 : 7;
+            alcance = 5;
+        } else if (tipo === 'trimestre') {
+            mesInicio = (n - 1) * 4 + 1;
+            alcance = 3;
+        } else {
+            mesInicio = (n - 1) * 3 + 1;
+            alcance = 2;
+        }
+        var mesFim = mesInicio + alcance;
+        var fimDia = new Date(ano, mesFim, 0).getDate();
+        saida.push({
+            data_inicio: formatIso(new Date(ano, mesInicio - 1, 1)),
+            data_fim: formatIso(new Date(ano, mesFim - 1, fimDia))
+        });
+    }
+    return saida;
+}
+
+function sugerirDatas(tipo) {
+    var info = PERIODOS_LETIVOS[tipo] || {};
+    var chaves = Object.keys(info.rotulos || {});
+    var inicio = document.getElementById('al_data_inicio').value;
+    var fim = document.getElementById('al_data_fim').value;
+    var ano = parseInt(document.getElementById('al_ano').value, 10);
+    if (inicio && fim && fim >= inicio) {
+        return dividirIntervalo(inicio, fim, chaves.length);
+    }
+    if (ano >= 2000 && ano <= 2100) {
+        return calendarioPadrao(tipo, ano, chaves.length);
+    }
+    return [];
+}
+
+function atualizarLimitesPeriodos() {
+    var inicio = document.getElementById('al_data_inicio').value;
+    var fim = document.getElementById('al_data_fim').value;
+    var limitar = inicio && fim && fim >= inicio;
+    document.querySelectorAll('#al-periodos input[type="date"]').forEach(function (input) {
+        if (limitar) {
+            input.min = inicio;
+            input.max = fim;
+        } else {
+            input.removeAttribute('min');
+            input.removeAttribute('max');
+        }
+    });
+    document.querySelectorAll('#al-periodos input[data-dias-letivos]').forEach(function (input) {
+        var bloco = input.closest('.grid');
+        var datas = bloco ? bloco.querySelectorAll('input[type="date"]') : [];
+        var teto = 366;
+        if (datas.length >= 2 && datas[0].value && datas[1].value && datas[1].value >= datas[0].value) {
+            var a = parseIso(datas[0].value);
+            var b = parseIso(datas[1].value);
+            if (a && b) {
+                teto = Math.round((b.getTime() - a.getTime()) / 86400000) + 1;
+            }
+        }
+        input.max = String(Math.max(1, teto));
+    });
+}
+
+function renderPeriodos(tipo, salvos) {
+    var box = document.getElementById('al-periodos');
+    var titulo = document.getElementById('al-periodos-titulo');
+    if (!box || !titulo) { return; }
+    var info = PERIODOS_LETIVOS[tipo] || PERIODOS_LETIVOS.bimestre || { rotulos: {}, campo: 'Período' };
+    var rotulos = info.rotulos || {};
+    var chaves = Object.keys(rotulos).map(function (k) { return parseInt(k, 10); }).filter(function (n) { return n > 0; });
+    chaves.sort(function (a, b) { return a - b; });
+    var campo = String(info.campo || 'período').toLowerCase();
+    titulo.textContent = chaves.length === 1 ? 'Datas da etapa' : ('Datas de cada ' + campo);
+    var mapa = {};
+    var usarSalvos = Array.isArray(salvos) && salvos.length > 0;
+    if (usarSalvos) {
+        salvos.forEach(function (p) { mapa[parseInt(p.numero, 10)] = p; });
+    }
+    var sugestao = usarSalvos ? [] : sugerirDatas(tipo);
+    box.innerHTML = '';
+    chaves.forEach(function (n, idx) {
+        var salvo = mapa[n] || {};
+        var sug = sugestao[idx] || {};
+        var ini = soData(salvo.data_inicio || sug.data_inicio || '');
+        var fim = soData(salvo.data_fim || sug.data_fim || '');
+        var rotulo = rotulos[n] || rotulos[String(n)] || (n + 'º período');
+        var dias = salvo.dias_letivos != null && salvo.dias_letivos !== '' ? String(salvo.dias_letivos) : '';
+        var row = document.createElement('div');
+        row.className = 'px-3 py-3';
+        var nome = document.createElement('div');
+        nome.className = 'text-sm font-medium text-gray-800 mb-2';
+        nome.textContent = rotulo;
+        var campos = document.createElement('div');
+        campos.className = 'grid grid-cols-1 sm:grid-cols-3 gap-3';
+        campos.appendChild(campoDataPeriodo('Data início', 'periodos[' + n + '][data_inicio]', 'al_periodo_' + n + '_inicio', ini));
+        campos.appendChild(campoDataPeriodo('Data fim', 'periodos[' + n + '][data_fim]', 'al_periodo_' + n + '_fim', fim));
+        campos.appendChild(campoNumeroPeriodo('Dias letivos', 'periodos[' + n + '][dias_letivos]', 'al_periodo_' + n + '_dias', dias));
+        row.appendChild(nome);
+        row.appendChild(campos);
+        box.appendChild(row);
+    });
+    atualizarLimitesPeriodos();
+}
+
+function campoDataPeriodo(rotulo, name, id, valor) {
+    var wrap = document.createElement('div');
+    var label = document.createElement('label');
+    label.htmlFor = id;
+    label.className = 'block text-xs font-medium text-gray-600 mb-1';
+    label.textContent = rotulo;
+    var input = document.createElement('input');
+    input.type = 'date';
+    input.id = id;
+    input.name = name;
+    input.required = true;
+    input.value = valor;
+    input.className = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500';
+    wrap.appendChild(label);
+    wrap.appendChild(input);
+    return wrap;
+}
+
+function campoNumeroPeriodo(rotulo, name, id, valor) {
+    var wrap = document.createElement('div');
+    var label = document.createElement('label');
+    label.htmlFor = id;
+    label.className = 'block text-xs font-medium text-gray-600 mb-1';
+    label.textContent = rotulo;
+    var input = document.createElement('input');
+    input.type = 'number';
+    input.id = id;
+    input.name = name;
+    input.required = true;
+    input.min = '1';
+    input.max = '366';
+    input.setAttribute('data-dias-letivos', '1');
+    input.step = '1';
+    input.inputMode = 'numeric';
+    input.value = valor;
+    input.className = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500';
+    wrap.appendChild(label);
+    wrap.appendChild(input);
+    return wrap;
+}
+
+function aoMudarLimitesDoAno() {
+    if (periodosManuais) {
+        atualizarLimitesPeriodos();
+        return;
+    }
+    renderPeriodos(document.getElementById('al_periodo_tipo').value, null);
+}
+
+function prepararDivisao(tipo, temCadastros, usados, periodosSalvos) {
     var sel = document.getElementById('al_periodo_tipo');
     var aviso = document.getElementById('al_periodo_tipo_aviso');
     sel.disabled = false;
     sel.value = tipo || 'bimestre';
     anoLetivoEdicao.original = sel.value || 'bimestre';
     anoLetivoEdicao.usados = Array.isArray(usados) ? usados : [];
+    anoLetivoEdicao.periodosSalvos = Array.isArray(periodosSalvos) ? periodosSalvos : [];
+    periodosManuais = anoLetivoEdicao.periodosSalvos.length > 0;
     limparMapeamento();
+    renderPeriodos(sel.value, periodosManuais ? anoLetivoEdicao.periodosSalvos : null);
     if (temCadastros && anoLetivoEdicao.usados.length) {
         var nomes = anoLetivoEdicao.usados.map(function (p) { return p.rotulo; }).join(', ');
         aviso.textContent = 'Já existem cadastros neste ano (' + nomes + '). Ao mudar a divisão, você indica para qual período novo cada um vai.';
@@ -338,6 +554,11 @@ function cancelarMapaPeriodos() {
     if (!salvar && !anoLetivoEdicao.mapaPronto) {
         document.getElementById('al_periodo_tipo').value = anoLetivoEdicao.original;
         limparMapeamento();
+        periodosManuais = anoLetivoEdicao.periodosSalvos.length > 0;
+        renderPeriodos(
+            anoLetivoEdicao.original,
+            periodosManuais ? anoLetivoEdicao.periodosSalvos : null
+        );
     }
 }
 
@@ -392,12 +613,13 @@ function openAnoLetivoDrawer(id) {
             document.getElementById('al_id').value = data.item.id;
             document.getElementById('al_ano').value = data.item.ano;
             document.getElementById('al_ativo').checked = !!parseInt(data.item.ativo, 10);
-            document.getElementById('al_data_inicio').value = data.item.data_inicio || '';
-            document.getElementById('al_data_fim').value = data.item.data_fim || '';
+            document.getElementById('al_data_inicio').value = soData(data.item.data_inicio);
+            document.getElementById('al_data_fim').value = soData(data.item.data_fim);
             prepararDivisao(
                 data.item.periodo_tipo || 'bimestre',
                 !!data.tem_cadastros,
-                data.periodos_usados || []
+                data.periodos_usados || [],
+                data.item.periodos || []
             );
         })
         .catch(function () { alert('Erro de conexão.'); closeAnoLetivoDrawer(); });
@@ -437,9 +659,27 @@ function enviarAnoLetivo() {
 document.getElementById('al_periodo_tipo').addEventListener('change', function () {
     var form = document.getElementById('ano-letivo-form');
     limparMapeamento();
+    if (this.value === anoLetivoEdicao.original && anoLetivoEdicao.periodosSalvos.length) {
+        periodosManuais = true;
+        renderPeriodos(this.value, anoLetivoEdicao.periodosSalvos);
+    } else {
+        periodosManuais = false;
+        renderPeriodos(this.value, null);
+    }
     if (form.dataset.mode !== 'edit') { return; }
     if (this.value === anoLetivoEdicao.original || !anoLetivoEdicao.usados.length) { return; }
     abrirModalMapeamento(false);
+});
+
+['al_ano', 'al_data_inicio', 'al_data_fim'].forEach(function (id) {
+    document.getElementById(id).addEventListener('change', aoMudarLimitesDoAno);
+});
+
+document.getElementById('al-periodos').addEventListener('input', function () {
+    periodosManuais = true;
+});
+document.getElementById('al-periodos').addEventListener('change', function () {
+    atualizarLimitesPeriodos();
 });
 
 document.getElementById('ano-letivo-form').addEventListener('submit', function (e) {

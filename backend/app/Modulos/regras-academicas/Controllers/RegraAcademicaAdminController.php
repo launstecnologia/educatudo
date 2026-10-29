@@ -25,24 +25,44 @@ class RegraAcademicaAdminController extends \App\Controllers\Admin\AdminBaseCont
         }
 
         $model = $this->service()->model();
+        $anoAtual = (int) date('Y');
+        $anoInformado = array_key_exists('ano_letivo', $_GET);
+        $anoPedido = (int) ($_GET['ano_letivo'] ?? 0);
+        if (!$anoInformado) {
+            $anoFiltro = $anoAtual;
+        } elseif ($anoPedido >= 2000 && $anoPedido <= 2100) {
+            $anoFiltro = $anoPedido;
+        } else {
+            $anoFiltro = 0;
+        }
         $filtros = [
-            'ano_letivo' => (int) ($_GET['ano_letivo'] ?? 0),
+            'ano_letivo' => $anoFiltro,
             'curso_id' => (int) ($_GET['curso_id'] ?? 0),
             'serie_id' => (int) ($_GET['serie_id'] ?? 0),
         ];
+        $consulta = $filtros;
+        if ($anoFiltro <= 0) {
+            unset($consulta['ano_letivo']);
+        }
         $flash = $this->getFlashMessage();
         $catalogos = $this->catalogos();
+        $anosLetivos = $catalogos['anos_letivos'];
+        if (!in_array($anoAtual, $anosLetivos, true)) {
+            $anosLetivos[] = $anoAtual;
+            rsort($anosLetivos);
+        }
 
         $this->viewWithLayout('admin', 'admin/regras-academicas/index', [
             'title' => 'Regras de Aprovação - EducaTudo',
             'user' => $this->auth->getUser(),
             'current_page' => 'regras-academicas',
-            'itens' => $model->schemaPronto() ? $model->getAll(array_filter($filtros)) : [],
+            'itens' => $model->schemaPronto() ? $model->getAll(array_filter($consulta)) : [],
             'schema_pronto' => $model->schemaPronto(),
             'filtros' => $filtros,
+            'ano_atual' => $anoAtual,
             'cursos' => $catalogos['cursos'],
             'series' => $catalogos['series'],
-            'anos_letivos' => $catalogos['anos_letivos'],
+            'anos_letivos' => $anosLetivos,
             'csrf_token' => $this->generateCsrfToken(),
             'flash_status' => $flash['type'] === 'success' ? 'success' : ($flash['message'] ? 'error' : ''),
             'flash_message' => $flash['message'] ?? '',
@@ -88,8 +108,8 @@ class RegraAcademicaAdminController extends \App\Controllers\Admin\AdminBaseCont
             $this->redirect('/admin/regras-academicas/nova');
             return;
         }
-        $this->setFlashMessage('Regra de aprovação cadastrada.', 'success');
-        $this->redirect('/admin/regras-academicas');
+        $this->setFlashMessage('Regra de aprovação cadastrada.' . $this->avisoCards((int) ($_POST['ano_letivo'] ?? 0)), 'success');
+        $this->redirect('/admin/regras-academicas/' . (int) ($result['id'] ?? 0) . '/editar');
     }
 
     public function atualizar($id): void
@@ -109,8 +129,12 @@ class RegraAcademicaAdminController extends \App\Controllers\Admin\AdminBaseCont
             $this->redirect('/admin/regras-academicas/' . (int) $id . '/editar');
             return;
         }
-        $this->setFlashMessage('Regra de aprovação atualizada (nova versão gravada).', 'success');
-        $this->redirect('/admin/regras-academicas');
+        $salvo = $this->service()->model()->findById((int) $id);
+        $nomeSalvo = trim((string) ($salvo['nome'] ?? ''));
+        $anoSalvo = (int) ($salvo['ano_letivo'] ?? 0);
+        $anoTexto = $anoSalvo > 0 ? (string) $anoSalvo : 'qualquer ano';
+        $this->setFlashMessage('Regra salva: ' . $nomeSalvo . ' · ano letivo ' . $anoTexto . '.' . $this->avisoCards($anoSalvo), 'success');
+        $this->redirect('/admin/regras-academicas/' . (int) $id . '/editar');
     }
 
     public function excluir($id): void
@@ -141,8 +165,14 @@ class RegraAcademicaAdminController extends \App\Controllers\Admin\AdminBaseCont
         $catalogos = $this->catalogos();
         $flash = $this->getFlashMessage();
         $historico = [];
+        $model = $this->service()->model();
         if ($item && !empty($item['id'])) {
-            $historico = $this->service()->model()->listarHistorico((int) $item['id']);
+            $historico = $model->listarHistorico((int) $item['id']);
+            $item['materias_ids'] = $model->listarMateriasIds((int) $item['id']);
+            $item['series_ids'] = $model->listarSeriesIds((int) $item['id']);
+            if ($item['series_ids'] === [] && (int) ($item['serie_id'] ?? 0) > 0) {
+                $item['series_ids'] = [(int) $item['serie_id']];
+            }
         }
         $this->viewWithLayout('admin', 'admin/regras-academicas/form', [
             'title' => ($item ? 'Editar' : 'Nova') . ' regra de aprovação - EducaTudo',
@@ -153,10 +183,99 @@ class RegraAcademicaAdminController extends \App\Controllers\Admin\AdminBaseCont
             'cursos' => $catalogos['cursos'],
             'series' => $catalogos['series'],
             'anos_letivos' => $catalogos['anos_letivos'],
+            'cards_por_ano' => $this->cardsPorAno($this->anosDosCards($catalogos['anos_letivos'], $item)),
+            'recuperacao_pode_cadastrar' => $this->podeRecuperacao('cadastrar'),
+            'recuperacao_pode_alterar' => $this->podeRecuperacao('alterar'),
+            'recuperacao_pode_excluir' => $this->podeRecuperacao('excluir'),
+            'boletim_pronto' => $model->boletimPronto(),
+            'materias' => $this->materiasDaRegra(),
             'csrf_token' => $this->generateCsrfToken(),
             'flash_status' => $flash['type'] === 'success' ? 'success' : ($flash['message'] ? 'error' : ''),
             'flash_message' => $flash['message'] ?? '',
         ]);
+    }
+
+    /**
+     * @param list<int> $anos
+     * @param array<string,mixed>|null $item
+     * @return list<int>
+     */
+    private function anosDosCards(array $anos, ?array $item): array
+    {
+        $anoItem = (int) ($item['ano_letivo'] ?? 0);
+        $lista = array_map('intval', $anos);
+        if ($anoItem > 0 && !in_array($anoItem, $lista, true)) {
+            $lista[] = $anoItem;
+        }
+        return $lista;
+    }
+
+    /**
+     * @param list<int> $anos
+     * @return array<int, array{tipo:string,campo:string,rotulos:list<string>}>
+     */
+    private function cardsPorAno(array $anos): array
+    {
+        $cards = [];
+        foreach ($anos as $ano) {
+            $ano = (int) $ano;
+            if ($ano <= 0) {
+                continue;
+            }
+            $info = \App\Core\PeriodoLetivo::doAno($ano);
+            $cards[$ano] = [
+                'tipo' => (string) ($info['tipo'] ?? 'bimestre'),
+                'campo' => (string) ($info['rotulo_campo'] ?? 'Bimestre'),
+                'rotulos' => array_values(is_array($info['rotulos'] ?? null) ? $info['rotulos'] : []),
+            ];
+        }
+        return $cards;
+    }
+
+    private function avisoCards(int $ano): string
+    {
+        if ($ano <= 0) {
+            return '';
+        }
+        $info = \App\Core\PeriodoLetivo::doAno($ano);
+        $quantidade = (int) ($info['quantidade'] ?? 0);
+        $campo = mb_strtolower((string) ($info['rotulo_campo_plural'] ?? 'períodos'));
+        if ($quantidade < 1) {
+            return '';
+        }
+        return ' Os ' . $quantidade . ' ' . $campo . ' deste ano já aparecem como cards de avaliação em Eventos Avaliativos.';
+    }
+
+    /**
+     * @return list<array{id:int,nome:string,eh_rotulo:bool}>
+     */
+    private function materiasDaRegra(): array
+    {
+        $saida = [];
+        try {
+            foreach ((new \App\Dominio\Escola\Models\ComponenteCurricular())->getOficiaisParaMatriz(true) as $componente) {
+                $id = (int) ($componente['id'] ?? 0);
+                if ($id <= 0) {
+                    continue;
+                }
+                $saida[] = [
+                    'id' => $id,
+                    'nome' => (string) ($componente['nome'] ?? ''),
+                    'eh_rotulo' => !empty($componente['eh_rotulo']),
+                ];
+            }
+        } catch (Throwable $e) {
+            return [];
+        }
+        usort($saida, static fn (array $a, array $b): int => strcmp($a['nome'], $b['nome']));
+        return $saida;
+    }
+
+    private function podeRecuperacao(string $acao): bool
+    {
+        $user = $this->auth->getUser();
+        $permissions = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user ?? []);
+        return \App\Core\AdminPermissionMatrix::can($permissions, 'regras_academicas', $acao);
     }
 
     /**

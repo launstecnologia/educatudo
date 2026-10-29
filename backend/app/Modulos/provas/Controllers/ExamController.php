@@ -383,7 +383,11 @@ class ExamController extends BaseController
                 if (!class_exists('AlunoLancamentoNotaHelper', false)) {
                 }
                 $alunosL = !empty($tidsL)
-                    ? AlunoLancamentoNotaHelper::filtrarAlunosExibicao($this->turmaModel->getAlunosByTurmasIds($tidsL))
+                    ? $this->filtrarAlunosConvocadosEvento(
+                        AlunoLancamentoNotaHelper::filtrarAlunosExibicao($this->turmaModel->getAlunosByTurmasIds($tidsL)),
+                        (int) $ev['id'],
+                        (int) ($ev['materia_id'] ?? 0)
+                    )
                     : [];
                 $uniqAlunos = [];
                 foreach ($alunosL as $al) {
@@ -397,7 +401,14 @@ class ExamController extends BaseController
                 }
                 $lancamentoTotalAlunos = count($uniqAlunos);
                 $notasMg = new ExamBlockManualGrade();
-                $lancamentoPreenchidas = $notasMg->countComNota((int) $ev['id'], (int) $professor['id'], (int) $ev['materia_id']);
+                $lancamentoPreenchidas = 0;
+                foreach ($notasMg->fetchMap((int) $ev['id'], (int) $professor['id'], (int) $ev['materia_id']) as $chaveNota => $notaLancada) {
+                    $partesNota = explode('_', (string) $chaveNota);
+                    $aidNota = (int) ($partesNota[1] ?? 0);
+                    if ($aidNota > 0 && isset($uniqAlunos[$aidNota]) && ($notaLancada['nota'] ?? null) !== null) {
+                        $lancamentoPreenchidas++;
+                    }
+                }
             }
             $eventos[] = [
                 'id' => $ev['id'],
@@ -1087,8 +1098,12 @@ class ExamController extends BaseController
             return;
         }
         $turmaIdList = array_keys($turmasIds);
-        $alunosFlat = AlunoLancamentoNotaHelper::filtrarAlunosExibicao(
-            $this->turmaModel->getAlunosByTurmasIds($turmaIdList)
+        $alunosFlat = $this->filtrarAlunosConvocadosEvento(
+            AlunoLancamentoNotaHelper::filtrarAlunosExibicao(
+                $this->turmaModel->getAlunosByTurmasIds($turmaIdList)
+            ),
+            (int) $evento_id,
+            $materiaId
         );
         $porTurma = [];
         foreach ($alunosFlat as $a) {
@@ -1189,8 +1204,12 @@ class ExamController extends BaseController
             return;
         }
         $alunosPermitidos = [];
-        $alunosFlat = AlunoLancamentoNotaHelper::filtrarAlunosExibicao(
-            $this->turmaModel->getAlunosByTurmasIds(array_keys($turmasPermitidas))
+        $alunosFlat = $this->filtrarAlunosConvocadosEvento(
+            AlunoLancamentoNotaHelper::filtrarAlunosExibicao(
+                $this->turmaModel->getAlunosByTurmasIds(array_keys($turmasPermitidas))
+            ),
+            (int) $evento_id,
+            $materiaId
         );
         foreach ($alunosFlat as $a) {
             $tid = (int) ($a['turma_id'] ?? 0);
@@ -1298,8 +1317,12 @@ class ExamController extends BaseController
             if (empty($idsTurma)) {
                 continue;
             }
-            $alunosMid = AlunoLancamentoNotaHelper::filtrarAlunosExibicao(
-                $this->turmaModel->getAlunosByTurmasIds($idsTurma)
+            $alunosMid = $this->filtrarAlunosConvocadosEvento(
+                AlunoLancamentoNotaHelper::filtrarAlunosExibicao(
+                    $this->turmaModel->getAlunosByTurmasIds($idsTurma)
+                ),
+                (int) $evento_id,
+                (int) $mid
             );
             $linhasMid = [];
             foreach ($alunosMid as $a) {
@@ -1328,6 +1351,32 @@ class ExamController extends BaseController
 
         $this->setFlashMessage('Notas salvas e replicadas para todas as matérias do evento.', 'success');
         $this->redirect('/professor/provas/evento-lancar-notas/' . (int) $evento_id . '?materia_id=' . $materiaId);
+    }
+
+    /**
+     * Evento de recuperação com alunos marcados: o lançamento do professor só lista esses alunos.
+     * Sem linhas no evento, a turma inteira continua valendo.
+     *
+     * @param list<array<string,mixed>> $alunos
+     * @return list<array<string,mixed>>
+     */
+    private function filtrarAlunosConvocadosEvento(array $alunos, int $blocoId, int $materiaId = 0): array
+    {
+        if ($blocoId <= 0 || $alunos === []) {
+            return $alunos;
+        }
+        try {
+            $convocados = (new \App\Modulos\EventosAvaliativos\Models\EventoAvaliativo())->convocadosDoBloco($blocoId, $materiaId);
+        } catch (\Throwable $e) {
+            return $alunos;
+        }
+        if (empty($convocados['restringe'])) {
+            return $alunos;
+        }
+        $mapa = array_fill_keys($convocados['alunos'] ?? [], true);
+        return array_values(array_filter($alunos, static function ($aluno) use ($mapa): bool {
+            return is_array($aluno) && isset($mapa[(int) ($aluno['id'] ?? 0)]);
+        }));
     }
     
     /**

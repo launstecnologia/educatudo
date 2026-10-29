@@ -1,0 +1,375 @@
+{
+  "origem": "https://launstecnologia.github.io/educatudo/",
+  "conteudos": [
+    {
+      "chave": "apresentacao",
+      "label": "Apresentação",
+      "grupo_rotulo": "Comece por aqui",
+      "posicao": "inicio",
+      "arquivo": "apresentacao.html",
+      "caracteres": 1555,
+      "sha256": "4b3522a97858e34ec50beeb036b005d8b41efb62c8679da3d8e2cb76df4ad147"
+    },
+    {
+      "chave": "ano_letivo",
+      "label": "",
+      "grupo_rotulo": "",
+      "posicao": "",
+      "arquivo": "ano_letivo.html",
+      "caracteres": 605,
+      "sha256": "32e4b0b48a7054c6a45ef5ba131e9bf06b7726a585d37fcca81f1d8f842e25e0"
+    },
+    {
+      "chave": "cursos_series",
+      "label": "",
+      "grupo_rotulo": "",
+      "posicao": "",
+      "arquivo": "cursos_series.html",
+      "caracteres": 498,
+      "sha256": "d44e2c20972f049a50fa62659099272e0de79eff12182a175d4f0f319781f5b4"
+    },
+    {
+      "chave": "componentes",
+      "label": "",
+      "grupo_rotulo": "",
+      "posicao": "",
+      "arquivo": "componentes.html",
+      "caracteres": 755,
+      "sha256": "53cd29cd7a75bd9effed15dbe8a760ba2113da8790fbeccdf36b4109426c272c"
+    },
+    {
+      "chave": "matriz",
+      "label": "",
+      "grupo_rotulo": "",
+      "posicao": "",
+      "arquivo": "matriz.html",
+      "caracteres": 687,
+      "sha256": "50f00d8df4aa56f295e7a0d456365094d631bfda19a7cb4a9936eca8e39c47e2"
+    },
+    {
+      "chave": "calendario",
+      "label": "",
+      "grupo_rotulo": "",
+      "posicao": "",
+      "arquivo": "calendario.html",
+      "caracteres": 602,
+      "sha256": "4ca9b2b9e6f931b545b349081553f9f3fdeedaba925105aa3373dc1bc9ffe14a"
+    },
+    {
+      "chave": "professores",
+      "label": "",
+      "grupo_rotulo": "",
+      "posicao": "",
+      "arquivo": "professores.html",
+      "caracteres": 450,
+      "sha256": "c6f76e69ba30466f393f62bfc88da5c93d71971026f78ed6b76790ed1422eed1"
+    },
+    {
+      "chave": "salas",
+      "label": "",
+      "grupo_rotulo": "",
+      "posicao": "",
+      "arquivo": "salas.html",
+      "caracteres": 440,
+      "sha256": "8488de25898d79f669207dc88e4cb87b6e1f7ecfd1a91bf4a5af9cc5e68f5996"
+    },
+    {
+      "chave": "turmas",
+      "label": "",
+      "grupo_rotulo": "",
+      "posicao": "",
+      "arquivo": "turmas.html",
+      "caracteres": 621,
+      "sha256": "e3f5dbbd97ea58bdf4f16147ae6905a200880ecaf474a147630a6fcb873f28ba"
+    },
+    {
+      "chave": "alunos",
+      "label": "",
+      "grupo_rotulo": "",
+      "posicao": "",
+      "arquivo": "alunos.html",
+      "caracteres": 1325,
+      "sha256": "012aba4895d8912be6d64baf33c8590801859cc6121d506799138a6ad8080c06"
+    },
+    {
+      "chave": "grade",
+      "label": "",
+      "grupo_rotulo": "",
+      "posicao": "",
+      "arquivo": "grade.html",
+      "caracteres": 649,
+      "sha256": "eaa943264db0d936f2b6420802fa270a70ca5113e31be00d694205a0433b5643"
+    },
+    {
+      "chave": "apos_implantacao",
+      "label": "Depois da implantação, o ano roda",
+      "grupo_rotulo": "Depois da implantação",
+      "posicao": "fim",
+      "arquivo": "apos_implantacao.html",
+      "caracteres": 458,
+      "sha256": "233c61c8af55097ddb930e919eb5246a7d21dc40a491d4eb10f66f799a185c52"
+    },
+    {
+      "chave": "ficha_aluno",
+      "label": "A ficha do aluno",
+      "grupo_rotulo": "Depois da implantação",
+      "posicao": "fim",
+      "arquivo": "ficha_aluno.html",
+      "caracteres": 11532,
+      "sha256": "bb96b6b2f69488a885e3f807382d636c5c4927b637eb6281e49414b2297a3e88"
+    },
+    {
+      "chave": "rotina",
+      "label": "Rotina — lançar notas e registrar a aula",
+      "grupo_rotulo": "Depois da implantação",
+      "posicao": "fim",
+      "arquivo": "rotina.html",
+      "caracteres": 8799,
+      "sha256": "e127e0bd514e01005aada58d41f541d0944acb1c20801128df16315c0635063d"
+    },
+    {
+      "chave": "transferencia",
+      "label": "Quando o aluno chega de outra escola",
+      "grupo_rotulo": "Depois da implantação",
+      "posicao": "fim",
+      "arquivo": "transferencia.html",
+      "caracteres": 5548,
+      "sha256": "e45aff67dc07bfd5f8af4e3801bc8b402e32f85b2241a894a4a38afd4bf91557"
+    },
+    {
+      "chave": "fechamento",
+      "label": "Fechar o período e emitir o histórico",
+      "grupo_rotulo": "Depois da implantação",
+      "posicao": "fim",
+      "arquivo": "fechamento.html",
+      "caracteres": 18738,
+      "sha256": "e9e07a5c2ec46e91f29c792c62edc17f73192f714906a853feb24872aac216a9"
+    }
+  ],
+  "imagens": [
+    {
+      "arquivo": "003-ano-letivo.jpg",
+      "sha256": "b6e729774a3b24a778e7f871de5f893d543f544e8549185eef03673ef8c05786"
+    },
+    {
+      "arquivo": "004-ano-letivo-novo-novo-ano-letivo.jpg",
+      "sha256": "1dd157ed79146d5256d909261d43062177b6b6e1d164ac64c2be10023774def9"
+    },
+    {
+      "arquivo": "006-cursos-series.jpg",
+      "sha256": "5c9310a1ea7bd821082aba112f36a4a94f202e473c679aab02632eb048badbb3"
+    },
+    {
+      "arquivo": "007-cursos-series-novo-novo-curso.jpg",
+      "sha256": "688c769749c0a1bf8f01125e28672c873908748cd547a12bc20921b7cf96ac33"
+    },
+    {
+      "arquivo": "011-componentes.jpg",
+      "sha256": "639b641301463c9b4b34205df724ee2b37ef4c3234f12857ff4431846b30c637"
+    },
+    {
+      "arquivo": "012-componentes-novo-novo-componente-curricular.jpg",
+      "sha256": "a3b2448481796de9a9dbfa474eca47cd2c6fd3d7e1dd49b275927bab2a274c7c"
+    },
+    {
+      "arquivo": "013-matrizes.jpg",
+      "sha256": "37306b0b4847903cc198c27c7ef258656dc11b3b956240c2d7e05773113ed825"
+    },
+    {
+      "arquivo": "014-matrizes-novo-nova-matriz.jpg",
+      "sha256": "f7147560e74211092ec002cfb1d698bda77470d039bdc67d4cb836ccbb9c9b08"
+    },
+    {
+      "arquivo": "016-calendario-letivo.jpg",
+      "sha256": "190f41064d68279418c9fa250110b2accf7759e2bd7d3449cf1cc34ba8c78dae"
+    },
+    {
+      "arquivo": "017-calendario-letivo-novo-configurar.jpg",
+      "sha256": "283b45663b7ee5d1a1ae419a783fb01eb2659911361e5f5e0227e12212ccace8"
+    },
+    {
+      "arquivo": "021-professores.jpg",
+      "sha256": "eda000dbae568e9619d5d2ab239c2c76acba167b93a892f657ca033155fa0059"
+    },
+    {
+      "arquivo": "022-professores-novo-novo-professor.jpg",
+      "sha256": "9093273fdca5bdef3a6ca37341355cb5cc87a0ce38540ff96276f03c51f58e5a"
+    },
+    {
+      "arquivo": "024-alunos.jpg",
+      "sha256": "8172557e0b0647a24ddc5d3bdd7c6d6aee9d21bed1ec9dfb32a1c41c1793a049"
+    },
+    {
+      "arquivo": "025-alunos-admin-students-create.jpg",
+      "sha256": "a2c17de06832e74671cb3b62853f392d12f0185337721182c4ed5a09005fbc3e"
+    },
+    {
+      "arquivo": "026-turmas.jpg",
+      "sha256": "055666ea2b155058d8985aff2d39917e8712c290d8eb90f4f43491749a0279f5"
+    },
+    {
+      "arquivo": "027-turmas-novo-nova-turma.jpg",
+      "sha256": "18e5836f34bd8c3f2b3230671a8bc768f9b4e7cce67192efa5ad6981ed902980"
+    },
+    {
+      "arquivo": "030-grade-horaria.jpg",
+      "sha256": "b74bfea8ab21b461760dc1718d934a9cc1a6e03a3d1d24910ee8ce771a3a3c5b"
+    },
+    {
+      "arquivo": "031-grade-horaria-novo-nova-aula.jpg",
+      "sha256": "30cfb36da4872a1f2a3efa9292a4fe46cca6f7a7076fd09370d66d4f503cebd8"
+    },
+    {
+      "arquivo": "032-salas.jpg",
+      "sha256": "ffd07f217d32e1196bfd73819b353d7329cedd7dbe3e2f63649908f9806081d8"
+    },
+    {
+      "arquivo": "033-salas-novo-nova-sala.jpg",
+      "sha256": "e5408b243aaf5c6a408b36a8973126e360ad4d12083f335088debbb5f38fd7e3"
+    },
+    {
+      "arquivo": "051-lancamento.jpg",
+      "sha256": "83ae4950d07fab054ea8ae09dfb9f6a6cc8877b5f253ecef519b0e60428f4de2"
+    },
+    {
+      "arquivo": "052-lancamento-novo-novo-evento.jpg",
+      "sha256": "e724a076a90c817266255d63667153913b505cc15ba8eb8d16cfa279986fb2b3"
+    },
+    {
+      "arquivo": "053-lancamento-wizard-2.jpg",
+      "sha256": "fc8b7b54371b95a8710b2ccbca883387c84b3d290a8be4e838a1a290b91994d4"
+    },
+    {
+      "arquivo": "054-lancamento-wizard-3.jpg",
+      "sha256": "526688fe1dfb3fed99d4acaa9af1573dabea08ac428dbc577be82f27bbb0638f"
+    },
+    {
+      "arquivo": "055-lancamento-wizard-4.jpg",
+      "sha256": "cc44f6870a10449e3078118c8e54958039175a34063cff51152d4e5ffcc6b8bd"
+    },
+    {
+      "arquivo": "066-diario.jpg",
+      "sha256": "414b9161b3295911b5af4850f9f949f44f170095475d42db45efc6ae282c1ed9"
+    },
+    {
+      "arquivo": "067-frequencia.jpg",
+      "sha256": "f19224a8d4dcac1af59ac4816ac195559eb75767be55018161a41e3117a047a2"
+    },
+    {
+      "arquivo": "068-ocorrencias.jpg",
+      "sha256": "353a84b722718695f77b446b0506714639c62096ba0e6e5d3d2d27ccc851ee22"
+    },
+    {
+      "arquivo": "069-ocorrencias-novo-nova-ocorrencia.jpg",
+      "sha256": "9093273fdca5bdef3a6ca37341355cb5cc87a0ce38540ff96276f03c51f58e5a"
+    },
+    {
+      "arquivo": "074-fechamento-hub.jpg",
+      "sha256": "7ccb1355c04efda85c1cd1dd7a0ae04345d335a13cc5b72856bfaf23371de367"
+    },
+    {
+      "arquivo": "075-fechamento-hub-acoes.jpg",
+      "sha256": "d8dca0338b380d62136e83f559a1d27f42101ab00bcfebfbbf759b6f167ce0f4"
+    },
+    {
+      "arquivo": "076-fechamento-hub-acao-conferir-turma.jpg",
+      "sha256": "862fb636b2e84ada4d97f4dd4ac506995de0a2621d7b7e18af3e564c43f13b83"
+    },
+    {
+      "arquivo": "080-fechamento-homologado.jpg",
+      "sha256": "b0c7be5991d6d00302db235cc4645205f64a3dbff016f21f04b190a0268c0441"
+    },
+    {
+      "arquivo": "081-fechamento-turma-homologada.jpg",
+      "sha256": "d538df5b0f80aa73ddf5ac84fe3133c6ffbe92feec65d6d09f184ca0138ecba0"
+    },
+    {
+      "arquivo": "082-documentos-periodo.jpg",
+      "sha256": "2ef4027988ab47883d89292505449721d7ad3f017fb77d27f208ec7138413526"
+    },
+    {
+      "arquivo": "083-historico-assinado.jpg",
+      "sha256": "697f022f1844d1394054805ebde8de23a5f4619db045d1d00ab058caa8f9463c"
+    },
+    {
+      "arquivo": "084-notas-coordenacao.jpg",
+      "sha256": "acd77879df9afc55e351fef015eb0b5b5ec12d8dea0069f32afd952ac297162e"
+    },
+    {
+      "arquivo": "085-boletins-zip.jpg",
+      "sha256": "9c4fb4fd596c46d7420e6ae06c2980de1daeedc36d1c0c99508f0144939e7d7d"
+    },
+    {
+      "arquivo": "086-trajetoria-lancar-escola.jpg",
+      "sha256": "ddb427c749229f88491c45e17e09c580945de1e49a6b750093e909e61d2bb7be"
+    },
+    {
+      "arquivo": "087-lancar-escola-drawer.jpg",
+      "sha256": "e6b168c417646e2a2a1226272a59778ce97a3f72b8f8ca0596d8679bed366c4e"
+    },
+    {
+      "arquivo": "088-docs-outra-escola.jpg",
+      "sha256": "3ad0630f82632993a6d1143f182e71acf45eb46f925ef30e00470d03745fce63"
+    },
+    {
+      "arquivo": "089-lancamento-wizard-professores.jpg",
+      "sha256": "7b1ae027775f209099c24fc38f2aa2d8db3001681396c00d62f7b7fce43005f4"
+    },
+    {
+      "arquivo": "090-lancamento-wizard-revisao.jpg",
+      "sha256": "c5efd5bcac9b6d09e0738df2ffe97220057896c8e5494fad84f0cb608677555b"
+    },
+    {
+      "arquivo": "091-lancamento-detalhe.jpg",
+      "sha256": "5c2f0b29498790875d030945cfea9db31b6eb94a1add07327b977e4cd2b35611"
+    },
+    {
+      "arquivo": "092-lancamento-materias.jpg",
+      "sha256": "697b642fcf2abbcf63d9b53dc3bfd312110f8f609a717a9bc5e1c230704e8444"
+    },
+    {
+      "arquivo": "093-lancar-notas-grid.jpg",
+      "sha256": "5bff40c3b5a90e8b7318813c31d8ee217134fa3fc7c8226a7fb64873e3e7e794"
+    },
+    {
+      "arquivo": "095-aluno-visao-geral.jpg",
+      "sha256": "5bc78303d490261e3fd43c3da34bf6acbee76e6cdb87eebb1e37033f10c09edd"
+    },
+    {
+      "arquivo": "096-aluno-dados-pessoais.jpg",
+      "sha256": "3de57309d45f287247302a1c3cc4fdb1bd47662a82605d93fde3935325ab41c1"
+    },
+    {
+      "arquivo": "097-aluno-responsaveis.jpg",
+      "sha256": "bb4252034881335a91338a5b2c6a52a9b55b49032b5d816055dd66dc96bcafe1"
+    },
+    {
+      "arquivo": "098-aluno-matriculas.jpg",
+      "sha256": "e26516cb688686c5109ff2b42b2fd9e95277c2240eaee30f0769b76a86120049"
+    },
+    {
+      "arquivo": "099-aluno-saude.jpg",
+      "sha256": "d3c6c80c0f0d89dd1baf943c0efd7cee3b860a7003ae15752840bdbddd723106"
+    },
+    {
+      "arquivo": "100-aluno-documentos.jpg",
+      "sha256": "93d2c203a3171d0e65acd4a36a7b69ced4cca26806e2e49c545bb98a51881ffa"
+    },
+    {
+      "arquivo": "101-aluno-vida-escolar.jpg",
+      "sha256": "d33c3276537d1595682547b64e7ec2c49ed6a261f059f801d2a023e8b2f0678f"
+    },
+    {
+      "arquivo": "102-aluno-pedagogico.jpg",
+      "sha256": "7663833a78238c667947e1b47d2ed5bcaaf25e3c048e4d062b2ce9b104eb4137"
+    },
+    {
+      "arquivo": "103-aluno-historico.jpg",
+      "sha256": "adb0f115fe829df540e372aa46fdb5caf97ba4389ffb38d39b114537f96aac06"
+    },
+    {
+      "arquivo": "104-aluno-mais-acoes.jpg",
+      "sha256": "81371f573212d67f134673de766b092583b5b93b3fe1f0d9c27dc296a241b642"
+    }
+  ]
+}

@@ -117,7 +117,7 @@ class ResultadoAcademicoService
         if ($curso === null) {
             return -1;
         }
-        $serie = $matchOrNull($regra['serie_id'] ?? null, $contexto['serie_id'] ?? null);
+        $serie = $this->pontuarSeries($regra, $contexto['serie_id'] ?? null);
         if ($serie === null) {
             return -1;
         }
@@ -169,6 +169,34 @@ class ResultadoAcademicoService
         $score += $materia === 10 ? 160 : $materia;
         $score += $numRegra > 0 ? 20 : 2;
         return $score;
+    }
+
+    /**
+     * Série vazia vale para todas. Com uma ou mais séries, só vale para as marcadas.
+     *
+     * @param array<string,mixed> $regra
+     */
+    private function pontuarSeries(array $regra, mixed $serieContexto): ?int
+    {
+        $series = [];
+        foreach ((array) ($regra['series_ids'] ?? []) as $serieId) {
+            $serieId = (int) $serieId;
+            if ($serieId > 0) {
+                $series[$serieId] = true;
+            }
+        }
+        if ($series === [] && (int) ($regra['serie_id'] ?? 0) > 0) {
+            $series[(int) $regra['serie_id']] = true;
+        }
+        $contexto = (int) $serieContexto;
+        if ($series === []) {
+            return 1;
+        }
+        if ($contexto <= 0) {
+            return null;
+        }
+
+        return isset($series[$contexto]) ? 10 : null;
     }
 
     /**

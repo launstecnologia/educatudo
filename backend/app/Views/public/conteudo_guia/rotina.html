@@ -1,0 +1,167 @@
+<div class="guia-referencia"><div class="sec">
+  
+  <p class="s">A parte mais usada do sistema, e a que envolve mais gente.</p>
+
+  <div class="cadeia">
+    <h3>O caminho que a nota percorre</h3>
+    <p class="sub">Da prova aplicada até o documento oficial.</p>
+    <div class="elo"><span class="dot"></span><span class="tx"><span class="tt">Evento de avaliação</span>
+      <span class="dd">a coordenação diz o que vai valer nota</span></span></div>
+    <div class="seta">▾</div>
+    <div class="elo"><span class="dot"></span><span class="tx"><span class="tt">Nota lançada</span>
+      <span class="dd">o professor ou a secretaria digita</span></span></div>
+    <div class="seta">▾</div>
+    <div class="elo hi"><span class="dot"></span><span class="tx"><span class="tt">Coluna do Quadro de Notas</span>
+      <span class="dd">a nota cai no lugar que o evento apontou</span></span></div>
+    <div class="seta">▾</div>
+    <div class="elo"><span class="dot"></span><span class="tx"><span class="tt">Média do boletim</span>
+      <span class="dd">a fórmula do Modelo de Boletim consolida</span></span></div>
+    <div class="seta">▾</div>
+    <div class="elo"><span class="dot"></span><span class="tx"><span class="tt">Resultado final</span>
+      <span class="dd">as Regras de Aprovação decidem</span></span></div>
+    <div class="seta">▾</div>
+    <div class="elo"><span class="dot"></span><span class="tx"><span class="tt">Boletim · Ata · Histórico</span>
+      <span class="dd">documentos oficiais</span></span></div>
+    <div class="alerta"><b>Se a nota não chega no boletim, o problema quase sempre está no terceiro elo.</b>
+      O evento foi criado sem apontar para a coluna certa do Quadro de Notas. A nota existe, está lançada,
+      e não aparece em lugar nenhum.</div>
+  </div>
+
+  <div class="papeis">
+    <div class="pp"><div class="who">Coordenação</div>
+      <div class="what">Cria os eventos de avaliação e define para onde a nota vai.</div></div>
+    <div class="pp"><div class="who">Professor</div>
+      <div class="what">Monta a prova, quando online, e lança as notas da sua turma.</div></div>
+    <div class="pp"><div class="who">Secretaria</div>
+      <div class="what">Lança em nome do professor quando preciso e acompanha o que falta.</div></div>
+  </div>
+
+<details class="card num" id="ref-rotina-r0">
+  <summary class="head">
+    <span class="n">1</span>
+    <span class="tit">
+      <b>Criar o evento de avaliação</b>
+      <span class="ok">/admin/provas</span>
+    </span>
+    <span class="chev">▸</span>
+  </summary>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Em Avaliações e Notas, clique em <b>Novo Evento</b>. Abre um assistente de 5 passos: Dados → Configuração → Turmas → Professores → Revisão.</li><li>No passo <b>1 · Dados</b>, dê um título que dê para achar depois: tipo + período + turma. Ex.: “Prova Semanal S1 — 1A”.</li><li>Escolha o ano letivo, o bimestre e o Tipo de Nota (Prova Semanal, Prova Bimestral, Trabalho…).</li><li>Não crie um evento por turma se a avaliação vale para várias: o passo 3 aceita várias turmas de uma vez.</li></ol><div class="shots"><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/051-lancamento.jpg" data-print-legenda="Listagem — Novo Evento" aria-label="Ampliar: Listagem — Novo Evento" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/051-lancamento.jpg" alt="Listagem — Novo Evento" loading="lazy" width="983" height="718"></button></figure><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/052-lancamento-novo-novo-evento.jpg" data-print-legenda="Passo 1 · Dados" aria-label="Ampliar: Passo 1 · Dados" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/052-lancamento-novo-novo-evento.jpg" alt="Passo 1 · Dados" loading="lazy" width="983" height="718"></button></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Título genérico do tipo “Prova”. Com quatro bimestres e várias disciplinas, ninguém distingue depois.</li><li>A listagem esconde os eventos Concluídos por padrão. Se “sumiu”, mude o filtro Status para Todos (inclui concluídos).</li></ul><div class="usado"><b>Usado depois em:</b> Lançamento da nota, quadro de notas e boletim.</div></div>
+</details>
+<details class="card num crit" id="ref-rotina-r1">
+  <summary class="head">
+    <span class="n">2</span>
+    <span class="tit">
+      <b>Definir para onde a nota vai<span class="sel crit">onde a nota se perde</span></b>
+      <span class="ok">/admin/provas</span>
+    </span>
+    <span class="chev">▸</span>
+  </summary>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Ainda no passo <b>1 · Dados</b> — não é no passo Configuração. Tipo de Nota e destino do quadro ficam juntos aqui.</li><li>Em prova semanal, preencha Destinos no quadro: o Quadro, o Bloco de disciplinas (A/B) e a coluna (S1, S2…). O cartão roxo confirma: “Vai para S1 · Bloco A”.</li><li>Em prova bimestral, esse bloco some: o próprio Tipo de Nota já aponta a coluna do boletim.</li><li>Original ou Substitutiva e “mostrar no portal” vêm no passo 2. Desmarque o portal para prova interna.</li></ol><div class="shots"><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/053-lancamento-wizard-2.jpg" data-print-legenda="Destino no quadro — S1 · Bloco A" aria-label="Ampliar: Destino no quadro — S1 · Bloco A" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/053-lancamento-wizard-2.jpg" alt="Destino no quadro — S1 · Bloco A" loading="lazy" width="983" height="718"></button></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Deixar o Quadro em branco ou apontando para a coluna errada. A nota é lançada normalmente e não aparece no boletim. É a causa mais frequente de “lancei a nota e sumiu”.</li><li>Escolher Tipo de Nota com escala diferente da que a prova usa — a nota entra fora do padrão.</li><li>Marcar “mostrar no portal” numa avaliação interna que a escola não queria divulgar.</li></ul><div class="usado"><b>Usado depois em:</b> Composição do boletim e cálculo da média.</div><div class="nota">Este é o passo que decide se a nota vira documento. Se só der para conferir uma coisa antes de salvar o evento, confira o destino no quadro.</div></div>
+</details>
+<details class="card num" id="ref-rotina-r2">
+  <summary class="head">
+    <span class="n">3</span>
+    <span class="tit">
+      <b>Escolher como a prova acontece</b>
+      <span class="ok">/admin/provas</span>
+    </span>
+    <span class="chev">▸</span>
+  </summary>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>No passo <b>2 · Configuração</b>, Tipo de Evento: <b>Prova online</b> (questões na plataforma) ou <b>Lançamento de notas</b> (prova no papel; a escola só informa o resultado, sem questões).</li><li>Em lançamento, diga quem lança: <b>Atribuir ao professor</b> ou <b>Coordenação lança a nota</b>. É esta escolha que abre a tela de lançamento no detalhe.</li><li>Passo <b>3 · Turmas</b>: marque quem entra (ex.: 1A). Passo <b>4 · Professores</b>: professor + matéria + as turmas dele.</li><li>Passo <b>5 · Revisão</b>: confira título, destino no quadro, tipo de evento e responsável — só então Criar Evento.</li></ol><div class="shots"><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/054-lancamento-wizard-3.jpg" data-print-legenda="Passo 2 · Lançamento de notas" aria-label="Ampliar: Passo 2 · Lançamento de notas" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/054-lancamento-wizard-3.jpg" alt="Passo 2 · Lançamento de notas" loading="lazy" width="983" height="718"></button></figure><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/055-lancamento-wizard-4.jpg" data-print-legenda="Passo 3 · Turmas" aria-label="Ampliar: Passo 3 · Turmas" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/055-lancamento-wizard-4.jpg" alt="Passo 3 · Turmas" loading="lazy" width="983" height="718"></button></figure><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/089-lancamento-wizard-professores.jpg" data-print-legenda="Passo 4 · Professores" aria-label="Ampliar: Passo 4 · Professores" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/089-lancamento-wizard-professores.jpg" alt="Passo 4 · Professores" loading="lazy" width="983" height="718"></button></figure><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/090-lancamento-wizard-revisao.jpg" data-print-legenda="Passo 5 · Revisão" aria-label="Ampliar: Passo 5 · Revisão" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/090-lancamento-wizard-revisao.jpg" alt="Passo 5 · Revisão" loading="lazy" width="983" height="718"></button></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Escolher “prova online” para uma avaliação que será no papel: o sistema fica esperando questões que nunca chegam.</li><li>Atribuir ao professor sem avisá-lo. O evento existe, o prazo corre, e ninguém lança.</li></ul><div class="usado"><b>Usado depois em:</b> Trabalho do professor e lançamento da nota.</div></div>
+</details>
+<details class="card num" id="ref-rotina-r3">
+  <summary class="head">
+    <span class="n">4</span>
+    <span class="tit">
+      <b>Lançar as notas</b>
+      <span class="ok">/admin/provas</span>
+    </span>
+    <span class="chev">▸</span>
+  </summary>
+  <div class="body">
+    <div class="lab">O evento inteiro, do começo ao fim</div>
+    <p style="margin:0 0 10px;font-size:14px;line-height:1.55;color:#3A4150">Não se lança nota na listagem. Primeiro o assistente cria o evento; depois se entra no <b>detalhe</b> e se digita a nota aluno a aluno. Exemplo real: Prova Semanal S1 — 1A, lançamento pela coordenação, destino S1 · Bloco A.</p>
+    <ol class="como">
+      <li><b>Passo 1 · Dados.</b> Título, ano, bimestre, Tipo de Nota. Em semanal: Quadro + Bloco + coluna (S1).</li>
+      <li><b>Passo 2 · Configuração.</b> Tipo de Evento = Lançamento de notas. Quem lança = Coordenação lança a nota (ou o professor, se for o caso).</li>
+      <li><b>Passo 3 · Turmas.</b> Marque a turma (1A).</li>
+      <li><b>Passo 4 · Professores.</b> Professor + matéria daquela turma. Sem quantidade de questões — a nota é cheia, de 0 a 10.</li>
+      <li><b>Passo 5 · Revisão.</b> Confira destino no quadro e responsável. Clique em Criar Evento.</li>
+    </ol>
+    <div class="shots">
+      <figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/052-lancamento-novo-novo-evento.jpg" data-print-legenda="1 · Dados" aria-label="Ampliar: 1 · Dados" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/052-lancamento-novo-novo-evento.jpg" alt="1 · Dados" loading="lazy" width="983" height="718"></button></figure>
+      <figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/053-lancamento-wizard-2.jpg" data-print-legenda="1 · Destino S1" aria-label="Ampliar: 1 · Destino S1" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/053-lancamento-wizard-2.jpg" alt="1 · Destino S1" loading="lazy" width="983" height="718"></button></figure>
+      <figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/054-lancamento-wizard-3.jpg" data-print-legenda="2 · Configuração" aria-label="Ampliar: 2 · Configuração" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/054-lancamento-wizard-3.jpg" alt="2 · Configuração" loading="lazy" width="983" height="718"></button></figure>
+      <figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/055-lancamento-wizard-4.jpg" data-print-legenda="3 · Turmas" aria-label="Ampliar: 3 · Turmas" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/055-lancamento-wizard-4.jpg" alt="3 · Turmas" loading="lazy" width="983" height="718"></button></figure>
+      <figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/089-lancamento-wizard-professores.jpg" data-print-legenda="4 · Professores" aria-label="Ampliar: 4 · Professores" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/089-lancamento-wizard-professores.jpg" alt="4 · Professores" loading="lazy" width="983" height="718"></button></figure>
+      <figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/090-lancamento-wizard-revisao.jpg" data-print-legenda="5 · Revisão" aria-label="Ampliar: 5 · Revisão" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/090-lancamento-wizard-revisao.jpg" alt="5 · Revisão" loading="lazy" width="983" height="718"></button></figure>
+    </div>
+    <div class="lab">Como lançar a nota dentro do detalhe</div>
+    <ol class="como">
+      <li>Na listagem, no evento, abra <b>Ações → Gerenciar</b>. Entra no painel do evento, não na edição do cadastro.</li>
+      <li>O título vira “Lançamento de notas: …”. Clique em <b>Lançar notas (coordenação)</b> no topo — ou, na linha da matéria, em <b>Lançar/editar notas</b>.</li>
+      <li>Abre a tabela da turma. Filtre Matéria e Turma no topo. Cada linha é um aluno: campo <b>Nota</b> (0 a 10) e <b>Observação</b> opcional.</li>
+      <li>Digite as notas. Em branco = sem nota ainda. Confira contra a lista de presença.</li>
+      <li>Clique em <b>Salvar notas</b>. Sair sem salvar perde o que foi digitado.</li>
+    </ol>
+    <div class="shots">
+      <figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/091-lancamento-detalhe.jpg" data-print-legenda="Detalhe — Lançar notas (coordenação)" aria-label="Ampliar: Detalhe — Lançar notas (coordenação)" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/091-lancamento-detalhe.jpg" alt="Detalhe — Lançar notas (coordenação)" loading="lazy" width="983" height="718"></button></figure>
+      <figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/092-lancamento-materias.jpg" data-print-legenda="Progresso por matéria" aria-label="Ampliar: Progresso por matéria" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/092-lancamento-materias.jpg" alt="Progresso por matéria" loading="lazy" width="983" height="718"></button></figure>
+      <figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/093-lancar-notas-grid.jpg" data-print-legenda="Tabela: aluno, nota, salvar" aria-label="Ampliar: Tabela: aluno, nota, salvar" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/093-lancar-notas-grid.jpg" alt="Tabela: aluno, nota, salvar" loading="lazy" width="983" height="718"></button></figure>
+    </div>
+    <div class="nota">Se no wizard ficou “Atribuir ao professor”, quem lança é o professor em /professor — a coordenação acompanha o progresso no mesmo detalhe. “Coordenação lança a nota” abre a tabela acima para a secretaria/coordenação.</div>
+    <div class="lab">Erros comuns</div>
+    <ul class="erros">
+      <li>Procurar a tabela de notas na listagem ou no wizard. Ela só existe depois de Gerenciar → Lançar notas.</li>
+      <li>Lançar no bimestre ou na coluna errada. Isso se decide no wizard (passos 1 e 2), não na tabela. Conferir o filtro do topo antes de digitar.</li>
+      <li>Aluno que não aparece: ele não está matriculado naquela turma. Cadastrado não é o mesmo que matriculado.</li>
+      <li>Sair da tabela sem Salvar notas.</li>
+    </ul>
+    <div class="usado"><b>Usado depois em:</b> Simulação do boletim, painel de fechamento e resultado final.</div>
+  </div>
+</details>
+<details class="card num" id="ref-rotina-r4">
+  <summary class="head">
+    <span class="n">5</span>
+    <span class="tit">
+      <b>Segunda chamada e correções</b>
+      <span class="ok">/admin/provas</span>
+    </span>
+    <span class="chev">▸</span>
+  </summary>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Crie outro evento no mesmo assistente, no passo Configuração marcado como <b>Substitutiva</b>, apontando para a mesma coluna do quadro (mesmo S, mesmo bloco).</li><li>Entre no detalhe (Ações → Gerenciar → Lançar notas) e lance só os alunos da segunda chamada.</li><li>Para corrigir uma nota já lançada, abra de novo a mesma tabela e altere — enquanto o período não estiver fechado.</li></ol><div class="shots"><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/054-lancamento-wizard-3.jpg" data-print-legenda="Original ou Substitutiva" aria-label="Ampliar: Original ou Substitutiva" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/054-lancamento-wizard-3.jpg" alt="Original ou Substitutiva" loading="lazy" width="983" height="718"></button></figure><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/093-lancar-notas-grid.jpg" data-print-legenda="Corrigir na mesma tabela" aria-label="Ampliar: Corrigir na mesma tabela" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/093-lancar-notas-grid.jpg" alt="Corrigir na mesma tabela" loading="lazy" width="983" height="718"></button></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Criar a substitutiva apontando para outra coluna: a nota entra, mas em lugar errado do boletim.</li><li>Tentar corrigir depois do período homologado. Aí é preciso retificar, e isso fica registrado.</li></ul><div class="usado"><b>Usado depois em:</b> Resultado final e boletim.</div></div>
+</details>
+<details class="card num" id="ref-rotina-r5">
+  <summary class="head">
+    <span class="n">6</span>
+    <span class="tit">
+      <b>Acompanhar o diário dos professores</b>
+      <span class="ok">/admin/diario</span>
+    </span>
+    <span class="chev">▸</span>
+  </summary>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Filtre por período, turma e professor.</li><li>Veja o que cada professor lançou: conteúdo da aula, frequência e notas.</li><li>Use o status para achar quem ainda está pendente.</li><li>Cobre os pendentes antes do fim do período. Se precisar, a secretaria também consegue lançar em /admin/diario/lancar.</li></ol><div class="shots"><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/066-diario.jpg" data-print-legenda="Diário" aria-label="Ampliar: Diário" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/066-diario.jpg" alt="Diário" loading="lazy" width="1152" height="900"></button></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Descobrir a pendência só na hora de fechar o bimestre. Esta tela existe para ver antes.</li><li>Confundir com o diário do professor: o professor lança no portal dele; aqui você acompanha (e, se preciso, lança).</li></ul><div class="usado"><b>Usado depois em:</b> Frequência, painel de fechamento e conselho de classe.</div><div class="nota">O professor registra a aula no portal dele. A secretaria acompanha — e pode lançar se faltar.</div></div>
+</details>
+<details class="card num" id="ref-rotina-r6">
+  <summary class="head">
+    <span class="n">7</span>
+    <span class="tit">
+      <b>Frequência</b>
+      <span class="ok">/admin/frequencia</span>
+    </span>
+    <span class="chev">▸</span>
+  </summary>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Escolha a turma e o período.</li><li>Confira o percentual de cada aluno — a mesma tela mostra faltas e presença.</li><li>Justifique as faltas que tiverem atestado ou amparo (no diário/presença).</li><li>Acompanhe quem está perto do limite mínimo.</li></ol><div class="shots"><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/067-frequencia.jpg" data-print-legenda="Frequência" aria-label="Ampliar: Frequência" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/067-frequencia.jpg" alt="Frequência" loading="lazy" width="1152" height="900"></button></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Esperar o fim do bimestre para olhar. Aluno perto do limite precisa ser identificado enquanto ainda dá para agir.</li><li>Esquecer que a frequência pode nascer do diário ou de um lançamento avulso de faltas — se o número não bate, confira as duas origens.</li></ul><div class="usado"><b>Usado depois em:</b> Resultado final, reprovação por falta e conselho de classe.</div></div>
+</details>
+<details class="card num" id="ref-rotina-r7">
+  <summary class="head">
+    <span class="n">8</span>
+    <span class="tit">
+      <b>Ocorrências</b>
+      <span class="ok">/admin/ocorrencias</span>
+    </span>
+    <span class="chev">▸</span>
+  </summary>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como"><li>Registre a ocorrência com data, local e o relato do que aconteceu.</li><li>Classifique a categoria e a gravidade.</li><li>Registre testemunhas, quando houver.</li><li>Preencha o que a escola vai fazer — a providência tomada.</li></ol><div class="shots"><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/068-ocorrencias.jpg" data-print-legenda="Ocorrências" aria-label="Ampliar: Ocorrências" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/068-ocorrencias.jpg" alt="Ocorrências" loading="lazy" width="1152" height="900"></button></figure><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/069-ocorrencias-novo-nova-ocorrencia.jpg" data-print-legenda="Nova ocorrência" aria-label="Ampliar: Nova ocorrência" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/069-ocorrencias-novo-nova-ocorrencia.jpg" alt="Nova ocorrência" loading="lazy" width="448" height="900"></button></figure></div><div class="lab">Erros comuns</div><ul class="erros"><li>Registrar o julgamento em vez do fato. O relato deve descrever o que foi observado.</li><li>Deixar a providência em branco: sem ela, a ocorrência não sustenta medida disciplinar depois.</li></ul><div class="usado"><b>Usado depois em:</b> Conselho de classe, comunicação com a família e histórico disciplinar.</div></div>
+</details>
+</div></div>

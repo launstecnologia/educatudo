@@ -7,13 +7,32 @@ $filtros = is_array($filtros ?? null) ? $filtros : [];
 $cursos = is_array($cursos ?? null) ? $cursos : [];
 $series = is_array($series ?? null) ? $series : [];
 $anosLetivos = is_array($anos_letivos ?? null) ? $anos_letivos : [];
+$anoAtual = (int) ($ano_atual ?? (int) date('Y'));
 $schemaPronto = !empty($schema_pronto);
 $csrf_token = $csrf_token ?? '';
 
 $page_header_title = 'Regras de Aprovação';
 $page_header_subtitle = 'Critérios de aprovação, recuperação e frequência. O boletim usa esta regra para definir a situação do aluno.';
+$filtrosAtivos = 0;
+if ((int) ($filtros['ano_letivo'] ?? 0) !== $anoAtual) {
+    $filtrosAtivos++;
+}
+if ((int) ($filtros['curso_id'] ?? 0) > 0) {
+    $filtrosAtivos++;
+}
+if ((int) ($filtros['serie_id'] ?? 0) > 0) {
+    $filtrosAtivos++;
+}
 ob_start();
 ?>
+<button type="button" onclick="openFilterDrawer()"
+        class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+    <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
+    Filtros
+    <?php if ($filtrosAtivos > 0): ?>
+        <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold"><?= $filtrosAtivos ?></span>
+    <?php endif; ?>
+</button>
 <a href="<?= URL ?>/admin/regras-academicas/nova"
    class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
     <i class="fa-solid fa-plus mr-2"></i>
@@ -30,41 +49,6 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
     Rode a migration <code class="text-sm">2026_08_22_regras_academicas.sql</code> no painel Master antes de cadastrar.
 </div>
 <?php endif; ?>
-
-<form method="GET" action="<?= URL ?>/admin/regras-academicas" class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-    <div>
-        <label class="block text-xs font-medium text-gray-500 mb-1">Ano letivo</label>
-        <select name="ano_letivo" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-            <option value="0">Todos</option>
-            <?php foreach ($anosLetivos as $ano): ?>
-                <?php $ano = (int) $ano; ?>
-                <option value="<?= $ano ?>" <?= (int) ($filtros['ano_letivo'] ?? 0) === $ano ? 'selected' : '' ?>><?= $ano ?></option>
-            <?php endforeach; ?>
-        </select>
-    </div>
-    <div>
-        <label class="block text-xs font-medium text-gray-500 mb-1">Curso</label>
-        <select name="curso_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-            <option value="0">Todos</option>
-            <?php foreach ($cursos as $c): ?>
-                <option value="<?= (int) $c['id'] ?>" <?= (int) ($filtros['curso_id'] ?? 0) === (int) $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $c['nome']) ?></option>
-            <?php endforeach; ?>
-        </select>
-    </div>
-    <div>
-        <label class="block text-xs font-medium text-gray-500 mb-1">Série</label>
-        <select name="serie_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-            <option value="0">Todas</option>
-            <?php foreach ($series as $s): ?>
-                <option value="<?= (int) $s['id'] ?>" <?= (int) ($filtros['serie_id'] ?? 0) === (int) $s['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $s['nome']) ?></option>
-            <?php endforeach; ?>
-        </select>
-    </div>
-    <div class="flex gap-2">
-        <button type="submit" class="px-4 py-2 bg-primary text-primary rounded-lg text-sm font-medium hover:opacity-90">Filtrar</button>
-        <a href="<?= URL ?>/admin/regras-academicas" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Limpar</a>
-    </div>
-</form>
 
 <div class="bg-white rounded-xl shadow-sm border border-gray-200">
     <div class="overflow-x-auto">
@@ -85,7 +69,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                 <tr>
                     <td colspan="7" class="px-6 py-12 text-center text-gray-500">
                         <i class="fa-solid fa-scale-balanced text-4xl text-gray-300 mb-4"></i>
-                        <p>Nenhuma regra de aprovação cadastrada</p>
+                        <p><?= (int) ($filtros['ano_letivo'] ?? 0) > 0 ? 'Nenhuma regra de aprovação em ' . (int) $filtros['ano_letivo'] . '.' : 'Nenhuma regra de aprovação cadastrada' ?></p>
                         <p class="text-sm mt-1">Sem regra, o boletim continua usando a nota mínima do próprio evento.</p>
                     </td>
                 </tr>
@@ -105,7 +89,19 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                             <?php endif; ?>
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-700">
-                            <?= number_format((float) $row['media_minima'], 1, ',', '.') ?>
+                            <?php
+                                $escalaLinha = (string) ($row['escala'] ?? '10');
+                                $conceitoLinha = (string) ($row['conceito_minimo'] ?? '');
+                                $rotuloEscala = \App\Modulos\RegrasAcademicas\Models\RegraAcademica::ESCALAS[$escalaLinha] ?? 'Numérica (0 a 10)';
+                                $conceitosLinha = \App\Modulos\RegrasAcademicas\Models\RegraAcademica::conceitosDa($escalaLinha);
+                            ?>
+                            <?php if ($conceitosLinha !== null && $conceitoLinha !== ''): ?>
+                                A partir de <?= htmlspecialchars($conceitosLinha[$conceitoLinha] ?? $conceitoLinha) ?>
+                                <div class="text-xs text-gray-500"><?= htmlspecialchars($rotuloEscala) ?></div>
+                            <?php else: ?>
+                                <?= number_format((float) $row['media_minima'], 1, ',', '.') ?>
+                                <div class="text-xs text-gray-500"><?= htmlspecialchars($rotuloEscala) ?></div>
+                            <?php endif; ?>
                             <?php if (!empty($row['usar_frequencia'])): ?>
                                 <div class="text-xs text-gray-500"><?= number_format((float) $row['frequencia_minima'], 0) ?>% freq.</div>
                             <?php else: ?>
@@ -145,3 +141,69 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
         </table>
     </div>
 </div>
+
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
+<aside id="filterDrawer" class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col" aria-hidden="true">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <div>
+            <h3 class="text-lg font-semibold text-gray-900">Filtrar regras</h3>
+            <p class="mt-0.5 text-xs text-gray-500">Ano letivo, curso e série.</p>
+        </div>
+        <button type="button" onclick="closeFilterDrawer()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar filtros"><i class="fa-solid fa-xmark text-xl"></i></button>
+    </div>
+    <form method="get" action="<?= URL ?>/admin/regras-academicas" class="flex flex-col flex-1 overflow-hidden">
+        <div class="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+            <div>
+                <label for="filtro-ano" class="block text-sm font-medium text-gray-700 mb-1.5">Ano letivo</label>
+                <select id="filtro-ano" name="ano_letivo" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="0">Todos</option>
+                    <?php foreach ($anosLetivos as $ano): ?>
+                        <?php $ano = (int) $ano; ?>
+                        <option value="<?= $ano ?>" <?= (int) ($filtros['ano_letivo'] ?? 0) === $ano ? 'selected' : '' ?>><?= $ano ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div>
+                <label for="filtro-curso" class="block text-sm font-medium text-gray-700 mb-1.5">Ciclo/Etapa/Curso</label>
+                <select id="filtro-curso" name="curso_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="0">Todos</option>
+                    <?php foreach ($cursos as $c): ?>
+                        <option value="<?= (int) $c['id'] ?>" <?= (int) ($filtros['curso_id'] ?? 0) === (int) $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $c['nome']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div>
+                <label for="filtro-serie" class="block text-sm font-medium text-gray-700 mb-1.5">Série / Ano Escolar</label>
+                <select id="filtro-serie" name="serie_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="0">Todas as Séries / Anos</option>
+                    <?php foreach ($series as $s): ?>
+                        <option value="<?= (int) $s['id'] ?>" <?= (int) ($filtros['serie_id'] ?? 0) === (int) $s['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $s['nome']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-200 flex gap-3 bg-gray-50">
+            <a href="<?= URL ?>/admin/regras-academicas" class="flex-1 inline-flex items-center justify-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">Limpar</a>
+            <button type="submit" class="flex-1 px-4 py-2.5 bg-primary text-primary rounded-lg text-sm font-semibold hover:opacity-90 transition-colors">Aplicar filtros</button>
+        </div>
+    </form>
+</aside>
+<script>
+function openFilterDrawer() {
+    document.getElementById('filterDrawerBackdrop').classList.remove('hidden');
+    var drawer = document.getElementById('filterDrawer');
+    drawer.classList.remove('translate-x-full');
+    drawer.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+}
+function closeFilterDrawer() {
+    document.getElementById('filterDrawerBackdrop').classList.add('hidden');
+    var drawer = document.getElementById('filterDrawer');
+    drawer.classList.add('translate-x-full');
+    drawer.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') closeFilterDrawer();
+});
+</script>

@@ -1,0 +1,528 @@
+<div class="guia-referencia"><div class="sec">
+  
+  <p class="s">Uma turma por vez. Esta trilha reinicia a cada bimestre. No fim do ano, o boletim
+  oficial sai por período; o <b>histórico junta a trajetória inteira</b> num quadro de equivalência —
+  Fundamental do 1º ao 9º, Médio da 1ª à 3ª, inclusive o que ele fez em outra escola.</p>
+
+  <div class="maq">
+    <h3>Os estados da turma no painel</h3>
+    <div class="els">
+      <span class="st">Aberto</span><span class="ar">→</span>
+      <span class="st">Em fechamento</span><span class="ar">→</span>
+      <span class="st warn">Em recuperação</span><span class="ar">→</span>
+      <span class="st lock">Homologado</span><span class="ar">→</span>
+      <span class="st">Retificado</span>
+    </div>
+    <p><b>Aberto</b> ainda lança nota. <b>Em fechamento</b> trava o lançamento, mas dá para
+    <span class="btnex">Voltar para aberto</span>. Quem ficou em recuperação precisa de resultado
+    definitivo (aprovado ou reprovado) antes de homologar. <b>Homologado</b> não reabre:
+    só <span class="btnex">Retificar período</span>, com justificativa.</p>
+  </div>
+
+  <div class="docs">
+    <h3>O que a escola recebe no fim de cada período</h3>
+    <table>
+      <tbody><tr><td>Boletim</td><td>Por aluno, com os quatro bimestres (nota e faltas) e a média final. PDF em Documentos do período; ZIP em Painéis → Relatórios</td></tr>
+      <tr><td>Ata de Resultados Finais</td><td>Por turma — o documento oficial do período</td></tr>
+      <tr><td>Ficha Individual</td><td>Por aluno, consolidado do ano</td></tr>
+      <tr><td>Histórico Escolar</td><td>Quadro de equivalência: todas as séries nas colunas. 9º ano traz 1º–9º; 3º do Médio traz 1ª+2ª+3ª — inclusive outra escola</td></tr>
+      <tr><td>Pacote de transferência</td><td>Quando o aluno <b>sai</b> da escola (Vida Escolar). A entrada de transferido é outra: Lançar Escola</td></tr>
+    </tbody></table>
+  </div>
+
+  <div class="cadeia">
+    <h3>O histórico não é o boletim do ano em curso</h3>
+    <p class="sub">É a trajetória. O sistema puxa todos os anos homologados nesta escola e aceita os anos cursados em outra instituição.</p>
+    <div class="traj">
+      <div class="c">
+        <div class="n2">Aluno no 1º ano</div>
+        <div class="t">Só o 1º</div>
+        <div class="d">O documento traz o ano em curso. Se ele veio transferido, o fundamental ou o 1º de outra escola entra no mesmo papel.</div>
+      </div>
+      <div class="c">
+        <div class="n2">Aluno no 2º ano</div>
+        <div class="t">1º + 2º</div>
+        <div class="d">O 1º homologado (aqui ou lançado de fora) aparece junto com o 2º. Não se emite um histórico “só do segundo”.</div>
+      </div>
+      <div class="c hi">
+        <div class="n2">Aluno no 3º ano</div>
+        <div class="t">1º + 2º + 3º</div>
+        <div class="d">O Ensino Médio inteiro. Conclusão ou transferência sai com os três anos, cada um com a escola de origem.</div>
+      </div>
+    </div>
+    <div class="alerta"><b>Sim, o sistema faz isso.</b> Ao gerar o rascunho, ele consolida todos os resultados anuais homologados desta escola, os anos da Vida Escolar (incluindo importação de outra instituição) e o que você lançar à mão em “Lançar estudo em outra instituição”. O PDF agrupa por ano/série.</div>
+  </div>
+
+<details class="card num" id="ref-fechamento-f0">
+  <summary class="head">
+    <span class="n">1</span>
+    <span class="tit">
+      <b>Conferir se a turma está pronta</b>
+      <span class="ok">Fechamento → Painel · /admin/fechamento</span>
+    </span>
+    <span class="chev">▸</span>
+  </summary>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Abra Fechamento. Filtre o ano letivo e o período (bimestre ou ano inteiro).</li>
+    <li>A tabela mostra, por turma: estado, alunos, frequência, recuperação e pendências.</li>
+    <li>Clique na turma. A tela lista cada aluno: média, frequência, resultado e o que falta.</li>
+    <li>Clique na pendência para ir à tela de lançamento. Resolva tudo antes de iniciar o fechamento.</li>
+  </ol>
+  <div class="shots"><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/074-fechamento-hub.jpg" data-print-legenda="Painel de fechamento" aria-label="Ampliar: Painel de fechamento" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/074-fechamento-hub.jpg" alt="Painel de fechamento" loading="lazy" width="1152" height="900"></button></figure><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/076-fechamento-hub-acao-conferir-turma.jpg" data-print-legenda="Conferir turma" aria-label="Ampliar: Conferir turma" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/076-fechamento-hub-acao-conferir-turma.jpg" alt="Conferir turma" loading="lazy" width="1152" height="900"></button></figure></div>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Tentar fechar com pendência. O botão <span class="btnex">Iniciar fechamento</span> fica desabilitado e o motivo aparece no próprio botão — leia o que ele diz.</li>
+    <li>Confundir aluno “sem nota” com nota zero. Sem nota bloqueia; nunca vira aprovado nem reprovado sozinho.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Início do fechamento, conselho e homologação.</div></div>
+</details>
+
+<details class="card num" id="ref-fechamento-f1">
+  <summary class="head">
+    <span class="n">2</span>
+    <span class="tit">
+      <b>Iniciar o fechamento da turma</b>
+      <span class="ok">Na turma · botão Iniciar fechamento</span>
+    </span>
+    <span class="chev">▸</span>
+  </summary>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Com a turma sem pendências, clique em <span class="btnex">Iniciar fechamento</span>.</li>
+    <li>O estado passa de Aberto para Em fechamento. As Regras de Aprovação calculam média, frequência e situação de cada aluno.</li>
+    <li>Os lançamentos da turma ficam travados.</li>
+    <li>Confira o resumo no topo: alunos, pendências e quantos estão em recuperação.</li>
+    <li>Se iniciou cedo demais, use <span class="btnex">Voltar para aberto</span>, corrija e inicie de novo.</li>
+  </ol>
+  <div class="shots"><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/075-fechamento-hub-acoes.jpg" data-print-legenda="Ações do fechamento" aria-label="Ampliar: Ações do fechamento" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/075-fechamento-hub-acoes.jpg" alt="Ações do fechamento" loading="lazy" width="320" height="293"></button></figure></div>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Fechar sem conferir qual regra de aprovação está vigente. Se a regra estiver errada, o resultado inteiro sai errado.</li>
+    <li>Esquecer turma no meio do caminho: o fechamento é por turma, nunca da escola inteira de uma vez.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Conselho, recuperação e homologação.</div>
+  <div class="nota">Fechar não é homologar. Fechar trava o lançamento e é reversível. Homologar é o ponto sem volta.</div></div>
+</details>
+
+<details class="card num crit" id="ref-fechamento-f1b">
+  <summary class="head">
+    <span class="n">3</span>
+    <span class="tit">
+      <b>Resolver a recuperação<span class="sel crit">bloqueia a homologação</span></b>
+      <span class="ok">Painel da turma · coluna Recuperação</span>
+    </span>
+    <span class="chev">▸</span>
+  </summary>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Se o resumo mostrar alunos em recuperação, o estado pode ir para Em recuperação.</li>
+    <li>Lance a nota da recuperação no evento substitutivo (mesmo quadro/coluna combinados no Lançamento de Notas).</li>
+    <li>Cada aluno precisa terminar aprovado ou reprovado. Em recuperação ou exame final não entra no snapshot.</li>
+    <li>Só então o botão Homologar libera.</li>
+  </ol>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Homologar com recuperação em aberto. O sistema bloqueia e escreve quantos alunos faltam resolver.</li>
+    <li>Lançar a recuperação em outra coluna do quadro: a nota entra, mas não substitui o resultado do período.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Homologação e boletim oficial.</div>
+  <div class="nota">Se ninguém ficou em recuperação, pule este passo.</div></div>
+</details>
+
+<details class="card num" id="ref-fechamento-f2">
+  <summary class="head">
+    <span class="n">4</span>
+    <span class="tit">
+      <b>Conselho de Classe</b>
+      <span class="ok">Fechamento → Conselho · /admin/conselhos</span>
+    </span>
+    <span class="chev">▸</span>
+  </summary>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Em Conselho de Classe, clique em <span class="btnex">Iniciar Conselho</span>. Escolha ano, período e turma.</li>
+    <li>Percorra os casos limítrofes: perto da média, perto da frequência mínima, ou em recuperação.</li>
+    <li>Registre cada decisão com justificativa. A deliberação muda o resultado, não a nota lançada.</li>
+    <li>Encerre o conselho. Se a escola exigir conselho no fechamento, homologar fica bloqueado até isso.</li>
+  </ol>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Mudar a nota do aluno para forçar o resultado. Nunca faça isso: corrompe o histórico. Use o registro do conselho.</li>
+    <li>Encerrar sem justificar os casos alterados. A justificativa é o que sustenta a decisão se a família questionar.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Resultado final, ata da turma e histórico do aluno.</div></div>
+</details>
+
+<details class="card num" id="ref-fechamento-f3">
+  <summary class="head">
+    <span class="n">5</span>
+    <span class="tit">
+      <b>Conferir os resultados</b>
+      <span class="ok">Painel da turma ou /admin/resultados-finais</span>
+    </span>
+    <span class="chev">▸</span>
+  </summary>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Na turma do Fechamento, confira aluno a aluno: média, frequência e situação.</li>
+    <li>Abra a conta de pelo menos um aluno e confira contra o cálculo feito à mão.</li>
+    <li>Resolva os casos sinalizados: sem nota, frequência limítrofe, transferido, matrícula tardia.</li>
+    <li>Aluno transferido não entra na estatística de aprovação da turma.</li>
+  </ol>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Homologar sem conferir nenhum aluno à mão. É o único jeito de descobrir regra mal configurada antes do documento sair.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Homologação e todos os documentos do período.</div></div>
+</details>
+
+<div class="linha"><span>daqui para trás, tudo é corrigível</span></div>
+
+<details class="card num marco" id="ref-fechamento-f4">
+  <summary class="head">
+    <span class="n">6</span>
+    <span class="tit">
+      <b>Homologar<span class="sel">ponto sem volta</span></b>
+      <span class="ok">Na turma · Homologar selecionados / Homologar todos os elegíveis</span>
+    </span>
+    <span class="chev">▸</span>
+  </summary>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Com tudo conferido e sem recuperação em aberto, marque os alunos (ou use todos os elegíveis).</li>
+    <li>Clique em <span class="btnex">Homologar selecionados</span> ou <span class="btnex">Homologar todos os elegíveis</span>. Confirme.</li>
+    <li>O estado da turma vira Homologado. Notas, faltas e boletim oficial travam.</li>
+    <li>O registro guarda quem homologou, quando, e o resultado. O livro fica em /admin/homologacoes.</li>
+  </ol>
+  <div class="shots"><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/080-fechamento-homologado.jpg" data-print-legenda="Painel 2025 — turma 1A homologada" aria-label="Ampliar: Painel 2025 — turma 1A homologada" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/080-fechamento-homologado.jpg" alt="Painel homologado" loading="lazy" width="983" height="718"></button></figure><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/081-fechamento-turma-homologada.jpg" data-print-legenda="Turma 1A travada — só retifica" aria-label="Ampliar: Turma 1A travada — só retifica" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/081-fechamento-turma-homologada.jpg" alt="Turma homologada" loading="lazy" width="983" height="718"></button></figure></div>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Tratar homologação como “salvar”. Daqui para frente, corrigir exige <span class="btnex">Retificar período</span>, com justificativa, e gera nova versão.</li>
+    <li>Homologar com chamada pendente ou aluno em recuperação. O botão explica o bloqueio.</li>
+  
+  <div class="usado"><b>Usado depois em:</b> Boletim, ata, ficha e histórico escolar.</div>
+  <div class="nota">Esta é a única ação irreversível do módulo acadêmico. Homologado não volta para Aberto.</div></ul></div>
+</details>
+
+<details class="card num" id="ref-fechamento-f5">
+  <summary class="head">
+    <span class="n">7</span>
+    <span class="tit">
+      <b>Gerar boletim, PDF e ZIP</b>
+      <span class="ok">Documentos do período · Relatórios · Vida Escolar</span>
+    </span>
+    <span class="chev">▸</span>
+  </summary>
+  <div class="body">
+  <div class="lab">1 · Gerar / conferir o boletim</div>
+  <ol class="como">
+    <li>O boletim oficial nasce do fechamento homologado — não se “monta” à mão. Sem homologar, o PDF sai como prévia, sem valor para a família.</li>
+    <li>Abra Fechamento → Documentos do período (<code>/admin/documentos-periodo</code>). Filtre ano letivo, período e turma.</li>
+    <li>Confira a lista: cada aluno tem <span class="btnex">Ficha</span> e <span class="btnex">Boletim PDF</span>. A turma tem <span class="btnex">Ata (prévia)</span> e <span class="btnex">Ata PDF</span>.</li>
+    <li>Outro caminho, um aluno por vez: Secretaria → Vida Escolar → escolha a turma → no menu do aluno, <span class="btnex">Boletim (PDF)</span> (ou a aba Boletim no prontuário).</li>
+  </ol>
+  <div class="lab">2 · Gerar o PDF individual</div>
+  <ol class="como">
+    <li>Em Documentos do período, clique em <span class="btnex">Boletim PDF</span> na linha do aluno. Abre o PDF oficial daquele período (snapshot homologado).</li>
+    <li>Em Vida Escolar, o mesmo PDF sai de <span class="btnex">Boletim (PDF)</span> no menu de ações — usa a ficha daquele ano.</li>
+    <li>Olhe um PDF inteiro antes de mandar o lote: cabeçalho, disciplinas, médias, frequência e resultado.</li>
+  </ol>
+  <div class="shots"><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/082-documentos-periodo.jpg" data-print-legenda="Documentos do período — Ata, Ficha e Boletim PDF por aluno" aria-label="Ampliar: Documentos do período — Ata, Ficha e Boletim PDF por aluno" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/082-documentos-periodo.jpg" alt="Documentos do período" loading="lazy" width="983" height="718"></button></figure></div>
+  <div class="lab">3 · Gerar o ZIP da turma (ou da escola)</div>
+  <ol class="como">
+    <li>Abra Painéis → Relatórios → <b>Notas da Coordenação</b> (<code>/admin/reports/boletim-coordenacao</code>).</li>
+    <li>Em Exibir, deixe <b>Boletim da Vida Escolar</b>. Escolha o ano letivo e a turma (ou Todas as turmas).</li>
+    <li>Clique em <span class="btnex">Gerar relatório</span>. A tela lista os alunos com ficha.</li>
+    <li>Clique em <span class="btnex">Baixar boletins (ZIP)</span>. O sistema gera um PDF por aluno em segundo plano e empacota. Com a escola inteira pode levar alguns minutos — deixe a página aberta.</li>
+    <li>Quando o banner ficar verde, clique em <span class="btnex">Baixar ZIP</span>. Quem ainda não tem ficha na Vida Escolar fica de fora do arquivo; a tela avisa quantos.</li>
+  </ol>
+  <div class="shots"><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/084-notas-coordenacao.jpg" data-print-legenda="Notas da Coordenação — Gerar relatório" aria-label="Ampliar: Notas da Coordenação — Gerar relatório" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/084-notas-coordenacao.jpg" alt="Notas da Coordenação" loading="lazy" width="983" height="718"></button></figure><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/085-boletins-zip.jpg" data-print-legenda="Depois de gerar — Baixar boletins (ZIP)" aria-label="Ampliar: Depois de gerar — Baixar boletins (ZIP)" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/085-boletins-zip.jpg" alt="Baixar boletins ZIP" loading="lazy" width="983" height="718"></button></figure></div>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Emitir o PDF antes de homologar: sai com marca de rascunho e não tem valor oficial. Serve para o conselho, não para a família.</li>
+    <li>Clicar em Baixar ZIP sem ter gerado o relatório, ou com fonte “Notas do evento”: o ZIP dos boletins oficiais só existe na fonte Vida Escolar, com aluno que já tem ficha.</li>
+    <li>Gerar trinta PDFs sem olhar um. Erro de layout descoberto depois da impressão custa o dobro.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Entrega às famílias, reunião de pais e montagem do histórico.</div>
+  <div class="nota">O visual do papel (brasão, margens, rodapé) se ajusta em Secretaria → Documentos Institucionais → Layout de documentos. O boletim é do período; o histórico (passo 8) é da trajetória inteira.</div></div>
+</details>
+
+<details class="card num" id="ref-fechamento-f6">
+  <summary class="head">
+    <span class="n">8</span>
+    <span class="tit">
+      <b>Gerar e emitir o histórico escolar<span class="sel out">Ensino Médio inteiro</span></b>
+      <span class="ok">Secretaria → Vida Escolar · /admin/students/ID/historico-escolar</span>
+    </span>
+    <span class="chev">▸</span>
+  </summary>
+  <div class="body">
+  <div class="lab">O que entra no documento</div>
+  <ol class="como">
+    <li><b>Todos os anos desta escola</b> com resultado anual homologado — 1º, 2º e 3º, o que o aluno já tiver. O rascunho não pega só o ano atual.</li>
+    <li><b>Anos de outra instituição</b> já gravados na Vida Escolar (Lançar Escola / importar transferência).</li>
+    <li><b>Itens manuais</b> pelo formulário “Lançar estudo em outra instituição”, no próprio histórico — um componente por vez, com a escola de origem.</li>
+  </ol>
+  <div class="lab">Como gerar o rascunho</div>
+  <ol class="como">
+    <li>Com os anos desta escola homologados, abra Secretaria → Vida Escolar. Escolha o ano e a turma.</li>
+    <li>No aluno, clique em Histórico (também em <code>/admin/students/ID/historico-escolar</code>).</li>
+    <li>Complete o checklist pré-emissão: nome, nascimento, filiação, documento, nacionalidade, INEP da unidade, CNPJ, diretor e secretário.</li>
+    <li>Escolha a finalidade (Solicitação, Transferência ou Conclusão) e clique em <span class="btnex">Gerar rascunho</span>. O sistema reconsolida os internos e anexa os anos da Vida Escolar.</li>
+    <li>Abra a versão. Confira se todos os anos esperados estão lá — aluno do 2º precisa do 1º; aluno do 3º precisa do 1º, do 2º e do 3º.</li>
+  </ol>
+  <div class="lab">Se ele estudou em outra escola</div>
+  <ol class="como">
+    <li>Faça isso na entrada, não na hora de emitir: seção <b>Quando o aluno chega de outra escola</b> — anexar o PDF e <span class="btnex">Lançar Escola</span> na Trajetória.</li>
+    <li>Ajuste pontual no rascunho: bloco <b>Lançar estudo em outra instituição</b> (um componente por vez). Clique em <span class="btnex">Adicionar item externo</span>.</li>
+    <li>Gere o rascunho de novo depois de lançar. Os itens externos não são apagados na reconsolidação.</li>
+  </ol>
+  <div class="lab">Conferir, emitir e assinar</div>
+  <ol class="como">
+    <li>Confira componente a componente, ano a ano. Clique em <span class="btnex">Conferir</span>.</li>
+    <li>Com o checklist verde, clique em <span class="btnex">Emitir (imutável)</span>. O documento ganha hash e QR de validação pública.</li>
+    <li>Assine como Secretário(a) e como Diretor(a). Depois, <span class="btnex">Baixar PDF</span>.</li>
+    <li>Se o aluno <b>sai</b> da escola: na ficha, Pacote de transferência. Ofícios ficam em Vida Escolar → Ofícios. Isso não substitui Lançar Escola na entrada.</li>
+  </ol>
+  <div class="shots"><figure class="shot"><button type="button" class="guia-foto" data-print-src="/assets/guia-onboarding/referencia/083-historico-assinado.jpg" data-print-legenda="Histórico emitido e assinado — conferir, emitir, assinar, baixar PDF" aria-label="Ampliar: Histórico emitido e assinado — conferir, emitir, assinar, baixar PDF" aria-haspopup="dialog"><img src="/assets/guia-onboarding/referencia/083-historico-assinado.jpg" alt="Histórico assinado" loading="lazy" width="983" height="718"></button></figure></div>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Achar que o histórico “nasce sozinho” depois de homologar. Homologar trava o resultado do período; emitir o histórico é outro ato, no aluno, e junta a trajetória.</li>
+    <li>Emitir o 3º ano sem lançar o 1º e o 2º de outra escola. O sistema só inclui o que está homologado aqui ou gravado na Vida Escolar / itens externos.</li>
+    <li>Tentar emitir com checklist incompleto. O botão Emitir fica desabilitado até ficar verde.</li>
+    <li>Deixar o layout para a última hora, no dia em que a família pede a transferência.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Transferência, matrícula em outra escola e conclusão de curso.</div>
+  <div class="nota">Rascunho → Conferido → Emitido → Assinado. Emitido congela. Correção vira nova versão; a anterior é cancelada. Itens de outra escola são copiados para a nova versão.</div></div>
+</details>
+
+<details class="card num" id="ref-fechamento-f7">
+  <summary class="head">
+    <span class="n">9</span>
+    <span class="tit">
+      <b>Retificar depois de homologado</b>
+      <span class="ok">Na turma · Retificar período</span>
+    </span>
+    <span class="chev">▸</span>
+  </summary>
+  <div class="body"><div class="lab">Como fazer</div><ol class="como">
+    <li>Só aparece quando o período está Homologado. Clique em <span class="btnex">Retificar período</span>.</li>
+    <li>Escreva a justificativa (obrigatória). Confirme.</li>
+    <li>O snapshot homologado permanece no livro. O fluxo reabre com auditoria para corrigir e homologar de novo.</li>
+  </ol>
+  <div class="lab">Erros comuns</div><ul class="erros">
+    <li>Procurar um “desfazer homologação”. Esse botão não existe. O caminho formal é a retificação.</li>
+  </ul>
+  <div class="usado"><b>Usado depois em:</b> Nova homologação e nova versão dos documentos.</div></div>
+</details>
+
+  <h3>Exemplo — boletim do período (gerar, PDF, ZIP)</h3>
+  <p class="s">Turma 1A, 2025, ano dividido em <b>quatro bimestres</b>. O boletim oficial mostra
+  nota e faltas de cada bimestre e a média final — não só o resultado do ano.
+  PDF um a um em Documentos do período; lote em Painéis → Relatórios → Notas da Coordenação →
+  <b>Gerar relatório</b> → <b>Baixar boletins (ZIP)</b>.</p>
+
+  <div class="papel bol">
+    <div class="bras">
+      <div class="esc">Colégio Educa</div>
+      <div class="ht">Boletim Escolar</div>
+      <div class="sube">1ª Série EM · Turma 1A · Ano letivo 2025 · 1º, 2º, 3º e 4º bimestres · homologado</div>
+    </div>
+    <div class="meta">
+      <div><b>Aluno:</b> Ana Almeida Rocha</div>
+      <div><b>Nascimento:</b> 01/02/2010</div>
+      <div><b>Turma:</b> 1A · 2025</div>
+      <div><b>Frequência anual:</b> 93,10%</div>
+      <div><b>Origem:</b> snapshot homologado</div>
+      <div><span class="selo">Boletim oficial</span></div>
+    </div>
+    <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th rowspan="2">Componente</th>
+          <th class="bim" colspan="2">1º Bimestre</th>
+          <th class="bim" colspan="2">2º Bimestre</th>
+          <th class="bim" colspan="2">3º Bimestre</th>
+          <th class="bim" colspan="2">4º Bimestre</th>
+          <th class="bim" colspan="3">Final</th>
+        </tr>
+        <tr>
+          <th class="sub">Nota</th><th class="sub">Faltas</th>
+          <th class="sub">Nota</th><th class="sub">Faltas</th>
+          <th class="sub">Nota</th><th class="sub">Faltas</th>
+          <th class="sub">Nota</th><th class="sub">Faltas</th>
+          <th class="sub">Média</th><th class="sub">Faltas</th><th class="sub">Situação</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Língua Portuguesa</td><td>4,80</td><td>2</td><td>5,20</td><td>1</td><td>4,90</td><td>2</td><td>5,10</td><td>1</td><td>5,00</td><td>6</td><td class="sit-r">Reprovado</td></tr>
+        <tr><td>Matemática</td><td>6,00</td><td>2</td><td>6,50</td><td>1</td><td>6,20</td><td>2</td><td>6,26</td><td>1</td><td>6,24</td><td>6</td><td class="sit-a">Aprovado</td></tr>
+        <tr><td>Língua Inglesa</td><td>6,50</td><td>1</td><td>6,80</td><td>1</td><td>6,40</td><td>2</td><td>6,70</td><td>2</td><td>6,60</td><td>6</td><td class="sit-a">Aprovado</td></tr>
+        <tr><td>História</td><td>6,20</td><td>2</td><td>6,80</td><td>1</td><td>6,40</td><td>2</td><td>6,60</td><td>1</td><td>6,50</td><td>6</td><td class="sit-a">Aprovado</td></tr>
+        <tr><td>Geografia</td><td>6,00</td><td>2</td><td>6,30</td><td>1</td><td>6,10</td><td>2</td><td>6,24</td><td>1</td><td>6,16</td><td>6</td><td class="sit-a">Aprovado</td></tr>
+        <tr><td>Física</td><td>6,40</td><td>1</td><td>6,70</td><td>2</td><td>6,30</td><td>2</td><td>6,60</td><td>1</td><td>6,50</td><td>6</td><td class="sit-a">Aprovado</td></tr>
+        <tr><td>Química</td><td>5,20</td><td>2</td><td>5,80</td><td>1</td><td>5,40</td><td>2</td><td>5,60</td><td>1</td><td>5,50</td><td>6</td><td class="sit-r">Reprovado</td></tr>
+        <tr><td>Biologia</td><td>6,00</td><td>2</td><td>6,40</td><td>1</td><td>6,00</td><td>2</td><td>6,32</td><td>1</td><td>6,18</td><td>6</td><td class="sit-a">Aprovado</td></tr>
+        <tr><td>Arte</td><td>6,20</td><td>1</td><td>6,50</td><td>2</td><td>6,20</td><td>1</td><td>6,46</td><td>2</td><td>6,34</td><td>6</td><td class="sit-a">Aprovado</td></tr>
+        <tr><td>Educação Física</td><td>6,80</td><td>1</td><td>6,40</td><td>1</td><td>6,50</td><td>2</td><td>6,30</td><td>2</td><td>6,50</td><td>6</td><td class="sit-a">Aprovado</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="res"><b>Resultado do período:</b> Reprovado por rendimento (média anual abaixo da mínima em Língua Portuguesa e Química). O PDF traz os quatro bimestres; o ZIP empacota um arquivo desses por aluno.</div>
+    <div class="qr">PDF: Fechamento → Documentos do período → Boletim PDF. ZIP: Painéis → Relatórios → Notas da Coordenação → Gerar relatório → Baixar boletins (ZIP).</div>
+  </div>
+
+  <h3>Exemplo — histórico escolar (quadro de equivalência)</h3>
+  <p class="s">Este é o papel: <b>disciplinas nas linhas, todos os anos nas colunas</b>. No Fundamental,
+  o 9º ano traz do 1º ao 9º. No Médio, o 3º traz 1ª + 2ª + 3ª. Anos feitos em outra escola entram
+  na mesma grade e na tabela de estabelecimento. Células com <b>**</b> são componente que a série não oferecia.</p>
+
+  <div class="hist-of">
+    <div class="hh">
+      <div class="brasao">COLÉGIO<br>EDUCA</div>
+      <div class="hid">
+        <div class="nm">Colégio Educa</div>
+        <div class="en">Rua das Palmeiras, 120 — Centro — Ribeirão Preto — SP</div>
+        <div class="dc">INEP: 35012345 — Autorização do Curso: Resolução CEE · e-mail: secretaria@colegioeduca.local</div>
+      </div>
+    </div>
+
+    <table>
+      <tbody><tr><th class="bar" colspan="4">Histórico Escolar do Ensino Fundamental</th></tr>
+      <tr><th class="bar" colspan="4">Dados do aluno</th></tr>
+      <tr>
+        <td class="labc">Nome do Aluno (a)</td>
+        <td colspan="2">Maria Clara Nunes</td>
+        <td><b>Sexo</b> F</td>
+      </tr>
+      <tr>
+        <td class="labc">Data de Nascimento</td>
+        <td>12/04/2011</td>
+        <td><b>Naturalidade</b> Amarante</td>
+        <td><b>UF</b> MA</td>
+      </tr>
+      <tr>
+        <td class="labc">Nome do Pai</td>
+        <td colspan="3">Paulo Henrique Nunes</td>
+      </tr>
+      <tr>
+        <td class="labc">Nome da Mãe</td>
+        <td colspan="3">Ana Lúcia Silva Nunes</td>
+      </tr>
+    </tbody></table>
+
+    <div class="scroll">
+    <table class="eq">
+      <tbody><tr><th class="bar" colspan="19">Equivalência</th></tr>
+      <tr>
+        <th class="comp" rowspan="2">Componentes<br>Curriculares</th>
+        <th colspan="2">Alfabetização</th>
+        <th colspan="2">1ª Série</th>
+        <th colspan="2">2ª Série</th>
+        <th colspan="2">3ª Série</th>
+        <th colspan="2">4ª Série</th>
+        <th colspan="2">5ª Série</th>
+        <th colspan="2">6ª Série</th>
+        <th colspan="2">7ª Série</th>
+        <th colspan="2">8ª Série</th>
+      </tr>
+      <tr>
+        <th>1º<br>ANO</th><th>CHA</th>
+        <th>2º<br>ANO</th><th>CHA</th>
+        <th>3º<br>ANO</th><th>CHA</th>
+        <th>4º<br>ANO</th><th>CHA</th>
+        <th>5º<br>ANO</th><th>CHA</th>
+        <th>6º<br>ANO</th><th>CHA</th>
+        <th>7º<br>ANO</th><th>CHA</th>
+        <th>8º<br>ANO</th><th>CHA</th>
+        <th>9º<br>ANO</th><th>CHA</th>
+      </tr>
+      <tr>
+        <td class="comp">Português</td>
+        <td>7,0</td><td>240</td><td>7,2</td><td>240</td><td>7,5</td><td>240</td><td>7,8</td><td>240</td><td>8,0</td><td>240</td>
+        <td>7,5</td><td>200</td><td>7,6</td><td>200</td><td>7,8</td><td>200</td><td>8,0</td><td>200</td>
+      </tr>
+      <tr>
+        <td class="comp">Matemática</td>
+        <td>6,8</td><td>240</td><td>7,0</td><td>240</td><td>7,2</td><td>240</td><td>7,4</td><td>240</td><td>7,6</td><td>240</td>
+        <td>7,0</td><td>200</td><td>7,2</td><td>200</td><td>7,4</td><td>200</td><td>7,5</td><td>200</td>
+      </tr>
+      <tr>
+        <td class="comp">Ciências</td>
+        <td>7,5</td><td>160</td><td>7,6</td><td>160</td><td>7,8</td><td>160</td><td>8,0</td><td>160</td><td>8,2</td><td>160</td>
+        <td>7,8</td><td>120</td><td>8,0</td><td>120</td><td>8,1</td><td>120</td><td>8,2</td><td>120</td>
+      </tr>
+      <tr>
+        <td class="comp">História</td>
+        <td>8,0</td><td>80</td><td>8,0</td><td>80</td><td>8,2</td><td>80</td><td>8,3</td><td>80</td><td>8,4</td><td>80</td>
+        <td>8,0</td><td>80</td><td>8,1</td><td>80</td><td>8,2</td><td>80</td><td>8,3</td><td>80</td>
+      </tr>
+      <tr>
+        <td class="comp">Geografia</td>
+        <td>7,8</td><td>80</td><td>7,9</td><td>80</td><td>8,0</td><td>80</td><td>8,1</td><td>80</td><td>8,2</td><td>80</td>
+        <td>7,9</td><td>80</td><td>8,0</td><td>80</td><td>8,1</td><td>80</td><td>8,2</td><td>80</td>
+      </tr>
+      <tr>
+        <td class="comp">Artes</td>
+        <td>9,0</td><td>80</td><td>9,0</td><td>80</td><td>9,2</td><td>80</td><td>9,0</td><td>80</td><td>9,1</td><td>80</td>
+        <td>8,8</td><td>80</td><td>9,0</td><td>80</td><td>9,0</td><td>80</td><td>9,2</td><td>80</td>
+      </tr>
+      <tr>
+        <td class="comp">Religião</td>
+        <td>8,5</td><td>40</td><td>8,5</td><td>40</td><td>8,6</td><td>40</td><td>8,7</td><td>40</td><td>8,8</td><td>40</td>
+        <td>8,5</td><td>40</td><td>8,6</td><td>40</td><td>8,7</td><td>40</td><td>8,8</td><td>40</td>
+      </tr>
+      <tr>
+        <td class="comp">Inglês</td>
+        <td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td>
+        <td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td>
+        <td>8,0</td><td>80</td><td>8,2</td><td>80</td><td>8,4</td><td>80</td><td>8,5</td><td>80</td>
+      </tr>
+      <tr>
+        <td class="comp">Ed. Física</td>
+        <td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td>
+        <td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td>
+        <td>9,0</td><td>80</td><td>9,0</td><td>80</td><td>9,2</td><td>80</td><td>9,5</td><td>80</td>
+      </tr>
+      <tr>
+        <td class="comp">Ética</td>
+        <td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td>
+        <td class="na">**</td><td class="na">**</td><td class="na">**</td><td class="na">**</td>
+        <td>8,5</td><td>80</td><td>8,6</td><td>80</td><td>8,7</td><td>80</td><td>8,8</td><td>80</td>
+      </tr>
+      <tr>
+        <td class="comp tot">CHA TOTAL</td>
+        <td class="tot" colspan="2">920</td>
+        <td class="tot" colspan="2">920</td>
+        <td class="tot" colspan="2">920</td>
+        <td class="tot" colspan="2">920</td>
+        <td class="tot" colspan="2">920</td>
+        <td class="tot" colspan="2">1040</td>
+        <td class="tot" colspan="2">1040</td>
+        <td class="tot" colspan="2">1040</td>
+        <td class="tot" colspan="2">1040</td>
+      </tr>
+    </tbody></table>
+    </div>
+
+    <table>
+      <tbody><tr>
+        <th class="bar">Série/Ano</th>
+        <th class="bar">Ano</th>
+        <th class="bar">Estabelecimento de ensino</th>
+        <th class="bar">Município</th>
+        <th class="bar">Estado</th>
+        <th class="bar">Resultado</th>
+      </tr>
+      <tr><td>1º Ano</td><td>2017</td><td>E. M. Gen. Eurico Gaspar Dutra</td><td>Amarante</td><td>MA</td><td>Aprovado</td></tr>
+      <tr><td>1ª Série / 2º Ano</td><td>2018</td><td>E. M. Gen. Eurico Gaspar Dutra</td><td>Amarante</td><td>MA</td><td>Aprovado</td></tr>
+      <tr><td>2ª Série / 3º Ano</td><td>2019</td><td>E. M. Gen. Eurico Gaspar Dutra</td><td>Amarante</td><td>MA</td><td>Aprovado</td></tr>
+      <tr><td>3ª Série / 4º Ano</td><td>2020</td><td>E. M. Gen. Eurico Gaspar Dutra</td><td>Amarante</td><td>MA</td><td>Aprovado</td></tr>
+      <tr><td>4ª Série / 5º Ano</td><td>2021</td><td>E. M. Gen. Eurico Gaspar Dutra</td><td>Amarante</td><td>MA</td><td>Aprovado</td></tr>
+      <tr><td>5ª Série / 6º Ano</td><td>2022</td><td>Colégio Educa</td><td>Ribeirão Preto</td><td>SP</td><td>Aprovado</td></tr>
+      <tr><td>6ª Série / 7º Ano</td><td>2023</td><td>Colégio Educa</td><td>Ribeirão Preto</td><td>SP</td><td>Aprovado</td></tr>
+      <tr><td>7ª Série / 8º Ano</td><td>2024</td><td>Colégio Educa</td><td>Ribeirão Preto</td><td>SP</td><td>Aprovado</td></tr>
+      <tr><td>8ª Série / 9º Ano</td><td>2025</td><td>Colégio Educa</td><td>Ribeirão Preto</td><td>SP</td><td>Aprovado</td></tr>
+    </tbody></table>
+
+    <table>
+      <tbody><tr><th class="bar">Observações</th></tr>
+      <tr><td class="obs">Estudos de 2017 a 2021 realizados em outra instituição (E. M. Gen. Eurico Gaspar Dutra — Amarante/MA), lançados na Vida Escolar. De 2022 a 2025, resultados homologados nesta instituição. Escala 0–10. Documento isento de autenticação pela Inspeção Escolar, nos termos da legislação vigente.</td></tr>
+      <tr><td class="car">Área reservada para carimbos</td></tr>
+    </tbody></table>
+
+    <div class="ass2">
+      <div>Secretário(a) escolar<br>Admin Colégio Educa · 17/09/2026</div>
+      <div>Diretor(a)<br>Admin Colégio Educa · 17/09/2026</div>
+    </div>
+    <div class="hint">No sistema: Secretaria → Vida Escolar → aluno → Histórico → Gerar rascunho → Conferir → Emitir → Assinar → Baixar PDF. Anos de outra escola: Lançar Escola ou “Lançar estudo em outra instituição”.</div>
+  </div>
+</div></div>

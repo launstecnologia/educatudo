@@ -41,6 +41,13 @@ foreach ($eventos as $ev) {
     }
 }
 $tipoLabelsLegenda = $tiposUsados === [] ? $tipoLabels : array_intersect_key($tipoLabels, $tiposUsados);
+$corCal = strtolower(trim((string) ($calendario_cor ?? '')));
+$textoCal = strtolower(trim((string) ($calendario_cor_texto ?? '')));
+if (!preg_match('/^#[0-9a-f]{6}$/', $corCal) || !preg_match('/^#[0-9a-f]{6}$/', $textoCal)) {
+    $corCal = '';
+    $textoCal = '';
+}
+$tomCal = $corCal !== '' ? '--button-primary-color:' . $corCal . ';--primary-text-color:' . $textoCal . ';' : '';
 ?>
 
 <div class="mb-6">
@@ -88,7 +95,7 @@ $tipoLabelsLegenda = $tiposUsados === [] ? $tipoLabels : array_intersect_key($ti
 </div>
 
 <!-- View mensal -->
-<div id="viewMes" class="hidden mb-8">
+<div id="viewMes" class="hidden mb-8"<?= $tomCal !== '' ? ' style="' . htmlspecialchars($tomCal, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
     <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div id="mesCabecalho" class="px-6 py-4 border-b border-gray-100 flex items-center justify-between" style="background-color: var(--button-primary-color);">
             <span id="mesTitulo" class="text-base font-bold" style="color: var(--primary-text-color);"></span>
@@ -105,7 +112,7 @@ $tipoLabelsLegenda = $tiposUsados === [] ? $tipoLabels : array_intersect_key($ti
 </div>
 
 <!-- Grade dos 12 meses -->
-<div id="viewAno" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
+<div id="viewAno" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8"<?= $tomCal !== '' ? ' style="' . htmlspecialchars($tomCal, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
 <?php for ($mes = 1; $mes <= 12; $mes++):
     $primeiroDia  = mktime(0, 0, 0, $mes, 1, $ano);
     $diasNoMes    = (int) date('t', $primeiroDia);

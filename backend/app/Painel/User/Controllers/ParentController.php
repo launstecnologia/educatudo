@@ -1642,6 +1642,8 @@ class ParentController extends BaseController
             'tipoText' => $visuais['text'],
             'calendario_nome' => (string) ($cfg['nome'] ?? ''),
             'calendario_rotulo' => (string) ($cfg['rotulo'] ?? ''),
+            'calendario_cor' => (string) ($cfg['cor'] ?? ''),
+            'calendario_cor_texto' => (string) ($cfg['cor_texto'] ?? ''),
         ]);
     }
 

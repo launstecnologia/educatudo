@@ -617,10 +617,8 @@ class AdminStudentProfileService
                 }
             }
 
-            // Fallback de UX: se ainda não houver tabela gerada para este aluno,
-            // mantém os eventos configurados visíveis para coordenação na lista
-            // para permitir ação/diagnóstico ("sem tabela gerada...").
-            if (empty($boletimEventosNotas)) {
+            // Períodos só configurados continuam na lista mesmo quando outro bimestre
+            // já foi publicado. O demonstrativo lê as notas lançadas, sem esperar a geração.
                 // Em vez de listRulesCatalog(500) + getRuleById() por regra (N+1 de até
                 // ~1000 queries), busca as regras candidatas em 1 query e as contagens
                 // de componentes em 1 query agrupada.
@@ -664,7 +662,10 @@ class AdminStudentProfileService
 
                 foreach ($rowsCatalogo as $full) {
                     $rid = (int) ($full['id'] ?? 0);
-                    if ($rid <= 0 || isset($seenNotas[$rid])) {
+                    $anoCat = isset($full['ano_letivo']) && $full['ano_letivo'] !== null ? (int) $full['ano_letivo'] : 0;
+                    $bimCat = isset($full['bimestre']) && $full['bimestre'] !== null ? (int) $full['bimestre'] : 0;
+                    $chaveCat = $rid . ':' . $anoCat . ':' . $bimCat;
+                    if ($rid <= 0 || isset($seenNotas[$chaveCat]) || isset($seenNotas[$rid])) {
                         continue;
                     }
                     $turmasRegra = $this->controller->parseSeriesIdsRaw($full['turmas_ids'] ?? null);
@@ -682,7 +683,7 @@ class AdminStudentProfileService
                             }
                         }
                     }
-                    $seenNotas[$rid] = true;
+                    $seenNotas[$chaveCat] = true;
                     $boletimEventosNotas[] = [
                         'id' => $rid,
                         'nome' => (string) ($full['nome'] ?? ''),
@@ -695,7 +696,6 @@ class AdminStudentProfileService
                         'ano_letivo' => isset($full['ano_letivo']) && $full['ano_letivo'] !== null ? (int) $full['ano_letivo'] : null,
                     ];
                 }
-            }
 
             // Fallback final de segurança: evita tela vazia por qualquer inconsistência
             // de parse/filtro de série; mostra eventos "notas" visíveis para coordenação
