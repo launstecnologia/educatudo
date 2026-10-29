@@ -115,7 +115,8 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
             'professor_alunos' => \App\Core\LayoutHelper::get('module_professor_alunos', '1') === '1',
             'professor_planos_aula' => \App\Core\LayoutHelper::get('module_professor_planos_aula', '1') === '1',
             'professor_jornadas' => \App\Core\LayoutHelper::get('module_professor_jornadas', '1') === '1',
-            'professor_provas' => \App\Core\LayoutHelper::get('module_professor_provas', '1') === '1',
+            'professor_provas' => \App\Core\LayoutHelper::get('module_professor_provas', '1') === '1'
+                || \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos'),
             'professor_redacao_configuravel' => \App\Core\LayoutHelper::get('module_redacao_configuravel', '1') === '1' && \App\Core\LayoutHelper::get('module_professor_redacao_configuravel', '1') === '1',
             'professor_redacao_livre' => \App\Core\LayoutHelper::get('module_professor_redacao_livre', '0') === '1',
             'professor_gerar_slides' => \App\Core\LayoutHelper::isModuleEnabled('professor_gerar_slides'),

@@ -1116,10 +1116,25 @@ class LayoutHelper
      */
     public static function isModuleEnabled($module)
     {
-        if (self::getModuleStatus($module) !== '1') {
+        $module = (string) $module;
+        $ligado = self::getModuleStatus($module) === '1'
+            || self::provaOnlineAcompanhaEventoAvaliativo($module);
+        if (!$ligado) {
             return false;
         }
-        return !self::moduloBloqueadoPorTudiCoins((string) $module);
+        return !self::moduloBloqueadoPorTudiCoins($module);
+    }
+
+    /**
+     * Eventos Avaliativos usa a Prova Online para o aluno fazer a prova e para o professor lançar.
+     * Com o modelo novo ligado, a Prova Online entra junto, mesmo se a chave antiga estiver desligada.
+     */
+    private static function provaOnlineAcompanhaEventoAvaliativo(string $module): bool
+    {
+        if ($module !== 'aluno_provas' && $module !== 'professor_provas') {
+            return false;
+        }
+        return self::getModuleStatus('eventos_avaliativos') === '1';
     }
 
     /**

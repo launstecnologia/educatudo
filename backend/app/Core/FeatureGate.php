@@ -149,6 +149,9 @@ class FeatureGate
     {
         // Rotas passam 'ai_agents' / 'gerar_slides'; layout Master usa professor_* .
         $layoutKey = strpos($module, 'professor_') === 0 ? $module : ('professor_' . $module);
+        if ($module === 'provas' && LayoutHelper::isModuleEnabled('eventos_avaliativos')) {
+            return !LayoutHelper::moduloBloqueadoPorTudiCoins('professor_provas');
+        }
         if (LayoutHelper::moduloBloqueadoPorTudiCoins($layoutKey)) {
             return false;
         }
