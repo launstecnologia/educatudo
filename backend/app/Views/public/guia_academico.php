@@ -53,7 +53,7 @@ $totalGuia = count($etapasGuia);
 </head>
 <body class="guia">
 <a class="guia-pular" href="#guia-conteudo">Pular para as instruções</a>
-<header class="guia-cabecalho"><div><img class="guia-marca" src="<?= $e(URL) ?>/assets/guia-onboarding/logo-educatudo-black.png" alt="EducaTudo — Educação para o futuro agora!" width="4544" height="728"><span class="guia-selo">Guia acadêmico</span></div></header>
+<header class="guia-cabecalho"><div><img class="guia-marca" src="<?= $e(URL) ?>/assets/logos/logo-educatudo-black.png" alt="EducaTudo — Educação para o futuro agora!" width="4544" height="728"><span class="guia-selo">Guia acadêmico</span></div></header>
 <div class="guia-layout">
 <aside class="guia-menu" aria-label="Índice do guia">
     <h2>Etapas da implantação</h2>
