@@ -149,11 +149,11 @@
 
     function linkAcao(url, rotulo) {
         if (!url) return '';
-        return '<a class="text-xs font-medium text-accent hover:underline" href="' + esc(href(url)) + '">' + esc(rotulo) + '</a>';
+        return '<a class="shrink-0 text-xs font-medium text-accent hover:underline" href="' + esc(href(url)) + '">' + esc(rotulo) + '</a>';
     }
 
     function titulo(t, extra) {
-        return '<div class="flex items-center justify-between gap-3 mb-4"><h3 class="text-sm font-semibold text-slate-900">' +
+        return '<div class="mb-4 flex min-w-0 items-center justify-between gap-3"><h3 class="min-w-0 truncate text-sm font-semibold text-slate-900">' +
             esc(t) + '</h3>' + (extra || '') + '</div>';
     }
 
@@ -256,15 +256,14 @@
             var legenda = chaves.map(function (k) {
                 var n = Number(buckets[k] || 0);
                 var pct = total > 0 ? Math.round((n / total) * 100) : 0;
-                return '<li class="flex items-center justify-between gap-2 text-sm">' +
-                    '<span class="flex items-center gap-2 min-w-0 text-slate-600"><span class="h-2.5 w-2.5 rounded-full" style="background:' + (coresSit[k] || '#cbd5e1') + '"></span>' +
-                    esc(rotulos[k] || k) + '</span>' +
+                return '<li class="flex min-w-0 items-center gap-2 text-sm">' +
+                    '<span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:' + (coresSit[k] || '#cbd5e1') + '"></span>' +
+                    '<span class="min-w-0 truncate text-slate-600">' + esc(rotulos[k] || k) + '</span>' +
                     '<span class="shrink-0 text-slate-500">' + pct + '% <span class="text-slate-400">(' + fmtNum(n) + ')</span></span></li>';
             }).join('');
             sit.innerHTML = titulo('Situação dos alunos', link) +
-                '<div class="flex items-center gap-2">' +
-                '<div class="relative h-44 w-44 shrink-0"><canvas id="dash-sit-chart"></canvas></div>' +
-                '<ul class="flex-1 space-y-2">' + legenda + '</ul></div>' +
+                '<div class="relative mx-auto" style="height:132px;width:132px"><canvas id="dash-sit-chart"></canvas></div>' +
+                '<ul class="mt-3 space-y-2">' + legenda + '</ul>' +
                 (data.nota ? '<p class="mt-3 text-xs text-slate-400">' + esc(data.nota) + '</p>' : '');
             desenharSituacao(buckets, rotulos, total, chaves);
             }
@@ -501,13 +500,13 @@
                   '<span class="text-base font-bold leading-none">' + esc(dt.dia) + '</span>' +
                   '<span class="text-[10px] uppercase tracking-wide">' + esc(dt.mes) + '</span></div>'
                 : '';
-            return '<li class="flex items-center gap-3 py-2">' + badge +
-                '<div class="min-w-0"><p class="truncate text-sm font-medium text-slate-800">' + esc(e.titulo) + '</p>' +
-                '<p class="text-xs text-slate-400">' + esc(detalhe || fmtData(e.data)) + '</p></div></li>';
+            return '<li class="flex min-w-0 items-start gap-3 py-2">' + badge +
+                '<div class="min-w-0 flex-1"><p class="text-sm font-medium text-slate-800" style="overflow-wrap:anywhere">' + esc(e.titulo) + '</p>' +
+                '<p class="text-xs text-slate-400" style="overflow-wrap:anywhere">' + esc(detalhe || fmtData(e.data)) + '</p></div></li>';
         }).join('');
         var link = linkAcao(data.href_letivo || data.href_escolar, 'Ver calendário');
         el.innerHTML = titulo('Próximos eventos', link) +
-            (itens ? '<ul>' + itens + '</ul>' : vazio('Nenhum evento próximo.'));
+            (itens ? '<ul class="pr-1" style="max-height:220px;overflow-y:auto">' + itens + '</ul>' : vazio('Nenhum evento próximo.'));
     }
 
     function renderMatriculas(el, data) {

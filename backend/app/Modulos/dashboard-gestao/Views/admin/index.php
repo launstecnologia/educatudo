@@ -14,7 +14,7 @@ $alertasNovos = $alertas_novos ?? null;
 $aulasOnline = is_array($aulas_online ?? null) ? $aulas_online : [];
 
 $tem = static fn (string $k): bool => in_array($k, $widgets, true);
-$card = 'bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5';
+$card = 'bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 min-w-0';
 $selectPill = 'bg-transparent border-0 text-sm font-semibold text-gray-900 py-1 pl-1 pr-7 focus:outline-none focus:ring-0 cursor-pointer';
 
 $filtrosExtrasAtivos = ((int) ($filtro['curso_id'] ?? 0) > 0)
@@ -168,7 +168,7 @@ $rotuloPeriodo = (string) (\App\Core\PeriodoLetivo::doAno($anoDash)['rotulo_camp
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
         <?php if ($tem('desempenho')): ?>
         <div id="dash-slot-distribuicao" class="<?= $card ?> min-h-[280px]"><?php include __DIR__ . '/_skeleton_bloco.php'; ?></div>
-        <div id="dash-slot-situacao" class="<?= $card ?> min-h-[280px]"><?php include __DIR__ . '/_skeleton_bloco.php'; ?></div>
+        <div id="dash-slot-situacao" class="<?= $card ?> self-start"><?php include __DIR__ . '/_skeleton_bloco.php'; ?></div>
         <?php endif; ?>
         <?php if ($tem('frequencia_hoje')): ?>
         <div data-widget="frequencia_hoje" class="<?= $card ?> min-h-[280px] <?= $tem('desempenho') ? '' : 'lg:col-span-3' ?>"><?php include __DIR__ . '/_skeleton_bloco.php'; ?></div>
@@ -178,17 +178,26 @@ $rotuloPeriodo = (string) (\App\Core\PeriodoLetivo::doAno($anoDash)['rotulo_camp
 
     <?php
     $blocoInferior = ($tem('atencao_pedagogica') ? 1 : 0) + ($tem('calendario') ? 1 : 0) + ($tem('ocorrencias') ? 1 : 0);
+    $atencaoLarga = $tem('atencao_pedagogica') && $blocoInferior > 1;
+    $empilharLado = $atencaoLarga && $tem('calendario') && $tem('ocorrencias');
     ?>
     <?php if ($blocoInferior > 0): ?>
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4">
         <?php if ($tem('atencao_pedagogica')): ?>
-        <div data-widget="atencao_pedagogica" class="<?= $card ?> min-h-[280px] <?= $blocoInferior === 1 ? 'xl:col-span-3' : '' ?>"><?php include __DIR__ . '/_skeleton_bloco.php'; ?></div>
+        <div data-widget="atencao_pedagogica" class="<?= $card ?> min-h-[280px] <?= $blocoInferior === 1 ? 'xl:col-span-3' : 'xl:col-span-2' ?>"><?php include __DIR__ . '/_skeleton_bloco.php'; ?></div>
         <?php endif; ?>
+        <?php if ($empilharLado): ?>
+        <div class="flex min-w-0 flex-col gap-4">
+            <div data-widget="calendario" class="<?= $card ?> self-start"><?php include __DIR__ . '/_skeleton_bloco.php'; ?></div>
+            <div data-widget="ocorrencias" class="<?= $card ?> min-h-[140px]"><?php include __DIR__ . '/_skeleton_bloco.php'; ?></div>
+        </div>
+        <?php else: ?>
         <?php if ($tem('calendario')): ?>
         <div data-widget="calendario" class="<?= $card ?> min-h-[280px]"><?php include __DIR__ . '/_skeleton_bloco.php'; ?></div>
         <?php endif; ?>
         <?php if ($tem('ocorrencias')): ?>
         <div data-widget="ocorrencias" class="<?= $card ?> min-h-[280px]"><?php include __DIR__ . '/_skeleton_bloco.php'; ?></div>
+        <?php endif; ?>
         <?php endif; ?>
     </div>
     <?php endif; ?>
@@ -221,7 +230,7 @@ $rotuloPeriodo = (string) (\App\Core\PeriodoLetivo::doAno($anoDash)['rotulo_camp
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-<script src="<?= URL ?>/public/static/js/dashboard-gestao.js?v=6"></script>
+<script src="<?= URL ?>/public/static/js/dashboard-gestao.js?v=9"></script>
 <script>
 (() => {
     const countEl = document.getElementById('alunos-online-count');

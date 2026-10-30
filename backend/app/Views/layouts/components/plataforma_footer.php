@@ -16,8 +16,8 @@ $ocultarFooter = !empty($plataforma_footer_oculto);
 <footer class="plataforma-footer" role="contentinfo">
     <div class="plataforma-footer-grid">
         <div class="plataforma-footer-esquerda">
-            <img src="<?= htmlspecialchars($logoEducatudo) ?>" alt="Educatudo" class="plataforma-footer-logo-educatudo" width="92" height="20" loading="lazy">
-            <span>© <?= $anoFooter ?> Educatudo. Todos os direitos reservados.</span>
+            <img src="<?= htmlspecialchars($logoEducatudo) ?>" alt="Educatudo" class="plataforma-footer-logo-educatudo" width="104" height="22" loading="lazy">
+            <span class="plataforma-footer-copy">© <?= $anoFooter ?> Educatudo. Todos os direitos reservados.</span>
         </div>
 
         <nav class="plataforma-footer-centro" aria-label="Documentos legais">
@@ -27,9 +27,9 @@ $ocultarFooter = !empty($plataforma_footer_oculto);
         </nav>
 
         <div class="plataforma-footer-direita">
-            <span>Desenvolvido por</span>
+            <span class="plataforma-footer-credito">Desenvolvido por</span>
             <a href="https://www.launs.com.br" target="_blank" rel="noopener noreferrer" class="plataforma-footer-launs-link" title="Launs">
-                <img src="<?= htmlspecialchars($logoLauns) ?>" alt="Launs" class="plataforma-footer-logo-launs" width="72" height="16" loading="lazy">
+                <img src="<?= htmlspecialchars($logoLauns) ?>" alt="Launs" class="plataforma-footer-logo-launs" width="78" height="18" loading="lazy">
             </a>
         </div>
     </div>
@@ -64,38 +64,51 @@ $ocultarFooter = !empty($plataforma_footer_oculto);
 .plataforma-footer {
     flex-shrink: 0;
     margin-top: auto;
-    background: #F8FAFC;
-    border-top: 1px solid #E2E8F0;
-    min-height: 64px;
-    padding: 12px 24px;
-    color: #64748B;
-    font-size: 12.5px;
-    line-height: 1.4;
+    background: #fff;
+    border-top: 1px solid #e2e8f0;
+    padding: 14px 28px;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.35;
 }
 
 .plataforma-footer-grid {
     width: 100%;
-    min-height: 40px;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
-    gap: 12px 24px;
+    gap: 16px 28px;
 }
 
 .plataforma-footer-esquerda,
 .plataforma-footer-direita {
     display: flex;
-    align-items: center;
-    gap: 10px;
     min-width: 0;
 }
 
 .plataforma-footer-esquerda {
+    flex-direction: column;
+    align-items: flex-start;
     justify-self: start;
+    gap: 6px;
+}
+
+.plataforma-footer-copy {
+    color: #94a3b8;
+    font-size: 12px;
 }
 
 .plataforma-footer-direita {
+    flex-direction: column;
+    align-items: flex-end;
     justify-self: end;
+    gap: 4px;
+}
+
+.plataforma-footer-credito {
+    color: #94a3b8;
+    font-size: 11px;
+    letter-spacing: 0.01em;
 }
 
 .plataforma-footer-centro {
@@ -104,35 +117,47 @@ $ocultarFooter = !empty($plataforma_footer_oculto);
     flex-wrap: wrap;
     align-items: center;
     justify-content: center;
-    gap: 8px 18px;
+    gap: 6px 0;
+}
+
+.plataforma-footer-centro a:not(:last-child)::after {
+    content: "";
+    display: inline-block;
+    width: 3px;
+    height: 3px;
+    margin: 0 12px;
+    border-radius: 999px;
+    background: #cbd5e1;
+    vertical-align: middle;
 }
 
 .plataforma-footer-logo-educatudo,
 .plataforma-footer-logo-launs {
     display: block;
     width: auto;
-    max-width: 110px;
     object-fit: contain;
     flex-shrink: 0;
 }
 
 .plataforma-footer-logo-educatudo {
-    height: 20px;
+    height: 22px;
+    max-width: 120px;
 }
 
 .plataforma-footer-logo-launs {
-    height: 16px;
+    height: 18px;
+    max-width: 88px;
 }
 
 .plataforma-footer a {
-    color: #64748B;
+    color: #475569;
     text-decoration: none;
     transition: color 0.15s ease;
 }
 
 .plataforma-footer a:hover,
 .plataforma-footer a:focus-visible {
-    color: #0b5ed7;
+    color: #0f172a;
 }
 
 .plataforma-footer a:focus-visible {
@@ -175,6 +200,7 @@ $ocultarFooter = !empty($plataforma_footer_oculto);
     .plataforma-footer-centro {
         justify-self: center;
         justify-content: center;
+        align-items: center;
         flex-wrap: wrap;
         order: 0;
         grid-column: auto;
