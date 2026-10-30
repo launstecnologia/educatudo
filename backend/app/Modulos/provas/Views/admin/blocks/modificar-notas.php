@@ -115,7 +115,7 @@ $formatarNota = static function ($valor): string {
                         <?php endif; ?>
                         <div class="font-normal normal-case"><?= htmlspecialchars(number_format((float) $questao['valor'], 1, ',', '.')) ?> pt</div>
                         <?php if (!empty($questao['invalidada'])): ?>
-                        <div class="mt-1 text-[11px] font-semibold text-violet-700 normal-case">Invalidada</div>
+                        <div class="mt-1 text-[11px] font-semibold text-violet-700 normal-case">Questão inválida</div>
                         <?php elseif ($podeAlterar): ?>
                         <button type="button"
                                 class="mt-1 text-[11px] font-semibold text-indigo-700 hover:text-indigo-900 normal-case"
@@ -180,9 +180,9 @@ $formatarNota = static function ($valor): string {
                     ?>
                     <td class="px-2 py-3 text-center">
                         <?php if (!empty($questao['invalidada'])): ?>
-                        <span class="inline-flex flex-col items-center px-2 py-1 rounded-lg bg-violet-50 text-violet-800 text-xs font-semibold" title="Questão invalidada: vale o ponto para todos">
+                        <span class="inline-flex flex-col items-center px-2 py-1 rounded-lg bg-violet-50 text-violet-800 text-xs font-semibold" title="Questão inválida: não entra em acertos, erros nem na nota">
                             <?php if (!empty($resp['letra'])): ?><span><?= htmlspecialchars((string) $resp['letra']) ?></span><?php endif; ?>
-                            Invalidada
+                            Questão inválida
                         </span>
                         <?php elseif (!empty($aluno['editavel'])): ?>
                         <button type="button"
@@ -361,13 +361,13 @@ $formatarNota = static function ($valor): string {
             if (row.dataset.editavel !== '1') return;
             var nota = 0;
             var acertos = 0;
+            var questoesValidas = 0;
             questoes.forEach(function (th) {
-                var valor = parseFloat(th.dataset.valor || '0');
                 if (th.dataset.invalidada === '1') {
-                    nota += valor;
-                    acertos += 1;
                     return;
                 }
+                questoesValidas += 1;
+                var valor = parseFloat(th.dataset.valor || '0');
                 var btn = row.querySelector('.mn-toggle[data-questao="' + th.dataset.mnQuestao + '"]');
                 if (!btn) return;
                 var atual = btn.dataset.atual;
@@ -402,7 +402,7 @@ $formatarNota = static function ($valor): string {
                 notaEl.classList.remove('text-amber-800');
             }
             if (acertosEl) {
-                acertosEl.textContent = acertos + '/' + questoes.length + ' acertos';
+                acertosEl.textContent = acertos + '/' + questoesValidas + ' acertos';
             }
         });
     }

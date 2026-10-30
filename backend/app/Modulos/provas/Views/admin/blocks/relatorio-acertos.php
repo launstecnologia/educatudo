@@ -228,7 +228,7 @@ foreach ($stats as $s) {
                         <th class="celula-q" data-questao-id="<?= (int)$q['id'] ?>" title="Clique para ver a questão">
                             <?= $qi + 1 ?>
                             <?php if (!empty($q['invalidada'])): ?>
-                                <span class="ml-1 text-[10px] text-amber-700 font-bold" title="Questão invalidada">INV</span>
+                                <span class="block text-[10px] text-amber-700 font-bold leading-tight" title="Não entra em acertos nem na quantidade">inválida</span>
                             <?php endif; ?>
                         </th>
                     <?php endforeach; ?>
@@ -242,7 +242,11 @@ foreach ($stats as $s) {
                         $st = $stats[$q['id']] ?? ['acertos' => 0, 'total' => 0];
                         $pct = $st['total'] > 0 ? round(100 * $st['acertos'] / $st['total']) : 0;
                         ?>
+                        <?php if (!empty($q['invalidada'])): ?>
+                        <td title="Questão inválida">—</td>
+                        <?php else: ?>
                         <td title="<?= $st['acertos'] ?>/<?= $st['total'] ?> acertos"><?= $pct ?>%</td>
+                        <?php endif; ?>
                     <?php endforeach; ?>
                 <?php endforeach; ?>
             </tr>
@@ -256,7 +260,9 @@ foreach ($stats as $s) {
                     <?php foreach ($mat['questoes'] as $q): ?>
                         <?php
                         $resp = $al['respostas'][$q['id']] ?? null;
-                        if ($resp === null): ?>
+                        if (!empty($q['invalidada']) || !empty($resp['invalidada'])): ?>
+                            <td class="celula-dash" title="Questão inválida">inválida</td>
+                        <?php elseif ($resp === null): ?>
                             <td class="celula-dash">-</td>
                         <?php elseif ($resp['correta']): ?>
                             <td class="celula-1" data-questao-id="<?= (int)$q['id'] ?>" data-aluno-id="<?= (int)$al['id'] ?>" data-alt-id="<?= (int)($resp['alternativa_id'] ?? 0) ?>">1</td>

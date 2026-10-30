@@ -92,14 +92,17 @@ if (!class_exists('LayoutHelper')) {
                             echo $tipos[$questao['tipo']] ?? $questao['tipo'];
                             ?>
                             <?php if (!empty($questao['invalidada'])): ?>
-                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">Invalidada</span>
+                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">Questão inválida</span>
                             <?php endif; ?>
                         </h4>
                         <?php if (!empty($isAdmin)): ?>
                             <button type="button"
                                     class="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-semibold <?= !empty($questao['invalidada']) ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-amber-600 hover:bg-amber-700 text-white' ?>"
                                     title="<?= !empty($questao['invalidada']) ? 'Revalidar questão' : 'Invalidar questão' ?>"
-                                    onclick="abrirModalInvalidacaoQuestao(<?= (int)$questao['id'] ?>, <?= !empty($questao['invalidada']) ? 'true' : 'false' ?>, <?= json_encode((string)($questao['observacao_invalidacao'] ?? ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>)">
+                                    data-questao-id="<?= (int) $questao['id'] ?>"
+                                    data-invalidada="<?= !empty($questao['invalidada']) ? '1' : '0' ?>"
+                                    data-observacao="<?= htmlspecialchars((string) ($questao['observacao_invalidacao'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                                    onclick="abrirModalInvalidacaoQuestao(this)">
                                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 3c-.77-1.33-2.69-1.33-3.46 0L3.2 16c-.77 1.33.19 3 1.73 3z"></path>
                                 </svg>
@@ -207,7 +210,7 @@ if (!class_exists('LayoutHelper')) {
             </div>
             <div class="mb-4">
                 <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-                    Ao invalidar, esta questão será marcada como <strong>certa para todos os alunos</strong>, e as notas serão recalculadas.
+                    A questão <strong>sai da prova</strong>. Não conta como acerto, não conta como erro e não entra na quantidade de questões. Na coordenação ela aparece como questão inválida.
                 </div>
             </div>
             <div class="flex justify-end space-x-3">
@@ -580,14 +583,26 @@ if (modalRemoverEl) {
 
 let questaoInvalidacaoAtual = { id: 0, invalidada: false };
 
-function abrirModalInvalidacaoQuestao(questaoId, invalidada, observacaoAtual) {
-    questaoInvalidacaoAtual = { id: parseInt(questaoId || 0, 10), invalidada: !!invalidada };
-    document.getElementById('motivoInvalidacaoQuestao').value = (observacaoAtual || '');
+function mostrarModalInvalidacao(modal) {
+    if (!modal) return;
+    if (modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+    }
+    modal.classList.remove('hidden');
+    modal.style.display = 'block';
+}
+
+function abrirModalInvalidacaoQuestao(botao) {
+    const questaoId = parseInt(botao.getAttribute('data-questao-id') || '0', 10);
+    const invalidada = botao.getAttribute('data-invalidada') === '1';
+    const observacaoAtual = botao.getAttribute('data-observacao') || '';
+    questaoInvalidacaoAtual = { id: questaoId, invalidada: invalidada };
+    document.getElementById('motivoInvalidacaoQuestao').value = observacaoAtual;
     document.getElementById('senhaInvalidacaoQuestao').value = '';
     document.getElementById('tituloModalInvalidar').textContent = invalidada ? 'Revalidar questão' : 'Invalidar questão';
     document.getElementById('textoModalInvalidar').textContent = invalidada
         ? 'Informe o motivo da revalidação e confirme com sua senha.'
-        : 'Ao invalidar, a questão será marcada como certa para todos os alunos.';
+        : 'A questão sai da quantidade de questões. Não conta como acerto nem como erro.';
     const btn = document.getElementById('btnConfirmarInvalidacaoQuestao');
     btn.textContent = invalidada ? 'Continuar revalidação' : 'Continuar';
     btn.className = invalidada
@@ -596,8 +611,8 @@ function abrirModalInvalidacaoQuestao(questaoId, invalidada, observacaoAtual) {
     const modalPasso1 = document.getElementById('modalInvalidarQuestao');
     const modalPasso2 = document.getElementById('modalSenhaInvalidarQuestao');
     modalPasso2.classList.add('hidden');
-    modalPasso1.classList.remove('hidden');
-    modalPasso1.style.display = 'block';
+    modalPasso2.style.display = 'none';
+    mostrarModalInvalidacao(modalPasso1);
 }
 
 function avancarSenhaInvalidacaoQuestao() {
@@ -608,17 +623,13 @@ function avancarSenhaInvalidacaoQuestao() {
     }
     document.getElementById('modalInvalidarQuestao').classList.add('hidden');
     document.getElementById('modalInvalidarQuestao').style.display = 'none';
-    const modalPasso2 = document.getElementById('modalSenhaInvalidarQuestao');
-    modalPasso2.classList.remove('hidden');
-    modalPasso2.style.display = 'block';
+    mostrarModalInvalidacao(document.getElementById('modalSenhaInvalidarQuestao'));
 }
 
 function voltarModalInvalidacaoQuestao() {
     document.getElementById('modalSenhaInvalidarQuestao').classList.add('hidden');
     document.getElementById('modalSenhaInvalidarQuestao').style.display = 'none';
-    const modalPasso1 = document.getElementById('modalInvalidarQuestao');
-    modalPasso1.classList.remove('hidden');
-    modalPasso1.style.display = 'block';
+    mostrarModalInvalidacao(document.getElementById('modalInvalidarQuestao'));
 }
 
 function fecharModalInvalidacaoQuestao() {
@@ -647,7 +658,7 @@ function confirmarInvalidacaoQuestao() {
 
     const invalidar = !questaoInvalidacaoAtual.invalidada;
     const msgConfirm = invalidar
-        ? 'Confirmar invalidação desta questão? Ela contará como certa para todos os alunos.'
+        ? 'Confirmar invalidação desta questão? Ela deixa de contar como acerto, como erro e na quantidade de questões.'
         : 'Confirmar revalidação desta questão? As notas serão recalculadas.';
     if (!confirm(msgConfirm)) {
         return;

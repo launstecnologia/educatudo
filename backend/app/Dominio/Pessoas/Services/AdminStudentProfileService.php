@@ -1022,12 +1022,19 @@ class AdminStudentProfileService
             if ($hasQtdAcertos) { $acertosParts[] = "pr.qtd_acertos"; }
             if ($hasProvasRespostasCorreta) { $acertosParts[] = "(SELECT COUNT(*) FROM provas_respostas prs WHERE prs.prova_id = pr.prova_id AND prs.aluno_id = pr.aluno_id AND prs.correta = 1)"; }
             $acertosExpr = !empty($acertosParts) ? "COALESCE(" . implode(", ", $acertosParts) . ", 0)" : "0";
+            $invalidasExpr = "0";
+            if ($this->temColuna('provas_questoes', 'invalidada')) {
+                $qtdExpr = "(SELECT COUNT(*) FROM provas_questoes pq WHERE pq.prova_id = pr.prova_id AND COALESCE(pq.invalidada, 0) = 0)";
+                $acertosExpr = "(SELECT COUNT(*) FROM provas_respostas prs INNER JOIN provas_questoes pq ON pq.id = prs.questao_id AND COALESCE(pq.invalidada, 0) = 0 WHERE prs.prova_id = pr.prova_id AND prs.aluno_id = pr.aluno_id AND prs.correta = 1)";
+                $invalidasExpr = "(SELECT COUNT(*) FROM provas_questoes pq WHERE pq.prova_id = pr.prova_id AND COALESCE(pq.invalidada, 0) = 1)";
+            }
 
             $sqlProvasAlunoComBloco =
                 "SELECT pr.id, pr.prova_id, pr.nota, pr.iniciado_em, pr.status, p.titulo as prova_titulo,
                         {$materiaExpr} as prova_materia,
                         {$qtdExpr} as prova_total_questoes,
                         {$acertosExpr} as prova_acertos,
+                        {$invalidasExpr} as prova_questoes_invalidas,
                         pb.id as bloco_id,
                         pb.bloco_modelo_id as bloco_modelo_id,
                         pbm.nome as bloco_modelo_nome,
@@ -1053,6 +1060,7 @@ class AdminStudentProfileService
                         {$materiaExpr} as prova_materia,
                         {$qtdExpr} as prova_total_questoes,
                         {$acertosExpr} as prova_acertos,
+                        {$invalidasExpr} as prova_questoes_invalidas,
                         NULL as bloco_id,
                         NULL as bloco_modelo_id,
                         NULL as bloco_modelo_nome,

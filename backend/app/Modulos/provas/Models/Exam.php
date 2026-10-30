@@ -302,12 +302,16 @@ class Exam
      */
     public function getContagemAcertosErros($provaId, $alunoId)
     {
+        $filtroValida = $this->hasColunaInvalidadaEmQuestoes()
+            ? ' AND COALESCE(q.invalidada, 0) = 0'
+            : '';
         $row = $this->db->fetch(
-            "SELECT 
-                SUM(CASE WHEN correta = 1 THEN 1 ELSE 0 END) as acertos,
-                SUM(CASE WHEN correta = 0 THEN 1 ELSE 0 END) as erros
-             FROM provas_respostas 
-             WHERE prova_id = :prova_id AND aluno_id = :aluno_id",
+            "SELECT
+                SUM(CASE WHEN r.correta = 1 THEN 1 ELSE 0 END) as acertos,
+                SUM(CASE WHEN r.correta = 0 THEN 1 ELSE 0 END) as erros
+             FROM provas_respostas r
+             LEFT JOIN provas_questoes q ON q.id = r.questao_id
+             WHERE r.prova_id = :prova_id AND r.aluno_id = :aluno_id{$filtroValida}",
             ['prova_id' => $provaId, 'aluno_id' => $alunoId]
         );
         return [
@@ -1113,9 +1117,9 @@ class Exam
         $pontuacao = 0.00;
         
         if ((int)($questao['invalidada'] ?? 0) === 1) {
-            // Questão invalidada: aluno ganha o ponto integral independentemente da resposta.
-            $correta = 1;
-            $pontuacao = (float) ($questao['valor'] ?? 0);
+            // Questão inválida fica fora da nota. A resposta é guardada, mas não vale ponto nem erro.
+            $correta = null;
+            $pontuacao = 0.00;
         } elseif ($questao['tipo'] === 'multipla_escolha' && $alternativaId) {
             $alternativa = $this->db->fetch(
                 "SELECT * FROM provas_alternativas WHERE id = :id",
@@ -1207,7 +1211,7 @@ class Exam
                 throw new \Exception('Prova foi cancelada; não é possível finalizar');
             }
             
-            // Calcula nota total considerando questões invalidadas (valem para todos os alunos).
+            // Nota só com as questões que continuam valendo. A inválida sai da conta.
             $notaTotal = $this->calcularNotaComQuestoesInvalidas($provaId, $alunoId);
             
             // Busca prova para pegar valor_total
@@ -1309,7 +1313,9 @@ class Exam
     }
 
     /**
-     * Calcula nota final da prova considerando questão invalidada como ponto para todos.
+     * Nota só das questões válidas. A inválida não entra no ponto nem no total.
+     * Se alguma foi invalidada, a nota das demais é reescalada para o valor da prova,
+     * como se a questão inválida não existisse.
      */
     private function calcularNotaComQuestoesInvalidas($provaId, $alunoId): float
     {
@@ -1324,14 +1330,11 @@ class Exam
             return (float) ($rowLegado['nota'] ?? 0);
         }
 
-        // Placeholders posicionais (?) evitam HY093 com :prova_id repetido no PDO MySQL.
         $row = $this->db->fetch(
-            "SELECT COALESCE(SUM(
-                        CASE
-                            WHEN COALESCE(q.invalidada, 0) = 1 THEN COALESCE(q.valor, 0)
-                            ELSE COALESCE(r.pontuacao, 0)
-                        END
-                    ), 0) AS nota
+            "SELECT
+                COALESCE(SUM(CASE WHEN COALESCE(q.invalidada, 0) = 1 THEN 0 ELSE COALESCE(r.pontuacao, 0) END), 0) AS pontos,
+                COALESCE(SUM(CASE WHEN COALESCE(q.invalidada, 0) = 0 THEN COALESCE(q.valor, 0) ELSE 0 END), 0) AS valor_valido,
+                COALESCE(SUM(CASE WHEN COALESCE(q.invalidada, 0) = 1 THEN 1 ELSE 0 END), 0) AS qtd_invalidas
              FROM provas_questoes q
              LEFT JOIN provas_respostas r
                     ON r.questao_id = q.id
@@ -1341,7 +1344,20 @@ class Exam
             [$provaId, $alunoId, $provaId]
         );
 
-        return (float) ($row['nota'] ?? 0);
+        $pontos = (float) ($row['pontos'] ?? 0);
+        $valorValido = (float) ($row['valor_valido'] ?? 0);
+        $qtdInvalidas = (int) ($row['qtd_invalidas'] ?? 0);
+        if ($qtdInvalidas === 0 || $valorValido <= 0) {
+            return $pontos;
+        }
+
+        $prova = $this->findById($provaId);
+        $valorTotal = (float) (is_array($prova) ? ($prova['valor_total'] ?? 0) : 0);
+        if ($valorTotal <= 0) {
+            return $pontos;
+        }
+
+        return round(($pontos / $valorValido) * $valorTotal, 2);
     }
 
     private function hasColunaInvalidadaEmQuestoes(): bool
@@ -1410,19 +1426,7 @@ class Exam
                 );
             }
 
-            // Ajusta pontuação das respostas já marcadas para manter consistência do histórico.
-            if ($invalidar) {
-                $this->db->query(
-                    "UPDATE provas_respostas
-                     SET correta = 1,
-                         pontuacao = :valor
-                     WHERE questao_id = :questao_id",
-                    [
-                        'questao_id' => $questaoId,
-                        'valor' => (float) ($questao['valor'] ?? 0),
-                    ]
-                );
-            }
+            // A resposta original fica gravada. A questão inválida só sai da soma.
 
             // Recalcula nota de quem já finalizou a prova.
             $this->recalcularNotasFinalizadasDaProva((int) ($questao['prova_id'] ?? 0));
@@ -1562,24 +1566,44 @@ class Exam
      */
     public function getAlunosRealizacao($provaId)
     {
+        $ignorarInvalida = $this->hasColunaInvalidadaEmQuestoes();
+        $sqlAcertos = $ignorarInvalida
+            ? "SELECT COUNT(*)
+                        FROM provas_respostas r1
+                        LEFT JOIN provas_questoes q1 ON q1.id = r1.questao_id
+                        WHERE r1.prova_id = pr.prova_id
+                        AND r1.aluno_id = pr.aluno_id
+                        AND r1.correta = 1
+                        AND COALESCE(q1.invalidada, 0) = 0"
+            : "SELECT COUNT(*)
+                        FROM provas_respostas r1
+                        WHERE r1.prova_id = pr.prova_id
+                        AND r1.aluno_id = pr.aluno_id
+                        AND r1.correta = 1";
+        $sqlErros = $ignorarInvalida
+            ? "SELECT COUNT(*)
+                        FROM provas_respostas r2
+                        LEFT JOIN provas_questoes q2 ON q2.id = r2.questao_id
+                        WHERE r2.prova_id = pr.prova_id
+                        AND r2.aluno_id = pr.aluno_id
+                        AND r2.correta = 0
+                        AND COALESCE(q2.invalidada, 0) = 0"
+            : "SELECT COUNT(*)
+                        FROM provas_respostas r2
+                        WHERE r2.prova_id = pr.prova_id
+                        AND r2.aluno_id = pr.aluno_id
+                        AND r2.correta = 0";
+
         return $this->db->fetchAll(
             "SELECT pr.*, 
                     a.nome as aluno_nome,
                     a.ra as aluno_ra,
                     t.nome as turma_nome,
                     COALESCE((
-                        SELECT COUNT(*) 
-                        FROM provas_respostas r1
-                        WHERE r1.prova_id = pr.prova_id
-                        AND r1.aluno_id = pr.aluno_id
-                        AND r1.correta = 1
+                        {$sqlAcertos}
                     ), 0) as acertos,
                     COALESCE((
-                        SELECT COUNT(*)
-                        FROM provas_respostas r2
-                        WHERE r2.prova_id = pr.prova_id
-                        AND r2.aluno_id = pr.aluno_id
-                        AND r2.correta = 0
+                        {$sqlErros}
                     ), 0) as erros
              FROM provas_realizacoes pr
              LEFT JOIN alunos a ON pr.aluno_id = a.id

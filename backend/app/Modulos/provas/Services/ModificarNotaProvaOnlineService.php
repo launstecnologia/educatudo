@@ -171,7 +171,7 @@ class ModificarNotaProvaOnlineService
                     $qid = (int) $item['questao_id'];
                     $questao = $questoes[$qid];
                     if (!empty($questao['invalidada'])) {
-                        throw new \InvalidArgumentException('A questão ' . (int) $questao['numero'] . ' está invalidada e já vale ponto para todos.');
+                        throw new \InvalidArgumentException('A questão ' . (int) $questao['numero'] . ' está inválida e não entra na nota.');
                     }
                     $existente = $respostas[$alunoId][$qid] ?? null;
                     $antes = null;

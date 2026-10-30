@@ -134,20 +134,32 @@ $totalRegistrosNotas = count($provas_realizadas) + count($notas_lancamento_event
                                     </td>
                                     <?php foreach ($pmColunas as $col):
                                         $ck = $col['key'] ?? '';
-                                        $c = ($linha['celdas'][$ck] ?? []) + ['q' => 0, 'acertos' => 0, 'erros' => 0];
-                                        $vazio = ((int) ($c['q'] ?? 0)) <= 0 && ((int) ($c['acertos'] ?? 0)) <= 0 && ((int) ($c['erros'] ?? 0)) <= 0;
+                                        $c = ($linha['celdas'][$ck] ?? []) + ['q' => 0, 'acertos' => 0, 'erros' => 0, 'invalidas' => 0];
+                                        $inv = (int) ($c['invalidas'] ?? 0);
+                                        $vazio = ((int) ($c['q'] ?? 0)) <= 0 && ((int) ($c['acertos'] ?? 0)) <= 0 && ((int) ($c['erros'] ?? 0)) <= 0 && $inv <= 0;
                                     ?>
                                         <td class="border border-gray-300 px-1 py-1 text-green-700 font-medium"><?= $vazio ? '—' : (int) $c['acertos'] ?></td>
                                         <td class="border border-gray-300 px-1 py-1 text-red-700 font-medium"><?= $vazio ? '—' : (int) $c['erros'] ?></td>
-                                        <td class="border border-gray-300 px-1 py-1 text-gray-800"><?= $vazio ? '—' : (int) $c['q'] ?></td>
+                                        <td class="border border-gray-300 px-1 py-1 text-gray-800">
+                                            <?= $vazio ? '—' : (int) $c['q'] ?>
+                                            <?php if ($inv > 0): ?>
+                                                <div class="text-[10px] font-semibold text-amber-700 leading-tight" title="Não entra em acertos, erros nem na quantidade de questões"><?= $inv === 1 ? '1 questão inválida' : ((int) $inv . ' questões inválidas') ?></div>
+                                            <?php endif; ?>
+                                        </td>
                                     <?php endforeach; ?>
                                     <?php
-                                    $t = ($linha['totais'] ?? []) + ['q' => 0, 'acertos' => 0, 'erros' => 0];
-                                    $tVazio = ((int) $t['q']) <= 0 && ((int) $t['acertos']) <= 0 && ((int) $t['erros']) <= 0;
+                                    $t = ($linha['totais'] ?? []) + ['q' => 0, 'acertos' => 0, 'erros' => 0, 'invalidas' => 0];
+                                    $tInv = (int) ($t['invalidas'] ?? 0);
+                                    $tVazio = ((int) $t['q']) <= 0 && ((int) $t['acertos']) <= 0 && ((int) $t['erros']) <= 0 && $tInv <= 0;
                                     ?>
                                     <td class="border border-gray-300 px-1 py-1 text-green-700 font-semibold"><?= $tVazio ? '—' : (int) $t['acertos'] ?></td>
                                     <td class="border border-gray-300 px-1 py-1 text-red-700 font-semibold"><?= $tVazio ? '—' : (int) $t['erros'] ?></td>
-                                    <td class="border border-gray-300 px-1 py-1 text-gray-900 font-semibold"><?= $tVazio ? '—' : (int) $t['q'] ?></td>
+                                    <td class="border border-gray-300 px-1 py-1 text-gray-900 font-semibold">
+                                        <?= $tVazio ? '—' : (int) $t['q'] ?>
+                                        <?php if ($tInv > 0): ?>
+                                            <div class="text-[10px] font-semibold text-amber-700 leading-tight"><?= $tInv === 1 ? '1 questão inválida' : ((int) $tInv . ' questões inválidas') ?></div>
+                                        <?php endif; ?>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>

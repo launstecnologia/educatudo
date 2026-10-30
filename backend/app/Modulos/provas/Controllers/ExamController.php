@@ -5931,8 +5931,8 @@ class ExamController extends BaseController
             $this->json([
                 'success' => true,
                 'message' => $invalidar
-                    ? 'Questão invalidada e notas recalculadas.'
-                    : 'Questão revalidada e notas recalculadas.',
+                    ? 'Questão inválida. Ela saiu da quantidade de questões e não entra em acertos nem em erros.'
+                    : 'Questão revalidada. Acertos, erros e notas foram recalculados.',
             ]);
         } catch (\Exception $e) {
             error_log('Erro invalidarQuestao: ' . $e->getMessage());

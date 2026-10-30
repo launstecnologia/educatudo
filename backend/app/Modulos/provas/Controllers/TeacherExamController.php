@@ -1859,6 +1859,14 @@ class TeacherExamController extends BaseController
                 foreach ($mat['questoes'] as $q) {
                     $keyResp = $aluno['id'] . '_' . $q['id'];
                     $resp = $respostasMap[$keyResp] ?? null;
+                    if (!empty($q['invalidada'])) {
+                        $respostasAluno[$q['id']] = [
+                            'correta' => null,
+                            'invalidada' => true,
+                            'alternativa_id' => $resp['alternativa_id'] ?? null,
+                        ];
+                        continue;
+                    }
 
                     if ($resp) {
                         $acertou = (int)$resp['correta'];

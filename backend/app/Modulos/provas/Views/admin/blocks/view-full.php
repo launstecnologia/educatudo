@@ -125,7 +125,7 @@ function liberarProvaParaAluno(blocoId) {
                                             (<?= htmlspecialchars($questao['tipo'] === 'multipla_escolha' ? 'Múltipla Escolha' : ($questao['tipo'] === 'verdadeiro_falso' ? 'Verdadeiro/Falso' : 'Dissertativa')) ?>)
                                         </span>
                                         <?php if (!empty($questao['invalidada'])): ?>
-                                            <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">Invalidada</span>
+                                            <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">Questão inválida</span>
                                         <?php endif; ?>
                                     </h4>
                                 </div>

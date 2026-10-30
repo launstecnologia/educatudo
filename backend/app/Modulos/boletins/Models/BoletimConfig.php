@@ -4057,6 +4057,13 @@ class BoletimConfig
 
     public function getProvasFinalizadasByAlunoAndBloco(int $alunoId, int $blocoId, ?string $inicio, ?string $fim, ?int $materiaId = null): array
     {
+        $ignoraInvalida = $this->hasColumn('provas_questoes', 'invalidada');
+        $sqlTotalQuestoes = $ignoraInvalida
+            ? "(SELECT COUNT(*) FROM provas_questoes pq WHERE pq.prova_id = pr.prova_id AND COALESCE(pq.invalidada, 0) = 0)"
+            : "(SELECT COUNT(*) FROM provas_questoes pq WHERE pq.prova_id = pr.prova_id)";
+        $sqlAcertos = $ignoraInvalida
+            ? "(SELECT COUNT(DISTINCT rr.questao_id) FROM provas_respostas rr INNER JOIN provas_questoes pq ON pq.id = rr.questao_id AND COALESCE(pq.invalidada, 0) = 0 WHERE rr.prova_id = pr.prova_id AND rr.aluno_id = pr.aluno_id AND rr.correta = 1)"
+            : "(SELECT COUNT(DISTINCT rr.questao_id) FROM provas_respostas rr WHERE rr.prova_id = pr.prova_id AND rr.aluno_id = pr.aluno_id AND rr.correta = 1)";
         $sql = "SELECT
                     pr.prova_id,
                     pr.aluno_id,
@@ -4066,10 +4073,8 @@ class BoletimConfig
                     m.nome AS materia_nome,
                     p.titulo,
                     p.valor_total,
-                    (SELECT COUNT(*) FROM provas_questoes pq
-                      WHERE pq.prova_id = pr.prova_id) AS total_questoes,
-                    (SELECT COUNT(DISTINCT rr.questao_id) FROM provas_respostas rr
-                      WHERE rr.prova_id = pr.prova_id AND rr.aluno_id = pr.aluno_id AND rr.correta = 1) AS acertos
+                    {$sqlTotalQuestoes} AS total_questoes,
+                    {$sqlAcertos} AS acertos
                 FROM provas_realizacoes pr
                 INNER JOIN provas p ON p.id = pr.prova_id AND p.deleted_at IS NULL
                 LEFT JOIN materias m ON m.id = p.materia_id
@@ -4385,22 +4390,32 @@ class BoletimConfig
         }
         $phAlunos = implode(',', array_fill(0, count($alunoIds), '?'));
         $phProvas = implode(',', array_fill(0, count($provaIds), '?'));
-        $stats = $this->db->fetchAll(
-            "SELECT prova_id, aluno_id,
+        $ignoraInvalida = $this->hasColumn('provas_questoes', 'invalidada');
+        $sqlStats = $ignoraInvalida
+            ? "SELECT r.prova_id, r.aluno_id,
+                    COUNT(DISTINCT CASE WHEN COALESCE(q.invalidada, 0) = 0 THEN r.questao_id END) AS respondidas,
+                    COUNT(DISTINCT CASE WHEN r.correta = 1 AND COALESCE(q.invalidada, 0) = 0 THEN r.questao_id END) AS acertos
+             FROM provas_respostas r
+             LEFT JOIN provas_questoes q ON q.id = r.questao_id
+             WHERE r.aluno_id IN ($phAlunos) AND r.prova_id IN ($phProvas)
+             GROUP BY r.prova_id, r.aluno_id"
+            : "SELECT prova_id, aluno_id,
                     COUNT(DISTINCT questao_id) AS respondidas,
                     COUNT(DISTINCT CASE WHEN correta = 1 THEN questao_id END) AS acertos
              FROM provas_respostas
              WHERE aluno_id IN ($phAlunos) AND prova_id IN ($phProvas)
-             GROUP BY prova_id, aluno_id",
-            array_merge($alunoIds, $provaIds)
-        ) ?: [];
-        $tamanhos = $this->db->fetchAll(
-            "SELECT prova_id, COUNT(*) AS total_questoes
+             GROUP BY prova_id, aluno_id";
+        $stats = $this->db->fetchAll($sqlStats, array_merge($alunoIds, $provaIds)) ?: [];
+        $sqlTamanhos = $ignoraInvalida
+            ? "SELECT prova_id, COUNT(*) AS total_questoes
+             FROM provas_questoes
+             WHERE prova_id IN ($phProvas) AND COALESCE(invalidada, 0) = 0
+             GROUP BY prova_id"
+            : "SELECT prova_id, COUNT(*) AS total_questoes
              FROM provas_questoes
              WHERE prova_id IN ($phProvas)
-             GROUP BY prova_id",
-            $provaIds
-        ) ?: [];
+             GROUP BY prova_id";
+        $tamanhos = $this->db->fetchAll($sqlTamanhos, $provaIds) ?: [];
         $tamanhoPorProva = [];
         foreach ($tamanhos as $tam) {
             $pidTam = (int) ($tam['prova_id'] ?? 0);

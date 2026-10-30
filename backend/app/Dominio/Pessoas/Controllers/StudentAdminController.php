@@ -4274,6 +4274,7 @@ class StudentAdminController extends AdminBaseController
 
             $totalQ = (int) ($row['prova_total_questoes'] ?? 0);
             $acertos = (int) ($row['prova_acertos'] ?? 0);
+            $invalidas = (int) ($row['prova_questoes_invalidas'] ?? 0);
 
             $dataProvaBanco = $row['bloco_data_prova'] ?? null;
             $iniciado = $row['iniciado_em'] ?? null;
@@ -4337,10 +4338,11 @@ class StudentAdminController extends AdminBaseController
                 $grid[$mk] = [];
             }
             if (!isset($grid[$mk][$colKey])) {
-                $grid[$mk][$colKey] = ['q' => 0, 'acertos' => 0];
+                $grid[$mk][$colKey] = ['q' => 0, 'acertos' => 0, 'invalidas' => 0];
             }
             $grid[$mk][$colKey]['q'] += $totalQ;
             $grid[$mk][$colKey]['acertos'] += $acertos;
+            $grid[$mk][$colKey]['invalidas'] = (int) ($grid[$mk][$colKey]['invalidas'] ?? 0) + $invalidas;
         }
 
         uasort($colCandidates, function ($a, $b) {
@@ -4411,15 +4413,18 @@ class StudentAdminController extends AdminBaseController
                 $tAcertos = 0;
                 $tErros = 0;
                 $tQ = 0;
+                $tInvalidas = 0;
                 foreach ($colKeysOrd as $ck) {
-                    $c = $celdas[$ck] ?? ['q' => 0, 'acertos' => 0];
+                    $c = $celdas[$ck] ?? ['q' => 0, 'acertos' => 0, 'invalidas' => 0];
                     $q = (int) ($c['q'] ?? 0);
                     $a = (int) ($c['acertos'] ?? 0);
+                    $inv = (int) ($c['invalidas'] ?? 0);
                     $e = max(0, $q - $a);
-                    $linhaCelulas[$ck] = ['q' => $q, 'acertos' => $a, 'erros' => $e];
+                    $linhaCelulas[$ck] = ['q' => $q, 'acertos' => $a, 'erros' => $e, 'invalidas' => $inv];
                     $tAcertos += $a;
                     $tErros += $e;
                     $tQ += $q;
+                    $tInvalidas += $inv;
                 }
                 $materiasSaida[] = [
                     'materia_key' => $mk,
@@ -4429,6 +4434,7 @@ class StudentAdminController extends AdminBaseController
                         'acertos' => $tAcertos,
                         'erros' => $tErros,
                         'q' => $tQ,
+                        'invalidas' => $tInvalidas,
                     ],
                 ];
             }
@@ -4436,8 +4442,9 @@ class StudentAdminController extends AdminBaseController
             // Só matérias que tiveram prova neste bloco (Q > 0 nas colunas desta tabela).
             $materiasSaida = array_values(array_filter($materiasSaida, static function ($linha) {
                 $tQ = (int) (($linha['totais']['q'] ?? 0));
+                $tInv = (int) (($linha['totais']['invalidas'] ?? 0));
 
-                return $tQ > 0;
+                return $tQ > 0 || $tInv > 0;
             }));
 
             usort($materiasSaida, function ($a, $b) {
