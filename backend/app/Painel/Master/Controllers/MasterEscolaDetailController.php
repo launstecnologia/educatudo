@@ -407,7 +407,14 @@ class MasterEscolaDetailController extends BaseController
     }
 
 
-    private function syncLayoutToTenant(int $escolaId): void
+    /**
+     * Copia config_escolas_layout para o config_layout da escola.
+     * $apenasChaves limita a cópia. Sem isso, cor e logo antigos do Master
+     * sobrescrevem o visual que a escola já salvou no próprio banco.
+     *
+     * @param list<string>|null $apenasChaves
+     */
+    private function syncLayoutToTenant(int $escolaId, ?array $apenasChaves = null): void
     {
         $db = Database::getInstance();
         $layout = $this->getLayoutConfig($escolaId);
@@ -440,7 +447,22 @@ class MasterEscolaDetailController extends BaseController
             if (!$pdo) return;
         }
 
+        $permitidas = null;
+        if ($apenasChaves !== null) {
+            $permitidas = [];
+            foreach ($apenasChaves as $chave) {
+                $chave = (string) $chave;
+                if ($chave !== '') {
+                    $permitidas[$chave] = true;
+                }
+            }
+            $permitidas['tenant_slug'] = true;
+        }
+
         foreach ($layout as $config_key => $config_value) {
+            if ($permitidas !== null && !isset($permitidas[(string) $config_key])) {
+                continue;
+            }
             try {
                 $pdo->prepare(
                     "INSERT INTO config_layout (config_key, config_value) VALUES (?, ?)
@@ -1207,7 +1229,7 @@ class MasterEscolaDetailController extends BaseController
         $config['release_flags'] = implode(',', array_keys($releaseFlags));
 
         $this->setLayoutConfig($id, $config);
-        $this->syncLayoutToTenant($id);
+        $this->syncLayoutToTenant($id, array_keys($config));
 
         $this->setFlashMessage('Módulos e release salvos com sucesso.', 'success');
         header('Location: ' . URL . '/master/escolas/' . $id . '/modulos');
@@ -1408,10 +1430,10 @@ class MasterEscolaDetailController extends BaseController
         try {
             \App\Services\MasterCreditosCatalogoSyncService::salvarVinculos($id, $tabelaId, $pacIds, $plIds);
             $res = \App\Services\MasterCreditosCatalogoSyncService::sincronizarTenant($id);
-            if (!empty($res['layout_patch'])) {
+            if (!empty($res['layout_patch']) && is_array($res['layout_patch'])) {
                 $this->setLayoutConfig($id, $res['layout_patch']);
+                $this->syncLayoutToTenant($id, array_keys($res['layout_patch']));
             }
-            $this->syncLayoutToTenant($id);
             if (!empty($res['errors'])) {
                 $this->setFlashMessage('Vínculos salvos. Avisos: ' . implode(' ', $res['errors']), 'error');
             } else {
@@ -1588,7 +1610,7 @@ class MasterEscolaDetailController extends BaseController
             }
         }
         $this->setLayoutConfig($id, $config);
-        $this->syncLayoutToTenant($id);
+        $this->syncLayoutToTenant($id, array_keys($config));
         $this->setFlashMessage('TudiCoins salvos com sucesso.', 'success');
         header('Location: ' . URL . '/master/escolas/' . $id . '/creditos');
         exit;
@@ -1685,7 +1707,7 @@ class MasterEscolaDetailController extends BaseController
         $this->setLayoutConfig($id, [
             'dashboard_slider_items' => json_encode($sanitized, JSON_UNESCAPED_UNICODE),
         ]);
-        $this->syncLayoutToTenant($id);
+        $this->syncLayoutToTenant($id, ['dashboard_slider_items']);
         $this->setFlashMessage('Slides do dashboard salvos com sucesso.', 'success');
         header('Location: ' . URL . '/master/escolas/' . $id . '/sliders');
         exit;
@@ -1857,7 +1879,7 @@ class MasterEscolaDetailController extends BaseController
         }
 
         $this->setLayoutConfig($id, $config);
-        $this->syncLayoutToTenant($id);
+        $this->syncLayoutToTenant($id, array_keys($config));
 
         $this->setFlashMessage('Links úteis salvos com sucesso.', 'success');
         header('Location: ' . URL . '/master/escolas/' . $id . '/links-uteis');
@@ -1934,7 +1956,7 @@ class MasterEscolaDetailController extends BaseController
         }
 
         $this->setLayoutConfig($id, $config);
-        $this->syncLayoutToTenant($id);
+        $this->syncLayoutToTenant($id, array_keys($config));
 
         $this->setFlashMessage('Apps externos salvos com sucesso.', 'success');
         header('Location: ' . URL . '/master/escolas/' . $id . '/apps-externos');
@@ -1988,7 +2010,7 @@ class MasterEscolaDetailController extends BaseController
         }
 
         $this->setLayoutConfig($id, $config);
-        $this->syncLayoutToTenant($id);
+        $this->syncLayoutToTenant($id, array_keys($config));
 
         $this->setFlashMessage('Prompts salvos com sucesso.', 'success');
         header('Location: ' . URL . '/master/escolas/' . $id . '/prompts');
