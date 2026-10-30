@@ -67,7 +67,9 @@ class DashboardGestaoAdminController extends \App\Controllers\Admin\AdminBaseCon
         }
 
         $this->viewWithLayout('admin', 'admin/dashboard-gestao/index', [
-            'title' => 'Dashboard - EducaTudo',
+            'title' => 'Visão da Escola - EducaTudo',
+            'page_heading' => 'Visão da Escola',
+            'page_subtitle' => 'Acompanhe o desempenho acadêmico e a rotina da escola.',
             'user' => $user,
             'current_page' => 'dashboard',
             'csrf_token' => $this->generateCsrfToken(),

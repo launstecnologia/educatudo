@@ -431,6 +431,210 @@ class FrequencyService
     }
 
     /**
+     * Frequência mês a mês do ano civil, no total da escola e por curso.
+     * Mesma regra de percentualGeral: presente+atraso em aulas finalizadas.
+     *
+     * @param list<int> $turmaIds
+     * @return array{labels:list<string>,series:list<array{label:string,data:list<?float>}>}
+     */
+    public function evolucaoMensal(int $ano, array $turmaIds = []): array
+    {
+        $labels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        $escola = array_fill(0, 12, null);
+        if (!$this->schemaPronto() || $ano < 2000) {
+            return ['labels' => $labels, 'series' => [['label' => 'Escola', 'data' => $escola]]];
+        }
+
+        [$turmaSql, $turmaParams] = $this->filtroTurmasSql($turmaIds, 'da.turma_id');
+        $curso = $this->expressaoCurso();
+        $selectCurso = $curso['expr'] !== '' ? ', ' . $curso['expr'] . ' AS curso_nome' : '';
+        $groupCurso = $curso['expr'] !== '' ? ', ' . $curso['expr'] : '';
+        $rows = $this->db->fetchAll(
+            "SELECT MONTH(da.data_aula) AS mes{$selectCurso},
+                    COUNT(*) AS total,
+                    SUM(CASE WHEN df.situacao IN ('presente','atraso') THEN 1 ELSE 0 END) AS presencas
+             FROM diario_frequencias df
+             INNER JOIN diario_aulas da ON da.id = df.diario_aula_id
+             {$curso['join']}
+             WHERE da.status = 'finalizada'
+               AND da.data_aula BETWEEN :inicio AND :fim{$turmaSql}
+             GROUP BY MONTH(da.data_aula){$groupCurso}",
+            array_merge([
+                'inicio' => sprintf('%04d-01-01', $ano),
+                'fim' => sprintf('%04d-12-31', $ano),
+            ], $turmaParams)
+        ) ?: [];
+
+        $totaisMes = array_fill(1, 12, ['total' => 0, 'presencas' => 0]);
+        /** @var array<string, array<int, array{total:int,presencas:int}>> $porCurso */
+        $porCurso = [];
+        foreach ($rows as $row) {
+            $mes = (int) ($row['mes'] ?? 0);
+            if ($mes < 1 || $mes > 12) {
+                continue;
+            }
+            $total = (int) ($row['total'] ?? 0);
+            $presencas = (int) ($row['presencas'] ?? 0);
+            $totaisMes[$mes]['total'] += $total;
+            $totaisMes[$mes]['presencas'] += $presencas;
+            $nome = trim((string) ($row['curso_nome'] ?? ''));
+            if ($nome === '') {
+                continue;
+            }
+            if (!isset($porCurso[$nome][$mes])) {
+                $porCurso[$nome][$mes] = ['total' => 0, 'presencas' => 0];
+            }
+            $porCurso[$nome][$mes]['total'] += $total;
+            $porCurso[$nome][$mes]['presencas'] += $presencas;
+        }
+
+        $series = [['label' => 'Escola', 'data' => $this->seriePercentual($totaisMes)]];
+        if (count($porCurso) > 1) {
+            uasort($porCurso, static function (array $a, array $b): int {
+                $ta = 0;
+                $tb = 0;
+                foreach ($a as $m) {
+                    $ta += $m['total'];
+                }
+                foreach ($b as $m) {
+                    $tb += $m['total'];
+                }
+                return $tb <=> $ta;
+            });
+            $n = 0;
+            foreach ($porCurso as $nome => $meses) {
+                if ($n >= 3) {
+                    break;
+                }
+                $completo = array_fill(1, 12, ['total' => 0, 'presencas' => 0]);
+                foreach ($meses as $mes => $agg) {
+                    $completo[$mes] = $agg;
+                }
+                $series[] = ['label' => $nome, 'data' => $this->seriePercentual($completo)];
+                $n++;
+            }
+        }
+
+        return ['labels' => $labels, 'series' => $series];
+    }
+
+    /**
+     * Percentual de presença por turma no período.
+     *
+     * @param list<int> $turmaIds
+     * @return list<array{id:int,nome:string,percentual:?float}>
+     */
+    public function frequenciaPorTurma(string $inicio, string $fim, array $turmaIds = []): array
+    {
+        if (!$this->schemaPronto()) {
+            return [];
+        }
+        [$turmaSql, $turmaParams] = $this->filtroTurmasSql($turmaIds, 'da.turma_id');
+        $rows = $this->db->fetchAll(
+            "SELECT t.id, t.nome,
+                    COUNT(*) AS total,
+                    SUM(CASE WHEN df.situacao IN ('presente','atraso') THEN 1 ELSE 0 END) AS presencas
+             FROM diario_frequencias df
+             INNER JOIN diario_aulas da ON da.id = df.diario_aula_id
+             INNER JOIN turmas t ON t.id = da.turma_id
+             WHERE da.status = 'finalizada'
+               AND da.data_aula BETWEEN :inicio AND :fim{$turmaSql}
+             GROUP BY t.id, t.nome",
+            array_merge(['inicio' => $inicio, 'fim' => $fim], $turmaParams)
+        ) ?: [];
+
+        $out = [];
+        foreach ($rows as $row) {
+            $total = (int) ($row['total'] ?? 0);
+            if ($total <= 0) {
+                continue;
+            }
+            $out[] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'nome' => (string) ($row['nome'] ?? 'Turma'),
+                'percentual' => round(((int) ($row['presencas'] ?? 0) / $total) * 100, 0),
+            ];
+        }
+        usort($out, static fn (array $a, array $b): int => ((float) $b['percentual']) <=> ((float) $a['percentual']));
+        return $out;
+    }
+
+    /**
+     * @param array<int, array{total:int,presencas:int}> $meses
+     * @return list<?float>
+     */
+    private function seriePercentual(array $meses): array
+    {
+        $data = [];
+        for ($mes = 1; $mes <= 12; $mes++) {
+            $total = (int) ($meses[$mes]['total'] ?? 0);
+            $data[] = $total > 0
+                ? round(((int) $meses[$mes]['presencas'] / $total) * 100, 1)
+                : null;
+        }
+        return $data;
+    }
+
+    /**
+     * @return array{join:string,expr:string}
+     */
+    private function expressaoCurso(): array
+    {
+        $tabela = null;
+        foreach (['curso', 'cursos'] as $candidata) {
+            if ($this->tabelaExiste($candidata)) {
+                $tabela = $candidata;
+                break;
+            }
+        }
+        if ($tabela === null || !$this->tabelaExiste('turmas')) {
+            return ['join' => '', 'expr' => ''];
+        }
+        $col = '';
+        if ($this->colunaExiste('turmas', 'curso_novo_id')) {
+            $col = 't.curso_novo_id';
+        } elseif ($this->colunaExiste('turmas', 'curso_id')) {
+            $col = 't.curso_id';
+        }
+        if ($col === '') {
+            return ['join' => '', 'expr' => ''];
+        }
+        return [
+            'join' => 'LEFT JOIN turmas t ON t.id = da.turma_id LEFT JOIN ' . $tabela . ' c ON c.id = ' . $col,
+            'expr' => 'c.nome',
+        ];
+    }
+
+    private function tabelaExiste(string $tabela): bool
+    {
+        if (!preg_match('/^[a-z0-9_]+$/i', $tabela)) {
+            return false;
+        }
+        try {
+            return $this->db->fetch("SHOW TABLES LIKE '{$tabela}'") !== false;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function colunaExiste(string $tabela, string $coluna): bool
+    {
+        if (!preg_match('/^[a-z0-9_]+$/i', $tabela) || !preg_match('/^[a-z0-9_]+$/i', $coluna)) {
+            return false;
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c',
+                ['t' => $tabela, 'c' => $coluna]
+            );
+            return ((int) ($row['c'] ?? 0)) > 0;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
      * @param list<int> $turmaIds
      * @return array{0:string,1:array<string,int>}
      */

@@ -151,17 +151,18 @@
             <div class="plataforma-pagina plataforma-pagina-preenche">
             <!-- Header com menu hamburger, título, notificações e avatar (padrão Professor) -->
             <header class="bg-white shadow-sm border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 sticky top-0 z-30 shrink-0">
-                <div class="flex justify-between items-center gap-2">
+                <div class="flex justify-between items-center gap-3">
                     <!-- Botão menu mobile -->
                     <button id="mobileMenuToggle" type="button" class="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" aria-label="Abrir menu">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
                         </svg>
                     </button>
-                    <div class="flex-1 min-w-0">
-                        <h1 id="admin-page-title" class="text-lg md:text-2xl font-bold text-gray-900 truncate">Painel Administrativo</h1>
-                        <p class="text-xs md:text-sm text-gray-600 truncate"><?= htmlspecialchars($page_subtitle ?? ('Bem-vindo, ' . ($user['nome'] ?? 'Administrador') . '!')) ?></p>
+                    <div class="min-w-0 max-w-md shrink">
+                        <h1 id="admin-page-title" class="text-lg md:text-xl font-bold text-gray-900 truncate"><?= htmlspecialchars($page_heading ?? 'Painel Administrativo') ?></h1>
+                        <p class="text-xs md:text-sm text-gray-500 truncate"><?= htmlspecialchars($page_subtitle ?? ('Bem-vindo, ' . ($user['nome'] ?? 'Administrador') . '!')) ?></p>
                     </div>
+                    <div id="admin-header-slot" class="hidden min-w-0"></div>
                     <div class="flex items-center space-x-2 md:space-x-4 flex-shrink-0">
                         <!-- Notificações -->
                         <?php 

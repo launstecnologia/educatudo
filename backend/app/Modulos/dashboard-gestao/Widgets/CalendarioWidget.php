@@ -48,17 +48,21 @@ class CalendarioWidget implements WidgetDashboard
         }
         $db = \App\Core\Database::getInstance();
         $rows = $db->fetchAll(
-            "SELECT titulo, DATE(inicio_em) AS data_evento, categoria
+            "SELECT titulo, DATE(inicio_em) AS data_evento,
+                    DATE_FORMAT(inicio_em, '%H:%i') AS hora, local, categoria
              FROM school_calendar_events
              WHERE status = 'publicado' AND DATE(inicio_em) >= :hoje
              ORDER BY inicio_em ASC
-             LIMIT 8",
+             LIMIT 6",
             ['hoje' => $filtro->hoje]
         ) ?: [];
         $out = [];
         foreach ($rows as $row) {
+            $hora = (string) ($row['hora'] ?? '');
             $out[] = [
                 'data' => (string) ($row['data_evento'] ?? ''),
+                'hora' => ($hora !== '' && $hora !== '00:00') ? $hora : '',
+                'local' => (string) ($row['local'] ?? ''),
                 'titulo' => (string) ($row['titulo'] ?? 'Evento'),
                 'tipo' => $this->tipoCategoria((string) ($row['categoria'] ?? 'evento')),
             ];
@@ -75,19 +79,24 @@ class CalendarioWidget implements WidgetDashboard
             return [];
         }
         $db = \App\Core\Database::getInstance();
+        $localSql = $this->consulta->colunaExiste('calendario_letivo_eventos', 'local_evento')
+            ? ', e.local_evento'
+            : '';
         $rows = $db->fetchAll(
-            "SELECT e.descricao, e.data_inicio, e.tipo
+            "SELECT e.descricao, e.data_inicio, e.tipo{$localSql}
              FROM calendario_letivo_eventos e
              INNER JOIN calendario_letivo c ON c.id = e.calendario_id
              WHERE c.ano = :ano AND e.data_fim >= :hoje
              ORDER BY e.data_inicio ASC
-             LIMIT 8",
+             LIMIT 6",
             ['ano' => $filtro->anoCivil, 'hoje' => $filtro->hoje]
         ) ?: [];
         $out = [];
         foreach ($rows as $row) {
             $out[] = [
                 'data' => (string) ($row['data_inicio'] ?? ''),
+                'hora' => '',
+                'local' => (string) ($row['local_evento'] ?? ''),
                 'titulo' => (string) ($row['descricao'] ?? 'Evento letivo'),
                 'tipo' => $this->tipoLetivo((string) ($row['tipo'] ?? 'evento')),
             ];

@@ -21,8 +21,9 @@ class AtencaoPedagogicaWidget implements WidgetDashboard
                 $linhas[] = [
                     'aluno' => (string) $aluno['nome'],
                     'turma' => (string) $aluno['turma_nome'],
-                    'indicador' => 'Frequência abaixo de ' . (int) FrequencyService::MINIMO_LEGAL . '%',
-                    'situacao' => $pct < 50 ? 'Crítico' : 'Atenção',
+                    'indicador' => 'Frequência',
+                    'valor' => number_format($pct, 0, ',', '.') . '%',
+                    'situacao' => 'Em risco',
                     'badge' => $pct < 50 ? 'critico' : 'atencao',
                 ];
             }
@@ -32,11 +33,16 @@ class AtencaoPedagogicaWidget implements WidgetDashboard
         if ($model->schemaPronto() && count($linhas) < 12) {
             $linhas = array_merge($linhas, $this->componentesAbaixo($filtro, 12 - count($linhas)));
         }
+        if (count($linhas) < 5) {
+            $consulta = new \App\Modulos\DashboardGestao\Services\DashboardConsulta(\App\Core\Database::getInstance());
+            $linhas = array_merge($linhas, $consulta->atencaoNotasFicha($filtro, 5 - count($linhas)));
+        }
 
         return [
             'ok' => true,
             'disponivel' => true,
             'linhas' => $linhas,
+            'href' => '/admin/students',
             'nota' => 'Frequência abaixo de 75% ou componente em recuperação/reprovação.',
         ];
     }
@@ -70,7 +76,7 @@ class AtencaoPedagogicaWidget implements WidgetDashboard
         }
         $limite = (int) $limite;
         $rows = $db->fetchAll(
-            "SELECT a.nome AS aluno, t.nome AS turma, r.situacao, r.rotulo
+            "SELECT a.nome AS aluno, t.nome AS turma, r.situacao, r.rotulo, r.media_final
              FROM resultado_academico r
              INNER JOIN alunos a ON a.id = r.aluno_id
              INNER JOIN turmas t ON t.id = r.turma_id
@@ -83,13 +89,16 @@ class AtencaoPedagogicaWidget implements WidgetDashboard
         $out = [];
         foreach ($rows as $row) {
             $sit = (string) ($row['situacao'] ?? '');
-            $critico = in_array($sit, ['reprovado_rendimento'], true);
+            $critico = in_array($sit, ['reprovado_rendimento', 'reprovado_frequencia'], true);
+            $recuperacao = in_array($sit, ['recuperacao', 'exame_final'], true);
+            $media = $row['media_final'] ?? null;
             $out[] = [
                 'aluno' => (string) $row['aluno'],
                 'turma' => (string) $row['turma'],
-                'indicador' => 'Componentes abaixo do critério',
-                'situacao' => (string) ($row['rotulo'] ?? 'Atenção'),
-                'badge' => $critico ? 'critico' : 'atencao',
+                'indicador' => 'Notas',
+                'valor' => $media === null ? '—' : number_format((float) $media, 1, ',', '.'),
+                'situacao' => $critico ? 'Em risco' : ($recuperacao ? 'Recuperação' : 'Acompanhamento'),
+                'badge' => $critico ? 'critico' : ($recuperacao ? 'recuperacao' : 'atencao'),
             ];
         }
         return $out;

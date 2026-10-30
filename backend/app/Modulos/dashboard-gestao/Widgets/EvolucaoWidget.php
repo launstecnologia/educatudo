@@ -6,9 +6,8 @@ use App\Modulos\DashboardGestao\Services\DashboardConsulta;
 use App\Modulos\DashboardGestao\Services\DashboardFiltro;
 use App\Services\FrequencyService;
 /**
- * Evolução por bimestre: frequência do Diário (sempre) e média homologada (se houver).
- * Metodologia da média: AVG(media_final) do snapshot homologado em resultado_academico,
- * sem recálculo a partir de notas brutas.
+ * Evolução mensal da frequência no ano letivo (Diário, aulas finalizadas).
+ * Série da escola e, quando houver mais de um curso, as maiores turmas de curso.
  */
 class EvolucaoWidget implements WidgetDashboard
 {
@@ -26,71 +25,85 @@ class EvolucaoWidget implements WidgetDashboard
 
     public function montar(DashboardFiltro $filtro): array
     {
-        $freqSvc = new FrequencyService();
-        $labels = ['1º bim.', '2º bim.', '3º bim.', '4º bim.'];
-        $frequencia = [];
-        $media = [];
-        $temMedia = false;
-
+        $labels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
         if ($filtro->semTurmas) {
             return [
                 'ok' => true,
                 'disponivel' => true,
                 'labels' => $labels,
                 'series' => [
-                    ['label' => 'Frequência (%)', 'data' => [null, null, null, null], 'fonte' => 'FrequencyService'],
-                    ['label' => 'Média homologada', 'data' => [null, null, null, null], 'ocultar' => true],
+                    ['label' => 'Escola', 'data' => array_fill(0, 12, null)],
                 ],
                 'nota' => 'Nenhuma turma neste recorte.',
             ];
         }
 
-        $model = new \App\Models\Education\ResultadoAcademico();
-        $schemaResultado = $model->schemaPronto();
-        $db = \App\Core\Database::getInstance();
-        [$turmaSql, $turmaParams] = $this->consulta->sqlInTurmas($filtro->turmaIds, 'r.turma_id');
+        $evo = (new FrequencyService())->evolucaoMensal($filtro->anoCivil, $filtro->turmaIds);
+        if ($this->temPonto($evo['series'])) {
+            return [
+                'ok' => true,
+                'disponivel' => true,
+                'modo' => 'frequencia',
+                'labels' => $evo['labels'],
+                'series' => $evo['series'],
+                'nota' => 'Ano letivo inteiro. Presente e atraso sobre aulas finalizadas do diário.',
+            ];
+        }
 
-        for ($b = 1; $b <= 4; $b++) {
-            $periodo = DashboardFiltro::periodoDoBimestre($filtro->anoCivil, $b);
-            $frequencia[] = $freqSvc->percentualGeral($periodo['inicio'], $periodo['fim'], $filtro->turmaIds);
-            $mediaBim = null;
-            if ($schemaResultado) {
-                $row = $db->fetch(
-                    "SELECT AVG(r.media_final) AS media
-                     FROM resultado_academico r
-                     WHERE r.status = 'homologado'
-                       AND r.ano_letivo = :ano
-                       AND r.periodo_tipo = 'bimestre'
-                       AND r.periodo_numero = :bim
-                       AND r.media_final IS NOT NULL{$turmaSql}",
-                    array_merge(['ano' => $filtro->anoCivil, 'bim' => $b], $turmaParams)
-                );
-                if ($row && $row['media'] !== null) {
-                    $mediaBim = round((float) $row['media'], 1);
-                    $temMedia = true;
+        return $this->evolucaoNotas($filtro);
+    }
+
+    /**
+     * @param list<array{data?:list<mixed>}> $series
+     */
+    private function temPonto(array $series): bool
+    {
+        foreach ($series as $serie) {
+            foreach ($serie['data'] ?? [] as $valor) {
+                if ($valor !== null) {
+                    return true;
                 }
             }
-            $media[] = $mediaBim;
+        }
+        return false;
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function evolucaoNotas(DashboardFiltro $filtro): array
+    {
+        $info = \App\Core\PeriodoLetivo::doAno($filtro->anoCivil);
+        $quantidade = max(1, (int) ($info['quantidade'] ?? 4));
+        $labels = [];
+        $data = [];
+        $tem = false;
+        for ($periodo = 1; $periodo <= $quantidade; $periodo++) {
+            $labels[] = \App\Core\PeriodoLetivo::rotulo($filtro->anoCivil, $periodo);
+            $media = $this->consulta->mediaNotasFicha($filtro, $periodo);
+            $data[] = $media;
+            if ($media !== null) {
+                $tem = true;
+            }
+        }
+        if (!$tem) {
+            return [
+                'ok' => true,
+                'disponivel' => true,
+                'modo' => 'frequencia',
+                'labels' => ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+                'series' => [['label' => 'Escola', 'data' => array_fill(0, 12, null)]],
+                'nota' => 'Sem chamada no diário e sem nota calculada neste ano.',
+            ];
         }
 
         return [
             'ok' => true,
             'disponivel' => true,
+            'modo' => 'notas',
             'labels' => $labels,
-            'series' => [
-                [
-                    'label' => 'Frequência (%)',
-                    'data' => $frequencia,
-                    'fonte' => 'FrequencyService (diário, aulas finalizadas)',
-                ],
-                [
-                    'label' => 'Média homologada',
-                    'data' => $media,
-                    'fonte' => 'AVG(media_final) do snapshot homologado em resultado_academico. Sem recálculo.',
-                    'ocultar' => !$temMedia,
-                ],
-            ],
-            'nota' => 'Frequência: presente+atraso sobre registros do diário. Média: somente resultados homologados.',
+            'series' => [['label' => 'Média', 'data' => $data]],
+            'nota' => 'Média das notas calculadas na ficha, por período. Não há chamada no diário neste ano.',
         ];
     }
 }

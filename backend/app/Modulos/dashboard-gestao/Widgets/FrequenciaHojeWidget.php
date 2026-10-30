@@ -28,6 +28,7 @@ class FrequenciaHojeWidget implements WidgetDashboard
                     'aulas_finalizadas' => 0,
                     'chamadas_pendentes' => 0,
                 ],
+                'turmas' => [],
                 'links' => [
                     'presenca' => (class_exists('LayoutHelper', false) && \App\Core\LayoutHelper::isModuleEnabled('presenca')) ? '/admin/presenca' : null,
                     'diario' => '/admin/diario',
@@ -38,6 +39,7 @@ class FrequenciaHojeWidget implements WidgetDashboard
 
         $freq = new FrequencyService();
         $resumo = $freq->resumoDoDia($filtro->hoje, $filtro->turmaIds);
+        $porTurma = $freq->frequenciaPorTurma($filtro->inicio, $filtro->fim, $filtro->turmaIds);
         $diario = new ClassDiaryService();
         $pendentes = $diario->acompanhamento($filtro->hoje, $filtro->hoje, 0, 'pendente', $filtro->turmaId);
         if ($filtro->turmaIds !== [] && $filtro->turmaId <= 0) {
@@ -55,8 +57,9 @@ class FrequenciaHojeWidget implements WidgetDashboard
         return [
             'ok' => true,
             'disponivel' => true,
-            'vazio' => ((int) ($resumo['aulas_finalizadas'] ?? 0) === 0),
+            'vazio' => ((int) ($resumo['aulas_finalizadas'] ?? 0) === 0) && $porTurma === [],
             'resumo' => $resumo,
+            'turmas' => $porTurma,
             'links' => [
                 'presenca' => $presencaOn ? '/admin/presenca' : null,
                 'diario' => '/admin/diario?' . $qs,
