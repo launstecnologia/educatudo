@@ -10,6 +10,36 @@ $linhas = is_array($matriz['linhas'] ?? null) ? $matriz['linhas'] : [];
 $pendencias = is_array($matriz['pendencias'] ?? null) ? $matriz['pendencias'] : [];
 $participantes = is_array($matriz['participantes'] ?? null) ? $matriz['participantes'] : [];
 $professoresTurma = is_array($matriz['professores_turma'] ?? null) ? $matriz['professores_turma'] : [];
+$ocorrenciasPorAluno = is_array($ocorrencias_por_aluno ?? null) ? $ocorrencias_por_aluno : [];
+$podeRegistrar = !empty($pode_registrar);
+$alunoInicial = (int) ($aluno_inicial ?? 0);
+$notaMinima = (float) ($matriz['nota_minima'] ?? 6);
+$fila = [];
+foreach ($linhas as $linhaFila) {
+    if (!is_array($linhaFila)) {
+        continue;
+    }
+    $codigoFila = (string) ($linhaFila['resultado_preliminar']['codigo'] ?? '');
+    if ($codigoFila === 'recuperacao' || $codigoFila === 'baixa_frequencia') {
+        $fila[] = $linhaFila;
+    }
+}
+$indiceInicial = 0;
+if ($alunoInicial > 0) {
+    foreach ($fila as $iFila => $linhaFila) {
+        if ((int) ($linhaFila['aluno']['id'] ?? 0) === $alunoInicial) {
+            $indiceInicial = $iFila;
+            break;
+        }
+    }
+} else {
+    foreach ($fila as $iFila => $linhaFila) {
+        if (empty($linhaFila['resultado_homologado'])) {
+            $indiceInicial = $iFila;
+            break;
+        }
+    }
+}
 $csrf_token = $csrf_token ?? '';
 $status = (string) ($sessao['status'] ?? '');
 $sid = (int) ($sessao['id'] ?? 0);
@@ -87,84 +117,141 @@ if ($periodo === '') {
 <?php endif; ?>
 
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
-    <div class="px-5 py-4 border-b border-gray-200">
-        <h3 class="text-base font-semibold text-gray-900">Matriz do Conselho</h3>
-        <p class="text-sm text-gray-500 mt-0.5">Médias do boletim gerado. Clique no aluno para deliberar sem alterar a nota original.</p>
+    <div class="px-5 py-4 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h3 class="text-base font-semibold text-gray-900">Alunos para deliberar</h3>
+            <p class="text-sm text-gray-500 mt-0.5">Só quem ficou abaixo da média depois da recuperação, ou abaixo da frequência. Um aluno por vez.</p>
+        </div>
+        <?php if ($fila !== []): ?>
+        <div class="flex items-center gap-2">
+            <button type="button" id="conselho-anterior" class="px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">Anterior</button>
+            <span id="conselho-posicao" class="text-sm text-gray-600 min-w-[4.5rem] text-center"><?= $indiceInicial + 1 ?> de <?= count($fila) ?></span>
+            <button type="button" id="conselho-proximo" class="px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">Próximo</button>
+        </div>
+        <?php endif; ?>
     </div>
-    <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50">Aluno</th>
-                    <?php foreach ($componentes as $comp): ?>
-                    <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" title="<?= htmlspecialchars((string) $comp['nome']) ?>"><?= htmlspecialchars((string) ($comp['sigla'] ?? $comp['nome'])) ?></th>
-                    <?php endforeach; ?>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequência</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Preliminar</th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Homologado</th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-                <?php if ($linhas === []): ?>
-                <tr>
-                    <td colspan="<?= 4 + count($componentes) ?>" class="px-6 py-12 text-center text-gray-500">Nenhum aluno nesta turma.</td>
-                </tr>
+    <?php if ($fila === []): ?>
+    <p class="px-5 py-12 text-center text-gray-500">Nenhum aluno ficou abaixo da média nem da frequência neste Conselho.</p>
+    <?php else: ?>
+    <?php foreach ($fila as $iFila => $linha):
+        $aluno = is_array($linha['aluno'] ?? null) ? $linha['aluno'] : [];
+        $prelim = is_array($linha['resultado_preliminar'] ?? null) ? $linha['resultado_preliminar'] : [];
+        $abaixo = is_array($prelim['abaixo'] ?? null) ? $prelim['abaixo'] : [];
+        $freq = is_array($linha['frequencia'] ?? null) ? $linha['frequencia'] : [];
+        $pct = $freq['percentual'] ?? null;
+        $baixaFreq = $pct !== null && (float) $pct < \App\Services\FrequencyService::MINIMO_LEGAL;
+        $alunoIdCard = (int) ($aluno['id'] ?? 0);
+        $proximoId = (int) ($fila[$iFila + 1]['aluno']['id'] ?? 0);
+        $homolog = $linha['resultado_homologado'] ?? null;
+        $ocs = is_array($ocorrenciasPorAluno[$alunoIdCard] ?? null) ? $ocorrenciasPorAluno[$alunoIdCard] : [];
+        $nomeCc = \App\Helpers\AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
+            (string) ($aluno['nome'] ?? ''),
+            !empty($aluno['transferido'])
+        );
+    ?>
+    <article class="conselho-aluno px-5 py-5 <?= $iFila === $indiceInicial ? '' : 'hidden' ?>" data-indice="<?= (int) $iFila ?>" data-aluno="<?= $alunoIdCard ?>">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-5">
+            <div>
+                <h4 class="text-lg font-semibold text-gray-900"><?= htmlspecialchars($nomeCc) ?></h4>
+                <p class="text-sm text-gray-600 mt-1"><?= htmlspecialchars((string) ($prelim['detalhe'] ?? '')) ?></p>
+            </div>
+            <div class="text-sm text-gray-700">
+                <?php if ($homolog): ?>
+                Deliberado: <?= htmlspecialchars(\App\Modulos\ConselhoClasse\Models\ConselhoSessao::RESULTADOS[$homolog] ?? (string) $homolog) ?>
                 <?php else: ?>
-                <?php
-                if (!class_exists('AlunoLancamentoNotaHelper', false)) {
-                }
-                foreach ($linhas as $linha):
-                    $aluno = $linha['aluno'];
-                    $prelim = $linha['resultado_preliminar'] ?? [];
-                    $homolog = $linha['resultado_homologado'];
-                    $freq = $linha['frequencia']['percentual'] ?? null;
-                    $abaixo = $prelim['abaixo'] ?? [];
-                    $transferidoCc = !empty($aluno['transferido']);
-                    $nomeCc = \App\Helpers\AlunoLancamentoNotaHelper::rotuloNomeComTransferencia(
-                        (string) ($aluno['nome'] ?? ''),
-                        $transferidoCc
-                    );
-                ?>
-                <tr class="<?= $transferidoCc ? 'bg-gray-100 text-gray-500' : 'hover:bg-gray-50' ?>">
-                    <td class="px-4 py-3 text-sm sticky left-0 <?= $transferidoCc ? 'bg-gray-100' : 'bg-white' ?>">
-                        <a href="<?= URL ?>/admin/conselhos/<?= $sid ?>/aluno/<?= (int) $aluno['id'] ?>" class="font-medium <?= $transferidoCc ? 'text-gray-500' : 'text-gray-900' ?> hover:underline">
-                            <?= htmlspecialchars($nomeCc) ?>
-                        </a>
-                    </td>
-                    <?php foreach ($componentes as $comp):
-                        $chave = mb_strtolower((string) $comp['nome']);
-                        $cel = $linha['componentes'][$chave] ?? null;
-                        $media = $cel['media'] ?? null;
-                        $isAbaixo = $media !== null && in_array((string) $comp['nome'], $abaixo, true);
-                    ?>
-                    <td class="px-3 py-3 text-sm text-center <?= $isAbaixo ? 'text-amber-800 font-semibold' : 'text-gray-700' ?>">
-                        <?= $media !== null ? number_format((float) $media, 1, ',', '.') : '—' ?>
-                    </td>
-                    <?php endforeach; ?>
-                    <td class="px-4 py-3 text-sm <?= ($freq !== null && $freq < 75) ? 'text-amber-800 font-semibold' : 'text-gray-700' ?>">
-                        <?= $freq !== null ? number_format((float) $freq, 1, ',', '.') . '%' : '—' ?>
-                    </td>
-                    <td class="px-4 py-3">
-                        <?php
-                        $codigo = (string) ($prelim['codigo'] ?? '');
-                        $ui_badge_variant = $codigo === 'aprovado' ? 'ativo' : ($codigo === 'sem_notas' || $codigo === 'transferido' ? 'neutro' : 'pendente');
-                        $ui_badge_label = (string) ($prelim['label'] ?? '—');
-                        include __DIR__ . '/../../../../Views/admin/_partials/ui/badge.php';
-                        ?>
-                        <?php if (!empty($prelim['detalhe'])): ?>
-                        <div class="text-xs text-gray-500 mt-1"><?= htmlspecialchars((string) $prelim['detalhe']) ?></div>
-                        <?php endif; ?>
-                    </td>
-                    <td class="px-4 py-3 text-sm text-gray-700">
-                        <?= $homolog ? htmlspecialchars(\App\Modulos\ConselhoClasse\Models\ConselhoSessao::RESULTADOS[$homolog] ?? $homolog) : '—' ?>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
+                Sem deliberação
                 <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
+            </div>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+            <?php foreach ($componentes as $comp):
+                $chave = mb_strtolower((string) $comp['nome']);
+                $cel = $linha['componentes'][$chave] ?? null;
+                $media = is_array($cel) ? ($cel['media'] ?? null) : null;
+                $isAbaixo = $media !== null && in_array((string) $comp['nome'], $abaixo, true);
+            ?>
+            <div class="rounded-lg border <?= $isAbaixo ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-gray-50' ?> px-3 py-2">
+                <div class="text-xs text-gray-500"><?= htmlspecialchars((string) ($comp['sigla'] ?? $comp['nome'])) ?></div>
+                <div class="text-base font-semibold <?= $isAbaixo ? 'text-amber-800' : 'text-gray-900' ?>"><?= $media !== null ? number_format((float) $media, 1, ',', '.') : '—' ?></div>
+            </div>
+            <?php endforeach; ?>
+            <div class="rounded-lg border <?= $baixaFreq ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-gray-50' ?> px-3 py-2">
+                <div class="text-xs text-gray-500">Frequência</div>
+                <div class="text-base font-semibold <?= $baixaFreq ? 'text-amber-800' : 'text-gray-900' ?>"><?= $pct !== null ? number_format((float) $pct, 1, ',', '.') . '%' : '—' ?></div>
+                <div class="text-xs text-gray-500"><?= (int) ($freq['faltas'] ?? 0) ?> falta(s)</div>
+            </div>
+        </div>
+        <div class="mb-5">
+            <h5 class="text-sm font-semibold text-gray-900 mb-2">Ocorrências</h5>
+            <?php if ($ocs === []): ?>
+            <p class="text-sm text-gray-500">Nenhuma ocorrência cadastrada.</p>
+            <?php else: ?>
+            <ul class="space-y-1">
+                <?php foreach ($ocs as $oc): ?>
+                <li class="text-sm text-gray-700">
+                    <a href="<?= URL ?>/admin/ocorrencias/<?= (int) ($oc['id'] ?? 0) ?>" class="hover:underline"><?= htmlspecialchars((string) ($oc['titulo'] ?? '')) ?></a>
+                    <?php if (!empty($oc['data'])): ?>
+                    <span class="text-xs text-gray-500"> · <?= date('d/m/Y', strtotime((string) $oc['data'])) ?></span>
+                    <?php endif; ?>
+                </li>
+                <?php endforeach; ?>
+            </ul>
+            <?php endif; ?>
+        </div>
+        <?php if ($podeRegistrar): ?>
+        <form method="POST" action="<?= URL ?>/admin/conselhos/<?= $sid ?>/deliberar" class="border-t border-gray-100 pt-4">
+            <input type="hidden" name="_token" value="<?= htmlspecialchars((string) $csrf_token) ?>">
+            <input type="hidden" name="aluno_id" value="<?= $alunoIdCard ?>">
+            <input type="hidden" name="origem" value="fila">
+            <input type="hidden" name="proximo_aluno_id" value="<?= $proximoId ?>">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label class="block">
+                    <span class="block text-sm font-medium text-gray-700 mb-1.5">Decisão</span>
+                    <select name="resultado_decisao" required class="w-full h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm">
+                        <option value="">Selecione</option>
+                        <?php foreach (\App\Modulos\ConselhoClasse\Models\ConselhoSessao::RESULTADOS as $valor => $rotulo): ?>
+                        <option value="<?= htmlspecialchars($valor) ?>" <?= $homolog === $valor ? 'selected' : '' ?>><?= htmlspecialchars($rotulo) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <label class="block md:col-span-2">
+                    <span class="block text-sm font-medium text-gray-700 mb-1.5">Justificativa</span>
+                    <textarea name="justificativa" rows="3" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></textarea>
+                </label>
+            </div>
+            <div class="flex justify-end mt-4">
+                <button type="submit" class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-semibold"><?= $proximoId > 0 ? 'Registrar e ir ao próximo' : 'Registrar deliberação' ?></button>
+            </div>
+        </form>
+        <?php else: ?>
+        <p class="text-sm text-gray-500 border-t border-gray-100 pt-4">Coloque o Conselho em andamento para deliberar. A média mínima deste boletim é <?= number_format($notaMinima, 1, ',', '.') ?>.</p>
+        <?php endif; ?>
+    </article>
+    <?php endforeach; ?>
+    <?php endif; ?>
 </div>
+<script>
+(function () {
+    var cards = Array.prototype.slice.call(document.querySelectorAll('.conselho-aluno'));
+    var posicao = document.getElementById('conselho-posicao');
+    var atual = 0;
+    cards.forEach(function (card, i) {
+        if (!card.classList.contains('hidden')) atual = i;
+    });
+    function mostrar(indice) {
+        if (!cards.length) return;
+        atual = Math.max(0, Math.min(cards.length - 1, indice));
+        cards.forEach(function (card, i) {
+            card.classList.toggle('hidden', i !== atual);
+        });
+        if (posicao) posicao.textContent = (atual + 1) + ' de ' + cards.length;
+    }
+    var anterior = document.getElementById('conselho-anterior');
+    var proximo = document.getElementById('conselho-proximo');
+    if (anterior) anterior.addEventListener('click', function () { mostrar(atual - 1); });
+    if (proximo) proximo.addEventListener('click', function () { mostrar(atual + 1); });
+})();
+</script>
 
 <div class="bg-white rounded-xl shadow-lg p-6">
     <h3 class="text-base font-semibold text-gray-900 mb-1">Participantes</h3>

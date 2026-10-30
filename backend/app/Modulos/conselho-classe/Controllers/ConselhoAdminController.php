@@ -119,12 +119,22 @@ class ConselhoAdminController extends \App\Controllers\Admin\AdminBaseController
 
         $svc = $this->service();
         $flash = $this->getFlashMessage();
+        $matriz = $svc->matriz($sessao);
+        $filaIds = [];
+        foreach ((array) ($matriz['linhas'] ?? []) as $linhaFila) {
+            $codigoFila = (string) ($linhaFila['resultado_preliminar']['codigo'] ?? '');
+            if ($codigoFila === 'recuperacao' || $codigoFila === 'baixa_frequencia') {
+                $filaIds[] = (int) ($linhaFila['aluno']['id'] ?? 0);
+            }
+        }
         $this->viewWithLayout('admin', 'admin/conselho-classe/show', [
             'title' => 'Conselho de Classe - EducaTudo',
             'user' => $this->auth->getUser(),
             'current_page' => 'conselho_classe',
             'sessao' => $sessao,
-            'matriz' => $svc->matriz($sessao),
+            'matriz' => $matriz,
+            'ocorrencias_por_aluno' => $svc->ocorrenciasRecentes($filaIds),
+            'aluno_inicial' => max(0, (int) ($_GET['aluno'] ?? 0)),
             'ata' => $svc->model()->getAta((int) $id),
             'pode_registrar' => $svc->podeRegistrar($sessao),
             'csrf_token' => $this->generateCsrfToken(),
@@ -198,12 +208,26 @@ class ConselhoAdminController extends \App\Controllers\Admin\AdminBaseController
             return;
         }
         $alunoId = (int) ($_POST['aluno_id'] ?? 0);
-        $voltar = '/admin/conselhos/' . (int) $id . '/aluno/' . $alunoId;
+        $origemFila = (string) ($_POST['origem'] ?? '') === 'fila';
+        $voltar = $origemFila
+            ? '/admin/conselhos/' . (int) $id . ($alunoId > 0 ? '?aluno=' . $alunoId : '')
+            : '/admin/conselhos/' . (int) $id . '/aluno/' . $alunoId;
         if (!$this->csrfOuRedirect($voltar)) {
             return;
         }
         $result = $this->service()->deliberar((int) $id, $_POST, (int) ($this->auth->getUser()['id'] ?? 0));
         $this->setFlashMessage($result['success'] ? 'Deliberação registrada. A nota original do evento não foi alterada.' : ($result['error'] ?? 'Falha'), $result['success'] ? 'success' : 'error');
+        if ($origemFila) {
+            $proximo = (int) ($_POST['proximo_aluno_id'] ?? 0);
+            $destino = '/admin/conselhos/' . (int) $id;
+            if (!empty($result['success']) && $proximo > 0) {
+                $destino .= '?aluno=' . $proximo;
+            } elseif (empty($result['success']) && $alunoId > 0) {
+                $destino .= '?aluno=' . $alunoId;
+            }
+            $this->redirect($destino);
+            return;
+        }
         $this->redirect($voltar);
     }
 

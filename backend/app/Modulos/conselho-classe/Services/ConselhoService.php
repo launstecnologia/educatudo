@@ -795,6 +795,86 @@ class ConselhoService
         ];
     }
 
+    /**
+     * Ocorrências recentes dos alunos que entram na fila do Conselho.
+     *
+     * @param list<int> $alunoIds
+     * @return array<int, list<array{id:int,titulo:string,data:string}>>
+     */
+    public function ocorrenciasRecentes(array $alunoIds): array
+    {
+        $alunoIds = array_values(array_unique(array_filter(array_map('intval', $alunoIds), static function ($id) {
+            return $id > 0;
+        })));
+        if ($alunoIds === [] || !$this->moduloOcorrenciasHabilitado() || !$this->model->tabelaExiste('alunos_ocorrencias')) {
+            return [];
+        }
+        $ph = [];
+        $phItem = [];
+        $idsSet = [];
+        foreach ($alunoIds as $i => $id) {
+            $ph[] = ':a' . $i;
+            $phItem[] = ':i' . $i;
+            $idsSet[$id] = true;
+        }
+        $comItens = $this->model->tabelaExiste('alunos_ocorrencias_itens');
+        $sql = $comItens
+            ? 'SELECT o.id, o.aluno_id, oi.aluno_id AS item_aluno_id, o.titulo, o.data_ocorrencia
+               FROM alunos_ocorrencias o
+               LEFT JOIN alunos_ocorrencias_itens oi
+                 ON oi.ocorrencia_id = o.id AND oi.aluno_id IN (' . implode(',', $phItem) . ')
+               WHERE o.aluno_id IN (' . implode(',', $ph) . ')
+                  OR oi.aluno_id IS NOT NULL
+               ORDER BY o.data_ocorrencia DESC, o.id DESC
+               LIMIT 240'
+            : 'SELECT id, aluno_id, NULL AS item_aluno_id, titulo, data_ocorrencia
+               FROM alunos_ocorrencias
+               WHERE aluno_id IN (' . implode(',', $ph) . ')
+               ORDER BY data_ocorrencia DESC, id DESC
+               LIMIT 240';
+        $paramsSql = [];
+        foreach ($alunoIds as $i => $id) {
+            $paramsSql['a' . $i] = $id;
+            if ($comItens) {
+                $paramsSql['i' . $i] = $id;
+            }
+        }
+        try {
+            $rows = $this->db->fetchAll($sql, $paramsSql) ?: [];
+        } catch (Throwable $e) {
+            error_log('ConselhoService::ocorrenciasRecentes: ' . $e->getMessage());
+            return [];
+        }
+        $porAluno = [];
+        $vistos = [];
+        foreach ($rows as $row) {
+            $ocorrenciaId = (int) ($row['id'] ?? 0);
+            $candidatos = [];
+            $principal = (int) ($row['aluno_id'] ?? 0);
+            $item = (int) ($row['item_aluno_id'] ?? 0);
+            if (isset($idsSet[$principal])) {
+                $candidatos[] = $principal;
+            }
+            if ($item > 0 && isset($idsSet[$item]) && $item !== $principal) {
+                $candidatos[] = $item;
+            }
+            foreach ($candidatos as $alunoId) {
+                $marca = $alunoId . ':' . $ocorrenciaId;
+                if (isset($vistos[$marca]) || count($porAluno[$alunoId] ?? []) >= 6) {
+                    continue;
+                }
+                $vistos[$marca] = true;
+                $porAluno[$alunoId][] = [
+                    'id' => $ocorrenciaId,
+                    'titulo' => (string) ($row['titulo'] ?? ''),
+                    'data' => (string) ($row['data_ocorrencia'] ?? ''),
+                ];
+            }
+        }
+
+        return $porAluno;
+    }
+
     private function moduloOcorrenciasHabilitado(): bool
     {
         return LayoutHelper::isModuleEnabled('ocorrencias');
