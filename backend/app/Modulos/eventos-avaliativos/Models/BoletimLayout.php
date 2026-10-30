@@ -561,6 +561,167 @@ class BoletimLayout
     }
 
     /**
+     * Turmas do ano cobertas por um boletim oficial ativo.
+     * Lista vazia de turma ou série no boletim vale para todas.
+     *
+     * @param list<int> $somenteTurmas
+     * @return list<int>
+     */
+    public function turmasCobertas(int $ano, array $somenteTurmas = []): array
+    {
+        if ($ano <= 0 || !$this->identidadePronta()) {
+            return [];
+        }
+        $layouts = $this->db->fetchAll(
+            'SELECT turmas_ids, series_ids
+             FROM boletim_layouts
+             WHERE ano_letivo = :ano AND ativo = 1 AND finalidade = \'oficial\'
+             ORDER BY id ASC',
+            ['ano' => $ano]
+        ) ?: [];
+        if ($layouts === []) {
+            return [];
+        }
+        try {
+            $turmas = $this->db->fetchAll(
+                'SELECT id, serie_id FROM turmas WHERE ano_letivo = :ano AND (ativo = 1 OR ativo IS NULL)',
+                ['ano' => $ano]
+            ) ?: [];
+        } catch (\Throwable $e) {
+            $turmas = $this->db->fetchAll(
+                'SELECT id, serie_id FROM turmas WHERE ano_letivo = :ano',
+                ['ano' => $ano]
+            ) ?: [];
+        }
+        $filtro = [];
+        foreach ($somenteTurmas as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $filtro[$id] = true;
+            }
+        }
+        $ids = [];
+        foreach ($turmas as $turma) {
+            $turmaId = (int) ($turma['id'] ?? 0);
+            $serieId = (int) ($turma['serie_id'] ?? 0);
+            if ($turmaId <= 0 || ($filtro !== [] && !isset($filtro[$turmaId]))) {
+                continue;
+            }
+            if ($this->layoutCobreTurma($layouts, $turmaId, $serieId)) {
+                $ids[$turmaId] = $turmaId;
+            }
+        }
+
+        return array_values($ids);
+    }
+
+    /**
+     * Matérias do boletim oficial que cobre a turma. Vazio se nenhum boletim couber.
+     *
+     * @return list<array{materia_id:int,componente_nome:string,ordem:int}>
+     */
+    public function componentesOficial(int $ano, int $turmaId, int $serieId): array
+    {
+        $layout = $this->layoutOficialDaTurma($ano, $turmaId, $serieId);
+        if ($layout === null) {
+            return [];
+        }
+        $ids = $this->idsJson((string) ($layout['materias_ids'] ?? ''));
+        if ($ids === []) {
+            return [];
+        }
+        $ph = [];
+        $params = [];
+        foreach ($ids as $i => $id) {
+            $chave = 'm' . $i;
+            $ph[] = ':' . $chave;
+            $params[$chave] = $id;
+        }
+        try {
+            $nomes = $this->db->fetchAll(
+                'SELECT id, nome FROM materias WHERE id IN (' . implode(',', $ph) . ')',
+                $params
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $porId = [];
+        foreach ($nomes as $nome) {
+            $id = (int) ($nome['id'] ?? 0);
+            if ($id > 0) {
+                $porId[$id] = (string) ($nome['nome'] ?? 'Componente');
+            }
+        }
+        $saida = [];
+        $ordem = 0;
+        foreach ($ids as $id) {
+            if (!isset($porId[$id])) {
+                continue;
+            }
+            $ordem++;
+            $saida[] = [
+                'materia_id' => $id,
+                'componente_nome' => $porId[$id],
+                'ordem' => $ordem,
+            ];
+        }
+
+        return $saida;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $layouts
+     */
+    private function layoutCobreTurma(array $layouts, int $turmaId, int $serieId): bool
+    {
+        return $this->escolherLayoutOficial($layouts, $turmaId, $serieId) !== null;
+    }
+
+    /**
+     * @return array<string,mixed>|null
+     */
+    private function layoutOficialDaTurma(int $ano, int $turmaId, int $serieId): ?array
+    {
+        if ($ano <= 0 || !$this->identidadePronta()) {
+            return null;
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT id, turmas_ids, series_ids, materias_ids
+             FROM boletim_layouts
+             WHERE ano_letivo = :ano AND ativo = 1 AND finalidade = \'oficial\'
+             ORDER BY id ASC',
+            ['ano' => $ano]
+        ) ?: [];
+
+        return $this->escolherLayoutOficial($rows, $turmaId, $serieId);
+    }
+
+    /**
+     * @param list<array<string,mixed>> $layouts
+     * @return array<string,mixed>|null
+     */
+    private function escolherLayoutOficial(array $layouts, int $turmaId, int $serieId): ?array
+    {
+        foreach ($layouts as $layout) {
+            if (!is_array($layout)) {
+                continue;
+            }
+            $turmas = $this->idsJson((string) ($layout['turmas_ids'] ?? ''));
+            $series = $this->idsJson((string) ($layout['series_ids'] ?? ''));
+            if ($turmas !== [] && !in_array($turmaId, $turmas, true)) {
+                continue;
+            }
+            if ($series !== [] && !in_array($serieId, $series, true)) {
+                continue;
+            }
+
+            return $layout;
+        }
+
+        return null;
+    }
+
+    /**
      * @param array<int,float|null> $medias
      */
     public function calcularFormula(?string $formula, array $medias): ?float

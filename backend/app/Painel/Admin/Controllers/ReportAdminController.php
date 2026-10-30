@@ -317,6 +317,68 @@ class ReportAdminController extends AdminBaseController
         $this->json(['success' => true, 'alunos' => $alunos]);
     }
 
+    public function prepararBoletimCoordenacao(): void
+    {
+        if (!$this->enforceAdminPermissionKey('relatorios_gerais', 'visualizar', false)) {
+            return;
+        }
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Token inválido. Tente novamente.', 'error');
+            $this->redirect('/admin/reports/boletim-coordenacao');
+            return;
+        }
+        $fonte = strtolower(trim((string) ($_POST['fonte'] ?? '')));
+        $fonte = $fonte === 'demonstrativo' ? 'demonstrativo' : 'vida_escolar';
+        $anoLetivo = max(0, (int) ($_POST['ano_letivo'] ?? 0));
+        $turmaId = (int) ($_POST['turma_id'] ?? 0);
+        $cursoId = max(0, (int) ($_POST['curso_id'] ?? 0));
+        if ($fonte === 'vida_escolar' && $anoLetivo > 0) {
+            $turmasDoBoletim = [];
+            if ($turmaId > 0) {
+                $turmasDoBoletim = [$turmaId];
+            } elseif ($cursoId > 0) {
+                $turmasDoBoletim = $this->idsTurmasDoCursoBoletimCoordenacao($cursoId);
+            }
+            try {
+                $usuario = $this->auth->getUser();
+                (new \App\Modulos\VidaEscolar\Services\VidaEscolarService())->garantirFichasDoLayoutOficial(
+                    $anoLetivo,
+                    $turmasDoBoletim,
+                    is_array($usuario) ? $usuario : []
+                );
+            } catch (\Throwable $e) {
+                error_log('boletimCoordenacao garantir fichas: ' . $e->getMessage());
+            }
+        }
+        $params = [
+            'fonte' => $fonte,
+            'ano_letivo' => $anoLetivo,
+            'periodo' => max(0, (int) ($_POST['periodo'] ?? 0)),
+            'curso_id' => $cursoId,
+            'turma_id' => max(0, $turmaId),
+            'executar' => 1,
+        ];
+        $alunoQ = trim((string) ($_POST['aluno_q'] ?? ''));
+        if ($alunoQ !== '') {
+            $params['aluno_q'] = $alunoQ;
+        }
+        $notaAbaixo = trim((string) ($_POST['nota_abaixo_de'] ?? ''));
+        if ($notaAbaixo !== '') {
+            $params['nota_abaixo_de'] = $notaAbaixo;
+        }
+        if ((string) ($_POST['materias_exibicao'] ?? '') === 'abaixo') {
+            $params['materias_exibicao'] = 'abaixo';
+        }
+        if (!empty($_POST['assinatura'])) {
+            $params['assinatura'] = 1;
+        }
+        $boletimId = max(0, (int) ($_POST['boletim_id'] ?? 0));
+        if ($boletimId > 0) {
+            $params['boletim_id'] = $boletimId;
+        }
+        $this->redirect('/admin/reports/boletim-coordenacao?' . http_build_query($params));
+    }
+
     public function boletimCoordenacao()
     {
         if (!$this->enforceAdminPermissionKey('relatorios_gerais', 'visualizar', false)) {
@@ -362,7 +424,7 @@ class ReportAdminController extends AdminBaseController
                 } catch (\Throwable $e) {
                     error_log('boletimCoordenacao vida_escolar: ' . $e->getMessage());
                     $this->setFlashMessage(
-                        'Não foi possível montar o boletim. Confira se as fichas da Vida Escolar do ano foram geradas (Modelo de Boletim / sincronizar) ou filtre por uma turma.',
+                        'Não foi possível montar o boletim da Vida Escolar. Filtre por uma turma e gere de novo.',
                         'error'
                     );
                     $relatorio = null;
@@ -402,9 +464,11 @@ class ReportAdminController extends AdminBaseController
 
         $flash = $this->getFlashMessage();
         $zipJob = $this->resolverZipJobBoletinsVidaEscolar();
+        $paginaPropriaRelatorio = class_exists(\App\Core\LayoutHelper::class)
+            && \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos');
         $this->viewWithLayout('admin', 'admin/reports/boletim_coordenacao', [
-            'title' => 'Boletins — Relatórios',
-            'page_title' => 'Boletins',
+            'title' => $paginaPropriaRelatorio ? 'Relatórios' : 'Boletins — Relatórios',
+            'page_title' => $paginaPropriaRelatorio ? 'Relatórios' : 'Boletins',
             'user' => $user,
             'current_page' => 'reports_boletim_coordenacao',
             'fonte' => $fonte,

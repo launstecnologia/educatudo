@@ -515,6 +515,74 @@ class VidaEscolar
     }
 
     /**
+     * Alunos matriculados nas turmas do ano. Cai para o vínculo atual da turma se não houver matrícula.
+     *
+     * @param list<int> $turmaIds
+     * @return list<array{aluno_id:int,turma_id:int}>
+     */
+    public function listarAlunosDasTurmas(array $turmaIds, int $anoLetivo): array
+    {
+        $turmaIds = array_values(array_unique(array_filter(array_map('intval', $turmaIds), static function ($id) {
+            return $id > 0;
+        })));
+        if ($turmaIds === [] || $anoLetivo <= 0) {
+            return [];
+        }
+        $ph = [];
+        $params = ['ano' => $anoLetivo];
+        foreach ($turmaIds as $i => $id) {
+            $chave = 't' . $i;
+            $ph[] = ':' . $chave;
+            $params[$chave] = $id;
+        }
+        $in = implode(',', $ph);
+        $rows = [];
+        if ($this->tabelaExiste('matricula') && $this->tabelaExiste('ano_letivo')) {
+            try {
+                $rows = $this->db->fetchAll(
+                    "SELECT DISTINCT a.id AS aluno_id, m.turma_id
+                     FROM matricula m
+                     INNER JOIN ano_letivo al ON al.id = m.ano_letivo_id AND al.ano = :ano
+                     INNER JOIN alunos a ON a.id = m.aluno_id
+                     WHERE m.turma_id IN ({$in})
+                       AND m.status IN ('ativa', 'concluido', 'transferido')
+                       AND (a.ativo = 1 OR a.ativo IS NULL OR m.status = 'transferido')
+                     ORDER BY m.turma_id ASC, a.id ASC",
+                    $params
+                ) ?: [];
+            } catch (\Throwable $e) {
+                $rows = [];
+            }
+        }
+        if ($rows === []) {
+            try {
+                $rows = $this->db->fetchAll(
+                    "SELECT DISTINCT a.id AS aluno_id, a.turma_id
+                     FROM alunos a
+                     INNER JOIN turmas t ON t.id = a.turma_id AND t.ano_letivo = :ano
+                     WHERE a.turma_id IN ({$in})
+                       AND (a.ativo = 1 OR a.ativo IS NULL)
+                     ORDER BY a.turma_id ASC, a.id ASC",
+                    $params
+                ) ?: [];
+            } catch (\Throwable $e) {
+                return [];
+            }
+        }
+        $saida = [];
+        foreach ($rows as $row) {
+            $alunoId = (int) ($row['aluno_id'] ?? 0);
+            $turmaId = (int) ($row['turma_id'] ?? 0);
+            if ($alunoId <= 0 || $turmaId <= 0) {
+                continue;
+            }
+            $saida[] = ['aluno_id' => $alunoId, 'turma_id' => $turmaId];
+        }
+
+        return $saida;
+    }
+
+    /**
      * @param list<int> $fichaIds
      * @return array<int, list<array<string,mixed>>>
      */

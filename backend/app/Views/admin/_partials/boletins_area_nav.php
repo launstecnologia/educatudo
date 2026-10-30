@@ -1,7 +1,7 @@
 <?php
 /**
  * Cabeçalho e abas da área Boletins.
- * $boletins_aba: modelos | periodos | resultados | relatorios
+ * $boletins_aba: modelos | periodos | resultados | relatorios (relatorios só no modelo antigo)
  */
 $modeloEvento = class_exists(\App\Core\LayoutHelper::class) && \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos');
 $abaBoletins = (string) ($boletins_aba ?? 'modelos');
@@ -9,8 +9,10 @@ $abasBoletins = [
     'modelos' => ['Modelos', URL . '/admin/boletins'],
     'periodos' => ['Períodos e fórmulas', URL . '/admin/boletim'],
     'resultados' => ['Resultados e versões', URL . '/admin/boletim-configuracao/gerados'],
-    'relatorios' => ['Relatórios', URL . '/admin/reports/boletim-coordenacao?fonte=vida_escolar'],
 ];
+if (!$modeloEvento) {
+    $abasBoletins['relatorios'] = ['Relatórios', URL . '/admin/reports/boletim-coordenacao?fonte=vida_escolar'];
+}
 ?>
 <div class="mb-6">
     <div class="flex items-start justify-between gap-3 flex-wrap mb-4">

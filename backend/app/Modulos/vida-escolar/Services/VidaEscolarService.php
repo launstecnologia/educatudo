@@ -317,6 +317,82 @@ class VidaEscolarService
     }
 
     /**
+     * Cria a ficha da Vida Escolar para cada aluno coberto pelo boletim oficial do ano
+     * e copia as notas já geradas. Não homologa: ficha homologada não é reescrita.
+     *
+     * @param list<int> $turmaIdsFiltro vazio = todas as turmas do boletim
+     * @param array<string,mixed> $usuario
+     * @return array{criadas:int,sincronizadas:int}
+     */
+    public function garantirFichasDoLayoutOficial(int $anoLetivo, array $turmaIdsFiltro = [], array $usuario = []): array
+    {
+        $vazio = ['criadas' => 0, 'sincronizadas' => 0];
+        if (!$this->model->schemaPronto() || $anoLetivo <= 0) {
+            return $vazio;
+        }
+        $layout = new \App\Modulos\EventosAvaliativos\Models\BoletimLayout();
+        $turmas = $layout->turmasCobertas($anoLetivo, $turmaIdsFiltro);
+        if ($turmas === []) {
+            return $vazio;
+        }
+        $alunos = $this->model->listarAlunosDasTurmas($turmas, $anoLetivo);
+        if ($alunos === []) {
+            return $vazio;
+        }
+        set_time_limit(180);
+
+        $ids = [];
+        foreach ($alunos as $row) {
+            $ids[] = (int) $row['aluno_id'];
+        }
+        $fichas = $this->model->listarFichasPorAlunosAno($ids, $anoLetivo);
+        $usuarioId = (int) ($usuario['id'] ?? 0);
+        $criadas = 0;
+        $sincronizadas = 0;
+        foreach ($alunos as $row) {
+            $alunoId = (int) $row['aluno_id'];
+            $turmaId = (int) $row['turma_id'];
+            if ($alunoId <= 0 || $turmaId <= 0) {
+                continue;
+            }
+            $ficha = $fichas[$alunoId . ':' . $turmaId] ?? null;
+            if (is_array($ficha) && ($ficha['status'] ?? '') === 'homologada') {
+                continue;
+            }
+            if (!is_array($ficha)) {
+                $ok = $this->garantirFicha($alunoId, $turmaId, $anoLetivo, $usuarioId > 0 ? $usuarioId : null);
+                if (empty($ok['success'])) {
+                    continue;
+                }
+                $fichaId = (int) ($ok['id'] ?? 0);
+                if ($fichaId <= 0) {
+                    continue;
+                }
+                if (!empty($ok['criada'])) {
+                    $criadas++;
+                }
+                $ficha = $this->model->findFicha($fichaId) ?: ['id' => $fichaId, 'status' => 'em_curso'];
+                $fichas[$alunoId . ':' . $turmaId] = $ficha;
+            }
+            $fichaId = (int) ($ficha['id'] ?? 0);
+            if ($fichaId <= 0 || ($ficha['status'] ?? '') === 'homologada') {
+                continue;
+            }
+            try {
+                $sync = $this->sincronizarDeEventosGerados($alunoId, $usuario, null, null, $fichaId, false, false);
+                if (empty($sync['success'])) {
+                    continue;
+                }
+                $sincronizadas += (int) ($sync['atualizadas'] ?? 0);
+            } catch (\Throwable $e) {
+                error_log('Vida escolar sincronizar ficha do boletim aluno #' . $alunoId . ': ' . $e->getMessage());
+            }
+        }
+
+        return ['criadas' => $criadas, 'sincronizadas' => $sincronizadas];
+    }
+
+    /**
      * Regrava notas e faltas da ficha a partir dos eventos oficiais (seed/demo).
      *
      * @param array<string,mixed> $usuario
@@ -3520,7 +3596,11 @@ class VidaEscolarService
     private function componentesParaNovaFicha(int $turmaId, int $anoLetivo, int $alunoId = 0): array
     {
         $turma = $turmaId > 0 ? $this->model->turmaPorId($turmaId) : null;
-        $serieId = (int) ($turma['serie_id'] ?? 0);
+        $serieId = (int) (is_array($turma) ? ($turma['serie_id'] ?? 0) : 0);
+        $doLayout = (new \App\Modulos\EventosAvaliativos\Models\BoletimLayout())->componentesOficial($anoLetivo, $turmaId, $serieId);
+        if ($doLayout !== []) {
+            return $doLayout;
+        }
         $preferido = $alunoId > 0 ? $this->boletimIdDicaDoAluno($alunoId, $anoLetivo) : 0;
         $modelo = $this->boletimCadastro()->encontrarOficialParaTurma(
             $turmaId,
@@ -3549,11 +3629,21 @@ class VidaEscolarService
         if ($fichaId <= 0 || ($ficha['status'] ?? '') === 'homologada') {
             return;
         }
-        $modelo = $this->modeloOficialDaFicha($ficha);
-        if (!is_array($modelo)) {
-            return;
+        $turmaId = (int) ($ficha['turma_id'] ?? 0);
+        $ano = (int) ($ficha['ano_letivo'] ?? 0);
+        $turma = $turmaId > 0 ? $this->model->turmaPorId($turmaId) : null;
+        $comps = (new \App\Modulos\EventosAvaliativos\Models\BoletimLayout())->componentesOficial(
+            $ano,
+            $turmaId,
+            (int) (is_array($turma) ? ($turma['serie_id'] ?? 0) : 0)
+        );
+        if ($comps === []) {
+            $modelo = $this->modeloOficialDaFicha($ficha);
+            if (!is_array($modelo)) {
+                return;
+            }
+            $comps = $this->boletimCadastro()->componentesParaFicha($modelo);
         }
-        $comps = $this->boletimCadastro()->componentesParaFicha($modelo);
         if ($comps === []) {
             return;
         }

@@ -944,7 +944,7 @@ class ImplantacaoAcademicaService
             ],
             'relatorio' => [
                 'como_fazer' => [
-                    $comPrint('Abra Como a escola avalia → Relatórios. É a mesma área do demonstrativo, na aba Relatórios. Esta tela não cadastra nota: ela imprime o que o evento, o demonstrativo e o boletim já calcularam.', '104-relatorio-boletim.jpg', 'Tela do relatório'),
+                    $comPrint('Abra Como a escola avalia → Relatórios. A tela é só de emissão: imprime o que o evento, o demonstrativo e o boletim já calcularam.', '104-relatorio-boletim.jpg', 'Tela do relatório'),
                     $comPrint('Em Exibir, escolha Boletim ou Demonstrativo de notas. São dois documentos. O boletim é o oficial. O demonstrativo é a conta detalhada do período e usa a versão vigente.', '105-relatorio-demonstrativo.jpg', 'Boletim ou demonstrativo'),
                     $comPrint('Escolha o ano letivo e o período. Todos junta o ano. Um trimestre mostra só aquele período.', '104-relatorio-boletim.jpg', 'Ano e período'),
                     $comPrint('Filtre curso, turma ou um aluno (nome, RA ou código). Nota abaixo de restringe quem ficou sob o corte. Em Matérias, dá para ver todas ou só as que estão abaixo desse corte.', '104-relatorio-boletim.jpg', 'Filtros'),

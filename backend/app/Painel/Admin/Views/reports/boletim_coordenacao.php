@@ -65,12 +65,30 @@ $zipTermino = (string) ($zipJob['finalizado_em'] ?? '');
 $zipPedido = (string) ($zipJob['pedido_em'] ?? '');
 $zipDuracao = (string) ($zipJob['duracao'] ?? '');
 include \App\Core\ViewPaths::adminPartial('flash_message.php');
+$modeloEventoRelatorio = class_exists(\App\Core\LayoutHelper::class)
+    && \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos');
 ?>
+<?php if ($modeloEventoRelatorio): ?>
+<div class="mb-6">
+    <div class="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Relatórios</h1>
+            <p class="text-sm text-gray-600 mt-1">Escolha o boletim ou o demonstrativo de notas. O demonstrativo usa a versão vigente.</p>
+        </div>
+        <a href="<?= URL ?>/admin/academico"
+           class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+            <i class="fa-solid fa-arrow-left mr-2 text-gray-500" aria-hidden="true"></i>
+            Voltar
+        </a>
+    </div>
+</div>
+<?php else: ?>
 <?php $boletins_aba = 'relatorios'; include \App\Core\ViewPaths::adminPartial('boletins_area_nav.php'); ?>
 <div class="mb-6">
     <h2 class="text-lg font-semibold text-gray-900">Relatórios</h2>
     <p class="text-gray-600 mt-1">Escolha o boletim ou o demonstrativo de notas. O demonstrativo usa a versão vigente.</p>
 </div>
+<?php endif; ?>
 <?php
 $boletimContextoId = max(0, (int) ($_GET['boletim_id'] ?? 0));
 if ($boletimContextoId > 0):
@@ -96,7 +114,8 @@ $opcoesPeriodo = is_array($infoPeriodoAno['opcoes'] ?? null) ? $infoPeriodoAno['
 $campoClasse = 'w-full h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100';
 $alunoQFiltro = trim((string) ($aluno_q ?? ''));
 ?>
-<form method="GET" action="<?= URL ?>/admin/reports/boletim-coordenacao" id="form-boletim-coordenacao" class="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
+<form method="POST" action="<?= URL ?>/admin/reports/boletim-coordenacao" id="form-boletim-coordenacao" class="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
+    <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? ''), ENT_QUOTES, 'UTF-8') ?>">
     <?php if ($boletimContextoId > 0): ?>
     <input type="hidden" name="boletim_id" value="<?= $boletimContextoId ?>">
     <?php endif; ?>
@@ -287,7 +306,7 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
     <?php if ((int) ($relatorio['total_alunos'] ?? 0) <= 0): ?>
         <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4"><?php
             if ($fonteRelatorio === 'vida_escolar') {
-                echo 'Nenhuma ficha de boletim na Vida Escolar para estes filtros. Sincronize o boletim oficial do ano em Vida Escolar / Modelo de Boletim (ou materialize as fichas do ano no ambiente de teste).';
+                echo 'Nenhum aluno com boletim oficial na Vida Escolar para estes filtros.';
             } elseif ($fonteRelatorio === 'demonstrativo') {
                 echo 'Nenhum demonstrativo de notas encontrado para os filtros selecionados.';
             } else {

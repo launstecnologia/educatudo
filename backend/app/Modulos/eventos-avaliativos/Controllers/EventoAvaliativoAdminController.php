@@ -437,6 +437,7 @@ class EventoAvaliativoAdminController extends AdminBaseController
             $this->redirect('/admin/eventos-avaliativos/boletim/novo?ano=' . $ano);
             return;
         }
+        $this->vincularVidaEscolarDoBoletim((int) $res['id']);
         $this->setFlashMessage('Boletim criado. Monte as linhas do layout.', 'success');
         $this->redirect('/admin/eventos-avaliativos/boletim/' . (int) $res['id']);
     }
@@ -472,6 +473,7 @@ class EventoAvaliativoAdminController extends AdminBaseController
             $this->redirect('/admin/eventos-avaliativos/boletim/' . $id . '/dados');
             return;
         }
+        $this->vincularVidaEscolarDoBoletim($id);
         $this->setFlashMessage('Dados do boletim salvos.', 'success');
         $this->redirect('/admin/eventos-avaliativos/boletim/' . $id . '/dados');
     }
@@ -634,6 +636,28 @@ class EventoAvaliativoAdminController extends AdminBaseController
             return [$fallback];
         }
         return $anos;
+    }
+
+    private function vincularVidaEscolarDoBoletim(int $boletimId): void
+    {
+        if ($boletimId <= 0) {
+            return;
+        }
+        try {
+            $item = (new BoletimLayout())->find($boletimId);
+            $ano = (int) ($item['ano_letivo'] ?? 0);
+            if ($item === null || $ano <= 0 || (string) ($item['finalidade'] ?? '') !== 'oficial' || (int) ($item['ativo'] ?? 0) !== 1) {
+                return;
+            }
+            $usuario = $this->auth->getUser();
+            (new \App\Modulos\VidaEscolar\Services\VidaEscolarService())->garantirFichasDoLayoutOficial(
+                $ano,
+                [],
+                is_array($usuario) ? $usuario : []
+            );
+        } catch (\Throwable $e) {
+            error_log('Vida escolar ao salvar boletim #' . $boletimId . ': ' . $e->getMessage());
+        }
     }
 
     private function boletimPermitido(string $acao, bool $apenasConsulta = false): bool
