@@ -685,6 +685,41 @@ class LayoutHelper
     }
     
     /**
+     * Chaves de cor, logo e título que o admin da escola e o Master editam juntos.
+     * O valor aplicado no sistema é o do banco da escola.
+     *
+     * @return list<string>
+     */
+    public static function chavesIdentidadeVisual(): array
+    {
+        return [
+            'primary_color',
+            'primary_text_color',
+            'button_primary_color',
+            'navbar_bg_color',
+            'sidebar_text_color',
+            'secondary_color',
+            'secondary_text_color',
+            'page_background_color',
+            'logo_url',
+            'logo_navbar_url',
+            'logo_login_url',
+            'logo_1x1_url',
+            'logo_horizontal_url',
+            'logo_white_url',
+            'logo_horizontal_white_url',
+            'login_cover_url',
+            'logo_use_login',
+            'logo_use_navbar',
+            'logo_size_login',
+            'logo_size_navbar',
+            'system_title',
+            'system_subtitle',
+            'menu_colag_nome',
+        ];
+    }
+
+    /**
      * Obter URL da logo
      */
     public static function getLogoUrl()

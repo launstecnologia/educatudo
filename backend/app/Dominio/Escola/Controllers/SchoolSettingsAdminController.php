@@ -324,6 +324,43 @@ class SchoolSettingsAdminController extends AdminBaseController
         $this->viewWithLayout('admin', 'admin/dev/layout', $data);
     }
 
+    /**
+     * @param array<string, mixed> $gravado
+     */
+    private function espelharIdentidadeNoMaster(array $gravado): void
+    {
+        $escolaId = defined('TENANT_ID') ? (int) TENANT_ID : 0;
+        if ($escolaId < 1 || $gravado === []) {
+            return;
+        }
+        $permitidas = array_fill_keys(LayoutHelper::chavesIdentidadeVisual(), true);
+        $pares = [];
+        foreach ($gravado as $chave => $valor) {
+            if (!isset($permitidas[$chave]) || is_array($valor)) {
+                continue;
+            }
+            $pares[$chave] = (string) $valor;
+        }
+        if ($pares === []) {
+            return;
+        }
+        $pdo = \App\Painel\Master\Services\MasterFilaService::masterPdo();
+        if (!$pdo instanceof \PDO) {
+            return;
+        }
+        try {
+            $st = $pdo->prepare(
+                'INSERT INTO config_escolas_layout (escola_id, config_key, config_value) VALUES (?, ?, ?)
+                 ON DUPLICATE KEY UPDATE config_value = VALUES(config_value)'
+            );
+            foreach ($pares as $chave => $valor) {
+                $st->execute([$escolaId, $chave, $valor]);
+            }
+        } catch (\Throwable $e) {
+            error_log('[layout] falha ao espelhar identidade no master: ' . $e->getMessage());
+        }
+    }
+
     public function saveLayout()
     {
         $user = $this->auth->getUser();
@@ -391,6 +428,7 @@ class SchoolSettingsAdminController extends AdminBaseController
             }
 
             LayoutHelper::invalidateCache();
+            $this->espelharIdentidadeNoMaster($configs);
 
             $this->json(['success' => true, 'message' => 'Configurações salvas com sucesso!']);
             
@@ -517,6 +555,11 @@ class SchoolSettingsAdminController extends AdminBaseController
             }
 
             LayoutHelper::invalidateCache();
+            $espelho = [];
+            foreach ($configKeys as $configKey) {
+                $espelho[$configKey] = $url;
+            }
+            $this->espelharIdentidadeNoMaster($espelho);
             
             $this->json([
                 'success' => true, 

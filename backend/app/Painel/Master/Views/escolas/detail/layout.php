@@ -86,7 +86,7 @@ $navbar_links_aluno = [
         <h3 class="text-lg font-semibold text-slate-800 mb-4">Cores e Identidade Visual</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <?php
-            $corPrimariaMaster = (string) ($layout_config['primary_color'] ?? '#6366f1');
+            $corPrimariaMaster = (string) ($layout_config['primary_color'] ?? '#a855f7');
             $navbarBgMaster = (string) ($layout_config['navbar_bg_color'] ?? $corPrimariaMaster);
             if (!class_exists('LayoutHelper', false)) {
             }
@@ -108,8 +108,13 @@ $navbar_links_aluno = [
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Cor do texto (sobre botões/primária)</label>
-                <input type="text" name="layout_primary_text_color" value="<?= htmlspecialchars($layout_config['primary_text_color'] ?? '#ffffff') ?>"
-                       class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <div class="flex gap-2 items-center">
+                    <input type="color" id="lc_primary_text_picker" value="<?= htmlspecialchars($layout_config['primary_text_color'] ?? '#ffffff') ?>"
+                           class="h-10 w-14 rounded border border-slate-300 cursor-pointer">
+                    <input type="text" name="layout_primary_text_color" id="lc_primary_text" value="<?= htmlspecialchars($layout_config['primary_text_color'] ?? '#ffffff') ?>"
+                           class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <p class="text-xs text-slate-500 mt-1">Texto sobre botões primários e fundos de destaque.</p>
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Cor dos botões primários</label>
@@ -137,6 +142,37 @@ $navbar_links_aluno = [
                     <input type="text" name="layout_sidebar_text_color" id="lc_sidebar_text" value="<?= htmlspecialchars($sidebarTextMaster) ?>"
                            class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 </div>
+                <p class="text-xs text-slate-500 mt-1">Texto dos itens do menu e dos submenus.</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Cor secundária</label>
+                <div class="flex gap-2 items-center">
+                    <input type="color" id="lc_secondary_picker" value="<?= htmlspecialchars($layout_config['secondary_color'] ?? '#0ea5e9') ?>"
+                           class="h-10 w-14 rounded border border-slate-300 cursor-pointer">
+                    <input type="text" name="layout_secondary_color" id="lc_secondary_text" value="<?= htmlspecialchars($layout_config['secondary_color'] ?? '#0ea5e9') ?>"
+                           class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <p class="text-xs text-slate-500 mt-1">Botões secundários e elementos complementares.</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Cor do texto secundário</label>
+                <div class="flex gap-2 items-center">
+                    <input type="color" id="lc_secondary_text_picker" value="<?= htmlspecialchars($layout_config['secondary_text_color'] ?? '#ffffff') ?>"
+                           class="h-10 w-14 rounded border border-slate-300 cursor-pointer">
+                    <input type="text" name="layout_secondary_text_color" id="lc_secondary_text_value" value="<?= htmlspecialchars($layout_config['secondary_text_color'] ?? '#ffffff') ?>"
+                           class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <p class="text-xs text-slate-500 mt-1">Texto sobre o fundo secundário.</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Background da página</label>
+                <div class="flex gap-2 items-center">
+                    <input type="color" id="lc_page_bg_picker" value="<?= htmlspecialchars($layout_config['page_background_color'] ?? '#f8fafc') ?>"
+                           class="h-10 w-14 rounded border border-slate-300 cursor-pointer">
+                    <input type="text" name="layout_page_background_color" id="lc_page_bg_text" value="<?= htmlspecialchars($layout_config['page_background_color'] ?? '#f8fafc') ?>"
+                           class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <p class="text-xs text-slate-500 mt-1">Cor de fundo principal das páginas.</p>
             </div>
         </div>
     </div>
@@ -146,7 +182,9 @@ $navbar_links_aluno = [
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <?php
             $imageFields = [
-                ['label' => 'Logo principal', 'url_name' => 'layout_logo_url', 'file_name' => 'layout_logo_upload', 'config_key' => 'logo_url', 'preview_class' => 'h-20 object-contain'],
+                ['label' => 'Logo padrão do sistema', 'url_name' => 'layout_logo_url', 'file_name' => 'layout_logo_upload', 'config_key' => 'logo_url', 'preview_class' => 'h-20 object-contain'],
+                ['label' => 'Logo do navbar', 'url_name' => 'layout_logo_navbar_url', 'file_name' => 'layout_logo_navbar_upload', 'config_key' => 'logo_navbar_url', 'preview_class' => 'h-20 object-contain'],
+                ['label' => 'Logo da tela inicial', 'url_name' => 'layout_logo_login_url', 'file_name' => 'layout_logo_login_upload', 'config_key' => 'logo_login_url', 'preview_class' => 'h-20 object-contain'],
                 ['label' => 'Logo quadrado (1x1)', 'url_name' => 'layout_logo_1x1_url', 'file_name' => 'layout_logo_1x1_upload', 'config_key' => 'logo_1x1_url', 'preview_class' => 'h-20 w-20 object-cover rounded-lg'],
                 ['label' => 'Logo branca (modo dark/navbar)', 'url_name' => 'layout_logo_white_url', 'file_name' => 'layout_logo_white_upload', 'config_key' => 'logo_white_url', 'preview_class' => 'h-20 object-contain'],
                 ['label' => 'Logo horizontal branca (modo dark/navbar)', 'url_name' => 'layout_logo_horizontal_white_url', 'file_name' => 'layout_logo_horizontal_white_upload', 'config_key' => 'logo_horizontal_white_url', 'preview_class' => 'h-20 object-contain'],
@@ -407,9 +445,13 @@ function updatePreviewFromUrl(input) {
         text.oninput = function() { if (/^#[0-9A-Fa-f]{6}$/.test(this.value)) picker.value = this.value; };
     }
     bindColorPair('lc_color_picker', 'lc_color_text');
+    bindColorPair('lc_primary_text_picker', 'lc_primary_text');
     bindColorPair('lc_button_picker', 'lc_button_text');
     bindColorPair('lc_navbar_picker', 'lc_navbar_text');
     bindColorPair('lc_sidebar_text_picker', 'lc_sidebar_text');
+    bindColorPair('lc_secondary_picker', 'lc_secondary_text');
+    bindColorPair('lc_secondary_text_picker', 'lc_secondary_text_value');
+    bindColorPair('lc_page_bg_picker', 'lc_page_bg_text');
 })();
 
 (function() {

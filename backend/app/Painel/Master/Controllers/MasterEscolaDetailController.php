@@ -357,6 +357,14 @@ class MasterEscolaDetailController extends BaseController
             }
         }
 
+        // O admin da escola grava direto no banco dela. Essa cópia é a que o sistema usa.
+        foreach (LayoutHelper::chavesIdentidadeVisual() as $chaveVisual) {
+            if (!array_key_exists($chaveVisual, $tenant)) {
+                continue;
+            }
+            $master[$chaveVisual] = (string) $tenant[$chaveVisual];
+        }
+
         // Compatibilidade: prompts antigos salvos com chaves "prompt_gerar_*"
         $promptAliases = [
             'prompt_tema' => 'prompt_gerar_tema_redacao',
@@ -509,6 +517,8 @@ class MasterEscolaDetailController extends BaseController
     {
         $map = [
             'layout_logo_upload'        => 'logo',
+            'layout_logo_navbar_upload' => 'logo_navbar',
+            'layout_logo_login_upload'  => 'logo_login',
             'layout_logo_1x1_upload'    => 'logo_1x1',
             'layout_logo_white_upload'  => 'logo_white',
             'layout_logo_horizontal_white_upload' => 'logo_horizontal_white',
@@ -1746,6 +1756,8 @@ class MasterEscolaDetailController extends BaseController
 
         foreach ([
             'layout_logo_upload' => 'Logo principal',
+            'layout_logo_navbar_upload' => 'Logo do navbar',
+            'layout_logo_login_upload' => 'Logo da tela inicial',
             'layout_logo_1x1_upload' => 'Logo quadrado (1x1)',
             'layout_logo_white_upload' => 'Logo branca (modo dark/navbar)',
             'layout_logo_horizontal_white_upload' => 'Logo horizontal branca (modo dark/navbar)',
@@ -1754,12 +1766,9 @@ class MasterEscolaDetailController extends BaseController
             $url = $this->uploadLayoutImage($id, $field);
             if ($url !== null) {
                 match ($field) {
-                    'layout_logo_upload' => (function () use (&$config, $url) {
-                        $config['logo_url'] = $url;
-                        $config['logo_horizontal_url'] = $url;
-                        $config['logo_white_url'] = $url;
-                        $config['logo_horizontal_white_url'] = $url;
-                    })(),
+                    'layout_logo_upload' => $config['logo_url'] = $url,
+                    'layout_logo_navbar_upload' => $config['logo_navbar_url'] = $url,
+                    'layout_logo_login_upload' => $config['logo_login_url'] = $url,
                     'layout_logo_1x1_upload' => $config['logo_1x1_url'] = $url,
                     'layout_logo_white_upload' => $config['logo_white_url'] = $url,
                     'layout_logo_horizontal_white_upload' => $config['logo_horizontal_white_url'] = $url,
@@ -1780,7 +1789,12 @@ class MasterEscolaDetailController extends BaseController
             'layout_button_primary_color' => 'button_primary_color',
             'layout_navbar_bg_color'    => 'navbar_bg_color',
             'layout_sidebar_text_color' => 'sidebar_text_color',
+            'layout_secondary_color'    => 'secondary_color',
+            'layout_secondary_text_color' => 'secondary_text_color',
+            'layout_page_background_color' => 'page_background_color',
             'layout_logo_url'           => 'logo_url',
+            'layout_logo_navbar_url'    => 'logo_navbar_url',
+            'layout_logo_login_url'     => 'logo_login_url',
             'layout_logo_1x1_url'       => 'logo_1x1_url',
             'layout_logo_white_url'     => 'logo_white_url',
             'layout_logo_horizontal_white_url' => 'logo_horizontal_white_url',
@@ -1801,6 +1815,9 @@ class MasterEscolaDetailController extends BaseController
             'button_primary_color',
             'navbar_bg_color',
             'sidebar_text_color',
+            'secondary_color',
+            'secondary_text_color',
+            'page_background_color',
         ];
         foreach ($layoutKeys as $postKey => $cfgKey) {
             $v = trim((string) ($_POST[$postKey] ?? ''));
@@ -1838,7 +1855,7 @@ class MasterEscolaDetailController extends BaseController
         }
 
         $this->setLayoutConfig($id, $config);
-        $this->syncLayoutToTenant($id);
+        $this->syncLayoutToTenant($id, array_keys($config));
 
         if (!empty($uploadFailures)) {
             $this->setFlashMessage(
