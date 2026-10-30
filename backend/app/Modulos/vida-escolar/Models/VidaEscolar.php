@@ -584,6 +584,48 @@ class VidaEscolar
 
     /**
      * @param list<int> $fichaIds
+     * @return array<int, true>
+     */
+    public function idsFichasComNota(array $fichaIds): array
+    {
+        $fichaIds = array_values(array_unique(array_filter(array_map('intval', $fichaIds), static function ($id) {
+            return $id > 0;
+        })));
+        if ($fichaIds === []) {
+            return [];
+        }
+        $ph = [];
+        $params = [];
+        foreach ($fichaIds as $i => $id) {
+            $chave = 'f' . $i;
+            $ph[] = ':' . $chave;
+            $params[$chave] = $id;
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                'SELECT DISTINCT l.ficha_id
+                 FROM boletim_ficha_linhas l
+                 INNER JOIN boletim_ficha_celulas c ON c.linha_id = l.id
+                 WHERE l.ficha_id IN (' . implode(',', $ph) . ')
+                   AND c.nota IS NOT NULL',
+                $params
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $comNota = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['ficha_id'] ?? 0);
+            if ($id > 0) {
+                $comNota[$id] = true;
+            }
+        }
+
+        return $comNota;
+    }
+
+    /**
+     * @param list<int> $fichaIds
      * @return array<int, list<array<string,mixed>>>
      */
     public function listarLinhasPorFichas(array $fichaIds): array

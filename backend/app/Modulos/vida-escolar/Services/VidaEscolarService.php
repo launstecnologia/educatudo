@@ -322,11 +322,11 @@ class VidaEscolarService
      *
      * @param list<int> $turmaIdsFiltro vazio = todas as turmas do boletim
      * @param array<string,mixed> $usuario
-     * @return array{criadas:int,sincronizadas:int}
+     * @return array{criadas:int,sincronizadas:int,pendentes:int,processados:int}
      */
-    public function garantirFichasDoLayoutOficial(int $anoLetivo, array $turmaIdsFiltro = [], array $usuario = []): array
+    public function garantirFichasDoLayoutOficial(int $anoLetivo, array $turmaIdsFiltro = [], array $usuario = [], int $limite = 0): array
     {
-        $vazio = ['criadas' => 0, 'sincronizadas' => 0];
+        $vazio = ['criadas' => 0, 'sincronizadas' => 0, 'pendentes' => 0, 'processados' => 0];
         if (!$this->model->schemaPronto() || $anoLetivo <= 0) {
             return $vazio;
         }
@@ -339,19 +339,21 @@ class VidaEscolarService
         if ($alunos === []) {
             return $vazio;
         }
-        set_time_limit(180);
 
         $ids = [];
         foreach ($alunos as $row) {
             $ids[] = (int) $row['aluno_id'];
         }
         $fichas = $this->model->listarFichasPorAlunosAno($ids, $anoLetivo);
-        $usuarioId = (int) ($usuario['id'] ?? 0);
-        $criadas = 0;
-        $sincronizadas = 0;
+        $fichaIds = [];
+        foreach ($fichas as $ficha) {
+            $fichaIds[] = (int) ($ficha['id'] ?? 0);
+        }
+        $comNota = $this->model->idsFichasComNota($fichaIds);
+        $fila = [];
         foreach ($alunos as $row) {
-            $alunoId = (int) $row['aluno_id'];
-            $turmaId = (int) $row['turma_id'];
+            $alunoId = (int) ($row['aluno_id'] ?? 0);
+            $turmaId = (int) ($row['turma_id'] ?? 0);
             if ($alunoId <= 0 || $turmaId <= 0) {
                 continue;
             }
@@ -359,6 +361,29 @@ class VidaEscolarService
             if (is_array($ficha) && ($ficha['status'] ?? '') === 'homologada') {
                 continue;
             }
+            $fichaId = (int) (is_array($ficha) ? ($ficha['id'] ?? 0) : 0);
+            if ($fichaId > 0 && isset($comNota[$fichaId])) {
+                continue;
+            }
+            $fila[] = $row;
+        }
+        $restantes = count($fila);
+        if ($limite > 0 && $restantes > $limite) {
+            $fila = array_slice($fila, 0, $limite);
+        }
+        if ($fila === []) {
+            return $vazio;
+        }
+        set_time_limit($limite > 0 ? 40 : 120);
+
+        $usuarioId = (int) ($usuario['id'] ?? 0);
+        $criadas = 0;
+        $sincronizadas = 0;
+        $processados = 0;
+        foreach ($fila as $row) {
+            $alunoId = (int) $row['aluno_id'];
+            $turmaId = (int) $row['turma_id'];
+            $ficha = $fichas[$alunoId . ':' . $turmaId] ?? null;
             if (!is_array($ficha)) {
                 $ok = $this->garantirFicha($alunoId, $turmaId, $anoLetivo, $usuarioId > 0 ? $usuarioId : null);
                 if (empty($ok['success'])) {
@@ -383,13 +408,19 @@ class VidaEscolarService
                 if (empty($sync['success'])) {
                     continue;
                 }
+                $processados++;
                 $sincronizadas += (int) ($sync['atualizadas'] ?? 0);
             } catch (\Throwable $e) {
                 error_log('Vida escolar sincronizar ficha do boletim aluno #' . $alunoId . ': ' . $e->getMessage());
             }
         }
 
-        return ['criadas' => $criadas, 'sincronizadas' => $sincronizadas];
+        return [
+            'criadas' => $criadas,
+            'sincronizadas' => $sincronizadas,
+            'pendentes' => max(0, $restantes - $processados),
+            'processados' => $processados,
+        ];
     }
 
     /**

@@ -332,24 +332,6 @@ class ReportAdminController extends AdminBaseController
         $anoLetivo = max(0, (int) ($_POST['ano_letivo'] ?? 0));
         $turmaId = (int) ($_POST['turma_id'] ?? 0);
         $cursoId = max(0, (int) ($_POST['curso_id'] ?? 0));
-        if ($fonte === 'vida_escolar' && $anoLetivo > 0) {
-            $turmasDoBoletim = [];
-            if ($turmaId > 0) {
-                $turmasDoBoletim = [$turmaId];
-            } elseif ($cursoId > 0) {
-                $turmasDoBoletim = $this->idsTurmasDoCursoBoletimCoordenacao($cursoId);
-            }
-            try {
-                $usuario = $this->auth->getUser();
-                (new \App\Modulos\VidaEscolar\Services\VidaEscolarService())->garantirFichasDoLayoutOficial(
-                    $anoLetivo,
-                    $turmasDoBoletim,
-                    is_array($usuario) ? $usuario : []
-                );
-            } catch (\Throwable $e) {
-                error_log('boletimCoordenacao garantir fichas: ' . $e->getMessage());
-            }
-        }
         $params = [
             'fonte' => $fonte,
             'ano_letivo' => $anoLetivo,
@@ -377,6 +359,45 @@ class ReportAdminController extends AdminBaseController
             $params['boletim_id'] = $boletimId;
         }
         $this->redirect('/admin/reports/boletim-coordenacao?' . http_build_query($params));
+    }
+
+    public function prepararFichasBoletimCoordenacao(): void
+    {
+        if (!$this->enforceAdminPermissionKey('relatorios_gerais', 'visualizar', false)) {
+            return;
+        }
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->json(['ok' => false, 'erro' => 'Token inválido. Atualize a página e tente de novo.'], 403);
+            return;
+        }
+        $anoLetivo = max(0, (int) ($_POST['ano_letivo'] ?? 0));
+        $turmaId = (int) ($_POST['turma_id'] ?? 0);
+        $cursoId = max(0, (int) ($_POST['curso_id'] ?? 0));
+        $turmasDoBoletim = [];
+        if ($turmaId > 0) {
+            $turmasDoBoletim = [$turmaId];
+        } elseif ($cursoId > 0) {
+            $turmasDoBoletim = $this->idsTurmasDoCursoBoletimCoordenacao($cursoId);
+        }
+        try {
+            $usuario = $this->auth->getUser();
+            $res = (new \App\Modulos\VidaEscolar\Services\VidaEscolarService())->garantirFichasDoLayoutOficial(
+                $anoLetivo,
+                $turmasDoBoletim,
+                is_array($usuario) ? $usuario : [],
+                8
+            );
+        } catch (\Throwable $e) {
+            error_log('boletimCoordenacao preparar fichas: ' . $e->getMessage());
+            $this->json(['ok' => false, 'erro' => 'Não foi possível preparar a Vida Escolar agora.'], 500);
+            return;
+        }
+        $this->json([
+            'ok' => true,
+            'pendentes' => (int) ($res['pendentes'] ?? 0),
+            'processados' => (int) ($res['processados'] ?? 0),
+            'criadas' => (int) ($res['criadas'] ?? 0),
+        ]);
     }
 
     public function boletimCoordenacao()

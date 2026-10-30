@@ -453,6 +453,7 @@ $router->get('/admin/reports', 'Admin/ReportAdminController@relatorios');
 $router->get('/admin/reports/censo', 'Admin/ReportAdminController@censo');
 $router->get('/admin/reports/boletim-coordenacao', 'Admin/ReportAdminController@boletimCoordenacao');
 $router->post('/admin/reports/boletim-coordenacao', 'Admin/ReportAdminController@prepararBoletimCoordenacao');
+$router->post('/admin/reports/boletim-coordenacao/preparar-fichas', 'Admin/ReportAdminController@prepararFichasBoletimCoordenacao');
 $router->post('/admin/reports/boletim-coordenacao/observacoes/limpar', 'Admin/ReportAdminController@limparObservacoesBoletimCoordenacao');
 $router->get('/admin/reports/boletim-coordenacao/buscar-alunos', 'Admin/ReportAdminController@buscarAlunosBoletimCoordenacao');
 $router->get('/admin/reports/boletim-coordenacao/exportar', 'Admin/ReportAdminController@exportarBoletimCoordenacao');

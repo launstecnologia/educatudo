@@ -114,6 +114,14 @@ $opcoesPeriodo = is_array($infoPeriodoAno['opcoes'] ?? null) ? $infoPeriodoAno['
 $campoClasse = 'w-full h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:border-primary focus:ring-2 focus:ring-purple-100';
 $alunoQFiltro = trim((string) ($aluno_q ?? ''));
 ?>
+<div id="relatorio-carregando" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/40 px-4" role="alertdialog" aria-modal="true" aria-labelledby="relatorio-carregando-titulo" aria-busy="true">
+    <div class="w-full max-w-md rounded-xl bg-white shadow-lg px-6 py-5 text-center">
+        <i class="fa-solid fa-spinner fa-spin text-2xl text-gray-700" aria-hidden="true"></i>
+        <p id="relatorio-carregando-titulo" class="mt-3 text-base font-semibold text-gray-900">Gerando o relatório</p>
+        <p id="relatorio-carregando-texto" class="mt-1 text-sm text-gray-600">Isso pode levar um instante. Não feche esta página.</p>
+        <button type="button" id="relatorio-carregando-fechar" class="hidden mt-4 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700">Fechar</button>
+    </div>
+</div>
 <form method="POST" action="<?= URL ?>/admin/reports/boletim-coordenacao" id="form-boletim-coordenacao" class="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
     <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? ''), ENT_QUOTES, 'UTF-8') ?>">
     <?php if ($boletimContextoId > 0): ?>
@@ -478,6 +486,103 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
     <?php endif; ?>
 <?php endif; ?>
 
+<script>
+(function () {
+    var form = document.getElementById('form-boletim-coordenacao');
+    var overlay = document.getElementById('relatorio-carregando');
+    var titulo = document.getElementById('relatorio-carregando-titulo');
+    var texto = document.getElementById('relatorio-carregando-texto');
+    var fechar = document.getElementById('relatorio-carregando-fechar');
+    var fonteSelect = document.getElementById('fonte-boletim-coord');
+    if (!form || !overlay) return;
+
+    function mostrar(tituloTexto, detalhe) {
+        if (titulo) titulo.textContent = tituloTexto;
+        if (texto) {
+            texto.textContent = detalhe;
+            texto.className = 'mt-1 text-sm text-gray-600';
+        }
+        if (fechar) fechar.classList.add('hidden');
+        overlay.classList.remove('hidden');
+    }
+    function falha(mensagem) {
+        if (titulo) titulo.textContent = 'Não foi possível gerar';
+        if (texto) {
+            texto.textContent = mensagem;
+            texto.className = 'mt-1 text-sm text-red-700';
+        }
+        if (fechar) fechar.classList.remove('hidden');
+    }
+    if (fechar) {
+        fechar.addEventListener('click', function () {
+            overlay.classList.add('hidden');
+        });
+    }
+    function urlDoRelatorio() {
+        var params = new URLSearchParams(new FormData(form));
+        params.delete('_token');
+        params.set('executar', '1');
+        return form.action + '?' + params.toString();
+    }
+    form.addEventListener('submit', function (event) {
+        var fonte = fonteSelect ? fonteSelect.value : 'vida_escolar';
+        if (fonte !== 'vida_escolar') {
+            mostrar('Gerando o relatório', 'Isso pode levar um instante. Não feche esta página.');
+            return;
+        }
+        event.preventDefault();
+        mostrar('Gerando o relatório', 'Preparando a Vida Escolar dos alunos deste filtro.');
+        var tentativas = 0;
+        var parados = 0;
+        var ultimoPendente = null;
+        var endereco = form.action.replace(/\/$/, '') + '/preparar-fichas';
+        function passo() {
+            tentativas++;
+            if (tentativas > 80) {
+                window.location = urlDoRelatorio();
+                return;
+            }
+            fetch(endereco, {
+                method: 'POST',
+                body: new FormData(form),
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' }
+            }).then(function (resposta) {
+                return resposta.json().then(function (dados) {
+                    if (!resposta.ok || !dados.ok) {
+                        throw new Error((dados && dados.erro) || 'Não foi possível preparar a Vida Escolar.');
+                    }
+                    return dados;
+                });
+            }).then(function (dados) {
+                var pendentes = parseInt(dados.pendentes, 10) || 0;
+                var processados = parseInt(dados.processados, 10) || 0;
+                if (pendentes <= 0) {
+                    mostrar('Gerando o relatório', 'Abrindo o relatório…');
+                    window.location = urlDoRelatorio();
+                    return;
+                }
+                if (processados <= 0 || pendentes === ultimoPendente) {
+                    parados++;
+                } else {
+                    parados = 0;
+                }
+                ultimoPendente = pendentes;
+                if (parados >= 2) {
+                    mostrar('Gerando o relatório', 'Abrindo o que já está pronto…');
+                    window.location = urlDoRelatorio();
+                    return;
+                }
+                mostrar('Gerando o relatório', 'Preparando a Vida Escolar. Faltam ' + pendentes + ' alunos.');
+                passo();
+            }).catch(function (erro) {
+                falha(erro && erro.message ? erro.message : 'Não foi possível gerar o relatório.');
+            });
+        }
+        passo();
+    });
+})();
+</script>
 <script>
 (function () {
     var fonteSelect = document.getElementById('fonte-boletim-coord');
