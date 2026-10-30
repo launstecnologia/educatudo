@@ -80,6 +80,10 @@ BEGIN
     DELETE FROM recuperacoes WHERE nome LIKE 'ET25 %';
   END IF;
 
+  IF (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'boletim_layouts' AND COLUMN_NAME = 'nome') > 0 THEN
+    DELETE FROM boletim_layouts WHERE nome LIKE 'ET25 %';
+  END IF;
+
   DELETE e FROM resultado_documento_emissoes e
   INNER JOIN alunos a ON a.id = e.aluno_id
   WHERE a.nickname LIKE 'et25.%' OR e.hash_validacao LIKE 'et25%';

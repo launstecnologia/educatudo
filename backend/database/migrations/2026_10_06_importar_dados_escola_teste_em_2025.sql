@@ -2,6 +2,7 @@
 -- Seed Escola Educa Teste — Ensino Médio 2025, divisão trimestral.
 -- Eventos avaliativos: Simulado 1, 2, 3 e Prova Trimestral em cada trimestre.
 -- Recuperação ao lado de cada trimestre e uma Recuperação final (card próprio).
+-- Boletim oficial de 2025 (boletim_layouts), ligado à regra et25-em-2025.
 -- Senha (alunos, pais e professores): Teste@123
 -- Prefixo exclusivo: alunos et25.* | professores ET25-* | turmas observacoes ET25
 --
@@ -91,6 +92,10 @@ BEGIN
 
   IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'recuperacoes') > 0 THEN
     DELETE FROM recuperacoes WHERE nome LIKE 'ET25 %';
+  END IF;
+
+  IF (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'boletim_layouts' AND COLUMN_NAME = 'nome') > 0 THEN
+    DELETE FROM boletim_layouts WHERE nome LIKE 'ET25 %';
   END IF;
 
   DELETE e FROM resultado_documento_emissoes e
@@ -1243,6 +1248,20 @@ BEGIN
   FROM DUAL
   WHERE NOT EXISTS (SELECT 1 FROM boletim_regras WHERE codigo = 'et25-em');
   SET v_regra = (SELECT id FROM boletim_regras WHERE codigo = 'et25-em' LIMIT 1);
+
+  IF (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'boletim_layouts' AND COLUMN_NAME = 'nome') > 0 THEN
+    INSERT INTO boletim_layouts (
+      ano_letivo, nome, finalidade, vis_aluno, vis_pais, ativo,
+      regra_academica_id, materias_ids, series_ids, turmas_ids, layout_json
+    ) VALUES (
+      2025, 'ET25 Boletim oficial', 'oficial', 1, 1, 1,
+      v_regra_acad,
+      (SELECT JSON_ARRAYAGG(m.id) FROM materias m WHERE m.nome IN ('Língua Portuguesa','Matemática','História','Geografia','Física','Química','Biologia','Sociologia')),
+      JSON_ARRAY(v_s1, v_s2, v_s3),
+      (SELECT JSON_ARRAYAGG(t.id) FROM turmas t WHERE t.ano_letivo = 2025 AND t.observacoes LIKE 'ET25 %'),
+      '{"linhas":[{"nome":"1º Trimestre","colunas":["1_media","1_faltas","1_rec","1_situacao"]},{"nome":"2º Trimestre","colunas":["2_media","2_faltas","2_rec","2_situacao"]},{"nome":"3º Trimestre","colunas":["3_media","3_faltas","3_rec","3_situacao"]},{"nome":"Recuperação · 1º Trimestre","colunas":["61_rec"]},{"nome":"Recuperação · 2º Trimestre","colunas":["62_rec"]},{"nome":"Recuperação · 3º Trimestre","colunas":["63_rec"]},{"nome":"Final","colunas":["final_media","final_rec","final_situacao"]}],"formulas":{"final_media":""}}'
+    );
+  END IF;
 
   INSERT INTO boletins (
     nome, finalidade, ano_letivo, materias_ids, series_ids, turmas_ids,
