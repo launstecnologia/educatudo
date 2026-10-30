@@ -51,6 +51,8 @@ $masterPendentes = $master_pendentes ?? [];
     </div>
 </div>
 
+<div id="aviso-migration-finalizada" class="mb-6 hidden rounded-lg border border-green-300 bg-green-50 px-4 py-3 text-sm font-medium text-green-900" role="status"></div>
+
 <!-- Acao principal -->
 <?php if ($totalPendentes > 0): ?>
 <div class="mb-6 flex flex-wrap items-center gap-3">
@@ -270,12 +272,12 @@ $masterPendentes = $master_pendentes ?? [];
                         <!-- preenchido via JS -->
                     </ul>
                 </div>
+                <p id="modal-escolher-status" class="hidden mx-6 mb-3 rounded-lg border px-4 py-3 text-sm font-medium" role="status" aria-live="polite"></p>
                 <div class="px-6 py-4 border-t border-slate-200 flex flex-wrap items-center gap-2 justify-between">
                     <div class="flex gap-2">
                         <button type="button" id="modal-escolher-marcar-todos" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Marcar todos</button>
                         <button type="button" id="modal-escolher-desmarcar-todos" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Desmarcar todos</button>
                     </div>
-                    <p id="modal-escolher-status" class="hidden w-full text-sm text-slate-600"></p>
                     <div class="flex gap-2">
                     <button type="button" id="modal-escolher-fechar" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Cancelar</button>
                     <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Executar selecionadas</button>
@@ -323,6 +325,17 @@ $masterPendentes = $master_pendentes ?? [];
 <script>
 (function() {
     var baseUrl = '<?= rtrim(URL, '/') ?>';
+    try {
+        var avisoMigration = sessionStorage.getItem('educatudo_migration_aviso');
+        if (avisoMigration) {
+            sessionStorage.removeItem('educatudo_migration_aviso');
+            var avisoEl = document.getElementById('aviso-migration-finalizada');
+            if (avisoEl) {
+                avisoEl.textContent = avisoMigration;
+                avisoEl.classList.remove('hidden');
+            }
+        }
+    } catch (e) {}
     var statusGeralEl = document.getElementById('status-geral');
     var resultadoExecucaoEl = document.getElementById('resultado-execucao');
     var confirmacaoResolver = null;
@@ -710,6 +723,13 @@ $masterPendentes = $master_pendentes ?? [];
         modalEscolaId.value = escolaId;
         modalNome.textContent = escolaNome;
         modalLista.innerHTML = '';
+        if (!(migrationAndamento && migrationAndamento.ativo)) {
+            var statusAberto = document.getElementById('modal-escolher-status');
+            if (statusAberto) {
+                statusAberto.textContent = '';
+                statusAberto.className = 'hidden mx-6 mb-3 rounded-lg border px-4 py-3 text-sm font-medium';
+            }
+        }
         var list = Array.isArray(pendentes) ? pendentes : [];
         var soCargas = list.length > 0 && list.every(function(f) { return String(f).indexOf('importar_dados_') !== -1; });
         list.forEach(function(file) {
@@ -738,7 +758,78 @@ $masterPendentes = $master_pendentes ?? [];
         modalEscolher.classList.remove('hidden');
     }
 
+    var migrationAndamento = null;
+
+    function tempoCorrido(inicio) {
+        var seg = Math.max(0, Math.floor((Date.now() - inicio) / 1000));
+        var m = Math.floor(seg / 60);
+        var s = seg % 60;
+        return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+    }
+
+    function pintarStatusMigration(tipo) {
+        var el = document.getElementById('modal-escolher-status');
+        if (!el) return null;
+        el.classList.remove('hidden');
+        el.className = 'mx-6 mb-3 rounded-lg border px-4 py-3 text-sm font-medium';
+        if (tipo === 'ok') {
+            el.className += ' border-green-300 bg-green-50 text-green-900';
+        } else if (tipo === 'erro') {
+            el.className += ' border-red-300 bg-red-50 text-red-900';
+        } else {
+            el.className += ' border-blue-300 bg-blue-50 text-blue-900';
+        }
+        return el;
+    }
+
+    function atualizarTextoAndamento() {
+        if (!migrationAndamento || !migrationAndamento.ativo) return;
+        var el = pintarStatusMigration('rodando');
+        if (!el) return;
+        el.textContent = 'Migration em andamento há ' + tempoCorrido(migrationAndamento.inicio) + '. ' + migrationAndamento.detalhe;
+    }
+
+    function iniciarAndamento(detalhe) {
+        if (migrationAndamento && migrationAndamento.timer) clearInterval(migrationAndamento.timer);
+        migrationAndamento = {
+            inicio: Date.now(),
+            detalhe: detalhe || 'A migration está em execução.',
+            timer: null,
+            ativo: true
+        };
+        atualizarTextoAndamento();
+        migrationAndamento.timer = setInterval(atualizarTextoAndamento, 1000);
+        var fechar = document.getElementById('modal-escolher-fechar');
+        if (fechar) {
+            fechar.disabled = true;
+            fechar.textContent = 'Aguarde';
+        }
+    }
+
+    function pararAndamento() {
+        if (migrationAndamento && migrationAndamento.timer) clearInterval(migrationAndamento.timer);
+        if (migrationAndamento) migrationAndamento.ativo = false;
+        var fechar = document.getElementById('modal-escolher-fechar');
+        if (fechar) {
+            fechar.disabled = false;
+            fechar.textContent = 'Cancelar';
+        }
+    }
+
+    function guardarAvisoMigration(texto) {
+        try { sessionStorage.setItem('educatudo_migration_aviso', texto); } catch (e) {}
+    }
+
+    function concluirMigration(texto) {
+        pararAndamento();
+        var el = pintarStatusMigration('ok');
+        if (el) el.textContent = texto;
+        guardarAvisoMigration(texto);
+        setTimeout(function() { location.reload(); }, 2500);
+    }
+
     function closeModalEscolher() {
+        if (migrationAndamento && migrationAndamento.ativo) return;
         modalEscolher.classList.add('hidden');
     }
 
@@ -774,38 +865,61 @@ $masterPendentes = $master_pendentes ?? [];
         });
     });
 
-    function acompanharCarga(jobId, btnSubmit, origText, statusEl) {
+    function acompanharCarga(jobId, btnSubmit, origText) {
         var tentativas = 0;
         var timer = setInterval(function() {
             tentativas++;
             fetch(baseUrl + '/master/migrations/job?id=' + encodeURIComponent(jobId))
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
-                    var job = data.job || {};
-                    var msg = (job.resultado_decoded && job.resultado_decoded.mensagem) || '';
-                    if (job.status === 'done') {
+                    if (!data.success) {
+                        if (tentativas < 5) return;
                         clearInterval(timer);
-                        if (statusEl) statusEl.textContent = 'Carga concluída. Atualizando a página...';
-                        setTimeout(function() { location.reload(); }, 600);
-                        return;
-                    }
-                    if (job.status === 'failed') {
-                        clearInterval(timer);
-                        if (statusEl) statusEl.textContent = job.mensagem_erro || 'A carga falhou.';
-                        alert('Erro: ' + (job.mensagem_erro || 'a carga falhou'));
+                        pararAndamento();
+                        var sumiu = (data && data.error) || 'Não foi possível acompanhar a migration.';
+                        var elSumiu = pintarStatusMigration('erro');
+                        if (elSumiu) elSumiu.textContent = sumiu;
                         btnSubmit.disabled = false;
                         btnSubmit.textContent = origText;
                         return;
                     }
-                    if (statusEl && msg) statusEl.textContent = msg + ' Pode fechar esta janela.';
-                    btnSubmit.textContent = job.status === 'pending' ? 'Na fila...' : 'Em segundo plano...';
+                    var job = data.job || {};
+                    var msg = (job.resultado_decoded && job.resultado_decoded.mensagem) || '';
+                    if (job.status === 'done') {
+                        clearInterval(timer);
+                        btnSubmit.textContent = 'Finalizada';
+                        var finalMsg = msg ? ('Migration finalizada. ' + msg) : 'Migration finalizada com sucesso.';
+                        concluirMigration(finalMsg);
+                        return;
+                    }
+                    if (job.status === 'failed') {
+                        clearInterval(timer);
+                        pararAndamento();
+                        var erro = job.mensagem_erro || 'A migration falhou.';
+                        var elErro = pintarStatusMigration('erro');
+                        if (elErro) elErro.textContent = erro;
+                        alert('Erro: ' + erro);
+                        btnSubmit.disabled = false;
+                        btnSubmit.textContent = origText;
+                        return;
+                    }
+                    if (migrationAndamento) {
+                        migrationAndamento.detalhe = msg || (job.status === 'pending'
+                            ? 'Aguardando a fila do servidor.'
+                            : 'A migration está em execução no servidor. Pode levar vários minutos.');
+                    }
+                    btnSubmit.textContent = job.status === 'pending' ? 'Na fila...' : 'Rodando...';
                 })
                 .catch(function() {
-                    if (tentativas > 40 && statusEl) {
-                        statusEl.textContent = 'Sem resposta do status. A carga pode continuar no servidor.';
-                    }
+                    if (tentativas <= 90) return;
+                    clearInterval(timer);
+                    pararAndamento();
+                    var elRede = pintarStatusMigration('erro');
+                    if (elRede) elRede.textContent = 'Sem resposta do status. A migration pode continuar no servidor.';
+                    btnSubmit.disabled = false;
+                    btnSubmit.textContent = origText;
                 });
-        }, 5000);
+        }, 2000);
     }
 
     if (formEscolher) {
@@ -826,34 +940,38 @@ $masterPendentes = $master_pendentes ?? [];
                 'migrations[]': arquivos
             });
             var btnSubmit = formEscolher.querySelector('button[type="submit"]');
-            var statusEl = document.getElementById('modal-escolher-status');
             var origText = btnSubmit.textContent;
             btnSubmit.disabled = true;
-            btnSubmit.textContent = 'Enviando...';
+            btnSubmit.textContent = 'Rodando...';
+            iniciarAndamento('Enviando a migration para o servidor.');
             fetch(baseUrl + '/master/migrations/executar-escola-selecionadas', { method: 'POST', body: formData })
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     if (data.success && data.background && data.job_id) {
-                        if (statusEl) {
-                            statusEl.classList.remove('hidden');
-                            statusEl.textContent = 'Rodando em segundo plano. Pode fechar esta janela; a carga continua no servidor.';
+                        if (migrationAndamento) {
+                            migrationAndamento.detalhe = 'A migration está em execução no servidor. Pode levar vários minutos.';
                         }
-                        btnSubmit.textContent = 'Em segundo plano...';
-                        acompanharCarga(data.job_id, btnSubmit, origText, statusEl);
+                        btnSubmit.textContent = 'Rodando...';
+                        acompanharCarga(data.job_id, btnSubmit, origText);
                         return;
                     }
-                    if (data.success) {
-                        closeModalEscolher();
-                        if (data.resultado && data.resultado.status === 'ok') {
-                            setTimeout(function() { location.reload(); }, 800);
-                        }
-                    } else {
-                        alert('Erro: ' + (data.error || 'desconhecido'));
+                    if (data.success && data.resultado && data.resultado.status === 'ok') {
+                        btnSubmit.textContent = 'Finalizada';
+                        concluirMigration('Migration finalizada. ' + (data.resultado.message || 'Executada com sucesso.'));
+                        return;
                     }
+                    pararAndamento();
+                    var erro = (data && data.error) || 'desconhecido';
+                    var elErro = pintarStatusMigration('erro');
+                    if (elErro) elErro.textContent = erro;
+                    alert('Erro: ' + erro);
                     btnSubmit.disabled = false;
                     btnSubmit.textContent = origText;
                 })
                 .catch(function(err) {
+                    pararAndamento();
+                    var elErro = pintarStatusMigration('erro');
+                    if (elErro) elErro.textContent = 'Erro de rede: ' + err.message;
                     alert('Erro de rede: ' + err.message);
                     btnSubmit.disabled = false;
                     btnSubmit.textContent = origText;

@@ -1,5 +1,7 @@
 -- =============================================================================
 -- Seed Escola Educa Teste — Ensino Médio 2025, divisão trimestral.
+-- Eventos avaliativos: Simulado 1, 2, 3 e Prova Trimestral em cada trimestre.
+-- Recuperação ao lado de cada trimestre e uma Recuperação final (card próprio).
 -- Senha (alunos, pais e professores): Teste@123
 -- Prefixo exclusivo: alunos et25.* | professores ET25-* | turmas observacoes ET25
 --
@@ -7,7 +9,7 @@
 -- Não entra em "Executar todas" nem no bootstrap (nome importar_dados_*).
 -- Pode rodar de novo: apaga o próprio seed, apaga as cargas antigas da escola
 -- teste (EM 2026 et.* e Fundamental II 2026 etf.*) e recria só o EM 2025.
--- Não mexe em catálogo de componentes, tipos de avaliação, unidade nem equipe.
+-- Não mexe em componentes, unidade nem equipe. Cria o tipo "Rec Final" se ainda não existir.
 -- Para só esvaziar o EM 2025: 2026_10_06_importar_dados_escola_teste_em_2025_apagar.sql
 -- Rode antes as migrations de schema dessa escola.
 -- Volume alto (diário do ano + chamada). Se o navegador estourar o tempo,
@@ -76,6 +78,20 @@ BEGIN
   WHERE pb.titulo LIKE 'ET25 %';
 
   DELETE FROM provas_blocos WHERE titulo LIKE 'ET25 %';
+
+  IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'eventos_avaliativos_alunos') > 0 THEN
+    DELETE a FROM eventos_avaliativos_alunos a
+    INNER JOIN eventos_avaliativos e ON e.id = a.evento_id
+    WHERE e.nome LIKE 'ET25 %' OR e.descricao = 'ET25';
+  END IF;
+
+  IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'eventos_avaliativos') > 0 THEN
+    DELETE FROM eventos_avaliativos WHERE nome LIKE 'ET25 %' OR descricao = 'ET25';
+  END IF;
+
+  IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'recuperacoes') > 0 THEN
+    DELETE FROM recuperacoes WHERE nome LIKE 'ET25 %';
+  END IF;
 
   DELETE e FROM resultado_documento_emissoes e
   INNER JOIN alunos a ON a.id = e.aluno_id
@@ -428,6 +444,8 @@ BEGIN
   DECLARE v_tipo_s3 INT DEFAULT 0;
   DECLARE v_tipo_pb INT DEFAULT 0;
   DECLARE v_tipo_rec INT DEFAULT 0;
+  DECLARE v_tipo_rf INT DEFAULT 0;
+  DECLARE v_evento_id INT DEFAULT 0;
   DECLARE v_regra_acad INT DEFAULT 0;
   DECLARE v_t INT DEFAULT 0;
   DECLARE v_n INT DEFAULT 0;
@@ -535,6 +553,7 @@ BEGIN
     UNION ALL SELECT '2025-11-17', '2025-11-21', 'avaliacao', 'ET25 Semana de provas 3º trimestre'
     UNION ALL SELECT '2025-11-20', '2025-11-20', 'feriado', 'ET25 Consciência Negra'
     UNION ALL SELECT '2025-11-27', '2025-11-27', 'avaliacao', 'ET25 Recuperação 3º trimestre'
+    UNION ALL SELECT '2025-12-05', '2025-12-05', 'avaliacao', 'ET25 Recuperação final'
     UNION ALL SELECT '2025-12-12', '2025-12-12', 'evento', 'ET25 Conselho de classe final'
     UNION ALL SELECT '2025-12-13', '2025-12-31', 'recesso', 'ET25 Encerramento / férias'
   ) d;
@@ -625,13 +644,17 @@ BEGIN
   SELECT 'Prova Bimestral', 'ET25 prova principal do trimestre (nome legado do quadro).', 1, 20, 'prova_bim' FROM DUAL
   WHERE NOT EXISTS (SELECT 1 FROM provas_tipos_avaliacao WHERE nome = 'Prova Bimestral' AND deleted_at IS NULL);
   INSERT INTO provas_tipos_avaliacao (nome, descricao, ativo, ordem, chave_quadro)
-  SELECT 'Rec', 'ET25 recuperação do trimestre. Substitui a prova só até a nota 6,00.', 1, 30, 'et25_rec' FROM DUAL
+  SELECT 'Rec', 'ET25 recuperação do trimestre. Substitui a prova se for maior, limitada a 6,00.', 1, 30, 'et25_rec' FROM DUAL
   WHERE NOT EXISTS (SELECT 1 FROM provas_tipos_avaliacao WHERE nome = 'Rec' AND deleted_at IS NULL);
+  INSERT INTO provas_tipos_avaliacao (nome, descricao, ativo, ordem, chave_quadro)
+  SELECT 'Rec Final', 'ET25 recuperação do fim do ano. Substitui a média se for maior.', 1, 40, 'et25_rec_final' FROM DUAL
+  WHERE NOT EXISTS (SELECT 1 FROM provas_tipos_avaliacao WHERE nome = 'Rec Final' AND deleted_at IS NULL);
   SET v_tipo_s1 = (SELECT id FROM provas_tipos_avaliacao WHERE nome = 'Simulado 1' AND deleted_at IS NULL LIMIT 1);
   SET v_tipo_s2 = (SELECT id FROM provas_tipos_avaliacao WHERE nome = 'Simulado 2' AND deleted_at IS NULL LIMIT 1);
   SET v_tipo_s3 = (SELECT id FROM provas_tipos_avaliacao WHERE nome = 'Simulado 3' AND deleted_at IS NULL LIMIT 1);
   SET v_tipo_pb = (SELECT id FROM provas_tipos_avaliacao WHERE nome = 'Prova Bimestral' AND deleted_at IS NULL LIMIT 1);
   SET v_tipo_rec = (SELECT id FROM provas_tipos_avaliacao WHERE nome = 'Rec' AND deleted_at IS NULL LIMIT 1);
+  SET v_tipo_rf = (SELECT id FROM provas_tipos_avaliacao WHERE nome = 'Rec Final' AND deleted_at IS NULL LIMIT 1);
 
   INSERT INTO regras_academicas (
     nome, codigo, ano_letivo, curso_id, periodo_tipo, media_minima, frequencia_minima,
@@ -639,9 +662,57 @@ BEGIN
   ) VALUES (
     'Regra EM 2025 — trimestral', 'et25-em-2025', 2025, v_curso, 'trimestre', 6.00, 75.00,
     1, 'periodo', 'formula', 'max(media, min(rec, 6))', 'none', 2, 1,
-    'ET25 Aprovação com média 6,00 e 75% de frequência. Recuperação por trimestre, limitada à nota mínima.'
+    'ET25 Ano trimestral. Média 6,00 e 75% de frequência. Recuperação em cada trimestre, limitada a 6,00, e uma recuperação final.'
   );
   SET v_regra_acad = (SELECT id FROM regras_academicas WHERE codigo = 'et25-em-2025' LIMIT 1);
+
+  IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ano_letivo_periodos') > 0 THEN
+    DELETE FROM ano_letivo_periodos WHERE ano_letivo_id = v_ano_id;
+    INSERT INTO ano_letivo_periodos (ano_letivo_id, numero, data_inicio, data_fim) VALUES
+      (v_ano_id, 1, '2025-02-03', '2025-05-16'),
+      (v_ano_id, 2, '2025-05-19', '2025-08-29'),
+      (v_ano_id, 3, '2025-09-01', '2025-12-12');
+  END IF;
+
+  IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'regras_academicas_materias') > 0 THEN
+    INSERT IGNORE INTO regras_academicas_materias (regra_id, materia_id)
+    SELECT v_regra_acad, m.id
+    FROM materias m
+    WHERE m.nome IN ('Língua Portuguesa','Matemática','História','Geografia','Física','Química','Biologia','Sociologia');
+  END IF;
+
+  IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'regras_academicas_series') > 0 THEN
+    INSERT IGNORE INTO regras_academicas_series (regra_id, serie_id) VALUES
+      (v_regra_acad, v_s1),
+      (v_regra_acad, v_s2),
+      (v_regra_acad, v_s3);
+  END IF;
+
+  IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'recuperacoes') > 0 THEN
+    SET @et25_tem_regra_rec = (
+      SELECT COUNT(*) FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'recuperacoes' AND COLUMN_NAME = 'regra_id'
+    );
+    SET @et25_tem_opc_rec = (
+      SELECT COUNT(*) FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'recuperacoes' AND COLUMN_NAME = 'permite_aumentar'
+    );
+    IF @et25_tem_regra_rec > 0 AND @et25_tem_opc_rec > 0 THEN
+      INSERT INTO recuperacoes (
+        ano_letivo, regra_id, nome, quando, nota_minima, nota_maxima, efeito, aplica_em, formula, permite_aumentar, ordem
+      ) VALUES
+        (2025, v_regra_acad, 'ET25 Recuperação do trimestre', 'bimestre', 6.00, 10.00, 'formula', NULL, 'max(media, min(rec, 6))', 0, 1),
+        (2025, v_regra_acad, 'ET25 Recuperação final', 'final', 6.00, 10.00, 'maior_nota', NULL, NULL, 0, 2);
+    ELSEIF @et25_tem_regra_rec > 0 THEN
+      INSERT INTO recuperacoes (ano_letivo, regra_id, nome, quando, nota_minima, nota_maxima, efeito, ordem) VALUES
+        (2025, v_regra_acad, 'ET25 Recuperação do trimestre', 'bimestre', 6.00, 10.00, 'maior_nota', 1),
+        (2025, v_regra_acad, 'ET25 Recuperação final', 'final', 6.00, 10.00, 'maior_nota', 2);
+    ELSE
+      INSERT INTO recuperacoes (ano_letivo, nome, quando, nota_minima, nota_maxima, efeito, ordem) VALUES
+        (2025, 'ET25 Recuperação do trimestre', 'bimestre', 6.00, 10.00, 'maior_nota', 1),
+        (2025, 'ET25 Recuperação final', 'final', 6.00, 10.00, 'maior_nota', 2);
+    END IF;
+  END IF;
 
   INSERT INTO professores (nome, email, senha_hash, codigo_prof, materias, turmas, ativo, pagante, password)
   SELECT d.nome, d.email, v_hash, d.cod, JSON_ARRAY(), JSON_ARRAY(), 1, 0, ''
@@ -1271,6 +1342,112 @@ BEGIN
   INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.titulo LIKE 'ET25 %'
   ON DUPLICATE KEY UPDATE nota_final = VALUES(nota_final), eventos_qtd = 1;
 
+  -- Eventos avaliativos: um evento por peça em cada trimestre, a recuperação
+  -- ao lado do trimestre (período 61, 62 e 63) e a recuperação final (90).
+  IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'eventos_avaliativos') > 0
+     AND (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'provas_blocos' AND COLUMN_NAME = 'evento_avaliativo_id') > 0 THEN
+
+    INSERT INTO eventos_avaliativos (nome, descricao, ano_letivo, bimestre, tipo_avaliacao_id, ativo, criado_por)
+    SELECT CONCAT('ET25 Simulado 1 — ', n, 'º trimestre'), 'ET25', 2025, n, v_tipo_s1, 1, v_admin
+    FROM (SELECT 1 n UNION ALL SELECT 2 UNION ALL SELECT 3) p;
+    INSERT INTO eventos_avaliativos (nome, descricao, ano_letivo, bimestre, tipo_avaliacao_id, ativo, criado_por)
+    SELECT CONCAT('ET25 Simulado 2 — ', n, 'º trimestre'), 'ET25', 2025, n, v_tipo_s2, 1, v_admin
+    FROM (SELECT 1 n UNION ALL SELECT 2 UNION ALL SELECT 3) p;
+    INSERT INTO eventos_avaliativos (nome, descricao, ano_letivo, bimestre, tipo_avaliacao_id, ativo, criado_por)
+    SELECT CONCAT('ET25 Simulado 3 — ', n, 'º trimestre'), 'ET25', 2025, n, v_tipo_s3, 1, v_admin
+    FROM (SELECT 1 n UNION ALL SELECT 2 UNION ALL SELECT 3) p;
+    INSERT INTO eventos_avaliativos (nome, descricao, ano_letivo, bimestre, tipo_avaliacao_id, ativo, criado_por)
+    SELECT CONCAT('ET25 Prova Trimestral — ', n, 'º trimestre'), 'ET25', 2025, n, v_tipo_pb, 1, v_admin
+    FROM (SELECT 1 n UNION ALL SELECT 2 UNION ALL SELECT 3) p;
+    INSERT INTO eventos_avaliativos (nome, descricao, ano_letivo, bimestre, tipo_avaliacao_id, ativo, criado_por)
+    SELECT CONCAT('ET25 Recuperação — ', n, 'º trimestre'), 'ET25', 2025, 60 + n, v_tipo_rec, 1, v_admin
+    FROM (SELECT 1 n UNION ALL SELECT 2 UNION ALL SELECT 3) p;
+    INSERT INTO eventos_avaliativos (nome, descricao, ano_letivo, bimestre, tipo_avaliacao_id, ativo, criado_por)
+    VALUES ('ET25 Recuperação final', 'ET25', 2025, 90, v_tipo_rf, 1, v_admin);
+
+    UPDATE provas_blocos pb
+    INNER JOIN provas_tipos_avaliacao ta ON ta.id = pb.tipo_avaliacao_id
+    INNER JOIN eventos_avaliativos e
+      ON e.descricao = 'ET25'
+     AND e.deleted_at IS NULL
+     AND e.ano_letivo = 2025
+     AND e.tipo_avaliacao_id = pb.tipo_avaliacao_id
+     AND e.bimestre = IF(ta.nome = 'Rec', 60 + pb.bimestre, pb.bimestre)
+    SET pb.evento_avaliativo_id = e.id
+    WHERE pb.titulo LIKE 'ET25 %'
+      AND pb.deleted_at IS NULL
+      AND pb.bimestre BETWEEN 1 AND 3;
+
+    IF (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'eventos_avaliativos' AND COLUMN_NAME = 'sigla') > 0 THEN
+      UPDATE eventos_avaliativos
+      SET sigla = CASE
+        WHEN nome LIKE 'ET25 Simulado 1%' THEN 'S1'
+        WHEN nome LIKE 'ET25 Simulado 2%' THEN 'S2'
+        WHEN nome LIKE 'ET25 Simulado 3%' THEN 'S3'
+        WHEN nome LIKE 'ET25 Prova Trimestral%' THEN 'PT'
+        WHEN nome LIKE 'ET25 Recuperação final%' THEN 'RF'
+        WHEN nome LIKE 'ET25 Recuperação%' THEN 'REC'
+        ELSE sigla
+      END
+      WHERE descricao = 'ET25' AND deleted_at IS NULL;
+    END IF;
+
+    IF (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'eventos_avaliativos' AND COLUMN_NAME = 'liberar_nota_aluno') > 0 THEN
+      UPDATE eventos_avaliativos
+      SET liberar_nota_aluno = 1
+      WHERE descricao = 'ET25' AND deleted_at IS NULL;
+    END IF;
+
+    SET v_evento_id = (
+      SELECT id FROM eventos_avaliativos
+      WHERE descricao = 'ET25' AND bimestre = 90 AND deleted_at IS NULL
+      ORDER BY id DESC LIMIT 1
+    );
+    SET v_t = 1;
+    WHILE v_t <= 12 DO
+      SET v_serie_cod = ELT(v_t, '1','1','1','1','2','2','2','2','3','3','3','3');
+      SET v_letra = ELT(v_t, 'A','B','C','D','A','B','C','D','A','B','C','D');
+      SET v_turma_nome = CONCAT(v_serie_cod, 'º ', v_letra);
+      SET v_turma_id = (SELECT id FROM turmas WHERE ano_letivo = 2025 AND nome = v_turma_nome AND observacoes LIKE 'ET25 %' LIMIT 1);
+      SET v_titulo = CONCAT('ET25 Rec Final — ', v_turma_nome);
+      INSERT INTO provas_blocos (
+        titulo, descricao, data_prova, hora_inicio, hora_fim, criado_por, tipo_prova,
+        formato_evento, configuracao_nota, ano_letivo, bimestre, tipo_avaliacao_id,
+        visivel_no_portal_aluno, ativo, liberado, status, turma_id
+      ) VALUES (
+        v_titulo, 'ET25', '2025-12-05', '07:10:00', '09:40:00', v_admin, 'original',
+        'lancamento_nota', 'coordenacao_calcula', 2025, 90, v_tipo_rf,
+        1, 1, 1, 'liberado', v_turma_id
+      );
+      SET v_bloco_id = LAST_INSERT_ID();
+      UPDATE provas_blocos SET evento_avaliativo_id = v_evento_id WHERE id = v_bloco_id;
+      INSERT IGNORE INTO provas_blocos_turmas (bloco_id, turma_id) VALUES (v_bloco_id, v_turma_id);
+      INSERT INTO provas_blocos_professores (bloco_id, professor_id, materia_id, quantidade_questoes)
+      SELECT v_bloco_id, p.id, m.id, 1
+      FROM (
+        SELECT 'Língua Portuguesa' n, 'ET25-LPO' c UNION ALL SELECT 'Matemática','ET25-MAT'
+        UNION ALL SELECT 'História','ET25-HIS' UNION ALL SELECT 'Geografia','ET25-GEO'
+        UNION ALL SELECT 'Física','ET25-FIS' UNION ALL SELECT 'Química','ET25-QUI'
+        UNION ALL SELECT 'Biologia','ET25-BIO' UNION ALL SELECT 'Sociologia','ET25-SOC'
+      ) map
+      INNER JOIN materias m ON m.nome = map.n
+      INNER JOIN professores p ON p.codigo_prof = map.c;
+      INSERT IGNORE INTO provas_blocos_professores_turmas (bloco_professor_id, turma_id)
+      SELECT bp.id, v_turma_id FROM provas_blocos_professores bp WHERE bp.bloco_id = v_bloco_id;
+      SET v_t = v_t + 1;
+    END WHILE;
+
+    INSERT IGNORE INTO provas_blocos_notas_lancadas (bloco_id, professor_id, materia_id, turma_id, aluno_id, nota)
+    SELECT pb.id, bp.professor_id, bp.materia_id, pbt.turma_id, a.id,
+      ROUND(3 + (CRC32(CONCAT(a.id,'|recfinal|',bp.materia_id)) % 70) / 10, 2)
+    FROM provas_blocos pb
+    INNER JOIN provas_blocos_professores bp ON bp.bloco_id = pb.id
+    INNER JOIN provas_blocos_turmas pbt ON pbt.bloco_id = pb.id
+    INNER JOIN matricula mt ON mt.turma_id = pbt.turma_id AND mt.ano_letivo_id = v_ano_id
+    INNER JOIN alunos a ON a.id = mt.aluno_id AND a.nickname LIKE 'et25.%'
+    WHERE pb.titulo LIKE 'ET25 Rec Final — %' AND pb.deleted_at IS NULL;
+  END IF;
+
   DROP TABLE IF EXISTS et25_tmp_media;
   CREATE TABLE et25_tmp_media (
     aluno_id INT NOT NULL,
@@ -1296,7 +1473,7 @@ BEGIN
     MAX(CASE WHEN ta.nome = 'Prova Bimestral' THEN n.nota END),
     MAX(CASE WHEN ta.nome = 'Rec' THEN n.nota END)
   FROM provas_blocos_notas_lancadas n
-  INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.titulo LIKE 'ET25 %'
+  INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.titulo LIKE 'ET25 %' AND pb.bimestre BETWEEN 1 AND 3
   INNER JOIN provas_tipos_avaliacao ta ON ta.id = pb.tipo_avaliacao_id
   GROUP BY n.aluno_id, n.turma_id, n.materia_id, pb.bimestre;
 
@@ -1784,13 +1961,13 @@ BEGIN
   IF (SELECT COUNT(*) FROM alunos WHERE nickname LIKE 'et25.%') <> 600 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Seed ET25 incompleto: esperado 600 alunos.';
   END IF;
-  -- 600 alunos × 8 matérias × 5 tipos × 3 trimestres.
+  -- 600 alunos × 8 matérias × (5 tipos × 3 trimestres + recuperação final).
   IF (
     SELECT COUNT(*)
     FROM provas_blocos_notas_lancadas n
     INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.titulo LIKE 'ET25 %' AND pb.deleted_at IS NULL
     INNER JOIN alunos a ON a.id = n.aluno_id AND a.nickname LIKE 'et25.%'
-  ) <> 72000 THEN
+  ) <> 76800 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Seed ET25 incompleto: cada aluno precisa de nota em todas as matérias e tipos.';
   END IF;
 END$$

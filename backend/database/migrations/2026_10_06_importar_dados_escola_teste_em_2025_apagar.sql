@@ -66,6 +66,20 @@ BEGIN
 
   DELETE FROM provas_blocos WHERE titulo LIKE 'ET25 %';
 
+  IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'eventos_avaliativos_alunos') > 0 THEN
+    DELETE a FROM eventos_avaliativos_alunos a
+    INNER JOIN eventos_avaliativos e ON e.id = a.evento_id
+    WHERE e.nome LIKE 'ET25 %' OR e.descricao = 'ET25';
+  END IF;
+
+  IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'eventos_avaliativos') > 0 THEN
+    DELETE FROM eventos_avaliativos WHERE nome LIKE 'ET25 %' OR descricao = 'ET25';
+  END IF;
+
+  IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'recuperacoes') > 0 THEN
+    DELETE FROM recuperacoes WHERE nome LIKE 'ET25 %';
+  END IF;
+
   DELETE e FROM resultado_documento_emissoes e
   INNER JOIN alunos a ON a.id = e.aluno_id
   WHERE a.nickname LIKE 'et25.%' OR e.hash_validacao LIKE 'et25%';
