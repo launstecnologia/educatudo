@@ -144,3 +144,5 @@
 - [x] Boletim: sincronização individual e em lote prioriza o resultado final vigente do evento bimestral (inclusive zero) sobre cópia anual antiga. Notas parciais, células externas e homologadas preservadas; 6 testes de regressão (15 asserções). — 2026-11-03
 
 - [x] Boletim: preservar a linha-mãe identificada do agrupamento (ex.: Língua Portuguesa) na geração sem notas das filhas. Corrige linha ausente na fonte gravada que deixava nota antiga na ficha mesmo após sincronizar; regressão cobre matriz e registro de persistência. — 2026-11-03
+
+- [x] Boletim: regravação acionada por Sincronizar eventos preserva a mesma matriz do Demonstrativo usada na geração, incluindo Português agrupado. Regressão reproduz gerar → regravar e impede a perda da linha-mãe. — 2026-11-03

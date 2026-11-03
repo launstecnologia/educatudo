@@ -3862,7 +3862,15 @@ class BoletimConfigController extends BaseController
         array $usuario
     ): bool {
         $regraId = (int) ($regra['id'] ?? 0);
-        $sim = $this->simularRegraAluno($regra, $alunoId, $periodoRef, $dataInicio, $dataFim);
+        if (strtolower(trim((string) ($regra['exibir_em'] ?? ''))) === 'notas') {
+            // Sincronizar também regrava a fonte: preserve a mesma matriz da
+            // geração, incluindo a linha-mãe identificada do agrupamento.
+            $sim = ['matriz_materias' => $this->matrizDemonstrativoAtual(
+                $regra, $alunoId, $periodoRef, $dataInicio, $dataFim
+            )];
+        } else {
+            $sim = $this->simularRegraAluno($regra, $alunoId, $periodoRef, $dataInicio, $dataFim);
+        }
 
         return $this->gravarSimulacaoOficial($regraId, $alunoId, $periodoRef, $dataInicio, $dataFim, $sim, $usuario);
     }
