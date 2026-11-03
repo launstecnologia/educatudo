@@ -19,6 +19,7 @@ $router->get('/professor/mural-recados', 'Modulos/mural/TeacherMuralController@i
 $router->get('/professor/mural-recados/criar', 'Modulos/mural/TeacherMuralController@criar');
 $router->post('/professor/mural-recados/salvar', 'Modulos/mural/TeacherMuralController@salvar');
 $router->get('/professor/mural-recados/editar', 'Modulos/mural/TeacherMuralController@editar');
+$router->get('/professor/mural-recados/{id}/dados', 'Modulos/mural/TeacherMuralController@dados');
 $router->post('/professor/mural-recados/atualizar', 'Modulos/mural/TeacherMuralController@atualizar');
 $router->post('/professor/mural-recados/excluir', 'Modulos/mural/TeacherMuralController@excluir');
 $router->post('/professor/mural-recados/marcar-visto', 'Modulos/mural/TeacherMuralController@marcarVisto');

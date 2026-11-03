@@ -342,6 +342,16 @@ class ParentAcademicReadService
             )";
             $params['class_id'] = $classId;
         }
+        $temAluno = $this->hasColumn('mural_recados', 'aluno_id');
+        $filtroPublico = $this->hasColumn('mural_recados', 'publico')
+            ? "COALESCE(r.publico, 'alunos') = 'alunos' AND"
+            : '';
+        if ($temAluno) {
+            $destinoSql = "(r.aluno_id = :student_id OR (r.aluno_id IS NULL AND (r.enviar_para_todos = 1{$classCondition})))";
+            $params['student_id'] = $studentId;
+        } else {
+            $destinoSql = "(r.enviar_para_todos = 1{$classCondition})";
+        }
         $hasSubjects = $this->db->tableExists('materias') && $this->hasColumn('mural_recados', 'materia_id');
         $subjectIdSelect = $hasSubjects ? 'r.materia_id' : 'NULL';
         $subjectSelect = $hasSubjects ? 'm.nome' : 'NULL';
@@ -354,7 +364,7 @@ class ParentAcademicReadService
              FROM mural_recados r
              LEFT JOIN professores p ON p.id = r.autor_id AND r.autor_tipo = 'professor'
              {$subjectJoin}
-             WHERE (r.enviar_para_todos = 1{$classCondition})
+             WHERE {$filtroPublico} {$destinoSql}
                AND r.data_publicacao <= NOW()
                AND CURDATE() <= r.data_sai_mural
              ORDER BY r.data_publicacao DESC",
