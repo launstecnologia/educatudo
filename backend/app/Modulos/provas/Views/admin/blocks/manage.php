@@ -107,7 +107,12 @@ $notaUnicaTodasMaterias = $lancamentoPorCoordenacao && !empty($bloco['nota_unica
             </button>
             <?php endif; ?>
             <?php if ($provaImpressa): ?>
-            <a href="<?= URL ?>/admin/provas/blocos/<?= (int) $bloco['id'] ?>/imprimir"
+            <a href="<?= URL ?>/admin/provas/blocos/<?= (int) $bloco['id'] ?>/layout"
+               class="btn-primary-custom inline-flex items-center gap-2 px-4 py-2 rounded-lg">
+                <i class="fa-solid fa-table-columns" aria-hidden="true"></i>
+                Montar layout
+            </a>
+            <a href="<?= URL ?>/admin/provas/blocos/<?= (int) $bloco['id'] ?>/layout/imprimir"
                class="inline-flex items-center gap-2 bg-white text-gray-800 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50"
                target="_blank" rel="noopener">
                 <i class="fa-solid fa-print" aria-hidden="true"></i>
@@ -130,7 +135,7 @@ $notaUnicaTodasMaterias = $lancamentoPorCoordenacao && !empty($bloco['nota_unica
 <?php if ($escolaConstroiImpressa && $materiasImpressa !== []): ?>
 <div class="mb-6 rounded-xl border border-gray-200 bg-white p-5">
     <p class="text-sm font-semibold text-gray-900">A escola constrói a prova</p>
-    <p class="text-sm text-gray-500 mt-1 mb-4">Monte as questões de cada disciplina. Depois imprima a prova e leia o gabarito.</p>
+    <p class="text-sm text-gray-500 mt-1 mb-4">Monte as questões de cada disciplina. Em Montar layout, ajuste cabeçalho, logo, imagens e páginas. Depois imprima e leia o gabarito.</p>
     <div class="flex flex-wrap gap-2">
         <?php foreach ($materiasImpressa as $midImpresso => $nomeImpresso): ?>
         <form method="post" action="<?= URL ?>/admin/provas/blocos/<?= (int) $bloco['id'] ?>/elaborar-prova-impressa">

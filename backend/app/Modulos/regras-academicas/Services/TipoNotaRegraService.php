@@ -27,7 +27,7 @@ class TipoNotaRegraService
         ],
         'impressa' => [
             'label' => 'Avaliação impressa',
-            'hint' => 'A prova é montada no sistema, impressa e lida no gabarito. O aluno não responde na plataforma.',
+            'hint' => 'A prova é montada no sistema, com cabeçalho, logo e paginação, impressa e lida no gabarito. O aluno não responde na plataforma.',
             'origem' => 'prova_online',
         ],
         'offline' => [

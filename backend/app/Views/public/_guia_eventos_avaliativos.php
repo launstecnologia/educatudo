@@ -60,6 +60,7 @@ $mostrarPrintEvento = static function (string $arquivo, string $legenda, bool $p
         <?php $mostrarPrintEvento('116-eventos-disciplina.jpg', 'No painel da disciplina, selecione os vínculos e clique em Concluir. O professor é opcional quando a escola ou a coordenação assume a atividade.', true); ?>
         <h4>Quem lança a nota?</h4>
         <p>No offline, escolha <strong>Atribuir ao professor</strong> ou <strong>Escola lança a nota</strong>. Na avaliação impressa, escolha <strong>Atribuir ao professor</strong> para ele criar as questões, ou <strong>Escola constrói a prova</strong>. Se atribuir ao professor, informe o professor nas disciplinas e o prazo.</p>
+        <p>Depois de criar a avaliação impressa, abra o subevento e use <strong>Montar layout</strong>. Ali entram o cabeçalho, a logo, as questões que o professor ou a coordenação lançou, o tamanho das imagens e a paginação. <strong>Imprimir prova</strong> usa esse desenho.</p>
         <?php $mostrarPrintEvento('117-eventos-responsavel.jpg', 'Em Quem lança a nota, escolha o responsável. Ao atribuir ao professor, preencha o prazo.'); ?>
         <details><summary>Se a avaliação for online</summary><div>
             <p>Escolha <strong>Atribuir professor</strong> para ele elaborar as questões, ou <strong>Coordenação faz a prova</strong>. Na atribuição ao professor, confira o prazo e a quantidade de questões nos vínculos da disciplina.</p>

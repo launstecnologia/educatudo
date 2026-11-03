@@ -53,6 +53,9 @@ $router->post('/admin/provas/blocos/{id}/trocar-prova', 'Modulos/provas/TeacherE
 $router->get('/admin/provas/blocos/{id}/provas/{provaId}/modificar-notas', 'Modulos/provas/TeacherExamController@modificarNotasOnline');
 $router->post('/admin/provas/blocos/{id}/provas/{provaId}/modificar-notas', 'Modulos/provas/TeacherExamController@salvarModificarNotasOnline');
 $router->get('/admin/provas/blocos/{id}/visualizar-completo', 'Modulos/provas/TeacherExamController@visualizarCompleto');
+$router->get('/admin/provas/blocos/{id}/layout/imprimir', 'Modulos/provas/LayoutProvaImpressaController@imprimir');
+$router->get('/admin/provas/blocos/{id}/layout', 'Modulos/provas/LayoutProvaImpressaController@abrir');
+$router->post('/admin/provas/blocos/{id}/layout', 'Modulos/provas/LayoutProvaImpressaController@salvar');
 $router->get('/admin/provas/blocos/{id}/imprimir', 'Modulos/provas/ExamController@verImpressaoBlocoCompleto');
 $router->get('/admin/provas/blocos/{id}/pdf-completo', 'Modulos/provas/ExamController@gerarPdfBlocoCompleto');
 $router->get('/admin/provas/blocos/{id}/prova-aluno-pdf', 'Modulos/provas/ExamController@gerarPdfProvaAluno');

@@ -4498,6 +4498,9 @@ class ExamController extends BaseController
             http_response_code(404);
             exit('Bloco não encontrado');
         }
+        if ((string) ($bloco['formato_evento'] ?? '') === 'prova_impressa' && (string) ($_GET['gabaritos'] ?? '') !== '1') {
+            $this->redirect('/admin/provas/blocos/' . (int) $blocoId . '/layout/imprimir');
+        }
 
         $provas = $this->db->fetchAll(
             "SELECT p.*, pr.nome as professor_nome, m.nome as materia_nome, pbp.ordem
