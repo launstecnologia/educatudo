@@ -5056,7 +5056,11 @@ class BoletimConfigController extends BaseController
                         ];
                     }
                     if ($totJ <= 0) {
-                        $detalhes['aviso_jornadas'] = 'Nenhuma jornada do escopo aplica-se à turma deste aluno (verifique turmas na jornada).';
+                        $excluidasMatricula = (int) ($resJ['excluidas_por_matricula'] ?? 0);
+                        $detalhes['excluidas_por_matricula'] = $excluidasMatricula;
+                        $detalhes['aviso_jornadas'] = $excluidasMatricula > 0
+                            ? 'A matrícula deste aluno é posterior a este período. A jornada dos bimestres anteriores não entra na nota.'
+                            : 'Nenhuma jornada do escopo aplica-se à turma deste aluno (verifique turmas na jornada).';
                     } else {
                         $roundModeComp = $this->resolveRoundModeComponente($componente, $roundMode);
                         $matrizPorCodigo[$codigo] = $this->applyRoundModeToMateriaMap((array) ($resJ['por_materia'] ?? []), $roundModeComp);

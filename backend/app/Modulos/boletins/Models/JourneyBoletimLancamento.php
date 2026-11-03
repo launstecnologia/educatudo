@@ -9,10 +9,15 @@ namespace App\Modulos\Boletins\Models;
  */
 
 use App\Core\Database;
+use App\Core\PeriodoLetivo;
+
 class JourneyBoletimLancamento
 {
     /** @var Database */
     private $db;
+
+    /** @var array<string, ?string> */
+    private $dataEntradaPorAlunoAno = [];
 
     /**
      * null = ainda não verificado; true = coluna jornadas.materia_id existe; false = não existe (SELECT usa literal).
@@ -259,7 +264,7 @@ class JourneyBoletimLancamento
         $ph = implode(',', array_fill(0, count($jornadaIds), '?'));
         $materiaSql = $this->sqlJornadasMateriaIdSelect();
         $rows = $this->db->fetchAll(
-            "SELECT j.id, j.titulo, j.turma_id, j.estrutura, j.created_at, {$materiaSql}, j.professor_id
+            "SELECT j.id, j.titulo, j.turma_id, j.estrutura, j.created_at, {$materiaSql}, j.professor_id, j.ano_letivo, j.bimestre
              FROM jornadas j
              WHERE (j.ativo = 1 OR j.ativo IS NULL)
                AND j.id IN ($ph)
@@ -340,6 +345,129 @@ class JourneyBoletimLancamento
         }
 
         return !($jf < $iniF || $ji > $fimF);
+    }
+
+    /**
+     * Jornada de bimestre já encerrado quando o aluno entrou na escola não entra na nota.
+     * Quem chegou no 3º bimestre não leva a jornada do 1º e do 2º.
+     */
+    public static function jornadaAnteriorAMatricula(array $jornada, string $dataEntrada, int $ano): bool
+    {
+        $entrada = self::normalizarData($dataEntrada);
+        if ($entrada === null) {
+            return false;
+        }
+        $bim = (int) ($jornada['bimestre'] ?? 0);
+        if ($bim >= 1 && $bim <= 4 && $ano >= 2000) {
+            $intervalo = PeriodoLetivo::intervalo($ano, $bim);
+            $fim = self::normalizarData((string) ($intervalo['fim'] ?? ''));
+
+            return $fim !== null && $entrada > $fim;
+        }
+        $estrutura = json_decode((string) ($jornada['estrutura'] ?? ''), true) ?: [];
+        $fimJornada = self::normalizarData(isset($estrutura['data_fim']) ? (string) $estrutura['data_fim'] : null);
+        if ($fimJornada === null) {
+            $fimJornada = self::normalizarData(substr((string) ($jornada['created_at'] ?? ''), 0, 10));
+        }
+
+        return $fimJornada !== null && $entrada > $fimJornada;
+    }
+
+    /**
+     * Primeiro dia em que o aluno passou a frequentar neste ano.
+     * Usa a matrícula; se não houver data, o cadastro do aluno no mesmo ano.
+     */
+    private function dataEntradaAlunoNoAno(int $alunoId, int $ano): ?string
+    {
+        if ($alunoId <= 0 || $ano < 2000) {
+            return null;
+        }
+        $chave = $alunoId . ':' . $ano;
+        if (array_key_exists($chave, $this->dataEntradaPorAlunoAno)) {
+            return $this->dataEntradaPorAlunoAno[$chave];
+        }
+        $data = null;
+        if ($this->db->tableExists('matricula') && $this->db->tableExists('ano_letivo')) {
+            $row = $this->db->fetch(
+                "SELECT MIN(m.data_entrada) AS data_entrada
+                 FROM matricula m
+                 INNER JOIN ano_letivo al ON al.id = m.ano_letivo_id
+                 WHERE m.aluno_id = :aluno
+                   AND al.ano = :ano
+                   AND m.data_entrada IS NOT NULL
+                   AND m.status IN ('ativa', 'concluido', 'transferido')",
+                ['aluno' => $alunoId, 'ano' => $ano]
+            );
+            if (is_array($row)) {
+                $data = self::normalizarData(isset($row['data_entrada']) ? (string) $row['data_entrada'] : null);
+            }
+        }
+        if ($data === null && $this->db->tableExists('alunos')) {
+            $row = $this->db->fetch(
+                'SELECT created_at FROM alunos WHERE id = :id LIMIT 1',
+                ['id' => $alunoId]
+            );
+            if (is_array($row)) {
+                $criado = self::normalizarData(substr((string) ($row['created_at'] ?? ''), 0, 10));
+                if ($criado !== null && (int) substr($criado, 0, 4) === $ano) {
+                    $data = $criado;
+                }
+            }
+        }
+        $this->dataEntradaPorAlunoAno[$chave] = $data;
+
+        return $data;
+    }
+
+    /**
+     * @param array<int, array<string,mixed>> $jornadaById
+     * @param list<int> $jornadaIds
+     * @return list<int>
+     */
+    private function filtrarJornadasAnterioresAMatricula(
+        int $alunoId,
+        array $jornadaById,
+        array $jornadaIds,
+        ?string $dataIni,
+        ?string $dataFim
+    ): array {
+        if ($alunoId <= 0 || $jornadaIds === []) {
+            return $jornadaIds;
+        }
+        $fimPeriodo = self::normalizarData($dataFim);
+        $mantidas = [];
+        foreach ($jornadaIds as $jid) {
+            $jid = (int) $jid;
+            $jr = $jornadaById[$jid] ?? null;
+            if (!is_array($jr)) {
+                continue;
+            }
+            $ano = (int) ($jr['ano_letivo'] ?? 0);
+            if ($ano < 2000 && $dataIni !== null && $dataIni !== '') {
+                $ano = (int) substr($dataIni, 0, 4);
+            }
+            if ($ano < 2000 && $fimPeriodo !== null) {
+                $ano = (int) substr($fimPeriodo, 0, 4);
+            }
+            if ($ano < 2000) {
+                $mantidas[] = $jid;
+                continue;
+            }
+            $entrada = $this->dataEntradaAlunoNoAno($alunoId, $ano);
+            if ($entrada === null) {
+                $mantidas[] = $jid;
+                continue;
+            }
+            if ($fimPeriodo !== null && $entrada > $fimPeriodo) {
+                continue;
+            }
+            if (self::jornadaAnteriorAMatricula($jr, $entrada, $ano)) {
+                continue;
+            }
+            $mantidas[] = $jid;
+        }
+
+        return $mantidas;
     }
 
     /**
@@ -582,6 +710,10 @@ class JourneyBoletimLancamento
             }
         }
 
+        $antesMatricula = count($noEscopo);
+        $noEscopo = $this->filtrarJornadasAnterioresAMatricula($alunoId, $jornadaById, $noEscopo, $dataIni, $dataFim);
+        $excluidasMatricula = $antesMatricula - count($noEscopo);
+
         $total = count($noEscopo);
         if ($total === 0) {
             return [
@@ -594,6 +726,7 @@ class JourneyBoletimLancamento
                 'nota_unica_valor_padrao' => null,
                 'nota_unica_substituicao_por_materia' => [],
                 'por_nome' => [],
+                'excluidas_por_matricula' => $excluidasMatricula,
             ];
         }
 
@@ -733,6 +866,7 @@ class JourneyBoletimLancamento
             'nota_unica_valor_padrao' => $notaUnicaValorPadrao,
             'nota_unica_substituicao_por_materia' => $substituicaoPorMateria,
             'por_nome' => $porNome,
+            'excluidas_por_matricula' => $excluidasMatricula,
         ];
     }
 
@@ -816,7 +950,7 @@ class JourneyBoletimLancamento
         $params = array_merge($jornadaIds, [$alunoId]);
 
         return $this->db->fetchAll(
-            "SELECT j.id, j.titulo, j.turma_id, j.estrutura, j.created_at, {$materiaSql}, j.professor_id
+            "SELECT j.id, j.titulo, j.turma_id, j.estrutura, j.created_at, {$materiaSql}, j.professor_id, j.ano_letivo, j.bimestre
              FROM jornadas j
              WHERE (j.ativo = 1 OR j.ativo IS NULL)
                AND j.id IN ($ph)
@@ -1126,6 +1260,7 @@ class JourneyBoletimLancamento
                 }
                 $noEscopo[] = $jid;
             }
+            $noEscopo = $this->filtrarJornadasAnterioresAMatricula($alunoId, $jornadaById, $noEscopo, $dataIni, $dataFim);
 
             $total = count($noEscopo);
             $concl = 0;
