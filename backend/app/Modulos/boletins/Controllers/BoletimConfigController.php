@@ -7792,26 +7792,10 @@ class BoletimConfigController extends BaseController
             $notasHerdadasMae = is_array($notasMaeHerdada[$g['label_key']] ?? null)
                 ? $notasMaeHerdada[$g['label_key']]
                 : [];
-            $temNotaHerdada = false;
-            foreach ($notasHerdadasMae as $valHerdado) {
-                if (is_numeric($valHerdado)) {
-                    $temNotaHerdada = true;
-                    break;
-                }
-            }
             $paiNotasBoletim = $this->notasLinhaGrupoDoBoletim($linhasBoletim, $g['label'], $g['label_key']);
-            $temNotaBoletim = false;
-            if (is_array($paiNotasBoletim)) {
-                foreach ($paiNotasBoletim as $valBoletim) {
-                    if (is_numeric($valBoletim)) {
-                        $temNotaBoletim = true;
-                        break;
-                    }
-                }
-            }
-            if ($filhosLinhas === [] && !$temNotaHerdada && !$temNotaBoletim) {
-                continue;
-            }
+            // A área configurada precisa existir no resultado gravado mesmo sem
+            // notas nas filhas (ex.: ingresso posterior ao bimestre). Sem a mãe
+            // identificada, a sincronização não atualiza a célula antiga da ficha.
             usort($filhosLinhas, function (array $a, array $b): int {
                 $ka = $this->canonicalMateriaNomeKey((string) ($a['materia_nome'] ?? ''));
                 $kb = $this->canonicalMateriaNomeKey((string) ($b['materia_nome'] ?? ''));

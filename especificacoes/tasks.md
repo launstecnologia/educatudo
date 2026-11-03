@@ -142,3 +142,5 @@
 - [x] Boletim: alinhar jornadas e período entre prévia, geração individual e demonstrativo; escopo vazio não busca outras jornadas e respeita matrícula posterior ao bimestre. Validado com 8 testes PHP (31 asserções); sem alteração dos dados da escola. — 2026-11-03
 
 - [x] Boletim: sincronização individual e em lote prioriza o resultado final vigente do evento bimestral (inclusive zero) sobre cópia anual antiga. Notas parciais, células externas e homologadas preservadas; 6 testes de regressão (15 asserções). — 2026-11-03
+
+- [x] Boletim: preservar a linha-mãe identificada do agrupamento (ex.: Língua Portuguesa) na geração sem notas das filhas. Corrige linha ausente na fonte gravada que deixava nota antiga na ficha mesmo após sincronizar; regressão cobre matriz e registro de persistência. — 2026-11-03
