@@ -176,12 +176,16 @@ class CarteirinhaService
             'valido' => false,
             'motivo' => 'desligada',
             'escola' => $escola,
+            'logo' => $this->urlLogoDocumento(),
             'aluno_nome' => '',
             'turma' => '',
             'ra' => '',
             'foto' => '',
             'validade' => '',
             'codigo' => '',
+            'hash' => '',
+            'emitida_em' => '',
+            'versao' => 0,
         ];
         if (!\App\Core\LayoutHelper::isModuleEnabled('carteirinha') || !$this->model->tabelasProntas()) {
             $vazio['motivo'] = 'indisponivel';
@@ -210,12 +214,16 @@ class CarteirinhaService
             'valido' => $valido,
             'motivo' => (string) ($cartao['situacao'] ?? 'cancelada'),
             'escola' => $escola,
+            'logo' => $this->urlLogoDocumento(),
             'aluno_nome' => (string) ($cartao['nome'] ?? ''),
             'turma' => (string) ($cartao['turma'] ?? ''),
             'ra' => (string) ($cartao['ra'] ?? ''),
             'foto' => (string) ($cartao['foto'] ?? ''),
             'validade' => (string) ($cartao['validade'] ?? ''),
             'codigo' => (string) ($cartao['codigo'] ?? ''),
+            'hash' => $token,
+            'emitida_em' => (string) ($cartao['emitida_em'] ?? ''),
+            'versao' => (int) ($cartao['versao'] ?? 1),
         ];
     }
 
@@ -428,6 +436,15 @@ class CarteirinhaService
             return '';
         }
         return trim((string) \App\Core\LayoutHelper::getLogoUrl());
+    }
+
+    private function urlLogoDocumento(): string
+    {
+        if (!class_exists(\App\Core\LayoutHelper::class)) {
+            return '';
+        }
+        $url = trim((string) \App\Core\LayoutHelper::getDocumentLogoUrl());
+        return $url !== '' ? $url : $this->urlLogo();
     }
 
     private function urlFoto(string $caminho): string
