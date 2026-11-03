@@ -965,20 +965,6 @@ class VidaEscolarService
             if ($bimRow >= 1 && $bimRow <= 4 && !isset($periodosGerados[$bimRow])) {
                 $periodosGerados[$bimRow] = ['nota' => null, 'faltas' => null];
             }
-            $prioBase = 0;
-            if ($bimRow >= 1 && $bimRow <= 4) {
-                $prioBase += 10;
-            }
-            $exibir = strtolower(trim((string) ($row['exibir_em'] ?? '')));
-            if ($exibir === 'notas') {
-                $prioBase += 5;
-            } elseif ($exibir === 'boletim') {
-                $prioBase += 2;
-            }
-            $temMediaFinalRow = is_numeric($row['media_final'] ?? null);
-            if ($temMediaFinalRow) {
-                $prioBase += 20;
-            }
             $rowId = (int) ($row['id'] ?? 0);
             foreach ($periodosGerados as $periodo => $vals) {
                 if ($periodo < 1 || $periodo > 4) {
@@ -994,26 +980,10 @@ class VidaEscolarService
                     (string) ($linha['componente_nome'] ?? $nomeExibir)
                 );
                 $nota = $vals['nota'] ?? null;
-                $qualidade = (int) ($vals['qualidade'] ?? 0);
-                if ($qualidade <= 0) {
-                    $qualidade = $this->qualidadeNotaExtraida($nota, $row, $temMediaFinalRow);
-                }
-                $prio = $prioBase + ($qualidade * 100);
-                $notaIgualMediaFinal = $temMediaFinalRow && $nota !== null
-                    && abs((float) $nota - (float) $row['media_final']) < 0.001;
-                // O bônus só vale para média final comum. Na qualidade 4 ele
-                // faria a média parcial (6) ganhar da Média Bim Final (7).
-                if ($notaIgualMediaFinal && $qualidade < 4) {
-                    $prio += 30;
-                }
-                $prefere = 0;
-                if ($qualidade >= 4) {
-                    $prefere = $notaIgualMediaFinal ? 1 : 2;
-                }
-                // Média Bim Final diferente da coluna Média (6 → 7) vence qualquer outra linha.
-                if (!empty($vals['diverge_media'])) {
-                    $prio += 200;
-                }
+                $prioridade = $this->prioridadeNotaGerada($row, $vals, (int) $periodo);
+                $qualidade = $prioridade['qualidade'];
+                $prio = $prioridade['prio'];
+                $prefere = $prioridade['prefere'];
                 $atual = $propostas[$linhaId][$periodo] ?? null;
                 // Empate: mantém a primeira (id menor) — mesmo critério do DocumentoOficialService.
                 // Exceção: Média Bim Final diferente do media_final gravado substitui a média parcial.
@@ -1255,20 +1225,6 @@ class VidaEscolarService
                     if ($bimRow >= 1 && $bimRow <= 4 && !isset($periodosGerados[$bimRow])) {
                         $periodosGerados[$bimRow] = ['nota' => null, 'faltas' => null];
                     }
-                    $prioBase = 0;
-                    if ($bimRow >= 1 && $bimRow <= 4) {
-                        $prioBase += 10;
-                    }
-                    $exibir = strtolower(trim((string) ($row['exibir_em'] ?? '')));
-                    if ($exibir === 'notas') {
-                        $prioBase += 5;
-                    } elseif ($exibir === 'boletim') {
-                        $prioBase += 2;
-                    }
-                    $temMediaFinalRow = is_numeric($row['media_final'] ?? null);
-                    if ($temMediaFinalRow) {
-                        $prioBase += 20;
-                    }
                     foreach ($periodosGerados as $periodo => $vals) {
                         $periodo = (int) $periodo;
                         if ($periodo < 1 || $periodo > 4) {
@@ -1303,24 +1259,10 @@ class VidaEscolarService
                         if ($nota === null && $faltas === null) {
                             continue;
                         }
-                        $qualidade = (int) ($vals['qualidade'] ?? 0);
-                        if ($qualidade <= 0) {
-                            $qualidade = $this->qualidadeNotaExtraida(
-                                $nota !== null ? (float) $nota : null,
-                                $row,
-                                $temMediaFinalRow
-                            );
-                        }
-                        $prio = $prioBase + ($qualidade * 100);
-                        $notaIgualMediaFinal = $temMediaFinalRow && $nota !== null
-                            && abs((float) $nota - (float) $row['media_final']) < 0.001;
-                        if ($notaIgualMediaFinal && $qualidade < 4) {
-                            $prio += 30;
-                        }
-                        $prefere = $qualidade >= 4 ? ($notaIgualMediaFinal ? 1 : 2) : 0;
-                        if (!empty($vals['diverge_media'])) {
-                            $prio += 200;
-                        }
+                        $prioridade = $this->prioridadeNotaGerada($row, $vals, $periodo);
+                        $qualidade = $prioridade['qualidade'];
+                        $prio = $prioridade['prio'];
+                        $prefere = $prioridade['prefere'];
                         $prioAtual = $prioCelula[$chaveCel] ?? null;
                         $prefereAtual = $prefereCelula[$chaveCel] ?? 0;
                         // Empate: primeira geração (id menor) vence — igual ao documento oficial.
@@ -2552,6 +2494,50 @@ class VidaEscolarService
         }
 
         return $out;
+    }
+
+    /**
+     * O resultado final do evento bimestral é a fonte do documento anual.
+     * Uma cópia anual antiga não pode vencer a fonte atualizada, inclusive zero.
+     *
+     * @return array{prio:int,qualidade:int,prefere:int}
+     */
+    private function prioridadeNotaGerada(array $row, array $valores, int $periodo): array
+    {
+        $bimestre = (int) ($row['bimestre'] ?? 0);
+        if ($bimestre < 1 || $bimestre > 4) {
+            $bimestre = $this->bimestreDePeriodoRef((string) ($row['periodo_ref'] ?? '')) ?? 0;
+        }
+        $exibir = strtolower(trim((string) ($row['exibir_em'] ?? '')));
+        $temMediaFinal = is_numeric($row['media_final'] ?? null);
+        $nota = isset($valores['nota']) ? (float) $valores['nota'] : null;
+        $qualidade = (int) ($valores['qualidade'] ?? 0);
+        if ($qualidade <= 0) {
+            $qualidade = $this->qualidadeNotaExtraida($nota, $row, $temMediaFinal);
+        }
+        $prio = ($bimestre >= 1 && $bimestre <= 4 ? 10 : 0)
+            + ($exibir === 'notas' ? 5 : ($exibir === 'boletim' ? 2 : 0))
+            + ($temMediaFinal ? 20 : 0)
+            + ($qualidade * 100);
+        $igualMediaFinal = $temMediaFinal && $nota !== null
+            && abs($nota - (float) $row['media_final']) < 0.001;
+        if ($igualMediaFinal && $qualidade < 4) {
+            $prio += 30;
+        }
+        if (!empty($valores['diverge_media'])) {
+            $prio += 200;
+        }
+        // Só o resultado final da fonte ganha da cópia anual. Uma nota parcial
+        // ou ausente continua sem substituir um resultado final disponível.
+        if ($exibir === 'notas' && $bimestre === $periodo && $nota !== null && $qualidade >= 3) {
+            $prio += 1000;
+        }
+
+        return [
+            'prio' => $prio,
+            'qualidade' => $qualidade,
+            'prefere' => $qualidade >= 4 ? ($igualMediaFinal ? 1 : 2) : 0,
+        ];
     }
 
     /**
