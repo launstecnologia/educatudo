@@ -285,6 +285,7 @@ class CarteirinhaService
         $situacao = $this->situacao($row);
         $token = (string) ($row['token'] ?? '');
         $url = $this->urlValidacao($token);
+        $urlCelular = $this->urlCelular($token);
         return [
             'id' => (int) ($row['id'] ?? $row['carteirinha_id'] ?? 0),
             'aluno_id' => (int) ($row['aluno_id'] ?? 0),
@@ -302,6 +303,8 @@ class CarteirinhaService
             'situacao' => $situacao,
             'qr' => $url !== '' ? $this->qrDataUri($url) : '',
             'url' => $url,
+            'url_celular' => $urlCelular,
+            'qr_celular' => $urlCelular !== '' ? $this->qrDataUri($urlCelular) : '',
         ];
     }
 
@@ -442,6 +445,46 @@ class CarteirinhaService
         return $nome !== '' ? $nome : $serie;
     }
 
+    /**
+     * Cartão no formato da carteirinha, para o aluno abrir no celular.
+     * Sem dado do aluno quando a escola não usa o módulo.
+     *
+     * @return array{uso:bool,encontrado:bool,motivo:string,escola:string,logo:string,cartao:?array}
+     */
+    public function cartaoPublico(string $token): array
+    {
+        $resposta = [
+            'uso' => false,
+            'encontrado' => false,
+            'motivo' => 'desligada',
+            'escola' => $this->nomeEscola(),
+            'logo' => $this->urlLogoDocumento(),
+            'cartao' => null,
+        ];
+        if (!\App\Core\LayoutHelper::isModuleEnabled('carteirinha') || !$this->model->tabelasProntas()) {
+            $resposta['motivo'] = 'indisponivel';
+            return $resposta;
+        }
+        if (!$this->model->habilitada()) {
+            return $resposta;
+        }
+        $token = strtolower(trim($token));
+        $resposta['uso'] = true;
+        if (!preg_match('/^[a-f0-9]{32}$/', $token)) {
+            $resposta['motivo'] = 'inexistente';
+            return $resposta;
+        }
+        $doc = $this->model->findByToken($token);
+        if (!$doc) {
+            $resposta['motivo'] = 'inexistente';
+            return $resposta;
+        }
+        $resposta['encontrado'] = true;
+        $resposta['motivo'] = '';
+        $resposta['cartao'] = $this->apresentar($doc);
+        return $resposta;
+    }
+
     private function urlValidacao(string $token): string
     {
         if ($token === '') {
@@ -449,6 +492,15 @@ class CarteirinhaService
         }
         $base = defined('URL') ? rtrim((string) URL, '/') : '';
         return $base . '/validar/carteirinha/' . rawurlencode($token);
+    }
+
+    private function urlCelular(string $token): string
+    {
+        if ($token === '') {
+            return '';
+        }
+        $base = defined('URL') ? rtrim((string) URL, '/') : '';
+        return $base . '/carteirinha/' . rawurlencode($token);
     }
 
     private function codigoCurto(string $token): string

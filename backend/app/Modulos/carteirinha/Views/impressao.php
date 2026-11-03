@@ -6,8 +6,8 @@ $pdfUrl = (string) ($pdfUrl ?? '');
 $e = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
 $uma = count($cartoes) === 1;
 $cartaoUnico = $uma ? $cartoes[0] : [];
-$urlCelular = (string) ($cartaoUnico['url'] ?? '');
-$qrCelular = (string) ($cartaoUnico['qr'] ?? '');
+$urlCelular = (string) ($cartaoUnico['url_celular'] ?? '');
+$qrCelular = (string) ($cartaoUnico['qr_celular'] ?? '');
 $nomeUnico = (string) ($cartaoUnico['nome'] ?? '');
 $titulo = $uma
     ? ($nomeUnico !== '' ? $nomeUnico : 'Carteirinha')
@@ -76,7 +76,7 @@ body{margin:0;background:#e7edf3;color:#0f172a;font-family:ui-sans-serif,system-
     <?php if ($uma && $qrCelular !== ''): ?>
     <aside class="painel">
         <h2>Abrir no celular</h2>
-        <p>Aponte a câmera para este QR. A carteirinha abre no celular, sem precisar entrar na plataforma.</p>
+        <p>Aponte a câmera para guardar a carteirinha no celular, no mesmo formato do cartão. O QR impresso nela é o da portaria: a leitura confirma a matrícula.</p>
         <img src="<?= $e($qrCelular) ?>" alt="QR para abrir a carteirinha no celular">
         <div class="codigo"><?= $e($cartaoUnico['codigo'] ?? '') ?></div>
     </aside>

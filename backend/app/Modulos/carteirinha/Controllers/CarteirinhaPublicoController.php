@@ -17,5 +17,14 @@ class CarteirinhaPublicoController extends BaseController
         }
         require dirname(__DIR__) . '/Views/publico/validar.php';
     }
+
+    public function ver(string $token): void
+    {
+        $info = (new CarteirinhaService())->cartaoPublico($token);
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        require dirname(__DIR__) . '/Views/publico/cartao.php';
+    }
 }
 }
