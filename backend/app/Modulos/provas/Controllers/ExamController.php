@@ -7068,7 +7068,7 @@ class ExamController extends BaseController
     }
     
     /**
-     * Lê imagem e extrai questão usando OCR
+     * Lê PDF ou imagem e extrai a questão, inclusive as figuras do arquivo.
      */
     public function lerImagemQuestao($id)
     {
@@ -7089,193 +7089,99 @@ class ExamController extends BaseController
             return;
         }
 
+        $arquivoTranscricao = null;
+        $referenciaCredito = null;
+        $moduloCredito = 'gerar_exercicio_ia_professor';
         try {
             if (!$isAdmin && !$this->provaModel->canEdit($id, $user['id'])) {
                 throw new \Exception('Você não tem permissão para editar esta prova');
             }
 
-            // Verifica se foi enviada uma imagem
+            if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+                throw new \Exception('Token inválido. Recarregue a página.');
+            }
             if (empty($_FILES['imagem']) || $_FILES['imagem']['error'] !== UPLOAD_ERR_OK) {
-                throw new \Exception('Nenhuma imagem foi enviada ou ocorreu um erro no upload');
+                throw new \Exception('Envie um PDF ou uma imagem da questão.');
             }
-            
+
             $imagem = $_FILES['imagem'];
-            
-            // Valida tipo de arquivo
-            $tiposPermitidos = ['image/png', 'image/jpeg', 'image/jpg'];
-            if (!in_array($imagem['type'], $tiposPermitidos)) {
-                throw new \Exception('Tipo de arquivo não permitido. Use PNG, JPG ou JPEG');
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mime = $finfo ? (string) finfo_file($finfo, (string) $imagem['tmp_name']) : '';
+            if ($finfo) {
+                finfo_close($finfo);
             }
-            
-            // Valida tamanho (10MB)
-            if ($imagem['size'] > 10 * 1024 * 1024) {
-                throw new \Exception('Imagem muito grande. Tamanho máximo: 10MB');
+            $permitidos = [
+                'image/png' => 'png',
+                'image/jpeg' => 'jpg',
+                'image/jpg' => 'jpg',
+                'image/webp' => 'webp',
+                'application/pdf' => 'pdf',
+            ];
+            if (!isset($permitidos[$mime])) {
+                throw new \Exception('Use PDF, PNG, JPG ou WEBP.');
             }
-            
-            // Lê imagem e converte para base64
-            $imageData = base64_encode(file_get_contents($imagem['tmp_name']));
-            
-            // Usa OpenAIService para transcrever com Google Vision
-            $openaiService = new \App\Services\OpenAIService();
-            
-            // Transcreve a imagem
-            $textoTranscrito = $openaiService->transcreverComGoogleVision($imageData);
-            
-            if (empty($textoTranscrito)) {
-                throw new \Exception('Não foi possível transcrever o texto da imagem');
+            if ((int) $imagem['size'] > 15 * 1024 * 1024) {
+                throw new \Exception('Arquivo muito grande. Tamanho máximo: 15MB.');
             }
-            
-            // Usa IA para extrair enunciado e questões do texto transcrito
-            $systemPrompt = 'Você é um assistente especializado em extrair questões de provas a partir de texto transcrito por OCR. 
 
-Sua tarefa é analisar o texto transcrito e extrair:
-1. O ENUNCIADO COMPLETO da questão (todo o texto antes das alternativas, incluindo o contexto e a pergunta)
-2. As alternativas (A, B, C, D, E, etc.) se for múltipla escolha
-3. NÃO marque nenhuma alternativa como correta (sempre false) - o professor vai marcar depois
-4. O tipo de questão (multipla_escolha ou dissertativa)
+            $slug = defined('TENANT_SLUG') ? strtolower((string) preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG)) : '';
+            if ($slug === '') {
+                throw new \Exception('Não foi possível preparar o arquivo desta escola.');
+            }
+            $dir = dirname(__DIR__, 4) . '/storage/tmp/questao_transcricao/' . $slug;
+            if (!is_dir($dir) && !mkdir($dir, 0700, true) && !is_dir($dir)) {
+                throw new \Exception('Não foi possível preparar o arquivo.');
+            }
+            $path = $dir . '/questao-' . (int) ($user['id'] ?? 0) . '-' . bin2hex(random_bytes(8)) . '.' . $permitidos[$mime];
+            if (!move_uploaded_file((string) $imagem['tmp_name'], $path)) {
+                throw new \Exception('Não foi possível guardar o arquivo.');
+            }
+            @chmod($path, 0600);
+            $arquivoTranscricao = $path;
 
-REGRAS IMPORTANTES:
-- O enunciado deve incluir TODO o texto antes das alternativas, incluindo contexto, explicações e a pergunta final
-- Se houver texto como "QUESTÃO 180" ou números, remova apenas esses identificadores, mas mantenha todo o conteúdo da questão
-- Para múltipla escolha, extraia TODAS as alternativas encontradas (A, B, C, D, E, etc.)
-- Cada alternativa deve conter apenas o texto da opção, sem o prefixo "A)", "B)", etc.
-- SEMPRE marque todas as alternativas como "correta": false - o professor vai selecionar a correta depois
-- Limpe artefatos de OCR (quebras de linha estranhas no meio de frases, caracteres especiais)
-- Mantenha parágrafos e quebras de linha naturais do texto
-
-Retorne APENAS um JSON válido no seguinte formato:
-{
-  "enunciado": "texto completo do enunciado incluindo contexto e pergunta",
-  "tipo": "multipla_escolha",
-  "valor": 1.0,
-  "alternativas": [
-    {"texto": "texto da alternativa A sem o prefixo A)", "correta": false},
-    {"texto": "texto da alternativa B sem o prefixo B)", "correta": false},
-    {"texto": "texto da alternativa C sem o prefixo C)", "correta": false},
-    {"texto": "texto da alternativa D sem o prefixo D)", "correta": false},
-    {"texto": "texto da alternativa E sem o prefixo E)", "correta": false}
-  ]
-}';
-            
-            $userPrompt = "Extraia a questão do seguinte texto transcrito por OCR:\n\n" . $textoTranscrito;
-            
-            // Usa chatCompletion que é público
-            // Aumenta timeout para processamento de imagem
-            set_time_limit(300);
-            ini_set('max_execution_time', 300);
-            
-            $response = $openaiService->chatCompletion(
-                [
-                    [
-                        'role' => 'user',
-                        'content' => $userPrompt
-                    ]
-                ],
-                $systemPrompt,
-                'gpt-4o',
-                0.3,
-                4000
-            );
-            
-            $content = $response['resposta'] ?? '';
-            
-            if (empty($content)) {
-                error_log("Resposta vazia da IA ao processar imagem");
-                error_log("Resposta completa: " . print_r($response, true));
-                throw new \Exception('A IA não retornou nenhuma resposta. Tente novamente.');
-            }
-            
-            // Garante que o conteúdo está em UTF-8 válido
-            if (!mb_check_encoding($content, 'UTF-8')) {
-                $content = mb_convert_encoding($content, 'UTF-8', 'auto');
-            }
-            
-            error_log("Conteúdo bruto da IA (primeiros 1000 chars): " . substr($content, 0, 1000));
-            
-            // Limpar caracteres de controle (mas preservar UTF-8)
-            $content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $content);
-            
-            // Remove BOM UTF-8 se presente
-            if (substr($content, 0, 3) === "\xEF\xBB\xBF") {
-                $content = substr($content, 3);
-            }
-            
-            // Extrai JSON da resposta
-            $jsonContent = null;
-            
-            // Tenta extrair de markdown code block
-            if (preg_match('/```json\s*([\s\S]*?)\s*```/', $content, $matches)) {
-                $jsonContent = trim($matches[1]);
-            } elseif (preg_match('/```\s*([\s\S]*?)\s*```/', $content, $matches)) {
-                $jsonContent = trim($matches[1]);
-            } elseif (preg_match('/\{[\s\S]*\}/', $content, $matches)) {
-                $jsonContent = $matches[0];
-            } else {
-                // Se não encontrou JSON, tenta usar o conteúdo completo
-                $jsonContent = trim($content);
-            }
-            
-            if (empty($jsonContent)) {
-                error_log("Não foi possível extrair JSON do conteúdo");
-                error_log("Conteúdo completo: " . $content);
-                throw new \Exception('Não foi possível extrair a questão do texto. O formato da resposta não é válido.');
-            }
-            
-            // Tenta decodificar JSON
-            $questao = json_decode($jsonContent, true, 512, JSON_UNESCAPED_UNICODE);
-            
-            // Se falhar, tenta corrigir JSON comum
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                error_log("Erro ao decodificar JSON (primeira tentativa): " . json_last_error_msg());
-                error_log("JSON recebido (primeiros 1000 chars): " . substr($jsonContent, 0, 1000));
-                
-                // Tenta corrigir JSON comum
-                $jsonContent = preg_replace('/,\s*}/', '}', $jsonContent); // Remove vírgulas finais
-                $jsonContent = preg_replace('/,\s*]/', ']', $jsonContent); // Remove vírgulas finais em arrays
-                $jsonContent = preg_replace('/,\s*,/', ',', $jsonContent); // Remove vírgulas duplicadas
-                
-                $questao = json_decode($jsonContent, true, 512, JSON_UNESCAPED_UNICODE);
-                
-                if (json_last_error() !== JSON_ERROR_NONE) {
-                    error_log("Erro ao decodificar JSON (segunda tentativa): " . json_last_error_msg());
-                    error_log("JSON corrigido (primeiros 1000 chars): " . substr($jsonContent, 0, 1000));
-                    throw new \Exception('Erro ao processar a resposta da IA: ' . json_last_error_msg() . '. Tente novamente.');
+            $modulo = $moduloCredito;
+            $papel = \App\Services\CreditosService::tipoCarteiraDoUsuario((string) ($user['tipo'] ?? 'professor'));
+            $creditos = new \App\Services\CreditosService();
+            $referencia = null;
+            if ($creditos->isCreditosHabilitado()) {
+                if (!$creditos->podeConsumir($papel, (int) $user['id'], $modulo)) {
+                    @unlink($path);
+                    throw new \Exception('TudiCoins insuficientes para transcrever a questão.');
                 }
+                $referencia = 'transcrever_questao_' . (int) $user['id'] . '_' . bin2hex(random_bytes(4));
+                $referenciaCredito = $referencia;
+                $creditos->consumir($papel, (int) $user['id'], $modulo, $referencia);
             }
-            
-            if (!$questao || !is_array($questao)) {
-                error_log("JSON decodificado mas não é um array válido");
-                throw new \Exception('A resposta da IA não está no formato esperado. Tente novamente.');
-            }
-            
-            // Garante que o tipo seja válido
-            if (!isset($questao['tipo']) || !in_array($questao['tipo'], ['multipla_escolha', 'dissertativa', 'verdadeiro_falso'])) {
-                $questao['tipo'] = 'multipla_escolha';
-            }
-            
-            // Garante que valor seja numérico
-            if (!isset($questao['valor']) || !is_numeric($questao['valor'])) {
-                $questao['valor'] = 1.0;
-            }
-            
-            // Garante que alternativas seja array
-            if (!isset($questao['alternativas']) || !is_array($questao['alternativas'])) {
-                $questao['alternativas'] = [];
-            }
-            
-            // Garante que enunciado exista
-            if (empty($questao['enunciado'])) {
-                $questao['enunciado'] = $textoTranscrito; // Usa texto transcrito como fallback
-            }
-            
+
+            $jobId = \App\Services\AIJobService::enqueue('transcrever_questao_arquivo', [
+                'arquivo' => [
+                    'path' => $path,
+                    'slug' => $slug,
+                    'mime' => $mime,
+                ],
+                'usuario_id' => (int) $user['id'],
+                'credits_ref' => $referencia,
+                'credits_modulo' => $referencia !== null ? $modulo : null,
+            ], (int) $user['id'], (string) ($user['tipo'] ?? 'professor'));
+
             $this->json([
                 'success' => true,
-                'message' => 'Questão extraída com sucesso',
-                'questao' => $questao,
-                'texto_transcrito' => substr($textoTranscrito, 0, 200) . '...' // Para debug
+                'job_id' => $jobId,
+                'message' => 'Arquivo enviado. A transcrição está em andamento.',
             ]);
+            return;
             
         } catch (\Exception $e) {
+            if ($arquivoTranscricao !== null && is_file($arquivoTranscricao)) {
+                @unlink($arquivoTranscricao);
+            }
+            if ($referenciaCredito !== null) {
+                try {
+                    (new \App\Services\CreditosService())->estornarPorReferencia($moduloCredito, $referenciaCredito);
+                } catch (\Throwable $estorno) {
+                    error_log('Estorno da transcrição: ' . $estorno->getMessage());
+                }
+            }
             error_log("Erro ao ler imagem de questão: " . $e->getMessage());
             if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
                 if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {

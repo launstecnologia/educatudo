@@ -553,6 +553,9 @@ class AIJobService
             case 'gerar_plano_aula_copiloto':
                 return self::dispatchGerarPlanoAulaCopiloto($payload);
 
+            case 'transcrever_questao_arquivo':
+                return self::dispatchTranscreverQuestaoArquivo($payload);
+
             case 'grade_horaria_importar_imagem':
                 return self::dispatchGradeHorariaImportarImagem($payload);
 
@@ -731,6 +734,34 @@ class AIJobService
             'importacao_id' => (int) ($res['importacao_id'] ?? 0),
             'aluno_id' => $alunoId,
         ];
+    }
+
+    private static function dispatchTranscreverQuestaoArquivo(array $payload): array
+    {
+        $path = (string) ($payload['arquivo']['path'] ?? '');
+        $mime = (string) ($payload['arquivo']['mime'] ?? '');
+        $slug = strtolower((string) preg_replace('/[^a-z0-9_-]/i', '', (string) ($payload['arquivo']['slug'] ?? '')));
+        if (defined('TENANT_SLUG')) {
+            $slugTenant = strtolower((string) preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG));
+            if ($slugTenant !== '' && $slug !== $slugTenant) {
+                throw new \RuntimeException('Arquivo da questão não encontrado.');
+            }
+        }
+        if (!preg_match('/^[a-z0-9_-]+$/', $slug)) {
+            throw new \RuntimeException('Arquivo da questão não encontrado.');
+        }
+        $base = realpath(dirname(__DIR__, 3) . '/storage/tmp/questao_transcricao/' . $slug);
+        $real = $path !== '' ? realpath($path) : false;
+        if ($base === false || $real === false || !is_file($real) || !str_starts_with($real, $base . DIRECTORY_SEPARATOR)) {
+            throw new \RuntimeException('Arquivo da questão não encontrado.');
+        }
+        try {
+            $servico = new \App\Modulos\Provas\Services\TranscricaoQuestaoArquivoService();
+            $questao = $servico->transcrever($real, $mime, (int) ($payload['usuario_id'] ?? 0), $slug);
+        } finally {
+            @unlink($real);
+        }
+        return ['questao' => $questao];
     }
 
     private static function dispatchGradeHorariaImportarImagem(array $payload): array

@@ -152,9 +152,6 @@
             $tudicoinsProvaIa = \App\Core\CreditosModuleRegistry::acaoIaDisponivel('gerar_exercicio_ia_professor');
             ?>
             <?php if ($tudicoinsProvaIa): ?>
-            <button onclick="abrirModalLerImagem()" class="px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
-                📷 Ler Imagem
-            </button>
             <button onclick="abrirModalGerarIA()" class="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors">
                 🤖 Gerar com IA
             </button>
@@ -164,6 +161,9 @@
                 Banco de Questões
             </button>
             <?php endif; ?>
+            <button onclick="abrirModalLerImagem()" class="px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
+                Importar PDF ou imagem
+            </button>
             <button onclick="abrirModalColarJson()" class="px-6 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors">
                 📚 Importar da Apostila
             </button>
@@ -606,7 +606,7 @@
 <div id="modal-ler-imagem" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" style="display: none;">
     <div class="bg-white rounded-xl shadow-2xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center mb-6">
-            <h3 class="text-2xl font-bold text-gray-900">📷 Ler Questão de Imagem</h3>
+            <h3 class="text-2xl font-bold text-gray-900">Importar PDF ou imagem</h3>
             <button onclick="fecharModalLerImagem()" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -617,7 +617,7 @@
         <form id="lerImagemForm" class="space-y-6" enctype="multipart/form-data">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Envie uma imagem com a questão (PNG, JPG, JPEG)
+                    Envie a questão em PDF ou imagem. O texto é transcrito e as figuras do arquivo entram no enunciado.
                 </label>
                 <div id="upload-area" class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-green-500 transition-colors cursor-pointer">
                     <div class="space-y-1 text-center">
@@ -626,16 +626,17 @@
                         </svg>
                         <div class="flex text-sm text-gray-600">
                             <label for="imagem-questao-ler" class="relative cursor-pointer bg-white rounded-md font-medium text-green-600 hover:text-green-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-green-500">
-                                <span>Selecione uma imagem</span>
-                                <input id="imagem-questao-ler" name="imagem" type="file" accept="image/png,image/jpeg,image/jpg" class="sr-only">
+                                <span>Selecione um PDF ou uma imagem</span>
+                                <input id="imagem-questao-ler" name="imagem" type="file" accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp" class="sr-only">
                             </label>
                             <p class="pl-1">ou arraste e solte</p>
                         </div>
-                        <p class="text-xs text-gray-500">PNG, JPG, JPEG até 10MB | Ou cole com Ctrl+V</p>
+                        <p class="text-xs text-gray-500">PDF, PNG, JPG ou WEBP até 15MB. Imagem também pode ser colada com Ctrl+V.</p>
                     </div>
                 </div>
                 <div id="preview-imagem-ler" class="mt-4 hidden">
                     <img id="preview-img-ler" src="" alt="Preview" class="max-w-full max-h-64 rounded-lg border border-gray-300">
+                    <p id="preview-arquivo-ler" class="hidden text-sm text-gray-700"></p>
                     <button type="button" onclick="removerImagemLer()" class="mt-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm">
                         Remover Imagem
                     </button>
@@ -650,7 +651,7 @@
                 </button>
                 <button type="submit" id="btn-ler-imagem" 
                         class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-                    📷 Ler e Extrair Questão
+                    Transcrever
                 </button>
             </div>
         </form>
@@ -661,7 +662,7 @@
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <span>Processando imagem e extraindo questão...</span>
+                <span>Lendo o arquivo e transcrevendo a questão...</span>
             </div>
         </div>
     </div>
@@ -1216,12 +1217,43 @@ document.getElementById('modal-ler-imagem').addEventListener('click', function(e
 });
 
 // Função para processar imagem (arquivo ou dados)
+function arquivoEhPdf(file) {
+    return !!(file && (file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '')));
+}
+
+function mostrarPreviewArquivo(nome) {
+    var previewImgEl = document.getElementById('preview-img-ler');
+    var previewNomeEl = document.getElementById('preview-arquivo-ler');
+    var previewEl = document.getElementById('preview-imagem-ler');
+    var uploadAreaEl = document.getElementById('upload-area');
+    if (previewImgEl) {
+        previewImgEl.classList.add('hidden');
+        previewImgEl.removeAttribute('src');
+    }
+    if (previewNomeEl) {
+        previewNomeEl.textContent = nome || 'Arquivo selecionado';
+        previewNomeEl.classList.remove('hidden');
+    }
+    if (previewEl) previewEl.classList.remove('hidden');
+    if (uploadAreaEl) uploadAreaEl.classList.add('hidden');
+}
+
 function processarImagem(fileOrDataUrl) {
     let file;
     let dataUrl;
     
     if (fileOrDataUrl instanceof File) {
         file = fileOrDataUrl;
+        if (arquivoEhPdf(file)) {
+            var dataTransferPdf = new DataTransfer();
+            dataTransferPdf.items.add(file);
+            var inputPdf = document.getElementById('imagem-questao-ler');
+            if (inputPdf) inputPdf.files = dataTransferPdf.files;
+            var imagemDataPdf = document.getElementById('imagem-data-ler');
+            if (imagemDataPdf) imagemDataPdf.value = '';
+            mostrarPreviewArquivo(file.name);
+            return;
+        }
         const reader = new FileReader();
         reader.onload = function(e) {
             dataUrl = e.target.result;
@@ -1254,7 +1286,12 @@ function mostrarPreviewLer(dataUrl) {
     const previewEl = document.getElementById('preview-imagem-ler');
     const uploadAreaEl = document.getElementById('upload-area');
     
-    if (previewImgEl) previewImgEl.src = dataUrl;
+    var previewNomeEl = document.getElementById('preview-arquivo-ler');
+    if (previewNomeEl) previewNomeEl.classList.add('hidden');
+    if (previewImgEl) {
+        previewImgEl.classList.remove('hidden');
+        previewImgEl.src = dataUrl;
+    }
     if (previewEl) previewEl.classList.remove('hidden');
     if (uploadAreaEl) uploadAreaEl.classList.add('hidden');
 }
@@ -1629,10 +1666,10 @@ uploadArea.addEventListener('drop', function(e) {
     const files = e.dataTransfer.files;
     if (files.length > 0) {
         const file = files[0];
-        if (file.type.startsWith('image/')) {
+        if (file.type.startsWith('image/') || arquivoEhPdf(file)) {
             processarImagem(file);
         } else {
-            alert('Por favor, selecione apenas arquivos de imagem (PNG, JPG, JPEG)');
+            alert('Envie um PDF ou uma imagem (PNG, JPG ou WEBP).');
         }
     }
 });
@@ -2058,6 +2095,8 @@ document.getElementById('lerImagemForm').addEventListener('submit', function(e) 
     const formData = new FormData();
     const provaId = <?= $prova['id'] ?>;
     formData.append('prova_id', provaId);
+    var tokenTranscricao = typeof getCsrfTokenForUpload === 'function' ? getCsrfTokenForUpload() : '';
+    if (tokenTranscricao) formData.append('_token', tokenTranscricao);
     
     // Se tem arquivo, usa o arquivo
     if (imagemFile) {
@@ -2080,6 +2119,83 @@ document.getElementById('lerImagemForm').addEventListener('submit', function(e) 
     
     enviarFormulario(formData, provaId);
 });
+
+function preencherQuestaoTranscrita(questao) {
+    var editorEnunciado = document.getElementById('editor-enunciado');
+    var hiddenEnunciado = document.getElementById('enunciado-questao');
+    var textoEnunciado = questao.enunciado || '';
+    if (hiddenEnunciado) hiddenEnunciado.value = textoEnunciado;
+    if (editorEnunciado) {
+        if (textoEnunciado.indexOf('<img') !== -1 || textoEnunciado.indexOf('<br') !== -1) {
+            editorEnunciado.innerHTML = textoEnunciado;
+        } else if (typeof MathEditor !== 'undefined' && MathEditor.preencherDeLaTeX) {
+            MathEditor.preencherDeLaTeX(editorEnunciado, textoEnunciado);
+        } else {
+            editorEnunciado.textContent = textoEnunciado;
+        }
+    }
+    if (questao.tipo) {
+        var tipoEl = document.getElementById('tipo-questao');
+        if (tipoEl) {
+            tipoEl.value = questao.tipo;
+            if (typeof atualizarOpcoesPorTipo === 'function') atualizarOpcoesPorTipo();
+        }
+    }
+    var valorEl = document.getElementById('valor-questao');
+    if (valorEl && questao.valor) valorEl.value = questao.valor;
+    if (questao.tipo === 'multipla_escolha' && questao.alternativas && questao.alternativas.length > 0) {
+        document.getElementById('opcoes-lista').innerHTML = '';
+        opcoesCount = 0;
+        questao.alternativas.forEach(function() { adicionarOpcao(); });
+        setTimeout(function() {
+            var itens = document.querySelectorAll('#opcoes-lista .alt-item');
+            questao.alternativas.forEach(function(alt, index) {
+                var ed = itens[index] ? itens[index].querySelector('.alt-editor') : null;
+                if (!ed) return;
+                ed.textContent = (alt.texto || '').trim();
+            });
+        }, 50);
+    }
+    var aviso = 'Questão transcrita. Revise o texto e as figuras e clique em Adicionar Questão.';
+    if (questao.outras > 0) aviso += ' O arquivo tinha mais questões; esta é a primeira.';
+    alert(aviso);
+    fecharModalLerImagem();
+}
+
+function acompanharTranscricao(jobId, btnLer, loadingDiv, originalText) {
+    var baseStatus = <?= json_encode(in_array(($user['tipo'] ?? ''), ['admin', 'admin_escola'], true) ? rtrim((string) URL, '/') . '/admin/ai-job/' : rtrim((string) URL, '/') . '/professor/ai-job/') ?>;
+    var tentativas = 0;
+    return new Promise(function(resolve, reject) {
+        function consultar() {
+            tentativas++;
+            if (tentativas > 90) {
+                reject(new Error('A transcrição demorou demais. Tente de novo.'));
+                return;
+            }
+            fetch(baseStatus + jobId + '/status', { credentials: 'include', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.status === 'done') {
+                        var questao = data.result && data.result.questao;
+                        if (!questao) {
+                            reject(new Error('A transcrição não devolveu a questão.'));
+                            return;
+                        }
+                        preencherQuestaoTranscrita(questao);
+                        resolve();
+                        return;
+                    }
+                    if (data.status === 'failed' || data.status === 'error' || data.status === 'not_found') {
+                        reject(new Error(data.error || 'Não foi possível transcrever o arquivo.'));
+                        return;
+                    }
+                    setTimeout(consultar, 2000);
+                })
+                .catch(reject);
+        }
+        consultar();
+    });
+}
 
 function enviarFormulario(formData, provaId) {
     const btnLer = document.getElementById('btn-ler-imagem');
@@ -2123,68 +2239,12 @@ function enviarFormulario(formData, provaId) {
         }
     })
     .then(data => {
+        if (data.success && data.job_id) {
+            return acompanharTranscricao(data.job_id, btnLer, loadingDiv, originalText);
+        }
         if (data.success) {
-            // Preencher formulário com os dados extraídos
             if (data.questao) {
-                const questao = data.questao;
-                
-                // Preencher enunciado (contenteditable + hidden)
-                var editorEnunciado = document.getElementById('editor-enunciado');
-                var hiddenEnunciado = document.getElementById('enunciado-questao');
-                var textoEnunciado = questao.enunciado || '';
-                if (hiddenEnunciado) hiddenEnunciado.value = textoEnunciado;
-                if (editorEnunciado && typeof MathEditor !== 'undefined' && MathEditor.preencherDeLaTeX) {
-                    MathEditor.preencherDeLaTeX(editorEnunciado, textoEnunciado);
-                }
-                
-                // Preencher tipo
-                if (questao.tipo) {
-                    const tipoEl = document.getElementById('tipo-questao');
-                    if (tipoEl) {
-                        tipoEl.value = questao.tipo;
-                        atualizarOpcoesPorTipo();
-                    }
-                }
-                
-                // Preencher pontuação (se o campo existir)
-                const valorEl = document.getElementById('valor-questao');
-                if (valorEl && questao.valor) {
-                    valorEl.value = questao.valor;
-                }
-                
-                // Preencher alternativas se for múltipla escolha
-                if (questao.tipo === 'multipla_escolha' && questao.alternativas && questao.alternativas.length > 0) {
-                    document.getElementById('opcoes-lista').innerHTML = '';
-                    opcoesCount = 0;
-                    questao.alternativas.forEach(function() { adicionarOpcao(); });
-                    setTimeout(function() {
-                        var itens = document.querySelectorAll('#opcoes-lista .alt-item');
-                        questao.alternativas.forEach(function(alt, index) {
-                            var ed = itens[index] ? itens[index].querySelector('.alt-editor') : null;
-                            if (!ed) return;
-                            var t = (alt.texto || '').trim();
-                            if (t.indexOf('eq-chip') !== -1 || t.indexOf('data-latex') !== -1) {
-                                var serializado = typeof enunciadoHtmlParaLaTeXSerializado === 'function' ? enunciadoHtmlParaLaTeXSerializado(t) : t;
-                                if (typeof MathEditor !== 'undefined' && MathEditor.preencherDeLaTeX) MathEditor.preencherDeLaTeX(ed, serializado);
-                                else ed.innerHTML = t;
-                            } else if (t.indexOf('<') !== -1 || t.indexOf('&') !== -1) {
-                                ed.innerHTML = t;
-                                if ((t.indexOf('eq-chip') !== -1 || t.indexOf('eq-chip-math') !== -1) && typeof MathEditor !== 'undefined' && MathEditor.renderMathInEditor) {
-                                    setTimeout(function() { MathEditor.renderMathInEditor(ed); }, 0);
-                                }
-                            } else if (typeof MathEditor !== 'undefined' && MathEditor.preencherDeLaTeX && t.indexOf('\\(') !== -1) {
-                                MathEditor.preencherDeLaTeX(ed, t);
-                            } else {
-                                ed.textContent = t;
-                            }
-                            var radio = itens[index] ? itens[index].querySelector('input[name="resposta_opcao"]') : null;
-                            if (alt.correta && radio) radio.checked = true;
-                        });
-                    }, 50);
-                }
-                
-                alert('Questão extraída com sucesso! Revise os campos e clique em "Adicionar Questão".');
-                fecharModalLerImagem();
+                preencherQuestaoTranscrita(data.questao);
             } else {
                 alert('Questão extraída, mas não foi possível processar os dados.');
             }
