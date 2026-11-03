@@ -1576,10 +1576,9 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
         });
         if (!lista) return;
         lista.querySelectorAll('.subevento-row').forEach(function (row) {
-            var modo = multi ? estadoAgenda(row).modo : 'todas';
             row.querySelectorAll('.js-horas-linha').forEach(function (el) {
                 el.classList.add('hidden');
-                el.disabled = !(multi && modo === 'todas');
+                el.disabled = false;
             });
             var dataLinha = row.querySelector('.js-data-linha');
             if (dataLinha) dataLinha.classList.toggle('hidden', multi);
@@ -1839,6 +1838,22 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
         erroEl.classList.remove('hidden');
     }
 
+    function gravarHorasVisiveis() {
+        if (!lista) return;
+        lista.querySelectorAll('.subevento-row').forEach(function (row) {
+            var inicio = row.querySelector('.js-hora-inicio');
+            var fim = row.querySelector('.js-hora-fim');
+            if (inicio) inicio.disabled = false;
+            if (fim) fim.disabled = false;
+            if (estadoAgenda(row).modo !== 'todas') return;
+            var bloco = blocoAgenda(row);
+            if (!bloco) return;
+            var visivelInicio = bloco.querySelector('.js-todas-inicio');
+            var visivelFim = bloco.querySelector('.js-todas-fim');
+            if (inicio && visivelInicio && visivelInicio.value) inicio.value = visivelInicio.value;
+            if (fim && visivelFim && visivelFim.value) fim.value = visivelFim.value;
+        });
+    }
     function validar(passo) {
         if (passo === 1) {
             if (!(document.getElementById('nome').value || '').trim()) return 'Informe o nome do evento.';
@@ -1847,6 +1862,7 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
             if (!form.querySelector('.js-turma:checked')) return 'Marque pelo menos uma turma.';
         }
         if (passo === 2) {
+            gravarHorasVisiveis();
             var erroDisc = validarPares(document.getElementById('pares-padrao'), 'Disciplinas', true);
             if (erroDisc) return erroDisc;
             if (configAtual() === 'professor_por_questao' && !(document.getElementById('prazo_entrega_professor').value || '').trim()) {
@@ -2259,6 +2275,7 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
         });
     }
     form.addEventListener('submit', function (e) {
+        gravarHorasVisiveis();
         if (atual < 3) {
             e.preventDefault();
             irPara(atual + 1);

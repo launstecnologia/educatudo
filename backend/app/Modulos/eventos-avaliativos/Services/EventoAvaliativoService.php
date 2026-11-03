@@ -1127,18 +1127,21 @@ class EventoAvaliativoService
             } else {
                 $paresItens = $padrao['itens'];
             }
-            $horaInicio = null;
-            $horaFim = null;
-            if ($exigeHorario) {
-                $horaInicio = $this->normalizarHora((string) ($row['hora_inicio'] ?? ''));
-                $horaFim = $this->normalizarHora((string) ($row['hora_fim'] ?? ''));
-                if ($horaInicio === null || $horaFim === null || $horaInicio >= $horaFim) {
-                    return ['error' => 'Informe o horário de início e de término de "' . $titulo . '".'];
-                }
-            }
+            $horaInicio = $this->normalizarHora((string) ($row['hora_inicio'] ?? ''));
+            $horaFim = $this->normalizarHora((string) ($row['hora_fim'] ?? ''));
             $agenda = $this->normalizarAgenda($row, $titulo, $permitidas, $horaInicio, $horaFim);
             if (isset($agenda['error'])) {
                 return $agenda;
+            }
+            if ($exigeHorario && ($horaInicio === null || $horaFim === null || $horaInicio >= $horaFim)) {
+                $primeiroHorario = $agenda['itens'][0] ?? null;
+                if (is_array($primeiroHorario)) {
+                    $horaInicio = $horaInicio ?? ($primeiroHorario['hora_inicio'] ?? null);
+                    $horaFim = $horaFim ?? ($primeiroHorario['hora_fim'] ?? null);
+                }
+                if ($horaInicio === null || $horaFim === null || $horaInicio >= $horaFim) {
+                    return ['error' => 'Informe o horário de início e de término de "' . $titulo . '".'];
+                }
             }
             $blocoId = (int) ($row['id'] ?? 0);
             $itens[] = [
