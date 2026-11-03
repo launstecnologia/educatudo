@@ -26,7 +26,7 @@ static $carteirinhaCss = false;
 <style>
 .carteirinha-cartao{width:100%;max-width:420px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 24px rgba(15,23,42,.12);border:1px solid #e5e7eb;font-family:ui-sans-serif,system-ui,sans-serif;color:#111827;box-sizing:border-box}
 .carteirinha-faixa{color:#fff;padding:12px 14px;display:flex;align-items:center;gap:10px}
-.carteirinha-faixa img{height:28px;width:auto;max-width:72px;object-fit:contain;background:#fff;border-radius:6px;padding:2px}
+.carteirinha-faixa img{height:36px;width:auto;max-width:120px;object-fit:contain;background:transparent}
 .carteirinha-faixa-texto{min-width:0}
 .carteirinha-kicker{font-size:11px;letter-spacing:.04em;text-transform:uppercase;opacity:.85}
 .carteirinha-escola{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

@@ -43,7 +43,7 @@ body { margin: 0; font-family: DejaVu Sans, sans-serif; color: #111827; }
         <tr>
             <td class="faixa" colspan="3" style="background:<?= $e($cor) ?>">
                 <?php if ($logo !== ''): ?>
-                    <img src="<?= $e($logo) ?>" alt="" style="height:22px;width:auto;background:#fff;padding:2px">
+                    <img src="<?= $e($logo) ?>" alt="" style="height:28px;width:auto">
                 <?php endif; ?>
                 <div class="kicker">CARTEIRINHA ESCOLAR</div>
                 <div><?= $e($cartao['escola'] ?? $escola) ?></div>

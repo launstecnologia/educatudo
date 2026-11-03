@@ -1,5 +1,5 @@
 <?php
-/** Tela de impressão e envio. Variáveis: $cartoes, $escola, $pdfUrl */
+/** Conteúdo de envio da carteirinha, dentro do painel. Variáveis: $cartoes, $escola, $pdfUrl */
 $cartoes = is_array($cartoes ?? null) ? $cartoes : [];
 $escola = (string) ($escola ?? 'EducaTudo');
 $pdfUrl = (string) ($pdfUrl ?? '');
@@ -20,67 +20,61 @@ if ($uma && $urlCelular !== '') {
     $whatsapp = 'https://wa.me/?text=' . rawurlencode($texto);
 }
 ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title><?= $e($titulo) ?> · <?= $e($escola) ?></title>
 <style>
-body{margin:0;background:#e7edf3;color:#0f172a;font-family:ui-sans-serif,system-ui,-apple-system,sans-serif}
-.barra{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding:16px 20px;background:#fff;border-bottom:1px solid #e2e8f0}
-.olho{margin:0;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#64748b}
-.barra h1{margin:2px 0 0;font-size:18px}
-.acoes{display:flex;flex-wrap:wrap;gap:8px}
-.btn{display:inline-flex;align-items:center;justify-content:center;height:40px;padding:0 14px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;font-size:14px;font-weight:600;text-decoration:none;cursor:pointer}
-.btn-forte{background:#0f766e;border-color:#0f766e;color:#fff}
-.btn-wa{background:#128C7E;border-color:#128C7E;color:#fff}
-.folha{max-width:920px;margin:0 auto;padding:28px 16px 48px;display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start;justify-content:center}
-.cartoes{display:flex;flex-wrap:wrap;gap:16px;justify-content:center}
-.painel{width:min(100%,280px);background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:18px;text-align:center;box-shadow:0 10px 30px rgba(15,23,42,.06)}
-.painel h2{margin:0;font-size:16px}
-.painel p{margin:8px 0 0;font-size:13px;line-height:1.45;color:#475569}
-.painel img{width:210px;height:210px;margin-top:14px}
-.codigo{margin-top:8px;font-size:12px;letter-spacing:.08em;color:#64748b}
+.carteirinha-envio-acoes{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.carteirinha-envio-btn{display:inline-flex;align-items:center;justify-content:center;height:40px;padding:0 14px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;font-size:14px;font-weight:600;text-decoration:none;cursor:pointer}
+.carteirinha-envio-btn-forte{background:#0f766e;border-color:#0f766e;color:#fff}
+.carteirinha-envio-btn-wa{background:#128C7E;border-color:#128C7E;color:#fff}
+.carteirinha-envio-folha{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.carteirinha-envio-cartoes{display:flex;flex-wrap:wrap;gap:16px}
+.carteirinha-envio-painel{width:min(100%,260px);background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:18px;text-align:center}
+.carteirinha-envio-painel h2{margin:0;font-size:16px;color:#0f172a}
+.carteirinha-envio-painel p{margin:8px 0 0;font-size:13px;line-height:1.45;color:#475569}
+.carteirinha-envio-painel img{width:200px;height:200px;margin-top:14px}
+.carteirinha-envio-codigo{margin-top:8px;font-size:12px;letter-spacing:.08em;color:#64748b}
 @media print{
-  .barra,.painel{display:none !important}
-  body{background:#fff}
-  .folha{max-width:none;padding:0;display:block}
-  .cartoes{display:block}
-  .cartoes .carteirinha-cartao{margin:0 0 12px}
+  body.carteirinha-imprimindo *{visibility:hidden}
+  body.carteirinha-imprimindo .carteirinha-envio-cartoes,
+  body.carteirinha-imprimindo .carteirinha-envio-cartoes *{visibility:visible}
+  body.carteirinha-imprimindo .carteirinha-envio-cartoes{position:absolute;left:0;top:0}
+  body.carteirinha-imprimindo .carteirinha-envio-acoes,
+  body.carteirinha-imprimindo .carteirinha-envio-painel{display:none !important}
 }
 </style>
-</head>
-<body>
-<header class="barra">
-    <div>
-        <p class="olho"><?= $e($escola) ?></p>
-        <h1><?= $e($titulo) ?></h1>
-    </div>
-    <div class="acoes">
+<div class="carteirinha-envio">
+    <div class="carteirinha-envio-acoes">
         <?php if ($pdfUrl !== ''): ?>
-        <a class="btn" href="<?= $e($pdfUrl) ?>">Baixar PDF</a>
+        <a class="carteirinha-envio-btn" href="<?= $e($pdfUrl) ?>">Baixar PDF</a>
         <?php endif; ?>
-        <button type="button" class="btn btn-forte" onclick="window.print()">Imprimir</button>
+        <button type="button" class="carteirinha-envio-btn carteirinha-envio-btn-forte" onclick="imprimirCarteirinha()">Imprimir</button>
+        <script>
+        function imprimirCarteirinha() {
+            document.body.classList.add('carteirinha-imprimindo');
+            var limpar = function () {
+                document.body.classList.remove('carteirinha-imprimindo');
+                window.removeEventListener('afterprint', limpar);
+            };
+            window.addEventListener('afterprint', limpar);
+            window.print();
+        }
+        </script>
         <?php if ($whatsapp !== ''): ?>
-        <a class="btn btn-wa" href="<?= $e($whatsapp) ?>" target="_blank" rel="noopener">Enviar para WhatsApp</a>
+        <a class="carteirinha-envio-btn carteirinha-envio-btn-wa" href="<?= $e($whatsapp) ?>" target="_blank" rel="noopener">Enviar para WhatsApp</a>
         <?php endif; ?>
     </div>
-</header>
-<main class="folha">
-    <section class="cartoes">
-        <?php foreach ($cartoes as $cartao): ?>
-            <?php include __DIR__ . '/compartilhado/cartao.php'; ?>
-        <?php endforeach; ?>
-    </section>
-    <?php if ($uma && $qrCelular !== ''): ?>
-    <aside class="painel">
-        <h2>Abrir no celular</h2>
-        <p>Aponte a câmera para guardar a carteirinha no celular, no mesmo formato do cartão. O QR impresso nela é o da portaria: a leitura confirma a matrícula.</p>
-        <img src="<?= $e($qrCelular) ?>" alt="QR para abrir a carteirinha no celular">
-        <div class="codigo"><?= $e($cartaoUnico['codigo'] ?? '') ?></div>
-    </aside>
-    <?php endif; ?>
-</main>
-</body>
-</html>
+    <div class="carteirinha-envio-folha">
+        <section class="carteirinha-envio-cartoes">
+            <?php foreach ($cartoes as $cartao): ?>
+                <?php include __DIR__ . '/compartilhado/cartao.php'; ?>
+            <?php endforeach; ?>
+        </section>
+        <?php if ($uma && $qrCelular !== ''): ?>
+        <aside class="carteirinha-envio-painel">
+            <h2>Abrir no celular</h2>
+            <p>Aponte a câmera para guardar a carteirinha no celular, no mesmo formato do cartão. O QR impresso nela é o da portaria.</p>
+            <img src="<?= $e($qrCelular) ?>" alt="QR para abrir a carteirinha no celular">
+            <div class="carteirinha-envio-codigo"><?= $e($cartaoUnico['codigo'] ?? '') ?></div>
+        </aside>
+        <?php endif; ?>
+    </div>
+</div>

@@ -51,14 +51,15 @@ class CarteirinhaAlunoController extends BaseController
             $this->redirect('/aluno/carteirinha');
             return;
         }
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
-        $cartoes = [$cartao];
-        $escola = (string) ($cartao['escola'] ?? 'EducaTudo');
         $base = defined('URL') ? rtrim((string) URL, '/') : '';
-        $pdfUrl = $base . '/aluno/carteirinha/pdf';
-        require dirname(__DIR__) . '/Views/impressao.php';
+        $this->viewWithLayout('student', 'student/carteirinha/impressao', [
+            'title' => 'Carteirinha - EducaTudo',
+            'user' => $this->auth->getUser(),
+            'current_page' => 'carteirinha',
+            'cartoes' => [$cartao],
+            'escola' => (string) ($cartao['escola'] ?? 'EducaTudo'),
+            'pdfUrl' => $base . '/aluno/carteirinha/pdf',
+        ]);
     }
 
     public function pdf(): void

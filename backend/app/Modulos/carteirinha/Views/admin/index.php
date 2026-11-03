@@ -87,7 +87,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
     <input type="hidden" name="turma_id" value="<?= $turmaId ?>">
     <input type="hidden" name="busca" value="<?= $e($busca) ?>">
     <button type="submit" class="px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-800 hover:bg-gray-50">Emitir quem ainda não tem</button>
-    <a href="<?= URL ?>/admin/carteirinha/imprimir?turma_id=<?= $turmaId ?>" target="_blank" rel="noopener" class="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700">Imprimir a turma</a>
+    <a href="<?= URL ?>/admin/carteirinha/imprimir?turma_id=<?= $turmaId ?>" class="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700">Imprimir a turma</a>
 </form>
 <?php endif; ?>
 
@@ -177,9 +177,9 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
                             </form>
                             <?php endif; ?>
                             <?php if ((int) $aluno['carteirinha_id'] > 0): ?>
-                            <a href="<?= URL ?>/admin/carteirinha/imprimir?aluno_id=<?= (int) $aluno['id'] ?>" target="_blank" rel="noopener" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <button type="button" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" onclick="abrirCarteirinha(<?= (int) $aluno['id'] ?>)">
                                 <i class="fa-solid fa-print text-gray-400 w-4 text-center"></i> Imprimir
-                            </a>
+                            </button>
                             <?php endif; ?>
                         <?php
                         $row_actions_dropdown_items = ob_get_clean();
@@ -262,7 +262,40 @@ $ui_offcanvas_id = 'filtro';
 $ui_offcanvas_titulo = 'Filtros';
 $ui_offcanvas_max_w = 'max-w-md';
 include $ui . '/offcanvas.php';
+
+ob_start();
 ?>
+<div id="carteirinhaCartaoSlot" class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 bg-gray-50"></div>
+<?php
+$ui_offcanvas_body = ob_get_clean();
+$ui_offcanvas_id = 'cartao';
+$ui_offcanvas_titulo = 'Carteirinha';
+$ui_offcanvas_max_w = 'max-w-3xl';
+include $ui . '/offcanvas.php';
+?>
+<script>
+function abrirCarteirinha(alunoId) {
+    var slot = document.getElementById('carteirinhaCartaoSlot');
+    if (!slot || typeof openCartaoDrawer !== 'function') {
+        return;
+    }
+    slot.innerHTML = '<p class="text-sm text-gray-500">Carregando…</p>';
+    openCartaoDrawer();
+    fetch(<?= json_encode(rtrim((string) URL, '/')) ?> + '/admin/carteirinha/cartao?aluno_id=' + encodeURIComponent(alunoId), {
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    }).then(function (resposta) {
+        if (!resposta.ok) {
+            throw new Error('falha');
+        }
+        return resposta.text();
+    }).then(function (html) {
+        slot.innerHTML = html;
+    }).catch(function () {
+        slot.innerHTML = '<p class="text-sm text-red-700">Não foi possível abrir a carteirinha.</p>';
+    });
+}
+</script>
 <?php endif; ?>
 
 <?php if ($podeAlterar): ?>

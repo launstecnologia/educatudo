@@ -139,7 +139,37 @@ class CarteirinhaAdminController extends \App\Painel\Admin\Controllers\AdminBase
             $this->redirect('/admin/carteirinha');
             return;
         }
-        $this->renderImpressao($cartoes, $this->urlPdfAdmin());
+        $this->viewWithLayout('admin', 'admin/carteirinha/impressao', [
+            'title' => 'Carteirinha - EducaTudo',
+            'user' => $this->auth->getUser(),
+            'current_page' => 'carteirinha',
+            'cartoes' => $cartoes,
+            'escola' => (string) ($cartoes[0]['escola'] ?? 'EducaTudo'),
+            'pdfUrl' => $this->urlPdfAdmin(),
+        ]);
+    }
+
+    public function cartao(): void
+    {
+        if (!$this->enforceAdminPermissionKey('carteirinha', 'visualizar', false)) {
+            return;
+        }
+        $alunoId = (int) ($_GET['aluno_id'] ?? 0);
+        try {
+            $cartoes = $this->service->paraImpressao($alunoId, 0);
+        } catch (\Throwable $e) {
+            http_response_code(422);
+            echo '<p class="px-6 py-8 text-sm text-red-700">' . htmlspecialchars($this->mensagemErro($e), ENT_QUOTES, 'UTF-8') . '</p>';
+            return;
+        }
+        if ($cartoes === []) {
+            http_response_code(404);
+            echo '<p class="px-6 py-8 text-sm text-gray-600">Não há carteirinha emitida para este aluno.</p>';
+            return;
+        }
+        $escola = (string) ($cartoes[0]['escola'] ?? 'EducaTudo');
+        $pdfUrl = $this->urlPdfAdmin();
+        require dirname(__DIR__) . '/Views/impressao.php';
     }
 
     public function pdf(): void
@@ -172,18 +202,6 @@ class CarteirinhaAdminController extends \App\Painel\Admin\Controllers\AdminBase
             $query['turma_id'] = $turmaId;
         }
         return $base . '/admin/carteirinha/pdf' . ($query !== [] ? '?' . http_build_query($query) : '');
-    }
-
-    /**
-     * @param list<array<string,mixed>> $cartoes
-     */
-    private function renderImpressao(array $cartoes, string $pdfUrl): void
-    {
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
-        $escola = (string) ($cartoes[0]['escola'] ?? 'EducaTudo');
-        require dirname(__DIR__) . '/Views/impressao.php';
     }
 
     private function acao(callable $fn): void

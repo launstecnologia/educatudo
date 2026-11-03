@@ -12,6 +12,7 @@ $router->post('/admin/carteirinha/emitir', 'Modulos/carteirinha/CarteirinhaAdmin
 $router->post('/admin/carteirinha/emitir-turma', 'Modulos/carteirinha/CarteirinhaAdminController@emitirTurma');
 $router->post('/admin/carteirinha/cancelar', 'Modulos/carteirinha/CarteirinhaAdminController@cancelar');
 $router->get('/admin/carteirinha/imprimir', 'Modulos/carteirinha/CarteirinhaAdminController@imprimir');
+$router->get('/admin/carteirinha/cartao', 'Modulos/carteirinha/CarteirinhaAdminController@cartao');
 $router->get('/admin/carteirinha/pdf', 'Modulos/carteirinha/CarteirinhaAdminController@pdf');
 
 $router->get('/aluno/carteirinha', 'Modulos/carteirinha/CarteirinhaAlunoController@index');
