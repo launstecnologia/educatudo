@@ -2632,7 +2632,8 @@ class ExamController extends BaseController
                 'tipo' => $postData['tipo'] ?? 'multipla_escolha',
                 'valor' => $postData['valor'] ?? 1.00,
                 'ordem' => $ordem,
-                'alternativas' => $postData['alternativas'] ?? []
+                'alternativas' => $postData['alternativas'] ?? [],
+                'explicacao' => $postData['explicacao'] ?? null,
             ];
             
             $questaoId = $this->provaModel->addQuestao($id, $data);

@@ -757,11 +757,11 @@ class AIJobService
         }
         try {
             $servico = new \App\Modulos\Provas\Services\TranscricaoQuestaoArquivoService();
-            $questao = $servico->transcrever($real, $mime, (int) ($payload['usuario_id'] ?? 0), $slug);
+            $questoes = $servico->transcrever($real, $mime, (int) ($payload['usuario_id'] ?? 0), $slug);
         } finally {
             @unlink($real);
         }
-        return ['questao' => $questao];
+        return ['questoes' => $questoes];
     }
 
     private static function dispatchGradeHorariaImportarImagem(array $payload): array

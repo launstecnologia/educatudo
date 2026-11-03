@@ -617,7 +617,7 @@
         <form id="lerImagemForm" class="space-y-6" enctype="multipart/form-data">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Envie a questão em PDF ou imagem. O texto é transcrito e as figuras do arquivo entram no enunciado.
+                    Envie a prova inteira em PDF ou imagem. Todas as questões entram na lista, já com o gabarito quando o arquivo tiver a resposta.
                 </label>
                 <div id="upload-area" class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-green-500 transition-colors cursor-pointer">
                     <div class="space-y-1 text-center">
@@ -662,7 +662,7 @@
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <span>Lendo o arquivo e transcrevendo a questão...</span>
+                <span>Lendo a prova e separando as questões...</span>
             </div>
         </div>
     </div>
@@ -2120,6 +2120,44 @@ document.getElementById('lerImagemForm').addEventListener('submit', function(e) 
     enviarFormulario(formData, provaId);
 });
 
+function salvarQuestoesTranscritas(questoes) {
+    var url = '<?= URL ?>/professor/provas/adicionar-questao/<?= (int) $prova['id'] ?>';
+    var cadeia = Promise.resolve();
+    questoes.forEach(function(questao) {
+        cadeia = cadeia.then(function() {
+            return fetch(url, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({
+                    enunciado: questao.enunciado || '',
+                    tipo: questao.tipo || 'multipla_escolha',
+                    valor: questao.valor || 1,
+                    explicacao: questao.explicacao || '',
+                    alternativas: (questao.alternativas || []).map(function(alt, indice) {
+                        return {
+                            texto: alt.texto || '',
+                            correta: alt.correta ? 1 : 0,
+                            ordem: indice
+                        };
+                    })
+                })
+            }).then(function(resposta) { return resposta.json(); }).then(function(data) {
+                if (!data || !data.success) {
+                    throw new Error((data && data.error) || 'Não foi possível gravar uma questão.');
+                }
+            });
+        });
+    });
+    return cadeia.then(function() {
+        var comGabarito = questoes.some(function(questao) {
+            return (questao.alternativas || []).some(function(alt) { return !!alt.correta; });
+        });
+        alert(questoes.length + (questoes.length === 1 ? ' questão foi adicionada' : ' questões foram adicionadas') + (comGabarito ? ', já com o gabarito.' : '.'));
+        window.location.reload();
+    });
+}
+
 function preencherQuestaoTranscrita(questao) {
     var editorEnunciado = document.getElementById('editor-enunciado');
     var hiddenEnunciado = document.getElementById('enunciado-questao');
@@ -2176,13 +2214,15 @@ function acompanharTranscricao(jobId, btnLer, loadingDiv, originalText) {
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     if (data.status === 'done') {
-                        var questao = data.result && data.result.questao;
-                        if (!questao) {
-                            reject(new Error('A transcrição não devolveu a questão.'));
+                        var lista = data.result && data.result.questoes;
+                        if ((!lista || !lista.length) && data.result && data.result.questao) {
+                            lista = [data.result.questao];
+                        }
+                        if (!lista || !lista.length) {
+                            reject(new Error('A transcrição não devolveu as questões.'));
                             return;
                         }
-                        preencherQuestaoTranscrita(questao);
-                        resolve();
+                        salvarQuestoesTranscritas(lista).then(resolve).catch(reject);
                         return;
                     }
                     if (data.status === 'failed' || data.status === 'error' || data.status === 'not_found') {
@@ -2243,11 +2283,11 @@ function enviarFormulario(formData, provaId) {
             return acompanharTranscricao(data.job_id, btnLer, loadingDiv, originalText);
         }
         if (data.success) {
-            if (data.questao) {
-                preencherQuestaoTranscrita(data.questao);
-            } else {
-                alert('Questão extraída, mas não foi possível processar os dados.');
+            var listaDireta = data.questoes || (data.questao ? [data.questao] : []);
+            if (listaDireta.length) {
+                return salvarQuestoesTranscritas(listaDireta);
             }
+            alert('A transcrição não devolveu as questões.');
         } else {
             throw new Error(data.error || 'Erro ao processar imagem');
         }

@@ -15,14 +15,13 @@ class TranscricaoQuestaoArquivoService
 {
     private string $slugEscola = '';
     /**
-     * @return array{enunciado:string,tipo:string,valor:float,alternativas:list<array{texto:string,correta:bool}>,outras:int}
+     * @return list<array{enunciado:string,tipo:string,valor:float,alternativas:list<array{texto:string,correta:int,ordem:int}>,explicacao:?string}>
      */
     public function transcrever(string $caminho, string $mime, int $usuarioId, string $slugEscola): array
     {
         $this->slugEscola = $this->slugLimpo($slugEscola);
         $figuras = [];
         $texto = '';
-        $anexarOrigem = false;
 
         if ($mime === 'application/pdf') {
             [$texto, $figuras, $maiorFigura] = $this->lerPdf($caminho, $usuarioId);
@@ -32,7 +31,6 @@ class TranscricaoQuestaoArquivoService
             }
         } else {
             $texto = $this->ocrDoArquivo($caminho, $mime);
-            $anexarOrigem = true;
             $urlOrigem = $this->publicarArquivo($caminho, $mime, $usuarioId, 'origem');
             if ($urlOrigem !== null) {
                 $figuras[] = $urlOrigem;
@@ -44,15 +42,25 @@ class TranscricaoQuestaoArquivoService
             throw new \RuntimeException('Não foi possível ler o texto deste arquivo.');
         }
 
-        $questao = $this->estruturar($texto);
-        $urls = $figuras;
-        if ($anexarOrigem && empty($questao['tem_figura'])) {
-            array_pop($urls);
+        $extraidas = $this->estruturar($texto, count($figuras));
+        $lista = [];
+        foreach ($extraidas as $questao) {
+            $indice = (int) ($questao['figura'] ?? 0);
+            $urls = [];
+            if ($indice >= 1 && isset($figuras[$indice - 1])) {
+                $urls[] = $figuras[$indice - 1];
+            } elseif (count($extraidas) === 1 && count($figuras) === 1 && !empty($questao['tem_figura'])) {
+                $urls[] = $figuras[0];
+            }
+            $questao['enunciado'] = $this->montarEnunciado((string) ($questao['enunciado'] ?? ''), $urls);
+            unset($questao['figura'], $questao['tem_figura']);
+            $lista[] = $questao;
         }
-        $questao['enunciado'] = $this->montarEnunciado((string) ($questao['enunciado'] ?? $texto), $urls);
-        unset($questao['tem_figura']);
+        if ($lista === []) {
+            throw new \RuntimeException('Não foi possível separar as questões deste arquivo.');
+        }
 
-        return $questao;
+        return $lista;
     }
 
     /**
@@ -72,11 +80,11 @@ class TranscricaoQuestaoArquivoService
         $vistos = [];
         $paginas = 0;
         foreach ($pdf->getPages() as $pagina) {
-            if (++$paginas > 4 || count($urls) >= 4) {
+            if (++$paginas > 8 || count($urls) >= 8) {
                 break;
             }
             foreach ($pagina->getXObjects() as $objeto) {
-                if (!$objeto instanceof Image || count($urls) >= 4) {
+                if (!$objeto instanceof Image || count($urls) >= 8) {
                     continue;
                 }
                 $bytes = $objeto->getContent();
@@ -122,25 +130,30 @@ class TranscricaoQuestaoArquivoService
     }
 
     /**
-     * @return array{enunciado:string,tipo:string,valor:float,alternativas:list<array{texto:string,correta:bool}>,outras:int,tem_figura:bool}
+     * @return list<array{enunciado:string,tipo:string,valor:float,alternativas:list<array{texto:string,correta:int,ordem:int}>,explicacao:?string,figura:int,tem_figura:bool}>
      */
-    private function estruturar(string $texto): array
+    private function estruturar(string $texto, int $quantidadeFiguras): array
     {
-        $systemPrompt = 'Você extrai uma questão de prova a partir de texto transcrito. '
-            . 'Devolva somente JSON com enunciado, tipo (multipla_escolha, verdadeiro_falso ou dissertativa), '
-            . 'valor numérico, alternativas (texto e correta sempre false) e tem_figura (true se houver gráfico, mapa, figura ou tabela visual). '
-            . 'outras é o número de questões além da primeira, se o texto tiver mais de uma. '
-            . 'O enunciado é texto puro, sem HTML e sem as alternativas. Não invente gabarito.';
+        $systemPrompt = 'Você extrai TODAS as questões de uma prova, na ordem, a partir do texto. '
+            . 'Se houver gabarito, folha do professor ou resposta indicada, marque a alternativa correta. Não invente gabarito quando ele não estiver no texto. '
+            . 'A página de gabarito não é uma questão nova. '
+            . 'Devolva somente JSON: {"questoes":[{"enunciado":"texto puro sem alternativas","tipo":"multipla_escolha|verdadeiro_falso|dissertativa","valor":2,"gabarito":"B","explicacao":"resolução curta ou vazio","figura":0,"tem_figura":false,"alternativas":[{"texto":"..."}]}]}. '
+            . 'gabarito é só a letra A, B, C, D ou E, ou string vazia quando o arquivo não trouxer a resposta. figura é o número da figura do arquivo (1 a ' . $quantidadeFiguras . ') que pertence à questão, ou 0. '
+            . 'No máximo 40 questões.';
+        $trecho = $texto;
+        if (mb_strlen($texto) > 24000) {
+            $trecho = mb_substr($texto, 0, 18000) . "\n\n[texto do meio omitido]\n\n" . mb_substr($texto, -6000);
+        }
         $openai = new OpenAIService();
         $response = $openai->chatCompletion(
             [[
                 'role' => 'user',
-                'content' => "Extraia a primeira questão deste texto:\n\n" . mb_substr($texto, 0, 12000),
+                'content' => "Extraia todas as questões desta prova. Há {$quantidadeFiguras} figura(s) no arquivo, na ordem em que aparecem.\n\n" . $trecho,
             ]],
             $systemPrompt,
             'gpt-4o',
             0.2,
-            4000
+            8000
         );
         $conteudo = (string) ($response['resposta'] ?? '');
         $json = $conteudo;
@@ -148,37 +161,85 @@ class TranscricaoQuestaoArquivoService
             $json = trim($bloco[1]);
         } elseif (preg_match('/\{[\s\S]*\}/', $conteudo, $bloco)) {
             $json = $bloco[0];
+        } elseif (preg_match('/\[[\s\S]*\]/', $conteudo, $bloco)) {
+            $json = $bloco[0];
         }
-        $questao = json_decode($json, true);
-        if (!is_array($questao)) {
-            $questao = [];
+        $decodificado = json_decode($json, true);
+        $brutas = [];
+        if (isset($decodificado['questoes']) && is_array($decodificado['questoes'])) {
+            $brutas = $decodificado['questoes'];
+        } elseif (is_array($decodificado) && array_is_list($decodificado)) {
+            $brutas = $decodificado;
+        } elseif (is_array($decodificado) && isset($decodificado['enunciado'])) {
+            $brutas = [$decodificado];
         }
+
+        $lista = [];
+        foreach ($brutas as $questao) {
+            if (!is_array($questao) || count($lista) >= 40) {
+                continue;
+            }
+            $normalizada = $this->normalizarQuestao($questao);
+            if ($normalizada['enunciado'] === '') {
+                continue;
+            }
+            $lista[] = $normalizada;
+        }
+
+        return $lista;
+    }
+
+    private function letraDoGabarito(string $valor): string
+    {
+        $valor = strtoupper(trim(preg_replace('/\s+/', ' ', $valor) ?? ''));
+        if (preg_match('/^(?:ALTERNATIVA|LETRA|RESPOSTA|GABARITO)?\s*[:\-]?\s*([A-E])(?:[).:\-])?$/', $valor, $letra)) {
+            return $letra[1];
+        }
+
+        return '';
+    }
+
+    /**
+     * @param array<string,mixed> $questao
+     * @return array{enunciado:string,tipo:string,valor:float,alternativas:list<array{texto:string,correta:int,ordem:int}>,explicacao:?string,figura:int,tem_figura:bool}
+     */
+    private function normalizarQuestao(array $questao): array
+    {
         $tipo = (string) ($questao['tipo'] ?? 'multipla_escolha');
         if (!in_array($tipo, ['multipla_escolha', 'verdadeiro_falso', 'dissertativa'], true)) {
             $tipo = 'multipla_escolha';
         }
+        $letraGabarito = $this->letraDoGabarito((string) ($questao['gabarito'] ?? ''));
         $alternativas = [];
         foreach ((array) ($questao['alternativas'] ?? []) as $alternativa) {
             $textoAlt = trim((string) (is_array($alternativa) ? ($alternativa['texto'] ?? '') : $alternativa));
             if ($textoAlt === '') {
                 continue;
             }
-            $alternativas[] = ['texto' => $textoAlt, 'correta' => false];
+            $ordem = count($alternativas);
+            $letraAlt = chr(65 + $ordem);
+            $correta = $letraGabarito !== '' && $letraAlt === $letraGabarito;
+            $alternativas[] = [
+                'texto' => $textoAlt,
+                'correta' => $correta ? 1 : 0,
+                'ordem' => $ordem,
+            ];
             if (count($alternativas) >= 5) {
                 break;
             }
         }
-        $enunciado = trim((string) ($questao['enunciado'] ?? ''));
-        if ($enunciado === '') {
-            $enunciado = $texto;
+        $explicacao = trim(strip_tags((string) ($questao['explicacao'] ?? '')));
+        if ($explicacao !== '') {
+            $explicacao = mb_substr($explicacao, 0, 1500);
         }
 
         return [
-            'enunciado' => $enunciado,
+            'enunciado' => trim((string) ($questao['enunciado'] ?? '')),
             'tipo' => $tipo,
-            'valor' => is_numeric($questao['valor'] ?? null) ? (float) $questao['valor'] : 1.0,
+            'valor' => is_numeric($questao['valor'] ?? null) && (float) $questao['valor'] > 0 ? (float) $questao['valor'] : 1.0,
             'alternativas' => $alternativas,
-            'outras' => max(0, (int) ($questao['outras'] ?? 0)),
+            'explicacao' => $explicacao !== '' ? $explicacao : null,
+            'figura' => max(0, (int) ($questao['figura'] ?? 0)),
             'tem_figura' => !empty($questao['tem_figura']),
         ];
     }
