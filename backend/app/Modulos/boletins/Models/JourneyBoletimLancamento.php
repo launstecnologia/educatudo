@@ -202,9 +202,6 @@ class JourneyBoletimLancamento
                 $ids[] = $id;
             }
         }
-        if ($ids === [] && $anoLetivo > 0) {
-            return $this->listarIdsPorBimestre($bims, 0);
-        }
 
         return array_values(array_unique($ids));
     }
@@ -617,7 +614,8 @@ class JourneyBoletimLancamento
         string $calcType,
         array $faixasPercentuais = [],
         bool $notaUnicaPeloTotalConcluidasNoEscopo = false,
-        ?array $notaUnicaExtras = null
+        ?array $notaUnicaExtras = null,
+        bool $escopoExplicito = false
     ): array {
         $calcType = strtolower(trim($calcType));
         if (!in_array($calcType, ['media', 'soma', 'maior', 'ultima'], true)) {
@@ -634,14 +632,17 @@ class JourneyBoletimLancamento
                 $jornadas,
                 $this->buscarJornadasComAtividadeDoAluno($alunoId, $jornadaIdsEscopo)
             );
+        } elseif (!$escopoExplicito) {
+            $jornadas = $this->listarJornadasCandidatas($turmaIds, $dataIni, $dataFim);
         } else {
-            $jornadas = $this->listarJornadasCandidatas($turmaIds, null, null);
+            // Seleção vazia de um bimestre não significa todas as jornadas da turma.
+            $jornadas = [];
         }
 
         $jornadaIds = array_values(array_filter(array_map(static function ($j) {
             return (int) ($j['id'] ?? 0);
         }, $jornadas)));
-        if ($jornadaIds === []) {
+        if ($jornadaIds === [] && !$escopoExplicito) {
             $bimsFallback = $this->bimestresDosIds($jornadaIdsEscopo);
             foreach ($this->listarJornadasCandidatas($turmaIds, null, null) as $jornadaTurma) {
                 $idTurma = (int) ($jornadaTurma['id'] ?? 0);
@@ -700,7 +701,7 @@ class JourneyBoletimLancamento
             }
         }
 
-        if ($noEscopo === []) {
+        if ($noEscopo === [] && !$escopoExplicito) {
             $noEscopo = $this->idsJornadasDaTurmaNoBimestre($turmaId, $jornadaIdsEscopo);
             foreach ($this->buscarJornadasPorIdsEscopoTurma([$turmaId], $noEscopo) as $jornadaTurma) {
                 $idTurma = (int) ($jornadaTurma['id'] ?? 0);

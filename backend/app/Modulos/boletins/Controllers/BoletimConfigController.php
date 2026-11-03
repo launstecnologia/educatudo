@@ -2134,7 +2134,9 @@ class BoletimConfigController extends BaseController
         $dataInicio = $this->normalizarDataYmdOpcional((string) ($regra['default_data_inicio'] ?? ''));
         $dataFim = $this->normalizarDataYmdOpcional((string) ($regra['default_data_fim'] ?? ''));
         if ($dataInicio === null || $dataFim === null) {
-            $rangePadrao = $this->periodoToRange($this->periodoDefault());
+            $periodoEvento = SimulacaoBoletimConsulta::resolverPeriodo($regra, null, null);
+            $datasEvento = $this->datasDoPeriodoSimulacao($periodoEvento);
+            $rangePadrao = ['inicio' => $datasEvento['inicio'], 'fim' => $datasEvento['fim']];
             $dataInicio = substr((string) ($rangePadrao['inicio'] ?? ''), 0, 10) ?: date('Y-01-01');
             $dataFim = substr((string) ($rangePadrao['fim'] ?? ''), 0, 10) ?: date('Y-m-d');
         }
@@ -2195,7 +2197,9 @@ class BoletimConfigController extends BaseController
         $dataInicio = $this->normalizarDataYmdOpcional((string) ($regra['default_data_inicio'] ?? ''));
         $dataFim = $this->normalizarDataYmdOpcional((string) ($regra['default_data_fim'] ?? ''));
         if ($dataInicio === null || $dataFim === null) {
-            $rangePadrao = $this->periodoToRange($this->periodoDefault());
+            $periodoEvento = SimulacaoBoletimConsulta::resolverPeriodo($regra, null, null);
+            $datasEvento = $this->datasDoPeriodoSimulacao($periodoEvento);
+            $rangePadrao = ['inicio' => $datasEvento['inicio'], 'fim' => $datasEvento['fim']];
             $dataInicio = substr((string) ($rangePadrao['inicio'] ?? ''), 0, 10) ?: date('Y-01-01');
             $dataFim = substr((string) ($rangePadrao['fim'] ?? ''), 0, 10) ?: date('Y-m-d');
         }
@@ -4139,8 +4143,11 @@ class BoletimConfigController extends BaseController
                 if (array_key_exists('faixas_percentuais', $cfgDraft)) {
                     $cfg['faixas_percentuais'] = $cfgDraft['faixas_percentuais'];
                 }
-                if (isset($cfgDraft['jornada_ids']) && is_array($cfgDraft['jornada_ids']) && $cfgDraft['jornada_ids'] !== []) {
+                if (isset($cfgDraft['jornada_ids']) && is_array($cfgDraft['jornada_ids'])) {
                     $cfg['jornada_ids'] = $cfgDraft['jornada_ids'];
+                    if (!array_key_exists('jornada_bimestres', $cfgDraft)) {
+                        unset($cfg['jornada_bimestres']);
+                    }
                 }
                 if (isset($cfgDraft['jornada_bimestres']) && is_array($cfgDraft['jornada_bimestres'])) {
                     $cfg['jornada_bimestres'] = $cfgDraft['jornada_bimestres'];
@@ -4963,6 +4970,29 @@ class BoletimConfigController extends BaseController
                     $turmaId = (int) ($rowTurma['turma_id'] ?? 0);
                 }
                 $cfg = $this->parseJornadasConfigFromComponente($componente);
+                $configJornada = $this->decodeComponenteConfig($componente);
+                $bimestresJornada = array_values(array_filter(array_map(
+                    'intval',
+                    (array) ($configJornada['jornada_bimestres'] ?? [])
+                ), static fn (int $b): bool => $b >= 1 && $b <= 4));
+                // Sem seleção manual, a fonte pertence ao bimestre do evento.
+                if ($bimestresJornada === [] && !array_key_exists('jornada_ids', $configJornada)) {
+                    $bimestreEvento = (int) ($regra['bimestre'] ?? 0);
+                    if ($bimestreEvento >= 1 && $bimestreEvento <= 4) {
+                        $bimestresJornada = [$bimestreEvento];
+                    }
+                }
+                $escopoJornadaExplicito = $bimestresJornada !== []
+                    || array_key_exists('jornada_ids', $configJornada);
+                if ($bimestresJornada !== []) {
+                    $cfg['jornada_ids'] = (new JourneyBoletimLancamento())->listarIdsPorBimestre(
+                        $bimestresJornada,
+                        (int) ($regra['ano_letivo'] ?? 0)
+                    );
+                    // Prévia e geração usam o mesmo escopo por bimestre.
+                    $cfg['data_ini'] = null;
+                    $cfg['data_fim'] = null;
+                }
                 // Não sobrescrever o range global da simulação (GET data_inicio/data_fim).
                 $rangePeriodoRef = $this->periodoToRange($periodoRef);
                 $dataIni = $cfg['data_ini'];
@@ -5015,7 +5045,8 @@ class BoletimConfigController extends BaseController
                         $calcJ,
                         $cfg['faixas_percentuais'] ?? [],
                         $notaUnicaTodasLinhas,
-                        $notaUnicaExtras
+                        $notaUnicaExtras,
+                        $escopoJornadaExplicito
                     );
                     if ($linearJ) {
                         $detalhes['jornada_nota_linear'] = 1;
@@ -9725,16 +9756,10 @@ class BoletimConfigController extends BaseController
             $ano = (int) $m[1];
             $b = (int) $m[2];
 
-            $ranges = [
-                1 => ['01-01 00:00:00', '03-31 23:59:59'],
-                2 => ['04-01 00:00:00', '06-30 23:59:59'],
-                3 => ['07-01 00:00:00', '09-30 23:59:59'],
-                4 => ['10-01 00:00:00', '12-31 23:59:59'],
-            ];
-
+            $intervalo = PeriodoLetivo::intervalo($ano, $b);
             return [
-                'inicio' => $ano . '-' . $ranges[$b][0],
-                'fim' => $ano . '-' . $ranges[$b][1],
+                'inicio' => $intervalo['inicio'] . ' 00:00:00',
+                'fim' => $intervalo['fim'] . ' 23:59:59',
             ];
         }
 

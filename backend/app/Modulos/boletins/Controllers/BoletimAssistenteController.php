@@ -224,7 +224,6 @@ class BoletimAssistenteController extends BaseController
         }
 
         $rascunho = $this->rascunhoComFontesSalvas($rascunho, $estado);
-        $rascunho = $this->garantirEscopoJornada($rascunho, $estado);
         $rascunho = $this->aplicarJornadaDoEstadoNoRascunhoPreview($rascunho, $estado);
         [$periodoRef, $dataInicio, $dataFim] = $this->resolverPeriodoPreview($rascunho, $estado);
 
@@ -425,8 +424,11 @@ class BoletimAssistenteController extends BaseController
                     if (array_key_exists('faixas_percentuais', $cfgWizard)) {
                         $cfgSalva['faixas_percentuais'] = $cfgWizard['faixas_percentuais'];
                     }
-                    if (isset($cfgWizard['jornada_ids']) && is_array($cfgWizard['jornada_ids']) && $cfgWizard['jornada_ids'] !== []) {
+                    if (isset($cfgWizard['jornada_ids']) && is_array($cfgWizard['jornada_ids'])) {
                         $cfgSalva['jornada_ids'] = $cfgWizard['jornada_ids'];
+                        if (!array_key_exists('jornada_bimestres', $cfgWizard)) {
+                            unset($cfgSalva['jornada_bimestres']);
+                        }
                     }
                     if (isset($cfgWizard['jornada_bimestres']) && is_array($cfgWizard['jornada_bimestres'])) {
                         $cfgSalva['jornada_bimestres'] = $cfgWizard['jornada_bimestres'];
@@ -1325,40 +1327,6 @@ class BoletimAssistenteController extends BaseController
         $nome = preg_replace('/\s+/', ' ', $nome);
 
         return is_string($nome) ? $nome : '';
-    }
-
-    /**
-     * A nota de jornada segue as jornadas do bimestre, não o intervalo de datas do evento.
-     *
-     * @param array<string,mixed> $rascunho
-     * @param array<string,mixed> $estado
-     * @return array<string,mixed>
-     */
-    private function garantirEscopoJornada(array $rascunho, array $estado): array
-    {
-        $bimestre = (int) ($rascunho['bimestre'] ?? $estado['bimestre'] ?? 0);
-        $ano = (int) ($rascunho['ano_letivo'] ?? $estado['ano_letivo'] ?? 0);
-        $idsBimestre = ($bimestre >= 1 && $bimestre <= 4)
-            ? $this->assistente->ferramentas()->resolverIdsJornadaPorBimestre([$bimestre], $ano)
-            : [];
-        $componentes = [];
-        foreach ((array) ($rascunho['componentes'] ?? []) as $comp) {
-            if (!is_array($comp) || strtolower(trim((string) ($comp['source_type'] ?? ''))) !== 'jornadas') {
-                $componentes[] = $comp;
-                continue;
-            }
-            $config = is_array($comp['config'] ?? null) ? $comp['config'] : [];
-            if ($idsBimestre !== []) {
-                $config['jornada_ids'] = $idsBimestre;
-            }
-            unset($config['data_ini'], $config['data_fim']);
-            $comp['config'] = $config;
-            unset($comp['config_json']);
-            $componentes[] = $comp;
-        }
-        $rascunho['componentes'] = $componentes;
-
-        return $rascunho;
     }
 
     /**
