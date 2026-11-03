@@ -407,7 +407,7 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::i
 
 <!-- Secretaria -->
 <div class="menu-group">
-    <div class="flex items-center rounded-xl <?= in_array($cp, ['gestao_escolar', 'secretaria'], true) ? 'bg-white/20' : '' ?>">
+    <div class="flex items-center rounded-xl <?= in_array($cp, ['gestao_escolar', 'secretaria', 'carteirinha'], true) ? 'bg-white/20' : '' ?>">
         <a href="<?= URL ?>/admin/gestao-escolar" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
             <i class="fa-regular fa-folder-open w-5 h-5 mr-3"></i>
             <span class="sidebar-text">Secretaria</span>
@@ -456,6 +456,12 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::i
         <a href="<?= URL ?>/admin/students/remanejamento" class="<?= $linkCls($curMovimentacao) ?>">
             <i class="fa-solid fa-people-arrows w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Movimentação de alunos</span>
+        </a>
+        <?php endif; ?>
+        <?php if ($modOn('carteirinha') && ($canViewSidebar(['carteirinha']) || $canViewSidebar(['censo_escolar', 'declaracoes_aluno', 'transferencia']))): ?>
+        <a href="<?= URL ?>/admin/carteirinha" class="<?= $linkCls($cp === 'carteirinha') ?>">
+            <i class="fa-solid fa-id-card w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Carteirinha</span>
         </a>
         <?php endif; ?>
         <?php if ($canViewSidebar(['declaracoes_aluno'])): ?>

@@ -106,7 +106,7 @@
         $showFechamentoGroup = $canViewSidebar(['resultados_finais', 'conselho_classe']);
         $showSecretariaNavGroup = $canViewSidebar([
             'processos_matricula', 'transferencia',
-            'censo_escolar', 'declaracoes_aluno',
+            'censo_escolar', 'declaracoes_aluno', 'carteirinha',
         ]);
         $showPaineisGroup = $canViewSidebar(['dashboard', 'saude_academica', 'conformidade', 'relatorios_gerais', 'declaracoes_aluno']);
         $showInventoryGroup = $modOn('recursos_fisicos') && $canViewSidebar(['almoxarifado', 'patrimonio']);
@@ -136,7 +136,7 @@
         ], true);
         $secretariaNavOpen = in_array($cp, [
             'gestao_escolar', 'secretaria', 'censo_escolar', 'enrollment', 'enrollment_config',
-            'paineis_documentos',
+            'paineis_documentos', 'carteirinha',
         ], true) || $curMovimentacao;
         $paineisOpen = in_array($cp, [
             'paineis', 'dashboard', 'saude_academica', 'conformidade',
@@ -873,6 +873,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'vida_escolar': 'secretaria',
         'vida_escolar_oficios': 'secretaria',
         'paineis_documentos': 'secretaria',
+        'carteirinha': 'secretaria',
         'almoxarifado': 'recursos-escolares',
         'patrimonio': 'recursos-escolares',
         'tudicoins_escola': 'z-configuracao',

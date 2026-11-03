@@ -14,11 +14,20 @@
                 Dashboard
             </h1>
             <p class="text-sm sm:text-base text-gray-600 mt-1">Acompanhe seu progresso e continue aprendendo.</p>
-            <a href="<?= URL ?>/grade-horaria"
-               class="mt-3 inline-flex items-center px-4 py-2 rounded-lg bg-primary text-primary text-sm font-semibold hover:opacity-90 whitespace-nowrap">
-                <i class="fa-regular fa-calendar-days mr-2"></i>
-                Grade horária
-            </a>
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+                <a href="<?= URL ?>/grade-horaria"
+                   class="inline-flex items-center px-4 py-2 rounded-lg bg-primary text-primary text-sm font-semibold hover:opacity-90 whitespace-nowrap">
+                    <i class="fa-regular fa-calendar-days mr-2"></i>
+                    Grade horária
+                </a>
+                <?php if (\App\Core\LayoutHelper::isModuleEnabled('carteirinha') && \App\Modulos\Carteirinha\Services\CarteirinhaService::escolaUsa()): ?>
+                <a href="<?= URL ?>/aluno/carteirinha"
+                   class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-800 text-sm font-semibold hover:bg-gray-50 whitespace-nowrap">
+                    <i class="fa-solid fa-id-card mr-2"></i>
+                    Carteirinha
+                </a>
+                <?php endif; ?>
+            </div>
         </div>
         <?php if (!empty($turmas_cursos_select) && is_array($turmas_cursos_select)): ?>
         <div class="flex flex-col items-stretch sm:items-end gap-1 w-full sm:w-auto max-w-full">

@@ -220,10 +220,15 @@ class AuthMiddleware
         }
 
         $decoded = json_decode($rawJson, true);
-        $permissions = AdminPermissionMatrix::sanitizePermissions($decoded);
+        $permissions = AdminPermissionMatrix::sanitizePermissions(is_array($decoded) ? $decoded : []);
         if ($permissions === []) {
             return false;
         }
+        $permissions = AdminPermissionMatrix::completarAusentes(
+            $permissions,
+            is_array($decoded) ? $decoded : [],
+            (string) ($user['perfil_admin'] ?? '')
+        );
         $permissions = AdminPermissionMatrix::aplicarRestricaoZConfiguracao(
             (string) ($user['perfil_admin'] ?? ''),
             $permissions

@@ -71,6 +71,7 @@ class AdminSecretariaAccess
             '/admin/ocorrencias',
             '/admin/conselhos',
             '/admin/censo',
+            '/admin/carteirinha',
             '/admin/faltas',
             '/admin/presenca',
             '/admin/frequencia',

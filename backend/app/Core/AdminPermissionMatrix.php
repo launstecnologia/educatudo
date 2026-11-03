@@ -103,6 +103,7 @@ class AdminPermissionMatrix
 
             'faltas' => ['label' => 'Faltas', 'prefixes' => ['/admin/faltas', '/admin/faltas/lancar', '/admin/frequencia']],
             'presenca' => ['label' => 'Gestão de Presença', 'prefixes' => ['/admin/presenca', '/admin/frequencia']],
+            'carteirinha' => ['label' => 'Carteirinha', 'prefixes' => ['/admin/carteirinha']],
             'diario_classe' => ['label' => 'Diário de Classe', 'prefixes' => ['/admin/diario']],
             'conformidade' => ['label' => 'Painel de Conformidade', 'prefixes' => ['/admin/conformidade']],
             'calendario_letivo' => ['label' => 'Calendário Letivo', 'prefixes' => ['/admin/calendario-letivo']],
@@ -205,7 +206,7 @@ class AdminPermissionMatrix
             'conteudo' => ['label' => 'Conteúdo', 'items' => ['arquivos', 'educahits_portal', 'apostilas_ia', 'apostilas', 'expo_colag']],
             'financeiro' => ['label' => 'Financeiro', 'items' => ['financeiro_dashboard', 'financeiro_relatorio_pagantes']],
             'secretaria' => ['label' => 'Secretaria', 'items' => [
-                'censo_escolar', 'diario_classe', 'faltas', 'presenca',
+                'censo_escolar', 'diario_classe', 'faltas', 'presenca', 'carteirinha',
                 'documentos_institucionais', 'modelos_documentos', 'documentos_professor',
                 'processos_matricula', 'transferencia', 'ocorrencias', 'almoxarifado', 'patrimonio',
                 'pacotes_creditos',
@@ -261,7 +262,7 @@ class AdminPermissionMatrix
                     'denuncias_forum', 'forum', 'mural_recados', 'comunicacao_escolar', 'calendario_escolar', 'notificacoes', 'notificacoes_push',
                     'configuracao_boletim', 'grupos_regras_notas', 'avatares_alunos',
                     'apostilas_ia', 'apostilas', 'arquivos', 'expo_colag', 'minicursos', 'planos_aula', 'ava',
-                    'faltas', 'presenca', 'diario_classe', 'conformidade', 'calendario_letivo', 'bncc', 'documentos_institucionais', 'modelos_documentos', 'documentos_professor', 'saude_academica', 'grade_horaria', 'materias', 'almoxarifado', 'patrimonio', 'ocorrencias', 'conselho_classe', 'censo_escolar', 'pacotes_creditos',
+                    'faltas', 'presenca', 'carteirinha', 'diario_classe', 'conformidade', 'calendario_letivo', 'bncc', 'documentos_institucionais', 'modelos_documentos', 'documentos_professor', 'saude_academica', 'grade_horaria', 'materias', 'almoxarifado', 'patrimonio', 'ocorrencias', 'conselho_classe', 'censo_escolar', 'pacotes_creditos',
                     'alertas_sensiveis', 'alunos_online', 'reconhecimento_facial',
                     'relatorios_gerais',
                     'administradores', 'professores', 'transferencia', 'lista_chamada',
@@ -284,7 +285,7 @@ class AdminPermissionMatrix
                     'dashboard', 'alunos', 'ano_letivo', 'curso', 'series', 'matriz_curricular', 'regras_academicas', 'resultados_finais', 'vida_escolar', 'salas', 'turmas',
                     'exercicios', 'jornadas_aluno', 'provas_online', 'redacao_professor',
                     'configuracao_boletim', 'grupos_regras_notas', 'relatorios_gerais',
-                    'faltas', 'presenca', 'diario_classe', 'conformidade', 'calendario_letivo', 'bncc', 'documentos_institucionais', 'modelos_documentos', 'documentos_professor', 'saude_academica', 'grade_horaria', 'materias', 'almoxarifado', 'patrimonio', 'ocorrencias', 'conselho_classe', 'censo_escolar',
+                    'faltas', 'presenca', 'carteirinha', 'diario_classe', 'conformidade', 'calendario_letivo', 'bncc', 'documentos_institucionais', 'modelos_documentos', 'documentos_professor', 'saude_academica', 'grade_horaria', 'materias', 'almoxarifado', 'patrimonio', 'ocorrencias', 'conselho_classe', 'censo_escolar',
                     'professores', 'transferencia', 'lista_chamada', 'reconhecimento_facial',
                     'acao_rapida_ativar_desativar',
                     'responsaveis_vinculados', 'matriculas_aluno', 'processos_matricula', 'declaracoes_aluno', 'documentos_aluno',
@@ -315,6 +316,44 @@ class AdminPermissionMatrix
             $sanitized[$moduleKey] = [];
             foreach ($actions as $action) {
                 $sanitized[$moduleKey][$action] = !empty($row[$action]);
+            }
+        }
+
+        return $sanitized;
+    }
+
+    /**
+     * Chave nova no catálogo ainda não gravada no JSON do perfil usa o padrão daquele perfil.
+     * O que já foi salvo (ligado ou desligado) permanece.
+     *
+     * @param array<string, array<string, bool>> $sanitized
+     * @param array<string, mixed> $raw
+     * @return array<string, array<string, bool>>
+     */
+    public static function completarAusentes(array $sanitized, array $raw, string $perfil): array
+    {
+        $base = self::defaultPermissionsByProfile($perfil);
+        foreach (self::moduleCatalog() as $moduleKey => $_moduleDef) {
+            if (isset($raw[$moduleKey]) && is_array($raw[$moduleKey])) {
+                continue;
+            }
+            if (isset($base[$moduleKey])) {
+                $sanitized[$moduleKey] = $base[$moduleKey];
+            }
+        }
+
+        if (!isset($raw['carteirinha']) || !is_array($raw['carteirinha'])) {
+            foreach (['censo_escolar', 'declaracoes_aluno', 'transferencia'] as $chave) {
+                if (empty($sanitized[$chave]['visualizar'])) {
+                    continue;
+                }
+                $sanitized['carteirinha'] = [
+                    'visualizar' => true,
+                    'cadastrar' => true,
+                    'alterar' => true,
+                    'excluir' => true,
+                ];
+                break;
             }
         }
 
@@ -440,7 +479,10 @@ class AdminPermissionMatrix
         }
 
         $decoded = json_decode($raw, true);
-        $sanitized = self::sanitizePermissions($decoded);
+        $sanitized = self::sanitizePermissions(is_array($decoded) ? $decoded : []);
+        if ($sanitized !== []) {
+            $sanitized = self::completarAusentes($sanitized, is_array($decoded) ? $decoded : [], $perfil);
+        }
         $efetivas = $sanitized === [] ? $base : $sanitized;
 
         return self::aplicarRestricaoZConfiguracao($perfil, $efetivas);

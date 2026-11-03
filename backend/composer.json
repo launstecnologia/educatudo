@@ -53,6 +53,7 @@
             "App\\Modulos\\Patrimonio\\": "app/Modulos/patrimonio/",
             "App\\Modulos\\Matricula\\": "app/Modulos/matricula/",
             "App\\Modulos\\Boletins\\": "app/Modulos/boletins/",
+            "App\\Modulos\\Carteirinha\\": "app/Modulos/carteirinha/",
             "App\\Modulos\\Mural\\": "app/Modulos/mural/",
             "App\\Modulos\\AulasOnline\\": "app/Modulos/aulas-online/",
             "App\\Modulos\\Minicursos\\": "app/Modulos/minicursos/",
