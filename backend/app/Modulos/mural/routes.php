@@ -14,6 +14,8 @@ $router->get('/admin/mural-recados/editar', 'Modulos/mural/AdminMuralController@
 $router->post('/admin/mural-recados/atualizar', 'Modulos/mural/AdminMuralController@atualizar');
 $router->post('/admin/mural-recados/excluir', 'Modulos/mural/AdminMuralController@excluir');
 
+$router->get('/mural-recados/anexo/{id}', 'Modulos/mural/MuralAnexoController@baixar');
+
 // Professor
 $router->get('/professor/mural-recados', 'Modulos/mural/TeacherMuralController@index');
 $router->get('/professor/mural-recados/criar', 'Modulos/mural/TeacherMuralController@criar');

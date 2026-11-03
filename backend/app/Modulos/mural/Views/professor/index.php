@@ -98,6 +98,10 @@ document.querySelectorAll('.marcar-visto-professor').forEach(function (btn) {
                 <tr class="hover:bg-gray-50" data-recado-titulo="<?= htmlspecialchars($r['titulo'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                     <td class="px-6 py-4">
                         <span class="font-medium text-gray-900"><?= htmlspecialchars($r['titulo']) ?></span>
+                        <?php $qtdAnexos = count($anexos_por_recado[(int) $r['id']] ?? []); ?>
+                        <?php if ($qtdAnexos > 0): ?>
+                        <span class="block text-xs text-gray-500 mt-1"><?= $qtdAnexos === 1 ? '1 anexo' : $qtdAnexos . ' anexos' ?></span>
+                        <?php endif; ?>
                     </td>
                     <td class="px-6 py-4 text-sm text-gray-600">
                         <?php if (!empty($r['aluno_id'])): ?>
@@ -137,7 +141,23 @@ document.querySelectorAll('.marcar-visto-professor').forEach(function (btn) {
 <?php if (!empty($recados)): ?>
 <div id="recados-conteudos-holder" class="hidden" aria-hidden="true">
     <?php foreach ($recados as $r): ?>
-    <div id="recado-conteudo-<?= (int)$r['id'] ?>" class="recado-conteudo-item"><?= rich_text_render($r['conteudo'] ?? '') ?></div>
+    <div id="recado-conteudo-<?= (int)$r['id'] ?>" class="recado-conteudo-item"><?= rich_text_render($r['conteudo'] ?? '') ?><?php
+        $anexosRecado = $anexos_por_recado[(int) $r['id']] ?? [];
+        if ($anexosRecado !== []) {
+            echo '<div class="not-prose mt-4 space-y-3">';
+            foreach ($anexosRecado as $anexo) {
+                $urlAnexo = URL . '/mural-recados/anexo/' . (int) $anexo['id'];
+                $nomeAnexo = htmlspecialchars((string) ($anexo['arquivo_nome'] ?? 'Anexo'), ENT_QUOTES, 'UTF-8');
+                $ehImagem = strncmp((string) ($anexo['tipo_arquivo'] ?? ''), 'image/', 6) === 0;
+                if ($ehImagem) {
+                    echo '<a href="' . htmlspecialchars($urlAnexo, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener"><img src="' . htmlspecialchars($urlAnexo, ENT_QUOTES, 'UTF-8') . '" alt="' . $nomeAnexo . '" class="max-w-full max-h-80 rounded-lg border border-gray-200"></a>';
+                } else {
+                    echo '<a href="' . htmlspecialchars($urlAnexo, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 text-sm text-blue-700 hover:text-blue-900">' . $nomeAnexo . '</a>';
+                }
+            }
+            echo '</div>';
+        }
+    ?></div>
     <?php endforeach; ?>
 </div>
 <?php endif; ?>
@@ -231,7 +251,7 @@ foreach ($alunos_opcoes ?? [] as $alunoOpcao) {
 }
 ob_start();
 ?>
-<form id="mural-form" method="post" action="<?= URL ?>/professor/mural-recados/salvar" class="flex flex-col flex-1 overflow-hidden">
+<form id="mural-form" method="post" action="<?= URL ?>/professor/mural-recados/salvar" enctype="multipart/form-data" class="flex flex-col flex-1 overflow-hidden">
     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
     <input type="hidden" name="id" id="mural_id" value="" disabled>
     <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-6">
@@ -296,6 +316,14 @@ ob_start();
                     <?php endif; ?>
                 </div>
             </div>
+        </div>
+        <div>
+            <label for="mural_anexos" class="block text-sm font-medium text-gray-700 mb-1">Anexo ou imagem</label>
+            <input type="file" id="mural_anexos" name="anexos[]" multiple
+                   accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                   class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+            <p class="mt-1 text-xs text-gray-500">Até 5 arquivos, 8 MB cada. JPG, PNG, WEBP, GIF ou PDF.</p>
+            <div id="mural_anexos_atuais" class="mt-3 space-y-2"></div>
         </div>
     </div>
     <div class="px-6 sm:px-8 py-4 border-t border-gray-200 flex gap-3">
@@ -364,6 +392,7 @@ include $ui . '/offcanvas.php';
     if (!form) return;
     var muralQuill = null;
     var base = <?= json_encode(URL . '/professor/mural-recados', JSON_UNESCAPED_SLASHES) ?>;
+    var baseAnexo = <?= json_encode(URL . '/mural-recados/anexo', JSON_UNESCAPED_SLASHES) ?>;
 
     function getMuralQuill() {
         if (muralQuill) return muralQuill;
@@ -414,6 +443,41 @@ include $ui . '/offcanvas.php';
             });
         });
     }
+    function mostrarAnexosAtuais(lista) {
+        var box = document.getElementById('mural_anexos_atuais');
+        if (!box) return;
+        box.innerHTML = '';
+        (lista || []).forEach(function (anexo) {
+            if (!anexo || !anexo.id) return;
+            var linha = document.createElement('label');
+            linha.className = 'flex items-start gap-2 text-sm text-gray-700';
+            var check = document.createElement('input');
+            check.type = 'checkbox';
+            check.name = 'remover_anexos[]';
+            check.value = String(anexo.id);
+            check.className = 'mt-1 rounded border-gray-300 text-red-600';
+            var texto = document.createElement('span');
+            texto.className = 'min-w-0';
+            if (anexo.imagem) {
+                var img = document.createElement('img');
+                img.src = baseAnexo + '/' + anexo.id;
+                img.alt = anexo.nome || 'Imagem';
+                img.className = 'max-h-24 rounded border border-gray-200 mb-1';
+                texto.appendChild(img);
+            }
+            var nome = document.createElement('span');
+            nome.className = 'block break-all';
+            nome.textContent = anexo.nome || 'Anexo';
+            var aviso = document.createElement('span');
+            aviso.className = 'block text-xs text-gray-500';
+            aviso.textContent = 'Marque para remover';
+            texto.appendChild(nome);
+            texto.appendChild(aviso);
+            linha.appendChild(check);
+            linha.appendChild(texto);
+            box.appendChild(linha);
+        });
+    }
     function limparAlunos() {
         if (busca) busca.value = '';
         document.querySelectorAll('.mural-aluno-item, .mural-aluno-grupo').forEach(function (el) {
@@ -433,6 +497,7 @@ include $ui . '/offcanvas.php';
         var todos = form.querySelector('[name="alcance"][value="todos"]');
         if (todos) todos.checked = true;
         setMuralConteudo('');
+        mostrarAnexosAtuais([]);
         toggleDestino();
 
         if (!id) {
@@ -472,6 +537,7 @@ include $ui . '/offcanvas.php';
                     var aluno = form.querySelector('.mural-aluno-radio[value="' + item.aluno_id + '"]');
                     if (aluno) aluno.checked = true;
                 }
+                mostrarAnexosAtuais(item.anexos || []);
                 toggleDestino();
             })
             .catch(function () {

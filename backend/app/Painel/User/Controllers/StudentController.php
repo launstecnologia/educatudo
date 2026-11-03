@@ -2257,6 +2257,11 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
             $recadosCompletos[] = $r;
         }
         $recados = $recadosCompletos;
+        $anexosPorRecado = (new \App\Modulos\Mural\Services\MuralRecadoService($this->db))
+            ->listarAnexosDosRecados(array_map('intval', array_column($recados, 'id')));
+        foreach ($recados as $indice => $recado) {
+            $recados[$indice]['anexos'] = $anexosPorRecado[(int) $recado['id']] ?? [];
+        }
         $professores_opcoes = $this->db->fetchAll("SELECT DISTINCT p.id, p.nome FROM mural_recados r JOIN professores p ON p.id = r.autor_id WHERE r.autor_tipo = 'professor' ORDER BY p.nome");
         $materias_opcoes = [];
         try {

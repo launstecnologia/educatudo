@@ -81,6 +81,252 @@ class MuralRecadoService
         }
     }
 
+    public function alunoPodeVerRecado(int $recadoId, int $alunoId): bool
+    {
+        return $this->alunoPodeVer($recadoId, $alunoId);
+    }
+
+    /**
+     * @param array<string, mixed> $user
+     */
+    public function usuarioPodeVerAnexo(array $user, int $recadoId): bool
+    {
+        $tipo = (string) ($user['tipo'] ?? '');
+        $userId = (int) ($user['id'] ?? 0);
+        if ($recadoId <= 0 || $userId <= 0) {
+            return false;
+        }
+        if ($tipo === 'admin') {
+            return true;
+        }
+        if ($tipo === 'professor') {
+            $row = $this->db->fetch(
+                "SELECT id FROM mural_recados WHERE id = :id AND autor_tipo = 'professor' AND autor_id = :autor",
+                ['id' => $recadoId, 'autor' => $userId]
+            );
+            return !empty($row);
+        }
+        if ($tipo === 'aluno') {
+            return $this->alunoPodeVer($recadoId, $userId);
+        }
+        return false;
+    }
+
+    /**
+     * @param array<int, int> $recadoIds
+     * @return array<int, array<int, array<string, mixed>>>
+     */
+    public function listarAnexosDosRecados(array $recadoIds): array
+    {
+        $recadoIds = array_values(array_unique(array_filter(array_map('intval', $recadoIds))));
+        if ($recadoIds === []) {
+            return [];
+        }
+        $marcas = [];
+        $params = [];
+        foreach ($recadoIds as $i => $recadoId) {
+            $chave = 'r' . $i;
+            $marcas[] = ':' . $chave;
+            $params[$chave] = $recadoId;
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT id, mural_recado_id, arquivo_nome, tipo_arquivo, tamanho
+             FROM mural_recados_anexos
+             WHERE mural_recado_id IN (' . implode(',', $marcas) . ')
+             ORDER BY id',
+            $params
+        );
+        $porRecado = [];
+        foreach ($rows as $row) {
+            $porRecado[(int) $row['mural_recado_id']][] = $row;
+        }
+        return $porRecado;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listarAnexos(int $recadoId): array
+    {
+        return $this->listarAnexosDosRecados([$recadoId])[$recadoId] ?? [];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function buscarAnexo(int $anexoId): ?array
+    {
+        if ($anexoId <= 0) {
+            return null;
+        }
+        $row = $this->db->fetch(
+            'SELECT id, mural_recado_id, arquivo, arquivo_nome, tipo_arquivo
+             FROM mural_recados_anexos WHERE id = :id',
+            ['id' => $anexoId]
+        );
+        return $row ?: null;
+    }
+
+    /**
+     * @param array<int, int> $ids
+     */
+    public function removerAnexos(int $recadoId, array $ids): void
+    {
+        if ($recadoId <= 0) {
+            return;
+        }
+        foreach (array_values(array_unique(array_filter(array_map('intval', $ids)))) as $anexoId) {
+            $row = $this->db->fetch(
+                'SELECT id, arquivo FROM mural_recados_anexos WHERE id = :id AND mural_recado_id = :rid',
+                ['id' => $anexoId, 'rid' => $recadoId]
+            );
+            if (!$row) {
+                continue;
+            }
+            $path = $this->caminhoFisicoAnexo((string) $row['arquivo']);
+            if ($path !== null) {
+                @unlink($path);
+            }
+            $this->db->query(
+                'DELETE FROM mural_recados_anexos WHERE id = :id AND mural_recado_id = :rid',
+                ['id' => $anexoId, 'rid' => $recadoId]
+            );
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $files
+     * @return array{salvos: int, erros: array<int, string>}
+     */
+    public function salvarAnexos(int $recadoId, array $files): array
+    {
+        $vazio = ['salvos' => 0, 'erros' => []];
+        if ($recadoId <= 0 || !isset($files['name']) || !is_array($files['name'])) {
+            return $vazio;
+        }
+        $enviados = 0;
+        foreach ($files['name'] as $i => $nome) {
+            if ((int) ($files['error'][$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                $enviados++;
+            }
+        }
+        if ($enviados === 0) {
+            return $vazio;
+        }
+        $ja = (int) ($this->db->fetch(
+            'SELECT COUNT(*) AS total FROM mural_recados_anexos WHERE mural_recado_id = :id',
+            ['id' => $recadoId]
+        )['total'] ?? 0);
+        if ($ja + $enviados > 5) {
+            return ['salvos' => 0, 'erros' => ['Cada recado aceita no máximo 5 anexos.']];
+        }
+        $slug = defined('TENANT_SLUG') ? preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG) : '';
+        if ($slug === '') {
+            return ['salvos' => 0, 'erros' => ['Não foi possível guardar o anexo.']];
+        }
+        $dir = dirname(__DIR__, 4) . '/storage/uploads/' . $slug . '/mural/' . $recadoId;
+        if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+            return ['salvos' => 0, 'erros' => ['Não foi possível guardar o anexo.']];
+        }
+        $permitidos = [
+            'image/jpeg' => ['jpg', 'image/jpeg'],
+            'image/jpg' => ['jpg', 'image/jpeg'],
+            'image/pjpeg' => ['jpg', 'image/jpeg'],
+            'image/png' => ['png', 'image/png'],
+            'image/x-png' => ['png', 'image/png'],
+            'image/webp' => ['webp', 'image/webp'],
+            'image/gif' => ['gif', 'image/gif'],
+            'application/pdf' => ['pdf', 'application/pdf'],
+        ];
+        $salvos = 0;
+        $erros = [];
+        foreach ($files['name'] as $i => $original) {
+            $erroUpload = (int) ($files['error'][$i] ?? UPLOAD_ERR_NO_FILE);
+            if ($erroUpload === UPLOAD_ERR_NO_FILE) {
+                continue;
+            }
+            $nomeOriginal = basename((string) $original);
+            if ($nomeOriginal === '') {
+                $nomeOriginal = 'arquivo';
+            }
+            if ($erroUpload !== UPLOAD_ERR_OK) {
+                $erros[] = 'Não foi possível enviar ' . $nomeOriginal . '.';
+                continue;
+            }
+            $tmp = (string) ($files['tmp_name'][$i] ?? '');
+            $tamanho = (int) ($files['size'][$i] ?? 0);
+            if ($tmp === '' || !is_uploaded_file($tmp)) {
+                $erros[] = 'Não foi possível enviar ' . $nomeOriginal . '.';
+                continue;
+            }
+            if ($tamanho <= 0 || $tamanho > 8 * 1024 * 1024) {
+                $erros[] = $nomeOriginal . ' passa de 8 MB.';
+                continue;
+            }
+            $finfo = function_exists('finfo_open') ? finfo_open(FILEINFO_MIME_TYPE) : false;
+            $mime = $finfo ? (string) finfo_file($finfo, $tmp) : '';
+            if ($finfo) {
+                finfo_close($finfo);
+            }
+            if (!isset($permitidos[$mime])) {
+                $erros[] = $nomeOriginal . ' precisa ser imagem (JPG, PNG, WEBP ou GIF) ou PDF.';
+                continue;
+            }
+            [$extensao, $mimeGravado] = $permitidos[$mime];
+            $filename = bin2hex(random_bytes(16)) . '.' . $extensao;
+            if (!move_uploaded_file($tmp, $dir . '/' . $filename)) {
+                $erros[] = 'Não foi possível guardar ' . $nomeOriginal . '.';
+                continue;
+            }
+            $this->db->insert(
+                'INSERT INTO mural_recados_anexos (mural_recado_id, arquivo, arquivo_nome, tipo_arquivo, tamanho)
+                 VALUES (:rid, :arquivo, :nome, :mime, :tamanho)',
+                [
+                    'rid' => $recadoId,
+                    'arquivo' => $slug . '/mural/' . $recadoId . '/' . $filename,
+                    'nome' => $nomeOriginal,
+                    'mime' => $mimeGravado,
+                    'tamanho' => $tamanho,
+                ]
+            );
+            $salvos++;
+        }
+        return ['salvos' => $salvos, 'erros' => $erros];
+    }
+
+    public function apagarArquivosDoRecado(int $recadoId): void
+    {
+        if ($recadoId <= 0) {
+            return;
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT arquivo FROM mural_recados_anexos WHERE mural_recado_id = :id',
+            ['id' => $recadoId]
+        );
+        foreach ($rows as $row) {
+            $path = $this->caminhoFisicoAnexo((string) ($row['arquivo'] ?? ''));
+            if ($path !== null) {
+                @unlink($path);
+            }
+        }
+    }
+
+    public function caminhoFisicoAnexo(string $caminho): ?string
+    {
+        $caminho = str_replace('\\', '/', $caminho);
+        $slug = defined('TENANT_SLUG') ? preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG) : '';
+        if ($slug === '' || $caminho === '' || strpos($caminho, '..') !== false || strpos($caminho, $slug . '/mural/') !== 0) {
+            return null;
+        }
+        $base = realpath(dirname(__DIR__, 4) . '/storage/uploads');
+        $full = realpath(dirname(__DIR__, 4) . '/storage/uploads/' . $caminho);
+        $prefix = $base !== false ? rtrim($base, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR : '';
+        if ($base === false || $full === false || $prefix === '' || strpos($full, $prefix) !== 0 || !is_file($full)) {
+            return null;
+        }
+        return $full;
+    }
+
     public function marcarVistoAluno(int $recadoId, int $alunoId): void
     {
         if ($recadoId <= 0 || $alunoId <= 0 || !$this->alunoPodeVer($recadoId, $alunoId)) {

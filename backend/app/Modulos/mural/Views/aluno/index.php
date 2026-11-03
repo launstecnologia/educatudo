@@ -66,6 +66,21 @@
                             echo '<div class="text-gray-700 whitespace-pre-wrap">' . nl2br(htmlspecialchars($c)) . '</div>';
                         }
                     }
+                    $anexosRecado = $recado['anexos'] ?? [];
+                    if ($anexosRecado !== []) {
+                        echo '<div class="mt-4 space-y-3">';
+                        foreach ($anexosRecado as $anexo) {
+                            $urlAnexo = URL . '/mural-recados/anexo/' . (int) ($anexo['id'] ?? 0);
+                            $nomeAnexo = htmlspecialchars((string) ($anexo['arquivo_nome'] ?? 'Anexo'), ENT_QUOTES, 'UTF-8');
+                            $ehImagem = strncmp((string) ($anexo['tipo_arquivo'] ?? ''), 'image/', 6) === 0;
+                            if ($ehImagem) {
+                                echo '<a href="' . htmlspecialchars($urlAnexo, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener"><img src="' . htmlspecialchars($urlAnexo, ENT_QUOTES, 'UTF-8') . '" alt="' . $nomeAnexo . '" class="max-w-full max-h-80 rounded-lg border border-gray-200"></a>';
+                            } else {
+                                echo '<a href="' . htmlspecialchars($urlAnexo, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 text-sm text-blue-700 hover:text-blue-900">' . $nomeAnexo . '</a>';
+                            }
+                        }
+                        echo '</div>';
+                    }
                     ?>
                 </div>
                 <?php if (empty($recado['ja_visto'])): ?>

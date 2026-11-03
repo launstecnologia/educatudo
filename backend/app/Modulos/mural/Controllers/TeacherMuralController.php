@@ -88,11 +88,13 @@ class TeacherMuralController extends BaseController
         );
         $turmas = $this->getTurmasProfessor();
         $materias_opcoes = $this->getMateriasOpcoes();
+        $servico = new MuralRecadoService($this->db);
         $data = [
             'title' => 'Mural de Recados - Professor',
             'page_title' => 'Mural de Recados',
             'user' => $user,
             'recados' => $recados,
+            'anexos_por_recado' => $servico->listarAnexosDosRecados(array_map('intval', array_column($recados, 'id'))),
             'recebidos' => $recebidos,
             'turmas_opcoes' => $turmas,
             'alunos_opcoes' => $this->getAlunosDasTurmas(array_map('intval', array_column($turmas, 'id'))),
@@ -243,8 +245,32 @@ class TeacherMuralController extends BaseController
                 'alcance' => $alcance,
                 'aluno_id' => (int) ($recado['aluno_id'] ?? 0),
                 'turmas' => $turmas,
+                'anexos' => array_map(static function (array $anexo): array {
+                    $mime = (string) ($anexo['tipo_arquivo'] ?? '');
+                    return [
+                        'id' => (int) $anexo['id'],
+                        'nome' => (string) ($anexo['arquivo_nome'] ?? ''),
+                        'imagem' => strncmp($mime, 'image/', 6) === 0,
+                    ];
+                }, (new MuralRecadoService($this->db))->listarAnexos($id)),
             ],
         ]);
+    }
+
+    private function gravarAnexosEAvisar(int $recadoId, string $mensagem): void
+    {
+        $servico = new MuralRecadoService($this->db);
+        $remover = isset($_POST['remover_anexos']) && is_array($_POST['remover_anexos'])
+            ? array_map('intval', $_POST['remover_anexos'])
+            : [];
+        $servico->removerAnexos($recadoId, $remover);
+        $resultado = $servico->salvarAnexos($recadoId, $_FILES['anexos'] ?? []);
+        $servico->publicarNoSino($recadoId);
+        if ($resultado['erros'] !== []) {
+            $this->setFlashMessage($mensagem . ' ' . implode(' ', $resultado['erros']), 'error');
+            return;
+        }
+        $this->setFlashMessage($mensagem, 'success');
     }
 
     /**
@@ -289,8 +315,7 @@ class TeacherMuralController extends BaseController
         foreach ($destino['turmas'] as $tid) {
             $this->db->insert("INSERT INTO mural_recados_turmas (mural_recado_id, turma_id) VALUES (:rid, :tid)", ['rid' => $id, 'tid' => $tid]);
         }
-        (new MuralRecadoService($this->db))->publicarNoSino($id);
-        $this->setFlashMessage('Recado publicado no mural e no sino.', 'success');
+        $this->gravarAnexosEAvisar($id, 'Recado publicado no mural e no sino.');
         $this->redirect(URL . '/professor/mural-recados');
     }
 
@@ -347,8 +372,7 @@ class TeacherMuralController extends BaseController
         foreach ($destino['turmas'] as $tid) {
             $this->db->insert("INSERT INTO mural_recados_turmas (mural_recado_id, turma_id) VALUES (:rid, :tid)", ['rid' => $id, 'tid' => $tid]);
         }
-        (new MuralRecadoService($this->db))->publicarNoSino($id);
-        $this->setFlashMessage('Recado atualizado.', 'success');
+        $this->gravarAnexosEAvisar($id, 'Recado atualizado.');
         $this->redirect(URL . '/professor/mural-recados');
     }
 
@@ -366,6 +390,7 @@ class TeacherMuralController extends BaseController
         if (!$recado) {
             $this->json(['error' => 'Recado não encontrado'], 404);
         }
+        (new MuralRecadoService($this->db))->apagarArquivosDoRecado($id);
         $this->db->query("DELETE FROM mural_recados WHERE id = :id", ['id' => $id]);
         $this->json(['success' => true]);
     }
