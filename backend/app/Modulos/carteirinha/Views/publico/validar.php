@@ -7,42 +7,55 @@ $uso = !empty($info['uso']);
 $encontrado = !empty($info['encontrado']);
 $valido = !empty($info['valido']);
 $motivo = (string) ($info['motivo'] ?? '');
+$validadeTxt = trim((string) ($info['validade'] ?? ''));
 if (!$uso && $motivo === 'indisponivel') {
     $titulo = 'Validação indisponível';
-    $selo = 'Indisponível';
+    $detalhe = 'A consulta não está disponível agora.';
+    $icone = 'erro';
     $cor = '#991b1b';
     $fundo = '#fef2f2';
 } elseif (!$uso) {
     $titulo = 'Esta escola não usa carteirinha';
-    $selo = 'Desligada';
+    $detalhe = 'A validação online está desligada.';
+    $icone = 'alerta';
     $cor = '#92400e';
     $fundo = '#fffbeb';
 } elseif (!$encontrado) {
     $titulo = 'Carteirinha não encontrada';
-    $selo = 'Não encontrada';
+    $detalhe = 'Este código não corresponde a uma carteirinha desta escola.';
+    $icone = 'erro';
     $cor = '#991b1b';
     $fundo = '#fef2f2';
 } elseif ($valido) {
     $titulo = 'Carteirinha válida';
-    $selo = 'Válida';
+    $detalhe = $validadeTxt !== '' ? 'Dentro da validade até ' . $validadeTxt . '.' : 'Dentro da validade.';
+    $icone = 'ok';
     $cor = '#065f46';
     $fundo = '#ecfdf5';
 } elseif ($motivo === 'vencida') {
     $titulo = 'Carteirinha vencida';
-    $selo = 'Vencida';
+    $detalhe = $validadeTxt !== '' ? 'Fora da validade desde ' . $validadeTxt . '.' : 'Fora da validade.';
+    $icone = 'alerta';
     $cor = '#9a3412';
     $fundo = '#fff7ed';
 } elseif ($motivo === 'inativa') {
     $titulo = 'Aluno inativo';
-    $selo = 'Inativa';
+    $detalhe = 'Esta identificação não está ativa na escola.';
+    $icone = 'alerta';
     $cor = '#9a3412';
     $fundo = '#fff7ed';
 } else {
     $titulo = 'Carteirinha cancelada';
-    $selo = 'Cancelada';
+    $detalhe = 'Esta via foi cancelada ou substituída.';
+    $icone = 'erro';
     $cor = '#991b1b';
     $fundo = '#fef2f2';
 }
+$svg = [
+    'ok' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 9.2 17 19 7"/></svg>',
+    'alerta' => '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7.5V13M12 16.2v.6"/></svg>',
+    'erro' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg>',
+][$icone];
 $foto = (string) ($info['foto'] ?? '');
 $logo = (string) ($info['logo'] ?? '');
 $nomeEscola = (string) ($info['escola'] ?? $escola);
@@ -68,9 +81,10 @@ body{margin:0;background:#e7edf3;color:#0f172a;font-family:ui-sans-serif,system-
 .escola{font-size:17px;font-weight:700;letter-spacing:-.01em}
 .kicker{margin-top:4px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b}
 .status{margin:16px 22px 0;border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px}
-.selo{width:46px;height:46px;border-radius:50%;border:2px solid currentColor;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;text-align:center;line-height:1.1;flex-shrink:0}
+.selo{width:44px;height:44px;border-radius:50%;border:2px solid currentColor;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.selo svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .status h1{margin:0;font-size:18px;line-height:1.2}
-.status p{margin:2px 0 0;font-size:12px;opacity:.8}
+.status p{margin:3px 0 0;font-size:13px;line-height:1.35;opacity:.9}
 .corpo{padding:18px 22px 8px}
 .pessoa{display:flex;gap:14px;align-items:center}
 .foto{width:72px;height:90px;border-radius:10px;background:#f1f5f9;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;border:1px solid #e2e8f0}
@@ -102,10 +116,10 @@ body{margin:0;background:#e7edf3;color:#0f172a;font-family:ui-sans-serif,system-
             <div class="kicker">Validação de carteirinha escolar</div>
         </header>
         <div class="status" style="background:<?= $e($fundo) ?>;color:<?= $e($cor) ?>">
-            <div class="selo"><?= $e($selo) ?></div>
+            <div class="selo"><?= $svg ?></div>
             <div>
                 <h1><?= $e($titulo) ?></h1>
-                <p>Situação conferida neste momento</p>
+                <p><?= $e($detalhe) ?></p>
             </div>
         </div>
         <div class="corpo">

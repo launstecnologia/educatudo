@@ -165,6 +165,55 @@ class CarteirinhaService
     }
 
     /**
+     * @param list<array<string,mixed>> $cartoes
+     */
+    public function baixarPdf(array $cartoes): void
+    {
+        if ($cartoes === []) {
+            throw new \InvalidArgumentException('Não há carteirinha emitida para baixar.');
+        }
+        $base = defined('URL') ? rtrim((string) URL, '/') : '';
+        foreach ($cartoes as $i => $cartao) {
+            $cartoes[$i]['logo'] = $this->urlAbsoluta((string) ($cartao['logo'] ?? ''), $base);
+            $cartoes[$i]['foto'] = $this->urlAbsoluta((string) ($cartao['foto'] ?? ''), $base);
+            $cartoes[$i]['qr_pdf'] = $this->qrPngDataUri((string) ($cartao['url'] ?? ''));
+        }
+        $escola = (string) ($cartoes[0]['escola'] ?? 'EducaTudo');
+        ob_start();
+        require dirname(__DIR__) . '/Views/pdf.php';
+        $html = (string) ob_get_clean();
+        $codigo = (string) preg_replace('/[^A-Za-z0-9\-]+/', '', (string) ($cartoes[0]['codigo'] ?? ''));
+        $arquivo = count($cartoes) === 1
+            ? 'carteirinha-' . ($codigo !== '' ? $codigo : 'aluno') . '.pdf'
+            : 'carteirinhas.pdf';
+
+        $old = ini_get('display_errors');
+        ini_set('display_errors', '0');
+        try {
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            $options = new \Dompdf\Options();
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('isRemoteEnabled', true);
+            $options->setAllowedProtocols(['data://', 'http://', 'https://']);
+            $host = strtolower((string) parse_url($base, PHP_URL_HOST));
+            if ($host !== '') {
+                $options->setAllowedRemoteHosts([$host]);
+            }
+            $options->set('defaultFont', 'DejaVu Sans');
+            $dompdf = new \Dompdf\Dompdf($options);
+            $dompdf->loadHtml($html, 'UTF-8');
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+            $dompdf->stream($arquivo, ['Attachment' => true]);
+        } finally {
+            ini_set('display_errors', (string) $old);
+        }
+        exit;
+    }
+
+    /**
      * @return array<string,mixed>
      */
     public function validarPublico(string $token): array
@@ -455,6 +504,40 @@ class CarteirinhaService
         }
         try {
             return (string) (AvatarUrlHelper::normalizeAdminAvatarUrl($caminho) ?? '');
+        } catch (\Throwable $e) {
+            return '';
+        }
+    }
+
+    private function urlAbsoluta(string $url, string $base): string
+    {
+        $url = trim($url);
+        if ($url === '' || str_starts_with($url, 'data:') || preg_match('#^https?://#i', $url)) {
+            return $url;
+        }
+        if ($base !== '' && str_starts_with($url, '/')) {
+            return $base . $url;
+        }
+        return $url;
+    }
+
+    private function qrPngDataUri(string $url): string
+    {
+        if ($url === '') {
+            return '';
+        }
+        try {
+            $opcoes = new QROptions([
+                'outputType' => QRCode::OUTPUT_IMAGE_PNG,
+                'eccLevel' => QRCode::ECC_M,
+                'scale' => 6,
+                'outputBase64' => true,
+            ]);
+            $png = (new QRCode($opcoes))->render($url);
+            if (!is_string($png) || !str_starts_with($png, 'data:image/')) {
+                return '';
+            }
+            return $png;
         } catch (\Throwable $e) {
             return '';
         }

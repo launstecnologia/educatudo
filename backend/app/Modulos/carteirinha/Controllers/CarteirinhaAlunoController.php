@@ -56,7 +56,27 @@ class CarteirinhaAlunoController extends BaseController
         }
         $cartoes = [$cartao];
         $escola = (string) ($cartao['escola'] ?? 'EducaTudo');
+        $base = defined('URL') ? rtrim((string) URL, '/') : '';
+        $pdfUrl = $base . '/aluno/carteirinha/pdf';
         require dirname(__DIR__) . '/Views/impressao.php';
+    }
+
+    public function pdf(): void
+    {
+        if (!$this->service->tabelasProntas() || !$this->service->habilitada()) {
+            $this->redirect('/aluno/carteirinha');
+            return;
+        }
+        $cartao = $this->service->cartaoDoAluno($this->alunoId());
+        if (!$cartao) {
+            $this->redirect('/aluno/carteirinha');
+            return;
+        }
+        try {
+            $this->service->baixarPdf([$cartao]);
+        } catch (\Throwable $e) {
+            $this->redirect('/aluno/carteirinha');
+        }
     }
 
     private function alunoId(): int

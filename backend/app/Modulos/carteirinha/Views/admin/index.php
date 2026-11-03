@@ -12,6 +12,7 @@ $pagina = (int) ($pagina ?? 1);
 $totalPaginas = (int) ($total_paginas ?? 1);
 $total = (int) ($total ?? 0);
 $e = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
+$ui = __DIR__ . '/../../../../Views/admin/_partials/ui';
 $rotulos = [
     'valida' => 'Válida',
     'vencida' => 'Vencida',
@@ -31,6 +32,29 @@ if ($turmaId > 0) {
 if ($busca !== '') {
     $queryBase['busca'] = $busca;
 }
+$filtrosAtivos = ($turmaId > 0 ? 1 : 0) + ($busca !== '' ? 1 : 0);
+$opcoesTurma = ['0' => 'Todas'];
+foreach ($turmas as $turma) {
+    $opcoesTurma[(string) (int) $turma['id']] = trim((string) $turma['nome'] . ' · ' . (string) ($turma['ano_letivo'] ?? ''));
+}
+
+ob_start();
+if ($schemaPronto && $habilitada):
+    $ui_btn_variant = 'filtro';
+    $ui_btn_label = 'Filtros';
+    $ui_btn_icon = 'fa-solid fa-filter';
+    $ui_btn_onclick = 'openFiltroDrawer()';
+    $ui_btn_filter_count = $filtrosAtivos;
+    include $ui . '/btn.php';
+endif;
+if ($schemaPronto && $podeAlterar):
+?>
+<button type="button" onclick="openUsoDrawer()" class="inline-flex items-center justify-center w-10 h-10 border border-gray-300 rounded-lg text-gray-600 bg-white hover:bg-gray-50" aria-label="Habilitar ou desabilitar a carteirinha" title="Habilitar ou desabilitar">
+    <i class="fa-solid fa-gear"></i>
+</button>
+<?php
+endif;
+$page_header_actions = ob_get_clean();
 $page_header_title = 'Carteirinha';
 $page_header_subtitle = 'A escola decide se usa. Ligada, a secretaria emite e o QR confirma na hora.';
 include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
@@ -48,72 +72,31 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
     </div>
 <?php else: ?>
 
-<div class="bg-white rounded-xl shadow-lg p-6 mb-6 w-full">
-    <form method="POST" action="<?= URL ?>/admin/carteirinha/uso" class="flex flex-wrap items-center justify-between gap-4">
-        <input type="hidden" name="csrf_token" value="<?= $e($csrf) ?>">
-        <input type="hidden" name="habilitada" value="0">
-        <div>
-            <p class="text-sm font-semibold text-gray-900">Usar carteirinha nesta escola</p>
-            <p class="text-sm text-gray-500 mt-1">
-                <?= $habilitada
-                    ? 'Ligada. O aluno vê o cartão e o QR pode ser conferido sem login.'
-                    : 'Desligada. O menu do aluno some e a página pública avisa que a escola não usa.' ?>
-            </p>
-        </div>
+<?php if (!$habilitada): ?>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-600">
+        A carteirinha está desabilitada nesta escola.
         <?php if ($podeAlterar): ?>
-        <label class="inline-flex items-center gap-3 text-sm font-medium text-gray-800">
-            <input type="checkbox" name="habilitada" value="1" class="rounded border-gray-300" <?= $habilitada ? 'checked' : '' ?>
-                <?= $habilitada ? 'onchange="if(!this.checked){this.form.dataset.confirmar=\'1\'}"' : '' ?>>
-            <?= $habilitada ? 'Habilitada' : 'Desabilitada' ?>
-        </label>
-        <button type="submit" class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-semibold"
-            onclick="if (this.form.dataset.confirmar==='1' && !this.form.querySelector('[name=habilitada][type=checkbox]').checked) { return confirm('Desabilitar a carteirinha? Os QR deixam de valer até você ligar de novo.'); } return true;">
-            Salvar
-        </button>
-        <?php else: ?>
-        <span class="text-sm font-semibold <?= $habilitada ? 'text-emerald-700' : 'text-gray-500' ?>"><?= $habilitada ? 'Habilitada' : 'Desabilitada' ?></span>
+            Use a engrenagem para habilitar.
         <?php endif; ?>
-    </form>
-</div>
-
-<?php if ($habilitada): ?>
-<form method="GET" action="<?= URL ?>/admin/carteirinha" class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6 w-full">
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-        <div>
-            <label for="turma_id" class="block text-sm font-medium text-gray-700 mb-2">Turma</label>
-            <select id="turma_id" name="turma_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white">
-                <option value="0">Todas</option>
-                <?php foreach ($turmas as $turma): ?>
-                    <option value="<?= (int) $turma['id'] ?>" <?= (int) $turma['id'] === $turmaId ? 'selected' : '' ?>>
-                        <?= $e(trim((string) $turma['nome'] . ' · ' . (string) ($turma['ano_letivo'] ?? ''))) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div>
-            <label for="busca" class="block text-sm font-medium text-gray-700 mb-2">Aluno</label>
-            <input id="busca" name="busca" value="<?= $e($busca) ?>" placeholder="Nome ou RA" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-        </div>
-        <div class="flex gap-3">
-            <button type="submit" class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-semibold">Filtrar</button>
-            <a href="<?= URL ?>/admin/carteirinha" class="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700">Limpar</a>
-        </div>
     </div>
-</form>
+<?php else: ?>
 
 <?php if ($podeAlterar && $turmaId > 0): ?>
 <form method="POST" action="<?= URL ?>/admin/carteirinha/emitir-turma" class="mb-6 flex flex-wrap items-center gap-3">
     <input type="hidden" name="csrf_token" value="<?= $e($csrf) ?>">
     <input type="hidden" name="turma_id" value="<?= $turmaId ?>">
     <input type="hidden" name="busca" value="<?= $e($busca) ?>">
-    <button type="submit" class="px-4 py-2 rounded-lg border border-teal-600 text-teal-800 text-sm font-semibold hover:bg-teal-50">Emitir quem ainda não tem</button>
-    <a href="<?= URL ?>/admin/carteirinha/imprimir?turma_id=<?= $turmaId ?>" class="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700">Imprimir a turma</a>
+    <button type="submit" class="px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-800 hover:bg-gray-50">Emitir quem ainda não tem</button>
+    <a href="<?= URL ?>/admin/carteirinha/imprimir?turma_id=<?= $turmaId ?>" target="_blank" rel="noopener" class="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700">Imprimir a turma</a>
 </form>
 <?php endif; ?>
 
 <?php if (!$filtrar): ?>
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-500">
-        Escolha uma turma ou busque um aluno para emitir.
+        <p>Escolha uma turma ou busque um aluno para emitir.</p>
+        <button type="button" onclick="openFiltroDrawer()" class="mt-4 inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+            <i class="fa-solid fa-filter mr-2 text-gray-500"></i> Filtros
+        </button>
     </div>
 <?php else: ?>
 <div class="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -194,7 +177,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
                             </form>
                             <?php endif; ?>
                             <?php if ((int) $aluno['carteirinha_id'] > 0): ?>
-                            <a href="<?= URL ?>/admin/carteirinha/imprimir?aluno_id=<?= (int) $aluno['id'] ?>" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <a href="<?= URL ?>/admin/carteirinha/imprimir?aluno_id=<?= (int) $aluno['id'] ?>" target="_blank" rel="noopener" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                 <i class="fa-solid fa-print text-gray-400 w-4 text-center"></i> Imprimir
                             </a>
                             <?php endif; ?>
@@ -225,5 +208,104 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
     </div>
 <?php endif; ?>
 <?php endif; ?>
+
+<?php
+ob_start();
+?>
+<form method="GET" action="<?= URL ?>/admin/carteirinha" class="flex flex-col flex-1 overflow-hidden">
+    <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6">
+        <?php
+        $ui_form_campo_label = 'Turma';
+        $ui_form_campo_name = 'turma_id';
+        $ui_form_campo_tipo = 'select';
+        $ui_form_campo_opcoes = $opcoesTurma;
+        $ui_form_campo_value = (string) $turmaId;
+        $ui_form_campo_placeholder = '';
+        $ui_form_campo_span = 'full';
+        $ui_form_campo_mb = 'mb-4';
+        $ui_form_campo_obrigatorio = false;
+        include $ui . '/form_campo.php';
+
+        $ui_form_campo_label = 'Aluno';
+        $ui_form_campo_name = 'busca';
+        $ui_form_campo_tipo = 'text';
+        $ui_form_campo_value = $busca;
+        $ui_form_campo_placeholder = 'Nome ou RA';
+        $ui_form_campo_opcoes = [];
+        include $ui . '/form_campo.php';
+        ?>
+    </div>
+    <div class="px-6 sm:px-8 py-4 border-t border-gray-200 flex gap-3">
+        <?php
+        $ui_btn_variant = 'complementar';
+        $ui_btn_label = 'Limpar';
+        $ui_btn_href = URL . '/admin/carteirinha';
+        $ui_btn_class = 'flex-1 justify-center';
+        $ui_btn_icon = '';
+        $ui_btn_onclick = '';
+        $ui_btn_type = 'button';
+        $ui_btn_filter_count = 0;
+        include $ui . '/btn.php';
+
+        $ui_btn_variant = 'primary';
+        $ui_btn_label = 'Filtrar';
+        $ui_btn_href = '';
+        $ui_btn_type = 'submit';
+        $ui_btn_class = 'flex-1 justify-center';
+        include $ui . '/btn.php';
+        ?>
+    </div>
+</form>
+<?php
+$ui_offcanvas_body = ob_get_clean();
+$ui_offcanvas_id = 'filtro';
+$ui_offcanvas_titulo = 'Filtros';
+$ui_offcanvas_max_w = 'max-w-md';
+include $ui . '/offcanvas.php';
+?>
+<?php endif; ?>
+
+<?php if ($podeAlterar): ?>
+<?php ob_start(); ?>
+<form method="POST" action="<?= URL ?>/admin/carteirinha/uso" class="flex flex-col flex-1 overflow-hidden"
+      onsubmit="var marcado = this.querySelector('input[name=habilitada]:checked'); if (marcado && marcado.value === '0' && <?= $habilitada ? 'true' : 'false' ?>) { return confirm('Desabilitar a carteirinha? Os QR deixam de valer até você ligar de novo.'); } return true;">
+    <input type="hidden" name="csrf_token" value="<?= $e($csrf) ?>">
+    <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-3">
+        <p class="text-sm text-gray-600">A escola decide se a carteirinha fica disponível para o aluno e para a leitura do QR.</p>
+        <label class="flex items-start gap-3 p-4 border border-gray-200 rounded-lg cursor-pointer">
+            <input type="radio" name="habilitada" value="1" class="mt-1" <?= $habilitada ? 'checked' : '' ?>>
+            <span>
+                <span class="block text-sm font-semibold text-gray-900">Habilitada</span>
+                <span class="block text-sm text-gray-500 mt-1">O aluno vê o cartão e o QR pode ser conferido sem login.</span>
+            </span>
+        </label>
+        <label class="flex items-start gap-3 p-4 border border-gray-200 rounded-lg cursor-pointer">
+            <input type="radio" name="habilitada" value="0" class="mt-1" <?= $habilitada ? '' : 'checked' ?>>
+            <span>
+                <span class="block text-sm font-semibold text-gray-900">Desabilitada</span>
+                <span class="block text-sm text-gray-500 mt-1">O menu do aluno some e a página pública avisa que a escola não usa.</span>
+            </span>
+        </label>
+    </div>
+    <div class="px-6 sm:px-8 py-4 border-t border-gray-200">
+        <?php
+        $ui_btn_variant = 'primary';
+        $ui_btn_label = 'Salvar';
+        $ui_btn_type = 'submit';
+        $ui_btn_href = '';
+        $ui_btn_class = 'w-full justify-center';
+        $ui_btn_icon = '';
+        $ui_btn_onclick = '';
+        include $ui . '/btn.php';
+        ?>
+    </div>
+</form>
+<?php
+$ui_offcanvas_body = ob_get_clean();
+$ui_offcanvas_id = 'uso';
+$ui_offcanvas_titulo = 'Uso da carteirinha';
+$ui_offcanvas_max_w = 'max-w-md';
+include $ui . '/offcanvas.php';
+?>
 <?php endif; ?>
 <?php endif; ?>

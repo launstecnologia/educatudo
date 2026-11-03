@@ -20,7 +20,7 @@ $e = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
 <?php else: ?>
     <div class="flex flex-col items-stretch gap-4 w-full max-w-[420px]">
         <?php include dirname(__DIR__) . '/compartilhado/cartao.php'; ?>
-        <a href="<?= URL ?>/aluno/carteirinha/imprimir" class="inline-flex px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700">Abrir para impressão</a>
+        <a href="<?= URL ?>/aluno/carteirinha/imprimir" target="_blank" rel="noopener" class="inline-flex px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700">Imprimir ou enviar</a>
         <?php if (($cartao['situacao'] ?? '') !== 'valida'): ?>
             <p class="text-sm text-amber-800">Esta carteirinha não está válida. Procure a secretaria para emitir outra.</p>
         <?php endif; ?>

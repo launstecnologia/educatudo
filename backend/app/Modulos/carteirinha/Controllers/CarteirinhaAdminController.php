@@ -139,13 +139,45 @@ class CarteirinhaAdminController extends \App\Painel\Admin\Controllers\AdminBase
             $this->redirect('/admin/carteirinha');
             return;
         }
-        $this->renderImpressao($cartoes);
+        $this->renderImpressao($cartoes, $this->urlPdfAdmin());
+    }
+
+    public function pdf(): void
+    {
+        if (!$this->enforceAdminPermissionKey('carteirinha', 'visualizar', false)) {
+            return;
+        }
+        try {
+            $cartoes = $this->service->paraImpressao(
+                (int) ($_GET['aluno_id'] ?? 0),
+                (int) ($_GET['turma_id'] ?? 0)
+            );
+            $this->service->baixarPdf($cartoes);
+        } catch (\Throwable $e) {
+            $this->setFlashMessage($this->mensagemErro($e), 'error');
+            $this->redirect('/admin/carteirinha');
+        }
+    }
+
+    private function urlPdfAdmin(): string
+    {
+        $base = defined('URL') ? rtrim((string) URL, '/') : '';
+        $query = [];
+        $alunoId = (int) ($_GET['aluno_id'] ?? 0);
+        $turmaId = (int) ($_GET['turma_id'] ?? 0);
+        if ($alunoId > 0) {
+            $query['aluno_id'] = $alunoId;
+        }
+        if ($turmaId > 0 && $alunoId <= 0) {
+            $query['turma_id'] = $turmaId;
+        }
+        return $base . '/admin/carteirinha/pdf' . ($query !== [] ? '?' . http_build_query($query) : '');
     }
 
     /**
      * @param list<array<string,mixed>> $cartoes
      */
-    private function renderImpressao(array $cartoes): void
+    private function renderImpressao(array $cartoes, string $pdfUrl): void
     {
         while (ob_get_level() > 0) {
             ob_end_clean();
