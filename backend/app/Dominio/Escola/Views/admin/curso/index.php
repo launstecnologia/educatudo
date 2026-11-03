@@ -76,7 +76,6 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Séries</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ordem</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                 </tr>
@@ -103,9 +102,6 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                         <?= (int) ($row['total_series'] ?? 0) ?>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        <?= (int) $row['ordem'] ?>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?= $row['ativo'] ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' ?>">
@@ -192,12 +188,12 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
 
         <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-8">
             <section>
-                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Dados do curso</h3>
+                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Curso</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
                     <div class="sm:col-span-2">
-                        <label for="cu_nome" class="block text-sm font-medium text-gray-700 mb-1">Nome <span class="text-red-500">*</span></label>
+                        <label for="cu_nome" class="block text-sm font-medium text-gray-700 mb-1">Curso <span class="text-red-500">*</span></label>
                         <input type="text" id="cu_nome" name="nome" required
-                               placeholder="Ex.: Ensino Fundamental, Ensino Médio"
+                               placeholder="Ex.: Ensino Médio Regular, Direito, Pedagogia"
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
                     </div>
 
@@ -206,8 +202,8 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                         <label for="cu_tipo" class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
                         <select id="cu_tipo" name="tipo"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
-                            <option value="regular">Regular (com série)</option>
-                            <option value="extra">Extra (sem série — ex.: Música, Robótica)</option>
+                            <option value="regular">Regular (com série / ano escolar)</option>
+                            <option value="extra">Extra (sem série / ano escolar — ex.: Música, Robótica)</option>
                         </select>
                     </div>
                     <div id="cu-wrap-possui-serie" class="flex items-end pb-1">
@@ -215,9 +211,9 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                             <label class="flex items-center">
                                 <input type="checkbox" id="cu_possui_serie" name="possui_serie" value="1" checked
                                        class="rounded border-gray-300 text-green-600 shadow-sm focus:border-green-300 focus:ring focus:ring-green-200 focus:ring-opacity-50">
-                                <span class="ml-2 text-sm text-gray-700">Possui série (ex.: 1º Ano, 2º Ano)</span>
+                                <span class="ml-2 text-sm text-gray-700">Possui série / ano escolar (ex.: 1º Ano, 2ª Série)</span>
                             </label>
-                            <p class="ml-6 text-xs text-gray-500 mt-1">Desmarque para cursos extras sem série.</p>
+                            <p class="ml-6 text-xs text-gray-500 mt-1">Desmarque para cursos extras, como música ou robótica.</p>
                         </div>
                     </div>
                     <?php endif; ?>
@@ -246,14 +242,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"></textarea>
                     </div>
 
-                    <div>
-                        <label for="cu_ordem" class="block text-sm font-medium text-gray-700 mb-1">Ordem</label>
-                        <input type="number" id="cu_ordem" name="ordem" value="0"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
-                        <p class="mt-1 text-xs text-gray-500">Use múltiplos de 10 (10, 20, 30…) para ordenar na listagem.</p>
-                    </div>
-
-                    <div class="flex items-end pb-1">
+                    <div class="flex items-center">
                         <label class="flex items-center">
                             <input type="checkbox" id="cu_ativo" name="ativo" value="1" checked
                                    class="rounded border-gray-300 text-green-600 shadow-sm focus:border-green-300 focus:ring focus:ring-green-200 focus:ring-opacity-50">
@@ -369,7 +358,6 @@ function openCursoDrawer(id) {
             document.getElementById('cu_id').value = data.item.id;
             document.getElementById('cu_nome').value = data.item.nome;
             document.getElementById('cu_descricao').value = data.item.descricao || '';
-            document.getElementById('cu_ordem').value = data.item.ordem;
             document.getElementById('cu_ativo').checked = !!parseInt(data.item.ativo, 10);
             aplicarCorCurso(data.item.cor || '');
             var tipoSel = document.getElementById('cu_tipo');

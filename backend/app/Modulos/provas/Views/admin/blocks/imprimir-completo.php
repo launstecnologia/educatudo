@@ -39,6 +39,9 @@ $baseUrl = defined('URL') ? rtrim(URL, '/') : '';
         .alternativas { padding-left: 16px; margin-top: 10px; }
         .alternativa { margin-bottom: 8px; }
         .alternativa.correta { font-weight: 600; color: #16a34a; }
+        .folha-aluno { page-break-before: always; margin: 16px auto; width: 190mm; }
+        .folha-aluno img { width: 190mm; height: auto; display: block; }
+        .folha-aluno p { margin: 0 0 8px; font-size: 13px; }
         @media print {
             body { background: #fff; padding: 0; }
             .toolbar { display: none !important; }
@@ -46,6 +49,8 @@ $baseUrl = defined('URL') ? rtrim(URL, '/') : '';
             .prova-section { page-break-before: always; }
             .prova-section:first-of-type { page-break-before: auto; }
             .questao { page-break-inside: avoid; }
+            .folha-aluno { page-break-before: always; margin: 0 auto; width: 190mm; }
+            .folha-aluno img { width: 190mm; height: auto; display: block; }
         }
         .enunciado mjx-container { font-size: 1em; }
     </style>
@@ -108,8 +113,8 @@ $baseUrl = defined('URL') ? rtrim(URL, '/') : '';
                         foreach ($q['alternativas'] as $aIdx => $alt): 
                             $letraAlt = $letrasAlt[$aIdx] ?? '';
                         ?>
-                        <div class="alternativa <?= !empty($alt['correta']) ? 'correta' : '' ?>">
-                            <?= !empty($alt['correta']) ? '<strong style="color:#16a34a;">✓ ' . htmlspecialchars($letraAlt) . ')</strong>' : '<strong>' . htmlspecialchars($letraAlt) . ')</strong>' ?> <?= isset($alt['texto']) ? \App\Core\LayoutHelper::renderEnunciadoProva($alt['texto']) : '' ?>
+                        <div class="alternativa <?= empty($prova_impressa) && !empty($alt['correta']) ? 'correta' : '' ?>">
+                            <?= empty($prova_impressa) && !empty($alt['correta']) ? '<strong style="color:#16a34a;">✓ ' . htmlspecialchars($letraAlt) . ')</strong>' : '<strong>' . htmlspecialchars($letraAlt) . ')</strong>' ?> <?= isset($alt['texto']) ? \App\Core\LayoutHelper::renderEnunciadoProva($alt['texto']) : '' ?>
                         </div>
                         <?php endforeach; ?>
                     </div>
@@ -117,6 +122,13 @@ $baseUrl = defined('URL') ? rtrim(URL, '/') : '';
                 </div>
                 <?php endforeach; ?>
             <?php endif; ?>
+        </div>
+        <?php endforeach; ?>
+
+        <?php foreach (($folhas_aluno ?? []) as $folha): ?>
+        <div class="folha-aluno">
+            <p>Folha de <?= htmlspecialchars((string) ($folha['aluno_nome'] ?? '')) ?> — preencha o quadro. O QR Code identifica o aluno na leitura.</p>
+            <img src="<?= htmlspecialchars($baseUrl) ?>/admin/leitor-gabarito/folhas/<?= (int) ($folha['id'] ?? 0) ?>/png" alt="Gabarito de <?= htmlspecialchars((string) ($folha['aluno_nome'] ?? '')) ?>">
         </div>
         <?php endforeach; ?>
     </div>

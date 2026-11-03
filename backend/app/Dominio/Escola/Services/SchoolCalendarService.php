@@ -4,6 +4,7 @@ namespace App\Dominio\Escola\Services;
 
 
 use App\Core\Database;
+use App\Modulos\Comunicacao\Services\SchoolCommunicationService;
 
 /**
  * EducaTudo - SchoolCalendarService
@@ -49,6 +50,21 @@ class SchoolCalendarService
             'slug' => 'avaliacao', 'nome' => 'Avaliação',
             'cor' => '#5b21b6', 'cor_fundo' => '#ede9fe',
             'efeito' => 'neutro', 'sistema' => 1, 'ordem' => 6,
+        ],
+        'reuniao' => [
+            'slug' => 'reuniao', 'nome' => 'Reunião',
+            'cor' => '#0f766e', 'cor_fundo' => '#ccfbf1',
+            'efeito' => 'neutro', 'sistema' => 1, 'ordem' => 7,
+        ],
+        'passeio' => [
+            'slug' => 'passeio', 'nome' => 'Passeio',
+            'cor' => '#c2410c', 'cor_fundo' => '#ffedd5',
+            'efeito' => 'neutro', 'sistema' => 1, 'ordem' => 8,
+        ],
+        'apresentacao' => [
+            'slug' => 'apresentacao', 'nome' => 'Apresentação',
+            'cor' => '#9d174d', 'cor_fundo' => '#fce7f3',
+            'efeito' => 'neutro', 'sistema' => 1, 'ordem' => 9,
         ],
     ];
 
@@ -689,10 +705,21 @@ class SchoolCalendarService
         return ['ok' => true, 'id' => $id];
     }
 
-    public function excluirCalendario(int $id): bool
+    public function excluirCalendario(int $id, int $autorId = 0): bool
     {
         if ($id <= 0 || !$this->tableExists()) {
             return false;
+        }
+        if ($this->vinculoAvisoDisponivel()) {
+            $avisos = $this->db->fetchAll(
+                "SELECT evento_escolar_id
+                 FROM calendario_letivo_eventos
+                 WHERE calendario_id = :id AND evento_escolar_id IS NOT NULL",
+                ['id' => $id]
+            ) ?: [];
+            foreach ($avisos as $aviso) {
+                $this->cancelarAvisoEscolar((int) ($aviso['evento_escolar_id'] ?? 0), $autorId);
+            }
         }
         $this->db->query("DELETE FROM calendario_letivo WHERE id = :id", ['id' => $id]);
         return true;
@@ -1101,10 +1128,29 @@ class SchoolCalendarService
         if ($calendarioId <= 0 || !$this->tableExists()) {
             return [];
         }
-        return $this->db->fetchAll(
-            "SELECT * FROM calendario_letivo_eventos WHERE calendario_id = :id ORDER BY data_inicio ASC",
+        if (!$this->vinculoAvisoDisponivel()) {
+            $rows = $this->db->fetchAll(
+                "SELECT * FROM calendario_letivo_eventos WHERE calendario_id = :id ORDER BY data_inicio ASC",
+                ['id' => $calendarioId]
+            ) ?: [];
+            return $this->anexarAvisos($rows, false);
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT e.*,
+                    s.id AS aviso_id,
+                    s.status AS aviso_status,
+                    s.prioridade AS aviso_prioridade,
+                    s.publico AS aviso_publico,
+                    s.dia_inteiro AS aviso_dia_inteiro,
+                    DATE_FORMAT(s.inicio_em, '%H:%i') AS aviso_hora_inicio,
+                    DATE_FORMAT(s.fim_em, '%H:%i') AS aviso_hora_fim
+             FROM calendario_letivo_eventos e
+             LEFT JOIN school_calendar_events s ON s.id = e.evento_escolar_id
+             WHERE e.calendario_id = :id
+             ORDER BY e.data_inicio ASC",
             ['id' => $calendarioId]
         ) ?: [];
+        return $this->anexarAvisos($rows, true);
     }
 
     /**
@@ -1183,14 +1229,14 @@ class SchoolCalendarService
         int $visivelAluno = 0,
         int $visivelProfessor = 0,
         int $visivelPais = 0
-    ): bool {
+    ): int {
         if ($calendarioId <= 0 || !$this->tableExists() || !$this->datasEventoGravaveis($inicio, $fim)) {
-            return false;
+            return 0;
         }
         if (!$this->tipoValido($tipo)) {
             $tipo = 'feriado';
         }
-        $this->db->insert(
+        $id = (int) $this->db->insert(
             "INSERT INTO calendario_letivo_eventos
                 (calendario_id, data_inicio, data_fim, tipo, descricao, link_reuniao, local_evento, visivel_aluno, visivel_professor, visivel_pais)
              VALUES (:c, :i, :f, :t, :d, :lr, :le, :va, :vp, :vpais)",
@@ -1208,7 +1254,7 @@ class SchoolCalendarService
             ]
         );
 
-        return true;
+        return $id;
     }
 
     public function atualizarEvento(
@@ -1260,10 +1306,20 @@ class SchoolCalendarService
         return true;
     }
 
-    public function excluirEvento(int $eventoId): void
+    public function excluirEvento(int $eventoId, int $autorId = 0): void
     {
         if ($eventoId <= 0 || !$this->tableExists()) {
             return;
+        }
+        if ($this->vinculoAvisoDisponivel()) {
+            $row = $this->db->fetch(
+                "SELECT evento_escolar_id FROM calendario_letivo_eventos WHERE id = :id LIMIT 1",
+                ['id' => $eventoId]
+            );
+            $escolarId = (int) ($row['evento_escolar_id'] ?? 0);
+            if ($escolarId > 0) {
+                $this->cancelarAvisoEscolar($escolarId, $autorId);
+            }
         }
         $this->db->query("DELETE FROM calendario_letivo_eventos WHERE id = :id", ['id' => $eventoId]);
     }
@@ -1283,85 +1339,609 @@ class SchoolCalendarService
         return $cache;
     }
 
+    public function vinculoAvisoDisponivel(): bool
+    {
+        return $this->tableExists()
+            && $this->tabelaEscolarExiste()
+            && $this->colunaExiste('calendario_letivo_eventos', 'evento_escolar_id');
+    }
+
     /**
-     * Replica o evento letivo no calendário escolar (app da família) e notifica os responsáveis.
-     *
-     * @return int ID do evento escolar criado, ou 0 se não foi possível publicar
+     * @return list<array{id:int,nome:string}>
      */
-    public function publicarNoCalendarioEscolar(
-        string $titulo,
-        string $inicio,
-        string $fim,
-        string $tipo,
-        string $local = '',
-        int $autorId = 0
-    ): int {
-        if (!$this->tabelaEscolarExiste() || $titulo === '' || $inicio === '') {
+    public function turmasParaAviso(): array
+    {
+        try {
+            $rows = $this->db->fetchAll('SELECT id, nome FROM turmas ORDER BY nome') ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            $out[] = ['id' => (int) ($row['id'] ?? 0), 'nome' => (string) ($row['nome'] ?? '')];
+        }
+        return $out;
+    }
+
+    /**
+     * @return list<array{id:int,nome:string,turma_nome:string}>
+     */
+    public function alunosParaAviso(): array
+    {
+        try {
+            $rows = $this->db->fetchAll(
+                'SELECT a.id, a.nome, t.nome AS turma_nome
+                 FROM alunos a
+                 LEFT JOIN turmas t ON t.id = a.turma_id
+                 WHERE a.ativo = 1
+                 ORDER BY a.nome'
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            $out[] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'nome' => (string) ($row['nome'] ?? ''),
+                'turma_nome' => (string) ($row['turma_nome'] ?? ''),
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Lê hora, prioridade e público do formulário do calendário letivo.
+     *
+     * @param array<string,mixed> $post
+     * @return array{ok:bool,erros:array<string,string>,aviso:array<string,mixed>}
+     */
+    public function interpretarAvisoFamilia(array $post, bool $permitido): array
+    {
+        $vazio = [
+            'publicar' => false,
+            'hora_inicio' => '',
+            'hora_fim' => '',
+            'dia_inteiro' => true,
+            'prioridade' => 'normal',
+            'publico' => 'todos',
+            'turmas' => [],
+            'alunos' => [],
+        ];
+        if (!$permitido || empty($post['publicar_calendario_escolar'])) {
+            return ['ok' => true, 'erros' => [], 'aviso' => $vazio];
+        }
+        $erros = [];
+        $publico = (string) ($post['aviso_publico'] ?? 'todos');
+        if (!in_array($publico, ['todos', 'turmas', 'alunos'], true)) {
+            $publico = 'todos';
+        }
+        $turmas = $this->idsPost($post['turmas'] ?? []);
+        $alunos = $this->idsPost($post['alunos'] ?? []);
+        if ($publico === 'turmas' && $turmas === []) {
+            $erros['aviso'] = 'Selecione ao menos uma turma para avisar a família.';
+        }
+        if ($publico === 'alunos' && $alunos === []) {
+            $erros['aviso'] = 'Selecione ao menos um aluno para avisar a família.';
+        }
+        $diaInteiro = !empty($post['aviso_dia_inteiro']);
+        $horaInicio = trim((string) ($post['aviso_hora_inicio'] ?? ''));
+        $horaFim = trim((string) ($post['aviso_hora_fim'] ?? ''));
+        if ($diaInteiro) {
+            $horaInicio = '';
+            $horaFim = '';
+        } elseif (!$this->horaValida($horaInicio)) {
+            $erros['hora_inicio'] = 'Informe o horário de início ou marque o dia inteiro.';
+        } elseif ($horaFim !== '' && !$this->horaValida($horaFim)) {
+            $erros['hora_inicio'] = 'Informe um horário de fim válido.';
+        }
+        $prioridade = (string) ($post['aviso_prioridade'] ?? 'normal');
+        if (!in_array($prioridade, ['normal', 'importante', 'urgente'], true)) {
+            $prioridade = 'normal';
+        }
+        if ($erros !== []) {
+            return ['ok' => false, 'erros' => $erros, 'aviso' => $vazio];
+        }
+
+        return [
+            'ok' => true,
+            'erros' => [],
+            'aviso' => [
+                'publicar' => true,
+                'hora_inicio' => $horaInicio,
+                'hora_fim' => $horaFim,
+                'dia_inteiro' => $diaInteiro,
+                'prioridade' => $prioridade,
+                'publico' => $publico,
+                'turmas' => $publico === 'turmas' ? $turmas : [],
+                'alunos' => $publico === 'alunos' ? $alunos : [],
+            ],
+        ];
+    }
+
+    /**
+     * Cria, atualiza ou cancela o aviso da família ligado ao evento letivo.
+     *
+     * @param array<string,mixed> $aviso
+     * @return array{ok:bool,id:int,acao:string}
+     */
+    public function sincronizarAvisoFamilia(int $eventoLetivoId, array $aviso): array
+    {
+        $publicar = !empty($aviso['publicar']);
+        $ignorado = ['ok' => true, 'id' => 0, 'acao' => 'ignorado'];
+        if ($eventoLetivoId <= 0 || !$this->tabelaEscolarExiste()) {
+            return $publicar ? ['ok' => false, 'id' => 0, 'acao' => 'erro'] : $ignorado;
+        }
+        if (!$this->vinculoAvisoDisponivel()) {
+            if (!$publicar || !empty($aviso['atualizando'])) {
+                return $publicar
+                    ? ['ok' => true, 'id' => 0, 'acao' => 'sem_vinculo']
+                    : $ignorado;
+            }
+            $aviso['turmas'] = $this->idsExistentes('turmas', (array) ($aviso['turmas'] ?? []));
+            $aviso['alunos'] = $this->idsExistentes('alunos', (array) ($aviso['alunos'] ?? []));
+            if (($aviso['publico'] ?? '') === 'turmas' && $aviso['turmas'] === []) {
+                return ['ok' => false, 'id' => 0, 'acao' => 'erro'];
+            }
+            if (($aviso['publico'] ?? '') === 'alunos' && $aviso['alunos'] === []) {
+                return ['ok' => false, 'id' => 0, 'acao' => 'erro'];
+            }
+            $id = $this->inserirAvisoEscolar($aviso, (int) ($aviso['autor_id'] ?? 0));
+            if ($id <= 0) {
+                return ['ok' => false, 'id' => 0, 'acao' => 'erro'];
+            }
+            $this->gravarPublicoAviso($id, (array) $aviso['turmas'], (array) $aviso['alunos']);
+            $enviou = $this->notificarAvisoEscolar($id, $aviso, 'Novo evento: ');
+            return ['ok' => true, 'id' => $id, 'acao' => 'criado', 'notificou' => $enviou];
+        }
+
+        $letivo = $this->db->fetch(
+            "SELECT evento_escolar_id FROM calendario_letivo_eventos WHERE id = :id LIMIT 1",
+            ['id' => $eventoLetivoId]
+        );
+        if (!$letivo) {
+            return ['ok' => false, 'id' => 0, 'acao' => 'erro'];
+        }
+        $escolarId = (int) ($letivo['evento_escolar_id'] ?? 0);
+        $autorId = (int) ($aviso['autor_id'] ?? 0);
+        if (!$publicar) {
+            if ($escolarId > 0) {
+                $cancelamento = $this->cancelarAvisoEscolar($escolarId, $autorId);
+                if ($cancelamento['cancelou']) {
+                    return [
+                        'ok' => true,
+                        'id' => $escolarId,
+                        'acao' => 'cancelado',
+                        'notificou' => $cancelamento['notificou'],
+                    ];
+                }
+            }
+            return $ignorado;
+        }
+
+        $turmas = $this->idsExistentes('turmas', (array) ($aviso['turmas'] ?? []));
+        $alunos = $this->idsExistentes('alunos', (array) ($aviso['alunos'] ?? []));
+        $publico = (string) ($aviso['publico'] ?? 'todos');
+        if ($publico === 'turmas' && $turmas === []) {
+            return ['ok' => false, 'id' => 0, 'acao' => 'erro'];
+        }
+        if ($publico === 'alunos' && $alunos === []) {
+            return ['ok' => false, 'id' => 0, 'acao' => 'erro'];
+        }
+        $aviso['turmas'] = $publico === 'turmas' ? $turmas : [];
+        $aviso['alunos'] = $publico === 'alunos' ? $alunos : [];
+        $aviso['publico'] = in_array($publico, ['todos', 'turmas', 'alunos'], true) ? $publico : 'todos';
+
+        $atual = $escolarId > 0
+            ? $this->db->fetch('SELECT * FROM school_calendar_events WHERE id = :id LIMIT 1', ['id' => $escolarId])
+            : null;
+        if (!$atual) {
+            $orfao = $this->buscarAvisoOrfao($aviso);
+            if ($orfao) {
+                $escolarId = (int) $orfao['id'];
+                $this->db->update(
+                    'UPDATE calendario_letivo_eventos SET evento_escolar_id = :escolar WHERE id = :id',
+                    ['escolar' => $escolarId, 'id' => $eventoLetivoId]
+                );
+                $atual = $orfao;
+            }
+        }
+        if (!$atual) {
+            $novoId = $this->inserirAvisoEscolar($aviso, $autorId);
+            if ($novoId <= 0) {
+                return ['ok' => false, 'id' => 0, 'acao' => 'erro'];
+            }
+            $this->gravarPublicoAviso($novoId, (array) $aviso['turmas'], (array) $aviso['alunos']);
+            $this->db->update(
+                'UPDATE calendario_letivo_eventos SET evento_escolar_id = :escolar WHERE id = :id',
+                ['escolar' => $novoId, 'id' => $eventoLetivoId]
+            );
+            $enviou = $this->notificarAvisoEscolar($novoId, $aviso, 'Novo evento: ');
+            return ['ok' => true, 'id' => $novoId, 'acao' => 'criado', 'notificou' => $enviou];
+        }
+
+        $dados = $this->dadosAvisoEscolar($aviso);
+        $turmasAtuais = $this->idsDoAviso('school_calendar_event_classes', 'turma_id', $escolarId);
+        $alunosAtuais = $this->idsDoAviso('school_calendar_event_students', 'aluno_id', $escolarId);
+        $republicar = (string) ($atual['status'] ?? '') !== 'publicado';
+        if (!$republicar && !$this->avisoMudou($atual, $dados, $turmasAtuais, $alunosAtuais, (array) $aviso['turmas'], (array) $aviso['alunos'])) {
+            return ['ok' => true, 'id' => $escolarId, 'acao' => 'inalterado'];
+        }
+        try {
+            $this->db->update(
+                "UPDATE school_calendar_events
+                    SET titulo = :title, descricao = :description, categoria = :category, prioridade = :priority,
+                        local = :location, inicio_em = :starts, fim_em = :ends, dia_inteiro = :all_day,
+                        publico = :audience, status = 'publicado', published_at = COALESCE(published_at, NOW())
+                  WHERE id = :id",
+                $dados + ['id' => $escolarId]
+            );
+        } catch (\Throwable $e) {
+            error_log('Calendário letivo: falha ao atualizar aviso da família #' . $escolarId . ': ' . $e->getMessage());
+            return ['ok' => false, 'id' => $escolarId, 'acao' => 'erro'];
+        }
+        $this->gravarPublicoAviso($escolarId, (array) $aviso['turmas'], (array) $aviso['alunos']);
+        $enviou = $this->notificarAvisoEscolar($escolarId, $aviso, 'Evento atualizado: ');
+        return ['ok' => true, 'id' => $escolarId, 'acao' => 'atualizado', 'notificou' => $enviou];
+    }
+
+    /**
+     * Aviso já publicado com o mesmo título e o mesmo dia, ainda sem vínculo.
+     *
+     * @param array<string,mixed> $aviso
+     * @return array<string,mixed>|null
+     */
+    private function buscarAvisoOrfao(array $aviso): ?array
+    {
+        $titulo = mb_substr(trim((string) ($aviso['titulo'] ?? '')), 0, 255);
+        $inicio = (string) ($aviso['inicio'] ?? '');
+        if ($titulo === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $inicio)) {
+            return null;
+        }
+        $row = $this->db->fetch(
+            "SELECT s.*
+             FROM school_calendar_events s
+             WHERE s.titulo = :titulo
+               AND DATE(s.inicio_em) = :inicio
+               AND s.status = 'publicado'
+               AND NOT EXISTS (
+                   SELECT 1 FROM calendario_letivo_eventos l WHERE l.evento_escolar_id = s.id
+               )
+             ORDER BY s.id DESC
+             LIMIT 1",
+            ['titulo' => $titulo, 'inicio' => $inicio]
+        );
+        return is_array($row) && !empty($row) ? $row : null;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $rows
+     * @return list<array<string,mixed>>
+     */
+    private function anexarAvisos(array $rows, bool $comVinculo): array
+    {
+        $ids = [];
+        foreach ($rows as &$row) {
+            $row['aviso_id'] = (int) ($row['aviso_id'] ?? 0);
+            $row['aviso_status'] = (string) ($row['aviso_status'] ?? '');
+            $row['aviso_prioridade'] = (string) ($row['aviso_prioridade'] ?? 'normal');
+            $row['aviso_publico'] = (string) ($row['aviso_publico'] ?? 'todos');
+            $row['aviso_dia_inteiro'] = (int) ($row['aviso_dia_inteiro'] ?? 1);
+            if (!$comVinculo || $row['aviso_id'] <= 0 || $row['aviso_dia_inteiro'] === 1) {
+                $row['aviso_hora_inicio'] = '';
+                $row['aviso_hora_fim'] = '';
+            } else {
+                $row['aviso_hora_inicio'] = (string) ($row['aviso_hora_inicio'] ?? '');
+                $row['aviso_hora_fim'] = (string) ($row['aviso_hora_fim'] ?? '');
+                if ($row['aviso_hora_fim'] === '00:00') {
+                    $row['aviso_hora_fim'] = '';
+                }
+            }
+            $row['aviso_turmas'] = [];
+            $row['aviso_alunos'] = [];
+            if ($row['aviso_id'] > 0) {
+                $ids[$row['aviso_id']] = $row['aviso_id'];
+            }
+        }
+        unset($row);
+        if (!$comVinculo || $ids === []) {
+            return $rows;
+        }
+        $turmas = [];
+        $alunos = [];
+        [$in, $params] = $this->inNomeado('av', array_values($ids));
+        foreach ($this->db->fetchAll(
+            "SELECT event_id, turma_id FROM school_calendar_event_classes WHERE event_id IN ($in)",
+            $params
+        ) ?: [] as $item) {
+            $turmas[(int) $item['event_id']][] = (int) $item['turma_id'];
+        }
+        foreach ($this->db->fetchAll(
+            "SELECT event_id, aluno_id FROM school_calendar_event_students WHERE event_id IN ($in)",
+            $params
+        ) ?: [] as $item) {
+            $alunos[(int) $item['event_id']][] = (int) $item['aluno_id'];
+        }
+        foreach ($rows as &$row) {
+            $id = (int) $row['aviso_id'];
+            $row['aviso_turmas'] = $turmas[$id] ?? [];
+            $row['aviso_alunos'] = $alunos[$id] ?? [];
+        }
+        unset($row);
+        return $rows;
+    }
+
+    /**
+     * @param array<string,mixed> $aviso
+     */
+    private function inserirAvisoEscolar(array $aviso, int $autorId): int
+    {
+        $dados = $this->dadosAvisoEscolar($aviso);
+        try {
+            return (int) $this->db->insert(
+                "INSERT INTO school_calendar_events
+                    (titulo, descricao, categoria, prioridade, local, inicio_em, fim_em, dia_inteiro, publico, status, criado_por, published_at)
+                 VALUES (:title, :description, :category, :priority, :location, :starts, :ends, :all_day, :audience, 'publicado', :author, NOW())",
+                $dados + ['author' => max(0, $autorId)]
+            );
+        } catch (\Throwable $e) {
+            error_log('Calendário letivo: falha ao publicar aviso da família: ' . $e->getMessage());
             return 0;
         }
-        $mapaCategoria = [
-            'feriado'   => 'feriado',
-            'avaliacao' => 'prova',
-            'recesso'   => 'evento',
-            'reposicao' => 'evento',
-            'evento'    => 'evento',
-            'suspensao' => 'evento',
-        ];
-        $categoria = $mapaCategoria[$tipo] ?? 'evento';
-        $prioridade = in_array($tipo, ['feriado', 'suspensao'], true) ? 'importante' : 'normal';
+    }
+
+    /**
+     * @param array<string,mixed> $aviso
+     * @return array<string,mixed>
+     */
+    private function dadosAvisoEscolar(array $aviso): array
+    {
+        $titulo = mb_substr(trim((string) ($aviso['titulo'] ?? '')), 0, 255);
+        $inicio = (string) ($aviso['inicio'] ?? '');
+        $fim = (string) ($aviso['fim'] ?? '');
         if ($fim === '' || $fim < $inicio) {
             $fim = $inicio;
         }
-        $inicioEm = $inicio . ' 00:00:00';
-        $fimEm = $fim . ' 23:59:59';
-        try {
-            $id = (int) $this->db->insert(
-                "INSERT INTO school_calendar_events
-                    (titulo, descricao, categoria, prioridade, local, inicio_em, fim_em, dia_inteiro, publico, status, criado_por, published_at)
-                 VALUES (:title, :description, :category, :priority, :location, :starts, :ends, 1, 'todos', 'publicado', :author, NOW())",
-                [
-                    'title'       => mb_substr($titulo, 0, 255),
-                    'description' => $titulo,
-                    'category'    => $categoria,
-                    'priority'    => $prioridade,
-                    'location'    => $local !== '' ? mb_substr($local, 0, 255) : null,
-                    'starts'      => $inicioEm,
-                    'ends'        => $fimEm,
-                    'author'      => max(0, $autorId),
-                ]
-            );
-        } catch (\Throwable $e) {
-            error_log('Calendário letivo: falha ao publicar no calendário escolar: ' . $e->getMessage());
-            return 0;
+        $diaInteiro = !empty($aviso['dia_inteiro']) || ((string) ($aviso['hora_inicio'] ?? '') === '' && (string) ($aviso['hora_fim'] ?? '') === '');
+        $horaInicio = $this->horaValida((string) ($aviso['hora_inicio'] ?? '')) ? (string) $aviso['hora_inicio'] : '00:00';
+        $horaFim = $this->horaValida((string) ($aviso['hora_fim'] ?? '')) ? (string) $aviso['hora_fim'] : '';
+        $inicioEm = $diaInteiro ? $inicio . ' 00:00:00' : $inicio . ' ' . $horaInicio . ':00';
+        $fimEm = $diaInteiro ? $fim . ' 23:59:59' : ($horaFim !== '' ? $fim . ' ' . $horaFim . ':00' : null);
+        $local = trim((string) ($aviso['local'] ?? ''));
+        $link = trim((string) ($aviso['link'] ?? ''));
+        $descricao = $titulo;
+        if ($link !== '') {
+            $descricao .= "\n" . $link;
         }
-        if ($id <= 0) {
-            return 0;
+        $prioridade = (string) ($aviso['prioridade'] ?? 'normal');
+        if (!in_array($prioridade, ['normal', 'importante', 'urgente'], true)) {
+            $prioridade = 'normal';
         }
-        $this->notificarResponsaveisCalendarioEscolar($id, $titulo, $inicio, $autorId);
-        return $id;
+        $publico = (string) ($aviso['publico'] ?? 'todos');
+        if (!in_array($publico, ['todos', 'turmas', 'alunos'], true)) {
+            $publico = 'todos';
+        }
+
+        return [
+            'title' => $titulo,
+            'description' => mb_substr($descricao, 0, 5000),
+            'category' => $this->categoriaDoTipo((string) ($aviso['tipo'] ?? '')),
+            'priority' => $prioridade,
+            'location' => $local !== '' ? mb_substr($local, 0, 255) : null,
+            'starts' => $inicioEm,
+            'ends' => $fimEm,
+            'all_day' => $diaInteiro ? 1 : 0,
+            'audience' => $publico,
+        ];
     }
 
-    private function notificarResponsaveisCalendarioEscolar(int $eventoId, string $titulo, string $inicio, int $autorId): void
+    private function categoriaDoTipo(string $tipo): string
+    {
+        $mapa = [
+            'feriado' => 'feriado',
+            'avaliacao' => 'prova',
+            'reuniao' => 'reunião',
+            'passeio' => 'passeio',
+            'apresentacao' => 'apresentação',
+        ];
+        return $mapa[$tipo] ?? 'evento';
+    }
+
+    /**
+     * @param list<int> $turmas
+     * @param list<int> $alunos
+     */
+    private function gravarPublicoAviso(int $eventoId, array $turmas, array $alunos): void
+    {
+        $this->db->query('DELETE FROM school_calendar_event_classes WHERE event_id = :id', ['id' => $eventoId]);
+        $this->db->query('DELETE FROM school_calendar_event_students WHERE event_id = :id', ['id' => $eventoId]);
+        foreach ($turmas as $turmaId) {
+            $this->db->insert(
+                'INSERT INTO school_calendar_event_classes (event_id, turma_id) VALUES (:id, :turma)',
+                ['id' => $eventoId, 'turma' => (int) $turmaId]
+            );
+        }
+        foreach ($alunos as $alunoId) {
+            $this->db->insert(
+                'INSERT INTO school_calendar_event_students (event_id, aluno_id) VALUES (:id, :aluno)',
+                ['id' => $eventoId, 'aluno' => (int) $alunoId]
+            );
+        }
+    }
+
+    /**
+     * @return array{cancelou:bool,notificou:bool}
+     */
+    private function cancelarAvisoEscolar(int $escolarId, int $autorId): array
+    {
+        $nada = ['cancelou' => false, 'notificou' => true];
+        if ($escolarId <= 0 || !$this->tabelaEscolarExiste()) {
+            return $nada;
+        }
+        $atual = $this->db->fetch(
+            'SELECT id, titulo, inicio_em, publico, status FROM school_calendar_events WHERE id = :id LIMIT 1',
+            ['id' => $escolarId]
+        );
+        if (!$atual || (string) ($atual['status'] ?? '') === 'cancelado') {
+            return $nada;
+        }
+        $this->db->update(
+            "UPDATE school_calendar_events SET status = 'cancelado' WHERE id = :id",
+            ['id' => $escolarId]
+        );
+        $turmas = $this->idsDoAviso('school_calendar_event_classes', 'turma_id', $escolarId);
+        $alunos = $this->idsDoAviso('school_calendar_event_students', 'aluno_id', $escolarId);
+        $aviso = [
+            'titulo' => (string) ($atual['titulo'] ?? ''),
+            'inicio' => substr((string) ($atual['inicio_em'] ?? ''), 0, 10),
+            'hora_inicio' => strlen((string) ($atual['inicio_em'] ?? '')) >= 16 ? substr((string) $atual['inicio_em'], 11, 5) : '',
+            'dia_inteiro' => false,
+            'publico' => (string) ($atual['publico'] ?? 'todos'),
+            'turmas' => $turmas,
+            'alunos' => $alunos,
+            'autor_id' => $autorId,
+        ];
+        $enviou = $this->notificarAvisoEscolar($escolarId, $aviso, 'Evento cancelado: ');
+        return ['cancelou' => true, 'notificou' => $enviou];
+    }
+
+    /**
+     * @param array<string,mixed> $aviso
+     */
+    private function notificarAvisoEscolar(int $eventoId, array $aviso, string $prefixo): bool
     {
         try {
             $comunicacao = new SchoolCommunicationService($this->db);
-            $pais = $comunicacao->parentIds('todos');
+            $pais = $comunicacao->parentIds(
+                (string) ($aviso['publico'] ?? 'todos'),
+                array_map('intval', (array) ($aviso['turmas'] ?? [])),
+                array_map('intval', (array) ($aviso['alunos'] ?? []))
+            );
             if ($pais === []) {
-                return;
+                return true;
             }
+            $inicio = (string) ($aviso['inicio'] ?? '');
             $quando = \DateTime::createFromFormat('Y-m-d', $inicio);
             $dataFmt = $quando ? $quando->format('d/m/Y') : $inicio;
+            $hora = (string) ($aviso['hora_inicio'] ?? '');
+            if ($hora !== '' && empty($aviso['dia_inteiro'])) {
+                $dataFmt .= ' ' . $hora;
+            }
+            $titulo = (string) ($aviso['titulo'] ?? '');
             $comunicacao->push(
                 $pais,
-                'Novo evento: ' . $titulo,
-                $dataFmt,
+                $prefixo . $titulo,
+                $prefixo === 'Evento cancelado: ' ? 'Consulte o calendário escolar.' : $dataFmt,
                 '/calendar-events/' . $eventoId,
                 ['type' => 'calendar_event', 'event_id' => (string) $eventoId],
-                $autorId
+                (int) ($aviso['autor_id'] ?? 0)
             );
+            return true;
         } catch (\Throwable $e) {
-            error_log('Calendário letivo: falha ao notificar responsáveis do evento escolar #' . $eventoId . ': ' . $e->getMessage());
+            error_log('Calendário letivo: falha ao notificar responsáveis do aviso #' . $eventoId . ': ' . $e->getMessage());
+            return false;
         }
+    }
+
+    /**
+     * @param array<string,mixed> $atual
+     * @param array<string,mixed> $dados
+     * @param list<int> $turmasAtuais
+     * @param list<int> $alunosAtuais
+     * @param list<int> $turmas
+     * @param list<int> $alunos
+     */
+    private function avisoMudou(array $atual, array $dados, array $turmasAtuais, array $alunosAtuais, array $turmas, array $alunos): bool
+    {
+        $pares = [
+            'titulo' => 'title',
+            'descricao' => 'description',
+            'categoria' => 'category',
+            'prioridade' => 'priority',
+            'local' => 'location',
+            'publico' => 'audience',
+        ];
+        foreach ($pares as $coluna => $chave) {
+            if (trim((string) ($atual[$coluna] ?? '')) !== trim((string) ($dados[$chave] ?? ''))) {
+                return true;
+            }
+        }
+        if ((int) ($atual['dia_inteiro'] ?? 0) !== (int) ($dados['all_day'] ?? 0)) {
+            return true;
+        }
+        if ($this->normalizarDataHora($atual['inicio_em'] ?? null) !== $this->normalizarDataHora($dados['starts'] ?? null)) {
+            return true;
+        }
+        if ($this->normalizarDataHora($atual['fim_em'] ?? null) !== $this->normalizarDataHora($dados['ends'] ?? null)) {
+            return true;
+        }
+        sort($turmasAtuais);
+        sort($alunosAtuais);
+        sort($turmas);
+        sort($alunos);
+        return $turmasAtuais !== $turmas || $alunosAtuais !== $alunos;
+    }
+
+    private function normalizarDataHora(mixed $valor): string
+    {
+        $texto = trim((string) $valor);
+        if ($texto === '') {
+            return '';
+        }
+        $time = strtotime($texto);
+        return $time === false ? $texto : date('Y-m-d H:i:s', $time);
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function idsPost(mixed $ids): array
+    {
+        if (!is_array($ids)) {
+            return [];
+        }
+        return array_values(array_unique(array_filter(array_map('intval', $ids), static fn (int $id): bool => $id > 0)));
+    }
+
+    /**
+     * @param list<mixed> $ids
+     * @return list<int>
+     */
+    private function idsExistentes(string $tabela, array $ids): array
+    {
+        if (!in_array($tabela, ['turmas', 'alunos'], true)) {
+            return [];
+        }
+        $ids = $this->idsPost($ids);
+        if ($ids === []) {
+            return [];
+        }
+        [$in, $params] = $this->inNomeado('id', $ids);
+        $rows = $this->db->fetchAll("SELECT id FROM {$tabela} WHERE id IN ($in)", $params) ?: [];
+        return array_values(array_map('intval', array_column($rows, 'id')));
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function idsDoAviso(string $tabela, string $coluna, int $eventoId): array
+    {
+        if (!in_array($tabela, ['school_calendar_event_classes', 'school_calendar_event_students'], true)) {
+            return [];
+        }
+        if (!in_array($coluna, ['turma_id', 'aluno_id'], true)) {
+            return [];
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT {$coluna} AS alvo FROM {$tabela} WHERE event_id = :id",
+            ['id' => $eventoId]
+        ) ?: [];
+        return array_values(array_map('intval', array_column($rows, 'alvo')));
+    }
+
+    private function horaValida(string $hora): bool
+    {
+        return preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $hora) === 1;
     }
 
     /**

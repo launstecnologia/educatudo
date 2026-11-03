@@ -5,7 +5,12 @@
             <h1 class="text-2xl md:text-3xl font-bold text-gray-900">Painel do Professor</h1>
             <p class="text-sm md:text-base text-gray-600 mt-2">Bem-vindo, <?= htmlspecialchars($professor['nome']) ?>! Gerencie suas turmas e acompanhe o progresso dos alunos.</p>
         </div>
-        <div class="flex items-center space-x-4">
+        <div class="flex items-center gap-4">
+            <a href="<?= URL ?>/professor/grade-horaria"
+               class="inline-flex items-center px-4 py-2.5 rounded-lg bg-primary text-primary text-sm font-semibold hover:opacity-90 whitespace-nowrap">
+                <i class="fa-regular fa-calendar-days mr-2"></i>
+                Minha grade
+            </a>
             <div class="text-right">
                 <p class="text-xs md:text-sm text-gray-500">Código do Professor</p>
                 <p class="text-base md:text-lg font-semibold text-blue-600"><?= htmlspecialchars($professor['codigo_prof']) ?></p>
@@ -251,7 +256,11 @@
                 <div class="space-y-4">
                     <?php foreach ($eventos_prova_recentes as $evento):
                         $isLancamentoNota = (($evento['formato_evento'] ?? 'online_questoes') === 'lancamento_nota');
-                        if ($isLancamentoNota) {
+                        $escolaElaboraImpressa = (($evento['formato_evento'] ?? '') === 'prova_impressa')
+                            && (($evento['configuracao_nota'] ?? '') === 'coordenacao_calcula');
+                        if ($escolaElaboraImpressa) {
+                            $urlProva = URL . '/professor/provas';
+                        } elseif ($isLancamentoNota) {
                             $urlProva = URL . '/professor/provas/evento-lancar-notas/' . (int)$evento['id'] . '?materia_id=' . (int)$evento['materia_id'];
                         } else {
                             $urlProva = !empty($evento['prova_existente_id'])

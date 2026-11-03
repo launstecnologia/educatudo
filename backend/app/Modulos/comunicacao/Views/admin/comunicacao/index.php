@@ -4,12 +4,12 @@ $modOn = static function (string $key): bool {
 };
 
 $hub_title = 'Comunicação';
-$hub_subtitle = 'Fórum, recados, avisos, calendário, reuniões e notificações da escola.';
+$hub_subtitle = 'Fórum, mural, avisos aos pais, calendário e reuniões da escola.';
 $hub_cards = [
     [
         'href' => URL . '/admin/comunicacao-escolar',
         'title' => 'Comunicação Escolar',
-        'description' => 'Envie comunicados oficiais para a comunidade escolar.',
+        'description' => 'Avisos aos pais, com resposta, mídia e push opcional.',
         'icon' => 'fa-solid fa-envelope-open-text',
     ],
 ];
@@ -17,8 +17,8 @@ $hub_cards = [
 if ($modOn('calendario_escolar')) {
     $hub_cards[] = [
         'href' => URL . '/admin/calendario-escolar',
-        'title' => 'Calendário Escolar',
-        'description' => 'Eventos exibidos aos responsáveis no app.',
+        'title' => 'Avisos à família',
+        'description' => 'Avisos já enviados aos responsáveis no app. O cadastro fica no Calendário Letivo.',
         'icon' => 'fa-regular fa-calendar-days',
     ];
 }
@@ -42,23 +42,11 @@ if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('mu
     $hub_cards[] = [
         'href' => URL . '/admin/mural-recados',
         'title' => 'Mural de Recados',
-        'description' => 'Publique recados para alunos, pais e professores.',
+        'description' => 'Recados no portal do aluno ou do professor, com sino e confirmação de leitura.',
         'icon' => 'fa-solid fa-bullhorn',
     ];
 }
 
-$hub_cards[] = [
-    'href' => URL . '/admin/notifications',
-    'title' => 'Notificações',
-    'description' => 'Histórico e envio de notificações internas.',
-    'icon' => 'fa-regular fa-bell',
-];
-$hub_cards[] = [
-    'href' => URL . '/admin/notificacoes-push',
-    'title' => 'Notificações Push',
-    'description' => 'Dispare avisos push para o aplicativo da família.',
-    'icon' => 'fa-solid fa-bell-concierge',
-];
 $hub_cards[] = [
     'href' => URL . '/admin/reunioes/geral',
     'title' => 'Reuniões',

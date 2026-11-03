@@ -11,56 +11,74 @@ $componentes_disponiveis = $componentes_disponiveis ?? [];
 
 $page_header_title = 'Matriz Curricular';
 $page_header_subtitle = 'Defina o componente oficial de cada série. Desdobramentos somam a carga da área.';
-ob_start();
+$trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/matrizes-curriculares', 'Matriz Curricular');
+$filtrosAtivos = 0;
+if ((string) ($filtros['curso_id'] ?? '') !== '') {
+    $filtrosAtivos++;
+}
+if ((string) ($filtros['serie_id'] ?? '') !== '') {
+    $filtrosAtivos++;
+}
 ?>
-<button type="button" onclick="openMatrizDrawer()"
-   class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
-    <i class="fa-solid fa-plus mr-2"></i>
-    Nova Matriz
-</button>
+<div class="mb-6">
+    <?php include __DIR__ . '/../../../../../Views/layouts/components/trilha.php'; ?>
+    <div class="mt-4 flex justify-between items-center gap-4">
+        <div class="flex items-center gap-3 min-w-0">
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
+                <i class="fa-solid fa-sitemap text-lg" aria-hidden="true"></i>
+            </span>
+            <div class="min-w-0">
+                <h2 class="text-xl font-bold text-gray-900"><?= htmlspecialchars($page_header_title) ?></h2>
+                <p class="text-sm text-gray-500 mt-0.5"><?= htmlspecialchars($page_header_subtitle) ?></p>
+            </div>
+        </div>
+        <div class="flex items-center justify-end gap-3 flex-wrap flex-shrink-0 ml-auto">
+            <button type="button" onclick="openFilterDrawer()"
+                    class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
+                Filtros
+                <?php if ($filtrosAtivos > 0): ?>
+                    <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold"><?= $filtrosAtivos ?></span>
+                <?php endif; ?>
+            </button>
+            <?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
+            <?php
+            $ui_btn_variant = 'complementar';
+            $ui_btn_label = 'Log';
+            $ui_btn_icon = 'fa-solid fa-clock-rotate-left';
+            $ui_btn_onclick = 'abrirTrilhaMatrizes()';
+            include \App\Core\ViewPaths::adminPartial('ui/btn.php');
+            ?>
+            <?php endif; ?>
+            <button type="button" onclick="openMatrizDrawer()"
+               class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
+                <i class="fa-solid fa-plus mr-2"></i>
+                Nova Matriz
+            </button>
+        </div>
+    </div>
+</div>
 <?php
-$page_header_actions = ob_get_clean();
-include \App\Core\ViewPaths::adminPartial('page_header_list.php');
 
 $flash_status = $status;
 $flash_message = $message;
 include \App\Core\ViewPaths::adminPartial('flash_message.php');
 ?>
 
-<form method="GET" action="<?= URL ?>/admin/matrizes-curriculares" class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6 flex flex-wrap items-end gap-4">
-    <div>
-        <label for="curso_id" class="block text-xs font-medium text-gray-500 mb-1">Curso</label>
-        <select id="curso_id" name="curso_id" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
-            <option value="">Todos</option>
-            <?php foreach ($cursos as $c): ?>
-            <option value="<?= (int) $c['id'] ?>" <?= (string) $filtros['curso_id'] === (string) $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars($c['nome']) ?></option>
-            <?php endforeach; ?>
-        </select>
-    </div>
-    <div>
-        <label for="serie_id" class="block text-xs font-medium text-gray-500 mb-1">Série</label>
-        <select id="serie_id" name="serie_id" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
-            <option value="">Todas</option>
-            <?php foreach ($series as $s): ?>
-            <option value="<?= (int) $s['id'] ?>" <?= (string) $filtros['serie_id'] === (string) $s['id'] ? 'selected' : '' ?>><?= htmlspecialchars($s['nome']) ?></option>
-            <?php endforeach; ?>
-        </select>
-    </div>
-    <button type="submit" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">Filtrar</button>
-    <?php if (!empty($filtros['curso_id']) || !empty($filtros['serie_id'])): ?>
-    <a href="<?= URL ?>/admin/matrizes-curriculares" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Limpar</a>
-    <?php endif; ?>
-</form>
-
 <?php if (empty($itens)): ?>
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 px-6 py-12 text-center text-gray-500">
     <i class="fa-solid fa-sitemap text-4xl text-gray-300 mb-4"></i>
-    <p>Nenhuma matriz curricular cadastrada</p>
-    <button type="button" onclick="openMatrizDrawer()"
-       class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
-        <i class="fa-solid fa-plus mr-2"></i>
-        Cadastrar a primeira matriz
-    </button>
+    <?php if ($filtrosAtivos > 0): ?>
+        <p>Nenhuma matriz curricular encontrada com esses filtros</p>
+        <a href="<?= URL ?>/admin/matrizes-curriculares" class="inline-block mt-4 text-sm font-medium text-blue-600 hover:text-blue-800">Limpar filtros</a>
+    <?php else: ?>
+        <p>Nenhuma matriz curricular cadastrada</p>
+        <button type="button" onclick="openMatrizDrawer()"
+           class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
+            <i class="fa-solid fa-plus mr-2"></i>
+            Cadastrar a primeira matriz
+        </button>
+    <?php endif; ?>
 </div>
 <?php else: ?>
 <div class="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -71,9 +89,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Curso</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Série</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Turno</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Componentes</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Série / Turno</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                 </tr>
@@ -84,9 +100,23 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?= htmlspecialchars($row['nome']) ?></td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><?= htmlspecialchars($row['codigo']) ?></td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700"><?= htmlspecialchars($row['curso_nome']) ?></td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700"><?= htmlspecialchars($row['serie_nome']) ?></td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><?= htmlspecialchars($row['turno'] ?? '—') ?></td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><?= (int) $row['total_componentes'] ?></td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <?php
+                        $turnoBruto = trim((string) ($row['turno'] ?? ''));
+                        $turnoRotulos = [
+                            'manha' => 'Manhã',
+                            'tarde' => 'Tarde',
+                            'noite' => 'Noite',
+                            'integral' => 'Integral',
+                            'todos' => 'Todos',
+                        ];
+                        $turnoTexto = $turnoRotulos[mb_strtolower($turnoBruto)] ?? $turnoBruto;
+                        ?>
+                        <div class="text-sm text-gray-900"><?= htmlspecialchars((string) $row['serie_nome']) ?></div>
+                        <?php if ($turnoTexto !== ''): ?>
+                        <div class="text-xs text-gray-500 mt-0.5"><?= htmlspecialchars($turnoTexto) ?></div>
+                        <?php endif; ?>
+                    </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?= $row['ativo'] ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' ?>">
                             <?= $row['ativo'] ? 'Ativa' : 'Inativa' ?>
@@ -116,6 +146,49 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
     </div>
 </div>
 <?php endif; ?>
+
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
+<aside id="filterDrawer"
+       class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
+       aria-hidden="true">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <div>
+            <h3 class="text-lg font-semibold text-gray-900">Filtrar matrizes</h3>
+            <p class="mt-0.5 text-xs text-gray-500">Curso e série.</p>
+        </div>
+        <button type="button" onclick="closeFilterDrawer()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar filtros">
+            <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+    </div>
+    <form method="GET" action="<?= URL ?>/admin/matrizes-curriculares" class="flex flex-col flex-1 overflow-hidden">
+        <div class="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+            <div>
+                <label for="filtro-curso" class="block text-sm font-medium text-gray-700 mb-1.5">Curso</label>
+                <select id="filtro-curso" name="curso_id"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">Todos</option>
+                    <?php foreach ($cursos as $c): ?>
+                    <option value="<?= (int) $c['id'] ?>" <?= (string) $filtros['curso_id'] === (string) $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars($c['nome']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div>
+                <label for="filtro-serie" class="block text-sm font-medium text-gray-700 mb-1.5">Série</label>
+                <select id="filtro-serie" name="serie_id"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">Todas</option>
+                    <?php foreach ($series as $s): ?>
+                    <option value="<?= (int) $s['id'] ?>" <?= (string) $filtros['serie_id'] === (string) $s['id'] ? 'selected' : '' ?>><?= htmlspecialchars($s['nome']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-200 flex gap-3 bg-gray-50">
+            <a href="<?= URL ?>/admin/matrizes-curriculares" class="flex-1 inline-flex items-center justify-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">Limpar</a>
+            <button type="submit" class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors">Aplicar filtros</button>
+        </div>
+    </form>
+</aside>
 
 <!-- Offcanvas: Cadastrar/Editar Matriz Curricular -->
 <div id="matrizDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeMatrizDrawer()"></div>
@@ -619,8 +692,31 @@ document.getElementById('matriz-form').addEventListener('submit', function (e) {
         .catch(function () { alert('Erro de conexão. Tente novamente.'); });
 });
 
+function openFilterDrawer() {
+    document.getElementById('filterDrawerBackdrop').classList.remove('hidden');
+    var drawer = document.getElementById('filterDrawer');
+    drawer.classList.remove('translate-x-full');
+    drawer.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+}
+function closeFilterDrawer() {
+    document.getElementById('filterDrawerBackdrop').classList.add('hidden');
+    var drawer = document.getElementById('filterDrawer');
+    drawer.classList.add('translate-x-full');
+    drawer.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+}
+
 document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') { closeMatrizDrawer(); }
+    if (e.key !== 'Escape') {
+        return;
+    }
+    var filtro = document.getElementById('filterDrawer');
+    if (filtro && !filtro.classList.contains('translate-x-full')) {
+        closeFilterDrawer();
+        return;
+    }
+    closeMatrizDrawer();
 });
 </script>
 
@@ -645,3 +741,12 @@ function excluirMatriz(id) {
         .catch(() => alert('Erro de conexão'));
 }
 </script>
+<?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
+<?php
+$trilha_log_id = 'trilhaMatrizes';
+$trilha_log_titulo = 'Log da matriz curricular';
+$trilha_log_url = URL . '/admin/matrizes-curriculares/logs';
+$trilha_log_vazio = 'Nenhum cadastro, alteração ou exclusão de matriz curricular registrado.';
+include \App\Core\ViewPaths::adminPartial('ui/trilha_log.php');
+?>
+<?php endif; ?>

@@ -22,6 +22,8 @@ if (is_array($vagas_resumo) && empty($vagas_resumo['ilimitado'])) {
 
 $page_header_title = 'Detalhes da Turma';
 $page_header_subtitle = (string) ($turma['nome'] ?? '');
+$nomeTrilhaTurma = trim($page_header_subtitle) !== '' ? trim($page_header_subtitle) : 'Detalhes da Turma';
+$trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/turmas/' . $turmaId, $nomeTrilhaTurma);
 ob_start();
 ?>
 <a href="<?= URL ?>/admin/turmas"
@@ -41,8 +43,28 @@ ob_start();
 </a>
 <?php
 $page_header_actions = ob_get_clean();
-include \App\Core\ViewPaths::adminPartial('page_header_list.php');
 ?>
+<div class="mb-6">
+    <?php include __DIR__ . '/../../../../../Views/layouts/components/trilha.php'; ?>
+    <div class="mt-4 flex justify-between items-center gap-4">
+        <div class="flex items-center gap-3 min-w-0">
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
+                <i class="fa-solid fa-school text-lg" aria-hidden="true"></i>
+            </span>
+            <div class="min-w-0">
+                <h2 class="text-xl font-bold text-gray-900"><?= htmlspecialchars($page_header_title) ?></h2>
+                <?php if ($page_header_subtitle !== ''): ?>
+                <p class="text-sm text-gray-500 mt-0.5"><?= htmlspecialchars($page_header_subtitle) ?></p>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php if ($page_header_actions !== ''): ?>
+        <div class="flex items-center justify-end gap-3 flex-shrink-0 ml-auto">
+            <?= $page_header_actions ?>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
 
 <div class="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-6">
     <?php

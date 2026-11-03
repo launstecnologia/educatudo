@@ -31,7 +31,7 @@ class ComponenteCurricularService
         }
 
         if ($this->componenteCurricular->nameExists($data['nome'])) {
-            return ['success' => false, 'error' => 'Nome do componente curricular já cadastrado'];
+            return ['success' => false, 'error' => 'Componente Curricular já cadastrado'];
         }
 
         if ($this->componenteCurricular->codigoExists($data['codigo'])) {
@@ -64,7 +64,7 @@ class ComponenteCurricularService
         }
 
         if ($this->componenteCurricular->nameExists($data['nome'], $id)) {
-            return ['success' => false, 'error' => 'Nome do componente curricular já cadastrado'];
+            return ['success' => false, 'error' => 'Componente Curricular já cadastrado'];
         }
 
         if ($this->componenteCurricular->codigoExists($data['codigo'], $id)) {
@@ -112,10 +112,10 @@ class ComponenteCurricularService
     private function validar(array $data, ?int $idAtual = null): ?string
     {
         if ($data['nome'] === '') {
-            return 'Nome é obrigatório';
+            return 'Componente Curricular é obrigatório';
         }
         if (mb_strlen($data['nome']) > 100) {
-            return 'Nome deve ter no máximo 100 caracteres';
+            return 'Componente Curricular deve ter no máximo 100 caracteres';
         }
 
         if ($data['codigo'] === '') {
@@ -130,7 +130,7 @@ class ComponenteCurricularService
         }
 
         if (!isset(ComponenteCurricular::AREAS_CONHECIMENTO[$data['area_conhecimento']])) {
-            return 'Área do conhecimento inválida';
+            return 'Área do Conhecimento inválida';
         }
 
         if (!isset(ComponenteCurricular::TIPOS[$data['tipo']])) {
@@ -144,11 +144,11 @@ class ComponenteCurricularService
         $paiId = (int) ($data['pai_id'] ?? 0);
         if ($paiId > 0) {
             if (!$this->componenteCurricular->exists($paiId)) {
-                return 'Área (componente pai) inválida';
+                return 'Unidade Curricular inválida';
             }
             $pai = $this->componenteCurricular->findById($paiId);
             if (is_array($pai) && (int) ($pai['pai_id'] ?? 0) > 0) {
-                return 'A área precisa ser um componente raiz (um nível só)';
+                return 'A unidade curricular precisa ser um componente raiz (um nível só)';
             }
             $filhosDoAtual = $this->componenteCurricular->idsComFilhos();
             $idAtual = (int) ($idAtual ?? 0);
@@ -156,7 +156,7 @@ class ComponenteCurricularService
                 return 'Um componente não pode ser pai de si mesmo';
             }
             if ($idAtual > 0 && isset($filhosDoAtual[$idAtual])) {
-                return 'Quem já é área (tem filhos) não pode virar filho de outro';
+                return 'Quem já é unidade curricular (tem desdobramentos) não pode vincular a outra';
             }
         }
 
@@ -172,6 +172,71 @@ class ComponenteCurricularService
     {
         $valor = trim((string) $valor);
         return isset(ComponenteCurricular::ETAPAS[$valor]) ? $valor : 'nao_aplica';
+    }
+
+    /**
+     * Restringe a árvore da listagem pelos filtros da tela (nome, sigla, área e ciclo).
+     *
+     * @param list<array<string, mixed>> $itens
+     * @param array<string, mixed> $entrada
+     * @return array{itens: list<array<string, mixed>>, filtros: array{nome: string, sigla: string, area: string, etapa: string}}
+     */
+    public function aplicarFiltroListagem(array $itens, array $entrada): array
+    {
+        $filtros = [
+            'nome' => $this->textoFiltro($entrada['nome'] ?? '', 100),
+            'sigla' => $this->textoFiltro($entrada['sigla'] ?? '', 20),
+            'area' => trim((string) ($entrada['area'] ?? '')),
+            'etapa' => trim((string) ($entrada['etapa'] ?? '')),
+        ];
+        if (!isset(ComponenteCurricular::AREAS_CONHECIMENTO[$filtros['area']])) {
+            $filtros['area'] = '';
+        }
+        $ciclos = ['etapa_infantil', 'etapa_fund_i', 'etapa_fund_ii', 'etapa_medio'];
+        if (!in_array($filtros['etapa'], $ciclos, true)) {
+            $filtros['etapa'] = '';
+        }
+
+        if ($filtros['nome'] === '' && $filtros['sigla'] === '' && $filtros['area'] === '' && $filtros['etapa'] === '') {
+            return ['itens' => $itens, 'filtros' => $filtros];
+        }
+
+        $saida = [];
+        foreach ($itens as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            if ($filtros['nome'] !== '' && mb_stripos((string) ($item['nome'] ?? ''), $filtros['nome']) === false) {
+                continue;
+            }
+            if ($filtros['sigla'] !== '' && mb_stripos((string) ($item['sigla'] ?? ''), $filtros['sigla']) === false) {
+                continue;
+            }
+            if ($filtros['area'] !== '' && (string) ($item['area_conhecimento'] ?? '') !== $filtros['area']) {
+                continue;
+            }
+            if ($filtros['etapa'] !== '') {
+                $valorEtapa = (string) ($item[$filtros['etapa']] ?? 'nao_aplica');
+                if ($valorEtapa === '' || $valorEtapa === 'nao_aplica') {
+                    continue;
+                }
+            }
+            $saida[] = $item;
+        }
+
+        return ['itens' => $saida, 'filtros' => $filtros];
+    }
+
+    private function textoFiltro($valor, int $maximo): string
+    {
+        $valor = trim((string) $valor);
+        if ($valor === '') {
+            return '';
+        }
+        if (mb_strlen($valor) > $maximo) {
+            $valor = mb_substr($valor, 0, $maximo);
+        }
+        return $valor;
     }
 }
 

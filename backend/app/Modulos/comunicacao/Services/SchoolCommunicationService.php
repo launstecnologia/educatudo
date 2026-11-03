@@ -25,7 +25,7 @@ class SchoolCommunicationService
         $this->devices = new MobileDeviceService();
     }
 
-    public function parentIds(string $audience, array $classIds = [], array $studentIds = []): array
+    public function parentIds(string $audience, array $classIds = [], array $studentIds = [], array $serieIds = [], array $cursoIds = []): array
     {
         $where = '1=1';
         $params = [];
@@ -39,6 +39,17 @@ class SchoolCommunicationService
             if ($ids === []) return [];
             $where = 'a.id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')';
             $params = $ids;
+        } elseif ($audience === 'series') {
+            $ids = array_values(array_unique(array_filter(array_map('intval', $serieIds))));
+            if ($ids === []) return [];
+            $where = 'a.turma_id IN (SELECT id FROM turmas WHERE serie_id IN (' . implode(',', array_fill(0, count($ids), '?')) . '))';
+            $params = $ids;
+        } elseif ($audience === 'cursos') {
+            $ids = array_values(array_unique(array_filter(array_map('intval', $cursoIds))));
+            if ($ids === []) return [];
+            $marcas = implode(',', array_fill(0, count($ids), '?'));
+            $where = 'a.turma_id IN (SELECT id FROM turmas WHERE curso_novo_id IN (' . $marcas . ') OR curso_id IN (' . $marcas . '))';
+            $params = array_merge($ids, $ids);
         }
         $rows = $this->db->fetchAll(
             "SELECT DISTINCT parent_id FROM (

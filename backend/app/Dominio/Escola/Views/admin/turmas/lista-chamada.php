@@ -31,6 +31,13 @@ $criterioLabel = match ($criterioAtual) {
 
 $page_header_title = 'Lista de Chamada';
 $page_header_subtitle = 'Numeração e ordenação da turma ' . (string) ($turma['nome'] ?? '');
+$nomeTrilhaTurma = trim((string) ($turma['nome'] ?? ''));
+$trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/turmas/' . $turmaId . '/lista-chamada', 'Lista de Chamada', [
+    ['rotulo' => 'Acadêmico', 'url' => '/admin/academico'],
+    ['rotulo' => 'Turmas', 'url' => '/admin/turmas'],
+    ['rotulo' => $nomeTrilhaTurma !== '' ? $nomeTrilhaTurma : 'Turma', 'url' => '/admin/turmas/' . $turmaId],
+    ['rotulo' => 'Lista de Chamada'],
+]);
 ob_start();
 ?>
 <a href="<?= URL ?>/admin/turmas/<?= $turmaId ?>"
@@ -40,7 +47,27 @@ ob_start();
 </a>
 <?php
 $page_header_actions = ob_get_clean();
-include \App\Core\ViewPaths::adminPartial('page_header_list.php');
+?>
+<div class="mb-6">
+    <?php include __DIR__ . '/../../../../../Views/layouts/components/trilha.php'; ?>
+    <div class="mt-4 flex justify-between items-center gap-4">
+        <div class="flex items-center gap-3 min-w-0">
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
+                <i class="fa-solid fa-clipboard-list text-lg" aria-hidden="true"></i>
+            </span>
+            <div class="min-w-0">
+                <h2 class="text-xl font-bold text-gray-900"><?= htmlspecialchars($page_header_title) ?></h2>
+                <p class="text-sm text-gray-500 mt-0.5"><?= htmlspecialchars($page_header_subtitle) ?></p>
+            </div>
+        </div>
+        <?php if ($page_header_actions !== ''): ?>
+        <div class="flex items-center justify-end gap-3 flex-shrink-0 ml-auto">
+            <?= $page_header_actions ?>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+<?php
 
 $flash_status = (($flash_type ?? '') === 'success') ? 'success' : ((($flash_message ?? '') !== '') ? 'error' : '');
 include \App\Core\ViewPaths::adminPartial('flash_message.php');

@@ -35,6 +35,10 @@ $edicao = is_array($edicao ?? null) ? $edicao : null;
 $eventoIdForm = (int) ($edicao['id'] ?? 0);
 $editando = $eventoIdForm > 0;
 $canalEdicao = (string) ($edicao['canal'] ?? 'offline');
+if ($canalEdicao !== 'online' && (string) ($edicao['aplicacao_offline'] ?? '') === 'impressa') {
+    $canalEdicao = 'impressa';
+}
+$impressaEdicao = $canalEdicao === 'impressa';
 $cfgEdicao = (string) ($edicao['configuracao_nota'] ?? 'professor_por_questao');
 $modoEdicao = (string) ($edicao['modo_offline'] ?? 'lancamento_direto');
 $criterioEdicao = (string) ($edicao['criterio_fechamento'] ?? 'ultima');
@@ -284,7 +288,7 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
                     <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-teal-600 text-sm font-semibold text-white">1</span>
                     <div>
                         <p class="text-sm font-semibold text-gray-900">Tipo de Avaliação</p>
-                        <p class="text-sm text-gray-500 mt-0.5">Defina se a avaliação será online (via plataforma) ou offline (presencial).</p>
+                        <p class="text-sm text-gray-500 mt-0.5">Online na plataforma, impressa com gabarito ou offline com nota informada.</p>
                     </div>
                 </div>
                 <div class="p-5">
@@ -308,7 +312,14 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
                         </div>
                     </div>
                     <label class="flex items-start gap-3 rounded-lg border border-gray-200 p-3 cursor-pointer hover:bg-gray-50">
-                        <input type="radio" name="canal_origem" value="offline" class="mt-1 js-canal"<?= $canalEdicao !== 'online' ? ' checked' : '' ?>>
+                        <input type="radio" name="canal_origem" value="impressa" class="mt-1 js-canal"<?= $impressaEdicao ? ' checked' : '' ?>>
+                        <span>
+                            <span class="block text-sm font-medium text-gray-900"><?= htmlspecialchars((string) ($canais['impressa']['label'] ?? 'Avaliação impressa'), ENT_QUOTES, 'UTF-8') ?></span>
+                            <span class="block text-xs text-gray-500 mt-0.5"><?= htmlspecialchars((string) ($canais['impressa']['hint'] ?? 'A prova é montada no sistema, impressa e lida no gabarito. O aluno não responde na plataforma.'), ENT_QUOTES, 'UTF-8') ?></span>
+                        </span>
+                    </label>
+                    <label class="flex items-start gap-3 rounded-lg border border-gray-200 p-3 cursor-pointer hover:bg-gray-50">
+                        <input type="radio" name="canal_origem" value="offline" class="mt-1 js-canal"<?= $canalEdicao === 'offline' ? ' checked' : '' ?>>
                         <span>
                             <span class="block text-sm font-medium text-gray-900"><?= htmlspecialchars((string) ($canais['offline']['label'] ?? 'Avaliações offline'), ENT_QUOTES, 'UTF-8') ?></span>
                             <span class="block text-xs text-gray-500 mt-0.5"><?= htmlspecialchars((string) ($canais['offline']['hint'] ?? 'Ocorre fora da plataforma — a escola informa a nota.'), ENT_QUOTES, 'UTF-8') ?></span>
@@ -349,9 +360,13 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
                     <label class="flex items-center"><input type="radio" name="configuracao_nota" value="professor_por_questao" class="js-config w-4 h-4 text-purple-600 border-gray-300"<?= $canalEdicao === 'online' && $cfgEdicao === 'professor_por_questao' ? ' checked' : '' ?>> <span class="ml-2 text-gray-700">Atribuir professor</span></label>
                     <label class="flex items-center"><input type="radio" name="configuracao_nota" value="coordenacao_calcula" class="js-config w-4 h-4 text-purple-600 border-gray-300"<?= $canalEdicao === 'online' && $cfgEdicao === 'coordenacao_calcula' ? ' checked' : '' ?>> <span class="ml-2 text-gray-700">Coordenação faz a prova</span></label>
                 </div>
-                <div id="cfgLancamentoOptions" class="flex flex-wrap gap-6">
-                    <label class="flex items-center"><input type="radio" name="configuracao_nota" value="professor_por_questao" class="js-config w-4 h-4 text-purple-600 border-gray-300"<?= $canalEdicao !== 'online' && $cfgEdicao === 'professor_por_questao' ? ' checked' : '' ?>> <span class="ml-2 text-gray-700">Atribuir ao professor</span></label>
-                    <label class="flex items-center"><input type="radio" name="configuracao_nota" value="coordenacao_calcula" class="js-config w-4 h-4 text-purple-600 border-gray-300"<?= $canalEdicao !== 'online' && $cfgEdicao === 'coordenacao_calcula' ? ' checked' : '' ?>> <span class="ml-2 text-gray-700">Escola lança a nota</span></label>
+                <div id="cfgLancamentoOptions" class="flex flex-wrap gap-6<?= $impressaEdicao ? ' hidden' : '' ?>">
+                    <label class="flex items-center"><input type="radio" name="configuracao_nota" value="professor_por_questao" class="js-config w-4 h-4 text-purple-600 border-gray-300"<?= $canalEdicao !== 'online' && !$impressaEdicao && $cfgEdicao === 'professor_por_questao' ? ' checked' : '' ?>> <span class="ml-2 text-gray-700">Atribuir ao professor</span></label>
+                    <label class="flex items-center"><input type="radio" name="configuracao_nota" value="coordenacao_calcula" class="js-config w-4 h-4 text-purple-600 border-gray-300"<?= $canalEdicao !== 'online' && !$impressaEdicao && $cfgEdicao === 'coordenacao_calcula' ? ' checked' : '' ?>> <span class="ml-2 text-gray-700">Escola lança a nota</span></label>
+                </div>
+                <div id="cfgImpressaOptions" class="flex flex-wrap gap-6<?= $impressaEdicao ? '' : ' hidden' ?>">
+                    <label class="flex items-center"><input type="radio" name="configuracao_nota" value="professor_por_questao" class="js-config w-4 h-4 text-purple-600 border-gray-300"<?= $impressaEdicao && $cfgEdicao === 'professor_por_questao' ? ' checked' : '' ?>> <span class="ml-2 text-gray-700">Atribuir ao professor</span></label>
+                    <label class="flex items-center"><input type="radio" name="configuracao_nota" value="coordenacao_calcula" class="js-config w-4 h-4 text-purple-600 border-gray-300"<?= $impressaEdicao && $cfgEdicao === 'coordenacao_calcula' ? ' checked' : '' ?>> <span class="ml-2 text-gray-700">Escola constrói a prova</span></label>
                 </div>
                 <div id="prazoProfessorContainer" class="mt-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2" id="labelPrazoProfessor" for="prazo_entrega_professor">Prazo para o professor lançar as notas <span class="text-red-500">*</span></label>
@@ -606,10 +621,20 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
 
     function formatoAtual() {
         var el = form.querySelector('input[name="canal_origem"]:checked');
-        return el && el.value === 'online' ? 'online_questoes' : 'lancamento_nota';
+        if (!el) return 'lancamento_nota';
+        if (el.value === 'online') return 'online_questoes';
+        if (el.value === 'impressa') return 'prova_impressa';
+        return 'lancamento_nota';
+    }
+    function comProva() {
+        var formato = formatoAtual();
+        return formato === 'online_questoes' || formato === 'prova_impressa';
     }
     function caixaConfig() {
-        return document.getElementById(formatoAtual() === 'online_questoes' ? 'cfgOnlineOptions' : 'cfgLancamentoOptions');
+        var formato = formatoAtual();
+        if (formato === 'online_questoes') return document.getElementById('cfgOnlineOptions');
+        if (formato === 'prova_impressa') return document.getElementById('cfgImpressaOptions');
+        return document.getElementById('cfgLancamentoOptions');
     }
     function configAtual() {
         var box = caixaConfig();
@@ -620,7 +645,7 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
         return configAtual() === 'coordenacao_calcula';
     }
     function exigeQuestoes() {
-        return formatoAtual() === 'online_questoes' && configAtual() === 'professor_por_questao';
+        return comProva() && configAtual() === 'professor_por_questao';
     }
     function turmasEvento() {
         var ids = Array.from(form.querySelectorAll('.js-turma:checked')).map(function (el) { return String(el.value); });
@@ -1685,6 +1710,7 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
         var periodo = textoSelecionado('bimestre');
         var ano = document.getElementById('ano_letivo').value || '';
         var online = formatoAtual() === 'online_questoes';
+        var impressa = formatoAtual() === 'prova_impressa';
         var porProfessor = configAtual() === 'professor_por_questao';
         var turmas = Array.from(form.querySelectorAll('.js-turma:checked')).map(function (el) {
             var nomeTurma = el.parentElement ? el.parentElement.querySelector('.js-turma-nome') : null;
@@ -1723,7 +1749,7 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
         html += cartaoResumo(2, 'Avaliação', 'Onde acontece e quem lança a nota.', [
             { rotulo: 'Onde acontece', valor: esc(canal) },
             { rotulo: 'Periodicidade', valor: esc(modo) },
-            { rotulo: online ? 'Quem elabora' : 'Quem lança', valor: esc(quem) },
+            { rotulo: impressa || online ? 'Quem elabora' : 'Quem lança', valor: esc(quem) },
             { rotulo: 'Prazo do professor', valor: porProfessor && prazo ? esc(prazo) : '' },
             { rotulo: 'Portal do aluno', valor: online ? (portal && portal.checked ? 'Visível' : 'Oculto') : '' }
         ]);
@@ -1737,10 +1763,10 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
         var corpoDatas = '<div class="overflow-x-auto"><table class="min-w-full text-sm">';
         corpoDatas += '<thead><tr class="text-left text-xs font-medium uppercase tracking-wide text-gray-500">';
         corpoDatas += '<th class="pb-2 pr-4 font-medium">Nome</th><th class="pb-2 pr-4 font-medium">Data</th>';
-        if (online) corpoDatas += '<th class="pb-2 font-medium">Horário</th>';
+        if (online || impressa) corpoDatas += '<th class="pb-2 font-medium">Horário</th>';
         corpoDatas += '</tr></thead><tbody class="divide-y divide-gray-100">';
         subs.forEach(function (sub) {
-            var horario = online && sub.inicio && sub.fim ? sub.inicio + '–' + sub.fim : '';
+            var horario = (online || impressa) && sub.inicio && sub.fim ? sub.inicio + '–' + sub.fim : '';
             corpoDatas += '<tr><td class="py-2.5 pr-4 font-medium text-gray-900">' + esc(sub.titulo || 'Sem nome');
             if (sub.proprio && sub.materias.length) {
                 corpoDatas += '<span class="mt-0.5 block text-xs font-normal text-gray-500">Nesta data: ' + esc(sub.materias.join(', ')) + '</span>';
@@ -1749,7 +1775,7 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
                 corpoDatas += '<span class="mt-0.5 block text-xs font-normal text-gray-500">' + sub.agenda + '</span>';
             }
             corpoDatas += '</td><td class="py-2.5 pr-4 text-gray-700 whitespace-nowrap">' + esc(dataBr(sub.data) || 'Sem data') + '</td>';
-            if (online) corpoDatas += '<td class="py-2.5 text-gray-700 whitespace-nowrap">' + esc(horario || '—') + '</td>';
+            if (online || impressa) corpoDatas += '<td class="py-2.5 text-gray-700 whitespace-nowrap">' + esc(horario || '—') + '</td>';
             corpoDatas += '</tr>';
         });
         corpoDatas += '</tbody></table></div>';
@@ -1826,7 +1852,7 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
             if (configAtual() === 'professor_por_questao' && !(document.getElementById('prazo_entrega_professor').value || '').trim()) {
                 return 'Informe o prazo para o professor.';
             }
-            if (formatoAtual() === 'online_questoes' && origemOffline() !== 'eventos') {
+            if (comProva() && origemOffline() !== 'eventos') {
                 var modoHora = lista && lista.children[0] ? estadoAgenda(lista.children[0]).modo : 'todas';
                 if (modoHora === 'todas') {
                     var inicio = (document.getElementById('hora_inicio') || {}).value || '';
@@ -1857,7 +1883,7 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
                     var isoData = (campoData || {}).value || '';
                     if (!nomeData) return 'Informe o nome do subevento ' + (d + 1) + '.';
                     if (modoLinha === 'todas' && !/^\d{4}-\d{2}-\d{2}$/.test(isoData)) return 'Informe a data de ' + nomeData + '.';
-                    if (formatoAtual() === 'online_questoes') {
+                    if (comProva()) {
                         var iniData = ((datas[d].querySelector('.js-hora-inicio') || {}).value || '');
                         var fimData = ((datas[d].querySelector('.js-hora-fim') || {}).value || '');
                         if (!iniData || !fimData || iniData >= fimData) return 'Informe o horário de início e de término de ' + nomeData + '.';
@@ -2260,7 +2286,7 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
 
     function atualizarParesUi() {
         var opc = professorOpcional();
-        var esconderProf = opc && formatoAtual() === 'online_questoes';
+        var esconderProf = opc && comProva();
         var qtd = exigeQuestoes();
         form.querySelectorAll('.js-par').forEach(function (card) {
             var campos = camposDoPar(card);
@@ -2293,7 +2319,9 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
         });
         form.querySelectorAll('.js-hint-par').forEach(function (el) {
             el.textContent = esconderProf
-                ? 'A coordenação elabora a prova, só com a disciplina.'
+                ? (formatoAtual() === 'prova_impressa'
+                    ? 'A escola constrói a prova, só com a disciplina.'
+                    : 'A coordenação elabora a prova, só com a disciplina.')
                 : (opc
                     ? 'A escola lança a nota. O professor é opcional.'
                     : 'O resumo fica aqui. No painel, professor e disciplina se filtram um pelo outro.');
@@ -2301,36 +2329,51 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
     }
 
     function sync() {
-        var online = formatoAtual() === 'online_questoes';
+        var formato = formatoAtual();
+        var online = formato === 'online_questoes';
+        var impressa = formato === 'prova_impressa';
+        var exame = online || impressa;
         var boxOn = document.getElementById('cfgOnlineOptions');
         var boxOff = document.getElementById('cfgLancamentoOptions');
-        var ativo = online ? boxOn : boxOff;
-        var inativo = online ? boxOff : boxOn;
-        var valor = (ativo.querySelector('input:checked') || {}).value
-            || (inativo.querySelector('input:checked') || {}).value
-            || 'professor_por_questao';
-        if (boxOn) boxOn.classList.toggle('hidden', !online);
-        if (boxOff) boxOff.classList.toggle('hidden', online);
-        if (inativo) inativo.querySelectorAll('input').forEach(function (el) { el.checked = false; });
-        if (ativo) {
-            var alvo = ativo.querySelector('input[value="' + valor + '"]');
-            if (alvo) alvo.checked = true;
+        var boxImp = document.getElementById('cfgImpressaOptions');
+        var caixas = [boxOn, boxOff, boxImp];
+        var ativo = impressa ? boxImp : (online ? boxOn : boxOff);
+        var valor = 'professor_por_questao';
+        caixas.forEach(function (caixa) {
+            var marcado = caixa ? caixa.querySelector('input:checked') : null;
+            if (marcado && caixa === ativo) valor = marcado.value;
+        });
+        if (valor === 'professor_por_questao') {
+            caixas.forEach(function (caixa) {
+                var marcado = caixa ? caixa.querySelector('input:checked') : null;
+                if (marcado) valor = marcado.value;
+            });
         }
+        caixas.forEach(function (caixa) {
+            if (!caixa) return;
+            var ligada = caixa === ativo;
+            caixa.classList.toggle('hidden', !ligada);
+            caixa.querySelectorAll('input').forEach(function (el) {
+                el.checked = ligada && el.value === valor;
+            });
+        });
         var label = document.getElementById('labelResponsavelEvento');
         var ajuda = document.getElementById('helpResponsavelEvento');
         var prazoLabel = document.getElementById('labelPrazoProfessor');
-        if (label) label.innerHTML = online ? 'Quem elabora a prova <span class="text-red-500">*</span>' : 'Quem lança a nota <span class="text-red-500">*</span>';
-        if (ajuda) ajuda.textContent = online
-            ? 'Atribua ao professor para ele criar as questões, ou a coordenação elabora a prova.'
-            : 'Atribua ao professor ou deixe a escola lançar a nota. O professor é opcional.';
-        if (prazoLabel) prazoLabel.innerHTML = online
+        if (label) label.innerHTML = exame ? 'Quem elabora a prova <span class="text-red-500">*</span>' : 'Quem lança a nota <span class="text-red-500">*</span>';
+        if (ajuda) ajuda.textContent = impressa
+            ? 'Atribua ao professor para ele criar as questões, ou a escola constrói a prova. A coordenação imprime e lê o gabarito.'
+            : (online
+                ? 'Atribua ao professor para ele criar as questões, ou a coordenação elabora a prova.'
+                : 'Atribua ao professor ou deixe a escola lançar a nota. O professor é opcional.');
+        if (prazoLabel) prazoLabel.innerHTML = exame
             ? 'Prazo para professores enviarem provas <span class="text-red-500">*</span>'
             : 'Prazo para o professor lançar as notas <span class="text-red-500">*</span>';
         var porProfessor = configAtual() === 'professor_por_questao';
         var prazoBox = document.getElementById('prazoProfessorContainer');
         var notaUnica = document.getElementById('notaUnicaTodasMateriasBox');
         if (prazoBox) prazoBox.classList.toggle('hidden', !porProfessor);
-        if (notaUnica) notaUnica.classList.toggle('hidden', online || porProfessor);
+        if (notaUnica) notaUnica.classList.toggle('hidden', exame || porProfessor);
         var portal = document.getElementById('visivelPortalBox');
         var portalCheck = document.getElementById('visivel_no_portal_aluno');
         if (portal) portal.classList.toggle('hidden', !online);
@@ -2340,10 +2383,10 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
         }
         aplicarPeriodicidade();
         if (blocoEventos) blocoEventos.classList.toggle('hidden', !online && origemOffline() === 'lancamento_direto');
-        if (campoOrigem) campoOrigem.value = online ? 'prova_online' : origemOffline();
+        if (campoOrigem) campoOrigem.value = exame ? 'prova_online' : origemOffline();
         if (criterio) {
-            var o = online ? 'prova_online' : origemOffline();
-            if (!online && estavaOnline) {
+            var o = exame ? 'prova_online' : origemOffline();
+            if (!exame && estavaOnline) {
                 if (registro && registro.value === 'acertos_questoes') registro.value = 'nota';
                 if (criterio.value === 'aproveitamento_nq') criterio.value = 'ultima';
             }
@@ -2353,7 +2396,7 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
             if (o === 'prova_online' && registro) registro.value = 'acertos_questoes';
             if (o === 'prova_online' && criterio.value === 'ultima') criterio.value = 'aproveitamento_nq';
         }
-        estavaOnline = online;
+        estavaOnline = exame;
         if (hintNq) hintNq.classList.toggle('hidden', !criterio || criterio.value !== 'aproveitamento_nq');
         atualizarParesUi();
     }

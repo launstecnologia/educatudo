@@ -47,8 +47,8 @@ class ComponenteCurricular
     /** Catálogo fixo de aplicabilidade por etapa de ensino (valor salvo => rótulo exibido) */
     public const ETAPAS = [
         'nao_aplica' => 'Não se aplica',
-        'obrigatoria' => 'Obrigatória',
-        'oferta' => 'Oferta (eletiva)',
+        'obrigatoria' => 'Obrigatório',
+        'oferta' => 'Eletivo',
     ];
 
     public function __construct()

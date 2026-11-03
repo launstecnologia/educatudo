@@ -7,6 +7,7 @@ namespace App\Dominio\Escola\Controllers;
 use App\Painel\Admin\Controllers\AdminBaseController;
 use App\Core\AdminPermissionMatrix;
 use App\Core\LayoutHelper;
+use App\Painel\Admin\Services\TrilhaCadastroService;
 use App\Services\SchoolCalendarService;
 
 /**
@@ -69,6 +70,9 @@ class SchoolCalendarController extends AdminBaseController
             'grades_provas' => $gradesProvas,
             'status' => $status,
             'schema_pronto' => $service->tableExists(),
+            'aviso_vinculo' => $service->vinculoAvisoDisponivel(),
+            'turmas_aviso' => $this->podePublicarCalendarioEscolar($service) ? $service->turmasParaAviso() : [],
+            'alunos_aviso' => $this->podePublicarCalendarioEscolar($service) ? $service->alunosParaAviso() : [],
             'pode_publicar_escolar' => $this->podePublicarCalendarioEscolar($service),
             'pode_alterar_evento' => $this->podeAcaoCalendario('alterar'),
             'pode_cadastrar_tipo' => $service->tabelaTiposExiste() && $this->podeAcaoCalendario('cadastrar'),
@@ -79,6 +83,24 @@ class SchoolCalendarController extends AdminBaseController
             'tipoText' => $visuais['text'],
             'csrf_token' => $this->generateCsrfToken(),
         ]);
+    }
+
+    public function logs(): void
+    {
+        $user = $this->auth->getUser();
+        if (!$user || ($user['perfil_admin'] ?? '') !== 'dev') {
+            $this->json(['error' => 'Sem permissão.'], 403);
+            return;
+        }
+
+        try {
+            $logs = (new TrilhaCadastroService($this->db))->listar('calendario');
+        } catch (\Throwable $e) {
+            $this->json(['error' => 'Não foi possível ler os logs do calendário letivo.'], 500);
+            return;
+        }
+
+        $this->json(['success' => true, 'logs' => $logs]);
     }
 
     public function salvarAno(): void
@@ -132,7 +154,11 @@ class SchoolCalendarController extends AdminBaseController
             return;
         }
         $ano = (int) ($_POST['ano'] ?? date('Y'));
-        (new SchoolCalendarService($this->db))->excluirCalendario((int) ($_POST['calendario_id'] ?? 0));
+        $user = $this->auth->getUser();
+        (new SchoolCalendarService($this->db))->excluirCalendario(
+            (int) ($_POST['calendario_id'] ?? 0),
+            (int) ($user['id'] ?? 0)
+        );
         $this->setFlashMessage('Calendário removido.', 'success');
         $this->redirectCalendario($ano);
     }
@@ -220,7 +246,31 @@ class SchoolCalendarController extends AdminBaseController
         }
         $local = trim((string) ($_POST['local_evento'] ?? ''));
         $link = trim((string) ($_POST['link_reuniao'] ?? ''));
-        $publicarEscolar = !empty($_POST['publicar_calendario_escolar']) && $this->podePublicarCalendarioEscolar($service);
+        $podePublicar = $this->podePublicarCalendarioEscolar($service);
+        $avisoPedido = $service->interpretarAvisoFamilia($_POST, $podePublicar);
+        if (!$avisoPedido['ok']) {
+            $this->responderEvento($ano, $calendarioId, false, (string) reset($avisoPedido['erros']), $avisoPedido['erros'], 422);
+            return;
+        }
+        $avisoChecado = $avisoPedido['aviso'];
+        if (
+            !empty($avisoChecado['publicar'])
+            && empty($avisoChecado['dia_inteiro'])
+            && (string) ($avisoChecado['hora_fim'] ?? '') !== ''
+            && $inicio === $fim
+            && (string) $avisoChecado['hora_fim'] < (string) $avisoChecado['hora_inicio']
+        ) {
+            $this->responderEvento(
+                $ano,
+                $calendarioId,
+                false,
+                'O horário de fim deve ser igual ou posterior ao de início.',
+                ['hora_inicio' => 'O horário de fim deve ser igual ou posterior ao de início.'],
+                422
+            );
+            return;
+        }
+        $publicarEscolar = !empty($avisoPedido['aviso']['publicar']);
         $visivelPais = (isset($_POST['visivel_pais']) || $publicarEscolar) ? 1 : 0;
         $visivelAluno = isset($_POST['visivel_aluno']) ? 1 : 0;
         $visivelProfessor = isset($_POST['visivel_professor']) ? 1 : 0;
@@ -253,7 +303,7 @@ class SchoolCalendarController extends AdminBaseController
                 }
                 $msg = 'Evento atualizado no calendário letivo.';
             } else {
-                $gravou = $service->salvarEvento(
+                $eventoId = $service->salvarEvento(
                     $calendarioId,
                     $inicio,
                     $fim,
@@ -265,7 +315,7 @@ class SchoolCalendarController extends AdminBaseController
                     $visivelProfessor,
                     $visivelPais,
                 );
-                if (!$gravou) {
+                if ($eventoId <= 0) {
                     $this->responderEvento(
                         $ano,
                         $calendarioId,
@@ -279,28 +329,26 @@ class SchoolCalendarController extends AdminBaseController
                 $this->lembrarEnvioEvento($token);
                 $msg = 'Evento adicionado ao calendário letivo.';
             }
-            $escolarId = 0;
             $tipoFlash = 'success';
-            if ($publicarEscolar) {
-                $user = $this->auth->getUser();
+            $user = $this->auth->getUser();
+            $aviso = $avisoPedido['aviso'];
+            $aviso['titulo'] = $descricao;
+            $aviso['inicio'] = $inicio;
+            $aviso['fim'] = $fim;
+            $aviso['tipo'] = $tipo;
+            $aviso['local'] = $local;
+            $aviso['link'] = $link;
+            $aviso['autor_id'] = (int) ($user['id'] ?? 0);
+            $aviso['atualizando'] = $atualizando;
+            if ($publicarEscolar || ($atualizando && $podePublicar)) {
                 try {
-                    $escolarId = $service->publicarNoCalendarioEscolar(
-                        $descricao,
-                        $inicio,
-                        $fim,
-                        $tipo,
-                        $local,
-                        (int) ($user['id'] ?? 0)
-                    );
+                    $resultado = $service->sincronizarAvisoFamilia($eventoId, $aviso);
                 } catch (\Throwable $e) {
-                    error_log('Calendário letivo publicar evento escolar: ' . $e->getMessage());
-                    $escolarId = 0;
+                    error_log('Calendário letivo sincronizar aviso da família: ' . $e->getMessage());
+                    $resultado = ['ok' => false, 'id' => 0, 'acao' => 'erro'];
                 }
-                $verbo = $atualizando ? 'atualizado' : 'adicionado';
-                if ($escolarId > 0) {
-                    $msg = 'Evento ' . $verbo . ' no calendário letivo e publicado no calendário escolar. Os responsáveis foram notificados.';
-                } else {
-                    $msg = 'Evento ' . $verbo . ' no calendário letivo. Não foi possível publicar no calendário escolar.';
+                $msg = $this->mensagemAvisoFamilia($msg, $resultado, $publicarEscolar);
+                if (($resultado['acao'] ?? '') === 'erro' || (isset($resultado['notificou']) && $resultado['notificou'] === false)) {
                     $tipoFlash = 'error';
                 }
             }
@@ -329,7 +377,11 @@ class SchoolCalendarController extends AdminBaseController
             return;
         }
         $ano = (int) ($_POST['ano'] ?? date('Y'));
-        (new SchoolCalendarService($this->db))->excluirEvento((int) ($_POST['id'] ?? 0));
+        $user = $this->auth->getUser();
+        (new SchoolCalendarService($this->db))->excluirEvento(
+            (int) ($_POST['id'] ?? 0),
+            (int) ($user['id'] ?? 0)
+        );
         $this->setFlashMessage('Evento removido.', 'success');
         $this->redirectCalendario($ano, (int) ($_POST['calendario_id'] ?? 0));
     }
@@ -453,6 +505,42 @@ class SchoolCalendarController extends AdminBaseController
         if (count($_SESSION['calendario_evento_envio']) > 30) {
             $_SESSION['calendario_evento_envio'] = array_slice($_SESSION['calendario_evento_envio'], -30, null, true);
         }
+    }
+
+    /**
+     * @param array{ok?:bool,id?:int,acao?:string} $resultado
+     */
+    private function mensagemAvisoFamilia(string $base, array $resultado, bool $publicar): string
+    {
+        $acao = (string) ($resultado['acao'] ?? '');
+        $avisou = !array_key_exists('notificou', $resultado) || !empty($resultado['notificou']);
+        if ($acao === 'criado') {
+            return $avisou
+                ? 'Evento salvo no calendário letivo e aviso enviado à família.'
+                : 'Evento salvo e publicado para a família. Não foi possível enviar a notificação.';
+        }
+        if ($acao === 'atualizado') {
+            return $avisou
+                ? 'Evento salvo. O aviso da família foi atualizado e os responsáveis notificados.'
+                : 'Evento salvo e o aviso da família foi atualizado. Não foi possível enviar a notificação.';
+        }
+        if ($acao === 'inalterado') {
+            return 'Evento salvo. O aviso da família permanece publicado.';
+        }
+        if ($acao === 'cancelado') {
+            return $avisou
+                ? 'Evento salvo. O aviso da família foi cancelado e os responsáveis notificados.'
+                : 'Evento salvo e o aviso da família foi cancelado. Não foi possível enviar a notificação.';
+        }
+        if ($acao === 'sem_vinculo') {
+            return 'Evento salvo. Para sincronizar o aviso da família, rode a migration 2026_10_31_calendario_aviso_familia.sql no painel Master.';
+        }
+        if ($acao === 'erro') {
+            return $publicar
+                ? 'Evento salvo no calendário letivo. Não foi possível avisar a família.'
+                : 'Evento salvo no calendário letivo. Não foi possível cancelar o aviso da família.';
+        }
+        return $base;
     }
 
     private function urlCalendario(int $ano, int $id = 0): string

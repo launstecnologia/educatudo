@@ -245,8 +245,10 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                             if ($blocoId <= 0) {
                                 continue;
                             }
-                            $online = (string) ($sub['formato_evento'] ?? '') === 'online_questoes';
-                            $urlNota = URL . '/admin/provas/blocos/' . $blocoId . '/' . ($online ? 'gerenciar' : 'lancar-notas-coordenacao');
+                            $formatoSub = (string) ($sub['formato_evento'] ?? '');
+                            $online = $formatoSub === 'online_questoes';
+                            $impressa = $formatoSub === 'prova_impressa';
+                            $urlNota = URL . '/admin/provas/blocos/' . $blocoId . '/' . ($online || $impressa ? 'gerenciar' : 'lancar-notas-coordenacao');
                             $tituloSub = trim((string) ($sub['titulo'] ?? ''));
                             if ($tituloSub === '') {
                                 $tituloSub = 'Subevento #' . $blocoId;
@@ -273,8 +275,16 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                             <td class="px-4 py-3 text-right">
                                 <?php ob_start(); ?>
                                 <a href="<?= $urlNota ?>" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                                    <i class="fa-solid fa-pen-to-square w-4 text-center text-gray-400"></i> <?= $online ? 'Gerenciar prova' : 'Lançar notas' ?>
+                                    <i class="fa-solid fa-pen-to-square w-4 text-center text-gray-400"></i> <?= $online || $impressa ? 'Gerenciar prova' : 'Lançar notas' ?>
                                 </a>
+                                <?php if ($impressa): ?>
+                                <a href="<?= URL ?>/admin/provas/blocos/<?= $blocoId ?>/imprimir" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                    <i class="fa-solid fa-print w-4 text-center text-gray-400"></i> Imprimir prova
+                                </a>
+                                <a href="<?= URL ?>/admin/leitor-gabarito" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                    <i class="fa-solid fa-barcode w-4 text-center text-gray-400"></i> Ler gabarito
+                                </a>
+                                <?php endif; ?>
                                 <a href="<?= URL ?>/admin/provas/blocos/<?= $blocoId ?>/resultados" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                     <i class="fa-solid fa-chart-column w-4 text-center text-gray-400"></i> Ver resultado
                                 </a>

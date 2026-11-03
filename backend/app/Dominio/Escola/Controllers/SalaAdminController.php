@@ -11,6 +11,7 @@ use App\Painel\Admin\Controllers\AdminBaseController;
 
 
 use App\Models\Education\Sala;
+use App\Painel\Admin\Services\TrilhaCadastroService;
 use App\Services\SalaService;
 
 if (!class_exists(__NAMESPACE__ . '\\SalaAdminController', false)) {
@@ -114,6 +115,24 @@ class SalaAdminController extends AdminBaseController
         }
 
         $this->json(['success' => true, 'message' => 'Sala/Ambiente excluída com sucesso']);
+    }
+
+    public function logs(): void
+    {
+        $user = $this->auth->getUser();
+        if (!$user || ($user['perfil_admin'] ?? '') !== 'dev') {
+            $this->json(['error' => 'Sem permissão.'], 403);
+            return;
+        }
+
+        try {
+            $logs = (new TrilhaCadastroService($this->db))->listar('salas');
+        } catch (\Throwable $e) {
+            $this->json(['error' => 'Não foi possível ler os logs de salas.'], 500);
+            return;
+        }
+
+        $this->json(['success' => true, 'logs' => $logs]);
     }
 }
 }

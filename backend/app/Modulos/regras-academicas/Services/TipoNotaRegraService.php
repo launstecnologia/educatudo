@@ -25,6 +25,11 @@ class TipoNotaRegraService
             'hint' => 'Ocorre dentro da plataforma — o aluno faz a prova no sistema.',
             'origem' => 'prova_online',
         ],
+        'impressa' => [
+            'label' => 'Avaliação impressa',
+            'hint' => 'A prova é montada no sistema, impressa e lida no gabarito. O aluno não responde na plataforma.',
+            'origem' => 'prova_online',
+        ],
         'offline' => [
             'label' => 'Avaliações offline',
             'hint' => 'Ocorre fora da plataforma — a escola informa a nota.',
@@ -92,7 +97,7 @@ class TipoNotaRegraService
         $descricao = trim((string) ($post['descricao'] ?? ''));
         $origemRaw = $post['origem'] ?? 'lancamento_direto';
         $canal = strtolower(trim((string) ($post['canal_origem'] ?? '')));
-        if ($canal === 'online') {
+        if ($canal === 'online' || $canal === 'impressa') {
             $origemRaw = 'prova_online';
         } elseif ($canal === 'offline') {
             $modo = strtolower(trim((string) ($post['modo_offline'] ?? '')));

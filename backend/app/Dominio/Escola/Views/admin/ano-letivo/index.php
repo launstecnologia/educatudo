@@ -8,21 +8,53 @@ if (!class_exists('PeriodoLetivo')) {
 }
 
 $page_header_title = 'Anos Letivos';
-        $page_header_subtitle = 'Cadastre os anos letivos e a divisão (bimestre, trimestre ou semestre) usada em toda a escola';
-if ($schema_ready) {
-    ob_start();
-    ?>
-    <button type="button" onclick="openAnoLetivoDrawer()"
-       class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
-        <i class="fa-solid fa-plus mr-2"></i>
-        Novo Ano Letivo
-    </button>
-    <?php
-    $page_header_actions = ob_get_clean();
-} else {
-    $page_header_actions = '';
-}
-include \App\Core\ViewPaths::adminPartial('page_header_list.php');
+$page_header_subtitle = 'Cadastre o ano, o início, o término e a organização (bimestral, trimestral, semestral ou anual)';
+$trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/ano-letivo', 'Anos Letivos');
+$organizacaoAnoLetivo = [
+    'bimestre' => 'Bimestral',
+    'trimestre' => 'Trimestral',
+    'semestre' => 'Semestral',
+    'etapa_unica' => 'Anual',
+];
+?>
+<div class="mb-6">
+    <?php include __DIR__ . '/../../../../../Views/layouts/components/trilha.php'; ?>
+    <div class="mt-4 flex justify-between items-center gap-4 flex-wrap">
+        <div class="flex items-center gap-3 min-w-0">
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
+                <i class="fa-regular fa-calendar text-lg" aria-hidden="true"></i>
+            </span>
+            <div class="min-w-0">
+                <h2 class="text-xl font-bold text-gray-900"><?= htmlspecialchars($page_header_title) ?></h2>
+                <p class="text-sm text-gray-500 mt-0.5"><?= htmlspecialchars($page_header_subtitle) ?></p>
+            </div>
+        </div>
+        <?php
+        $podeVerLogAnoLetivo = (($user['perfil_admin'] ?? '') === 'dev');
+        if ($schema_ready || $podeVerLogAnoLetivo):
+        ?>
+        <div class="flex items-center justify-end gap-2 flex-shrink-0 ml-auto">
+            <?php if ($podeVerLogAnoLetivo): ?>
+            <?php
+            $ui_btn_variant = 'complementar';
+            $ui_btn_label = 'Log';
+            $ui_btn_icon = 'fa-solid fa-clock-rotate-left';
+            $ui_btn_onclick = 'abrirLogsAnoLetivo()';
+            include \App\Core\ViewPaths::adminPartial('ui/btn.php');
+            ?>
+            <?php endif; ?>
+            <?php if ($schema_ready): ?>
+            <button type="button" onclick="openAnoLetivoDrawer()"
+               class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
+                <i class="fa-solid fa-plus mr-2"></i>
+                Novo Ano Letivo
+            </button>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+<?php
 
 $flash_status = $status;
 $flash_message = $message;
@@ -49,10 +81,10 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ano</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Início</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fim</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Divisão do ano</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ano Letivo</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Início do Ano Letivo</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Término do Ano Letivo</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organização do Ano Letivo</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                 </tr>
@@ -74,7 +106,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                         if (!class_exists('PeriodoLetivo')) {
                         }
                         $tipoAno = \App\Core\PeriodoLetivo::normalizarTipo((string) ($row['periodo_tipo'] ?? 'bimestre'));
-                        echo htmlspecialchars(\App\Core\PeriodoLetivo::TIPOS[$tipoAno] ?? \App\Core\PeriodoLetivo::TIPOS['bimestre']);
+                        echo htmlspecialchars($organizacaoAnoLetivo[$tipoAno] ?? 'Bimestral');
                         ?>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
@@ -92,6 +124,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                         <form action="<?= URL ?>/admin/ano-letivo/<?= (int) $row['id'] ?>/delete" method="POST"
                               onsubmit="return confirm('Excluir este ano letivo?');">
                             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
+                            <input type="hidden" name="ano" value="<?= (int) $row['ano'] ?>">
                             <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                                 <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Excluir
                             </button>
@@ -160,10 +193,10 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
 
         <div class="flex-1 min-h-0 overflow-y-auto px-6 sm:px-8 py-6 space-y-8">
             <section>
-                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Dados do ano letivo</h3>
+                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Ano Letivo</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
                     <div>
-                        <label for="al_ano" class="block text-sm font-medium text-gray-700 mb-1">Ano <span class="text-red-500">*</span></label>
+                        <label for="al_ano" class="block text-sm font-medium text-gray-700 mb-1">Ano Letivo <span class="text-red-500">*</span></label>
                         <input type="number" id="al_ano" name="ano" required min="2000" max="2100"
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
                     </div>
@@ -175,33 +208,34 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                         </label>
                     </div>
                     <div>
-                        <label for="al_data_inicio" class="block text-sm font-medium text-gray-700 mb-1">Data início</label>
+                        <label for="al_data_inicio" class="block text-sm font-medium text-gray-700 mb-1">Início do Ano Letivo</label>
                         <input type="date" id="al_data_inicio" name="data_inicio"
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
                     </div>
                     <div>
-                        <label for="al_data_fim" class="block text-sm font-medium text-gray-700 mb-1">Data fim</label>
+                        <label for="al_data_fim" class="block text-sm font-medium text-gray-700 mb-1">Término do Ano Letivo</label>
                         <input type="date" id="al_data_fim" name="data_fim"
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
                     </div>
                     <div class="sm:col-span-2">
-                        <label for="al_periodo_tipo" class="block text-sm font-medium text-gray-700 mb-1">Divisão do ano <span class="text-red-500">*</span></label>
+                        <label for="al_periodo_tipo" class="block text-sm font-medium text-gray-700 mb-1">Organização do Ano Letivo <span class="text-red-500">*</span></label>
                         <select id="al_periodo_tipo" name="periodo_tipo" required
                                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white">
                             <?php foreach (\App\Core\PeriodoLetivo::TIPOS as $cod => $lab): ?>
-                                <option value="<?= htmlspecialchars($cod) ?>" <?= $cod === 'bimestre' ? 'selected' : '' ?>><?= htmlspecialchars($lab) ?></option>
+                                <option value="<?= htmlspecialchars($cod) ?>" <?= $cod === 'bimestre' ? 'selected' : '' ?>><?= htmlspecialchars($organizacaoAnoLetivo[$cod] ?? $lab) ?></option>
                             <?php endforeach; ?>
                         </select>
-                        <p class="text-xs text-gray-500 mt-1">Define os períodos em prova, jornada, boletim e conselho. Ex.: trimestral mostra 1º, 2º e 3º trimestre.</p>
+                        <p class="text-xs text-gray-500 mt-1">Define os períodos letivos usados em prova, jornada, boletim e conselho. Ex.: Trimestral mostra 1º, 2º e 3º trimestre.</p>
                         <p id="al_periodo_tipo_aviso" class="hidden mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"></p>
                         <div id="al-mapeamento-fields"></div>
                     </div>
-                    <div class="sm:col-span-2">
-                        <h4 id="al-periodos-titulo" class="text-sm font-medium text-gray-900">Datas de cada bimestre</h4>
-                        <p class="text-xs text-gray-500 mt-1 mb-3">Informe o início, o fim e os dias letivos de cada período. As datas precisam caber no ano letivo e não podem se sobrepor.</p>
-                        <div id="al-periodos" class="rounded-lg border border-gray-200 divide-y divide-gray-200"></div>
-                    </div>
                 </div>
+            </section>
+
+            <section>
+                <h3 id="al-periodos-titulo" class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Períodos Letivos</h3>
+                <p class="text-xs text-gray-500 mb-3">Informe o início, o término e os dias letivos de cada período letivo. As datas precisam caber no ano letivo e não podem se sobrepor.</p>
+                <div id="al-periodos" class="rounded-lg border border-gray-200 divide-y divide-gray-200"></div>
             </section>
         </div>
 
@@ -224,7 +258,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
         <div class="pointer-events-auto bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-lg my-4 overflow-hidden flex flex-col">
             <div class="px-5 py-4 border-b border-gray-200 flex items-start justify-between gap-3">
                 <div>
-                    <h3 id="modalMapaPeriodosTitulo" class="text-lg font-semibold text-gray-900">Para onde vai cada período?</h3>
+                    <h3 id="modalMapaPeriodosTitulo" class="text-lg font-semibold text-gray-900">Para onde vai cada período letivo?</h3>
                     <p id="modalMapaPeriodosTexto" class="mt-1 text-sm text-gray-500"></p>
                 </div>
                 <button type="button" onclick="cancelarMapaPeriodos()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
@@ -247,13 +281,17 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
 </div>
 
 <script>
-var PERIODOS_LETIVOS = <?= json_encode((function () {
+var PERIODOS_LETIVOS = <?= json_encode((function () use ($organizacaoAnoLetivo) {
     $mapa = [];
     foreach (\App\Core\PeriodoLetivo::TIPOS as $cod => $lab) {
+        $rotulos = \App\Core\PeriodoLetivo::rotulosDoTipo($cod);
+        if ($cod === 'etapa_unica') {
+            $rotulos = [1 => 'Anual'];
+        }
         $mapa[$cod] = [
-            'nome' => $lab,
+            'nome' => $organizacaoAnoLetivo[$cod] ?? $lab,
             'campo' => \App\Core\PeriodoLetivo::rotuloCampo($cod),
-            'rotulos' => \App\Core\PeriodoLetivo::rotulosDoTipo($cod),
+            'rotulos' => $rotulos,
         ];
     }
     return $mapa;
@@ -393,8 +431,7 @@ function renderPeriodos(tipo, salvos) {
     var rotulos = info.rotulos || {};
     var chaves = Object.keys(rotulos).map(function (k) { return parseInt(k, 10); }).filter(function (n) { return n > 0; });
     chaves.sort(function (a, b) { return a - b; });
-    var campo = String(info.campo || 'período').toLowerCase();
-    titulo.textContent = chaves.length === 1 ? 'Datas da etapa' : ('Datas de cada ' + campo);
+    titulo.textContent = 'Períodos Letivos';
     var mapa = {};
     var usarSalvos = Array.isArray(salvos) && salvos.length > 0;
     if (usarSalvos) {
@@ -416,9 +453,9 @@ function renderPeriodos(tipo, salvos) {
         nome.textContent = rotulo;
         var campos = document.createElement('div');
         campos.className = 'grid grid-cols-1 sm:grid-cols-3 gap-3';
-        campos.appendChild(campoDataPeriodo('Data início', 'periodos[' + n + '][data_inicio]', 'al_periodo_' + n + '_inicio', ini));
-        campos.appendChild(campoDataPeriodo('Data fim', 'periodos[' + n + '][data_fim]', 'al_periodo_' + n + '_fim', fim));
-        campos.appendChild(campoNumeroPeriodo('Dias letivos', 'periodos[' + n + '][dias_letivos]', 'al_periodo_' + n + '_dias', dias));
+        campos.appendChild(campoDataPeriodo('Início', 'periodos[' + n + '][data_inicio]', 'al_periodo_' + n + '_inicio', ini));
+        campos.appendChild(campoDataPeriodo('Término', 'periodos[' + n + '][data_fim]', 'al_periodo_' + n + '_fim', fim));
+        campos.appendChild(campoNumeroPeriodo('Dias Letivos', 'periodos[' + n + '][dias_letivos]', 'al_periodo_' + n + '_dias', dias));
         row.appendChild(nome);
         row.appendChild(campos);
         box.appendChild(row);
@@ -488,7 +525,7 @@ function prepararDivisao(tipo, temCadastros, usados, periodosSalvos) {
     renderPeriodos(sel.value, periodosManuais ? anoLetivoEdicao.periodosSalvos : null);
     if (temCadastros && anoLetivoEdicao.usados.length) {
         var nomes = anoLetivoEdicao.usados.map(function (p) { return p.rotulo; }).join(', ');
-        aviso.textContent = 'Já existem cadastros neste ano (' + nomes + '). Ao mudar a divisão, você indica para qual período novo cada um vai.';
+        aviso.textContent = 'Já existem cadastros neste ano letivo (' + nomes + '). Ao mudar a organização do ano letivo, você indica para qual período letivo cada um vai.';
         aviso.classList.remove('hidden');
     } else {
         aviso.textContent = '';
@@ -508,7 +545,7 @@ function abrirModalMapeamento(salvarDepois) {
     var chaves = Object.keys(rotulos);
     salvarAoConfirmarMapa = !!salvarDepois;
     document.getElementById('modalMapaPeriodosTexto').textContent =
-        'O ano passa de ' + rotuloTipo(anoLetivoEdicao.original) + ' para ' + rotuloTipo(novo) + '. Pode juntar dois períodos no mesmo destino, como o 3º e o 4º bimestre no 3º trimestre. Onde a turma já existe nos dois, fica o cadastro do período que já ocupa esse lugar.';
+        'A organização do ano letivo passa de ' + rotuloTipo(anoLetivoEdicao.original) + ' para ' + rotuloTipo(novo) + '. Pode juntar dois períodos letivos no mesmo destino, como o 3º e o 4º bimestre no 3º trimestre. Onde a turma já existe nos dois, fica o cadastro do período letivo que já ocupa esse lugar.';
     var lista = document.getElementById('modalMapaPeriodosLista');
     lista.innerHTML = '';
     anoLetivoEdicao.usados.forEach(function (p) {
@@ -576,7 +613,7 @@ function confirmarMapaPeriodos() {
         box.appendChild(input);
     });
     if (!ok) {
-        alert('Escolha o período novo de cada linha.');
+        alert('Escolha o período letivo de cada linha.');
         return;
     }
     anoLetivoEdicao.mapaPronto = true;
@@ -699,7 +736,230 @@ document.addEventListener('keydown', function (e) {
         cancelarMapaPeriodos();
         return;
     }
+    var detalheLog = document.getElementById('anoLetivoLogDetalheDrawer');
+    if (detalheLog && detalheLog.getAttribute('aria-hidden') === 'false' && typeof fecharDetalheLogAnoLetivo === 'function') {
+        fecharDetalheLogAnoLetivo();
+        return;
+    }
+    var painelLog = document.getElementById('anoLetivoLogsDrawer');
+    if (painelLog && painelLog.getAttribute('aria-hidden') === 'false' && typeof closeAnoLetivoLogsDrawer === 'function') {
+        closeAnoLetivoLogsDrawer();
+        return;
+    }
     closeAnoLetivoDrawer();
 });
+</script>
+<?php endif; ?>
+
+<?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
+<?php
+ob_start();
+?>
+<div class="flex flex-col flex-1 min-h-0 overflow-hidden">
+    <div id="logsAnoLetivoCorpo" class="flex-1 overflow-y-auto px-6 py-4"></div>
+</div>
+<?php
+$ui_offcanvas_body = ob_get_clean();
+$ui_offcanvas_id = 'anoLetivoLogs';
+$ui_offcanvas_titulo = 'Log do ano letivo';
+$ui_offcanvas_max_w = 'max-w-2xl';
+include \App\Core\ViewPaths::adminPartial('ui/offcanvas.php');
+?>
+<div id="anoLetivoLogDetalheDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" onclick="fecharDetalheLogAnoLetivo()"></div>
+<aside id="anoLetivoLogDetalheDrawer"
+       class="fixed top-0 right-0 h-full w-full max-w-lg bg-white shadow-2xl z-[70] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
+       aria-hidden="true"
+       role="dialog"
+       aria-labelledby="anoLetivoLogDetalheTitulo">
+    <div class="flex items-center justify-between px-6 py-5 border-b border-gray-200">
+        <h2 id="anoLetivoLogDetalheTitulo" class="text-xl font-bold text-gray-900">O que foi alterado</h2>
+        <button type="button" onclick="fecharDetalheLogAnoLetivo()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+            <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+    </div>
+    <div id="anoLetivoLogDetalheCorpo" class="flex-1 overflow-y-auto px-6 py-5"></div>
+</aside>
+<script>
+var logsAnoLetivoItens = [];
+
+function abrirLogsAnoLetivo() {
+    if (typeof openAnoLetivoLogsDrawer === 'function') {
+        openAnoLetivoLogsDrawer();
+    }
+    carregarLogsAnoLetivo();
+}
+
+function fecharDetalheLogAnoLetivo() {
+    var drawer = document.getElementById('anoLetivoLogDetalheDrawer');
+    var backdrop = document.getElementById('anoLetivoLogDetalheDrawerBackdrop');
+    if (!drawer || !backdrop) return;
+    drawer.classList.add('translate-x-full');
+    drawer.setAttribute('aria-hidden', 'true');
+    backdrop.classList.add('hidden');
+}
+
+function abrirDetalheLogAnoLetivo(indice) {
+    var log = logsAnoLetivoItens[indice];
+    var corpo = document.getElementById('anoLetivoLogDetalheCorpo');
+    var drawer = document.getElementById('anoLetivoLogDetalheDrawer');
+    var backdrop = document.getElementById('anoLetivoLogDetalheDrawerBackdrop');
+    if (!log || !corpo || !drawer || !backdrop) return;
+    corpo.replaceChildren();
+    corpo.appendChild(montarDetalheLogAnoLetivo(log));
+    backdrop.classList.remove('hidden');
+    drawer.classList.remove('translate-x-full');
+    drawer.setAttribute('aria-hidden', 'false');
+}
+
+function carregarLogsAnoLetivo() {
+    var corpo = document.getElementById('logsAnoLetivoCorpo');
+    if (!corpo) return;
+    corpo.replaceChildren();
+    corpo.appendChild(textoLogAnoLetivo('Carregando…', 'text-sm text-gray-500'));
+
+    fetch(<?= json_encode(URL . '/admin/ano-letivo/logs') ?>, {
+        headers: { 'Accept': 'application/json' },
+        credentials: 'same-origin'
+    })
+        .then(function (res) {
+            return res.json().then(function (data) {
+                return { ok: res.ok, data: data };
+            });
+        })
+        .then(function (resultado) {
+            corpo.replaceChildren();
+            var logs = resultado.ok && resultado.data && Array.isArray(resultado.data.logs) ? resultado.data.logs : null;
+            if (!logs) {
+                corpo.appendChild(textoLogAnoLetivo(
+                    (resultado.data && resultado.data.error) ? resultado.data.error : 'Não foi possível carregar os logs.',
+                    'text-sm text-red-600'
+                ));
+                return;
+            }
+            logsAnoLetivoItens = logs;
+            if (logs.length === 0) {
+                corpo.appendChild(textoLogAnoLetivo('Nenhum cadastro ou alteração de ano letivo registrado.', 'text-sm text-gray-500'));
+                return;
+            }
+            corpo.appendChild(tabelaLogsAnoLetivo(logs));
+        })
+        .catch(function () {
+            corpo.replaceChildren();
+            corpo.appendChild(textoLogAnoLetivo('Não foi possível carregar os logs.', 'text-sm text-red-600'));
+        });
+}
+
+function textoLogAnoLetivo(texto, classe) {
+    var p = document.createElement('p');
+    p.className = classe;
+    p.textContent = texto;
+    return p;
+}
+
+function tabelaLogsAnoLetivo(logs) {
+    var quadro = document.createElement('div');
+    quadro.className = 'overflow-x-auto border border-gray-200 rounded-lg';
+    var tabela = document.createElement('table');
+    tabela.className = 'min-w-full divide-y divide-gray-200';
+    var cabeca = document.createElement('thead');
+    cabeca.className = 'bg-gray-50';
+    var trCabeca = document.createElement('tr');
+    ['Usuário', 'Ação', 'Data e horário', ''].forEach(function (titulo) {
+        var th = document.createElement('th');
+        th.className = 'px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
+        th.textContent = titulo;
+        trCabeca.appendChild(th);
+    });
+    cabeca.appendChild(trCabeca);
+    tabela.appendChild(cabeca);
+    var corpo = document.createElement('tbody');
+    corpo.className = 'bg-white divide-y divide-gray-200';
+    logs.forEach(function (log, indice) {
+        corpo.appendChild(linhaLogAnoLetivo(log, indice));
+    });
+    tabela.appendChild(corpo);
+    quadro.appendChild(tabela);
+    return quadro;
+}
+
+function linhaLogAnoLetivo(log, indice) {
+    var tr = document.createElement('tr');
+    tr.className = 'hover:bg-gray-50';
+    [log.usuario || 'Não identificado', log.acao || '', log.quando || ''].forEach(function (valor) {
+        var td = document.createElement('td');
+        td.className = 'px-4 py-3 text-sm text-gray-900 whitespace-nowrap';
+        td.textContent = String(valor);
+        tr.appendChild(td);
+    });
+    var tdBtn = document.createElement('td');
+    tdBtn.className = 'px-4 py-3 text-right';
+    var botao = document.createElement('button');
+    botao.type = 'button';
+    botao.className = 'inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50';
+    botao.textContent = 'Ver';
+    botao.addEventListener('click', function () {
+        abrirDetalheLogAnoLetivo(indice);
+    });
+    tdBtn.appendChild(botao);
+    tr.appendChild(tdBtn);
+    return tr;
+}
+
+function montarDetalheLogAnoLetivo(log) {
+    var bloco = document.createElement('div');
+    var resumo = document.createElement('p');
+    resumo.className = 'text-sm text-gray-600 mb-4';
+    resumo.textContent = String(log.usuario || 'Não identificado') + ' · ' + String(log.acao || '') + ' · ' + String(log.quando || '');
+    bloco.appendChild(resumo);
+
+    var alteracoes = Array.isArray(log.alteracoes) ? log.alteracoes : [];
+    if (alteracoes.length === 0) {
+        bloco.appendChild(textoLogAnoLetivo('Nenhum campo diferente do registro anterior.', 'text-sm text-gray-500'));
+        return bloco;
+    }
+
+    var tabela = document.createElement('table');
+    tabela.className = 'min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg';
+    var cabeca = document.createElement('thead');
+    cabeca.className = 'bg-gray-50';
+    var trCabeca = document.createElement('tr');
+    var semAntes = alteracoes.every(function (item) { return !item.antes; });
+    var soValor = log.acao === 'Criado' || semAntes;
+    var colunas = soValor ? ['Campo', 'Valor'] : ['Campo', 'Antes', 'Depois'];
+    colunas.forEach(function (titulo) {
+        var th = document.createElement('th');
+        th.className = 'px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
+        th.textContent = titulo;
+        trCabeca.appendChild(th);
+    });
+    cabeca.appendChild(trCabeca);
+    tabela.appendChild(cabeca);
+    var corpo = document.createElement('tbody');
+    corpo.className = 'bg-white divide-y divide-gray-200';
+    alteracoes.forEach(function (item) {
+        var tr = document.createElement('tr');
+        var valores = soValor
+            ? [item.campo, item.depois]
+            : [item.campo, item.antes, item.depois];
+        valores.forEach(function (valor) {
+            var td = document.createElement('td');
+            td.className = 'px-4 py-3 text-sm text-gray-900';
+            td.textContent = String(valor || '—');
+            tr.appendChild(td);
+        });
+        corpo.appendChild(tr);
+    });
+    tabela.appendChild(corpo);
+    bloco.appendChild(tabela);
+    return bloco;
+}
+
+document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    var detalhe = document.getElementById('anoLetivoLogDetalheDrawer');
+    if (!detalhe || detalhe.getAttribute('aria-hidden') !== 'false') return;
+    e.stopImmediatePropagation();
+    fecharDetalheLogAnoLetivo();
+}, true);
 </script>
 <?php endif; ?>

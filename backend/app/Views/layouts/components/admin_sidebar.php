@@ -122,7 +122,7 @@
             'teachers', 'grupos-regras-notas', 'quadros-notas', 'implantar-academico',
             'agrupamentos-componentes', 'regras-academicas', 'recuperacao', 'salas', 'serie', 'turmas',
             'tipos_avaliacao', 'boletins', 'boletim_guia', 'boletim-layout', 'reports_boletim_coordenacao',
-            'provas', 'provas_blocos', 'eventos-avaliativos',
+            'provas', 'provas_blocos', 'eventos-avaliativos', 'leitor_gabarito',
         ], true);
         $rotinaOpen = in_array($cp, [
             'rotina', 'exercises',
@@ -174,7 +174,7 @@
             'grupos-regras-notas', 'quadros-notas', 'regras-academicas', 'recuperacao',
             'tipos_avaliacao', 'boletins', 'boletim_guia', 'boletim_config', 'boletim-layout',
             'reports_boletim_coordenacao',
-            'provas', 'provas_blocos', 'eventos-avaliativos',
+            'provas', 'provas_blocos', 'eventos-avaliativos', 'leitor_gabarito',
         ], true);
         $forumNestedOpen = $forumDenunciasAtivo;
         $notificacoesNestedOpen = in_array($cp, ['notifications', 'notificacoes-push'], true);

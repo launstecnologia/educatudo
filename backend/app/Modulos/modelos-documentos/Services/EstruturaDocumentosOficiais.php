@@ -290,7 +290,7 @@ class EstruturaDocumentosOficiais
         $sec = ModeloDocumentoService::secaoPadrao([100], 'footer');
         $sec['columns'][0]['elements'][] = ModeloDocumentoService::elementoEstrutura(
             'texto',
-            ['text' => '{{escola_nome}} · {{escola_endereco}} · {{escola_docs}} · Tel. {{escola_telefone}} · nº {{numero}}/{{ano}}'],
+            ['text' => '{{escola_nome}} · {{escola_endereco}} · {{escola_docs}} · nº {{numero}}/{{ano}}'],
             ['textAlign' => 'center', 'fontSize' => 8, 'color' => '#6b7280']
         );
         $atual = is_array($est['footer']['sections'] ?? null) ? $est['footer']['sections'] : [];

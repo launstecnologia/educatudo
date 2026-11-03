@@ -21,3 +21,4 @@ $router->post('/professor/mural-recados/salvar', 'Modulos/mural/TeacherMuralCont
 $router->get('/professor/mural-recados/editar', 'Modulos/mural/TeacherMuralController@editar');
 $router->post('/professor/mural-recados/atualizar', 'Modulos/mural/TeacherMuralController@atualizar');
 $router->post('/professor/mural-recados/excluir', 'Modulos/mural/TeacherMuralController@excluir');
+$router->post('/professor/mural-recados/marcar-visto', 'Modulos/mural/TeacherMuralController@marcarVisto');

@@ -95,6 +95,12 @@ class EventoAvaliativoService
         if ($config['formato'] === 'online_questoes') {
             $post['canal_origem'] = 'online';
             $post['origem'] = 'prova_online';
+        } elseif ($config['formato'] === 'prova_impressa') {
+            $post['canal_origem'] = 'impressa';
+            $post['origem'] = 'prova_online';
+            if (($post['modo_offline'] ?? '') === '') {
+                $post['modo_offline'] = 'lancamento_direto';
+            }
         } else {
             $post['canal_origem'] = 'offline';
             if (($post['modo_offline'] ?? '') === '') {
@@ -124,7 +130,7 @@ class EventoAvaliativoService
             $config['exige_questoes'],
             $professoresValidos,
             $materiasValidas,
-            $config['formato'] === 'online_questoes'
+            $config['formato'] !== 'lancamento_nota'
         );
         if (isset($subeventos['error'])) {
             return ['success' => false, 'error' => $subeventos['error']];
@@ -523,7 +529,7 @@ class EventoAvaliativoService
             'nome' => (string) ($evento['nome'] ?? ''),
             'ano_letivo' => (int) ($evento['ano_letivo'] ?? 0),
             'bimestre' => (int) ($evento['bimestre'] ?? 0),
-            'canal' => $formato === 'online_questoes' ? 'online' : 'offline',
+            'canal' => $formato === 'online_questoes' ? 'online' : ($formato === 'prova_impressa' ? 'impressa' : 'offline'),
             'configuracao_nota' => (string) ($primeiro['configuracao_nota'] ?? 'professor_por_questao'),
             'visivel_portal' => !empty($primeiro['visivel_no_portal_aluno']) ? 1 : 0,
             'liberar_nota_aluno' => !empty($evento['liberar_nota_aluno']) ? 1 : 0,
@@ -580,6 +586,12 @@ class EventoAvaliativoService
         if ($config['formato'] === 'online_questoes') {
             $post['canal_origem'] = 'online';
             $post['origem'] = 'prova_online';
+        } elseif ($config['formato'] === 'prova_impressa') {
+            $post['canal_origem'] = 'impressa';
+            $post['origem'] = 'prova_online';
+            if (($post['modo_offline'] ?? '') === '') {
+                $post['modo_offline'] = 'lancamento_direto';
+            }
         } else {
             $post['canal_origem'] = 'offline';
             if (($post['modo_offline'] ?? '') === '') {
@@ -609,7 +621,7 @@ class EventoAvaliativoService
             $config['exige_questoes'],
             $professoresValidos,
             $materiasValidas,
-            $config['formato'] === 'online_questoes'
+            $config['formato'] !== 'lancamento_nota'
         );
         if (isset($subeventos['error'])) {
             return ['success' => false, 'error' => $subeventos['error']];
@@ -1020,11 +1032,13 @@ class EventoAvaliativoService
         $canal = (string) ($post['canal_origem'] ?? '');
         if ($canal === 'online') {
             $formato = 'online_questoes';
+        } elseif ($canal === 'impressa') {
+            $formato = 'prova_impressa';
         } elseif ($canal === 'offline') {
             $formato = 'lancamento_nota';
         } else {
             $formato = (string) ($post['formato_evento'] ?? 'lancamento_nota');
-            if (!in_array($formato, ['online_questoes', 'lancamento_nota'], true)) {
+            if (!in_array($formato, ['online_questoes', 'lancamento_nota', 'prova_impressa'], true)) {
                 $formato = 'lancamento_nota';
             }
         }
@@ -1049,21 +1063,24 @@ class EventoAvaliativoService
 
         $horaInicio = $this->normalizarHora((string) ($post['hora_inicio'] ?? ''));
         $horaFim = $this->normalizarHora((string) ($post['hora_fim'] ?? ''));
-        if ($formato === 'online_questoes' && ($horaInicio !== null || $horaFim !== null) && ($horaInicio === null || $horaFim === null || $horaInicio >= $horaFim)) {
-            return ['error' => 'Informe o horário de início e de término da prova online.'];
+        $comProva = $formato === 'online_questoes' || $formato === 'prova_impressa';
+        if ($comProva && ($horaInicio !== null || $horaFim !== null) && ($horaInicio === null || $horaFim === null || $horaInicio >= $horaFim)) {
+            return ['error' => $formato === 'prova_impressa'
+                ? 'Informe o horário de início e de término da prova impressa.'
+                : 'Informe o horário de início e de término da prova online.'];
         }
 
         return [
             'formato' => $formato,
             'configuracao' => $configuracao,
             'tipo_prova' => $tipoProva,
-            'visivel_portal' => !empty($post['visivel_no_portal_aluno']) ? 1 : 0,
+            'visivel_portal' => $formato === 'online_questoes' && !empty($post['visivel_no_portal_aluno']) ? 1 : 0,
             'nota_unica' => ($formato === 'lancamento_nota' && $configuracao === 'coordenacao_calcula' && !empty($post['nota_unica_todas_materias'])) ? 1 : 0,
             'prazo' => $prazo,
             'hora_inicio' => $horaInicio,
             'hora_fim' => $horaFim,
             'professor_opcional' => $professorOpcional,
-            'exige_questoes' => $formato === 'online_questoes' && $configuracao === 'professor_por_questao',
+            'exige_questoes' => $comProva && $configuracao === 'professor_por_questao',
         ];
     }
 

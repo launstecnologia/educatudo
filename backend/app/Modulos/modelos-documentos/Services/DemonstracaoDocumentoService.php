@@ -45,6 +45,7 @@ class DemonstracaoDocumentoService
             'turmas' => $turmas,
             'alunos' => $alunos,
             'componentes' => [],
+            'periodos' => $this->periodosPublicos($chave),
             'vars' => null,
             'resumo' => '',
         ];
@@ -62,17 +63,19 @@ class DemonstracaoDocumentoService
             $ano = (int) ($turma['ano_letivo'] ?? 0);
         }
         $linhas = $this->linhasNotas($alunoId, $turmaId, $ano, (int) ($turma['matriz_curricular_id'] ?? 0));
-        $periodos = GradeSoltaService::periodos($chave);
+        $atalhos = $this->atalhosDeComponentes($linhas, $chave);
         $vars = ModeloDocumentoService::varsExemplo();
         $vars = $this->sobreporEscola($vars);
         $vars = $this->sobreporAlunoTurma($vars, $aluno, $turma);
         $vars['_grade_fonte'] = ['componentes' => $linhas];
-        $vars = GradeSoltaService::completar(GradeSoltaService::mapa($chave), $vars);
+        $vars = GradeSoltaService::completar($this->gradeDaDemonstracao($chave, $atalhos), $vars);
         unset($vars['_grade_fonte']);
         $vars['componentes_serie_html'] = $this->htmlComponentes($linhas);
-        $vars['quadro_notas_html'] = $this->htmlQuadroSimples($linhas, $periodos);
+        $vars['quadro_notas_html'] = ModeloDocumentoService::htmlQuadroDeLinhasBimestrais($linhas);
+        $vars['historico_html'] = $this->htmlHistoricoDoAno($linhas, $ano, $vars);
+        $out['linhas'] = $linhas;
         $out['vars'] = $this->variaveisTexto($vars);
-        $out['componentes'] = $this->atalhosDeComponentes($linhas);
+        $out['componentes'] = $atalhos;
         $out['resumo'] = trim((string) ($aluno['nome_exibir'] ?? '')) . ' · ' . $this->rotuloTurma($turma);
         return $out;
     }
@@ -602,6 +605,48 @@ class DemonstracaoDocumentoService
     }
 
     /**
+     * Trajetória de um ano, nas mesmas colunas do histórico de exemplo.
+     * Os textos de $vars já vêm escapados.
+     *
+     * @param list<array<string, mixed>> $linhas
+     * @param array<string, mixed> $vars
+     */
+    private function htmlHistoricoDoAno(array $linhas, int $ano, array $vars): string
+    {
+        $html = '<table class="dados"><thead><tr>'
+            . '<th>Ano</th><th>Série</th><th>Estabelecimento</th><th>Município</th><th>Resultado</th><th>CH</th>'
+            . '</tr></thead><tbody>';
+        if ($linhas === []) {
+            $html .= '<tr><td colspan="6">Sem componentes lançados neste ano.</td></tr>';
+        } else {
+            $anoTxt = $ano > 0 ? (string) $ano : '—';
+            $html .= '<tr><td>' . htmlspecialchars($anoTxt, ENT_QUOTES, 'UTF-8') . '</td>'
+                . '<td>' . (string) ($vars['serie'] ?? '—') . '</td>'
+                . '<td>' . (string) ($vars['escola_nome'] ?? '—') . '</td>'
+                . '<td>' . (string) ($vars['escola_municipio'] ?? '—') . '</td>'
+                . '<td>Em curso</td><td>—</td></tr>';
+        }
+
+        return $html . '</tbody></table>';
+    }
+
+    public static function chaveGradeDoCodigo(string $codigo): string
+    {
+        $codigo = strtolower($codigo);
+        if (str_contains($codigo, '1127a')) {
+            return '1127a';
+        }
+        if (str_contains($codigo, '1127b')) {
+            return '1127b';
+        }
+        if (str_contains($codigo, '1128')) {
+            return '1128';
+        }
+
+        return '1127';
+    }
+
+    /**
      * @param list<array<string, mixed>> $linhas
      * @param list<array<string, mixed>> $periodos
      */
@@ -642,26 +687,185 @@ class DemonstracaoDocumentoService
     }
 
     /**
-     * @param list<array<string, mixed>> $linhas
-     * @return list<array{nome:string,token:string}>
+     * A grade fixa não conhece disciplina fora do catálogo. O alias é o nome,
+     * o mesmo slug que o boletim editável usa em {{nota_slug_n}}.
+     *
+     * @param list<array<string, mixed>> $atalhos
+     * @return array<string, mixed>
      */
-    private function atalhosDeComponentes(array $linhas): array
+    private function gradeDaDemonstracao(string $chave, array $atalhos): array
+    {
+        $grade = GradeSoltaService::mapa($chave);
+        $componentes = is_array($grade['componentes'] ?? null) ? $grade['componentes'] : [];
+        foreach ($atalhos as $atalho) {
+            if (!is_array($atalho)) {
+                continue;
+            }
+            $slug = (string) ($atalho['slug'] ?? '');
+            $nome = trim((string) ($atalho['nome'] ?? ''));
+            if ($slug === '' || $nome === '') {
+                continue;
+            }
+            $achou = false;
+            foreach ($componentes as $i => $comp) {
+                if (!is_array($comp) || (string) ($comp['slug'] ?? '') !== $slug) {
+                    continue;
+                }
+                $aliases = is_array($comp['aliases'] ?? null) ? $comp['aliases'] : [];
+                $aliases[] = $nome;
+                $comp['aliases'] = array_values(array_unique($aliases));
+                $componentes[$i] = $comp;
+                $achou = true;
+                break;
+            }
+            if ($achou) {
+                continue;
+            }
+            $componentes[] = [
+                'slug' => $slug,
+                'nome' => $nome,
+                'grupo' => '',
+                'vaga' => false,
+                'aliases' => [$nome],
+            ];
+        }
+        $grade['componentes'] = $componentes;
+
+        return $grade;
+    }
+
+    /**
+     * @return list<array{n:int,rotulo:string,bimestres:list<int>}>
+     */
+    private function periodosPublicos(string $chave): array
+    {
+        $out = [];
+        foreach (GradeSoltaService::periodos($chave) as $periodo) {
+            if (!is_array($periodo)) {
+                continue;
+            }
+            $bims = [];
+            foreach ($periodo['bimestres'] ?? [] as $b) {
+                $n = (int) $b;
+                if ($n >= 1 && $n <= 4) {
+                    $bims[] = $n;
+                }
+            }
+            $out[] = [
+                'n' => (int) ($periodo['n'] ?? 0),
+                'rotulo' => (string) ($periodo['rotulo'] ?? ''),
+                'bimestres' => $bims,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $linhas
+     * @return list<array{nome:string,slug:string,sigla:string,token:string,notas:list<string>,faltas:list<string>,media:string}>
+     */
+    private function atalhosDeComponentes(array $linhas, string $chave): array
     {
         $out = [];
         $usadas = [];
+        $siglas = [];
+        $periodos = GradeSoltaService::periodos($chave);
         foreach ($linhas as $linha) {
             $nome = trim((string) ($linha['nome'] ?? ''));
-            $slug = $this->slugPeloNome($nome);
-            if ($nome === '' || $slug === '' || isset($usadas[$slug])) {
+            $slug = $this->slugLivre($nome, $usadas);
+            if ($nome === '' || $slug === '') {
                 continue;
             }
             $usadas[$slug] = true;
-            $out[] = ['nome' => $nome, 'token' => 'nota_' . $slug . '_1'];
+            $sigla = $this->siglaLivre($nome, $siglas);
+            $siglas[$sigla] = true;
+            $notas = [];
+            $faltas = [];
+            foreach ($periodos as $periodo) {
+                $n = (int) ($periodo['n'] ?? 0);
+                if ($n <= 0) {
+                    continue;
+                }
+                $notas[] = 'nota_' . $slug . '_' . $n;
+                $faltas[] = 'falta_' . $slug . '_' . $n;
+            }
+            $out[] = [
+                'nome' => $nome,
+                'slug' => $slug,
+                'sigla' => $sigla,
+                'token' => $notas[0] ?? ('nota_' . $slug . '_1'),
+                'notas' => $notas,
+                'faltas' => $faltas,
+                'media' => 'media_final_' . $slug,
+            ];
             if (count($out) >= 40) {
                 break;
             }
         }
         return $out;
+    }
+
+    /**
+     * @param array<string, true> $usadas
+     */
+    private function slugLivre(string $nome, array $usadas): string
+    {
+        $slug = $this->slugPeloNome($nome);
+        if ($slug !== '' && !isset($usadas[$slug])) {
+            return $slug;
+        }
+        $base = str_replace(' ', '_', $this->normalizar($nome));
+        $base = trim((string) (preg_replace('/[^a-z0-9_]+/', '', $base) ?? ''), '_');
+        $base = substr($base, 0, 28);
+        if ($base === '') {
+            $base = 'comp';
+        }
+        $slug = $base;
+        $n = 2;
+        while (isset($usadas[$slug])) {
+            $slug = $base . '_' . $n;
+            $n++;
+            if ($n > 50) {
+                return '';
+            }
+        }
+
+        return $slug;
+    }
+
+    /**
+     * @param array<string, true> $usadas
+     */
+    private function siglaLivre(string $nome, array $usadas): string
+    {
+        $ignorar = ['de' => true, 'da' => true, 'do' => true, 'das' => true, 'dos' => true, 'e' => true];
+        $letras = [];
+        foreach (preg_split('/\s+/', trim($nome)) ?: [] as $parte) {
+            $limpa = $this->normalizar((string) $parte);
+            if ($limpa === '' || isset($ignorar[$limpa])) {
+                continue;
+            }
+            $letras[] = strtoupper(substr($limpa, 0, 1));
+        }
+        if (count($letras) >= 2) {
+            $sigla = implode('', $letras);
+        } else {
+            $uma = strtoupper((string) (preg_replace('/[^a-z]/', '', $this->normalizar($nome)) ?? ''));
+            $sigla = substr($uma, 0, 3);
+        }
+        if ($sigla === '') {
+            $sigla = 'DISC';
+        }
+        $sigla = substr($sigla, 0, 8);
+        $base = $sigla;
+        $n = 2;
+        while (isset($usadas[$sigla])) {
+            $sigla = substr($base, 0, 6) . $n;
+            $n++;
+        }
+
+        return $sigla;
     }
 
     private function slugPeloNome(string $nome): string

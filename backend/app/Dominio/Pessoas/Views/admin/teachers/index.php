@@ -18,6 +18,7 @@ foreach (['q' => $q, 'status' => $status, 'pagante' => $pagante] as $fv) {
 
 $page_header_title = 'Gestão de Professores';
 $page_header_subtitle = 'Cadastre e gerencie os professores da escola';
+$trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/teachers', 'Professores');
 ob_start();
 ?>
 <button type="button" onclick="openFilterDrawer()"
@@ -38,6 +39,15 @@ ob_start();
     <i class="fa-solid fa-file-export mr-2 text-gray-500"></i>
     Exportar CSV
 </a>
+<?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
+<?php
+$ui_btn_variant = 'complementar';
+$ui_btn_label = 'Log';
+$ui_btn_icon = 'fa-solid fa-clock-rotate-left';
+$ui_btn_onclick = 'abrirTrilhaProfessores()';
+include \App\Core\ViewPaths::adminPartial('ui/btn.php');
+?>
+<?php endif; ?>
 <button type="button" onclick="openTeacherDrawer()"
         class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
     <i class="fa-solid fa-plus mr-2"></i>
@@ -45,8 +55,26 @@ ob_start();
 </button>
 <?php
 $page_header_actions = ob_get_clean();
-include \App\Core\ViewPaths::adminPartial('page_header_list.php');
 ?>
+<div class="mb-6">
+    <?php include __DIR__ . '/../../../../../Views/layouts/components/trilha.php'; ?>
+    <div class="mt-4 flex justify-between items-center gap-4">
+        <div class="flex items-center gap-3 min-w-0">
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
+                <i class="fa-solid fa-chalkboard-user text-lg" aria-hidden="true"></i>
+            </span>
+            <div class="min-w-0">
+                <h2 class="text-xl font-bold text-gray-900"><?= htmlspecialchars($page_header_title) ?></h2>
+                <p class="text-sm text-gray-500 mt-0.5"><?= htmlspecialchars($page_header_subtitle) ?></p>
+            </div>
+        </div>
+        <?php if ($page_header_actions !== ''): ?>
+        <div class="flex items-center justify-end gap-3 flex-shrink-0 ml-auto">
+            <?= $page_header_actions ?>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
 
 <div class="bg-white rounded-xl shadow-sm border border-gray-200">
     <div class="overflow-x-auto">
@@ -728,3 +756,12 @@ document.addEventListener('keydown', function (e) {
     }
 });
 </script>
+<?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
+<?php
+$trilha_log_id = 'trilhaProfessores';
+$trilha_log_titulo = 'Log de professores';
+$trilha_log_url = URL . '/admin/teachers/logs';
+$trilha_log_vazio = 'Nenhum cadastro, alteração ou exclusão de professor registrado.';
+include \App\Core\ViewPaths::adminPartial('ui/trilha_log.php');
+?>
+<?php endif; ?>

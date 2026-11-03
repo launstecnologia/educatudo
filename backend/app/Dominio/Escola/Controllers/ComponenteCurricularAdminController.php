@@ -14,6 +14,7 @@ use App\Painel\Admin\Controllers\AdminBaseController;
 
 
 use App\Models\Education\ComponenteCurricular;
+use App\Painel\Admin\Services\TrilhaCadastroService;
 use App\Services\ComponenteCurricularService;
 
 if (!class_exists(__NAMESPACE__ . '\\ComponenteCurricularAdminController', false)) {
@@ -35,9 +36,21 @@ class ComponenteCurricularAdminController extends AdminBaseController
             return;
         }
 
+        $arvore = $this->model()->getAllArvore() ?: [];
+        $nomePorId = [];
+        foreach ($arvore as $itemArvore) {
+            if (!is_array($itemArvore)) {
+                continue;
+            }
+            $nomePorId[(int) ($itemArvore['id'] ?? 0)] = (string) ($itemArvore['nome'] ?? '');
+        }
+        $listagem = $this->service()->aplicarFiltroListagem($arvore, $_GET);
+
         $data = [
             'title' => 'Componentes Curriculares - EducaTudo',
-            'items' => $this->model()->getAllArvore(),
+            'items' => $listagem['itens'],
+            'nome_por_id' => $nomePorId,
+            'filtros' => $listagem['filtros'],
             'ids_com_filhos' => $this->model()->idsComFilhos(),
             'pais_candidatos' => array_values(array_filter(
                 $this->model()->getAll(true) ?: [],
@@ -174,6 +187,24 @@ class ComponenteCurricularAdminController extends AdminBaseController
         }
 
         return $total;
+    }
+
+    public function logs(): void
+    {
+        $user = $this->auth->getUser();
+        if (!$user || ($user['perfil_admin'] ?? '') !== 'dev') {
+            $this->json(['error' => 'Sem permissão.'], 403);
+            return;
+        }
+
+        try {
+            $logs = (new TrilhaCadastroService($this->db))->listar('componentes');
+        } catch (\Throwable $e) {
+            $this->json(['error' => 'Não foi possível ler os logs de componentes curriculares.'], 500);
+            return;
+        }
+
+        $this->json(['success' => true, 'logs' => $logs]);
     }
 }
 }

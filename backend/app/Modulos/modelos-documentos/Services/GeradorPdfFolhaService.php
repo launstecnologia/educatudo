@@ -23,9 +23,15 @@ class GeradorPdfFolhaService
 
         $id = bin2hex(random_bytes(8));
         $dir = sys_get_temp_dir();
-        $htmlPath = $dir . DIRECTORY_SEPARATOR . 'folha_' . $id . '.html';
-        $pdfPath = $dir . DIRECTORY_SEPARATOR . 'folha_' . $id . '.pdf';
+        $perfil = $dir . DIRECTORY_SEPARATOR . 'chrome_' . $id;
+        if (!@mkdir($perfil, 0700, true) && !is_dir($perfil)) {
+            return null;
+        }
+        @chmod($perfil, 0700);
+        $htmlPath = $perfil . DIRECTORY_SEPARATOR . 'folha.html';
+        $pdfPath = $perfil . DIRECTORY_SEPARATOR . 'folha.pdf';
         if (file_put_contents($htmlPath, $html) === false) {
+            $this->limparPerfil($perfil, $htmlPath, $pdfPath);
             return null;
         }
         @chmod($htmlPath, 0600);
@@ -41,6 +47,7 @@ class GeradorPdfFolhaService
             '--no-pdf-header-footer',
             '--proxy-server=127.0.0.1:9',
             '--proxy-bypass-list=<-loopback>',
+            '--user-data-dir=' . $perfil . DIRECTORY_SEPARATOR . 'profile',
             '--print-to-pdf=' . $pdfPath,
             $htmlPath,
         ];
@@ -52,16 +59,18 @@ class GeradorPdfFolhaService
         $pipes = [];
         $ambiente = [
             'PATH' => getenv('PATH') ?: '/usr/bin:/bin',
-            'HOME' => $dir,
-            'TMPDIR' => $dir,
+            'HOME' => $perfil,
+            'TMPDIR' => $perfil,
             'LANG' => 'C.UTF-8',
-            'XDG_CONFIG_HOME' => $dir,
-            'XDG_CACHE_HOME' => $dir,
-            'XDG_RUNTIME_DIR' => $dir,
+            'XDG_CONFIG_HOME' => $perfil,
+            'XDG_CACHE_HOME' => $perfil,
+            'XDG_RUNTIME_DIR' => $perfil,
+            'FONTCONFIG_PATH' => '/etc/fonts',
+            'DBUS_SESSION_BUS_ADDRESS' => 'disabled:',
         ];
         $proc = proc_open($cmd, $desc, $pipes, null, $ambiente);
         if (!is_resource($proc)) {
-            @unlink($htmlPath);
+            $this->limparPerfil($perfil, $htmlPath, $pdfPath);
             return null;
         }
         fclose($pipes[0]);
@@ -81,16 +90,41 @@ class GeradorPdfFolhaService
         fclose($pipes[1]);
         fclose($pipes[2]);
         proc_close($proc);
-        @unlink($htmlPath);
 
         if (!is_file($pdfPath) || filesize($pdfPath) < 100) {
-            @unlink($pdfPath);
+            $this->limparPerfil($perfil, $htmlPath, $pdfPath);
             return null;
         }
         $bin = file_get_contents($pdfPath);
-        @unlink($pdfPath);
+        $this->limparPerfil($perfil, $htmlPath, $pdfPath);
 
         return is_string($bin) && $bin !== '' ? $bin : null;
+    }
+
+    private function limparPerfil(string $perfil, string $htmlPath, string $pdfPath): void
+    {
+        @unlink($htmlPath);
+        @unlink($pdfPath);
+        $this->apagarDiretorio($perfil);
+    }
+
+    private function apagarDiretorio(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+        foreach (scandir($dir) ?: [] as $item) {
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
+            $caminho = $dir . DIRECTORY_SEPARATOR . $item;
+            if (is_dir($caminho)) {
+                $this->apagarDiretorio($caminho);
+            } else {
+                @unlink($caminho);
+            }
+        }
+        @rmdir($dir);
     }
 
     private function binario(): ?string
@@ -100,12 +134,12 @@ class GeradorPdfFolhaService
             return $env;
         }
         $candidatos = [
-            '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+            '/usr/lib/chromium/chromium',
             '/usr/bin/google-chrome-stable',
             '/usr/bin/google-chrome',
-            '/usr/bin/chromium',
             '/usr/bin/chromium-browser',
-            '/usr/lib/chromium/chromium',
+            '/usr/bin/chromium',
+            '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
         ];
         foreach ($candidatos as $caminho) {
             if (is_file($caminho) && is_executable($caminho)) {

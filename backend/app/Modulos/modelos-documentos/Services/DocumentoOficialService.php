@@ -63,7 +63,9 @@ class DocumentoOficialService
         $payload['componentes_ficha'] = $this->montarComponentesFicha($alunoId, $turmaId, $anoLetivo, $payload);
         $cargas = $this->cargaDaMatriz((int) ($payload['turma']['matriz_curricular_id'] ?? 0));
         $payload['dias_letivos'] = (string) ((int) ($cargas['_dias'] ?? 200));
-        $payload['quadro_notas_html'] = $this->quadroFichaHtml($payload['componentes_ficha']);
+        $payload['quadro_notas_html'] = \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService::htmlQuadroDeLinhasBimestrais(
+            $payload['componentes_ficha']
+        );
         $payload['observacoes'] = $this->observacoesFicha($alunoId, $turmaId, $anoLetivo, $payload);
         $payload['proxima_serie'] = $this->proximaSerieRotulo($payload);
         $payload['conselho_label'] = !empty($payload['_homologado'])
@@ -120,7 +122,9 @@ class DocumentoOficialService
         if ($payload === null) {
             throw new \RuntimeException('Não foi possível montar o boletim deste aluno.');
         }
-        $payload['quadro_notas_html'] = $this->quadroBoletimFinalHtml($payload['componentes_ficha'] ?? []);
+        $payload['quadro_notas_html'] = \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService::htmlQuadroDeLinhasBimestrais(
+            is_array($payload['componentes_ficha'] ?? null) ? $payload['componentes_ficha'] : []
+        );
         return $this->emitirDocumento('boletim', $payload, $usuarioId, $configApp, $alunoId, $turmaId, $registrarEmissao);
     }
 
@@ -1400,19 +1404,40 @@ class DocumentoOficialService
             return '';
         }
         if ($rows === []) {
-            return '';
+            return '<p>Nenhum ano letivo homologado.</p>';
         }
         $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
-        $html = '<table class="dados"><tr>'
-            . '<td class="label">Ano</td><td class="label">Ano/Série</td>'
-            . '<td class="label">Estabelecimento</td><td class="label">Resultado</td></tr>';
+        $html = '<table class="dados"><thead><tr>'
+            . '<th>Ano</th><th>Série</th><th>Estabelecimento</th><th>Município</th><th>Resultado</th><th>CH</th>'
+            . '</tr></thead><tbody>';
         foreach ($rows as $r) {
+            $serie = trim((string) ($r['serie'] ?? ''));
+            if ($serie === '') {
+                $serie = trim((string) ($r['turma_nome'] ?? ''));
+            }
             $html .= '<tr><td>' . $esc($r['ano_letivo'] ?? '') . '</td>'
-                . '<td>' . $esc($r['serie'] ?? $r['turma_nome'] ?? '') . '</td>'
-                . '<td>' . $esc($r['turma_nome'] ?? '') . '</td>'
-                . '<td>' . $esc($r['situacao'] ?? '') . '</td></tr>';
+                . '<td>' . $esc($serie !== '' ? $serie : '—') . '</td>'
+                . '<td>—</td><td>—</td>'
+                . '<td>' . $esc($this->rotuloSituacaoHistorico((string) ($r['situacao'] ?? ''))) . '</td>'
+                . '<td>—</td></tr>';
         }
-        return $html . '</table>';
+        return $html . '</tbody></table>';
+    }
+
+    private function rotuloSituacaoHistorico(string $situacao): string
+    {
+        $map = [
+            'aprovado' => 'Aprovado',
+            'reprovado' => 'Reprovado',
+            'reprovado_rendimento' => 'Reprovado',
+            'reprovado_frequencia' => 'Reprovado por frequência',
+            'transferido' => 'Transferido',
+            'em_curso' => 'Em curso',
+            'cursando' => 'Em curso',
+        ];
+        $chave = strtolower(trim($situacao));
+
+        return $map[$chave] ?? ($situacao !== '' ? $situacao : '—');
     }
 
     private function dataPorExtenso(string $iso): string

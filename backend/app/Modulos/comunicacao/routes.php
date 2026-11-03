@@ -12,6 +12,9 @@ $router->get('/admin/comunicacao', 'Modulos/comunicacao/ComunicacaoAdminControll
 $router->get('/admin/comunicacao-escolar', 'Modulos/comunicacao/SchoolCommunicationController@index');
 $router->get('/admin/comunicacao-escolar/nova', 'Modulos/comunicacao/SchoolCommunicationController@create');
 $router->post('/admin/comunicacao-escolar', 'Modulos/comunicacao/SchoolCommunicationController@store');
+$router->post('/admin/comunicacao-escolar/professor-pais', 'Modulos/comunicacao/SchoolCommunicationController@liberarProfessor');
+$router->get('/professor/comunicacao-pais', 'Modulos/comunicacao/TeacherComunicacaoController@index');
+$router->post('/professor/comunicacao-pais', 'Modulos/comunicacao/TeacherComunicacaoController@store');
 $router->get('/admin/comunicacao-escolar/{id}', 'Modulos/comunicacao/SchoolCommunicationController@show');
 $router->post('/admin/comunicacao-escolar/{id}/responder', 'Modulos/comunicacao/SchoolCommunicationController@reply');
 

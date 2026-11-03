@@ -25,6 +25,7 @@ $router->get('/admin/reconhecimento-facial/alunos/{id}/eventos', 'Admin/FacialRe
 
 // Gestão de Alunos
 $router->get('/admin/students', 'Admin/StudentAdminController@alunos');
+$router->get('/admin/students/logs', 'Admin/StudentAdminController@logs');
 $router->get('/admin/students/transfer', 'Admin/StudentAdminController@transferenciaAlunos');
 $router->get('/admin/students/export-csv', 'Admin/StudentAdminController@exportarAlunosCSV');
 $router->get('/admin/students/export-historico-turmas', 'Admin/StudentAdminController@exportarHistoricoTurmasCSV');
@@ -117,6 +118,7 @@ $router->put('/admin/monitors/{id}', 'Admin/MonitorAdminController@atualizarMoni
 $router->delete('/admin/monitors/{id}', 'Admin/MonitorAdminController@excluirMonitor');
 
 $router->get('/admin/teachers', 'Admin/TeacherAdminController@professores');
+$router->get('/admin/teachers/logs', 'Admin/TeacherAdminController@logs');
 $router->get('/admin/teachers/{id}/dados', 'Admin/TeacherAdminController@dadosProfessor');
 $router->post('/admin/teachers', 'Admin/TeacherAdminController@salvarProfessor');
 $router->put('/admin/teachers/{id}', 'Admin/TeacherAdminController@atualizarProfessor');
@@ -204,6 +206,7 @@ $router->post('/admin/plano-curso/marcar-trabalhada', 'Admin/CoursePlanControlle
 
 // Calendário Letivo (dias letivos / carga horária anual)
 $router->get('/admin/calendario-letivo', 'Admin/SchoolCalendarController@index');
+$router->get('/admin/calendario-letivo/logs', 'Admin/SchoolCalendarController@logs');
 $router->post('/admin/calendario-letivo/salvar-ano', 'Admin/SchoolCalendarController@salvarAno');
 $router->post('/admin/calendario-letivo/excluir', 'Admin/SchoolCalendarController@excluirCalendario');
 $router->post('/admin/calendario-letivo/salvar-evento', 'Admin/SchoolCalendarController@salvarEvento');
@@ -339,6 +342,7 @@ $router->post('/admin/dev/webhooks/{id}/test', 'Integrations/WebhookController@t
 
 // Gestão de Matérias
 $router->get('/admin/componentes-curriculares', 'Admin/ComponenteCurricularAdminController@index');
+$router->get('/admin/componentes-curriculares/logs', 'Admin/ComponenteCurricularAdminController@logs');
 $router->get('/admin/componentes-curriculares/{id}/dados', 'Admin/ComponenteCurricularAdminController@dados');
 $router->post('/admin/componentes-curriculares', 'Admin/ComponenteCurricularAdminController@store');
 $router->put('/admin/componentes-curriculares/{id}', 'Admin/ComponenteCurricularAdminController@update');
@@ -346,6 +350,7 @@ $router->delete('/admin/componentes-curriculares/{id}', 'Admin/ComponenteCurricu
 
 // Salas / Ambientes (CRUD - reaproveita school_locations, usada também pelo Patrimônio)
 $router->get('/admin/salas', 'Admin/SalaAdminController@index');
+$router->get('/admin/salas/logs', 'Admin/SalaAdminController@logs');
 $router->get('/admin/salas/{id}/dados', 'Admin/SalaAdminController@dados');
 $router->post('/admin/salas', 'Admin/SalaAdminController@store');
 $router->put('/admin/salas/{id}', 'Admin/SalaAdminController@update');
@@ -362,6 +367,7 @@ $router->delete('/admin/unidades/{id}', 'Admin/SchoolUnitsAdminController@delete
 
 // Gestão de Turmas (CRUD Completo - criar/editar em offcanvas no index; show continua página própria)
 $router->get('/admin/turmas', 'Education/ClassController@index');
+$router->get('/admin/turmas/logs', 'Education/ClassController@logs');
 $router->post('/admin/turmas', 'Education/ClassController@store');
 $router->get('/admin/turmas/{id}', 'Education/ClassController@show');
 $router->get('/admin/turmas/{id}/dados', 'Education/ClassController@dados');
@@ -399,6 +405,7 @@ $router->post('/admin/z-configuracao/zerar-popular', 'Education/AnoLetivoControl
 
 // Ano Letivo (CRUD - estrutura normalizada, offcanvas em index)
 $router->get('/admin/ano-letivo', 'Education/AnoLetivoController@index');
+$router->get('/admin/ano-letivo/logs', 'Education/AnoLetivoController@logs');
 $router->get('/admin/ano-letivo/{id}/dados', 'Education/AnoLetivoController@dados');
 $router->post('/admin/ano-letivo', 'Education/AnoLetivoController@store');
 $router->post('/admin/ano-letivo/{id}/update', 'Education/AnoLetivoController@update');
@@ -406,9 +413,11 @@ $router->post('/admin/ano-letivo/{id}/delete', 'Education/AnoLetivoController@de
 
 // Curso (CRUD - tabela curso, estrutura normalizada, offcanvas em index)
 $router->get('/admin/cursos-series', 'Education/CursoController@cursosSeries');
+$router->get('/admin/cursos-series/logs', 'Education/CursoController@logs');
 $router->get('/admin/curso', 'Education/CursoController@index');
 $router->get('/admin/curso/{id}/dados', 'Education/CursoController@dados');
 $router->post('/admin/curso', 'Education/CursoController@store');
+$router->post('/admin/curso/reordenar', 'Education/CursoController@reordenar');
 $router->post('/admin/curso/{id}/update', 'Education/CursoController@update');
 $router->post('/admin/curso/{id}/delete', 'Education/CursoController@destroy');
 $router->post('/admin/curso/bulk-delete', 'Education/CursoController@bulkDestroy');
@@ -420,12 +429,14 @@ $router->get('/admin/curso/{id}/modelo-csv', 'Education/CursoController@modeloCs
 $router->get('/admin/serie', 'Education/SerieController@index');
 $router->get('/admin/serie/{id}/dados', 'Education/SerieController@dados');
 $router->post('/admin/serie', 'Education/SerieController@store');
+$router->post('/admin/serie/reordenar', 'Education/SerieController@reordenar');
 $router->post('/admin/serie/{id}/update', 'Education/SerieController@update');
 $router->post('/admin/serie/{id}/delete', 'Education/SerieController@destroy');
 $router->post('/admin/serie/bulk-delete', 'Education/SerieController@bulkDestroy');
 
 // Matriz Curricular (CRUD - série × Componente Curricular × carga horária)
 $router->get('/admin/matrizes-curriculares', 'Admin/MatrizCurricularAdminController@index');
+$router->get('/admin/matrizes-curriculares/logs', 'Admin/MatrizCurricularAdminController@logs');
 $router->get('/admin/matrizes-curriculares/{id}/dados', 'Admin/MatrizCurricularAdminController@dados');
 $router->post('/admin/matrizes-curriculares', 'Admin/MatrizCurricularAdminController@store');
 $router->post('/admin/matrizes-curriculares/{id}/update', 'Admin/MatrizCurricularAdminController@update');
@@ -440,7 +451,11 @@ $router->post('/admin/cursos', 'Education/CourseCatalogController@storeCurso');
 
 // Grade Horária de Aulas
 $router->get('/admin/grade-horaria', 'Education/GradeHorariaController@index');
+$router->get('/admin/grade-horaria/logs', 'Education/GradeHorariaController@logs');
 $router->get('/admin/grade-horaria/pdf', 'Education/GradeHorariaController@pdf');
+$router->get('/admin/grade-horaria/pdf-professores', 'Education/GradeHorariaController@pdfProfessores');
+$router->get('/admin/grade-horaria/modelo-planilha', 'Education/GradeHorariaController@modeloPlanilha');
+$router->post('/admin/grade-horaria/processar-planilha', 'Education/GradeHorariaController@processarPlanilha');
 $router->post('/admin/grade-horaria', 'Education/GradeHorariaController@store');
 $router->get('/admin/grade-horaria/{id}/dados', 'Education/GradeHorariaController@dados');
 $router->post('/admin/grade-horaria/{id}', 'Education/GradeHorariaController@update');

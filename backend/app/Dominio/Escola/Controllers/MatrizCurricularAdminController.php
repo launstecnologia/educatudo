@@ -17,6 +17,7 @@ use App\Painel\Admin\Controllers\AdminBaseController;
 use App\Models\Education\ClassRoom;
 use App\Models\Education\ComponenteCurricular;
 use App\Models\Education\MatrizCurricular;
+use App\Painel\Admin\Services\TrilhaCadastroService;
 use App\Services\MatrizCurricularService;
 
 if (!class_exists(__NAMESPACE__ . '\\MatrizCurricularAdminController', false)) {
@@ -168,6 +169,24 @@ class MatrizCurricularAdminController extends AdminBaseController
             'status' => $_GET['status'] ?? '',
             'message' => $_GET['message'] ?? '',
         ];
+    }
+
+    public function logs(): void
+    {
+        $user = $this->auth->getUser();
+        if (!$user || ($user['perfil_admin'] ?? '') !== 'dev') {
+            $this->json(['error' => 'Sem permissão.'], 403);
+            return;
+        }
+
+        try {
+            $logs = (new TrilhaCadastroService($this->db))->listar('matrizes');
+        } catch (\Throwable $e) {
+            $this->json(['error' => 'Não foi possível ler os logs da matriz curricular.'], 500);
+            return;
+        }
+
+        $this->json(['success' => true, 'logs' => $logs]);
     }
 }
 }

@@ -42,6 +42,41 @@ unset($_SESSION['flash_message'], $_SESSION['flash_type']);
 </div>
 <?php endif; ?>
 
+<?php if (!empty($recebidos)): ?>
+<div class="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
+    <div class="px-6 py-4 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900">Recados da coordenação</h3>
+        <p class="text-sm text-gray-500">Também aparecem no sino. Marque como lido para confirmar a leitura.</p>
+    </div>
+    <div class="divide-y divide-gray-100">
+        <?php foreach ($recebidos as $recebido): ?>
+        <div class="px-6 py-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+                <p class="font-medium text-gray-900"><?= htmlspecialchars((string) $recebido['titulo']) ?></p>
+                <p class="text-sm text-gray-600 mt-1"><?= rich_text_render($recebido['conteudo'] ?? '') ?></p>
+            </div>
+            <?php if (empty($recebido['ja_visto'])): ?>
+            <button type="button" class="marcar-visto-professor px-4 py-2 bg-green-600 text-white text-sm rounded-lg" data-id="<?= (int) $recebido['id'] ?>">Marcar como lido</button>
+            <?php else: ?>
+            <span class="text-sm text-green-700">Lido</span>
+            <?php endif; ?>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<script>
+document.querySelectorAll('.marcar-visto-professor').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        var form = new FormData();
+        form.append('_token', <?= json_encode($csrf_token ?? '') ?>);
+        form.append('ids[]', btn.getAttribute('data-id'));
+        fetch(<?= json_encode(URL . '/professor/mural-recados/marcar-visto') ?>, { method: 'POST', body: form, credentials: 'same-origin' })
+            .then(function () { window.location.reload(); });
+    });
+});
+</script>
+<?php endif; ?>
+
 <div class="bg-white rounded-xl shadow-lg overflow-hidden">
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">

@@ -202,6 +202,19 @@
             </header>
             
             <div class="p-6 mobile-content plataforma-conteudo">
+                <?php
+                if (!\App\Helpers\TrilhaAdmin::jaRenderizada()) {
+                    $trilhaUri = (string) ($_SERVER['REQUEST_URI'] ?? '');
+                    if (\App\Helpers\TrilhaAdmin::pertenceAoEscopo($trilhaUri)) {
+                        $trilhaItens = \App\Helpers\TrilhaAdmin::montar($trilhaUri, (string) ($title ?? ''));
+                        if (count($trilhaItens) >= 2) {
+                            echo '<div class="mb-6">';
+                            include __DIR__ . '/components/trilha.php';
+                            echo '</div>';
+                        }
+                    }
+                }
+                ?>
                 <?= $content ?>
             </div>
             <?php include __DIR__ . '/components/plataforma_footer.php'; ?>

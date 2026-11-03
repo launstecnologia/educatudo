@@ -240,7 +240,7 @@ class AnoLetivoService
             'bloqueada' => true,
             'total' => $total,
             'rotulos' => $rotulos,
-            'mensagem' => 'Não é possível alterar a divisão do ano: já existem cadastros usando esses períodos (' . $lista . ').',
+            'mensagem' => 'Não é possível alterar a organização do ano letivo: já existem cadastros usando esses períodos letivos (' . $lista . ').',
         ];
     }
 
@@ -252,21 +252,21 @@ class AnoLetivoService
     {
         $ano = (int) ($dados['ano'] ?? 0);
         if ($ano < 2000 || $ano > 2100) {
-            throw new \InvalidArgumentException('Ano inválido.');
+            throw new \InvalidArgumentException('Ano Letivo inválido.');
         }
         $dataInicio = trim((string) ($dados['data_inicio'] ?? ''));
         $dataFim = trim((string) ($dados['data_fim'] ?? ''));
         $dataInicio = $dataInicio !== '' ? $dataInicio : null;
         $dataFim = $dataFim !== '' ? $dataFim : null;
         if ($dataInicio !== null && $dataFim !== null && $dataFim < $dataInicio) {
-            throw new \InvalidArgumentException('A data fim não pode ser anterior à data início.');
+            throw new \InvalidArgumentException('O término do ano letivo não pode ser anterior ao início.');
         }
 
         $bruto = trim((string) ($dados['periodo_tipo'] ?? ''));
         if ($bruto === '') {
             $periodoTipo = PeriodoLetivo::tipoPadrao();
         } elseif (!PeriodoLetivo::tipoValido($bruto)) {
-            throw new \InvalidArgumentException('Divisão do ano inválida.');
+            throw new \InvalidArgumentException('Organização do Ano Letivo inválida.');
         } else {
             $periodoTipo = PeriodoLetivo::normalizarTipo($bruto);
         }
@@ -331,6 +331,9 @@ class AnoLetivoService
         $tipo = (string) $payload['periodo_tipo'];
         $qtd = PeriodoLetivo::quantidade($tipo);
         $rotulos = PeriodoLetivo::rotulosDoTipo($tipo);
+        if ($tipo === 'etapa_unica') {
+            $rotulos[1] = 'Anual';
+        }
         $anoInicio = $payload['data_inicio'];
         $anoFim = $payload['data_fim'];
         $periodos = [];
@@ -344,19 +347,19 @@ class AnoLetivoService
             $fim = trim((string) ($item['data_fim'] ?? ''));
             $rotulo = (string) ($rotulos[$n] ?? ($n . 'º período'));
             if ($inicio === '' || $fim === '') {
-                throw new \InvalidArgumentException('Informe o início e o fim — ' . $rotulo . '.');
+                throw new \InvalidArgumentException('Informe o início e o término — ' . $rotulo . '.');
             }
             if (!$this->dataIsoValida($inicio) || !$this->dataIsoValida($fim)) {
                 throw new \InvalidArgumentException('Data inválida em ' . $rotulo . '.');
             }
             if ($fim < $inicio) {
-                throw new \InvalidArgumentException('Em ' . $rotulo . ', a data fim não pode ser anterior à data início.');
+                throw new \InvalidArgumentException('Em ' . $rotulo . ', o término não pode ser anterior ao início.');
             }
             if ($anoInicio !== null && $inicio < $anoInicio) {
-                throw new \InvalidArgumentException($rotulo . ' começa antes da data início do ano letivo.');
+                throw new \InvalidArgumentException($rotulo . ' começa antes do início do ano letivo.');
             }
             if ($anoFim !== null && $fim > $anoFim) {
-                throw new \InvalidArgumentException($rotulo . ' termina depois da data fim do ano letivo.');
+                throw new \InvalidArgumentException($rotulo . ' termina depois do término do ano letivo.');
             }
             if ($fimAnterior !== null && $inicio <= $fimAnterior) {
                 throw new \InvalidArgumentException($rotulo . ' começa antes do fim do período anterior.');
@@ -401,7 +404,7 @@ class AnoLetivoService
             && $payload['data_fim'] !== null
             && $payload['data_fim'] < $payload['data_inicio']
         ) {
-            throw new \InvalidArgumentException('A data fim não pode ser anterior à data início.');
+            throw new \InvalidArgumentException('O término do ano letivo não pode ser anterior ao início.');
         }
         return $payload;
     }
@@ -416,7 +419,7 @@ class AnoLetivoService
         }
         if (!$this->tabelaPeriodosExiste()) {
             throw new \RuntimeException(
-                'As datas dos períodos ainda não estão disponíveis neste banco. Execute a migration de períodos do ano letivo.'
+                'As datas dos períodos letivos ainda não estão disponíveis neste banco. Execute a migration de períodos do ano letivo.'
             );
         }
         if (!$this->colunaExiste('ano_letivo_periodos', 'dias_letivos')) {
@@ -473,7 +476,7 @@ class AnoLetivoService
             return;
         }
         throw new \InvalidArgumentException(
-            'A divisão do ano ainda não está disponível neste banco. Execute a migration de período do ano letivo.'
+            'A organização do ano letivo ainda não está disponível neste banco. Execute a migration de período do ano letivo.'
         );
     }
 
@@ -486,7 +489,7 @@ class AnoLetivoService
         $gravado = PeriodoLetivo::normalizarTipo((string) ($row['periodo_tipo'] ?? ''));
         if ($gravado !== $esperado) {
             throw new \RuntimeException(
-                'A divisão do ano não foi gravada. Execute a migration de período do ano letivo e tente novamente.'
+                'A organização do ano letivo não foi gravada. Execute a migration de período do ano letivo e tente novamente.'
             );
         }
     }
@@ -519,7 +522,7 @@ class AnoLetivoService
         }
         if ($faltando !== []) {
             throw new \InvalidArgumentException(
-                'Indique para onde vai cada período que já tem cadastro: ' . implode(', ', $faltando) . '.'
+                'Indique para onde vai cada período letivo que já tem cadastro: ' . implode(', ', $faltando) . '.'
             );
         }
         return $mapa;
@@ -1324,7 +1327,7 @@ class AnoLetivoService
         foreach ($rows as $row) {
             $origem = (int) ($row['periodo_numero'] ?? 0);
             if ($origem < 1 || !isset($mapa[$origem])) {
-                throw new \InvalidArgumentException('Indique para onde vai o período ' . $origem . ' dos fechamentos deste ano.');
+                throw new \InvalidArgumentException('Indique para onde vai o período letivo ' . $origem . ' dos fechamentos deste ano.');
             }
             $destino = (int) $mapa[$origem];
             $vigente = (int) ($row['vigente'] ?? 0) === 1;
@@ -1368,7 +1371,7 @@ class AnoLetivoService
         }
         if ($this->temLinhasDoTipo($tabela, $ano, $tipoAtual)) {
             throw new \InvalidArgumentException(
-                'Não é possível usar esta divisão porque já existem ' . $rotulo . ' gravados. Escolha bimestre, trimestre ou semestre.'
+                'Não é possível usar esta organização do ano letivo porque já existem ' . $rotulo . ' gravados. Escolha Bimestral, Trimestral ou Semestral.'
             );
         }
     }
@@ -1426,7 +1429,7 @@ class AnoLetivoService
         } catch (\Throwable $e) {
             if ($this->ehConflitoUnico($e)) {
                 throw new \InvalidArgumentException(
-                    'Não dá para juntar esses períodos: já existe o mesmo cadastro nos dois (por exemplo, a mesma turma ou o mesmo aluno). Escolha um período de destino diferente para cada um.'
+                    'Não dá para juntar esses períodos letivos: já existe o mesmo cadastro nos dois (por exemplo, a mesma turma ou o mesmo aluno). Escolha um período letivo de destino diferente para cada um.'
                 );
             }
             throw $e;

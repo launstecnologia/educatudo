@@ -248,7 +248,7 @@ class ExamBlockController extends BaseController
             $errors = [];
 
             $formatoEvento = $postData['formato_evento'] ?? 'online_questoes';
-            if (!in_array($formatoEvento, ['online_questoes', 'lancamento_nota'], true)) {
+            if (!in_array($formatoEvento, ['online_questoes', 'lancamento_nota', 'prova_impressa'], true)) {
                 $formatoEvento = 'online_questoes';
             }
             $configuracaoNota = (string) ($postData['configuracao_nota'] ?? '');
@@ -533,7 +533,7 @@ class ExamBlockController extends BaseController
             $errors = [];
 
             $formatoEvento = $postData['formato_evento'] ?? 'online_questoes';
-            if (!in_array($formatoEvento, ['online_questoes', 'lancamento_nota'], true)) {
+            if (!in_array($formatoEvento, ['online_questoes', 'lancamento_nota', 'prova_impressa'], true)) {
                 $formatoEvento = 'online_questoes';
             }
             $configuracaoNota = (string) ($postData['configuracao_nota'] ?? '');

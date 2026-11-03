@@ -11,6 +11,7 @@ use App\Core\AuthManager;
 use App\Core\BaseController;
 use App\Core\Database;
 use App\Models\User\Student;
+use App\Painel\Admin\Services\TrilhaCadastroService;
 
 if (!class_exists(__NAMESPACE__ . '\\CursoController', false)) {
 class CursoController extends BaseController
@@ -75,6 +76,16 @@ class CursoController extends BaseController
         return $cor;
     }
 
+    private function proximaOrdem(): int
+    {
+        $linha = $this->db->fetch("SELECT COALESCE(MAX(ordem), 0) AS maior FROM curso");
+        if (!is_array($linha)) {
+            return 1;
+        }
+
+        return ((int) $linha['maior']) + 1;
+    }
+
     /**
      * @param array<string,mixed> $campos
      */
@@ -116,7 +127,7 @@ class CursoController extends BaseController
         $user = $this->auth->getUser();
         if (!$this->tableExists()) {
             $this->viewWithLayout('admin', 'admin/cursos-series/index', [
-                'title' => 'Cursos e Séries - EducaTudo',
+                'title' => 'Cursos e Séries / Anos Escolares - EducaTudo',
                 'user' => $user,
                 'current_page' => 'cursos-series',
                 'schema_ready' => false,
@@ -155,7 +166,7 @@ class CursoController extends BaseController
         $cursosAtivos = $this->db->fetchAll("SELECT id, nome FROM curso WHERE ativo = 1 ORDER BY ordem ASC, nome ASC") ?: [];
 
         $this->viewWithLayout('admin', 'admin/cursos-series/index', [
-            'title' => 'Cursos e Séries - EducaTudo',
+            'title' => 'Cursos e Séries / Anos Escolares - EducaTudo',
             'user' => $user,
             'current_page' => 'cursos-series',
             'schema_ready' => true,
@@ -168,6 +179,24 @@ class CursoController extends BaseController
             'has_tipo_possui_serie' => $this->hasTipoPossuiSerie(),
             'has_cor' => $this->hasCor(),
         ]);
+    }
+
+    public function logs()
+    {
+        $user = $this->auth->getUser();
+        if (!$user || ($user['perfil_admin'] ?? '') !== 'dev') {
+            $this->json(['error' => 'Sem permissão.'], 403);
+            return;
+        }
+
+        try {
+            $logs = (new TrilhaCadastroService($this->db))->listar('cursos_series');
+        } catch (\Throwable $e) {
+            $this->json(['error' => 'Não foi possível ler os logs de cursos e séries.'], 500);
+            return;
+        }
+
+        $this->json(['success' => true, 'logs' => $logs]);
     }
 
     /**
@@ -200,7 +229,6 @@ class CursoController extends BaseController
         try {
             $nome = trim($_POST['nome'] ?? '');
             $descricao = trim($_POST['descricao'] ?? '') ?: null;
-            $ordem = (int)($_POST['ordem'] ?? 0);
             $ativo = isset($_POST['ativo']) ? 1 : 0;
             $tipo = trim($_POST['tipo'] ?? '') === 'extra' ? 'extra' : 'regular';
             $possuiSerie = ($tipo === 'extra') ? 0 : (isset($_POST['possui_serie']) ? 1 : 0);
@@ -215,7 +243,7 @@ class CursoController extends BaseController
                 'nome' => $nome,
                 'descricao' => $descricao,
                 'ativo' => $ativo,
-                'ordem' => $ordem,
+                'ordem' => $this->proximaOrdem(),
             ];
             if ($this->hasTipoPossuiSerie()) {
                 $campos['tipo'] = $tipo;
@@ -242,12 +270,16 @@ class CursoController extends BaseController
             return;
         }
         try {
+            $id = (int) $id;
             $nome = trim($_POST['nome'] ?? '');
             $descricao = trim($_POST['descricao'] ?? '') ?: null;
-            $ordem = (int)($_POST['ordem'] ?? 0);
             $ativo = isset($_POST['ativo']) ? 1 : 0;
             if ($nome === '') {
                 throw new \Exception('Nome é obrigatório.');
+            }
+            $item = $this->db->fetch("SELECT id, ordem FROM curso WHERE id = :id", ['id' => $id]);
+            if (!$item) {
+                throw new \Exception('Curso não encontrado.');
             }
             $existe = $this->db->fetch("SELECT id FROM curso WHERE nome = :nome AND id != :id", ['nome' => $nome, 'id' => $id]);
             if ($existe) {
@@ -259,7 +291,7 @@ class CursoController extends BaseController
                 'nome' => $nome,
                 'descricao' => $descricao,
                 'ativo' => $ativo,
-                'ordem' => $ordem,
+                'ordem' => (int) $item['ordem'],
             ];
             if ($this->hasTipoPossuiSerie()) {
                 $campos['tipo'] = $tipo;
@@ -273,6 +305,71 @@ class CursoController extends BaseController
         } catch (\Exception $e) {
             $this->json(['error' => $e->getMessage()], 400);
         }
+    }
+
+    /**
+     * Grava a ordem dos cursos depois do arraste na listagem.
+     */
+    public function reordenar()
+    {
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->json(['error' => 'Token inválido.'], 400);
+            return;
+        }
+        if (!$this->tableExists()) {
+            $this->json(['error' => 'Tabela não disponível.'], 400);
+            return;
+        }
+
+        $brutos = $_POST['ids'] ?? null;
+        if (!is_array($brutos) || $brutos === []) {
+            $this->json(['error' => 'Informe a ordem dos cursos.'], 400);
+            return;
+        }
+
+        $ids = [];
+        foreach ($brutos as $valor) {
+            $cursoId = (int) $valor;
+            if ($cursoId <= 0 || in_array($cursoId, $ids, true)) {
+                $this->json(['error' => 'Ordem inválida.'], 400);
+                return;
+            }
+            $ids[] = $cursoId;
+        }
+
+        $linhas = $this->db->fetchAll("SELECT id FROM curso");
+        $idsBanco = [];
+        foreach ($linhas as $linha) {
+            $idsBanco[] = (int) $linha['id'];
+        }
+        $recebidos = $ids;
+        sort($idsBanco);
+        sort($recebidos);
+        if ($idsBanco === [] || $idsBanco !== $recebidos) {
+            $this->json(['error' => 'A lista não confere com os cursos cadastrados. Atualize a página e tente de novo.'], 400);
+            return;
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $posicao = 1;
+            foreach ($ids as $cursoId) {
+                $this->db->update(
+                    "UPDATE curso SET ordem = :ordem WHERE id = :id",
+                    ['ordem' => $posicao, 'id' => $cursoId]
+                );
+                $posicao++;
+            }
+            $this->db->commit();
+        } catch (\Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollback();
+            }
+            $this->json(['error' => 'Não foi possível salvar a ordem.'], 400);
+            return;
+        }
+
+        $this->json(['success' => true]);
     }
 
     public function destroy($id)

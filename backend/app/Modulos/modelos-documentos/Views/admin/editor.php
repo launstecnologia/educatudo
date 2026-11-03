@@ -121,11 +121,21 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                         Mostrar dados reais na folha
                     </label>
                     <p class="edoc-hint" id="edoc-demo-status">A folha usa um exemplo até escolher o aluno.</p>
+                    <label class="edoc-demo-check" for="edoc-demo-sigla">
+                        <input type="checkbox" id="edoc-demo-sigla">
+                        Sigla no lugar do nome
+                    </label>
                     <div class="edoc-atalhos">
+                        <button type="button" class="edoc-btn" data-atalho="boletim">Boletim</button>
+                        <button type="button" class="edoc-btn" data-atalho="glossario">Glossário</button>
+                        <button type="button" class="edoc-btn" data-atalho="componentes">Disciplinas</button>
                         <button type="button" class="edoc-btn" data-atalho="serie">Série e turma</button>
-                        <button type="button" class="edoc-btn" data-atalho="componentes">Componentes</button>
-                        <button type="button" class="edoc-btn" data-atalho="notas">Notas</button>
                     </div>
+                    <div class="edoc-disc-chips edoc-demo-resultados">
+                        <button type="button" data-drag-var="situacao_final" title="Arraste o resultado do aluno">Situação</button>
+                        <button type="button" data-drag-var="frequencia_percentual" title="Arraste a frequência">Frequência</button>
+                    </div>
+                    <p class="edoc-hint">Arraste a disciplina, a nota ou o resultado para a célula. A sigla você troca no campo e no glossário.</p>
                     <details class="edoc-var-drop" id="edoc-demo-comps-drop" hidden>
                         <summary>Componentes da série <span class="edoc-var-count" id="edoc-demo-comps-count"></span></summary>
                         <div class="edoc-var-chips" id="edoc-demo-comps"></div>

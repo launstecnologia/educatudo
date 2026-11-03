@@ -7,6 +7,7 @@ use App\Core\AuthManager;
 use App\Core\BaseController;
 use App\Core\Database;
 use App\Dominio\Escola\Services\AnoLetivoService;
+use App\Painel\Admin\Services\LogAnoLetivoService;
 use App\Helpers\AdminPasswordHelper;
 use App\Painel\Master\Services\LimparDadosEscolaEducaService;
 use App\Painel\Master\Services\MasterFilaService;
@@ -416,6 +417,27 @@ class AnoLetivoController extends BaseController
             'tem_cadastros' => $periodos !== [],
             'periodos_usados' => $periodos,
         ]);
+    }
+
+    /**
+     * Trilha de cadastro, edição e exclusão. Só o perfil dev.
+     */
+    public function logs()
+    {
+        $user = $this->auth->getUser();
+        if (!$user || ($user['perfil_admin'] ?? '') !== 'dev') {
+            $this->json(['error' => 'Sem permissão.'], 403);
+            return;
+        }
+
+        try {
+            $logs = (new LogAnoLetivoService($this->db))->listar();
+        } catch (\Throwable $e) {
+            $this->json(['error' => 'Não foi possível ler os logs do ano letivo.'], 500);
+            return;
+        }
+
+        $this->json(['success' => true, 'logs' => $logs]);
     }
 
     public function store()

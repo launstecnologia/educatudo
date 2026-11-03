@@ -62,7 +62,7 @@ class AdminPermissionMatrix
 
             'exercicios' => ['label' => 'Exercícios', 'prefixes' => ['/admin/exercises']],
             'jornadas_aluno' => ['label' => 'Jornada do Aluno', 'prefixes' => ['/admin/consulta-jornadas-aluno', '/admin/jornadas']],
-            'provas_online' => ['label' => 'Lançamento de Notas', 'prefixes' => ['/admin/consulta-provas-aluno', '/admin/consulta-provas-professor', '/admin/provas', '/admin/provas-professor', '/admin/blocos-modelo', '/admin/eventos-avaliativos']],
+            'provas_online' => ['label' => 'Lançamento de Notas', 'prefixes' => ['/admin/consulta-provas-aluno', '/admin/consulta-provas-professor', '/admin/provas', '/admin/provas-professor', '/admin/blocos-modelo', '/admin/eventos-avaliativos', '/admin/leitor-gabarito']],
             'assistente' => ['label' => 'Assistente', 'prefixes' => ['/admin/assistente', '/admin/assistente-provas', '/admin/consulta-assistente', '/admin/doc-sistema']],
             'redacao_professor' => ['label' => 'Jornada da Redação', 'prefixes' => ['/admin/redacao-professor']],
             'inclusao' => ['label' => 'EducaInclui (Acessibilidade)', 'prefixes' => ['/admin/inclusao']],
@@ -73,7 +73,7 @@ class AdminPermissionMatrix
             'forum' => ['label' => 'Fórum', 'prefixes' => ['/forum']],
             'mural_recados' => ['label' => 'Mural de Recados', 'prefixes' => ['/admin/mural-recados']],
             'comunicacao_escolar' => ['label' => 'Comunicação Escolar', 'prefixes' => ['/admin/comunicacao-escolar']],
-            'calendario_escolar' => ['label' => 'Calendário Escolar', 'prefixes' => ['/admin/calendario-escolar']],
+            'calendario_escolar' => ['label' => 'Avisos à família', 'prefixes' => ['/admin/calendario-escolar']],
             'notificacoes' => ['label' => 'Notificações', 'prefixes' => ['/admin/notifications']],
             'notificacoes_push' => ['label' => 'Notificações Push', 'prefixes' => ['/admin/push-notifications']],
 

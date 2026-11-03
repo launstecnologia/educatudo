@@ -165,6 +165,7 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
         $chave = (string) ($_GET['chave'] ?? '1127');
         try {
             $pacote = (new DemonstracaoDocumentoService($this->db))->pacote($turmaId, $alunoId, $chave);
+            unset($pacote['linhas']);
             $this->json($pacote);
         } catch (\Throwable $e) {
             error_log('ModeloDocumento demonstracao: ' . $e->getMessage());
@@ -330,6 +331,27 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
         }
 
         $vars = $this->service->varsExemploDoModelo($modelo);
+        $turmaId = max(0, (int) ($_GET['turma_id'] ?? 0));
+        $alunoId = max(0, (int) ($_GET['aluno_id'] ?? 0));
+        if ($turmaId > 0 && $alunoId > 0) {
+            try {
+                $demo = new \App\Modulos\ModelosDocumentos\Services\DemonstracaoDocumentoService($this->db);
+                $chaveGrade = $demo::chaveGradeDoCodigo((string) ($modelo['codigo'] ?? ''));
+                $pacote = $demo->pacote($turmaId, $alunoId, $chaveGrade);
+                if (is_array($pacote['vars'] ?? null)) {
+                    foreach ($pacote['vars'] as $chave => $valor) {
+                        if (is_string($chave) && is_string($valor) && $valor !== '') {
+                            $vars[$chave] = $valor;
+                        }
+                    }
+                }
+                if (is_array($pacote['linhas'] ?? null) && $pacote['linhas'] !== []) {
+                    $vars['_grade_fonte'] = ['componentes' => $pacote['linhas']];
+                }
+            } catch (\Throwable $e) {
+                error_log('ModeloDocumento preview demonstracao: ' . $e->getMessage());
+            }
+        }
         $vars['_pdf_teste'] = true;
         $estilo = ModeloDocumentoService::estiloDoModelo($modelo);
         $html = $this->service->renderHtml($modelo, $vars, $estilo, $this->config);

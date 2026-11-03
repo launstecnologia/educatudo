@@ -1667,11 +1667,19 @@ class ParentController extends BaseController
         $sql = "SELECT r.id, r.titulo, r.conteudo, r.data_publicacao, r.data_sai_mural, r.autor_tipo, r.autor_id,
                 CASE WHEN r.autor_tipo = 'professor' THEN (SELECT p.nome FROM professores p WHERE p.id = r.autor_id LIMIT 1) ELSE 'Admin' END as autor_nome
                 FROM mural_recados r
-                WHERE (r.enviar_para_todos = 1" . ($turmaId > 0 ? " OR EXISTS (
+                WHERE COALESCE(r.publico, 'alunos') = 'alunos'
+                AND (
+                    r.aluno_id = :aluno_destino
+                    OR (
+                        r.aluno_id IS NULL
+                        AND (r.enviar_para_todos = 1" . ($turmaId > 0 ? " OR EXISTS (
                     SELECT 1 FROM mural_recados_turmas rt WHERE rt.mural_recado_id = r.id AND rt.turma_id = :turma_id
                   )" : "") . ")
+                    )
+                )
                 AND (CURDATE() <= r.data_sai_mural)
                 ORDER BY r.data_publicacao DESC";
+        $params['aluno_destino'] = (int) $filho['id'];
         if ($turmaId > 0) {
             $params['turma_id'] = $turmaId;
         }

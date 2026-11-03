@@ -12,14 +12,17 @@ if ($tipoLabels === []) {
     $tipoLabels = [
         'feriado' => 'Feriado', 'recesso' => 'Recesso', 'reposicao' => 'Reposição',
         'evento' => 'Evento', 'suspensao' => 'Suspensão', 'avaliacao' => 'Avaliação',
+        'reuniao' => 'Reunião', 'passeio' => 'Passeio', 'apresentacao' => 'Apresentação',
     ];
     $tipoBg = [
         'feriado' => '#fee2e2', 'recesso' => '#fef3c7', 'reposicao' => '#dcfce7',
         'evento' => '#dbeafe', 'suspensao' => '#f3f4f6', 'avaliacao' => '#ede9fe',
+        'reuniao' => '#ccfbf1', 'passeio' => '#ffedd5', 'apresentacao' => '#fce7f3',
     ];
     $tipoText = [
         'feriado' => '#991b1b', 'recesso' => '#92400e', 'reposicao' => '#166534',
         'evento' => '#1e40af', 'suspensao' => '#374151', 'avaliacao' => '#5b21b6',
+        'reuniao' => '#0f766e', 'passeio' => '#c2410c', 'apresentacao' => '#9d174d',
     ];
 }
 $podeCadastrarTipo = !empty($pode_cadastrar_tipo);
@@ -55,6 +58,14 @@ $eventoParaJs = static function (array $e) use ($tipoLabels, $dataCalendario, $g
         'visivel_aluno' => (int) ($e['visivel_aluno'] ?? 0),
         'visivel_professor' => (int) ($e['visivel_professor'] ?? 0),
         'visivel_pais' => (int) ($e['visivel_pais'] ?? 0),
+        'aviso_status' => (string) ($e['aviso_status'] ?? ''),
+        'aviso_prioridade' => (string) ($e['aviso_prioridade'] ?? 'normal'),
+        'aviso_publico' => (string) ($e['aviso_publico'] ?? 'todos'),
+        'aviso_dia_inteiro' => (int) ($e['aviso_dia_inteiro'] ?? 1),
+        'aviso_hora_inicio' => (string) ($e['aviso_hora_inicio'] ?? ''),
+        'aviso_hora_fim' => (string) ($e['aviso_hora_fim'] ?? ''),
+        'aviso_turmas' => array_values(array_map('intval', (array) ($e['aviso_turmas'] ?? []))),
+        'aviso_alunos' => array_values(array_map('intval', (array) ($e['aviso_alunos'] ?? []))),
         'provas' => is_array($provas) ? array_values($provas) : [],
     ];
 };
@@ -98,57 +109,109 @@ foreach ($eventos as $ev) {
 
 $mesesNomes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 $mesAtual   = (int) date('m'); // mês atual para view mensal
+$linkAno = static function (int $alvo) use ($calendarioId, $variosPronto): string {
+    $params = ['ano' => $alvo];
+    if ($variosPronto && $calendarioId > 0) {
+        $params['id'] = $calendarioId;
+    }
+    return '?' . http_build_query($params);
+};
 $page_header_title    = 'Calendário Letivo ' . $ano . ($variosPronto && $nomeCal !== '' ? ' · ' . $nomeCal : '');
 $page_header_subtitle = $rotuloCal !== ''
     ? $rotuloCal . '. Feriados, recessos, reposições e eventos deste calendário.'
     : 'Visualize feriados, recessos, reposições e eventos do ano letivo.';
 
 ob_start();
+$btnBarra = 'inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50';
 ?>
-<div class="flex flex-wrap items-center gap-2">
-    <a href="?ano=<?= $ano - 1 ?>" class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-left"></i></a>
-    <span class="text-sm font-semibold text-gray-700"><?= $ano ?></span>
-    <a href="?ano=<?= $ano + 1 ?>" class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-right"></i></a>
-    <?php if ($variosPronto): ?>
-    <div class="inline-flex shrink-0 items-center rounded-lg border border-gray-300 bg-white"<?= $corCal !== '' ? ' style="border-color:' . htmlspecialchars($corCal, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
-        <?php if ($corCal !== ''): ?>
-        <span class="ml-3 h-2.5 w-2.5 shrink-0 rounded-full" style="background:<?= htmlspecialchars($corCal, ENT_QUOTES, 'UTF-8') ?>"></span>
+<div class="space-y-2">
+    <div class="flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto py-0.5">
+        <div class="flex shrink-0 items-center gap-2">
+        <div class="inline-flex h-10 shrink-0 items-center overflow-hidden rounded-lg border border-gray-300 bg-white">
+            <a href="<?= htmlspecialchars($linkAno($ano - 1), ENT_QUOTES) ?>" class="inline-flex h-full items-center px-3 text-gray-700 hover:bg-gray-50" aria-label="Ano anterior"><i class="fa-solid fa-chevron-left"></i></a>
+            <span class="inline-flex h-full min-w-[3.5rem] items-center justify-center border-x border-gray-300 px-3 text-sm font-semibold text-gray-700"><?= $ano ?></span>
+            <a href="<?= htmlspecialchars($linkAno($ano + 1), ENT_QUOTES) ?>" class="inline-flex h-full items-center px-3 text-gray-700 hover:bg-gray-50" aria-label="Próximo ano"><i class="fa-solid fa-chevron-right"></i></a>
+        </div>
+        <?php if ($variosPronto): ?>
+        <div class="inline-flex h-10 shrink-0 items-center rounded-lg border border-gray-300 bg-white"<?= $corCal !== '' ? ' style="border-color:' . htmlspecialchars($corCal, ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
+            <?php if ($corCal !== ''): ?>
+            <span class="ml-3 h-2.5 w-2.5 shrink-0 rounded-full" style="background:<?= htmlspecialchars($corCal, ENT_QUOTES, 'UTF-8') ?>"></span>
+            <?php endif; ?>
+            <select id="selCalendario" aria-label="Calendário" onchange="if (this.value) window.location = this.value;"
+                    class="h-full max-w-[14rem] cursor-pointer border-0 bg-transparent <?= $corCal !== '' ? 'pl-2' : 'pl-3' ?> pr-8 text-sm text-gray-700 focus:outline-none focus:ring-0">
+                <?php foreach ($calendarios as $cal): ?>
+                <option value="?ano=<?= $ano ?>&amp;id=<?= (int) $cal['id'] ?>" <?= (int) $cal['id'] === $calendarioId ? 'selected' : '' ?>><?= htmlspecialchars((string) ($cal['nome'] ?? 'Geral')) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
         <?php endif; ?>
-        <select id="selCalendario" aria-label="Calendário" onchange="if (this.value) window.location = this.value;"
-                class="max-w-[16rem] cursor-pointer border-0 bg-transparent py-2 <?= $corCal !== '' ? 'pl-2' : 'pl-3' ?> pr-9 text-sm text-gray-700 focus:outline-none focus:ring-0">
-            <?php foreach ($calendarios as $cal): ?>
-            <option value="?ano=<?= $ano ?>&id=<?= (int) $cal['id'] ?>" <?= (int) $cal['id'] === $calendarioId ? 'selected' : '' ?>><?= htmlspecialchars((string) ($cal['nome'] ?? 'Geral')) ?></option>
-            <?php endforeach; ?>
-        </select>
+        </div>
+        <div class="min-w-2 flex-1" aria-hidden="true"></div>
+        <div class="flex shrink-0 items-center gap-2">
+            <div class="inline-flex h-10 shrink-0 items-center overflow-hidden rounded-lg border border-gray-300 bg-white">
+                <button type="button" id="btnViewYear" onclick="setView('year')" class="inline-flex h-full items-center whitespace-nowrap px-3 text-sm font-medium text-gray-700 transition-colors" title="Ano inteiro"><i class="fa-solid fa-calendar-days mr-1.5"></i>Ano</button>
+                <button type="button" id="btnViewMonth" onclick="setView('month')" class="inline-flex h-full items-center whitespace-nowrap border-l border-gray-300 px-3 text-sm font-medium text-gray-700 transition-colors" title="Mês atual"><i class="fa-solid fa-calendar mr-1.5"></i>Mês</button>
+            </div>
+            <div id="navMes" class="hidden shrink-0 items-center gap-1">
+                <button type="button" onclick="navMes(-1)" class="inline-flex h-10 items-center rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 hover:bg-gray-50" aria-label="Mês anterior"><i class="fa-solid fa-chevron-left"></i></button>
+                <span id="labelMes" class="w-28 whitespace-nowrap text-center text-sm font-semibold text-gray-700"></span>
+                <button type="button" onclick="navMes(+1)" class="inline-flex h-10 items-center rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 hover:bg-gray-50" aria-label="Próximo mês"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+        </div>
     </div>
-    <button type="button" onclick="openNovoCalendario()" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50">
-        <i class="fa-solid fa-plus mr-2"></i>Novo calendário
-    </button>
-    <?php endif; ?>
-    <!-- Toggle de visualização -->
-    <div class="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
-        <button id="btnViewYear" onclick="setView('year')" class="px-3 py-2 text-sm font-medium transition-colors" title="Ano inteiro"><i class="fa-solid fa-calendar-days mr-1.5"></i>Ano</button>
-        <button id="btnViewMonth" onclick="setView('month')" class="px-3 py-2 text-sm font-medium transition-colors border-l border-gray-300" title="Mês atual"><i class="fa-solid fa-calendar mr-1.5"></i>Mês</button>
+    <div class="flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto py-0.5">
+        <div class="flex shrink-0 items-center gap-2">
+        <button type="button" onclick="openFilterDrawer()" class="<?= $btnBarra ?>">
+            <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
+            Filtros
+            <span id="badgeFiltrosCalendario" class="ml-2 hidden h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-blue-600 px-1.5 text-xs font-semibold text-white">0</span>
+        </button>
+        <?php if ($variosPronto): ?>
+        <button type="button" onclick="openNovoCalendario()" class="<?= $btnBarra ?>">
+            <i class="fa-solid fa-plus mr-2 text-gray-500"></i>Novo calendário
+        </button>
+        <?php endif; ?>
+        <button type="button" onclick="openConfigDrawer()" class="<?= $btnBarra ?>"><i class="fa-solid fa-gear mr-2 text-gray-500"></i>Configurar ano</button>
+        <?php if ($config): ?>
+        <button type="button" onclick="openEventosDrawer()" class="<?= $btnBarra ?>">
+            <i class="fa-solid fa-list-ul mr-2 text-gray-500"></i>Eventos
+            <span class="ml-2 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-gray-100 px-1.5 text-xs font-semibold text-gray-600"><?= count($eventos) ?></span>
+        </button>
+        <?php endif; ?>
+        </div>
+        <div class="min-w-2 flex-1" aria-hidden="true"></div>
+        <?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
+        <button type="button" onclick="abrirTrilhaCalendario()" class="<?= $btnBarra ?>"><i class="fa-solid fa-clock-rotate-left mr-2 text-gray-500"></i>Log</button>
+        <?php endif; ?>
+        <?php if ($config): ?>
+        <button type="button" onclick="openEventoDrawer()" class="btn-primary-custom inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-lg px-4 text-sm font-semibold shadow-sm hover:opacity-90"><i class="fa-solid fa-plus mr-2"></i>Adicionar evento</button>
+        <?php endif; ?>
     </div>
-    <!-- Navegação do mês (visível só na view mensal) -->
-    <div id="navMes" class="hidden items-center gap-1">
-        <button onclick="navMes(-1)" class="px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-left"></i></button>
-        <span id="labelMes" class="text-sm font-semibold text-gray-700 w-28 text-center"></span>
-        <button onclick="navMes(+1)" class="px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-right"></i></button>
-    </div>
-    <button type="button" onclick="openConfigDrawer()" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50"><i class="fa-solid fa-gear mr-2"></i>Configurar ano</button>
-    <?php if ($config): ?>
-    <button type="button" onclick="openEventosDrawer()" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white hover:bg-gray-50">
-        <i class="fa-solid fa-list-ul mr-2"></i>Eventos
-        <span class="ml-2 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-gray-100 px-1.5 text-xs font-semibold text-gray-600"><?= count($eventos) ?></span>
-    </button>
-    <button type="button" onclick="openEventoDrawer()" class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90"><i class="fa-solid fa-plus mr-2"></i>Adicionar evento</button>
-    <?php endif; ?>
 </div>
 <?php
 $page_header_actions = ob_get_clean();
-include \App\Core\ViewPaths::adminPartial('page_header_list.php');
-
+$trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/calendario-letivo', 'Calendário Letivo');
+?>
+<div class="mb-6">
+    <?php include __DIR__ . '/../../../../Views/layouts/components/trilha.php'; ?>
+    <div class="mt-4 flex items-center gap-3 min-w-0">
+        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
+            <i class="fa-solid fa-calendar-check text-lg" aria-hidden="true"></i>
+        </span>
+        <div class="min-w-0">
+            <h2 class="text-xl font-bold text-gray-900"><?= htmlspecialchars($page_header_title) ?></h2>
+            <?php if ($page_header_subtitle !== ''): ?>
+            <p class="text-sm text-gray-500 mt-0.5"><?= htmlspecialchars($page_header_subtitle) ?></p>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php if ($page_header_actions !== ''): ?>
+    <div class="mt-4 min-w-0">
+        <?= $page_header_actions ?>
+    </div>
+    <?php endif; ?>
+</div>
+<?php
 if (!($schema_pronto ?? false)): ?>
     <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 mb-6">
         <i class="fa-solid fa-triangle-exclamation mr-2"></i> Rode a migration <code>2026_06_25_calendario_letivo.sql</code> no painel Master para habilitar este módulo.
@@ -156,6 +219,10 @@ if (!($schema_pronto ?? false)): ?>
 <?php elseif (!$variosPronto): ?>
     <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 mb-6">
         <i class="fa-solid fa-triangle-exclamation mr-2"></i> Para cadastrar um calendário por curso ou série, rode a migration <code>2026_10_01_calendario_letivo_varios.sql</code> no painel Master.
+    </div>
+<?php elseif (!empty($pode_publicar_escolar) && empty($aviso_vinculo)): ?>
+    <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 mb-6">
+        <i class="fa-solid fa-triangle-exclamation mr-2"></i> Para o aviso à família acompanhar a edição deste evento, rode a migration <code>2026_10_31_calendario_aviso_familia.sql</code> no painel Master.
     </div>
 <?php endif; ?>
 <?php
@@ -304,10 +371,12 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
                 }
             ?>
             <div
-                class="relative flex items-center justify-center rounded text-xs font-medium h-7 select-none <?= $ring ?> <?= !empty($evsDia) ? 'cursor-pointer hover:opacity-80 hover:shadow-sm transition-all' : 'cursor-default' ?>"
+                class="cal-dia relative flex items-center justify-center rounded text-xs font-medium h-7 select-none <?= $ring ?> <?= !empty($evsDia) ? 'cursor-pointer hover:opacity-80 hover:shadow-sm transition-all' : 'cursor-default' ?>"
                 style="background-color:<?= $cellBg ?>; color:<?= $cellText ?>;"
+                data-date="<?= $dateKey ?>"
+                data-weekend="<?= $isWeekend ? '1' : '0' ?>"
                 <?= $evPayload ? "onclick=\"openDayModal('" . $evPayload . "')\"" : '' ?>
-            ><?= $dia ?><?php if (count($tiposDia) > 1): ?><span class="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-blue-500"></span><?php endif; ?></div>
+            ><?= $dia ?><?php if (count($tiposDia) > 1): ?><span class="cal-dia-extra absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-blue-500"></span><?php endif; ?></div>
             <?php endfor; ?>
         </div>
     </div>
@@ -367,7 +436,11 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
                     }
                     $eventoId = (int) $ev['id'];
                 ?>
-                    <tr class="hover:bg-gray-50 <?= $idx >= 10 ? 'hidden' : '' ?>" data-evento-linha>
+                    <tr class="hover:bg-gray-50 <?= $idx >= 10 ? 'hidden' : '' ?>"
+                        data-evento-linha
+                        data-evento-id="<?= $eventoId ?>"
+                        data-tipo="<?= htmlspecialchars($t, ENT_QUOTES) ?>"
+                        data-busca="<?= htmlspecialchars(trim((string) ($ev['descricao'] ?? '') . ' ' . ($tipoLabels[$t] ?? $t) . ' ' . ($ev['local_evento'] ?? '')), ENT_QUOTES) ?>">
                         <td class="px-6 py-4">
                             <div class="flex items-center gap-3">
                                 <span class="h-2.5 w-2.5 flex-shrink-0 rounded-full" style="background:<?= htmlspecialchars($tipoText[$t] ?? '#6b7280') ?>"></span>
@@ -677,13 +750,85 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
                     </label>
                 </div>
                 <?php if (!empty($pode_publicar_escolar)): ?>
+                <?php
+                $turmasAviso = is_array($turmas_aviso ?? null) ? $turmas_aviso : [];
+                $alunosAviso = is_array($alunos_aviso ?? null) ? $alunos_aviso : [];
+                ?>
                 <label class="flex items-start gap-3 cursor-pointer select-none rounded-lg border border-gray-200 bg-gray-50 p-4 hover:bg-gray-100">
                     <input type="checkbox" id="evento_publicar_escolar" name="publicar_calendario_escolar" value="1" class="mt-0.5 w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
                     <span>
-                        <span class="block text-sm font-medium text-gray-900">Publicar também no Calendário Escolar</span>
-                        <span class="block text-xs text-gray-600 mt-0.5">O evento aparece para os responsáveis no app e gera notificação.</span>
+                        <span class="block text-sm font-medium text-gray-900">Avisar a família</span>
+                        <span class="block text-xs text-gray-600 mt-0.5">O evento aparece para os responsáveis no app. Editar ou desmarcar aqui atualiza o mesmo aviso.</span>
                     </span>
                 </label>
+                <div id="aviso-familia-campos" class="hidden mt-4 space-y-4 rounded-lg border border-gray-200 p-4">
+                    <span id="aviso_familia" class="sr-only"></span>
+                    <p id="erro_aviso_familia" class="hidden text-xs text-red-600" role="alert"></p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="aviso_prioridade" class="block text-sm font-medium text-gray-700 mb-1">Prioridade do aviso</label>
+                            <select id="aviso_prioridade" name="aviso_prioridade" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                                <option value="normal">Normal</option>
+                                <option value="importante">Importante</option>
+                                <option value="urgente">Urgente</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <label class="inline-flex items-center gap-2 cursor-pointer select-none pb-2">
+                                <input type="checkbox" id="aviso_dia_inteiro" name="aviso_dia_inteiro" value="1" checked class="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
+                                <span class="text-sm text-gray-700">Dia inteiro</span>
+                            </label>
+                        </div>
+                        <div>
+                            <label for="aviso_hora_inicio" class="block text-sm font-medium text-gray-700 mb-1">Horário de início</label>
+                            <input type="time" id="aviso_hora_inicio" name="aviso_hora_inicio" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                            <p id="erro_aviso_hora_inicio" class="hidden mt-1 text-xs text-red-600" role="alert"></p>
+                        </div>
+                        <div>
+                            <label for="aviso_hora_fim" class="block text-sm font-medium text-gray-700 mb-1">Horário de fim</label>
+                            <input type="time" id="aviso_hora_fim" name="aviso_hora_fim" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                        </div>
+                    </div>
+                    <fieldset>
+                        <legend class="block text-sm font-medium text-gray-700 mb-2">Quem recebe o aviso</legend>
+                        <div class="flex flex-wrap gap-4">
+                            <label class="inline-flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="aviso_publico" value="todos" checked class="text-green-600 border-gray-300 focus:ring-green-500">
+                                <span class="text-sm text-gray-700">Toda a escola</span>
+                            </label>
+                            <label class="inline-flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="aviso_publico" value="turmas" class="text-green-600 border-gray-300 focus:ring-green-500">
+                                <span class="text-sm text-gray-700">Turmas</span>
+                            </label>
+                            <label class="inline-flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="aviso_publico" value="alunos" class="text-green-600 border-gray-300 focus:ring-green-500">
+                                <span class="text-sm text-gray-700">Alunos específicos</span>
+                            </label>
+                        </div>
+                    </fieldset>
+                    <div id="aviso-turmas" class="hidden">
+                        <p class="text-sm font-medium text-gray-700 mb-2">Turmas</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                            <?php foreach ($turmasAviso as $turma): ?>
+                            <label class="flex items-center gap-2 text-sm text-gray-700">
+                                <input type="checkbox" name="turmas[]" value="<?= (int) ($turma['id'] ?? 0) ?>" class="rounded border-gray-300 text-green-600">
+                                <?= htmlspecialchars((string) ($turma['nome'] ?? '')) ?>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <div id="aviso-alunos" class="hidden">
+                        <p class="text-sm font-medium text-gray-700 mb-2">Alunos</p>
+                        <div class="grid grid-cols-1 gap-2 max-h-56 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                            <?php foreach ($alunosAviso as $aluno): ?>
+                            <label class="flex items-center gap-2 text-sm text-gray-700">
+                                <input type="checkbox" name="alunos[]" value="<?= (int) ($aluno['id'] ?? 0) ?>" class="rounded border-gray-300 text-green-600">
+                                <?= htmlspecialchars((string) (($aluno['nome'] ?? '') . ' · ' . (($aluno['turma_nome'] ?? '') !== '' ? $aluno['turma_nome'] : 'Sem turma'))) ?>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
                 <?php endif; ?>
             </section>
         </div>
@@ -699,11 +844,68 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
     </form>
 </aside>
 
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
+<aside id="filterDrawer"
+       class="fixed top-0 right-0 z-50 flex h-full w-full max-w-md translate-x-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-in-out"
+       aria-hidden="true">
+    <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+        <div>
+            <h3 class="text-lg font-semibold text-gray-900">Filtrar calendário</h3>
+            <p class="mt-0.5 text-xs text-gray-500">Tipo e nome do evento.</p>
+        </div>
+        <button type="button" onclick="closeFilterDrawer()" class="p-1 text-gray-400 hover:text-gray-600" aria-label="Fechar filtros">
+            <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+    </div>
+    <form id="formFiltroCalendario" class="flex flex-1 flex-col overflow-hidden" onsubmit="aplicarFiltrosCalendario(); return false;">
+        <div class="flex-1 space-y-4 overflow-y-auto px-6 py-5">
+            <div>
+                <label for="filtroBuscaEvento" class="mb-1.5 block text-sm font-medium text-gray-700">Descrição</label>
+                <input type="search" id="filtroBuscaEvento" placeholder="Nome do evento"
+                       class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <fieldset>
+                <legend class="mb-1.5 text-sm font-medium text-gray-700">Tipo</legend>
+                <div class="space-y-2">
+                    <?php foreach ($tipoLabels as $k => $v): ?>
+                    <label class="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 px-3 py-2.5 hover:bg-gray-50">
+                        <input type="checkbox" data-filtro-tipo value="<?= htmlspecialchars((string) $k, ENT_QUOTES) ?>" checked
+                               class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                        <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:<?= htmlspecialchars($tipoText[$k] ?? '#6b7280', ENT_QUOTES) ?>"></span>
+                        <span class="text-sm text-gray-800"><?= htmlspecialchars((string) $v) ?></span>
+                    </label>
+                    <?php endforeach; ?>
+                </div>
+            </fieldset>
+        </div>
+        <div class="flex gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
+            <button type="button" onclick="limparFiltrosCalendario()" class="inline-flex flex-1 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50">Limpar</button>
+            <button type="submit" class="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">Aplicar filtros</button>
+        </div>
+    </form>
+</aside>
+
 <script>
 // ── View anual / mensal ───────────────────────────────────────────────────────
 var MESES_NOMES = <?= json_encode($mesesNomes, $jsonJs) ?>;
 var currentView = 'year';
 var currentMes  = <?= $mesAtual ?>;  // 1-based
+var filtroTipos = null;
+var filtroBusca = '';
+
+function passaFiltro(ev) {
+    if (!ev) return false;
+    if (Array.isArray(filtroTipos) && filtroTipos.indexOf(ev.tipo) === -1) return false;
+    if (filtroBusca) {
+        var blob = String(ev.descricao || '') + ' ' + String(ev.label || '') + ' ' + String(ev.local_evento || '');
+        if (blob.toLowerCase().indexOf(filtroBusca.toLowerCase()) === -1) return false;
+    }
+    return true;
+}
+
+function filtroAtivo() {
+    return Array.isArray(filtroTipos) || filtroBusca !== '';
+}
 
 // Contagens anuais para restaurar ao voltar à view de ano
 var countsAno = <?php
@@ -725,6 +927,7 @@ function updateCards(mes) {
         var kMes = parseInt(k.substring(5, 7), 10);
         if (mes !== null && kMes !== mes) return;
         eventData[k].forEach(function(ev) {
+            if (!passaFiltro(ev)) return;
             if (ev.tipo === 'feriado')   f++;
             if (ev.tipo === 'recesso')   r++;
             if (ev.tipo === 'reposicao') rep++;
@@ -808,7 +1011,7 @@ function renderMes(mes) {
         var dow = dt.getDay();
         var isWeekend = (dow === 0 || dow === 6);
         var key = ano + '-' + String(mes).padStart(2,'0') + '-' + String(d).padStart(2,'0');
-        var evs = eventData[key] || [];
+        var evs = (eventData[key] || []).filter(passaFiltro);
         var isToday = (dt.getTime() === today.getTime());
 
         var cell = document.createElement('div');
@@ -866,6 +1069,7 @@ function renderMes(mes) {
     Object.keys(eventData).forEach(function(k) {
         if (k.startsWith(ano + '-' + mesKey + '-')) {
             eventData[k].forEach(function(ev) {
+                if (!passaFiltro(ev)) return;
                 if (!mesEvs.find(function(e){ return e.id === ev.id; })) mesEvs.push(ev);
             });
         }
@@ -983,7 +1187,8 @@ function htmlAcoesEvento(ev) {
 
 function openDayModal(payloadStr) {
     var data = JSON.parse(payloadStr);
-    var events = data.events;
+    var events = (data.events || []).filter(passaFiltro);
+    if (!events.length) return;
     document.getElementById('modalDiaData').textContent = data.date;
 
     var tipos = [...new Set(events.map(function(e){ return e.label; }))];
@@ -1053,6 +1258,83 @@ function hideDrawer(backdropId, drawerId) {
     document.body.style.overflow = '';
 }
 
+function openFilterDrawer() {
+    var boxes = document.querySelectorAll('#filterDrawer [data-filtro-tipo]');
+    boxes.forEach(function (el) {
+        el.checked = !Array.isArray(filtroTipos) || filtroTipos.indexOf(el.value) !== -1;
+    });
+    var busca = document.getElementById('filtroBuscaEvento');
+    if (busca) busca.value = filtroBusca;
+    showDrawer('filterDrawerBackdrop', 'filterDrawer');
+}
+function closeFilterDrawer() {
+    if (!document.getElementById('filterDrawer')) return;
+    hideDrawer('filterDrawerBackdrop', 'filterDrawer');
+}
+function atualizarBadgeFiltro() {
+    var badge = document.getElementById('badgeFiltrosCalendario');
+    if (!badge) return;
+    var n = (Array.isArray(filtroTipos) ? 1 : 0) + (filtroBusca !== '' ? 1 : 0);
+    badge.textContent = String(n);
+    badge.classList.toggle('hidden', n === 0);
+    badge.classList.toggle('inline-flex', n > 0);
+}
+function atualizarLegendaFiltro() {
+    document.querySelectorAll('.flex.flex-wrap.gap-3.mb-5 [data-tipo-slug]').forEach(function (el) {
+        var slug = el.getAttribute('data-tipo-slug');
+        var ativo = !Array.isArray(filtroTipos) || filtroTipos.indexOf(slug) !== -1;
+        el.classList.toggle('opacity-40', !ativo);
+    });
+}
+function aplicarFiltroAno() {
+    if (typeof tipoBg === 'undefined' || typeof tipoText === 'undefined') return;
+    document.querySelectorAll('#viewAno .cal-dia').forEach(function (cell) {
+        var key = cell.getAttribute('data-date');
+        var todos = eventData[key] || [];
+        var evs = todos.filter(passaFiltro);
+        var weekend = cell.getAttribute('data-weekend') === '1';
+        var dot = cell.querySelector('.cal-dia-extra');
+        var oculto = todos.length > 0 && evs.length === 0 && filtroAtivo();
+        if (evs.length) {
+            cell.style.backgroundColor = tipoBg[evs[0].tipo] || '#f9fafb';
+            cell.style.color = tipoText[evs[0].tipo] || '#111827';
+        } else {
+            cell.style.backgroundColor = weekend ? '#f9fafb' : 'transparent';
+            cell.style.color = weekend ? '#9ca3af' : '#374151';
+        }
+        cell.classList.toggle('opacity-40', oculto);
+        cell.classList.toggle('pointer-events-none', oculto);
+        cell.classList.toggle('cursor-pointer', evs.length > 0);
+        cell.classList.toggle('cursor-default', evs.length === 0);
+        cell.classList.toggle('hover:opacity-80', evs.length > 0);
+        cell.classList.toggle('hover:shadow-sm', evs.length > 0);
+        if (dot) dot.classList.toggle('hidden', evs.length < 2);
+    });
+}
+function aplicarFiltrosCalendario() {
+    var boxes = document.querySelectorAll('#filterDrawer [data-filtro-tipo]');
+    var marcados = [];
+    boxes.forEach(function (el) {
+        if (el.checked) marcados.push(el.value);
+    });
+    filtroTipos = marcados.length === boxes.length ? null : marcados;
+    var busca = document.getElementById('filtroBuscaEvento');
+    filtroBusca = busca ? busca.value.trim() : '';
+    atualizarBadgeFiltro();
+    atualizarLegendaFiltro();
+    aplicarFiltroAno();
+    if (currentView === 'month') renderMes(currentMes);
+    updateCards(currentView === 'month' ? currentMes : null);
+    if (document.getElementById('eventosTabela')) renderEventosPagina(1);
+    closeFilterDrawer();
+}
+function limparFiltrosCalendario() {
+    document.querySelectorAll('#filterDrawer [data-filtro-tipo]').forEach(function (el) { el.checked = true; });
+    var busca = document.getElementById('filtroBuscaEvento');
+    if (busca) busca.value = '';
+    aplicarFiltrosCalendario();
+}
+
 function restaurarFormularioCalendario() {
     var idEl = document.getElementById('calendario_id');
     if (idEl) idEl.value = String(calendarioAtualId || '');
@@ -1103,6 +1385,62 @@ function openNovoCalendario() {
     showDrawer('configDrawerBackdrop', 'configDrawer');
 }
 
+function marcarAlvosAviso(nome, ids) {
+    var escolhidos = {};
+    (ids || []).forEach(function (id) { escolhidos[String(id)] = true; });
+    document.querySelectorAll('#aviso-familia-campos input[name="' + nome + '"]').forEach(function (campo) {
+        campo.checked = !!escolhidos[campo.value];
+    });
+}
+
+function togglePublicoAviso() {
+    var marcado = document.querySelector('#aviso-familia-campos [name="aviso_publico"]:checked');
+    var publico = marcado ? marcado.value : 'todos';
+    var turmas = document.getElementById('aviso-turmas');
+    var alunos = document.getElementById('aviso-alunos');
+    if (turmas) turmas.classList.toggle('hidden', publico !== 'turmas');
+    if (alunos) alunos.classList.toggle('hidden', publico !== 'alunos');
+}
+
+function toggleHorarioAviso() {
+    var dia = document.getElementById('aviso_dia_inteiro');
+    var inicio = document.getElementById('aviso_hora_inicio');
+    var fim = document.getElementById('aviso_hora_fim');
+    var bloqueado = !dia || dia.checked;
+    if (inicio) inicio.disabled = bloqueado;
+    if (fim) fim.disabled = bloqueado;
+}
+
+function toggleAvisoFamilia() {
+    var chk = document.getElementById('evento_publicar_escolar');
+    var box = document.getElementById('aviso-familia-campos');
+    if (box) box.classList.toggle('hidden', !chk || !chk.checked);
+    togglePublicoAviso();
+    toggleHorarioAviso();
+}
+
+function preencherAvisoFamilia(ev) {
+    var pub = document.getElementById('evento_publicar_escolar');
+    if (!pub) return;
+    var ativo = ev.aviso_status === 'publicado';
+    pub.checked = ativo;
+    var prioridade = document.getElementById('aviso_prioridade');
+    if (prioridade) prioridade.value = ev.aviso_prioridade || 'normal';
+    var dia = document.getElementById('aviso_dia_inteiro');
+    if (dia) dia.checked = !ativo || Number(ev.aviso_dia_inteiro) === 1 || !ev.aviso_hora_inicio;
+    var horaInicio = document.getElementById('aviso_hora_inicio');
+    var horaFim = document.getElementById('aviso_hora_fim');
+    if (horaInicio) horaInicio.value = ativo && ev.aviso_hora_inicio ? ev.aviso_hora_inicio : '';
+    if (horaFim) horaFim.value = ativo && ev.aviso_hora_fim ? ev.aviso_hora_fim : '';
+    var publico = ev.aviso_publico || 'todos';
+    var radio = document.querySelector('#aviso-familia-campos [name="aviso_publico"][value="' + publico + '"]');
+    if (!radio) radio = document.querySelector('#aviso-familia-campos [name="aviso_publico"][value="todos"]');
+    if (radio) radio.checked = true;
+    marcarAlvosAviso('turmas[]', ev.aviso_turmas || []);
+    marcarAlvosAviso('alunos[]', ev.aviso_alunos || []);
+    toggleAvisoFamilia();
+}
+
 function definirModoEvento(editando) {
     var titulo = document.getElementById('eventoDrawerTitle');
     var btn = document.getElementById('eventoSubmitBtn');
@@ -1133,8 +1471,7 @@ function preencherFormEvento(ev) {
     document.getElementById('evento_visivel_aluno').checked = Number(ev.visivel_aluno) === 1;
     document.getElementById('evento_visivel_professor').checked = Number(ev.visivel_professor) === 1;
     document.getElementById('evento_visivel_pais').checked = Number(ev.visivel_pais) === 1;
-    var pub = document.getElementById('evento_publicar_escolar');
-    if (pub) pub.checked = false;
+    preencherAvisoFamilia(ev);
     definirModoEvento(true);
 }
 
@@ -1171,8 +1508,28 @@ function closeEventosDrawer() {
     hideDrawer('eventosDrawerBackdrop', 'eventosDrawer');
 }
 
+function linhaPassaFiltro(linha) {
+    var id = linha.getAttribute('data-evento-id');
+    var ev = id && eventosPorId[id];
+    if (ev) return passaFiltro(ev);
+    return passaFiltro({
+        tipo: linha.getAttribute('data-tipo') || '',
+        descricao: linha.getAttribute('data-busca') || '',
+        label: '',
+        local_evento: ''
+    });
+}
+
 function renderEventosPagina(pagina) {
-    var linhas = document.querySelectorAll('#eventosTabela [data-evento-linha]');
+    var todas = document.querySelectorAll('#eventosTabela [data-evento-linha]');
+    var linhas = [];
+    todas.forEach(function (linha) {
+        if (!linhaPassaFiltro(linha)) {
+            linha.classList.add('hidden');
+            return;
+        }
+        linhas.push(linha);
+    });
     var total = linhas.length;
     var totalPaginas = Math.max(1, Math.ceil(total / EVENTOS_POR_PAGINA));
     pagina = Math.min(Math.max(1, pagina), totalPaginas);
@@ -1186,8 +1543,8 @@ function renderEventosPagina(pagina) {
     var box = document.getElementById('eventosPaginacao');
     if (!box) return;
     if (total === 0) {
-        box.classList.add('hidden');
-        box.innerHTML = '';
+        box.classList.remove('hidden');
+        box.innerHTML = '<p class="text-sm text-gray-600">' + (filtroAtivo() ? 'Nenhum evento com esses filtros.' : 'Nenhum evento cadastrado.') + '</p>';
         return;
     }
     box.classList.remove('hidden');
@@ -1237,6 +1594,7 @@ function openEventoDrawer(opts) {
     var tokenEnvio = document.getElementById('evento_envio_token');
     if (tokenEnvio) tokenEnvio.value = novoTokenEnvio();
     limparErrosEvento();
+    toggleAvisoFamilia();
     showDrawer('eventoDrawerBackdrop', 'eventoDrawer');
 }
 function closeEventoDrawer() { hideDrawer('eventoDrawerBackdrop', 'eventoDrawer'); }
@@ -1246,12 +1604,24 @@ if (chkPublicar) {
     chkPublicar.addEventListener('change', function () {
         if (this.checked) {
             document.getElementById('evento_visivel_pais').checked = true;
+            var tipo = document.querySelector('#tipoGrid input[name="tipo"]:checked');
+            var prioridade = document.getElementById('aviso_prioridade');
+            if (prioridade && prioridade.value === 'normal' && tipo && (tipo.value === 'feriado' || tipo.value === 'suspensao')) {
+                prioridade.value = 'importante';
+            }
         }
+        toggleAvisoFamilia();
     });
 }
+document.querySelectorAll('#aviso-familia-campos [name="aviso_publico"]').forEach(function (radio) {
+    radio.addEventListener('change', togglePublicoAviso);
+});
+var chkDiaInteiro = document.getElementById('aviso_dia_inteiro');
+if (chkDiaInteiro) chkDiaInteiro.addEventListener('change', toggleHorarioAviso);
 
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
+        closeFilterDrawer();
         closeConfigDrawer();
         closeEventoDrawer();
         closeEventosDrawer();
@@ -1267,6 +1637,8 @@ var camposErroEvento = {
     data_fim: 'evento_data_fim',
     descricao: 'evento_descricao',
     link: 'evento_link',
+    aviso: 'aviso_familia',
+    hora_inicio: 'aviso_hora_inicio',
     formulario: 'erro_evento_formulario'
 };
 
@@ -1322,7 +1694,7 @@ function mostrarErroCampoEvento(campo, mensagem) {
 
 function aplicarErrosEvento(erros) {
     limparErrosEvento();
-    var ordem = ['data_inicio', 'data_fim', 'descricao', 'link', 'formulario'];
+    var ordem = ['data_inicio', 'data_fim', 'descricao', 'link', 'aviso', 'hora_inicio', 'formulario'];
     var primeiro = '';
     ordem.forEach(function (campo) {
         if (!erros[campo]) return;
@@ -1696,6 +2068,12 @@ if (novoTipoPanel) {
 var tipoGrid = document.getElementById('tipoGrid');
 if (tipoGrid) tipoGrid.addEventListener('change', atualizarHintEfeito);
 atualizarHintEfeito();
+toggleAvisoFamilia();
+(function () {
+    var params = new URLSearchParams(window.location.search);
+    var eventoId = parseInt(params.get('evento') || '', 10);
+    if (eventoId > 0 && eventosPorId[eventoId]) editarEvento(eventoId);
+})();
 var eventosPaginacao = document.getElementById('eventosPaginacao');
 if (eventosPaginacao) {
     renderEventosPagina(1);
@@ -1709,3 +2087,12 @@ if (eventosPaginacao) {
 openConfigDrawer();
 <?php endif; ?>
 </script>
+<?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
+<?php
+$trilha_log_id = 'trilhaCalendario';
+$trilha_log_titulo = 'Log do calendário letivo';
+$trilha_log_url = URL . '/admin/calendario-letivo/logs';
+$trilha_log_vazio = 'Nenhum cadastro, alteração ou exclusão do calendário letivo registrado.';
+include \App\Core\ViewPaths::adminPartial('ui/trilha_log.php');
+?>
+<?php endif; ?>

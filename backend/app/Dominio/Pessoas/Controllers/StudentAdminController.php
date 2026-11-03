@@ -18,6 +18,7 @@ use App\Core\LayoutHelper;
 use App\Core\Logger;
 use App\Services\MediaStorageService;
 use App\Models\User\Student;
+use App\Painel\Admin\Services\TrilhaCadastroService;
 use App\Helpers\StudentFormHelper;
 use App\Helpers\StudentPhotoHelper;
 use App\Services\StudentResponsibleImportService;
@@ -914,7 +915,9 @@ class StudentAdminController extends AdminBaseController
         }
 
         $flash = $this->getFlashMessage();
-        $data['title'] = 'Detalhes do Aluno - EducaTudo';
+        $alunoTrilha = is_array($data['student'] ?? null) ? $data['student'] : [];
+        $nomeTrilha = trim((string) ($alunoTrilha['nome'] ?? ''));
+        $data['title'] = ($nomeTrilha !== '' ? $nomeTrilha : 'Detalhes do Aluno') . ' - EducaTudo';
         $data['page_title'] = 'Detalhes do Aluno';
         $data['page_subtitle'] = 'Início > Alunos > Detalhes do Aluno';
         $data['flash_message'] = $flash['message'] ?? '';
@@ -4496,6 +4499,24 @@ class StudentAdminController extends AdminBaseController
             'tabelas' => $tabelas,
             'tem_dados' => $temDados,
         ];
+    }
+
+    public function logs(): void
+    {
+        $user = $this->auth->getUser();
+        if (!$user || ($user['perfil_admin'] ?? '') !== 'dev') {
+            $this->json(['error' => 'Sem permissão.'], 403);
+            return;
+        }
+
+        try {
+            $logs = (new TrilhaCadastroService($this->db))->listar('alunos');
+        } catch (\Throwable $e) {
+            $this->json(['error' => 'Não foi possível ler os logs de alunos.'], 500);
+            return;
+        }
+
+        $this->json(['success' => true, 'logs' => $logs]);
     }
 }
 }

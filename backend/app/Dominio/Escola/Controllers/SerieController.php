@@ -87,7 +87,6 @@ class SerieController extends BaseController
         try {
             $cursoId = (int) ($_POST['curso_id'] ?? 0);
             $nome = trim($_POST['nome'] ?? '');
-            $ordem = (int) ($_POST['ordem'] ?? 0);
             $ativo = isset($_POST['ativo']) ? 1 : 0;
 
             if ($cursoId <= 0) {
@@ -112,7 +111,12 @@ class SerieController extends BaseController
 
             $this->db->insert(
                 "INSERT INTO serie (curso_id, nome, ordem, ativo) VALUES (:curso_id, :nome, :ordem, :ativo)",
-                ['curso_id' => $cursoId, 'nome' => $nome, 'ordem' => $ordem, 'ativo' => $ativo]
+                [
+                    'curso_id' => $cursoId,
+                    'nome' => $nome,
+                    'ordem' => $this->proximaOrdem($cursoId),
+                    'ativo' => $ativo,
+                ]
             );
 
             $this->json(['success' => true, 'message' => 'Série cadastrada com sucesso.']);
@@ -133,9 +137,9 @@ class SerieController extends BaseController
         }
 
         try {
+            $id = (int) $id;
             $cursoId = (int) ($_POST['curso_id'] ?? 0);
             $nome = trim($_POST['nome'] ?? '');
-            $ordem = (int) ($_POST['ordem'] ?? 0);
             $ativo = isset($_POST['ativo']) ? 1 : 0;
 
             if ($cursoId <= 0) {
@@ -145,10 +149,17 @@ class SerieController extends BaseController
                 throw new \Exception('Nome é obrigatório.');
             }
 
-            $item = $this->db->fetch("SELECT id FROM serie WHERE id = :id", ['id' => $id]);
+            $item = $this->db->fetch(
+                "SELECT id, curso_id, ordem FROM serie WHERE id = :id",
+                ['id' => $id]
+            );
             if (!$item) {
                 throw new \Exception('Série não encontrada.');
             }
+
+            $ordem = ((int) $item['curso_id'] === $cursoId)
+                ? (int) $item['ordem']
+                : $this->proximaOrdem($cursoId);
 
             $existe = $this->db->fetch(
                 "SELECT id FROM serie WHERE curso_id = :curso_id AND nome = :nome AND id != :id",
@@ -167,6 +178,75 @@ class SerieController extends BaseController
         } catch (\Exception $e) {
             $this->json(['error' => $e->getMessage()], 400);
         }
+    }
+
+    /**
+     * Grava a ordem das séries de um curso depois do arraste na listagem.
+     */
+    public function reordenar()
+    {
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->json(['error' => 'Token inválido.'], 400);
+            return;
+        }
+        if (!$this->schemaReady()) {
+            $this->json(['error' => 'Estrutura não disponível.'], 400);
+            return;
+        }
+
+        $cursoId = (int) ($_POST['curso_id'] ?? 0);
+        $brutos = $_POST['ids'] ?? null;
+        if ($cursoId <= 0 || !is_array($brutos) || $brutos === []) {
+            $this->json(['error' => 'Informe o curso e a ordem das séries.'], 400);
+            return;
+        }
+
+        $ids = [];
+        foreach ($brutos as $valor) {
+            $serieId = (int) $valor;
+            if ($serieId <= 0 || in_array($serieId, $ids, true)) {
+                $this->json(['error' => 'Ordem inválida.'], 400);
+                return;
+            }
+            $ids[] = $serieId;
+        }
+
+        $linhas = $this->db->fetchAll(
+            "SELECT id FROM serie WHERE curso_id = :curso_id",
+            ['curso_id' => $cursoId]
+        );
+        $idsBanco = [];
+        foreach ($linhas as $linha) {
+            $idsBanco[] = (int) $linha['id'];
+        }
+        $recebidos = $ids;
+        sort($idsBanco);
+        sort($recebidos);
+        if ($idsBanco === [] || $idsBanco !== $recebidos) {
+            $this->json(['error' => 'A lista não confere com as séries deste curso. Atualize a página e tente de novo.'], 400);
+            return;
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $posicao = 1;
+            foreach ($ids as $serieId) {
+                $this->db->update(
+                    "UPDATE serie SET ordem = :ordem WHERE id = :id AND curso_id = :curso_id",
+                    ['ordem' => $posicao, 'id' => $serieId, 'curso_id' => $cursoId]
+                );
+                $posicao++;
+            }
+            $this->db->commit();
+        } catch (\Exception $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollback();
+            }
+            $this->json(['error' => 'Não foi possível salvar a ordem.'], 400);
+            return;
+        }
+
+        $this->json(['success' => true]);
     }
 
     public function destroy($id)
@@ -242,6 +322,19 @@ class SerieController extends BaseController
         }
 
         $this->json(['success' => true, 'message' => $message, 'deleted' => $deleted, 'errors' => $errors]);
+    }
+
+    private function proximaOrdem(int $cursoId): int
+    {
+        $linha = $this->db->fetch(
+            "SELECT COALESCE(MAX(ordem), 0) AS maior FROM serie WHERE curso_id = :curso_id",
+            ['curso_id' => $cursoId]
+        );
+        if (!is_array($linha)) {
+            return 1;
+        }
+
+        return ((int) $linha['maior']) + 1;
     }
 
     /**

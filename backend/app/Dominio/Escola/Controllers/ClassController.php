@@ -12,6 +12,7 @@ use App\Core\AuthManager;
 use App\Core\BaseController;
 use App\Models\Education\ClassRoom;
 use App\Core\Database;
+use App\Painel\Admin\Services\TrilhaCadastroService;
 use App\Models\Education\MatrizCurricular;
 use App\Models\Education\Sala;
 use App\Helpers\StudentFormHelper;
@@ -1038,6 +1039,24 @@ class ClassController extends BaseController
         return $this->turmaModel->getCursos();
     }
     
+    public function logs()
+    {
+        $user = $this->auth->getUser();
+        if (!$user || ($user['perfil_admin'] ?? '') !== 'dev') {
+            $this->json(['error' => 'Sem permissão.'], 403);
+            return;
+        }
+
+        try {
+            $logs = (new TrilhaCadastroService($this->db))->listar('turmas');
+        } catch (\Throwable $e) {
+            $this->json(['error' => 'Não foi possível ler os logs de turmas.'], 500);
+            return;
+        }
+
+        $this->json(['success' => true, 'logs' => $logs]);
+    }
+
     /**
      * Redireciona para o dashboard correto baseado no tipo
      */

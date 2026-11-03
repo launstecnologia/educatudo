@@ -27,8 +27,18 @@ $turnos = [
 
 $page_header_title = 'Turmas';
 $page_header_subtitle = 'Gerencie as turmas da escola';
+$trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/turmas', 'Turmas');
 ob_start();
 ?>
+<?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
+<?php
+$ui_btn_variant = 'complementar';
+$ui_btn_label = 'Log';
+$ui_btn_icon = 'fa-solid fa-clock-rotate-left';
+$ui_btn_onclick = 'abrirTrilhaTurmas()';
+include \App\Core\ViewPaths::adminPartial('ui/btn.php');
+?>
+<?php endif; ?>
 <button type="button" onclick="openTurmaDrawer()"
    class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
     <i class="fa-solid fa-plus mr-2"></i>
@@ -36,8 +46,26 @@ ob_start();
 </button>
 <?php
 $page_header_actions = ob_get_clean();
-include \App\Core\ViewPaths::adminPartial('page_header_list.php');
 ?>
+<div class="mb-6">
+    <?php include __DIR__ . '/../../../../../Views/layouts/components/trilha.php'; ?>
+    <div class="mt-4 flex justify-between items-center gap-4">
+        <div class="flex items-center gap-3 min-w-0">
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
+                <i class="fa-solid fa-school text-lg" aria-hidden="true"></i>
+            </span>
+            <div class="min-w-0">
+                <h2 class="text-xl font-bold text-gray-900"><?= htmlspecialchars($page_header_title) ?></h2>
+                <p class="text-sm text-gray-500 mt-0.5"><?= htmlspecialchars($page_header_subtitle) ?></p>
+            </div>
+        </div>
+        <?php if ($page_header_actions !== ''): ?>
+        <div class="flex items-center justify-end gap-3 flex-shrink-0 ml-auto">
+            <?= $page_header_actions ?>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
 
 <?php if ($totalTurmas > 0): ?>
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -590,3 +618,12 @@ function toggleStatus(id, newStatus) {
     .catch(function () { alert('Erro de conexão. Tente novamente.'); });
 }
 </script>
+<?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
+<?php
+$trilha_log_id = 'trilhaTurmas';
+$trilha_log_titulo = 'Log de turmas';
+$trilha_log_url = URL . '/admin/turmas/logs';
+$trilha_log_vazio = 'Nenhum cadastro, alteração ou exclusão de turma registrado.';
+include \App\Core\ViewPaths::adminPartial('ui/trilha_log.php');
+?>
+<?php endif; ?>

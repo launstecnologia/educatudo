@@ -939,7 +939,7 @@ class ExamBlock
                 'turma_id', 'bloco_modelo_id', 'ativo', 'liberado', 'status', 'prazo_entrega_professor'
             ];
             $formatoEvento = $data['formato_evento'] ?? 'online_questoes';
-            if (!in_array($formatoEvento, ['online_questoes', 'lancamento_nota'], true)) {
+            if (!in_array($formatoEvento, ['online_questoes', 'lancamento_nota', 'prova_impressa'], true)) {
                 $formatoEvento = 'online_questoes';
             }
             [$dataProva, $horaInicio, $horaFim] = $this->resolverAgendaObrigatoria(
@@ -1136,7 +1136,7 @@ class ExamBlock
                 "status = CASE WHEN :liberado_status = 1 THEN 'liberado' ELSE status END"
             ];
             $formatoEvento = $data['formato_evento'] ?? 'online_questoes';
-            if (!in_array($formatoEvento, ['online_questoes', 'lancamento_nota'], true)) {
+            if (!in_array($formatoEvento, ['online_questoes', 'lancamento_nota', 'prova_impressa'], true)) {
                 $formatoEvento = 'online_questoes';
             }
             [$dataProva, $horaInicio, $horaFim] = $this->resolverAgendaObrigatoria(
@@ -1780,7 +1780,7 @@ class ExamBlock
     {
         $formato = (string) ($data['formato_evento'] ?? 'online_questoes');
         $configNota = (string) ($data['configuracao_nota'] ?? 'professor_por_questao');
-        $exigeQtd = ($formato === 'online_questoes' && $configNota === 'professor_por_questao');
+        $exigeQtd = (($formato === 'online_questoes' || $formato === 'prova_impressa') && $configNota === 'professor_por_questao');
         if (!$exigeQtd) {
             return 0;
         }

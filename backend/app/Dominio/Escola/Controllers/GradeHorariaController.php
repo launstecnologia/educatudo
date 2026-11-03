@@ -10,6 +10,7 @@ namespace App\Dominio\Escola\Controllers;
 use App\Core\AuthManager;
 use App\Core\BaseController;
 use App\Core\Database;
+use App\Painel\Admin\Services\TrilhaCadastroService;
 if (!class_exists(__NAMESPACE__ . '\\GradeHorariaController', false)) {
 class GradeHorariaController extends BaseController
 {
@@ -190,6 +191,12 @@ class GradeHorariaController extends BaseController
             }));
         }
 
+        $turmaPedida = (int) $filtros['turma_id'];
+        $filtros = $this->fixarTurmaDaGrade($turmasFiltro, $filtros);
+        if ((int) $filtros['turma_id'] > 0 && (int) $filtros['turma_id'] !== $turmaPedida) {
+            $this->redirect('/admin/grade-horaria' . $this->queryFiltrosGrade($filtros));
+        }
+
         $data = [
             'title' => 'Grade Horária de Aulas - EducaTudo',
             'user' => $user,
@@ -221,6 +228,8 @@ class GradeHorariaController extends BaseController
         $professores = $this->db->fetchAll("SELECT id, nome FROM professores WHERE ativo = 1 ORDER BY nome") ?: [];
         $materias = $this->materiasOperacionais();
 
+        $filtros = $this->fixarTurmaDaGrade($turmas, $filtros);
+
         $html = $this->renderizarHtml('admin/grade-horaria/pdf', [
             'itens' => $this->listarItens($filtros),
             'filtros' => $filtros,
@@ -234,6 +243,98 @@ class GradeHorariaController extends BaseController
 
         $orientacao = ($filtros['visao'] === 'dia') ? 'portrait' : 'landscape';
         $this->outputPdf($html, 'grade-horaria.pdf', $orientacao);
+    }
+
+    /**
+     * PDF com uma grade por professor: em cada horário, a turma e a sala.
+     * A turma fixa da tela é ignorada para o professor ver a semana inteira.
+     */
+    public function pdfProfessores()
+    {
+        $filtros = $this->filtrosDaRequest();
+        $filtros['turma_id'] = 0;
+        $filtros['visao'] = 'semana';
+        $filtros['dia'] = 0;
+
+        $turmas = $this->db->fetchAll(
+            "SELECT id, nome, serie, tipo_ensino FROM turmas WHERE ativo = 1 ORDER BY nome"
+        ) ?: [];
+        $professores = $this->db->fetchAll("SELECT id, nome FROM professores WHERE ativo = 1 ORDER BY nome") ?: [];
+        $materias = $this->materiasOperacionais();
+        $itens = $this->listarItens($filtros);
+
+        $porProfessor = [];
+        foreach ($itens as $item) {
+            $professorId = (int) ($item['professor_id'] ?? 0);
+            if ($professorId <= 0) {
+                continue;
+            }
+            if (!isset($porProfessor[$professorId])) {
+                $porProfessor[$professorId] = [
+                    'id' => $professorId,
+                    'nome' => (string) ($item['professor_nome'] ?? ''),
+                    'itens' => [],
+                ];
+            }
+            $porProfessor[$professorId]['itens'][] = $item;
+        }
+        uasort($porProfessor, static function ($a, $b) {
+            return strcasecmp((string) $a['nome'], (string) $b['nome']);
+        });
+
+        $html = $this->renderizarHtml('admin/grade-horaria/pdf-professores', [
+            'grades_professores' => array_values($porProfessor),
+            'filtros' => $filtros,
+            'dias_semana' => self::$DIAS_SEMANA,
+            'turmas' => $turmas,
+            'turmas_filtro' => $turmas,
+            'professores' => $professores,
+            'materias' => $materias,
+            'gerado_em' => date('d/m/Y H:i'),
+        ]);
+
+        $this->outputPdf($html, 'grade-professores.pdf', 'landscape');
+    }
+
+    /**
+     * Modelo CSV da grade, aberto pelo Excel.
+     */
+    public function modeloPlanilha(): void
+    {
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="modelo-grade-horaria.csv"');
+        echo "\xEF\xBB\xBF";
+        echo "dia;horario_de;horario_ate;turma;professor;componente;periodo\n";
+        echo "segunda;07:00;07:50;1A;Nome do Professor;Matemática;manha\n";
+        echo "terca;13:00;13:50;1A;Nome do Professor;História;tarde\n";
+        exit;
+    }
+
+    /**
+     * Lê a planilha e devolve o preview para conferir antes de salvar.
+     */
+    public function processarPlanilha(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            echo json_encode(['success' => false, 'error' => 'Token inválido.']);
+            return;
+        }
+        if (empty($_FILES['planilha']) || !is_array($_FILES['planilha'])) {
+            echo json_encode(['success' => false, 'error' => 'Envie uma planilha .xlsx ou .csv.']);
+            return;
+        }
+
+        try {
+            $preview = (new \App\Dominio\Escola\Services\ImportacaoGradeHorariaPlanilha())->lerArquivo($_FILES['planilha']);
+            echo json_encode($preview, JSON_UNESCAPED_UNICODE);
+        } catch (\RuntimeException $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        } catch (\Throwable $e) {
+            error_log('Grade horária planilha: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => 'Não foi possível ler a planilha. Use o modelo ou salve como CSV.']);
+        }
     }
 
     /**
@@ -515,6 +616,69 @@ class GradeHorariaController extends BaseController
     }
 
     /**
+     * A grade abre uma turma de cada vez. Sem turma na URL, fica a primeira da lista filtrada.
+     *
+     * @param list<array<string, mixed>> $turmas
+     * @param array{tipo_ensino:string,serie:string,turma_id:int,periodo:string,professor_id:int,materia_id:int,visao:string,dia:int} $filtros
+     * @return array{tipo_ensino:string,serie:string,turma_id:int,periodo:string,professor_id:int,materia_id:int,visao:string,dia:int}
+     */
+    private function fixarTurmaDaGrade(array $turmas, array $filtros): array
+    {
+        $ids = [];
+        foreach ($turmas as $turma) {
+            $id = (int) ($turma['id'] ?? 0);
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+        if ($ids === []) {
+            return $filtros;
+        }
+        if (in_array((int) $filtros['turma_id'], $ids, true)) {
+            return $filtros;
+        }
+
+        $filtros['turma_id'] = $ids[0];
+
+        return $filtros;
+    }
+
+    /**
+     * @param array{tipo_ensino:string,serie:string,turma_id:int,periodo:string,professor_id:int,materia_id:int,visao:string,dia:int} $filtros
+     */
+    private function queryFiltrosGrade(array $filtros): string
+    {
+        $limpo = [];
+        if (($filtros['tipo_ensino'] ?? '') !== '') {
+            $limpo['tipo_ensino'] = $filtros['tipo_ensino'];
+        }
+        if (($filtros['serie'] ?? '') !== '') {
+            $limpo['serie'] = $filtros['serie'];
+        }
+        if ((int) ($filtros['turma_id'] ?? 0) > 0) {
+            $limpo['turma_id'] = (int) $filtros['turma_id'];
+        }
+        if (($filtros['periodo'] ?? '') !== '') {
+            $limpo['periodo'] = $filtros['periodo'];
+        }
+        if ((int) ($filtros['professor_id'] ?? 0) > 0) {
+            $limpo['professor_id'] = (int) $filtros['professor_id'];
+        }
+        if ((int) ($filtros['materia_id'] ?? 0) > 0) {
+            $limpo['materia_id'] = (int) $filtros['materia_id'];
+        }
+        $visao = (string) ($filtros['visao'] ?? 'semana');
+        if ($visao !== '' && $visao !== 'semana') {
+            $limpo['visao'] = $visao;
+        }
+        if ((int) ($filtros['dia'] ?? 0) > 0) {
+            $limpo['dia'] = (int) $filtros['dia'];
+        }
+
+        return $limpo === [] ? '' : ('?' . http_build_query($limpo));
+    }
+
+    /**
      * @return array{tipo_ensino:string,serie:string,turma_id:int,periodo:string,professor_id:int,materia_id:int,visao:string,dia:int}
      */
     private function filtrosDaRequest(): array
@@ -541,83 +705,7 @@ class GradeHorariaController extends BaseController
      */
     private function listarItens(array $filtros): array
     {
-        $selectSala = ', NULL AS sala_nome';
-        $joinSala = '';
-        if ($this->colunaExiste('turmas', 'sala_padrao_id') && $this->tabelaExiste('school_locations')) {
-            $selectSala = ', sl.nome AS sala_nome';
-            $joinSala = ' LEFT JOIN school_locations sl ON sl.id = t.sala_padrao_id';
-        }
-
-        $where = [];
-        $params = [];
-
-        if ($filtros['turma_id'] > 0) {
-            $where[] = 'g.turma_id = :turma_id';
-            $params['turma_id'] = $filtros['turma_id'];
-        }
-        if ($filtros['periodo'] !== '') {
-            $where[] = 'g.periodo = :periodo';
-            $params['periodo'] = $filtros['periodo'];
-        }
-        if ($filtros['professor_id'] > 0) {
-            $where[] = 'g.professor_id = :professor_id';
-            $params['professor_id'] = $filtros['professor_id'];
-        }
-        if ($filtros['materia_id'] > 0) {
-            $where[] = 'g.materia_id = :materia_id';
-            $params['materia_id'] = $filtros['materia_id'];
-        }
-        if ($filtros['tipo_ensino'] !== '') {
-            $where[] = 't.tipo_ensino = :tipo_ensino';
-            $params['tipo_ensino'] = $filtros['tipo_ensino'];
-        }
-        if ($filtros['serie'] !== '') {
-            $where[] = 't.serie = :serie';
-            $params['serie'] = $filtros['serie'];
-        }
-
-        $sql = "SELECT g.*, t.nome AS turma_nome, t.serie AS turma_serie, t.tipo_ensino,
-                       p.nome AS professor_nome, m.nome AS materia_nome
-                       {$selectSala}
-                FROM grade_horaria g
-                JOIN turmas t ON g.turma_id = t.id
-                JOIN professores p ON g.professor_id = p.id
-                JOIN materias m ON g.materia_id = m.id
-                {$joinSala}";
-        if ($where !== []) {
-            $sql .= ' WHERE ' . implode(' AND ', $where);
-        }
-        $sql .= ' ORDER BY g.horario_de ASC, g.horario_ate ASC, g.dia_semana ASC, t.nome ASC';
-
-        return $this->db->fetchAll($sql, $params) ?: [];
-    }
-
-    private function colunaExiste(string $tabela, string $coluna): bool
-    {
-        if ($tabela !== 'turmas' || $coluna !== 'sala_padrao_id') {
-            return false;
-        }
-        try {
-            return $this->db->fetch('SHOW COLUMNS FROM turmas LIKE :c', ['c' => $coluna]) !== false;
-        } catch (\Exception $e) {
-            return false;
-        }
-    }
-
-    private function tabelaExiste(string $tabela): bool
-    {
-        if ($tabela !== 'school_locations') {
-            return false;
-        }
-        try {
-            $row = $this->db->fetch(
-                'SELECT 1 AS ok FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = :tabela LIMIT 1',
-                ['tabela' => $tabela]
-            );
-            return !empty($row);
-        } catch (\Exception $e) {
-            return false;
-        }
+        return (new \App\Dominio\Escola\Services\GradeHorariaLeitura())->listar($filtros);
     }
 
     private function renderizarHtml(string $view, array $viewData): string
@@ -695,6 +783,24 @@ class GradeHorariaController extends BaseController
             ];
         }
         return $out;
+    }
+
+    public function logs()
+    {
+        $user = $this->auth->getUser();
+        if (!$user || ($user['perfil_admin'] ?? '') !== 'dev') {
+            $this->json(['error' => 'Sem permissão.'], 403);
+            return;
+        }
+
+        try {
+            $logs = (new TrilhaCadastroService($this->db))->listar('grade');
+        } catch (\Throwable $e) {
+            $this->json(['error' => 'Não foi possível ler os logs da grade horária.'], 500);
+            return;
+        }
+
+        $this->json(['success' => true, 'logs' => $logs]);
     }
 }
 }

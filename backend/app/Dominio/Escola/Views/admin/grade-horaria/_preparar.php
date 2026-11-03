@@ -160,7 +160,7 @@ foreach (['tipo_ensino', 'serie', 'periodo'] as $chave) {
         $filtrosAtivos++;
     }
 }
-foreach (['turma_id', 'professor_id', 'materia_id'] as $chave) {
+foreach (['professor_id', 'materia_id'] as $chave) {
     if ((int) ($filtros[$chave] ?? 0) > 0) {
         $filtrosAtivos++;
     }
@@ -213,7 +213,27 @@ $nomePorId = static function (array $lista, int $id): string {
     return '';
 };
 
-$urlGrade = URL . '/admin/grade-horaria';
+$urlGrade = (isset($gradeBaseUrl) && $gradeBaseUrl !== '')
+    ? (string) $gradeBaseUrl
+    : (URL . '/admin/grade-horaria');
+$nomeTurmaAtual = '';
+$turmaAnteriorId = 0;
+$turmaProximaId = 0;
+$turmasNavegacao = array_values($turmas_filtro);
+$turmaAtualId = (int) ($filtros['turma_id'] ?? 0);
+foreach ($turmasNavegacao as $indiceTurma => $turmaNav) {
+    if ((int) ($turmaNav['id'] ?? 0) !== $turmaAtualId) {
+        continue;
+    }
+    $nomeTurmaAtual = trim((string) ($turmaNav['nome'] ?? ''));
+    if ($indiceTurma > 0) {
+        $turmaAnteriorId = (int) ($turmasNavegacao[$indiceTurma - 1]['id'] ?? 0);
+    }
+    if ($indiceTurma < count($turmasNavegacao) - 1) {
+        $turmaProximaId = (int) ($turmasNavegacao[$indiceTurma + 1]['id'] ?? 0);
+    }
+    break;
+}
 $hojeN = (int) date('N');
 $indiceDiaAtual = array_search($diaFiltro, $diasNavegacao, true);
 $diaAnterior = ($visao === 'dia' && $indiceDiaAtual !== false && $indiceDiaAtual > 0)
@@ -257,3 +277,8 @@ if ((int) ($filtros['materia_id'] ?? 0) > 0) {
 }
 $rotuloFiltrosTxt = $partesFiltro !== [] ? implode(' · ', $partesFiltro) : 'Toda a escola';
 $urlPdf = $urlGrade . '/pdf' . $montarQuery();
+$urlPdfProfessores = $urlGrade . '/pdf-professores' . $montarQuery([
+    'turma_id' => 0,
+    'visao' => 'semana',
+    'dia' => 0,
+]);

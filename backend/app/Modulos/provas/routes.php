@@ -39,6 +39,7 @@ $router->post('/admin/provas/blocos/{id}/toggle-liberado', 'Modulos/provas/ExamB
 $router->post('/admin/provas/blocos/{id}/marcar-concluido', 'Modulos/provas/ExamBlockController@marcarComoConcluido');
 $router->post('/admin/provas/blocos/{id}/visivel-portal-aluno', 'Modulos/provas/ExamBlockController@definirVisivelPortalAluno');
 $router->get('/admin/provas/blocos/{id}/gerenciar', 'Modulos/provas/TeacherExamController@gerenciar');
+$router->post('/admin/provas/blocos/{id}/elaborar-prova-impressa', 'Modulos/provas/ExamController@elaborarProvaImpressa');
 $router->get('/admin/provas/blocos/{id}/notas-lancadas', 'Modulos/provas/TeacherExamController@notasLancadasAdmin');
 $router->post('/admin/provas/blocos/{id}/importar-notas-internas', 'Modulos/provas/TeacherExamController@importarNotasInternas');
 $router->get('/admin/provas/blocos/{id}/lancar-notas-coordenacao', 'Modulos/provas/TeacherExamController@lancarNotasCoordenacao');

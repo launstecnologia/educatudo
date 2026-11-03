@@ -3,14 +3,17 @@ $items = is_array($items ?? null) ? $items : [];
 $classes = is_array($classes ?? null) ? $classes : [];
 $students = is_array($students ?? null) ? $students : [];
 $csrf = htmlspecialchars((string) ($csrf_token ?? ''));
-$publicoLabels = ['todos' => 'Todos os responsáveis', 'turmas' => 'Por turma', 'alunos' => 'Individual'];
+$publicoLabels = ['todos' => 'Todos os responsáveis', 'turmas' => 'Por turma', 'series' => 'Por série', 'cursos' => 'Por curso', 'alunos' => 'Individual'];
+$professorLiberado = !empty($professor_liberado);
+$series = is_array($series ?? null) ? $series : [];
+$cursos = is_array($cursos ?? null) ? $cursos : [];
 $prioridadeLabels = ['normal' => 'Normal', 'importante' => 'Importante', 'urgente' => 'Urgente'];
 
 $flash_status = (string) ($flash_type ?? '');
 include \App\Core\ViewPaths::adminPartial('flash_message.php');
 
 $page_header_title = 'Comunicação Escolar';
-$page_header_subtitle = 'Mensagens para responsáveis, separadas do mural dos alunos.';
+$page_header_subtitle = 'Avisos para os pais, com imagem, documento, YouTube e push opcional. O histórico interno antigo continua em Notificações.';
 ob_start();
 ?>
 <a href="<?= URL ?>/admin/calendario-escolar" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
@@ -23,6 +26,23 @@ ob_start();
 $page_header_actions = ob_get_clean();
 include \App\Core\ViewPaths::adminPartial('page_header_list.php');
 ?>
+
+<form method="post" action="<?= URL ?>/admin/comunicacao-escolar/professor-pais" class="mb-6 bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+    <input type="hidden" name="_token" value="<?= $csrf ?>">
+    <div>
+        <p class="text-sm font-semibold text-gray-900">Professor envia recado aos pais</p>
+        <p class="text-sm text-gray-500">Ligue para o maternal e o pré, por exemplo, quando o professor precisa avisar se a criança comeu.</p>
+    </div>
+    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+        <input type="checkbox" name="professor_comunicacao_pais" value="1" <?= $professorLiberado ? 'checked' : '' ?> class="rounded border-gray-300 text-green-600" onchange="this.form.submit()">
+        Liberado
+    </label>
+</form>
+<p class="mb-6 text-sm text-gray-500">
+    <a class="text-blue-600 hover:text-blue-800" href="<?= URL ?>/admin/notifications">Histórico de notificações internas</a>
+    <span class="mx-2">·</span>
+    <a class="text-blue-600 hover:text-blue-800" href="<?= URL ?>/admin/notificacoes-push">Histórico de push</a>
+</p>
 
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
 <?php if (empty($items)): ?>
@@ -84,7 +104,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
     <form id="comunicacao-form" method="post" action="<?= URL ?>/admin/comunicacao-escolar" enctype="multipart/form-data" class="flex flex-col flex-1 overflow-hidden">
         <input type="hidden" name="_token" value="<?= $csrf ?>">
         <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-8">
-            <p class="text-sm text-gray-600">Será enviada aos responsáveis no app e por push.</p>
+            <p class="text-sm text-gray-600">Chega no aplicativo da família. O push só sai se você marcar a opção.</p>
             <section>
                 <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Mensagem</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
@@ -108,10 +128,18 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                         <label for="com_expires" class="block text-sm font-medium text-gray-700 mb-1">Expira em</label>
                         <input type="datetime-local" id="com_expires" name="expires_at" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
                     </div>
-                    <div class="sm:col-span-2">
+                    <div>
+                        <label for="com_video" class="block text-sm font-medium text-gray-700 mb-1">Link do YouTube</label>
+                        <input type="url" id="com_video" name="video_url" placeholder="https://www.youtube.com/watch?v=..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                    </div>
+                    <div class="sm:col-span-2 flex flex-wrap gap-5">
                         <label class="inline-flex items-center gap-2 cursor-pointer">
                             <input type="checkbox" name="permite_resposta" value="1" checked class="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
-                            <span class="text-sm text-gray-700">Permitir resposta</span>
+                            <span class="text-sm text-gray-700">Permitir resposta dos pais</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="enviar_push" value="1" class="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500">
+                            <span class="text-sm text-gray-700">Enviar também notificação push</span>
                         </label>
                     </div>
                 </div>
@@ -120,10 +148,34 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                 <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Destinatários</h3>
                 <div class="flex flex-wrap gap-5 mb-4">
                     <label class="inline-flex items-center gap-2 cursor-pointer"><input type="radio" name="publico" value="todos" checked class="text-green-600 border-gray-300 focus:ring-green-500"><span class="text-sm text-gray-700">Todos os responsáveis</span></label>
+                    <label class="inline-flex items-center gap-2 cursor-pointer"><input type="radio" name="publico" value="cursos" class="text-green-600 border-gray-300 focus:ring-green-500"><span class="text-sm text-gray-700">Por curso</span></label>
+                    <label class="inline-flex items-center gap-2 cursor-pointer"><input type="radio" name="publico" value="series" class="text-green-600 border-gray-300 focus:ring-green-500"><span class="text-sm text-gray-700">Por série</span></label>
                     <label class="inline-flex items-center gap-2 cursor-pointer"><input type="radio" name="publico" value="turmas" class="text-green-600 border-gray-300 focus:ring-green-500"><span class="text-sm text-gray-700">Por turma</span></label>
                     <label class="inline-flex items-center gap-2 cursor-pointer"><input type="radio" name="publico" value="alunos" class="text-green-600 border-gray-300 focus:ring-green-500"><span class="text-sm text-gray-700">Individual</span></label>
                 </div>
-                <div id="com-turmas" class="hidden">
+                <div id="com-cursos" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Cursos</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                        <?php foreach ($cursos as $curso): ?>
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="cursos[]" value="<?= (int) $curso['id'] ?>" class="rounded border-gray-300 text-green-600">
+                            <?= htmlspecialchars((string) $curso['nome']) ?>
+                        </label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <div id="com-series" class="hidden mt-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Séries</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                        <?php foreach ($series as $serie): ?>
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="series[]" value="<?= (int) $serie['id'] ?>" class="rounded border-gray-300 text-green-600">
+                            <?= htmlspecialchars((string) (($serie['curso_nome'] ?? '') . ' · ' . $serie['nome'])) ?>
+                        </label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <div id="com-turmas" class="hidden mt-3">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Turmas</label>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
                         <?php foreach ($classes as $c): ?>
@@ -148,14 +200,14 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                 </div>
             </section>
             <section>
-                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Anexos</h3>
+                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Imagem e documento</h3>
                 <input type="file" name="attachments[]" multiple accept="image/jpeg,image/png,image/webp,application/pdf,.doc,.docx,.txt" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                <p class="text-xs text-gray-500 mt-1">Até 10 MB por arquivo.</p>
+                <p class="text-xs text-gray-500 mt-1">Imagem, PDF ou documento. Até 10 MB por arquivo.</p>
             </section>
         </div>
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
             <button type="button" onclick="closeComunicacaoDrawer()" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
-            <button type="submit" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 transition-colors shadow-sm">Publicar e notificar</button>
+            <button type="submit" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 transition-colors shadow-sm">Publicar</button>
         </div>
     </form>
 </aside>
@@ -164,6 +216,8 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
 function togglePublicoComunicacao() {
     var v = document.querySelector('#comunicacao-form [name=publico]:checked');
     v = v ? v.value : 'todos';
+    document.getElementById('com-cursos').classList.toggle('hidden', v !== 'cursos');
+    document.getElementById('com-series').classList.toggle('hidden', v !== 'series');
     document.getElementById('com-turmas').classList.toggle('hidden', v !== 'turmas');
     document.getElementById('com-alunos').classList.toggle('hidden', v !== 'alunos');
 }

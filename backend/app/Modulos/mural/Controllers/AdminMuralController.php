@@ -5,6 +5,7 @@ namespace App\Modulos\Mural\Controllers;
 use App\Core\AuthManager;
 use App\Core\BaseController;
 use App\Core\Database;
+use App\Modulos\Mural\Services\MuralRecadoService;
 
 
 /**
@@ -87,6 +88,9 @@ class AdminMuralController extends BaseController
         $recados = $this->db->fetchAll(
             "SELECT r.*,
                     (SELECT GROUP_CONCAT(t.nome) FROM mural_recados_turmas rt JOIN turmas t ON rt.turma_id = t.id WHERE rt.mural_recado_id = r.id) as turmas_nomes,
+                    (SELECT a.nome FROM alunos a WHERE a.id = r.aluno_id LIMIT 1) as aluno_nome,
+                    (SELECT p.nome FROM professores p WHERE p.id = r.professor_id LIMIT 1) as professor_nome,
+                    (SELECT COUNT(*) FROM mural_recados_vistos v WHERE v.mural_recado_id = r.id) as total_leituras,
                     CASE WHEN r.autor_tipo = 'professor' THEN (SELECT p.nome FROM professores p WHERE p.id = r.autor_id LIMIT 1) ELSE 'Admin' END as autor_nome
              FROM mural_recados r
              WHERE {$whereSql}
@@ -94,7 +98,14 @@ class AdminMuralController extends BaseController
              LIMIT " . (int) $perPage . " OFFSET " . (int) $offset,
             $params
         );
-        $professores_opcoes = $this->db->fetchAll("SELECT id, nome FROM professores ORDER BY nome");
+        $professores_opcoes = $this->db->fetchAll("SELECT id, nome FROM professores WHERE ativo = 1 ORDER BY nome");
+        $alunos_opcoes = $this->db->fetchAll(
+            "SELECT a.id, a.nome, t.nome AS turma_nome
+             FROM alunos a
+             LEFT JOIN turmas t ON t.id = a.turma_id
+             WHERE a.ativo = 1
+             ORDER BY a.nome"
+        );
         $materias_opcoes = $this->getMateriasOpcoesMural();
         $data = [
             'title' => 'Mural de Recados - Admin',
@@ -103,6 +114,7 @@ class AdminMuralController extends BaseController
             'recados' => $recados,
             'turmas_opcoes' => $this->getTurmasAll(),
             'professores_opcoes' => $professores_opcoes,
+            'alunos_opcoes' => $alunos_opcoes,
             'materias_opcoes' => $materias_opcoes,
             'filtro_professor' => $filtro_professor,
             'filtro_materia' => $filtro_materia,
@@ -121,6 +133,77 @@ class AdminMuralController extends BaseController
             'csrf_token' => $this->generateCsrfToken(),
         ];
         $this->viewWithLayout('admin', 'admin/mural-recados/index', $data);
+    }
+
+    /**
+     * @param array<string, mixed> $recado
+     */
+    private function alcanceDoRecado(array $recado): string
+    {
+        if (!empty($recado['aluno_id']) || !empty($recado['professor_id'])) {
+            return 'pessoa';
+        }
+        if (!empty($recado['enviar_para_todos'])) {
+            return 'todos';
+        }
+        return 'turmas';
+    }
+
+    /**
+     * @return array{erro: string, publico: string, enviar_para_todos: int, aluno_id: ?int, professor_id: ?int, turmas: array<int, int>}
+     */
+    private function lerDestinoMural(): array
+    {
+        $publico = ($_POST['publico'] ?? 'alunos') === 'professores' ? 'professores' : 'alunos';
+        $alcance = (string) ($_POST['alcance'] ?? 'todos');
+        if (!in_array($alcance, ['todos', 'turmas', 'pessoa'], true)) {
+            $alcance = 'todos';
+        }
+        $turmas = isset($_POST['turmas']) && is_array($_POST['turmas'])
+            ? array_values(array_unique(array_filter(array_map('intval', $_POST['turmas']))))
+            : [];
+        $alunoId = (int) ($_POST['aluno_id'] ?? 0);
+        $professorId = (int) ($_POST['professor_id'] ?? 0);
+        $vazio = [
+            'erro' => '',
+            'publico' => $publico,
+            'enviar_para_todos' => 0,
+            'aluno_id' => null,
+            'professor_id' => null,
+            'turmas' => [],
+        ];
+        if ($alcance === 'todos') {
+            $vazio['enviar_para_todos'] = 1;
+            return $vazio;
+        }
+        if ($alcance === 'turmas') {
+            if ($turmas === []) {
+                $vazio['erro'] = 'Selecione ao menos uma turma.';
+                return $vazio;
+            }
+            $vazio['turmas'] = $turmas;
+            return $vazio;
+        }
+        if ($publico === 'professores') {
+            $existe = $professorId > 0
+                ? $this->db->fetch('SELECT id FROM professores WHERE id = :id AND ativo = 1', ['id' => $professorId])
+                : null;
+            if (!$existe) {
+                $vazio['erro'] = 'Selecione o professor.';
+                return $vazio;
+            }
+            $vazio['professor_id'] = $professorId;
+            return $vazio;
+        }
+        $existe = $alunoId > 0
+            ? $this->db->fetch('SELECT id FROM alunos WHERE id = :id AND ativo = 1', ['id' => $alunoId])
+            : null;
+        if (!$existe) {
+            $vazio['erro'] = 'Selecione o aluno.';
+            return $vazio;
+        }
+        $vazio['aluno_id'] = $alunoId;
+        return $vazio;
     }
 
     private function getMateriasOpcoesMural()
@@ -160,6 +243,10 @@ class AdminMuralController extends BaseController
                 'titulo' => (string) ($recado['titulo'] ?? ''),
                 'conteudo' => (string) ($recado['conteudo'] ?? ''),
                 'enviar_para_todos' => !empty($recado['enviar_para_todos']) ? 1 : 0,
+                'publico' => ($recado['publico'] ?? 'alunos') === 'professores' ? 'professores' : 'alunos',
+                'alcance' => $this->alcanceDoRecado($recado),
+                'aluno_id' => (int) ($recado['aluno_id'] ?? 0),
+                'professor_id' => (int) ($recado['professor_id'] ?? 0),
                 'turmas' => $turmas,
             ],
         ]);
@@ -174,33 +261,35 @@ class AdminMuralController extends BaseController
         $user = $this->authManager->getUser();
         $titulo = trim($_POST['titulo'] ?? '');
         $conteudo = trim($_POST['conteudo'] ?? '');
-        $enviar_para_todos = isset($_POST['enviar_para_todos']) && $_POST['enviar_para_todos'] === '1' ? 1 : 0;
-        $turmas_ids = isset($_POST['turmas']) && is_array($_POST['turmas']) ? array_map('intval', array_filter($_POST['turmas'])) : [];
+        $destino = $this->lerDestinoMural();
         if ($titulo === '') {
             $this->setFlashMessage('Título é obrigatório.', 'error');
             $this->redirect(URL . '/admin/mural-recados?novo=1');
         }
-        if (!$enviar_para_todos && empty($turmas_ids)) {
-            $this->setFlashMessage('Selecione ao menos uma turma ou marque "Enviar para todos".', 'error');
+        if ($destino['erro'] !== '') {
+            $this->setFlashMessage($destino['erro'], 'error');
             $this->redirect(URL . '/admin/mural-recados?novo=1');
         }
         $data_sai = date('Y-m-d', strtotime('+30 days'));
-        $id = $this->db->insert(
-            "INSERT INTO mural_recados (titulo, conteudo, autor_tipo, autor_id, enviar_para_todos, data_sai_mural) VALUES (:titulo, :conteudo, 'admin', :autor_id, :enviar_para_todos, :data_sai_mural)",
+        $id = (int) $this->db->insert(
+            "INSERT INTO mural_recados (titulo, conteudo, autor_tipo, autor_id, enviar_para_todos, publico, aluno_id, professor_id, data_sai_mural)
+             VALUES (:titulo, :conteudo, 'admin', :autor_id, :enviar_para_todos, :publico, :aluno_id, :professor_id, :data_sai_mural)",
             [
                 'titulo' => $titulo,
                 'conteudo' => $conteudo,
                 'autor_id' => $user['id'],
-                'enviar_para_todos' => $enviar_para_todos,
+                'enviar_para_todos' => $destino['enviar_para_todos'],
+                'publico' => $destino['publico'],
+                'aluno_id' => $destino['aluno_id'],
+                'professor_id' => $destino['professor_id'],
                 'data_sai_mural' => $data_sai,
             ]
         );
-        if (!$enviar_para_todos && $id) {
-            foreach ($turmas_ids as $tid) {
-                $this->db->insert("INSERT INTO mural_recados_turmas (mural_recado_id, turma_id) VALUES (:rid, :tid)", ['rid' => $id, 'tid' => $tid]);
-            }
+        foreach ($destino['turmas'] as $tid) {
+            $this->db->insert("INSERT INTO mural_recados_turmas (mural_recado_id, turma_id) VALUES (:rid, :tid)", ['rid' => $id, 'tid' => $tid]);
         }
-        $this->setFlashMessage('Recado publicado no mural.', 'success');
+        (new MuralRecadoService($this->db))->publicarNoSino($id);
+        $this->setFlashMessage('Recado publicado no mural e no sino.', 'success');
         $this->redirect(URL . '/admin/mural-recados');
     }
 
@@ -224,33 +313,37 @@ class AdminMuralController extends BaseController
         }
         $titulo = trim($_POST['titulo'] ?? '');
         $conteudo = trim($_POST['conteudo'] ?? '');
-        $enviar_para_todos = isset($_POST['enviar_para_todos']) && $_POST['enviar_para_todos'] === '1' ? 1 : 0;
-        $turmas_ids = isset($_POST['turmas']) && is_array($_POST['turmas']) ? array_map('intval', array_filter($_POST['turmas'])) : [];
+        $destino = $this->lerDestinoMural();
         if ($titulo === '') {
             $this->setFlashMessage('Título é obrigatório.', 'error');
             $this->redirect(URL . '/admin/mural-recados?recado=' . $id);
         }
-        if (!$enviar_para_todos && empty($turmas_ids)) {
-            $this->setFlashMessage('Selecione ao menos uma turma ou marque "Enviar para todos".', 'error');
+        if ($destino['erro'] !== '') {
+            $this->setFlashMessage($destino['erro'], 'error');
             $this->redirect(URL . '/admin/mural-recados?recado=' . $id);
         }
         $data_sai = date('Y-m-d', strtotime('+30 days'));
         $this->db->query(
-            "UPDATE mural_recados SET titulo = :titulo, conteudo = :conteudo, enviar_para_todos = :enviar_para_todos, data_sai_mural = :data_sai_mural WHERE id = :id",
+            "UPDATE mural_recados
+             SET titulo = :titulo, conteudo = :conteudo, enviar_para_todos = :enviar_para_todos,
+                 publico = :publico, aluno_id = :aluno_id, professor_id = :professor_id, data_sai_mural = :data_sai_mural
+             WHERE id = :id",
             [
                 'titulo' => $titulo,
                 'conteudo' => $conteudo,
-                'enviar_para_todos' => $enviar_para_todos,
+                'enviar_para_todos' => $destino['enviar_para_todos'],
+                'publico' => $destino['publico'],
+                'aluno_id' => $destino['aluno_id'],
+                'professor_id' => $destino['professor_id'],
                 'data_sai_mural' => $data_sai,
                 'id' => $id,
             ]
         );
         $this->db->query("DELETE FROM mural_recados_turmas WHERE mural_recado_id = :id", ['id' => $id]);
-        if (!$enviar_para_todos) {
-            foreach ($turmas_ids as $tid) {
-                $this->db->insert("INSERT INTO mural_recados_turmas (mural_recado_id, turma_id) VALUES (:rid, :tid)", ['rid' => $id, 'tid' => $tid]);
-            }
+        foreach ($destino['turmas'] as $tid) {
+            $this->db->insert("INSERT INTO mural_recados_turmas (mural_recado_id, turma_id) VALUES (:rid, :tid)", ['rid' => $id, 'tid' => $tid]);
         }
+        (new MuralRecadoService($this->db))->publicarNoSino($id);
         $this->setFlashMessage('Recado atualizado.', 'success');
         $this->redirect(URL . '/admin/mural-recados');
     }

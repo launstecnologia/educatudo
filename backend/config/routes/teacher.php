@@ -2,6 +2,8 @@
 // Jornadas → Modulos/jornadas/routes.php
 $router->get('/professor/ai-job/{id}/status', 'AIJobController@status');
 $router->get('/professor/dashboard', 'User/TeacherController@dashboard');
+$router->get('/professor/grade-horaria', 'Education/GradeHorariaConsultaController@professor');
+$router->get('/professor/grade-horaria/pdf', 'Education/GradeHorariaConsultaController@pdfProfessor');
 $router->get('/professor/carteira', 'User/TeacherController@carteira');
 $router->get('/professor/carteira/comprar', 'User/TeacherController@carteiraComprar');
 $router->post('/professor/carteira/comprar', 'User/TeacherController@carteiraComprar');

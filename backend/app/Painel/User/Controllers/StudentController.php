@@ -948,7 +948,14 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
         $turmaFiltro = $turmaId > 0
             ? " OR EXISTS (SELECT 1 FROM mural_recados_turmas rt WHERE rt.mural_recado_id = r.id AND rt.turma_id = :aluno_turma_id)"
             : '';
-        $sql = "(r.enviar_para_todos = 1{$turmaFiltro})
+        $sql = "COALESCE(r.publico, 'alunos') = 'alunos'
+                AND (
+                    r.aluno_id = :aluno_destino
+                    OR (
+                        r.aluno_id IS NULL
+                        AND (r.enviar_para_todos = 1{$turmaFiltro})
+                    )
+                )
                 AND (CURDATE() <= r.data_sai_mural)";
         if ($apenasNaoVistos) {
             $sql .= " AND NOT EXISTS (
@@ -961,7 +968,7 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
 
     private function buildMuralRecadosBaseParams(int $alunoId, int $turmaId, bool $apenasNaoVistos): array
     {
-        $params = [];
+        $params = ['aluno_destino' => $alunoId];
         if ($turmaId > 0) {
             $params['aluno_turma_id'] = $turmaId;
         }
@@ -2285,6 +2292,10 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
     public function marcarVistoMuralRecado()
     {
         header('Content-Type: application/json; charset=utf-8');
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            echo json_encode(['success' => false, 'error' => 'Sessão expirada.']);
+            return;
+        }
         $user = $this->authManager->getUser();
         $aluno = $this->db->fetch("SELECT id FROM alunos WHERE id = :user_id", ['user_id' => $user['id']]);
         if (!$aluno) {
@@ -2296,11 +2307,9 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
             echo json_encode(['success' => true]);
             return;
         }
+        $servico = new \App\Modulos\Mural\Services\MuralRecadoService($this->db);
         foreach ($ids as $rid) {
-            $this->db->query(
-                "INSERT IGNORE INTO mural_recados_vistos (mural_recado_id, aluno_id) VALUES (:rid, :aid)",
-                ['rid' => $rid, 'aid' => $aluno['id']]
-            );
+            $servico->marcarVistoAluno($rid, (int) $aluno['id']);
         }
         echo json_encode(['success' => true]);
     }
@@ -5659,13 +5668,20 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
     private function getMuralRecadosParaAlunoComFiltros($aluno_id, $turma_id, array $filtros = [], $apenas_nao_vistos = false)
     {
         $turma_id = $turma_id !== null && $turma_id !== '' ? (int) $turma_id : 0;
-        $params = [];
+        $params = ['aluno_destino' => (int) $aluno_id];
         $sql = "SELECT r.id, r.titulo, r.conteudo, r.data_publicacao, r.data_sai_mural, r.autor_tipo, r.autor_id,
                 CASE WHEN r.autor_tipo = 'professor' THEN (SELECT p.nome FROM professores p WHERE p.id = r.autor_id LIMIT 1) ELSE 'Admin' END as autor_nome
                 FROM mural_recados r
-                WHERE (r.enviar_para_todos = 1" . ($turma_id > 0 ? " OR EXISTS (
+                WHERE COALESCE(r.publico, 'alunos') = 'alunos'
+                AND (
+                    r.aluno_id = :aluno_destino
+                    OR (
+                        r.aluno_id IS NULL
+                        AND (r.enviar_para_todos = 1" . ($turma_id > 0 ? " OR EXISTS (
                     SELECT 1 FROM mural_recados_turmas rt WHERE rt.mural_recado_id = r.id AND rt.turma_id = :aluno_turma_id
                   )" : "") . ")
+                    )
+                )
                 AND (CURDATE() <= r.data_sai_mural)";
         if ($turma_id > 0) {
             $params['aluno_turma_id'] = $turma_id;

@@ -5,6 +5,7 @@ namespace App\Modulos\Mural\Controllers;
 use App\Core\AuthManager;
 use App\Core\BaseController;
 use App\Core\Database;
+use App\Modulos\Mural\Services\MuralRecadoService;
 
 
 /**
@@ -71,6 +72,11 @@ class TeacherMuralController extends BaseController
             $where[] = "DATE(r.data_publicacao) <= :data_ate";
             $params['data_ate'] = $filtro_data_ate;
         }
+        $turmasProfessor = $this->getTurmasProfessor();
+        $recebidos = (new MuralRecadoService($this->db))->listarRecebidosProfessor(
+            (int) $professor['id'],
+            array_map('intval', array_column($turmasProfessor, 'id'))
+        );
         $recados = $this->db->fetchAll(
             "SELECT r.*,
                     (SELECT GROUP_CONCAT(t.nome) FROM mural_recados_turmas rt JOIN turmas t ON rt.turma_id = t.id WHERE rt.mural_recado_id = r.id) as turmas_nomes
@@ -86,6 +92,7 @@ class TeacherMuralController extends BaseController
             'page_title' => 'Mural de Recados',
             'user' => $user,
             'recados' => $recados,
+            'recebidos' => $recebidos,
             'turmas_opcoes' => $turmas,
             'materias_opcoes' => $materias_opcoes,
             'filtro_materia' => $filtro_materia,
@@ -156,8 +163,8 @@ class TeacherMuralController extends BaseController
             $this->redirect(URL . '/professor/mural-recados/criar');
         }
         $data_sai = date('Y-m-d', strtotime('+30 days'));
-        $id = $this->db->insert(
-            "INSERT INTO mural_recados (titulo, conteudo, autor_tipo, autor_id, enviar_para_todos, data_sai_mural) VALUES (:titulo, :conteudo, 'professor', :autor_id, :enviar_para_todos, :data_sai_mural)",
+        $id = (int) $this->db->insert(
+            "INSERT INTO mural_recados (titulo, conteudo, autor_tipo, autor_id, enviar_para_todos, publico, data_sai_mural) VALUES (:titulo, :conteudo, 'professor', :autor_id, :enviar_para_todos, 'alunos', :data_sai_mural)",
             [
                 'titulo' => $titulo,
                 'conteudo' => $conteudo,
@@ -171,7 +178,8 @@ class TeacherMuralController extends BaseController
                 $this->db->insert("INSERT INTO mural_recados_turmas (mural_recado_id, turma_id) VALUES (:rid, :tid)", ['rid' => $id, 'tid' => $tid]);
             }
         }
-        $this->setFlashMessage('Recado publicado no mural.', 'success');
+        (new MuralRecadoService($this->db))->publicarNoSino($id);
+        $this->setFlashMessage('Recado publicado no mural e no sino.', 'success');
         $this->redirect(URL . '/professor/mural-recados');
     }
 
@@ -250,6 +258,7 @@ class TeacherMuralController extends BaseController
                 $this->db->insert("INSERT INTO mural_recados_turmas (mural_recado_id, turma_id) VALUES (:rid, :tid)", ['rid' => $id, 'tid' => $tid]);
             }
         }
+        (new MuralRecadoService($this->db))->publicarNoSino($id);
         $this->setFlashMessage('Recado atualizado.', 'success');
         $this->redirect(URL . '/professor/mural-recados');
     }
@@ -270,6 +279,27 @@ class TeacherMuralController extends BaseController
         }
         $this->db->query("DELETE FROM mural_recados WHERE id = :id", ['id' => $id]);
         $this->json(['success' => true]);
+    }
+
+    public function marcarVisto()
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            echo json_encode(['success' => false, 'error' => 'Sessão expirada.']);
+            return;
+        }
+        $user = $this->authManager->getUser();
+        $professor = $this->db->fetch('SELECT id FROM professores WHERE id = :id', ['id' => $user['id']]);
+        if (!$professor) {
+            echo json_encode(['success' => false, 'error' => 'Professor não encontrado.']);
+            return;
+        }
+        $ids = isset($_POST['ids']) && is_array($_POST['ids']) ? array_map('intval', array_filter($_POST['ids'])) : [];
+        $servico = new MuralRecadoService($this->db);
+        foreach ($ids as $rid) {
+            $servico->marcarVistoProfessor($rid, (int) $professor['id']);
+        }
+        echo json_encode(['success' => true]);
     }
 }
 }

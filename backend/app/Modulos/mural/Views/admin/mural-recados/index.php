@@ -147,14 +147,29 @@ unset($_SESSION['flash_message'], $_SESSION['flash_type']);
             </section>
             <section>
                 <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Destinatários</h3>
+                <p class="text-sm text-gray-500 mb-4">O recado aparece no portal e no sino. A leitura fica registrada.</p>
                 <div class="flex flex-wrap gap-5 mb-4">
                     <label class="inline-flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="enviar_para_todos" value="1" checked class="text-green-600 border-gray-300 focus:ring-green-500">
-                        <span class="text-sm text-gray-700">Enviar para todos</span>
+                        <input type="radio" name="publico" value="alunos" checked class="text-green-600 border-gray-300 focus:ring-green-500">
+                        <span class="text-sm text-gray-700">Alunos</span>
                     </label>
                     <label class="inline-flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="enviar_para_todos" value="0" id="mural_radio_turmas" class="text-green-600 border-gray-300 focus:ring-green-500">
-                        <span class="text-sm text-gray-700">Selecionar turmas</span>
+                        <input type="radio" name="publico" value="professores" class="text-green-600 border-gray-300 focus:ring-green-500">
+                        <span class="text-sm text-gray-700">Professores</span>
+                    </label>
+                </div>
+                <div class="flex flex-wrap gap-5 mb-4">
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="alcance" value="todos" checked class="text-green-600 border-gray-300 focus:ring-green-500">
+                        <span class="text-sm text-gray-700">Todos</span>
+                    </label>
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="alcance" value="turmas" class="text-green-600 border-gray-300 focus:ring-green-500">
+                        <span class="text-sm text-gray-700">Turmas</span>
+                    </label>
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="alcance" value="pessoa" class="text-green-600 border-gray-300 focus:ring-green-500">
+                        <span class="text-sm text-gray-700">Uma pessoa</span>
                     </label>
                 </div>
                 <div id="mural_turmas_container" class="hidden">
@@ -167,6 +182,24 @@ unset($_SESSION['flash_message'], $_SESSION['flash_type']);
                         </label>
                         <?php endforeach; ?>
                     </div>
+                </div>
+                <div id="mural_aluno_box" class="hidden">
+                    <label for="mural_aluno_id" class="block text-sm font-medium text-gray-700 mb-1">Aluno</label>
+                    <select id="mural_aluno_id" name="aluno_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                        <option value="">Selecione o aluno</option>
+                        <?php foreach ($alunos_opcoes ?? [] as $aluno): ?>
+                        <option value="<?= (int) $aluno['id'] ?>"><?= htmlspecialchars((string) ($aluno['nome'] . (!empty($aluno['turma_nome']) ? ' · ' . $aluno['turma_nome'] : ''))) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div id="mural_professor_box" class="hidden">
+                    <label for="mural_professor_id" class="block text-sm font-medium text-gray-700 mb-1">Professor</label>
+                    <select id="mural_professor_id" name="professor_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                        <option value="">Selecione o professor</option>
+                        <?php foreach ($professores_opcoes ?? [] as $professor): ?>
+                        <option value="<?= (int) $professor['id'] ?>"><?= htmlspecialchars((string) $professor['nome']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
             </section>
         </div>
@@ -194,6 +227,7 @@ unset($_SESSION['flash_message'], $_SESSION['flash_type']);
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Título</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Autor</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Destinatários</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Leituras</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
             </tr>
@@ -201,7 +235,7 @@ unset($_SESSION['flash_message'], $_SESSION['flash_type']);
         <tbody class="bg-white divide-y divide-gray-200">
             <?php if (empty($recados)): ?>
             <tr>
-                <td colspan="5" class="px-6 py-8 text-center text-gray-500">Nenhum recado ainda.</td>
+                <td colspan="6" class="px-6 py-8 text-center text-gray-500">Nenhum recado ainda.</td>
             </tr>
             <?php else: ?>
             <?php
@@ -213,7 +247,23 @@ unset($_SESSION['flash_message'], $_SESSION['flash_type']);
             <tr class="hover:bg-gray-50">
                 <td class="px-6 py-4 font-medium text-gray-900"><?= htmlspecialchars($r['titulo']) ?></td>
                 <td class="px-6 py-4 text-sm text-gray-600"><?= $autor_nome ?></td>
-                <td class="px-6 py-4 text-sm text-gray-600"><?= !empty($r['enviar_para_todos']) ? 'Todos' : (htmlspecialchars($r['turmas_nomes'] ?? '-')) ?></td>
+                <td class="px-6 py-4 text-sm text-gray-600"><?php
+                    $publicoRecado = ($r['publico'] ?? 'alunos') === 'professores' ? 'professores' : 'alunos';
+                    if ($publicoRecado === 'professores' && !empty($r['professor_nome'])) {
+                        echo htmlspecialchars((string) $r['professor_nome']);
+                    } elseif ($publicoRecado === 'professores' && !empty($r['enviar_para_todos'])) {
+                        echo 'Todos os professores';
+                    } elseif ($publicoRecado === 'professores') {
+                        echo 'Professores: ' . htmlspecialchars((string) ($r['turmas_nomes'] ?? '-'));
+                    } elseif (!empty($r['aluno_nome'])) {
+                        echo htmlspecialchars((string) $r['aluno_nome']);
+                    } elseif (!empty($r['enviar_para_todos'])) {
+                        echo 'Todos os alunos';
+                    } else {
+                        echo htmlspecialchars((string) ($r['turmas_nomes'] ?? '-'));
+                    }
+                ?></td>
+                <td class="px-6 py-4 text-sm text-gray-600"><?= (int) ($r['total_leituras'] ?? 0) ?></td>
                 <td class="px-6 py-4 text-sm text-gray-500"><?= $data_pub ?></td>
                 <td class="px-6 py-4 text-right">
                     <?php ob_start(); ?>
@@ -499,13 +549,19 @@ function setMuralConteudo(html) {
     var q = getMuralQuill();
     if (q) q.root.innerHTML = html || '';
 }
-function toggleMuralTurmas() {
-    var todos = document.querySelector('#mural-form [name="enviar_para_todos"]:checked');
-    var paraTodos = !todos || todos.value === '1';
-    document.getElementById('mural_turmas_container').classList.toggle('hidden', paraTodos);
+function muralValor(nome, padrao) {
+    var el = document.querySelector('#mural-form [name="' + nome + '"]:checked');
+    return el ? el.value : padrao;
 }
-document.querySelectorAll('#mural-form [name="enviar_para_todos"]').forEach(function(r) {
-    r.addEventListener('change', toggleMuralTurmas);
+function toggleMuralDestino() {
+    var alcance = muralValor('alcance', 'todos');
+    var publico = muralValor('publico', 'alunos');
+    document.getElementById('mural_turmas_container').classList.toggle('hidden', alcance !== 'turmas');
+    document.getElementById('mural_aluno_box').classList.toggle('hidden', !(alcance === 'pessoa' && publico === 'alunos'));
+    document.getElementById('mural_professor_box').classList.toggle('hidden', !(alcance === 'pessoa' && publico === 'professores'));
+}
+document.querySelectorAll('#mural-form [name="alcance"], #mural-form [name="publico"]').forEach(function(r) {
+    r.addEventListener('change', toggleMuralDestino);
 });
 function showMuralDrawer() {
     document.getElementById('muralDrawerBackdrop').classList.remove('hidden');
@@ -529,8 +585,11 @@ function openMuralDrawer(id) {
     idInput.disabled = true;
     setMuralConteudo('');
     document.querySelectorAll('.mural-turma-check').forEach(function(c) { c.checked = false; });
-    document.querySelector('#mural-form [name="enviar_para_todos"][value="1"]').checked = true;
-    toggleMuralTurmas();
+    document.querySelector('#mural-form [name="publico"][value="alunos"]').checked = true;
+    document.querySelector('#mural-form [name="alcance"][value="todos"]').checked = true;
+    document.getElementById('mural_aluno_id').value = '';
+    document.getElementById('mural_professor_id').value = '';
+    toggleMuralDestino();
 
     if (!id) {
         form.dataset.mode = 'create';
@@ -561,13 +620,17 @@ function openMuralDrawer(id) {
         idInput.disabled = false;
         document.getElementById('mural_titulo').value = item.titulo || '';
         setMuralConteudo(item.conteudo || '');
-        var paraTodos = Number(item.enviar_para_todos) === 1;
-        document.querySelector('#mural-form [name="enviar_para_todos"][value="' + (paraTodos ? '1' : '0') + '"]').checked = true;
+        var publico = item.publico === 'professores' ? 'professores' : 'alunos';
+        var alcance = ['todos', 'turmas', 'pessoa'].indexOf(item.alcance) !== -1 ? item.alcance : 'todos';
+        document.querySelector('#mural-form [name="publico"][value="' + publico + '"]').checked = true;
+        document.querySelector('#mural-form [name="alcance"][value="' + alcance + '"]').checked = true;
+        document.getElementById('mural_aluno_id').value = item.aluno_id ? String(item.aluno_id) : '';
+        document.getElementById('mural_professor_id').value = item.professor_id ? String(item.professor_id) : '';
         var turmas = item.turmas || [];
         document.querySelectorAll('.mural-turma-check').forEach(function(c) {
             c.checked = turmas.indexOf(parseInt(c.value, 10)) !== -1;
         });
-        toggleMuralTurmas();
+        toggleMuralDestino();
     }).catch(function() {
         alert('Erro de conexão ao carregar o recado.');
         closeMuralDrawer();

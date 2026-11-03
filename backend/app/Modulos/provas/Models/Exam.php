@@ -1547,7 +1547,20 @@ class Exam
             return false;
         }
         
-        return $prova['professor_id'] == $professorId;
+        if ($prova['professor_id'] != $professorId) {
+            return false;
+        }
+        $escola = $this->db->fetch(
+            "SELECT 1 AS ok
+             FROM provas_blocos_vinculo v
+             INNER JOIN provas_blocos pb ON pb.id = v.bloco_id AND pb.deleted_at IS NULL
+             WHERE v.prova_id = :prova_id
+               AND pb.formato_evento = 'prova_impressa'
+               AND pb.configuracao_nota = 'coordenacao_calcula'
+             LIMIT 1",
+            ['prova_id' => (int) $id]
+        );
+        return $escola === false || $escola === null;
     }
     
     /**

@@ -10,6 +10,7 @@ use App\Painel\Admin\Controllers\AdminBaseController;
 
 use App\Models\Education\ComponenteCurricular;
 use App\Models\User\Teacher;
+use App\Painel\Admin\Services\TrilhaCadastroService;
 
 if (!class_exists(__NAMESPACE__ . '\\TeacherAdminController', false)) {
 class TeacherAdminController extends AdminBaseController
@@ -558,6 +559,24 @@ class TeacherAdminController extends AdminBaseController
         } catch (\Exception $e) {
             $this->json(['error' => $e->getMessage()], 400);
         }
+    }
+
+    public function logs(): void
+    {
+        $user = $this->auth->getUser();
+        if (!$user || ($user['perfil_admin'] ?? '') !== 'dev') {
+            $this->json(['error' => 'Sem permissão.'], 403);
+            return;
+        }
+
+        try {
+            $logs = (new TrilhaCadastroService($this->db))->listar('professores');
+        } catch (\Throwable $e) {
+            $this->json(['error' => 'Não foi possível ler os logs de professores.'], 500);
+            return;
+        }
+
+        $this->json(['success' => true, 'logs' => $logs]);
     }
 
     public function jornadas()

@@ -6,8 +6,8 @@ namespace App\Painel\Admin\Controllers;
  */
 
 
-use App\Services\EvolutionApiService;
 use App\Core\Logger;
+use App\Services\EvolutionApiService;
 
 if (!class_exists(__NAMESPACE__ . '\\DevAdminController', false)) {
 class DevAdminController extends AdminBaseController

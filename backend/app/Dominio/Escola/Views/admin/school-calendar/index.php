@@ -15,16 +15,16 @@ $statusClasses = [
 $flash_status = (string) ($flash_type ?? '');
 include \App\Core\ViewPaths::adminPartial('flash_message.php');
 
-$page_header_title = 'Calendário escolar';
-$page_header_subtitle = 'Eventos exibidos aos responsáveis no app.';
+$page_header_title = 'Avisos à família';
+$page_header_subtitle = 'Avisos já enviados aos responsáveis no app. O cadastro fica no Calendário Letivo.';
 ob_start();
 ?>
 <a href="<?= URL ?>/admin/comunicacao-escolar" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
     <i class="fa-solid fa-envelope-open-text mr-2 text-gray-500"></i>Comunicações
 </a>
-<button type="button" onclick="openEventoEscolarDrawer()" class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
-    <i class="fa-solid fa-plus mr-2"></i>Novo evento
-</button>
+<a href="<?= URL ?>/admin/calendario-letivo" class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
+    <i class="fa-solid fa-calendar-check mr-2"></i>Calendário Letivo
+</a>
 <?php
 $page_header_actions = ob_get_clean();
 include \App\Core\ViewPaths::adminPartial('page_header_list.php');
@@ -34,10 +34,10 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
 <?php if (!$events): ?>
     <div class="px-6 py-12 text-center text-gray-500">
         <i class="fa-regular fa-calendar-days text-3xl text-gray-300 mb-3 block"></i>
-        <p>Nenhum evento cadastrado.</p>
-        <button type="button" onclick="openEventoEscolarDrawer()" class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90">
-            <i class="fa-solid fa-plus mr-2"></i>Novo evento
-        </button>
+        <p>Nenhum aviso enviado à família.</p>
+        <a href="<?= URL ?>/admin/calendario-letivo" class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90">
+            <i class="fa-solid fa-calendar-check mr-2"></i>Cadastrar no Calendário Letivo
+        </a>
     </div>
 <?php else: ?>
     <div class="divide-y divide-gray-100">
@@ -64,11 +64,22 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                     <?= htmlspecialchars(ucfirst($status)) ?>
                 </span>
                 <?php if ($status === 'publicado'): ?>
-                    <?php ob_start(); ?>
+                    <?php
+                    $letivoId = (int) ($e['letivo_id'] ?? 0);
+                    $letivoAno = (int) ($e['letivo_ano'] ?? 0);
+                    $letivoCalendario = (int) ($e['letivo_calendario_id'] ?? 0);
+                    ob_start();
+                    if ($letivoId > 0 && $letivoAno > 0): ?>
+                    <a href="<?= URL ?>/admin/calendario-letivo?ano=<?= $letivoAno ?>&id=<?= $letivoCalendario ?>&evento=<?= $letivoId ?>"
+                       class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                        <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar no calendário
+                    </a>
+                    <?php else: ?>
                     <button type="button" onclick="openEventoEscolarDrawer(<?= (int) $e['id'] ?>)"
                             class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                         <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                     </button>
+                    <?php endif; ?>
                     <div class="border-t border-gray-100 my-1"></div>
                     <form method="post" action="<?= URL ?>/admin/calendario-escolar/<?= (int) $e['id'] ?>/cancelar" onsubmit="return confirm('Cancelar evento e notificar os responsáveis?')">
                         <input type="hidden" name="_token" value="<?= $csrf ?>">
@@ -297,10 +308,6 @@ document.addEventListener('keydown', function (e) {
 
 (function () {
     var params = new URLSearchParams(window.location.search);
-    if (params.get('novo') === '1') {
-        openEventoEscolarDrawer();
-        return;
-    }
     var eventoId = parseInt(params.get('evento') || '', 10);
     if (eventoId > 0) openEventoEscolarDrawer(eventoId);
 })();

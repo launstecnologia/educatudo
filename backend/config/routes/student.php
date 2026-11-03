@@ -3,6 +3,8 @@
 $router->post('/api/aluno/presenca', 'Api/StudentPresenceController@heartbeat');
 
 $router->get('/dashboard', 'User/StudentController@dashboard');
+$router->get('/grade-horaria', 'Education/GradeHorariaConsultaController@aluno');
+$router->get('/grade-horaria/pdf', 'Education/GradeHorariaConsultaController@pdfAluno');
 $router->get('/dashboard/agenda', 'User/StudentController@dashboardAgendaJson');
 $router->get('/dashboard/api/montar', 'User/StudentController@dashboardApiMontar');
 $router->post('/dashboard/trocar-turma', 'User/StudentController@trocarTurmaCurso');

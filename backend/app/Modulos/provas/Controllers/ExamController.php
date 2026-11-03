@@ -31,6 +31,7 @@ use App\Models\User\Student;
 use App\Models\User\Teacher;
 use App\Modulos\EducaInclui\Models\VersaoAdaptada;
 use App\Modulos\EducaInclui\Models\VersaoAdaptadaLog;
+use App\Modulos\LeitorGabarito\Services\LeitorGabaritoService;
 
 if (!class_exists(__NAMESPACE__ . '\\ExamController', false)) {
 class ExamController extends BaseController
@@ -460,6 +461,19 @@ class ExamController extends BaseController
             return !in_array($prova['id'], $provasIdsEmEventos);
         });
         $provas = array_values($provas);
+        $ocultasEscola = $this->db->fetchAll(
+            "SELECT pbv.prova_id AS id
+             FROM provas_blocos_vinculo pbv
+             INNER JOIN provas_blocos pb ON pb.id = pbv.bloco_id AND pb.deleted_at IS NULL
+             WHERE pb.formato_evento = 'prova_impressa'
+               AND pb.configuracao_nota = 'coordenacao_calcula'"
+        ) ?: [];
+        $idsOcultos = array_map('intval', array_column($ocultasEscola, 'id'));
+        if ($idsOcultos !== []) {
+            $provas = array_values(array_filter($provas, static function ($prova) use ($idsOcultos) {
+                return !in_array((int) ($prova['id'] ?? 0), $idsOcultos, true);
+            }));
+        }
 
         // Resumo de resultados por prova (somente provas do professor já filtradas acima)
         $resumoPorProva = [];
@@ -884,16 +898,181 @@ class ExamController extends BaseController
         if ((int)$prova['professor_id'] !== (int)$professorId) {
             throw new \Exception('Você não tem permissão para ' . $acao . ' esta prova');
         }
+        if ($this->provaImpressaDaEscola((int) ($prova['id'] ?? 0))) {
+            throw new \Exception('Nesta prova impressa, a escola constrói as questões.');
+        }
 
         if (($prova['status'] ?? '') === 'aprovada') {
             throw new \Exception('Esta prova foi aprovada pela coordenação e não pode mais ser alterada pelo professor.');
         }
+    }
+
+    private function provaImpressaDaEscola(int $provaId): bool
+    {
+        if ($provaId <= 0) {
+            return false;
+        }
+        $linha = $this->db->fetch(
+            "SELECT 1 AS ok
+             FROM provas_blocos_vinculo v
+             INNER JOIN provas_blocos pb ON pb.id = v.bloco_id AND pb.deleted_at IS NULL
+             WHERE v.prova_id = :prova_id
+               AND pb.formato_evento = 'prova_impressa'
+               AND pb.configuracao_nota = 'coordenacao_calcula'
+             LIMIT 1",
+            ['prova_id' => $provaId]
+        );
+        return is_array($linha);
     }
     
     /**
      * Formulário de criação de prova
      * @param int|null $evento_id ID do evento de prova (opcional)
      */
+    /**
+     * A escola abre o editor da prova impressa de uma disciplina do bloco.
+     */
+    public function elaborarProvaImpressa($blocoId): void
+    {
+        $user = $this->auth->getUser();
+        if (!in_array($user['tipo'] ?? '', ['admin', 'admin_escola'], true)) {
+            $this->redirect('/admin/provas');
+            return;
+        }
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Token inválido. Recarregue a página.', 'error');
+            $this->redirect('/admin/provas');
+            return;
+        }
+        $blocoId = (int) $blocoId;
+        $materiaId = (int) ($_POST['materia_id'] ?? 0);
+        $blocoModel = new ExamBlock();
+        $bloco = $blocoModel->findById($blocoId);
+        if (!$bloco || $materiaId <= 0) {
+            $this->setFlashMessage('Prova não encontrada.', 'error');
+            $this->redirect('/admin/provas');
+            return;
+        }
+        if (($bloco['formato_evento'] ?? '') !== 'prova_impressa' || ($bloco['configuracao_nota'] ?? '') !== 'coordenacao_calcula') {
+            $this->setFlashMessage('Esta prova não está para a escola construir.', 'error');
+            $this->redirect('/admin/provas/blocos/' . $blocoId . '/gerenciar');
+            return;
+        }
+        $existente = $this->db->fetch(
+            "SELECT p.id
+             FROM provas p
+             INNER JOIN provas_blocos_vinculo v ON v.prova_id = p.id
+             WHERE v.bloco_id = :bloco_id AND p.materia_id = :materia_id AND p.deleted_at IS NULL
+             LIMIT 1",
+            ['bloco_id' => $blocoId, 'materia_id' => $materiaId]
+        );
+        if (!empty($existente['id'])) {
+            $this->redirect('/admin/provas/editar/' . (int) $existente['id']);
+            return;
+        }
+        $professorId = $this->professorDaProvaImpressa($blocoId, $materiaId);
+        if ($professorId <= 0) {
+            $this->setFlashMessage('Cadastre um professor desta disciplina para a escola montar a prova.', 'error');
+            $this->redirect('/admin/provas/blocos/' . $blocoId . '/gerenciar');
+            return;
+        }
+        $dataProva = (string) ($bloco['data_prova'] ?? '');
+        $inicio = trim($dataProva . ' ' . ((string) ($bloco['hora_inicio'] ?? '08:00:00')));
+        $fim = trim($dataProva . ' ' . ((string) ($bloco['hora_fim'] ?? '10:00:00')));
+        if (strtotime($inicio) === false) {
+            $inicio = date('Y-m-d H:i:s');
+        }
+        if (strtotime($fim) === false || strtotime($fim) <= strtotime($inicio)) {
+            $fim = date('Y-m-d H:i:s', strtotime($inicio) + 7200);
+        }
+        $turmas = $this->db->fetchAll(
+            'SELECT turma_id FROM provas_blocos_turmas WHERE bloco_id = :bloco_id',
+            ['bloco_id' => $blocoId]
+        ) ?: [];
+        $turmaIds = [];
+        foreach ($turmas as $turma) {
+            $turmaId = (int) ($turma['turma_id'] ?? 0);
+            if ($turmaId > 0) {
+                $turmaIds[$turmaId] = true;
+            }
+        }
+        $primeiraTurma = (int) (array_key_first($turmaIds) ?? 0);
+        $provaId = (int) $this->db->insert(
+            "INSERT INTO provas (
+                professor_id, materia_id, turma_id, titulo, descricao,
+                data_inicio, data_fim, valor_total, mostrar_resultado,
+                permite_correcao, liberar_resultado, ativo, liberada, status
+             ) VALUES (
+                :professor_id, :materia_id, :turma_id, :titulo, :descricao,
+                :data_inicio, :data_fim, :valor_total, 0,
+                0, 'nao_liberar', 1, 0, 'rascunho'
+             )",
+            [
+                'professor_id' => $professorId,
+                'materia_id' => $materiaId,
+                'turma_id' => $primeiraTurma > 0 ? $primeiraTurma : null,
+                'titulo' => (string) ($bloco['titulo'] ?? 'Prova impressa'),
+                'descricao' => 'Prova impressa elaborada pela escola.',
+                'data_inicio' => date('Y-m-d H:i:s', (int) strtotime($inicio)),
+                'data_fim' => date('Y-m-d H:i:s', (int) strtotime($fim)),
+                'valor_total' => 10,
+            ]
+        );
+        foreach (array_keys($turmaIds) as $turmaId) {
+            $this->db->insert(
+                'INSERT INTO provas_turmas (prova_id, turma_id) VALUES (:prova_id, :turma_id)',
+                ['prova_id' => $provaId, 'turma_id' => $turmaId]
+            );
+        }
+        $ordem = $this->db->fetch(
+            'SELECT COALESCE(MAX(ordem), -1) + 1 AS proxima FROM provas_blocos_vinculo WHERE bloco_id = :bloco_id',
+            ['bloco_id' => $blocoId]
+        );
+        $this->db->insert(
+            'INSERT INTO provas_blocos_vinculo (bloco_id, prova_id, ordem) VALUES (:bloco_id, :prova_id, :ordem)',
+            ['bloco_id' => $blocoId, 'prova_id' => $provaId, 'ordem' => (int) ($ordem['proxima'] ?? 0)]
+        );
+        $this->redirect('/admin/provas/editar/' . $provaId);
+    }
+
+    private function professorDaProvaImpressa(int $blocoId, int $materiaId): int
+    {
+        $linha = $this->db->fetch(
+            'SELECT professor_id FROM provas_blocos_professores
+             WHERE bloco_id = :bloco_id AND materia_id = :materia_id AND professor_id IS NOT NULL
+             LIMIT 1',
+            ['bloco_id' => $blocoId, 'materia_id' => $materiaId]
+        );
+        $professorId = (int) ($linha['professor_id'] ?? 0);
+        if ($professorId > 0) {
+            return $professorId;
+        }
+        $materia = $this->db->fetch(
+            'SELECT nome FROM materias WHERE id = :id',
+            ['id' => $materiaId]
+        );
+        $nomeMateria = mb_strtolower(trim((string) ($materia['nome'] ?? '')));
+        if ($nomeMateria === '') {
+            return 0;
+        }
+        $professores = $this->db->fetchAll(
+            'SELECT id, materias FROM professores WHERE ativo = 1'
+        ) ?: [];
+        foreach ($professores as $professor) {
+            $lista = json_decode((string) ($professor['materias'] ?? ''), true);
+            if (!is_array($lista)) {
+                continue;
+            }
+            foreach ($lista as $item) {
+                $nome = mb_strtolower(trim((string) (is_array($item) ? ($item['nome'] ?? '') : $item)));
+                if ($nome !== '' && $nome === $nomeMateria) {
+                    return (int) $professor['id'];
+                }
+            }
+        }
+        return 0;
+    }
+
     public function criar($evento_id = null)
     {
         $user = $this->auth->getUser();
@@ -963,6 +1142,11 @@ class ExamController extends BaseController
             $formatoEvento = $evento['formato_evento'] ?? 'online_questoes';
             if ($formatoEvento === 'lancamento_nota' && $materiaIdParaBusca > 0) {
                 $this->redirect('/professor/provas/evento-lancar-notas/' . (int) $evento_id . '?materia_id=' . $materiaIdParaBusca);
+                return;
+            }
+            if ($formatoEvento === 'prova_impressa' && ($evento['configuracao_nota'] ?? '') === 'coordenacao_calcula') {
+                $this->setFlashMessage('Nesta prova impressa, a escola constrói as questões.', 'error');
+                $this->redirect('/professor/provas');
                 return;
             }
             
@@ -1413,6 +1597,11 @@ class ExamController extends BaseController
                 $blocoModel = new ExamBlock();
                 $evento = $blocoModel->findById($postData['evento_id']);
                 
+                if ($evento && ($evento['formato_evento'] ?? '') === 'prova_impressa' && ($evento['configuracao_nota'] ?? '') === 'coordenacao_calcula') {
+                    $this->json(['error' => 'Nesta prova impressa, a escola constrói as questões.'], 403);
+                    return;
+                }
+
                 if ($evento) {
                     // Preenche título se não fornecido
                     if (empty($postData['titulo'])) {
@@ -1881,6 +2070,11 @@ class ExamController extends BaseController
             if (in_array($prova['status'], ['enviada', 'aprovada'])) {
                 $this->setFlashMessage('Esta prova não pode ser editada após o envio para a coordenação.', 'error');
                 $this->redirect('/professor/provas/visualizar/' . $id);
+                return;
+            }
+            if ($this->provaImpressaDaEscola((int) $id)) {
+                $this->setFlashMessage('Nesta prova impressa, a escola constrói as questões.', 'error');
+                $this->redirect('/professor/provas');
                 return;
             }
         }
@@ -2631,6 +2825,9 @@ class ExamController extends BaseController
             $agoraBloco = date('Y-m-d H:i:s');
             $inicioBloco = ($bloco['data_prova'] ?? '') . ' ' . ($bloco['hora_inicio'] ?? '00:00:00');
             $fimBloco = ($bloco['data_prova'] ?? '') . ' ' . ($bloco['hora_fim'] ?? '23:59:59');
+            if (($bloco['formato_evento'] ?? '') === 'prova_impressa') {
+                continue;
+            }
             $visivelPortal = !array_key_exists('visivel_no_portal_aluno', $bloco) || !empty($bloco['visivel_no_portal_aluno']);
             if (empty($bloco['liberado'])
                 && !empty($bloco['ativo'])
@@ -2848,7 +3045,7 @@ class ExamController extends BaseController
                 "SELECT DISTINCT pbp.prova_id AS id
                  FROM provas_blocos_vinculo pbp
                  INNER JOIN provas_blocos pb ON pb.id = pbp.bloco_id
-                 WHERE pb.deleted_at IS NULL AND pb.visivel_no_portal_aluno = 0"
+                 WHERE pb.deleted_at IS NULL AND (pb.visivel_no_portal_aluno = 0 OR pb.formato_evento = 'prova_impressa')"
             );
             foreach ($ocultas ?: [] as $row) {
                 if (!empty($row['id'])) {
@@ -3101,6 +3298,9 @@ class ExamController extends BaseController
                  LIMIT 1",
                 ['prova_id' => $id]
             );
+            if ($blocoVinculadoIniciar && (($blocoVinculadoIniciar['formato_evento'] ?? '') === 'prova_impressa')) {
+                throw new \Exception('Esta prova é impressa. Responda na folha de papel.');
+            }
             if ($blocoVinculadoIniciar && !$this->alunoPodeVerBlocoNoPortalLinha($blocoVinculadoIniciar)) {
                 throw new \Exception('Esta prova não está disponível no portal para os alunos.');
             }
@@ -3275,6 +3475,11 @@ class ExamController extends BaseController
              LIMIT 1",
             ['prova_id' => $id]
         );
+        if ($blocoProva && ($blocoProva['formato_evento'] ?? '') === 'prova_impressa') {
+            $this->setFlashMessage('Esta prova é impressa. Responda na folha de papel.', 'error');
+            $this->redirect('/aluno/provas');
+            return;
+        }
 
         // EducaInclui — entrega de versão adaptada significativa (clone) via redirect nativo.
         // O clone é uma prova ativo=0/liberada=0 (invisível em listagens). Só o dono a abre.
@@ -4254,6 +4459,19 @@ class ExamController extends BaseController
         }
         unset($q);
 
+        $vinculo = $this->db->fetch(
+            "SELECT b.formato_evento
+             FROM provas_blocos_vinculo v
+             INNER JOIN provas_blocos b ON b.id = v.bloco_id
+             WHERE v.prova_id = :id
+             LIMIT 1",
+            ['id' => (int) $id]
+        );
+        if (is_array($vinculo) && (string) ($vinculo['formato_evento'] ?? '') === 'prova_impressa') {
+            $this->enviarPdfDeUmaProva($prova, $questoes);
+            return;
+        }
+
         $this->viewWithLayout('partial', 'admin/exams/imprimir-prova', [
             'prova' => $prova,
             'questoes' => $questoes,
@@ -4273,7 +4491,7 @@ class ExamController extends BaseController
         }
 
         $bloco = $this->db->fetch(
-            "SELECT id, titulo, data_prova, hora_inicio, hora_fim FROM provas_blocos WHERE id = :id",
+            "SELECT id, titulo, data_prova, hora_inicio, hora_fim, formato_evento FROM provas_blocos WHERE id = :id",
             ['id' => $blocoId]
         );
         if (!$bloco) {
@@ -4306,10 +4524,222 @@ class ExamController extends BaseController
         }
         unset($prova);
 
+        $provaImpressa = (string) ($bloco['formato_evento'] ?? '') === 'prova_impressa';
+        if ($provaImpressa) {
+            $this->enviarPdfGabaritosDoBloco($bloco, $provas);
+            return;
+        }
+
         $this->viewWithLayout('partial', 'admin/exams/blocks/imprimir-completo', [
             'bloco' => $bloco,
             'provas' => $provas,
+            'prova_impressa' => false,
+            'folhas_aluno' => [],
         ]);
+    }
+
+    /**
+     * PDF com as questões de cada matéria e um gabarito por página.
+     *
+     * @param array<string, mixed> $bloco
+     * @param list<array<string, mixed>> $provas
+     */
+    private function enviarPdfGabaritosDoBloco(array $bloco, array $provas): void
+    {
+        $folhas = $this->folhasGabaritoDoBloco($provas, (int) ($bloco['id'] ?? 0));
+        $pacotes = [];
+        foreach ($provas as $prova) {
+            $pacotes[] = ['prova' => $prova];
+        }
+        $this->enviarPdfGabaritos(
+            $bloco,
+            $pacotes,
+            $folhas,
+            true,
+            'gabaritos-bloco-' . (int) ($bloco['id'] ?? 0) . '.pdf'
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $bloco
+     * @param list<array{prova: array<string, mixed>}> $pacotes
+     * @param list<array<string, mixed>> $folhas
+     */
+    private function enviarPdfGabaritos(array $bloco, array $pacotes, array $folhas, bool $conjunto, string $nomeArquivo): void
+    {
+        @ini_set('memory_limit', '512M');
+        @set_time_limit(180);
+        $view = $this->resolveViewPath('admin/exams/blocks/imprimir-gabaritos-pdf');
+        if ($view === null) {
+            http_response_code(500);
+            exit('Não foi possível montar o PDF.');
+        }
+        extract([
+            'bloco' => $bloco,
+            'pacotes' => $pacotes,
+            'folhas' => $folhas,
+            'gabarito_conjunto' => $conjunto,
+        ], EXTR_SKIP);
+        ob_start();
+        include $view;
+        $html = (string) ob_get_clean();
+
+        $options = new \Dompdf\Options();
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('isRemoteEnabled', false);
+        $options->set('defaultFont', 'DejaVu Sans');
+        $dompdf = new \Dompdf\Dompdf($options);
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+        $dompdf->stream($nomeArquivo, ['Attachment' => false]);
+        exit;
+    }
+
+    /**
+     * Uma folha por aluno, com as matérias do bloco no mesmo quadro de bolhas.
+     *
+     * @param list<array<string, mixed>> $provas
+     * @return list<array<string, mixed>>
+     */
+    private function folhasGabaritoDoBloco(array $provas, int $blocoId): array
+    {
+        $servico = new LeitorGabaritoService();
+        if (!$servico->tabelasProntas() || $provas === [] || $blocoId <= 0) {
+            return [];
+        }
+        $turmasVistas = [];
+        $saida = [];
+        foreach ($provas as $prova) {
+            $provaId = (int) ($prova['id'] ?? 0);
+            if ($provaId <= 0) {
+                continue;
+            }
+            $turmas = $this->db->fetchAll(
+                'SELECT DISTINCT turma_id FROM provas_turmas WHERE prova_id = :id',
+                ['id' => $provaId]
+            );
+            foreach ($turmas as $turma) {
+                $turmaId = (int) ($turma['turma_id'] ?? 0);
+                if ($turmaId <= 0 || isset($turmasVistas[$turmaId])) {
+                    continue;
+                }
+                $turmasVistas[$turmaId] = true;
+                $turmaRow = $this->db->fetch(
+                    'SELECT nome FROM turmas WHERE id = :id',
+                    ['id' => $turmaId]
+                );
+                $turmaNome = is_array($turmaRow) ? (string) ($turmaRow['nome'] ?? '') : '';
+                try {
+                    $servico->gerarFolhasDoBloco($blocoId, $turmaId);
+                    foreach ($servico->folhasDoBlocoParaImpressao($blocoId, $turmaId) as $folha) {
+                        $folha['turma_nome'] = $turmaNome;
+                        $folha['imagem'] = $this->folhaEmDataUri($servico, (int) ($folha['id'] ?? 0));
+                        $saida[] = $folha;
+                    }
+                } catch (\Throwable $e) {
+                    error_log('folha gabarito: ' . $e->getMessage());
+                }
+            }
+        }
+        return $saida;
+    }
+
+    /**
+     * PDF de uma matéria: questões e gabarito só dessa prova.
+     *
+     * @param array<string, mixed> $prova
+     * @param list<array<string, mixed>> $questoes
+     */
+    private function enviarPdfDeUmaProva(array $prova, array $questoes): void
+    {
+        $prova['questoes'] = $questoes;
+        if (trim((string) ($prova['materia_nome'] ?? '')) === '') {
+            $nomes = $this->db->fetch(
+                'SELECT m.nome AS materia_nome, pr.nome AS professor_nome
+                 FROM provas p
+                 LEFT JOIN materias m ON m.id = p.materia_id
+                 LEFT JOIN professores pr ON pr.id = p.professor_id
+                 WHERE p.id = :id',
+                ['id' => (int) ($prova['id'] ?? 0)]
+            );
+            if (is_array($nomes)) {
+                $prova['materia_nome'] = (string) ($nomes['materia_nome'] ?? '');
+                $prova['professor_nome'] = (string) ($nomes['professor_nome'] ?? ($prova['professor_nome'] ?? ''));
+            }
+        }
+        $bloco = [
+            'id' => (int) ($prova['id'] ?? 0),
+            'titulo' => (string) ($prova['titulo'] ?? 'Prova'),
+            'data_prova' => $prova['data_prova'] ?? null,
+            'hora_inicio' => $prova['hora_inicio'] ?? null,
+            'hora_fim' => $prova['hora_fim'] ?? null,
+        ];
+        $this->enviarPdfGabaritos(
+            $bloco,
+            [['prova' => $prova]],
+            $this->folhasGabaritoDeUmaProva($prova),
+            false,
+            'gabarito-prova-' . (int) ($prova['id'] ?? 0) . '.pdf'
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $prova
+     * @return list<array<string, mixed>>
+     */
+    private function folhasGabaritoDeUmaProva(array $prova): array
+    {
+        $servico = new LeitorGabaritoService();
+        $provaId = (int) ($prova['id'] ?? 0);
+        if (!$servico->tabelasProntas() || $provaId <= 0) {
+            return [];
+        }
+        $turmas = $this->db->fetchAll(
+            'SELECT DISTINCT turma_id FROM provas_turmas WHERE prova_id = :id',
+            ['id' => $provaId]
+        );
+        $saida = [];
+        foreach ($turmas as $turma) {
+            $turmaId = (int) ($turma['turma_id'] ?? 0);
+            if ($turmaId <= 0) {
+                continue;
+            }
+            $turmaRow = $this->db->fetch('SELECT nome FROM turmas WHERE id = :id', ['id' => $turmaId]);
+            $turmaNome = is_array($turmaRow) ? (string) ($turmaRow['nome'] ?? '') : '';
+            try {
+                $servico->gerarFolhas($provaId, null, $turmaId, true);
+                foreach ($servico->folhasParaImpressao($provaId, null, $turmaId) as $folha) {
+                    $folha['turma_nome'] = $turmaNome;
+                    $folha['materia_nome'] = (string) ($prova['materia_nome'] ?? '');
+                    $folha['imagem'] = $this->folhaEmDataUri($servico, (int) ($folha['id'] ?? 0));
+                    $saida[] = $folha;
+                }
+            } catch (\Throwable $e) {
+                error_log('folha gabarito: ' . $e->getMessage());
+            }
+        }
+        return $saida;
+    }
+
+    private function folhaEmDataUri(LeitorGabaritoService $servico, int $folhaId): string
+    {
+        if ($folhaId <= 0) {
+            return '';
+        }
+        try {
+            $caminho = $servico->caminhoFolha($folhaId, null);
+        } catch (\Throwable $e) {
+            return '';
+        }
+        if (!is_file($caminho)) {
+            return '';
+        }
+        $bytes = file_get_contents($caminho);
+        if (!is_string($bytes) || $bytes === '') {
+            return '';
+        }
+        return 'data:image/png;base64,' . base64_encode($bytes);
     }
 
     /**
@@ -6839,7 +7269,7 @@ Retorne APENAS um JSON válido no seguinte formato:
         $blocoModel = new ExamBlock();
         
         $bloco = $blocoModel->findById($blocoId);
-        if (!$bloco) {
+        if (!$bloco || ($bloco['formato_evento'] ?? '') === 'prova_impressa') {
             $this->logProvas('[INICIAR_BLOCO] REDIRECIONANDO: bloco não encontrado', ['bloco_id' => $blocoId]);
             $this->setFlashMessage('Bloco de provas não disponível', 'error');
             $this->redirect('/aluno/provas');

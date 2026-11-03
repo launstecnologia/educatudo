@@ -237,6 +237,12 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                 </svg>
                 <span class="sidebar-text">Dashboard</span>
             </a>
+            <a href="<?= URL ?>/professor/grade-horaria" class="flex items-center px-4 py-3 <?= ($current_page ?? '') === 'grade_horaria' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                <span class="sidebar-text">Minha grade</span>
+            </a>
             <?php foreach ($professorTudinhaApps as $tudinhaApp): ?>
             <a href="<?= htmlspecialchars($tudinhaApp['href']) ?>"<?= !empty($tudinhaApp['nova_guia']) ? ' target="_blank" rel="noopener noreferrer"' : '' ?> class="flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200 hover:scale-105">
                 <img src="<?= URL ?>/public/assets/educaprof-icone-v3.png" alt="" class="mr-3 h-5 w-5 shrink-0 object-contain" width="20" height="20">
@@ -476,6 +482,16 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                     </a>
                     <?php endif; ?>
 
+                    <?php if (\App\Core\LayoutHelper::get('module_professor_comunicacao_pais', '0') === '1'): ?>
+                    <a href="<?= URL ?>/professor/comunicacao-pais"
+                       class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'comunicacao-pais' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
+                        <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                        </svg>
+                        <span class="sidebar-text text-sm">Recados aos pais</span>
+                    </a>
+                    <?php endif; ?>
+
                     <?php if (\App\Core\LayoutHelper::isModuleEnabled('mural_recados')): ?>
                     <a href="<?= URL ?>/professor/mural-recados"
                        class="flex items-center px-4 py-2 <?= ($current_page ?? '') === 'mural-recados' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-lg transition-all duration-200">
@@ -557,17 +573,6 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                 </svg>
                 <span class="sidebar-text">Tutoriais</span>
-            </a>
-            
-            <!-- Notificações -->
-            <?php $notificationsEnabled = $modulosProfessor['professor_notifications']; ?>
-            <a href="<?= $notificationsEnabled ? URL . '/professor/notifications' : '#' ?>" 
-               onclick="<?= $notificationsEnabled ? '' : 'event.preventDefault(); mostrarModalModuloDesabilitado(\'Notificações\'); return false;' ?>"
-               class="flex items-center px-4 py-3 <?= ($current_page ?? '') === 'notifications' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105 <?= !$notificationsEnabled ? 'opacity-50 cursor-not-allowed' : '' ?>">
-                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
-                </svg>
-                <span class="sidebar-text">Notificações</span>
             </a>
             
             <!-- Logout Button -->

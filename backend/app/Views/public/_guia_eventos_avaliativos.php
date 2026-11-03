@@ -53,13 +53,13 @@ $mostrarPrintEvento = static function (string $arquivo, string $legenda, bool $p
     <section class="evg-bloco" aria-labelledby="evg-estrutura">
         <h3 class="evg-titulo" id="evg-estrutura"><span class="evg-passo" aria-hidden="true">3</span>Estrutura: onde acontece e quem participa</h3>
         <h4>A avaliação acontece dentro ou fora da plataforma?</h4>
-        <dl class="evg-opcoes"><div><dt>Avaliações offline</dt><dd>Para provas presenciais, trabalhos ou outras atividades cuja nota será informada pela escola ou pelo professor.</dd></div><div><dt>Avaliação online</dt><dd>Para o aluno responder à prova dentro da plataforma. Você também precisará gerenciar a elaboração e a liberação da prova.</dd></div></dl>
+        <dl class="evg-opcoes"><div><dt>Avaliação online</dt><dd>Para o aluno responder à prova dentro da plataforma. Você também precisará gerenciar a elaboração e a liberação da prova.</dd></div><div><dt>Avaliação impressa</dt><dd>A prova é montada no sistema, impressa e lida no gabarito. O professor ou a escola cria as questões. A coordenação imprime, aplica em sala e faz a leitura. O aluno não responde na plataforma.</dd></div><div><dt>Avaliações offline</dt><dd>Para prova presencial, trabalho ou outra atividade cuja nota será informada pela escola ou pelo professor.</dd></div></dl>
         <?php $mostrarPrintEvento('115-eventos-tipo.jpg', 'Escolha o Tipo de Avaliação. Em Disciplina, use + Adicionar disciplina ou abra uma linha para ajustar.'); ?>
         <h4>Adicione as disciplinas e confira as turmas de cada uma</h4>
         <p>Clique em <strong>+ Adicionar disciplina</strong> ou na linha existente. No painel lateral, escolha a <strong>Disciplina</strong>, o <strong>Professor</strong>, quando exigido, e as <strong>Turmas</strong> daquela linha. Clique em <strong>Concluir</strong> para voltar ao formulário.</p>
         <?php $mostrarPrintEvento('116-eventos-disciplina.jpg', 'No painel da disciplina, selecione os vínculos e clique em Concluir. O professor é opcional quando a escola ou a coordenação assume a atividade.', true); ?>
         <h4>Quem lança a nota?</h4>
-        <p>No offline, escolha <strong>Atribuir ao professor</strong> ou <strong>Escola lança a nota</strong>. Se atribuir ao professor, informe o professor nas disciplinas e o <strong>Prazo para o professor lançar as notas</strong>.</p>
+        <p>No offline, escolha <strong>Atribuir ao professor</strong> ou <strong>Escola lança a nota</strong>. Na avaliação impressa, escolha <strong>Atribuir ao professor</strong> para ele criar as questões, ou <strong>Escola constrói a prova</strong>. Se atribuir ao professor, informe o professor nas disciplinas e o prazo.</p>
         <?php $mostrarPrintEvento('117-eventos-responsavel.jpg', 'Em Quem lança a nota, escolha o responsável. Ao atribuir ao professor, preencha o prazo.'); ?>
         <details><summary>Se a avaliação for online</summary><div>
             <p>Escolha <strong>Atribuir professor</strong> para ele elaborar as questões, ou <strong>Coordenação faz a prova</strong>. Na atribuição ao professor, confira o prazo e a quantidade de questões nos vínculos da disciplina.</p>

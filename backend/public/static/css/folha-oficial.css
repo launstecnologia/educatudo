@@ -1,4 +1,8 @@
 /* Folha oficial: a mesma regra vale no editor e no PDF. Medida em mm/pt, sem encolher. */
+body, table.seed-folha, table.edoc-grade-livre, table.dados, table.quadro-notas {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
 table.seed-folha {
   margin: 0;
   border-collapse: collapse;

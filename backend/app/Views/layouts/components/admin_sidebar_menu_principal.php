@@ -307,7 +307,7 @@ if ($nomeMenuEscola === '') {
         <?php if ($modOn('calendario_escolar')): ?>
         <a href="<?= URL ?>/admin/calendario-escolar" class="<?= $linkCls($cp === 'school-calendar') ?>">
             <i class="fa-regular fa-calendar-days w-4 h-4 mr-3 flex-shrink-0"></i>
-            <span class="sidebar-text text-sm">Calendário Escolar</span>
+            <span class="sidebar-text text-sm">Avisos à família</span>
         </a>
         <?php endif; ?>
         <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('forum')): ?>
@@ -334,22 +334,6 @@ if ($nomeMenuEscola === '') {
             <span class="sidebar-text text-sm">Mural de Recados</span>
         </a>
         <?php endif; ?>
-        <div class="flex items-center rounded-lg <?= $cp === 'notifications' ? 'bg-white/20' : '' ?>">
-            <a href="<?= URL ?>/admin/notifications" class="flex-1 <?= $linkCls($cp === 'notifications') ?>">
-                <i class="fa-regular fa-bell w-4 h-4 mr-3"></i>
-                <span class="sidebar-text text-sm">Notificações</span>
-            </a>
-            <button type="button" onclick="toggleNestedMenu('notificacoes')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
-                <svg id="notificacoes-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-            </button>
-        </div>
-        <div id="notificacoes-nested" class="<?= $notificacoesNestedOpen ? '' : 'hidden' ?> ml-6 mt-1 space-y-1 border-l border-white/20 pl-2">
-            <a href="<?= URL ?>/admin/notificacoes-push" class="<?= $linkCls($cp === 'notificacoes-push') ?>">
-                <span class="sidebar-text text-sm">Notificações Push</span>
-            </a>
-        </div>
         <a href="<?= URL ?>/admin/reunioes/geral" class="<?= $linkCls(in_array($cp, ['reunioes_geral', 'reunioes'], true)) ?>">
             <i class="fa-solid fa-people-group w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Reuniões</span>

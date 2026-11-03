@@ -38,10 +38,29 @@
       out.page.imprimirFundo = page.imprimirFundo === true;
     }
     if (e.grade && typeof e.grade === 'object') out.grade = e.grade;
+    var glossario = glossarioValido(e.glossario);
+    if (glossario.length) out.glossario = glossario;
     if (e.emissao && typeof e.emissao === 'object') out.emissao = e.emissao;
     var campos = camposVariaveisValidos(e.campos_variaveis);
     if (campos.length) out.campos_variaveis = campos;
     return stripLogoDuplicado(out);
+  }
+
+  function glossarioValido(lista) {
+    if (!Array.isArray(lista)) return [];
+    var out = [];
+    var vistas = {};
+    for (var i = 0; i < lista.length && out.length < 40; i++) {
+      var item = lista[i];
+      if (!item || typeof item !== 'object') continue;
+      var slug = String(item.slug || '').toLowerCase();
+      var nome = String(item.nome || '').replace(/[<>]/g, '').replace(/\{\{|\}\}/g, '').replace(/\s+/g, ' ').trim().slice(0, 80);
+      var sigla = String(item.sigla || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 12);
+      if (!/^[a-z0-9_]{1,40}$/.test(slug) || !nome || !/^[A-Z0-9]{1,12}$/.test(sigla) || vistas[slug]) continue;
+      vistas[slug] = true;
+      out.push({ slug: slug, nome: nome, sigla: sigla });
+    }
+    return out;
   }
 
   function camposVariaveisValidos(lista) {
@@ -101,7 +120,7 @@
     selected: null,
     zoom: 90,
     preview: false,
-    demo: false,
+    demo: true,
     history: [],
     histI: -1,
     dirty: false,
@@ -326,12 +345,19 @@
     return map[t] || t;
   }
 
+  C.varsAmostra = Object.assign({}, C.varsPreview || {});
+
+  function varsDaFolha() {
+    if ((state.preview || state.demo) && C.varsPreview) return C.varsPreview;
+    return C.varsAmostra || C.varsPreview || {};
+  }
+
   function ph(html) {
     if (!html) return '';
-    var usarDados = state.preview || state.demo;
+    var bag = varsDaFolha();
     var out = String(html).replace(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi, function (_, k) {
-      if (usarDados && C.varsPreview && Object.prototype.hasOwnProperty.call(C.varsPreview, k)) {
-        return String(C.varsPreview[k]);
+      if (bag && Object.prototype.hasOwnProperty.call(bag, k) && String(bag[k]) !== '') {
+        return String(bag[k]);
       }
       var campo = campoVariavelPorChave(k);
       if (campo) return '<span class="edoc-ph">' + esc(campo.rotulo) + '</span>';
@@ -404,7 +430,31 @@
       n.removeAttribute('contenteditable');
       n.removeAttribute('spellcheck');
     });
+    $all('[data-edoc-token]', clone).forEach(function (cel) {
+      var chave = String(cel.getAttribute('data-edoc-token') || '');
+      if (!/^[a-z0-9_]{1,80}$/i.test(chave)) {
+        cel.removeAttribute('data-edoc-token');
+        return;
+      }
+      cel.textContent = '{{' + chave + '}}';
+    });
     return sanitizeHtml(clone.innerHTML);
+  }
+
+  function atualizarTokensDasCelulas(body) {
+    if (!body) return;
+    var bag = varsDaFolha();
+    $all('[data-edoc-token]', body).forEach(function (cel) {
+      var chave = String(cel.getAttribute('data-edoc-token') || '');
+      var texto = (cel.textContent || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+      var token = '{{' + chave + '}}';
+      var resolvido = '';
+      if (bag && Object.prototype.hasOwnProperty.call(bag, chave)) {
+        resolvido = String(bag[chave]).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      }
+      if (!texto || texto === token || texto === resolvido) return;
+      cel.removeAttribute('data-edoc-token');
+    });
   }
 
   function inserirQuebraLinha() {
@@ -587,8 +637,12 @@
       limparFonteInterna(body);
       body.style.fontSize = pt + 'pt';
       el.style.fontSize = pt;
+      $all('table, td, th', body).forEach(function (nodo) { nodo.style.fontSize = pt + 'pt'; });
       var folha = paper && el.id ? corpoDoElemento(paper.querySelector('.edoc-el[data-id="' + el.id + '"]')) : null;
-      if (folha && folha !== body) folha.style.fontSize = pt + 'pt';
+      if (folha && folha !== body) {
+        folha.style.fontSize = pt + 'pt';
+        $all('table, td, th', folha).forEach(function (nodo) { nodo.style.fontSize = pt + 'pt'; });
+      }
     }
     atualizarLabelFonte(pt);
   }
@@ -1458,51 +1512,11 @@
     body.focus();
   }
 
-  function garantirBarraInline() {
-    var bar = $('#edoc-inline-bar');
-    if (bar) return bar;
-    bar = document.createElement('div');
-    bar.id = 'edoc-inline-bar';
-    bar.className = 'edoc-inline-bar';
-    bar.innerHTML = htmlBarraFmt(false);
-    document.body.appendChild(bar);
-    $all('[data-fmt]', bar).forEach(function (b) {
-      b.addEventListener('mousedown', function (e) { e.preventDefault(); e.stopPropagation(); });
-      b.addEventListener('click', function (e) {
-        e.stopPropagation();
-        if (!editando) return;
-        var body = corpoDoElemento(editando.node);
-        var path = findPath(editando.id);
-        if (!body || !path || !path.element) return;
-        var foco = body.querySelector('[contenteditable="true"]') || body;
-        if (foco && foco.focus) foco.focus();
-        executarFmt(b.getAttribute('data-fmt'), path.element, body);
-        if (body.isConnected) sincronizarBloco(path.element, body);
-      });
-    });
-    return bar;
-  }
-
   function mostrarBarraInline(elNode) {
-    var bar = garantirBarraInline();
-    bar.classList.add('is-open');
-    function pos() {
-      var body = corpoDoElemento(elNode);
-      var r = (body || elNode).getBoundingClientRect();
-      bar.style.left = Math.max(8, r.left) + 'px';
-      bar.style.top = Math.max(8, r.top - 42) + 'px';
-    }
-    pos();
-    if (bar._off) bar._off();
-    var stage = $('.edoc-stage');
-    if (stage) {
-      stage.addEventListener('scroll', pos);
-      window.addEventListener('resize', pos);
-      bar._off = function () {
-        stage.removeEventListener('scroll', pos);
-        window.removeEventListener('resize', pos);
-      };
-    }
+    var body = corpoDoElemento(elNode);
+    var id = elNode && elNode.getAttribute('data-id');
+    var path = id ? findPath(id) : null;
+    if (path && path.element) atualizarLabelFonte(tamanhoFontePt(path.element, body));
   }
 
   function esconderBarraInline() {
@@ -1510,6 +1524,17 @@
     if (!bar) return;
     bar.classList.remove('is-open');
     if (bar._off) { bar._off(); bar._off = null; }
+  }
+
+  function corpoVivoDoElemento(target) {
+    if (!target || !paper) return null;
+    if (editando && editando.id === target.id) {
+      var editado = corpoDoElemento(editando.node);
+      if (editado && paper.contains(editado)) return editado;
+    }
+    var node = paper.querySelector('.edoc-el[data-id="' + target.id + '"]');
+    var body = corpoDoElemento(node);
+    return body && paper.contains(body) ? body : null;
   }
 
   function soltarCelulasEditaveis(body) {
@@ -1576,7 +1601,10 @@
         render();
       }
     };
-    body.oninput = function () { sincronizarBloco(path.element, body); };
+    body.oninput = function () {
+      atualizarTokensDasCelulas(body);
+      sincronizarBloco(path.element, body);
+    };
     body.onpaste = function (e) {
       var file = arquivoDoClipboard(e.clipboardData);
       if (file) {
@@ -1619,6 +1647,9 @@
       return '<' + tag + ' class="edoc-el-body" style="margin:0;font-size:' + sz + ';' + st + '">' + htmlTextoInterno(el, 'Título') + '</' + tag + '>';
     }
     if (t === 'texto' || t === 'texto_rico') {
+      if (!(p.html || p.text)) {
+        return '<div class="edoc-el-body edoc-escreva" style="' + st + '"><br></div>';
+      }
       return '<div class="edoc-el-body" style="' + st + '">' + htmlTextoInterno(el, 'Texto') + '</div>';
     }
     if (t === 'html') return '<div class="edoc-html-raw edoc-el-body" style="' + st + '">' + htmlTextoInterno(el) + '</div>';
@@ -1645,34 +1676,113 @@
     if (t === 'quebra_pagina') return '<div style="border-top:2px dashed #f59e0b;margin:12px 0;color:#b45309;font-size:10px;text-align:center">Quebra de página</div>';
     if (t === 'qrcode') return '<div class="edoc-logo-slot">QR</div>';
     if (t === 'tabela_notas') {
-      var quadro = ((state.preview || state.demo) && C.varsPreview && C.varsPreview.quadro_notas_html)
-        ? C.varsPreview.quadro_notas_html
-        : '{{quadro_notas_html}}';
-      var quadroHtml = String(quadro).indexOf('{{') === 0
-        ? '<span class="edoc-ph">' + esc(quadro) + '</span>'
-        : sanitizeHtml(quadro);
-      return '<div class="edoc-quadro-notas" style="' + st + '">' + quadroHtml + '</div>';
+      return htmlBlocoHtml('quadro_notas_html', st, 'edoc-quadro-notas');
     }
-    if (t === 'assinaturas') {
-      return '<div style="' + st + ';display:flex;gap:16px;margin-top:28px">'
-        + '<div style="flex:1;text-align:center">____________<br><small>Responsável</small></div>'
-        + '<div style="flex:1;text-align:center">____________<br><small>Direção</small></div></div>';
+    if (t === 'tabela_coletiva') {
+      return htmlBlocoHtml('tabela_html', st, 'edoc-html-raw');
     }
-    var samples = {
-      dados_escola: 'Escola / CNPJ / Endereço',
-      dados_aluno: 'Aluno, turma, matrícula',
-      dados_responsavel: 'Responsável e contato',
-      dados_turma: 'Turma, série, ano letivo',
-      tabela_aluno: 'Tabela do aluno',
-      tabela_notas: 'Tabela de notas',
-      tabela_frequencia: 'Tabela de frequência',
-      historico: 'Histórico escolar',
-      resultado_final: 'Resultado final',
-      frequencia: 'Frequência',
-      observacoes: 'Observações'
-    };
-    return '<div style="' + st + 'border:1px solid #e5e7eb;border-radius:6px;padding:8px 10px;font-size:12px;background:#f9fafb">'
-      + '<strong>' + labelTipo(t) + '</strong><div style="color:#6b7280;margin-top:4px">' + (samples[t] || '') + '</div></div>';
+    if (t === 'tabela_frequencia' || t === 'frequencia') {
+      return '<div class="edoc-html-raw edoc-el-body" style="' + st + '">'
+        + '<p style="margin:0 0 6px;font-weight:bold;">Frequência</p>'
+        + '<p style="margin:0;">' + ph('{{frequencia_percentual}}') + '</p>'
+        + htmlVar('frequencia_html') + '</div>';
+    }
+    if (t === 'historico') return htmlBlocoHtml('historico_html', st, 'edoc-html-raw');
+    if (t === 'observacoes') {
+      return '<div class="edoc-html-raw edoc-el-body" style="' + st + '">'
+        + '<p style="margin:0 0 6px;font-weight:bold;">Observações</p>'
+        + '<p style="margin:0;">' + ph('{{observacoes}}') + '</p></div>';
+    }
+    if (t === 'assinaturas') return htmlAssinaturas(el, st);
+    if (t === 'dados_escola') {
+      return tabelaDados([
+        ['Escola', '{{escola_nome}}'],
+        ['CNPJ', '{{escola_cnpj_numero}}'],
+        ['Endereço', '{{escola_endereco}}'],
+        ['Contato', '{{escola_docs}}']
+      ], st);
+    }
+    if (t === 'dados_aluno' || t === 'tabela_aluno') {
+      return tabelaDados([
+        ['Aluno(a)', '{{aluno_nome}}'],
+        ['Código', '{{aluno_codigo}}'],
+        ['RA', '{{aluno_ra}}'],
+        ['Turma', '{{turma_nome}}'],
+        ['Série / Curso', '{{serie}} · {{curso_nome}}']
+      ], st);
+    }
+    if (t === 'dados_responsavel') {
+      return tabelaDados([
+        ['Responsável', '{{resp_nome}}'],
+        ['CPF', '{{resp_cpf}}'],
+        ['Parentesco', '{{resp_parentesco}}'],
+        ['Telefone', '{{resp_telefone}}']
+      ], st);
+    }
+    if (t === 'dados_turma') {
+      return tabelaDados([
+        ['Turma', '{{turma_nome}}'],
+        ['Série', '{{serie}}'],
+        ['Curso', '{{curso_nome}}'],
+        ['Ano letivo', '{{ano_letivo}}'],
+        ['Período', '{{periodo_label}}']
+      ], st);
+    }
+    if (t === 'resultado_final') {
+      return tabelaDados([
+        ['Situação final', '{{situacao_final}}'],
+        ['Frequência', '{{frequencia_percentual}}']
+      ], st);
+    }
+    return '<div class="edoc-el-body" style="' + st + '">' + htmlTextoInterno(el, labelTipo(t)) + '</div>';
+  }
+
+  function htmlVar(chave) {
+    var bag = varsDaFolha();
+    var v = bag && bag[chave] != null ? String(bag[chave]) : '';
+    if (!v) return '';
+    if (v.indexOf('<') >= 0) return sanitizeHtml(v);
+    return ph(v);
+  }
+
+  function htmlBlocoHtml(chave, st, classe) {
+    var miolo = htmlVar(chave);
+    if (!miolo) miolo = '<span class="edoc-ph">{{' + chave + '}}</span>';
+    return '<div class="' + classe + ' edoc-el-body" style="' + st + '">' + miolo + '</div>';
+  }
+
+  function tabelaDados(pares, st) {
+    var rows = '';
+    pares.forEach(function (par) {
+      rows += '<tr><td class="label" style="width:32%;font-weight:bold;padding:4px 8px;border:1px solid #ccc;">'
+        + esc(par[0]) + '</td><td style="padding:4px 8px;border:1px solid #ccc;">' + ph(par[1]) + '</td></tr>';
+    });
+    return '<div class="edoc-html-raw edoc-el-body" style="' + st + '"><table class="dados" style="width:100%;border-collapse:collapse;margin:0;">'
+      + rows + '</table></div>';
+  }
+
+  function htmlAssinaturas(el, st) {
+    var qtd = Math.max(1, Math.min(3, parseInt((el.props || {}).quantidade, 10) || 2));
+    var blocos = [
+      '<p style="text-align:center;margin:28px 0 0;">________________________</p>'
+        + '<p style="text-align:center;margin:4px 0 0;font-weight:bold;">' + ph('{{resp_nome}}') + '</p>'
+        + '<p style="text-align:center;margin:0;">Responsável</p>',
+      '<p style="text-align:center;margin:28px 0 0;">________________________</p>'
+        + '<p style="text-align:center;margin:4px 0 0;font-weight:bold;">' + ph('{{assinante_nome}}') + '</p>'
+        + '<p style="text-align:center;margin:0;">' + ph('{{assinante_cargo}}') + '</p>',
+      '<p style="text-align:center;margin:28px 0 0;">________________________</p>'
+        + '<p style="text-align:center;margin:4px 0 0;font-weight:bold;">' + ph('{{secretario_nome}}') + '</p>'
+        + '<p style="text-align:center;margin:0;">Secretaria</p>'
+    ];
+    var larguras = qtd === 1 ? [100] : (qtd === 2 ? [50, 50] : [34, 33, 33]);
+    var cols = '';
+    var tds = '';
+    for (var i = 0; i < qtd; i++) {
+      cols += '<col style="width:' + larguras[i] + '%">';
+      tds += '<td style="width:' + larguras[i] + '%;vertical-align:top;border:none;">' + blocos[i] + '</td>';
+    }
+    return '<div class="edoc-el-body" style="' + st + '"><table style="width:100%;border-collapse:collapse;table-layout:fixed;">'
+      + '<colgroup>' + cols + '</colgroup><tr>' + tds + '</tr></table></div>';
   }
 
   function renderSection(sec, role) {
@@ -1696,7 +1806,7 @@
       html += '<div class="edoc-col' + (state.selected && state.selected.id === col.id ? ' is-selected' : '')
         + '" data-id="' + col.id + '" data-kind="column" style="width:' + (col.width || 100) + '%;flex:0 0 auto;justify-content:'
         + ({ top: 'flex-start', middle: 'center', bottom: 'flex-end' }[col.vAlign || 'top'] || 'flex-start') + '">';
-      html += '<div class="edoc-col-drop">Solte o elemento aqui</div>';
+      html += '<div class="edoc-col-drop">Clique para escrever</div>';
       (col.elements || []).forEach(function (el) {
         var sel = state.selected && state.selected.id === el.id;
         html += '<div class="edoc-el' + (sel ? ' is-selected' : '')
@@ -1905,13 +2015,14 @@
     [['header', 'Cabeçalho'], ['body', 'Corpo'], ['footer', 'Rodapé']].forEach(function (pair) {
       var secs = areaOf(pair[0]).sections || [];
       if (fiel && !secs.length) return;
-      if (pair[0] === 'footer') html += '<div class="edoc-area-footer">';
+      var areaClass = 'edoc-area' + (pair[0] === 'footer' ? ' edoc-area-footer' : '');
+      html += '<div class="' + areaClass + '" data-role="' + pair[0] + '">';
       if (!fiel) html += '<div class="edoc-area-label">' + pair[1] + '</div>';
       if (!secs.length) {
-        html += '<div class="edoc-empty edoc-dropzone" data-empty="' + pair[0] + '">Clique, arraste Tabela/Imagem ou cole (Ctrl+V)</div>';
+        html += '<div class="edoc-empty edoc-dropzone" data-empty="' + pair[0] + '">Arraste uma estrutura ou um elemento, ou cole com Ctrl+V</div>';
       }
       secs.forEach(function (s) { html += renderSection(s, pair[0]); });
-      if (pair[0] === 'footer') html += '</div>';
+      html += '</div>';
     });
     selecaoGrade = null;
     paper.innerHTML = html;
@@ -1922,6 +2033,25 @@
     renderProps();
     var zl = $('#edoc-zoom-label');
     if (zl) zl.textContent = state.zoom + '%';
+    atualizarLinkPdf();
+  }
+
+  function atualizarLinkPdf() {
+    var a = $('#edoc-pdf');
+    if (!a || !C.previewUrl) return;
+    var url = C.previewUrl;
+    if (state.demo) {
+      var turma = $('#edoc-demo-turma');
+      var aluno = $('#edoc-demo-aluno');
+      var tid = turma && turma.value ? turma.value : '';
+      var aid = aluno && aluno.value ? aluno.value : '';
+      if (tid && aid) {
+        url += (url.indexOf('?') >= 0 ? '&' : '?')
+          + 'turma_id=' + encodeURIComponent(tid)
+          + '&aluno_id=' + encodeURIComponent(aid);
+      }
+    }
+    a.href = url;
   }
 
   function desenharReguas(pg) {
@@ -1981,6 +2111,115 @@
     var plain = dt.getData('text/plain') || '';
     if (plain.indexOf('edoc-var:') === 0) return plain.slice(9).trim();
     return '';
+  }
+
+  function prepararArraste(e, mime, valor, plain) {
+    if (!e.dataTransfer) return;
+    e.dataTransfer.effectAllowed = 'copy';
+    try { e.dataTransfer.setData('text/plain', plain); } catch (err) {}
+    try { e.dataTransfer.setData(mime, valor); } catch (err2) {}
+  }
+
+  function dadosDoArraste(dt) {
+    var layout = '';
+    var tipo = '';
+    var chave = '';
+    var texto = '';
+    var arquivo = null;
+    if (dt) {
+      layout = dt.getData('text/edoc-layout') || '';
+      tipo = dt.getData('text/edoc-type') || '';
+      chave = lerChaveDrop(dt);
+      texto = dt.getData('text/edoc-texto') || '';
+      var plain = dt.getData('text/plain') || '';
+      if (!layout && !tipo && !chave && !texto) {
+        if (plain.indexOf('edoc-layout:') === 0) layout = plain.slice(12);
+        else if (plain.indexOf('edoc-type:') === 0) tipo = plain.slice(10);
+        else if (plain.indexOf('edoc-texto:') === 0) texto = plain.slice(11);
+      } else if (!texto && plain.indexOf('edoc-texto:') === 0) {
+        texto = plain.slice(11);
+      }
+      if (dt.files && dt.files[0]) arquivo = dt.files[0];
+    }
+    return { layout: layout, tipo: tipo, chave: chave, texto: texto, arquivo: arquivo };
+  }
+
+  function largurasDoLayout(layout) {
+    try {
+      var widths = JSON.parse(layout);
+      if (!Array.isArray(widths) || !widths.length) return null;
+      return widths;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function soltarNaRole(role, dados) {
+    if (!dados) return;
+    if (dados.layout) {
+      var widths = largurasDoLayout(dados.layout);
+      if (widths) addSection(role, widths);
+      return;
+    }
+    if (dados.chave || dados.tipo || dados.texto) {
+      addSection(role, [100]);
+      var col = areaOf(role).sections.slice(-1)[0].columns[0];
+      if (dados.chave) insertVariavel(col.id, dados.chave, true);
+      else if (dados.texto) insertTexto(col.id, dados.texto, true);
+      else insertElement(col.id, dados.tipo, true);
+      return;
+    }
+    if (dados.arquivo) {
+      addSection(role, [100]);
+      var colArq = areaOf(role).sections.slice(-1)[0].columns[0];
+      inserirArquivoNaColuna(colArq.id, dados.arquivo);
+    }
+  }
+
+  function secaoSemElementos(section) {
+    if (!section) return false;
+    var cols = section.columns || [];
+    if (!cols.length) return false;
+    for (var i = 0; i < cols.length; i++) {
+      if ((cols[i].elements || []).length) return false;
+    }
+    return true;
+  }
+
+  function aplicarLayoutNaSecao(section, widths) {
+    section.columns = widths.map(function (w) {
+      return { id: uid('c'), width: w, vAlign: 'top', elements: [] };
+    });
+    state.selected = { id: section.id, kind: 'section' };
+    pushHist();
+    render();
+  }
+
+  function soltarNaColuna(colId, dados) {
+    if (!dados || !colId) return;
+    if (dados.layout) {
+      var widths = largurasDoLayout(dados.layout);
+      var path = findPath(colId);
+      if (widths && path && path.section && secaoSemElementos(path.section)) {
+        aplicarLayoutNaSecao(path.section, widths);
+        return;
+      }
+      if (widths) addSection(path ? path.role : 'body', widths);
+      return;
+    }
+    if (dados.chave) {
+      insertVariavel(colId, dados.chave);
+      return;
+    }
+    if (dados.texto) {
+      insertTexto(colId, dados.texto);
+      return;
+    }
+    if (dados.tipo) {
+      insertElement(colId, dados.tipo);
+      return;
+    }
+    if (dados.arquivo) inserirArquivoNaColuna(colId, dados.arquivo);
   }
 
   function marcarSelecionado(elNode, id) {
@@ -2311,13 +2550,14 @@
         marcarCelulaDrop(celulaDoEvento(e));
       }, true);
       paper.addEventListener('drop', function (e) {
-        var chave = lerChaveDrop(e.dataTransfer);
+        var dados = dadosDoArraste(e.dataTransfer);
         var celula = celulaDoEvento(e);
-        if (!chave || !celula) return;
+        if (!celula || (!dados.chave && !dados.texto)) return;
         e.preventDefault();
         e.stopPropagation();
         marcarCelulaDrop(null);
-        inserirVariavelNaCelula(celula, chave);
+        if (dados.chave) inserirVariavelNaCelula(celula, dados.chave);
+        else inserirTextoNaCelula(celula, dados.texto);
       }, true);
     }
     paper.onmousemove = function (e) {
@@ -2409,48 +2649,49 @@
       });
       col.addEventListener('drop', function (e) {
         e.preventDefault();
+        e.stopPropagation();
         col.classList.remove('is-over');
         var celula = celulaDoEvento(e);
         marcarCelulaDrop(null);
-        var tipo = e.dataTransfer.getData('text/edoc-type');
-        var layout = e.dataTransfer.getData('text/edoc-layout');
-        var chave = lerChaveDrop(e.dataTransfer);
-        if (chave && celula && inserirVariavelNaCelula(celula, chave)) return;
-        if (layout) {
-          insertLayoutAt(col.getAttribute('data-id'), layout);
-        } else if (chave) {
-          insertVariavel(col.getAttribute('data-id'), chave);
-        } else if (tipo) {
-          insertElement(col.getAttribute('data-id'), tipo);
-        } else if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-          inserirArquivoNaColuna(col.getAttribute('data-id'), e.dataTransfer.files[0]);
-        }
+        var dados = dadosDoArraste(e.dataTransfer);
+        if (dados.chave && celula && inserirVariavelNaCelula(celula, dados.chave)) return;
+        if (dados.texto && celula && inserirTextoNaCelula(celula, dados.texto)) return;
+        soltarNaColuna(col.getAttribute('data-id'), dados);
       });
     });
     $all('.edoc-gutter', paper).forEach(bindGutter);
     $all('[data-empty]', paper).forEach(function (el) {
-      el.addEventListener('dragover', function (e) { e.preventDefault(); });
+      el.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+      });
       el.addEventListener('click', function (e) {
         e.stopPropagation();
-        addSection(el.getAttribute('data-empty'), [100]);
+        escreverNaArea(el.getAttribute('data-empty'));
       });
       el.addEventListener('drop', function (e) {
         e.preventDefault();
-        var layout = e.dataTransfer.getData('text/edoc-layout');
-        var tipo = e.dataTransfer.getData('text/edoc-type');
-        var chave = lerChaveDrop(e.dataTransfer);
-        var role = el.getAttribute('data-empty');
-        if (layout) addSection(role, JSON.parse(layout));
-        else if (chave || tipo) {
-          addSection(role, [100]);
-          var col = areaOf(role).sections.slice(-1)[0].columns[0];
-          if (chave) insertVariavel(col.id, chave, true);
-          else insertElement(col.id, tipo, true);
-        } else if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-          addSection(role, [100]);
-          var colArq = areaOf(role).sections.slice(-1)[0].columns[0];
-          inserirArquivoNaColuna(colArq.id, e.dataTransfer.files[0]);
-        }
+        e.stopPropagation();
+        soltarNaRole(el.getAttribute('data-empty'), dadosDoArraste(e.dataTransfer));
+      });
+    });
+    $all('.edoc-area', paper).forEach(function (area) {
+      area.addEventListener('dragover', function (e) {
+        if (state.preview) return;
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+        area.classList.add('is-over');
+      });
+      area.addEventListener('dragleave', function (e) {
+        if (e.relatedTarget && area.contains(e.relatedTarget)) return;
+        area.classList.remove('is-over');
+      });
+      area.addEventListener('drop', function (e) {
+        area.classList.remove('is-over');
+        var alvo = e.target;
+        if (alvo && alvo.closest && (alvo.closest('.edoc-col') || alvo.closest('[data-empty]'))) return;
+        e.preventDefault();
+        soltarNaRole(area.getAttribute('data-role') || 'body', dadosDoArraste(e.dataTransfer));
       });
     });
   }
@@ -2467,6 +2708,18 @@
     }
     if (editando && editando.node && editando.node.contains(e.target) && e.target.closest('[contenteditable="true"]')) {
       return;
+    }
+    if (!state.preview && !act) {
+      var colVazia = e.target.closest('.edoc-col');
+      if (colVazia && !e.target.closest('.edoc-el')) {
+        escreverNaColuna(colVazia.getAttribute('data-id'));
+        return;
+      }
+      var areaClique = e.target.closest('.edoc-area');
+      if (areaClique && !e.target.closest('.edoc-col, .edoc-el, [data-empty]')) {
+        escreverNaArea(areaClique.getAttribute('data-role') || 'body');
+        return;
+      }
     }
     var elNode = e.target.closest('.edoc-el');
     var tipo = elNode ? elNode.getAttribute('data-type') : '';
@@ -2655,7 +2908,7 @@
   function arrastandoVariavel(dt) {
     if (!dt || !dt.types) return false;
     var types = Array.prototype.slice.call(dt.types);
-    return types.indexOf('text/edoc-var') >= 0 || types.indexOf('text/plain') >= 0;
+    return types.indexOf('text/edoc-var') >= 0 || types.indexOf('text/edoc-texto') >= 0 || types.indexOf('text/plain') >= 0;
   }
 
   function marcarCelulaDrop(celula) {
@@ -2686,9 +2939,8 @@
     var destino = linha && linha.cells[celula.cellIndex];
     if (!destino) return false;
     var token = tokenDaChave(chave);
-    var texto = (destino.textContent || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
-    if (!texto || texto === '—') destino.textContent = token;
-    else if (texto.indexOf(token) < 0) destino.appendChild(document.createTextNode(' ' + token));
+    destino.setAttribute('data-edoc-token', chave);
+    destino.textContent = token;
     path.element.props.html = restaurarMedidasMm(anterior, wrap.innerHTML);
     delete path.element.props.text;
     if (editando && editando.id === path.element.id) {
@@ -2706,6 +2958,59 @@
     render();
     setStatus('Variável colocada na célula');
     return true;
+  }
+
+  function inserirTextoNaCelula(celula, texto) {
+    var elNode = celula.closest('.edoc-el');
+    if (!elNode || !paper || !paper.contains(celula)) return false;
+    var path = findPath(elNode.getAttribute('data-id'));
+    if (!path || !path.element || !ehTextoEditavel(path.element.type)) return false;
+    var tabelaViva = celula.closest('table');
+    var body = corpoDoElemento(elNode);
+    if (!tabelaViva || !body || !body.contains(tabelaViva)) return false;
+    path.element.props = path.element.props || {};
+    var anterior = path.element.props.html || path.element.props.text || '';
+    var wrap = document.createElement('div');
+    wrap.innerHTML = String(anterior).indexOf('<') >= 0 ? anterior : esc(anterior);
+    var vivas = body.querySelectorAll('table');
+    var fontes = wrap.querySelectorAll('table');
+    var ti = Array.prototype.indexOf.call(vivas, tabelaViva);
+    var tabelaFonte = fontes[ti];
+    if (!tabelaFonte || !celula.parentElement) return false;
+    var linha = tabelaFonte.rows[celula.parentElement.rowIndex];
+    var destino = linha && linha.cells[celula.cellIndex];
+    if (!destino) return false;
+    destino.removeAttribute('data-edoc-token');
+    destino.textContent = String(texto || '');
+    path.element.props.html = restaurarMedidasMm(anterior, wrap.innerHTML);
+    delete path.element.props.text;
+    if (editando && editando.id === path.element.id) {
+      var bodyEd = corpoDoElemento(editando.node);
+      if (bodyEd) {
+        bodyEd.oninput = null;
+        bodyEd.onkeydown = null;
+        bodyEd.onpaste = null;
+      }
+      esconderBarraInline();
+      editando = null;
+    }
+    state.selected = { id: path.element.id, kind: 'element' };
+    pushHist();
+    render();
+    setStatus('Texto colocado na célula');
+    return true;
+  }
+
+  function insertTexto(colId, texto, skipHist) {
+    var path = findPath(colId);
+    if (!path || !path.column) return;
+    var el = defaultElement('texto');
+    el.props = { text: String(texto || '') };
+    path.column.elements = path.column.elements || [];
+    path.column.elements.push(el);
+    state.selected = { id: el.id, kind: 'element' };
+    if (!skipHist) pushHist();
+    render();
   }
 
   function insertVariavel(colId, chave, skipHist) {
@@ -2815,6 +3120,68 @@
     inserirArquivoNaColuna(colId, file);
   }
 
+  function focarTexto(id) {
+    var node = paper && paper.querySelector('.edoc-el[data-id="' + id + '"]');
+    if (!node) return;
+    marcarSelecionado(node, id);
+    iniciarEdicaoNaFolha(node);
+    var body = corpoDoElemento(node);
+    if (!body) return;
+    body.focus();
+    var sel = window.getSelection();
+    if (!sel) return;
+    var range = document.createRange();
+    range.selectNodeContents(body);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  function escreverNaColuna(colId) {
+    if (state.preview) return;
+    var path = findPath(colId);
+    if (!path || !path.column) return;
+    var els = path.column.elements || [];
+    if (els.length === 1 && ehTextoEditavel(els[0].type)) {
+      state.selected = { id: els[0].id, kind: 'element' };
+      render();
+      focarTexto(els[0].id);
+      return;
+    }
+    if (els.length) return;
+    var el = defaultElement('texto');
+    el.props = { text: '' };
+    path.column.elements = [el];
+    state.selected = { id: el.id, kind: 'element' };
+    pushHist();
+    render();
+    focarTexto(el.id);
+    setStatus('Escreva o texto');
+  }
+
+  function escreverNaArea(role) {
+    if (state.preview) return;
+    role = role || 'body';
+    var secs = areaOf(role).sections || [];
+    var colId = null;
+    secs.forEach(function (s) {
+      (s.columns || []).forEach(function (c) {
+        if (!colId && !(c.elements || []).length) colId = c.id;
+      });
+    });
+    if (!colId) {
+      var sec = {
+        id: uid('s'),
+        type: 'section',
+        role: role,
+        columns: [{ id: uid('c'), width: 100, vAlign: 'top', elements: [] }]
+      };
+      areaOf(role).sections.push(sec);
+      colId = sec.columns[0].id;
+    }
+    escreverNaColuna(colId);
+  }
+
   function addSection(role, widths) {
     var sec = {
       id: uid('s'),
@@ -2831,7 +3198,8 @@
   }
 
   function insertLayoutAt(colId, layoutJson) {
-    var widths = JSON.parse(layoutJson);
+    var widths = largurasDoLayout(layoutJson);
+    if (!widths) return;
     var path = findPath(colId);
     var role = path ? path.role : 'body';
     addSection(role, widths);
@@ -3000,13 +3368,14 @@
     var st = el.style || {};
     var html = '<div class="edoc-sec-label">' + labelTipo(el.type).toUpperCase() + '</div>';
     if (el.type === 'titulo' || el.type === 'texto' || el.type === 'texto_rico' || el.type === 'html') {
+      html += '<div class="edoc-sec-label">FORMATO</div>';
+      html += '<div class="edoc-rte-bar">' + htmlBarraFmt(true) + '</div>';
+      html += '<p class="edoc-hint">Clique na célula da folha. A+, A−, linha, coluna e mesclar aplicam nela.</p>';
       html += '<label>Conteúdo</label>';
       html += '<div class="edoc-rte-wrap">'
-        + '<div class="edoc-rte-bar">' + htmlBarraFmt(true) + '</div>'
         + '<div class="edoc-rte" contenteditable="true" role="textbox" aria-multiline="true" spellcheck="true"></div>'
         + '</div>';
       html += '<button type="button" class="edoc-btn" id="edoc-insert-var" style="margin-top:6px">{ } Variáveis</button>';
-      html += '<p class="edoc-hint" style="margin-top:8px">Clique no texto da folha para digitar. Use a barra para centralizar e A+ / A− para o tamanho da fonte.</p>';
       html += painelMedidasFolha(p.html || '');
     }
     if (el.type === 'tabela_notas') {
@@ -3314,6 +3683,14 @@
     $all('[data-fmt]', box).forEach(function (b) {
       b.addEventListener('mousedown', function (e) { e.preventDefault(); });
       b.addEventListener('click', function () {
+        var folha = corpoVivoDoElemento(target);
+        if (folha) {
+          executarFmt(b.getAttribute('data-fmt'), target, folha);
+          if (folha.isConnected) sincronizarBloco(target, folha);
+          atualizarLabelFonte(tamanhoFontePt(target, folha));
+          atualizarBotoesRte(box);
+          return;
+        }
         restoreRange();
         executarFmt(b.getAttribute('data-fmt'), target, rte);
         saveRange();
@@ -3493,7 +3870,8 @@
     if (/1127\s*-?\s*a/i.test(cod) || /1127a/i.test(cod)) return '1127a';
     if (/1127\s*-?\s*b/i.test(cod) || /1127b/i.test(cod)) return '1127b';
     if (/1128/i.test(cod)) return '1128';
-    return '1127';
+    if (/1127/i.test(cod)) return '1127';
+    return '1127a';
   }
 
   function inserirBlocoHtml(html) {
@@ -3524,11 +3902,121 @@
     var comps = $('#edoc-demo-comps');
     if (!box || !turma || !aluno || !C.demoUrl) return;
     var req = 0;
-    var blocos = {
-      serie: '<p>Série: {{serie}}<br>Turma: {{turma_nome}}<br>Curso: {{curso_nome}}<br>Ano letivo: {{ano_letivo}}</p>',
-      componentes: '{{componentes_serie_html}}',
-      notas: '{{quadro_notas_html}}'
-    };
+    var demoPacote = { componentes: [], periodos: [] };
+    function mapaGlossario() {
+      var mapa = {};
+      glossarioValido(state.estrutura && state.estrutura.glossario).forEach(function (item) {
+        mapa[item.slug] = item.sigla;
+      });
+      return mapa;
+    }
+    function siglaDe(comp) {
+      var mapa = mapaGlossario();
+      return (mapa[comp.slug] || comp.sigla || comp.nome || '').trim();
+    }
+    function usarSigla() {
+      var caixa = $('#edoc-demo-sigla');
+      return !!(caixa && caixa.checked);
+    }
+    function rotuloDisc(comp) {
+      return usarSigla() ? siglaDe(comp) : (comp.nome || siglaDe(comp));
+    }
+    function guardarSigla(slug, nome, sigla) {
+      sigla = String(sigla || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 12);
+      if (!sigla) return;
+      var lista = glossarioValido(state.estrutura.glossario).filter(function (item) {
+        return item.slug !== slug;
+      });
+      lista.push({ slug: slug, nome: nome, sigla: sigla });
+      state.estrutura.glossario = lista;
+      state.dirty = true;
+      scheduleSave();
+    }
+    function celulaToken(chave) {
+      return '<td data-edoc-token="' + esc(chave) + '" style="border:0.4px solid #222;padding:2px;vertical-align:middle;text-align:center;">{{' + esc(chave) + '}}</td>';
+    }
+    function periodosDemo() {
+      var pers = demoPacote.periodos || [];
+      if (pers.length) return pers;
+      return [
+        { n: 1, rotulo: '1º Bimestre', bimestres: [1] },
+        { n: 2, rotulo: '2º Bimestre', bimestres: [2] },
+        { n: 3, rotulo: '3º Bimestre', bimestres: [3] },
+        { n: 4, rotulo: '4º Bimestre', bimestres: [4] }
+      ];
+    }
+    function htmlListaEditavel() {
+      var comps = demoPacote.componentes || [];
+      if (!comps.length) return '';
+      var html = '<table class="dados" style="width:100%;border-collapse:collapse;"><tr><td style="border:0.4px solid #222;padding:3px;font-weight:bold;">Componente curricular</td></tr>';
+      comps.forEach(function (c) {
+        html += '<tr><td style="border:0.4px solid #222;padding:3px;">' + esc(rotuloDisc(c)) + '</td></tr>';
+      });
+      return html + '</table>';
+    }
+    function htmlBoletimEditavel() {
+      var comps = demoPacote.componentes || [];
+      var pers = periodosDemo();
+      if (!comps.length) return '';
+      var th = 'border:0.4px solid #222;padding:2px;background:#e5e7eb;font-weight:bold;text-align:center;';
+      var html = '<table class="dados quadro-notas" style="width:100%;border-collapse:collapse;font-size:7pt;">';
+      html += '<thead><tr><th rowspan="2" style="' + th + '">Componente</th>';
+      pers.forEach(function (p) {
+        html += '<th colspan="2" style="' + th + '">' + esc(p.rotulo || '') + '</th>';
+      });
+      html += '<th rowspan="2" style="' + th + '">Média</th><th rowspan="2" style="' + th + '">Resultado</th></tr><tr>';
+      pers.forEach(function () {
+        html += '<th style="' + th + '">Nota</th><th style="' + th + '">Falta</th>';
+      });
+      html += '</tr></thead><tbody>';
+      comps.forEach(function (c) {
+        html += '<tr><td style="border:0.4px solid #222;padding:3px;">' + esc(rotuloDisc(c)) + '</td>';
+        pers.forEach(function (p) {
+          html += celulaToken('nota_' + c.slug + '_' + p.n);
+          html += celulaToken('falta_' + c.slug + '_' + p.n);
+        });
+        html += celulaToken(c.media || ('media_final_' + c.slug));
+        html += celulaToken(c.media || ('media_final_' + c.slug));
+        html += '</tr>';
+      });
+      return html + '</tbody></table>';
+    }
+    function htmlGlossario() {
+      var comps = demoPacote.componentes || [];
+      if (!comps.length) return '';
+      var th = 'border:0.4px solid #222;padding:3px;background:#e5e7eb;font-weight:bold;';
+      var td = 'border:0.4px solid #222;padding:3px;';
+      var html = '<p style="margin:0 0 4px;font-weight:bold;">Glossário</p>';
+      html += '<table class="dados" style="width:100%;border-collapse:collapse;"><tr><th style="' + th + '">Sigla</th><th style="' + th + '">Componente</th></tr>';
+      comps.forEach(function (c) {
+        html += '<tr><td style="' + td + '">' + esc(siglaDe(c)) + '</td><td style="' + td + '">' + esc(c.nome || '') + '</td></tr>';
+      });
+      return html + '</table>';
+    }
+    function gravarGradeDemo() {
+      var comps = demoPacote.componentes || [];
+      var pers = periodosDemo();
+      if (!comps.length) return;
+      state.estrutura.grade = {
+        tipo: 'ficha',
+        periodos: pers.map(function (p) {
+          var bims = Array.isArray(p.bimestres) && p.bimestres.length ? p.bimestres : [p.n];
+          return { n: p.n, rotulo: p.rotulo || '', bimestres: bims };
+        }),
+        componentes: comps.map(function (c) {
+          return { slug: c.slug, nome: c.nome, grupo: '', vaga: false, aliases: [c.nome] };
+        })
+      };
+    }
+    function inserirPersonalizado(html, aviso) {
+      if (!html) {
+        if (status) status.textContent = 'Escolha o aluno para montar as disciplinas da série.';
+        return;
+      }
+      gravarGradeDemo();
+      inserirBlocoHtml(html);
+      setStatus(aviso);
+    }
     function pintarTurmas(lista) {
       var atual = turma.value;
       var html = '<option value="">Selecione a turma</option>';
@@ -3547,24 +4035,82 @@
       aluno.innerHTML = html;
       if (atual) aluno.value = atual;
     }
+    function ligarArrasteTexto(el) {
+      if (!el || el._edocDragTxt) return;
+      el._edocDragTxt = true;
+      el.setAttribute('draggable', 'true');
+      var dragging = false;
+      el.addEventListener('dragstart', function (e) {
+        dragging = true;
+        var texto = el.getAttribute('data-drag-texto') || '';
+        var slug = el.getAttribute('data-sigla-drag') || '';
+        if (slug) {
+          var campo = el.closest('.edoc-disc') && el.closest('.edoc-disc').querySelector('[data-sigla]');
+          texto = (campo && campo.value.trim()) || texto;
+        }
+        prepararArraste(e, 'text/edoc-texto', texto, 'edoc-texto:' + texto);
+      });
+      el.addEventListener('dragend', function () {
+        marcarCelulaDrop(null);
+        setTimeout(function () { dragging = false; }, 0);
+      });
+      el.addEventListener('click', function () {
+        if (dragging) return;
+        var texto = el.getAttribute('data-drag-texto') || '';
+        var slug = el.getAttribute('data-sigla-drag') || '';
+        if (slug) {
+          var campo = el.closest('.edoc-disc') && el.closest('.edoc-disc').querySelector('[data-sigla]');
+          texto = (campo && campo.value.trim()) || texto;
+        }
+        var sel = state.selected ? findPath(state.selected.id) : null;
+        var colId = (sel && sel.column) ? sel.column.id : garantirColunaCorpo();
+        insertTexto(colId, texto);
+      });
+    }
     function pintarComponentes(lista) {
       var drop = $('#edoc-demo-comps-drop');
       var contagem = $('#edoc-demo-comps-count');
       if (!comps) return;
+      demoPacote.componentes = lista || [];
       if (!lista || !lista.length) {
         comps.innerHTML = '';
         if (drop) drop.hidden = true;
         return;
       }
+      var mapa = mapaGlossario();
+      var pers = periodosDemo();
       var html = '';
       lista.forEach(function (c) {
-        var nome = esc(c.nome || '');
-        html += '<button type="button" class="edoc-var-chip" data-drag-var="' + esc(c.token || '') + '" title="Insere a nota de ' + nome + '">'
-          + '<span class="edoc-var-nome">' + nome + '</span>'
-          + '<span class="edoc-var-token">{{' + esc(c.token || '') + '}}</span></button>';
+        var nome = c.nome || '';
+        var sigla = mapa[c.slug] || c.sigla || '';
+        html += '<div class="edoc-disc">';
+        html += '<button type="button" class="edoc-disc-nome" draggable="true" data-drag-texto="' + esc(nome) + '" title="Arraste o nome para a folha">' + esc(nome) + '</button>';
+        html += '<label class="edoc-disc-sigla">Sigla <input type="text" maxlength="12" data-sigla="' + esc(c.slug) + '" data-nome="' + esc(nome) + '" value="' + esc(sigla) + '"></label>';
+        html += '<div class="edoc-disc-chips">';
+        html += '<button type="button" data-drag-texto="' + esc(nome) + '">Nome</button>';
+        html += '<button type="button" data-drag-texto="' + esc(sigla) + '" data-sigla-drag="' + esc(c.slug) + '">Sigla</button>';
+        pers.forEach(function (p, i) {
+          var nota = (c.notas && c.notas[i]) || ('nota_' + c.slug + '_' + p.n);
+          var falta = (c.faltas && c.faltas[i]) || ('falta_' + c.slug + '_' + p.n);
+          html += '<button type="button" data-drag-var="' + esc(nota) + '" title="Nota de ' + esc(p.rotulo || '') + '">' + esc(String(p.n)) + 'º</button>';
+          html += '<button type="button" data-drag-var="' + esc(falta) + '" title="Falta de ' + esc(p.rotulo || '') + '">F' + esc(String(p.n)) + '</button>';
+        });
+        html += '<button type="button" data-drag-var="' + esc(c.media || ('media_final_' + c.slug)) + '">Média</button>';
+        html += '<button type="button" data-drag-var="' + esc(c.media || ('media_final_' + c.slug)) + '" title="Resultado final da disciplina">Resultado</button>';
+        html += '</div></div>';
       });
       comps.innerHTML = html;
       $all('[data-drag-var]', comps).forEach(ligarArrasteVariavel);
+      $all('[data-drag-texto]', comps).forEach(ligarArrasteTexto);
+      $all('[data-sigla]', comps).forEach(function (campo) {
+        campo.addEventListener('change', function () {
+          var siglaLimpa = String(campo.value || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 12);
+          campo.value = siglaLimpa;
+          guardarSigla(campo.getAttribute('data-sigla') || '', campo.getAttribute('data-nome') || '', siglaLimpa);
+          var botao = campo.closest('.edoc-disc') && campo.closest('.edoc-disc').querySelector('[data-sigla-drag]');
+          if (botao) botao.setAttribute('data-drag-texto', siglaLimpa);
+        });
+      });
       if (contagem) contagem.textContent = String(lista.length);
       if (drop) drop.hidden = false;
     }
@@ -3588,6 +4134,7 @@
         carregar();
         return;
       }
+      if (Array.isArray(data.periodos) && data.periodos.length) demoPacote.periodos = data.periodos;
       pintarComponentes(data.componentes || []);
       if (data.vars) {
         persistirEdicaoSeHouver();
@@ -3636,9 +4183,22 @@
     }
     box.addEventListener('click', function (e) {
       var atalho = e.target.closest('[data-atalho]');
-      if (atalho && blocos[atalho.getAttribute('data-atalho')]) {
-        inserirBlocoHtml(blocos[atalho.getAttribute('data-atalho')]);
+      if (!atalho) return;
+      var qual = atalho.getAttribute('data-atalho');
+      if (qual === 'serie') {
+        inserirBlocoHtml('<p>Série: {{serie}}<br>Turma: {{turma_nome}}<br>Curso: {{curso_nome}}<br>Ano letivo: {{ano_letivo}}</p>');
         return;
+      }
+      if (qual === 'componentes') {
+        inserirPersonalizado(htmlListaEditavel(), 'Lista na folha. Troque o nome pela sigla direto na célula.');
+        return;
+      }
+      if (qual === 'notas' || qual === 'boletim') {
+        inserirPersonalizado(htmlBoletimEditavel(), 'Boletim na folha. Apague a linha, edite a sigla ou solte outro resultado na célula.');
+        return;
+      }
+      if (qual === 'glossario') {
+        inserirPersonalizado(htmlGlossario(), 'Glossário na folha. Edite a sigla e o nome como quiser.');
       }
     });
     carregar();
@@ -3650,7 +4210,8 @@
       var dragging = false;
       el.addEventListener('dragstart', function (e) {
         dragging = true;
-        e.dataTransfer.setData('text/edoc-type', el.getAttribute('data-drag-type'));
+        var tipo = el.getAttribute('data-drag-type') || '';
+        prepararArraste(e, 'text/edoc-type', tipo, 'edoc-type:' + tipo);
       });
       el.addEventListener('dragend', function () {
         setTimeout(function () { dragging = false; }, 0);
@@ -3663,7 +4224,8 @@
     $all('[data-drag-layout]').forEach(function (el) {
       el.setAttribute('draggable', 'true');
       el.addEventListener('dragstart', function (e) {
-        e.dataTransfer.setData('text/edoc-layout', el.getAttribute('data-drag-layout'));
+        var layout = el.getAttribute('data-drag-layout') || '';
+        prepararArraste(e, 'text/edoc-layout', layout, 'edoc-layout:' + layout);
       });
       el.addEventListener('click', function () {
         addSection('body', JSON.parse(el.getAttribute('data-drag-layout')));
@@ -3679,10 +4241,8 @@
     var dragging = false;
     el.addEventListener('dragstart', function (e) {
       dragging = true;
-      var chave = el.getAttribute('data-drag-var');
-      e.dataTransfer.effectAllowed = 'copy';
-      e.dataTransfer.setData('text/edoc-var', chave);
-      e.dataTransfer.setData('text/plain', 'edoc-var:' + chave);
+      var chave = el.getAttribute('data-drag-var') || '';
+      prepararArraste(e, 'text/edoc-var', chave, 'edoc-var:' + chave);
     });
     el.addEventListener('dragend', function () {
       marcarCelulaDrop(null);
@@ -3944,6 +4504,34 @@
         persistirEdicaoSeHouver();
         render();
       });
+      if (!stage._edocDrop) {
+        stage._edocDrop = true;
+        stage.addEventListener('dragover', function (e) {
+          if (state.preview || !paper) return;
+          var sob = document.elementFromPoint(e.clientX, e.clientY);
+          if (!sob || (sob !== paper && !paper.contains(sob))) return;
+          e.preventDefault();
+          if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+        });
+        stage.addEventListener('drop', function (e) {
+          if (state.preview || !paper) return;
+          if (e.target && (e.target === paper || paper.contains(e.target))) return;
+          var sob = document.elementFromPoint(e.clientX, e.clientY);
+          if (!sob || (sob !== paper && !paper.contains(sob))) return;
+          var dados = dadosDoArraste(e.dataTransfer);
+          if (!dados.layout && !dados.tipo && !dados.chave && !dados.texto && !dados.arquivo) return;
+          e.preventDefault();
+          var col = sob.closest ? sob.closest('.edoc-col') : null;
+          if (col) {
+            soltarNaColuna(col.getAttribute('data-id'), dados);
+            return;
+          }
+          var vazio = sob.closest ? sob.closest('[data-empty]') : null;
+          var area = sob.closest ? sob.closest('.edoc-area') : null;
+          var role = vazio ? vazio.getAttribute('data-empty') : (area ? area.getAttribute('data-role') : 'body');
+          soltarNaRole(role || 'body', dados);
+        });
+      }
     }
   }
 

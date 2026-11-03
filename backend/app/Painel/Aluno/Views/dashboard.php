@@ -14,6 +14,11 @@
                 Dashboard
             </h1>
             <p class="text-sm sm:text-base text-gray-600 mt-1">Acompanhe seu progresso e continue aprendendo.</p>
+            <a href="<?= URL ?>/grade-horaria"
+               class="mt-3 inline-flex items-center px-4 py-2 rounded-lg bg-primary text-primary text-sm font-semibold hover:opacity-90 whitespace-nowrap">
+                <i class="fa-regular fa-calendar-days mr-2"></i>
+                Grade horária
+            </a>
         </div>
         <?php if (!empty($turmas_cursos_select) && is_array($turmas_cursos_select)): ?>
         <div class="flex flex-col items-stretch sm:items-end gap-1 w-full sm:w-auto max-w-full">

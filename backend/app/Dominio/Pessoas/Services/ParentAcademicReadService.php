@@ -116,7 +116,16 @@ class ParentAcademicReadService
         $items=[];
         if($this->db->tableExists('student_access_events')) foreach($this->db->fetchAll('SELECT id,kind,event_at FROM student_access_events WHERE student_id=:id ORDER BY event_at DESC LIMIT 5',['id'=>$studentId]) as $row){$items[]=['type'=>'attendance','title'=>$row['kind']==='entrada'?'Entrada registrada':'Saída registrada','occurred_at'=>$this->isoDate($row['event_at']),'route'=>'/attendance','metadata'=>['kind'=>$row['kind']]];}
         if($this->db->tableExists('provas_realizacoes')) foreach($this->db->fetchAll("SELECT pr.prova_id,p.titulo,pr.finalizado_em FROM provas_realizacoes pr INNER JOIN provas p ON p.id=pr.prova_id WHERE pr.aluno_id=:id AND pr.finalizado_em IS NOT NULL ORDER BY pr.finalizado_em DESC LIMIT 3",['id'=>$studentId]) as $row){$items[]=['type'=>'exam','title'=>'Prova finalizada: '.$row['titulo'],'occurred_at'=>$this->isoDate($row['finalizado_em']),'route'=>'/exams','metadata'=>['exam_id'=>(int)$row['prova_id']]];}
-        if($this->db->tableExists('school_communications')) foreach($this->db->fetchAll("SELECT c.id,c.titulo,c.published_at FROM school_communications c INNER JOIN alunos a ON a.id=:student WHERE c.status='publicado' AND (c.publico='todos' OR EXISTS(SELECT 1 FROM school_communication_classes cc WHERE cc.communication_id=c.id AND cc.turma_id=a.turma_id) OR EXISTS(SELECT 1 FROM school_communication_students cs WHERE cs.communication_id=c.id AND cs.aluno_id=a.id)) ORDER BY c.published_at DESC LIMIT 3",['student'=>$studentId]) as $row){$items[]=['type'=>'communication','title'=>'Novo comunicado: '.$row['titulo'],'occurred_at'=>$this->isoDate($row['published_at']),'route'=>'/school-communications/'.(int)$row['id'],'metadata'=>['communication_id'=>(int)$row['id']]];}
+        if($this->db->tableExists('school_communications')) {
+            $extraPublico = '';
+            if ($this->db->tableExists('school_communication_series')) {
+                $extraPublico .= " OR (c.publico='series' AND EXISTS(SELECT 1 FROM school_communication_series ss WHERE ss.communication_id=c.id AND ss.serie_id=t.serie_id))";
+            }
+            if ($this->db->tableExists('school_communication_cursos')) {
+                $extraPublico .= " OR (c.publico='cursos' AND EXISTS(SELECT 1 FROM school_communication_cursos cu WHERE cu.communication_id=c.id AND cu.curso_id=COALESCE(t.curso_novo_id, t.curso_id)))";
+            }
+            foreach($this->db->fetchAll("SELECT c.id,c.titulo,c.published_at FROM school_communications c INNER JOIN alunos a ON a.id=:student LEFT JOIN turmas t ON t.id=a.turma_id WHERE c.status='publicado' AND (c.publico='todos' OR EXISTS(SELECT 1 FROM school_communication_classes cc WHERE cc.communication_id=c.id AND cc.turma_id=a.turma_id) OR EXISTS(SELECT 1 FROM school_communication_students cs WHERE cs.communication_id=c.id AND cs.aluno_id=a.id){$extraPublico}) ORDER BY c.published_at DESC LIMIT 3",['student'=>$studentId]) as $row){$items[]=['type'=>'communication','title'=>'Novo comunicado: '.$row['titulo'],'occurred_at'=>$this->isoDate($row['published_at']),'route'=>'/school-communications/'.(int)$row['id'],'metadata'=>['communication_id'=>(int)$row['id']]];}
+        }
         usort($items,fn($a,$b)=>strcmp((string)$b['occurred_at'],(string)$a['occurred_at']));
         return array_slice($items,0,8);
     }

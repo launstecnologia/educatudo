@@ -66,8 +66,12 @@ $statCards = [
             <?php foreach ($eventos as $evento): ?>
                 <?php
                 $isLancamentoNota = (($evento['formato_evento'] ?? 'online_questoes') === 'lancamento_nota');
+                $isProvaImpressa = (($evento['formato_evento'] ?? '') === 'prova_impressa');
+                $escolaElaboraImpressa = $isProvaImpressa && (($evento['configuracao_nota'] ?? '') === 'coordenacao_calcula');
                 $lancamentoCoordOnly = ($isLancamentoNota && (($evento['configuracao_nota'] ?? '') === 'coordenacao_calcula'));
-                if ($isLancamentoNota) {
+                if ($escolaElaboraImpressa) {
+                    $urlProva = URL . '/professor/provas';
+                } elseif ($isLancamentoNota) {
                     $urlProva = $lancamentoCoordOnly
                         ? (URL . '/professor/provas')
                         : (URL . '/professor/provas/evento-lancar-notas/' . (int)$evento['id'] . '?materia_id=' . (int)$evento['materia_id']);
@@ -88,7 +92,11 @@ $statCards = [
                 $totA = (int)($evento['lancamento_total_alunos'] ?? 0);
                 $preen = (int)($evento['lancamento_notas_preenchidas'] ?? 0);
                 $okLanc = $totA > 0 && $preen >= $totA;
-                if ($isLancamentoNota) {
+                if ($escolaElaboraImpressa) {
+                    $actionLabel = 'A escola elabora a prova';
+                    $actionIcon = 'fa-solid fa-school';
+                    $actionClass = 'border-gray-300 bg-white text-gray-700';
+                } elseif ($isLancamentoNota) {
                     $actionLabel = $lancamentoCoordOnly ? 'Coordenação lança notas' : 'Lançar notas';
                     $actionIcon = $lancamentoCoordOnly ? 'fa-solid fa-user-shield' : 'fa-solid fa-pen-to-square';
                     $actionClass = $lancamentoCoordOnly
@@ -114,6 +122,9 @@ $statCards = [
                                     <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">Substitutiva</span>
                                 <?php else: ?>
                                     <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Original</span>
+                                <?php endif; ?>
+                                <?php if ($isProvaImpressa): ?>
+                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-teal-100 text-teal-800">Prova impressa</span>
                                 <?php endif; ?>
                                 <?php if ($isLancamentoNota): ?>
                                     <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">Lançamento de notas</span>
@@ -148,6 +159,13 @@ $statCards = [
                         </span>
                     </div>
                 </a>
+                <?php if ($isProvaImpressa && !empty($evento['prova_existente_id'])): ?>
+                <a href="<?= URL ?>/professor/leitor-gabarito/provas/<?= (int) $evento['prova_existente_id'] ?>"
+                   class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-teal-800">
+                    <i class="fa-solid fa-barcode" aria-hidden="true"></i>
+                    Ler gabarito
+                </a>
+                <?php endif; ?>
             <?php endforeach; ?>
         </div>
     </div>

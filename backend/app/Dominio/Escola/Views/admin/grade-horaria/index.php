@@ -19,13 +19,57 @@ unset($_SESSION['success_message'], $_SESSION['error_message']);
 
 <div class="grade-no-print">
 <?php
+$filtrosGrade = is_array($filtros ?? null) ? $filtros : [];
+$filtrosGradeAtivos = 0;
+foreach (['tipo_ensino', 'serie', 'periodo'] as $chaveFiltroGrade) {
+    if (($filtrosGrade[$chaveFiltroGrade] ?? '') !== '') {
+        $filtrosGradeAtivos++;
+    }
+}
+foreach (['professor_id', 'materia_id'] as $chaveFiltroGrade) {
+    if ((int) ($filtrosGrade[$chaveFiltroGrade] ?? 0) > 0) {
+        $filtrosGradeAtivos++;
+    }
+}
 ob_start();
 ?>
-<button type="button" onclick="document.getElementById('modal-imagem-ia').classList.remove('hidden')"
-        class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-    <i class="fa-regular fa-image mr-2 text-gray-500"></i>
-    Importar por imagem
+<button type="button" onclick="openFilterDrawer()"
+        class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+    <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
+    Filtros
+    <?php if ($filtrosGradeAtivos > 0): ?>
+    <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold"><?= $filtrosGradeAtivos ?></span>
+    <?php endif; ?>
 </button>
+<div class="inline-flex" data-dropdown>
+    <button type="button" data-dropdown-toggle
+            class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+        <i class="fa-solid fa-file-import mr-2 text-gray-500"></i>
+        Importar
+        <i class="fa-solid fa-chevron-down ml-2 text-xs text-gray-400"></i>
+    </button>
+    <div data-dropdown-menu class="hidden fixed z-50 w-48 rounded-lg bg-white shadow-lg ring-1 ring-black/5 overflow-hidden">
+        <div class="py-1">
+            <button type="button" onclick="abrirImportacaoImagem(); this.closest('[data-dropdown-menu]').classList.add('hidden');"
+                    class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                <i class="fa-regular fa-image text-gray-400 w-4 text-center"></i> Por imagem
+            </button>
+            <button type="button" onclick="abrirImportacaoExcel(); this.closest('[data-dropdown-menu]').classList.add('hidden');"
+                    class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                <i class="fa-solid fa-file-excel text-gray-400 w-4 text-center"></i> Por Excel
+            </button>
+        </div>
+    </div>
+</div>
+<?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
+<?php
+$ui_btn_variant = 'complementar';
+$ui_btn_label = 'Log';
+$ui_btn_icon = 'fa-solid fa-clock-rotate-left';
+$ui_btn_onclick = 'abrirTrilhaGrade()';
+include \App\Core\ViewPaths::adminPartial('ui/btn.php');
+?>
+<?php endif; ?>
 <button type="button" onclick="openAulaDrawer()"
         class="inline-flex items-center px-4 py-2.5 bg-primary text-primary rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
     <i class="fa-solid fa-plus mr-2"></i>
@@ -35,8 +79,27 @@ ob_start();
 $page_header_actions = ob_get_clean();
 $page_header_title = 'Grade Horária de Aulas';
 $page_header_subtitle = 'Organize as aulas da escola em uma visão semanal.';
-include \App\Core\ViewPaths::adminPartial('page_header_list.php');
+$trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/grade-horaria', 'Grade Horária');
 ?>
+<div class="mb-6">
+    <?php include __DIR__ . '/../../../../../Views/layouts/components/trilha.php'; ?>
+    <div class="mt-4 flex justify-between items-center gap-4">
+        <div class="flex items-center gap-3 min-w-0">
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
+                <i class="fa-regular fa-calendar-days text-lg" aria-hidden="true"></i>
+            </span>
+            <div class="min-w-0">
+                <h2 class="text-xl font-bold text-gray-900"><?= htmlspecialchars($page_header_title) ?></h2>
+                <p class="text-sm text-gray-500 mt-0.5"><?= htmlspecialchars($page_header_subtitle) ?></p>
+            </div>
+        </div>
+        <?php if ($page_header_actions !== ''): ?>
+        <div class="flex items-center justify-end gap-3 flex-shrink-0 ml-auto">
+            <?= $page_header_actions ?>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
 
 <?php if ($success_message): ?>
     <div class="mb-6 p-4 rounded-lg bg-green-100 text-green-800 border border-green-200"><?= htmlspecialchars($success_message) ?></div>
@@ -219,7 +282,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                 <div id="resumo-preview-ia" class="text-sm text-gray-600 mb-4"></div>
                 <div id="resultado-salvar-ia" class="hidden text-sm rounded-lg p-3 mb-4"></div>
                 <div class="flex justify-end gap-2 flex-shrink-0">
-                    <button type="button" onclick="voltarUploadIA()"
+                    <button type="button" id="btn-voltar-importacao" onclick="voltarUploadIA()"
                             class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Enviar outra imagem</button>
                     <button type="button" id="btn-salvar-importacao" onclick="salvarImportacaoIA()"
                             class="btn-primary-custom px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90">
@@ -227,6 +290,33 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                     </button>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-excel-grade" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen px-4 py-6">
+        <div class="fixed inset-0 bg-black/50" onclick="fecharImportacaoExcel()"></div>
+        <div class="relative bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">Importar grade por Excel</h3>
+            <p class="text-sm text-gray-600 mb-4">Envie uma planilha .xlsx ou .csv com uma aula por linha. Você confere os dados antes de salvar.</p>
+            <p class="text-sm mb-4">
+                <a href="<?= URL ?>/admin/grade-horaria/modelo-planilha" class="text-blue-700 hover:text-blue-900 font-medium">Baixar modelo</a>
+            </p>
+            <form id="form-excel-grade" enctype="multipart/form-data" class="space-y-4">
+                <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
+                <div>
+                    <label for="input-planilha-grade" class="block text-sm font-medium text-gray-700 mb-1.5">Planilha (.xlsx ou .csv)</label>
+                    <input id="input-planilha-grade" type="file" name="planilha" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required
+                           class="w-full text-sm text-gray-700">
+                </div>
+                <div id="resultado-excel-grade" class="hidden text-sm rounded-lg p-3"></div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" onclick="fecharImportacaoExcel()"
+                            class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancelar</button>
+                    <button type="submit" id="btn-processar-excel" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Conferir planilha</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -240,6 +330,7 @@ var materiasIA = [];
 var csrfTokenIA = '<?= htmlspecialchars($csrf_token) ?>';
 var urlBase = '<?= URL ?>';
 var pollingGradeIA = null;
+var origemImportacao = 'imagem';
 var professoresAula = <?= json_encode(array_map(static function ($professor) {
     return [
         'id' => (int) ($professor['id'] ?? 0),
@@ -442,9 +533,25 @@ document.getElementById('aula-form').addEventListener('submit', function(e) {
 });
 
 document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        closeAulaDrawer();
+    if (e.key !== 'Escape') {
+        return;
     }
+    var excel = document.getElementById('modal-excel-grade');
+    if (excel && !excel.classList.contains('hidden')) {
+        fecharImportacaoExcel();
+        return;
+    }
+    var imagem = document.getElementById('modal-imagem-ia');
+    if (imagem && !imagem.classList.contains('hidden')) {
+        fecharModalImportacao();
+        return;
+    }
+    var filtro = document.getElementById('filterDrawer');
+    if (filtro && filtro.getAttribute('aria-hidden') === 'false') {
+        closeFilterDrawer();
+        return;
+    }
+    closeAulaDrawer();
 });
 
 function fecharModalImportacao() {
@@ -456,10 +563,31 @@ function fecharModalImportacao() {
     document.getElementById('modal-imagem-ia').classList.add('hidden');
 }
 
-function voltarUploadIA() {
+function abrirImportacaoImagem() {
+    origemImportacao = 'imagem';
+    document.getElementById('btn-voltar-importacao').textContent = 'Enviar outra imagem';
     document.getElementById('painel-preview-ia').classList.add('hidden');
     document.getElementById('painel-upload-ia').classList.remove('hidden');
+    document.getElementById('modal-imagem-ia').classList.remove('hidden');
+}
+function abrirImportacaoExcel() {
+    origemImportacao = 'excel';
+    document.getElementById('resultado-excel-grade').classList.add('hidden');
+    document.getElementById('modal-excel-grade').classList.remove('hidden');
+}
+function fecharImportacaoExcel() {
+    document.getElementById('modal-excel-grade').classList.add('hidden');
+}
+function voltarUploadIA() {
+    document.getElementById('painel-preview-ia').classList.add('hidden');
     document.getElementById('resultado-salvar-ia').classList.add('hidden');
+    if (origemImportacao === 'excel') {
+        document.getElementById('modal-imagem-ia').classList.add('hidden');
+        document.getElementById('painel-upload-ia').classList.remove('hidden');
+        abrirImportacaoExcel();
+        return;
+    }
+    document.getElementById('painel-upload-ia').classList.remove('hidden');
     limparImagemIA();
 }
 
@@ -791,4 +919,58 @@ document.getElementById('form-imagem-ia').addEventListener('submit', function(e)
         btn.textContent = 'Processar';
     });
 });
+
+document.getElementById('form-excel-grade').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var btn = document.getElementById('btn-processar-excel');
+    var resultado = document.getElementById('resultado-excel-grade');
+    var input = document.getElementById('input-planilha-grade');
+    resultado.classList.add('hidden');
+    if (!input.files || !input.files[0]) {
+        resultado.classList.remove('hidden');
+        resultado.className = 'text-sm rounded-lg p-3 bg-amber-100 text-amber-800';
+        resultado.textContent = 'Selecione a planilha .xlsx ou .csv.';
+        return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Lendo...';
+    fetch(urlBase + '/admin/grade-horaria/processar-planilha', {
+        method: 'POST',
+        body: new FormData(this)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        btn.disabled = false;
+        btn.textContent = 'Conferir planilha';
+        if (data.success && data.itens && data.itens.length > 0) {
+            origemImportacao = 'excel';
+            document.getElementById('btn-voltar-importacao').textContent = 'Enviar outra planilha';
+            fecharImportacaoExcel();
+            document.getElementById('painel-upload-ia').classList.add('hidden');
+            document.getElementById('painel-preview-ia').classList.remove('hidden');
+            document.getElementById('modal-imagem-ia').classList.remove('hidden');
+            renderPreview(data.itens, data.dias_semana, data.turmas, data.professores, data.materias);
+            return;
+        }
+        resultado.classList.remove('hidden');
+        resultado.className = 'text-sm rounded-lg p-3 bg-red-100 text-red-800';
+        resultado.textContent = data.error || 'Nenhuma aula encontrada na planilha.';
+    })
+    .catch(function() {
+        btn.disabled = false;
+        btn.textContent = 'Conferir planilha';
+        resultado.classList.remove('hidden');
+        resultado.className = 'text-sm rounded-lg p-3 bg-red-100 text-red-800';
+        resultado.textContent = 'Não foi possível ler a planilha. Tente de novo.';
+    });
+});
 </script>
+<?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
+<?php
+$trilha_log_id = 'trilhaGrade';
+$trilha_log_titulo = 'Log da grade horária';
+$trilha_log_url = URL . '/admin/grade-horaria/logs';
+$trilha_log_vazio = 'Nenhum cadastro, alteração ou exclusão de aula registrado.';
+include \App\Core\ViewPaths::adminPartial('ui/trilha_log.php');
+?>
+<?php endif; ?>

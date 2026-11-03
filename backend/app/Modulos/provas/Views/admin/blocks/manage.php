@@ -5,6 +5,18 @@
  */
 $modoLancamentoNota = !empty($modo_lancamento_nota);
 $lancamentoPorCoordenacao = $modoLancamentoNota && (($bloco['configuracao_nota'] ?? '') === 'coordenacao_calcula');
+$provaImpressa = (($bloco['formato_evento'] ?? '') === 'prova_impressa');
+$escolaConstroiImpressa = $provaImpressa && (($bloco['configuracao_nota'] ?? '') === 'coordenacao_calcula');
+$materiasImpressa = [];
+if ($escolaConstroiImpressa) {
+    foreach (is_array($bloco['professores'] ?? null) ? $bloco['professores'] : [] as $parImpresso) {
+        $midImpresso = (int) ($parImpresso['materia_id'] ?? 0);
+        if ($midImpresso <= 0 || isset($materiasImpressa[$midImpresso])) {
+            continue;
+        }
+        $materiasImpressa[$midImpresso] = (string) ($parImpresso['materia_nome'] ?? 'Disciplina');
+    }
+}
 $notaUnicaTodasMaterias = $lancamentoPorCoordenacao && !empty($bloco['nota_unica_todas_materias']);
 ?>
 
@@ -52,7 +64,7 @@ $notaUnicaTodasMaterias = $lancamentoPorCoordenacao && !empty($bloco['nota_unica
                 <i class="fa-solid fa-chart-column" aria-hidden="true"></i>
                 Relatório de notas
             </a>
-            <?php else: ?>
+            <?php elseif (!$provaImpressa): ?>
             <a href="<?= URL ?>/admin/provas/blocos/<?= (int)$bloco['id'] ?>/resultados-novos"
                class="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
                 <i class="fa-solid fa-chart-column" aria-hidden="true"></i>
@@ -80,7 +92,7 @@ $notaUnicaTodasMaterias = $lancamentoPorCoordenacao && !empty($bloco['nota_unica
             </form>
             <?php endif; ?>
             <?php endif; ?>
-            <?php if (!$modoLancamentoNota): ?>
+            <?php if (!$modoLancamentoNota && !$provaImpressa): ?>
             <a href="<?= URL ?>/admin/provas/blocos/<?= $bloco['id'] ?>/visualizar-completo"
                class="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
                 <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
@@ -94,6 +106,19 @@ $notaUnicaTodasMaterias = $lancamentoPorCoordenacao && !empty($bloco['nota_unica
                 Aprovação Final
             </button>
             <?php endif; ?>
+            <?php if ($provaImpressa): ?>
+            <a href="<?= URL ?>/admin/provas/blocos/<?= (int) $bloco['id'] ?>/imprimir"
+               class="inline-flex items-center gap-2 bg-white text-gray-800 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50"
+               target="_blank" rel="noopener">
+                <i class="fa-solid fa-print" aria-hidden="true"></i>
+                Imprimir prova
+            </a>
+            <a href="<?= URL ?>/admin/leitor-gabarito/blocos/<?= (int) $bloco['id'] ?>"
+               class="inline-flex items-center gap-2 bg-white text-gray-800 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50">
+                <i class="fa-solid fa-barcode" aria-hidden="true"></i>
+                Ler gabarito
+            </a>
+            <?php endif; ?>
             <a href="<?= URL ?>/admin/provas"
                class="inline-flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
                 ← Voltar
@@ -101,6 +126,24 @@ $notaUnicaTodasMaterias = $lancamentoPorCoordenacao && !empty($bloco['nota_unica
         </div>
     </div>
 </div>
+
+<?php if ($escolaConstroiImpressa && $materiasImpressa !== []): ?>
+<div class="mb-6 rounded-xl border border-gray-200 bg-white p-5">
+    <p class="text-sm font-semibold text-gray-900">A escola constrói a prova</p>
+    <p class="text-sm text-gray-500 mt-1 mb-4">Monte as questões de cada disciplina. Depois imprima a prova e leia o gabarito.</p>
+    <div class="flex flex-wrap gap-2">
+        <?php foreach ($materiasImpressa as $midImpresso => $nomeImpresso): ?>
+        <form method="post" action="<?= URL ?>/admin/provas/blocos/<?= (int) $bloco['id'] ?>/elaborar-prova-impressa">
+            <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
+            <input type="hidden" name="materia_id" value="<?= (int) $midImpresso ?>">
+            <button type="submit" class="btn-primary-custom inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium">
+                Elaborar <?= htmlspecialchars($nomeImpresso) ?>
+            </button>
+        </form>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
 
 <?php if ($modoLancamentoNota && !empty($flash_importacao_notas['message'])): ?>
 <?php
@@ -542,6 +585,31 @@ $statusLabelsOnline = [
                     </td>
                     <td class="px-6 py-3 text-right">
                         <?php ob_start(); ?>
+                        <?php if ($provaImpressa): ?>
+                        <a href="<?= URL ?>/admin/provas/blocos/<?= (int) $bloco['id'] ?>/resultados-novos"
+                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="fa-solid fa-chart-column text-gray-400 w-4 text-center" aria-hidden="true"></i>
+                            Resultado
+                        </a>
+                        <?php if (!empty($prova['prova_id'])): ?>
+                        <a href="<?= URL ?>/admin/provas/<?= (int) $prova['prova_id'] ?>/imprimir"
+                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                           target="_blank" rel="noopener">
+                            <i class="fa-solid fa-print text-gray-400 w-4 text-center" aria-hidden="true"></i>
+                            Imprimir prova
+                        </a>
+                        <a href="<?= URL ?>/admin/leitor-gabarito/provas/<?= (int) $prova['prova_id'] ?>"
+                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="fa-solid fa-barcode text-gray-400 w-4 text-center" aria-hidden="true"></i>
+                            Ler gabarito
+                        </a>
+                        <?php endif; ?>
+                        <a href="<?= URL ?>/admin/provas/blocos/<?= (int) $bloco['id'] ?>/visualizar-completo"
+                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="fa-solid fa-file-lines text-gray-400 w-4 text-center" aria-hidden="true"></i>
+                            Prova completa
+                        </a>
+                        <?php endif; ?>
                         <?php if (!empty($prova['prova_id'])): ?>
                         <a href="<?= URL ?>/admin/provas/visualizar/<?= (int) $prova['prova_id'] ?>"
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">

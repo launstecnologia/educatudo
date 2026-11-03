@@ -5,15 +5,21 @@ foreach (['nome', 'ra', 'cpf', 'nickname', 'responsavel', 'turma_id'] as $fk) {
         $filtrosAtivos++;
     }
 }
+$trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/students', 'Alunos');
 ?>
-<!-- Header Section -->
 <div class="mb-6">
-    <div class="flex justify-between items-center gap-4">
-        <div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-1">Lista de Alunos</h2>
-            <p class="text-gray-600 text-sm">Gerencie todos os alunos da escola</p>
+    <?php include __DIR__ . '/../../../../../Views/layouts/components/trilha.php'; ?>
+    <div class="mt-4 flex justify-between items-center gap-4">
+        <div class="flex items-center gap-3 min-w-0">
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
+                <i class="fa-solid fa-user-graduate text-lg" aria-hidden="true"></i>
+            </span>
+            <div class="min-w-0">
+                <h2 class="text-xl font-bold text-gray-900">Lista de Alunos</h2>
+                <p class="text-sm text-gray-500 mt-0.5">Gerencie todos os alunos da escola</p>
+            </div>
         </div>
-        <div class="flex items-center gap-3 flex-shrink-0">
+        <div class="flex items-center justify-end gap-3 flex-shrink-0 ml-auto">
             <button type="button" onclick="openFilterDrawer()"
                     class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                 <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
@@ -22,6 +28,15 @@ foreach (['nome', 'ra', 'cpf', 'nickname', 'responsavel', 'turma_id'] as $fk) {
                 <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold"><?= $filtrosAtivos ?></span>
                 <?php endif; ?>
             </button>
+            <?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
+            <?php
+            $ui_btn_variant = 'complementar';
+            $ui_btn_label = 'Log';
+            $ui_btn_icon = 'fa-solid fa-clock-rotate-left';
+            $ui_btn_onclick = 'abrirTrilhaAlunos()';
+            include \App\Core\ViewPaths::adminPartial('ui/btn.php');
+            ?>
+            <?php endif; ?>
             <a href="<?= URL ?>/admin/students/create"
                class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
                 <i class="fa-solid fa-plus mr-2"></i>
@@ -250,3 +265,12 @@ document.addEventListener('keydown', function(e) {
     }
 });
 </script>
+<?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
+<?php
+$trilha_log_id = 'trilhaAlunos';
+$trilha_log_titulo = 'Log de alunos';
+$trilha_log_url = URL . '/admin/students/logs';
+$trilha_log_vazio = 'Nenhum cadastro, alteração ou exclusão de aluno registrado.';
+include \App\Core\ViewPaths::adminPartial('ui/trilha_log.php');
+?>
+<?php endif; ?>

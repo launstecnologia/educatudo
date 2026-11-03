@@ -1,5 +1,8 @@
 # Tasks — backlog atual
 
+- [x] Calendário único no admin: o cadastro fica no Calendário Letivo, com a opção Avisar a família (hora, prioridade e público). O aviso no app acompanha edição, desmarcação e exclusão. A tela de Comunicação lista os avisos já enviados. Migration `2026_10_31_calendario_aviso_familia.sql`. — 2026-10-31
+- [ ] Rodar a migration `2026_10_31_calendario_aviso_familia.sql` (via painel Master ou `run_migrations.php`) em cada escola — cria `calendario_letivo_eventos.evento_escolar_id` e os tipos Reunião, Passeio e Apresentação. Sem ela o aviso à família não acompanha a edição.
+
 - [x] Guia público — Demonstrativo de Notas detalhado em sete partes: regra, períodos, eventos/subeventos, agrupamentos, colunas/fórmulas, simulação e salvar/gerar. Seis prints do usuário íntegros; PHP lint, code-reviewer, carregamento/ampliação e navegação validados. Boletim e Relatórios preservados. — 2026-10-29
 - [x] Guia público: cópia integral do guia GitHub Pages indicado, exceto Como a escola avalia; Estrutura, Pessoas e turmas, apresentação, ficha, rotina, transferência e fechamento/histórico, com 56 imagens locais. Comparação dos 16 textos no navegador, checksums, navegação, painéis expansíveis, ampliação dos prints, PHP lint e code-reviewer aprovados. — 2026-10-29
 - [x] Guia público de implantação — Demonstrativo focado em Modelos e vínculo com regra; Boletim com montagem por trimestre, média final e revisão; Relatório completo com filtros e exportações. Capturas reais dos controles, sem identificadores de alunos. — 2026-10-29

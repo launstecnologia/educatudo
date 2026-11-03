@@ -33,6 +33,10 @@ $router->get('/validar/historico/{hash}', 'Public/HistoricoValidacaoController@v
 // Manual da implantação acadêmica (sem login; sem progresso nem dados da escola)
 $router->get('/guia/implantar-academico', 'Public/GuiaAcademicoController@index');
 
+// Foto do gabarito pelo celular (token assinado, sem sessão)
+$router->get('/captura-gabarito/{token}', 'Modulos/leitor-gabarito/CapturaGabaritoController@abrir');
+$router->post('/captura-gabarito/{token}', 'Modulos/leitor-gabarito/CapturaGabaritoController@enviar');
+
 // Expo Colag — página pública do stand via QR (sem login)
 $router->get('/expo-colag/s/{token}', 'Modulos/expo-colag/ExpoColagPublicoController@stand');
 $router->post('/expo-colag/s/{token}/avaliar', 'Modulos/expo-colag/ExpoColagPublicoController@avaliarStand');

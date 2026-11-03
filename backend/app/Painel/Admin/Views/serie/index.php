@@ -65,7 +65,6 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                     </th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Curso</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Série</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ordem</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                 </tr>
@@ -81,9 +80,6 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         <?= htmlspecialchars($row['nome']) ?>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        <?= (int)$row['ordem'] ?>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?= $row['ativo'] ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' ?>">
@@ -154,7 +150,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
        class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
-        <h2 id="serieDrawerTitle" class="text-xl font-bold text-gray-900">Nova Série</h2>
+        <h2 id="serieDrawerTitle" class="text-xl font-bold text-gray-900">Nova Série / Ano Escolar</h2>
         <button type="button" onclick="closeSerieDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
@@ -166,7 +162,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
 
         <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-8">
             <section>
-                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Dados da série</h3>
+                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Série / Ano Escolar</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
                     <div>
                         <label for="se_curso_id" class="block text-sm font-medium text-gray-700 mb-1">Curso <span class="text-red-500">*</span></label>
@@ -179,21 +175,15 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                         </select>
                     </div>
                     <div>
-                        <label for="se_nome" class="block text-sm font-medium text-gray-700 mb-1">Nome da série <span class="text-red-500">*</span></label>
-                        <input type="text" id="se_nome" name="nome" required placeholder="Ex.: 1º Ano, 2º Ano"
+                        <label for="se_nome" class="block text-sm font-medium text-gray-700 mb-1">Série / Ano Escolar <span class="text-red-500">*</span></label>
+                        <input type="text" id="se_nome" name="nome" required placeholder="Ex.: 1º Ano, 6º Ano, 2ª Série"
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
-                    </div>
-                    <div>
-                        <label for="se_ordem" class="block text-sm font-medium text-gray-700 mb-1">Ordem</label>
-                        <input type="number" id="se_ordem" name="ordem" value="0"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
-                        <p class="mt-1 text-xs text-gray-500">Use múltiplos de 10 (10, 20, 30…) para ordenar na listagem.</p>
                     </div>
                     <div class="flex items-end pb-1">
                         <label class="flex items-center">
                             <input type="checkbox" id="se_ativo" name="ativo" value="1" checked
                                    class="rounded border-gray-300 text-green-600 shadow-sm focus:border-green-300 focus:ring focus:ring-green-200 focus:ring-opacity-50">
-                            <span class="ml-2 text-sm text-gray-700">Série ativa</span>
+                            <span class="ml-2 text-sm text-gray-700">Série / ano escolar ativo</span>
                         </label>
                     </div>
                 </div>
@@ -225,14 +215,14 @@ function openSerieDrawer(id, cursoId) {
 
     if (!id) {
         form.dataset.mode = 'create';
-        document.getElementById('serieDrawerTitle').textContent = 'Nova Série';
+        document.getElementById('serieDrawerTitle').textContent = 'Nova Série / Ano Escolar';
         document.getElementById('se-form-submit-label').textContent = 'Salvar';
         showSerieDrawer();
         return;
     }
 
     form.dataset.mode = 'edit';
-    document.getElementById('serieDrawerTitle').textContent = 'Editar Série';
+    document.getElementById('serieDrawerTitle').textContent = 'Editar Série / Ano Escolar';
     document.getElementById('se-form-submit-label').textContent = 'Salvar Alterações';
     showSerieDrawer();
 
@@ -243,7 +233,6 @@ function openSerieDrawer(id, cursoId) {
             document.getElementById('se_id').value = data.item.id;
             document.getElementById('se_curso_id').value = data.item.curso_id;
             document.getElementById('se_nome').value = data.item.nome;
-            document.getElementById('se_ordem').value = data.item.ordem;
             document.getElementById('se_ativo').checked = !!parseInt(data.item.ativo, 10);
         })
         .catch(function () { alert('Erro de conexão.'); closeSerieDrawer(); });

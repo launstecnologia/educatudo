@@ -904,6 +904,104 @@ class ModeloDocumentoService
         );
     }
 
+    /**
+     * Mesmo quadro do editor (bimestres + final, nota e falta).
+     * A falta por bimestre nem sempre existe: o total vai na coluna final.
+     *
+     * @param list<array<string,mixed>> $linhas
+     */
+    public static function htmlQuadroDeLinhasBimestrais(array $linhas): string
+    {
+        $fmt = static function (mixed $v): string {
+            if ($v === null || $v === '') {
+                return '—';
+            }
+            if (is_numeric($v)) {
+                return number_format((float) $v, 1, ',', '.');
+            }
+            $txt = trim((string) $v);
+            return $txt !== '' ? $txt : '—';
+        };
+        $montadas = [];
+        foreach ($linhas as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $nome = trim((string) ($row['materia_nome'] ?? $row['componente'] ?? $row['nome'] ?? ''));
+            if ($nome === '') {
+                continue;
+            }
+            $faltasBruto = $row['faltas'] ?? null;
+            if ($faltasBruto === null || $faltasBruto === '') {
+                $faltas = '—';
+            } elseif (is_numeric($faltasBruto)) {
+                $faltas = (string) (int) round((float) $faltasBruto);
+            } else {
+                $faltas = trim((string) $faltasBruto);
+                if ($faltas === '') {
+                    $faltas = '—';
+                }
+            }
+            $celulas = [];
+            for ($b = 1; $b <= 4; $b++) {
+                $celulas[] = ['nota' => $fmt($row['b' . $b] ?? null), 'falta' => '—'];
+            }
+            $celulas[] = [
+                'nota' => $fmt($row['media_final'] ?? $row['media'] ?? null),
+                'falta' => $faltas,
+            ];
+            $montadas[] = ['componente' => $nome, 'celulas' => $celulas];
+        }
+
+        return self::htmlQuadroNotas(
+            ['1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre', 'FINAL'],
+            $montadas
+        );
+    }
+
+    public static function htmlHistoricoAmostra(): string
+    {
+        $linhas = [
+            ['2022', '6º Ano', 'EMEF Exemplo', 'Ribeirão Preto/SP', 'Aprovado', '800 h'],
+            ['2023', '7º Ano', 'EMEF Exemplo', 'Ribeirão Preto/SP', 'Aprovado', '800 h'],
+            ['2024', '8º Ano', 'Colégio Almeida Garrett', 'Ribeirão Preto/SP', 'Aprovado', '1.000 h'],
+            ['2025', '9º Ano', 'Colégio Almeida Garrett', 'Ribeirão Preto/SP', 'Aprovado', '1.000 h'],
+        ];
+        $html = '<table class="dados"><thead><tr>'
+            . '<th>Ano</th><th>Série</th><th>Estabelecimento</th><th>Município</th><th>Resultado</th><th>CH</th>'
+            . '</tr></thead><tbody>';
+        foreach ($linhas as $celulas) {
+            $html .= '<tr>';
+            foreach ($celulas as $celula) {
+                $html .= '<td>' . htmlspecialchars($celula, ENT_QUOTES, 'UTF-8') . '</td>';
+            }
+            $html .= '</tr>';
+        }
+
+        return $html . '</tbody></table>';
+    }
+
+    public static function htmlAtaAmostra(): string
+    {
+        $alunos = [
+            'Maria Eduarda Silva',
+            'João Pedro Almeida',
+            'Ana Beatriz Costa',
+            'Lucas Henrique Dias',
+            'Sofia Martins',
+            'Pedro Henrique Lima',
+        ];
+        $html = '<table class="dados"><thead><tr>'
+            . '<th>Nº</th><th>Aluno</th><th>Situação</th><th>Frequência</th>'
+            . '</tr></thead><tbody>';
+        foreach ($alunos as $i => $nome) {
+            $html .= '<tr><td>' . ($i + 1) . '</td><td>' . htmlspecialchars($nome, ENT_QUOTES, 'UTF-8')
+                . '</td><td>Aprovado</td><td>95%</td></tr>';
+        }
+
+        return $html . '</tbody></table>';
+    }
+
     public static function idEstrutura(string $prefixo = 'n'): string
     {
         try {
@@ -1467,6 +1565,10 @@ class ModeloDocumentoService
         if (isset($estrutura['grade']) && is_array($estrutura['grade'])) {
             $base['grade'] = $estrutura['grade'];
         }
+        $glossario = self::glossarioValido($estrutura['glossario'] ?? null);
+        if ($glossario !== []) {
+            $base['glossario'] = $glossario;
+        }
         $emissao = self::emissaoValida($estrutura['emissao'] ?? null);
         if ($emissao !== null) {
             $base['emissao'] = $emissao;
@@ -1476,6 +1578,45 @@ class ModeloDocumentoService
             $base['campos_variaveis'] = $campos;
         }
         return $this->estruturaSemLogoDuplicado($base);
+    }
+
+    /**
+     * Siglas escolhidas no editor (slug da disciplina → abreviação).
+     *
+     * @return list<array{slug:string,nome:string,sigla:string}>
+     */
+    private static function glossarioValido(mixed $lista): array
+    {
+        if (!is_array($lista)) {
+            return [];
+        }
+        $out = [];
+        $vistas = [];
+        foreach ($lista as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $slug = strtolower(trim((string) ($item['slug'] ?? '')));
+            $nome = trim(preg_replace('/\s+/', ' ', (string) ($item['nome'] ?? '')) ?? '');
+            $nome = str_replace(['<', '>', '{{', '}}'], '', $nome);
+            $nome = trim(preg_replace('/\s+/', ' ', $nome) ?? '');
+            $sigla = strtoupper((string) (preg_replace('/[^A-Za-z0-9]/', '', (string) ($item['sigla'] ?? '')) ?? ''));
+            $sigla = substr($sigla, 0, 12);
+            if (!preg_match('/^[a-z0-9_]{1,40}$/', $slug) || $nome === '' || !preg_match('/^[A-Z0-9]{1,12}$/', $sigla) || isset($vistas[$slug])) {
+                continue;
+            }
+            $vistas[$slug] = true;
+            $out[] = [
+                'slug' => $slug,
+                'nome' => mb_substr($nome, 0, 80),
+                'sigla' => $sigla,
+            ];
+            if (count($out) >= 40) {
+                break;
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -3296,7 +3437,7 @@ HTML;
             'desc4_nome' => '',
             'desc4_valor' => '',
             'turma_nome' => '5º Ano A',
-            'turma_frase' => 'na turma 5º Ano A',
+            'turma_frase' => ' na turma 5º Ano A',
             'serie' => '5º Ano',
             'organizacao' => 'Ensino Médio',
             'numero_chamada' => '12',
@@ -3306,7 +3447,7 @@ HTML;
             'data_saida' => '',
             'tipo_matricula' => 'Rematrícula',
             'data_hoje' => date('d/m/Y'),
-            'observacoes' => '',
+            'observacoes' => 'Aluno com bom aproveitamento. Sem pendências de documentação.',
             'info_pertinente' => 'Anos/séries: 2024–2025 — 4º e 5º anos',
             'info_pertinente_html' => '<ul><li>2024 — 4º ano</li><li>2025 — 5º ano</li></ul>',
             'titulo' => 'Pré-visualização do modelo',
@@ -3333,7 +3474,7 @@ HTML;
             'aut_hora_retorno' => '14h00',
             'aut_finalidade' => 'Consulta',
             'responsaveis_html' => '<p>Ana Paula Silva (mãe) · Carlos Silva (pai)</p>',
-            'historico_html' => '',
+            'historico_html' => self::htmlHistoricoAmostra(),
             'razao_social' => 'Centro Educacional e Cultural Almeida Santos LTDA.',
             'cnpj_layout' => '00.000.000/0001-00',
             'rodape_unidades' => 'Unidade I — Rua Marquês de Pombal, 415',
@@ -3347,7 +3488,7 @@ HTML;
             'sed_html' => '<table class="dados"><tr><td>CPF ou RG</td><td>Ok</td></tr></table>',
             'situacao_final' => 'Aprovado',
             'frequencia_percentual' => '95,0%',
-            'tabela_html' => '<table class="dados"><tr><td class="label">Aluno</td><td class="label">Situação</td></tr><tr><td>Maria Eduarda Silva</td><td>Aprovado</td></tr></table>',
+            'tabela_html' => self::htmlAtaAmostra(),
             'titulo_relatorio' => 'Relatório de fechamento',
             'periodo_label' => '2º bimestre',
             'periodo_nome' => '2º bimestre',
@@ -3694,20 +3835,26 @@ CSS;
         $left = number_format($this->margemDaPagina($m['left'] ?? 15), 1, '.', '');
         [$largura, $altura] = $this->medidasPaginaMm($estrutura);
 
+        $mioloAltura = number_format(max(20, $altura - (float) $top - (float) $bottom), 1, '.', '');
+
         return <<<CSS
-  @page { size: {$largura}mm {$altura}mm; margin: 0; }
+  @page { size: {$largura}mm {$altura}mm; margin: {$top}mm {$right}mm {$bottom}mm {$left}mm; }
   html, body.folha-impressa { margin: 0; padding: 0; background: #fff; }
+  body.folha-impressa, body.folha-impressa * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   body.folha-impressa {
-    box-sizing: border-box;
-    width: 100%;
     margin: 0;
-    padding: {$top}mm {$right}mm {$bottom}mm {$left}mm;
+    padding: 0;
     font-family: "DejaVu Sans", Arial, Helvetica, sans-serif;
+    font-size: 11pt;
+    color: #222;
   }
   body.folha-impressa.rodape-no-fim {
     display: flex;
     flex-direction: column;
-    min-height: {$altura}mm;
+    min-height: {$mioloAltura}mm;
   }
   body.folha-impressa.rodape-no-fim .doc-rodape-fim { margin-top: auto; }
   body.folha-impressa table.doc-linha { margin: 0 0 8px !important; }

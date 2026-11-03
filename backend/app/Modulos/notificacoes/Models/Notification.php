@@ -158,7 +158,8 @@ public function marcarComoLida($notificacaoId, $usuarioId, $tipoUsuario)
                     AND tipo_destinatario = ?";
             
             $params = [$notificacaoId, $usuarioId, $tipoDestinatario];
-            return $this->db->update($sql, $params);
+            $ok = $this->db->update($sql, $params);
+            $this->confirmarLeituraMural((int) $notificacaoId, (int) $usuarioId, $tipoDestinatario);
         } else {
             // Criar novo registro específico para este usuário
             $sql = "INSERT INTO notificacoes_destinatarios 
@@ -166,8 +167,9 @@ public function marcarComoLida($notificacaoId, $usuarioId, $tipoUsuario)
                     VALUES (?, ?, ?, 1, NOW())";
             
             $params = [$notificacaoId, $tipoDestinatario, $usuarioId];
-            return $this->db->insert($sql, $params);
+            $ok = $this->db->insert($sql, $params);
         }
+        return $ok;
     }
     
     /**
@@ -205,7 +207,8 @@ public function marcarComoLida($notificacaoId, $usuarioId, $tipoUsuario)
                     AND tipo_destinatario = ?";
             
             $params = [$notificacaoId, $usuarioId, $tipoDestinatario];
-            return $this->db->update($sql, $params);
+            $ok = $this->db->update($sql, $params);
+            $this->confirmarLeituraMural((int) $notificacaoId, (int) $usuarioId, $tipoDestinatario);
         } else {
             // Criar novo registro específico para este usuário
             $sql = "INSERT INTO notificacoes_destinatarios 
@@ -213,7 +216,32 @@ public function marcarComoLida($notificacaoId, $usuarioId, $tipoUsuario)
                     VALUES (?, ?, ?, NOW())";
             
             $params = [$notificacaoId, $tipoDestinatario, $usuarioId];
-            return $this->db->insert($sql, $params);
+            $ok = $this->db->insert($sql, $params);
+        }
+        return $ok;
+    }
+
+    private function confirmarLeituraMural(int $notificacaoId, int $usuarioId, string $tipoDestinatario): void
+    {
+        try {
+            $row = $this->db->fetch('SELECT mural_recado_id FROM notificacoes WHERE id = ?', [$notificacaoId]);
+            $muralId = (int) ($row['mural_recado_id'] ?? 0);
+            if ($muralId <= 0) {
+                return;
+            }
+            if ($tipoDestinatario === 'alunos') {
+                $this->db->query(
+                    'INSERT IGNORE INTO mural_recados_vistos (mural_recado_id, aluno_id) VALUES (?, ?)',
+                    [$muralId, $usuarioId]
+                );
+            } elseif ($tipoDestinatario === 'professores') {
+                $this->db->query(
+                    'INSERT IGNORE INTO mural_recados_vistos (mural_recado_id, professor_id) VALUES (?, ?)',
+                    [$muralId, $usuarioId]
+                );
+            }
+        } catch (\Throwable $e) {
+            error_log('Leitura do mural via sino: ' . $e->getMessage());
         }
     }
     
