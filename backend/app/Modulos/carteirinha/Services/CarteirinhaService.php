@@ -225,7 +225,7 @@ class CarteirinhaService
             'valido' => false,
             'motivo' => 'desligada',
             'escola' => $escola,
-            'logo' => $this->urlLogoDocumento(),
+            'logo' => $this->urlLogoCarteirinha(),
             'aluno_nome' => '',
             'turma' => '',
             'ra' => '',
@@ -263,7 +263,7 @@ class CarteirinhaService
             'valido' => $valido,
             'motivo' => (string) ($cartao['situacao'] ?? 'cancelada'),
             'escola' => $escola,
-            'logo' => $this->urlLogoDocumento(),
+            'logo' => $this->urlLogoCarteirinha(),
             'aluno_nome' => (string) ($cartao['nome'] ?? ''),
             'turma' => (string) ($cartao['turma'] ?? ''),
             'ra' => (string) ($cartao['ra'] ?? ''),
@@ -294,7 +294,8 @@ class CarteirinhaService
             'turma' => (string) ($row['turma_nome'] ?? ''),
             'foto' => $this->urlFoto((string) ($row['foto_url'] ?? '')),
             'escola' => $this->nomeEscola(),
-            'logo' => $this->urlLogo(),
+            'logo' => $this->urlLogoCarteirinha(),
+            'cor_barra' => $this->corBarra(),
             'codigo' => $this->codigoCurto($token),
             'validade' => $this->formatarData((string) ($row['valida_ate'] ?? '')),
             'valida_ate' => (string) ($row['valida_ate'] ?? ''),
@@ -458,7 +459,7 @@ class CarteirinhaService
             'encontrado' => false,
             'motivo' => 'desligada',
             'escola' => $this->nomeEscola(),
-            'logo' => $this->urlLogoDocumento(),
+            'logo' => $this->urlLogoCarteirinha(),
             'cartao' => null,
         ];
         if (!\App\Core\LayoutHelper::isModuleEnabled('carteirinha') || !$this->model->tabelasProntas()) {
@@ -529,6 +530,34 @@ class CarteirinhaService
             $nome = trim((string) \App\Core\LayoutHelper::getSystemTitle());
         }
         return $nome !== '' ? $nome : 'EducaTudo';
+    }
+
+    private function urlLogoCarteirinha(): string
+    {
+        if (!class_exists(\App\Core\LayoutHelper::class)) {
+            return '';
+        }
+        $escolha = trim((string) \App\Core\LayoutHelper::get('carteirinha_logo', 'padrao'));
+        $chaves = [
+            'padrao' => 'logo_url',
+            'navbar' => 'logo_navbar_url',
+            'login' => 'logo_login_url',
+        ];
+        $chave = $chaves[$escolha] ?? 'logo_url';
+        $url = trim((string) \App\Core\LayoutHelper::get($chave, ''));
+        if ($url !== '') {
+            return $url;
+        }
+        return $this->urlLogoDocumento();
+    }
+
+    private function corBarra(): string
+    {
+        if (!class_exists(\App\Core\LayoutHelper::class)) {
+            return '';
+        }
+        $cor = \App\Core\LayoutHelper::sanitizarCorHex((string) \App\Core\LayoutHelper::get('carteirinha_barra_cor', ''));
+        return $cor ?? '';
     }
 
     private function urlLogo(): string

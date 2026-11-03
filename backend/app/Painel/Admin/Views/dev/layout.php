@@ -338,6 +338,46 @@
                         </div>
                         <p class="text-sm text-gray-500 mt-1">Cor de fundo principal das páginas</p>
                     </div>
+
+                    <?php
+                    $logoCarteirinhaAtual = (string) ($config_layout['carteirinha_logo'] ?? 'padrao');
+                    if (!in_array($logoCarteirinhaAtual, ['padrao', 'navbar', 'login'], true)) {
+                        $logoCarteirinhaAtual = 'padrao';
+                    }
+                    $corBarraCarteirinha = (string) ($config_layout['carteirinha_barra_cor'] ?? '');
+                    if ($corBarraCarteirinha === '') {
+                        $corBarraCarteirinha = '#0f766e';
+                    }
+                    ?>
+                    <div class="pt-2 border-t border-gray-200">
+                        <h4 class="text-sm font-semibold text-gray-900">Carteirinha</h4>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2" for="carteirinha-logo">Logo da carteirinha</label>
+                        <select name="config[carteirinha_logo]"
+                                id="carteirinha-logo"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white">
+                            <option value="padrao" <?= $logoCarteirinhaAtual === 'padrao' ? 'selected' : '' ?>>Padrão do sistema</option>
+                            <option value="navbar" <?= $logoCarteirinhaAtual === 'navbar' ? 'selected' : '' ?>>Logo do navbar</option>
+                            <option value="login" <?= $logoCarteirinhaAtual === 'login' ? 'selected' : '' ?>>Logo da tela inicial</option>
+                        </select>
+                        <p class="text-sm text-gray-500 mt-1">Qual das logos acima aparece na faixa da carteirinha.</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Cor da barra da carteirinha</label>
+                        <div class="flex items-center space-x-3">
+                            <input type="color"
+                                   name="config[carteirinha_barra_cor]"
+                                   value="<?= htmlspecialchars($corBarraCarteirinha) ?>"
+                                   class="w-12 h-10 rounded border border-gray-300">
+                            <input type="text"
+                                   name="config[carteirinha_barra_cor]"
+                                   value="<?= htmlspecialchars($corBarraCarteirinha) ?>"
+                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                   placeholder="#0f766e">
+                        </div>
+                        <p class="text-sm text-gray-500 mt-1">Faixa do cartão. Prefira uma cor escura: o texto dela é branco. Válida e vencida continuam no texto abaixo.</p>
+                    </div>
                     
                 </div>
                 
@@ -528,7 +568,8 @@ function resetColors() {
             'config[sidebar_text_color]': '#ffffff',
             'config[secondary_color]': '#0ea5e9',
             'config[secondary_text_color]': '#ffffff',
-            'config[page_background_color]': '#f8fafc'
+            'config[page_background_color]': '#f8fafc',
+            'config[carteirinha_barra_cor]': '#0f766e'
         };
         Object.keys(padroes).forEach(function (nome) {
             document.querySelectorAll('input[name="' + nome + '"]').forEach(function (input) {

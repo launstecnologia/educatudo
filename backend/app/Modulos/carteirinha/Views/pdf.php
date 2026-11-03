@@ -30,7 +30,11 @@ body { margin: 0; font-family: DejaVu Sans, sans-serif; color: #111827; }
 <?php foreach ($cartoes as $cartao): ?>
     <?php
     $situacao = (string) ($cartao['situacao'] ?? '');
-    $cor = $situacao === 'valida' ? '#0f766e' : '#b45309';
+    $corStatus = $situacao === 'valida' ? '#0f766e' : '#b45309';
+    $cor = trim((string) ($cartao['cor_barra'] ?? ''));
+    if (!preg_match('/^#[0-9A-Fa-f]{6}$/', $cor)) {
+        $cor = $corStatus;
+    }
     $foto = (string) ($cartao['foto'] ?? '');
     $logo = (string) ($cartao['logo'] ?? '');
     $qr = (string) ($cartao['qr_pdf'] ?? '');
@@ -58,7 +62,7 @@ body { margin: 0; font-family: DejaVu Sans, sans-serif; color: #111827; }
                 <div class="meta">RA <?= $e(($cartao['ra'] ?? '') !== '' ? $cartao['ra'] : '—') ?></div>
                 <div class="meta"><?= $e(($cartao['turma'] ?? '') !== '' ? $cartao['turma'] : 'Sem turma') ?></div>
                 <div class="meta">Válida até <?= $e($cartao['validade'] ?? '') ?></div>
-                <div class="meta" style="color:<?= $e($cor) ?>;font-weight:bold"><?= $e($rotulo[$situacao] ?? '') ?></div>
+                <div class="meta" style="color:<?= $e($corStatus) ?>;font-weight:bold"><?= $e($rotulo[$situacao] ?? '') ?></div>
             </td>
             <td style="padding:10px;width:96px;vertical-align:top;text-align:center">
                 <?php if ($qr !== ''): ?>

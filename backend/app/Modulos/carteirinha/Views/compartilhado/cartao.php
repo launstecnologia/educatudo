@@ -12,7 +12,11 @@ $rotulo = [
     'cancelada' => 'Cancelada',
     'inativa' => 'Aluno inativo',
 ][$situacao] ?? '';
-$corFaixa = $situacao === 'valida' ? '#0f766e' : '#b45309';
+$corStatus = $situacao === 'valida' ? '#0f766e' : '#b45309';
+$corFaixa = trim((string) ($cartao['cor_barra'] ?? ''));
+if (!preg_match('/^#[0-9A-Fa-f]{6}$/', $corFaixa)) {
+    $corFaixa = $corStatus;
+}
 $foto = (string) ($cartao['foto'] ?? '');
 $logo = (string) ($cartao['logo'] ?? '');
 $qr = (string) ($cartao['qr'] ?? '');
@@ -76,7 +80,7 @@ static $carteirinhaCss = false;
             <div class="carteirinha-meta"><?= $e(($cartao['turma'] ?? '') !== '' ? $cartao['turma'] : 'Sem turma') ?></div>
             <div class="carteirinha-validade">Válida até <?= $e($cartao['validade'] ?? '') ?></div>
             <?php if ($rotulo !== ''): ?>
-                <div class="carteirinha-status" style="color:<?= $e($corFaixa) ?>"><?= $e($rotulo) ?></div>
+                <div class="carteirinha-status" style="color:<?= $e($corStatus) ?>"><?= $e($rotulo) ?></div>
             <?php endif; ?>
         </div>
         <div class="carteirinha-qr">

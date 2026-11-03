@@ -716,6 +716,8 @@ class LayoutHelper
             'system_title',
             'system_subtitle',
             'menu_colag_nome',
+            'carteirinha_logo',
+            'carteirinha_barra_cor',
         ];
     }
 

@@ -399,7 +399,13 @@ class SchoolSettingsAdminController extends AdminBaseController
                 'navbar_bg_color',
                 'sidebar_text_color',
                 'button_primary_color',
+                'carteirinha_barra_cor',
             ];
+            $logosCarteirinha = ['padrao', 'navbar', 'login'];
+            if (array_key_exists('carteirinha_logo', $configs)
+                && !in_array((string) $configs['carteirinha_logo'], $logosCarteirinha, true)) {
+                unset($configs['carteirinha_logo']);
+            }
             foreach ($chavesCor as $chaveCor) {
                 if (!array_key_exists($chaveCor, $configs)) {
                     continue;
