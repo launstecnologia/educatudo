@@ -132,6 +132,21 @@ $notaUnicaTodasMaterias = $lancamentoPorCoordenacao && !empty($bloco['nota_unica
     </div>
 </div>
 
+<?php if (!empty($flash_message)): ?>
+<?php
+$flashTipoGeral = (string) ($flash_type ?? 'info');
+$flashClassesGerais = [
+    'success' => 'bg-green-50 border-green-200 text-green-800',
+    'error' => 'bg-red-50 border-red-200 text-red-800',
+    'warning' => 'bg-amber-50 border-amber-200 text-amber-900',
+    'info' => 'bg-blue-50 border-blue-200 text-blue-800',
+];
+?>
+<div class="mb-6 rounded-lg border px-4 py-3 text-sm <?= $flashClassesGerais[$flashTipoGeral] ?? $flashClassesGerais['info'] ?>" role="status">
+    <?= htmlspecialchars((string) $flash_message) ?>
+</div>
+<?php endif; ?>
+
 <?php if ($escolaConstroiImpressa && $materiasImpressa !== []): ?>
 <div class="mb-6 rounded-xl border border-gray-200 bg-white p-5">
     <p class="text-sm font-semibold text-gray-900">A escola constrói a prova</p>
@@ -521,6 +536,7 @@ $statusClassesOnline = [
     'nao_enviada' => 'bg-red-100 text-red-800',
     'retornada' => 'bg-amber-100 text-amber-800',
     'pendente' => 'bg-amber-100 text-amber-800',
+    'elaboracao' => 'bg-blue-100 text-blue-800',
 ];
 $statusLabelsOnline = [
     'nao_avaliada' => 'Enviada',
@@ -531,6 +547,7 @@ $statusLabelsOnline = [
     'nao_enviada' => 'Não Enviada',
     'retornada' => 'Retornada ao professor',
     'pendente' => 'Aguardando envio',
+    'elaboracao' => 'Em elaboração',
 ];
 ?>
 <div class="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
@@ -597,6 +614,13 @@ $statusLabelsOnline = [
                             Resultado
                         </a>
                         <?php if (!empty($prova['prova_id'])): ?>
+                        <?php if ($escolaConstroiImpressa): ?>
+                        <a href="<?= URL ?>/admin/provas/editar/<?= (int) $prova['prova_id'] ?>"
+                           class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                            <i class="fa-solid fa-pen text-gray-400 w-4 text-center" aria-hidden="true"></i>
+                            Editar questões
+                        </a>
+                        <?php endif; ?>
                         <a href="<?= URL ?>/admin/provas/<?= (int) $prova['prova_id'] ?>/imprimir"
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                            target="_blank" rel="noopener">

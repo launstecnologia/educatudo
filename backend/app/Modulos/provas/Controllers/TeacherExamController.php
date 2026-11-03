@@ -92,8 +92,14 @@ class TeacherExamController extends BaseController
             return;
         }
         
-        // Busca provas enviadas para aprovação OU retornadas ao professor (rascunho com observação)
-        // IMPORTANTE: p.status é renomeado para status_original para evitar conflito
+        // Busca provas enviadas para aprovação OU retornadas ao professor (rascunho com observação).
+        // Na prova impressa da escola, o rascunho sem professor também entra na lista.
+        $escolaConstroi = ($bloco['formato_evento'] ?? '') === 'prova_impressa'
+            && ($bloco['configuracao_nota'] ?? '') === 'coordenacao_calcula';
+        $filtroStatus = $escolaConstroi
+            ? "p.status IN ('enviada', 'aguardando_aprovacao', 'aprovada', 'reprovada', 'pendente', 'agendada', 'rascunho')"
+            : "p.status IN ('enviada', 'aguardando_aprovacao', 'aprovada', 'reprovada', 'pendente', 'agendada')
+                 OR (p.status = 'rascunho' AND p.observacao_coordenacao IS NOT NULL AND TRIM(p.observacao_coordenacao) != '')";
         $provas = $this->db->fetchAll(
             "SELECT p.id, p.titulo, p.descricao, p.materia_id, p.professor_id, 
                     p.data_inicio, p.data_fim, p.tempo_limite, p.valor_total,
@@ -121,8 +127,7 @@ class TeacherExamController extends BaseController
              WHERE pbp.bloco_id = :bloco_id
              AND p.deleted_at IS NULL
              AND (
-                 p.status IN ('enviada', 'aguardando_aprovacao', 'aprovada', 'reprovada', 'pendente', 'agendada')
-                 OR (p.status = 'rascunho' AND p.observacao_coordenacao IS NOT NULL AND TRIM(p.observacao_coordenacao) != '')
+                 {$filtroStatus}
              )
              ORDER BY m.nome ASC, pr.nome ASC",
             ['bloco_id' => $blocoId]
@@ -208,13 +213,13 @@ class TeacherExamController extends BaseController
         // Cria mapa de provas criadas
         $provasCriadas = [];
         foreach ($provas as $prova) {
-            $key = $prova['professor_id'] . '_' . $prova['materia_id'];
+            $key = (int) ($prova['professor_id'] ?? 0) . '_' . (int) ($prova['materia_id'] ?? 0);
             $provasCriadas[$key] = true;
         }
         
         // Conta provas não enviadas (professores que ainda não criaram prova)
         foreach ($professoresBloco as $profBloco) {
-            $key = $profBloco['professor_id'] . '_' . $profBloco['materia_id'];
+            $key = (int) ($profBloco['professor_id'] ?? 0) . '_' . (int) ($profBloco['materia_id'] ?? 0);
             if (!isset($provasCriadas[$key])) {
                 $contagem['nao_enviada']++;
             }
@@ -311,7 +316,13 @@ class TeacherExamController extends BaseController
                 // Outros status (rascunho com observação = retornada; demais = não avaliada)
                 else {
                     $obs = trim($prova['observacao_coordenacao'] ?? '');
-                    $statusExibicao = ($statusBanco === 'rascunho' && $obs !== '') ? 'retornada' : 'nao_avaliada';
+                    if ($statusBanco === 'rascunho' && $obs !== '') {
+                        $statusExibicao = 'retornada';
+                    } elseif ($statusBanco === 'rascunho') {
+                        $statusExibicao = 'elaboracao';
+                    } else {
+                        $statusExibicao = 'nao_avaliada';
+                    }
                 }
             }
             
@@ -335,16 +346,19 @@ class TeacherExamController extends BaseController
         
         // Adiciona matérias sem provas criadas
         foreach ($professoresBloco as $profBloco) {
-            $key = $profBloco['professor_id'] . '_' . $profBloco['materia_id'];
+            $key = (int) ($profBloco['professor_id'] ?? 0) . '_' . (int) ($profBloco['materia_id'] ?? 0);
             if (!isset($provasCriadas[$key])) {
                 $materia = $this->db->fetch(
                     "SELECT nome FROM materias WHERE id = :id",
                     ['id' => $profBloco['materia_id']]
                 );
-                $professor = $this->db->fetch(
-                    "SELECT nome FROM professores WHERE id = :id",
-                    ['id' => $profBloco['professor_id']]
-                );
+                $professor = null;
+                if ((int) ($profBloco['professor_id'] ?? 0) > 0) {
+                    $professor = $this->db->fetch(
+                        "SELECT nome FROM professores WHERE id = :id",
+                        ['id' => (int) $profBloco['professor_id']]
+                    );
+                }
                 
                 $materiaNome = $materia['nome'] ?? 'Sem matéria';
                 if (!isset($provasPorMateria[$materiaNome])) {
@@ -356,7 +370,7 @@ class TeacherExamController extends BaseController
                     'prova_id' => null,
                     'professor_id' => $profBloco['professor_id'],
                     'materia_id' => $profBloco['materia_id'],
-                    'professor_nome' => $professor['nome'] ?? 'Sem professor',
+                    'professor_nome' => is_array($professor) ? (string) ($professor['nome'] ?? 'Sem professor') : 'Sem professor',
                     'materia_nome' => $materiaNome,
                     'status' => 'nao_enviada',
                     'numero_questoes' => 0,
@@ -441,6 +455,7 @@ class TeacherExamController extends BaseController
             error_log('gerenciar: contagem canceladas: ' . $e->getMessage());
         }
 
+        $flash = $this->getFlashMessage();
         $data = [
             'title' => 'Gerenciar Provas - EducaTudo',
             'user' => $user,
@@ -452,6 +467,8 @@ class TeacherExamController extends BaseController
             'status_filtro' => $filterStatus,
             'total_canceladas' => $totalCanceladas,
             'csrf_token' => $this->generateCsrfToken(),
+            'flash_message' => (string) ($flash['message'] ?? ''),
+            'flash_type' => (string) ($flash['type'] ?? 'info'),
             'current_page' => 'provas_blocos'
         ];
         

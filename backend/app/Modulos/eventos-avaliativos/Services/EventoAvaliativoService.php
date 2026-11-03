@@ -1202,7 +1202,7 @@ class EventoAvaliativoService
                 }
             }
             if ($turmas === []) {
-                return ['error' => 'Em "' . $titulo . '", marque as turmas deste professor.'];
+                return ['error' => 'Em "' . $titulo . '", marque as turmas desta disciplina.'];
             }
             $chave = ($professorId > 0 ? $professorId : 0) . ':' . $materiaId;
             if (isset($vistos[$chave])) {

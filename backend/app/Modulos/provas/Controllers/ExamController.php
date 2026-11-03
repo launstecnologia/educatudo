@@ -971,8 +971,8 @@ class ExamController extends BaseController
             return;
         }
         $professorId = $this->professorDaProvaImpressa($blocoId, $materiaId);
-        if ($professorId <= 0) {
-            $this->setFlashMessage('Cadastre um professor desta disciplina para a escola montar a prova.', 'error');
+        if ($professorId <= 0 && !$this->provaAceitaSemProfessor()) {
+            $this->setFlashMessage('Para a escola elaborar só com a matéria, rode a migration 2026_11_03_prova_sem_professor no Master.', 'error');
             $this->redirect('/admin/provas/blocos/' . $blocoId . '/gerenciar');
             return;
         }
@@ -997,41 +997,53 @@ class ExamController extends BaseController
             }
         }
         $primeiraTurma = (int) (array_key_first($turmaIds) ?? 0);
-        $provaId = (int) $this->db->insert(
-            "INSERT INTO provas (
-                professor_id, materia_id, turma_id, titulo, descricao,
-                data_inicio, data_fim, valor_total, mostrar_resultado,
-                permite_correcao, liberar_resultado, ativo, liberada, status
-             ) VALUES (
-                :professor_id, :materia_id, :turma_id, :titulo, :descricao,
-                :data_inicio, :data_fim, :valor_total, 0,
-                0, 'nao_liberar', 1, 0, 'rascunho'
-             )",
-            [
-                'professor_id' => $professorId,
-                'materia_id' => $materiaId,
-                'turma_id' => $primeiraTurma > 0 ? $primeiraTurma : null,
-                'titulo' => (string) ($bloco['titulo'] ?? 'Prova impressa'),
-                'descricao' => 'Prova impressa elaborada pela escola.',
-                'data_inicio' => date('Y-m-d H:i:s', (int) strtotime($inicio)),
-                'data_fim' => date('Y-m-d H:i:s', (int) strtotime($fim)),
-                'valor_total' => 10,
-            ]
-        );
-        foreach (array_keys($turmaIds) as $turmaId) {
-            $this->db->insert(
-                'INSERT INTO provas_turmas (prova_id, turma_id) VALUES (:prova_id, :turma_id)',
-                ['prova_id' => $provaId, 'turma_id' => $turmaId]
+        try {
+            $this->db->beginTransaction();
+            $provaId = (int) $this->db->insert(
+                "INSERT INTO provas (
+                    professor_id, materia_id, turma_id, titulo, descricao,
+                    data_inicio, data_fim, valor_total, mostrar_resultado,
+                    permite_correcao, liberar_resultado, ativo, liberada, status
+                 ) VALUES (
+                    :professor_id, :materia_id, :turma_id, :titulo, :descricao,
+                    :data_inicio, :data_fim, :valor_total, 0,
+                    0, 'nao_liberar', 1, 0, 'rascunho'
+                 )",
+                [
+                    'professor_id' => $professorId > 0 ? $professorId : null,
+                    'materia_id' => $materiaId,
+                    'turma_id' => $primeiraTurma > 0 ? $primeiraTurma : null,
+                    'titulo' => (string) ($bloco['titulo'] ?? 'Prova impressa'),
+                    'descricao' => 'Prova impressa elaborada pela escola.',
+                    'data_inicio' => date('Y-m-d H:i:s', (int) strtotime($inicio)),
+                    'data_fim' => date('Y-m-d H:i:s', (int) strtotime($fim)),
+                    'valor_total' => 10,
+                ]
             );
+            foreach (array_keys($turmaIds) as $turmaId) {
+                $this->db->insert(
+                    'INSERT INTO provas_turmas (prova_id, turma_id) VALUES (:prova_id, :turma_id)',
+                    ['prova_id' => $provaId, 'turma_id' => $turmaId]
+                );
+            }
+            $ordem = $this->db->fetch(
+                'SELECT COALESCE(MAX(ordem), -1) + 1 AS proxima FROM provas_blocos_vinculo WHERE bloco_id = :bloco_id',
+                ['bloco_id' => $blocoId]
+            );
+            $this->db->insert(
+                'INSERT INTO provas_blocos_vinculo (bloco_id, prova_id, ordem) VALUES (:bloco_id, :prova_id, :ordem)',
+                ['bloco_id' => $blocoId, 'prova_id' => $provaId, 'ordem' => (int) ($ordem['proxima'] ?? 0)]
+            );
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollback();
+            }
+            error_log('elaborarProvaImpressa: ' . $e->getMessage());
+            $this->setFlashMessage('Não foi possível abrir a prova desta matéria. Rode a migration 2026_11_03_prova_sem_professor no Master.', 'error');
+            $this->redirect('/admin/provas/blocos/' . $blocoId . '/gerenciar');
+            return;
         }
-        $ordem = $this->db->fetch(
-            'SELECT COALESCE(MAX(ordem), -1) + 1 AS proxima FROM provas_blocos_vinculo WHERE bloco_id = :bloco_id',
-            ['bloco_id' => $blocoId]
-        );
-        $this->db->insert(
-            'INSERT INTO provas_blocos_vinculo (bloco_id, prova_id, ordem) VALUES (:bloco_id, :prova_id, :ordem)',
-            ['bloco_id' => $blocoId, 'prova_id' => $provaId, 'ordem' => (int) ($ordem['proxima'] ?? 0)]
-        );
         $this->redirect('/admin/provas/editar/' . $provaId);
     }
 
@@ -1043,34 +1055,23 @@ class ExamController extends BaseController
              LIMIT 1',
             ['bloco_id' => $blocoId, 'materia_id' => $materiaId]
         );
-        $professorId = (int) ($linha['professor_id'] ?? 0);
-        if ($professorId > 0) {
-            return $professorId;
+        return (int) ($linha['professor_id'] ?? 0);
+    }
+
+    private function provaAceitaSemProfessor(): bool
+    {
+        try {
+            $coluna = $this->db->fetch(
+                "SELECT IS_NULLABLE AS aceita
+                 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'provas'
+                   AND COLUMN_NAME = 'professor_id'"
+            );
+        } catch (\Throwable $e) {
+            return false;
         }
-        $materia = $this->db->fetch(
-            'SELECT nome FROM materias WHERE id = :id',
-            ['id' => $materiaId]
-        );
-        $nomeMateria = mb_strtolower(trim((string) ($materia['nome'] ?? '')));
-        if ($nomeMateria === '') {
-            return 0;
-        }
-        $professores = $this->db->fetchAll(
-            'SELECT id, materias FROM professores WHERE ativo = 1'
-        ) ?: [];
-        foreach ($professores as $professor) {
-            $lista = json_decode((string) ($professor['materias'] ?? ''), true);
-            if (!is_array($lista)) {
-                continue;
-            }
-            foreach ($lista as $item) {
-                $nome = mb_strtolower(trim((string) (is_array($item) ? ($item['nome'] ?? '') : $item)));
-                if ($nome !== '' && $nome === $nomeMateria) {
-                    return (int) $professor['id'];
-                }
-            }
-        }
-        return 0;
+        return is_array($coluna) && (string) ($coluna['aceita'] ?? '') === 'YES';
     }
 
     public function criar($evento_id = null)
@@ -2081,11 +2082,20 @@ class ExamController extends BaseController
 
         // Professor logado ou (admin editando: usa dados do professor dono da prova)
         $professorId = $isAdmin ? ($prova['professor_id'] ?? $prova['user_id'] ?? null) : $user['id'];
-        $professor = $this->teacherModel->findById($professorId);
+        $professor = $professorId ? $this->teacherModel->findById($professorId) : null;
         if (!$professor) {
-            $this->setFlashMessage('Professor da prova não encontrado', 'error');
-            $this->redirect($isAdmin ? '/admin/provas' : '/professor/dashboard');
-            return;
+            if ($isAdmin && $this->provaImpressaDaEscola((int) $id)) {
+                $professor = [
+                    'id' => 0,
+                    'nome' => 'Escola',
+                    'materias' => '[]',
+                    'turmas' => '[]',
+                ];
+            } else {
+                $this->setFlashMessage('Professor da prova não encontrado', 'error');
+                $this->redirect($isAdmin ? '/admin/provas' : '/professor/dashboard');
+                return;
+            }
         }
 
         // Garantir token CSRF na sessão para upload de imagem (colar/selecionar)
@@ -2102,6 +2112,22 @@ class ExamController extends BaseController
                 "SELECT * FROM materias WHERE nome IN ($placeholders) ORDER BY nome ASC",
                 $materias_professor
             );
+        }
+        $materiaJaListada = false;
+        foreach ($materias as $materiaItem) {
+            if ((int) ($materiaItem['id'] ?? 0) === (int) ($prova['materia_id'] ?? 0)) {
+                $materiaJaListada = true;
+                break;
+            }
+        }
+        if (!$materiaJaListada && !empty($prova['materia_id'])) {
+            $materiaDaProva = $this->db->fetch(
+                'SELECT * FROM materias WHERE id = :id',
+                ['id' => (int) $prova['materia_id']]
+            );
+            if (is_array($materiaDaProva)) {
+                $materias[] = $materiaDaProva;
+            }
         }
         
         // Busca turmas do professor
@@ -2202,22 +2228,36 @@ class ExamController extends BaseController
             $numeroQuestoesObrigatorio = (int)$configProva['numero_questoes'];
         } else {
             // Fallback: quantidade definida no bloco (provas_blocos_professores)
-            $blocoQtd = $this->db->fetch(
-                "SELECT pbp.quantidade_questoes
-                 FROM provas_blocos_vinculo pbv
-                 INNER JOIN provas_blocos_professores pbp ON pbp.bloco_id = pbv.bloco_id
-                   AND pbp.professor_id = :professor_id AND pbp.materia_id = :materia_id
-                 WHERE pbv.prova_id = :prova_id
-                 LIMIT 1",
-                ['prova_id' => $id, 'professor_id' => $prova['professor_id'], 'materia_id' => $prova['materia_id']]
-            );
+            if (!empty($prova['professor_id'])) {
+                $blocoQtd = $this->db->fetch(
+                    "SELECT pbp.quantidade_questoes
+                     FROM provas_blocos_vinculo pbv
+                     INNER JOIN provas_blocos_professores pbp ON pbp.bloco_id = pbv.bloco_id
+                       AND pbp.professor_id = :professor_id AND pbp.materia_id = :materia_id
+                     WHERE pbv.prova_id = :prova_id
+                     LIMIT 1",
+                    ['prova_id' => $id, 'professor_id' => $prova['professor_id'], 'materia_id' => $prova['materia_id']]
+                );
+            } else {
+                $blocoQtd = $this->db->fetch(
+                    "SELECT pbp.quantidade_questoes
+                     FROM provas_blocos_vinculo pbv
+                     INNER JOIN provas_blocos_professores pbp ON pbp.bloco_id = pbv.bloco_id
+                       AND pbp.professor_id IS NULL AND pbp.materia_id = :materia_id
+                     WHERE pbv.prova_id = :prova_id
+                     LIMIT 1",
+                    ['prova_id' => $id, 'materia_id' => $prova['materia_id']]
+                );
+            }
             if ($blocoQtd && isset($blocoQtd['quantidade_questoes']) && (int)$blocoQtd['quantidade_questoes'] > 0) {
                 $numeroQuestoesObrigatorio = (int)$blocoQtd['quantidade_questoes'];
             }
         }
         
         // Busca planos de aula do professor
-        $planosAula = $this->planoAulaModel->findByProfessor($professor['id']);
+        $planosAula = (int) ($professor['id'] ?? 0) > 0
+            ? $this->planoAulaModel->findByProfessor($professor['id'])
+            : [];
         
         $data = [
             'title' => 'Editar Prova - EducaTudo',
