@@ -6852,8 +6852,20 @@ $boletimWizardSteps = [
                 estado = remoto;
                 estado.linhas_layout = linhasLocais;
                 var ordemRemota = Array.isArray(estado.colunas_ordem) ? estado.colunas_ordem : [];
+                var mediasSub = {};
+                ((j.rascunho && j.rascunho.componentes) || []).forEach(function (c) {
+                    if (!c) return;
+                    var cfg = c.config;
+                    if (typeof cfg === 'string' && cfg) {
+                        try { cfg = JSON.parse(cfg); } catch (e) { cfg = {}; }
+                    }
+                    if (cfg && cfg.media_subeventos) mediasSub[String(c.codigo || '').toLowerCase()] = true;
+                });
                 ordemRemota.forEach(function (cod, idx) {
-                    if (!cod || ordemLocal.indexOf(cod) >= 0) return;
+                    if (!cod) return;
+                    var jaTem = ordemLocal.indexOf(cod);
+                    if (jaTem >= 0 && !mediasSub[cod]) return;
+                    if (jaTem >= 0) ordemLocal.splice(jaTem, 1);
                     var anterior = idx > 0 ? ordemRemota[idx - 1] : '';
                     var pos = anterior ? ordemLocal.indexOf(anterior) : -1;
                     if (pos >= 0) ordemLocal.splice(pos + 1, 0, cod);

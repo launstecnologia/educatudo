@@ -6798,6 +6798,125 @@ class BoletimAssistenteWizard
     }
 
     /**
+     * @param list<array<string,mixed>> $comps
+     * @param list<string> $codigos
+     * @param array<string,mixed> $estado
+     */
+    private function linhaCabecalhoDosCodigos(array $comps, array $codigos, array $estado = []): string
+    {
+        $aceitos = array_fill_keys($codigos, true);
+        foreach ($comps as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if ($cod === '' || !isset($aceitos[$cod])) {
+                continue;
+            }
+            $nome = trim((string) ($this->configDoComponente($c)['linha_cabecalho'] ?? ''));
+            if ($nome !== '') {
+                return function_exists('mb_substr') ? mb_substr($nome, 0, 40) : substr($nome, 0, 40);
+            }
+        }
+        foreach ((array) ($estado['linhas_layout'] ?? []) as $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            $nome = trim((string) ($linha['nome'] ?? ''));
+            if ($nome === '') {
+                continue;
+            }
+            foreach ((array) ($linha['colunas'] ?? []) as $cod) {
+                if (isset($aceitos[strtolower(trim((string) $cod))])) {
+                    return function_exists('mb_substr') ? mb_substr($nome, 0, 40) : substr($nome, 0, 40);
+                }
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * A média dos subeventos fica imediatamente depois deles, na mesma faixa.
+     *
+     * @param array<string,mixed> $rascunho
+     * @param array<string,mixed> $estado
+     * @return array<string,mixed>
+     */
+    private function encostarMediaNosSubeventos(array $rascunho, array &$estado): array
+    {
+        $comps = is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : [];
+        $ordem = [];
+        foreach ((array) ($estado['colunas_ordem'] ?? []) as $cod) {
+            $cod = strtolower(trim((string) $cod));
+            if ($cod !== '') {
+                $ordem[] = $cod;
+            }
+        }
+        $mudou = false;
+        foreach ($comps as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            $cfg = $this->configDoComponente($c);
+            if (empty($cfg['media_subeventos'])) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            $fontes = [];
+            foreach ((array) ($cfg['codigos_subeventos'] ?? []) as $fonte) {
+                $fonte = strtolower(trim((string) $fonte));
+                if ($fonte !== '') {
+                    $fontes[] = $fonte;
+                }
+            }
+            if ($cod === '' || $fontes === []) {
+                continue;
+            }
+            $linha = $this->linhaCabecalhoDosCodigos($comps, $fontes, $estado);
+            if ($linha !== '' && trim((string) ($cfg['linha_cabecalho'] ?? '')) === '') {
+                $cfg['linha_cabecalho'] = $linha;
+                foreach ($comps as &$cLinha) {
+                    if (!is_array($cLinha)) {
+                        continue;
+                    }
+                    if (strtolower(trim((string) ($cLinha['codigo'] ?? ''))) !== $cod) {
+                        continue;
+                    }
+                    $cLinha['config'] = $cfg;
+                }
+                unset($cLinha);
+            }
+            $ultimoIdx = -1;
+            foreach ($fontes as $fonte) {
+                $idx = array_search($fonte, $ordem, true);
+                if ($idx !== false) {
+                    $ultimoIdx = max($ultimoIdx, (int) $idx);
+                }
+            }
+            if ($ultimoIdx < 0) {
+                continue;
+            }
+            $atual = array_search($cod, $ordem, true);
+            if ($atual !== false) {
+                array_splice($ordem, (int) $atual, 1);
+                if ((int) $atual < $ultimoIdx) {
+                    $ultimoIdx--;
+                }
+            }
+            array_splice($ordem, $ultimoIdx + 1, 0, [$cod]);
+            $mudou = true;
+        }
+        $rascunho['componentes'] = $comps;
+        if (!$mudou) {
+            return $rascunho;
+        }
+        $estado['colunas_ordem'] = $ordem;
+
+        return $this->aplicarOrdemColunas($rascunho, $estado);
+    }
+
+    /**
      * Coluna com a média (ou o critério do evento) dos subeventos marcados, logo depois deles.
      *
      * @param array<string,mixed> $rascunho
@@ -6839,20 +6958,51 @@ class BoletimAssistenteWizard
                 continue;
             }
             $codigo = 'msub' . (int) $grupo['evento_id'];
-            if (isset($codigos[$codigo])) {
-                continue;
-            }
             $exp = $this->expressaoDoCriterioDosSubeventos($cols, (string) $grupo['criterio']);
-            if ($exp === '' || $this->expressaoJaExiste($comps, $exp)) {
+            if ($exp === '') {
                 continue;
             }
-            $nome = isset($nomesUsados['média final']) ? 'Média dos subeventos' : 'Média final';
+            $nome = 'Média dos subeventos';
             if (count($grupos) > 1) {
                 $nomeEvento = trim((string) $grupo['nome']);
                 $nome = $nomeEvento !== '' ? ('Média ' . $nomeEvento) : $nome;
                 if (function_exists('mb_substr')) {
                     $nome = mb_substr($nome, 0, 60);
                 }
+            }
+            $linha = $this->linhaCabecalhoDosCodigos($comps, $cols, $estado);
+            $cfgMedia = [
+                'expressao' => $exp,
+                'formula_mode' => 'single',
+                'papel_wizard' => 'exibe',
+                'layout_type' => 'media',
+                'layout_group' => 'quadro_comum',
+                'media_subeventos' => 1,
+                'evento_avaliativo_id' => (int) $grupo['evento_id'],
+                'codigos_subeventos' => $cols,
+            ];
+            if ($linha !== '') {
+                $cfgMedia['linha_cabecalho'] = $linha;
+            }
+            if (isset($codigos[$codigo])) {
+                foreach ($comps as &$cExistente) {
+                    if (!is_array($cExistente)) {
+                        continue;
+                    }
+                    if (strtolower(trim((string) ($cExistente['codigo'] ?? ''))) !== $codigo) {
+                        continue;
+                    }
+                    $cExistente['nome'] = $nome;
+                    $cExistente['source_type'] = 'calculado';
+                    $cExistente['calc_type'] = 'media';
+                    $cExistente['config'] = $cfgMedia;
+                }
+                unset($cExistente);
+                $this->gravarNomeColunaNoEstado($estado, $codigo, $nome);
+                continue;
+            }
+            if ($this->expressaoJaExiste($comps, $exp)) {
+                continue;
             }
             $novo = [
                 'codigo' => $codigo,
@@ -6863,15 +7013,7 @@ class BoletimAssistenteWizard
                 'blocos_ids' => [],
                 'peso' => 0,
                 'obrigatorio' => 0,
-                'config' => [
-                    'expressao' => $exp,
-                    'formula_mode' => 'single',
-                    'papel_wizard' => 'exibe',
-                    'layout_type' => 'media',
-                    'layout_group' => 'quadro_comum',
-                    'media_subeventos' => 1,
-                    'evento_avaliativo_id' => (int) $grupo['evento_id'],
-                ],
+                'config' => $cfgMedia,
             ];
             $pos = 0;
             $ultimo = $cols[count($cols) - 1];
@@ -6911,12 +7053,14 @@ class BoletimAssistenteWizard
             return [];
         }
         $porBloco = [];
+        $porTipo = [];
+        $porNome = [];
         foreach ($comps as $c) {
             if (!is_array($c) || (string) ($c['source_type'] ?? '') !== 'provas_sistema') {
                 continue;
             }
             $cfg = $this->configDoComponente($c);
-            if (!empty($cfg['recuperacao_exibe']) || strtolower((string) ($cfg['layout_type'] ?? '')) === 'faltas') {
+            if (!empty($cfg['recuperacao_exibe']) || !empty($cfg['media_subeventos']) || strtolower((string) ($cfg['layout_type'] ?? '')) === 'faltas') {
                 continue;
             }
             $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
@@ -6927,6 +7071,14 @@ class BoletimAssistenteWizard
                 if ($blocoId > 0 && !isset($porBloco[$blocoId])) {
                     $porBloco[$blocoId] = $cod;
                 }
+            }
+            $tipo = (int) (($cfg['tipo_avaliacao_id'] ?? null) ?: ($c['tipo_avaliacao_id'] ?? 0));
+            if ($tipo > 0 && !isset($porTipo[$tipo])) {
+                $porTipo[$tipo] = $cod;
+            }
+            $nome = mb_strtolower(trim((string) ($c['nome'] ?? '')));
+            if ($nome !== '' && !isset($porNome[$nome])) {
+                $porNome[$nome] = $cod;
             }
         }
         $out = [];
@@ -6940,7 +7092,15 @@ class BoletimAssistenteWizard
                     continue;
                 }
                 $blocoId = (int) ($sub['id'] ?? 0);
+                $tipoSub = (int) ($sub['tipo_avaliacao_id'] ?? 0);
+                $titulo = mb_strtolower(trim((string) ($sub['titulo'] ?? '')));
                 $cod = $porBloco[$blocoId] ?? '';
+                if ($cod === '' && $tipoSub > 0) {
+                    $cod = $porTipo[$tipoSub] ?? '';
+                }
+                if ($cod === '' && $titulo !== '') {
+                    $cod = $porNome[$titulo] ?? '';
+                }
                 if ($cod !== '' && !in_array($cod, $codigos, true)) {
                     $codigos[] = $cod;
                 }
@@ -7263,6 +7423,7 @@ class BoletimAssistenteWizard
                 if (!$this->ehBoletimComposto($estado)) {
                     $rascunho = $this->aplicarOrdemColunas($rascunho, $estado);
                     $estado['colunas_ordem'] = $this->extrairCodigosColunasMoveis($rascunho);
+                    $rascunho = $this->encostarMediaNosSubeventos($rascunho, $estado);
                 }
                 $rascunho = $this->sincronizarLinhasLayout($rascunho, $estado);
                 $rascunho = $this->religarExpressoesNasColunasVivas($rascunho, $estado);
