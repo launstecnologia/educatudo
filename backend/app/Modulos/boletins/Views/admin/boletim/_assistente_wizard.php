@@ -948,7 +948,7 @@ $boletimWizardSteps = [
     function subeventoAvaliativoMarcado(ev, sub) {
         var pecaPai = pecaDoTipoAvaliacao(ev && ev.tipo_avaliacao_id);
         var peca = pecaPai || pecaDoTipoAvaliacao(sub && sub.tipo_avaliacao_id);
-        if (!peca) return false;
+        if (!peca) return true;
         if ((estado.pecas || []).indexOf(peca.key) < 0) return false;
         var opts = (estado.pecas_opcoes && estado.pecas_opcoes[peca.key]) || {};
         if (Number(opts.blocos_ids_manual || 0) !== 1) return true;
@@ -989,14 +989,13 @@ $boletimWizardSteps = [
             html += '<div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-600">Nenhum evento avaliativo neste período. Cadastre em <a class="text-indigo-700 underline" href="<?= URL ?>/admin/eventos-avaliativos">Eventos Avaliativos</a>.</div>';
         }
         lista.forEach(function (ev) {
-            var habilitado = pecasDoEventoAvaliativo(ev).length > 0;
-            var on = habilitado && eventoAvaliativoMarcado(ev);
+            var on = eventoAvaliativoMarcado(ev);
             var detalhe = [];
             var nSub = Number(ev.total_subeventos || (ev.subeventos || []).length || 0);
             detalhe.push(nSub + (nSub === 1 ? ' sub-evento' : ' sub-eventos'));
             if (ev.turmas_nomes) detalhe.push(ev.turmas_nomes);
             html += '<div class="bw-card' + (on ? ' selected' : '') + '">';
-            html += '<label class="flex items-start gap-3 cursor-pointer"><input type="checkbox" class="mt-1 bw-evento-avaliativo rounded border-gray-300 text-indigo-600" value="' + Number(ev.id) + '"' + (on ? ' checked' : '') + (habilitado ? '' : ' disabled') + '>'
+            html += '<label class="flex items-start gap-3 cursor-pointer"><input type="checkbox" class="mt-1 bw-evento-avaliativo rounded border-gray-300 text-indigo-600" value="' + Number(ev.id) + '"' + (on ? ' checked' : '') + '>'
                 + '<span><span class="text-sm font-semibold text-gray-900">' + esc(ev.nome || ('Evento #' + ev.id)) + '</span>'
                 + (ev.descricao ? '<span class="block text-xs text-gray-500">' + esc(ev.descricao) + '</span>' : '')
                 + '<span class="block text-xs text-gray-500 mt-1">' + esc(detalhe.join(' · ')) + '</span></span></label>';
@@ -5943,8 +5942,10 @@ $boletimWizardSteps = [
         bodyEl.querySelectorAll('.bw-evento-avaliativo, .bw-evento-sub').forEach(function (el) {
             el.addEventListener('change', function () {
                 aplicarSelecaoEventosAvaliativos();
-                renderAll();
-                agendarMontar();
+                setTimeout(function () {
+                    renderAll();
+                    agendarMontar();
+                }, 0);
             });
         });
         bodyEl.querySelectorAll('.bw-evento-jornada').forEach(function (el) {
