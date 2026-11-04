@@ -27,7 +27,7 @@ if ($uma && $urlCelular !== '') {
 .carteirinha-envio-btn-wa{background:#128C7E;border-color:#128C7E;color:#fff}
 .carteirinha-envio-folha{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
 .carteirinha-envio-cartoes{display:flex;flex-wrap:wrap;gap:16px;flex:1 1 320px;min-width:0;width:100%}
-.carteirinha-envio-cartoes-um{flex:1 1 520px;max-width:520px;min-width:min(100%,520px)}
+.carteirinha-envio-cartoes-um{flex:1 1 400px;max-width:400px;min-width:min(100%,400px)}
 .carteirinha-envio-painel{flex:0 1 280px;width:min(100%,280px);max-width:100%;box-sizing:border-box;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:18px;text-align:center}
 .carteirinha-envio-painel h2{margin:0;font-size:16px;color:#0f172a}
 .carteirinha-envio-painel p{margin:8px 0 0;font-size:13px;line-height:1.45;color:#475569}

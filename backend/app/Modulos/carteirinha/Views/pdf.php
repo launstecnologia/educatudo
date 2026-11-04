@@ -16,7 +16,7 @@ $rotulo = [
 <meta charset="UTF-8">
 <style>
 body { margin: 0; font-family: DejaVu Sans, sans-serif; color: #111827; }
-.cartao { width: 360px; border: 1px solid #d1d5db; margin: 0 0 16px 0; page-break-inside: avoid; }
+.cartao { width: 340px; height: 214px; border: 1px solid #d1d5db; margin: 0 0 16px 0; page-break-inside: avoid; }
 .faixa { color: #fff; padding: 10px 12px; font-size: 13px; }
 .kicker { font-size: 9px; letter-spacing: 0.5px; }
 .nome { font-size: 14px; font-weight: bold; }
