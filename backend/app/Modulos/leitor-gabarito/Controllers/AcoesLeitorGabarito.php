@@ -282,12 +282,12 @@ trait AcoesLeitorGabarito
             $this->redirect($this->contexto()['base']);
             return;
         }
-        $marcacoes = json_decode((string) ($leitura['marcacoes_json'] ?? ''), true);
         $this->render('revisao', [
             'title' => 'Revisar leitura',
             'leitura' => $leitura,
-            'questoes' => is_array($marcacoes) ? ($marcacoes['questoes'] ?? []) : [],
+            'grupos' => $this->servico()->gruposDaRevisao($leitura),
             'alunos' => $this->servico()->opcoesAluno((int) $leitura['prova_id'], (int) ($leitura['conjunto'] ?? 0)),
+            'voltar' => $this->urlDepoisDaLeitura($leitura),
             'flash' => $this->getFlashMessage(),
         ]);
     }
@@ -322,13 +322,13 @@ trait AcoesLeitorGabarito
             if (!is_array($letras)) {
                 $letras = [];
             }
-            $nota = $this->servico()->confirmar(
+            $materias = $this->servico()->confirmar(
                 $leituraId,
                 $this->professorId(),
                 (int) ($_POST['aluno_id'] ?? 0),
                 $letras
             );
-            $this->setFlashMessage('Nota lançada: ' . number_format($nota, 2, ',', '.'), 'success');
+            $this->setFlashMessage($this->mensagemNotas($materias), 'success');
             $this->redirect($volta);
         } catch (\Throwable $e) {
             $this->setFlashMessage($this->mensagemSegura($e), 'error');
@@ -388,6 +388,23 @@ trait AcoesLeitorGabarito
             }
         }
         return $this->contexto()['base'] . '/provas/' . (int) $leitura['prova_id'];
+    }
+
+    /**
+     * @param list<array{nome:string,nota:float,acertos:int,total:int}> $materias
+     */
+    private function mensagemNotas(array $materias): string
+    {
+        if ($materias === []) {
+            return 'Nota lançada.';
+        }
+        $partes = [];
+        foreach ($materias as $materia) {
+            $partes[] = $materia['nome'] . ': ' . number_format((float) $materia['nota'], 2, ',', '.')
+                . ' (' . (int) $materia['acertos'] . ' de ' . (int) $materia['total'] . ')';
+        }
+        $prefixo = count($materias) > 1 ? 'Notas lançadas. ' : 'Nota lançada. ';
+        return $prefixo . implode(' · ', $partes);
     }
 
     private function mensagemSegura(\Throwable $e): string

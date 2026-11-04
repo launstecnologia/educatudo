@@ -346,8 +346,9 @@ class LeitorGabaritoService
 
     /**
      * @param array<string, string> $letras questao_id => letra
+     * @return list<array{nome:string,nota:float,acertos:int,total:int}>
      */
-    public function confirmar(int $leituraId, ?int $professorId, int $alunoId, array $letras): float
+    public function confirmar(int $leituraId, ?int $professorId, int $alunoId, array $letras): array
     {
         $leitura = $this->buscarLeitura($leituraId, $professorId);
         if ($leitura === null) {
@@ -909,20 +910,27 @@ class LeitorGabaritoService
      * @param array<string, mixed> $leitura
      * @param list<array<string, mixed>> $marcacoes
      * @param array<string, string>|null $letras
+     * @return list<array{nome:string,nota:float,acertos:int,total:int}>
      */
-    private function lancar(array $leitura, array $marcacoes, int $alunoId, int $folhaId, ?array $letras): float
+    private function lancar(array $leitura, array $marcacoes, int $alunoId, int $folhaId, ?array $letras): array
     {
         $provaId = (int) $leitura['prova_id'];
         $mapas = [];
         $provasAfetadas = [];
         $ajustadas = [];
+        $marcacoes = $this->completarMaterias($leitura, $marcacoes);
         $this->db->beginTransaction();
         try {
+            $contagem = [];
             foreach ($marcacoes as $questao) {
                 $provaQuestao = (int) ($questao['prova_id'] ?? 0);
                 if ($provaQuestao <= 0) {
                     $provaQuestao = $provaId;
                 }
+                if (!isset($contagem[$provaQuestao])) {
+                    $contagem[$provaQuestao] = ['acertos' => 0, 'total' => 0];
+                }
+                $contagem[$provaQuestao]['total']++;
                 if (!isset($mapas[$provaQuestao])) {
                     $mapas[$provaQuestao] = $this->mapaAlternativas($provaQuestao);
                 }
@@ -959,9 +967,13 @@ class LeitorGabaritoService
                 $questao['situacao'] = $letra === '' ? 'vazia' : 'marcada';
                 $ajustadas[] = $questao;
                 $provasAfetadas[$provaQuestao] = true;
+                if ($correta === 1) {
+                    $contagem[$provaQuestao]['acertos']++;
+                }
             }
 
-            $nota = 0.0;
+            $nomes = $this->nomesDasProvas(array_map('intval', array_keys($provasAfetadas)));
+            $materias = [];
             $notaDaLeitura = null;
             foreach (array_keys($provasAfetadas) as $provaAfetada) {
                 $realizacao = $this->db->fetch(
@@ -984,27 +996,38 @@ class LeitorGabaritoService
                 if ((int) $provaAfetada === $provaId) {
                     $notaDaLeitura = $notaProva;
                 }
-                $nota = $notaProva;
+                $materias[] = [
+                    'nome' => (string) ($nomes[(int) $provaAfetada] ?? 'Prova'),
+                    'nota' => $notaProva,
+                    'acertos' => (int) ($contagem[(int) $provaAfetada]['acertos'] ?? 0),
+                    'total' => (int) ($contagem[(int) $provaAfetada]['total'] ?? 0),
+                ];
             }
-            if ($notaDaLeitura !== null) {
-                $nota = $notaDaLeitura;
+            $nota = $notaDaLeitura;
+            $mensagem = null;
+            if (count($materias) > 1) {
+                $nota = null;
+                $mensagem = $this->textoNotas($materias);
+            } elseif ($materias !== [] && $nota === null) {
+                $nota = $materias[0]['nota'];
             }
             $json = json_encode(['questoes' => $ajustadas], JSON_UNESCAPED_UNICODE);
             $this->db->update(
                 "UPDATE leitor_gabarito_leituras
-                 SET status = 'confirmada', mensagem = NULL, folha_id = :folha_id, aluno_id = :aluno_id,
+                 SET status = 'confirmada', mensagem = :mensagem, folha_id = :folha_id, aluno_id = :aluno_id,
                      marcacoes_json = :marcacoes_json, nota = :nota, lido_em = NOW(), confirmado_em = NOW()
                  WHERE id = :id",
                 [
                     'folha_id' => $folhaId,
                     'aluno_id' => $alunoId,
                     'marcacoes_json' => $json === false ? null : $json,
+                    'mensagem' => $mensagem,
                     'nota' => $nota,
                     'id' => (int) $leitura['id'],
                 ]
             );
             $this->db->commit();
-            return $nota;
+            return $materias;
         } catch (\Throwable $e) {
             if ($this->db->inTransaction()) {
                 $this->db->rollback();
@@ -1072,6 +1095,256 @@ class LeitorGabaritoService
             }
         }
         return null;
+    }
+
+    /**
+     * Questões da leitura agrupadas pela matéria, com o gabarito e a nota que o acerto gera.
+     *
+     * @param array<string, mixed> $leitura
+     * @return list<array{nome:string,prova_id:int,acertos:int,total:int,nota:float,maximo:float,questoes:list<array<string,mixed>>}>
+     */
+    public function gruposDaRevisao(array $leitura): array
+    {
+        $marcacoes = json_decode((string) ($leitura['marcacoes_json'] ?? ''), true);
+        $questoes = is_array($marcacoes) ? ($marcacoes['questoes'] ?? []) : [];
+        if (!is_array($questoes) || $questoes === []) {
+            return [];
+        }
+        $questoes = $this->completarMaterias($leitura, $questoes);
+        $idsProva = [];
+        $idsQuestao = [];
+        foreach ($questoes as $questao) {
+            if (!is_array($questao)) {
+                continue;
+            }
+            $provaId = (int) ($questao['prova_id'] ?? 0);
+            if ($provaId <= 0) {
+                $provaId = (int) ($leitura['prova_id'] ?? 0);
+            }
+            if ($provaId > 0) {
+                $idsProva[$provaId] = $provaId;
+            }
+            $questaoId = (int) ($questao['questao_id'] ?? 0);
+            if ($questaoId > 0) {
+                $idsQuestao[$questaoId] = $questaoId;
+            }
+        }
+        $nomes = $this->nomesDasProvas(array_values($idsProva));
+        $gabarito = $this->letrasDoGabarito(array_values($idsQuestao));
+        $grupos = [];
+        $indice = -1;
+        $provaAnterior = 0;
+        foreach ($questoes as $questao) {
+            if (!is_array($questao)) {
+                continue;
+            }
+            $provaId = (int) ($questao['prova_id'] ?? 0);
+            if ($provaId <= 0) {
+                $provaId = (int) ($leitura['prova_id'] ?? 0);
+            }
+            $rotulo = trim((string) ($questao['rotulo'] ?? ''));
+            $abre = $indice < 0
+                || $provaId !== $provaAnterior
+                || ($rotulo !== '' && $rotulo !== (string) $grupos[$indice]['nome']);
+            if ($abre) {
+                $nome = $rotulo !== '' ? $rotulo : (string) ($nomes[$provaId] ?? 'Prova');
+                $indice++;
+                $grupos[$indice] = [
+                    'nome' => $nome,
+                    'prova_id' => $provaId,
+                    'acertos' => 0,
+                    'total' => 0,
+                    'nota' => 0.0,
+                    'maximo' => 0.0,
+                    'questoes' => [],
+                ];
+                $provaAnterior = $provaId;
+            }
+            $letra = strtoupper(trim((string) ($questao['letra'] ?? '')));
+            $certa = (string) ($gabarito[(int) ($questao['questao_id'] ?? 0)] ?? '');
+            $valor = (float) ($questao['valor'] ?? 0);
+            $acertou = $certa !== '' && $letra === $certa;
+            $questao['gabarito'] = $certa;
+            $questao['acertou'] = $acertou;
+            $grupos[$indice]['questoes'][] = $questao;
+            $grupos[$indice]['total']++;
+            $grupos[$indice]['maximo'] += $valor;
+            if ($acertou) {
+                $grupos[$indice]['acertos']++;
+                $grupos[$indice]['nota'] += $valor;
+            }
+        }
+        foreach ($grupos as $i => $grupo) {
+            $grupos[$i]['nota'] = round((float) $grupo['nota'], 2);
+            $grupos[$i]['maximo'] = round((float) $grupo['maximo'], 2);
+        }
+        return $grupos;
+    }
+
+    /**
+     * A folha do bloco guarda a matéria em cada questão. Leituras antigas podem ter perdido isso.
+     *
+     * @param array<string, mixed> $leitura
+     * @param list<array<string, mixed>> $questoes
+     * @return list<array<string, mixed>>
+     */
+    private function completarMaterias(array $leitura, array $questoes): array
+    {
+        $faltaProva = false;
+        foreach ($questoes as $questao) {
+            if (is_array($questao) && (int) ($questao['prova_id'] ?? 0) <= 0) {
+                $faltaProva = true;
+                break;
+            }
+        }
+        if (!$faltaProva) {
+            return $questoes;
+        }
+        $folhaId = (int) ($leitura['folha_id'] ?? 0);
+        $folha = $folhaId > 0 ? $this->buscarFolha($folhaId) : null;
+        $pacote = is_array($folha) ? json_decode((string) ($folha['questoes_json'] ?? ''), true) : null;
+        $origem = is_array($pacote) ? ($pacote['questoes'] ?? null) : null;
+        if (!is_array($origem)) {
+            return $questoes;
+        }
+        $mapa = [];
+        $rotulo = '';
+        foreach ($origem as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $nome = trim((string) ($item['rotulo'] ?? ''));
+            if ($nome !== '') {
+                $rotulo = $nome;
+            }
+            $questaoId = (int) ($item['questao_id'] ?? 0);
+            if ($questaoId <= 0) {
+                continue;
+            }
+            $mapa[$questaoId] = [
+                'prova_id' => (int) ($item['prova_id'] ?? 0),
+                'rotulo' => $rotulo,
+            ];
+        }
+        foreach ($questoes as $i => $questao) {
+            if (!is_array($questao)) {
+                continue;
+            }
+            $info = $mapa[(int) ($questao['questao_id'] ?? 0)] ?? null;
+            if ($info === null) {
+                continue;
+            }
+            if ((int) ($questao['prova_id'] ?? 0) <= 0 && $info['prova_id'] > 0) {
+                $questoes[$i]['prova_id'] = $info['prova_id'];
+            }
+            if (trim((string) ($questao['rotulo'] ?? '')) === '' && $info['rotulo'] !== '') {
+                $questoes[$i]['rotulo'] = $info['rotulo'];
+            }
+        }
+        return $questoes;
+    }
+
+    /**
+     * @param list<int> $provaIds
+     * @return array<int, string>
+     */
+    private function nomesDasProvas(array $provaIds): array
+    {
+        $ids = [];
+        foreach ($provaIds as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $ids[$id] = $id;
+            }
+        }
+        if ($ids === []) {
+            return [];
+        }
+        $params = [];
+        $marcadores = [];
+        $i = 0;
+        foreach ($ids as $id) {
+            $chave = 'p' . $i;
+            $marcadores[] = ':' . $chave;
+            $params[$chave] = $id;
+            $i++;
+        }
+        $linhas = $this->db->fetchAll(
+            'SELECT p.id, COALESCE(NULLIF(TRIM(m.nome), \'\'), NULLIF(TRIM(p.titulo), \'\'), \'Prova\') AS nome
+             FROM provas p
+             LEFT JOIN materias m ON m.id = p.materia_id
+             WHERE p.id IN (' . implode(',', $marcadores) . ')',
+            $params
+        );
+        $nomes = [];
+        foreach ($linhas as $linha) {
+            $nomes[(int) $linha['id']] = (string) $linha['nome'];
+        }
+        return $nomes;
+    }
+
+    /**
+     * Letra impressa na folha (A–E) da alternativa correta.
+     *
+     * @param list<int> $questaoIds
+     * @return array<int, string>
+     */
+    private function letrasDoGabarito(array $questaoIds): array
+    {
+        $ids = [];
+        foreach ($questaoIds as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $ids[$id] = $id;
+            }
+        }
+        if ($ids === []) {
+            return [];
+        }
+        $params = [];
+        $marcadores = [];
+        $i = 0;
+        foreach ($ids as $id) {
+            $chave = 'q' . $i;
+            $marcadores[] = ':' . $chave;
+            $params[$chave] = $id;
+            $i++;
+        }
+        $linhas = $this->db->fetchAll(
+            'SELECT questao_id, correta
+             FROM provas_alternativas
+             WHERE questao_id IN (' . implode(',', $marcadores) . ')
+             ORDER BY questao_id ASC, ordem ASC, id ASC',
+            $params
+        );
+        $letras = ['A', 'B', 'C', 'D', 'E'];
+        $posicao = [];
+        $gabarito = [];
+        foreach ($linhas as $linha) {
+            $questaoId = (int) $linha['questao_id'];
+            $indice = $posicao[$questaoId] ?? 0;
+            if ($indice >= 5) {
+                continue;
+            }
+            $posicao[$questaoId] = $indice + 1;
+            if ((int) $linha['correta'] === 1 && !isset($gabarito[$questaoId])) {
+                $gabarito[$questaoId] = $letras[$indice];
+            }
+        }
+        return $gabarito;
+    }
+
+    /**
+     * @param list<array{nome:string,nota:float,acertos:int,total:int}> $materias
+     */
+    private function textoNotas(array $materias): string
+    {
+        $partes = [];
+        foreach ($materias as $materia) {
+            $partes[] = $materia['nome'] . ' ' . number_format((float) $materia['nota'], 2, ',', '.')
+                . ' (' . (int) $materia['acertos'] . '/' . (int) $materia['total'] . ')';
+        }
+        return mb_substr(implode(' · ', $partes), 0, 500);
     }
 
     /**

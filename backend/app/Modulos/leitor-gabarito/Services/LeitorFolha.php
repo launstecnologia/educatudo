@@ -37,7 +37,7 @@ class LeitorFolha
 
     /**
      * @param list<array{questao_id:int,valor:float|int,alternativas:list<array{letra:string,id:int}>}> $questoes
-     * @return list<array{numero:int,questao_id:int,valor:float,situacao:string,letra:?string,alternativa_id:?int,opcoes:list<array{letra:string,alternativa_id:int,preenchimento:float}>}>
+     * @return list<array{numero:int,questao_id:int,prova_id:int,rotulo:string,valor:float,situacao:string,letra:?string,alternativa_id:?int,opcoes:list<array{letra:string,alternativa_id:int,preenchimento:float}>}>
      */
     public function lerMarcacoes(AlinhamentoFolha $alinhamento, array $questoes): array
     {
@@ -70,6 +70,7 @@ class LeitorFolha
                 'numero' => (int) $questao['numero'],
                 'questao_id' => (int) $questao['questao_id'],
                 'prova_id' => (int) ($questao['prova_id'] ?? 0),
+                'rotulo' => trim((string) ($questao['rotulo'] ?? '')),
                 'valor' => (float) $questao['valor'],
                 'situacao' => $situacao,
                 'letra' => $letra,

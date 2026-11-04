@@ -147,8 +147,9 @@ $dropdown = dirname(__DIR__, 4) . '/Views/admin/_partials/row_actions_dropdown.p
                     <?php $badge = $badges[$leitura['status']] ?? ['—', 'bg-gray-100 text-gray-700']; ?>
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4 text-sm text-gray-900">
+                            <?php $notasPorMateria = ($leitura['status'] ?? '') === 'confirmada' && trim((string) ($leitura['mensagem'] ?? '')) !== ''; ?>
                             <div class="font-medium"><?= htmlspecialchars((string) ($leitura['aluno_nome'] ?? 'Aluno não identificado')) ?></div>
-                            <?php if (!empty($leitura['mensagem'])): ?>
+                            <?php if (!empty($leitura['mensagem']) && !$notasPorMateria): ?>
                             <div class="text-gray-500 mt-1"><?= htmlspecialchars((string) $leitura['mensagem']) ?></div>
                             <?php endif; ?>
                         </td>
@@ -156,7 +157,11 @@ $dropdown = dirname(__DIR__, 4) . '/Views/admin/_partials/row_actions_dropdown.p
                             <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium <?= $badge[1] ?>"><?= htmlspecialchars($badge[0]) ?></span>
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-900">
+                            <?php if (!empty($notasPorMateria)): ?>
+                            <?= htmlspecialchars((string) $leitura['mensagem']) ?>
+                            <?php else: ?>
                             <?= $leitura['nota'] === null ? '—' : htmlspecialchars(number_format((float) $leitura['nota'], 2, ',', '.')) ?>
+                            <?php endif; ?>
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap"><?= htmlspecialchars(date('d/m/Y H:i', strtotime((string) $leitura['criado_em']))) ?></td>
                         <td class="px-6 py-4 text-right">
