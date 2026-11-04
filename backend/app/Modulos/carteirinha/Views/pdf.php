@@ -16,14 +16,14 @@ $rotulo = [
 <meta charset="UTF-8">
 <style>
 body { margin: 0; font-family: DejaVu Sans, sans-serif; color: #111827; }
-.cartao { width: 360px; border: 1px solid #d1d5db; margin: 0 0 16px 0; page-break-inside: avoid; }
-.faixa { color: #fff; padding: 10px 12px; font-size: 13px; }
-.kicker { font-size: 9px; letter-spacing: 0.5px; }
-.nome { font-size: 14px; font-weight: bold; }
-.meta { font-size: 11px; color: #374151; margin-top: 4px; }
-.foto { width: 72px; height: 90px; }
-.qr { width: 84px; height: 84px; }
-.codigo { font-size: 9px; color: #6b7280; text-align: center; }
+.cartao { width: 8.56cm; height: 5.4cm; border: 1px solid #d1d5db; margin: 0 0 0.4cm 0; page-break-inside: avoid; }
+.faixa { color: #fff; padding: 0.22cm 0.35cm; font-size: 11px; }
+.kicker { font-size: 8px; letter-spacing: 0.4px; }
+.nome { font-size: 12px; font-weight: bold; }
+.meta { font-size: 9px; color: #374151; margin-top: 2px; }
+.foto { width: 2.3cm; height: 3cm; }
+.qr { width: 2.5cm; height: 2.5cm; }
+.codigo { font-size: 8px; color: #6b7280; text-align: center; }
 </style>
 </head>
 <body>
