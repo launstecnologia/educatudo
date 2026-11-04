@@ -962,7 +962,7 @@ $boletimWizardSteps = [
         });
         var jornada = null;
         (catalogo.pecas || []).forEach(function (p) { if (p.key === 'jornada') jornada = p; });
-        if (jornada) {
+        if (jornada && catalogo.modulo_jornadas) {
             var onJ = (estado.pecas || []).indexOf('jornada') >= 0;
             var optsJ = (estado.pecas_opcoes && estado.pecas_opcoes.jornada) ? estado.pecas_opcoes.jornada : pecasOpcoesPadraoJs('jornada');
             html += '<div class="bw-card' + (onJ ? ' selected' : '') + '">';
@@ -1800,6 +1800,7 @@ $boletimWizardSteps = [
             rec: 'Rec'
         };
         if (nomes[key]) return nomes[key];
+        if (key === 'jornada') return 'Jornada do aluno';
         var m = pecaMeta(key);
         return (m && m.label) ? m.label : String(key || '');
     }
@@ -5513,6 +5514,7 @@ $boletimWizardSteps = [
             html += '<p class="text-xs text-gray-500 mt-1">Marque o que entra e o ' + esc(rotuloCampoPeriodo().toLocaleLowerCase('pt-BR')) + ' de cada tipo. Ordem das colunas e o cálculo ficam no passo <strong>Fórmula</strong>.</p>';
             html += '<div class="grid gap-3 mt-3">';
             (catalogo.pecas || []).forEach(function (p) {
+                if (p.key === 'jornada' && !catalogo.modulo_jornadas) return;
                 var on = (estado.pecas || []).indexOf(p.key) >= 0;
                 var opts = (estado.pecas_opcoes && estado.pecas_opcoes[p.key]) ? estado.pecas_opcoes[p.key] : pecasOpcoesPadraoJs(p.key);
                 html += '<div class="bw-card' + (on ? ' selected' : '') + '">';
@@ -5840,8 +5842,13 @@ $boletimWizardSteps = [
         bodyEl.querySelectorAll('.bw-peca').forEach(function (el) {
             el.addEventListener('change', function () {
                 var tinhaSemanal = (estado.pecas || []).indexOf('semanal') >= 0;
+                var tinhaJornada = (estado.pecas || []).indexOf('jornada') >= 0;
+                var cardJornada = bodyEl.querySelector('.bw-peca[value="jornada"]');
                 estado.pecas = [];
                 bodyEl.querySelectorAll('.bw-peca:checked').forEach(function (c) { estado.pecas.push(c.value); });
+                if (tinhaJornada && !cardJornada && estado.pecas.indexOf('jornada') < 0) {
+                    estado.pecas.push('jornada');
+                }
                 if (!estado.pecas_opcoes) estado.pecas_opcoes = {};
                 if (!tinhaSemanal && estado.pecas.indexOf('semanal') >= 0) {
                     estado.materia_unica = 1;

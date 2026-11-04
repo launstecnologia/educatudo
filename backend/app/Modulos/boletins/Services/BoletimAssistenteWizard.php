@@ -139,7 +139,7 @@ class BoletimAssistenteWizard
 
         return [
             'passos' => self::PASSOS,
-            'modelos' => $this->modelosProntos(),
+            'modelos' => $this->modelosParaCatalogo(),
             'formulas' => $this->formulasPresetMeta(),
             'regras' => $regras,
             'series' => $series,
@@ -154,6 +154,7 @@ class BoletimAssistenteWizard
             'familias_componentes' => $this->catalogoFamiliasComponentes(),
             'boletins' => $this->catalogoBoletins(),
             'quadros_notas' => $this->catalogoQuadrosNotas(),
+            'modulo_jornadas' => \App\Core\LayoutHelper::isModuleEnabled('jornadas'),
             'modulo_eventos_avaliativos' => \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos'),
             'eventos_avaliativos' => \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos')
                 ? $this->ferramentas->listarEventosAvaliativosParaBoletim()
@@ -1411,6 +1412,22 @@ class BoletimAssistenteWizard
         return implode("\n", $linhas);
     }
 
+    /**
+     * @return list<array{key:string,titulo:string,descricao:string,pecas:list<string>,formula_preset:string}>
+     */
+    private function modelosParaCatalogo(): array
+    {
+        $modelos = $this->modelosProntos();
+        if (\App\Core\LayoutHelper::isModuleEnabled('jornadas')) {
+            return $modelos;
+        }
+
+        return array_values(array_filter(
+            $modelos,
+            static fn (array $modelo): bool => !in_array('jornada', $modelo['pecas'] ?? [], true)
+        ));
+    }
+
     /** @return list<array{key:string,titulo:string,descricao:string,pecas:list<string>,formula_preset:string}> */
     public function modelosProntos(): array
     {
@@ -1494,18 +1511,20 @@ class BoletimAssistenteWizard
                 'fechamento_rotulo' => $herdado['rotulo'],
             ];
         }
-        $out[] = [
-            'key' => 'jornada',
-            'label' => 'Jornada do aluno',
-            'hint' => 'Nota pela quantidade de jornadas concluídas (quantitativo) ou tabela por faixa. Pode entrar na média ou só melhorar.',
-            'tipo_avaliacao_id' => 0,
-            'chave_quadro' => null,
-            'criterio_fechamento' => null,
-            'registro_evento' => null,
-            'calc_type' => 'media',
-            'usar_percentual' => 1,
-            'fechamento_rotulo' => '',
-        ];
+        if (\App\Core\LayoutHelper::isModuleEnabled('jornadas')) {
+            $out[] = [
+                'key' => 'jornada',
+                'label' => 'Jornada do aluno',
+                'hint' => 'Nota pela quantidade de jornadas concluídas (quantitativo) ou tabela por faixa. Pode entrar na média ou só melhorar.',
+                'tipo_avaliacao_id' => 0,
+                'chave_quadro' => null,
+                'criterio_fechamento' => null,
+                'registro_evento' => null,
+                'calc_type' => 'media',
+                'usar_percentual' => 1,
+                'fechamento_rotulo' => '',
+            ];
+        }
         return $out;
     }
 
