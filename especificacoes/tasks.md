@@ -1,5 +1,7 @@
 # Tasks — backlog atual
 
+- [x] Relatório completo em `/admin/relatorios/completo`: a escola marca os bancos (cadastro, ficha, responsáveis, matrícula, documentos, chamada, notas, resultado final, frequência, faltas, ocorrências, redações, provas e exercícios) e baixa Excel ou PDF. Sem senha. Limite de 1.500 alunos por arquivo. — 2026-11-04
+
 - [x] Calendário único no admin: o cadastro fica no Calendário Letivo, com a opção Avisar a família (hora, prioridade e público). O aviso no app acompanha edição, desmarcação e exclusão. A tela de Comunicação lista os avisos já enviados. Migration `2026_10_31_calendario_aviso_familia.sql`. — 2026-10-31
 - [ ] Rodar a migration `2026_10_31_calendario_aviso_familia.sql` (via painel Master ou `run_migrations.php`) em cada escola — cria `calendario_letivo_eventos.evento_escolar_id` e os tipos Reunião, Passeio e Apresentação. Sem ela o aviso à família não acompanha a edição.
 

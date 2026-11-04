@@ -17,6 +17,7 @@ $showPedagogicoGroup = $modOn('aulas_online')
     || \App\Core\FeatureGate::isModuleEnabled('jornadas');
 $showRelatoriosMenu = $canViewSidebar(['relatorios_gerais'])
     && (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('jornadas'));
+$showRelatorioCompleto = $canViewSidebar(['relatorios_gerais']);
 $showPedagogicoGroup = $showPedagogicoGroup || $showRelatoriosMenu;
 $showSistemaGroup = $canViewSidebar(['avatares_alunos'])
     || $modOn('redacao_configuravel')
@@ -407,7 +408,7 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::i
 
 <!-- Secretaria -->
 <div class="menu-group">
-    <div class="flex items-center rounded-xl <?= in_array($cp, ['gestao_escolar', 'secretaria', 'carteirinha'], true) ? 'bg-white/20' : '' ?>">
+    <div class="flex items-center rounded-xl <?= in_array($cp, ['gestao_escolar', 'secretaria', 'carteirinha', 'relatorio_completo'], true) ? 'bg-white/20' : '' ?>">
         <a href="<?= URL ?>/admin/gestao-escolar" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
             <i class="fa-regular fa-folder-open w-5 h-5 mr-3"></i>
             <span class="sidebar-text">Secretaria</span>
@@ -468,6 +469,12 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::i
         <a href="<?= URL ?>/admin/paineis/documentos" class="<?= $linkCls($cp === 'paineis_documentos') ?>">
             <i class="fa-solid fa-file-lines w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Documentos</span>
+        </a>
+        <?php endif; ?>
+        <?php if ($showRelatorioCompleto): ?>
+        <a href="<?= URL ?>/admin/relatorios/completo" class="<?= $linkCls($cp === 'relatorio_completo') ?>">
+            <i class="fa-solid fa-file-lines w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Relatório completo</span>
         </a>
         <?php endif; ?>
     </div>

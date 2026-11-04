@@ -239,7 +239,7 @@ class ArquivoEmissaoDocumentoService
     }
 
     /**
-     * @return array{nome:string,binario:string}|null
+     * @return array{codigo:string,nome:string,binario:string,mime:string}|null
      */
     public function baixar(int $id, ?array $config): ?array
     {
@@ -247,7 +247,7 @@ class ArquivoEmissaoDocumentoService
             return null;
         }
         $row = $this->db->fetch(
-            'SELECT nome, versao, arquivo_key FROM documentos_emissoes WHERE id = :id LIMIT 1',
+            'SELECT codigo, nome, versao, arquivo_key FROM documentos_emissoes WHERE id = :id LIMIT 1',
             ['id' => $id]
         );
         if (!is_array($row)) {
@@ -260,9 +260,17 @@ class ArquivoEmissaoDocumentoService
             return null;
         }
         $nome = preg_replace('/[^A-Za-z0-9_-]+/', '_', (string) ($row['nome'] ?? 'documento')) ?: 'documento';
+        $ext = strtolower(pathinfo($chave, PATHINFO_EXTENSION));
+        if ($ext !== 'xlsx') {
+            $ext = 'pdf';
+        }
         return [
-            'nome' => $nome . '_v' . (int) ($row['versao'] ?? 1) . '.pdf',
+            'codigo' => (string) ($row['codigo'] ?? ''),
+            'nome' => $nome . '_v' . (int) ($row['versao'] ?? 1) . '.' . $ext,
             'binario' => $binario,
+            'mime' => $ext === 'xlsx'
+                ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                : 'application/pdf',
         ];
     }
 

@@ -136,7 +136,7 @@
         ], true);
         $secretariaNavOpen = in_array($cp, [
             'gestao_escolar', 'secretaria', 'censo_escolar', 'enrollment', 'enrollment_config',
-            'paineis_documentos', 'carteirinha',
+            'paineis_documentos', 'carteirinha', 'relatorio_completo',
         ], true) || $curMovimentacao;
         $paineisOpen = in_array($cp, [
             'paineis', 'dashboard', 'saude_academica', 'conformidade',
@@ -874,6 +874,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'vida_escolar_oficios': 'secretaria',
         'paineis_documentos': 'secretaria',
         'carteirinha': 'secretaria',
+        'relatorio_completo': 'secretaria',
         'almoxarifado': 'recursos-escolares',
         'patrimonio': 'recursos-escolares',
         'tudicoins_escola': 'z-configuracao',

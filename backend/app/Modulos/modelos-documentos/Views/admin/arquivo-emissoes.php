@@ -19,7 +19,7 @@ $qs = http_build_query([
 ]);
 
 $page_header_title = 'Documentos';
-$page_header_subtitle = 'Gere declarações e autorizações por ano, série, turma ou aluno. Cada PDF fica guardado como uma versão.';
+$page_header_subtitle = 'Gere declarações, autorizações e o relatório completo. Cada arquivo fica guardado com a data e a hora, para baixar de novo.';
 ob_start(); ?>
 <a href="<?= URL ?>/admin/paineis" class="text-gray-600 hover:text-gray-900 text-sm">← Painéis</a>
 <?php
@@ -140,7 +140,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
     <div class="px-6 py-4 border-b border-gray-200">
         <h3 class="text-base font-semibold text-gray-900">Versões guardadas</h3>
-        <p class="text-sm text-gray-500">Baixar abre o PDF já gerado. Uma nova geração não apaga as anteriores.</p>
+        <p class="text-sm text-gray-500">Baixar abre o arquivo já gerado, com a data e a hora da versão. Uma nova geração não apaga as anteriores.</p>
     </div>
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 text-sm">
@@ -180,9 +180,10 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                         <?php endif; ?>
                     </td>
                     <td class="px-6 py-3 text-right">
-                        <a href="<?= URL ?>/admin/paineis/documentos/<?= (int) ($row['id'] ?? 0) ?>/pdf" target="_blank" rel="noopener"
+                        <?php $ehExcel = str_contains((string) ($row['nome'] ?? ''), 'Excel'); ?>
+                        <a href="<?= URL ?>/admin/paineis/documentos/<?= (int) ($row['id'] ?? 0) ?>/pdf" <?= $ehExcel ? '' : 'target="_blank" rel="noopener"' ?>
                            class="inline-flex items-center text-sm font-medium text-gray-700 hover:text-gray-900">
-                            <i class="fa-solid fa-file-pdf mr-1.5"></i> Baixar
+                            <i class="fa-solid <?= $ehExcel ? 'fa-file-excel' : 'fa-file-pdf' ?> mr-1.5"></i> Baixar
                         </a>
                     </td>
                 </tr>

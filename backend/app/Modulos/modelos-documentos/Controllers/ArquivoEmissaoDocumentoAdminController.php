@@ -6,6 +6,7 @@ namespace App\Modulos\ModelosDocumentos\Controllers;
  */
 
 
+use App\Core\AdminPermissionMatrix;
 use App\Modulos\ModelosDocumentos\Services\ArquivoEmissaoDocumentoService;
 use App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService;
 
@@ -26,6 +27,13 @@ class ArquivoEmissaoDocumentoAdminController extends \App\Controllers\Admin\Admi
             return;
         }
         $filtro = $this->filtroDaRequest();
+        $emissoes = $this->arquivo->listar($filtro);
+        if (!$this->podeVerRelatorioCompleto()) {
+            $emissoes = array_values(array_filter(
+                $emissoes,
+                static fn (array $row): bool => (string) ($row['codigo'] ?? '') !== 'relatorio_completo'
+            ));
+        }
         $flash = $this->getFlashMessage();
         $this->viewWithLayout('admin', 'admin/modelos-documentos/arquivo-emissoes', [
             'title' => 'Documentos — EducaTudo',
@@ -41,7 +49,7 @@ class ArquivoEmissaoDocumentoAdminController extends \App\Controllers\Admin\Admi
             'catalogo' => $this->arquivo->catalogo(),
             'opcoes' => $this->arquivo->opcoesFiltro(),
             'alunos' => $this->arquivo->alunosDaTurma($filtro['turma_id']),
-            'emissoes' => $this->arquivo->listar($filtro),
+            'emissoes' => $emissoes,
             'filtro' => $filtro,
             'categorias' => ModeloDocumentoService::CATEGORIAS,
         ]);
@@ -93,6 +101,11 @@ class ArquivoEmissaoDocumentoAdminController extends \App\Controllers\Admin\Admi
             return;
         }
         $arquivo = $this->arquivo->baixar($id, $this->config);
+        if (is_array($arquivo) && ($arquivo['codigo'] ?? '') === 'relatorio_completo' && !$this->podeVerRelatorioCompleto()) {
+            $this->setFlashMessage('Sem permissão para baixar este relatório.', 'error');
+            $this->redirect('/admin/paineis/documentos');
+            return;
+        }
         if ($arquivo === null) {
             $this->setFlashMessage('Esta versão não está mais no arquivo.', 'error');
             $this->redirect('/admin/paineis/documentos');
@@ -104,8 +117,11 @@ class ArquivoEmissaoDocumentoAdminController extends \App\Controllers\Admin\Admi
             while (ob_get_level() > 0) {
                 ob_end_clean();
             }
-            header('Content-Type: application/pdf');
-            header('Content-Disposition: inline; filename="' . $arquivo['nome'] . '"');
+            $mime = (string) ($arquivo['mime'] ?? 'application/pdf');
+            $nomeArquivo = str_replace(['"', "\r", "\n"], '', (string) $arquivo['nome']);
+            $disposicao = str_contains($mime, 'spreadsheet') ? 'attachment' : 'inline';
+            header('Content-Type: ' . $mime);
+            header('Content-Disposition: ' . $disposicao . '; filename="' . $nomeArquivo . '"');
             header('Cache-Control: private, max-age=0, must-revalidate');
             echo $arquivo['binario'];
             exit;
@@ -131,6 +147,14 @@ class ArquivoEmissaoDocumentoAdminController extends \App\Controllers\Admin\Admi
             'aluno_id' => (int) ($fonte['aluno_id'] ?? 0),
             'modelo_id' => (int) ($fonte['modelo_id'] ?? 0),
         ];
+    }
+
+    private function podeVerRelatorioCompleto(): bool
+    {
+        $user = $this->auth->getUser();
+        $permissions = AdminPermissionMatrix::effectivePermissionsForUser($this->db, is_array($user) ? $user : []);
+
+        return AdminPermissionMatrix::can($permissions, 'relatorios_gerais', 'visualizar');
     }
 
     private function urlFiltro(): string

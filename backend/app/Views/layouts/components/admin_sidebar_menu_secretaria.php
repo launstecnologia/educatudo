@@ -46,7 +46,7 @@ $fechamentoOpen = in_array($cur, [
 $secretariaNavOpen = in_array($cur, [
     'gestao_escolar', 'secretaria', 'censo_escolar', 'modelos_documentos',
     'vida_escolar', 'vida_escolar_oficios', 'almoxarifado', 'patrimonio', 'paineis_documentos',
-    'carteirinha',
+    'carteirinha', 'relatorio_completo',
 ], true) || $curMovimentacao;
 $paineisOpen = in_array($cur, [
     'paineis', 'dashboard', 'saude_academica', 'relatorios', 'paineis_documentos',
@@ -244,6 +244,7 @@ $gestaoOpen = $secretariaNavOpen;
 $secRedacaoVisivel = $secCan(['redacao_professor']) && $modOn('redacao_configuravel');
 $secJornadasVisivel = $secCan(['jornadas_aluno']) && \App\Core\FeatureGate::isModuleEnabled('jornadas');
 $secRelatoriosVisivel = $secCan(['relatorios_gerais']) && $modOn('jornadas');
+$secRelatorioCompleto = $secCan(['relatorios_gerais']);
 ?>
 <?php if ($secRedacaoVisivel || $secJornadasVisivel || $secRelatoriosVisivel): ?>
 <div class="menu-group">
@@ -315,9 +316,9 @@ $secRelatoriosVisivel = $secCan(['relatorios_gerais']) && $modOn('jornadas');
 </div>
 <?php endif; ?>
 
-<?php if ($secCan(['faltas', 'presenca', 'diario_classe', 'censo_escolar', 'modelos_documentos', 'transferencia', 'almoxarifado', 'patrimonio', 'declaracoes_aluno', 'carteirinha'])): ?>
+<?php if ($secCan(['faltas', 'presenca', 'diario_classe', 'censo_escolar', 'modelos_documentos', 'transferencia', 'almoxarifado', 'patrimonio', 'declaracoes_aluno', 'carteirinha', 'relatorios_gerais'])): ?>
 <div class="menu-group">
-    <div class="flex items-center rounded-xl <?= in_array($cur, ['gestao_escolar', 'secretaria', 'carteirinha'], true) ? 'bg-white/20' : '' ?>">
+    <div class="flex items-center rounded-xl <?= in_array($cur, ['gestao_escolar', 'secretaria', 'carteirinha', 'relatorio_completo'], true) ? 'bg-white/20' : '' ?>">
         <a href="<?= $urlBase ?>/admin/gestao-escolar" class="flex-1 flex items-center px-4 py-3 text-purple-100 hover:bg-white/20 hover:text-white rounded-xl transition-all duration-200">
             <i class="fa-regular fa-folder-open w-5 h-5 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text">Secretaria</span>
@@ -357,6 +358,12 @@ $secRelatoriosVisivel = $secCan(['relatorios_gerais']) && $modOn('jornadas');
         <a href="<?= $urlBase ?>/admin/paineis/documentos" class="<?= $linkCls($cur === 'paineis_documentos') ?>">
             <i class="fa-solid fa-file-lines w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Documentos</span>
+        </a>
+        <?php endif; ?>
+        <?php if ($secRelatorioCompleto): ?>
+        <a href="<?= $urlBase ?>/admin/relatorios/completo" class="<?= $linkCls($cur === 'relatorio_completo') ?>">
+            <i class="fa-solid fa-file-lines w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">Relatório completo</span>
         </a>
         <?php endif; ?>
     </div>

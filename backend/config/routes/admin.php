@@ -464,6 +464,9 @@ $router->post('/admin/grade-horaria/processar-imagem-ia', 'Education/GradeHorari
 $router->post('/admin/grade-horaria/salvar-importacao-ia', 'Education/GradeHorariaController@salvarImportacaoIA');
 
 // Relatórios Administrativos
+$router->get('/admin/relatorios/completo', 'Admin/RelatorioCompletoAdminController@index');
+$router->post('/admin/relatorios/completo', 'Admin/RelatorioCompletoAdminController@gerar');
+$router->get('/admin/relatorios/completo/{id}', 'Admin/RelatorioCompletoAdminController@baixar');
 $router->get('/admin/reports', 'Admin/ReportAdminController@relatorios');
 $router->get('/admin/reports/censo', 'Admin/ReportAdminController@censo');
 $router->get('/admin/reports/boletim-coordenacao', 'Admin/ReportAdminController@boletimCoordenacao');
