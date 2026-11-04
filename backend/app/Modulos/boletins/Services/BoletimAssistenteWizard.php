@@ -6768,6 +6768,26 @@ class BoletimAssistenteWizard
                 'colunas' => $cols,
             ];
         }
+        $codigosReligados = [];
+        foreach ($linhas as $linha) {
+            foreach ((array) ($linha['colunas'] ?? []) as $cod) {
+                $codigosReligados[strtolower(trim((string) $cod))] = true;
+            }
+        }
+        foreach ($this->normalizarLinhasLayout($estado['linhas_layout'] ?? []) as $antiga) {
+            $colunas = (array) ($antiga['colunas'] ?? []);
+            $religou = false;
+            foreach ($colunas as $cod) {
+                if (isset($codigosReligados[strtolower(trim((string) $cod))])) {
+                    $religou = true;
+                    break;
+                }
+            }
+            if ($religou) {
+                continue;
+            }
+            $linhas[] = $antiga;
+        }
         $linhas = $this->normalizarLinhasLayout($linhas);
         if ($linhas !== []) {
             $estado['linhas_layout'] = $linhas;
@@ -6791,6 +6811,7 @@ class BoletimAssistenteWizard
         $nomes = [];
         $livres = [];
         $recuperacoes = [];
+        $temRecuperacao = false;
         foreach ($comps as $c) {
             if (!is_array($c)) {
                 continue;
@@ -6808,6 +6829,7 @@ class BoletimAssistenteWizard
                 continue;
             }
             if (!empty($cfg['recuperacao_exibe']) || $tipoLayout === 'rec') {
+                $temRecuperacao = true;
                 $recuperacoes[] = $cod;
                 continue;
             }
@@ -6851,7 +6873,10 @@ class BoletimAssistenteWizard
             }
             $faltam = [];
             foreach ($achados[0] as $tok) {
-                if (in_array($tok, ['max', 'min'], true) || isset($codigos[$tok]) || isset($faltam[$tok])) {
+                if (in_array($tok, ['max', 'min'], true) || isset($faltam[$tok])) {
+                    continue;
+                }
+                if ($this->tokenApontaParaColunaViva($tok, $codigos)) {
                     continue;
                 }
                 $faltam[$tok] = true;
@@ -6861,14 +6886,9 @@ class BoletimAssistenteWizard
             }
             $nova = $exp;
             foreach (array_keys($faltam) as $tok) {
-                $pool = str_starts_with($tok, 'rec') ? $recuperacoes : $livres;
+                $ehRec = $tok === 'rec' || $tok === 'recuperacao';
+                $pool = $ehRec ? $recuperacoes : $livres;
                 $escolha = $this->colunaLivreParaToken($tok, $pool, $nomes);
-                if ($escolha === null && str_starts_with($tok, 'rec') && count($recuperacoes) === 1) {
-                    $escolha = $recuperacoes[0];
-                }
-                if ($escolha === null && count($faltam) === 1 && count($livres) === 1 && !str_starts_with($tok, 'rec')) {
-                    $escolha = $livres[0];
-                }
                 if ($escolha !== null) {
                     $nova = (string) preg_replace('/\b' . preg_quote($tok, '/') . '\b/', $escolha, $nova);
                     $livres = array_values(array_filter(
@@ -6879,26 +6899,10 @@ class BoletimAssistenteWizard
                         $recuperacoes,
                         static fn (string $cod): bool => $cod !== $escolha
                     ));
-                    unset($faltam[$tok]);
                     continue;
                 }
-                if (str_starts_with($tok, 'rec')) {
+                if ($ehRec && !$temRecuperacao) {
                     $nova = (string) preg_replace('/\b' . preg_quote($tok, '/') . '\b/', '0', $nova);
-                    unset($faltam[$tok]);
-                }
-            }
-            $restantes = array_keys($faltam);
-            $sims = array_values(array_filter(
-                $restantes,
-                static fn (string $tok): bool => (bool) preg_match('/^sim\d+$/', $tok)
-            ));
-            if ($sims !== [] && count($sims) === count($restantes) && count($livres) >= count($sims)) {
-                foreach ($sims as $tok) {
-                    $escolha = array_shift($livres);
-                    if ($escolha === null) {
-                        break;
-                    }
-                    $nova = (string) preg_replace('/\b' . preg_quote($tok, '/') . '\b/', $escolha, $nova);
                 }
             }
             if ($nova === $exp) {
@@ -6937,8 +6941,6 @@ class BoletimAssistenteWizard
             $nota = 0;
             if ($nome !== '' && ($nome === $token || str_contains($nome, $token))) {
                 $nota = 3;
-            } elseif (str_starts_with($token, 'prova') && str_contains($nome, 'prova')) {
-                $nota = 2;
             }
             if ($nota <= 0) {
                 continue;
@@ -6957,6 +6959,31 @@ class BoletimAssistenteWizard
         }
 
         return $candidatos[0];
+    }
+
+    /**
+     * @param array<string,bool> $codigos
+     */
+    private function tokenApontaParaColunaViva(string $token, array $codigos): bool
+    {
+        if (isset($codigos[$token])) {
+            return true;
+        }
+        $aliases = [
+            'prova_bim' => 'bimestral',
+            'bimestral' => 'prova_bim',
+            'rec' => 'recuperacao',
+            'recuperacao' => 'rec',
+            'media_sem' => 'semanal',
+            'semanal' => 'media_sem',
+            'trab' => 'trabalho',
+            'trabalho' => 'trab',
+            'part' => 'participacao',
+            'participacao' => 'part',
+        ];
+        $outro = $aliases[$token] ?? '';
+
+        return $outro !== '' && isset($codigos[$outro]);
     }
 
     public function enriquecerSaida(array $resultado): array

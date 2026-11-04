@@ -4693,15 +4693,29 @@ $boletimWizardSteps = [
         return cfg;
     }
 
-    function gravarLinhaNosComponentes() {
+    function idLinhaPorNome(nome) {
+        var h = 0;
+        var s = String(nome || '');
+        for (var i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+        return ('lin' + Math.abs(h).toString(36)).slice(0, 23);
+    }
+
+    function gravarLinhaNosComponentes(codigosAlvo) {
         if (!estado) return;
+        var alvo = {};
+        (codigosAlvo || []).forEach(function (cod) {
+            var c = String(cod || '').toLowerCase();
+            if (c) alvo[c] = true;
+        });
+        if (!Object.keys(alvo).length) return;
         var mapa = {};
         (estado.linhas_layout || []).forEach(function (lin) {
             if (!lin) return;
             var nome = String(lin.nome || '').trim().slice(0, 40);
             if (!nome) return;
             (lin.colunas || []).forEach(function (cod) {
-                mapa[String(cod || '').toLowerCase()] = nome;
+                var c = String(cod || '').toLowerCase();
+                if (alvo[c]) mapa[c] = nome;
             });
         });
         [rascunhoAtual, estado.rascunho_preservado].forEach(function (r) {
@@ -4709,6 +4723,7 @@ $boletimWizardSteps = [
             r.componentes.forEach(function (c) {
                 if (!c) return;
                 var cod = String(c.codigo || '').toLowerCase();
+                if (!alvo[cod]) return;
                 var cfg = configDoComp(c);
                 if (mapa[cod]) cfg.linha_cabecalho = mapa[cod];
                 else delete cfg.linha_cabecalho;
@@ -4743,7 +4758,7 @@ $boletimWizardSteps = [
         }).filter(function (lin) { return !!lin; });
         ordem.forEach(function (nome) {
             if (vistas[nome] || porNome[nome].length < 2) return;
-            linhas.push({ id: 'lin' + Math.abs(nome.length * 17).toString(36), nome: nome, colunas: porNome[nome].slice() });
+            linhas.push({ id: idLinhaPorNome(nome), nome: nome, colunas: porNome[nome].slice() });
         });
         estado.linhas_layout = linhas;
     }
@@ -5042,7 +5057,7 @@ $boletimWizardSteps = [
             return lin;
         }).filter(function (lin) { return lin && (lin.colunas || []).length >= 2; });
         estado.linhas_layout.push({ id: 'lin' + Date.now().toString(36), nome: nome.slice(0, 40), colunas: cols });
-        gravarLinhaNosComponentes();
+        gravarLinhaNosComponentes(cols);
         var pvNomes = {};
         (((previewEfetivo() || {}).colunas) || []).forEach(function (c) {
             if (c && c.codigo) pvNomes[String(c.codigo).toLowerCase()] = c.nome || '';
@@ -5072,7 +5087,7 @@ $boletimWizardSteps = [
         }).filter(function (lin) { return lin && (lin.colunas || []).length >= 2; });
         avisoLinha = { tipo: 'ok', texto: 'Essas colunas saíram da linha e voltam a aparecer sozinhas.' };
         colunasMarcadas = {};
-        gravarLinhaNosComponentes();
+        gravarLinhaNosComponentes(cols);
         renderRevisarDinamico();
         agendarMontar();
     }
