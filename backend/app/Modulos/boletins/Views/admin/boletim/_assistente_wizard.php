@@ -1819,26 +1819,69 @@ $boletimWizardSteps = [
         });
     }
 
-    function siglaFormula(value, label) {
-        var sigla = '';
-        var meta = pecaMeta(value);
-        var tipoId = meta ? Number(meta.tipo_avaliacao_id || 0) : 0;
-        var nomes = {};
-        function marcar(txt) {
-            txt = String(txt || '').trim().toLowerCase();
-            if (txt) nomes[txt] = true;
-        }
-        marcar(label);
-        marcar(pecaLabel(value));
-        eventosFormulaDoPeriodo().forEach(function (ev) {
-            var s = String(ev.sigla || '').trim();
-            if (!s) return;
-            if (tipoId > 0 && Number(ev.tipo_avaliacao_id || 0) === tipoId) sigla = s;
-            if (nomes[String(ev.nome || '').trim().toLowerCase()]) sigla = s;
-            var subs = ev.subeventos || [];
-            if (subs.length === 1 && nomes[String((subs[0] && subs[0].titulo) || '').trim().toLowerCase()]) sigla = s;
+    function siglaDoEvento(ev) {
+        return String((ev && ev.sigla) || '').trim();
+    }
+
+    function abrevSubevento(ev, indice) {
+        var sigla = siglaDoEvento(ev);
+        if (!sigla) return '';
+        var subs = (ev && ev.subeventos) || [];
+        if (subs.length <= 1) return sigla;
+        return sigla + String(indice + 1);
+    }
+
+    function prioridadeEventoSigla(ev) {
+        var ano = Number((estado && estado.ano_letivo) || 0);
+        var bim = Number((estado && estado.bimestre) || 0);
+        var p = 0;
+        if (ano > 0 && Number(ev.ano_letivo || 0) === ano) p += 2;
+        if (bim > 0 && Number(ev.bimestre || 0) === bim) p += 2;
+        return p;
+    }
+
+    function siglaPeloTexto(rotulo) {
+        var alvo = normalizarExprFormula(rotulo);
+        if (!alvo) return '';
+        var melhor = '';
+        var peso = -1;
+        (catalogo.eventos_avaliativos || []).forEach(function (ev) {
+            if (!siglaDoEvento(ev)) return;
+            var p = prioridadeEventoSigla(ev);
+            if (normalizarExprFormula(ev.nome) === alvo && p >= peso) {
+                melhor = siglaDoEvento(ev);
+                peso = p + 1;
+            }
+            ((ev && ev.subeventos) || []).forEach(function (sub, i) {
+                if (normalizarExprFormula(sub && sub.titulo) !== alvo || p < peso) return;
+                if (normalizarExprFormula(ev.nome) === alvo) return;
+                melhor = abrevSubevento(ev, i);
+                peso = p;
+            });
         });
-        return sigla;
+        return melhor;
+    }
+
+    function siglaPeloCodigoColuna(value) {
+        var m = String(value || '').match(/^(?:sev|rcv)_?(\d+)$/i);
+        if (!m) return '';
+        var blocoId = Number(m[1]);
+        var melhor = '';
+        var peso = -1;
+        (catalogo.eventos_avaliativos || []).forEach(function (ev) {
+            if (!siglaDoEvento(ev)) return;
+            var p = prioridadeEventoSigla(ev);
+            ((ev && ev.subeventos) || []).forEach(function (sub, i) {
+                if (Number(sub && sub.id) !== blocoId || p < peso) return;
+                melhor = abrevSubevento(ev, i);
+                peso = p;
+            });
+        });
+        return melhor;
+    }
+
+    function siglaFormula(value, label) {
+        return siglaPeloCodigoColuna(value) || siglaPeloTexto(label) || siglaPeloTexto(pecaLabel(value));
     }
 
     function labelToken(tok) {
@@ -2062,8 +2105,11 @@ $boletimWizardSteps = [
 
     function chipHtml(tok, idx, paleta) {
         var kind = tok.type === 'fn' ? 'fn' : tok.type;
+        var mostrado = labelToken(tok);
+        var completo = tok && (tok.label || tok.value) ? String(tok.label || tok.value) : '';
+        var dica = tok && tok.type === 'peca' && mostrado !== completo ? ' title="' + esc(completo) + '"' : '';
         var html = '<span class="bw-chip bw-chip-' + kind + (paleta ? ' bw-pal-chip' : '') + '" draggable="true"'
-            + ' data-type="' + esc(tok.type) + '" data-value="' + esc(tok.value) + '" data-label="' + esc(labelToken(tok)) + '"';
+            + ' data-type="' + esc(tok.type) + '" data-value="' + esc(tok.value) + '" data-label="' + esc(mostrado) + '"' + dica;
         if (!paleta) html += ' data-idx="' + idx + '"';
         html += '><span>' + esc(labelToken(tok)) + '</span>';
         if (!paleta) html += '<button type="button" class="bw-chip-x" draggable="false" data-idx="' + idx + '" aria-label="Remover">&times;</button>';
