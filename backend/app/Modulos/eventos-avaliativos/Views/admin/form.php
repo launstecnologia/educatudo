@@ -1576,9 +1576,11 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
         });
         if (!lista) return;
         lista.querySelectorAll('.subevento-row').forEach(function (row) {
+            var porGrupo = estadoAgenda(row).modo !== 'todas';
             row.querySelectorAll('.js-horas-linha').forEach(function (el) {
                 el.classList.add('hidden');
-                el.disabled = false;
+                el.disabled = porGrupo;
+                if (porGrupo) el.value = '';
             });
             var dataLinha = row.querySelector('.js-data-linha');
             if (dataLinha) dataLinha.classList.toggle('hidden', multi);
@@ -1640,11 +1642,21 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
             var materiaIds = [];
             var professores = [];
             pares.forEach(function (par) { nomesDoPar(par, materias, materiaIds, professores); });
+            var agendaEstado = estadoAgenda(row);
+            var inicioLinha = (row.querySelector('.js-hora-inicio') || {}).value || '';
+            var fimLinha = (row.querySelector('.js-hora-fim') || {}).value || '';
+            if (agendaEstado.modo !== 'todas') {
+                var primeiroBloco = (agendaEstado.blocos || []).filter(function (bloco) {
+                    return (bloco.turmas || []).length && bloco.inicio && bloco.fim;
+                })[0];
+                inicioLinha = primeiroBloco ? primeiroBloco.inicio : '';
+                fimLinha = primeiroBloco ? primeiroBloco.fim : '';
+            }
             return {
                 titulo: (row.querySelector('input[name*="[titulo]"]') || {}).value || '',
                 data: (row.querySelector('input[name*="[data]"]') || {}).value || '',
-                inicio: (row.querySelector('.js-hora-inicio') || {}).value || '',
-                fim: (row.querySelector('.js-hora-fim') || {}).value || '',
+                inicio: inicioLinha,
+                fim: fimLinha,
                 proprio: !!(ajuste && ajuste.checked),
                 agenda: resumoAgenda(row),
                 professores: professores,
@@ -1843,9 +1855,19 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
         lista.querySelectorAll('.subevento-row').forEach(function (row) {
             var inicio = row.querySelector('.js-hora-inicio');
             var fim = row.querySelector('.js-hora-fim');
+            if (estadoAgenda(row).modo !== 'todas') {
+                if (inicio) {
+                    inicio.value = '';
+                    inicio.disabled = true;
+                }
+                if (fim) {
+                    fim.value = '';
+                    fim.disabled = true;
+                }
+                return;
+            }
             if (inicio) inicio.disabled = false;
             if (fim) fim.disabled = false;
-            if (estadoAgenda(row).modo !== 'todas') return;
             var bloco = blocoAgenda(row);
             if (!bloco) return;
             var visivelInicio = bloco.querySelector('.js-todas-inicio');
@@ -1899,7 +1921,7 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
                     var isoData = (campoData || {}).value || '';
                     if (!nomeData) return 'Informe o nome do subevento ' + (d + 1) + '.';
                     if (modoLinha === 'todas' && !/^\d{4}-\d{2}-\d{2}$/.test(isoData)) return 'Informe a data de ' + nomeData + '.';
-                    if (comProva()) {
+                    if (comProva() && modoLinha === 'todas') {
                         var iniData = ((datas[d].querySelector('.js-hora-inicio') || {}).value || '');
                         var fimData = ((datas[d].querySelector('.js-hora-fim') || {}).value || '');
                         if (!iniData || !fimData || iniData >= fimData) return 'Informe o horário de início e de término de ' + nomeData + '.';

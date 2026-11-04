@@ -48,7 +48,9 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                 <?php if ($itens === []): ?>
                 <tr>
                     <td colspan="4" class="px-6 py-12 text-center text-gray-500">
-                        <p>Nenhuma regra de nota em <?= $anoFiltro ?><?= $cursoNome !== '' ? ' para ' . htmlspecialchars($cursoNome, ENT_QUOTES, 'UTF-8') : '' ?>.</p>
+                        <p><?= $anoFiltro > 0
+                            ? 'Nenhuma regra de nota em ' . $anoFiltro . ($cursoNome !== '' ? ' para ' . htmlspecialchars($cursoNome, ENT_QUOTES, 'UTF-8') : '') . '.'
+                            : 'Nenhuma regra de nota cadastrada' . ($cursoNome !== '' ? ' para ' . htmlspecialchars($cursoNome, ENT_QUOTES, 'UTF-8') : '') . '.' ?></p>
                         <p class="text-sm mt-1">Crie a regra em Regras de Aprovação para montar os eventos avaliativos.</p>
                     </td>
                 </tr>
@@ -105,6 +107,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                 <label for="filtro-ano-lista" class="block text-sm font-medium text-gray-700 mb-1.5">Ano</label>
                 <select id="filtro-ano-lista" name="ano_lista"
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="0" <?= $anoFiltro === 0 ? 'selected' : '' ?>>Todos</option>
                     <?php foreach ($anos as $opcao): ?>
                         <option value="<?= (int) $opcao ?>" <?= (int) $opcao === $anoFiltro ? 'selected' : '' ?>><?= (int) $opcao ?></option>
                     <?php endforeach; ?>

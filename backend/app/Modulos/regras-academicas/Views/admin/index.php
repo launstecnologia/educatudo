@@ -7,14 +7,13 @@ $filtros = is_array($filtros ?? null) ? $filtros : [];
 $cursos = is_array($cursos ?? null) ? $cursos : [];
 $series = is_array($series ?? null) ? $series : [];
 $anosLetivos = is_array($anos_letivos ?? null) ? $anos_letivos : [];
-$anoAtual = (int) ($ano_atual ?? (int) date('Y'));
 $schemaPronto = !empty($schema_pronto);
 $csrf_token = $csrf_token ?? '';
 
 $page_header_title = 'Regras de Aprovação';
 $page_header_subtitle = 'Critérios de aprovação, recuperação e frequência. O boletim usa esta regra para definir a situação do aluno.';
 $filtrosAtivos = 0;
-if ((int) ($filtros['ano_letivo'] ?? 0) !== $anoAtual) {
+if ((int) ($filtros['ano_letivo'] ?? 0) > 0) {
     $filtrosAtivos++;
 }
 if ((int) ($filtros['curso_id'] ?? 0) > 0) {

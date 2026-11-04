@@ -766,9 +766,8 @@ class EventoAvaliativoAdminController extends AdminBaseController
     {
         $anoAtual = (int) date('Y');
         $pedido = (int) ($_GET['ano_lista'] ?? 0);
-        $filtroExplicito = ($pedido >= 2000 && $pedido <= 2100);
-        $anoFiltro = $filtroExplicito ? $pedido : $anoAtual;
-        $anos = $this->anosDoCadastro($anoFiltro, true);
+        $anoFiltro = ($pedido >= 2000 && $pedido <= 2100) ? $pedido : 0;
+        $anos = $this->anosDoCadastro($anoFiltro > 0 ? $anoFiltro : $anoAtual, true);
         if (!in_array($anoAtual, $anos, true)) {
             $anos[] = $anoAtual;
             rsort($anos);
@@ -788,14 +787,17 @@ class EventoAvaliativoAdminController extends AdminBaseController
         $regras = new RegraAcademica();
         $itens = [];
         if ($regras->schemaPronto()) {
-            $consulta = ['ano_letivo' => $anoFiltro];
+            $consulta = [];
+            if ($anoFiltro > 0) {
+                $consulta['ano_letivo'] = $anoFiltro;
+            }
             if ($cursoFiltro > 0) {
                 $consulta['curso_id'] = $cursoFiltro;
             }
             $itens = $regras->getAll($consulta);
         }
         $filtrosAtivos = 0;
-        if ($filtroExplicito && $anoFiltro !== $anoAtual) {
+        if ($anoFiltro > 0) {
             $filtrosAtivos++;
         }
         if ($cursoFiltro > 0) {
@@ -805,7 +807,7 @@ class EventoAvaliativoAdminController extends AdminBaseController
             'title' => 'Eventos Avaliativos - EducaTudo',
             'itens' => $itens,
             'schema_pronto' => $regras->schemaPronto(),
-            'ano_padrao' => $anoFiltro,
+            'ano_padrao' => $anoAtual,
             'ano_filtro' => $anoFiltro,
             'ano_atual' => $anoAtual,
             'filtros_ativos' => $filtrosAtivos,

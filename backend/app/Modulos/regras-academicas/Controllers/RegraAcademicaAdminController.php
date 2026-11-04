@@ -26,15 +26,8 @@ class RegraAcademicaAdminController extends \App\Controllers\Admin\AdminBaseCont
 
         $model = $this->service()->model();
         $anoAtual = (int) date('Y');
-        $anoInformado = array_key_exists('ano_letivo', $_GET);
         $anoPedido = (int) ($_GET['ano_letivo'] ?? 0);
-        if (!$anoInformado) {
-            $anoFiltro = $anoAtual;
-        } elseif ($anoPedido >= 2000 && $anoPedido <= 2100) {
-            $anoFiltro = $anoPedido;
-        } else {
-            $anoFiltro = 0;
-        }
+        $anoFiltro = ($anoPedido >= 2000 && $anoPedido <= 2100) ? $anoPedido : 0;
         $filtros = [
             'ano_letivo' => $anoFiltro,
             'curso_id' => (int) ($_GET['curso_id'] ?? 0),
