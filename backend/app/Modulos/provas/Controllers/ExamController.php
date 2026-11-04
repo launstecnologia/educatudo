@@ -7154,6 +7154,7 @@ class ExamController extends BaseController
         }
 
         $arquivoTranscricao = null;
+        $paginasJson = null;
         $referenciaCredito = null;
         $moduloCredito = 'gerar_exercicio_ia_professor';
         try {
@@ -7202,6 +7203,14 @@ class ExamController extends BaseController
             }
             @chmod($path, 0600);
             $arquivoTranscricao = $path;
+            $paginasJson = null;
+            try {
+                $paginasJson = (new \App\Modulos\Provas\Services\TranscricaoQuestaoArquivoService())
+                    ->guardarPaginasRenderizadas($dir, $_FILES['paginas'] ?? [], (string) ($_POST['paginas_palavras'] ?? ''));
+            } catch (\Throwable $paginasErro) {
+                error_log('paginas prova: ' . $paginasErro->getMessage());
+                $paginasJson = null;
+            }
 
             $modulo = $moduloCredito;
             $papel = \App\Services\CreditosService::tipoCarteiraDoUsuario((string) ($user['tipo'] ?? 'professor'));
@@ -7222,6 +7231,7 @@ class ExamController extends BaseController
                     'path' => $path,
                     'slug' => $slug,
                     'mime' => $mime,
+                    'paginas_json' => $paginasJson,
                 ],
                 'usuario_id' => (int) $user['id'],
                 'credits_ref' => $referencia,
@@ -7238,6 +7248,9 @@ class ExamController extends BaseController
         } catch (\Exception $e) {
             if ($arquivoTranscricao !== null && is_file($arquivoTranscricao)) {
                 @unlink($arquivoTranscricao);
+            }
+            if (!empty($paginasJson)) {
+                (new \App\Modulos\Provas\Services\TranscricaoQuestaoArquivoService())->apagarPaginasRenderizadas($paginasJson);
             }
             if ($referenciaCredito !== null) {
                 try {

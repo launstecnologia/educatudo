@@ -818,6 +818,7 @@
     </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
 let opcoesCount = 0;
 let opcoesCountEdicao = 0;
@@ -2086,6 +2087,85 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+function renderizarPaginasPdf(arquivo) {
+    if (!arquivo || arquivo.type !== 'application/pdf' || typeof pdfjsLib === 'undefined') {
+        return Promise.resolve(null);
+    }
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    return arquivo.arrayBuffer().then(function(buffer) {
+        return pdfjsLib.getDocument({ data: buffer }).promise;
+    }).then(function(pdf) {
+        var total = Math.min(pdf.numPages, 6);
+        var blobs = [];
+        var meta = [];
+        var cadeia = Promise.resolve();
+        for (var numero = 1; numero <= total; numero++) {
+            (function(paginaNumero) {
+                cadeia = cadeia.then(function() {
+                    return pdf.getPage(paginaNumero).then(function(page) {
+                        var escala = 110 / 72;
+                        var viewport = page.getViewport({ scale: escala });
+                        var pontos = page.getViewport({ scale: 1 });
+                        var canvas = document.createElement('canvas');
+                        canvas.width = Math.floor(viewport.width);
+                        canvas.height = Math.floor(viewport.height);
+                        var contexto = canvas.getContext('2d');
+                        return page.render({ canvasContext: contexto, viewport: viewport }).promise.then(function() {
+                            return page.getTextContent();
+                        }).then(function(texto) {
+                            var palavras = [];
+                            (texto.items || []).forEach(function(item) {
+                                var conteudo = String(item.str || '').trim();
+                                if (!conteudo || !item.transform) return;
+                                var x = item.transform[4];
+                                var base = item.transform[5];
+                                var altura = item.height || Math.abs(item.transform[3]) || 8;
+                                var largura = item.width || 0;
+                                if (largura <= 0 || altura <= 0) return;
+                                var y0 = pontos.height - (base + altura);
+                                var y1 = pontos.height - base;
+                                var inicioQuestao = conteudo.match(/^(\d{1,2})\.\s*/);
+                                if (inicioQuestao && x < 90) {
+                                    palavras.push({
+                                        x0: x,
+                                        y0: y0,
+                                        x1: x + 16,
+                                        y1: y1,
+                                        texto: inicioQuestao[1] + '.'
+                                    });
+                                    conteudo = conteudo.slice(inicioQuestao[0].length).trim();
+                                    x = x + 18;
+                                    largura = Math.max(0, largura - 18);
+                                }
+                                if (!conteudo || largura <= 0) return;
+                                palavras.push({
+                                    x0: x,
+                                    y0: y0,
+                                    x1: x + largura,
+                                    y1: y1,
+                                    texto: conteudo.slice(0, 80)
+                                });
+                            });
+                            return new Promise(function(resolve) {
+                                canvas.toBlob(function(blob) {
+                                    if (blob) {
+                                        blobs.push(blob);
+                                        meta.push({ largura: pontos.width, altura: pontos.height, palavras: palavras });
+                                    }
+                                    resolve();
+                                }, 'image/png');
+                            });
+                        });
+                    });
+                });
+            })(numero);
+        }
+        return cadeia.then(function() {
+            return blobs.length ? { blobs: blobs, meta: meta } : null;
+        });
+    });
+}
+
 // Formulário de ler imagem
 document.getElementById('lerImagemForm').addEventListener('submit', function(e) {
     e.preventDefault();
@@ -2110,6 +2190,18 @@ document.getElementById('lerImagemForm').addEventListener('submit', function(e) 
     // Se tem arquivo, usa o arquivo
     if (imagemFile) {
         formData.append('imagem', imagemFile);
+        renderizarPaginasPdf(imagemFile).then(function(paginas) {
+            if (paginas) {
+                paginas.blobs.forEach(function(blob, indice) {
+                    formData.append('paginas[]', blob, 'pagina-' + (indice + 1) + '.png');
+                });
+                formData.append('paginas_palavras', JSON.stringify(paginas.meta));
+            }
+            enviarFormulario(formData, provaId);
+        }).catch(function() {
+            enviarFormulario(formData, provaId);
+        });
+        return;
     } else if (imagemData) {
         // Se tem dados (colado), converte para blob
         fetch(imagemData)

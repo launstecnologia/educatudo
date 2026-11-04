@@ -755,11 +755,23 @@ class AIJobService
         if ($base === false || $real === false || !is_file($real) || !str_starts_with($real, $base . DIRECTORY_SEPARATOR)) {
             throw new \RuntimeException('Arquivo da questão não encontrado.');
         }
+        $paginasJson = (string) ($payload['arquivo']['paginas_json'] ?? '');
+        if ($paginasJson !== '') {
+            $realPaginas = realpath($paginasJson);
+            if ($realPaginas === false || !is_file($realPaginas) || !str_starts_with($realPaginas, $base . DIRECTORY_SEPARATOR)) {
+                $paginasJson = '';
+            } else {
+                $paginasJson = $realPaginas;
+            }
+        }
         try {
             $servico = new \App\Modulos\Provas\Services\TranscricaoQuestaoArquivoService();
-            $questoes = $servico->transcrever($real, $mime, (int) ($payload['usuario_id'] ?? 0), $slug);
+            $questoes = $servico->transcrever($real, $mime, (int) ($payload['usuario_id'] ?? 0), $slug, $paginasJson);
         } finally {
             @unlink($real);
+            if ($paginasJson !== '') {
+                (new \App\Modulos\Provas\Services\TranscricaoQuestaoArquivoService())->apagarPaginasRenderizadas($paginasJson);
+            }
         }
         return ['questoes' => $questoes];
     }

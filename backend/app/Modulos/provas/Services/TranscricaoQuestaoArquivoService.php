@@ -17,7 +17,7 @@ class TranscricaoQuestaoArquivoService
     /**
      * @return list<array{enunciado:string,tipo:string,valor:float,alternativas:list<array{texto:string,correta:int,ordem:int}>,explicacao:?string}>
      */
-    public function transcrever(string $caminho, string $mime, int $usuarioId, string $slugEscola): array
+    public function transcrever(string $caminho, string $mime, int $usuarioId, string $slugEscola, string $paginasJson = ''): array
     {
         $this->slugEscola = $this->slugLimpo($slugEscola);
         $figuras = [];
@@ -42,7 +42,7 @@ class TranscricaoQuestaoArquivoService
             throw new \RuntimeException('Não foi possível ler o texto deste arquivo.');
         }
 
-        $recortesPdf = $mime === 'application/pdf' ? $this->recortarFigurasDoPdf($caminho, $usuarioId) : ['recortes' => [], 'ancoras' => []];
+        $recortesPdf = $mime === 'application/pdf' ? $this->recortarFigurasDoPdf($caminho, $usuarioId, $paginasJson) : ['recortes' => [], 'ancoras' => []];
         $extraidas = $this->atribuirGabarito($texto, $this->estruturar($texto, count($figuras) + count($recortesPdf['recortes'])));
         $lista = [];
         foreach ($extraidas as $indiceQuestao => $questao) {
@@ -150,9 +150,13 @@ class TranscricaoQuestaoArquivoService
      *
      * @return array{recortes:list<array{url:string,pagina:int,y:float}>,ancoras:list<array{numero:int,pagina:int,y:float}>}
      */
-    private function recortarFigurasDoPdf(string $caminho, int $usuarioId): array
+    private function recortarFigurasDoPdf(string $caminho, int $usuarioId, string $paginasJson = ''): array
     {
         $vazio = ['recortes' => [], 'ancoras' => []];
+        $prontas = $this->paginasDoCliente($paginasJson);
+        if ($prontas !== []) {
+            return $this->recortarPaginasPreparadas($prontas, $usuarioId);
+        }
         $pdftotext = $this->binario('pdftotext');
         $pdftoppm = $this->binario('pdftoppm');
         $ghostscript = $pdftoppm === null ? $this->binario('gs') : null;
@@ -180,66 +184,270 @@ class TranscricaoQuestaoArquivoService
                 return $vazio;
             }
             preg_match_all('/<page width="([\d.]+)" height="([\d.]+)"[^>]*>(.*?)<\/page>/s', $html, $paginas, PREG_SET_ORDER);
-            $ancoras = [];
-            $vistos = [];
-            $recortes = [];
+            $prontas = [];
             foreach ($paginas as $indice => $pagina) {
-                if (count($recortes) >= 8) {
-                    break;
-                }
                 $numero = $indice + 1;
                 $png = $dir . '/pagina-' . $numero . '.png';
                 if (!is_file($png)) {
                     continue;
                 }
-                $palavras = $this->palavrasDaPagina($pagina[3]);
-                if ($this->paginaDeGabarito($palavras)) {
-                    continue;
-                }
-                foreach ($palavras as $indicePalavra => $palavra) {
-                    if (!$this->eInicioDeQuestao($palavras, $indicePalavra)) {
-                        continue;
-                    }
-                    $n = (int) $palavra['texto'];
-                    if (isset($vistos[$n])) {
-                        continue;
-                    }
-                    $vistos[$n] = true;
-                    $ancoras[] = ['numero' => $n, 'pagina' => $numero, 'y' => $palavra['y0']];
-                }
-                $geometricos = $this->recortesDaPagina($png, $palavras, (float) $pagina[1], (float) $pagina[2]);
-                usort($geometricos, static fn (array $a, array $b): int => $a['y'] <=> $b['y']);
-                $destinos = $geometricos !== [] && $numero <= 3
-                    ? $this->destinosDasFiguras($png, count($geometricos))
-                    : [];
-                $usarModelo = $destinos !== [] && count($destinos) === count($geometricos);
-                foreach ($geometricos as $indiceRecorte => $recorte) {
-                    if (count($recortes) >= 8) {
-                        break;
-                    }
-                    $url = $this->publicarBytes($recorte['bytes'], 'png', 'image/png', $usuarioId, 'figura');
-                    if ($url === null) {
-                        continue;
-                    }
-                    $destino = $usarModelo ? $destinos[$indiceRecorte] : ['numero' => 0, 'onde' => 'enunciado', 'letra' => ''];
-                    $recortes[] = [
-                        'url' => $url,
-                        'pagina' => $numero,
-                        'y' => $recorte['y'],
-                        'numero' => $destino['numero'],
-                        'onde' => $destino['onde'],
-                        'letra' => $destino['letra'],
-                    ];
-                }
+                $prontas[] = [
+                    'png' => $png,
+                    'largura' => (float) $pagina[1],
+                    'altura' => (float) $pagina[2],
+                    'palavras' => $this->palavrasDaPagina($pagina[3]),
+                    'pagina' => $numero,
+                ];
             }
 
-            return ['recortes' => $recortes, 'ancoras' => $ancoras];
+            return $this->recortarPaginasPreparadas($prontas, $usuarioId);
         } finally {
             foreach (glob($dir . '/*') ?: [] as $arquivo) {
                 @unlink($arquivo);
             }
             @rmdir($dir);
         }
+    }
+
+    /**
+     * @param array<string, mixed> $arquivos
+     */
+    public function guardarPaginasRenderizadas(string $dir, array $arquivos, string $palavrasJson): ?string
+    {
+        if (!isset($arquivos['tmp_name']) || !is_array($arquivos['tmp_name']) || !is_dir($dir)) {
+            return null;
+        }
+        $meta = json_decode($palavrasJson, true);
+        if (!is_array($meta)) {
+            return null;
+        }
+        $quantidade = min(6, count($arquivos['tmp_name']));
+        if ($quantidade < 1 || count($meta) < $quantidade) {
+            return null;
+        }
+        $saida = [];
+        for ($i = 0; $i < $quantidade; $i++) {
+            if ((int) ($arquivos['error'][$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                continue;
+            }
+            if ((int) ($arquivos['size'][$i] ?? 0) > 4 * 1024 * 1024) {
+                continue;
+            }
+            $tmp = (string) ($arquivos['tmp_name'][$i] ?? '');
+            if ($tmp === '' || !is_file($tmp)) {
+                continue;
+            }
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mime = $finfo ? (string) finfo_file($finfo, $tmp) : '';
+            if ($finfo) {
+                finfo_close($finfo);
+            }
+            if ($mime !== 'image/png') {
+                continue;
+            }
+            $info = $meta[$i] ?? null;
+            if (!is_array($info)) {
+                continue;
+            }
+            $largura = (float) ($info['largura'] ?? 0);
+            $altura = (float) ($info['altura'] ?? 0);
+            if ($largura < 100 || $altura < 100 || $largura > 2000 || $altura > 2000) {
+                continue;
+            }
+            $palavras = $this->palavrasConfiaveis($info['palavras'] ?? []);
+            if ($palavras === []) {
+                continue;
+            }
+            $dest = $dir . '/pagina-' . ($i + 1) . '-' . bin2hex(random_bytes(4)) . '.png';
+            if (!move_uploaded_file($tmp, $dest)) {
+                continue;
+            }
+            @chmod($dest, 0600);
+            $saida[] = [
+                'png' => $dest,
+                'largura' => $largura,
+                'altura' => $altura,
+                'palavras' => $palavras,
+                'pagina' => $i + 1,
+            ];
+        }
+        if ($saida === []) {
+            return null;
+        }
+        $json = $dir . '/paginas-' . bin2hex(random_bytes(4)) . '.json';
+        file_put_contents($json, json_encode($saida, JSON_UNESCAPED_UNICODE));
+        @chmod($json, 0600);
+
+        return $json;
+    }
+
+    public function apagarPaginasRenderizadas(?string $jsonPath): void
+    {
+        if ($jsonPath === null || $jsonPath === '' || !is_file($jsonPath)) {
+            return;
+        }
+        $realJson = realpath($jsonPath);
+        $raiz = realpath(dirname(__DIR__, 4) . '/storage/tmp/questao_transcricao');
+        if ($realJson === false || $raiz === false || !str_starts_with($realJson, $raiz . DIRECTORY_SEPARATOR)) {
+            return;
+        }
+        $base = dirname($realJson);
+        $lista = json_decode((string) file_get_contents($realJson), true);
+        if (is_array($lista)) {
+            foreach ($lista as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                $png = realpath((string) ($item['png'] ?? ''));
+                if ($png !== false && is_file($png) && str_starts_with($png, $base . DIRECTORY_SEPARATOR)) {
+                    @unlink($png);
+                }
+            }
+        }
+        @unlink($realJson);
+    }
+
+    /**
+     * @param list<array{png:string,largura:float,altura:float,palavras:list<array{x0:float,y0:float,x1:float,y1:float,texto:string}>,pagina:int}> $prontas
+     * @return array{recortes:list<array{url:string,pagina:int,y:float,numero:int,onde:string,letra:string}>,ancoras:list<array{numero:int,pagina:int,y:float}>}
+     */
+    private function recortarPaginasPreparadas(array $prontas, int $usuarioId): array
+    {
+        $ancoras = [];
+        $vistos = [];
+        $recortes = [];
+        foreach ($prontas as $pronta) {
+            if (count($recortes) >= 8 || !is_file($pronta['png'])) {
+                break;
+            }
+            $numero = (int) $pronta['pagina'];
+            $palavras = $pronta['palavras'];
+            if ($this->paginaDeGabarito($palavras)) {
+                continue;
+            }
+            foreach ($palavras as $indicePalavra => $palavra) {
+                if (!$this->eInicioDeQuestao($palavras, $indicePalavra)) {
+                    continue;
+                }
+                $n = (int) $palavra['texto'];
+                if (isset($vistos[$n])) {
+                    continue;
+                }
+                $vistos[$n] = true;
+                $ancoras[] = ['numero' => $n, 'pagina' => $numero, 'y' => $palavra['y0']];
+            }
+            $geometricos = $this->recortesDaPagina($pronta['png'], $palavras, (float) $pronta['largura'], (float) $pronta['altura']);
+            usort($geometricos, static fn (array $a, array $b): int => $a['y'] <=> $b['y']);
+            $destinos = $geometricos !== [] && $numero <= 3
+                ? $this->destinosDasFiguras($pronta['png'], count($geometricos))
+                : [];
+            $usarModelo = $destinos !== [] && count($destinos) === count($geometricos);
+            foreach ($geometricos as $indiceRecorte => $recorte) {
+                if (count($recortes) >= 8) {
+                    break;
+                }
+                $url = $this->publicarBytes($recorte['bytes'], 'png', 'image/png', $usuarioId, 'figura');
+                if ($url === null) {
+                    continue;
+                }
+                $destino = $usarModelo ? $destinos[$indiceRecorte] : ['numero' => 0, 'onde' => 'enunciado', 'letra' => ''];
+                $recortes[] = [
+                    'url' => $url,
+                    'pagina' => $numero,
+                    'y' => $recorte['y'],
+                    'numero' => $destino['numero'],
+                    'onde' => $destino['onde'],
+                    'letra' => $destino['letra'],
+                ];
+            }
+        }
+
+        return ['recortes' => $recortes, 'ancoras' => $ancoras];
+    }
+
+    /**
+     * @return list<array{png:string,largura:float,altura:float,palavras:list<array{x0:float,y0:float,x1:float,y1:float,texto:string}>,pagina:int}>
+     */
+    private function paginasDoCliente(string $jsonPath): array
+    {
+        if ($jsonPath === '' || !is_file($jsonPath)) {
+            return [];
+        }
+        $base = realpath(dirname(__DIR__, 4) . '/storage/tmp/questao_transcricao/' . $this->slugLimpo($this->slugEscola));
+        $realJson = realpath($jsonPath);
+        if ($base === false || $realJson === false || !str_starts_with($realJson, $base . DIRECTORY_SEPARATOR)) {
+            return [];
+        }
+        $lista = json_decode((string) file_get_contents($realJson), true);
+        if (!is_array($lista)) {
+            return [];
+        }
+        $saida = [];
+        foreach (array_slice($lista, 0, 6) as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $png = realpath((string) ($item['png'] ?? ''));
+            if ($png === false || !is_file($png) || !str_starts_with($png, $base . DIRECTORY_SEPARATOR)) {
+                continue;
+            }
+            $medida = getimagesize($png);
+            if ($medida === false || ($medida['mime'] ?? '') !== 'image/png' || ($medida[0] ?? 0) > 2500 || ($medida[1] ?? 0) > 2500) {
+                continue;
+            }
+            $largura = (float) ($item['largura'] ?? 0);
+            $altura = (float) ($item['altura'] ?? 0);
+            $palavras = $this->palavrasConfiaveis($item['palavras'] ?? []);
+            if ($largura < 100 || $altura < 100 || $palavras === []) {
+                continue;
+            }
+            $saida[] = [
+                'png' => $png,
+                'largura' => $largura,
+                'altura' => $altura,
+                'palavras' => $palavras,
+                'pagina' => (int) ($item['pagina'] ?? (count($saida) + 1)),
+            ];
+        }
+
+        return $saida;
+    }
+
+    /**
+     * @param mixed $lista
+     * @return list<array{x0:float,y0:float,x1:float,y1:float,texto:string}>
+     */
+    private function palavrasConfiaveis($lista): array
+    {
+        if (!is_array($lista)) {
+            return [];
+        }
+        $saida = [];
+        foreach ($lista as $item) {
+            if (count($saida) >= 2500) {
+                break;
+            }
+            if (!is_array($item)) {
+                continue;
+            }
+            $x0 = (float) ($item['x0'] ?? -1);
+            $y0 = (float) ($item['y0'] ?? -1);
+            $x1 = (float) ($item['x1'] ?? -1);
+            $y1 = (float) ($item['y1'] ?? -1);
+            $texto = trim((string) ($item['texto'] ?? ''));
+            if ($texto === '' || mb_strlen($texto) > 80 || $x1 <= $x0 || $y1 <= $y0 || $x0 < -8 || $y0 < -8 || $x1 > 2200 || $y1 > 2200) {
+                continue;
+            }
+            $saida[] = [
+                'x0' => max(0, $x0),
+                'y0' => max(0, $y0),
+                'x1' => $x1,
+                'y1' => $y1,
+                'texto' => $texto,
+            ];
+        }
+
+        return $saida;
     }
 
     /**
