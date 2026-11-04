@@ -208,13 +208,24 @@ class LayoutProvaImpressaService
         $base['quebrar_disciplina'] = $bool($origem, 'quebrar_disciplina', true);
         $base['numero_pagina'] = $bool($origem, 'numero_pagina', true);
         $base['altura_logo'] = $this->faixa((int) ($origem['altura_logo'] ?? 56), 28, 140, 56);
+        $posicaoLogo = (string) ($origem['posicao_logo'] ?? 'centro');
+        $base['posicao_logo'] = in_array($posicaoLogo, ['esquerda', 'centro', 'direita'], true) ? $posicaoLogo : 'centro';
         $base['altura_imagem'] = $this->faixa((int) ($origem['altura_imagem'] ?? 180), 60, 480, 180);
         $base['tamanho_fonte'] = $this->faixa((int) ($origem['tamanho_fonte'] ?? 12), 10, 16, 12);
         $base['margem'] = $this->faixa((int) ($origem['margem'] ?? 14), 8, 24, 14);
+        $base['espaco_questao'] = array_key_exists('espaco_questao', $origem)
+            ? max(4, min(48, (int) $origem['espaco_questao']))
+            : 12;
+        $base['espaco_alternativa'] = array_key_exists('espaco_alternativa', $origem)
+            ? max(0, min(24, (int) $origem['espaco_alternativa']))
+            : 4;
         $titulo = $texto($origem, 'titulo', 180);
         $base['titulo'] = $titulo !== '' ? $titulo : $tituloBloco;
         $base['subtitulo'] = $texto($origem, 'subtitulo', 180);
         $base['instrucoes'] = $texto($origem, 'instrucoes', 800);
+        $base['texto_extra'] = $texto($origem, 'texto_extra', 800);
+        $lugarExtra = (string) ($origem['texto_extra_lugar'] ?? 'cabecalho');
+        $base['texto_extra_lugar'] = in_array($lugarExtra, ['cabecalho', 'final'], true) ? $lugarExtra : 'cabecalho';
         $base['rodape'] = $texto($origem, 'rodape', 120);
         $materias = is_array($origem['materias'] ?? null) ? $origem['materias'] : [];
         $base['materias'] = $materias;
@@ -229,6 +240,7 @@ class LayoutProvaImpressaService
         return [
             'mostrar_logo' => true,
             'altura_logo' => 56,
+            'posicao_logo' => 'centro',
             'mostrar_nome_escola' => true,
             'titulo' => $titulo !== '' ? $titulo : 'Prova impressa',
             'subtitulo' => '',
@@ -244,7 +256,11 @@ class LayoutProvaImpressaService
             'numero_pagina' => true,
             'margem' => 14,
             'tamanho_fonte' => 12,
+            'espaco_questao' => 12,
+            'espaco_alternativa' => 4,
             'altura_imagem' => 180,
+            'texto_extra' => '',
+            'texto_extra_lugar' => 'cabecalho',
             'rodape' => '',
             'materias' => [],
         ];

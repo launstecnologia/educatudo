@@ -1630,32 +1630,59 @@ function showImageResizePopover(img) {
     var div = document.createElement('div');
     div.id = id;
     div.className = 'editor-image-resize-popover';
-    div.innerHTML = '<div class="editor-image-resize-title">Redimensionar imagem</div>' +
+    div.innerHTML = '<div class="editor-image-resize-title">Tamanho</div>' +
         '<div class="editor-image-resize-row">' +
         '<button type="button" class="editor-image-resize-btn" data-pct="25">25%</button>' +
         '<button type="button" class="editor-image-resize-btn" data-pct="50">50%</button>' +
         '<button type="button" class="editor-image-resize-btn" data-pct="75">75%</button>' +
         '<button type="button" class="editor-image-resize-btn" data-pct="100">100%</button>' +
-        '</div>' +
-        '<div class="editor-image-resize-row editor-image-resize-row-steps">' +
         '<button type="button" class="editor-image-resize-btn editor-image-resize-btn-step" title="Diminuir" data-step="-">−</button>' +
         '<button type="button" class="editor-image-resize-btn editor-image-resize-btn-step" title="Aumentar" data-step="+">+</button>' +
         '</div>' +
-        '<div class="editor-image-resize-row">' +
-        '<button type="button" class="editor-image-resize-btn" data-recorte="1">Recortar</button>' +
-        '</div>';
+        '<button type="button" class="editor-image-resize-btn editor-image-resize-recorte" data-recorte="1">Recortar</button>';
+    if (!document.getElementById('editor-image-resize-style')) {
+        var estilo = document.createElement('style');
+        estilo.id = 'editor-image-resize-style';
+        estilo.textContent = '.editor-image-resize-popover{box-sizing:border-box;width:max-content;max-width:calc(100vw - 16px);font-family:inherit}' +
+            '.editor-image-resize-title{font-size:12px;font-weight:600;color:#6b7280;margin:0 0 8px}' +
+            '.editor-image-resize-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}' +
+            '.editor-image-resize-btn{box-sizing:border-box;appearance:none;-webkit-appearance:none;margin:0;border:1px solid #d1d5db;background:#fff;color:#111827;border-radius:8px;padding:7px 10px;font-size:13px;font-weight:600;line-height:1;cursor:pointer;white-space:nowrap}' +
+            '.editor-image-resize-btn:hover{background:#f3f4f6}' +
+            '.editor-image-resize-btn-step{width:34px;padding:7px 0;text-align:center}' +
+            '.editor-image-resize-recorte{display:flex;width:100%;justify-content:center;margin-top:8px;border:0;padding:9px 12px;background:var(--primary-color,#111827);color:var(--primary-text-color,#fff)}' +
+            '.editor-image-resize-recorte:hover{opacity:.92;background:var(--primary-color,#111827)}';
+        document.head.appendChild(estilo);
+    }
+    var tamanhoAtual = getImageSizePct(img);
+    div.querySelectorAll('[data-pct]').forEach(function(botaoTamanho) {
+        if (parseInt(botaoTamanho.getAttribute('data-pct'), 10) === tamanhoAtual) {
+            botaoTamanho.style.borderColor = 'var(--primary-color,#111827)';
+            botaoTamanho.style.background = 'var(--primary-color,#111827)';
+            botaoTamanho.style.color = 'var(--primary-text-color,#fff)';
+        }
+    });
     div.style.zIndex = '80';
     div.style.background = '#fff';
     div.style.border = '1px solid #e5e7eb';
     div.style.borderRadius = '12px';
-    div.style.padding = '10px';
+    div.style.padding = '12px';
     div.style.boxShadow = '0 8px 24px rgba(0,0,0,.15)';
     document.body.appendChild(div);
     function positionPopover() {
         var rect = img.getBoundingClientRect();
         div.style.position = 'fixed';
-        div.style.left = Math.max(8, rect.left) + 'px';
-        div.style.top = (rect.bottom + 6) + 'px';
+        var largura = div.offsetWidth || 280;
+        var esquerda = Math.max(8, rect.left);
+        if (esquerda + largura > window.innerWidth - 8) {
+            esquerda = Math.max(8, window.innerWidth - largura - 8);
+        }
+        var topo = rect.bottom + 6;
+        var altura = div.offsetHeight || 90;
+        if (topo + altura > window.innerHeight - 8) {
+            topo = Math.max(8, rect.top - altura - 6);
+        }
+        div.style.left = esquerda + 'px';
+        div.style.top = topo + 'px';
     }
     positionPopover();
     div.querySelectorAll('.editor-image-resize-btn[data-pct], .editor-image-resize-btn[data-step]').forEach(function(btn) {
