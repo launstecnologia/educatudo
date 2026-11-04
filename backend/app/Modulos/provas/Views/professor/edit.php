@@ -731,6 +731,15 @@
                             if (mb_strlen($enunc_texto) > 80) $enunc_preview .= '...';
                             preg_match('/<img[^>]+src=["\']([^"\']+)["\']/', $enunc, $m_img);
                             $enunc_img_src = isset($m_img[1]) ? $m_img[1] : ($questao['imagem_url'] ?? null);
+                            if (!$enunc_img_src && !empty($questao['alternativas']) && is_array($questao['alternativas'])) {
+                                foreach ($questao['alternativas'] as $altCard) {
+                                    $textoAltCard = (string) (is_array($altCard) ? ($altCard['texto'] ?? '') : $altCard);
+                                    if (preg_match('/<img[^>]+src=["\']([^"\']+)["\']/', $textoAltCard, $m_alt_img)) {
+                                        $enunc_img_src = $m_alt_img[1];
+                                        break;
+                                    }
+                                }
+                            }
                             ?>
                             <h4 class="font-semibold text-gray-900 mb-2"><?= htmlspecialchars($enunc_preview) ?></h4>
                             <?php if ($enunc_img_src): ?>
@@ -2190,7 +2199,12 @@ function preencherQuestaoTranscrita(questao) {
             questao.alternativas.forEach(function(alt, index) {
                 var ed = itens[index] ? itens[index].querySelector('.alt-editor') : null;
                 if (!ed) return;
-                ed.textContent = textoSemLetraDaAlternativa(alt.texto || '');
+                var s = textoSemLetraDaAlternativa(alt.texto || '');
+                if (s.indexOf('<') !== -1 || s.indexOf('&') !== -1) {
+                    ed.innerHTML = s;
+                } else {
+                    ed.textContent = s;
+                }
             });
         }, 50);
     }

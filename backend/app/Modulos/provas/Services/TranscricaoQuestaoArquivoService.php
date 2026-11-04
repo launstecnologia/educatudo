@@ -46,11 +46,34 @@ class TranscricaoQuestaoArquivoService
         $extraidas = $this->atribuirGabarito($texto, $this->estruturar($texto, count($figuras) + count($recortesPdf['recortes'])));
         $lista = [];
         foreach ($extraidas as $indiceQuestao => $questao) {
+            $numero = $indiceQuestao + 1;
             $indice = (int) ($questao['figura'] ?? 0);
             $urls = [];
+            $usouModelo = false;
             foreach ($recortesPdf['recortes'] as $recorte) {
-                if ($this->recorteDaQuestao($recorte, $indiceQuestao + 1, $recortesPdf['ancoras'])) {
-                    $urls[] = $recorte['url'];
+                if ((int) ($recorte['numero'] ?? 0) !== $numero) {
+                    continue;
+                }
+                $usouModelo = true;
+                if (($recorte['onde'] ?? 'enunciado') === 'alternativa') {
+                    $comFigura = $this->anexarFiguraNaAlternativa($questao, (string) ($recorte['letra'] ?? ''), (string) $recorte['url']);
+                    if ($comFigura === null) {
+                        $urls[] = (string) $recorte['url'];
+                    } else {
+                        $questao = $comFigura;
+                    }
+                    continue;
+                }
+                $urls[] = (string) $recorte['url'];
+            }
+            if (!$usouModelo) {
+                foreach ($recortesPdf['recortes'] as $recorte) {
+                    if ((int) ($recorte['numero'] ?? 0) !== 0) {
+                        continue;
+                    }
+                    if ($this->recorteDaQuestao($recorte, $numero, $recortesPdf['ancoras'])) {
+                        $urls[] = (string) $recorte['url'];
+                    }
                 }
             }
             if ($urls === [] && $indice >= 1 && isset($figuras[$indice - 1])) {
@@ -170,6 +193,9 @@ class TranscricaoQuestaoArquivoService
                     continue;
                 }
                 $palavras = $this->palavrasDaPagina($pagina[3]);
+                if ($this->paginaDeGabarito($palavras)) {
+                    continue;
+                }
                 foreach ($palavras as $indicePalavra => $palavra) {
                     if (!$this->eInicioDeQuestao($palavras, $indicePalavra)) {
                         continue;
@@ -181,7 +207,13 @@ class TranscricaoQuestaoArquivoService
                     $vistos[$n] = true;
                     $ancoras[] = ['numero' => $n, 'pagina' => $numero, 'y' => $palavra['y0']];
                 }
-                foreach ($this->recortesDaPagina($png, $palavras, (float) $pagina[1], (float) $pagina[2]) as $recorte) {
+                $geometricos = $this->recortesDaPagina($png, $palavras, (float) $pagina[1], (float) $pagina[2]);
+                usort($geometricos, static fn (array $a, array $b): int => $a['y'] <=> $b['y']);
+                $destinos = $geometricos !== [] && $numero <= 3
+                    ? $this->destinosDasFiguras($png, count($geometricos))
+                    : [];
+                $usarModelo = $destinos !== [] && count($destinos) === count($geometricos);
+                foreach ($geometricos as $indiceRecorte => $recorte) {
                     if (count($recortes) >= 8) {
                         break;
                     }
@@ -189,7 +221,15 @@ class TranscricaoQuestaoArquivoService
                     if ($url === null) {
                         continue;
                     }
-                    $recortes[] = ['url' => $url, 'pagina' => $numero, 'y' => $recorte['y']];
+                    $destino = $usarModelo ? $destinos[$indiceRecorte] : ['numero' => 0, 'onde' => 'enunciado', 'letra' => ''];
+                    $recortes[] = [
+                        'url' => $url,
+                        'pagina' => $numero,
+                        'y' => $recorte['y'],
+                        'numero' => $destino['numero'],
+                        'onde' => $destino['onde'],
+                        'letra' => $destino['letra'],
+                    ];
                 }
             }
 
@@ -200,6 +240,162 @@ class TranscricaoQuestaoArquivoService
             }
             @rmdir($dir);
         }
+    }
+
+    /**
+     * @param list<array{texto:string}> $palavras
+     */
+    private function paginaDeGabarito(array $palavras): bool
+    {
+        foreach (array_slice($palavras, 0, 8) as $palavra) {
+            $texto = mb_strtoupper(trim((string) ($palavra['texto'] ?? '')));
+            if ($texto === 'GABARITO' || str_starts_with($texto, 'GABARITO')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * O modelo vê a página e diz, de cima para baixo, a questão de cada desenho
+     * e se ele fica no enunciado ou numa alternativa. O recorte em si vem da página.
+     *
+     * @return list<array{numero:int,onde:string,letra:string}>
+     */
+    private function destinosDasFiguras(string $png, int $quantidade): array
+    {
+        $quantidade = min(4, max(0, $quantidade));
+        $envio = $quantidade > 0 ? $this->pngParaModelo($png) : '';
+        if ($envio === '') {
+            return [];
+        }
+        try {
+            $openai = new OpenAIService();
+            $response = $openai->chatCompletion(
+                [[
+                    'role' => 'user',
+                    'content' => [
+                        [
+                            'type' => 'text',
+                            'text' => 'Esta página tem exatamente ' . $quantidade . ' desenho(s), gráfico(s) ou figura(s), de cima para baixo. '
+                                . 'Diga a qual questão cada um pertence. A figura pertence à questão cujo número está logo acima dela. '
+                                . 'onde é "enunciado" quando a figura ilustra o comando, ou "alternativa" quando a figura é a própria opção. '
+                                . 'Devolva exatamente ' . $quantidade . ' itens, de cima para baixo.',
+                        ],
+                        [
+                            'type' => 'image_url',
+                            'image_url' => [
+                                'url' => 'data:image/jpeg;base64,' . $envio,
+                                'detail' => 'high',
+                            ],
+                        ],
+                    ],
+                ]],
+                'Responda apenas JSON. {"figuras":[{"numero":1,"onde":"enunciado","letra":""}]} '
+                . 'letra é A, B, C, D ou E só quando onde é "alternativa"; nos outros casos deixe vazio. '
+                . 'Não invente desenho e não devolva quantidade diferente da pedida.',
+                'gpt-4o',
+                0.0,
+                800
+            );
+        } catch (\Throwable $e) {
+            error_log('figura prova: ' . $e->getMessage());
+
+            return [];
+        }
+
+        return $this->destinosValidos($this->decodificarJson((string) ($response['resposta'] ?? '')), $quantidade);
+    }
+
+    /**
+     * @param array<string, mixed> $decodificado
+     * @return list<array{numero:int,onde:string,letra:string}>
+     */
+    private function destinosValidos(array $decodificado, int $quantidade): array
+    {
+        $figuras = [];
+        foreach ((array) ($decodificado['figuras'] ?? []) as $item) {
+            $figuras[] = $item;
+        }
+        if (count($figuras) !== $quantidade) {
+            return [];
+        }
+        $saida = [];
+        foreach ($figuras as $item) {
+            if (!is_array($item)) {
+                return [];
+            }
+            $numero = (int) ($item['numero'] ?? 0);
+            $onde = (string) ($item['onde'] ?? '');
+            if (($onde !== 'enunciado' && $onde !== 'alternativa') || $numero < 1 || $numero > 40) {
+                return [];
+            }
+            $letra = strtoupper(trim((string) ($item['letra'] ?? '')));
+            if ($onde === 'alternativa') {
+                if (preg_match('/^[A-E]$/', $letra) !== 1) {
+                    return [];
+                }
+            } else {
+                $letra = '';
+            }
+            $saida[] = ['numero' => $numero, 'onde' => $onde, 'letra' => $letra];
+        }
+
+        return $saida;
+    }
+
+    private function pngParaModelo(string $png): string
+    {
+        $im = imagecreatefrompng($png);
+        if ($im === false) {
+            return '';
+        }
+        if (!imageistruecolor($im)) {
+            imagepalettetotruecolor($im);
+        }
+        $largura = imagesx($im);
+        $altura = imagesy($im);
+        $destino = $im;
+        if ($largura > 1000 && $altura > 0) {
+            $novaLargura = 1000;
+            $novaAltura = max(1, (int) round($altura * (1000 / $largura)));
+            $reduzida = imagecreatetruecolor($novaLargura, $novaAltura);
+            if ($reduzida === false) {
+                return '';
+            }
+            imagecopyresampled($reduzida, $im, 0, 0, 0, 0, $novaLargura, $novaAltura, $largura, $altura);
+            $destino = $reduzida;
+        }
+        ob_start();
+        imagejpeg($destino, null, 72);
+        $bytes = ob_get_clean();
+        if (!is_string($bytes) || $bytes === '' || strlen($bytes) > 1400000) {
+            return '';
+        }
+
+        return base64_encode($bytes);
+    }
+
+    /**
+     * @param array{alternativas?:list<array{texto:string}>} $questao
+     * @return array{alternativas?:list<array{texto:string}>}|null
+     */
+    private function anexarFiguraNaAlternativa(array $questao, string $letra, string $url): ?array
+    {
+        $letra = strtoupper(trim($letra));
+        if ($url === '' || preg_match('/^[A-E]$/', $letra) !== 1 || !isset($questao['alternativas'])) {
+            return null;
+        }
+        $posicao = ord($letra) - 65;
+        if (!isset($questao['alternativas'][$posicao])) {
+            return null;
+        }
+        $texto = nl2br(htmlspecialchars((string) $questao['alternativas'][$posicao]['texto'], ENT_QUOTES, 'UTF-8'));
+        $segura = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
+        $questao['alternativas'][$posicao]['texto'] = $texto . '<p><img src="' . $segura . '" data-uploaded="1" alt="" style="max-width:100%;height:auto;"></p>';
+
+        return $questao;
     }
 
     /**
