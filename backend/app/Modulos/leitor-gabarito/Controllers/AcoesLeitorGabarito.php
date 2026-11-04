@@ -392,11 +392,16 @@ trait AcoesLeitorGabarito
 
     private function mensagemSegura(\Throwable $e): string
     {
-        if ($e instanceof \PDOException || !$e instanceof \RuntimeException) {
-            error_log('leitor gabarito: ' . $e->getMessage());
+        error_log('leitor gabarito: ' . get_class($e) . ': ' . $e->getMessage());
+        if ($e instanceof \RuntimeException) {
+            return $e->getMessage();
+        }
+        $texto = trim($e->getMessage());
+        $texto = preg_replace('/^Erro na execução da consulta:\s*/u', '', $texto) ?? $texto;
+        if ($texto === '' || preg_match('/password|senha|secret/i', $texto)) {
             return 'Não foi possível concluir. Tente de novo.';
         }
-        return $e->getMessage();
+        return mb_substr($texto, 0, 280);
     }
 
     private function servico(): LeitorGabaritoService

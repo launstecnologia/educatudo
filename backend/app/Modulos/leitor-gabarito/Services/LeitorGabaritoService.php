@@ -156,10 +156,7 @@ class LeitorGabaritoService
 
         $prova = $this->buscarProva($provaId, $professorId);
         $titulo = (string) ($prova['titulo'] ?? 'Prova');
-        $alunos = $this->db->fetchAll(
-            'SELECT id, nome FROM alunos WHERE turma_id = :turma_id AND ativo = 1 ORDER BY nome',
-            ['turma_id' => $turmaId]
-        );
+        $alunos = $this->alunosDaTurma($turmaId);
         if ($alunos === []) {
             throw new \RuntimeException('Não há aluno ativo nesta turma.');
         }
@@ -176,7 +173,7 @@ class LeitorGabaritoService
                     $atualizadas++;
                 }
             } catch (\Throwable $e) {
-                $erros[] = (string) $aluno['nome'] . ': ' . $e->getMessage();
+                $erros[] = (string) $aluno['nome'] . ': ' . $this->explicarFalha($e);
             }
         }
         return ['novas' => $novas, 'atualizadas' => $atualizadas, 'erros' => $erros];
@@ -468,17 +465,34 @@ class LeitorGabaritoService
         }
 
         if ($nova) {
-            $folhaId = (int) $this->db->insert(
-                'INSERT INTO leitor_gabarito_folhas (prova_id, aluno_id, conjunto, questoes_json, caminho_png)
-                 VALUES (:prova_id, :aluno_id, :conjunto, :questoes_json, :caminho_png)',
-                [
-                    'prova_id' => $provaId,
-                    'aluno_id' => $alunoId,
-                    'conjunto' => $conjunto,
-                    'questoes_json' => $pacote,
-                    'caminho_png' => 'pendente',
-                ]
-            );
+            try {
+                $folhaId = (int) $this->db->insert(
+                    'INSERT INTO leitor_gabarito_folhas (prova_id, aluno_id, conjunto, questoes_json, caminho_png)
+                     VALUES (:prova_id, :aluno_id, :conjunto, :questoes_json, :caminho_png)',
+                    [
+                        'prova_id' => $provaId,
+                        'aluno_id' => $alunoId,
+                        'conjunto' => $conjunto,
+                        'questoes_json' => $pacote,
+                        'caminho_png' => 'pendente',
+                    ]
+                );
+            } catch (\Throwable $e) {
+                if (!$this->chaveDuplicada($e)) {
+                    throw $e;
+                }
+                $jaGravada = $this->db->fetch(
+                    'SELECT id FROM leitor_gabarito_folhas
+                     WHERE prova_id = :prova_id AND aluno_id = :aluno_id AND conjunto = :conjunto
+                     LIMIT 1',
+                    ['prova_id' => $provaId, 'aluno_id' => $alunoId, 'conjunto' => $conjunto]
+                );
+                if (!is_array($jaGravada)) {
+                    throw new \RuntimeException('Já existe uma folha deste aluno e o banco não deixa gravar a do bloco. Rode a migration do leitor de gabarito.');
+                }
+                $folhaId = (int) $jaGravada['id'];
+                $nova = false;
+            }
         } else {
             $folhaId = (int) $existente['id'];
         }
@@ -489,8 +503,8 @@ class LeitorGabaritoService
             $imagem = $this->desenhista()->criarImagem($questoes, $folhaId, $alunoId, $nome, $titulo);
             $this->desenhista()->gravarPng($imagem, $destino);
             $this->db->update(
-                'UPDATE leitor_gabarito_folhas SET questoes_json = :questoes_json, caminho_png = :caminho_png WHERE id = :id',
-                ['questoes_json' => $pacote, 'caminho_png' => $relativo, 'id' => $folhaId]
+                'UPDATE leitor_gabarito_folhas SET questoes_json = :questoes_json, caminho_png = :caminho_png WHERE id = :id AND conjunto = :conjunto',
+                ['questoes_json' => $pacote, 'caminho_png' => $relativo, 'id' => $folhaId, 'conjunto' => $conjunto]
             );
         } catch (\Throwable $e) {
             if ($nova) {
@@ -524,10 +538,7 @@ class LeitorGabaritoService
             throw new \RuntimeException('A folha cabe até ' . GeometriaFolha::MAX_QUESTOES . ' questões objetivas.');
         }
 
-        $alunos = $this->db->fetchAll(
-            'SELECT id, nome FROM alunos WHERE turma_id = :turma_id AND ativo = 1 ORDER BY nome',
-            ['turma_id' => $turmaId]
-        );
+        $alunos = $this->alunosDaTurma($turmaId);
         if ($alunos === []) {
             throw new \RuntimeException('Não há aluno ativo nesta turma.');
         }
@@ -552,7 +563,7 @@ class LeitorGabaritoService
                     $atualizadas++;
                 }
             } catch (\Throwable $e) {
-                $erros[] = (string) $aluno['nome'] . ': ' . $e->getMessage();
+                $erros[] = (string) $aluno['nome'] . ': ' . $this->explicarFalha($e);
             }
         }
         return ['novas' => $novas, 'atualizadas' => $atualizadas, 'erros' => $erros];
@@ -564,6 +575,21 @@ class LeitorGabaritoService
      * @return array{novas:int,atualizadas:int,erros:list<string>}
      */
     public function gerarFolhasDoBloco(int $blocoId, int $turmaId): array
+    {
+        try {
+            return $this->executarGeracaoDoBloco($blocoId, $turmaId);
+        } catch (\RuntimeException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            error_log('leitor gabarito: ' . $e->getMessage());
+            throw new \RuntimeException($this->explicarFalha($e));
+        }
+    }
+
+    /**
+     * @return array{novas:int,atualizadas:int,erros:list<string>}
+     */
+    private function executarGeracaoDoBloco(int $blocoId, int $turmaId): array
     {
         $this->exigirTabelas();
         $provas = $this->provasDoBloco($blocoId);
@@ -1278,6 +1304,55 @@ class LeitorGabaritoService
     private function escaparLike(string $valor): string
     {
         return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $valor);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function alunosDaTurma(int $turmaId): array
+    {
+        try {
+            return $this->db->fetchAll(
+                'SELECT id, nome FROM alunos WHERE turma_id = :turma_id AND ativo = 1 ORDER BY nome',
+                ['turma_id' => $turmaId]
+            );
+        } catch (\Throwable $e) {
+            if (!preg_match("/Unknown column '[^']*ativo[^']*'/", $e->getMessage())) {
+                throw $e;
+            }
+            error_log('leitor gabarito: ' . $e->getMessage());
+            return $this->db->fetchAll(
+                'SELECT id, nome FROM alunos WHERE turma_id = :turma_id ORDER BY nome',
+                ['turma_id' => $turmaId]
+            );
+        }
+    }
+
+    private function chaveDuplicada(\Throwable $e): bool
+    {
+        $texto = $e->getMessage();
+        return str_contains($texto, '1062') || str_contains($texto, 'Duplicate');
+    }
+
+    private function explicarFalha(\Throwable $e): string
+    {
+        if ($e instanceof \RuntimeException) {
+            return $e->getMessage();
+        }
+        $texto = $e->getMessage();
+        if (preg_match("/Unknown column '([^']+)'/", $texto, $coluna)) {
+            return 'Não foi possível gerar a folha: falta a coluna ' . $coluna[1] . ' no banco.';
+        }
+        if (str_contains($texto, 'Base table or view not found')) {
+            return 'As tabelas do leitor de gabarito ainda não estão prontas. Rode as migrations no Master.';
+        }
+        if ($this->chaveDuplicada($e)) {
+            return 'Já existe uma folha deste aluno e o banco não deixa gravar outra. Rode a migration do leitor de gabarito.';
+        }
+        if (!str_contains($texto, 'SQLSTATE') && !preg_match('/password|senha|secret/i', $texto)) {
+            return mb_substr(trim($texto), 0, 240);
+        }
+        return 'Não foi possível concluir. Tente de novo.';
     }
 
     private function diretorioBase(): string
