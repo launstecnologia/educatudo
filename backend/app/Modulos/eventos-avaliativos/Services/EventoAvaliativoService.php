@@ -680,7 +680,7 @@ class EventoAvaliativoService
         }
 
         $existentes = $this->db->fetchAll(
-            'SELECT id, titulo, descricao, ativo, liberado, hora_inicio, hora_fim, grupo_regras_marca_id
+            'SELECT id, titulo, descricao, ativo, liberado, hora_inicio, hora_fim, grupo_regras_marca_id, tipo_avaliacao_id
                FROM provas_blocos
               WHERE evento_avaliativo_id = :id AND deleted_at IS NULL',
             ['id' => $id]
@@ -757,6 +757,11 @@ class EventoAvaliativoService
         try {
             if ($tipoId > 0) {
                 $tipos->update($tipoId, $tipoData);
+            } else {
+                $tipoId = (int) $tipos->create($tipoData);
+                if ($tipoId > 0) {
+                    $this->model->definirTipoAvaliacao($id, $tipoId);
+                }
             }
             $this->model->atualizar($id, [
                 'nome' => $nome,
@@ -775,6 +780,10 @@ class EventoAvaliativoService
                     $atual = $mapa[$blocoId];
                     $horaInicio = $sub['hora_inicio'] ?? $this->horaCurta($atual['hora_inicio'] ?? '');
                     $horaFim = $sub['hora_fim'] ?? $this->horaCurta($atual['hora_fim'] ?? '');
+                    $tipoBloco = (int) ($atual['tipo_avaliacao_id'] ?? 0);
+                    if ($tipoBloco <= 0) {
+                        $tipoBloco = $tipoId;
+                    }
                     $blocos->update($blocoId, [
                         'titulo' => $sub['titulo'],
                         'descricao' => $atual['descricao'] ?? ($tipoData['descricao'] ?? null),
@@ -794,7 +803,7 @@ class EventoAvaliativoService
                         'nota_unica_todas_materias' => $config['nota_unica'],
                         'ano_letivo' => $ano,
                         'bimestre' => $bimestre,
-                        'tipo_avaliacao_id' => $tipoId > 0 ? $tipoId : null,
+                        'tipo_avaliacao_id' => $tipoBloco > 0 ? $tipoBloco : null,
                         'semana' => $semana,
                     ]);
                     $this->renomearColunaQuadro((int) ($atual['grupo_regras_marca_id'] ?? 0), $sub['titulo']);

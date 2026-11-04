@@ -236,6 +236,19 @@ class EventoAvaliativo
         );
     }
 
+    public function definirTipoAvaliacao(int $id, int $tipoId): void
+    {
+        if ($id <= 0 || $tipoId <= 0 || !$this->temColuna('tipo_avaliacao_id')) {
+            return;
+        }
+        $this->db->query(
+            'UPDATE eventos_avaliativos
+                SET tipo_avaliacao_id = :tipo
+              WHERE id = :id AND deleted_at IS NULL',
+            ['tipo' => $tipoId, 'id' => $id]
+        );
+    }
+
     private function temColuna(string $coluna): bool
     {
         try {

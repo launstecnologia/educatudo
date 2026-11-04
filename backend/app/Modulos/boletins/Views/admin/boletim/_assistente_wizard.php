@@ -6852,8 +6852,12 @@ $boletimWizardSteps = [
                 estado = remoto;
                 estado.linhas_layout = linhasLocais;
                 var ordemRemota = Array.isArray(estado.colunas_ordem) ? estado.colunas_ordem : [];
-                ordemRemota.forEach(function (cod) {
-                    if (cod && ordemLocal.indexOf(cod) < 0) ordemLocal.push(cod);
+                ordemRemota.forEach(function (cod, idx) {
+                    if (!cod || ordemLocal.indexOf(cod) >= 0) return;
+                    var anterior = idx > 0 ? ordemRemota[idx - 1] : '';
+                    var pos = anterior ? ordemLocal.indexOf(anterior) : -1;
+                    if (pos >= 0) ordemLocal.splice(pos + 1, 0, cod);
+                    else ordemLocal.push(cod);
                 });
                 estado.colunas_ordem = ordemLocal;
                 if (nomeManual !== null) {

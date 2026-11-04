@@ -521,9 +521,12 @@ class BoletimAssistenteFerramentas
         $joinTipo = $this->temTabela('provas_tipos_avaliacao')
             ? 'LEFT JOIN provas_tipos_avaliacao pta ON pta.id = e.tipo_avaliacao_id AND pta.deleted_at IS NULL'
             : '';
+        $selectFechamento = ($joinTipo !== '' && $this->temColuna('provas_tipos_avaliacao', 'criterio_fechamento'))
+            ? 'pta.criterio_fechamento'
+            : 'NULL AS criterio_fechamento';
         $eventos = $this->db->fetchAll(
             'SELECT e.id, e.nome, ' . $selectSigla . ', e.descricao, e.ano_letivo, e.bimestre, e.tipo_avaliacao_id,
-                    ' . $selectCriterio . ',
+                    ' . $selectCriterio . ', ' . $selectFechamento . ',
                     (SELECT COUNT(*) FROM provas_blocos pb
                       WHERE pb.evento_avaliativo_id = e.id AND pb.deleted_at IS NULL) AS total_subeventos,
                     (SELECT GROUP_CONCAT(DISTINCT t.nome ORDER BY t.nome SEPARATOR \', \')
@@ -575,6 +578,7 @@ class BoletimAssistenteFerramentas
                 'ano_letivo' => (int) ($evento['ano_letivo'] ?? 0),
                 'bimestre' => (int) ($evento['bimestre'] ?? 0),
                 'tipo_avaliacao_id' => (int) ($evento['tipo_avaliacao_id'] ?? 0),
+                'criterio_fechamento' => strtolower(trim((string) ($evento['criterio_fechamento'] ?? ''))),
                 'total_subeventos' => (int) ($evento['total_subeventos'] ?? 0),
                 'turmas_nomes' => trim((string) ($evento['turmas_nomes'] ?? '')),
                 'criterio_professores' => $this->criterioProfessoresDoEvento($evento),
