@@ -1,7 +1,8 @@
 -- =============================================================================
 -- Seed Escola Educa Teste — Ensino Médio 2025, divisão trimestral.
--- Eventos avaliativos: Simulado 1, 2, 3 e Prova Trimestral em cada trimestre.
--- Recuperação ao lado de cada trimestre e uma Recuperação final (card próprio).
+-- Eventos avaliativos: em cada trimestre, o evento Simulado reúne 3 subeventos
+-- (Simulado 1, 2 e 3), cada um com todas as turmas. Prova, recuperação do
+-- trimestre e recuperação final também são um subevento só, com todas as turmas.
 -- Boletim oficial de 2025 (boletim_layouts), ligado à regra et25-em-2025.
 -- Senha (alunos, pais e professores): Teste@123
 -- Prefixo exclusivo: alunos et25.* | professores ET25-* | turmas observacoes ET25
@@ -1109,6 +1110,51 @@ BEGIN
     HAVING faltas > 0
   ) x ON e.nome = CONCAT('ET25 Faltas ', x.bim, 'º trimestre 2025');
 
+  -- Um subevento por peça, com as 12 turmas. O evento Simulado junta os três.
+  SET v_bim = 1;
+  WHILE v_bim <= 3 DO
+    SET v_ev = 1;
+    WHILE v_ev <= 5 DO
+      SET v_titulo = CONCAT('ET25 ', ELT(v_ev, 'Simulado 1','Simulado 2','Simulado 3','Prova Bimestral','Rec'), ' — T', v_bim);
+      SET v_data_ev = ELT(v_bim,
+        ELT(v_ev, '2025-02-20','2025-03-13','2025-04-10','2025-05-08','2025-05-15'),
+        ELT(v_ev, '2025-06-05','2025-06-12','2025-07-10','2025-08-14','2025-08-21'),
+        ELT(v_ev, '2025-09-11','2025-10-09','2025-10-30','2025-11-19','2025-11-27')
+      );
+      INSERT INTO provas_blocos (
+        titulo, descricao, data_prova, hora_inicio, hora_fim, criado_por, tipo_prova,
+        formato_evento, configuracao_nota, ano_letivo, bimestre, semana, tipo_avaliacao_id,
+        visivel_no_portal_aluno, ativo, liberado, status, turma_id
+      ) VALUES (
+        v_titulo, 'ET25', v_data_ev, '07:10:00', '09:40:00', v_admin, 'original',
+        'lancamento_nota', 'coordenacao_calcula', 2025, v_bim, v_ev,
+        ELT(v_ev, v_tipo_s1, v_tipo_s2, v_tipo_s3, v_tipo_pb, v_tipo_rec),
+        1, 1, 1, 'liberado', NULL
+      );
+      SET v_bloco_id = LAST_INSERT_ID();
+      INSERT IGNORE INTO provas_blocos_turmas (bloco_id, turma_id)
+      SELECT v_bloco_id, t.id FROM turmas t
+      WHERE t.ano_letivo = 2025 AND t.observacoes LIKE 'ET25 %';
+      INSERT INTO provas_blocos_professores (bloco_id, professor_id, materia_id, quantidade_questoes)
+      SELECT v_bloco_id, p.id, m.id, 1
+      FROM (
+        SELECT 'Língua Portuguesa' n, 'ET25-LPO' c UNION ALL SELECT 'Matemática','ET25-MAT'
+        UNION ALL SELECT 'História','ET25-HIS' UNION ALL SELECT 'Geografia','ET25-GEO'
+        UNION ALL SELECT 'Física','ET25-FIS' UNION ALL SELECT 'Química','ET25-QUI'
+        UNION ALL SELECT 'Biologia','ET25-BIO' UNION ALL SELECT 'Sociologia','ET25-SOC'
+      ) map
+      INNER JOIN materias m ON m.nome = map.n
+      INNER JOIN professores p ON p.codigo_prof = map.c;
+      INSERT IGNORE INTO provas_blocos_professores_turmas (bloco_professor_id, turma_id)
+      SELECT bp.id, t.id
+      FROM provas_blocos_professores bp
+      INNER JOIN turmas t ON t.ano_letivo = 2025 AND t.observacoes LIKE 'ET25 %'
+      WHERE bp.bloco_id = v_bloco_id;
+      SET v_ev = v_ev + 1;
+    END WHILE;
+    SET v_bim = v_bim + 1;
+  END WHILE;
+
   SET v_t = 1;
   WHILE v_t <= 12 DO
     SET v_serie_cod = ELT(v_t, '1','1','1','1','2','2','2','2','3','3','3','3');
@@ -1117,41 +1163,6 @@ BEGIN
     SET v_turma_id = (SELECT id FROM turmas WHERE ano_letivo = 2025 AND nome = v_turma_nome AND observacoes LIKE 'ET25 %' LIMIT 1);
     SET v_bim = 1;
     WHILE v_bim <= 3 DO
-      SET v_ev = 1;
-      WHILE v_ev <= 5 DO
-        SET v_titulo = CONCAT('ET25 ', ELT(v_ev, 'Simulado 1','Simulado 2','Simulado 3','Prova Bimestral','Rec'), ' — ', v_turma_nome, ' T', v_bim);
-        SET v_data_ev = ELT(v_bim,
-          ELT(v_ev, '2025-02-20','2025-03-13','2025-04-10','2025-05-08','2025-05-15'),
-          ELT(v_ev, '2025-06-05','2025-06-12','2025-07-10','2025-08-14','2025-08-21'),
-          ELT(v_ev, '2025-09-11','2025-10-09','2025-10-30','2025-11-19','2025-11-27')
-        );
-        INSERT INTO provas_blocos (
-          titulo, descricao, data_prova, hora_inicio, hora_fim, criado_por, tipo_prova,
-          formato_evento, configuracao_nota, ano_letivo, bimestre, tipo_avaliacao_id,
-          visivel_no_portal_aluno, ativo, liberado, status, turma_id
-        ) VALUES (
-          v_titulo, 'ET25', v_data_ev, '07:10:00', '09:40:00', v_admin, 'original',
-          'lancamento_nota', 'coordenacao_calcula', 2025, v_bim,
-          ELT(v_ev, v_tipo_s1, v_tipo_s2, v_tipo_s3, v_tipo_pb, v_tipo_rec),
-          1, 1, 1, 'liberado', v_turma_id
-        );
-        SET v_bloco_id = LAST_INSERT_ID();
-        INSERT IGNORE INTO provas_blocos_turmas (bloco_id, turma_id) VALUES (v_bloco_id, v_turma_id);
-        INSERT INTO provas_blocos_professores (bloco_id, professor_id, materia_id, quantidade_questoes)
-        SELECT v_bloco_id, p.id, m.id, 1
-        FROM (
-          SELECT 'Língua Portuguesa' n, 'ET25-LPO' c UNION ALL SELECT 'Matemática','ET25-MAT'
-          UNION ALL SELECT 'História','ET25-HIS' UNION ALL SELECT 'Geografia','ET25-GEO'
-          UNION ALL SELECT 'Física','ET25-FIS' UNION ALL SELECT 'Química','ET25-QUI'
-          UNION ALL SELECT 'Biologia','ET25-BIO' UNION ALL SELECT 'Sociologia','ET25-SOC'
-        ) map
-        INNER JOIN materias m ON m.nome = map.n
-        INNER JOIN professores p ON p.codigo_prof = map.c;
-        INSERT IGNORE INTO provas_blocos_professores_turmas (bloco_professor_id, turma_id)
-        SELECT bp.id, v_turma_id FROM provas_blocos_professores bp WHERE bp.bloco_id = v_bloco_id;
-        SET v_ev = v_ev + 1;
-      END WHILE;
-
       SET v_titulo = CONCAT('et25-', v_serie_cod, LOWER(v_letra), '-t', v_bim);
       INSERT INTO boletim_regras (
         nome, codigo, descricao_curta, formula_final, series_ids, turmas_ids, exibir_em,
@@ -1173,7 +1184,7 @@ BEGIN
       SET v_regra = LAST_INSERT_ID();
       INSERT INTO boletim_componentes (regra_id, codigo, nome, source_type, calc_type, peso, blocos_ids, config_json, obrigatorio, ordem, ativo)
       SELECT v_regra, x.cod, x.nom, x.src, 'media', 1,
-             CAST((SELECT pb.id FROM provas_blocos pb WHERE pb.titulo = CONCAT('ET25 ', x.nom, ' — ', v_turma_nome, ' T', v_bim) AND pb.deleted_at IS NULL LIMIT 1) AS CHAR),
+             CAST((SELECT pb.id FROM provas_blocos pb WHERE pb.titulo = CONCAT('ET25 ', x.nom, ' — T', v_bim) AND pb.deleted_at IS NULL LIMIT 1) AS CHAR),
              CASE
                WHEN x.src = 'calculado' THEN x.cfg
                ELSE JSON_OBJECT(
@@ -1297,7 +1308,7 @@ BEGIN
   INSERT INTO boletim_componentes (regra_id, codigo, nome, source_type, calc_type, peso, blocos_ids, config_json, obrigatorio, ordem, ativo)
   SELECT r.id, x.cod, x.nom, x.src, 'media', 1,
          (SELECT GROUP_CONCAT(pb.id ORDER BY pb.id) FROM provas_blocos pb
-           WHERE pb.deleted_at IS NULL AND pb.titulo LIKE CONCAT('ET25 ', x.nom, ' — % T', r.bimestre)),
+           WHERE pb.deleted_at IS NULL AND pb.titulo = CONCAT('ET25 ', x.nom, ' — T', r.bimestre)),
          CASE
            WHEN x.src = 'calculado' THEN x.cfg
            ELSE JSON_OBJECT(
@@ -1361,19 +1372,14 @@ BEGIN
   INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.titulo LIKE 'ET25 %'
   ON DUPLICATE KEY UPDATE nota_final = VALUES(nota_final), eventos_qtd = 1;
 
-  -- Eventos avaliativos: um evento por peça em cada trimestre, a recuperação
-  -- ao lado do trimestre (período 61, 62 e 63) e a recuperação final (90).
+  -- Eventos avaliativos: um Simulado por trimestre, com os 3 subeventos.
+  -- Prova e recuperação continuam um evento cada. Recuperação ao lado do
+  -- trimestre (período 61, 62 e 63) e a recuperação final (90).
   IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'eventos_avaliativos') > 0
      AND (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'provas_blocos' AND COLUMN_NAME = 'evento_avaliativo_id') > 0 THEN
 
     INSERT INTO eventos_avaliativos (nome, descricao, ano_letivo, bimestre, tipo_avaliacao_id, ativo, criado_por)
-    SELECT CONCAT('ET25 Simulado 1 — ', n, 'º trimestre'), 'ET25', 2025, n, v_tipo_s1, 1, v_admin
-    FROM (SELECT 1 n UNION ALL SELECT 2 UNION ALL SELECT 3) p;
-    INSERT INTO eventos_avaliativos (nome, descricao, ano_letivo, bimestre, tipo_avaliacao_id, ativo, criado_por)
-    SELECT CONCAT('ET25 Simulado 2 — ', n, 'º trimestre'), 'ET25', 2025, n, v_tipo_s2, 1, v_admin
-    FROM (SELECT 1 n UNION ALL SELECT 2 UNION ALL SELECT 3) p;
-    INSERT INTO eventos_avaliativos (nome, descricao, ano_letivo, bimestre, tipo_avaliacao_id, ativo, criado_por)
-    SELECT CONCAT('ET25 Simulado 3 — ', n, 'º trimestre'), 'ET25', 2025, n, v_tipo_s3, 1, v_admin
+    SELECT CONCAT('ET25 Simulado — ', n, 'º trimestre'), 'ET25', 2025, n, NULL, 1, v_admin
     FROM (SELECT 1 n UNION ALL SELECT 2 UNION ALL SELECT 3) p;
     INSERT INTO eventos_avaliativos (nome, descricao, ano_letivo, bimestre, tipo_avaliacao_id, ativo, criado_por)
     SELECT CONCAT('ET25 Prova Trimestral — ', n, 'º trimestre'), 'ET25', 2025, n, v_tipo_pb, 1, v_admin
@@ -1395,14 +1401,27 @@ BEGIN
     SET pb.evento_avaliativo_id = e.id
     WHERE pb.titulo LIKE 'ET25 %'
       AND pb.deleted_at IS NULL
+      AND pb.bimestre BETWEEN 1 AND 3
+      AND ta.nome NOT IN ('Simulado 1', 'Simulado 2', 'Simulado 3');
+
+    UPDATE provas_blocos pb
+    INNER JOIN provas_tipos_avaliacao ta ON ta.id = pb.tipo_avaliacao_id
+      AND ta.nome IN ('Simulado 1', 'Simulado 2', 'Simulado 3')
+    INNER JOIN eventos_avaliativos e
+      ON e.descricao = 'ET25'
+     AND e.deleted_at IS NULL
+     AND e.ano_letivo = 2025
+     AND e.nome LIKE 'ET25 Simulado — %'
+     AND e.bimestre = pb.bimestre
+    SET pb.evento_avaliativo_id = e.id
+    WHERE pb.titulo LIKE 'ET25 %'
+      AND pb.deleted_at IS NULL
       AND pb.bimestre BETWEEN 1 AND 3;
 
     IF (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'eventos_avaliativos' AND COLUMN_NAME = 'sigla') > 0 THEN
       UPDATE eventos_avaliativos
       SET sigla = CASE
-        WHEN nome LIKE 'ET25 Simulado 1%' THEN 'S1'
-        WHEN nome LIKE 'ET25 Simulado 2%' THEN 'S2'
-        WHEN nome LIKE 'ET25 Simulado 3%' THEN 'S3'
+        WHEN nome LIKE 'ET25 Simulado — %' THEN 'SIM'
         WHEN nome LIKE 'ET25 Prova Trimestral%' THEN 'PT'
         WHEN nome LIKE 'ET25 Recuperação final%' THEN 'RF'
         WHEN nome LIKE 'ET25 Recuperação%' THEN 'REC'
@@ -1422,39 +1441,35 @@ BEGIN
       WHERE descricao = 'ET25' AND bimestre = 90 AND deleted_at IS NULL
       ORDER BY id DESC LIMIT 1
     );
-    SET v_t = 1;
-    WHILE v_t <= 12 DO
-      SET v_serie_cod = ELT(v_t, '1','1','1','1','2','2','2','2','3','3','3','3');
-      SET v_letra = ELT(v_t, 'A','B','C','D','A','B','C','D','A','B','C','D');
-      SET v_turma_nome = CONCAT(v_serie_cod, 'º ', v_letra);
-      SET v_turma_id = (SELECT id FROM turmas WHERE ano_letivo = 2025 AND nome = v_turma_nome AND observacoes LIKE 'ET25 %' LIMIT 1);
-      SET v_titulo = CONCAT('ET25 Rec Final — ', v_turma_nome);
-      INSERT INTO provas_blocos (
-        titulo, descricao, data_prova, hora_inicio, hora_fim, criado_por, tipo_prova,
-        formato_evento, configuracao_nota, ano_letivo, bimestre, tipo_avaliacao_id,
-        visivel_no_portal_aluno, ativo, liberado, status, turma_id
-      ) VALUES (
-        v_titulo, 'ET25', '2025-12-05', '07:10:00', '09:40:00', v_admin, 'original',
-        'lancamento_nota', 'coordenacao_calcula', 2025, 90, v_tipo_rf,
-        1, 1, 1, 'liberado', v_turma_id
-      );
-      SET v_bloco_id = LAST_INSERT_ID();
-      UPDATE provas_blocos SET evento_avaliativo_id = v_evento_id WHERE id = v_bloco_id;
-      INSERT IGNORE INTO provas_blocos_turmas (bloco_id, turma_id) VALUES (v_bloco_id, v_turma_id);
-      INSERT INTO provas_blocos_professores (bloco_id, professor_id, materia_id, quantidade_questoes)
-      SELECT v_bloco_id, p.id, m.id, 1
-      FROM (
-        SELECT 'Língua Portuguesa' n, 'ET25-LPO' c UNION ALL SELECT 'Matemática','ET25-MAT'
-        UNION ALL SELECT 'História','ET25-HIS' UNION ALL SELECT 'Geografia','ET25-GEO'
-        UNION ALL SELECT 'Física','ET25-FIS' UNION ALL SELECT 'Química','ET25-QUI'
-        UNION ALL SELECT 'Biologia','ET25-BIO' UNION ALL SELECT 'Sociologia','ET25-SOC'
-      ) map
-      INNER JOIN materias m ON m.nome = map.n
-      INNER JOIN professores p ON p.codigo_prof = map.c;
-      INSERT IGNORE INTO provas_blocos_professores_turmas (bloco_professor_id, turma_id)
-      SELECT bp.id, v_turma_id FROM provas_blocos_professores bp WHERE bp.bloco_id = v_bloco_id;
-      SET v_t = v_t + 1;
-    END WHILE;
+    INSERT INTO provas_blocos (
+      titulo, descricao, data_prova, hora_inicio, hora_fim, criado_por, tipo_prova,
+      formato_evento, configuracao_nota, ano_letivo, bimestre, tipo_avaliacao_id,
+      visivel_no_portal_aluno, ativo, liberado, status, turma_id
+    ) VALUES (
+      'ET25 Rec Final', 'ET25', '2025-12-05', '07:10:00', '09:40:00', v_admin, 'original',
+      'lancamento_nota', 'coordenacao_calcula', 2025, 90, v_tipo_rf,
+      1, 1, 1, 'liberado', NULL
+    );
+    SET v_bloco_id = LAST_INSERT_ID();
+    UPDATE provas_blocos SET evento_avaliativo_id = v_evento_id WHERE id = v_bloco_id;
+    INSERT IGNORE INTO provas_blocos_turmas (bloco_id, turma_id)
+    SELECT v_bloco_id, t.id FROM turmas t
+    WHERE t.ano_letivo = 2025 AND t.observacoes LIKE 'ET25 %';
+    INSERT INTO provas_blocos_professores (bloco_id, professor_id, materia_id, quantidade_questoes)
+    SELECT v_bloco_id, p.id, m.id, 1
+    FROM (
+      SELECT 'Língua Portuguesa' n, 'ET25-LPO' c UNION ALL SELECT 'Matemática','ET25-MAT'
+      UNION ALL SELECT 'História','ET25-HIS' UNION ALL SELECT 'Geografia','ET25-GEO'
+      UNION ALL SELECT 'Física','ET25-FIS' UNION ALL SELECT 'Química','ET25-QUI'
+      UNION ALL SELECT 'Biologia','ET25-BIO' UNION ALL SELECT 'Sociologia','ET25-SOC'
+    ) map
+    INNER JOIN materias m ON m.nome = map.n
+    INNER JOIN professores p ON p.codigo_prof = map.c;
+    INSERT IGNORE INTO provas_blocos_professores_turmas (bloco_professor_id, turma_id)
+    SELECT bp.id, t.id
+    FROM provas_blocos_professores bp
+    INNER JOIN turmas t ON t.ano_letivo = 2025 AND t.observacoes LIKE 'ET25 %'
+    WHERE bp.bloco_id = v_bloco_id;
 
     INSERT IGNORE INTO provas_blocos_notas_lancadas (bloco_id, professor_id, materia_id, turma_id, aluno_id, nota)
     SELECT pb.id, bp.professor_id, bp.materia_id, pbt.turma_id, a.id,
@@ -1464,7 +1479,7 @@ BEGIN
     INNER JOIN provas_blocos_turmas pbt ON pbt.bloco_id = pb.id
     INNER JOIN matricula mt ON mt.turma_id = pbt.turma_id AND mt.ano_letivo_id = v_ano_id
     INNER JOIN alunos a ON a.id = mt.aluno_id AND a.nickname LIKE 'et25.%'
-    WHERE pb.titulo LIKE 'ET25 Rec Final — %' AND pb.deleted_at IS NULL;
+    WHERE pb.titulo = 'ET25 Rec Final' AND pb.deleted_at IS NULL;
   END IF;
 
   DROP TABLE IF EXISTS et25_tmp_media;
