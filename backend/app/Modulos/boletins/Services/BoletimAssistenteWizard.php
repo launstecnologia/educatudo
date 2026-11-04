@@ -697,6 +697,8 @@ class BoletimAssistenteWizard
             'decimal_places' => 2,
             'pecas' => [],
             'pecas_opcoes' => $this->pecasOpcoesPadrao([]),
+            'eventos_ids' => [],
+            'eventos_ids_manual' => 0,
             'materia_unica' => 0,
             'materia_unica_modo' => 'soma',
             'materia_unica_tocada' => false,
@@ -1881,6 +1883,15 @@ class BoletimAssistenteWizard
             }
         }
         $merged['pecas'] = array_values(array_unique($pecas));
+        $eventosIds = [];
+        foreach ((array) ($merged['eventos_ids'] ?? []) as $eventoId) {
+            $eventoId = (int) $eventoId;
+            if ($eventoId > 0 && !in_array($eventoId, $eventosIds, true)) {
+                $eventosIds[] = $eventoId;
+            }
+        }
+        $merged['eventos_ids'] = $eventosIds;
+        $merged['eventos_ids_manual'] = (int) ($merged['eventos_ids_manual'] ?? 0) === 1 ? 1 : 0;
         $merged['pecas_opcoes'] = $this->mesclarPecasOpcoes(
             $this->pecasOpcoesPadrao($merged['pecas'], (int) ($merged['bimestre'] ?? 0)),
             is_array($merged['pecas_opcoes'] ?? null) ? $merged['pecas_opcoes'] : []
@@ -5649,6 +5660,219 @@ class BoletimAssistenteWizard
     }
 
     /**
+     * Período da nota mais as recuperações ligadas a ele: 61 no 1º, 81 no par e 90 na final.
+     *
+     * @return list<int>
+     */
+    private function codigosPeriodoDaNota(int $bimestre): array
+    {
+        if ($bimestre < 1) {
+            return [];
+        }
+        $codigos = [$bimestre];
+        if ($bimestre <= 12) {
+            $codigos[] = 60 + $bimestre;
+        }
+        if ($bimestre <= 4) {
+            $codigos[] = 80 + (int) ceil($bimestre / 2);
+            $codigos[] = 90;
+        }
+        return array_values(array_unique($codigos));
+    }
+
+    /**
+     * @param array<string,mixed> $ev
+     * @param array<string,mixed> $estado
+     */
+    private function eventoCabeNoPeriodoDaNota(array $ev, array $estado): bool
+    {
+        $ano = (int) ($estado['ano_letivo'] ?? 0);
+        if ($ano > 0 && (int) ($ev['ano_letivo'] ?? 0) !== $ano) {
+            return false;
+        }
+        $bimestre = (int) ($estado['bimestre'] ?? 0);
+        if ($bimestre <= 0) {
+            return true;
+        }
+        return in_array((int) ($ev['bimestre'] ?? 0), $this->codigosPeriodoDaNota($bimestre), true);
+    }
+
+    /**
+     * Sem escolha manual, entra o que já está na nota e toda recuperação do período.
+     * Evento sem tipo (vários simulados no mesmo card) só entra se estiver marcado.
+     *
+     * @param list<array<string,mixed>> $eventos
+     * @param array<string,mixed> $estado
+     * @return list<array<string,mixed>>
+     */
+    private function eventosSelecionadosDaNota(array $eventos, array $estado): array
+    {
+        $manual = (int) ($estado['eventos_ids_manual'] ?? 0) === 1;
+        $marcados = [];
+        if ($manual) {
+            foreach ((array) ($estado['eventos_ids'] ?? []) as $id) {
+                $id = (int) $id;
+                if ($id > 0) {
+                    $marcados[$id] = true;
+                }
+            }
+        }
+        $tipos = [];
+        if (!$manual) {
+            foreach ((array) ($estado['pecas'] ?? []) as $key) {
+                $opts = (array) (($estado['pecas_opcoes'] ?? [])[$key] ?? []);
+                $tipo = (int) ($opts['tipo_avaliacao_id'] ?? 0);
+                if ($tipo > 0) {
+                    $tipos[$tipo] = true;
+                }
+            }
+        }
+        $out = [];
+        foreach ($eventos as $ev) {
+            if (!is_array($ev) || !$this->eventoCabeNoPeriodoDaNota($ev, $estado)) {
+                continue;
+            }
+            $id = (int) ($ev['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            if ($manual) {
+                if (isset($marcados[$id])) {
+                    $out[] = $ev;
+                }
+                continue;
+            }
+            $bimestre = (int) ($ev['bimestre'] ?? 0);
+            $tipo = (int) ($ev['tipo_avaliacao_id'] ?? 0);
+            if ($bimestre >= 60 || ($tipo > 0 && isset($tipos[$tipo]))) {
+                $out[] = $ev;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * @param array<string,mixed> $c
+     */
+    private function componenteVemDeEventoAvaliativo(array $c): bool
+    {
+        $src = (string) ($c['source_type'] ?? '');
+        if ($src === 'calculado' || $src === 'faltas_evento' || $src === 'jornadas') {
+            return false;
+        }
+        if ($this->componenteEhColunaSubevento($c) || $this->componenteEhRecuperacaoExibe($c)) {
+            return true;
+        }
+        return $src === 'provas_sistema';
+    }
+
+    /**
+     * Tira do demonstrativo a nota de evento que não foi marcado.
+     * A recuperação do período permanece, e o nome da coluna passa a ser o do evento.
+     *
+     * @param array<string,mixed> $rascunho
+     * @param array<string,mixed> $estado
+     * @return array<string,mixed>
+     */
+    private function restringirDemonstrativoAosEventosMarcados(array $rascunho, array &$estado): array
+    {
+        if (!$this->notasBimestraisComEventoAvaliativo($estado)) {
+            return $rascunho;
+        }
+        try {
+            $catalogo = $this->ferramentas->listarEventosAvaliativosParaBoletim();
+        } catch (\Throwable $e) {
+            return $rascunho;
+        }
+        $selecionados = $this->eventosSelecionadosDaNota($catalogo, $estado);
+        $estado['eventos_ids'] = array_map(
+            static fn (array $ev): int => (int) ($ev['id'] ?? 0),
+            $selecionados
+        );
+        $blocos = [];
+        $tipos = [];
+        $nomePorBloco = [];
+        foreach ($selecionados as $ev) {
+            $tipo = (int) ($ev['tipo_avaliacao_id'] ?? 0);
+            if ($tipo > 0) {
+                $tipos[$tipo] = true;
+            }
+            $subs = [];
+            foreach ((array) ($ev['subeventos'] ?? []) as $sub) {
+                if (is_array($sub)) {
+                    $subs[] = $sub;
+                }
+            }
+            $nomeEvento = trim((string) ($ev['nome'] ?? ''));
+            $recuperacao = (int) ($ev['bimestre'] ?? 0) >= 60;
+            foreach ($subs as $sub) {
+                $id = (int) ($sub['id'] ?? 0);
+                if ($id <= 0) {
+                    continue;
+                }
+                $blocos[$id] = true;
+                $tipoSub = (int) ($sub['tipo_avaliacao_id'] ?? 0);
+                if ($tipoSub > 0) {
+                    $tipos[$tipoSub] = true;
+                }
+                if ($recuperacao && count($subs) <= 1 && $nomeEvento !== '') {
+                    $nomePorBloco[$id] = $nomeEvento;
+                }
+            }
+        }
+        $pecas = [];
+        foreach ((array) ($estado['pecas'] ?? []) as $key) {
+            $key = (string) $key;
+            if ($key === 'jornada') {
+                $pecas[] = $key;
+                continue;
+            }
+            $opts = (array) (($estado['pecas_opcoes'] ?? [])[$key] ?? []);
+            $tipo = (int) ($opts['tipo_avaliacao_id'] ?? 0);
+            if ($tipo <= 0 || isset($tipos[$tipo])) {
+                $pecas[] = $key;
+            }
+        }
+        $estado['pecas'] = $pecas;
+
+        $comps = is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : [];
+        $out = [];
+        foreach ($comps as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            if (!$this->componenteVemDeEventoAvaliativo($c)) {
+                $out[] = $c;
+                continue;
+            }
+            $ids = $this->idsBlocosDoComponente($c);
+            if ($ids === []) {
+                $cfg = is_array($c['config'] ?? null) ? $c['config'] : [];
+                $tipo = (int) (($cfg['tipo_avaliacao_id'] ?? null) ?: ($c['tipo_avaliacao_id'] ?? 0));
+                if ($tipo > 0 && !isset($tipos[$tipo])) {
+                    continue;
+                }
+                $out[] = $c;
+                continue;
+            }
+            $vivos = array_values(array_filter(
+                $ids,
+                static fn (int $id): bool => isset($blocos[$id])
+            ));
+            if ($vivos === []) {
+                continue;
+            }
+            $c['blocos_ids'] = $vivos;
+            if (count($vivos) === 1 && isset($nomePorBloco[$vivos[0]]) && $nomePorBloco[$vivos[0]] !== '') {
+                $c['nome'] = $nomePorBloco[$vivos[0]];
+            }
+            $out[] = $c;
+        }
+        $rascunho['componentes'] = $out;
+        return $rascunho;
+    }
+
+    /**
      * Com eventos avaliativos, cada subevento marcado vira coluna.
      * A peça (ex.: Prova Semanal) continua sendo a média desses subeventos.
      *
@@ -6035,10 +6259,13 @@ class BoletimAssistenteWizard
         }
         $ano = (int) ($estado['ano_letivo'] ?? 0);
         $bimestre = (int) ($estado['bimestre'] ?? 0);
-        if ($ano <= 0 || $bimestre < 1 || $bimestre > 4) {
+        if ($ano <= 0 || $bimestre < 1 || $bimestre > 12) {
             return $rascunho;
         }
-        $periodos = $bimestre <= 2 ? [81, 90] : [82, 90];
+        $periodos = array_values(array_filter(
+            $this->codigosPeriodoDaNota($bimestre),
+            static fn (int $codigo): bool => $codigo >= 60
+        ));
         try {
             $eventos = $this->ferramentas->listarEventosAvaliativosParaBoletim();
         } catch (\Throwable $e) {
@@ -6062,8 +6289,15 @@ class BoletimAssistenteWizard
         }
 
         $novos = [];
+        $selecionados = [];
+        foreach ($this->eventosSelecionadosDaNota($eventos, $estado) as $escolhido) {
+            $selecionados[(int) ($escolhido['id'] ?? 0)] = true;
+        }
         foreach ($eventos as $ev) {
             if (!is_array($ev) || (int) ($ev['ano_letivo'] ?? 0) !== $ano) {
+                continue;
+            }
+            if (!isset($selecionados[(int) ($ev['id'] ?? 0)])) {
                 continue;
             }
             if (!in_array((int) ($ev['bimestre'] ?? 0), $periodos, true)) {
@@ -6169,6 +6403,7 @@ class BoletimAssistenteWizard
         $rascunho = is_array($resultado['rascunho'] ?? null) ? $resultado['rascunho'] : null;
         if ($rascunho !== null) {
             try {
+                $rascunho = $this->restringirDemonstrativoAosEventosMarcados($rascunho, $estado);
                 $rascunho = $this->expandirSubeventosAvaliativos($rascunho, $estado);
                 $rascunho = $this->anexarRecuperacoesNoDemonstrativo($rascunho, $estado);
                 $rascunho = $this->aplicarColunasOcultas($rascunho, $estado);

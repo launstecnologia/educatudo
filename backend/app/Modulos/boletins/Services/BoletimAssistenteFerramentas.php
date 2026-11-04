@@ -537,8 +537,11 @@ class BoletimAssistenteFerramentas
               ORDER BY e.ano_letivo DESC, e.bimestre ASC, e.nome ASC, e.id ASC
               LIMIT 400'
         ) ?: [];
+        $selectTipoBloco = $this->temColuna('provas_blocos', 'tipo_avaliacao_id')
+            ? 'pb.tipo_avaliacao_id'
+            : 'NULL AS tipo_avaliacao_id';
         $blocos = $this->db->fetchAll(
-            'SELECT pb.id, pb.evento_avaliativo_id, pb.titulo, pb.data_prova, pb.semana
+            'SELECT pb.id, pb.evento_avaliativo_id, pb.titulo, pb.data_prova, pb.semana, ' . $selectTipoBloco . '
                FROM provas_blocos pb
                INNER JOIN eventos_avaliativos e ON e.id = pb.evento_avaliativo_id
               WHERE e.deleted_at IS NULL AND e.ativo = 1 AND pb.deleted_at IS NULL' . ($this->temColuna('eventos_avaliativos', 'rascunho') ? ' AND e.rascunho = 0' : '') . '
@@ -555,6 +558,7 @@ class BoletimAssistenteFerramentas
                 'titulo' => trim((string) ($bloco['titulo'] ?? '')),
                 'data_prova' => isset($bloco['data_prova']) ? (string) $bloco['data_prova'] : '',
                 'semana' => (int) ($bloco['semana'] ?? 0),
+                'tipo_avaliacao_id' => (int) ($bloco['tipo_avaliacao_id'] ?? 0),
             ];
         }
         $out = [];

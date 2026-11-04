@@ -889,37 +889,81 @@ $boletimWizardSteps = [
         return !!(catalogo && catalogo.modulo_eventos_avaliativos && estado && estado.exibir_em === 'notas' && !ehBoletimComposto());
     }
 
+    function codigosPeriodoNota() {
+        var bim = Number((estado && estado.bimestre) || 0);
+        var ids = {};
+        if (bim >= 1) ids[bim] = true;
+        if (bim >= 1 && bim <= 12) ids[60 + bim] = true;
+        if (bim >= 1 && bim <= 4) {
+            ids[80 + Math.ceil(bim / 2)] = true;
+            ids[90] = true;
+        }
+        return ids;
+    }
+
     function eventosAvaliativosDoPeriodo() {
         var ano = Number((estado && estado.ano_letivo) || 0);
-        var bim = Number((estado && estado.bimestre) || 0);
+        var aceitos = codigosPeriodoNota();
         return (catalogo.eventos_avaliativos || []).filter(function (ev) {
             if (ano > 0 && Number(ev.ano_letivo || 0) !== ano) return false;
-            if (bim > 0 && Number(ev.bimestre || 0) !== bim) return false;
-            return true;
+            return !!aceitos[Number(ev.bimestre || 0)];
         });
     }
 
     function pecaDoTipoAvaliacao(tipoId) {
+        var id = Number(tipoId || 0);
+        if (id <= 0) return null;
         var achou = null;
         (catalogo.pecas || []).forEach(function (p) {
-            if (Number(p.tipo_avaliacao_id || 0) === Number(tipoId)) achou = p;
+            if (!p || p.key === 'jornada') return;
+            if (Number(p.tipo_avaliacao_id || 0) === id) achou = p;
         });
         return achou;
     }
 
-    function htmlSubeventosAvaliativos(ev, key) {
-        var opts = (estado.pecas_opcoes && estado.pecas_opcoes[key]) || {};
-        var manual = Number(opts.blocos_ids_manual || 0) === 1;
-        var ids = normalizarIdsJs(opts.blocos_ids);
-        var set = {};
-        ids.forEach(function (id) { set[id] = true; });
+    function pecasDoEventoAvaliativo(ev) {
+        var direta = pecaDoTipoAvaliacao(ev && ev.tipo_avaliacao_id);
+        if (direta) return [direta];
+        var vistas = {};
+        var lista = [];
+        ((ev && ev.subeventos) || []).forEach(function (sub) {
+            var peca = pecaDoTipoAvaliacao(sub && sub.tipo_avaliacao_id);
+            if (!peca || vistas[peca.key]) return;
+            vistas[peca.key] = true;
+            lista.push(peca);
+        });
+        return lista;
+    }
+
+    function eventoAvaliativoMarcado(ev) {
+        if (Number(estado && estado.eventos_ids_manual || 0) === 1 && Array.isArray(estado.eventos_ids)) {
+            return estado.eventos_ids.map(Number).indexOf(Number(ev && ev.id)) >= 0;
+        }
+        var bim = Number(ev && ev.bimestre || 0);
+        if (bim >= 60) return true;
+        var peca = pecaDoTipoAvaliacao(ev && ev.tipo_avaliacao_id);
+        return !!(peca && (estado.pecas || []).indexOf(peca.key) >= 0);
+    }
+
+    function subeventoAvaliativoMarcado(ev, sub) {
+        var pecaPai = pecaDoTipoAvaliacao(ev && ev.tipo_avaliacao_id);
+        var peca = pecaPai || pecaDoTipoAvaliacao(sub && sub.tipo_avaliacao_id);
+        if (!peca) return false;
+        if ((estado.pecas || []).indexOf(peca.key) < 0) return false;
+        var opts = (estado.pecas_opcoes && estado.pecas_opcoes[peca.key]) || {};
+        if (Number(opts.blocos_ids_manual || 0) !== 1) return true;
+        var id = Number(sub && sub.id || 0);
+        return normalizarIdsJs(opts.blocos_ids).indexOf(id) >= 0;
+    }
+
+    function htmlSubeventosAvaliativos(ev) {
         var html = '<div class="mt-3 pl-7 space-y-2 border-t border-gray-100 pt-3">';
         html += '<p class="text-xs font-medium text-gray-600">Sub-eventos que entram na nota</p>';
         html += '<div class="grid sm:grid-cols-2 gap-2">';
         (ev.subeventos || []).forEach(function (sub) {
             var id = Number(sub.id || 0);
             if (id <= 0) return;
-            var on = manual ? !!set[id] : true;
+            var on = subeventoAvaliativoMarcado(ev, sub);
             var data = dataProvaBr(sub.data_prova);
             html += '<label class="inline-flex items-start gap-2 text-sm border rounded-lg px-3 py-2 bg-white cursor-pointer">';
             html += '<input type="checkbox" class="bw-evento-sub mt-0.5 rounded border-gray-300 text-indigo-600" data-evento="' + Number(ev.id) + '" value="' + id + '"' + (on ? ' checked' : '') + '>';
@@ -945,19 +989,18 @@ $boletimWizardSteps = [
             html += '<div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-600">Nenhum evento avaliativo neste período. Cadastre em <a class="text-indigo-700 underline" href="<?= URL ?>/admin/eventos-avaliativos">Eventos Avaliativos</a>.</div>';
         }
         lista.forEach(function (ev) {
-            var peca = pecaDoTipoAvaliacao(ev.tipo_avaliacao_id);
-            var key = peca ? peca.key : '';
-            var on = key !== '' && (estado.pecas || []).indexOf(key) >= 0;
+            var habilitado = pecasDoEventoAvaliativo(ev).length > 0;
+            var on = habilitado && eventoAvaliativoMarcado(ev);
             var detalhe = [];
             var nSub = Number(ev.total_subeventos || (ev.subeventos || []).length || 0);
             detalhe.push(nSub + (nSub === 1 ? ' sub-evento' : ' sub-eventos'));
             if (ev.turmas_nomes) detalhe.push(ev.turmas_nomes);
             html += '<div class="bw-card' + (on ? ' selected' : '') + '">';
-            html += '<label class="flex items-start gap-3 cursor-pointer"><input type="checkbox" class="mt-1 bw-evento-avaliativo rounded border-gray-300 text-indigo-600" value="' + Number(ev.id) + '"' + (on ? ' checked' : '') + (key ? '' : ' disabled') + '>'
+            html += '<label class="flex items-start gap-3 cursor-pointer"><input type="checkbox" class="mt-1 bw-evento-avaliativo rounded border-gray-300 text-indigo-600" value="' + Number(ev.id) + '"' + (on ? ' checked' : '') + (habilitado ? '' : ' disabled') + '>'
                 + '<span><span class="text-sm font-semibold text-gray-900">' + esc(ev.nome || ('Evento #' + ev.id)) + '</span>'
                 + (ev.descricao ? '<span class="block text-xs text-gray-500">' + esc(ev.descricao) + '</span>' : '')
                 + '<span class="block text-xs text-gray-500 mt-1">' + esc(detalhe.join(' · ')) + '</span></span></label>';
-            if (on && key) html += htmlSubeventosAvaliativos(ev, key);
+            if (on) html += htmlSubeventosAvaliativos(ev);
             html += '</div>';
         });
         var jornada = null;
@@ -984,12 +1027,29 @@ $boletimWizardSteps = [
         var keys = [];
         var jornadaOn = (estado.pecas || []).indexOf('jornada') >= 0;
         if (!estado.pecas_opcoes) estado.pecas_opcoes = {};
+        var pecasGravadas = {};
+        var idsEvento = [];
+        function guardarPecaEvento(peca, ids, ev) {
+            if (!peca) return;
+            if (keys.indexOf(peca.key) < 0) keys.push(peca.key);
+            if (!estado.pecas_opcoes[peca.key]) estado.pecas_opcoes[peca.key] = pecasOpcoesPadraoJs(peca.key);
+            var atuais = pecasGravadas[peca.key] ? normalizarIdsJs(estado.pecas_opcoes[peca.key].blocos_ids) : [];
+            ids.forEach(function (sid) {
+                if (atuais.indexOf(sid) < 0) atuais.push(sid);
+            });
+            pecasGravadas[peca.key] = true;
+            var bimEvento = Number(ev.bimestre || 0);
+            var bim = bimEvento >= 60 ? Number(estado.bimestre || 0) : (bimEvento || Number(estado.bimestre || 0));
+            estado.pecas_opcoes[peca.key].bimestres = bim > 0 ? [bim] : [];
+            estado.pecas_opcoes[peca.key].blocos_ids = atuais;
+            estado.pecas_opcoes[peca.key].blocos_ids_manual = 1;
+            estado.pecas_opcoes[peca.key].tipo_avaliacao_id = Number(peca.tipo_avaliacao_id || ev.tipo_avaliacao_id || 0);
+        }
         bodyEl.querySelectorAll('.bw-evento-avaliativo:checked').forEach(function (el) {
             var id = Number(el.value);
             var ev = (catalogo.eventos_avaliativos || []).find(function (x) { return Number(x.id) === id; });
             if (!ev) return;
-            var peca = pecaDoTipoAvaliacao(ev.tipo_avaliacao_id);
-            if (!peca) return;
+            if (idsEvento.indexOf(id) < 0) idsEvento.push(id);
             var marcados = [];
             bodyEl.querySelectorAll('.bw-evento-sub[data-evento="' + id + '"]:checked').forEach(function (sub) {
                 var sid = Number(sub.value);
@@ -1001,14 +1061,27 @@ $boletimWizardSteps = [
                     if (sid > 0) marcados.push(sid);
                 });
             }
-            if (!estado.pecas_opcoes[peca.key]) estado.pecas_opcoes[peca.key] = pecasOpcoesPadraoJs(peca.key);
-            estado.pecas_opcoes[peca.key].bimestres = [Number(ev.bimestre || estado.bimestre || 0)].filter(function (n) { return n > 0; });
-            estado.pecas_opcoes[peca.key].blocos_ids = marcados;
-            estado.pecas_opcoes[peca.key].blocos_ids_manual = 1;
-            estado.pecas_opcoes[peca.key].tipo_avaliacao_id = Number(ev.tipo_avaliacao_id || 0);
-            keys.push(peca.key);
+            var pecaPai = pecaDoTipoAvaliacao(ev.tipo_avaliacao_id);
+            if (pecaPai) {
+                guardarPecaEvento(pecaPai, marcados, ev);
+                return;
+            }
+            var porTipo = {};
+            (ev.subeventos || []).forEach(function (sub) {
+                var sid = Number(sub.id || 0);
+                if (sid <= 0 || marcados.indexOf(sid) < 0) return;
+                var peca = pecaDoTipoAvaliacao(sub.tipo_avaliacao_id);
+                if (!peca) return;
+                if (!porTipo[peca.key]) porTipo[peca.key] = { peca: peca, ids: [] };
+                porTipo[peca.key].ids.push(sid);
+            });
+            Object.keys(porTipo).forEach(function (k) {
+                guardarPecaEvento(porTipo[k].peca, porTipo[k].ids, ev);
+            });
         });
         estado.pecas = keys;
+        estado.eventos_ids = idsEvento;
+        estado.eventos_ids_manual = 1;
         if (jornadaOn && estado.pecas.indexOf('jornada') < 0) estado.pecas.push('jornada');
         aplicarJuntarProfessoresDoEvento();
         marcarEdicaoManual();
