@@ -210,6 +210,49 @@ class LeitorGabaritoService
     }
 
     /**
+     * PNG da folha para embutir no PDF. Se o arquivo sumiu, desenha de novo.
+     */
+    public function bytesDaFolha(int $folhaId): string
+    {
+        $folha = $this->buscarFolha($folhaId);
+        if ($folha === null) {
+            throw new \RuntimeException('Folha não encontrada.');
+        }
+        $gravado = $this->lerArquivoDaFolha((string) ($folha['caminho_png'] ?? ''));
+        if ($gravado !== '') {
+            return $gravado;
+        }
+        $pacote = json_decode((string) ($folha['questoes_json'] ?? ''), true);
+        $questoes = is_array($pacote) ? ($pacote['questoes'] ?? null) : null;
+        if (!is_array($questoes) || $questoes === []) {
+            throw new \RuntimeException('Esta folha não tem questões para desenhar.');
+        }
+        $aluno = $this->db->fetch(
+            'SELECT nome FROM alunos WHERE id = :id',
+            ['id' => (int) $folha['aluno_id']]
+        );
+        $nome = is_array($aluno) ? (string) ($aluno['nome'] ?? '') : '';
+        $imagem = $this->desenhista()->criarImagem($questoes, $folhaId, (int) $folha['aluno_id'], $nome, 'Prova impressa');
+        ob_start();
+        imagepng($imagem);
+        $bytes = ob_get_clean();
+        if (!is_string($bytes) || $bytes === '') {
+            throw new \RuntimeException('Não foi possível desenhar a folha.');
+        }
+        $relativo = $this->slug() . '/folhas/' . $folhaId . '.png';
+        try {
+            $this->desenhista()->gravarPng($imagem, $this->destinoSeguro($relativo));
+            $this->db->update(
+                'UPDATE leitor_gabarito_folhas SET caminho_png = :caminho_png WHERE id = :id',
+                ['caminho_png' => $relativo, 'id' => $folhaId]
+            );
+        } catch (\Throwable $e) {
+            error_log('folha gabarito: ' . $e->getMessage());
+        }
+        return $bytes;
+    }
+
+    /**
      * @param list<array{name:string,tmp_name:string,error:int,size:int}> $arquivos
      * @return array{lidas:int,revisao:int,erros:int}
      */
@@ -1258,15 +1301,29 @@ class LeitorGabaritoService
         return $this->diretorioBase() . '/' . $relativo;
     }
 
+    private function lerArquivoDaFolha(string $relativo): string
+    {
+        if ($relativo === '' || $relativo === 'pendente') {
+            return '';
+        }
+        try {
+            $caminho = $this->caminhoAbsoluto($relativo);
+        } catch (\Throwable $e) {
+            return '';
+        }
+        $bytes = file_get_contents($caminho);
+        return is_string($bytes) ? $bytes : '';
+    }
+
     private function caminhoAbsoluto(string $relativo): string
     {
         $destino = $this->destinoSeguro($relativo);
-        $base = realpath($this->diretorioBase());
-        $real = realpath($destino);
-        if ($base === false || $real === false || !is_file($real)) {
+        if (!is_file($destino)) {
             throw new \RuntimeException('Arquivo da leitura não encontrado.');
         }
-        if ($real !== $base && !str_starts_with($real, $base . DIRECTORY_SEPARATOR)) {
+        $base = realpath($this->diretorioBase());
+        $real = realpath($destino);
+        if ($base === false || $real === false || ($real !== $base && !str_starts_with($real, $base . DIRECTORY_SEPARATOR))) {
             throw new \RuntimeException('Arquivo da leitura não encontrado.');
         }
         return $real;

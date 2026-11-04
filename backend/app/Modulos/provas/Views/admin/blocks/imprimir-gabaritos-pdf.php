@@ -95,7 +95,7 @@ foreach ($pacotes as $pacote) {
         <?php if (!empty($folha['imagem'])): ?>
         <img src="<?= $folha['imagem'] ?>" alt="Gabarito">
         <?php else: ?>
-        <p>Folha não gerada.</p>
+        <p><?= htmlspecialchars((string) (($folha['erro'] ?? '') !== '' ? $folha['erro'] : 'Folha não gerada.')) ?></p>
         <?php endif; ?>
     </div>
     <?php endforeach; ?>

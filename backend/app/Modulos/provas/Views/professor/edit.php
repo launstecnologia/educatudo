@@ -2190,7 +2190,7 @@ function preencherQuestaoTranscrita(questao) {
             questao.alternativas.forEach(function(alt, index) {
                 var ed = itens[index] ? itens[index].querySelector('.alt-editor') : null;
                 if (!ed) return;
-                ed.textContent = (alt.texto || '').trim();
+                ed.textContent = textoSemLetraDaAlternativa(alt.texto || '');
             });
         }, 50);
     }
@@ -3049,6 +3049,12 @@ function editarQuestao(questaoId) {
     abrirModalEditar();
 }
 
+function textoSemLetraDaAlternativa(texto) {
+    var s = String(texto || '').trim();
+    var limpo = s.replace(/^(?:alternativa\s+|letra\s+)?[\(\[]?\s*[A-Ea-e]\s*[\)\]\.\:\-]\s*/i, '').trim();
+    return limpo !== '' ? limpo : s;
+}
+
 function adicionarOpcaoEdicao(texto = '', correta = false) {
     if (opcoesCountEdicao >= 5) {
         alert('Máximo de 5 alternativas permitidas (A, B, C, D, E)');
@@ -3088,7 +3094,7 @@ function adicionarOpcaoEdicao(texto = '', correta = false) {
     container.appendChild(div);
     var ed = div.querySelector('.alt-editor');
     if (ed && texto) {
-        var s = (texto || '').trim();
+        var s = textoSemLetraDaAlternativa(texto);
         if (s) {
         if (s.indexOf('eq-chip') !== -1 || s.indexOf('data-latex') !== -1) {
             var latexSerializado = typeof enunciadoHtmlParaLaTeXSerializado === 'function' ? enunciadoHtmlParaLaTeXSerializado(s) : s;

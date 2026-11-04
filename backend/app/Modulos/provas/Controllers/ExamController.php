@@ -4675,14 +4675,40 @@ class ExamController extends BaseController
                 );
                 $turmaNome = is_array($turmaRow) ? (string) ($turmaRow['nome'] ?? '') : '';
                 try {
-                    $servico->gerarFolhasDoBloco($blocoId, $turmaId);
-                    foreach ($servico->folhasDoBlocoParaImpressao($blocoId, $turmaId) as $folha) {
+                    $resultado = $servico->gerarFolhasDoBloco($blocoId, $turmaId);
+                    $falhas = $this->falhasPorAluno($resultado['erros'] ?? []);
+                    $folhasTurma = $servico->folhasDoBlocoParaImpressao($blocoId, $turmaId);
+                    if ($folhasTurma === [] && $falhas !== []) {
+                        $saida[] = [
+                            'aluno_nome' => '',
+                            'turma_nome' => $turmaNome,
+                            'imagem' => '',
+                            'erro' => implode(' ', array_slice(array_values($falhas), 0, 3)),
+                        ];
+                    }
+                    foreach ($folhasTurma as $folha) {
                         $folha['turma_nome'] = $turmaNome;
-                        $folha['imagem'] = $this->folhaEmDataUri($servico, (int) ($folha['id'] ?? 0));
+                        $folha['erro'] = '';
+                        try {
+                            $bytes = $servico->bytesDaFolha((int) ($folha['id'] ?? 0));
+                            $folha['imagem'] = $bytes !== '' ? 'data:image/png;base64,' . base64_encode($bytes) : '';
+                        } catch (\Throwable $e) {
+                            $folha['imagem'] = '';
+                            $folha['erro'] = $e->getMessage();
+                        }
+                        if ($folha['imagem'] === '' && $folha['erro'] === '') {
+                            $folha['erro'] = $falhas[(string) ($folha['aluno_nome'] ?? '')] ?? 'Não foi possível desenhar a folha.';
+                        }
                         $saida[] = $folha;
                     }
                 } catch (\Throwable $e) {
                     error_log('folha gabarito: ' . $e->getMessage());
+                    $saida[] = [
+                        'aluno_nome' => '',
+                        'turma_nome' => $turmaNome,
+                        'imagem' => '',
+                        'erro' => $e->getMessage(),
+                    ];
                 }
             }
         }
@@ -4752,18 +4778,55 @@ class ExamController extends BaseController
             $turmaRow = $this->db->fetch('SELECT nome FROM turmas WHERE id = :id', ['id' => $turmaId]);
             $turmaNome = is_array($turmaRow) ? (string) ($turmaRow['nome'] ?? '') : '';
             try {
-                $servico->gerarFolhas($provaId, null, $turmaId, true);
+                $resultado = $servico->gerarFolhas($provaId, null, $turmaId, true);
+                $falhas = $this->falhasPorAluno($resultado['erros'] ?? []);
                 foreach ($servico->folhasParaImpressao($provaId, null, $turmaId) as $folha) {
                     $folha['turma_nome'] = $turmaNome;
                     $folha['materia_nome'] = (string) ($prova['materia_nome'] ?? '');
-                    $folha['imagem'] = $this->folhaEmDataUri($servico, (int) ($folha['id'] ?? 0));
+                    $folha['erro'] = '';
+                    try {
+                        $bytes = $servico->bytesDaFolha((int) ($folha['id'] ?? 0));
+                        $folha['imagem'] = $bytes !== '' ? 'data:image/png;base64,' . base64_encode($bytes) : '';
+                    } catch (\Throwable $e) {
+                        $folha['imagem'] = '';
+                        $folha['erro'] = $e->getMessage();
+                    }
+                    if ($folha['imagem'] === '' && $folha['erro'] === '') {
+                        $folha['erro'] = $falhas[(string) ($folha['aluno_nome'] ?? '')] ?? 'Não foi possível desenhar a folha.';
+                    }
                     $saida[] = $folha;
                 }
             } catch (\Throwable $e) {
                 error_log('folha gabarito: ' . $e->getMessage());
+                $saida[] = [
+                    'aluno_nome' => '',
+                    'turma_nome' => $turmaNome,
+                    'materia_nome' => (string) ($prova['materia_nome'] ?? ''),
+                    'imagem' => '',
+                    'erro' => $e->getMessage(),
+                ];
             }
         }
         return $saida;
+    }
+
+    /**
+     * @param list<string> $erros
+     * @return array<string, string>
+     */
+    private function falhasPorAluno(array $erros): array
+    {
+        $mapa = [];
+        foreach ($erros as $erro) {
+            $texto = (string) $erro;
+            $partes = explode(': ', $texto, 2);
+            if (count($partes) === 2) {
+                $mapa[$partes[0]] = $partes[1];
+                continue;
+            }
+            $mapa[''] = $texto;
+        }
+        return $mapa;
     }
 
     private function folhaEmDataUri(LeitorGabaritoService $servico, int $folhaId): string

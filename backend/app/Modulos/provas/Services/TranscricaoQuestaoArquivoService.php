@@ -130,7 +130,10 @@ class TranscricaoQuestaoArquivoService
     private function recortarFigurasDoPdf(string $caminho, int $usuarioId): array
     {
         $vazio = ['recortes' => [], 'ancoras' => []];
-        if (!function_exists('imagecreatefrompng') || !$this->temBinario('pdftoppm') || !$this->temBinario('pdftotext')) {
+        $pdftotext = $this->binario('pdftotext');
+        $pdftoppm = $this->binario('pdftoppm');
+        $ghostscript = $pdftoppm === null ? $this->binario('gs') : null;
+        if (!function_exists('imagecreatefrompng') || $pdftotext === null || ($pdftoppm === null && $ghostscript === null)) {
             return $vazio;
         }
         $dir = sys_get_temp_dir() . '/prova_fig_' . bin2hex(random_bytes(4));
@@ -138,8 +141,18 @@ class TranscricaoQuestaoArquivoService
             return $vazio;
         }
         try {
-            $html = $this->executar(['pdftotext', '-bbox-layout', '-f', '1', '-l', '6', $caminho, '-']);
-            $codigo = $this->executarCodigo(['pdftoppm', '-png', '-r', '110', '-f', '1', '-l', '6', $caminho, $dir . '/pagina']);
+            $html = $this->executar([$pdftotext, '-bbox-layout', '-f', '1', '-l', '6', $caminho, '-']);
+            if ($pdftoppm !== null) {
+                $codigo = $this->executarCodigo([$pdftoppm, '-png', '-r', '110', '-f', '1', '-l', '6', $caminho, $dir . '/pagina']);
+            } else {
+                $codigo = $this->executarCodigo([
+                    $ghostscript,
+                    '-dSAFER', '-dBATCH', '-dNOPAUSE', '-sDEVICE=png16m', '-r110',
+                    '-dFirstPage=1', '-dLastPage=6',
+                    '-sOutputFile=' . $dir . '/pagina-%d.png',
+                    $caminho,
+                ]);
+            }
             if ($html === '' || $codigo !== 0) {
                 return $vazio;
             }
@@ -157,12 +170,12 @@ class TranscricaoQuestaoArquivoService
                     continue;
                 }
                 $palavras = $this->palavrasDaPagina($pagina[3]);
-                foreach ($palavras as $palavra) {
-                    if (!preg_match('/^\d+\.$/', $palavra['texto'])) {
+                foreach ($palavras as $indicePalavra => $palavra) {
+                    if (!$this->eInicioDeQuestao($palavras, $indicePalavra)) {
                         continue;
                     }
                     $n = (int) $palavra['texto'];
-                    if ($n < 1 || isset($vistos[$n])) {
+                    if (isset($vistos[$n])) {
                         continue;
                     }
                     $vistos[$n] = true;
@@ -424,12 +437,50 @@ class TranscricaoQuestaoArquivoService
         return true;
     }
 
-    private function temBinario(string $nome): bool
+    /**
+     * "3." no fim de "6 × 3." não é o começo da questão 3.
+     *
+     * @param list<array{x0:float,y0:float,x1:float,y1:float,texto:string}> $palavras
+     */
+    private function eInicioDeQuestao(array $palavras, int $indice): bool
+    {
+        $palavra = $palavras[$indice] ?? null;
+        if (!is_array($palavra) || !preg_match('/^\d+\.$/', $palavra['texto'])) {
+            return false;
+        }
+        $numero = (int) $palavra['texto'];
+        if ($numero < 1 || $numero > 40) {
+            return false;
+        }
+        foreach ($palavras as $i => $outra) {
+            if ($i === $indice) {
+                continue;
+            }
+            if (abs($outra['y0'] - $palavra['y0']) < 4 && $outra['x1'] <= $palavra['x0'] + 1) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function binario(string $nome): ?string
     {
         $codigo = 1;
-        exec('command -v ' . escapeshellarg($nome) . ' >/dev/null 2>&1', $saida, $codigo);
+        $saida = [];
+        exec('command -v ' . escapeshellarg($nome) . ' 2>/dev/null', $saida, $codigo);
+        $achado = (string) ($saida[0] ?? '');
+        if ($codigo === 0 && str_starts_with($achado, '/') && is_executable($achado)) {
+            return $achado;
+        }
+        foreach (['/usr/bin/', '/usr/local/bin/', '/opt/homebrew/bin/'] as $pasta) {
+            $caminho = $pasta . $nome;
+            if (is_executable($caminho)) {
+                return $caminho;
+            }
+        }
 
-        return $codigo === 0;
+        return null;
     }
 
     /**
@@ -482,7 +533,7 @@ class TranscricaoQuestaoArquivoService
             . 'Se houver gabarito, folha do professor ou resposta indicada, marque a alternativa correta. Não invente gabarito quando ele não estiver no texto. '
             . 'A página de gabarito não é uma questão nova. '
             . 'Devolva somente JSON: {"questoes":[{"enunciado":"texto puro sem alternativas","tipo":"multipla_escolha|verdadeiro_falso|dissertativa","valor":2,"gabarito":"B","explicacao":"resolução curta ou vazio","figura":0,"tem_figura":false,"alternativas":[{"texto":"..."}]}]}. '
-            . 'gabarito é só a letra A, B, C, D ou E, ou string vazia quando o arquivo não trouxer a resposta. figura é o número da figura do arquivo (1 a ' . $quantidadeFiguras . ') que pertence à questão, ou 0. '
+            . 'gabarito é só a letra A, B, C, D ou E, ou string vazia quando o arquivo não trouxer a resposta. O texto da alternativa é só o conteúdo, sem a letra A), B), C), D) ou E). figura é o número da figura do arquivo (1 a ' . $quantidadeFiguras . ') que pertence à questão, ou 0. '
             . 'No máximo 40 questões.';
         $trecho = $this->trechoParaModelo($texto);
         $openai = new OpenAIService();
@@ -530,6 +581,14 @@ class TranscricaoQuestaoArquivoService
         return $lista;
     }
 
+    private function textoSemLetraDaAlternativa(string $texto): string
+    {
+        $limpo = preg_replace('/^(?:alternativa\s+|letra\s+)?[\(\[]?\s*[A-E]\s*[\)\]\.\:\-]\s*/iu', '', $texto, 1);
+        $limpo = is_string($limpo) ? trim($limpo) : '';
+
+        return $limpo !== '' ? $limpo : $texto;
+    }
+
     private function letraDoGabarito(string $valor): string
     {
         $valor = strtoupper(trim(preg_replace('/\s+/', ' ', $valor) ?? ''));
@@ -553,7 +612,7 @@ class TranscricaoQuestaoArquivoService
         $letraGabarito = $this->letraDoGabarito((string) ($questao['gabarito'] ?? ''));
         $alternativas = [];
         foreach ((array) ($questao['alternativas'] ?? []) as $alternativa) {
-            $textoAlt = trim((string) (is_array($alternativa) ? ($alternativa['texto'] ?? '') : $alternativa));
+            $textoAlt = $this->textoSemLetraDaAlternativa(trim((string) (is_array($alternativa) ? ($alternativa['texto'] ?? '') : $alternativa)));
             if ($textoAlt === '') {
                 continue;
             }
