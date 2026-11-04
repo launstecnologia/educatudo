@@ -70,8 +70,8 @@ if ($uma && $urlCelular !== '') {
         </section>
         <?php if ($uma && $qrCelular !== ''): ?>
         <aside class="carteirinha-envio-painel">
-            <h2>Abrir no celular</h2>
-            <p>Aponte a câmera para guardar a carteirinha no celular, no mesmo formato do cartão. O QR impresso nela é o da portaria.</p>
+            <h2>Abrir carteirinha no celular</h2>
+            <p>Aponte a câmera. A carteirinha abre deitada, no mesmo formato do cartão. O QR impresso nela é o da portaria.</p>
             <img src="<?= $e($qrCelular) ?>" alt="QR para abrir a carteirinha no celular">
             <div class="carteirinha-envio-codigo"><?= $e($cartaoUnico['codigo'] ?? '') ?></div>
         </aside>

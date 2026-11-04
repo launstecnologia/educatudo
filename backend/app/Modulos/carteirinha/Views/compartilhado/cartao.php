@@ -24,7 +24,8 @@ static $carteirinhaCss = false;
 ?>
 <?php if (!$carteirinhaCss): $carteirinhaCss = true; ?>
 <style>
-.carteirinha-cartao{width:100%;max-width:420px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 24px rgba(15,23,42,.12);border:1px solid #e5e7eb;font-family:ui-sans-serif,system-ui,sans-serif;color:#111827;box-sizing:border-box}
+.carteirinha-fit{width:100%;max-width:520px;container-type:inline-size}
+.carteirinha-cartao{width:520px;max-width:none;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 24px rgba(15,23,42,.12);border:1px solid #e5e7eb;font-family:ui-sans-serif,system-ui,sans-serif;color:#111827;box-sizing:border-box;zoom:min(1, calc(100cqw / 520px))}
 .carteirinha-faixa{color:#fff;padding:12px 14px;display:flex;align-items:center;gap:10px}
 .carteirinha-faixa img{height:36px;width:auto;max-width:120px;object-fit:contain;background:transparent}
 .carteirinha-faixa-texto{min-width:0}
@@ -42,20 +43,16 @@ static $carteirinhaCss = false;
 .carteirinha-qr{width:96px;flex-shrink:0;text-align:center}
 .carteirinha-qr img{width:96px;height:96px}
 .carteirinha-codigo{font-size:10px;letter-spacing:.04em;color:#6b7280;margin-top:2px}
-@media screen and (max-width:480px){
-  .carteirinha-corpo{flex-wrap:wrap}
-  .carteirinha-qr{width:100%;display:flex;flex-direction:column;align-items:center;padding-top:8px}
-  .carteirinha-qr img{width:min(220px,72vw);height:auto;aspect-ratio:1}
-  .carteirinha-codigo{font-size:12px}
-}
 @media print{
-  .carteirinha-cartao{width:340px;max-width:340px;box-shadow:none}
+  .carteirinha-fit{max-width:none;container-type:normal}
+  .carteirinha-cartao{zoom:1;width:340px;max-width:340px;box-shadow:none}
   .carteirinha-corpo{flex-wrap:nowrap}
-  .carteirinha-qr{width:84px;display:block;padding-top:0}
+  .carteirinha-qr{width:84px}
   .carteirinha-qr img{width:84px;height:84px}
 }
 </style>
 <?php endif; ?>
+<div class="carteirinha-fit">
 <article class="carteirinha-cartao">
     <div class="carteirinha-faixa" style="background:<?= $e($corFaixa) ?>">
         <?php if ($logo !== ''): ?>
@@ -91,3 +88,4 @@ static $carteirinhaCss = false;
         </div>
     </div>
 </article>
+</div>
