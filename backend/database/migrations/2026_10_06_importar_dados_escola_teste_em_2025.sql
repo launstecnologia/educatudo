@@ -3,6 +3,9 @@
 -- Eventos avaliativos: em cada trimestre, o evento Simulado reúne 3 subeventos
 -- (Simulado 1, 2 e 3), cada um com todas as turmas. Prova, recuperação do
 -- trimestre e recuperação final também são um subevento só, com todas as turmas.
+-- Notas em curva normal: cerca de 30% dos alunos ficam abaixo de 6,00.
+-- Calendário do ano inteiro (férias, feriados, trimestres e as avaliações).
+-- Grade da manhã de segunda a sexta, cinco horários, 2 aulas de cada componente.
 -- Boletim oficial de 2025 (boletim_layouts), ligado à regra et25-em-2025.
 -- Senha (alunos, pais e professores): Teste@123
 -- Prefixo exclusivo: alunos et25.* | professores ET25-* | turmas observacoes ET25
@@ -539,29 +542,46 @@ BEGIN
   INSERT INTO calendario_letivo_eventos (calendario_id, data_inicio, data_fim, tipo, descricao, visivel_aluno, visivel_professor, visivel_pais)
   SELECT v_cal, d.i, d.f, d.t, d.n, 1, 1, 1
   FROM (
-    SELECT '2025-02-03' i, '2025-02-03' f, 'evento' t, 'ET25 Início do ano letivo' n
+    SELECT '2025-01-01' i, '2025-02-02' f, 'recesso' t, 'ET25 Férias de janeiro' n
+    UNION ALL SELECT '2025-02-03', '2025-02-03', 'evento', 'ET25 Início do ano letivo — 1º trimestre'
+    UNION ALL SELECT '2025-02-20', '2025-02-20', 'avaliacao', 'ET25 Simulado 1 — 1º trimestre'
     UNION ALL SELECT '2025-03-03', '2025-03-05', 'recesso', 'ET25 Carnaval'
+    UNION ALL SELECT '2025-03-13', '2025-03-13', 'avaliacao', 'ET25 Simulado 2 — 1º trimestre'
+    UNION ALL SELECT '2025-03-20', '2025-03-20', 'evento', 'ET25 Reunião de pais — 1º trimestre'
+    UNION ALL SELECT '2025-04-10', '2025-04-10', 'avaliacao', 'ET25 Simulado 3 — 1º trimestre'
     UNION ALL SELECT '2025-04-18', '2025-04-18', 'feriado', 'ET25 Paixão de Cristo'
     UNION ALL SELECT '2025-04-21', '2025-04-21', 'feriado', 'ET25 Tiradentes'
     UNION ALL SELECT '2025-05-01', '2025-05-01', 'feriado', 'ET25 Dia do Trabalho'
-    UNION ALL SELECT '2025-05-05', '2025-05-09', 'avaliacao', 'ET25 Semana de provas 1º trimestre'
-    UNION ALL SELECT '2025-05-15', '2025-05-15', 'avaliacao', 'ET25 Recuperação 1º trimestre'
-    UNION ALL SELECT '2025-05-16', '2025-05-16', 'evento', 'ET25 Conselho de classe 1º trimestre'
+    UNION ALL SELECT '2025-05-08', '2025-05-08', 'avaliacao', 'ET25 Prova trimestral — 1º trimestre'
+    UNION ALL SELECT '2025-05-15', '2025-05-15', 'avaliacao', 'ET25 Recuperação — 1º trimestre'
+    UNION ALL SELECT '2025-05-16', '2025-05-16', 'evento', 'ET25 Conselho de classe — fim do 1º trimestre'
+    UNION ALL SELECT '2025-05-19', '2025-05-19', 'evento', 'ET25 Início do 2º trimestre'
+    UNION ALL SELECT '2025-06-05', '2025-06-05', 'avaliacao', 'ET25 Simulado 1 — 2º trimestre'
+    UNION ALL SELECT '2025-06-12', '2025-06-12', 'avaliacao', 'ET25 Simulado 2 — 2º trimestre'
     UNION ALL SELECT '2025-06-19', '2025-06-19', 'feriado', 'ET25 Corpus Christi'
+    UNION ALL SELECT '2025-06-27', '2025-06-27', 'evento', 'ET25 Festa junina'
+    UNION ALL SELECT '2025-07-09', '2025-07-09', 'feriado', 'ET25 Revolução Constitucionalista'
+    UNION ALL SELECT '2025-07-10', '2025-07-10', 'avaliacao', 'ET25 Simulado 3 — 2º trimestre'
     UNION ALL SELECT '2025-07-14', '2025-07-25', 'recesso', 'ET25 Recesso de julho'
-    UNION ALL SELECT '2025-08-11', '2025-08-15', 'avaliacao', 'ET25 Semana de provas 2º trimestre'
-    UNION ALL SELECT '2025-08-21', '2025-08-21', 'avaliacao', 'ET25 Recuperação 2º trimestre'
-    UNION ALL SELECT '2025-08-29', '2025-08-29', 'evento', 'ET25 Conselho de classe 2º trimestre'
+    UNION ALL SELECT '2025-08-14', '2025-08-14', 'avaliacao', 'ET25 Prova trimestral — 2º trimestre'
+    UNION ALL SELECT '2025-08-21', '2025-08-21', 'avaliacao', 'ET25 Recuperação — 2º trimestre'
+    UNION ALL SELECT '2025-08-28', '2025-08-28', 'evento', 'ET25 Reunião de pais — 2º trimestre'
+    UNION ALL SELECT '2025-08-29', '2025-08-29', 'evento', 'ET25 Conselho de classe — fim do 2º trimestre'
+    UNION ALL SELECT '2025-09-01', '2025-09-01', 'evento', 'ET25 Início do 3º trimestre'
     UNION ALL SELECT '2025-09-07', '2025-09-07', 'feriado', 'ET25 Independência'
+    UNION ALL SELECT '2025-09-11', '2025-09-11', 'avaliacao', 'ET25 Simulado 1 — 3º trimestre'
+    UNION ALL SELECT '2025-10-09', '2025-10-09', 'avaliacao', 'ET25 Simulado 2 — 3º trimestre'
     UNION ALL SELECT '2025-10-12', '2025-10-12', 'feriado', 'ET25 Nossa Senhora Aparecida'
+    UNION ALL SELECT '2025-10-16', '2025-10-16', 'evento', 'ET25 Reunião de pais — 3º trimestre'
+    UNION ALL SELECT '2025-10-30', '2025-10-30', 'avaliacao', 'ET25 Simulado 3 — 3º trimestre'
     UNION ALL SELECT '2025-11-02', '2025-11-02', 'feriado', 'ET25 Finados'
     UNION ALL SELECT '2025-11-15', '2025-11-15', 'feriado', 'ET25 Proclamação da República'
-    UNION ALL SELECT '2025-11-17', '2025-11-21', 'avaliacao', 'ET25 Semana de provas 3º trimestre'
+    UNION ALL SELECT '2025-11-19', '2025-11-19', 'avaliacao', 'ET25 Prova trimestral — 3º trimestre'
     UNION ALL SELECT '2025-11-20', '2025-11-20', 'feriado', 'ET25 Consciência Negra'
-    UNION ALL SELECT '2025-11-27', '2025-11-27', 'avaliacao', 'ET25 Recuperação 3º trimestre'
+    UNION ALL SELECT '2025-11-27', '2025-11-27', 'avaliacao', 'ET25 Recuperação — 3º trimestre'
     UNION ALL SELECT '2025-12-05', '2025-12-05', 'avaliacao', 'ET25 Recuperação final'
     UNION ALL SELECT '2025-12-12', '2025-12-12', 'evento', 'ET25 Conselho de classe final'
-    UNION ALL SELECT '2025-12-13', '2025-12-31', 'recesso', 'ET25 Encerramento / férias'
+    UNION ALL SELECT '2025-12-13', '2025-12-31', 'recesso', 'ET25 Férias de dezembro'
   ) d;
 
   INSERT INTO curso (nome, tipo, possui_serie, descricao, ativo, ordem)
@@ -781,34 +801,54 @@ BEGIN
   SET turmas = (SELECT JSON_ARRAYAGG(id) FROM turmas WHERE observacoes LIKE 'ET25 %')
   WHERE codigo_prof LIKE 'ET25-%';
 
-  SET v_n = 0;
-  WHILE v_n < 24 DO
-    SET v_livre = v_n MOD 3;
-    SET v_dia = 1 + (v_n DIV 5);
-    SET v_per = (v_n MOD 5) + 1;
-    SET v_de = ELT(v_per, '07:10:00','08:00:00','08:50:00','10:00:00','10:50:00');
-    SET v_ate = ELT(v_per, '08:00:00','08:50:00','09:40:00','10:50:00','11:40:00');
+  -- Manhã completa: segunda a sexta, cinco horários. Cada turma tem 2 aulas
+  -- de cada componente. O mesmo professor não fica em duas turmas no mesmo horário.
+  SET v_subj = 0;
+  WHILE v_subj < 8 DO
     SET v_idx = 0;
-    SET v_c = 0;
-    WHILE v_c < 12 DO
-      IF (v_c DIV 4) <> v_livre THEN
-        SET v_subj = (v_idx + (v_n DIV 3)) MOD 8;
-        SET v_serie_cod = ELT(v_c + 1, '1','1','1','1','2','2','2','2','3','3','3','3');
-        SET v_letra = ELT(v_c + 1, 'A','B','C','D','A','B','C','D','A','B','C','D');
-        SET v_turma_id = (SELECT id FROM turmas WHERE ano_letivo = 2025 AND nome = CONCAT(v_serie_cod, 'º ', v_letra) AND observacoes LIKE 'ET25 %' LIMIT 1);
-        SET v_mat_id = (SELECT id FROM materias WHERE nome = ELT(v_subj + 1, 'Língua Portuguesa','Matemática','História','Geografia','Física','Química','Biologia','Sociologia') LIMIT 1);
-        SET v_prof_id = (SELECT id FROM professores WHERE codigo_prof = ELT(v_subj + 1, 'ET25-LPO','ET25-MAT','ET25-HIS','ET25-GEO','ET25-FIS','ET25-QUI','ET25-BIO','ET25-SOC') LIMIT 1);
-        INSERT INTO grade_horaria (turma_id, materia_id, professor_id, dia_semana, horario_de, horario_ate, periodo)
-        VALUES (v_turma_id, v_mat_id, v_prof_id, v_dia, v_de, v_ate, 'manha');
-        SET v_idx = v_idx + 1;
-      END IF;
-      SET v_c = v_c + 1;
+    WHILE v_idx < 2 DO
+      SET v_c = 0;
+      WHILE v_c < 12 DO
+        SET v_n = 0;
+        SET v_livre = 0;
+        WHILE v_n < 25 AND v_livre = 0 DO
+          SET v_slot = MOD(v_subj * 3 + v_idx * 7 + v_c * 2 + v_n, 25);
+          SET v_dia = 1 + (v_slot DIV 5);
+          SET v_per = 1 + (v_slot MOD 5);
+          SET v_de = ELT(v_per, '07:10:00','08:00:00','08:50:00','10:00:00','10:50:00');
+          SET v_ate = ELT(v_per, '08:00:00','08:50:00','09:40:00','10:50:00','11:40:00');
+          SET v_serie_cod = ELT(v_c + 1, '1','1','1','1','2','2','2','2','3','3','3','3');
+          SET v_letra = ELT(v_c + 1, 'A','B','C','D','A','B','C','D','A','B','C','D');
+          SET v_turma_id = (SELECT id FROM turmas WHERE ano_letivo = 2025 AND nome = CONCAT(v_serie_cod, 'º ', v_letra) AND observacoes LIKE 'ET25 %' LIMIT 1);
+          SET v_mat_id = (SELECT id FROM materias WHERE nome = ELT(v_subj + 1, 'Língua Portuguesa','Matemática','História','Geografia','Física','Química','Biologia','Sociologia') LIMIT 1);
+          SET v_prof_id = (SELECT id FROM professores WHERE codigo_prof = ELT(v_subj + 1, 'ET25-LPO','ET25-MAT','ET25-HIS','ET25-GEO','ET25-FIS','ET25-QUI','ET25-BIO','ET25-SOC') LIMIT 1);
+          IF (SELECT COUNT(*) FROM grade_horaria WHERE turma_id = v_turma_id AND dia_semana = v_dia AND horario_de = v_de) = 0
+             AND (SELECT COUNT(*) FROM grade_horaria WHERE professor_id = v_prof_id AND dia_semana = v_dia AND horario_de = v_de) = 0
+             AND (SELECT COUNT(*) FROM grade_horaria WHERE turma_id = v_turma_id AND materia_id = v_mat_id AND dia_semana = v_dia) = 0 THEN
+            INSERT INTO grade_horaria (turma_id, materia_id, professor_id, dia_semana, horario_de, horario_ate, periodo)
+            VALUES (v_turma_id, v_mat_id, v_prof_id, v_dia, v_de, v_ate, 'manha');
+            SET v_livre = 1;
+          END IF;
+          SET v_n = v_n + 1;
+        END WHILE;
+        IF v_livre = 0 THEN
+          SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Grade ET25 não coube na manhã de segunda a sexta.';
+        END IF;
+        SET v_c = v_c + 1;
+      END WHILE;
+      SET v_idx = v_idx + 1;
     END WHILE;
-    SET v_n = v_n + 1;
+    SET v_subj = v_subj + 1;
   END WHILE;
 
   IF (SELECT COUNT(*) FROM grade_horaria gh INNER JOIN turmas t ON t.id = gh.turma_id WHERE t.observacoes LIKE 'ET25 %') <> 192 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Grade ET25 não fechou 192 aulas sem conflito.';
+  END IF;
+  IF (SELECT COUNT(DISTINCT CONCAT(gh.dia_semana, '-', gh.horario_de))
+        FROM grade_horaria gh
+        INNER JOIN turmas t ON t.id = gh.turma_id
+       WHERE t.observacoes LIKE 'ET25 %') <> 25 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Grade ET25 não preencheu os cinco horários de segunda a sexta.';
   END IF;
 
   SET v_t = 1;
@@ -1349,14 +1389,15 @@ BEGIN
   -- Grade completa: cada aluno da turma, cada matéria e cada tipo
   -- (Simulado 1, 2, 3, Prova Bimestral e Rec), nos três trimestres.
   -- Não corta pela data de entrada ou saída da matrícula.
+  -- Nível estável por aluno (curva normal, média 6,80). Cerca de 30% ficam abaixo de 6,00.
   INSERT IGNORE INTO provas_blocos_notas_lancadas (bloco_id, professor_id, materia_id, turma_id, aluno_id, nota)
   SELECT pb.id, bp.professor_id, bp.materia_id, pbt.turma_id, a.id,
-    ROUND(CASE
-      WHEN ta.nome = 'Rec' THEN 3 + (CRC32(CONCAT(a.id,'|rec|',bp.materia_id,'|',pb.bimestre)) % 70) / 10
-      WHEN RIGHT(a.nickname, 2) = '49' THEN 2 + (CRC32(CONCAT(a.id,'|',bp.materia_id,'|',pb.bimestre,'|',ta.nome)) % 36) / 10
-      WHEN RIGHT(a.nickname, 2) = '43' THEN 5 + (CRC32(CONCAT(a.id,'|',bp.materia_id,'|',pb.bimestre,'|',ta.nome)) % 10) / 10
-      ELSE 3.5 + (CRC32(CONCAT(a.id,'|',bp.materia_id,'|',pb.bimestre,'|',ta.nome)) % 66) / 10
-    END, 2)
+    ROUND(LEAST(10, GREATEST(3,
+      6.80
+      + 1.50 * SQRT(-2 * LN(((CRC32(CONCAT(a.id, '|u1')) % 10000) + 1) / 10001.0))
+        * COS(2 * PI() * ((CRC32(CONCAT(a.id, '|u2')) % 10000) / 10000.0))
+      + ((CRC32(CONCAT(a.id, '|', bp.materia_id, '|', pb.bimestre, '|', ta.nome)) % 7) / 10.0 - 0.3)
+    )), 2)
   FROM provas_blocos pb
   INNER JOIN provas_tipos_avaliacao ta ON ta.id = pb.tipo_avaliacao_id
     AND ta.nome IN ('Simulado 1', 'Simulado 2', 'Simulado 3', 'Prova Bimestral', 'Rec')
@@ -1473,7 +1514,12 @@ BEGIN
 
     INSERT IGNORE INTO provas_blocos_notas_lancadas (bloco_id, professor_id, materia_id, turma_id, aluno_id, nota)
     SELECT pb.id, bp.professor_id, bp.materia_id, pbt.turma_id, a.id,
-      ROUND(3 + (CRC32(CONCAT(a.id,'|recfinal|',bp.materia_id)) % 70) / 10, 2)
+      ROUND(LEAST(10, GREATEST(3,
+        6.80
+        + 1.50 * SQRT(-2 * LN(((CRC32(CONCAT(a.id, '|u1')) % 10000) + 1) / 10001.0))
+          * COS(2 * PI() * ((CRC32(CONCAT(a.id, '|u2')) % 10000) / 10000.0))
+        + ((CRC32(CONCAT(a.id, '|recfinal|', bp.materia_id)) % 7) / 10.0 - 0.3)
+      )), 2)
     FROM provas_blocos pb
     INNER JOIN provas_blocos_professores bp ON bp.bloco_id = pb.id
     INNER JOIN provas_blocos_turmas pbt ON pbt.bloco_id = pb.id
