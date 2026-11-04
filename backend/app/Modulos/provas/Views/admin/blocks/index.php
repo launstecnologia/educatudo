@@ -188,7 +188,7 @@
                             </td>
                             <td class="px-6 py-4 text-sm font-medium">
                                 <div class="flex flex-wrap gap-2">
-                                    <a href="<?= URL ?>/admin/provas/blocos/<?= $bloco['id'] ?>/gerenciar" 
+                                    <a href="<?= URL ?>/admin/provas/blocos/<?= $bloco['id'] ?>/gerenciar?de=provas" 
                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 transition-colors" title="Gerenciar Provas">
                                         <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>

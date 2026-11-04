@@ -328,6 +328,24 @@ class EventoAvaliativo
         return $sigla;
     }
 
+    /**
+     * @return array<string,mixed>|null
+     */
+    public function buscarSubevento(int $eventoId, int $blocoId): ?array
+    {
+        if ($eventoId <= 0 || $blocoId <= 0) {
+            return null;
+        }
+        $row = $this->db->fetch(
+            'SELECT id, titulo
+               FROM provas_blocos
+              WHERE id = :id AND evento_avaliativo_id = :evento AND deleted_at IS NULL',
+            ['id' => $blocoId, 'evento' => $eventoId]
+        );
+
+        return $row ?: null;
+    }
+
     public function blocoTemNota(int $blocoId): bool
     {
         if ($blocoId <= 0) {

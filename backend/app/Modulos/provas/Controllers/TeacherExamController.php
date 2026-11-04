@@ -981,7 +981,33 @@ class TeacherExamController extends BaseController
             return;
         }
 
-        $this->redirect('/admin/provas/blocos/' . (int) $blocoId . '/resultados-novos');
+        $this->redirect('/admin/provas/blocos/' . (int) $blocoId . '/resultados-novos' . $this->qsRetornoLista());
+    }
+
+    /** Mantém a origem da lista (eventos ou provas) ao abrir o dashboard de resultados. */
+    private function qsRetornoLista(): string
+    {
+        $de = (string) ($_GET['de'] ?? '');
+        if ($de !== 'eventos' && $de !== 'provas') {
+            return '';
+        }
+        $params = ['de' => $de];
+        if ($de === 'eventos') {
+            $ano = (int) ($_GET['ano'] ?? 0);
+            $periodo = (int) ($_GET['periodo'] ?? 0);
+            $regra = (int) ($_GET['regra'] ?? 0);
+            if ($ano >= 2000 && $ano <= 2100) {
+                $params['ano'] = $ano;
+            }
+            if ($periodo > 0 && $periodo < 100) {
+                $params['periodo'] = $periodo;
+            }
+            if ($regra > 0) {
+                $params['regra'] = $regra;
+            }
+        }
+
+        return '?' . http_build_query($params);
     }
 
     /**

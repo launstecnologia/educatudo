@@ -1,6 +1,8 @@
 <?php
 $tituloBloco = (string) ($bloco['titulo'] ?? 'Evento');
 $blocoId = (int) ($bloco['id'] ?? 0);
+\App\Modulos\EventosAvaliativos\Services\RetornoListaProva::registrar($blocoId);
+$urlVoltarLista = \App\Modulos\EventosAvaliativos\Services\RetornoListaProva::endereco($blocoId);
 $filtros = is_array($filtros ?? null) ? $filtros : [];
 $opcoes = is_array($opcoes_filtro ?? null) ? $opcoes_filtro : [];
 $totais = is_array($totais ?? null) ? $totais : [
@@ -161,7 +163,7 @@ if ($slugArquivo === '') {
                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50">
                 ← Painel do evento
             </a>
-            <a href="<?= URL ?>/admin/provas"
+            <a href="<?= htmlspecialchars($urlVoltarLista, ENT_QUOTES, 'UTF-8') ?>"
                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50">
                 Lista de eventos
             </a>

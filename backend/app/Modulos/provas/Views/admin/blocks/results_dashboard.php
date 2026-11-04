@@ -5,6 +5,7 @@
 $d = $dashboard ?? [];
 $ind = $d['indicadores'] ?? [];
 $blocoId = (int) ($bloco['id'] ?? 0);
+\App\Modulos\EventosAvaliativos\Services\RetornoListaProva::registrar($blocoId);
 $mediaMin = (float) ($d['media_minima'] ?? 55);
 $jsonDashboard = json_encode($d, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 ?>

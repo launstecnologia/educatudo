@@ -30,6 +30,7 @@ $mostrarProfessor = !empty($mostrar_professor);
 $mostrarMateria = !$notaUnicaTodasMaterias && $materiaIdFiltro <= 0;
 $colunasTabela = 6 + ($mostrarMateria ? 1 : 0) + ($mostrarProfessor ? 1 : 0);
 $blocoId = (int) ($bloco['id'] ?? 0);
+\App\Modulos\EventosAvaliativos\Services\RetornoListaProva::registrar($blocoId);
 $actionFiltro = URL . '/admin/provas/blocos/' . $blocoId . '/lancar-notas-coordenacao';
 $urlDesbloquear = URL . '/admin/provas/blocos/' . $blocoId . '/lancar-notas-coordenacao/desbloquear';
 

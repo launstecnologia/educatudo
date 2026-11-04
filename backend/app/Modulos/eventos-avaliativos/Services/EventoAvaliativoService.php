@@ -284,10 +284,62 @@ class EventoAvaliativoService
             return ['success' => false, 'error' => 'Este evento já tem nota lançada. Não é possível excluir.'];
         }
 
-        $subeventos = $this->model->listarSubeventos($id);
+        return $this->apagarEvento($evento, $usuarioId);
+    }
+
+    /**
+     * @return array{success:bool,error?:string,evento_encerrado?:bool}
+     */
+    public function excluirSubevento(int $eventoId, int $blocoId, int $usuarioId): array
+    {
+        $evento = $this->model->findById($eventoId);
+        if ($evento === null) {
+            return ['success' => false, 'error' => 'Evento não encontrado.'];
+        }
+        $sub = $this->model->buscarSubevento($eventoId, $blocoId);
+        if ($sub === null) {
+            return ['success' => false, 'error' => 'Subevento não encontrado.'];
+        }
+        if ($this->model->blocoTemNota($blocoId)) {
+            $titulo = trim((string) ($sub['titulo'] ?? ''));
+            if ($titulo === '') {
+                $titulo = 'este subevento';
+            }
+            return ['success' => false, 'error' => 'Não é possível excluir "' . $titulo . '" porque já tem nota lançada.'];
+        }
+
+        try {
+            (new ExamBlock())->delete($blocoId, $usuarioId);
+        } catch (Throwable $e) {
+            error_log('EventoAvaliativoService::excluirSubevento: ' . $e->getMessage());
+            return ['success' => false, 'error' => 'Não foi possível excluir o subevento.'];
+        }
+
+        if ($this->model->listarSubeventos($eventoId) !== []) {
+            return ['success' => true];
+        }
+
+        $encerrado = $this->apagarEvento($evento, $usuarioId);
+        if (empty($encerrado['success'])) {
+            return $encerrado;
+        }
+
+        return ['success' => true, 'evento_encerrado' => true];
+    }
+
+    /**
+     * @param array<string,mixed> $evento
+     * @return array{success:bool,error?:string}
+     */
+    private function apagarEvento(array $evento, int $usuarioId): array
+    {
+        $id = (int) ($evento['id'] ?? 0);
+        if ($id <= 0) {
+            return ['success' => false, 'error' => 'Evento não encontrado.'];
+        }
         try {
             $blocos = new ExamBlock();
-            foreach ($subeventos as $sub) {
+            foreach ($this->model->listarSubeventos($id) as $sub) {
                 $blocos->delete((int) $sub['id'], $usuarioId);
             }
             $this->model->marcarExcluido($id);
@@ -301,7 +353,7 @@ class EventoAvaliativoService
             }
             $this->retirarDoCalendario($id);
         } catch (Throwable $e) {
-            error_log('EventoAvaliativoService::excluir: ' . $e->getMessage());
+            error_log('EventoAvaliativoService::apagarEvento: ' . $e->getMessage());
             return ['success' => false, 'error' => 'Não foi possível excluir o evento.'];
         }
 

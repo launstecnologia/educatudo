@@ -18,6 +18,8 @@ if ($escolaConstroiImpressa) {
     }
 }
 $notaUnicaTodasMaterias = $lancamentoPorCoordenacao && !empty($bloco['nota_unica_todas_materias']);
+\App\Modulos\EventosAvaliativos\Services\RetornoListaProva::registrar((int) ($bloco['id'] ?? 0));
+$urlVoltarLista = \App\Modulos\EventosAvaliativos\Services\RetornoListaProva::endereco((int) ($bloco['id'] ?? 0));
 ?>
 
 <!-- Header Section -->
@@ -124,7 +126,7 @@ $notaUnicaTodasMaterias = $lancamentoPorCoordenacao && !empty($bloco['nota_unica
                 Ler gabarito
             </a>
             <?php endif; ?>
-            <a href="<?= URL ?>/admin/provas"
+            <a href="<?= htmlspecialchars($urlVoltarLista, ENT_QUOTES, 'UTF-8') ?>"
                class="inline-flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
                 ← Voltar
             </a>

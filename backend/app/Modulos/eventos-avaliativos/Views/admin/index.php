@@ -248,7 +248,8 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                             $formatoSub = (string) ($sub['formato_evento'] ?? '');
                             $online = $formatoSub === 'online_questoes';
                             $impressa = $formatoSub === 'prova_impressa';
-                            $urlNota = URL . '/admin/provas/blocos/' . $blocoId . '/' . ($online || $impressa ? 'gerenciar' : 'lancar-notas-coordenacao');
+                            $qsEventos = 'de=eventos&ano=' . $ano . '&periodo=' . $periodoNum . ($regraId > 0 ? '&regra=' . $regraId : '');
+                            $urlNota = URL . '/admin/provas/blocos/' . $blocoId . '/' . ($online || $impressa ? 'gerenciar' : 'lancar-notas-coordenacao') . '?' . $qsEventos;
                             $tituloSub = trim((string) ($sub['titulo'] ?? ''));
                             if ($tituloSub === '') {
                                 $tituloSub = 'Subevento #' . $blocoId;
@@ -278,16 +279,30 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                                     <i class="fa-solid fa-pen-to-square w-4 text-center text-gray-400"></i> <?= $online || $impressa ? 'Gerenciar prova' : 'Lançar notas' ?>
                                 </a>
                                 <?php if ($impressa): ?>
-                                <a href="<?= URL ?>/admin/provas/blocos/<?= $blocoId ?>/imprimir" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                <a href="<?= URL ?>/admin/provas/blocos/<?= $blocoId ?>/imprimir?<?= $qsEventos ?>" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                     <i class="fa-solid fa-print w-4 text-center text-gray-400"></i> Imprimir prova
                                 </a>
                                 <a href="<?= URL ?>/admin/leitor-gabarito" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                     <i class="fa-solid fa-barcode w-4 text-center text-gray-400"></i> Ler gabarito
                                 </a>
                                 <?php endif; ?>
-                                <a href="<?= URL ?>/admin/provas/blocos/<?= $blocoId ?>/resultados" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                <a href="<?= URL ?>/admin/provas/blocos/<?= $blocoId ?>/resultados?<?= $qsEventos ?>" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                     <i class="fa-solid fa-chart-column w-4 text-center text-gray-400"></i> Ver resultado
                                 </a>
+                                <?php if ($podeExcluir): ?>
+                                <?php
+                                    $avisoExcluirSub = $totalSub === 1
+                                        ? 'Excluir este subevento? O evento também será excluído, porque é o único.'
+                                        : 'Excluir este subevento?';
+                                ?>
+                                <form method="POST" action="<?= URL ?>/admin/eventos-avaliativos/<?= $eventoId ?>/subeventos/<?= $blocoId ?>/excluir" onsubmit="return confirm(<?= htmlspecialchars(json_encode($avisoExcluirSub), ENT_QUOTES, 'UTF-8') ?>);">
+                                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+                                    <input type="hidden" name="regra" value="<?= $regraId ?>">
+                                    <button type="submit" class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50">
+                                        <i class="fa-solid fa-trash-can w-4 text-center text-red-400"></i> Excluir
+                                    </button>
+                                </form>
+                                <?php endif; ?>
                                 <?php $row_actions_dropdown_items = ob_get_clean(); ?>
                                 <?php $row_actions_dropdown_id = 'row-actions-sub-' . $blocoId; ?>
                                 <?php include \App\Core\ViewPaths::adminPartial('row_actions_dropdown.php'); ?>

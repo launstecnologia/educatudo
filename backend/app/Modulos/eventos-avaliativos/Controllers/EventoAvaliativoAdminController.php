@@ -390,6 +390,40 @@ class EventoAvaliativoAdminController extends AdminBaseController
         $this->redirect($voltar);
     }
 
+    public function excluirSubevento($id, $blocoId): void
+    {
+        if (!$this->permitido('excluir') || !$this->exigirSchema()) {
+            return;
+        }
+        $id = (int) $id;
+        $blocoId = (int) $blocoId;
+        $evento = $this->service->model()->findById($id);
+        $voltar = $evento === null
+            ? '/admin/eventos-avaliativos'
+            : $this->urlListaEvento(
+                (int) ($evento['ano_letivo'] ?? 0),
+                (int) ($evento['bimestre'] ?? 0),
+                (int) ($_POST['regra'] ?? 0)
+            );
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Token inválido. Tente novamente.', 'error');
+            $this->redirect($voltar);
+            return;
+        }
+        $user = $this->auth->getUser() ?? [];
+        $res = $this->service->excluirSubevento($id, $blocoId, (int) ($user['id'] ?? 0));
+        if (empty($res['success'])) {
+            $this->setFlashMessage((string) ($res['error'] ?? 'Não foi possível excluir o subevento.'), 'error');
+            $this->redirect($voltar);
+            return;
+        }
+        $mensagem = !empty($res['evento_encerrado'])
+            ? 'Subevento excluído. O evento ficou sem datas e também foi excluído.'
+            : 'Subevento excluído.';
+        $this->setFlashMessage($mensagem, 'success');
+        $this->redirect($voltar);
+    }
+
     public function boletim(): void
     {
         if (!$this->boletimPermitido('visualizar')) {

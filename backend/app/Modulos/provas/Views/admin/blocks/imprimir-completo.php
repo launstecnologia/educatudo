@@ -6,6 +6,7 @@
 if (!class_exists('LayoutHelper')) {
 }
 $baseUrl = defined('URL') ? rtrim(URL, '/') : '';
+\App\Modulos\EventosAvaliativos\Services\RetornoListaProva::registrar((int) ($bloco['id'] ?? 0));
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">

@@ -470,7 +470,7 @@ document.addEventListener('keydown', function(e) {
                                         title="Ações"
                                         data-bloco-id="<?= (int)$bloco['id'] ?>"
                                         data-status="<?= htmlspecialchars($st) ?>"
-                                        data-gerenciar="<?= htmlspecialchars(URL . '/admin/provas/blocos/' . $bloco['id'] . '/gerenciar') ?>"
+                                        data-gerenciar="<?= htmlspecialchars(URL . '/admin/provas/blocos/' . $bloco['id'] . '/gerenciar?de=provas') ?>"
                                         data-editar="<?= htmlspecialchars(URL . '/admin/provas/blocos/' . $bloco['id'] . '/editar' . $editarVoltarQs) ?>"
                                         data-duplicar="<?= htmlspecialchars(URL . '/admin/provas/blocos/' . $bloco['id'] . '/duplicar') ?>"
                                         onclick="abrirDropdownAcoes(this)">

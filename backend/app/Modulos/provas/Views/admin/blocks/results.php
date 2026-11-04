@@ -9,6 +9,7 @@ $abaixo40 = $alunos_abaixo_40 ?? [];
 $todos = $todos_alunos ?? [];
 $porMateria = $stats_por_materia ?? [];
 $total_canceladas = (int)($total_canceladas ?? 0);
+\App\Modulos\EventosAvaliativos\Services\RetornoListaProva::registrar((int) ($bloco['id'] ?? 0));
 ?>
 
 <!-- Header -->
