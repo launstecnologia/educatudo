@@ -24,23 +24,49 @@ if (!$uso && $motivo === 'indisponivel') {
 <meta name="robots" content="noindex">
 <title>Carteirinha · <?= $e($escola) ?></title>
 <style>
-body{margin:0;background:#e7edf3;color:#0f172a;font-family:ui-sans-serif,system-ui,-apple-system,sans-serif}
-.pagina{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 16px;box-sizing:border-box}
-.cartao-wrap{width:100%;max-width:520px}
+html,body{margin:0;background:#e7edf3;color:#0f172a;font-family:ui-sans-serif,system-ui,-apple-system,sans-serif}
+.pagina{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 16px;box-sizing:border-box}
+.palco{width:100%;max-width:520px}
+.cartao-wrap{width:100%}
 .aviso{width:100%;max-width:420px;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:28px 22px;text-align:center}
 .aviso img{height:48px;width:auto;max-width:160px;object-fit:contain;margin:0 auto 12px;display:block}
 .aviso h1{margin:0;font-size:18px}
 .aviso p{margin:8px 0 0;font-size:14px;line-height:1.45;color:#475569}
 .nota{width:100%;max-width:520px;margin:14px 0 0;text-align:center;font-size:13px;line-height:1.45;color:#64748b}
+.gire{display:none}
+@media (orientation:portrait) and (max-width:540px){
+  html,body{height:100%;overflow:hidden}
+  .pagina{position:relative;height:100dvh;min-height:0;overflow:hidden;padding:0}
+  .gire{display:block;position:absolute;top:16px;left:16px;right:16px;z-index:2;margin:0;text-align:center;font-size:13px;line-height:1.3;color:#64748b}
+  .palco{
+    position:absolute;left:50%;top:50%;width:520px;max-width:none;
+    transform:translate(-50%,-50%) rotate(-90deg) scale(min(calc((100dvh - 88px) / 520px), calc((100vw - 28px) / 280px)));
+    transform-origin:center center
+  }
+  .nota{max-width:none}
+}
+@media (orientation:landscape) and (max-height:500px){
+  html,body{height:100%;overflow:hidden}
+  .pagina{position:relative;height:100dvh;min-height:0;overflow:hidden;padding:0}
+  .palco{
+    position:absolute;left:50%;top:50%;width:520px;max-width:none;
+    transform:translate(-50%,-50%) scale(min(calc((100vw - 28px) / 520px), calc((100dvh - 28px) / 280px)));
+    transform-origin:center center
+  }
+  .nota{max-width:none}
+}
 </style>
 </head>
 <body>
 <div class="pagina">
     <?php if ($encontrado && $cartao !== []): ?>
-        <div class="cartao-wrap">
-            <?php include dirname(__DIR__) . '/compartilhado/cartao.php'; ?>
+        <p class="gire">Gire o celular</p>
+        <div class="palco">
+            <div class="cartao-wrap">
+                <?php include dirname(__DIR__) . '/compartilhado/cartao.php'; ?>
+            </div>
+            <p class="nota">Mostre o QR desta carteirinha na portaria. A leitura confirma a matrícula.</p>
         </div>
-        <p class="nota">Mostre o QR desta carteirinha na portaria. A leitura confirma a matrícula.</p>
     <?php else: ?>
         <div class="aviso">
             <?php if ($logo !== ''): ?>

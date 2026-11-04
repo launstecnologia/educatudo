@@ -270,7 +270,7 @@ ob_start();
 $ui_offcanvas_body = ob_get_clean();
 $ui_offcanvas_id = 'cartao';
 $ui_offcanvas_titulo = 'Carteirinha';
-$ui_offcanvas_max_w = 'max-w-3xl';
+$ui_offcanvas_max_w = 'max-w-5xl';
 include $ui . '/offcanvas.php';
 ?>
 <script>
