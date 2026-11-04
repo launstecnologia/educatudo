@@ -563,6 +563,10 @@ class BoletimAssistenteController extends BaseController
                 'tipo' => ((string) ($colRaw['source_type'] ?? '')) === 'calculado' ? 'calculado' : 'peca',
                 'travada' => false,
             ];
+            $linhaCabPreview = trim((string) ($colRaw['linha_cabecalho'] ?? ''));
+            if ($linhaCabPreview !== '') {
+                $col['linha_cabecalho'] = $linhaCabPreview;
+            }
 
             if ($this->colunaPreviewEhSemana($col)) {
                 $temQuadro = true;

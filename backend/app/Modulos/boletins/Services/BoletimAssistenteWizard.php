@@ -5950,6 +5950,7 @@ class BoletimAssistenteWizard
         $estado['pecas'] = $pecas;
 
         $comps = is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : [];
+        $linhaPorBloco = $this->linhaCabecalhoPorBloco($comps);
         $out = [];
         foreach ($comps as $c) {
             if (!is_array($c)) {
@@ -5976,7 +5977,7 @@ class BoletimAssistenteWizard
                     $c['nome'] = $nomeTipo;
                     $this->gravarNomeColunaNoEstado($estado, (string) ($c['codigo'] ?? ''), $nomeTipo);
                 }
-                $out[] = $c;
+                $out[] = $this->aplicarLinhaCabecalhoNoComponente($c, $linhaPorBloco);
                 continue;
             }
             $vivos = array_values(array_filter(
@@ -5991,7 +5992,7 @@ class BoletimAssistenteWizard
                 $c['nome'] = $nomePorBloco[$vivos[0]];
                 $this->gravarNomeColunaNoEstado($estado, (string) ($c['codigo'] ?? ''), (string) $c['nome']);
             }
-            $out[] = $c;
+            $out[] = $this->aplicarLinhaCabecalhoNoComponente($c, $linhaPorBloco);
         }
         $jaTem = [];
         $codigos = [];
@@ -6022,6 +6023,15 @@ class BoletimAssistenteWizard
             $tipoSub = (int) ($tipoPorBloco[$blocoId] ?? 0);
             $nomeNovo = $titulo !== '' ? $titulo : ('Sub-evento ' . $blocoId);
             $this->gravarNomeColunaNoEstado($estado, $codigo, $nomeNovo);
+            $cfgNovo = [
+                'papel_wizard' => 'exibe',
+                'blocos_ids_manual' => 1,
+                'tipo_avaliacao_id' => $tipoSub > 0 ? $tipoSub : null,
+            ];
+            $nomeLinha = trim((string) ($linhaPorBloco[$blocoId] ?? ''));
+            if ($nomeLinha !== '') {
+                $cfgNovo['linha_cabecalho'] = function_exists('mb_substr') ? mb_substr($nomeLinha, 0, 40) : substr($nomeLinha, 0, 40);
+            }
             $novos[] = [
                 'codigo' => $codigo,
                 'nome' => $nomeNovo,
@@ -6033,11 +6043,7 @@ class BoletimAssistenteWizard
                 'peso' => 1,
                 'obrigatorio' => 0,
                 'tipo_avaliacao_id' => $tipoSub > 0 ? $tipoSub : null,
-                'config' => [
-                    'papel_wizard' => 'exibe',
-                    'blocos_ids_manual' => 1,
-                    'tipo_avaliacao_id' => $tipoSub > 0 ? $tipoSub : null,
-                ],
+                'config' => $cfgNovo,
             ];
         }
         if ($novos !== []) {
@@ -6619,6 +6625,340 @@ class BoletimAssistenteWizard
      * @param array<string,mixed> $resultado
      * @return array<string,mixed>
      */
+    /**
+     * @param list<array<string,mixed>> $comps
+     * @return array<int,string>
+     */
+    private function linhaCabecalhoPorBloco(array $comps): array
+    {
+        $porBloco = [];
+        foreach ($comps as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            $nome = trim((string) ($this->configDoComponente($c)['linha_cabecalho'] ?? ''));
+            if ($nome === '') {
+                continue;
+            }
+            if (function_exists('mb_substr')) {
+                $nome = mb_substr($nome, 0, 40);
+            } else {
+                $nome = substr($nome, 0, 40);
+            }
+            foreach ($this->idsBlocosDoComponente($c) as $id) {
+                if ($id > 0) {
+                    $porBloco[$id] = $nome;
+                }
+            }
+        }
+
+        return $porBloco;
+    }
+
+    /**
+     * @param array<string,mixed> $c
+     * @param array<int,string> $linhaPorBloco
+     * @return array<string,mixed>
+     */
+    private function aplicarLinhaCabecalhoNoComponente(array $c, array $linhaPorBloco): array
+    {
+        $cfg = $this->configDoComponente($c);
+        $nome = trim((string) ($cfg['linha_cabecalho'] ?? ''));
+        if ($nome === '') {
+            foreach ($this->idsBlocosDoComponente($c) as $id) {
+                $herdado = trim((string) ($linhaPorBloco[$id] ?? ''));
+                if ($herdado !== '') {
+                    $nome = $herdado;
+                    break;
+                }
+            }
+        }
+        if ($nome === '') {
+            return $c;
+        }
+        $cfg['linha_cabecalho'] = function_exists('mb_substr') ? mb_substr($nome, 0, 40) : substr($nome, 0, 40);
+        $c['config'] = $cfg;
+
+        return $c;
+    }
+
+    /**
+     * @param array<string,mixed> $c
+     * @return array<string,mixed>
+     */
+    private function configDoComponente(array $c): array
+    {
+        if (is_array($c['config'] ?? null)) {
+            return $c['config'];
+        }
+        if (is_string($c['config_json'] ?? null) && trim($c['config_json']) !== '') {
+            $decoded = json_decode($c['config_json'], true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * A faixa de cima segue o componente, não só o código que estava na tela na hora de criar.
+     *
+     * @param array<string,mixed> $rascunho
+     * @param array<string,mixed> $estado
+     * @return array<string,mixed>
+     */
+    private function sincronizarLinhasLayout(array $rascunho, array &$estado): array
+    {
+        $comps = is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : [];
+        $porCodigo = [];
+        foreach ($this->normalizarLinhasLayout($estado['linhas_layout'] ?? []) as $linha) {
+            $nome = trim((string) ($linha['nome'] ?? ''));
+            foreach ((array) ($linha['colunas'] ?? []) as $cod) {
+                $cod = strtolower(trim((string) $cod));
+                if ($cod !== '' && $nome !== '') {
+                    $porCodigo[$cod] = $nome;
+                }
+            }
+        }
+        foreach ($comps as &$c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if ($cod === '' || !isset($porCodigo[$cod])) {
+                continue;
+            }
+            $cfg = $this->configDoComponente($c);
+            if (trim((string) ($cfg['linha_cabecalho'] ?? '')) === '') {
+                $cfg['linha_cabecalho'] = $porCodigo[$cod];
+                $c['config'] = $cfg;
+            }
+        }
+        unset($c);
+
+        $grupos = [];
+        $ordem = [];
+        foreach ($comps as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            $nome = trim((string) ($this->configDoComponente($c)['linha_cabecalho'] ?? ''));
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if ($nome === '' || $cod === '') {
+                continue;
+            }
+            if (!isset($grupos[$nome])) {
+                $grupos[$nome] = [];
+                $ordem[] = $nome;
+            }
+            if (!in_array($cod, $grupos[$nome], true)) {
+                $grupos[$nome][] = $cod;
+            }
+        }
+        $linhas = [];
+        foreach ($ordem as $nome) {
+            $cols = $grupos[$nome];
+            if (count($cols) < 2) {
+                continue;
+            }
+            $linhas[] = [
+                'id' => 'lin' . substr(sha1($nome), 0, 8),
+                'nome' => $nome,
+                'colunas' => $cols,
+            ];
+        }
+        $linhas = $this->normalizarLinhasLayout($linhas);
+        if ($linhas !== []) {
+            $estado['linhas_layout'] = $linhas;
+        }
+        $rascunho['componentes'] = $comps;
+
+        return $rascunho;
+    }
+
+    /**
+     * A média cita um código que não é mais coluna (a prova ficou de fora e entrou como zero).
+     *
+     * @param array<string,mixed> $rascunho
+     * @param array<string,mixed> $estado
+     * @return array<string,mixed>
+     */
+    private function religarExpressoesNasColunasVivas(array $rascunho, array &$estado): array
+    {
+        $comps = is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : [];
+        $codigos = [];
+        $nomes = [];
+        $livres = [];
+        $recuperacoes = [];
+        foreach ($comps as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if ($cod === '') {
+                continue;
+            }
+            $codigos[$cod] = true;
+            $nomes[$cod] = mb_strtolower(trim((string) ($c['nome'] ?? $cod)));
+            $src = (string) ($c['source_type'] ?? '');
+            $cfg = $this->configDoComponente($c);
+            $tipoLayout = strtolower(trim((string) ($cfg['layout_type'] ?? '')));
+            if ($src !== 'provas_sistema' || $tipoLayout === 'faltas') {
+                continue;
+            }
+            if (!empty($cfg['recuperacao_exibe']) || $tipoLayout === 'rec') {
+                $recuperacoes[] = $cod;
+                continue;
+            }
+            $livres[] = $cod;
+        }
+        $citados = [];
+        foreach ($comps as $c) {
+            if (!is_array($c) || (string) ($c['source_type'] ?? '') !== 'calculado') {
+                continue;
+            }
+            $exp = strtolower(trim((string) ($this->configDoComponente($c)['expressao'] ?? '')));
+            if ($exp === '' || !preg_match_all('/\b[a-z_][a-z0-9_]*\b/', $exp, $achados)) {
+                continue;
+            }
+            foreach ($achados[0] as $tok) {
+                if (isset($codigos[$tok])) {
+                    $citados[$tok] = true;
+                }
+            }
+        }
+        $livres = array_values(array_filter(
+            $livres,
+            static fn (string $cod): bool => !isset($citados[$cod])
+        ));
+        $recuperacoes = array_values(array_filter(
+            $recuperacoes,
+            static fn (string $cod): bool => !isset($citados[$cod])
+        ));
+
+        if (!is_array($estado['formulas_blocos'] ?? null)) {
+            $estado['formulas_blocos'] = [];
+        }
+        foreach ($comps as &$c) {
+            if (!is_array($c) || (string) ($c['source_type'] ?? '') !== 'calculado') {
+                continue;
+            }
+            $cfg = $this->configDoComponente($c);
+            $exp = strtolower(trim((string) ($cfg['expressao'] ?? '')));
+            if ($exp === '' || !preg_match_all('/\b[a-z_][a-z0-9_]*\b/', $exp, $achados)) {
+                continue;
+            }
+            $faltam = [];
+            foreach ($achados[0] as $tok) {
+                if (in_array($tok, ['max', 'min'], true) || isset($codigos[$tok]) || isset($faltam[$tok])) {
+                    continue;
+                }
+                $faltam[$tok] = true;
+            }
+            if ($faltam === []) {
+                continue;
+            }
+            $nova = $exp;
+            foreach (array_keys($faltam) as $tok) {
+                $pool = str_starts_with($tok, 'rec') ? $recuperacoes : $livres;
+                $escolha = $this->colunaLivreParaToken($tok, $pool, $nomes);
+                if ($escolha === null && str_starts_with($tok, 'rec') && count($recuperacoes) === 1) {
+                    $escolha = $recuperacoes[0];
+                }
+                if ($escolha === null && count($faltam) === 1 && count($livres) === 1 && !str_starts_with($tok, 'rec')) {
+                    $escolha = $livres[0];
+                }
+                if ($escolha !== null) {
+                    $nova = (string) preg_replace('/\b' . preg_quote($tok, '/') . '\b/', $escolha, $nova);
+                    $livres = array_values(array_filter(
+                        $livres,
+                        static fn (string $cod): bool => $cod !== $escolha
+                    ));
+                    $recuperacoes = array_values(array_filter(
+                        $recuperacoes,
+                        static fn (string $cod): bool => $cod !== $escolha
+                    ));
+                    unset($faltam[$tok]);
+                    continue;
+                }
+                if (str_starts_with($tok, 'rec')) {
+                    $nova = (string) preg_replace('/\b' . preg_quote($tok, '/') . '\b/', '0', $nova);
+                    unset($faltam[$tok]);
+                }
+            }
+            $restantes = array_keys($faltam);
+            $sims = array_values(array_filter(
+                $restantes,
+                static fn (string $tok): bool => (bool) preg_match('/^sim\d+$/', $tok)
+            ));
+            if ($sims !== [] && count($sims) === count($restantes) && count($livres) >= count($sims)) {
+                foreach ($sims as $tok) {
+                    $escolha = array_shift($livres);
+                    if ($escolha === null) {
+                        break;
+                    }
+                    $nova = (string) preg_replace('/\b' . preg_quote($tok, '/') . '\b/', $escolha, $nova);
+                }
+            }
+            if ($nova === $exp) {
+                continue;
+            }
+            $cfg['expressao'] = $nova;
+            $c['config'] = $cfg;
+            $codAlvo = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if ($codAlvo !== '') {
+                $toks = $this->tokensDaExpressao($nova);
+                if ($toks !== []) {
+                    $estado['formulas_blocos'][$codAlvo] = $toks;
+                }
+            }
+        }
+        unset($c);
+        $rascunho['componentes'] = $comps;
+
+        return $rascunho;
+    }
+
+    /**
+     * @param list<string> $livres
+     * @param array<string,string> $nomes
+     */
+    private function colunaLivreParaToken(string $token, array $livres, array $nomes): ?string
+    {
+        $token = strtolower(trim($token));
+        if ($token === '') {
+            return null;
+        }
+        $melhorNota = 0;
+        $candidatos = [];
+        foreach ($livres as $cod) {
+            $nome = mb_strtolower(trim((string) ($nomes[$cod] ?? '')));
+            $nota = 0;
+            if ($nome !== '' && ($nome === $token || str_contains($nome, $token))) {
+                $nota = 3;
+            } elseif (str_starts_with($token, 'prova') && str_contains($nome, 'prova')) {
+                $nota = 2;
+            }
+            if ($nota <= 0) {
+                continue;
+            }
+            if ($nota > $melhorNota) {
+                $melhorNota = $nota;
+                $candidatos = [$cod];
+                continue;
+            }
+            if ($nota === $melhorNota) {
+                $candidatos[] = $cod;
+            }
+        }
+        if (count($candidatos) !== 1) {
+            return null;
+        }
+
+        return $candidatos[0];
+    }
+
     public function enriquecerSaida(array $resultado): array
     {
         $estado = is_array($resultado['estado'] ?? null) ? $resultado['estado'] : [];
@@ -6633,6 +6973,8 @@ class BoletimAssistenteWizard
                     $rascunho = $this->aplicarOrdemColunas($rascunho, $estado);
                     $estado['colunas_ordem'] = $this->extrairCodigosColunasMoveis($rascunho);
                 }
+                $rascunho = $this->sincronizarLinhasLayout($rascunho, $estado);
+                $rascunho = $this->religarExpressoesNasColunasVivas($rascunho, $estado);
                 $resultado['rascunho'] = $rascunho;
                 $resultado['estado'] = $estado;
             } catch (\Throwable $e) {
@@ -6935,12 +7277,17 @@ class BoletimAssistenteWizard
             if ($cod === '' || $cod === 'media_sem') {
                 continue;
             }
-            $colunas[] = [
+            $colPreview = [
                 'codigo' => $cod,
                 'nome' => (string) ($c['nome'] ?? $cod),
                 'tipo' => ((string) ($c['source_type'] ?? '')) === 'calculado' ? 'calculado' : 'peca',
                 'travada' => false,
             ];
+            $linhaCab = trim((string) ($this->configDoComponente($c)['linha_cabecalho'] ?? ''));
+            if ($linhaCab !== '') {
+                $colPreview['linha_cabecalho'] = function_exists('mb_substr') ? mb_substr($linhaCab, 0, 40) : substr($linhaCab, 0, 40);
+            }
+            $colunas[] = $colPreview;
         }
         if ($temSemana) {
             array_unshift($colunas, [
@@ -7024,6 +7371,10 @@ class BoletimAssistenteWizard
                 'layout_type' => strtolower(trim((string) ($cfg['layout_type'] ?? $c['layout_type'] ?? ''))),
                 'source_type' => (string) ($c['source_type'] ?? ''),
             ];
+            $linhaCab = trim((string) ($cfg['linha_cabecalho'] ?? ''));
+            if ($linhaCab !== '') {
+                $col['linha_cabecalho'] = function_exists('mb_substr') ? mb_substr($linhaCab, 0, 40) : substr($linhaCab, 0, 40);
+            }
             $pai = strtolower(trim((string) ($cfg['evento_pai_codigo'] ?? '')));
             if ($pai !== '' && isset($nomePorCodigo[$pai]) && $nomePorCodigo[$pai] !== '') {
                 $col['grupo'] = $nomePorCodigo[$pai];

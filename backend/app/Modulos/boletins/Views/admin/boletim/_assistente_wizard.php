@@ -3943,7 +3943,7 @@ $boletimWizardSteps = [
         return (colunaEhFaltas(o) || o.layout_type === 'rec') ? '' : '<div class="text-[9px] font-normal opacity-80">Valor 10</div>';
     }
 
-    function linhaLayoutDaColuna(codigo) {
+    function linhaLayoutDaColuna(codigo, coluna) {
         codigo = String(codigo || '').toLowerCase();
         var linhas = (estado && estado.linhas_layout) || [];
         for (var i = 0; i < linhas.length; i++) {
@@ -3951,6 +3951,8 @@ $boletimWizardSteps = [
             if (!lin || !Array.isArray(lin.colunas)) continue;
             if (lin.colunas.indexOf(codigo) >= 0) return lin;
         }
+        var nomeCab = coluna ? String(coluna.linha_cabecalho || '').trim() : '';
+        if (nomeCab) return { id: 'cab:' + nomeCab.toLowerCase(), nome: nomeCab, colunas: [codigo] };
         return null;
     }
 
@@ -3960,11 +3962,11 @@ $boletimWizardSteps = [
         outras = outras || [];
         while (i < outras.length) {
             var o = outras[i] || {};
-            var lin = linhaLayoutDaColuna(o.codigo);
+            var lin = linhaLayoutDaColuna(o.codigo, o);
             if (lin && String(lin.nome || '').trim()) {
                 var cols = [o];
                 var j = i + 1;
-                while (j < outras.length && linhaLayoutDaColuna((outras[j] || {}).codigo) && linhaLayoutDaColuna((outras[j] || {}).codigo).id === lin.id) {
+                while (j < outras.length && linhaLayoutDaColuna((outras[j] || {}).codigo, outras[j]) && linhaLayoutDaColuna((outras[j] || {}).codigo, outras[j]).id === lin.id) {
                     cols.push(outras[j]);
                     j++;
                 }
@@ -4680,7 +4682,74 @@ $boletimWizardSteps = [
         return html;
     }
 
+    function configDoComp(c) {
+        if (!c) return {};
+        var cfg = c.config;
+        if (typeof cfg === 'string' && cfg) {
+            try { cfg = JSON.parse(cfg); } catch (e) { cfg = {}; }
+        }
+        if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) cfg = {};
+        c.config = cfg;
+        return cfg;
+    }
+
+    function gravarLinhaNosComponentes() {
+        if (!estado) return;
+        var mapa = {};
+        (estado.linhas_layout || []).forEach(function (lin) {
+            if (!lin) return;
+            var nome = String(lin.nome || '').trim().slice(0, 40);
+            if (!nome) return;
+            (lin.colunas || []).forEach(function (cod) {
+                mapa[String(cod || '').toLowerCase()] = nome;
+            });
+        });
+        [rascunhoAtual, estado.rascunho_preservado].forEach(function (r) {
+            if (!r || !Array.isArray(r.componentes)) return;
+            r.componentes.forEach(function (c) {
+                if (!c) return;
+                var cod = String(c.codigo || '').toLowerCase();
+                var cfg = configDoComp(c);
+                if (mapa[cod]) cfg.linha_cabecalho = mapa[cod];
+                else delete cfg.linha_cabecalho;
+            });
+        });
+    }
+
+    function realinharLinhasPelosComponentes() {
+        if (!estado) return;
+        var comps = (rascunhoAtual && rascunhoAtual.componentes) || [];
+        var porNome = {};
+        var ordem = [];
+        comps.forEach(function (c) {
+            if (!c) return;
+            var nome = String(configDoComp(c).linha_cabecalho || '').trim();
+            var cod = String(c.codigo || '').toLowerCase();
+            if (!nome || !cod) return;
+            if (!porNome[nome]) {
+                porNome[nome] = [];
+                ordem.push(nome);
+            }
+            if (porNome[nome].indexOf(cod) < 0) porNome[nome].push(cod);
+        });
+        if (!ordem.length) return;
+        var vistas = {};
+        var linhas = (estado.linhas_layout || []).map(function (lin) {
+            if (!lin || !lin.nome || !porNome[lin.nome]) return lin;
+            vistas[lin.nome] = true;
+            if (porNome[lin.nome].length < 2) return null;
+            lin.colunas = porNome[lin.nome].slice();
+            return lin;
+        }).filter(function (lin) { return !!lin; });
+        ordem.forEach(function (nome) {
+            if (vistas[nome] || porNome[nome].length < 2) return;
+            linhas.push({ id: 'lin' + Math.abs(nome.length * 17).toString(36), nome: nome, colunas: porNome[nome].slice() });
+        });
+        estado.linhas_layout = linhas;
+    }
+
     function renderRevisarDinamico() {
+        realinharLinhasPelosComponentes();
         aplicarTitulosDosSubeventos();
         var col = document.getElementById('bw-colunas-wrap');
         var pvEl = document.getElementById('bw-preview-wrap');
@@ -4973,6 +5042,7 @@ $boletimWizardSteps = [
             return lin;
         }).filter(function (lin) { return lin && (lin.colunas || []).length >= 2; });
         estado.linhas_layout.push({ id: 'lin' + Date.now().toString(36), nome: nome.slice(0, 40), colunas: cols });
+        gravarLinhaNosComponentes();
         var pvNomes = {};
         (((previewEfetivo() || {}).colunas) || []).forEach(function (c) {
             if (c && c.codigo) pvNomes[String(c.codigo).toLowerCase()] = c.nome || '';
@@ -5002,6 +5072,7 @@ $boletimWizardSteps = [
         }).filter(function (lin) { return lin && (lin.colunas || []).length >= 2; });
         avisoLinha = { tipo: 'ok', texto: 'Essas colunas saíram da linha e voltam a aparecer sozinhas.' };
         colunasMarcadas = {};
+        gravarLinhaNosComponentes();
         renderRevisarDinamico();
         agendarMontar();
     }
