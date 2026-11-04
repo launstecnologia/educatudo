@@ -54,7 +54,7 @@ class LeitorGabaritoService
     public function listarProvas(?int $professorId, string $busca, int $pagina): array
     {
         $params = [];
-        $sql = "SELECT p.id, p.titulo, p.data_prova, m.nome AS materia_nome, prof.nome AS professor_nome,
+        $sql = "SELECT p.id, p.titulo, DATE(p.data_inicio) AS data_prova, m.nome AS materia_nome, prof.nome AS professor_nome,
                        (SELECT COUNT(*) FROM provas_questoes q
                         WHERE q.prova_id = p.id AND q.tipo IN ('multipla_escolha', 'verdadeiro_falso')) AS questoes_objetivas
                 FROM provas p
@@ -71,7 +71,7 @@ class LeitorGabaritoService
             $params['busca_titulo'] = $like;
             $params['busca_materia'] = $like;
         }
-        $sql .= ' ORDER BY p.data_prova DESC, p.id DESC';
+        $sql .= ' ORDER BY p.data_inicio DESC, p.id DESC';
         $linhas = $this->db->fetchAll($sql, $params);
         $linhas = array_values(array_filter($linhas, static function ($linha): bool {
             return (int) ($linha['questoes_objetivas'] ?? 0) > 0;
@@ -1440,7 +1440,7 @@ class LeitorGabaritoService
      */
     private function buscarProva(int $provaId, ?int $professorId): ?array
     {
-        $sql = 'SELECT p.id, p.titulo, p.data_prova, p.professor_id, p.valor_total, m.nome AS materia_nome, prof.nome AS professor_nome
+        $sql = 'SELECT p.id, p.titulo, DATE(p.data_inicio) AS data_prova, p.professor_id, p.valor_total, m.nome AS materia_nome, prof.nome AS professor_nome
                 FROM provas p
                 LEFT JOIN materias m ON m.id = p.materia_id
                 LEFT JOIN professores prof ON prof.id = p.professor_id
