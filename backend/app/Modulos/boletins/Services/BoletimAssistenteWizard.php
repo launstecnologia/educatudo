@@ -820,6 +820,7 @@ class BoletimAssistenteWizard
                 $this->aplicarJornadaDoFormulario($estado, $comps);
                 $this->aplicarGrupoLinhaDoFormulario($estado, $comps);
                 $this->marcarBimestreSalvoNasPecas($estado);
+                $this->marcarEventosSalvosNoEstado($estado, $comps);
                 $estado['passo'] = 'revisar';
                 $estado['rascunho_preservado'] = [
                     'modo' => ($regraIdAtual !== null && $regraIdAtual > 0) ? 'editar' : 'criar',
@@ -5706,6 +5707,66 @@ class BoletimAssistenteWizard
             return true;
         }
         return in_array((int) ($ev['bimestre'] ?? 0), $this->codigosPeriodoDaNota($bimestre), true);
+    }
+
+    /**
+     * Reabre o demonstrativo com os eventos e subeventos que já estavam na configuração salva.
+     *
+     * @param array<string,mixed> $estado
+     * @param list<array<string,mixed>> $comps
+     */
+    private function marcarEventosSalvosNoEstado(array &$estado, array $comps): void
+    {
+        if (!$this->notasBimestraisComEventoAvaliativo($estado)) {
+            return;
+        }
+        $blocos = [];
+        foreach ($comps as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            foreach ($this->idsBlocosDoComponente($c) as $id) {
+                $blocos[$id] = true;
+            }
+        }
+        if ($blocos === []) {
+            return;
+        }
+        try {
+            $eventos = $this->ferramentas->listarEventosAvaliativosParaBoletim();
+        } catch (\Throwable $e) {
+            return;
+        }
+        $eventosIds = [];
+        $subIds = [];
+        foreach ($eventos as $ev) {
+            if (!is_array($ev) || !$this->eventoCabeNoPeriodoDaNota($ev, $estado)) {
+                continue;
+            }
+            $eventoId = (int) ($ev['id'] ?? 0);
+            $achou = false;
+            foreach ((array) ($ev['subeventos'] ?? []) as $sub) {
+                if (!is_array($sub)) {
+                    continue;
+                }
+                $subId = (int) ($sub['id'] ?? 0);
+                if ($subId <= 0 || !isset($blocos[$subId])) {
+                    continue;
+                }
+                $subIds[] = $subId;
+                $achou = true;
+            }
+            if ($achou && $eventoId > 0) {
+                $eventosIds[] = $eventoId;
+            }
+        }
+        if ($eventosIds === []) {
+            return;
+        }
+        $estado['eventos_ids'] = $eventosIds;
+        $estado['eventos_ids_manual'] = 1;
+        $estado['subeventos_ids'] = $subIds;
+        $estado['subeventos_ids_manual'] = 1;
     }
 
     /**

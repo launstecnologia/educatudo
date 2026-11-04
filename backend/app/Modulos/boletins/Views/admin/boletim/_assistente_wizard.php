@@ -946,6 +946,10 @@ $boletimWizardSteps = [
     }
 
     function subeventoAvaliativoMarcado(ev, sub) {
+        var id = Number(sub && sub.id || 0);
+        if (Number(estado && estado.subeventos_ids_manual || 0) === 1 && Array.isArray(estado.subeventos_ids)) {
+            return estado.subeventos_ids.map(Number).indexOf(id) >= 0;
+        }
         var pecaPai = pecaDoTipoAvaliacao(ev && ev.tipo_avaliacao_id);
         var peca = pecaPai || pecaDoTipoAvaliacao(sub && sub.tipo_avaliacao_id);
         if (!peca) return true;
