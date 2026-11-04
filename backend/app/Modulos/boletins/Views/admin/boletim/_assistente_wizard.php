@@ -910,6 +910,99 @@ $boletimWizardSteps = [
         });
     }
 
+    function componentePorCodigo(codigo) {
+        codigo = String(codigo || '').toLowerCase();
+        if (!codigo) return null;
+        var achado = null;
+        [rascunhoAtual, estado && estado.rascunho_preservado].forEach(function (r) {
+            if (!r || !Array.isArray(r.componentes)) return;
+            r.componentes.forEach(function (c) {
+                if (c && String(c.codigo || '').toLowerCase() === codigo) achado = c;
+            });
+        });
+        return achado;
+    }
+
+    function nomeDaColunaDoSubevento(ev, sub) {
+        var subs = (ev && ev.subeventos) || [];
+        var recuperacao = Number(ev && ev.bimestre || 0) >= 60;
+        var nomeEvento = String(ev && ev.nome || '').trim();
+        if (recuperacao && subs.length <= 1 && nomeEvento) return nomeEvento;
+        var titulo = String(sub && sub.titulo || '').trim();
+        return titulo || nomeEvento;
+    }
+
+    function tituloSubeventoDaColuna(codigo) {
+        var comp = componentePorCodigo(codigo);
+        if (!comp) return '';
+        var bruto = comp.blocos_ids;
+        if (typeof bruto === 'string') bruto = bruto.split(',');
+        var ids = normalizarIdsJs(bruto);
+        if (!ids.length && Number(comp.bloco_id || 0) > 0) ids = [Number(comp.bloco_id)];
+        var info = null;
+        if (ids.length === 1) {
+            eventosAvaliativosDoPeriodo().forEach(function (ev) {
+                (ev.subeventos || []).forEach(function (sub) {
+                    if (Number(sub && sub.id) === ids[0]) info = { ev: ev, sub: sub };
+                });
+            });
+        }
+        if (!info) {
+            var cfg = comp.config || {};
+            if (typeof cfg === 'string') {
+                try { cfg = JSON.parse(cfg) || {}; } catch (e) { cfg = {}; }
+            }
+            if (!cfg || typeof cfg !== 'object') {
+                cfg = {};
+                if (typeof comp.config_json === 'string' && comp.config_json) {
+                    try { cfg = JSON.parse(comp.config_json) || {}; } catch (e2) { cfg = {}; }
+                }
+            }
+            var tipo = Number(cfg.tipo_avaliacao_id || comp.tipo_avaliacao_id || 0);
+            if (tipo > 0) {
+                var achados = [];
+                eventosAvaliativosDoPeriodo().forEach(function (ev) {
+                    (ev.subeventos || []).forEach(function (sub) {
+                        if (Number(sub && sub.tipo_avaliacao_id) === tipo) achados.push({ ev: ev, sub: sub });
+                    });
+                });
+                if (achados.length === 1) info = achados[0];
+            }
+        }
+        return info ? nomeDaColunaDoSubevento(info.ev, info.sub) : '';
+    }
+
+    function colunaDoRascunhoVemDeEvento(r, codigo) {
+        codigo = String(codigo || '').toLowerCase();
+        var achou = false;
+        ((r && r.componentes) || []).forEach(function (c) {
+            if (!c || String(c.codigo || '').toLowerCase() !== codigo) return;
+            var src = String(c.source_type || '');
+            if (src === 'provas_sistema' || src === 'provas') achou = true;
+        });
+        return achou;
+    }
+
+    function aplicarTitulosDosSubeventos() {
+        if (!estado) return;
+        if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object' || Array.isArray(estado.nomes_blocos)) {
+            estado.nomes_blocos = {};
+        }
+        var codigos = {};
+        [rascunhoAtual, estado.rascunho_preservado].forEach(function (r) {
+            if (!r || !Array.isArray(r.componentes)) return;
+            r.componentes.forEach(function (c) {
+                if (c && c.codigo) codigos[String(c.codigo)] = true;
+            });
+        });
+        Object.keys(codigos).forEach(function (codigo) {
+            var titulo = tituloSubeventoDaColuna(codigo);
+            if (!titulo) return;
+            estado.nomes_blocos[String(codigo).toLowerCase()] = titulo;
+            pintarTituloNasColunas(codigo, titulo);
+        });
+    }
+
     function pecaDoTipoAvaliacao(tipoId) {
         var id = Number(tipoId || 0);
         if (id <= 0) return null;
@@ -1973,6 +2066,8 @@ $boletimWizardSteps = [
         if (tok.type === 'op' && tok.value === '/') return '÷';
         if (tok.type === 'op' && tok.value === '-') return '−';
         if (tok.type === 'peca') {
+            var doSub = tituloSubeventoDaColuna(tok.value);
+            if (doSub) return doSub;
             var sigla = siglaFormula(tok.value, tok.label);
             if (sigla) return sigla;
             return tituloColuna(tok.value) || tok.label || pecaLabel(tok.value);
@@ -2354,10 +2449,16 @@ $boletimWizardSteps = [
 
     function aplicarNomesNoRascunho(r) {
         if (!r || !Array.isArray(r.componentes) || !estado) return r;
+        aplicarTitulosDosSubeventos();
         r.componentes.forEach(function (c) {
             if (!c) return;
             var cod = String(c.codigo || '');
             if (/^s[1-8]$/.test(cod) || cod === '_semanal') return;
+            var doEvento = tituloSubeventoDaColuna(cod);
+            if (doEvento) {
+                c.nome = doEvento;
+                return;
+            }
             if (tituloFoiLimpo(cod)) {
                 var padrao = nomeBlocoCalc(cod);
                 if (padrao) c.nome = padrao;
@@ -4580,6 +4681,7 @@ $boletimWizardSteps = [
     }
 
     function renderRevisarDinamico() {
+        aplicarTitulosDosSubeventos();
         var col = document.getElementById('bw-colunas-wrap');
         var pvEl = document.getElementById('bw-preview-wrap');
         var pv = aplicarOrdemNoPreview(previewEfetivo());
@@ -6578,13 +6680,22 @@ $boletimWizardSteps = [
                 var arredLocal = (estado && estado.grupo_linha && estado.grupo_linha.arredondamento) || '';
                 var remoto = j.estado;
                 var nomesAgora = {};
+                var nomesServidor = (remoto.nomes_blocos && typeof remoto.nomes_blocos === 'object' && !Array.isArray(remoto.nomes_blocos))
+                    ? remoto.nomes_blocos
+                    : {};
                 var fonteNomes = (estado && estado.nomes_blocos && typeof estado.nomes_blocos === 'object' && !Array.isArray(estado.nomes_blocos))
                     ? estado.nomes_blocos
                     : (nomesLocal || {});
                 Object.keys(fonteNomes).forEach(function (cod) {
                     if (!cod || cod === '_semanal' || /^s[1-8]$/.test(cod)) return;
+                    if (colunaDoRascunhoVemDeEvento(j.rascunho, cod)) return;
                     var nomeVivo = String(fonteNomes[cod] || '').trim().slice(0, 60);
                     if (nomeVivo) nomesAgora[cod] = nomeVivo;
+                });
+                Object.keys(nomesServidor).forEach(function (cod) {
+                    if (!colunaDoRascunhoVemDeEvento(j.rascunho, cod)) return;
+                    var nomeSrv = String(nomesServidor[cod] || '').trim().slice(0, 60);
+                    if (nomeSrv) nomesAgora[cod] = nomeSrv;
                 });
                 remoto.nomes_blocos = nomesAgora;
                 var escalasAgora = {};
@@ -6675,8 +6786,10 @@ $boletimWizardSteps = [
             gravarEscolhasGrupoNoRascunho(rascunhoAtual);
             previewAtual = j.preview || previewAtual;
             aplicarOrdemNoPreview(previewAtual);
+            aplicarTitulosDosSubeventos();
             if (previewAtual && estado && estado.nomes_blocos) {
                 Object.keys(estado.nomes_blocos).forEach(function (cod) {
+                    if (tituloSubeventoDaColuna(cod)) return;
                     pintarTituloNasColunas(cod, estado.nomes_blocos[cod]);
                 });
             }

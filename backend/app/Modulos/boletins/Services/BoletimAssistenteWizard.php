@@ -2124,6 +2124,9 @@ class BoletimAssistenteWizard
             if ($this->colunaTituloFoiLimpo($estado, $cod)) {
                 continue;
             }
+            if ($this->componenteVemDeEventoAvaliativo($c)) {
+                continue;
+            }
             $nome = trim(mb_substr((string) ($c['nome'] ?? ''), 0, 60));
             if ($nome === '') {
                 continue;
@@ -4933,6 +4936,9 @@ class BoletimAssistenteWizard
             if ($cod === '' || (bool) preg_match('/^s[1-8]$/', $cod)) {
                 continue;
             }
+            if ($this->componenteVemDeEventoAvaliativo($c)) {
+                continue;
+            }
             if ($this->colunaTituloFoiLimpo($estado, $cod)) {
                 $c['nome'] = $this->nomePadraoColuna($cod);
                 continue;
@@ -5839,6 +5845,22 @@ class BoletimAssistenteWizard
     }
 
     /**
+     * @param array<string,mixed> $estado
+     */
+    private function gravarNomeColunaNoEstado(array &$estado, string $codigo, string $nome): void
+    {
+        $codigo = strtolower(trim($codigo));
+        $nome = trim($nome);
+        if ($codigo === '' || $nome === '') {
+            return;
+        }
+        if (!is_array($estado['nomes_blocos'] ?? null)) {
+            $estado['nomes_blocos'] = [];
+        }
+        $estado['nomes_blocos'][$codigo] = mb_substr($nome, 0, 60);
+    }
+
+    /**
      * Tira do demonstrativo a nota de evento que não foi marcado.
      * A recuperação do período permanece, e o nome da coluna passa a ser o do evento.
      *
@@ -5944,6 +5966,16 @@ class BoletimAssistenteWizard
                 if ($tipo > 0 && !isset($tipos[$tipo])) {
                     continue;
                 }
+                $blocoUnico = $this->blocoUnicoDoTipo($tipo, $tipoPorBloco);
+                $nomeTipo = $this->nomeUnicoDoTipo($tipo, $nomePorBloco, $tipoPorBloco);
+                if ($blocoUnico > 0) {
+                    $c['blocos_ids'] = [$blocoUnico];
+                    $c['bloco_id'] = $blocoUnico;
+                }
+                if ($nomeTipo !== '') {
+                    $c['nome'] = $nomeTipo;
+                    $this->gravarNomeColunaNoEstado($estado, (string) ($c['codigo'] ?? ''), $nomeTipo);
+                }
                 $out[] = $c;
                 continue;
             }
@@ -5957,6 +5989,7 @@ class BoletimAssistenteWizard
             $c['blocos_ids'] = $vivos;
             if (count($vivos) === 1 && isset($nomePorBloco[$vivos[0]]) && $nomePorBloco[$vivos[0]] !== '') {
                 $c['nome'] = $nomePorBloco[$vivos[0]];
+                $this->gravarNomeColunaNoEstado($estado, (string) ($c['codigo'] ?? ''), (string) $c['nome']);
             }
             $out[] = $c;
         }
@@ -5987,9 +6020,11 @@ class BoletimAssistenteWizard
             $codigos[$codigo] = true;
             $jaTem[$blocoId] = true;
             $tipoSub = (int) ($tipoPorBloco[$blocoId] ?? 0);
+            $nomeNovo = $titulo !== '' ? $titulo : ('Sub-evento ' . $blocoId);
+            $this->gravarNomeColunaNoEstado($estado, $codigo, $nomeNovo);
             $novos[] = [
                 'codigo' => $codigo,
-                'nome' => $titulo !== '' ? $titulo : ('Sub-evento ' . $blocoId),
+                'nome' => $nomeNovo,
                 'source_type' => 'provas_sistema',
                 'calc_type' => 'ultima',
                 'usar_percentual' => 0,
@@ -6016,6 +6051,47 @@ class BoletimAssistenteWizard
         }
         $rascunho['componentes'] = $out;
         return $rascunho;
+    }
+
+    /**
+     * @param array<int,int> $tipoPorBloco
+     */
+    private function blocoUnicoDoTipo(int $tipo, array $tipoPorBloco): int
+    {
+        if ($tipo <= 0) {
+            return 0;
+        }
+        $bloco = 0;
+        $qtd = 0;
+        foreach ($tipoPorBloco as $blocoId => $tipoBloco) {
+            if ((int) $tipoBloco !== $tipo) {
+                continue;
+            }
+            $qtd++;
+            $bloco = (int) $blocoId;
+        }
+        return $qtd === 1 ? $bloco : 0;
+    }
+
+    /**
+     * @param array<int,string> $nomePorBloco
+     * @param array<int,int> $tipoPorBloco
+     */
+    private function nomeUnicoDoTipo(int $tipo, array $nomePorBloco, array $tipoPorBloco): string
+    {
+        if ($tipo <= 0) {
+            return '';
+        }
+        $nome = '';
+        $qtd = 0;
+        foreach ($tipoPorBloco as $blocoId => $tipoBloco) {
+            if ((int) $tipoBloco !== $tipo) {
+                continue;
+            }
+            $qtd++;
+            $nome = (string) ($nomePorBloco[(int) $blocoId] ?? '');
+        }
+        return $qtd === 1 ? $nome : '';
     }
 
     /**
