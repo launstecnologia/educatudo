@@ -1028,6 +1028,7 @@ $boletimWizardSteps = [
         if (!estado.pecas_opcoes) estado.pecas_opcoes = {};
         var pecasGravadas = {};
         var idsEvento = [];
+        var idsSub = [];
         function guardarPecaEvento(peca, ids, ev) {
             if (!peca) return;
             if (keys.indexOf(peca.key) < 0) keys.push(peca.key);
@@ -1060,6 +1061,9 @@ $boletimWizardSteps = [
                     if (sid > 0) marcados.push(sid);
                 });
             }
+            marcados.forEach(function (sid) {
+                if (idsSub.indexOf(sid) < 0) idsSub.push(sid);
+            });
             var pecaPai = pecaDoTipoAvaliacao(ev.tipo_avaliacao_id);
             if (pecaPai) {
                 guardarPecaEvento(pecaPai, marcados, ev);
@@ -1081,6 +1085,8 @@ $boletimWizardSteps = [
         estado.pecas = keys;
         estado.eventos_ids = idsEvento;
         estado.eventos_ids_manual = 1;
+        estado.subeventos_ids = idsSub;
+        estado.subeventos_ids_manual = 1;
         if (jornadaOn && estado.pecas.indexOf('jornada') < 0) estado.pecas.push('jornada');
         aplicarJuntarProfessoresDoEvento();
         marcarEdicaoManual();

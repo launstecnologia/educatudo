@@ -699,6 +699,8 @@ class BoletimAssistenteWizard
             'pecas_opcoes' => $this->pecasOpcoesPadrao([]),
             'eventos_ids' => [],
             'eventos_ids_manual' => 0,
+            'subeventos_ids' => [],
+            'subeventos_ids_manual' => 0,
             'materia_unica' => 0,
             'materia_unica_modo' => 'soma',
             'materia_unica_tocada' => false,
@@ -1892,6 +1894,15 @@ class BoletimAssistenteWizard
         }
         $merged['eventos_ids'] = $eventosIds;
         $merged['eventos_ids_manual'] = (int) ($merged['eventos_ids_manual'] ?? 0) === 1 ? 1 : 0;
+        $subeventosIds = [];
+        foreach ((array) ($merged['subeventos_ids'] ?? []) as $subId) {
+            $subId = (int) $subId;
+            if ($subId > 0 && !in_array($subId, $subeventosIds, true)) {
+                $subeventosIds[] = $subId;
+            }
+        }
+        $merged['subeventos_ids'] = $subeventosIds;
+        $merged['subeventos_ids_manual'] = (int) ($merged['subeventos_ids_manual'] ?? 0) === 1 ? 1 : 0;
         $merged['pecas_opcoes'] = $this->mesclarPecasOpcoes(
             $this->pecasOpcoesPadrao($merged['pecas'], (int) ($merged['bimestre'] ?? 0)),
             is_array($merged['pecas_opcoes'] ?? null) ? $merged['pecas_opcoes'] : []
@@ -5789,9 +5800,20 @@ class BoletimAssistenteWizard
             static fn (array $ev): int => (int) ($ev['id'] ?? 0),
             $selecionados
         );
+        $escolhaManual = (int) ($estado['subeventos_ids_manual'] ?? 0) === 1;
+        $subsEscolhidos = [];
+        if ($escolhaManual) {
+            foreach ((array) ($estado['subeventos_ids'] ?? []) as $subId) {
+                $subId = (int) $subId;
+                if ($subId > 0) {
+                    $subsEscolhidos[$subId] = true;
+                }
+            }
+        }
         $blocos = [];
         $tipos = [];
         $nomePorBloco = [];
+        $tipoPorBloco = [];
         foreach ($selecionados as $ev) {
             $tipo = (int) ($ev['tipo_avaliacao_id'] ?? 0);
             if ($tipo > 0) {
@@ -5810,12 +5832,21 @@ class BoletimAssistenteWizard
                 if ($id <= 0) {
                     continue;
                 }
+                if ($escolhaManual && $subsEscolhidos !== [] && !isset($subsEscolhidos[$id])) {
+                    continue;
+                }
                 $blocos[$id] = true;
                 $tipoSub = (int) ($sub['tipo_avaliacao_id'] ?? 0);
                 if ($tipoSub > 0) {
                     $tipos[$tipoSub] = true;
+                    $tipoPorBloco[$id] = $tipoSub;
                 }
+                $titulo = trim((string) ($sub['titulo'] ?? ''));
                 if ($recuperacao && count($subs) <= 1 && $nomeEvento !== '') {
+                    $nomePorBloco[$id] = $nomeEvento;
+                } elseif ($titulo !== '') {
+                    $nomePorBloco[$id] = $titulo;
+                } elseif ($nomeEvento !== '') {
                     $nomePorBloco[$id] = $nomeEvento;
                 }
             }
@@ -5867,6 +5898,60 @@ class BoletimAssistenteWizard
                 $c['nome'] = $nomePorBloco[$vivos[0]];
             }
             $out[] = $c;
+        }
+        $jaTem = [];
+        $codigos = [];
+        foreach ($out as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if ($cod !== '') {
+                $codigos[$cod] = true;
+            }
+            foreach ($this->idsBlocosDoComponente($c) as $id) {
+                $jaTem[$id] = true;
+            }
+        }
+        $novos = [];
+        foreach ($nomePorBloco as $blocoId => $titulo) {
+            $blocoId = (int) $blocoId;
+            if ($blocoId <= 0 || isset($jaTem[$blocoId])) {
+                continue;
+            }
+            $codigo = 'av' . $blocoId;
+            if (isset($codigos[$codigo])) {
+                $codigo = 'av_' . $blocoId;
+            }
+            $codigos[$codigo] = true;
+            $jaTem[$blocoId] = true;
+            $tipoSub = (int) ($tipoPorBloco[$blocoId] ?? 0);
+            $novos[] = [
+                'codigo' => $codigo,
+                'nome' => $titulo !== '' ? $titulo : ('Sub-evento ' . $blocoId),
+                'source_type' => 'provas_sistema',
+                'calc_type' => 'ultima',
+                'usar_percentual' => 0,
+                'blocos_ids' => [$blocoId],
+                'bloco_id' => $blocoId,
+                'peso' => 1,
+                'obrigatorio' => 0,
+                'tipo_avaliacao_id' => $tipoSub > 0 ? $tipoSub : null,
+                'config' => [
+                    'papel_wizard' => 'exibe',
+                    'blocos_ids_manual' => 1,
+                    'tipo_avaliacao_id' => $tipoSub > 0 ? $tipoSub : null,
+                ],
+            ];
+        }
+        if ($novos !== []) {
+            $pos = count($out);
+            foreach ($out as $i => $c) {
+                if (is_array($c) && $this->componenteVemDeEventoAvaliativo($c)) {
+                    $pos = $i + 1;
+                }
+            }
+            array_splice($out, $pos, 0, $novos);
         }
         $rascunho['componentes'] = $out;
         return $rascunho;
