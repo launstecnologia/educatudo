@@ -670,8 +670,20 @@
 
 <!-- Lista de Questões -->
 <div class="bg-white rounded-xl shadow-lg p-6 border border-blue-200">
-    <div class="flex justify-between items-center mb-4">
+    <div class="flex justify-between items-center mb-4 gap-3 flex-wrap">
         <h3 class="text-lg font-semibold text-gray-900">Questões da Prova (<?= count($questoes) ?>)</h3>
+        <?php if (!empty($questoes)): ?>
+            <div class="flex items-center gap-3">
+                <label class="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                    <input type="checkbox" id="selecionar-todas-questoes" onchange="alternarSelecaoQuestoes(this.checked)" class="h-4 w-4 rounded border-gray-300">
+                    Selecionar todas
+                </label>
+                <button type="button" id="btn-excluir-questoes" onclick="excluirQuestoesSelecionadas()" disabled
+                        class="px-3 py-1.5 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                    Excluir selecionadas
+                </button>
+            </div>
+        <?php endif; ?>
     </div>
     
     <div id="questoesList" class="space-y-4">
@@ -682,8 +694,11 @@
             </div>
         <?php else: ?>
             <?php foreach ($questoes as $index => $questao): ?>
-                <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors" data-questao-id="<?= $questao['id'] ?>">
-                    <div class="flex justify-between items-start">
+                <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors" data-questao-id="<?= (int) $questao['id'] ?>">
+                    <div class="flex justify-between items-start gap-3">
+                        <label class="mt-1 shrink-0 cursor-pointer">
+                            <input type="checkbox" class="questao-selecao h-4 w-4 rounded border-gray-300" value="<?= (int) $questao['id'] ?>" onchange="atualizarBotaoExcluirQuestoes()" aria-label="Selecionar questão <?= (int) ($index + 1) ?>">
+                        </label>
                         <div class="flex-1">
                             <div class="flex items-center mb-2 flex-wrap gap-2">
                                 <span class="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
@@ -729,21 +744,37 @@
                             $enunc_texto = trim(strip_tags($enunc));
                             $enunc_preview = mb_substr($enunc_texto, 0, 80);
                             if (mb_strlen($enunc_texto) > 80) $enunc_preview .= '...';
+                            $srcCard = static function (?string $bruto): string {
+                                $src = html_entity_decode(trim((string) $bruto), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                                $src = str_replace('/public/uploads/provas/questoes/', '/uploads/provas/questoes/', $src);
+                                if ($src === '' || preg_match('#^(javascript|data|vbscript):#i', $src) === 1 || strpos($src, '//') === 0) {
+                                    return '';
+                                }
+                                if (preg_match('#^https?://#i', $src) !== 1) {
+                                    $src = rtrim((string) URL, '/') . '/' . ltrim($src, '/');
+                                }
+                                return $src;
+                            };
                             preg_match('/<img[^>]+src=["\']([^"\']+)["\']/', $enunc, $m_img);
-                            $enunc_img_src = isset($m_img[1]) ? $m_img[1] : ($questao['imagem_url'] ?? null);
-                            if (!$enunc_img_src && !empty($questao['alternativas']) && is_array($questao['alternativas'])) {
+                            $enunc_img_src = isset($m_img[1]) ? $srcCard($m_img[1]) : '';
+                            if ($enunc_img_src === '') {
+                                $enunc_img_src = $srcCard($questao['imagem_url'] ?? '');
+                            }
+                            if ($enunc_img_src === '' && !empty($questao['alternativas']) && is_array($questao['alternativas'])) {
                                 foreach ($questao['alternativas'] as $altCard) {
                                     $textoAltCard = (string) (is_array($altCard) ? ($altCard['texto'] ?? '') : $altCard);
                                     if (preg_match('/<img[^>]+src=["\']([^"\']+)["\']/', $textoAltCard, $m_alt_img)) {
-                                        $enunc_img_src = $m_alt_img[1];
-                                        break;
+                                        $enunc_img_src = $srcCard($m_alt_img[1]);
+                                        if ($enunc_img_src !== '') {
+                                            break;
+                                        }
                                     }
                                 }
                             }
                             ?>
                             <h4 class="font-semibold text-gray-900 mb-2"><?= htmlspecialchars($enunc_preview) ?></h4>
-                            <?php if ($enunc_img_src): ?>
-                                <img src="<?= htmlspecialchars($enunc_img_src) ?>" alt="" class="questao-card-img-preview rounded border border-gray-300 mt-1">
+                            <?php if ($enunc_img_src !== ''): ?>
+                                <img src="<?= htmlspecialchars($enunc_img_src, ENT_QUOTES, 'UTF-8') ?>" alt="Figura da questão" class="mt-2 max-h-40 max-w-sm w-auto rounded border border-gray-200 bg-white object-contain">
                             <?php endif; ?>
                         </div>
                         <div class="flex space-x-2 ml-4">
@@ -1609,12 +1640,21 @@ function showImageResizePopover(img) {
         '<div class="editor-image-resize-row editor-image-resize-row-steps">' +
         '<button type="button" class="editor-image-resize-btn editor-image-resize-btn-step" title="Diminuir" data-step="-">−</button>' +
         '<button type="button" class="editor-image-resize-btn editor-image-resize-btn-step" title="Aumentar" data-step="+">+</button>' +
+        '</div>' +
+        '<div class="editor-image-resize-row">' +
+        '<button type="button" class="editor-image-resize-btn" data-recorte="1">Recortar</button>' +
         '</div>';
+    div.style.zIndex = '80';
+    div.style.background = '#fff';
+    div.style.border = '1px solid #e5e7eb';
+    div.style.borderRadius = '12px';
+    div.style.padding = '10px';
+    div.style.boxShadow = '0 8px 24px rgba(0,0,0,.15)';
     document.body.appendChild(div);
     function positionPopover() {
         var rect = img.getBoundingClientRect();
         div.style.position = 'fixed';
-        div.style.left = rect.left + 'px';
+        div.style.left = Math.max(8, rect.left) + 'px';
         div.style.top = (rect.bottom + 6) + 'px';
     }
     positionPopover();
@@ -1637,6 +1677,16 @@ function showImageResizePopover(img) {
             document.removeEventListener('click', closeHandler);
         });
     });
+    var botaoRecorte = div.querySelector('[data-recorte]');
+    if (botaoRecorte) {
+        botaoRecorte.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            div.remove();
+            document.removeEventListener('click', closeHandler);
+            abrirRecorteImagem(img);
+        });
+    }
     function closeHandler(e) {
         if (div.parentNode && !div.contains(e.target) && e.target !== img) {
             div.remove();
@@ -1644,6 +1694,181 @@ function showImageResizePopover(img) {
         }
     }
     setTimeout(function() { document.addEventListener('click', closeHandler); }, 10);
+}
+
+function abrirRecorteImagem(imgOriginal) {
+    var aberto = document.getElementById('editor-recorte-imagem');
+    if (aberto && typeof aberto._fechar === 'function') aberto._fechar();
+    else if (aberto) aberto.remove();
+    var url = normalizarUrlImagem(imgOriginal.getAttribute('src') || imgOriginal.src);
+    if (!url) return;
+
+    var fundo = document.createElement('div');
+    fundo.id = 'editor-recorte-imagem';
+    fundo.style.cssText = 'position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:24px;';
+    var painel = document.createElement('div');
+    painel.style.cssText = 'background:#fff;border-radius:16px;max-width:920px;width:100%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.25);';
+    painel.innerHTML = '<div style="padding:16px 20px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;gap:12px;">' +
+        '<div><div style="font-weight:700;color:#111827;">Recortar imagem</div>' +
+        '<div style="font-size:13px;color:#6b7280;margin-top:2px;">Arraste sobre a figura para marcar o que deve ficar. Depois salve a questão.</div></div>' +
+        '<button type="button" data-fechar class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white">Cancelar</button></div>' +
+        '<div data-palco style="position:relative;overflow:auto;background:#f3f4f6;padding:16px;flex:1;display:flex;justify-content:center;align-items:flex-start;min-height:180px;"></div>' +
+        '<div style="padding:16px 20px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;">' +
+        '<button type="button" data-aplicar disabled class="inline-flex items-center px-4 py-2.5 bg-primary text-primary rounded-lg text-sm font-semibold" style="opacity:.45;">Usar este recorte</button></div>';
+    fundo.appendChild(painel);
+    document.body.appendChild(fundo);
+
+    var palco = painel.querySelector('[data-palco]');
+    var botao = painel.querySelector('[data-aplicar]');
+    var selecao = null;
+    var escalaLargura = 1;
+    var escalaAltura = 1;
+    var foto = new Image();
+    var mesmaOrigem = true;
+    try {
+        mesmaOrigem = new URL(url, window.location.href).origin === window.location.origin;
+    } catch (erroUrl) {
+        mesmaOrigem = false;
+    }
+    if (!mesmaOrigem && url.indexOf('data:') !== 0) foto.crossOrigin = 'anonymous';
+
+    function fechar() {
+        document.removeEventListener('keydown', aoTeclar);
+        foto.onload = null;
+        foto.onerror = null;
+        if (fundo.parentNode) fundo.remove();
+    }
+    fundo._fechar = fechar;
+    function aoTeclar(e) {
+        if (e.key === 'Escape') fechar();
+    }
+    document.addEventListener('keydown', aoTeclar);
+    painel.querySelector('[data-fechar]').addEventListener('click', fechar);
+    fundo.addEventListener('click', function(e) {
+        if (e.target === fundo) fechar();
+    });
+
+    foto.onload = function() {
+        var maxW = Math.min(860, window.innerWidth - 80);
+        var maxH = Math.min(560, window.innerHeight - 220);
+        var escala = Math.min(1, maxW / foto.naturalWidth, maxH / foto.naturalHeight);
+        var largura = Math.max(1, Math.round(foto.naturalWidth * escala));
+        var altura = Math.max(1, Math.round(foto.naturalHeight * escala));
+        escalaLargura = foto.naturalWidth / largura;
+        escalaAltura = foto.naturalHeight / altura;
+        var caixa = document.createElement('div');
+        caixa.style.cssText = 'position:relative;width:' + largura + 'px;height:' + altura + 'px;cursor:crosshair;user-select:none;touch-action:none;flex:0 0 auto;';
+        var visual = document.createElement('img');
+        visual.src = foto.src;
+        visual.draggable = false;
+        visual.alt = '';
+        visual.style.cssText = 'width:100%;height:100%;display:block;pointer-events:none;';
+        var marca = document.createElement('div');
+        marca.style.cssText = 'position:absolute;border:2px solid var(--primary-color,#111827);background:rgba(17,24,39,.18);display:none;pointer-events:none;box-sizing:border-box;';
+        caixa.appendChild(visual);
+        caixa.appendChild(marca);
+        palco.appendChild(caixa);
+
+        var arrastando = false;
+        var origemX = 0;
+        var origemY = 0;
+        function atualizar(x, y) {
+            selecao = {
+                x: Math.max(0, Math.min(origemX, x)),
+                y: Math.max(0, Math.min(origemY, y)),
+                w: Math.abs(x - origemX),
+                h: Math.abs(y - origemY)
+            };
+            selecao.w = Math.min(selecao.w, largura - selecao.x);
+            selecao.h = Math.min(selecao.h, altura - selecao.y);
+            marca.style.left = selecao.x + 'px';
+            marca.style.top = selecao.y + 'px';
+            marca.style.width = selecao.w + 'px';
+            marca.style.height = selecao.h + 'px';
+            botao.disabled = selecao.w < 8 || selecao.h < 8;
+            botao.style.opacity = botao.disabled ? '0.45' : '1';
+        }
+        caixa.addEventListener('pointerdown', function(e) {
+            if (e.button !== undefined && e.button !== 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+            var rect = caixa.getBoundingClientRect();
+            arrastando = true;
+            origemX = e.clientX - rect.left;
+            origemY = e.clientY - rect.top;
+            marca.style.display = 'block';
+            atualizar(origemX, origemY);
+            if (caixa.setPointerCapture) caixa.setPointerCapture(e.pointerId);
+        });
+        caixa.addEventListener('pointermove', function(e) {
+            if (!arrastando) return;
+            var rect = caixa.getBoundingClientRect();
+            atualizar(
+                Math.max(0, Math.min(largura, e.clientX - rect.left)),
+                Math.max(0, Math.min(altura, e.clientY - rect.top))
+            );
+        });
+        caixa.addEventListener('pointerup', function() {
+            arrastando = false;
+        });
+        caixa.addEventListener('pointercancel', function() {
+            arrastando = false;
+        });
+    };
+    foto.onerror = function() {
+        palco.textContent = 'Não foi possível abrir esta imagem para recortar.';
+    };
+    foto.src = url;
+
+    botao.addEventListener('click', function() {
+        if (!selecao || selecao.w < 8 || selecao.h < 8 || !foto.naturalWidth) return;
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(selecao.w * escalaLargura));
+        canvas.height = Math.max(1, Math.round(selecao.h * escalaAltura));
+        var ctx = canvas.getContext('2d');
+        try {
+            ctx.drawImage(
+                foto,
+                Math.round(selecao.x * escalaLargura),
+                Math.round(selecao.y * escalaAltura),
+                canvas.width,
+                canvas.height,
+                0,
+                0,
+                canvas.width,
+                canvas.height
+            );
+            botao.disabled = true;
+            botao.textContent = 'Salvando...';
+            canvas.toBlob(function(blob) {
+                if (!blob) {
+                    botao.disabled = false;
+                    botao.textContent = 'Usar este recorte';
+                    alert('Não foi possível recortar esta imagem.');
+                    return;
+                }
+                uploadImageForEditor(blob).then(function(novaUrl) {
+                    imgOriginal.src = normalizarUrlImagem(novaUrl);
+                    imgOriginal.setAttribute('data-uploaded', '1');
+                    imgOriginal.style.maxWidth = '100%';
+                    imgOriginal.style.height = 'auto';
+                    var oculto = document.getElementById('edit-enunciado-value');
+                    var editor = imgOriginal.closest('#edit-enunciado, #editor-enunciado');
+                    if (oculto && editor) oculto.value = editor.innerHTML;
+                    fechar();
+                }).catch(function(erro) {
+                    botao.disabled = false;
+                    botao.textContent = 'Usar este recorte';
+                    alert('Erro ao salvar o recorte: ' + (erro.message || erro));
+                });
+            }, 'image/png');
+        } catch (erro) {
+            botao.disabled = false;
+            botao.textContent = 'Usar este recorte';
+            botao.style.opacity = '1';
+            alert('Não foi possível recortar esta imagem.');
+        }
+    });
 }
 
 // Preview da imagem ao selecionar arquivo no modal de ler imagem
@@ -3008,6 +3233,69 @@ function removerQuestao(questaoId) {
     .catch(error => {
         alert('Erro de conexão: ' + error.message);
         console.error(error);
+    });
+}
+
+function alternarSelecaoQuestoes(marcado) {
+    document.querySelectorAll('.questao-selecao').forEach(function(caixa) {
+        caixa.checked = marcado;
+    });
+    atualizarBotaoExcluirQuestoes();
+}
+
+function atualizarBotaoExcluirQuestoes() {
+    var caixas = document.querySelectorAll('.questao-selecao');
+    var marcadas = document.querySelectorAll('.questao-selecao:checked').length;
+    var botao = document.getElementById('btn-excluir-questoes');
+    var todas = document.getElementById('selecionar-todas-questoes');
+    if (botao) {
+        botao.disabled = marcadas === 0;
+        botao.textContent = marcadas > 0 ? 'Excluir selecionadas (' + marcadas + ')' : 'Excluir selecionadas';
+    }
+    if (todas) {
+        todas.checked = caixas.length > 0 && marcadas === caixas.length;
+        todas.indeterminate = marcadas > 0 && marcadas < caixas.length;
+    }
+}
+
+function excluirQuestoesSelecionadas() {
+    var ids = Array.from(document.querySelectorAll('.questao-selecao:checked')).map(function(caixa) {
+        return parseInt(caixa.value, 10);
+    }).filter(function(id) { return id > 0; });
+    if (!ids.length) {
+        return;
+    }
+    var texto = ids.length === 1
+        ? 'Excluir 1 questão? Essa ação não pode ser desfeita.'
+        : 'Excluir ' + ids.length + ' questões? Essa ação não pode ser desfeita.';
+    if (!confirm(texto)) {
+        return;
+    }
+    var botao = document.getElementById('btn-excluir-questoes');
+    if (botao) botao.disabled = true;
+    fetch('<?= URL ?>/professor/provas/remover-questoes/<?= (int) $prova['id'] ?>', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': <?= json_encode($_SESSION['csrf_token'] ?? '') ?>
+        },
+        body: JSON.stringify({
+            _token: <?= json_encode($_SESSION['csrf_token'] ?? '') ?>,
+            ids: ids
+        })
+    })
+    .then(function(response) { return parseJsonResponse(response); })
+    .then(function(data) {
+        if (data.success) {
+            location.reload();
+            return;
+        }
+        alert(data.error || 'Erro ao excluir as questões');
+        if (botao) botao.disabled = false;
+    })
+    .catch(function(error) {
+        alert('Erro de conexão: ' + error.message);
+        if (botao) botao.disabled = false;
     });
 }
 

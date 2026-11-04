@@ -2749,6 +2749,68 @@ class ExamController extends BaseController
             $this->json(['error' => $e->getMessage()], 400);
         }
     }
+
+    /**
+     * Remove várias questões da mesma prova.
+     */
+    public function removerQuestoes($id)
+    {
+        $user = $this->auth->getUser();
+        $isAdmin = in_array($user['tipo'], ['admin', 'admin_escola'], true);
+        $provaId = (int) $id;
+
+        if (!$isAdmin && ($user['tipo'] ?? '') !== 'professor') {
+            $this->json(['error' => 'Não autorizado'], 403);
+            return;
+        }
+
+        $body = json_decode(file_get_contents('php://input') ?: '{}', true);
+        if (!is_array($body)) {
+            $body = [];
+        }
+        $token = (string) ($body['_token'] ?? $body['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
+        if ($token === '' || !$this->verifyCsrfToken($token)) {
+            $this->json(['error' => 'Token inválido. Recarregue a página.'], 400);
+            return;
+        }
+
+        $ids = [];
+        foreach ((array) ($body['ids'] ?? []) as $item) {
+            $questaoId = (int) $item;
+            if ($questaoId > 0) {
+                $ids[$questaoId] = $questaoId;
+            }
+        }
+        $ids = array_values($ids);
+        if ($ids === []) {
+            $this->json(['error' => 'Selecione pelo menos uma questão.'], 400);
+            return;
+        }
+        if (count($ids) > 200) {
+            $this->json(['error' => 'Selecione no máximo 200 questões por vez.'], 400);
+            return;
+        }
+
+        try {
+            if (!$isAdmin && !$this->provaModel->canEdit($provaId, $user['id'])) {
+                throw new \Exception('Você não tem permissão para editar esta prova');
+            }
+            if (!$isAdmin) {
+                $prova = $this->provaModel->findById($provaId);
+                $this->validarPermissaoProfessorModificarProva($prova, $user['id'], 'editar');
+            }
+
+            $removidas = $this->provaModel->excluirQuestoesDaProva($provaId, $ids);
+            $this->json([
+                'success' => true,
+                'message' => $removidas === 1 ? '1 questão excluída.' : $removidas . ' questões excluídas.',
+                'removidas' => $removidas,
+            ]);
+        } catch (\Exception $e) {
+            error_log('Erro ao remover questões: ' . $e->getMessage());
+            $this->json(['error' => 'Não foi possível excluir as questões selecionadas.'], 400);
+        }
+    }
     
     /**
      * Toggle liberação da prova

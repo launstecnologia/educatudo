@@ -1047,6 +1047,39 @@ class Exam
             ['id' => $questaoId]
         );
     }
+
+    /**
+     * Remove só questões que pertencem à prova informada.
+     *
+     * @param list<int> $ids
+     */
+    public function excluirQuestoesDaProva(int $provaId, array $ids): int
+    {
+        $limpos = [];
+        foreach ($ids as $id) {
+            $questaoId = (int) $id;
+            if ($questaoId > 0) {
+                $limpos[$questaoId] = $questaoId;
+            }
+        }
+        $limpos = array_values($limpos);
+        if ($provaId <= 0 || $limpos === [] || count($limpos) > 200) {
+            return 0;
+        }
+
+        $params = ['prova_id' => $provaId];
+        $marcas = [];
+        foreach ($limpos as $indice => $questaoId) {
+            $nome = 'questao_' . $indice;
+            $marcas[] = ':' . $nome;
+            $params[$nome] = $questaoId;
+        }
+
+        return (int) $this->db->delete(
+            'DELETE FROM provas_questoes WHERE prova_id = :prova_id AND id IN (' . implode(', ', $marcas) . ')',
+            $params
+        );
+    }
     
     /**
      * Inicia realização da prova pelo aluno

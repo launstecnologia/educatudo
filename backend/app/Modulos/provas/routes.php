@@ -94,6 +94,7 @@ $router->post('/professor/provas/adicionar-questao/{id}', 'Modulos/provas/ExamCo
 $router->post('/professor/provas/atualizar-questao/{id}/{questaoId}', 'Modulos/provas/ExamController@atualizarQuestao');
 $router->post('/professor/provas/finalizar/{id}', 'Modulos/provas/ExamController@finalizarProva');
 $router->post('/professor/provas/remover-questao/{id}/{questaoId}', 'Modulos/provas/ExamController@removerQuestao');
+$router->post('/professor/provas/remover-questoes/{id}', 'Modulos/provas/ExamController@removerQuestoes');
 $router->post('/professor/provas/gerar-questoes-ia/{id}', 'Modulos/provas/ExamController@gerarQuestoesIA');
 $router->post('/professor/provas/gerar-questoes-ia-async/{id}', 'Modulos/provas/ExamController@gerarQuestoesIAAsync');
 $router->post('/professor/provas/importar-questoes-ia/{jobId}', 'Modulos/provas/ExamController@importarQuestoesIA');
