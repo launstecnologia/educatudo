@@ -220,8 +220,47 @@ class ParentAcademicReadService
 
     public function reportCard(int $studentId): array
     {
-        // Boletim oficial fica fora do acesso dos pais (portal e app).
-        return [];
+        if ($studentId <= 0) {
+            return [];
+        }
+        try {
+            if (!\App\Core\LayoutHelper::isModuleEnabled('vida_escolar')) {
+                return [];
+            }
+            $vida = new \App\Modulos\VidaEscolar\Services\VidaEscolarService();
+            $model = $vida->model();
+            if (!$model->schemaPronto()) {
+                return [];
+            }
+            $fichas = $model->listarFichasAluno($studentId);
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        $cards = [];
+        foreach ($fichas as $ficha) {
+            if (!is_array($ficha)) {
+                continue;
+            }
+            $fichaId = (int) ($ficha['id'] ?? 0);
+            if ($fichaId <= 0) {
+                continue;
+            }
+            try {
+                $quadro = $vida->quadro($fichaId, true);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            if (!is_array($quadro)) {
+                continue;
+            }
+            $card = $this->boletimDaFicha($quadro);
+            if ($card !== null) {
+                $cards[] = $card;
+            }
+        }
+
+        return $cards;
     }
 
     /**
@@ -238,6 +277,79 @@ class ParentAcademicReadService
             'events' => $this->scheduledExamEvents($classId),
             'periods' => $this->liveGradePeriods($studentId, $classId),
         ];
+    }
+
+    /**
+     * Média do componente em cada trimestre regular, na mesma coluna do demonstrativo.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function subjectPerformance(int $studentId): array
+    {
+        if ($studentId <= 0) {
+            return [];
+        }
+        $student = $this->db->fetch('SELECT turma_id FROM alunos WHERE id = :id', ['id' => $studentId]);
+        $classId = (int) ($student['turma_id'] ?? 0);
+        $series = [];
+        foreach ($this->liveGradePeriods($studentId, $classId) as $period) {
+            if (!is_array($period)) {
+                continue;
+            }
+            $columns = is_array($period['columns'] ?? null) ? $period['columns'] : [];
+            $index = $this->indiceDaMedia($columns);
+            if ($index === null || !isset($columns[$index]) || !is_array($columns[$index])) {
+                continue;
+            }
+            $columnId = (string) ($columns[$index]['id'] ?? '');
+            $year = (int) ($period['school_year'] ?? 0);
+            $term = (int) ($period['term'] ?? 0);
+            foreach ($period['rows'] ?? [] as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $subject = trim((string) ($row['subject'] ?? ''));
+                if ($subject === '') {
+                    continue;
+                }
+                $key = function_exists('mb_strtoupper') ? mb_strtoupper($subject, 'UTF-8') : strtoupper($subject);
+                $name = trim((string) ($row['subject_name'] ?? ''));
+                if (!isset($series[$key])) {
+                    $series[$key] = [
+                        'subject' => $subject,
+                        'subject_name' => $name !== '' ? $name : $subject,
+                        'points' => [],
+                    ];
+                }
+                $grades = is_array($row['grades'] ?? null) ? $row['grades'] : [];
+                $average = $this->notaNumerica($grades[$columnId] ?? null);
+                if ($average === null) {
+                    continue;
+                }
+                $series[$key]['points'][$year . ':' . $term] = [
+                    'school_year' => $year,
+                    'term' => $term,
+                    'label' => $term . 'º trimestre',
+                    'average' => $average,
+                ];
+            }
+        }
+
+        $list = [];
+        foreach ($series as $item) {
+            $points = array_values($item['points']);
+            usort($points, static function (array $a, array $b): int {
+                $year = $a['school_year'] <=> $b['school_year'];
+                return $year !== 0 ? $year : ($a['term'] <=> $b['term']);
+            });
+            $item['points'] = $points;
+            $list[] = $item;
+        }
+        usort($list, static function (array $a, array $b): int {
+            return strcasecmp((string) $a['subject'], (string) $b['subject']);
+        });
+
+        return $list;
     }
 
     private function recentActivity(int $studentId): array
@@ -709,6 +821,11 @@ class ParentAcademicReadService
                     'title' => (string) ($column['titulo'] ?? 'Nota'),
                 ];
             }
+            $ano = (int) ($period['ano'] ?? 0);
+            $bimestre = (int) ($period['bimestre'] ?? 0);
+            if (!\App\Core\PeriodoLetivo::numeroValido($ano, $bimestre)) {
+                continue;
+            }
             $rows = [];
             foreach ($period['linhas'] ?? [] as $line) {
                 if (!is_array($line)) {
@@ -739,6 +856,217 @@ class ParentAcademicReadService
         }
 
         return $out;
+    }
+
+    /**
+     * Mesma ficha do detalhe do aluno, só para leitura.
+     *
+     * @param array<string,mixed> $quadro
+     * @return array<string,mixed>|null
+     */
+    private function boletimDaFicha(array $quadro): ?array
+    {
+        $ficha = is_array($quadro['ficha'] ?? null) ? $quadro['ficha'] : [];
+        $ano = (int) ($ficha['ano_letivo'] ?? 0);
+        $anoRotulo = $ano > 0 ? $ano : (int) date('Y');
+        $info = \App\Core\PeriodoLetivo::doAno($anoRotulo);
+        $rotulos = is_array($info['rotulos'] ?? null) ? $info['rotulos'] : [];
+        $periodos = [];
+        foreach ($rotulos as $numero => $rotulo) {
+            $numero = (int) $numero;
+            if (\App\Core\PeriodoLetivo::numeroValido($anoRotulo, $numero)) {
+                $periodos[] = $numero;
+            }
+        }
+        if ($periodos === []) {
+            $periodos = [1, 2, 3];
+        }
+
+        $layout = is_array($quadro['layout_exibicao'] ?? null) ? $quadro['layout_exibicao'] : [];
+        $faixas = is_array($layout['faixas'] ?? null) ? $layout['faixas'] : [];
+        $grid = is_array($quadro['grid'] ?? null) ? $quadro['grid'] : [];
+        $colunas = [];
+        $indice = 0;
+        if ($faixas !== []) {
+            foreach ($faixas as $faixa) {
+                if (!is_array($faixa)) {
+                    continue;
+                }
+                $nomeFaixa = trim((string) ($faixa['nome'] ?? ''));
+                foreach ($faixa['colunas'] ?? [] as $coluna) {
+                    if (!is_array($coluna)) {
+                        continue;
+                    }
+                    $nomeColuna = trim((string) ($coluna['nome'] ?? ''));
+                    $titulo = $nomeFaixa !== '' && $nomeColuna !== '' && $nomeFaixa !== $nomeColuna
+                        ? $nomeFaixa . ' · ' . $nomeColuna
+                        : ($nomeColuna !== '' ? $nomeColuna : $nomeFaixa);
+                    $colunas[] = [
+                        'codigo' => 'c' . $indice,
+                        'nome' => $titulo !== '' ? $titulo : 'Nota',
+                        'peca' => (string) ($coluna['peca'] ?? ''),
+                        'periodo' => (int) ($coluna['periodo'] ?? 0),
+                    ];
+                    $indice++;
+                }
+            }
+        } else {
+            foreach ($periodos as $periodo) {
+                $rotulo = trim((string) ($rotulos[$periodo] ?? ($periodo . 'º período')));
+                $colunas[] = ['codigo' => 'n' . $periodo, 'nome' => $rotulo, 'peca' => 'media', 'periodo' => $periodo];
+                $colunas[] = ['codigo' => 'f' . $periodo, 'nome' => 'Faltas · ' . $rotulo, 'peca' => 'faltas', 'periodo' => $periodo];
+            }
+        }
+        if ($colunas === []) {
+            return null;
+        }
+
+        $minima = (float) ($layout['media_minima'] ?? 6);
+        $formula = (string) ($layout['formula_final_media'] ?? '');
+        $layoutCalc = new \App\Modulos\EventosAvaliativos\Models\BoletimLayout();
+        $subjects = [];
+        foreach ($grid as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $linha = is_array($row['linha'] ?? null) ? $row['linha'] : [];
+            $celulas = is_array($row['celulas'] ?? null) ? $row['celulas'] : [];
+            $nome = trim((string) ($linha['componente_nome'] ?? ''));
+            if ($nome === '') {
+                $nome = 'Componente';
+            }
+            $medias = [];
+            $faltas = [];
+            foreach ($celulas as $numero => $celula) {
+                $numero = (int) $numero;
+                if ($numero < 1 || !is_array($celula)) {
+                    continue;
+                }
+                if ($celula['nota'] !== null && $celula['nota'] !== '') {
+                    $medias[$numero] = (float) $celula['nota'];
+                }
+                if ($celula['faltas'] !== null && $celula['faltas'] !== '') {
+                    $faltas[$numero] = (int) $celula['faltas'];
+                }
+            }
+            $finalMedia = null;
+            try {
+                $finalMedia = $layoutCalc->calcularFormula($formula, $medias);
+            } catch (\Throwable $e) {
+                $finalMedia = null;
+            }
+            $faltasPreenchidas = array_filter($faltas, static fn ($valor) => $valor !== null);
+            $finalFaltas = $faltasPreenchidas === [] ? null : array_sum($faltasPreenchidas);
+            $grades = [];
+            foreach ($colunas as $coluna) {
+                $periodo = (int) $coluna['periodo'];
+                $peca = (string) $coluna['peca'];
+                $celula = $periodo > 0 && is_array($celulas[$periodo] ?? null) ? $celulas[$periodo] : null;
+                if ($peca === 'media' && $periodo > 0) {
+                    $valor = $this->textoNotaCelula($celula);
+                } elseif ($peca === 'faltas' && $periodo > 0) {
+                    $valor = isset($faltas[$periodo]) ? (string) $faltas[$periodo] : '';
+                } elseif ($peca === 'situacao' && $periodo > 0) {
+                    $valor = $this->textoSituacao($medias[$periodo] ?? null, $minima);
+                } elseif ($peca === 'media' && $periodo === 0) {
+                    $valor = $finalMedia === null ? '' : number_format($finalMedia, 1, ',', '');
+                } elseif ($peca === 'faltas' && $periodo === 0) {
+                    $valor = $finalFaltas === null ? '' : (string) $finalFaltas;
+                } elseif ($peca === 'situacao' && $periodo === 0) {
+                    $valor = $this->textoSituacao($finalMedia, $minima);
+                } else {
+                    $valor = '';
+                }
+                $grades[(string) $coluna['codigo']] = $valor;
+            }
+            $subjects[] = [
+                'subject_name' => $nome,
+                'grades' => $grades,
+            ];
+        }
+
+        $turma = trim((string) ($ficha['turma_nome'] ?? ''));
+        $titulo = trim(($ano > 0 ? (string) $ano : 'Boletim') . ($turma !== '' ? ' · ' . $turma : ''));
+        $publicColumns = [];
+        foreach ($colunas as $coluna) {
+            $publicColumns[] = ['codigo' => $coluna['codigo'], 'nome' => $coluna['nome']];
+        }
+
+        return [
+            'rule_id' => (int) ($ficha['id'] ?? 0),
+            'title' => $titulo !== '' ? $titulo : 'Boletim',
+            'period' => 'Boletim oficial',
+            'school_year' => $ano,
+            'term' => 0,
+            'updated_at' => $this->isoDate($ficha['updated_at'] ?? null),
+            'columns' => $publicColumns,
+            'subjects' => $subjects,
+        ];
+    }
+
+    /**
+     * @param array<string,mixed>|null $celula
+     */
+    private function textoNotaCelula(?array $celula): string
+    {
+        if (!is_array($celula)) {
+            return '';
+        }
+        $conceito = trim((string) ($celula['conceito'] ?? ''));
+        if ($conceito !== '') {
+            return $conceito;
+        }
+        if ($celula['nota'] === null || $celula['nota'] === '') {
+            return '';
+        }
+
+        return number_format((float) $celula['nota'], 1, ',', '');
+    }
+
+    /**
+     * @param list<array<string,mixed>> $columns
+     */
+    private function indiceDaMedia(array $columns): ?int
+    {
+        $fallback = null;
+        foreach ($columns as $index => $column) {
+            if (!is_array($column)) {
+                continue;
+            }
+            $fallback = (int) $index;
+            $title = function_exists('mb_strtolower')
+                ? mb_strtolower((string) ($column['title'] ?? ''), 'UTF-8')
+                : strtolower((string) ($column['title'] ?? ''));
+            if (str_contains($title, 'méd') || str_contains($title, 'med')) {
+                return (int) $index;
+            }
+        }
+
+        return $fallback;
+    }
+
+    private function notaNumerica($value): ?float
+    {
+        $text = trim((string) $value);
+        if ($text === '' || $text === '—' || $text === '-' || strcasecmp($text, 'null') === 0) {
+            return null;
+        }
+        $text = str_replace(',', '.', $text);
+        if (!is_numeric($text)) {
+            return null;
+        }
+
+        return round((float) $text, 2);
+    }
+
+    private function textoSituacao(?float $nota, float $minima): string
+    {
+        $aprovado = \App\Modulos\RegrasAcademicas\Services\EscalaNota::aprovado($nota, $minima);
+        if ($aprovado === null) {
+            return '';
+        }
+
+        return $aprovado ? 'Aprovado' : 'Reprovado';
     }
 
     private function isoDate($value): ?string

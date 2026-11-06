@@ -36,6 +36,13 @@ class MobileAcademicController extends BaseController
     }
     public function exercises($id): void { $this->respond($id, 'exercises'); }
 
+    public function subjectPerformance($id): void
+    {
+        $studentId = $this->authorizedStudentId($id);
+        $data = $this->service->subjectPerformance($studentId);
+        $this->json(['data' => $data, 'meta' => ['count' => count($data)]]);
+    }
+
     public function examEvents($id): void
     {
         $studentId = $this->authorizedStudentId($id);

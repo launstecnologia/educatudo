@@ -37,6 +37,7 @@ $router->middleware('MobileApiAuth', function ($router) {
     $router->get('/api/v1/students/{id}/dashboard', 'Api/V1/MobileAcademicController@dashboard');
     $router->get('/api/v1/students/{id}/exams', 'Api/V1/MobileAcademicController@exams');
     $router->get('/api/v1/students/{id}/exam-events', 'Api/V1/MobileAcademicController@examEvents');
+    $router->get('/api/v1/students/{id}/subject-performance', 'Api/V1/MobileAcademicController@subjectPerformance');
     $router->get('/api/v1/students/{id}/exercises', 'Api/V1/MobileAcademicController@exercises');
     $router->get('/api/v1/students/{id}/journeys', 'Api/V1/MobileAcademicController@journeys');
     $router->get('/api/v1/students/{id}/lesson-plans', 'Api/V1/MobileAcademicController@lessonPlans');
@@ -68,6 +69,7 @@ $router->middleware('MobileApiAuth', function ($router) {
     $router->get('/api/alunos/{id}/painel', 'Api/V1/MobileAcademicController@dashboard');
     $router->get('/api/alunos/{id}/provas', 'Api/V1/MobileAcademicController@exams');
     $router->get('/api/alunos/{id}/eventos-de-prova', 'Api/V1/MobileAcademicController@examEvents');
+    $router->get('/api/alunos/{id}/desempenho', 'Api/V1/MobileAcademicController@subjectPerformance');
     $router->get('/api/alunos/{id}/exercicios', 'Api/V1/MobileAcademicController@exercises');
     $router->get('/api/alunos/{id}/jornadas', 'Api/V1/MobileAcademicController@journeys');
     $router->get('/api/alunos/{id}/planos-de-aula', 'Api/V1/MobileAcademicController@lessonPlans');
