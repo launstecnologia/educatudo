@@ -718,8 +718,14 @@ class ParentAcademicReadService
                 foreach ($line['notas'] ?? [] as $blockId => $value) {
                     $grades[(string) $blockId] = (string) $value;
                 }
+                $nome = trim((string) ($line['materia'] ?? ''));
+                $sigla = trim((string) ($line['sigla'] ?? ''));
+                if ($nome === '') {
+                    $nome = 'Matéria';
+                }
                 $rows[] = [
-                    'subject' => (string) ($line['materia'] ?? 'Matéria'),
+                    'subject' => $sigla !== '' ? $sigla : $nome,
+                    'subject_name' => $nome,
                     'grades' => $grades,
                 ];
             }

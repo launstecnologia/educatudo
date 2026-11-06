@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Infra\Services;
-/** Envio de push Android pela API HTTP v1 do Firebase Cloud Messaging. */
+/** Envio de push pela API HTTP v1 do Firebase Cloud Messaging. */
 
 use App\Core\Logger;
 
@@ -54,6 +54,17 @@ class FirebaseMessagingService
                             'sound' => 'default',
                         ],
                     ],
+                    'apns' => [
+                        'headers' => [
+                            'apns-priority' => '10',
+                            'apns-push-type' => 'alert',
+                        ],
+                        'payload' => [
+                            'aps' => [
+                                'sound' => 'default',
+                            ],
+                        ],
+                    ],
                 ],
             ];
             if ($stringData !== []) {
@@ -66,7 +77,7 @@ class FirebaseMessagingService
                 CURLOPT_POST => true,
                 CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                 CURLOPT_HTTPHEADER => [
-                    'Authorization: \Bearer ' . $accessToken,
+                    'Authorization: Bearer ' . $accessToken,
                     'Content-Type: application/json; charset=utf-8',
                 ],
                 CURLOPT_RETURNTRANSFER => true,

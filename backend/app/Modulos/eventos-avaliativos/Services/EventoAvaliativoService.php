@@ -1335,7 +1335,8 @@ class EventoAvaliativoService
         $notas = $this->db->fetchAll(
             'SELECT pb.id AS bloco_id, pb.titulo, pb.data_prova, pb.semana,
                     e.id AS evento_id, e.nome AS evento_nome, e.ano_letivo, e.bimestre,
-                    n.id AS nota_id, n.materia_id, n.nota, m.nome AS materia_nome
+                    n.id AS nota_id, n.materia_id, n.nota, m.nome AS materia_nome,
+                    ' . $this->sqlSiglaDoComponente() . ' AS materia_sigla
                FROM provas_blocos_notas_lancadas n
                INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.deleted_at IS NULL
                INNER JOIN eventos_avaliativos e ON e.id = pb.evento_avaliativo_id
@@ -1401,6 +1402,10 @@ class EventoAvaliativoService
             }
             $blocoId = (int) ($nota['bloco_id'] ?? 0);
             $periodos[$chave]['materias'][$materiaId]['materia'] = $materia;
+            $sigla = trim((string) ($nota['materia_sigla'] ?? ''));
+            if ($sigla !== '') {
+                $periodos[$chave]['materias'][$materiaId]['sigla'] = $sigla;
+            }
             $periodos[$chave]['materias'][$materiaId]['notas'][$blocoId] = $this->formatarNotaAoVivo($nota['nota']);
         }
 
@@ -1474,6 +1479,19 @@ class EventoAvaliativoService
             return ['error' => 'Rode a migration 2026_10_27_eventos_sigla.sql no painel Master.'];
         }
         return ['valor' => $sigla];
+    }
+
+    private function sqlSiglaDoComponente(): string
+    {
+        try {
+            $coluna = $this->db->fetchAll("SHOW COLUMNS FROM `materias` LIKE 'sigla'");
+            if (!empty($coluna)) {
+                return 'm.sigla';
+            }
+        } catch (Throwable $e) {
+            // Sem a coluna, a família vê o nome completo do componente.
+        }
+        return 'NULL';
     }
 
     private function sqlSemRascunho(string $alias): string

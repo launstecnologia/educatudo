@@ -117,12 +117,21 @@ class TeacherComunicacaoController extends BaseController
             if (mb_strlen($resumo) > 160) {
                 $resumo = mb_substr($resumo, 0, 157) . '...';
             }
-            $this->service->push($parents, $title, $resumo, '/school-communications/' . $id, [
+            $resultadoPush = $this->service->push($parents, $title, $resumo, '/school-communications/' . $id, [
                 'type' => 'school_communication',
                 'communication_id' => (string) $id,
             ], $professorId);
+            $enviados = (int) ($resultadoPush['sent'] ?? 0);
+            $this->setFlashMessage(
+                $enviados > 0
+                    ? 'Recado enviado. O push foi aceito para ' . $enviados . ' aparelho(s).'
+                    : 'Recado enviado. Nenhum aparelho aceitou o push.',
+                $enviados > 0 ? 'success' : 'error'
+            );
+            $this->redirect(URL . '/professor/comunicacao-pais');
+            return;
         }
-        $this->setFlashMessage($enviarPush === 1 ? 'Recado enviado aos pais, com push.' : 'Recado enviado aos pais.', 'success');
+        $this->setFlashMessage('Recado enviado aos pais.', 'success');
         $this->redirect(URL . '/professor/comunicacao-pais');
     }
 

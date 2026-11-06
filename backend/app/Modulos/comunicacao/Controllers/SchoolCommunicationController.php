@@ -111,11 +111,20 @@ class SchoolCommunicationController extends BaseController
         $this->service->saveAttachments($id, $_FILES['attachments'] ?? []);
         if ($enviarPush === 1) {
             $parents = $this->service->parentIds($audience, $classIds, $studentIds, $serieIds, $cursoIds);
-            $this->service->push($parents, $title, $this->plainSummary($content), '/school-communications/' . $id, [
+            $resultadoPush = $this->service->push($parents, $title, $this->plainSummary($content), '/school-communications/' . $id, [
                 'type'=>'school_communication', 'communication_id'=>(string)$id,
             ], (int)$user['id']);
+            $enviados = (int) ($resultadoPush['sent'] ?? 0);
+            $this->setFlashMessage(
+                $enviados > 0
+                    ? 'Comunicação publicada. O push foi aceito para ' . $enviados . ' aparelho(s).'
+                    : 'Comunicação publicada. Nenhum aparelho aceitou o push.',
+                $enviados > 0 ? 'success' : 'error'
+            );
+            $this->redirect(URL . '/admin/comunicacao-escolar/' . $id);
+            return;
         }
-        $this->setFlashMessage($enviarPush === 1 ? 'Comunicação publicada e enviada por push aos responsáveis.' : 'Comunicação publicada para os responsáveis.', 'success');
+        $this->setFlashMessage('Comunicação publicada para os responsáveis.', 'success');
         $this->redirect(URL . '/admin/comunicacao-escolar/' . $id);
     }
 
