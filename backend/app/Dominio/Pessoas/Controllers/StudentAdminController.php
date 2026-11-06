@@ -1712,31 +1712,72 @@ class StudentAdminController extends AdminBaseController
                 throw new \Exception('Aluno não encontrado');
             }
 
-            if (!isset($_FILES['foto']) || $_FILES['foto']['error'] !== UPLOAD_ERR_OK) {
-                throw new \Exception('Erro no upload da imagem');
+            if (!isset($_FILES['foto']) || !is_array($_FILES['foto'])) {
+                throw new \Exception('Nenhuma imagem foi enviada. Tente novamente.');
             }
 
             $file = $_FILES['foto'];
-            $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-            $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-
-            if (!in_array($fileExtension, $allowedExtensions, true)) {
-                throw new \Exception('Tipo de arquivo não permitido. Use: ' . implode(', ', $allowedExtensions));
+            $uploadError = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
+            if ($uploadError !== UPLOAD_ERR_OK) {
+                $mensagensUpload = [
+                    UPLOAD_ERR_INI_SIZE => 'A foto é maior do que o servidor aceita.',
+                    UPLOAD_ERR_FORM_SIZE => 'A foto é maior do que o servidor aceita.',
+                    UPLOAD_ERR_PARTIAL => 'O envio da foto foi interrompido. Tente novamente.',
+                    UPLOAD_ERR_NO_FILE => 'Nenhuma imagem foi enviada.',
+                    UPLOAD_ERR_NO_TMP_DIR => 'Não foi possível guardar a foto no servidor.',
+                    UPLOAD_ERR_CANT_WRITE => 'Não foi possível guardar a foto no servidor.',
+                    UPLOAD_ERR_EXTENSION => 'O servidor bloqueou este arquivo.',
+                ];
+                throw new \Exception($mensagensUpload[$uploadError] ?? 'Erro no upload da imagem');
             }
 
-            if ($file['size'] > 2 * 1024 * 1024) {
+            $fileExtension = strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
+            if (in_array($fileExtension, ['heic', 'heif'], true)) {
+                throw new \Exception('Fotos HEIC do iPhone não são aceitas. Exporte a imagem como JPG ou PNG.');
+            }
+
+            if ((int) ($file['size'] ?? 0) > 2 * 1024 * 1024) {
                 throw new \Exception('Arquivo muito grande. Máximo 2MB');
             }
 
-            $imageInfo = @getimagesize($file['tmp_name']);
+            $imageInfo = @getimagesize((string) ($file['tmp_name'] ?? ''));
             if ($imageInfo === false) {
-                throw new \Exception('Arquivo não é uma imagem válida');
+                throw new \Exception('Arquivo não é uma imagem válida. Use JPG, PNG, GIF ou WebP.');
             }
 
+            $mime = '';
+            if (function_exists('finfo_open')) {
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                if ($finfo) {
+                    $detected = finfo_file($finfo, (string) ($file['tmp_name'] ?? ''));
+                    finfo_close($finfo);
+                    if (is_string($detected)) {
+                        $mime = $detected;
+                    }
+                }
+            }
+            if ($mime === '') {
+                $mime = (string) ($imageInfo['mime'] ?? '');
+            }
+            if ($mime === 'image/heic' || $mime === 'image/heif') {
+                throw new \Exception('Fotos HEIC do iPhone não são aceitas. Exporte a imagem como JPG ou PNG.');
+            }
+
+            $extensaoPorMime = [
+                'image/jpeg' => 'jpg',
+                'image/png' => 'png',
+                'image/gif' => 'gif',
+                'image/webp' => 'webp',
+            ];
+            if (!isset($extensaoPorMime[$mime])) {
+                throw new \Exception('Tipo de arquivo não permitido. Use JPG, PNG, GIF ou WebP.');
+            }
+
+            $fileExtension = $extensaoPorMime[$mime];
             $media = new MediaStorageService($this->config);
 
             $fileName = 'aluno_' . $id . '_' . time() . '.' . $fileExtension;
-            $contentType = $imageInfo['mime'] ?? ($file['type'] ?? 'application/octet-stream');
+            $contentType = $mime;
             if (!$media->put('avatars', $fileName, $file['tmp_name'], $contentType)) {
                 throw new \Exception('Erro ao salvar arquivo');
             }
