@@ -6992,13 +6992,15 @@ class BoletimAssistenteWizard
                     if (strtolower(trim((string) ($cExistente['codigo'] ?? ''))) !== $codigo) {
                         continue;
                     }
-                    $cExistente['nome'] = $nome;
-                    $cExistente['source_type'] = 'calculado';
-                    $cExistente['calc_type'] = 'media';
-                    $cExistente['config'] = $cfgMedia;
+                    $cfgAtual = $this->configDoComponente($cExistente);
+                    $cfgAtual['media_subeventos'] = 1;
+                    $cfgAtual['codigos_subeventos'] = $cols;
+                    if (trim((string) ($cfgAtual['linha_cabecalho'] ?? '')) === '' && $linha !== '') {
+                        $cfgAtual['linha_cabecalho'] = $linha;
+                    }
+                    $cExistente['config'] = $cfgAtual;
                 }
                 unset($cExistente);
-                $this->gravarNomeColunaNoEstado($estado, $codigo, $nome);
                 continue;
             }
             if ($this->expressaoJaExiste($comps, $exp)) {
