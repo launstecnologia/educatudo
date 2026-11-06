@@ -105,6 +105,72 @@ class ParentAcademicReadService
         ];
     }
 
+    /**
+     * Ocorrências liberadas para a família (enviar_pais = 1).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function occurrences(int $studentId): array
+    {
+        if ($studentId <= 0) {
+            return [];
+        }
+        try {
+            $select = 'o.id, o.data_ocorrencia, o.titulo, o.detalhe, o.nivel_gravidade, o.retorno_em';
+            $join = '';
+            if ($this->hasColumn('alunos_ocorrencias', 'status')) {
+                $select .= ', o.status';
+            }
+            if ($this->hasColumn('alunos_ocorrencias', 'categoria_id') && $this->db->tableExists('ocorrencias_categorias')) {
+                $select .= ', cat.nome AS categoria_nome';
+                $join .= ' LEFT JOIN ocorrencias_categorias cat ON cat.id = o.categoria_id';
+            }
+            if ($this->hasColumn('alunos_ocorrencias', 'materia_id') && $this->db->tableExists('materias')) {
+                $select .= ', m.nome AS materia_nome';
+                $join .= ' LEFT JOIN materias m ON m.id = o.materia_id';
+            }
+            $rows = $this->db->fetchAll(
+                "SELECT {$select}
+                 FROM alunos_ocorrencias o
+                 {$join}
+                 WHERE o.enviar_pais = 1
+                   AND (
+                       o.aluno_id = :aluno
+                       OR EXISTS (
+                           SELECT 1 FROM alunos_ocorrencias_itens oi
+                           WHERE oi.ocorrencia_id = o.id AND oi.aluno_id = :aluno_item
+                       )
+                   )
+                 ORDER BY o.data_ocorrencia DESC",
+                ['aluno' => $studentId, 'aluno_item' => $studentId]
+            );
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        $items = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $category = trim((string) ($row['categoria_nome'] ?? ''));
+            $subject = trim((string) ($row['materia_nome'] ?? ''));
+            $items[] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'title' => (string) ($row['titulo'] ?? ''),
+                'detail' => (string) ($row['detalhe'] ?? ''),
+                'severity' => (string) ($row['nivel_gravidade'] ?? ''),
+                'status' => isset($row['status']) ? (string) $row['status'] : null,
+                'category' => $category !== '' ? $category : null,
+                'subject' => $subject !== '' ? $subject : null,
+                'occurred_at' => $this->isoDate($row['data_ocorrencia'] ?? null),
+                'follow_up_at' => $this->isoDate($row['retorno_em'] ?? null),
+            ];
+        }
+
+        return $items;
+    }
+
     public function reportCard(int $studentId): array
     {
         // Boletim oficial fica fora do acesso dos pais (portal e app).
