@@ -56,6 +56,13 @@ class MobileAcademicController extends BaseController
         ]);
     }
 
+    public function absences($id): void
+    {
+        $studentId = $this->authorizedStudentId($id);
+        $data = $this->service->absences($studentId);
+        $this->json(['data' => $data, 'meta' => ['count' => count($data)]]);
+    }
+
     public function accessEvents($id): void
     {
         $studentId = $this->authorizedStudentId($id);

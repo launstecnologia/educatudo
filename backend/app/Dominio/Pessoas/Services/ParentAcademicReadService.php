@@ -106,6 +106,107 @@ class ParentAcademicReadService
     }
 
     /**
+     * Faltas lançadas do aluno, agrupadas pela disciplina.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function absences(int $studentId): array
+    {
+        if ($studentId <= 0
+            || !$this->db->tableExists('faltas_lancamentos')
+            || !$this->db->tableExists('faltas_eventos')) {
+            return [];
+        }
+
+        $temMateria = $this->db->tableExists('materias');
+        $join = $temMateria
+            ? 'LEFT JOIN materias m ON m.id = fl.materia_id AND fl.materia_id > 0'
+            : '';
+        $nome = $temMateria ? 'm.nome' : 'NULL';
+        $sigla = $temMateria ? $this->sqlSiglaMateria() : 'NULL';
+        $rows = $this->db->fetchAll(
+            'SELECT fl.materia_id,
+                    fl.faltas,
+                    fl.observacao,
+                    fe.id AS evento_id,
+                    fe.nome AS evento_nome,
+                    fe.bimestre,
+                    fe.ano_letivo,
+                    ' . $nome . ' AS materia_nome,
+                    ' . $sigla . ' AS materia_sigla
+               FROM faltas_lancamentos fl
+               INNER JOIN faltas_eventos fe ON fe.id = fl.evento_id AND fe.ativo = 1
+               ' . $join . '
+              WHERE fl.aluno_id = :aluno
+                AND fl.faltas > 0
+              ORDER BY fe.ano_letivo DESC, fe.id DESC',
+            ['aluno' => $studentId]
+        );
+        if (!is_array($rows) || $rows === []) {
+            return [];
+        }
+
+        $series = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $faltas = round((float) ($row['faltas'] ?? 0), 2);
+            if ($faltas <= 0) {
+                continue;
+            }
+            $materiaId = (int) ($row['materia_id'] ?? 0);
+            $nomeMateria = trim((string) ($row['materia_nome'] ?? ''));
+            $siglaMateria = trim((string) ($row['materia_sigla'] ?? ''));
+            if ($materiaId <= 0 || $nomeMateria === '') {
+                $nomeMateria = 'Faltas gerais';
+            }
+            $chave = $materiaId > 0 ? 'm' . $materiaId : 'geral';
+            if (!isset($series[$chave])) {
+                $series[$chave] = [
+                    'subject' => $siglaMateria !== '' ? $siglaMateria : $nomeMateria,
+                    'subject_name' => $nomeMateria,
+                    'absences' => 0.0,
+                    'periods' => [],
+                ];
+            }
+            $ano = (int) ($row['ano_letivo'] ?? 0);
+            $bimestre = trim((string) ($row['bimestre'] ?? ''));
+            $periodo = 0;
+            if (preg_match('/^(\d+)/', $bimestre, $numero)) {
+                $periodo = (int) $numero[1];
+            }
+            $rotulo = ($ano >= 1990 && $ano <= 2100 && $periodo > 0)
+                ? \App\Core\PeriodoLetivo::rotulo($ano, $periodo)
+                : '';
+            if ($rotulo === '') {
+                $rotulo = $bimestre !== '' ? $bimestre : 'Período';
+            }
+            $evento = trim((string) ($row['evento_nome'] ?? ''));
+            $nota = trim((string) ($row['observacao'] ?? ''));
+            $item = [
+                'school_year' => $ano,
+                'term' => $periodo,
+                'label' => $rotulo,
+                'event_name' => $evento,
+                'absences' => $faltas,
+            ];
+            if ($nota !== '') {
+                $item['note'] = $nota;
+            }
+            $series[$chave]['periods'][] = $item;
+            $series[$chave]['absences'] = round((float) $series[$chave]['absences'] + $faltas, 2);
+        }
+
+        $lista = array_values($series);
+        usort($lista, static function (array $a, array $b): int {
+            return strcasecmp((string) $a['subject_name'], (string) $b['subject_name']);
+        });
+
+        return $lista;
+    }
+
+    /**
      * Carteirinha vigente do aluno, no mesmo formato exibido ao próprio aluno.
      *
      * @return array<string,mixed>|null
@@ -326,10 +427,14 @@ class ParentAcademicReadService
                 if ($average === null) {
                     continue;
                 }
+                $rotulo = \App\Core\PeriodoLetivo::rotulo($year, $term);
+                if ($rotulo === '') {
+                    $rotulo = $term > 0 ? $term . 'º período' : 'Período';
+                }
                 $series[$key]['points'][$year . ':' . $term] = [
                     'school_year' => $year,
                     'term' => $term,
-                    'label' => $term . 'º trimestre',
+                    'label' => $rotulo,
                     'average' => $average,
                 ];
             }
@@ -1034,15 +1139,41 @@ class ParentAcademicReadService
                 continue;
             }
             $fallback = (int) $index;
-            $title = function_exists('mb_strtolower')
-                ? mb_strtolower((string) ($column['title'] ?? ''), 'UTF-8')
-                : strtolower((string) ($column['title'] ?? ''));
-            if (str_contains($title, 'méd') || str_contains($title, 'med')) {
+            if ($this->tituloEhMedia((string) ($column['title'] ?? ''))) {
                 return (int) $index;
             }
         }
 
         return $fallback;
+    }
+
+    private function sqlSiglaMateria(): string
+    {
+        try {
+            $coluna = $this->db->fetchAll("SHOW COLUMNS FROM `materias` LIKE 'sigla'");
+            if (!empty($coluna)) {
+                return 'm.sigla';
+            }
+        } catch (\Throwable $e) {
+            // Sem a coluna, a família vê o nome completo da disciplina.
+        }
+
+        return 'NULL';
+    }
+
+    private function tituloEhMedia(string $title): bool
+    {
+        $title = function_exists('mb_strtolower') ? mb_strtolower($title, 'UTF-8') : strtolower($title);
+        $title = strtr($title, [
+            'á' => 'a', 'à' => 'a', 'ã' => 'a', 'â' => 'a',
+            'é' => 'e', 'ê' => 'e',
+            'í' => 'i',
+            'ó' => 'o', 'ô' => 'o', 'õ' => 'o',
+            'ú' => 'u',
+            'ç' => 'c',
+        ]);
+
+        return preg_match('/(^|[^a-z])medias?([^a-z]|$)/', $title) === 1;
     }
 
     private function notaNumerica($value): ?float
