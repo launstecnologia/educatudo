@@ -12,6 +12,12 @@ $hub_cards = [
         'description' => 'Avisos aos pais, com resposta, mídia e push opcional.',
         'icon' => 'fa-solid fa-envelope-open-text',
     ],
+    [
+        'href' => URL . '/admin/documentos-familia',
+        'title' => 'Documentos da família',
+        'description' => 'Arquivos enviados, ficha de saúde e declarações aceitas no aplicativo.',
+        'icon' => 'fa-regular fa-folder-open',
+    ],
 ];
 
 if ($modOn('calendario_escolar')) {

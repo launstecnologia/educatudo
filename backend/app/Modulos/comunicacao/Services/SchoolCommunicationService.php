@@ -122,6 +122,82 @@ class SchoolCommunicationService
         }
         return $saved;
     }
+
+    /**
+     * @param array<string,mixed> $file
+     * @return array{path:string,name:string}|null
+     */
+    public function guardarImagem(array $file, string $pasta): ?array
+    {
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            return null;
+        }
+        $tmp = (string) ($file['tmp_name'] ?? '');
+        $size = (int) ($file['size'] ?? 0);
+        if ($tmp === '' || !is_uploaded_file($tmp) || $size <= 0 || $size > 8 * 1024 * 1024) {
+            return null;
+        }
+        $mapa = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+        $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($tmp) ?: '';
+        if (!isset($mapa[$mime])) {
+            return null;
+        }
+        $tenant = defined('TENANT_SLUG') ? preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG) : 'default';
+        $pasta = preg_replace('/[^a-z0-9_-]/i', '', $pasta) ?: 'comunicacao';
+        $relative = 'storage/uploads/' . $pasta . '/' . ($tenant !== '' ? $tenant : 'default');
+        $absolute = dirname(__DIR__, 4) . '/' . $relative;
+        if (!is_dir($absolute) && !@mkdir($absolute, 0775, true) && !is_dir($absolute)) {
+            return null;
+        }
+        $filename = bin2hex(random_bytes(16)) . '.' . $mapa[$mime];
+        if (!move_uploaded_file($tmp, $absolute . '/' . $filename)) {
+            return null;
+        }
+        $nome = basename((string) ($file['name'] ?? 'imagem'));
+
+        return ['path' => '/' . $relative . '/' . $filename, 'name' => $nome !== '' ? $nome : 'imagem'];
+    }
+
+    public function avisarAdmins(string $titulo, string $conteudo): void
+    {
+        try {
+            $admins = $this->db->fetchAll(
+                "SELECT id FROM usuarios WHERE tipo IN ('admin', 'admin_escola') AND ativo = 1"
+            );
+        } catch (\Throwable $e) {
+            $admins = $this->db->fetchAll(
+                "SELECT id FROM usuarios WHERE tipo IN ('admin', 'admin_escola')"
+            );
+        }
+        if (!is_array($admins) || $admins === []) {
+            return;
+        }
+        $primeiro = (int) ($admins[0]['id'] ?? 0);
+        if ($primeiro <= 0) {
+            return;
+        }
+        $notificacaoId = (int) $this->db->insert(
+            "INSERT INTO notificacoes (tipo_conteudo, titulo, conteudo, enviado_por, tipo_enviador, prioridade, data_envio, ativo)
+             VALUES ('mensagem', :titulo, :conteudo, :enviado, 'admin', 'alta', NOW(), 1)",
+            ['titulo' => $titulo, 'conteudo' => $conteudo, 'enviado' => $primeiro]
+        );
+        foreach ($admins as $admin) {
+            $destino = (int) ($admin['id'] ?? 0);
+            if ($destino <= 0) {
+                continue;
+            }
+            $this->db->insert(
+                "INSERT INTO notificacoes_destinatarios (notificacao_id, tipo_destinatario, destinatario_id, lida)
+                 VALUES (:id, 'usuarios', :destinatario, 0)",
+                ['id' => $notificacaoId, 'destinatario' => $destino]
+            );
+        }
+    }
+
+    public function canalFamiliaPronto(): bool
+    {
+        return $this->db->tableExists('familia_conversas') && $this->db->tableExists('familia_mensagens');
+    }
 }
 
 if (!class_exists('SchoolCommunicationService', false) && class_exists(__NAMESPACE__ . '\\SchoolCommunicationService', false)) {

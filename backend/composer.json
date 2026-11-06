@@ -47,6 +47,7 @@
             "App\\Modulos\\DashboardGestao\\": "app/Modulos/dashboard-gestao/",
             "App\\Modulos\\VidaEscolar\\": "app/Modulos/vida-escolar/",
             "App\\Modulos\\Comunicacao\\": "app/Modulos/comunicacao/",
+            "App\\Modulos\\DocumentosFamilia\\": "app/Modulos/documentos-familia/",
             "App\\Modulos\\Financeiro\\": "app/Modulos/financeiro/",
             "App\\Modulos\\EducaInclui\\": "app/Modulos/educainclui/",
             "App\\Modulos\\Conformidade\\": "app/Modulos/conformidade/",

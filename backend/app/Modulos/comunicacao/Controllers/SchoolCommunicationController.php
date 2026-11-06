@@ -166,15 +166,117 @@ class SchoolCommunicationController extends BaseController
         $this->csrf();
         $reply = $this->db->fetch('SELECT * FROM school_communication_replies WHERE id=:reply AND communication_id=:communication', ['reply'=>(int)($_POST['reply_id']??0),'communication'=>(int)$id]);
         $message = trim((string)($_POST['mensagem'] ?? ''));
-        if (!$reply || $message === '') $this->back('Resposta inválida.');
+        $imagem = $this->service->guardarImagem($_FILES['imagem'] ?? [], 'fique-sabendo');
+        if (!$reply || ($message === '' && $imagem === null) || mb_strlen($message) > 4000) $this->back('Resposta inválida.');
         $user = $this->auth->getUser();
         $this->db->insert(
-            "INSERT INTO school_communication_replies (communication_id,responsavel_id,aluno_id,sender_type,sender_id,mensagem) VALUES (:communication,:parent,:student,'admin',:sender,:message)",
-            ['communication'=>(int)$id,'parent'=>(int)$reply['responsavel_id'],'student'=>(int)$reply['aluno_id'],'sender'=>(int)$user['id'],'message'=>$message]
+            "INSERT INTO school_communication_replies (communication_id,responsavel_id,aluno_id,sender_type,sender_id,mensagem,imagem,imagem_nome) VALUES (:communication,:parent,:student,'admin',:sender,:message,:imagem,:nome)",
+            ['communication'=>(int)$id,'parent'=>(int)$reply['responsavel_id'],'student'=>(int)$reply['aluno_id'],'sender'=>(int)$user['id'],'message'=>$message,'imagem'=>$imagem['path'] ?? null,'nome'=>$imagem['name'] ?? null]
         );
-        $this->service->push([(int)$reply['responsavel_id']], 'Nova resposta da escola', $message, '/school-communications/' . (int)$id, ['type'=>'school_communication','communication_id'=>(string)(int)$id], (int)$user['id']);
+        $this->service->push([(int)$reply['responsavel_id']], 'Nova resposta da escola', $message !== '' ? $message : 'A escola enviou uma imagem.', '/school-communications/' . (int)$id, ['type'=>'school_communication','communication_id'=>(string)(int)$id], (int)$user['id']);
         $this->setFlashMessage('Resposta enviada.', 'success');
         $this->redirect(URL . '/admin/comunicacao-escolar/' . (int)$id);
+    }
+
+    public function conversas(): void
+    {
+        if (!$this->service->canalFamiliaPronto()) {
+            $this->setFlashMessage('Rode a migração do canal Fale com a Escola antes de abrir as conversas.', 'error');
+            $this->redirect(URL . '/admin/comunicacao-escolar');
+        }
+        $items = $this->db->fetchAll(
+            "SELECT c.id, c.updated_at, a.nome AS aluno_nome, r.nome AS responsavel_nome,
+                    (SELECT COUNT(*) FROM familia_mensagens m WHERE m.conversa_id = c.id AND m.autor_tipo = 'responsavel' AND m.lido_escola_em IS NULL) AS nao_lidas,
+                    (SELECT mensagem FROM familia_mensagens m WHERE m.conversa_id = c.id ORDER BY m.id DESC LIMIT 1) AS ultima
+             FROM familia_conversas c
+             INNER JOIN alunos a ON a.id = c.aluno_id
+             INNER JOIN responsaveis r ON r.id = c.responsavel_id
+             ORDER BY c.updated_at DESC
+             LIMIT 200"
+        );
+        $this->viewWithLayout('admin', 'admin/school-communication/conversas', [
+            'title' => 'Fale com a Escola',
+            'page_title' => 'Fale com a Escola',
+            'user' => $this->auth->getUser(),
+            'items' => is_array($items) ? $items : [],
+            'current_page' => 'school-communication',
+        ]);
+    }
+
+    public function conversa($id): void
+    {
+        $conversa = $this->conversaDoAdmin((int) $id);
+        $this->db->query(
+            "UPDATE familia_mensagens SET lido_escola_em = NOW() WHERE conversa_id = :id AND autor_tipo = 'responsavel' AND lido_escola_em IS NULL",
+            ['id' => (int) $conversa['id']]
+        );
+        $mensagens = $this->db->fetchAll(
+            'SELECT id, autor_tipo, mensagem, imagem, created_at FROM familia_mensagens WHERE conversa_id = :id ORDER BY id',
+            ['id' => (int) $conversa['id']]
+        );
+        $this->viewWithLayout('admin', 'admin/school-communication/conversa', [
+            'title' => 'Fale com a Escola',
+            'page_title' => 'Fale com a Escola',
+            'user' => $this->auth->getUser(),
+            'conversa' => $conversa,
+            'mensagens' => is_array($mensagens) ? $mensagens : [],
+            'current_page' => 'school-communication',
+            'csrf_token' => $this->generateCsrfToken(),
+        ]);
+    }
+
+    public function responderConversa($id): void
+    {
+        $this->csrf();
+        $conversa = $this->conversaDoAdmin((int) $id);
+        $message = trim((string) ($_POST['mensagem'] ?? ''));
+        $imagem = $this->service->guardarImagem($_FILES['imagem'] ?? [], 'fale-com-a-escola');
+        if (($message === '' && $imagem === null) || mb_strlen($message) > 4000) {
+            $this->setFlashMessage('Escreva uma resposta ou envie uma imagem.', 'error');
+            $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id']);
+        }
+        $user = $this->auth->getUser();
+        $this->db->insert(
+            "INSERT INTO familia_mensagens (conversa_id, autor_tipo, autor_id, mensagem, imagem, imagem_nome)
+             VALUES (:conversa, 'escola', :autor, :mensagem, :imagem, :nome)",
+            [
+                'conversa' => (int) $conversa['id'],
+                'autor' => (int) $user['id'],
+                'mensagem' => $message !== '' ? $message : null,
+                'imagem' => $imagem['path'] ?? null,
+                'nome' => $imagem['name'] ?? null,
+            ]
+        );
+        $this->db->query('UPDATE familia_conversas SET updated_at = NOW() WHERE id = :id', ['id' => (int) $conversa['id']]);
+        $this->service->push(
+            [(int) $conversa['responsavel_id']],
+            'Fale com a Escola',
+            $message !== '' ? $message : 'A escola enviou uma imagem.',
+            '/school-communications',
+            ['type' => 'school_message', 'conversation_id' => (string) (int) $conversa['id']],
+            (int) $user['id']
+        );
+        $this->setFlashMessage('Resposta enviada para a família.', 'success');
+        $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola/' . (int) $conversa['id']);
+    }
+
+    private function conversaDoAdmin(int $id): array
+    {
+        if (!$this->service->canalFamiliaPronto() || $id <= 0) {
+            $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola');
+        }
+        $conversa = $this->db->fetch(
+            'SELECT c.*, a.nome AS aluno_nome, r.nome AS responsavel_nome
+             FROM familia_conversas c
+             INNER JOIN alunos a ON a.id = c.aluno_id
+             INNER JOIN responsaveis r ON r.id = c.responsavel_id
+             WHERE c.id = :id',
+            ['id' => $id]
+        );
+        if (!$conversa) {
+            $this->redirect(URL . '/admin/comunicacao-escolar/fale-com-a-escola');
+        }
+        return $conversa;
     }
 
     public function calendar(): void

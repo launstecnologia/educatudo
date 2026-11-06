@@ -16,6 +16,12 @@ $page_header_title = 'Comunicação Escolar';
 $page_header_subtitle = 'Avisos para os pais, com imagem, documento, YouTube e push opcional. O histórico interno antigo continua em Notificações.';
 ob_start();
 ?>
+<a href="<?= URL ?>/admin/documentos-familia" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+    <i class="fa-regular fa-folder-open mr-2 text-gray-500"></i>Documentos
+</a>
+<a href="<?= URL ?>/admin/comunicacao-escolar/fale-com-a-escola" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+    <i class="fa-regular fa-comments mr-2 text-gray-500"></i>Fale com a Escola
+</a>
 <a href="<?= URL ?>/admin/calendario-escolar" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
     <i class="fa-regular fa-calendar-days mr-2 text-gray-500"></i>Calendário
 </a>
