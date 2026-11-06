@@ -3,6 +3,9 @@
 namespace App\Modulos\DocumentosFamilia\Services;
 
 use App\Core\Database;
+use App\Dominio\Pessoas\Models\StudentComplementaryRecord;
+use App\Dominio\Pessoas\Models\StudentDocument;
+use App\Infra\Services\MediaStorageService;
 
 /** Arquivos, ficha de saúde e declarações preenchidos pela família. */
 class DocumentoFamiliaService
@@ -123,6 +126,191 @@ class DocumentoFamiliaService
         }
 
         return ['path' => $full, 'nome' => basename((string) ($row['arquivo_nome'] ?? 'documento')), 'mime' => $mime];
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function checklistDoAluno(int $alunoId): array
+    {
+        $model = new StudentDocument();
+        if (!$model->tableExists()) {
+            return [];
+        }
+        $salvos = [];
+        foreach ($model->getByAluno($alunoId) as $row) {
+            $tipo = (string) ($row['tipo'] ?? '');
+            if ($tipo !== '' && $tipo !== 'outros') {
+                $salvos[$tipo] = $row;
+            }
+        }
+        $lista = [];
+        foreach (StudentDocument::checklist() as $tipo => $rotulo) {
+            if ($tipo === 'outros') {
+                continue;
+            }
+            $row = $salvos[$tipo] ?? null;
+            $status = (string) ($row['status'] ?? 'pendente');
+            if (!in_array($status, StudentDocument::STATUS, true)) {
+                $status = 'pendente';
+            }
+            $lista[] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'type' => $tipo,
+                'title' => $rotulo,
+                'status' => $status,
+                'file_name' => (string) ($row['arquivo_nome'] ?? ''),
+                'can_attach' => $status === 'pendente',
+            ];
+        }
+
+        return $lista;
+    }
+
+    /**
+     * @param array<string,mixed> $file
+     * @param array<string,mixed> $config
+     * @return array<string,mixed>|null
+     */
+    public function anexarChecklist(int $alunoId, string $tipo, array $file, array $config): ?array
+    {
+        $checklist = StudentDocument::checklist();
+        if (!isset($checklist[$tipo]) || $tipo === 'outros') {
+            return null;
+        }
+        $model = new StudentDocument();
+        if (!$model->tableExists()) {
+            return null;
+        }
+        foreach ($model->getByAluno($alunoId) as $row) {
+            if ((string) ($row['tipo'] ?? '') === $tipo && (string) ($row['status'] ?? '') !== 'pendente') {
+                return null;
+            }
+        }
+        $arquivo = $this->guardarChecklist($alunoId, $file, $config);
+        if ($arquivo === null) {
+            return null;
+        }
+        $id = $model->save($alunoId, $tipo, [
+            'titulo' => $checklist[$tipo],
+            'status' => 'entregue',
+            'arquivo_key' => $arquivo['key'],
+            'arquivo_nome' => $arquivo['nome'],
+            'arquivo_mime' => $arquivo['mime'],
+            'arquivo_tamanho' => $arquivo['tamanho'],
+        ]);
+        $this->avisarAdmins('Documento do aluno', $checklist[$tipo] . ' anexado pela família.');
+
+        return [
+            'id' => $id,
+            'type' => $tipo,
+            'title' => $checklist[$tipo],
+            'status' => 'entregue',
+            'file_name' => $arquivo['nome'],
+            'can_attach' => false,
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $config
+     * @return array{bytes:string,nome:string,mime:string}|null
+     */
+    public function conteudoChecklist(int $alunoId, int $documentoId, array $config): ?array
+    {
+        $model = new StudentDocument();
+        $doc = $model->find($alunoId, $documentoId);
+        if ($doc === null || trim((string) ($doc['arquivo_key'] ?? '')) === '') {
+            return null;
+        }
+        $conteudo = (new MediaStorageService($config))->getContents('arquivos', (string) $doc['arquivo_key']);
+        if (!is_string($conteudo) || $conteudo === '') {
+            return null;
+        }
+        $mime = (string) ($doc['arquivo_mime'] ?? 'application/octet-stream');
+        if (!in_array($mime, ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'], true)) {
+            $mime = 'application/octet-stream';
+        }
+
+        return [
+            'bytes' => $conteudo,
+            'nome' => basename((string) ($doc['arquivo_nome'] ?? 'documento')),
+            'mime' => $mime,
+        ];
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function anexosDoChecklist(): array
+    {
+        $model = new StudentDocument();
+        if (!$model->tableExists()) {
+            return [];
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT d.id, d.aluno_id, d.tipo, d.titulo, d.arquivo_nome, d.status, d.updated_at, a.nome AS aluno_nome
+             FROM alunos_documentos d
+             INNER JOIN alunos a ON a.id = d.aluno_id
+             WHERE d.arquivo_key IS NOT NULL AND d.arquivo_key <> ''
+             ORDER BY d.updated_at DESC
+             LIMIT 100"
+        );
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    public function fichaComplementar(int $alunoId): array
+    {
+        return (new StudentComplementaryRecord())->getByAluno($alunoId);
+    }
+
+    /**
+     * @param array<string,mixed> $campos
+     * @return array<string,mixed>
+     */
+    public function salvarFichaComplementar(int $alunoId, array $campos): array
+    {
+        $model = new StudentComplementaryRecord();
+        if (!$model->tableExists()) {
+            return [];
+        }
+        $dados = ['usa_transporte_escolar' => !empty($campos['usa_transporte_escolar']) ? 1 : 0];
+        $curtos = [
+            'tipo_sanguineo' => 8,
+            'plano_saude' => 120,
+            'plano_saude_numero' => 60,
+            'hospital_referencia' => 160,
+            'contato_emergencia_nome' => 160,
+            'contato_emergencia_telefone' => 40,
+            'contato_emergencia_parentesco' => 40,
+            'transporte_tipo' => 40,
+            'transporte_rota' => 120,
+            'transporte_ponto' => 160,
+            'transporte_responsavel' => 160,
+            'transporte_telefone' => 40,
+        ];
+        foreach (StudentComplementaryRecord::FIELDS as $campo) {
+            $valor = (string) ($campos[$campo] ?? '');
+            $dados[$campo] = isset($curtos[$campo]) ? $this->curto($valor, $curtos[$campo]) : $this->texto($valor);
+        }
+        $model->upsert($alunoId, $dados);
+        $this->avisarAdmins('Ficha do aluno', 'A família atualizou a ficha complementar.');
+
+        return $model->getByAluno($alunoId);
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function fichasComplementares(): array
+    {
+        $model = new StudentComplementaryRecord();
+        if (!$model->tableExists()) {
+            return [];
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT f.*, a.nome AS aluno_nome
+             FROM alunos_ficha_complementar f
+             INNER JOIN alunos a ON a.id = f.aluno_id
+             ORDER BY f.updated_at DESC
+             LIMIT 100'
+        );
+
+        return is_array($rows) ? $rows : [];
     }
 
     public function ficha(int $alunoId): ?array
@@ -320,6 +508,42 @@ class DocumentoFamiliaService
             'declaracoes' => is_array($declaracoes) ? $declaracoes : [],
             'aceites' => is_array($aceites) ? $aceites : [],
         ];
+    }
+
+    /**
+     * @param array<string,mixed> $file
+     * @param array<string,mixed> $config
+     * @return array{key:string,nome:string,mime:string,tamanho:int}|null
+     */
+    private function guardarChecklist(int $alunoId, array $file, array $config): ?array
+    {
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            return null;
+        }
+        $tmp = (string) ($file['tmp_name'] ?? '');
+        $size = (int) ($file['size'] ?? 0);
+        if ($tmp === '' || !is_uploaded_file($tmp) || $size <= 0 || $size > 10 * 1024 * 1024) {
+            return null;
+        }
+        $mapa = [
+            'application/pdf' => 'pdf',
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+        ];
+        $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($tmp) ?: '';
+        if (!isset($mapa[$mime])) {
+            return null;
+        }
+        $tenant = defined('TENANT_SLUG') ? preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG) : 'default';
+        $slug = $tenant !== '' ? $tenant : 'default';
+        $key = $slug . '/alunos_documentos/' . $alunoId . '/doc_' . $alunoId . '_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.' . $mapa[$mime];
+        if (!(new MediaStorageService($config))->put('arquivos', $key, $tmp, $mime)) {
+            return null;
+        }
+        $nome = basename((string) ($file['name'] ?? 'documento'));
+
+        return ['key' => $key, 'nome' => $nome !== '' ? $nome : 'documento', 'mime' => $mime, 'tamanho' => $size];
     }
 
     private function avisarAdmins(string $titulo, string $conteudo): void

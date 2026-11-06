@@ -26,15 +26,15 @@ class MobileDocumentoController extends BaseController
     public function index($studentId): void
     {
         $aluno = $this->aluno($studentId);
-        if (!$this->service->pronto()) {
-            $this->json(['data' => ['files' => [], 'health' => null, 'declarations' => []], 'meta' => ['available' => false]]);
-            return;
-        }
+        $alunoId = (int) $aluno['id'];
+        $declaracoes = $this->service->pronto()
+            ? $this->service->declaracoesDoAluno($alunoId, $this->parentId())
+            : [];
         $this->json([
             'data' => [
-                'files' => array_map(fn ($row) => $this->arquivo($row), $this->service->arquivos((int) $aluno['id'])),
-                'health' => $this->ficha($this->service->ficha((int) $aluno['id'])),
-                'declarations' => array_map(fn ($row) => $this->declaracao($row), $this->service->declaracoesDoAluno((int) $aluno['id'], $this->parentId())),
+                'files' => $this->service->checklistDoAluno($alunoId),
+                'health' => $this->ficha($this->service->fichaComplementar($alunoId)),
+                'declarations' => array_map(fn ($row) => $this->declaracao($row), $declaracoes),
             ],
             'meta' => ['available' => true],
         ]);
@@ -47,44 +47,45 @@ class MobileDocumentoController extends BaseController
         if ($id === false) {
             $this->fail('file_not_found', 'Arquivo não encontrado.', 404);
         }
-        $arquivo = $this->service->caminhoArquivo((int) $id, (int) $aluno['id']);
-        if ($arquivo === null) {
+        $conteudo = $this->service->conteudoChecklist((int) $aluno['id'], (int) $id, $this->config);
+        if ($conteudo === null) {
             $this->fail('file_not_found', 'Arquivo não encontrado.', 404);
         }
-        $this->enviarArquivo($arquivo);
+        $this->enviarConteudo($conteudo);
     }
 
     public function upload($studentId): void
     {
         $aluno = $this->aluno($studentId);
-        if (!$this->service->pronto()) {
-            $this->fail('unavailable', 'Os documentos da família ainda não estão disponíveis.', 503);
-        }
-        $titulo = trim((string) ($_POST['titulo'] ?? $_POST['title'] ?? ''));
-        $salvo = $this->service->guardarArquivo((int) $aluno['id'], $this->parentId(), $titulo, $_FILES['arquivo'] ?? $_FILES['file'] ?? []);
+        $tipo = trim((string) ($_POST['tipo'] ?? $_POST['type'] ?? ''));
+        $salvo = $this->service->anexarChecklist((int) $aluno['id'], $tipo, $_FILES['arquivo'] ?? $_FILES['file'] ?? [], $this->config);
         if ($salvo === null) {
-            $this->fail('invalid_file', 'Envie um PDF ou uma imagem de até 10 MB.', 422);
+            $this->fail('invalid_file', 'Anexe um PDF ou uma imagem de até 10 MB em um documento pendente.', 422);
         }
-        $this->json(['data' => $this->arquivo($salvo)], 201);
+        $this->json(['data' => $salvo], 201);
     }
 
     public function saveHealth($studentId): void
     {
         $aluno = $this->aluno($studentId);
-        if (!$this->service->pronto()) {
-            $this->fail('unavailable', 'A ficha de saúde ainda não está disponível.', 503);
-        }
         $input = $this->input();
-        $ficha = $this->service->salvarFicha((int) $aluno['id'], $this->parentId(), [
-            'tipo_sanguineo' => (string) ($input['blood_type'] ?? $input['tipo_sanguineo'] ?? ''),
-            'alergias' => (string) ($input['allergies'] ?? $input['alergias'] ?? ''),
-            'medicamentos' => (string) ($input['medications'] ?? $input['medicamentos'] ?? ''),
-            'condicoes' => (string) ($input['conditions'] ?? $input['condicoes'] ?? ''),
-            'plano_saude' => (string) ($input['health_plan'] ?? $input['plano_saude'] ?? ''),
-            'emergencia_nome' => (string) ($input['emergency_name'] ?? $input['emergencia_nome'] ?? ''),
-            'emergencia_telefone' => (string) ($input['emergency_phone'] ?? $input['emergencia_telefone'] ?? ''),
-            'observacoes' => (string) ($input['notes'] ?? $input['observacoes'] ?? ''),
-        ]);
+        $campos = [
+            'usa_transporte_escolar' => $input['usa_transporte_escolar'] ?? $input['uses_school_transport'] ?? 0,
+        ];
+        foreach ([
+            'tipo_sanguineo', 'alergias', 'medicamentos_uso', 'condicoes_cronicas', 'deficiencias_obs',
+            'plano_saude', 'plano_saude_numero', 'hospital_referencia',
+            'contato_emergencia_nome', 'contato_emergencia_telefone', 'contato_emergencia_parentesco',
+            'restricoes_alimentares', 'alimentacao_obs',
+            'transporte_tipo', 'transporte_rota', 'transporte_ponto', 'transporte_responsavel', 'transporte_telefone',
+            'observacoes_gerais',
+        ] as $campo) {
+            $campos[$campo] = (string) ($input[$campo] ?? '');
+        }
+        $ficha = $this->service->salvarFichaComplementar((int) $aluno['id'], $campos);
+        if ($ficha === []) {
+            $this->fail('unavailable', 'A ficha do aluno ainda não está disponível.', 503);
+        }
         $this->json(['data' => $this->ficha($ficha)]);
     }
 
@@ -132,24 +133,24 @@ class MobileDocumentoController extends BaseController
         ];
     }
 
-    private function ficha(?array $row): ?array
+    private function ficha(array $row): array
     {
-        if ($row === null) {
-            return null;
+        $saida = ['usa_transporte_escolar' => !empty($row['usa_transporte_escolar'])];
+        foreach ([
+            'tipo_sanguineo', 'alergias', 'medicamentos_uso', 'condicoes_cronicas', 'deficiencias_obs',
+            'plano_saude', 'plano_saude_numero', 'hospital_referencia',
+            'contato_emergencia_nome', 'contato_emergencia_telefone', 'contato_emergencia_parentesco',
+            'restricoes_alimentares', 'alimentacao_obs',
+            'transporte_tipo', 'transporte_rota', 'transporte_ponto', 'transporte_responsavel', 'transporte_telefone',
+            'observacoes_gerais',
+        ] as $campo) {
+            $saida[$campo] = (string) ($row[$campo] ?? '');
         }
+        $momento = (string) ($row['updated_at'] ?? '');
+        $saida['updated_at'] = $this->iso($momento !== '' ? $momento : null);
+        $saida['hash'] = hash('sha256', $momento . '|' . implode('|', $saida));
 
-        return [
-            'blood_type' => (string) ($row['tipo_sanguineo'] ?? ''),
-            'allergies' => (string) ($row['alergias'] ?? ''),
-            'medications' => (string) ($row['medicamentos'] ?? ''),
-            'conditions' => (string) ($row['condicoes'] ?? ''),
-            'health_plan' => (string) ($row['plano_saude'] ?? ''),
-            'emergency_name' => (string) ($row['emergencia_nome'] ?? ''),
-            'emergency_phone' => (string) ($row['emergencia_telefone'] ?? ''),
-            'notes' => (string) ($row['observacoes'] ?? ''),
-            'hash' => (string) ($row['hash_registro'] ?? ''),
-            'updated_at' => $this->iso($row['atualizado_em'] ?? null),
-        ];
+        return $saida;
     }
 
     private function declaracao(array $row): array
@@ -187,6 +188,20 @@ class MobileDocumentoController extends BaseController
         $time = strtotime((string) $value);
 
         return $time === false ? null : date(DATE_ATOM, $time);
+    }
+
+    private function enviarConteudo(array $arquivo): void
+    {
+        while (ob_get_level()) {
+            ob_end_clean();
+        }
+        $nome = str_replace(['"', "\r", "\n"], '', (string) $arquivo['nome']);
+        header('Content-Type: ' . $arquivo['mime']);
+        header('X-Content-Type-Options: nosniff');
+        header('Content-Disposition: inline; filename="' . $nome . '"');
+        header('Content-Length: ' . (string) strlen((string) $arquivo['bytes']));
+        echo $arquivo['bytes'];
+        exit;
     }
 
     private function enviarArquivo(array $arquivo): void

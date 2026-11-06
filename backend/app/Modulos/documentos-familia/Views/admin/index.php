@@ -29,23 +29,24 @@ if (!empty($flash_message)) {
 
 <div class="grid lg:grid-cols-2 gap-6">
     <section class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h3 class="font-bold mb-3">Arquivos</h3>
-        <?php if ($arquivos === []): ?><p class="text-sm text-gray-500">Nenhum arquivo enviado.</p><?php endif; ?>
+        <h3 class="font-bold mb-3">Checklist do aluno</h3>
+        <?php if ($arquivos === []): ?><p class="text-sm text-gray-500">Nenhum anexo no checklist.</p><?php endif; ?>
         <?php foreach ($arquivos as $item): ?>
+            <?php $rotulo = \App\Dominio\Pessoas\Models\StudentDocument::tipoLabel((string) ($item['tipo'] ?? ''), (string) ($item['titulo'] ?? '')); ?>
             <div class="py-2 border-b border-gray-100">
-                <a class="font-semibold text-blue-700" href="<?= URL ?>/admin/documentos-familia/arquivos/<?= (int) ($item['id'] ?? 0) ?>"><?= htmlspecialchars((string) ($item['titulo'] ?? '')) ?></a>
-                <p class="text-xs text-gray-500"><?= htmlspecialchars((string) ($item['aluno_nome'] ?? '')) ?> · <?= htmlspecialchars((string) ($item['responsavel_nome'] ?? '')) ?> · <?= !empty($item['created_at']) ? date('d/m/Y H:i', strtotime((string) $item['created_at'])) : '' ?></p>
+                <a class="font-semibold text-blue-700" href="<?= URL ?>/admin/students/<?= (int) ($item['aluno_id'] ?? 0) ?>/documentos/<?= (int) ($item['id'] ?? 0) ?>/baixar"><?= htmlspecialchars($rotulo) ?></a>
+                <p class="text-xs text-gray-500"><?= htmlspecialchars((string) ($item['aluno_nome'] ?? '')) ?> · <?= htmlspecialchars((string) ($item['status'] ?? '')) ?> · <?= !empty($item['updated_at']) ? date('d/m/Y H:i', strtotime((string) $item['updated_at'])) : '' ?></p>
             </div>
         <?php endforeach; ?>
     </section>
     <section class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h3 class="font-bold mb-3">Fichas de saúde</h3>
+        <h3 class="font-bold mb-3">Ficha complementar</h3>
         <?php if ($fichas === []): ?><p class="text-sm text-gray-500">Nenhuma ficha preenchida.</p><?php endif; ?>
         <?php foreach ($fichas as $item): ?>
             <div class="py-2 border-b border-gray-100">
-                <p class="font-semibold text-gray-900"><?= htmlspecialchars((string) ($item['aluno_nome'] ?? '')) ?></p>
-                <p class="text-xs text-gray-500">Tipo sanguíneo: <?= htmlspecialchars((string) (($item['tipo_sanguineo'] ?? '') !== '' ? $item['tipo_sanguineo'] : '—')) ?> · <?= !empty($item['atualizado_em']) ? date('d/m/Y H:i', strtotime((string) $item['atualizado_em'])) : '' ?></p>
-                <p class="text-xs text-gray-400 break-all">Hash <?= htmlspecialchars((string) ($item['hash_registro'] ?? '')) ?></p>
+                <a class="font-semibold text-blue-700" href="<?= URL ?>/admin/students/<?= (int) ($item['aluno_id'] ?? 0) ?>"><?= htmlspecialchars((string) ($item['aluno_nome'] ?? '')) ?></a>
+                <p class="text-xs text-gray-500">Sangue <?= htmlspecialchars((string) (($item['tipo_sanguineo'] ?? '') !== '' ? $item['tipo_sanguineo'] : '—')) ?> · Plano <?= htmlspecialchars((string) (($item['plano_saude'] ?? '') !== '' ? $item['plano_saude'] : '—')) ?> · <?= !empty($item['updated_at']) ? date('d/m/Y H:i', strtotime((string) $item['updated_at'])) : '' ?></p>
+                <p class="text-xs text-gray-500">Alergias: <?= htmlspecialchars((string) (($item['alergias'] ?? '') !== '' ? $item['alergias'] : '—')) ?></p>
             </div>
         <?php endforeach; ?>
     </section>
