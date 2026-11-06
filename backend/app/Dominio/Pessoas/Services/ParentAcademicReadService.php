@@ -106,6 +106,53 @@ class ParentAcademicReadService
     }
 
     /**
+     * Carteirinha vigente do aluno, no mesmo formato exibido ao próprio aluno.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function studentCard(int $studentId): ?array
+    {
+        if ($studentId <= 0) {
+            return null;
+        }
+        try {
+            if (!\App\Core\LayoutHelper::isModuleEnabled('carteirinha')) {
+                return null;
+            }
+            $service = new \App\Modulos\Carteirinha\Services\CarteirinhaService();
+            if (!$service->tabelasProntas() || !$service->habilitada()) {
+                return null;
+            }
+            $card = $service->cartaoDoAluno($studentId);
+        } catch (\Throwable $e) {
+            return null;
+        }
+        if (!is_array($card)) {
+            return null;
+        }
+        $bar = trim((string) ($card['cor_barra'] ?? ''));
+        if (!preg_match('/^#[0-9A-Fa-f]{6}$/', $bar)) {
+            $bar = '#1649D8';
+        }
+
+        return [
+            'id' => (int) ($card['id'] ?? 0),
+            'name' => (string) ($card['nome'] ?? ''),
+            'registration' => (string) ($card['ra'] ?? ''),
+            'class_name' => (string) ($card['turma'] ?? ''),
+            'photo_url' => (string) ($card['foto'] ?? ''),
+            'school_name' => (string) ($card['escola'] ?? ''),
+            'logo_url' => (string) ($card['logo'] ?? ''),
+            'bar_color' => $bar,
+            'code' => (string) ($card['codigo'] ?? ''),
+            'valid_until' => (string) ($card['validade'] ?? ''),
+            'issued_at' => (string) ($card['emitida_em'] ?? ''),
+            'status' => (string) ($card['situacao'] ?? ''),
+            'validation_url' => (string) ($card['url'] ?? ''),
+        ];
+    }
+
+    /**
      * Ocorrências liberadas para a família (enviar_pais = 1).
      *
      * @return list<array<string,mixed>>

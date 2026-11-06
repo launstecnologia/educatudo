@@ -28,6 +28,12 @@ class MobileAcademicController extends BaseController
     public function notices($id): void { $this->respond($id, 'notices', true); }
     public function reportCard($id): void { $this->respond($id, 'reportCard', true); }
     public function occurrences($id): void { $this->respond($id, 'occurrences', true); }
+
+    public function studentCard($id): void
+    {
+        $studentId = $this->authorizedStudentId($id);
+        $this->json(['data' => $this->service->studentCard($studentId)]);
+    }
     public function exercises($id): void { $this->respond($id, 'exercises'); }
 
     public function examEvents($id): void

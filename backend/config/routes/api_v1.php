@@ -46,6 +46,7 @@ $router->middleware('MobileApiAuth', function ($router) {
     $router->get('/api/v1/students/{id}/notices', 'Api/V1/MobileAcademicController@notices');
     $router->get('/api/v1/students/{id}/report-card', 'Api/V1/MobileAcademicController@reportCard');
     $router->get('/api/v1/students/{id}/occurrences', 'Api/V1/MobileAcademicController@occurrences');
+    $router->get('/api/v1/students/{id}/student-card', 'Api/V1/MobileAcademicController@studentCard');
     $router->get('/api/v1/students/{id}/access-events', 'Api/V1/MobileAcademicController@accessEvents');
     $router->get('/api/v1/students/{id}/finance', 'Api/V1/MobileFinanceController@student');
     $router->get('/api/v1/students/{id}/finance/invoices/{source}/{invoiceId}/payment', 'Api/V1/MobileFinanceController@payment');
@@ -76,6 +77,7 @@ $router->middleware('MobileApiAuth', function ($router) {
     $router->get('/api/alunos/{id}/avisos', 'Api/V1/MobileAcademicController@notices');
     $router->get('/api/alunos/{id}/boletim', 'Api/V1/MobileAcademicController@reportCard');
     $router->get('/api/alunos/{id}/ocorrencias', 'Api/V1/MobileAcademicController@occurrences');
+    $router->get('/api/alunos/{id}/carteirinha', 'Api/V1/MobileAcademicController@studentCard');
     $router->get('/api/alunos/{id}/acessos', 'Api/V1/MobileAcademicController@accessEvents');
     $router->get('/api/alunos/{id}/financeiro', 'Api/V1/MobileFinanceController@student');
     $router->get('/api/alunos/{id}/financeiro/faturas/{origem}/{faturaId}/pagamento', 'Api/V1/MobileFinanceController@pagamento');
