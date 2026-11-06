@@ -107,8 +107,24 @@ class ParentAcademicReadService
 
     public function reportCard(int $studentId): array
     {
-        // Boletim e notas ficam fora do acesso dos pais (portal e app).
+        // Boletim oficial fica fora do acesso dos pais (portal e app).
         return [];
+    }
+
+    /**
+     * Eventos de prova da turma e notas já liberadas para a família.
+     *
+     * @return array{events:list<array<string,mixed>>,periods:list<array<string,mixed>>}
+     */
+    public function examEvents(int $studentId): array
+    {
+        $student = $this->db->fetch('SELECT turma_id FROM alunos WHERE id = :id', ['id' => $studentId]);
+        $classId = (int) ($student['turma_id'] ?? 0);
+
+        return [
+            'events' => $this->scheduledExamEvents($classId),
+            'periods' => $this->liveGradePeriods($studentId, $classId),
+        ];
     }
 
     private function recentActivity(int $studentId): array
@@ -487,6 +503,123 @@ class ParentAcademicReadService
             'accuracy_percent' => $total > 0 ? round(($acertos / $total) * 100, 1) : 0.0,
             'latest' => $lista,
         ];
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    private function scheduledExamEvents(int $classId): array
+    {
+        if ($classId <= 0 || !$this->hasColumn('provas_blocos', 'titulo') || !$this->hasColumn('provas_blocos_turmas', 'turma_id')) {
+            return [];
+        }
+
+        $hasEvent = $this->hasColumn('provas_blocos', 'evento_avaliativo_id')
+            && $this->hasColumn('eventos_avaliativos', 'nome');
+        $releasedColumn = $hasEvent && $this->hasColumn('eventos_avaliativos', 'liberar_nota_aluno')
+            ? 'e.liberar_nota_aluno'
+            : '0';
+        $eventSelect = $hasEvent
+            ? "e.nome AS event_name, {$releasedColumn} AS liberar_nota_aluno"
+            : 'NULL AS event_name, 0 AS liberar_nota_aluno';
+        $eventJoin = '';
+        $ocultarNaoPublicado = '';
+        if ($hasEvent) {
+            $eventJoin = 'LEFT JOIN eventos_avaliativos e ON e.id = pb.evento_avaliativo_id';
+            if ($this->hasColumn('eventos_avaliativos', 'deleted_at')) {
+                $eventJoin .= ' AND e.deleted_at IS NULL';
+            }
+            if ($this->hasColumn('eventos_avaliativos', 'rascunho')) {
+                $eventJoin .= ' AND e.rascunho = 0';
+            }
+            $ocultarNaoPublicado = ' AND (pb.evento_avaliativo_id IS NULL OR e.id IS NOT NULL)';
+        }
+        $deleted = $this->hasColumn('provas_blocos', 'deleted_at') ? ' AND pb.deleted_at IS NULL' : '';
+        $term = $this->hasColumn('provas_blocos', 'bimestre') ? 'pb.bimestre' : 'NULL';
+        $year = $this->hasColumn('provas_blocos', 'ano_letivo') ? 'pb.ano_letivo' : 'NULL';
+
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT pb.id, pb.titulo, pb.data_prova, {$term} AS term, {$year} AS school_year, {$eventSelect}
+                 FROM provas_blocos pb
+                 INNER JOIN provas_blocos_turmas pbt ON pbt.bloco_id = pb.id AND pbt.turma_id = :turma
+                 {$eventJoin}
+                 WHERE 1 = 1 {$deleted}{$ocultarNaoPublicado}
+                 ORDER BY pb.data_prova DESC, pb.id DESC
+                 LIMIT 80",
+                ['turma' => $classId]
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        return array_map(function (array $row): array {
+            return [
+                'id' => (int) $row['id'],
+                'title' => trim((string) ($row['titulo'] ?? '')) !== '' ? (string) $row['titulo'] : 'Prova',
+                'event_name' => isset($row['event_name']) && $row['event_name'] !== null ? (string) $row['event_name'] : null,
+                'date' => $this->isoDate($row['data_prova'] ?? null),
+                'term' => isset($row['term']) && $row['term'] !== null ? (int) $row['term'] : null,
+                'school_year' => isset($row['school_year']) && $row['school_year'] !== null ? (int) $row['school_year'] : null,
+                'grades_released' => !empty($row['liberar_nota_aluno']),
+            ];
+        }, $rows);
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    private function liveGradePeriods(int $studentId, int $classId): array
+    {
+        if ($studentId <= 0 || $classId <= 0) {
+            return [];
+        }
+        try {
+            $periods = (new \App\Modulos\EventosAvaliativos\Services\EventoAvaliativoService())
+                ->notasAoVivoDoAluno($studentId, $classId);
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($periods as $period) {
+            if (!is_array($period)) {
+                continue;
+            }
+            $columns = [];
+            foreach ($period['colunas'] ?? [] as $column) {
+                if (!is_array($column)) {
+                    continue;
+                }
+                $columns[] = [
+                    'id' => (int) ($column['id'] ?? 0),
+                    'title' => (string) ($column['titulo'] ?? 'Nota'),
+                ];
+            }
+            $rows = [];
+            foreach ($period['linhas'] ?? [] as $line) {
+                if (!is_array($line)) {
+                    continue;
+                }
+                $grades = [];
+                foreach ($line['notas'] ?? [] as $blockId => $value) {
+                    $grades[(string) $blockId] = (string) $value;
+                }
+                $rows[] = [
+                    'subject' => (string) ($line['materia'] ?? 'Matéria'),
+                    'grades' => $grades,
+                ];
+            }
+            $out[] = [
+                'title' => (string) ($period['titulo'] ?? 'Notas'),
+                'school_year' => (int) ($period['ano'] ?? 0),
+                'term' => (int) ($period['bimestre'] ?? 0),
+                'columns' => $columns,
+                'rows' => $rows,
+            ];
+        }
+
+        return $out;
     }
 
     private function isoDate($value): ?string

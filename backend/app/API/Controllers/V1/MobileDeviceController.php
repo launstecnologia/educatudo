@@ -25,7 +25,7 @@ class MobileDeviceController extends BaseController
         $appVersion = trim((string) ($input['app_version'] ?? ''));
 
         if (!$this->validDeviceId($deviceId) || strlen($token) < 20 || strlen($token) > 4096
-            || $platform !== 'android' || strlen($appVersion) > 50) {
+            || !in_array($platform, ['android', 'ios'], true) || strlen($appVersion) > 50) {
             $this->json(['error' => [
                 'code' => 'validation_error',
                 'message' => 'Dados do dispositivo inválidos.',
