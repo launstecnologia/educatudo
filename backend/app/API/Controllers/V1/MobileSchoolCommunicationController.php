@@ -79,6 +79,11 @@ class MobileSchoolCommunicationController extends BaseController
     public function calendar($studentId): void
     {
         $student=$this->student($studentId);
+        $ano = filter_var($_GET['ano'] ?? $_GET['year'] ?? null, FILTER_VALIDATE_INT);
+        if ($ano !== false && $ano !== null && $ano >= 2000 && $ano <= 2100) {
+            $this->json($this->letivoParaPais($student, (int) $ano));
+            return;
+        }
         $from=$this->date($_GET['de'] ?? $_GET['from'] ?? '',date('Y-m-01',strtotime('-1 month'))); $to=$this->date($_GET['ate'] ?? $_GET['to'] ?? '',date('Y-m-t',strtotime('+6 months')));
         $rows=$this->db->fetchAll(
             "SELECT e.*,r.lido_em FROM school_calendar_events e LEFT JOIN school_calendar_event_reads r ON r.event_id=e.id AND r.responsavel_id=:parent AND r.aluno_id=:read_student
@@ -95,6 +100,108 @@ class MobileSchoolCommunicationController extends BaseController
         $student=$this->student($studentId); $event=$this->eventFor($student,$id);
         $this->db->query('INSERT INTO school_calendar_event_reads(event_id,responsavel_id,aluno_id,lido_em) VALUES(:event,:parent,:student,NOW()) ON DUPLICATE KEY UPDATE lido_em=COALESCE(lido_em,VALUES(lido_em))',['event'=>$event['id'],'parent'=>$this->parentId(),'student'=>$student['id']]);
         $this->json(['data'=>['is_read'=>true,'read_at'=>date(DATE_ATOM)]]);
+    }
+
+    /**
+     * Calendário letivo do ano, só com eventos marcados para pais.
+     *
+     * @param array<string,mixed> $student
+     * @return array<string,mixed>
+     */
+    private function letivoParaPais(array $student, int $ano): array
+    {
+        $service = new \App\Dominio\Escola\Services\SchoolCalendarService($this->db);
+        $turmaId = (int) ($student['turma_id'] ?? 0);
+        $anos = $this->anosDoLetivo();
+        $data = $this->eventosLetivosDaFamilia($service, $turmaId, $ano);
+        $comConteudo = [];
+        foreach ($anos as $candidato) {
+            if ($candidato === $ano) {
+                if ($data !== []) {
+                    $comConteudo[] = $candidato;
+                }
+                continue;
+            }
+            if ($this->eventosLetivosDaFamilia($service, $turmaId, $candidato) !== []) {
+                $comConteudo[] = $candidato;
+            }
+        }
+        rsort($comConteudo);
+
+        return [
+            'data' => $data,
+            'meta' => [
+                'count' => count($data),
+                'year' => $ano,
+                'years' => $comConteudo,
+                'source' => 'letivo',
+            ],
+        ];
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function anosDoLetivo(): array
+    {
+        try {
+            $rows = $this->db->fetchAll('SELECT DISTINCT ano FROM calendario_letivo ORDER BY ano DESC') ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $anos = [];
+        foreach ($rows as $row) {
+            $ano = (int) ($row['ano'] ?? 0);
+            if ($ano >= 2000 && $ano <= 2100) {
+                $anos[] = $ano;
+            }
+        }
+        return $anos;
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    private function eventosLetivosDaFamilia(\App\Dominio\Escola\Services\SchoolCalendarService $service, int $turmaId, int $ano): array
+    {
+        try {
+            $escopo = $service->escopoDaTurma($turmaId);
+            $cfg = $service->resolver($ano, (int) $escopo['serie_id'], (int) $escopo['curso_id']);
+            if (!$cfg) {
+                return [];
+            }
+            $labels = $service->visuaisTipos()['labels'] ?? [];
+            $rows = $service->eventos((int) $cfg['id']);
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        $data = [];
+        foreach ($rows as $evento) {
+            if (!is_array($evento) || (int) ($evento['visivel_pais'] ?? 0) !== 1) {
+                continue;
+            }
+            $tipo = (string) ($evento['tipo'] ?? '');
+            $inicio = (string) ($evento['data_inicio'] ?? '');
+            $fim = (string) ($evento['data_fim'] ?? '');
+            $local = trim((string) ($evento['local_evento'] ?? ''));
+            $titulo = trim((string) ($evento['descricao'] ?? ''));
+            $data[] = [
+                'id' => (int) ($evento['id'] ?? 0),
+                'title' => $titulo !== '' ? $titulo : 'Evento',
+                'description' => null,
+                'category' => (string) ($labels[$tipo] ?? ($tipo !== '' ? $tipo : 'Evento')),
+                'priority' => 'normal',
+                'location' => $local !== '' ? $local : null,
+                'starts_at' => $this->iso($inicio !== '' ? $inicio . ' 00:00:00' : null),
+                'ends_at' => ($fim !== '' && $fim !== $inicio) ? $this->iso($fim . ' 00:00:00') : null,
+                'all_day' => true,
+                'status' => 'publicado',
+                'is_read' => true,
+                'source' => 'letivo',
+            ];
+        }
+        return $data;
     }
 
     private function student($raw): array { $id=filter_var($raw,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]); if($id===false||!$this->policy->canAccess($this->parentId(),(int)$id))$this->fail('student_not_found','Aluno não encontrado.',404); $row=$this->db->fetch('SELECT a.id,a.nome,a.turma_id,t.serie_id,COALESCE(t.curso_novo_id,t.curso_id) curso_id FROM alunos a LEFT JOIN turmas t ON t.id=a.turma_id WHERE a.id=:id',['id'=>(int)$id]); if(!$row)$this->fail('student_not_found','Aluno não encontrado.',404); return $row; }
