@@ -474,6 +474,40 @@ class VidaEscolar
     }
 
     /**
+     * Só o necessário para escolher o boletim da ficha, sem notas_json.
+     *
+     * @param list<int> $alunoIds
+     * @return list<array<string,mixed>>
+     */
+    public function listarDicasBoletimPorAlunos(array $alunoIds): array
+    {
+        $alunoIds = array_values(array_unique(array_filter(array_map('intval', $alunoIds), static function ($id) {
+            return $id > 0;
+        })));
+        if ($alunoIds === [] || !$this->temTabelaResultadosGerados()) {
+            return [];
+        }
+        $vigenteSql = $this->sqlFiltroVigenteResultados();
+        $ph = [];
+        $params = [];
+        foreach ($alunoIds as $i => $id) {
+            $k = 'd' . $i;
+            $ph[] = ':' . $k;
+            $params[$k] = $id;
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT g.aluno_id, g.id, g.periodo_ref, r.exibir_em, r.ano_letivo{$this->sqlSelectBoletimId()}
+             FROM boletim_resultados_gerados g
+             INNER JOIN boletim_regras r ON r.id = g.regra_id
+             WHERE g.aluno_id IN (" . implode(',', $ph) . ") AND g.preview = 0{$vigenteSql}{$this->sqlFiltroBoletimOficial()}{$this->sqlFiltroExibicaoCoordenacao()}
+             ORDER BY g.aluno_id ASC, g.id ASC",
+            $params
+        );
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    /**
      * @param list<int> $alunoIds
      * @return array<int, array<string,mixed>>
      */
@@ -783,6 +817,62 @@ class VidaEscolar
         }
 
         return $out;
+    }
+
+    /**
+     * @param list<int> $alunoIds
+     * @return array<int, list<string>>
+     */
+    public function listarConfigJsonGruposLinhaPorAlunos(array $alunoIds, int $anoLetivo): array
+    {
+        $alunoIds = array_values(array_unique(array_filter(array_map('intval', $alunoIds), static function ($id) {
+            return $id > 0;
+        })));
+        $vazio = [];
+        foreach ($alunoIds as $id) {
+            $vazio[$id] = [];
+        }
+        if ($alunoIds === [] || $anoLetivo <= 0 || !$this->temTabelaResultadosGerados()) {
+            return $vazio;
+        }
+        try {
+            $tem = $this->db->fetch("SHOW TABLES LIKE 'boletim_componentes'");
+            if (!$tem) {
+                return $vazio;
+            }
+        } catch (\Throwable $e) {
+            return $vazio;
+        }
+        $vigenteSql = $this->sqlFiltroVigenteResultados();
+        $ph = [];
+        $params = ['ano' => $anoLetivo];
+        foreach ($alunoIds as $i => $id) {
+            $k = 'g' . $i;
+            $ph[] = ':' . $k;
+            $params[$k] = $id;
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT DISTINCT g.aluno_id, c.config_json
+             FROM boletim_componentes c
+             INNER JOIN boletim_resultados_gerados g ON g.regra_id = c.regra_id
+             INNER JOIN boletim_regras r ON r.id = c.regra_id
+             WHERE g.aluno_id IN (" . implode(',', $ph) . ")
+               AND g.preview = 0
+               {$vigenteSql}
+               AND (r.ano_letivo = :ano OR r.ano_letivo IS NULL OR r.ano_letivo = 0)
+               AND c.config_json IS NOT NULL
+               AND c.config_json <> ''",
+            $params
+        ) ?: [];
+        foreach ($rows as $row) {
+            $aid = (int) ($row['aluno_id'] ?? 0);
+            $raw = trim((string) ($row['config_json'] ?? ''));
+            if ($aid > 0 && $raw !== '') {
+                $vazio[$aid][] = $raw;
+            }
+        }
+
+        return $vazio;
     }
 
     private function temTabelaResultadosGerados(): bool
@@ -1209,6 +1299,40 @@ class VidaEscolar
         return is_array($row) ? $row : null;
     }
 
+    /**
+     * @param list<int> $ids
+     * @return array<int, array<string,mixed>>
+     */
+    public function turmasPorIds(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static function ($id) {
+            return $id > 0;
+        })));
+        if ($ids === []) {
+            return [];
+        }
+        $ph = [];
+        $params = [];
+        foreach ($ids as $i => $id) {
+            $k = 't' . $i;
+            $ph[] = ':' . $k;
+            $params[$k] = $id;
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT * FROM turmas WHERE id IN (' . implode(',', $ph) . ')',
+            $params
+        ) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $out[$id] = $row;
+            }
+        }
+
+        return $out;
+    }
+
     /** @return list<array<string,mixed>> */
     public function turmasAtivas(int $anoLetivo): array
     {
@@ -1307,6 +1431,49 @@ class VidaEscolar
         }
     }
 
+    /**
+     * Primeira matrícula de cada par aluno/turma, na mesma ordem de findMatriculaDaTurma.
+     *
+     * @param list<int> $alunoIds
+     * @return array<string, array{id:int}>
+     */
+    public function matriculasPorAlunos(array $alunoIds): array
+    {
+        $alunoIds = array_values(array_unique(array_filter(array_map('intval', $alunoIds), static function ($id) {
+            return $id > 0;
+        })));
+        if ($alunoIds === []) {
+            return [];
+        }
+        $ph = [];
+        $params = [];
+        foreach ($alunoIds as $i => $id) {
+            $k = 'm' . $i;
+            $ph[] = ':' . $k;
+            $params[$k] = $id;
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT id, aluno_id, turma_id
+                 FROM matricula
+                 WHERE aluno_id IN (" . implode(',', $ph) . ")
+                 ORDER BY (status = 'ativa') DESC, id DESC",
+                $params
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            $chave = (int) ($row['aluno_id'] ?? 0) . ':' . (int) ($row['turma_id'] ?? 0);
+            if (!isset($out[$chave]) && (int) ($row['id'] ?? 0) > 0) {
+                $out[$chave] = ['id' => (int) $row['id']];
+            }
+        }
+
+        return $out;
+    }
+
     public function findMatriculaAtiva(int $alunoId, int $turmaId): ?array
     {
         return $this->findMatriculaDaTurma($alunoId, $turmaId);
@@ -1377,6 +1544,99 @@ class VidaEscolar
             return !empty($row['ok']);
         } catch (\Throwable $e) {
             return false;
+        }
+    }
+
+    /**
+     * @param list<array<string,mixed>> $fichas
+     */
+    public function criarFichasEmLote(array $fichas): void
+    {
+        $this->inserirEmLotes(
+            'boletim_fichas',
+            ['aluno_id', 'turma_id', 'matricula_id', 'ano_letivo', 'serie_nome', 'status', 'observacao'],
+            $fichas,
+            80
+        );
+    }
+
+    /**
+     * @param list<array<string,mixed>> $linhas
+     */
+    public function criarLinhasEmLote(array $linhas): void
+    {
+        $this->inserirEmLotes(
+            'boletim_ficha_linhas',
+            ['ficha_id', 'materia_id', 'componente_nome', 'carga_horaria', 'ordem'],
+            $linhas,
+            100
+        );
+    }
+
+    /**
+     * @param list<array<string,mixed>> $celulas
+     */
+    public function criarCelulasVaziasEmLote(array $celulas): void
+    {
+        $this->inserirEmLotes(
+            'boletim_ficha_celulas',
+            ['linha_id', 'periodo_numero', 'origem', 'status'],
+            $celulas,
+            400
+        );
+    }
+
+    /**
+     * @param list<array<string,mixed>> $itens
+     */
+    public function registrarAuditoriaEmLote(array $itens): void
+    {
+        $this->inserirEmLotes(
+            'boletim_ficha_auditoria',
+            ['ficha_id', 'celula_id', 'acao', 'campo', 'valor_anterior', 'valor_novo', 'motivo', 'usuario_id', 'usuario_nome', 'usuario_perfil'],
+            $itens,
+            80
+        );
+    }
+
+    /**
+     * @param list<string> $colunas
+     * @param list<array<string,mixed>> $linhas
+     */
+    private function inserirEmLotes(string $tabela, array $colunas, array $linhas, int $tamanho): void
+    {
+        $permitidas = [
+            'boletim_fichas' => ['aluno_id', 'turma_id', 'matricula_id', 'ano_letivo', 'serie_nome', 'status', 'observacao'],
+            'boletim_ficha_linhas' => ['ficha_id', 'materia_id', 'componente_nome', 'carga_horaria', 'ordem'],
+            'boletim_ficha_celulas' => ['linha_id', 'periodo_numero', 'origem', 'status'],
+            'boletim_ficha_auditoria' => ['ficha_id', 'celula_id', 'acao', 'campo', 'valor_anterior', 'valor_novo', 'motivo', 'usuario_id', 'usuario_nome', 'usuario_perfil'],
+        ];
+        if (!isset($permitidas[$tabela]) || $colunas !== $permitidas[$tabela] || $linhas === []) {
+            return;
+        }
+        $tamanho = max(1, $tamanho);
+        foreach (array_chunk($linhas, $tamanho) as $lote) {
+            $params = [];
+            $grupos = [];
+            foreach ($lote as $i => $linha) {
+                if (!is_array($linha)) {
+                    continue;
+                }
+                $marcas = [];
+                foreach ($colunas as $coluna) {
+                    $chave = 'c' . $i . '_' . $coluna;
+                    $marcas[] = ':' . $chave;
+                    $params[$chave] = $linha[$coluna] ?? null;
+                }
+                $grupos[] = '(' . implode(',', $marcas) . ')';
+            }
+            if ($grupos === []) {
+                continue;
+            }
+            $this->db->insert(
+                'INSERT INTO `' . $tabela . '` (`' . implode('`,`', $colunas) . '`) VALUES ' . implode(',', $grupos),
+                $params
+            );
         }
     }
 

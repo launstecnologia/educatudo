@@ -12,6 +12,9 @@ class Boletim
 {
     private $db;
 
+    /** @var array<string, list<array<string,mixed>>> */
+    private array $listaCache = [];
+
     public function __construct()
     {
         $this->db = Database::getInstance();
@@ -84,6 +87,10 @@ class Boletim
         if (!$this->tabelasProntas()) {
             return [];
         }
+        $chaveLista = ($apenasAtivos ? '1' : '0') . ':' . ($incluirExcluidos ? '1' : '0');
+        if (isset($this->listaCache[$chaveLista])) {
+            return $this->listaCache[$chaveLista];
+        }
         $where = [];
         if ($apenasAtivos) {
             $where[] = 'b.ativo = 1';
@@ -101,7 +108,14 @@ class Boletim
             $row = $this->hidratar($row);
         }
         unset($row);
+        $this->listaCache[$chaveLista] = $rows;
+
         return $rows;
+    }
+
+    private function limparListaCache(): void
+    {
+        $this->listaCache = [];
     }
 
     /**
@@ -136,6 +150,7 @@ class Boletim
      */
     public function criar(array $data): int
     {
+        $this->limparListaCache();
         $params = $this->paramsPersistencia($data);
         if ($this->temColunaRegraAcademica()) {
             return (int) $this->db->insert(
@@ -165,6 +180,7 @@ class Boletim
      */
     public function atualizar(int $id, array $data): void
     {
+        $this->limparListaCache();
         $params = $this->paramsPersistencia($data);
         $params['id'] = $id;
         if ($this->temColunaRegraAcademica()) {
@@ -205,6 +221,7 @@ class Boletim
      */
     public function excluir(int $id): bool
     {
+        $this->limparListaCache();
         if ($id <= 0 || !$this->tabelasProntas() || !$this->temColunaExcluidoEm()) {
             return false;
         }

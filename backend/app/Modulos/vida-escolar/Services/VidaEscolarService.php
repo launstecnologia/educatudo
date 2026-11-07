@@ -38,6 +38,14 @@ class VidaEscolarService
     private ?BoletimCadastroService $boletimCadastro = null;
     /** @var array<string, array<string,mixed>|null> */
     private array $modeloBoletimCache = [];
+    /** @var array<int, array<string,mixed>|null> */
+    private array $turmaCache = [];
+    /** @var array<string, int> */
+    private array $boletimOficialTurmaCache = [];
+    /** @var array<string, int> */
+    private array $boletimDicaPreload = [];
+    /** @var array<string, list<array<string,mixed>>> */
+    private array $componentesLayoutCache = [];
 
     public function __construct(?VidaEscolar $model = null)
     {
@@ -255,6 +263,139 @@ class VidaEscolarService
         ]);
 
         return ['success' => true, 'id' => $fichaId, 'criada' => true];
+    }
+
+    /**
+     * Cria de uma vez as fichas que ainda não existem. Mesmos campos de garantirFicha.
+     *
+     * @param array<int, array<string,mixed>> $alunosAno
+     * @param array<string, array<string,mixed>> $fichas
+     * @return array<string, array<string,mixed>>
+     */
+    private function garantirFichasAusentesEmLote(array $alunosAno, array $fichas, int $ano, ?int $usuarioId): array
+    {
+        $faltantes = [];
+        foreach ($alunosAno as $aid => $aluno) {
+            $turmaId = (int) ($aluno['turma_id'] ?? 0);
+            if ($turmaId <= 0 || isset($fichas[$aid . ':' . $turmaId])) {
+                continue;
+            }
+            $faltantes[(int) $aid] = $turmaId;
+        }
+        if ($faltantes === []) {
+            return $fichas;
+        }
+
+        $turmas = $this->model->turmasPorIds(array_values($faltantes));
+        foreach ($turmas as $turmaId => $turma) {
+            $this->turmaCache[(int) $turmaId] = $turma;
+        }
+        $matriculas = $this->model->matriculasPorAlunos(array_keys($faltantes));
+        $layoutPorTurma = [];
+        foreach (array_unique(array_values($faltantes)) as $turmaId) {
+            $layoutPorTurma[(int) $turmaId] = $this->componentesLayoutDaTurma((int) $turmaId, $ano);
+        }
+
+        $paraInserir = [];
+        foreach ($faltantes as $aid => $turmaId) {
+            $turma = $turmas[$turmaId] ?? null;
+            $matricula = $matriculas[$aid . ':' . $turmaId] ?? null;
+            $paraInserir[] = [
+                'aluno_id' => $aid,
+                'turma_id' => $turmaId,
+                'matricula_id' => is_array($matricula) ? (int) ($matricula['id'] ?? 0) ?: null : null,
+                'ano_letivo' => $ano,
+                'serie_nome' => is_array($turma) ? ($turma['serie'] ?? null) : null,
+                'status' => 'em_curso',
+                'observacao' => null,
+            ];
+        }
+
+        $abriu = !$this->db->inTransaction();
+        if ($abriu) {
+            $this->db->beginTransaction();
+        }
+        try {
+            $this->model->criarFichasEmLote($paraInserir);
+            $novas = $this->model->listarFichasPorAlunosAno(array_keys($faltantes), $ano);
+            $linhas = [];
+            $auditoria = [];
+            $fichaIds = [];
+            foreach ($faltantes as $aid => $turmaId) {
+                $ficha = $novas[$aid . ':' . $turmaId] ?? null;
+                if (!is_array($ficha) || (int) ($ficha['id'] ?? 0) <= 0) {
+                    continue;
+                }
+                $fichas[$aid . ':' . $turmaId] = $ficha;
+                $fichaId = (int) $ficha['id'];
+                $fichaIds[] = $fichaId;
+                $ordem = 0;
+                $jaTemMateria = [];
+                $componentes = $layoutPorTurma[$turmaId] ?? [];
+                if ($componentes === []) {
+                    $componentes = $this->componentesParaNovaFicha($turmaId, $ano, $aid);
+                }
+                foreach ($componentes as $comp) {
+                    $materiaId = (int) ($comp['materia_id'] ?? 0);
+                    if ($materiaId > 0 && isset($jaTemMateria[$materiaId])) {
+                        continue;
+                    }
+                    $ordem++;
+                    if ($materiaId > 0) {
+                        $jaTemMateria[$materiaId] = true;
+                    }
+                    $linhas[] = [
+                        'ficha_id' => $fichaId,
+                        'materia_id' => $materiaId > 0 ? $materiaId : null,
+                        'componente_nome' => (string) ($comp['componente_nome'] ?? 'Componente'),
+                        'carga_horaria' => null,
+                        'ordem' => $ordem,
+                    ];
+                }
+                $auditoria[] = [
+                    'ficha_id' => $fichaId,
+                    'celula_id' => null,
+                    'acao' => 'criar_ficha',
+                    'campo' => null,
+                    'valor_anterior' => null,
+                    'valor_novo' => json_encode(['ano' => $ano, 'turma_id' => $turmaId], JSON_UNESCAPED_UNICODE),
+                    'motivo' => null,
+                    'usuario_id' => $usuarioId > 0 ? $usuarioId : null,
+                    'usuario_nome' => null,
+                    'usuario_perfil' => null,
+                ];
+            }
+            $this->model->criarLinhasEmLote($linhas);
+            $celulas = [];
+            foreach ($this->model->listarLinhasPorFichas($fichaIds) as $linhasFicha) {
+                foreach ($linhasFicha as $linha) {
+                    $linhaId = (int) ($linha['id'] ?? 0);
+                    if ($linhaId <= 0) {
+                        continue;
+                    }
+                    foreach ([1, 2, 3, 4, 0] as $periodo) {
+                        $celulas[] = [
+                            'linha_id' => $linhaId,
+                            'periodo_numero' => $periodo,
+                            'origem' => 'vazia',
+                            'status' => 'aberta',
+                        ];
+                    }
+                }
+            }
+            $this->model->criarCelulasVaziasEmLote($celulas);
+            $this->model->registrarAuditoriaEmLote($auditoria);
+            if ($abriu) {
+                $this->db->commit();
+            }
+        } catch (\Throwable $e) {
+            if ($abriu && $this->db->inTransaction()) {
+                $this->db->rollback();
+            }
+            throw $e;
+        }
+
+        return $fichas;
     }
 
     /**
@@ -1108,21 +1249,15 @@ class VidaEscolarService
         $n = 0;
         foreach ($porAno as $ano => $alunosAno) {
             $idsAno = array_map('intval', array_keys($alunosAno));
+            $this->aquecerDicasBoletim($idsAno, (int) $ano);
+            $this->aquecerGruposLinha($idsAno, (int) $ano);
             $fichas = $this->model->listarFichasPorAlunosAno($idsAno, (int) $ano);
-            foreach ($alunosAno as $aid => $aluno) {
-                $turmaId = (int) ($aluno['turma_id'] ?? 0);
-                $chaveFicha = $aid . ':' . $turmaId;
-                if (isset($fichas[$chaveFicha])) {
-                    continue;
-                }
-                $ok = $this->garantirFicha($aid, $turmaId, (int) $ano, $usuario['id'] ?? null);
-                if (!empty($ok['success']) && (int) ($ok['id'] ?? 0) > 0) {
-                    $fichaNova = $this->model->findFicha((int) $ok['id']);
-                    if (is_array($fichaNova)) {
-                        $fichas[$chaveFicha] = $fichaNova;
-                    }
-                }
-            }
+            $fichas = $this->garantirFichasAusentesEmLote(
+                $alunosAno,
+                $fichas,
+                (int) $ano,
+                isset($usuario['id']) ? (int) $usuario['id'] : null
+            );
 
             $fichaIds = [];
             $fichaPorAluno = [];
@@ -2098,7 +2233,7 @@ class VidaEscolarService
             return $this->regraAcadCache[$chave];
         }
         $turmaId = (int) ($ficha['turma_id'] ?? 0);
-        $turma = $turmaId > 0 ? $this->model->turmaPorId($turmaId) : null;
+        $turma = $this->turmaPorIdCache($turmaId);
         $contexto = [
             'ano_letivo' => (int) ($ficha['ano_letivo'] ?? 0),
             'curso_id' => (int) ($turma['curso_novo_id'] ?? $turma['curso_id'] ?? 0) ?: null,
@@ -3590,13 +3725,13 @@ class VidaEscolarService
         $turmaId = (int) ($ficha['turma_id'] ?? 0);
         $ano = (int) ($ficha['ano_letivo'] ?? 0);
         $alunoId = (int) ($ficha['aluno_id'] ?? 0);
-        $chave = $turmaId . ':' . $ano . ':' . $alunoId;
+        $preferido = $alunoId > 0 ? $this->boletimIdDicaDoAluno($alunoId, $ano) : 0;
+        $chave = $turmaId . ':' . $ano . ':' . $preferido;
         if (array_key_exists($chave, $this->modeloBoletimCache)) {
             return $this->modeloBoletimCache[$chave];
         }
-        $turma = $turmaId > 0 ? $this->model->turmaPorId($turmaId) : null;
+        $turma = $this->turmaPorIdCache($turmaId);
         $serieId = (int) ($turma['serie_id'] ?? 0);
-        $preferido = $alunoId > 0 ? $this->boletimIdDicaDoAluno($alunoId, $ano) : 0;
         $this->modeloBoletimCache[$chave] = $this->boletimCadastro()->encontrarOficialParaTurma(
             $turmaId,
             $serieId,
@@ -3608,16 +3743,33 @@ class VidaEscolarService
     }
 
     /**
+     * @return list<array<string,mixed>>
+     */
+    private function componentesLayoutDaTurma(int $turmaId, int $anoLetivo): array
+    {
+        $chaveLayout = $turmaId . ':' . $anoLetivo;
+        if (array_key_exists($chaveLayout, $this->componentesLayoutCache)) {
+            return $this->componentesLayoutCache[$chaveLayout];
+        }
+        $turmaLayout = $this->turmaPorIdCache($turmaId);
+        $serieLayout = (int) (is_array($turmaLayout) ? ($turmaLayout['serie_id'] ?? 0) : 0);
+        $doLayout = (new \App\Modulos\EventosAvaliativos\Models\BoletimLayout())->componentesOficial($anoLetivo, $turmaId, $serieLayout);
+        $this->componentesLayoutCache[$chaveLayout] = $doLayout;
+
+        return $doLayout;
+    }
+
+    /**
      * @return list<array{materia_id:int,componente_nome:string,ordem?:int}>
      */
     private function componentesParaNovaFicha(int $turmaId, int $anoLetivo, int $alunoId = 0): array
     {
-        $turma = $turmaId > 0 ? $this->model->turmaPorId($turmaId) : null;
-        $serieId = (int) (is_array($turma) ? ($turma['serie_id'] ?? 0) : 0);
-        $doLayout = (new \App\Modulos\EventosAvaliativos\Models\BoletimLayout())->componentesOficial($anoLetivo, $turmaId, $serieId);
+        $doLayout = $this->componentesLayoutDaTurma($turmaId, $anoLetivo);
         if ($doLayout !== []) {
             return $doLayout;
         }
+        $turma = $this->turmaPorIdCache($turmaId);
+        $serieId = (int) (is_array($turma) ? ($turma['serie_id'] ?? 0) : 0);
         $preferido = $alunoId > 0 ? $this->boletimIdDicaDoAluno($alunoId, $anoLetivo) : 0;
         $modelo = $this->boletimCadastro()->encontrarOficialParaTurma(
             $turmaId,
@@ -3648,12 +3800,7 @@ class VidaEscolarService
         }
         $turmaId = (int) ($ficha['turma_id'] ?? 0);
         $ano = (int) ($ficha['ano_letivo'] ?? 0);
-        $turma = $turmaId > 0 ? $this->model->turmaPorId($turmaId) : null;
-        $comps = (new \App\Modulos\EventosAvaliativos\Models\BoletimLayout())->componentesOficial(
-            $ano,
-            $turmaId,
-            (int) (is_array($turma) ? ($turma['serie_id'] ?? 0) : 0)
-        );
+        $comps = $this->componentesLayoutDaTurma($turmaId, $ano);
         if ($comps === []) {
             $modelo = $this->modeloOficialDaFicha($ficha);
             if (!is_array($modelo)) {
@@ -3697,6 +3844,10 @@ class VidaEscolarService
     {
         if ($alunoId <= 0) {
             return 0;
+        }
+        $preload = $alunoId . ':' . $anoLetivo;
+        if (array_key_exists($preload, $this->boletimDicaPreload)) {
+            return $this->boletimDicaPreload[$preload];
         }
         $notas = 0;
         $qualquer = 0;
@@ -3742,11 +3893,16 @@ class VidaEscolarService
     {
         $turmaId = (int) ($ficha['turma_id'] ?? 0);
         $ano = (int) ($ficha['ano_letivo'] ?? 0);
-        $turma = $turmaId > 0 ? $this->model->turmaPorId($turmaId) : null;
+        $chave = $turmaId . ':' . $ano;
+        if (array_key_exists($chave, $this->boletimOficialTurmaCache)) {
+            return $this->boletimOficialTurmaCache[$chave];
+        }
+        $turma = $this->turmaPorIdCache($turmaId);
         $serieId = (int) ($turma['serie_id'] ?? 0);
         $modelo = $this->boletimCadastro()->encontrarOficialParaTurma($turmaId, $serieId, $ano, null);
+        $this->boletimOficialTurmaCache[$chave] = (int) ((is_array($modelo) ? ($modelo['id'] ?? 0) : 0));
 
-        return (int) ((is_array($modelo) ? ($modelo['id'] ?? 0) : 0));
+        return $this->boletimOficialTurmaCache[$chave];
     }
 
     /**
@@ -4120,10 +4276,23 @@ class VidaEscolarService
         if (isset($this->gruposLinhaCache[$cacheKey])) {
             return $this->gruposLinhaCache[$cacheKey];
         }
+        $this->gruposLinhaCache[$cacheKey] = $this->montarGruposLinha(
+            $this->model->listarConfigJsonGruposLinhaDoAluno($alunoId, $anoLetivo)
+        );
+
+        return $this->gruposLinhaCache[$cacheKey];
+    }
+
+    /**
+     * @param list<string> $configs
+     * @return list<array{label:string,materias_ids:list<int>}>
+     */
+    private function montarGruposLinha(array $configs): array
+    {
         $out = [];
         $vistos = [];
-        foreach ($this->model->listarConfigJsonGruposLinhaDoAluno($alunoId, $anoLetivo) as $raw) {
-            $grp = $this->parseGroupLineConfigJson($raw);
+        foreach ($configs as $raw) {
+            $grp = $this->parseGroupLineConfigJson((string) $raw);
             if ($grp === null) {
                 continue;
             }
@@ -4134,9 +4303,83 @@ class VidaEscolarService
             $vistos[$chave] = true;
             $out[] = $grp;
         }
-        $this->gruposLinhaCache[$cacheKey] = $out;
 
         return $out;
+    }
+
+    /**
+     * @param list<int> $alunoIds
+     */
+    private function aquecerDicasBoletim(array $alunoIds, int $anoLetivo): void
+    {
+        $pendentes = [];
+        foreach ($alunoIds as $alunoId) {
+            $alunoId = (int) $alunoId;
+            if ($alunoId > 0 && !array_key_exists($alunoId . ':' . $anoLetivo, $this->boletimDicaPreload)) {
+                $pendentes[] = $alunoId;
+            }
+        }
+        if ($pendentes === []) {
+            return;
+        }
+        $porAluno = [];
+        foreach ($this->model->listarDicasBoletimPorAlunos($pendentes) as $row) {
+            $porAluno[(int) ($row['aluno_id'] ?? 0)][] = $row;
+        }
+        foreach ($pendentes as $alunoId) {
+            $notas = 0;
+            $qualquer = 0;
+            foreach ($porAluno[$alunoId] ?? [] as $row) {
+                $bid = (int) ($row['boletim_id'] ?? 0);
+                if ($bid <= 0 || !$this->eventoPertenceAoAno($row, $anoLetivo)) {
+                    continue;
+                }
+                if ($qualquer <= 0) {
+                    $qualquer = $bid;
+                }
+                if ((string) ($row['exibir_em'] ?? '') === 'notas') {
+                    $notas = $bid;
+                    break;
+                }
+            }
+            $this->boletimDicaPreload[$alunoId . ':' . $anoLetivo] = $notas > 0 ? $notas : $qualquer;
+        }
+    }
+
+    /**
+     * @param list<int> $alunoIds
+     */
+    private function aquecerGruposLinha(array $alunoIds, int $anoLetivo): void
+    {
+        $pendentes = [];
+        foreach ($alunoIds as $alunoId) {
+            $alunoId = (int) $alunoId;
+            if ($alunoId > 0 && !isset($this->gruposLinhaCache[$alunoId . ':' . $anoLetivo])) {
+                $pendentes[] = $alunoId;
+            }
+        }
+        if ($pendentes === []) {
+            return;
+        }
+        $porAluno = $this->model->listarConfigJsonGruposLinhaPorAlunos($pendentes, $anoLetivo);
+        foreach ($pendentes as $alunoId) {
+            $this->gruposLinhaCache[$alunoId . ':' . $anoLetivo] = $this->montarGruposLinha($porAluno[$alunoId] ?? []);
+        }
+    }
+
+    /**
+     * @return array<string,mixed>|null
+     */
+    private function turmaPorIdCache(int $turmaId): ?array
+    {
+        if ($turmaId <= 0) {
+            return null;
+        }
+        if (!array_key_exists($turmaId, $this->turmaCache)) {
+            $this->turmaCache[$turmaId] = $this->model->turmaPorId($turmaId);
+        }
+
+        return $this->turmaCache[$turmaId];
     }
 
     /**
