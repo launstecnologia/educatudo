@@ -428,6 +428,7 @@ class BoletimConfigController extends BaseController
                     'mensagem' => (string) ($st['mensagem'] ?? ''),
                     'progresso_feitos' => (int) ($st['progresso_feitos'] ?? 0),
                     'progresso_total' => (int) ($st['progresso_total'] ?? 0),
+                    'progresso_passo' => (string) ($st['progresso_passo'] ?? ''),
                 ];
             }
         }
@@ -3138,6 +3139,7 @@ class BoletimConfigController extends BaseController
             @set_time_limit(0);
         }
         $this->jobIdHeartbeat = (int) ($payload['_job_id'] ?? 0);
+        $this->registrarFalhaFatalDaGeracao();
         $this->renovarHeartbeatGeracao();
         $this->usuarioGeracaoJob = [
             'id' => (int) ($payload['user_id'] ?? 0),
@@ -3267,12 +3269,51 @@ class BoletimConfigController extends BaseController
         \App\Services\AIJobService::renovarHeartbeat($this->jobIdHeartbeat);
     }
 
-    private function gravarProgressoGeracao(int $feitos, int $total): void
+    private function gravarProgressoGeracao(int $feitos, int $total, string $passo = 'calculando'): void
     {
         if ($this->jobIdHeartbeat <= 0 || $total <= 0) {
             return;
         }
-        \App\Services\AIJobService::gravarProgresso($this->jobIdHeartbeat, $feitos, $total);
+        \App\Services\AIJobService::gravarProgresso($this->jobIdHeartbeat, $feitos, $total, $passo);
+    }
+
+    /**
+     * Memória estourada mata o processo sem gravar o job. Sem isto a tela fica em 100% até o prazo de 45 min.
+     */
+    private function registrarFalhaFatalDaGeracao(): void
+    {
+        $jobId = $this->jobIdHeartbeat;
+        if ($jobId <= 0) {
+            return;
+        }
+        // Reserva memória para o UPDATE quando o fatal for estouro de memória.
+        $reservaMemoria = str_repeat('x', 262144);
+        register_shutdown_function(static function () use ($jobId, &$reservaMemoria): void {
+            unset($reservaMemoria);
+            $err = error_get_last();
+            if (!is_array($err)) {
+                return;
+            }
+            $tipo = (int) ($err['type'] ?? 0);
+            if (!in_array($tipo, [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+                return;
+            }
+            $mensagem = substr(trim((string) ($err['message'] ?? 'Falha ao gerar o boletim.')), 0, 500);
+            if ($mensagem === '') {
+                $mensagem = 'Falha ao gerar o boletim.';
+            }
+            try {
+                $db = \App\Core\Database::getInstance();
+                $db->query(
+                    "UPDATE ai_jobs
+                     SET status = 'failed', error_message = ?, completed_at = NOW()
+                     WHERE id = ? AND status = 'processing'",
+                    [$mensagem, $jobId]
+                );
+            } catch (\Throwable $e) {
+                error_log('registrarFalhaFatalDaGeracao: ' . $e->getMessage());
+            }
+        });
     }
 
     /**
@@ -3419,6 +3460,10 @@ class BoletimConfigController extends BaseController
             $msg .= ' ⚠️ ' . count($alunosComMudancaSignificativa) . ' aluno(s) com nota final mudando 2+ pontos: ' . implode(', ', $exemplosMudanca) . '.';
         }
 
+        if (strtolower(trim((string) ($regra['exibir_em'] ?? ''))) === 'notas' && (int) ($regra['boletim_id'] ?? 0) > 0) {
+            $base = max(1, $gerados);
+            $this->gravarProgressoGeracao($base, $base, 'boletim_oficial');
+        }
         $this->atualizarBoletimDestinoAposNotas($regra, $periodoRef, $dataInicio, $dataFim);
 
         return [
@@ -3628,7 +3673,10 @@ class BoletimConfigController extends BaseController
                 }
                 error_log('Boletim ' . $logContexto . ' aluno #' . $alunoId . ': ' . $e->getMessage());
             }
+            // A simulação de um aluno chama a dos períodos e guardava tudo até o fim. Isso estourava 256 MB no boletim oficial.
+            $this->simulacaoAlunoCache = [];
             if (count($itensPersistir) >= self::TAMANHO_LOTE_ALUNOS_PERSISTIR) {
+                $this->gravarProgressoGeracao($avaliados, $totalAlunos, 'gravando');
                 $this->persistirLoteSimulacao(
                     $regraId,
                     $periodoRef,
@@ -3651,6 +3699,7 @@ class BoletimConfigController extends BaseController
         }
 
         if ($itensPersistir !== []) {
+            $this->gravarProgressoGeracao($avaliados, $totalAlunos, 'gravando');
             $this->persistirLoteSimulacao(
                 $regraId,
                 $periodoRef,
@@ -3670,6 +3719,9 @@ class BoletimConfigController extends BaseController
         }
 
         if (!$preview && $alunoIdsSync !== []) {
+            $this->gravarProgressoGeracao($totalAlunos, $totalAlunos, 'fichas');
+            $this->ultimoHeartbeatEm = 0.0;
+            $this->renovarHeartbeatGeracao();
             $this->sincronizarFichasVidaEscolarLote($alunoIdsSync, $usuarioVida, $periodoRef, $regraId);
         }
 
@@ -3707,6 +3759,7 @@ class BoletimConfigController extends BaseController
         if ($itensPersistir === []) {
             return;
         }
+        $this->ultimoHeartbeatEm = 0.0;
         $this->renovarHeartbeatGeracao();
         try {
             $this->boletimConfig->replaceGeneratedResultsEmLote(

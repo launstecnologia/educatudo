@@ -114,7 +114,7 @@ $rotuloModeloFiltro = $filtroBoletimNome !== '' ? $filtroBoletimNome : ('Modelo 
             <i class="fa-solid fa-spinner fa-spin mt-0.5"></i>
             <div class="min-w-[16rem] flex-1">
                 <p class="font-semibold">Gerando boletins em segundo plano</p>
-                <p class="text-sm mt-0.5">Você pode continuar na listagem. Esta página atualiza sozinha quando a geração terminar.</p>
+                <p class="text-sm mt-0.5">O texto abaixo diz o passo atual. 100% só aparece quando a geração termina e a página recarrega.</p>
                 <div id="boletim-geracao-progresso" class="mt-3 max-w-md">
                     <div class="flex items-center justify-between text-xs mb-1">
                         <span id="boletim-geracao-rotulo">Preparando o cálculo…</span>
@@ -602,24 +602,55 @@ document.addEventListener('keydown', function (e) {
         });
     }
 
+    function pctDoPasso(passo, feitos, total) {
+        if (passo === 'gravando') return 90;
+        if (passo === 'fichas') return 95;
+        if (passo === 'boletim_oficial') return 98;
+        if (total <= 0) return 0;
+        return Math.max(0, Math.min(85, Math.round((feitos / total) * 85)));
+    }
+
+    function textoPasso(passo, feitos, total) {
+        if (passo === 'gravando') return 'Gravando as notas no boletim…';
+        if (passo === 'fichas') return 'Atualizando a ficha da vida escolar…';
+        if (passo === 'boletim_oficial') return 'Notas prontas. Montando o boletim oficial…';
+        if (total > 0) return 'Calculando as notas: ' + feitos + ' de ' + total + ' alunos';
+        return 'Preparando o cálculo…';
+    }
+
+    function textoChip(passo, feitos, total) {
+        if (passo === 'gravando') return 'Gravando notas';
+        if (passo === 'fichas') return 'Atualizando fichas';
+        if (passo === 'boletim_oficial') return 'Boletim oficial';
+        if (total > 0) return feitos + ' de ' + total;
+        return 'Preparando…';
+    }
+
     function atualizarBarra(jobs) {
         let feitos = 0;
         let total = 0;
+        let pct = 100;
+        let passoBanner = 'calculando';
         ids.forEach(function (id) {
             const st = jobs[String(id)] || jobs[id];
-            if (!st) {
+            if (!st || (st.status !== 'pending' && st.status !== 'processing')) {
                 return;
             }
             const f = Number(st.progresso_feitos || 0);
             const t = Number(st.progresso_total || 0);
-            if (t > 0) {
+            const passo = String(st.progresso_passo || 'calculando');
+            const p = pctDoPasso(passo, f, t);
+            if (p < pct) {
+                pct = p;
+                passoBanner = passo;
+            }
+            if (passo === 'calculando' && t > 0) {
                 feitos += f;
                 total += t;
             }
             const chip = document.querySelector('.js-geracao-chip[data-job-id="' + id + '"] .js-geracao-rotulo');
-            if (chip && t > 0) {
-                const pctChip = Math.max(0, Math.min(100, Math.round((f / t) * 100)));
-                chip.textContent = f + ' de ' + t + ' · ' + pctChip + '%';
+            if (chip) {
+                chip.textContent = textoChip(passo, f, t);
             }
         });
         const rotulo = document.getElementById('boletim-geracao-rotulo');
@@ -628,14 +659,13 @@ document.addEventListener('keydown', function (e) {
         if (!rotulo || !pctEl || !barra) {
             return;
         }
-        if (total <= 0) {
+        if (pct === 100 && total <= 0 && passoBanner === 'calculando') {
             rotulo.textContent = 'Preparando o cálculo…';
             pctEl.textContent = '0%';
             barra.style.width = '0%';
             return;
         }
-        const pct = Math.max(0, Math.min(100, Math.round((feitos / total) * 100)));
-        rotulo.textContent = feitos + ' de ' + total + ' alunos';
+        rotulo.textContent = textoPasso(passoBanner, feitos, total);
         pctEl.textContent = pct + '%';
         barra.style.width = pct + '%';
     }

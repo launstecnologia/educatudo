@@ -1814,6 +1814,7 @@ class BoletimConfig
                 'mensagem' => is_array($result) ? (string) ($result['mensagem'] ?? '') : '',
                 'progresso_feitos' => is_array($result) ? (int) ($result['progresso_feitos'] ?? 0) : 0,
                 'progresso_total' => is_array($result) ? (int) ($result['progresso_total'] ?? 0) : 0,
+                'progresso_passo' => is_array($result) ? (string) ($result['progresso_passo'] ?? '') : '',
             ];
         }
 

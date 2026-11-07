@@ -73,12 +73,16 @@ class AIJobService
     /**
      * Grava o andamento enquanto o job segue em processing. O resultado final substitui este JSON.
      */
-    public static function gravarProgresso(int $jobId, int $feitos, int $total): void
+    public static function gravarProgresso(int $jobId, int $feitos, int $total, string $passo = 'calculando'): void
     {
         if ($jobId <= 0 || $total <= 0) {
             return;
         }
         $feitos = max(0, min($feitos, $total));
+        $passos = ['calculando', 'gravando', 'fichas', 'boletim_oficial'];
+        if (!in_array($passo, $passos, true)) {
+            $passo = 'calculando';
+        }
         $db = \App\Core\Database::getInstance();
         if (!$db->tableExists('ai_jobs')) {
             return;
@@ -89,6 +93,7 @@ class AIJobService
                 json_encode([
                     'progresso_feitos' => $feitos,
                     'progresso_total' => $total,
+                    'progresso_passo' => $passo,
                 ], JSON_UNESCAPED_UNICODE),
                 $jobId,
             ]
