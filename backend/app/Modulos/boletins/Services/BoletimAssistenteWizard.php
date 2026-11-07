@@ -6837,13 +6837,15 @@ class BoletimAssistenteWizard
     }
 
     /**
-     * A média dos subeventos fica imediatamente depois deles, na mesma faixa.
+     * Média nova dos subeventos nasce logo depois deles.
+     * Se a coluna já estava na ordem enviada, o arraste do usuário permanece.
      *
      * @param array<string,mixed> $rascunho
      * @param array<string,mixed> $estado
+     * @param array<string,bool> $jaPosicionadas
      * @return array<string,mixed>
      */
-    private function encostarMediaNosSubeventos(array $rascunho, array &$estado): array
+    private function encostarMediaNosSubeventos(array $rascunho, array &$estado, array $jaPosicionadas = []): array
     {
         $comps = is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : [];
         $ordem = [];
@@ -6894,7 +6896,7 @@ class BoletimAssistenteWizard
                     $ultimoIdx = max($ultimoIdx, (int) $idx);
                 }
             }
-            if ($ultimoIdx < 0) {
+            if ($ultimoIdx < 0 || isset($jaPosicionadas[$cod])) {
                 continue;
             }
             $atual = array_search($cod, $ordem, true);
@@ -7417,6 +7419,13 @@ class BoletimAssistenteWizard
         $rascunho = is_array($resultado['rascunho'] ?? null) ? $resultado['rascunho'] : null;
         if ($rascunho !== null) {
             try {
+                $jaPosicionadas = [];
+                foreach ((array) ($estado['colunas_ordem'] ?? []) as $codOrdem) {
+                    $codOrdem = strtolower(trim((string) $codOrdem));
+                    if ($codOrdem !== '') {
+                        $jaPosicionadas[$codOrdem] = true;
+                    }
+                }
                 $rascunho = $this->restringirDemonstrativoAosEventosMarcados($rascunho, $estado);
                 $rascunho = $this->expandirSubeventosAvaliativos($rascunho, $estado);
                 $rascunho = $this->anexarRecuperacoesNoDemonstrativo($rascunho, $estado);
@@ -7425,7 +7434,7 @@ class BoletimAssistenteWizard
                 if (!$this->ehBoletimComposto($estado)) {
                     $rascunho = $this->aplicarOrdemColunas($rascunho, $estado);
                     $estado['colunas_ordem'] = $this->extrairCodigosColunasMoveis($rascunho);
-                    $rascunho = $this->encostarMediaNosSubeventos($rascunho, $estado);
+                    $rascunho = $this->encostarMediaNosSubeventos($rascunho, $estado, $jaPosicionadas);
                 }
                 $rascunho = $this->sincronizarLinhasLayout($rascunho, $estado);
                 $rascunho = $this->religarExpressoesNasColunasVivas($rascunho, $estado);
