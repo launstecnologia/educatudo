@@ -3,7 +3,10 @@
 -- Eventos avaliativos: em cada trimestre, o evento Simulado reúne 3 subeventos
 -- (Simulado 1, 2 e 3), cada um com todas as turmas. Prova, recuperação do
 -- trimestre e recuperação final também são um subevento só, com todas as turmas.
--- Notas em curva normal: cerca de 30% dos alunos ficam abaixo de 6,00.
+-- Notas com perfil estável por aluno (excelente, bom, regular, dificuldade
+-- específica ou generalizada, em evolução, em queda). Recuperação do trimestre
+-- só quando a média fica abaixo de 6,00. Recuperação final só na média anual.
+-- Prévia sem gravar: php scripts/simular_notas_escola_teste_2025.php
 -- Calendário do ano inteiro (férias, feriados, trimestres e as avaliações).
 -- Grade da manhã de segunda a sexta, cinco horários, 2 aulas de cada componente.
 -- Boletim oficial de 2025 (boletim_layouts), ligado à regra et25-em-2025.
@@ -13,7 +16,8 @@
 -- Master → Migrations → Escola teste → Escolher → marque SÓ este arquivo.
 -- Não entra em "Executar todas" nem no bootstrap (nome importar_dados_*).
 -- Pode rodar de novo: apaga o próprio seed, apaga as cargas antigas da escola
--- teste (EM 2026 et.* e Fundamental II 2026 etf.*) e recria só o EM 2025.
+-- teste (EM 2026 et.* e Fundamental II 2026 etf.*) e os eventos de 2025
+-- que não são ET25 (ex.: Simulado e Prova Trimestral) e recria só o EM 2025.
 -- Não mexe em componentes, unidade nem equipe. Cria o tipo "Rec Final" se ainda não existir.
 -- Para só esvaziar o EM 2025: 2026_10_06_importar_dados_escola_teste_em_2025_apagar.sql
 -- Rode antes as migrations de schema dessa escola.
@@ -34,6 +38,8 @@ CREATE PROCEDURE apagar_escola_teste_em_2025()
 BEGIN
   DROP TABLE IF EXISTS et25_tmp_media;
   DROP TABLE IF EXISTS et25_tmp_freq;
+  DROP TABLE IF EXISTS et25_tmp_notas;
+  DROP TABLE IF EXISTS et25_tmp_anual;
 
   DELETE FROM presenca_eventos WHERE id_externo LIKE 'et25-%';
 
@@ -84,14 +90,50 @@ BEGIN
 
   DELETE FROM provas_blocos WHERE titulo LIKE 'ET25 %';
 
+  IF (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'provas_blocos' AND COLUMN_NAME = 'evento_avaliativo_id') > 0
+     AND (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'eventos_avaliativos') > 0 THEN
+    IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'provas_blocos_notas_lancadas_log') > 0 THEN
+      DELETE lg FROM provas_blocos_notas_lancadas_log lg
+      INNER JOIN provas_blocos pb ON pb.id = lg.bloco_id
+      INNER JOIN eventos_avaliativos e ON e.id = pb.evento_avaliativo_id
+      WHERE e.ano_letivo = 2025
+        AND e.nome NOT LIKE 'ET25 %'
+        AND (e.descricao IS NULL OR e.descricao <> 'ET25');
+    END IF;
+
+    DELETE n FROM provas_blocos_notas_lancadas n
+    INNER JOIN provas_blocos pb ON pb.id = n.bloco_id
+    INNER JOIN eventos_avaliativos e ON e.id = pb.evento_avaliativo_id
+    WHERE e.ano_letivo = 2025
+      AND e.nome NOT LIKE 'ET25 %'
+      AND (e.descricao IS NULL OR e.descricao <> 'ET25');
+
+    UPDATE diario_aulas da
+    INNER JOIN provas_blocos pb ON pb.id = da.evento_bloco_id
+    INNER JOIN eventos_avaliativos e ON e.id = pb.evento_avaliativo_id
+    SET da.evento_bloco_id = NULL
+    WHERE e.ano_letivo = 2025
+      AND e.nome NOT LIKE 'ET25 %'
+      AND (e.descricao IS NULL OR e.descricao <> 'ET25');
+
+    DELETE pb FROM provas_blocos pb
+    INNER JOIN eventos_avaliativos e ON e.id = pb.evento_avaliativo_id
+    WHERE e.ano_letivo = 2025
+      AND e.nome NOT LIKE 'ET25 %'
+      AND (e.descricao IS NULL OR e.descricao <> 'ET25');
+  END IF;
+
   IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'eventos_avaliativos_alunos') > 0 THEN
     DELETE a FROM eventos_avaliativos_alunos a
     INNER JOIN eventos_avaliativos e ON e.id = a.evento_id
-    WHERE e.nome LIKE 'ET25 %' OR e.descricao = 'ET25';
+    WHERE e.nome LIKE 'ET25 %' OR e.descricao = 'ET25'
+       OR (e.ano_letivo = 2025 AND e.nome NOT LIKE 'ET25 %' AND (e.descricao IS NULL OR e.descricao <> 'ET25'));
   END IF;
 
   IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'eventos_avaliativos') > 0 THEN
-    DELETE FROM eventos_avaliativos WHERE nome LIKE 'ET25 %' OR descricao = 'ET25';
+    DELETE FROM eventos_avaliativos
+    WHERE nome LIKE 'ET25 %' OR descricao = 'ET25'
+       OR (ano_letivo = 2025 AND nome NOT LIKE 'ET25 %' AND (descricao IS NULL OR descricao <> 'ET25'));
   END IF;
 
   IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'recuperacoes') > 0 THEN
@@ -1386,32 +1428,234 @@ BEGIN
   INNER JOIN faltas_eventos e ON e.nome = CONCAT('ET25 Faltas ', r.bimestre, 'º trimestre 2025')
   WHERE r.codigo IN ('et25-em-t1-notas', 'et25-em-t2-notas', 'et25-em-t3-notas');
 
-  -- Grade completa: cada aluno da turma, cada matéria e cada tipo
-  -- (Simulado 1, 2, 3, Prova Bimestral e Rec), nos três trimestres.
-  -- Não corta pela data de entrada ou saída da matrícula.
-  -- Nível estável por aluno (curva normal, média 6,80). Cerca de 30% ficam abaixo de 6,00.
-  INSERT IGNORE INTO provas_blocos_notas_lancadas (bloco_id, professor_id, materia_id, turma_id, aluno_id, nota)
-  SELECT pb.id, bp.professor_id, bp.materia_id, pbt.turma_id, a.id,
-    ROUND(LEAST(10, GREATEST(3,
-      6.80
-      + 1.50 * SQRT(-2 * LN(((CRC32(CONCAT(a.id, '|u1')) % 10000) + 1) / 10001.0))
-        * COS(2 * PI() * ((CRC32(CONCAT(a.id, '|u2')) % 10000) / 10000.0))
-      + ((CRC32(CONCAT(a.id, '|', bp.materia_id, '|', pb.bimestre, '|', ta.nome)) % 7) / 10.0 - 0.3)
-    )), 2)
-  FROM provas_blocos pb
-  INNER JOIN provas_tipos_avaliacao ta ON ta.id = pb.tipo_avaliacao_id
-    AND ta.nome IN ('Simulado 1', 'Simulado 2', 'Simulado 3', 'Prova Bimestral', 'Rec')
-  INNER JOIN provas_blocos_professores bp ON bp.bloco_id = pb.id
-  INNER JOIN provas_blocos_turmas pbt ON pbt.bloco_id = pb.id
-  INNER JOIN matricula mt ON mt.turma_id = pbt.turma_id AND mt.ano_letivo_id = v_ano_id
-  INNER JOIN alunos a ON a.id = mt.aluno_id AND a.nickname LIKE 'et25.%'
-  WHERE pb.titulo LIKE 'ET25 %' AND pb.deleted_at IS NULL;
+  -- Perfil estável pelo nickname (a mesma conta do dry-run
+  -- scripts/simular_notas_escola_teste_2025.php). Não corta pela matrícula.
+  -- Fórmula do boletim: (sim1 + sim2 + sim3 + max(prova, min(rec, 6))) / 4.
+  -- Rec do trimestre só existe quando a média antes da rec fica abaixo de 6,00.
+  DROP TABLE IF EXISTS et25_tmp_notas;
+  CREATE TABLE et25_tmp_notas (
+    aluno_id INT NOT NULL,
+    nickname VARCHAR(50) NOT NULL,
+    turma_id INT NOT NULL,
+    materia_id INT NOT NULL,
+    materia_nome VARCHAR(120) NOT NULL,
+    periodo TINYINT NOT NULL,
+    perfil VARCHAR(32) NOT NULL,
+    fraca TINYINT NOT NULL DEFAULT 0,
+    alvo DECIMAL(8,4) NOT NULL DEFAULT 0,
+    sim1 DECIMAL(6,2) NOT NULL DEFAULT 0,
+    sim2 DECIMAL(6,2) NOT NULL DEFAULT 0,
+    sim3 DECIMAL(6,2) NOT NULL DEFAULT 0,
+    prova DECIMAL(6,2) NOT NULL DEFAULT 0,
+    rec DECIMAL(6,2) NULL,
+    media_antes DECIMAL(8,2) NOT NULL DEFAULT 0,
+    media_final DECIMAL(8,2) NOT NULL DEFAULT 0,
+    PRIMARY KEY (aluno_id, materia_id, periodo)
+  ) ENGINE=InnoDB;
+
+  INSERT INTO et25_tmp_notas (aluno_id, nickname, turma_id, materia_id, materia_nome, periodo, perfil)
+  SELECT a.id, a.nickname, mt.turma_id, m.id, m.nome, p.n,
+    CASE
+      WHEN RIGHT(a.nickname, 2) = '43' THEN 'conselho'
+      WHEN CRC32(CONCAT(a.nickname, '|perfil')) % 100 < 12 THEN 'excelente'
+      WHEN CRC32(CONCAT(a.nickname, '|perfil')) % 100 < 35 THEN 'bom'
+      WHEN CRC32(CONCAT(a.nickname, '|perfil')) % 100 < 55 THEN 'regular'
+      WHEN CRC32(CONCAT(a.nickname, '|perfil')) % 100 < 73 THEN 'dificuldade_especifica'
+      WHEN CRC32(CONCAT(a.nickname, '|perfil')) % 100 < 85 THEN 'dificuldade_generalizada'
+      WHEN CRC32(CONCAT(a.nickname, '|perfil')) % 100 < 94 THEN 'em_evolucao'
+      ELSE 'em_queda'
+    END
+  FROM alunos a
+  INNER JOIN matricula mt ON mt.aluno_id = a.id AND mt.ano_letivo_id = v_ano_id
+  INNER JOIN materias m ON m.nome IN (
+    'Língua Portuguesa','Matemática','História','Geografia','Física','Química','Biologia','Sociologia'
+  )
+  CROSS JOIN (SELECT 1 n UNION ALL SELECT 2 UNION ALL SELECT 3) p
+  WHERE a.nickname LIKE 'et25.%';
+
+  UPDATE et25_tmp_notas n
+  INNER JOIN (
+    SELECT aluno_id, materia_id, rk, nweak
+    FROM (
+      SELECT aluno_id, materia_id,
+             ROW_NUMBER() OVER (
+               PARTITION BY aluno_id
+               ORDER BY CRC32(CONCAT(nickname, '|fraca|', materia_nome)), materia_nome
+             ) AS rk,
+             1 + (CRC32(CONCAT(nickname, '|nweak')) % 3) AS nweak
+      FROM et25_tmp_notas
+      WHERE periodo = 1
+    ) ordem
+  ) w ON w.aluno_id = n.aluno_id AND w.materia_id = n.materia_id
+  SET n.fraca = IF(n.perfil = 'dificuldade_especifica' AND w.rk <= w.nweak, 1, 0);
+
+  UPDATE et25_tmp_notas n
+  SET n.alvo = (
+    CASE n.perfil
+      WHEN 'excelente' THEN 8.6
+        + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|base')) % 10000) / 10000.0) * 0.7
+        + (((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|ruido')) % 10000) / 10000.0) - 0.5) * 0.35
+      WHEN 'bom' THEN 7.2
+        + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|base')) % 10000) / 10000.0) * 0.8
+        + (((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|ruido')) % 10000) / 10000.0) - 0.5) * 0.55
+      WHEN 'regular' THEN 5.85
+        + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|base')) % 10000) / 10000.0) * 1.15
+        + (((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|ruido')) % 10000) / 10000.0) - 0.5) * 0.7
+      WHEN 'dificuldade_especifica' THEN IF(n.fraca = 1,
+        4.4
+          + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|base')) % 10000) / 10000.0) * 1.0
+          + (n.periodo - 1) * 0.12
+          + (((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|ruido')) % 10000) / 10000.0) - 0.5) * 0.4,
+        7.0
+          + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|base')) % 10000) / 10000.0) * 0.6
+          + (((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|ruido')) % 10000) / 10000.0) - 0.5) * 0.45)
+      WHEN 'dificuldade_generalizada' THEN 4.55
+        + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|base')) % 10000) / 10000.0) * 1.15
+        + (((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|ruido')) % 10000) / 10000.0) - 0.5) * 0.55
+      WHEN 'em_evolucao' THEN 5.15
+        + (n.periodo - 1) * 1.10
+        + (((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|base')) % 10000) / 10000.0) - 0.5) * 0.30
+      WHEN 'em_queda' THEN 7.90
+        - (n.periodo - 1) * 1.05
+        + (((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|base')) % 10000) / 10000.0) - 0.5) * 0.30
+      ELSE 5.35
+        + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|base')) % 10000) / 10000.0) * 0.35
+        + (((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|ruido')) % 10000) / 10000.0) - 0.5) * 0.15
+    END
+  ) + (
+    CASE n.materia_nome
+      WHEN 'Língua Portuguesa' THEN 0.20
+      WHEN 'Matemática' THEN -0.35
+      WHEN 'História' THEN 0.05
+      WHEN 'Física' THEN -0.25
+      WHEN 'Química' THEN -0.15
+      WHEN 'Biologia' THEN -0.05
+      WHEN 'Sociologia' THEN 0.10
+      ELSE 0
+    END
+  );
+
+  UPDATE et25_tmp_notas n
+  SET
+    n.sim1 = ROUND(LEAST(10, GREATEST(0, n.alvo
+      + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|sim1')) % 15) / 10.0 - 0.7)
+      - (
+          ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|sim1')) % 15) / 10.0 - 0.7)
+        + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|sim2')) % 15) / 10.0 - 0.7)
+        + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|sim3')) % 15) / 10.0 - 0.7)
+        + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|prova')) % 15) / 10.0 - 0.7)
+      ) / 4)), 1),
+    n.sim2 = ROUND(LEAST(10, GREATEST(0, n.alvo
+      + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|sim2')) % 15) / 10.0 - 0.7)
+      - (
+          ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|sim1')) % 15) / 10.0 - 0.7)
+        + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|sim2')) % 15) / 10.0 - 0.7)
+        + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|sim3')) % 15) / 10.0 - 0.7)
+        + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|prova')) % 15) / 10.0 - 0.7)
+      ) / 4)), 1),
+    n.sim3 = ROUND(LEAST(10, GREATEST(0, n.alvo
+      + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|sim3')) % 15) / 10.0 - 0.7)
+      - (
+          ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|sim1')) % 15) / 10.0 - 0.7)
+        + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|sim2')) % 15) / 10.0 - 0.7)
+        + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|sim3')) % 15) / 10.0 - 0.7)
+        + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|prova')) % 15) / 10.0 - 0.7)
+      ) / 4)), 1),
+    n.prova = ROUND(LEAST(10, GREATEST(0, n.alvo
+      + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|prova')) % 15) / 10.0 - 0.7)
+      - (
+          ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|sim1')) % 15) / 10.0 - 0.7)
+        + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|sim2')) % 15) / 10.0 - 0.7)
+        + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|sim3')) % 15) / 10.0 - 0.7)
+        + ((CRC32(CONCAT(n.nickname, '|', n.materia_nome, '|', n.periodo, '|prova')) % 15) / 10.0 - 0.7)
+      ) / 4)), 1);
+
+  UPDATE et25_tmp_notas
+  SET media_antes = ROUND((sim1 + sim2 + sim3 + prova) / 4, 2);
+
+  UPDATE et25_tmp_notas
+  SET rec = CASE
+    WHEN media_antes >= 6 THEN NULL
+    WHEN (sim1 + sim2 + sim3) >= 18
+     AND CRC32(CONCAT(nickname, '|', materia_nome, '|', periodo, '|recdec')) % 100 < 68
+      THEN ROUND(6.0 + (CRC32(CONCAT(nickname, '|', materia_nome, '|', periodo, '|recok')) % 31) / 10.0, 1)
+    ELSE ROUND(3.5 + (CRC32(CONCAT(nickname, '|', materia_nome, '|', periodo, '|recno')) % 22) / 10.0, 1)
+  END;
+
+  UPDATE et25_tmp_notas
+  SET media_final = ROUND((sim1 + sim2 + sim3 + IF(rec IS NULL, prova, GREATEST(prova, LEAST(rec, 6)))) / 4, 2);
+
+  INSERT INTO provas_blocos_notas_lancadas (bloco_id, professor_id, materia_id, turma_id, aluno_id, nota)
+  SELECT pb.id, bp.professor_id, n.materia_id, n.turma_id, n.aluno_id,
+    CASE ta.nome
+      WHEN 'Simulado 1' THEN n.sim1
+      WHEN 'Simulado 2' THEN n.sim2
+      WHEN 'Simulado 3' THEN n.sim3
+      WHEN 'Prova Bimestral' THEN n.prova
+      WHEN 'Rec' THEN n.rec
+    END
+  FROM et25_tmp_notas n
+  INNER JOIN provas_tipos_avaliacao ta
+    ON ta.deleted_at IS NULL
+   AND ta.nome IN ('Simulado 1', 'Simulado 2', 'Simulado 3', 'Prova Bimestral', 'Rec')
+  INNER JOIN provas_blocos pb
+    ON pb.tipo_avaliacao_id = ta.id
+   AND pb.deleted_at IS NULL
+   AND pb.bimestre = n.periodo
+   AND pb.titulo = CONCAT('ET25 ', ta.nome, ' — T', n.periodo)
+  INNER JOIN provas_blocos_professores bp
+    ON bp.bloco_id = pb.id AND bp.materia_id = n.materia_id
+  WHERE ta.nome <> 'Rec' OR n.rec IS NOT NULL;
 
   INSERT INTO notas_tipo_finais (tipo_avaliacao_id, aluno_id, materia_id, turma_id, ano_letivo, periodo, nota_final, eventos_qtd)
   SELECT pb.tipo_avaliacao_id, n.aluno_id, n.materia_id, n.turma_id, 2025, pb.bimestre, n.nota, 1
   FROM provas_blocos_notas_lancadas n
-  INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.titulo LIKE 'ET25 %'
+  INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.titulo LIKE 'ET25 % — T%'
   ON DUPLICATE KEY UPDATE nota_final = VALUES(nota_final), eventos_qtd = 1;
+
+  DROP TABLE IF EXISTS et25_tmp_anual;
+  CREATE TABLE et25_tmp_anual (
+    aluno_id INT NOT NULL,
+    turma_id INT NOT NULL,
+    materia_id INT NOT NULL,
+    materia_nome VARCHAR(120) NOT NULL,
+    perfil VARCHAR(32) NOT NULL,
+    media_antes DECIMAL(8,2) NOT NULL,
+    rec_final DECIMAL(6,2) NULL,
+    media_final DECIMAL(8,2) NOT NULL,
+    teve_rec_tri TINYINT NOT NULL,
+    PRIMARY KEY (aluno_id, materia_id)
+  ) ENGINE=InnoDB;
+
+  INSERT INTO et25_tmp_anual (
+    aluno_id, turma_id, materia_id, materia_nome, perfil, media_antes, rec_final, media_final, teve_rec_tri
+  )
+  SELECT aluno_id, turma_id, materia_id, materia_nome, MIN(perfil),
+         ROUND(SUM(media_final) / 3, 2), NULL, ROUND(SUM(media_final) / 3, 2),
+         IF(SUM(media_antes < 6) > 0, 1, 0)
+  FROM et25_tmp_notas
+  GROUP BY aluno_id, turma_id, materia_id, materia_nome;
+
+  UPDATE et25_tmp_anual a
+  INNER JOIN alunos al ON al.id = a.aluno_id
+  SET a.rec_final = CASE
+    WHEN CRC32(CONCAT(al.nickname, '|', a.materia_nome, '|rf')) % 100 < CASE a.perfil
+      WHEN 'excelente' THEN 70
+      WHEN 'bom' THEN 65
+      WHEN 'regular' THEN 52
+      WHEN 'dificuldade_especifica' THEN 72
+      WHEN 'dificuldade_generalizada' THEN 38
+      WHEN 'em_evolucao' THEN 64
+      WHEN 'em_queda' THEN 42
+      ELSE 0
+    END
+      THEN ROUND(6.2 + (CRC32(CONCAT(al.nickname, '|', a.materia_nome, '|rfok')) % 19) / 10.0, 1)
+    ELSE ROUND(3.6 + (CRC32(CONCAT(al.nickname, '|', a.materia_nome, '|rfno')) % 21) / 10.0, 1)
+  END
+  WHERE a.media_antes < 6;
+
+  UPDATE et25_tmp_anual
+  SET media_final = ROUND(GREATEST(media_antes, IFNULL(rec_final, media_antes)), 2);
 
   -- Eventos avaliativos: um Simulado por trimestre, com os 3 subeventos.
   -- Prova e recuperação continuam um evento cada. Recuperação ao lado do
@@ -1512,20 +1756,18 @@ BEGIN
     INNER JOIN turmas t ON t.ano_letivo = 2025 AND t.observacoes LIKE 'ET25 %'
     WHERE bp.bloco_id = v_bloco_id;
 
-    INSERT IGNORE INTO provas_blocos_notas_lancadas (bloco_id, professor_id, materia_id, turma_id, aluno_id, nota)
-    SELECT pb.id, bp.professor_id, bp.materia_id, pbt.turma_id, a.id,
-      ROUND(LEAST(10, GREATEST(3,
-        6.80
-        + 1.50 * SQRT(-2 * LN(((CRC32(CONCAT(a.id, '|u1')) % 10000) + 1) / 10001.0))
-          * COS(2 * PI() * ((CRC32(CONCAT(a.id, '|u2')) % 10000) / 10000.0))
-        + ((CRC32(CONCAT(a.id, '|recfinal|', bp.materia_id)) % 7) / 10.0 - 0.3)
-      )), 2)
-    FROM provas_blocos pb
-    INNER JOIN provas_blocos_professores bp ON bp.bloco_id = pb.id
-    INNER JOIN provas_blocos_turmas pbt ON pbt.bloco_id = pb.id
-    INNER JOIN matricula mt ON mt.turma_id = pbt.turma_id AND mt.ano_letivo_id = v_ano_id
-    INNER JOIN alunos a ON a.id = mt.aluno_id AND a.nickname LIKE 'et25.%'
-    WHERE pb.titulo = 'ET25 Rec Final' AND pb.deleted_at IS NULL;
+    INSERT INTO provas_blocos_notas_lancadas (bloco_id, professor_id, materia_id, turma_id, aluno_id, nota)
+    SELECT pb.id, bp.professor_id, a.materia_id, a.turma_id, a.aluno_id, a.rec_final
+    FROM et25_tmp_anual a
+    INNER JOIN provas_blocos pb ON pb.titulo = 'ET25 Rec Final' AND pb.deleted_at IS NULL
+    INNER JOIN provas_blocos_professores bp ON bp.bloco_id = pb.id AND bp.materia_id = a.materia_id
+    WHERE a.rec_final IS NOT NULL;
+
+    INSERT INTO notas_tipo_finais (tipo_avaliacao_id, aluno_id, materia_id, turma_id, ano_letivo, periodo, nota_final, eventos_qtd)
+    SELECT pb.tipo_avaliacao_id, n.aluno_id, n.materia_id, n.turma_id, 2025, pb.bimestre, n.nota, 1
+    FROM provas_blocos_notas_lancadas n
+    INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.titulo = 'ET25 Rec Final'
+    ON DUPLICATE KEY UPDATE nota_final = VALUES(nota_final), eventos_qtd = 1;
   END IF;
 
   DROP TABLE IF EXISTS et25_tmp_media;
@@ -1648,8 +1890,8 @@ BEGIN
       WHEN RIGHT(a.nickname, 2) = '48' AND b.periodo = 3 THEN 'desistente'
       WHEN IFNULL(f.presencas, 0) / NULLIF(f.aulas, 0) * 100 < 75 THEN 'reprovado_frequencia'
       WHEN RIGHT(a.nickname, 2) = '43' AND b.media < 6 AND b.media >= 5 THEN 'aprovado_conselho'
-      WHEN b.media >= 6 AND b.antes < 6 THEN 'aprovado_recuperacao'
-      WHEN b.media >= 6 THEN 'aprovado'
+      WHEN b.pior >= 6 AND b.recs > 0 THEN 'aprovado_recuperacao'
+      WHEN b.pior >= 6 THEN 'aprovado'
       ELSE 'reprovado_rendimento'
     END,
     CASE
@@ -1657,8 +1899,8 @@ BEGIN
       WHEN RIGHT(a.nickname, 2) = '48' AND b.periodo = 3 THEN 'Desistente'
       WHEN IFNULL(f.presencas, 0) / NULLIF(f.aulas, 0) * 100 < 75 THEN 'Reprovado por frequência'
       WHEN RIGHT(a.nickname, 2) = '43' AND b.media < 6 AND b.media >= 5 THEN 'Aprovado pelo Conselho'
-      WHEN b.media >= 6 AND b.antes < 6 THEN 'Aprovado após recuperação'
-      WHEN b.media >= 6 THEN 'Aprovado'
+      WHEN b.pior >= 6 AND b.recs > 0 THEN 'Aprovado após recuperação'
+      WHEN b.pior >= 6 THEN 'Aprovado'
       ELSE 'Reprovado por rendimento'
     END,
     b.media,
@@ -1667,7 +1909,11 @@ BEGIN
     v_regra_acad,
     fp.id, NOW(), v_admin
   FROM (
-    SELECT aluno_id, turma_id, periodo, ROUND(AVG(media_final), 2) media, ROUND(AVG(media_antes), 2) antes
+    SELECT aluno_id, turma_id, periodo,
+           ROUND(AVG(media_final), 2) media,
+           ROUND(AVG(media_antes), 2) antes,
+           MIN(media_final) pior,
+           SUM(media_antes < 6) recs
     FROM et25_tmp_media
     GROUP BY aluno_id, turma_id, periodo
   ) b
@@ -1686,8 +1932,8 @@ BEGIN
       WHEN RIGHT(a.nickname, 2) = '48' THEN 'desistente'
       WHEN IFNULL(f.presencas, 0) / NULLIF(f.aulas, 0) * 100 < 75 THEN 'reprovado_frequencia'
       WHEN RIGHT(a.nickname, 2) = '43' AND b.media < 6 AND b.media >= 5 THEN 'aprovado_conselho'
-      WHEN b.media >= 6 AND b.antes < 6 THEN 'aprovado_recuperacao'
-      WHEN b.media >= 6 THEN 'aprovado'
+      WHEN b.pior >= 6 AND (b.recs > 0 OR b.finais > 0) THEN 'aprovado_recuperacao'
+      WHEN b.pior >= 6 THEN 'aprovado'
       ELSE 'reprovado_rendimento'
     END,
     CASE
@@ -1695,8 +1941,8 @@ BEGIN
       WHEN RIGHT(a.nickname, 2) = '48' THEN 'Desistente'
       WHEN IFNULL(f.presencas, 0) / NULLIF(f.aulas, 0) * 100 < 75 THEN 'Reprovado por frequência'
       WHEN RIGHT(a.nickname, 2) = '43' AND b.media < 6 AND b.media >= 5 THEN 'Aprovado pelo Conselho'
-      WHEN b.media >= 6 AND b.antes < 6 THEN 'Aprovado após recuperação'
-      WHEN b.media >= 6 THEN 'Aprovado'
+      WHEN b.pior >= 6 AND (b.recs > 0 OR b.finais > 0) THEN 'Aprovado após recuperação'
+      WHEN b.pior >= 6 THEN 'Aprovado'
       ELSE 'Reprovado por rendimento'
     END,
     b.media,
@@ -1704,8 +1950,13 @@ BEGIN
     IFNULL(f.aulas, 0) - IFNULL(f.presencas, 0),
     v_regra_acad, fp.id, NOW(), v_admin
   FROM (
-    SELECT aluno_id, turma_id, ROUND(AVG(media_final), 2) media, ROUND(AVG(media_antes), 2) antes
-    FROM et25_tmp_media
+    SELECT aluno_id, turma_id,
+           ROUND(AVG(media_final), 2) media,
+           ROUND(AVG(media_antes), 2) antes,
+           MIN(media_final) pior,
+           SUM(teve_rec_tri) recs,
+           SUM(rec_final IS NOT NULL) finais
+    FROM et25_tmp_anual
     GROUP BY aluno_id, turma_id
   ) b
   INNER JOIN alunos a ON a.id = b.aluno_id
@@ -1742,6 +1993,32 @@ BEGIN
   INNER JOIN turmas t ON t.id = r.turma_id
   LEFT JOIN matrizes_curriculares_componentes mcc ON mcc.matriz_id = t.matriz_curricular_id AND mcc.materia_id = x.materia_id
   WHERE r.periodo_tipo = 'trimestre' AND r.ano_letivo = 2025;
+
+  INSERT INTO resultado_academico_itens (
+    resultado_id, materia_id, materia_nome, carga_horaria, media, recuperacao, media_final,
+    faltas, frequencia_percentual, situacao, rotulo, ordem
+  )
+  SELECT r.id, x.materia_id, x.materia_nome, 80, x.media_antes, x.rec_final, x.media_final,
+         NULL, NULL,
+         CASE
+           WHEN x.media_final >= 6 AND (x.media_antes < 6 OR x.teve_rec_tri = 1) THEN 'aprovado_recuperacao'
+           WHEN x.media_final >= 6 THEN 'aprovado'
+           WHEN RIGHT(a.nickname, 2) = '43' AND x.media_final < 6 AND x.media_final >= 5 THEN 'aprovado_conselho'
+           ELSE 'reprovado_rendimento'
+         END,
+         CASE
+           WHEN x.media_final >= 6 AND (x.media_antes < 6 OR x.teve_rec_tri = 1) THEN 'Aprovado após recuperação'
+           WHEN x.media_final >= 6 THEN 'Aprovado'
+           WHEN RIGHT(a.nickname, 2) = '43' AND x.media_final < 6 AND x.media_final >= 5 THEN 'Aprovado pelo Conselho'
+           ELSE 'Reprovado por rendimento'
+         END,
+         IFNULL(mcc.ordem_boletim, 0)
+  FROM resultado_academico r
+  INNER JOIN alunos a ON a.id = r.aluno_id AND a.nickname LIKE 'et25.%'
+  INNER JOIN et25_tmp_anual x ON x.aluno_id = r.aluno_id AND x.turma_id = r.turma_id
+  INNER JOIN turmas t ON t.id = r.turma_id
+  LEFT JOIN matrizes_curriculares_componentes mcc ON mcc.matriz_id = t.matriz_curricular_id AND mcc.materia_id = x.materia_id
+  WHERE r.periodo_tipo = 'ano' AND r.ano_letivo = 2025 AND r.periodo_numero = 0;
 
   INSERT INTO resultado_documento_emissoes (
     tipo, modelo_codigo, aluno_id, turma_id, resultado_id, ano_letivo, periodo_tipo, periodo_numero,
@@ -1833,16 +2110,15 @@ BEGIN
     historico_id, ano_letivo, serie_ano, componente, materia_id, resultado_valor, carga_horaria, origem, ordem
   )
   SELECT h.id, '2025', a.serie, m.nome, x.materia_id,
-         REPLACE(CAST(ROUND(AVG(x.media_final), 2) AS CHAR), '.', ','),
-         80, 'Interno', IFNULL(MIN(mcc.ordem_historico), 0)
+         REPLACE(CAST(x.media_final AS CHAR), '.', ','),
+         80, 'Interno', IFNULL(mcc.ordem_historico, 0)
   FROM historico_documentos h
   INNER JOIN alunos a ON a.id = h.aluno_id AND a.nickname LIKE 'et25.%'
-  INNER JOIN et25_tmp_media x ON x.aluno_id = a.id
+  INNER JOIN et25_tmp_anual x ON x.aluno_id = a.id
   INNER JOIN materias m ON m.id = x.materia_id
   INNER JOIN turmas t ON t.id = a.turma_id
   LEFT JOIN matrizes_curriculares_componentes mcc ON mcc.matriz_id = t.matriz_curricular_id AND mcc.materia_id = x.materia_id
-  WHERE h.numero_registro_sed LIKE 'ET25-%'
-  GROUP BY h.id, a.serie, m.nome, x.materia_id;
+  WHERE h.numero_registro_sed LIKE 'ET25-%';
 
   INSERT INTO historico_resultados_anuais (historico_id, ano_letivo, serie_ano, resultado, observacao)
   SELECT h.id, i.ano_letivo, i.serie_ano,
@@ -2035,21 +2311,37 @@ BEGIN
     SELECT 1 AS bim UNION ALL SELECT 2 UNION ALL SELECT 3
   ) per;
 
-  DROP TABLE IF EXISTS et25_tmp_media;
-  DROP TABLE IF EXISTS et25_tmp_freq;
-
   IF (SELECT COUNT(*) FROM alunos WHERE nickname LIKE 'et25.%') <> 600 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Seed ET25 incompleto: esperado 600 alunos.';
   END IF;
-  -- 600 alunos × 8 matérias × (5 tipos × 3 trimestres + recuperação final).
+  IF (SELECT COUNT(*) FROM et25_tmp_notas) <> 14400 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Seed ET25 incompleto: faltam disciplinas ou trimestres.';
+  END IF;
+  IF (SELECT COUNT(*) FROM et25_tmp_notas WHERE rec IS NOT NULL AND media_antes >= 6) > 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Seed ET25: recuperação trimestral com média já suficiente.';
+  END IF;
+  IF (SELECT COUNT(*) FROM et25_tmp_anual WHERE rec_final IS NOT NULL AND media_antes >= 6) > 0 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Seed ET25: recuperação final com média anual já suficiente.';
+  END IF;
   IF (
     SELECT COUNT(*)
     FROM provas_blocos_notas_lancadas n
     INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.titulo LIKE 'ET25 %' AND pb.deleted_at IS NULL
     INNER JOIN alunos a ON a.id = n.aluno_id AND a.nickname LIKE 'et25.%'
-  ) <> 76800 THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Seed ET25 incompleto: cada aluno precisa de nota em todas as matérias e tipos.';
+  ) <> (
+    SELECT 57600
+      + (SELECT COUNT(*) FROM et25_tmp_notas WHERE rec IS NOT NULL)
+      + (SELECT COUNT(*) FROM et25_tmp_anual a
+         WHERE a.rec_final IS NOT NULL
+           AND EXISTS (SELECT 1 FROM provas_blocos pb WHERE pb.titulo = 'ET25 Rec Final' AND pb.deleted_at IS NULL))
+  ) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Seed ET25 incompleto: notas não batem com o perfil acadêmico.';
   END IF;
+
+  DROP TABLE IF EXISTS et25_tmp_media;
+  DROP TABLE IF EXISTS et25_tmp_freq;
+  DROP TABLE IF EXISTS et25_tmp_notas;
+  DROP TABLE IF EXISTS et25_tmp_anual;
 END$$
 
 DELIMITER ;

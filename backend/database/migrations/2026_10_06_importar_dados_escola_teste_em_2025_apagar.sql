@@ -1,5 +1,6 @@
 -- =============================================================================
--- Apaga somente o seed Ensino Médio 2025 da Escola Educa Teste (prefixo ET25).
+-- Apaga somente o seed Ensino Médio 2025 da Escola Educa Teste (prefixo ET25)
+-- e os eventos de 2025 que não são ET25 (ex.: Simulado e Prova Trimestral).
 -- Não mexe no seed de 2026 nem em curso, séries, unidade ou usuários.
 --
 -- Master → Migrations → Escola teste → Escolher → marque SÓ este arquivo.
@@ -16,6 +17,8 @@ CREATE PROCEDURE apagar_escola_teste_em_2025()
 BEGIN
   DROP TABLE IF EXISTS et25_tmp_media;
   DROP TABLE IF EXISTS et25_tmp_freq;
+  DROP TABLE IF EXISTS et25_tmp_notas;
+  DROP TABLE IF EXISTS et25_tmp_anual;
 
   DELETE FROM presenca_eventos WHERE id_externo LIKE 'et25-%';
 
@@ -66,14 +69,50 @@ BEGIN
 
   DELETE FROM provas_blocos WHERE titulo LIKE 'ET25 %';
 
+  IF (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'provas_blocos' AND COLUMN_NAME = 'evento_avaliativo_id') > 0
+     AND (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'eventos_avaliativos') > 0 THEN
+    IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'provas_blocos_notas_lancadas_log') > 0 THEN
+      DELETE lg FROM provas_blocos_notas_lancadas_log lg
+      INNER JOIN provas_blocos pb ON pb.id = lg.bloco_id
+      INNER JOIN eventos_avaliativos e ON e.id = pb.evento_avaliativo_id
+      WHERE e.ano_letivo = 2025
+        AND e.nome NOT LIKE 'ET25 %'
+        AND (e.descricao IS NULL OR e.descricao <> 'ET25');
+    END IF;
+
+    DELETE n FROM provas_blocos_notas_lancadas n
+    INNER JOIN provas_blocos pb ON pb.id = n.bloco_id
+    INNER JOIN eventos_avaliativos e ON e.id = pb.evento_avaliativo_id
+    WHERE e.ano_letivo = 2025
+      AND e.nome NOT LIKE 'ET25 %'
+      AND (e.descricao IS NULL OR e.descricao <> 'ET25');
+
+    UPDATE diario_aulas da
+    INNER JOIN provas_blocos pb ON pb.id = da.evento_bloco_id
+    INNER JOIN eventos_avaliativos e ON e.id = pb.evento_avaliativo_id
+    SET da.evento_bloco_id = NULL
+    WHERE e.ano_letivo = 2025
+      AND e.nome NOT LIKE 'ET25 %'
+      AND (e.descricao IS NULL OR e.descricao <> 'ET25');
+
+    DELETE pb FROM provas_blocos pb
+    INNER JOIN eventos_avaliativos e ON e.id = pb.evento_avaliativo_id
+    WHERE e.ano_letivo = 2025
+      AND e.nome NOT LIKE 'ET25 %'
+      AND (e.descricao IS NULL OR e.descricao <> 'ET25');
+  END IF;
+
   IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'eventos_avaliativos_alunos') > 0 THEN
     DELETE a FROM eventos_avaliativos_alunos a
     INNER JOIN eventos_avaliativos e ON e.id = a.evento_id
-    WHERE e.nome LIKE 'ET25 %' OR e.descricao = 'ET25';
+    WHERE e.nome LIKE 'ET25 %' OR e.descricao = 'ET25'
+       OR (e.ano_letivo = 2025 AND e.nome NOT LIKE 'ET25 %' AND (e.descricao IS NULL OR e.descricao <> 'ET25'));
   END IF;
 
   IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'eventos_avaliativos') > 0 THEN
-    DELETE FROM eventos_avaliativos WHERE nome LIKE 'ET25 %' OR descricao = 'ET25';
+    DELETE FROM eventos_avaliativos
+    WHERE nome LIKE 'ET25 %' OR descricao = 'ET25'
+       OR (ano_letivo = 2025 AND nome NOT LIKE 'ET25 %' AND (descricao IS NULL OR descricao <> 'ET25'));
   END IF;
 
   IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'recuperacoes') > 0 THEN
