@@ -31,19 +31,8 @@ $router->post('/mural-recados/marcar-visto', 'User/StudentController@marcarVisto
 // Fórum → Modulos/forum/routes.php
 // Fórum – moderação (admin)
 // Drive: rotas em app/Modulos/drive/routes.php
-// EducaLabs
-$router->get('/educalabs/access', 'EducaLabs/EducaLabsController@access');
-$router->get('/jogos/access', 'Games/GameController@access');
-$router->get('/notes/access', 'Notes/NotesController@access');
-$router->get('/notes/access-url', 'Notes/NotesController@accessUrl');
-$router->get('/educalabs', 'EducaLabs/EducaLabsController@index');
-$router->get('/educalabs/novo', 'EducaLabs/EducaLabsController@create');
-$router->post('/educalabs/salvar', 'EducaLabs/EducaLabsController@store');
-$router->get('/educalabs/projetos/{id}', 'EducaLabs/EducaLabsController@show');
-$router->get('/educalabs/projetos/{id}/preview', 'EducaLabs/EducaLabsController@preview');
-$router->get('/educalabs/projetos/{id}/preview/{file}', 'EducaLabs/EducaLabsController@previewFile');
-$router->post('/educalabs/projetos/{id}/mensagem', 'EducaLabs/EducaLabsController@addMessage');
-$router->post('/educalabs/projetos/{id}/gerar', 'EducaLabs/EducaLabsController@generate');
+// EducaLabs, jogos e notes → routes.php de cada módulo
+
 
 // Educa Livros (Google Books)
 $router->get('/livros', 'Integrations/GoogleBooksController@index');
@@ -51,26 +40,8 @@ $router->get('/livros/buscar', 'Integrations/GoogleBooksController@buscar');
 $router->get('/livros/destaques', 'Integrations/GoogleBooksController@destaques');
 $router->get('/livros/{id}', 'Integrations/GoogleBooksController@detalhes');
 
-// Meu Caderno (aluno: anotações com título, matéria, pastas de estudo e anexos)
-$router->get('/caderno', 'User/CadernoController@index');
-$router->get('/caderno/novo', 'User/CadernoController@create');
-$router->get('/caderno/novo-excalidraw', 'User/CadernoController@createExcalidraw');
-$router->post('/caderno', 'User/CadernoController@store');
-$router->post('/caderno/pasta', 'User/CadernoController@storePasta');
-$router->post('/caderno/pasta/{id}', 'User/CadernoController@updatePasta');
-$router->post('/caderno/pasta/{id}/excluir', 'User/CadernoController@destroyPasta');
-$router->get('/caderno/{id}', 'User/CadernoController@show');
-$router->get('/caderno/{id}/editar', 'User/CadernoController@edit');
-$router->get('/caderno/{id}/excalidraw-editor', 'User/CadernoController@excalidrawEditor');
-$router->get('/caderno/{id}/excalidraw-view', 'User/CadernoController@excalidrawView');
-$router->get('/caderno/{id}/excalidraw-carregar', 'User/CadernoController@excalidrawCarregar');
-$router->post('/caderno/{id}/excalidraw-salvar', 'User/CadernoController@excalidrawSalvar');
-$router->post('/caderno/{id}', 'User/CadernoController@update');
-$router->post('/caderno/{id}/excluir', 'User/CadernoController@destroy');
-$router->post('/caderno/anexo/excluir', 'User/CadernoController@excluirAnexo');
-$router->post('/caderno/anexo/salvar-anotacao', 'User/CadernoController@salvarAnotacaoAnexo');
-$router->get('/caderno/{caderno_id}/anexo/{anexo_id}/anotar', 'User/CadernoController@anotarAnexo');
-$router->get('/caderno/{caderno_id}/anexo/{anexo_id}', 'User/CadernoController@anexo');
+// Meu Caderno → Modulos/notes/routes.php
+
 
 // Alteração obrigatória de senha
 $router->get('/aluno/alterar-senha-obrigatoria', 'User/StudentController@alterarSenhaObrigatoria');
@@ -110,20 +81,8 @@ $router->post('/ingles/conversar', 'Integrations/EnglishController@conversar');
 $router->post('/ingles/traduzir', 'Integrations/EnglishController@traduzir');
 $router->get('/ingles/historico', 'Integrations/EnglishController@historico');
 
-// Jogos
-$router->get('/jogos', 'Games/GameController@index');
+// Jogos → Modulos/jogos/routes.php
 
-// Jogo do Milhão
-$router->get('/jogo-milhao', 'Games/MillionGameController@index');
-$router->get('/jogo-milhao/jogar', 'Games/MillionGameController@jogar');
-$router->post('/jogo-milhao/iniciar', 'Games/MillionGameController@iniciarPartida');
-$router->post('/jogo-milhao/continuar', 'Games/MillionGameController@continuarPartida');
-$router->post('/jogo-milhao/responder', 'Games/MillionGameController@responderPergunta');
-$router->post('/jogo-milhao/ajuda', 'Games/MillionGameController@usarAjuda');
-$router->post('/jogo-milhao/abandonar', 'Games/MillionGameController@abandonar');
-$router->post('/jogo-milhao/heartbeat', 'Games/MillionGameController@heartbeat');
-$router->post('/jogo-milhao/verificar-partida', 'Games/MillionGameController@verificarPartida');
-$router->post('/jogo-milhao/limpar-orfas', 'Games/MillionGameController@limparOrfas');
 
 // Avatar
 $router->get('/avatar', 'User/AvatarController@index');
@@ -135,67 +94,26 @@ $router->get('/onboarding/verificar', 'User/OnboardingController@verificarOnboar
 $router->post('/onboarding/salvar', 'User/OnboardingController@salvar');
 $router->get('/onboarding/buscar', 'User/OnboardingController@buscar');
 
-// Tickets de Suporte (Aluno)
-$router->get('/tickets', 'Tickets/TicketController@index');
-$router->get('/tickets/criar', 'Tickets/TicketController@criar');
-$router->post('/tickets/processar-criar', 'Tickets/TicketController@processarCriar');
-$router->get('/tickets/visualizar', 'Tickets/TicketController@visualizar');
-$router->post('/tickets/enviar-mensagem', 'Tickets/TicketController@enviarMensagem');
-$router->post('/tickets/upload-arquivo', 'Tickets/TicketController@uploadArquivo');
-$router->post('/tickets/upload-imagem', 'Tickets/TicketController@uploadImagem');
+// Tickets → Modulos/tickets/routes.php
 
-// Exercícios
-$router->get('/exercicios', 'Exercises/ExerciseController@index');
-$router->get('/exercicios/iniciar', 'Exercises/ExerciseController@iniciar');
-$router->post('/exercicios/responder', 'Exercises/ExerciseController@responder');
-$router->get('/exercicios/finalizar', 'Exercises/ExerciseController@finalizar');
-$router->post('/exercicios/finalizar', 'Exercises/ExerciseController@finalizar');
-$router->get('/exercicios/resultado', 'Exercises/ExerciseController@resultado');
-$router->get('/exercicios/historico', 'Exercises/ExerciseController@historico');
+
+// Exercícios → Modulos/exercicios/routes.php
+
 
 // Provas Online (Aluno)
 $router->post('/aluno/provas/voz-para-texto', 'User/StudentController@vozParaTexto');
 
-// Planos de Aula (Aluno)
-$router->get('/aluno/planos-aula', 'User/StudentController@planosAula');
-$router->get('/aluno/planos-aula/visualizar/{id}', 'User/StudentController@visualizarPlanoAula');
-// Arquivos/Recuperação: rotas em app/Modulos/arquivos/routes.php
-$router->get('/aluno/aulas-online', 'User/StudentOnlineClassController@index');
-$router->get('/aluno/aulas-online/mensagens', 'User/StudentOnlineClassController@mensagens');
-$router->post('/aluno/aulas-online/enviar-mensagem', 'User/StudentOnlineClassController@enviarMensagem');
-$router->get('/aluno/aulas-online/gravacao/{id}', 'User/StudentOnlineClassController@gravacao');
-$router->get('/aluno/aulas-online/{id}', 'User/StudentOnlineClassController@show');
+// Planos de aula e aulas online → módulos jornadas e aulas-online
+
 // Apostilas → Modulos/apostilas/routes.php
 
 // Meu Material / IA da Apostila (módulo novo, distinto do Apostilas simples acima)
 // Minicursos → Modulos/minicursos/routes.php
 
-// EducaHits — redirecionamento ao portal externo
-$router->get('/hits', 'EducaHits/EducaHitsPortalController@toPortal');
-$router->get('/hits/solicitar', 'EducaHits/EducaHitsPortalController@toSolicitar');
-$router->get('/hits/demo-player', 'EducaHits/EducaHitsPortalController@toPortal');
-$router->get('/hits/request', 'EducaHits/EducaHitsPortalController@toSolicitar');
-$router->post('/hits/request', 'EducaHits/EducaHitsPortalController@submitRequest');
-$router->get('/hits/my-requests', 'EducaHits/EducaHitsPortalController@toPortal');
-$router->get('/hits/track/{id}', 'EducaHits/EducaHitsPortalController@toPortal');
+// EducaHits → Modulos/educahits/routes.php
 
-// Exercícios Personalizados
-$router->get('/exercicios-personalizados', 'Exercises/CustomExerciseController@index');
-$router->get('/exercicios-personalizados/criar', 'Exercises/CustomExerciseController@criar');
-$router->post('/exercicios-personalizados/gerar', 'Exercises/CustomExerciseController@gerarExercicios');
-$router->post('/exercicios-personalizados/importar-questoes-ia/{jobId}', 'Exercises/CustomExerciseController@importarQuestoesIA');
-$router->post('/exercicios-personalizados/erro-geracao-ia', 'Exercises/CustomExerciseController@erroGeracaoIA');
-$router->post('/exercicios-personalizados/tentar-novamente/{listaId}', 'Exercises/CustomExerciseController@tentarNovamente');
-$router->get('/exercicios-personalizados/minhas-listas', 'Exercises/CustomExerciseController@listaMinhasListas');
-$router->get('/exercicios-personalizados/status', 'Exercises/CustomExerciseController@verificarStatus');
-$router->post('/exercicios-personalizados/iniciar', 'Exercises/CustomExerciseController@iniciarExecucao');
-$router->get('/exercicios-personalizados/executar', 'Exercises/CustomExerciseController@executar');
-$router->post('/exercicios-personalizados/executar', 'Exercises/CustomExerciseController@executar');
-$router->post('/exercicios-personalizados/responder', 'Exercises/CustomExerciseController@responderQuestao');
-$router->post('/exercicios-personalizados/finalizar', 'Exercises/CustomExerciseController@finalizar');
-$router->get('/exercicios-personalizados/finalizar', 'Exercises/CustomExerciseController@finalizar');
-$router->get('/exercicios-personalizados/resultados', 'Exercises/CustomExerciseController@resultados');
-$router->get('/exercicios-personalizados/historico', 'Exercises/CustomExerciseController@historico');
+
+// Exercícios personalizados → Modulos/exercicios/routes.php
 
 // Redações → Modulos/redacoes/routes.php
 
@@ -214,15 +132,24 @@ $router->get('/chat-professor/buscar-mensagens', 'Integrations/ChatController@bu
 
 // Simulados ENEM
 
-$router->get('/jogos', 'Games/GameController@index');
-$router->get('/jogos/xadrez', 'Games/GameController@xadrez');
-$router->get('/jogos/damas', 'Games/GameController@damas');
-$router->get('/jogos/milhao', 'Games/GameController@milhao');
-
-$router->get('/relatorios', 'RelatorioController@index');
-$router->get('/relatorios/desempenho', 'RelatorioController@desempenho');
-$router->get('/relatorios/jornada', 'RelatorioController@jornada');
-$router->get('/relatorios/redacao', 'RelatorioController@redacao');
+// Relatórios antigos do aluno: a classe RelatorioController não existe.
+// O desempenho vigente está em /desempenho/jornadas e /desempenho/provas.
+$router->get('/relatorios', function () {
+    header('Location: ' . URL . '/desempenho/jornadas');
+    exit;
+});
+$router->get('/relatorios/desempenho', function () {
+    header('Location: ' . URL . '/desempenho/jornadas');
+    exit;
+});
+$router->get('/relatorios/jornada', function () {
+    header('Location: ' . URL . '/desempenho/jornadas');
+    exit;
+});
+$router->get('/relatorios/redacao', function () {
+    header('Location: ' . URL . '/redacoes');
+    exit;
+});
 
 // AVA aluno → Modulos/ava/routes.php
 // AVA → Modulos/ava/routes.php

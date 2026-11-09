@@ -36,3 +36,12 @@ $router->post('/admin/students/{id}/vida-escolar/documento/{documentoId}/ler', '
 $router->get('/admin/students/{id}/vida-escolar/importar', 'Modulos/vida-escolar/VidaEscolarAdminController@importar');
 $router->post('/admin/students/{id}/vida-escolar/importar', 'Modulos/vida-escolar/VidaEscolarAdminController@salvarImportacao');
 $router->post('/admin/students/{id}/vida-escolar/importar/{importacaoId}/validar', 'Modulos/vida-escolar/VidaEscolarAdminController@validarImportacao');
+
+$router->get('/admin/faltas', 'Admin/SchoolAbsenceController@index');
+$router->get('/admin/faltas/exportar-excel', 'Admin/SchoolAbsenceController@exportarExcel');
+$router->get('/admin/faltas/lancar', 'Admin/SchoolAbsenceController@lancar');
+$router->get('/admin/faltas/lancar/exportar-excel', 'Admin/SchoolAbsenceController@exportarLancamentoExcel');
+$router->post('/admin/faltas/criar', 'Admin/SchoolAbsenceController@criarEvento');
+$router->post('/admin/faltas/atualizar', 'Admin/SchoolAbsenceController@atualizarEvento');
+$router->post('/admin/faltas/salvar', 'Admin/SchoolAbsenceController@salvarLancamentos');
+$router->post('/admin/faltas/excluir', 'Admin/SchoolAbsenceController@excluirEvento');

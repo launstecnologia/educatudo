@@ -21,7 +21,7 @@ $router->post('/admin/maintenance/toggle', 'Admin/StudentAdminController@toggleM
 // Redações → Modulos/redacoes/routes.php
 
 // Registros de entrada/saída facial por aluno
-$router->get('/admin/reconhecimento-facial/alunos/{id}/eventos', 'Admin/FacialRecognitionController@studentEvents');
+// Reconhecimento facial → Modulos/presenca/routes.php
 
 // Gestão de Alunos
 $router->get('/admin/students', 'Admin/StudentAdminController@alunos');
@@ -62,46 +62,13 @@ $router->post('/admin/students/{id}/password', 'Admin/StudentAdminController@upd
 $router->post('/admin/students/{id}/analise-tudinha', 'Admin/StudentAdminController@gerarAnaliseTudinha');
 $router->post('/admin/students/responsavel/atualizar', 'Admin/StudentAdminController@atualizarResponsavelAluno');
 
-// Declarações do Aluno (documentos oficiais em PDF)
-$router->get('/admin/students/{id}/declaracoes/{tipo}/pdf', 'Declarations/AdminDeclarationController@gerarPdf');
+// Declarações e histórico → Modulos/modelos-documentos/routes.php
 
-// Histórico Escolar oficial (Fundamental/Médio) — workflow + PDF + validação
-$router->get('/admin/students/{id}/historico-escolar', 'Declarations/AdminHistoricoEscolarController@index');
-$router->post('/admin/students/{id}/historico-escolar/gerar', 'Declarations/AdminHistoricoEscolarController@gerarRascunho');
-$router->get('/admin/students/{id}/historico-escolar/{historicoId}', 'Declarations/AdminHistoricoEscolarController@show');
-$router->get('/admin/students/{id}/historico-escolar/{historicoId}/pdf', 'Declarations/AdminHistoricoEscolarController@pdf');
-$router->post('/admin/students/{id}/historico-escolar/{historicoId}/conferir', 'Declarations/AdminHistoricoEscolarController@conferir');
-$router->post('/admin/students/{id}/historico-escolar/{historicoId}/voltar-rascunho', 'Declarations/AdminHistoricoEscolarController@voltarRascunho');
-$router->post('/admin/students/{id}/historico-escolar/{historicoId}/emitir', 'Declarations/AdminHistoricoEscolarController@emitir');
-$router->post('/admin/students/{id}/historico-escolar/{historicoId}/assinar', 'Declarations/AdminHistoricoEscolarController@assinar');
-$router->post('/admin/students/{id}/historico-escolar/{historicoId}/nova-versao', 'Declarations/AdminHistoricoEscolarController@novaVersao');
-$router->post('/admin/students/{id}/historico-escolar/{historicoId}/itens-externos', 'Declarations/AdminHistoricoEscolarController@adicionarItemExterno');
-$router->post('/admin/students/{id}/historico-escolar/{historicoId}/itens/{itemId}/excluir', 'Declarations/AdminHistoricoEscolarController@excluirItemExterno');
-$router->post('/admin/students/{id}/historico-escolar/{historicoId}/observacoes', 'Declarations/AdminHistoricoEscolarController@salvarObservacoes');
-$router->post('/admin/students/{id}/historico-escolar/{historicoId}/resultado', 'Declarations/AdminHistoricoEscolarController@salvarResultado');
-
-// Documentos / checklist de entrega do aluno
 $router->post('/admin/students/{id}/documentos/salvar', 'Admin/StudentAdminController@salvarDocumentoAluno');
 $router->post('/admin/students/{id}/documentos/{docId}/remover', 'Admin/StudentAdminController@removerDocumentoAluno');
 $router->get('/admin/students/{id}/documentos/{docId}/baixar', 'Admin/StudentAdminController@baixarDocumentoAluno');
 // Reuniões → Modulos/comunicacao/routes.php
-
-$router->get('/admin/resultados-finais', 'Admin/ResultadoFinalAdminController@index');
-$router->get('/admin/resultados-finais/relatorios', 'Admin/ResultadoFinalAdminController@relatorios');
-$router->get('/admin/resultados-finais/relatorios/pdf', 'Admin/ResultadoFinalAdminController@relatorioPdf');
-$router->get('/admin/resultados-finais/relatorios/csv', 'Admin/ResultadoFinalAdminController@relatorioCsv');
-$router->get('/admin/resultados-finais/layouts', 'Admin/ResultadoFinalAdminController@layouts');
-$router->post('/admin/resultados-finais/layouts', 'Admin/ResultadoFinalAdminController@salvarLayouts');
-$router->get('/admin/resultados-finais/turma/{id}', 'Admin/ResultadoFinalAdminController@turma');
-$router->post('/admin/resultados-finais/turma/{id}/homologar', 'Admin/ResultadoFinalAdminController@homologar');
-$router->post('/admin/resultados-finais/turma/{id}/especial', 'Admin/ResultadoFinalAdminController@especial');
-$router->post('/admin/resultados-finais/turma/{id}/especial/{especialId}/excluir', 'Admin/ResultadoFinalAdminController@excluirEspecial');
-$router->get('/admin/resultados-finais/turma/{id}/ata', 'Admin/ResultadoFinalAdminController@ata');
-$router->get('/admin/resultados-finais/turma/{id}/ata/pdf', 'Admin/ResultadoFinalAdminController@ataPdf');
-$router->post('/admin/resultados-finais/resultado/{id}/reabrir', 'Admin/ResultadoFinalAdminController@reabrir');
-$router->get('/admin/resultados-finais/aluno/{id}/ficha', 'Admin/ResultadoFinalAdminController@ficha');
-$router->get('/admin/resultados-finais/aluno/{id}/ficha/pdf', 'Admin/ResultadoFinalAdminController@fichaPdf');
-$router->get('/admin/resultados-finais/aluno/{id}/boletim/pdf', 'Admin/ResultadoFinalAdminController@boletimPdf');
+// Resultados finais → Modulos/fechamento/routes.php
 
 $router->post('/admin/students/cadastrar-pai', 'Admin/StudentAdminController@cadastrarPai');
 $router->post('/admin/students/transfer', 'Admin/StudentAdminController@processarTransferenciaAlunos');
@@ -168,7 +135,7 @@ $router->post('/admin/settings/sliders-dashboard', 'Admin/SchoolSettingsAdminCon
 
 // MCP / consulta de provas na visão do professor (somente leitura)
 
-$router->post('/admin/consulta-jornadas-aluno/mcp/ferramenta', 'Admin/JornadasAlunoMcpController@ferramenta');
+// Jornadas do aluno (MCP) → Modulos/jornadas/routes.php
 
 // MCP / turma, bloco, jornadas professor, boletim e faltas (somente leitura)
 $router->post('/admin/consulta-assistente/mcp/ferramenta', 'Admin/AssistenteConsultaMcpController@ferramenta');
@@ -180,16 +147,8 @@ $router->post('/admin/consulta-assistente/mcp/ferramenta', 'Admin/AssistenteCons
 $router->get('/admin/doc-sistema', 'Admin/DocSistemaController@index');
 $router->get('/admin/doc-sistema/{pagina}', 'Admin/DocSistemaController@index');
 
-// Faltas (Admin/Coordenação)
-$router->get('/admin/faltas', 'Admin/SchoolAbsenceController@index');
+// Faltas → Modulos/vida-escolar/routes.php
 $router->get('/admin/frequencia', 'Admin/FrequenciaAdminController@index');
-$router->get('/admin/faltas/exportar-excel', 'Admin/SchoolAbsenceController@exportarExcel');
-$router->get('/admin/faltas/lancar', 'Admin/SchoolAbsenceController@lancar');
-$router->get('/admin/faltas/lancar/exportar-excel', 'Admin/SchoolAbsenceController@exportarLancamentoExcel');
-$router->post('/admin/faltas/criar', 'Admin/SchoolAbsenceController@criarEvento');
-$router->post('/admin/faltas/atualizar', 'Admin/SchoolAbsenceController@atualizarEvento');
-$router->post('/admin/faltas/salvar', 'Admin/SchoolAbsenceController@salvarLancamentos');
-$router->post('/admin/faltas/excluir', 'Admin/SchoolAbsenceController@excluirEvento');
 
 // Diário de Classe: rotas em app/Modulos/diario/routes.php
 
@@ -215,27 +174,15 @@ $router->post('/admin/calendario-letivo/salvar-tipo', 'Admin/SchoolCalendarContr
 $router->post('/admin/calendario-letivo/excluir-tipo', 'Admin/SchoolCalendarController@excluirTipo');
 $router->post('/admin/calendario-letivo/efeito-tipo', 'Admin/SchoolCalendarController@atualizarEfeitoTipo');
 
-// Documentos Institucionais (PPP, Regimento) + Documentos do Professor
-$router->get('/admin/documentos-institucionais', 'Admin/InstitutionalDocsController@index');
-$router->post('/admin/documentos-institucionais/salvar', 'Admin/InstitutionalDocsController@salvar');
-$router->post('/admin/documentos-institucionais/excluir', 'Admin/InstitutionalDocsController@excluir');
-$router->get('/admin/documentos-institucionais/baixar', 'Admin/InstitutionalDocsController@baixar');
+// Documentos institucionais → Modulos/modelos-documentos/routes.php
+// Documentos do professor
 $router->get('/admin/teachers-documentos', 'Admin/TeacherDocsController@index');
 $router->post('/admin/teachers-documentos/salvar', 'Admin/TeacherDocsController@salvar');
 
 // Saúde Acadêmica (Secretaria / Coordenação — read-only)
 $router->get('/admin/saude-academica', 'Admin/SaudeAcademicaController@index');
 
-// UI Modelos (design system demo — perfil dev)
-$router->get('/admin/configuracao/ui-modelos', 'Admin/UiModelosController@index');
-$router->get('/admin/configuracao/ui-modelos/botoes', 'Admin/UiModelosController@botoes');
-$router->get('/admin/configuracao/ui-modelos/tabela', 'Admin/UiModelosController@tabela');
-$router->get('/admin/configuracao/ui-modelos/formulario', 'Admin/UiModelosController@formulario');
-$router->post('/admin/configuracao/ui-modelos/formulario', 'Admin/UiModelosController@formularioEnviar');
-$router->get('/admin/configuracao/ui-modelos/offcanvas', 'Admin/UiModelosController@offcanvas');
-$router->get('/admin/configuracao/ui-modelos/badges', 'Admin/UiModelosController@badges');
-$router->get('/admin/configuracao/ui-modelos/wizard', 'Admin/UiModelosController@wizard');
-$router->post('/admin/configuracao/ui-modelos/wizard', 'Admin/UiModelosController@wizardEnviar');
+// UI Modelos → Modulos/modelos-documentos/routes.php
 
 // Configurações Avançadas (Dev)
 $router->get('/admin/dev', 'Admin/DevAdminController@dev');
@@ -485,14 +432,7 @@ $router->get('/admin/financeiro/relatorio-pagantes', function() { header('Locati
 // Minicursos → Modulos/minicursos/routes.php
 
 
-// Planos de Aula (Admin)
-$router->get('/admin/planos-aula', 'Education/LessonPlanController@indexAdmin');
-$router->get('/admin/planos-aula/visualizar/{id}', 'Education/LessonPlanController@visualizar');
-$router->get('/admin/planos-aula/editar/{id}', 'Education/LessonPlanController@editar');
-$router->post('/admin/planos-aula/atualizar/{id}', 'Education/LessonPlanController@atualizar');
-$router->post('/admin/planos-aula/aprovar-rejeitar/{id}', 'Education/LessonPlanController@aprovarRejeitar');
-$router->post('/admin/planos-aula/aprovar-rascunhos', 'Education/LessonPlanController@aprovarTodosRascunhosAdmin');
-$router->get('/admin/planos-aula/pdf/{id}', 'Education/LessonPlanController@exportarPdf');
+// Planos de aula → Modulos/jornadas/routes.php
 
 // Provas Online (Admin)
 

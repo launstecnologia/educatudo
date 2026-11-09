@@ -79,7 +79,8 @@ docker compose exec php php scripts/init_local_multitenant.php --force-school
 ## Leitura recomendada
 
 - `backend/STRUCTURE.md` — layout seguro e deploy.
-- `CLAUDE.md` para contexto tecnico, arquitetura multi-tenant e padroes de codigo.
+- `.cursor/contexto/LEIA.md` — índice único para programar: trilha PHP (plataforma web) ou trilha Flutter (app dos pais).
+- `CLAUDE.md` para a arquitetura multi-tenant e os padrões da plataforma PHP.
 - `especificacoes/PRD.md` para escopo de produto.
-- `familia/docs/` para arquitetura do app Flutter.
+- `familia/docs/` para a arquitetura do app Flutter.
 - `services/apostila-ai/README.md` para o servico de apostilas com IA.

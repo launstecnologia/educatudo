@@ -16,3 +16,4 @@ $router->post('/admin/presenca/integracoes', 'Modulos/presenca/PresencaAdminCont
 $router->post('/admin/presenca/integracoes/ativo', 'Modulos/presenca/PresencaAdminController@toggleIntegracao');
 $router->post('/admin/presenca/identificadores', 'Modulos/presenca/PresencaAdminController@criarIdentificador');
 $router->post('/admin/presenca/identificadores/excluir', 'Modulos/presenca/PresencaAdminController@excluirIdentificador');
+$router->get('/admin/reconhecimento-facial/alunos/{id}/eventos', 'Admin/FacialRecognitionController@studentEvents');

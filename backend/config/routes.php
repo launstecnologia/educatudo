@@ -9,6 +9,12 @@ require __DIR__ . '/routes/master.php';
 require __DIR__ . '/routes/public.php';
 require __DIR__ . '/routes/api_v1.php';
 
+// Rotas públicas dos módulos (sem login). routes.php entra só dentro do Auth.
+$modulosPublicos = glob(dirname(__DIR__) . '/app/Modulos/*/routes.public.php') ?: [];
+foreach ($modulosPublicos as $routesFile) {
+    require $routesFile;
+}
+
 $router->middleware('Auth', function ($router) {
     require __DIR__ . '/routes/student.php';
     require __DIR__ . '/routes/monitor.php';

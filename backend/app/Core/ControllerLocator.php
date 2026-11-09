@@ -34,6 +34,8 @@ class ControllerLocator
         'Noticias/NoticiasController' => 'Modulos/noticias/NoticiasController',
         'Support/SupportTicketController' => 'Modulos/tickets/TicketController',
         'Tickets/TicketController' => 'Modulos/tickets/TicketController',
+        'User/CadernoController' => 'Modulos/notes/CadernoController',
+        'User/StudentOnlineClassController' => 'Modulos/aulas-online/StudentOnlineClassController',
     ];
 
     /**

@@ -30,3 +30,33 @@ $router->get('/admin/modelos-documentos/{id}/edit', 'Modulos/modelos-documentos/
 $router->post('/admin/modelos-documentos/{id}/edit', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@update');
 $router->get('/admin/modelos-documentos/{id}/preview', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@preview');
 $router->post('/admin/modelos-documentos/excluir', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@destroy');
+
+$router->get('/admin/students/{id}/declaracoes/{tipo}/pdf', 'Declarations/AdminDeclarationController@gerarPdf');
+$router->get('/admin/students/{id}/historico-escolar', 'Declarations/AdminHistoricoEscolarController@index');
+$router->post('/admin/students/{id}/historico-escolar/gerar', 'Declarations/AdminHistoricoEscolarController@gerarRascunho');
+$router->get('/admin/students/{id}/historico-escolar/{historicoId}', 'Declarations/AdminHistoricoEscolarController@show');
+$router->get('/admin/students/{id}/historico-escolar/{historicoId}/pdf', 'Declarations/AdminHistoricoEscolarController@pdf');
+$router->post('/admin/students/{id}/historico-escolar/{historicoId}/conferir', 'Declarations/AdminHistoricoEscolarController@conferir');
+$router->post('/admin/students/{id}/historico-escolar/{historicoId}/voltar-rascunho', 'Declarations/AdminHistoricoEscolarController@voltarRascunho');
+$router->post('/admin/students/{id}/historico-escolar/{historicoId}/emitir', 'Declarations/AdminHistoricoEscolarController@emitir');
+$router->post('/admin/students/{id}/historico-escolar/{historicoId}/assinar', 'Declarations/AdminHistoricoEscolarController@assinar');
+$router->post('/admin/students/{id}/historico-escolar/{historicoId}/nova-versao', 'Declarations/AdminHistoricoEscolarController@novaVersao');
+$router->post('/admin/students/{id}/historico-escolar/{historicoId}/itens-externos', 'Declarations/AdminHistoricoEscolarController@adicionarItemExterno');
+$router->post('/admin/students/{id}/historico-escolar/{historicoId}/itens/{itemId}/excluir', 'Declarations/AdminHistoricoEscolarController@excluirItemExterno');
+$router->post('/admin/students/{id}/historico-escolar/{historicoId}/observacoes', 'Declarations/AdminHistoricoEscolarController@salvarObservacoes');
+$router->post('/admin/students/{id}/historico-escolar/{historicoId}/resultado', 'Declarations/AdminHistoricoEscolarController@salvarResultado');
+
+$router->get('/admin/documentos-institucionais', 'Admin/InstitutionalDocsController@index');
+$router->post('/admin/documentos-institucionais/salvar', 'Admin/InstitutionalDocsController@salvar');
+$router->post('/admin/documentos-institucionais/excluir', 'Admin/InstitutionalDocsController@excluir');
+$router->get('/admin/documentos-institucionais/baixar', 'Admin/InstitutionalDocsController@baixar');
+
+$router->get('/admin/configuracao/ui-modelos', 'Admin/UiModelosController@index');
+$router->get('/admin/configuracao/ui-modelos/botoes', 'Admin/UiModelosController@botoes');
+$router->get('/admin/configuracao/ui-modelos/tabela', 'Admin/UiModelosController@tabela');
+$router->get('/admin/configuracao/ui-modelos/formulario', 'Admin/UiModelosController@formulario');
+$router->post('/admin/configuracao/ui-modelos/formulario', 'Admin/UiModelosController@formularioEnviar');
+$router->get('/admin/configuracao/ui-modelos/offcanvas', 'Admin/UiModelosController@offcanvas');
+$router->get('/admin/configuracao/ui-modelos/badges', 'Admin/UiModelosController@badges');
+$router->get('/admin/configuracao/ui-modelos/wizard', 'Admin/UiModelosController@wizard');
+$router->post('/admin/configuracao/ui-modelos/wizard', 'Admin/UiModelosController@wizardEnviar');

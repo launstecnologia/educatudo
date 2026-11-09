@@ -108,18 +108,7 @@ $router->get('/professor/relatorios/aluno/{id}', 'User/TeacherController@relator
 
 // Diário de Classe: rotas em app/Modulos/diario/routes.php
 
-// Planos de Aula (Professor)
-$router->get('/professor/planos-aula', 'Education/LessonPlanController@index');
-$router->get('/professor/planos-aula/criar', 'Education/LessonPlanController@criar');
-$router->post('/professor/planos-aula/salvar', 'Education/LessonPlanController@salvar');
-$router->post('/professor/planos-aula/copiloto', 'Education/LessonPlanController@gerarComCopiloto');
-$router->get('/professor/planos-aula/visualizar/{id}', 'Education/LessonPlanController@visualizar');
-$router->get('/professor/planos-aula/editar/{id}', 'Education/LessonPlanController@editar');
-$router->post('/professor/planos-aula/atualizar/{id}', 'Education/LessonPlanController@atualizar');
-$router->post('/professor/planos-aula/aprovar-rascunhos', 'Education/LessonPlanController@aprovarTodosRascunhos');
-$router->post('/professor/planos-aula/duplicar/{id}', 'Education/LessonPlanController@duplicar');
-$router->post('/professor/planos-aula/excluir/{id}', 'Education/LessonPlanController@excluir');
-$router->get('/professor/planos-aula/pdf/{id}', 'Education/LessonPlanController@exportarPdf');
+// Planos de aula → Modulos/jornadas/routes.php
 
 // Apostilas → Modulos/apostilas/routes.php
 

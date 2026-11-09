@@ -21,3 +21,28 @@ $router->get('/admin/exercises/{listaId}/questions/{questaoId}/edit', 'Modulos/e
 $router->put('/admin/exercises/{listaId}/questions/{questaoId}', 'Modulos/exercicios/ExerciseAdminController@atualizarQuestao');
 $router->delete('/admin/exercises/{listaId}/questions/{questaoId}', 'Modulos/exercicios/ExerciseAdminController@excluirQuestao');
 $router->post('/admin/exercises/{id}/questions/reorder', 'Modulos/exercicios/ExerciseAdminController@reordenarQuestoes');
+
+$router->get('/exercicios', 'Exercises/ExerciseController@index');
+$router->get('/exercicios/iniciar', 'Exercises/ExerciseController@iniciar');
+$router->post('/exercicios/responder', 'Exercises/ExerciseController@responder');
+$router->get('/exercicios/finalizar', 'Exercises/ExerciseController@finalizar');
+$router->post('/exercicios/finalizar', 'Exercises/ExerciseController@finalizar');
+$router->get('/exercicios/resultado', 'Exercises/ExerciseController@resultado');
+$router->get('/exercicios/historico', 'Exercises/ExerciseController@historico');
+
+$router->get('/exercicios-personalizados', 'Exercises/CustomExerciseController@index');
+$router->get('/exercicios-personalizados/criar', 'Exercises/CustomExerciseController@criar');
+$router->post('/exercicios-personalizados/gerar', 'Exercises/CustomExerciseController@gerarExercicios');
+$router->post('/exercicios-personalizados/importar-questoes-ia/{jobId}', 'Exercises/CustomExerciseController@importarQuestoesIA');
+$router->post('/exercicios-personalizados/erro-geracao-ia', 'Exercises/CustomExerciseController@erroGeracaoIA');
+$router->post('/exercicios-personalizados/tentar-novamente/{listaId}', 'Exercises/CustomExerciseController@tentarNovamente');
+$router->get('/exercicios-personalizados/minhas-listas', 'Exercises/CustomExerciseController@listaMinhasListas');
+$router->get('/exercicios-personalizados/status', 'Exercises/CustomExerciseController@verificarStatus');
+$router->post('/exercicios-personalizados/iniciar', 'Exercises/CustomExerciseController@iniciarExecucao');
+$router->get('/exercicios-personalizados/executar', 'Exercises/CustomExerciseController@executar');
+$router->post('/exercicios-personalizados/executar', 'Exercises/CustomExerciseController@executar');
+$router->post('/exercicios-personalizados/responder', 'Exercises/CustomExerciseController@responderQuestao');
+$router->post('/exercicios-personalizados/finalizar', 'Exercises/CustomExerciseController@finalizar');
+$router->get('/exercicios-personalizados/finalizar', 'Exercises/CustomExerciseController@finalizar');
+$router->get('/exercicios-personalizados/resultados', 'Exercises/CustomExerciseController@resultados');
+$router->get('/exercicios-personalizados/historico', 'Exercises/CustomExerciseController@historico');

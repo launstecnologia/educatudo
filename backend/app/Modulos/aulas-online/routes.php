@@ -19,3 +19,9 @@ $router->post('/admin/aulas-online/excluir', 'Modulos/aulas-online/OnlineClassCo
 $router->post('/admin/aulas-online/arquivo/upload', 'Modulos/aulas-online/OnlineClassController@uploadArquivo');
 $router->post('/admin/aulas-online/arquivo/excluir', 'Modulos/aulas-online/OnlineClassController@excluirArquivo');
 $router->get('/admin/aulas-online/arquivo/download', 'Modulos/aulas-online/OnlineClassController@downloadArquivo');
+
+$router->get('/aluno/aulas-online', 'Modulos/aulas-online/StudentOnlineClassController@index');
+$router->get('/aluno/aulas-online/mensagens', 'Modulos/aulas-online/StudentOnlineClassController@mensagens');
+$router->post('/aluno/aulas-online/enviar-mensagem', 'Modulos/aulas-online/StudentOnlineClassController@enviarMensagem');
+$router->get('/aluno/aulas-online/gravacao/{id}', 'Modulos/aulas-online/StudentOnlineClassController@gravacao');
+$router->get('/aluno/aulas-online/{id}', 'Modulos/aulas-online/StudentOnlineClassController@show');

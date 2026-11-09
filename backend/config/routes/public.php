@@ -9,40 +9,19 @@ $router->get('/professor/', 'Auth/AuthController@loginProfessor');
 $router->get('/pais', 'Auth/AuthController@loginPais');
 $router->get('/monitor', 'Auth/AuthController@loginMonitor');
 $router->get('/monitor/', 'Auth/AuthController@loginMonitor');
-$router->get('/educalabs/public/{share_id}', 'EducaLabs/EducaLabsController@publicView');
-$router->get('/educalabs/public/{share_id}/styles.css', 'EducaLabs/EducaLabsController@publicAsset');
-$router->get('/educalabs/public/{share_id}/script.js', 'EducaLabs/EducaLabsController@publicAsset');
-$router->get('/educalabs/validate-token', 'EducaLabs/EducaLabsController@validateToken');
-$router->post('/educalabs/logout', 'EducaLabs/EducaLabsController@logoutToken');
-$router->get('/games/validate-token', 'Games/GameController@validateToken');
-$router->post('/games/logout', 'Games/GameController@logoutToken');
-$router->get('/notes/validate-token', 'Notes/NotesTokenController@validateToken');
-$router->post('/notes/logout', 'Notes/NotesTokenController@logoutToken');
-$router->get('/external-apps/abrir/{id}', 'ExternalApps/ExternalAppsController@abrir');
-$router->get('/external-apps/validate-token', 'ExternalApps/ExternalAppsController@validateToken');
-$router->post('/external-apps/validate-token', 'ExternalApps/ExternalAppsController@validateToken');
-$router->get('/external-apps/credit-context', 'ExternalApps/ExternalAppsController@creditContext');
-$router->post('/external-apps/credit-context', 'ExternalApps/ExternalAppsController@creditContext');
-$router->post('/external-apps/consume', 'ExternalApps/ExternalAppsController@consumeCredit');
-$router->post('/external-apps/refund', 'ExternalApps/ExternalAppsController@refundCredit');
+// EducaLabs, jogos, notes, apps externos e notícias → Modulos/*/routes.public.php
 // AVA certificados → Modulos/ava/routes.php
+
 
 // Histórico Escolar — validação pública por hash (sem login; sem expor notas)
 $router->get('/validar/historico/{hash}', 'Public/HistoricoValidacaoController@validar');
-$router->get('/validar/carteirinha/{token}', 'Modulos/carteirinha/CarteirinhaPublicoController@validar');
-$router->get('/carteirinha/{token}', 'Modulos/carteirinha/CarteirinhaPublicoController@ver');
+// Carteirinha pública → Modulos/carteirinha/routes.public.php
+
 
 // Manual da implantação acadêmica (sem login; sem progresso nem dados da escola)
 $router->get('/guia/implantar-academico', 'Public/GuiaAcademicoController@index');
+// Gabarito, Expo, LEX, matrícula pública e webhook de presença → routes.public.php de cada módulo
 
-// Foto do gabarito pelo celular (token assinado, sem sessão)
-$router->get('/captura-gabarito/{token}', 'Modulos/leitor-gabarito/CapturaGabaritoController@abrir');
-$router->post('/captura-gabarito/{token}', 'Modulos/leitor-gabarito/CapturaGabaritoController@enviar');
-
-// Expo Colag — página pública do stand via QR (sem login)
-$router->get('/expo-colag/s/{token}', 'Modulos/expo-colag/ExpoColagPublicoController@stand');
-$router->post('/expo-colag/s/{token}/avaliar', 'Modulos/expo-colag/ExpoColagPublicoController@avaliarStand');
-$router->get('/expo-colag/midia/{id}/capa', 'Modulos/expo-colag/ExpoColagPublicoController@capa');
 
 $router->get('/manifest-aluno.json', 'Pwa/PwaController@manifestAluno');
 $router->get('/manifest-professor.json', 'Pwa/PwaController@manifestProfessor');
@@ -53,8 +32,8 @@ $router->get('/manifest-pais.json', 'Pwa/PwaController@manifestPais');
 $router->post('/api/webhook/gravacao-jitsi', 'Webhooks/JitsiRecordingWebhookController@handle');
 // Notificações API → Modulos/notificacoes/routes.php
 
-// API Notícias (RSS) e Notificações manuais (API externa)
-$router->get('/api/noticias', 'Noticias/NoticiasController@index');
+// API Notícias → Modulos/noticias/routes.public.php
+
 
 // API REST Pais (Parent) - Login (público)
 $router->post('/api/auth/login', 'Api/AuthController@login');
@@ -88,10 +67,7 @@ $router->get('/uploads/jornadas/exercicios/{filename}', 'Education/ServeImagemEx
 
 // Imagem de questão (provas) – rota pública para <img> no editor e na prova
 
-// Rotas de autenticação
-$router->get('/lex/entrar', 'Modulos/lex/LexLoginController@entrar');
-$router->get('/lex/retorno', 'Modulos/lex/LexLoginController@retorno');
-$router->get('/lex/saida', 'Modulos/lex/LexLoginController@saida');
+// LEX → Modulos/lex/routes.public.php
 $router->get('/login/csrf-token', 'Auth/AuthController@getLoginCsrfTokenJson');
 $router->get('/login', 'Auth/AuthController@loginAluno');
 $router->post('/login', 'Auth/AuthController@autenticar');
@@ -133,17 +109,4 @@ $router->post('/auth/alterar-senha-obrigatoria', 'Auth/AuthController@alterarSen
 $router->get('/consent', 'Auth/AuthController@consent');
 $router->post('/consent/accept', 'Auth/AuthController@acceptConsent');
 
-
-// Captação pública de interesse + trilha do responsável (contrato)
-$router->get('/matricula/interesse',                    'Modulos/matricula/MatriculaPublicoController@captacaoForm');
-$router->post('/matricula/interesse',                   'Modulos/matricula/MatriculaPublicoController@captacaoStore');
-$router->get('/matricula/contrato/{token}',              'Modulos/matricula/MatriculaPublicoController@verContrato');
-$router->post('/matricula/contrato/{token}/dados',       'Modulos/matricula/MatriculaPublicoController@confirmarDados');
-$router->post('/matricula/contrato/{token}/assinar',     'Modulos/matricula/MatriculaPublicoController@assinar');
-$router->get('/matricula/contrato/{token}/pdf',          'Modulos/matricula/MatriculaPublicoController@downloadPdf');
-$router->post('/webhooks/zapsign/{tenant_slug}',         'Modulos/matricula/ZapSignWebhookController@handle');
-$router->post('/webhooks/zapsign',                       'Modulos/matricula/ZapSignWebhookController@handle');
-
-// Catraca / portaria — Gestão de Presença (Bearer token da integração da escola)
-$router->post('/api/webhooks/presenca',                  'Modulos/presenca/PresencaWebhookController@receber');
-$router->post('/api/webhooks/presenca/{provedor}',       'Modulos/presenca/PresencaWebhookController@receber');
+// Matrícula pública e webhook de presença → routes.public.php de cada módulo

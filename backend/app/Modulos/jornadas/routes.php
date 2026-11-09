@@ -184,3 +184,26 @@ $router->get('/professor/api/educaprof/jornadas/contexto', 'Modulos/jornadas/Tea
 $router->post('/professor/api/educaprof/jornadas/dry-run', 'Modulos/jornadas/TeacherJourneyController@apiEducaProfJornadasDryRun');
 $router->post('/professor/api/educaprof/jornadas/criar', 'Modulos/jornadas/TeacherJourneyController@apiEducaProfJornadasCriar');
 $router->get('/professor/testar-openai', 'Modulos/jornadas/TeacherJourneyController@testarOpenAI');
+
+$router->post('/admin/consulta-jornadas-aluno/mcp/ferramenta', 'Admin/JornadasAlunoMcpController@ferramenta');
+
+$router->get('/admin/planos-aula', 'Education/LessonPlanController@indexAdmin');
+$router->get('/admin/planos-aula/visualizar/{id}', 'Education/LessonPlanController@visualizar');
+$router->get('/admin/planos-aula/editar/{id}', 'Education/LessonPlanController@editar');
+$router->post('/admin/planos-aula/atualizar/{id}', 'Education/LessonPlanController@atualizar');
+$router->post('/admin/planos-aula/aprovar-rejeitar/{id}', 'Education/LessonPlanController@aprovarRejeitar');
+$router->post('/admin/planos-aula/aprovar-rascunhos', 'Education/LessonPlanController@aprovarTodosRascunhosAdmin');
+$router->get('/admin/planos-aula/pdf/{id}', 'Education/LessonPlanController@exportarPdf');
+$router->get('/professor/planos-aula', 'Education/LessonPlanController@index');
+$router->get('/professor/planos-aula/criar', 'Education/LessonPlanController@criar');
+$router->post('/professor/planos-aula/salvar', 'Education/LessonPlanController@salvar');
+$router->post('/professor/planos-aula/copiloto', 'Education/LessonPlanController@gerarComCopiloto');
+$router->get('/professor/planos-aula/visualizar/{id}', 'Education/LessonPlanController@visualizar');
+$router->get('/professor/planos-aula/editar/{id}', 'Education/LessonPlanController@editar');
+$router->post('/professor/planos-aula/atualizar/{id}', 'Education/LessonPlanController@atualizar');
+$router->post('/professor/planos-aula/aprovar-rascunhos', 'Education/LessonPlanController@aprovarTodosRascunhos');
+$router->post('/professor/planos-aula/duplicar/{id}', 'Education/LessonPlanController@duplicar');
+$router->post('/professor/planos-aula/excluir/{id}', 'Education/LessonPlanController@excluir');
+$router->get('/professor/planos-aula/pdf/{id}', 'Education/LessonPlanController@exportarPdf');
+$router->get('/aluno/planos-aula', 'User/StudentController@planosAula');
+$router->get('/aluno/planos-aula/visualizar/{id}', 'User/StudentController@visualizarPlanoAula');

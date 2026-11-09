@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Painel\User\Controllers;
+namespace App\Modulos\Notes\Controllers;
 /**
  * EducaTudo - Meu Caderno (aluno)
  * Anotações do aluno: título, matéria, anexos (imagens/documentos)

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Painel\User\Controllers;
+namespace App\Modulos\AulasOnline\Controllers;
 
 
 use App\Core\AuthManager;
