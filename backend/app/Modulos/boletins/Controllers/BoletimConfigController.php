@@ -2272,6 +2272,26 @@ class BoletimConfigController extends BaseController
             if (is_array($titulosOkPost)) {
                 $decodedExtras['titulos_periodo_ok'] = $titulosOkPost;
             }
+            $ocultasPost = null;
+            if (trim((string) ($_POST['colunas_ocultas_json'] ?? '')) !== '') {
+                $ocultasDecoded = json_decode((string) $_POST['colunas_ocultas_json'], true);
+                if (is_array($ocultasDecoded)) {
+                    $ocultasPost = $ocultasDecoded;
+                }
+            }
+            if ($ocultasPost === null && is_array($rascunhoPost['colunas_ocultas'] ?? null)) {
+                $ocultasPost = $rascunhoPost['colunas_ocultas'];
+            }
+            if (is_array($ocultasPost)) {
+                $decodedExtras['colunas_ocultas'] = array_values(array_filter(array_map(
+                    static function ($c) {
+                        $c = strtolower(trim((string) $c));
+
+                        return preg_match('/^[a-z][a-z0-9_]{0,40}$/', $c) ? $c : '';
+                    },
+                    $ocultasPost
+                )));
+            }
             // REC/PF/eventos marcados no assistente — grava no extras junto com o saveRule
             // (antes só ia no patch de layout e sumia ao reabrir).
             $eventosIdsPost = $this->eventosAvaliativosIdsDePayload(
@@ -7821,6 +7841,24 @@ class BoletimConfigController extends BaseController
             ? $grp['agrupamento_por_virtual_mid']
             : [];
 
+        $ocultasQuadro = [];
+        $extrasRegra = [];
+        $rawExtrasRegra = $regra['extras_json'] ?? '';
+        if (is_string($rawExtrasRegra) && trim($rawExtrasRegra) !== '') {
+            $decodedExtrasRegra = json_decode($rawExtrasRegra, true);
+            if (is_array($decodedExtrasRegra)) {
+                $extrasRegra = $decodedExtrasRegra;
+            }
+        } elseif (is_array($rawExtrasRegra)) {
+            $extrasRegra = $rawExtrasRegra;
+        }
+        foreach ((array) ($extrasRegra['colunas_ocultas'] ?? []) as $codOc) {
+            $codOc = strtolower(trim((string) $codOc));
+            if ($codOc !== '') {
+                $ocultasQuadro[$codOc] = true;
+            }
+        }
+
         $colunas = [];
         foreach ($componentesRegra as $c) {
             $cod = trim((string) ($c['codigo'] ?? ''));
@@ -7830,6 +7868,10 @@ class BoletimConfigController extends BaseController
             $stCol = (string) ($c['source_type'] ?? 'provas_sistema');
             $layoutMeta = $this->parseLayoutMetaFromComponente($c);
             $cfgCol = $this->decodeComponenteConfig($c);
+            // Continua no cálculo/fórmula; só some da grade visual.
+            if (!empty($cfgCol['ocultar_no_quadro']) || isset($ocultasQuadro[strtolower($cod)])) {
+                continue;
+            }
             $linhaCab = trim((string) ($cfgCol['linha_cabecalho'] ?? ''));
             if ($linhaCab !== '') {
                 $linhaCab = function_exists('mb_substr') ? mb_substr($linhaCab, 0, 40) : substr($linhaCab, 0, 40);

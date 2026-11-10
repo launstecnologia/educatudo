@@ -10564,11 +10564,7 @@ $boletimWizardSteps = [
                     if (cod && !colunaOculta(cod) && ordemLocal.indexOf(cod) < 0) ordemLocal.push(cod);
                 });
                 estado.colunas_ordem = ordemLocal.filter(function (cod) { return !colunaOculta(cod); });
-                if (rascunhoAtual && Array.isArray(rascunhoAtual.componentes)) {
-                    rascunhoAtual.componentes = rascunhoAtual.componentes.filter(function (c) {
-                        return c && c.codigo && !colunaOculta(c.codigo);
-                    });
-                }
+                // Não remove componentes ocultos do rascunho: eles ficam para a fórmula.
                 if (nomeManual !== null) {
                     estado.nome = nomeManual;
                     estado.nome_automatico = false;
@@ -10581,11 +10577,6 @@ $boletimWizardSteps = [
                 }
             }
             rascunhoAtual = j.rascunho || null;
-            if (rascunhoAtual && Array.isArray(rascunhoAtual.componentes)) {
-                rascunhoAtual.componentes = rascunhoAtual.componentes.filter(function (c) {
-                    return c && c.codigo && !colunaOculta(c.codigo);
-                });
-            }
             garantirArredondamentoGrupoNoRascunho(rascunhoAtual);
             gravarEscolhasGrupoNoRascunho(rascunhoAtual);
             limparOrdemColunasFantasma();
@@ -10876,6 +10867,10 @@ $boletimWizardSteps = [
             add('linhas_layout_json', JSON.stringify(linhasPost || []));
             add('colunas_ordem_json', JSON.stringify(ordemPost || []));
             add('titulos_periodo_ok_json', JSON.stringify(titulosOkPost || {}));
+            var ocultasPost = Array.isArray(estado && estado.colunas_ocultas) ? estado.colunas_ocultas
+                : (Array.isArray(r.colunas_ocultas) ? r.colunas_ocultas : []);
+            add('colunas_ocultas_json', JSON.stringify(ocultasPost || []));
+            r.colunas_ocultas = ocultasPost.slice();
             // Dom/estado no clique do Aplicar — nunca confiar só no rascunho remoto do montar.
             try { sincronizarSelecaoEventosAvulsosDoDom({ preservarLayout: true }); } catch (eEvSave) { /* ignore */ }
             var eventosPost = [];

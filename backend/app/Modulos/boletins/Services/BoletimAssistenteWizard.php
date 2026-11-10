@@ -933,6 +933,9 @@ class BoletimAssistenteWizard
             if (is_array($extrasSalvos['titulos_periodo_ok'] ?? null)) {
                 $estado['titulos_periodo_ok'] = $extrasSalvos['titulos_periodo_ok'];
             }
+            if (is_array($extrasSalvos['colunas_ocultas'] ?? null)) {
+                $estado['colunas_ocultas'] = $this->normalizarColunasOcultas($extrasSalvos['colunas_ocultas']);
+            }
             if (is_array($extrasSalvos['eventos_avaliativos_ids'] ?? null)) {
                 $estado['eventos_avaliativos_ids'] = array_values(array_filter(array_map(
                     'intval',
@@ -10639,7 +10642,7 @@ class BoletimAssistenteWizard
     }
 
     /**
-     * Tira do rascunho a coluna que o usuário excluiu na ordem.
+     * Coluna tirada do quadro: some da visualização, mas permanece no cálculo/fórmula.
      *
      * @param array<string,mixed> $rascunho
      * @param array<string,mixed> $estado
@@ -10661,11 +10664,14 @@ class BoletimAssistenteWizard
             if ($cod === '') {
                 continue;
             }
+            // Semanal oculto continua fora (não entra em fórmula típica do quadro).
             if ($semanal && ($cod === 'media_sem' || $this->componenteEhSemanaQuadro($c))) {
                 continue;
             }
             if (isset($ocultas[$cod])) {
-                continue;
+                $cfg = $this->configDoComponente($c);
+                $cfg['ocultar_no_quadro'] = 1;
+                $c['config'] = $cfg;
             }
             $comps[] = $c;
         }
@@ -11539,6 +11545,7 @@ class BoletimAssistenteWizard
             'rec' => 'Rec.',
             'resultado' => 'Resultado',
         ];
+        $ocultas = array_flip($this->normalizarColunasOcultas($estado['colunas_ocultas'] ?? []));
         $porGrupo = [];
         foreach ($comps as $c) {
             if (!is_array($c)) {
@@ -11552,6 +11559,10 @@ class BoletimAssistenteWizard
             $lt = strtolower(trim((string) ($cfg['layout_type'] ?? $c['layout_type'] ?? '')));
             $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
             if ($cod === '') {
+                continue;
+            }
+            // Oculta no quadro: entra na fórmula, não na grade visual.
+            if (isset($ocultas[$cod]) || !empty($cfg['ocultar_no_quadro'])) {
                 continue;
             }
             $nomeCol = trim((string) ($c['nome'] ?? ''));
