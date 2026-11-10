@@ -5668,13 +5668,13 @@ $boletimWizardSteps = [
         html += '<table class="bw-preview-table boletim"><thead><tr>';
         html += '<th rowspan="2" class="mat text-left">' + esc(tab.titulo || 'Matéria') + '</th>';
         grupos.forEach(function (g, gi) {
-            var clsCab = gi > 0 ? ' class="grupo-sep"' : '';
-            html += '<th colspan="' + Math.max(1, (g.cols || []).length) + '"' + clsCab + '>' + esc(g.label || g.key) + '</th>';
+            // Borda também entre Matérias e o 1º período (gi === 0).
+            html += '<th colspan="' + Math.max(1, (g.cols || []).length) + '" class="grupo-sep">' + esc(g.label || g.key) + '</th>';
         });
         html += '</tr><tr>';
         grupos.forEach(function (g, gi) {
             (g.cols || []).forEach(function (c, ci) {
-                var clsSub = 'sub' + (gi > 0 && ci === 0 ? ' grupo-sep' : '');
+                var clsSub = 'sub' + (ci === 0 ? ' grupo-sep' : '');
                 html += '<th class="' + clsSub + '">' + esc(c.nome || c.codigo) + '</th>';
             });
         });
@@ -5691,7 +5691,7 @@ $boletimWizardSteps = [
                 (g.cols || []).forEach(function (c, ci) {
                     var v = notaDaLinhaPreview(notas, c.codigo);
                     var clsCel = classePreviewCelula(v, c);
-                    if (gi > 0 && ci === 0) clsCel = (clsCel ? clsCel + ' ' : '') + 'grupo-sep';
+                    if (ci === 0) clsCel = (clsCel ? clsCel + ' ' : '') + 'grupo-sep';
                     html += '<td class="' + clsCel + '">' + fmtPreviewCelula(v, c) + '</td>';
                 });
             });
