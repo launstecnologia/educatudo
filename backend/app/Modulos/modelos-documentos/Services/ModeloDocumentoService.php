@@ -2166,6 +2166,37 @@ class ModeloDocumentoService
         return array_values(array_filter($rows, [self::class, 'modeloEhBoletim']));
     }
 
+    /** Modelos oficiais têm emissão própria, fora do catálogo da Secretaria. */
+    public static function modeloEhDocumentoOficial(array $modelo): bool
+    {
+        if (self::categoriaDoCodigo((string) ($modelo['codigo'] ?? '')) === 'oficial'
+            || self::modeloEhBoletim($modelo)) {
+            return true;
+        }
+        $estrutura = is_array($modelo['estrutura'] ?? null)
+            ? $modelo['estrutura']
+            : json_decode((string) ($modelo['estrutura_json'] ?? ''), true);
+        if (!is_array($estrutura)) {
+            return false;
+        }
+        if (self::emissaoValida($estrutura['emissao'] ?? null) !== null
+            || (int) ($estrutura['fonte_boletim_id'] ?? 0) > 0) {
+            return true;
+        }
+        $temHistorico = static function (array $no) use (&$temHistorico): bool {
+            if (($no['type'] ?? '') === 'historico') {
+                return true;
+            }
+            foreach ($no as $valor) {
+                if (is_array($valor) && $temHistorico($valor)) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        return $temHistorico($estrutura);
+    }
+
     public static function modeloEhBoletim(array $modelo): bool
     {
         $estrutura = is_array($modelo['estrutura'] ?? null) ? $modelo['estrutura'] : json_decode((string) ($modelo['estrutura_json'] ?? ''), true);

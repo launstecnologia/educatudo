@@ -56,7 +56,7 @@ class ArquivoEmissaoDocumentoService
             }
             $codigo = (string) ($row['codigo'] ?? '');
             $categoria = ModeloDocumentoService::categoriaDoCodigo($codigo);
-            if ($categoria === 'oficial') {
+            if (ModeloDocumentoService::modeloEhDocumentoOficial($row)) {
                 continue;
             }
             $campos = [];
@@ -173,6 +173,10 @@ class ArquivoEmissaoDocumentoService
     {
         if (!$this->tabelaPronta()) {
             throw new \RuntimeException('Execute a migration 2026_10_02_documentos_emissoes.sql no painel Master.');
+        }
+        $modeloEscolhido = $this->modelos->findById($modeloId);
+        if (is_array($modeloEscolhido) && ModeloDocumentoService::modeloEhDocumentoOficial($modeloEscolhido)) {
+            throw new \InvalidArgumentException('Documentos oficiais devem ser emitidos na área própria. Na Secretaria, escolha uma declaração ou autorização.');
         }
         $ano = (int) ($escopo['ano'] ?? 0);
         if ($ano < 2000) {

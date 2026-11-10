@@ -1,5 +1,7 @@
 # Tasks — backlog atual
 
+- [x] Secretaria/Documentos: excluir modelos oficiais do catálogo, incluindo códigos personalizados vinculados a boletim, histórico, ficha, ata ou relatório final; impedir emissão direta nesse painel. 17 testes PHP (18 asserções), lint e code-reviewer aprovados. — 2026-11-10
+
 - [x] Documentos: preservar na declaração emitida o motor PDF, margens e espaçamento da prévia; corrigir logo ausente no ZIP por falta do contexto de mídia do tenant no cron. 3 testes PHP (11 asserções), lint e code-reviewer aprovados; conferência em produção após deploy. — 2026-11-10
 
 - [x] Boletim: expor HTML completo com campos de notas dinâmicos para o TI; unificar modelo vinculado ao curso/série na impressão do aluno, permitir escolher modelo de Documentos no relatório e preservá-lo nos PDFs do ZIP. Validado com 22 testes Playwright, 10 testes PHP (28 asserções), lint e code-reviewer; preserva ano da ficha e notas de cada aluno. — 2026-11-10
