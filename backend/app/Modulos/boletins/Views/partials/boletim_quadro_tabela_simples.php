@@ -89,6 +89,12 @@ $fmtNotaSimples = static function ($valor) use ($decSimples): string {
 .boletim-quadro-th-border {
     border: 1px solid color-mix(in srgb, var(--sidebar-bg-color, #1e3a5f) 75%, #000);
 }
+.boletim-quadro-grupo-sep {
+    border-left: 3px solid color-mix(in srgb, var(--sidebar-bg-color, #1e3a5f) 40%, #fff) !important;
+}
+td.boletim-quadro-grupo-sep {
+    border-left: 3px solid color-mix(in srgb, var(--sidebar-bg-color, #1e3a5f) 55%, #64748b) !important;
+}
 .boletim-quadro-row-alt {
     background: color-mix(in srgb, var(--sidebar-bg-color, #1e3a5f) 6%, #fff);
 }
@@ -106,14 +112,15 @@ $fmtNotaSimples = static function ($valor) use ($decSimples): string {
                     $agrupaCab = $faixaCab['rotulo'] !== '' && $spanCab >= 2;
                     if ($agrupaCab):
                 ?>
-                    <th class="boletim-quadro-th-border px-2 py-1 font-semibold align-middle" colspan="<?= $spanCab ?>">
+                    <th class="boletim-quadro-th-border boletim-quadro-grupo-sep px-2 py-1 font-semibold align-middle" colspan="<?= $spanCab ?>">
                         <?= htmlspecialchars((string) $faixaCab['rotulo'], ENT_QUOTES, 'UTF-8') ?>
                     </th>
                 <?php else:
                     for ($kCab = (int) $faixaCab['ini']; $kCab < (int) $faixaCab['fim']; $kCab++):
                         $oc = $colsVisiveis[$kCab];
+                        $clsSepLeaf = ($kCab === (int) $faixaCab['ini']) ? ' boletim-quadro-grupo-sep' : '';
                 ?>
-                    <th class="boletim-quadro-th-border px-2 py-1 font-semibold align-middle leading-tight min-w-[4.5rem]" rowspan="2">
+                    <th class="boletim-quadro-th-border<?= $clsSepLeaf ?> px-2 py-1 font-semibold align-middle leading-tight min-w-[4.5rem]" rowspan="2">
                         <?= htmlspecialchars(\App\Helpers\BoletimQuadroLayoutHelper::rotuloColunaQuadro($oc), ENT_QUOTES, 'UTF-8') ?>
                     </th>
                 <?php endfor; endif; endforeach; ?>
@@ -126,8 +133,9 @@ $fmtNotaSimples = static function ($valor) use ($decSimples): string {
                     }
                     for ($kCab = (int) $faixaCab['ini']; $kCab < (int) $faixaCab['fim']; $kCab++):
                         $oc = $colsVisiveis[$kCab];
+                        $clsSepSub = ($kCab === (int) $faixaCab['ini']) ? ' boletim-quadro-grupo-sep' : '';
                 ?>
-                    <th class="boletim-quadro-th-border px-2 py-1 font-semibold align-middle leading-tight min-w-[4.5rem]">
+                    <th class="boletim-quadro-th-border<?= $clsSepSub ?> px-2 py-1 font-semibold align-middle leading-tight min-w-[4.5rem]">
                         <?= htmlspecialchars(\App\Helpers\BoletimQuadroLayoutHelper::rotuloColunaQuadro($oc), ENT_QUOTES, 'UTF-8') ?>
                     </th>
                 <?php endfor; endforeach; ?>
@@ -137,8 +145,8 @@ $fmtNotaSimples = static function ($valor) use ($decSimples): string {
                 <th class="boletim-quadro-th-border px-3 py-2 text-left font-semibold align-middle whitespace-nowrap">
                     <?= htmlspecialchars($tituloSimples, ENT_QUOTES, 'UTF-8') ?>
                 </th>
-                <?php foreach ($colsVisiveis as $oc): ?>
-                    <th class="boletim-quadro-th-border px-2 py-1 font-semibold align-middle leading-tight min-w-[4.5rem]">
+                <?php foreach ($colsVisiveis as $ixOc => $oc): ?>
+                    <th class="boletim-quadro-th-border<?= $ixOc === 0 ? ' boletim-quadro-grupo-sep' : '' ?> px-2 py-1 font-semibold align-middle leading-tight min-w-[4.5rem]">
                         <?= htmlspecialchars(\App\Helpers\BoletimQuadroLayoutHelper::rotuloColunaQuadro($oc), ENT_QUOTES, 'UTF-8') ?>
                     </th>
                 <?php endforeach; ?>
@@ -146,7 +154,16 @@ $fmtNotaSimples = static function ($valor) use ($decSimples): string {
             <?php endif; ?>
         </thead>
         <tbody>
-            <?php $iS = 0; foreach ($linhasVisiveis as $linS): $iS++;
+            <?php
+            $idxsInicioGrupo = [];
+            if ($temLinhaCab) {
+                foreach ($faixasCab as $faixaCab) {
+                    $idxsInicioGrupo[(int) $faixaCab['ini']] = true;
+                }
+            } else {
+                $idxsInicioGrupo[0] = true;
+            }
+            $iS = 0; foreach ($linhasVisiveis as $linS): $iS++;
                 $notasS = is_array($linS['notas'] ?? null) ? $linS['notas'] : [];
                 $bgS = ($iS % 2 === 0) ? 'boletim-quadro-row-alt' : 'bg-white';
                 $ehPai = !empty($linS['eh_grupo_pai']);
@@ -159,9 +176,10 @@ $fmtNotaSimples = static function ($valor) use ($decSimples): string {
                         <?php endif; ?>
                         <?= htmlspecialchars((string) ($linS['materia_nome'] ?? '—'), ENT_QUOTES, 'UTF-8') ?>
                     </td>
-                    <?php foreach ($colsVisiveis as $oc):
+                    <?php foreach ($colsVisiveis as $ixOc => $oc):
                         $codO = (string) ($oc['codigo'] ?? '');
                         $nv = $notasS[$codO] ?? null;
+                        $clsSepCel = !empty($idxsInicioGrupo[$ixOc]) ? ' boletim-quadro-grupo-sep' : '';
                         if (is_array($nv)) {
                             $nv = $nv['texto'] ?? $nv['valor'] ?? null;
                         }
@@ -178,7 +196,7 @@ $fmtNotaSimples = static function ($valor) use ($decSimples): string {
                         $colGlobal = !empty($oc['valor_global']);
                         $mostrarIdem = $edicaoSimples !== null && is_numeric($nv) && $colGlobal && $iS > 1;
                     ?>
-                        <td class="border border-gray-300 px-1 py-1 <?= is_numeric($nv) ? 'text-emerald-800 font-semibold' : 'text-gray-500' ?><?= $isCalcEditavel ? ' boletim-cell-editavel cursor-pointer' : '' ?>"
+                        <td class="border border-gray-300 px-1 py-1<?= $clsSepCel ?> <?= is_numeric($nv) ? 'text-emerald-800 font-semibold' : 'text-gray-500' ?><?= $isCalcEditavel ? ' boletim-cell-editavel cursor-pointer' : '' ?>"
                             <?php if ($isCalcEditavel): ?>
                             data-cell-editavel="1"
                             data-componente-id="<?= (int) ($oc['id'] ?? 0) ?>"

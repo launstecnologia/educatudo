@@ -48,11 +48,12 @@ $layoutExibicao = is_array($quadro['layout_exibicao'] ?? null) ? $quadro['layout
 $layoutFaixas = is_array($layoutExibicao['faixas'] ?? null) ? $layoutExibicao['faixas'] : [];
 $layoutMinima = (float) ($layoutExibicao['media_minima'] ?? 6);
 $layoutFormula = (string) ($layoutExibicao['formula_final_media'] ?? '');
-// O que vale é o modelo de boletim do cadastro (Modelos), não layout órfão.
+// Título: layout de impressão (quadro montado) tem prioridade sobre o nome da regra de aprovação.
 $modeloNomeCadastro = trim((string) ($quadro['modelo_nome'] ?? ''));
-$layoutNome = $modeloNomeCadastro !== ''
-    ? $modeloNomeCadastro
-    : trim((string) ($layoutExibicao['nome'] ?? ''));
+$layoutNomeImpressao = trim((string) ($layoutExibicao['nome'] ?? ''));
+$layoutNome = $layoutNomeImpressao !== ''
+    ? $layoutNomeImpressao
+    : $modeloNomeCadastro;
 $escalaNota = (string) ($quadro['escala_nota'] ?? ($layoutExibicao['escala'] ?? '10'));
 $escalaMax = \App\Modulos\RegrasAcademicas\Services\EscalaNota::maximo($escalaNota);
 $quadroImpressaoHtml = trim((string) ($quadro_impressao_html ?? ''));

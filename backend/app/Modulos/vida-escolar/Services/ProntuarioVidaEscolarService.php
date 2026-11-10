@@ -696,33 +696,183 @@ class ProntuarioVidaEscolarService
     /**
      * Regra do quadro que o admin construiu (impressão), não o esqueleto Média/Faltas do cadastro.
      *
+     * Ordem: layout_boletim_id (assistente) → boletim_id com origem de quadro →
+     * regras de impressão do ano. Nunca devolve o esqueleto Média/Faltas.
+     *
      * @param 'oficial'|'complementar' $finalidadePref
      */
     private function regraIdDoModeloTurma(int $turmaId, int $serieId, int $ano, string $finalidadePref): int
     {
-        if ($turmaId <= 0 && $serieId <= 0) {
+        if ($turmaId <= 0 && $serieId <= 0 && $ano <= 0) {
             return 0;
         }
         try {
-            if (!class_exists(\App\Modulos\Boletins\Services\BoletimCadastroService::class)) {
-                return 0;
+            $modelo = null;
+            if (class_exists(\App\Modulos\Boletins\Services\BoletimCadastroService::class)
+                && ($turmaId > 0 || $serieId > 0)
+            ) {
+                $cadastro = new \App\Modulos\Boletins\Services\BoletimCadastroService();
+                $modelo = $cadastro->encontrarModeloParaTurma($turmaId, $serieId, $ano, $finalidadePref);
+                if ($modelo === null && $finalidadePref === 'complementar') {
+                    $modelo = $cadastro->encontrarModeloParaTurma($turmaId, $serieId, $ano, 'oficial');
+                }
             }
-            $cadastro = new \App\Modulos\Boletins\Services\BoletimCadastroService();
-            $modelo = $cadastro->encontrarModeloParaTurma($turmaId, $serieId, $ano, $finalidadePref);
-            if ($modelo === null && $finalidadePref === 'complementar') {
-                $modelo = $cadastro->encontrarModeloParaTurma($turmaId, $serieId, $ano, 'oficial');
+
+            // 1) Quadro do assistente ligado ao boletim_layouts (extras.layout_boletim_id).
+            $regraLayout = $this->regraIdImpressaoDoLayoutTurma($turmaId, $serieId, $ano, is_array($modelo) ? $modelo : null);
+            if ($regraLayout > 0) {
+                return $regraLayout;
             }
-            if (!is_array($modelo)) {
-                return 0;
-            }
-            $boletimId = (int) ($modelo['id'] ?? 0);
-            $regraCadastro = (int) ($modelo['regra_id'] ?? 0);
+
+            $boletimId = is_array($modelo) ? (int) ($modelo['id'] ?? 0) : 0;
+            $regraCadastro = is_array($modelo) ? (int) ($modelo['regra_id'] ?? 0) : 0;
+
+            // 2) Regras com boletim_id do modelo e origem de quadro (não esqueleto).
             $regraImpressao = $this->regraIdImpressaoDoBoletim($boletimId, $regraCadastro);
-            return $regraImpressao > 0 ? $regraImpressao : $regraCadastro;
+            if ($regraImpressao > 0) {
+                return $regraImpressao;
+            }
+
+            // 3) Só regras do ano com series_ids explícito desta série (sem “vale para todas”).
+            $regraAno = $this->regraIdImpressaoDoAno($ano, $serieId);
+            if ($regraAno > 0) {
+                return $regraAno;
+            }
+
+            // Não devolve boletins.regra_id (esqueleto Média/Faltas) — senão o detalhe
+            // mostra "Aprovação…" em vez do PP/PU/CH montado no assistente.
+            return 0;
         } catch (\Throwable $e) {
             error_log('Modelo boletim turma #' . $turmaId . ': ' . $e->getMessage());
             return 0;
         }
+    }
+
+    /**
+     * Resolve a regra de impressão via boletim_layouts da turma (chave do assistente).
+     *
+     * @param array<string,mixed>|null $modelo
+     */
+    private function regraIdImpressaoDoLayoutTurma(int $turmaId, int $serieId, int $ano, ?array $modelo): int
+    {
+        if ($ano <= 0) {
+            return 0;
+        }
+        if (!class_exists(\App\Modulos\Boletins\Services\BoletimVisaoImpressaoService::class)) {
+            return 0;
+        }
+        try {
+            $visao = new \App\Modulos\Boletins\Services\BoletimVisaoImpressaoService();
+            foreach ($this->layoutIdsDaTurma($turmaId, $serieId, $ano, $modelo) as $layoutId) {
+                $regraId = $visao->encontrarRegraDoLayout($layoutId);
+                if ($regraId > 0) {
+                    return $regraId;
+                }
+            }
+            return 0;
+        } catch (\Throwable $e) {
+            error_log('Regra impressão layout turma #' . $turmaId . ': ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Layouts oficiais do ano que cobrem a turma/série (preferindo vínculo com o modelo).
+     *
+     * @param array<string,mixed>|null $modelo
+     * @return list<int>
+     */
+    private function layoutIdsDaTurma(int $turmaId, int $serieId, int $ano, ?array $modelo): array
+    {
+        if ($ano <= 0) {
+            return [];
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT id, nome, regra_academica_id, turmas_ids, series_ids
+                 FROM boletim_layouts
+                 WHERE ano_letivo = :ano AND ativo = 1 AND finalidade = 'oficial'
+                 ORDER BY id ASC",
+                ['ano' => $ano]
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        $preferNome = strtolower(trim((string) ($modelo['nome'] ?? '')));
+        $preferRegra = (int) ($modelo['regra_academica_id'] ?? 0);
+        $candidatos = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $id = (int) ($row['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $turmas = $this->idsJsonLista($row['turmas_ids'] ?? null);
+            $series = $this->idsJsonLista($row['series_ids'] ?? null);
+            if ($turmas !== [] && $turmaId > 0 && !in_array($turmaId, $turmas, true)) {
+                continue;
+            }
+            if ($series !== [] && $serieId > 0 && !in_array($serieId, $series, true)) {
+                continue;
+            }
+            // Layout “vale para todas” só entra se não houver nenhum com turma/série explícita depois —
+            // ainda assim pontua menos.
+            $pts = 0;
+            if ($turmaId > 0 && in_array($turmaId, $turmas, true)) {
+                $pts += 40;
+            }
+            if ($serieId > 0 && in_array($serieId, $series, true)) {
+                $pts += 20;
+            }
+            if ($preferRegra > 0 && (int) ($row['regra_academica_id'] ?? 0) === $preferRegra) {
+                $pts += 30;
+            }
+            $nomeLayout = strtolower(trim((string) ($row['nome'] ?? '')));
+            if ($preferNome !== '' && $nomeLayout !== '' && $nomeLayout === $preferNome) {
+                $pts += 50;
+            }
+            if ($turmas === [] && $series === []) {
+                $pts += 1;
+            }
+            $candidatos[] = ['id' => $id, 'pts' => $pts];
+        }
+        if ($candidatos === []) {
+            return [];
+        }
+        usort($candidatos, static function (array $a, array $b): int {
+            $cmp = $b['pts'] <=> $a['pts'];
+            return $cmp !== 0 ? $cmp : ($a['id'] <=> $b['id']);
+        });
+
+        $ids = [];
+        foreach ($candidatos as $c) {
+            $ids[] = (int) $c['id'];
+        }
+
+        return $ids;
+    }
+
+    /**
+     * @param mixed $raw
+     * @return list<int>
+     */
+    private function idsJsonLista($raw): array
+    {
+        if (is_array($raw)) {
+            return array_values(array_filter(array_map('intval', $raw)));
+        }
+        if (!is_string($raw) || trim($raw) === '') {
+            return [];
+        }
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map('intval', $decoded)));
     }
 
     /**
@@ -749,6 +899,54 @@ class ProntuarioVidaEscolarService
             return 0;
         }
 
+        return $this->escolherMelhorRegraImpressao($rows, $regraCadastro);
+    }
+
+    /**
+     * Fallback restrito: regra do ano com series_ids contendo esta série.
+     * Não aceita series_ids vazio (evita pegar quadro de outra turma).
+     */
+    private function regraIdImpressaoDoAno(int $ano, int $serieId): int
+    {
+        if ($ano <= 0 || $serieId <= 0) {
+            return 0;
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT id, extras_json, series_ids, ano_letivo, updated_at
+                 FROM boletim_regras
+                 WHERE ativo = 1
+                   AND exibir_em = 'boletim'
+                   AND ano_letivo = :ano
+                 ORDER BY updated_at DESC, id DESC
+                 LIMIT 250",
+                ['ano' => $ano]
+            ) ?: [];
+        } catch (\Throwable $e) {
+            error_log('Regra impressão ano #' . $ano . ': ' . $e->getMessage());
+            return 0;
+        }
+
+        $filtrados = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $series = $this->idsJsonLista($row['series_ids'] ?? null);
+            if ($series === [] || !in_array($serieId, $series, true)) {
+                continue;
+            }
+            $filtrados[] = $row;
+        }
+
+        return $this->escolherMelhorRegraImpressao($filtrados, 0);
+    }
+
+    /**
+     * @param list<array<string,mixed>> $rows
+     */
+    private function escolherMelhorRegraImpressao(array $rows, int $regraCadastro = 0): int
+    {
         $melhor = 0;
         $melhorPts = -1;
         $melhorUpdated = -1;
@@ -778,7 +976,7 @@ class ProntuarioVidaEscolarService
             if ((int) ($extras['layout_boletim_id'] ?? 0) > 0) {
                 $pts += 10;
             }
-            // Esqueleto do cadastro (Média/Faltas) só se não houver quadro montado.
+            // Esqueleto do cadastro (Média/Faltas) não conta como quadro montado.
             if ($regraCadastro > 0 && $id === $regraCadastro) {
                 $pts += 1;
             }
@@ -1191,6 +1389,28 @@ class ProntuarioVidaEscolarService
             $score = ($fin === $finalidadePref) ? 100 : 0;
             if ($ano > 0 && $anoEv === $ano) {
                 $score += 20;
+            }
+            // Prefere o quadro montado (PP/PU/CH com título de período) ao esqueleto Média/Faltas.
+            $temCabPeriodo = false;
+            $temMediaGenerica = false;
+            foreach ((array) ($ev['colunas'] ?? []) as $colEv) {
+                if (!is_array($colEv)) {
+                    continue;
+                }
+                if (trim((string) ($colEv['linha_cabecalho'] ?? '')) !== '') {
+                    $temCabPeriodo = true;
+                }
+                $codEv = strtolower((string) ($colEv['codigo'] ?? ''));
+                $nomeEv = strtolower((string) ($colEv['nome'] ?? ''));
+                if (str_contains($codEv, 'media') || $nomeEv === 'média' || $nomeEv === 'media') {
+                    $temMediaGenerica = true;
+                }
+            }
+            if ($temCabPeriodo) {
+                $score += 50;
+            }
+            if ($temMediaGenerica && !$temCabPeriodo) {
+                $score -= 40;
             }
             $updated = strtotime((string) ($ev['updated_at'] ?? '')) ?: 0;
             if ($score > $scoreMelhor || ($score === $scoreMelhor && $updated > $updatedMelhor)) {
