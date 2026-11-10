@@ -8398,7 +8398,10 @@ class BoletimConfigController extends BaseController
                     $vcell = round(max(0.0, min($escalaCol, (float) $vcell)), 2);
                 }
                 $notasLinha[$cod] = $vcell;
-                $valoresFormula[$cod] = is_numeric($vcell) ? (float) $vcell : 0.0;
+                // Só nota lançada: ausente não vira 0 (senão composicao/média c/ rec corta a média).
+                if (is_numeric($vcell)) {
+                    $valoresFormula[$cod] = (float) $vcell;
+                }
                 $statsCod = $matrizPercentStatsPorCodigo[$cod] ?? [];
                 if (isset($statsCod[$mid]) && is_array($statsCod[$mid])) {
                     $notasLinha[$cod . '__n'] = (int) ($statsCod[$mid]['acertos'] ?? 0);
@@ -9302,7 +9305,10 @@ class BoletimConfigController extends BaseController
                 $refs = $this->codigosReferenciadosNaExpressao($item['expr'], array_keys($notas));
                 $vars = [];
                 foreach ($refs as $ref) {
-                    $vars[(string) $ref] = $this->valorNotaGrupoPorCodigo($notas, (string) $ref);
+                    $notaRef = $this->notaOpcionalGrupoPorCodigo($notas, (string) $ref);
+                    if ($notaRef !== null) {
+                        $vars[(string) $ref] = $notaRef;
+                    }
                 }
                 $resultado = $this->avaliarFormula($item['expr'], $vars);
                 if (empty($resultado['ok']) || !isset($resultado['valor']) || !is_numeric($resultado['valor'])) {
@@ -9321,11 +9327,23 @@ class BoletimConfigController extends BaseController
     }
 
     /**
-     * A fórmula cita o código da peça (prova_bim) e a coluna pode estar com o outro nome (bimestral).
+     * Nota do código/apelido, ou 0 se ausente.
+     * Não usar para montar o mapa de avaliarFormula (zera REC/traço e quebra composicao).
+     * Prefira {@see notaOpcionalGrupoPorCodigo} e omita a chave quando null.
      *
      * @param array<string,mixed> $notas
      */
     private function valorNotaGrupoPorCodigo(array $notas, string $codigo): float
+    {
+        return $this->notaOpcionalGrupoPorCodigo($notas, $codigo) ?? 0.0;
+    }
+
+    /**
+     * Nota lançada do código/apelido, ou null se ainda não há valor (traço).
+     *
+     * @param array<string,mixed> $notas
+     */
+    private function notaOpcionalGrupoPorCodigo(array $notas, string $codigo): ?float
     {
         $candidatos = $this->aliasesCodigoColuna($codigo);
         foreach ($candidatos as $cand) {
@@ -9336,7 +9354,7 @@ class BoletimConfigController extends BaseController
             }
         }
 
-        return 0.0;
+        return null;
     }
 
     /**
@@ -9666,7 +9684,10 @@ class BoletimConfigController extends BaseController
                                 }
                                 $vars = [];
                                 foreach ($refsExpr as $refToken) {
-                                    $vars[(string) $refToken] = $this->valorNotaGrupoPorCodigo($notasVirtuais, (string) $refToken);
+                                    $notaRef = $this->notaOpcionalGrupoPorCodigo($notasVirtuais, (string) $refToken);
+                                    if ($notaRef !== null) {
+                                        $vars[(string) $refToken] = $notaRef;
+                                    }
                                 }
                                 $rFormula = $this->avaliarFormula($expr, $vars);
                                 if (!empty($rFormula['ok']) && isset($rFormula['valor']) && is_numeric($rFormula['valor'])) {
@@ -11714,7 +11735,11 @@ class BoletimConfigController extends BaseController
                     $faltouMu = true;
                     break;
                 }
-                $valoresFormula[$rc] = $notaRef ?? 0.0;
+                // Ausente fica de fora do mapa: avaliarFormula trata como 0 na conta,
+                // mas composicao/chamada enxergam "sem nota" (não (média+0)/2).
+                if ($notaRef !== null) {
+                    $valoresFormula[$rc] = $notaRef;
+                }
             }
             if ($faltouMu) {
                 continue;
@@ -11851,7 +11876,10 @@ class BoletimConfigController extends BaseController
                     $refs = $this->codigosReferenciadosNaExpressao($expr, array_merge(array_keys($notas), array_keys($matrizPorCodigo)));
                     $vars = [];
                     foreach ($refs as $ref) {
-                        $vars[(string) $ref] = $this->valorNotaGrupoPorCodigo($notas, (string) $ref);
+                        $notaRef = $this->notaOpcionalGrupoPorCodigo($notas, (string) $ref);
+                        if ($notaRef !== null) {
+                            $vars[(string) $ref] = $notaRef;
+                        }
                     }
                     if ($refs === [] && !preg_match('/\d/', $expr)) {
                         continue;
