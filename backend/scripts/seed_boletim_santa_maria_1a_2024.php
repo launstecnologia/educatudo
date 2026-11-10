@@ -63,11 +63,18 @@ const DATAS = [
 ];
 
 /**
- * Notas de 2ª Chamada (CH) — evento no quadro, sem lançamento (como no PDF).
+ * Notas de 2ª Chamada (CH) — só no 3º bimestre, Fís/Qui/Bio = 2,3 (PDF).
  *
  * @var array<string, array<int, float>>
  */
-const CH_NOTAS = [];
+const CH_NOTAS = [
+    'Física 1' => [3 => 2.3],
+    'Física 2' => [3 => 2.3],
+    'Química 1' => [3 => 2.3],
+    'Química 2' => [3 => 2.3],
+    'Biologia 1' => [3 => 2.3],
+    'Biologia 2' => [3 => 2.3],
+];
 
 /**
  * Notas do boletim. Chave = matéria lançável.
@@ -191,14 +198,14 @@ const NOTAS = [
         'pp' => [1 => 2.0, 2 => 3.4, 3 => null, 4 => null],
         'pu' => [1 => 2.8, 2 => 3.2, 3 => 3.2, 4 => null],
         'pe' => [1 => 0.5, 2 => null, 3 => null, 4 => null],
-        'fal' => [1 => 0, 2 => 0, 3 => 3, 4 => 0],
+        'fal' => [1 => 0, 2 => 0, 3 => 5, 4 => 0],
         'rec_s1' => 5.0,
     ],
     'Biologia 2' => [
         'pp' => [1 => 4.0, 2 => 3.0, 3 => null, 4 => null],
         'pu' => [1 => 2.7, 2 => 3.1, 3 => 3.1, 4 => null],
         'pe' => [1 => null, 2 => null, 3 => null, 4 => null],
-        'fal' => [1 => 0, 2 => 0, 3 => 4, 4 => 0],
+        'fal' => [1 => 0, 2 => 0, 3 => 2, 4 => 0],
         'rec_s1' => 5.0,
     ],
     'Língua Inglesa' => [
