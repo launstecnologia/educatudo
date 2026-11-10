@@ -60,12 +60,14 @@ class BoletimConfigController extends BaseController
     private bool $notasManuaisGeracaoAtivo = false;
     /** @var array<int, array<string, mixed>> */
     private array $eventosFaltasCache = [];
-    /** @var array<int, array{regra: array<string, mixed>, componentes: list<array<string, mixed>>}> */
+    /** @var array<string, array{regra: array<string, mixed>, componentes: list<array<string, mixed>>}> */
     private array $expansaoRegraCache = [];
     /** @var array<string, array<string, mixed>> */
     private array $simulacaoAlunoCache = [];
     /** @var array<int, string> */
     private array $roundModeBoletimCache = [];
+    /** Ano da regra/simulação atual — usado no recasamento de blocos órfãos. */
+    private int $anoLetivoContextoSimulacao = 0;
     /** Simulação só lê o quadro; não grava extras_json da regra. */
     private bool $simulacaoSomenteLeitura = false;
     /** @var list<int> */
@@ -4563,16 +4565,24 @@ class BoletimConfigController extends BaseController
     private function componentesParaSimulacao(array $regra): array
     {
         $regraId = (int) ($regra['id'] ?? 0);
-        if ($regraId > 0 && isset($this->expansaoRegraCache[$regraId])) {
-            return $this->expansaoRegraCache[$regraId];
+        $anoCtx = (int) ($regra['ano_letivo'] ?? $this->anoLetivoContextoSimulacao ?? 0);
+        $chaveCache = $regraId . ':ano:' . $anoCtx;
+        if ($regraId > 0 && isset($this->expansaoRegraCache[$chaveCache])) {
+            return $this->expansaoRegraCache[$chaveCache];
         }
         $componentes = $regra['componentes'] ?? [];
         $expansao = $this->expandirRegraQuadroSemanalNaSimulacao($regra, is_array($componentes) ? $componentes : []);
         $componentes = $this->anexarFaltasEventoNotasSeFaltar($expansao['regra'], $expansao['componentes']);
+        // Recasa ID órfão → ID vivo uma vez; a leitura de nota depois é só por evento/bloco id.
+        $anoCtx = (int) ($expansao['regra']['ano_letivo'] ?? $anoCtx);
+        $componentes = $this->repararIdsEventoBlocoOrfaosNosComponentes(
+            is_array($componentes) ? $componentes : [],
+            $anoCtx
+        );
         $expansao['regra']['componentes'] = $componentes;
         $out = ['regra' => $expansao['regra'], 'componentes' => $componentes];
         if ($regraId > 0) {
-            $this->expansaoRegraCache[$regraId] = $out;
+            $this->expansaoRegraCache[$regraId . ':ano:' . $anoCtx] = $out;
         }
 
         return $out;
@@ -5409,12 +5419,19 @@ class BoletimConfigController extends BaseController
         }
 
         $roundMode = $roundModeCache;
+        $this->anoLetivoContextoSimulacao = (int) ($regra['ano_letivo'] ?? 0);
+        if ($this->anoLetivoContextoSimulacao < 2000 && $rangeInicioOverride) {
+            $this->anoLetivoContextoSimulacao = (int) substr((string) $rangeInicioOverride, 0, 4);
+        }
         $range = [
             'inicio' => $rangeInicioOverride ? ($rangeInicioOverride . ' 00:00:00') : null,
             'fim' => $rangeFimOverride ? ($rangeFimOverride . ' 23:59:59') : null,
         ];
         if ($range['inicio'] === null || $range['fim'] === null) {
             $range = $this->periodoToRange($periodoRef);
+        }
+        if ($this->anoLetivoContextoSimulacao < 2000 && !empty($range['inicio'])) {
+            $this->anoLetivoContextoSimulacao = (int) substr((string) $range['inicio'], 0, 4);
         }
         $expansaoQuadro = $this->componentesParaSimulacao($regra);
         $regra = $expansaoQuadro['regra'];
@@ -13879,17 +13896,29 @@ class BoletimConfigController extends BaseController
     }
 
     /**
+     * Leitura de nota: só por ID (evento_avaliativo_id → blocos desse evento, ou bloco_id).
+     * Não adivinha por sigla/tipo aqui — isso vazava CH de outro bimestre.
+     * IDs órfãos são recasados antes em repararIdsEventoBlocoOrfaosNosComponentes.
+     *
      * @return list<int>
      */
     private function resolveBlocoIdsFromComponentePersisted(array $componente): array
     {
+        $cfg = $this->decodeComponenteConfig($componente);
+        $eventoId = (int) ($cfg['evento_avaliativo_id'] ?? $componente['evento_avaliativo_id'] ?? 0);
+
+        if ($eventoId > 0) {
+            // Evento morto / sem bloco → vazio (não inventa nota de outro período).
+            return $this->blocoIdsDoEventoAvaliativo($eventoId, $componente);
+        }
+
         $rawBlocos = $componente['blocos_ids'] ?? '';
         if (is_array($rawBlocos)) {
             $ids = array_values(array_unique(array_filter(array_map('intval', $rawBlocos), static function ($id) {
                 return $id > 0;
             })));
             if ($ids !== []) {
-                return $ids;
+                return $this->filtrarBlocoIdsExistentes($ids);
             }
         }
         $raw = trim((string) $rawBlocos);
@@ -13902,99 +13931,248 @@ class BoletimConfigController extends BaseController
                 return $id > 0;
             })));
             if ($ids !== []) {
-                return $ids;
+                return $this->filtrarBlocoIdsExistentes($ids);
             }
         }
         $bid = (int) ($componente['bloco_id'] ?? 0);
         if ($bid > 0) {
-            return [$bid];
+            return $this->filtrarBlocoIdsExistentes([$bid]);
         }
 
-        // Assistente: coluna ligada ao Evento avaliativo sem blocos_ids gravados.
-        $cfg = $this->decodeComponenteConfig($componente);
-        $eventoId = (int) ($cfg['evento_avaliativo_id'] ?? $componente['evento_avaliativo_id'] ?? 0);
-        if ($eventoId > 0) {
-            try {
-                $rows = Database::getInstance()->fetchAll(
-                    'SELECT id FROM provas_blocos
-                      WHERE deleted_at IS NULL AND evento_avaliativo_id = :e
-                      ORDER BY id ASC',
-                    ['e' => $eventoId]
-                ) ?: [];
-            } catch (\Throwable $e) {
-                $rows = [];
+        return [];
+    }
+
+    /**
+     * @param list<int> $ids
+     * @return list<int>
+     */
+    private function filtrarBlocoIdsExistentes(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn (int $id): bool => $id > 0)));
+        if ($ids === []) {
+            return [];
+        }
+        $ph = [];
+        $params = [];
+        foreach ($ids as $i => $id) {
+            $k = 'b' . $i;
+            $ph[] = ':' . $k;
+            $params[$k] = $id;
+        }
+        try {
+            $rows = Database::getInstance()->fetchAll(
+                'SELECT id FROM provas_blocos
+                  WHERE deleted_at IS NULL AND id IN (' . implode(',', $ph) . ')',
+                $params
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $vivos = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $vivos[$id] = $id;
             }
-            $ids = [];
-            foreach ($rows as $row) {
-                $id = (int) ($row['id'] ?? 0);
-                if ($id > 0) {
-                    $ids[] = $id;
-                }
+        }
+        $out = [];
+        foreach ($ids as $id) {
+            if (isset($vivos[$id])) {
+                $out[] = $id;
             }
-            if ($ids !== []) {
-                $bimsEv = $this->parseProvaBimestresFromComponente($componente);
-                if ($bimsEv === []) {
-                    $codEv = strtolower(trim((string) ($componente['codigo'] ?? '')));
-                    if (preg_match('/^b([1-4])_/', $codEv, $mEv) === 1) {
-                        $bimsEv = [(int) $mEv[1]];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Troca evento_avaliativo_id / bloco_id / tipo mortos pelo ID vivo equivalente
+     * (mesmo sigla + bimestre + ano). Depois a nota sai só por esses IDs.
+     *
+     * @param list<array<string,mixed>> $componentes
+     * @return list<array<string,mixed>>
+     */
+    private function repararIdsEventoBlocoOrfaosNosComponentes(array $componentes, int $anoLetivo): array
+    {
+        if ($componentes === []) {
+            return $componentes;
+        }
+        if ($anoLetivo < 2000) {
+            $anoLetivo = $this->anoLetivoContextoSimulacao;
+        }
+
+        $out = [];
+        foreach ($componentes as $comp) {
+            if (!is_array($comp)) {
+                continue;
+            }
+            $cfg = $this->decodeComponenteConfig($comp);
+            $eventoId = (int) ($cfg['evento_avaliativo_id'] ?? $comp['evento_avaliativo_id'] ?? 0);
+            $blocoId = (int) ($comp['bloco_id'] ?? 0);
+            $blocosIds = [];
+            $rawBlocos = $comp['blocos_ids'] ?? ($cfg['blocos_ids'] ?? null);
+            if (is_array($rawBlocos)) {
+                $blocosIds = array_values(array_filter(array_map('intval', $rawBlocos)));
+            } elseif (is_string($rawBlocos) && trim($rawBlocos) !== '') {
+                foreach (explode(',', $rawBlocos) as $part) {
+                    $n = (int) trim($part);
+                    if ($n > 0) {
+                        $blocosIds[] = $n;
                     }
                 }
-                if ($bimsEv !== []) {
-                    $ids = $this->boletimConfig->filtrarBlocoIdsPorBimestres($ids, $bimsEv);
-                }
-
-                return array_values(array_unique($ids));
             }
+
+            $eventoVivo = $eventoId > 0 && $this->eventoAvaliativoExiste($eventoId);
+            if ($eventoId > 0 && !$eventoVivo) {
+                $vivo = $this->encontrarEventoBlocoVivoPorComponente($comp, $cfg, $anoLetivo);
+                if ($vivo !== null) {
+                    $eventoId = (int) $vivo['evento_id'];
+                    $blocoId = (int) $vivo['bloco_id'];
+                    $blocosIds = $blocoId > 0 ? [$blocoId] : [];
+                    $cfg['evento_avaliativo_id'] = $eventoId;
+                    if (!empty($vivo['tipo_avaliacao_id'])) {
+                        $cfg['tipo_avaliacao_id'] = (int) $vivo['tipo_avaliacao_id'];
+                    }
+                    $eventoVivo = true;
+                } else {
+                    // Sem substituto confiável: zera vínculo para não puxar bloco morto/errado.
+                    $cfg['evento_avaliativo_id'] = null;
+                    $eventoId = 0;
+                    $blocoId = 0;
+                    $blocosIds = [];
+                }
+            } elseif ($eventoVivo && $blocoId > 0) {
+                // Evento ok, mas bloco_id pode ser o órfão antigo — alinha ao evento.
+                $blocosDoEvento = $this->blocoIdsDoEventoAvaliativo($eventoId, $comp);
+                if ($blocosDoEvento !== [] && !in_array($blocoId, $blocosDoEvento, true)) {
+                    $blocoId = (int) $blocosDoEvento[0];
+                    $blocosIds = [$blocoId];
+                }
+            }
+
+            $comp['config'] = $cfg;
+            $comp['evento_avaliativo_id'] = $eventoId > 0 ? $eventoId : null;
+            $comp['bloco_id'] = $blocoId > 0 ? $blocoId : null;
+            $comp['blocos_ids'] = $blocosIds !== [] ? $blocosIds : null;
+            if (isset($comp['config_json'])) {
+                $comp['config_json'] = json_encode($cfg, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
+            $out[] = $comp;
         }
 
-        // Seed reimportado: evento_avaliativo_id antigo some. Recasa por tipo + bimestre.
-        // Sem bimestre explícito NÃO busca todos os bimestres (evita CH do 3º vazar no 1º).
-        return $this->resolverBlocoIdsPorTipoEBimestreDoComponente($componente, $cfg);
+        return $out;
+    }
+
+    private function eventoAvaliativoExiste(int $eventoId): bool
+    {
+        if ($eventoId <= 0) {
+            return false;
+        }
+        try {
+            $row = Database::getInstance()->fetch(
+                'SELECT id FROM eventos_avaliativos WHERE id = :id AND deleted_at IS NULL LIMIT 1',
+                ['id' => $eventoId]
+            );
+
+            return is_array($row) && (int) ($row['id'] ?? 0) === $eventoId;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     /**
      * @param array<string,mixed> $componente
      * @param array<string,mixed> $cfg
-     * @return list<int>
+     * @return array{evento_id:int,bloco_id:int,tipo_avaliacao_id:int}|null
      */
-    private function resolverBlocoIdsPorTipoEBimestreDoComponente(array $componente, array $cfg): array
+    private function encontrarEventoBlocoVivoPorComponente(array $componente, array $cfg, int $anoLetivo): ?array
     {
-        $tipoId = (int) ($cfg['tipo_avaliacao_id'] ?? $componente['tipo_avaliacao_id'] ?? 0);
-        if ($tipoId <= 0) {
-            return [];
+        if ($anoLetivo < 2000) {
+            return null;
         }
-        $bims = $this->parseProvaBimestresFromComponente($componente);
-        if ($bims === []) {
-            $cod = strtolower(trim((string) ($componente['codigo'] ?? '')));
-            if (preg_match('/^b([1-4])_/', $cod, $mCod) === 1) {
-                $bims = [(int) $mCod[1]];
+        $sigla = strtoupper(trim((string) ($cfg['sigla'] ?? $componente['sigla'] ?? '')));
+        $bim = 0;
+        $cod = strtolower(trim((string) ($componente['codigo'] ?? '')));
+        if (preg_match('/^b([1-4])_([a-z0-9]+)$/', $cod, $mCod) === 1) {
+            $bim = (int) $mCod[1];
+            if ($sigla === '') {
+                $sigla = strtoupper((string) $mCod[2]);
+            }
+        } elseif (preg_match('/^s([12])_rec$/', $cod, $mRec) === 1) {
+            $sigla = 'REC';
+            $bim = ((int) $mRec[1] === 1) ? 81 : 82;
+        } elseif ($cod === 'pf' || $sigla === 'PF') {
+            $sigla = 'PF';
+            $bim = 90;
+        }
+        if ($bim <= 0) {
+            $grupo = strtolower(trim((string) ($cfg['layout_group'] ?? $componente['layout_group'] ?? '')));
+            if (preg_match('/^b([1-4])$/', $grupo, $mG) === 1) {
+                $bim = (int) $mG[1];
             }
         }
-        // Sem bimestre: não expandir para o ano inteiro (PP/PU/CH de outros períodos).
-        if ($bims === []) {
+        if ($sigla === '') {
+            $nome = strtoupper(trim((string) ($componente['nome'] ?? '')));
+            if (preg_match('/\b(PP|PU|CH|PE|REC|PF)\b/', $nome, $mNome) === 1) {
+                $sigla = (string) $mNome[1];
+            }
+        }
+        if ($sigla === '' || $bim <= 0 || in_array($sigla, ['FAL', 'MS', 'MU', 'MA', 'MF'], true)) {
+            return null;
+        }
+        try {
+            $row = Database::getInstance()->fetch(
+                'SELECT e.id AS evento_id, e.tipo_avaliacao_id, pb.id AS bloco_id
+                   FROM eventos_avaliativos e
+                   INNER JOIN provas_blocos pb
+                           ON pb.evento_avaliativo_id = e.id AND pb.deleted_at IS NULL
+                  WHERE e.deleted_at IS NULL
+                    AND UPPER(TRIM(e.sigla)) = :sigla
+                    AND e.ano_letivo = :ano
+                    AND e.bimestre = :bim
+                  ORDER BY (e.descricao = \'SM24\') DESC, pb.id DESC
+                  LIMIT 1',
+                [
+                    'sigla' => $sigla,
+                    'ano' => $anoLetivo,
+                    'bim' => $bim,
+                ]
+            );
+        } catch (\Throwable $e) {
+            return null;
+        }
+        if (!is_array($row)) {
+            return null;
+        }
+        $eventoId = (int) ($row['evento_id'] ?? 0);
+        $blocoId = (int) ($row['bloco_id'] ?? 0);
+        if ($eventoId <= 0 || $blocoId <= 0) {
+            return null;
+        }
+
+        return [
+            'evento_id' => $eventoId,
+            'bloco_id' => $blocoId,
+            'tipo_avaliacao_id' => (int) ($row['tipo_avaliacao_id'] ?? 0),
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $componente
+     * @return list<int>
+     */
+    private function blocoIdsDoEventoAvaliativo(int $eventoId, array $componente): array
+    {
+        if ($eventoId <= 0) {
             return [];
         }
         try {
-            $sql = 'SELECT pb.id
-                      FROM provas_blocos pb
-                      LEFT JOIN eventos_avaliativos e ON e.id = pb.evento_avaliativo_id AND e.deleted_at IS NULL
-                     WHERE pb.deleted_at IS NULL
-                       AND pb.tipo_avaliacao_id = :tipo';
-            $params = ['tipo' => $tipoId];
-            $phPb = [];
-            $phEv = [];
-            foreach (array_values($bims) as $i => $bim) {
-                $kPb = 'bp' . $i;
-                $kEv = 'be' . $i;
-                $phPb[] = ':' . $kPb;
-                $phEv[] = ':' . $kEv;
-                $params[$kPb] = (int) $bim;
-                $params[$kEv] = (int) $bim;
-            }
-            $sql .= ' AND (pb.bimestre IN (' . implode(',', $phPb) . ')'
-                . ' OR e.bimestre IN (' . implode(',', $phEv) . '))';
-            $sql .= ' ORDER BY pb.id ASC LIMIT 20';
-            $rows = Database::getInstance()->fetchAll($sql, $params) ?: [];
+            $rows = Database::getInstance()->fetchAll(
+                'SELECT id FROM provas_blocos
+                  WHERE deleted_at IS NULL AND evento_avaliativo_id = :e
+                  ORDER BY id ASC',
+                ['e' => $eventoId]
+            ) ?: [];
         } catch (\Throwable $e) {
             return [];
         }
@@ -14004,6 +14182,19 @@ class BoletimConfigController extends BaseController
             if ($id > 0) {
                 $ids[] = $id;
             }
+        }
+        if ($ids === []) {
+            return [];
+        }
+        $bimsEv = $this->parseProvaBimestresFromComponente($componente);
+        if ($bimsEv === []) {
+            $codEv = strtolower(trim((string) ($componente['codigo'] ?? '')));
+            if (preg_match('/^b([1-4])_/', $codEv, $mEv) === 1) {
+                $bimsEv = [(int) $mEv[1]];
+            }
+        }
+        if ($bimsEv !== []) {
+            $ids = $this->boletimConfig->filtrarBlocoIdsPorBimestres($ids, $bimsEv);
         }
 
         return array_values(array_unique($ids));
