@@ -43,6 +43,8 @@
     if (e.emissao && typeof e.emissao === 'object') out.emissao = e.emissao;
     var campos = camposVariaveisValidos(e.campos_variaveis);
     if (campos.length) out.campos_variaveis = campos;
+    var fonteBoletimId = parseInt(e.fonte_boletim_id, 10) || 0;
+    if (fonteBoletimId > 0) out.fonte_boletim_id = fonteBoletimId;
     return stripLogoDuplicado(out);
   }
 
@@ -2043,12 +2045,19 @@
     if (state.demo) {
       var turma = $('#edoc-demo-turma');
       var aluno = $('#edoc-demo-aluno');
+      var fonteBol = $('#edoc-fonte-boletim');
       var tid = turma && turma.value ? turma.value : '';
       var aid = aluno && aluno.value ? aluno.value : '';
+      var bid = fonteBol && fonteBol.value
+        ? (parseInt(fonteBol.value, 10) || 0)
+        : (parseInt((state.estrutura && state.estrutura.fonte_boletim_id) || 0, 10) || 0);
       if (tid && aid) {
         url += (url.indexOf('?') >= 0 ? '&' : '?')
           + 'turma_id=' + encodeURIComponent(tid)
           + '&aluno_id=' + encodeURIComponent(aid);
+        if (bid > 0) {
+          url += '&boletim_id=' + encodeURIComponent(String(bid));
+        }
       }
     }
     a.href = url;
@@ -3897,12 +3906,38 @@
     var box = $('#edoc-demo');
     var turma = $('#edoc-demo-turma');
     var aluno = $('#edoc-demo-aluno');
+    var fonteBoletim = $('#edoc-fonte-boletim');
     var real = $('#edoc-demo-real');
     var status = $('#edoc-demo-status');
     var comps = $('#edoc-demo-comps');
     if (!box || !turma || !aluno || !C.demoUrl) return;
     var req = 0;
-    var demoPacote = { componentes: [], periodos: [] };
+    var demoPacote = { componentes: [], periodos: [], html_quadro: '' };
+    function boletimSelecionadoId() {
+      var doSelect = fonteBoletim ? (parseInt(fonteBoletim.value || '0', 10) || 0) : 0;
+      if (doSelect > 0) return doSelect;
+      return parseInt((state.estrutura && state.estrutura.fonte_boletim_id) || 0, 10) || 0;
+    }
+    function gravarFonteBoletim(id) {
+      id = parseInt(id, 10) || 0;
+      if (id > 0) state.estrutura.fonte_boletim_id = id;
+      else delete state.estrutura.fonte_boletim_id;
+      state.dirty = true;
+      scheduleSave();
+    }
+    function pintarBoletins(lista) {
+      if (!fonteBoletim) return;
+      var atual = boletimSelecionadoId();
+      var html = '<option value="">Selecione o boletim construído</option>';
+      (lista || []).forEach(function (b) {
+        var id = Number(b.id || 0);
+        if (!id) return;
+        var rotulo = b.rotulo || b.nome || ('Boletim #' + id);
+        html += '<option value="' + id + '"' + (id === atual ? ' selected' : '') + '>' + esc(rotulo) + '</option>';
+      });
+      fonteBoletim.innerHTML = html;
+      if (atual > 0) fonteBoletim.value = String(atual);
+    }
     function mapaGlossario() {
       var mapa = {};
       glossarioValido(state.estrutura && state.estrutura.glossario).forEach(function (item) {
@@ -4134,7 +4169,9 @@
         carregar();
         return;
       }
+      pintarBoletins(data.boletins || []);
       if (Array.isArray(data.periodos) && data.periodos.length) demoPacote.periodos = data.periodos;
+      demoPacote.html_quadro = data.html_quadro || '';
       pintarComponentes(data.componentes || []);
       if (data.vars) {
         persistirEdicaoSeHouver();
@@ -4156,6 +4193,7 @@
       var url = C.demoUrl
         + '?turma_id=' + encodeURIComponent(turma.value || '0')
         + '&aluno_id=' + encodeURIComponent(aluno.value || '0')
+        + '&boletim_id=' + encodeURIComponent(String(boletimSelecionadoId()))
         + '&chave=' + encodeURIComponent(chaveGrade());
       fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
         .then(function (r) { return r.json(); })
@@ -4175,6 +4213,15 @@
       carregar();
     });
     aluno.addEventListener('change', carregar);
+    if (fonteBoletim) {
+      if (state.estrutura && state.estrutura.fonte_boletim_id) {
+        fonteBoletim.value = String(state.estrutura.fonte_boletim_id);
+      }
+      fonteBoletim.addEventListener('change', function () {
+        gravarFonteBoletim(fonteBoletim.value);
+        carregar();
+      });
+    }
     if (real) {
       real.addEventListener('change', function () {
         state.demo = !!real.checked;
@@ -4194,7 +4241,24 @@
         return;
       }
       if (qual === 'notas' || qual === 'boletim') {
-        inserirPersonalizado(htmlBoletimEditavel(), 'Boletim na folha. Apague a linha, edite a sigla ou solte outro resultado na célula.');
+        var bid = boletimSelecionadoId();
+        if (!bid) {
+          if (status) status.textContent = 'Escolha o boletim a exibir antes de inserir o quadro.';
+          if (fonteBoletim) fonteBoletim.focus();
+          return;
+        }
+        gravarFonteBoletim(bid);
+        var htmlQuadro = demoPacote.html_quadro
+          || (C.varsPreview && C.varsPreview.quadro_notas_html)
+          || '';
+        if (!htmlQuadro) {
+          if (status) status.textContent = 'Este boletim ainda não tem quadro de impressão. Construa no assistente e conclua.';
+          return;
+        }
+        inserirPersonalizado(
+          '<div class="edoc-html-raw edoc-quadro-notas">{{quadro_notas_html}}</div>',
+          'Quadro do boletim na folha — o formato é o que você montou no assistente.'
+        );
         return;
       }
       if (qual === 'glossario') {

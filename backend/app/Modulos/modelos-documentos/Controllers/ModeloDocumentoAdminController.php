@@ -162,9 +162,10 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
         }
         $turmaId = max(0, (int) ($_GET['turma_id'] ?? 0));
         $alunoId = max(0, (int) ($_GET['aluno_id'] ?? 0));
+        $boletimId = max(0, (int) ($_GET['boletim_id'] ?? 0));
         $chave = (string) ($_GET['chave'] ?? '1127');
         try {
-            $pacote = (new DemonstracaoDocumentoService($this->db))->pacote($turmaId, $alunoId, $chave);
+            $pacote = (new DemonstracaoDocumentoService($this->db))->pacote($turmaId, $alunoId, $chave, $boletimId);
             unset($pacote['linhas']);
             $this->json($pacote);
         } catch (\Throwable $e) {
@@ -333,11 +334,17 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
         $vars = $this->service->varsExemploDoModelo($modelo);
         $turmaId = max(0, (int) ($_GET['turma_id'] ?? 0));
         $alunoId = max(0, (int) ($_GET['aluno_id'] ?? 0));
+        $estruturaModelo = is_array($modelo['estrutura'] ?? null) ? $modelo['estrutura'] : [];
+        if ($estruturaModelo === [] && !empty($modelo['estrutura_json'])) {
+            $decodedEst = json_decode((string) $modelo['estrutura_json'], true);
+            $estruturaModelo = is_array($decodedEst) ? $decodedEst : [];
+        }
+        $boletimId = max(0, (int) ($_GET['boletim_id'] ?? ($estruturaModelo['fonte_boletim_id'] ?? 0)));
         if ($turmaId > 0 && $alunoId > 0) {
             try {
                 $demo = new \App\Modulos\ModelosDocumentos\Services\DemonstracaoDocumentoService($this->db);
                 $chaveGrade = $demo::chaveGradeDoCodigo((string) ($modelo['codigo'] ?? ''));
-                $pacote = $demo->pacote($turmaId, $alunoId, $chaveGrade);
+                $pacote = $demo->pacote($turmaId, $alunoId, $chaveGrade, $boletimId);
                 if (is_array($pacote['vars'] ?? null)) {
                     foreach ($pacote['vars'] as $chave => $valor) {
                         if (is_string($chave) && is_string($valor) && $valor !== '') {

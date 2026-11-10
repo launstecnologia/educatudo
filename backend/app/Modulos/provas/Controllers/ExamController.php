@@ -1324,49 +1324,41 @@ class ExamController extends BaseController
     }
 
     /**
-     * Grava notas do evento (modo lançamento).
+     * Contexto de permissão para lançamento de notas do professor.
+     *
+     * @return array{ok:true,professor:array,materia_id:int,evento:array,turmas_permitidas:array<int,true>,alunos_permitidos:array<string,array{turma_id:int,aluno_id:int}>}|array{ok:false,message:string,redirect:string,http:int}
      */
-    public function eventoLancarNotasSalvar($evento_id)
+    private function resolverContextoLancamentoProfessor(int $eventoId, int $materiaId): array
     {
         $user = $this->auth->getUser();
-        if ($user['tipo'] !== 'professor') {
-            $this->json(['error' => 'Não autorizado'], 403);
-            return;
-        }
-        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
-            $this->setFlashMessage('Token inválido. Recarregue a página.', 'error');
-            $this->redirect('/professor/provas');
-            return;
+        if (($user['tipo'] ?? '') !== 'professor') {
+            return ['ok' => false, 'message' => 'Não autorizado', 'redirect' => '/admin/provas', 'http' => 403];
         }
         $professor = $this->teacherModel->findById($user['id']);
         if (!$professor) {
-            $this->setFlashMessage('Professor não encontrado', 'error');
-            $this->redirect('/professor/dashboard');
-            return;
+            return ['ok' => false, 'message' => 'Professor não encontrado', 'redirect' => '/professor/dashboard', 'http' => 404];
         }
-        $materiaId = (int) ($_POST['materia_id'] ?? 0);
         if ($materiaId <= 0) {
-            $this->setFlashMessage('Matéria inválida.', 'error');
-            $this->redirect('/professor/provas');
-            return;
+            return ['ok' => false, 'message' => 'Matéria inválida.', 'redirect' => '/professor/provas', 'http' => 400];
         }
         $blocoModel = new ExamBlock();
-        $evento = $blocoModel->findById((int) $evento_id);
+        $evento = $blocoModel->findById($eventoId);
         if ($evento) {
-            $fmtMap = $blocoModel->fetchFormatoEventoPorBlocoIds([(int) $evento_id]);
-            if (isset($fmtMap[(int) $evento_id])) {
-                $evento['formato_evento'] = $fmtMap[(int) $evento_id];
+            $fmtMap = $blocoModel->fetchFormatoEventoPorBlocoIds([$eventoId]);
+            if (isset($fmtMap[$eventoId])) {
+                $evento['formato_evento'] = $fmtMap[$eventoId];
             }
         }
         if (!$evento || (($evento['formato_evento'] ?? '') !== 'lancamento_nota')) {
-            $this->setFlashMessage('Evento inválido.', 'error');
-            $this->redirect('/professor/provas');
-            return;
+            return ['ok' => false, 'message' => 'Evento inválido.', 'redirect' => '/professor/provas', 'http' => 400];
         }
         if (($evento['configuracao_nota'] ?? '') === 'coordenacao_calcula') {
-            $this->setFlashMessage('Neste evento, somente a coordenação lança as notas.', 'error');
-            $this->redirect('/professor/provas');
-            return;
+            return [
+                'ok' => false,
+                'message' => 'Neste evento, somente a coordenação lança as notas.',
+                'redirect' => '/professor/provas',
+                'http' => 403,
+            ];
         }
         $turmasPermitidas = [];
         $ok = false;
@@ -1384,16 +1376,14 @@ class ExamController extends BaseController
             break;
         }
         if (!$ok) {
-            $this->setFlashMessage('Sem permissão.', 'error');
-            $this->redirect('/professor/provas');
-            return;
+            return ['ok' => false, 'message' => 'Sem permissão.', 'redirect' => '/professor/provas', 'http' => 403];
         }
         $alunosPermitidos = [];
         $alunosFlat = $this->filtrarAlunosConvocadosEvento(
             AlunoLancamentoNotaHelper::filtrarAlunosExibicao(
                 $this->turmaModel->getAlunosByTurmasIds(array_keys($turmasPermitidas))
             ),
-            (int) $evento_id,
+            $eventoId,
             $materiaId
         );
         foreach ($alunosFlat as $a) {
@@ -1404,79 +1394,30 @@ class ExamController extends BaseController
             }
             $alunosPermitidos[$tid . '_' . $aid] = ['turma_id' => $tid, 'aluno_id' => $aid];
         }
-        $notasPost = $_POST['notas'] ?? [];
-        $obsPost = $_POST['observacoes'] ?? [];
-        if (!is_array($notasPost)) {
-            $notasPost = [];
-        }
-        if (!is_array($obsPost)) {
-            $obsPost = [];
-        }
-        $linhas = [];
-        foreach ($alunosPermitidos as $pair) {
-            $turmaId = (int) $pair['turma_id'];
-            $alunoId = (int) $pair['aluno_id'];
-            $valorRaw = $notasPost[$turmaId][$alunoId] ?? '';
-            $obs = '';
-            if (isset($obsPost[$turmaId][$alunoId])) {
-                $obs = substr((string) $obsPost[$turmaId][$alunoId], 0, 500);
-            }
-            $valorStr = is_string($valorRaw) ? trim(str_replace(',', '.', $valorRaw)) : '';
-            $notaVal = null;
-            if ($valorStr !== '') {
-                if (!is_numeric($valorStr)) {
-                    $this->setFlashMessage('Nota inválida para um ou mais alunos.', 'error');
-                    $this->redirect('/professor/provas/evento-lancar-notas/' . (int) $evento_id . '?materia_id=' . $materiaId);
-                    return;
-                }
-                $nf = (float) $valorStr;
-                if ($nf < 0 || $nf > 10) {
-                    $this->setFlashMessage('Notas devem estar entre 0 e 10.', 'error');
-                    $this->redirect('/professor/provas/evento-lancar-notas/' . (int) $evento_id . '?materia_id=' . $materiaId);
-                    return;
-                }
-                $notaVal = round($nf, 2);
-            }
-            $linhas[] = [
-                'turma_id' => $turmaId,
-                'aluno_id' => $alunoId,
-                'nota' => $notaVal,
-                'observacao' => $obs,
-            ];
-        }
-        $notasModel = new ExamBlockManualGrade();
-        if (!$notasModel->tableExists()) {
-            $this->setFlashMessage('Tabela de notas ainda não existe. Execute a migração SQL no banco.', 'error');
-            $this->redirect('/professor/provas/evento-lancar-notas/' . (int) $evento_id . '?materia_id=' . $materiaId);
-            return;
-        }
-        $notaUnicaTodasMaterias = !empty($evento['nota_unica_todas_materias']);
-        if (!$notaUnicaTodasMaterias) {
-            try {
-                $notasModel->upsertLinhas((int) $evento_id, (int) $professor['id'], $materiaId, $linhas);
-            } catch (\RuntimeException $e) {
-                $this->setFlashMessage($e->getMessage(), 'error');
-                $this->redirect('/professor/provas/evento-lancar-notas/' . (int) $evento_id . '?materia_id=' . $materiaId);
-                return;
-            }
-            $this->setFlashMessage('Notas salvas com sucesso.', 'success');
-            $this->redirect('/professor/provas/evento-lancar-notas/' . (int) $evento_id . '?materia_id=' . $materiaId);
-            return;
-        }
 
-        // ENAC/nota única: replica a nota lançada por aluno para todas as matérias do professor no evento.
-        $mapPorAluno = [];
-        foreach ($linhas as $ln) {
-            $aid = (int) ($ln['aluno_id'] ?? 0);
-            if ($aid <= 0) {
-                continue;
-            }
-            $mapPorAluno[$aid] = [
-                'nota' => $ln['nota'] ?? null,
-                'observacao' => (string) ($ln['observacao'] ?? ''),
-            ];
-        }
+        return [
+            'ok' => true,
+            'professor' => $professor,
+            'materia_id' => $materiaId,
+            'evento' => $evento,
+            'turmas_permitidas' => $turmasPermitidas,
+            'alunos_permitidos' => $alunosPermitidos,
+        ];
+    }
 
+    /**
+     * Replica nota(s) para todas as matérias do professor no evento (ENAC / nota única).
+     *
+     * @param array<int,array{nota:mixed,observacao:string}> $mapPorAluno
+     * @throws \RuntimeException
+     */
+    private function replicarNotasUnicasTodasMaterias(
+        int $eventoId,
+        array $professor,
+        array $evento,
+        array $mapPorAluno,
+        ExamBlockManualGrade $notasModel
+    ): void {
         $combosMateria = [];
         foreach ($evento['professores'] ?? [] as $pe) {
             if ((int) ($pe['professor_id'] ?? 0) !== (int) $professor['id']) {
@@ -1506,7 +1447,7 @@ class ExamController extends BaseController
                 AlunoLancamentoNotaHelper::filtrarAlunosExibicao(
                     $this->turmaModel->getAlunosByTurmasIds($idsTurma)
                 ),
-                (int) $evento_id,
+                $eventoId,
                 (int) $mid
             );
             $linhasMid = [];
@@ -1524,17 +1465,205 @@ class ExamController extends BaseController
                 ];
             }
             if (!empty($linhasMid)) {
-                try {
-                    $notasModel->upsertLinhas((int) $evento_id, (int) $professor['id'], (int) $mid, $linhasMid);
-                } catch (\RuntimeException $e) {
-                    $this->setFlashMessage($e->getMessage(), 'error');
-                    $this->redirect('/professor/provas/evento-lancar-notas/' . (int) $evento_id . '?materia_id=' . $materiaId);
-                    return;
-                }
+                $notasModel->upsertLinhas($eventoId, (int) $professor['id'], (int) $mid, $linhasMid);
             }
         }
+    }
 
-        $this->setFlashMessage('Notas salvas e replicadas para todas as matérias do evento.', 'success');
+    /**
+     * Interpreta nota 0–10 (vírgula/ponto) ou vazio = sem lançamento.
+     *
+     * @return array{ok:true,nota:?float}|array{ok:false,message:string}
+     */
+    private function parseNotaLancamento(string $valorRaw): array
+    {
+        $valorStr = trim(str_replace(',', '.', $valorRaw));
+        if ($valorStr === '') {
+            return ['ok' => true, 'nota' => null];
+        }
+        if (!is_numeric($valorStr)) {
+            return ['ok' => false, 'message' => 'Nota inválida.'];
+        }
+        $nf = (float) $valorStr;
+        if ($nf < 0 || $nf > 10) {
+            return ['ok' => false, 'message' => 'Notas devem estar entre 0 e 10.'];
+        }
+        return ['ok' => true, 'nota' => round($nf, 2)];
+    }
+
+    /**
+     * Autosave de uma nota (AJAX) no lançamento do professor.
+     */
+    public function eventoLancarNotasSalvarAjax($evento_id)
+    {
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->json(['success' => false, 'message' => 'Token inválido. Recarregue a página.'], 419);
+            return;
+        }
+        $materiaId = (int) ($_POST['materia_id'] ?? 0);
+        $ctx = $this->resolverContextoLancamentoProfessor((int) $evento_id, $materiaId);
+        if (empty($ctx['ok'])) {
+            $this->json(['success' => false, 'message' => (string) ($ctx['message'] ?? 'Erro')], (int) ($ctx['http'] ?? 400));
+            return;
+        }
+        $turmaId = (int) ($_POST['turma_id'] ?? 0);
+        $alunoId = (int) ($_POST['aluno_id'] ?? 0);
+        $chave = $turmaId . '_' . $alunoId;
+        if ($turmaId <= 0 || $alunoId <= 0 || !isset($ctx['alunos_permitidos'][$chave])) {
+            $this->json(['success' => false, 'message' => 'Aluno não permitido neste lançamento.'], 403);
+            return;
+        }
+        $parsed = $this->parseNotaLancamento((string) ($_POST['nota'] ?? ''));
+        if (empty($parsed['ok'])) {
+            $this->json(['success' => false, 'message' => (string) $parsed['message']], 400);
+            return;
+        }
+        $linha = [
+            'turma_id' => $turmaId,
+            'aluno_id' => $alunoId,
+            'nota' => $parsed['nota'],
+            'observacao' => '',
+        ];
+        $notasModel = new ExamBlockManualGrade();
+        if (!$notasModel->tableExists()) {
+            $this->json(['success' => false, 'message' => 'Tabela de notas ainda não existe. Execute a migração SQL no banco.'], 500);
+            return;
+        }
+        $evento = $ctx['evento'];
+        $professor = $ctx['professor'];
+        try {
+            if (!empty($evento['nota_unica_todas_materias'])) {
+                $this->replicarNotasUnicasTodasMaterias(
+                    (int) $evento_id,
+                    $professor,
+                    $evento,
+                    [
+                        $alunoId => [
+                            'nota' => $linha['nota'],
+                            'observacao' => '',
+                        ],
+                    ],
+                    $notasModel
+                );
+            } else {
+                $notasModel->upsertLinhas((int) $evento_id, (int) $professor['id'], $materiaId, [$linha]);
+            }
+        } catch (\RuntimeException $e) {
+            $this->json(['success' => false, 'message' => $e->getMessage()], 409);
+            return;
+        }
+        $this->json([
+            'success' => true,
+            'message' => !empty($evento['nota_unica_todas_materias'])
+                ? 'Nota salva e replicada para todas as matérias.'
+                : 'Nota salva.',
+            'nota' => $linha['nota'],
+        ]);
+    }
+
+    /**
+     * Grava notas do evento (modo lançamento).
+     */
+    public function eventoLancarNotasSalvar($evento_id)
+    {
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Token inválido. Recarregue a página.', 'error');
+            $this->redirect('/professor/provas');
+            return;
+        }
+        $materiaId = (int) ($_POST['materia_id'] ?? 0);
+        $ctx = $this->resolverContextoLancamentoProfessor((int) $evento_id, $materiaId);
+        if (empty($ctx['ok'])) {
+            $msg = (string) ($ctx['message'] ?? 'Erro');
+            $http = (int) ($ctx['http'] ?? 400);
+            if ($http === 403 && $msg === 'Não autorizado') {
+                $this->json(['error' => 'Não autorizado'], 403);
+                return;
+            }
+            $this->setFlashMessage($msg, 'error');
+            $this->redirect((string) ($ctx['redirect'] ?? '/professor/provas'));
+            return;
+        }
+        $professor = $ctx['professor'];
+        $evento = $ctx['evento'];
+        $alunosPermitidos = $ctx['alunos_permitidos'];
+        $notasPost = $_POST['notas'] ?? [];
+        $obsPost = $_POST['observacoes'] ?? [];
+        if (!is_array($notasPost)) {
+            $notasPost = [];
+        }
+        if (!is_array($obsPost)) {
+            $obsPost = [];
+        }
+        $linhas = [];
+        foreach ($alunosPermitidos as $pair) {
+            $turmaId = (int) $pair['turma_id'];
+            $alunoId = (int) $pair['aluno_id'];
+            $valorRaw = $notasPost[$turmaId][$alunoId] ?? '';
+            $obs = '';
+            if (isset($obsPost[$turmaId][$alunoId])) {
+                $obs = substr((string) $obsPost[$turmaId][$alunoId], 0, 500);
+            }
+            $parsed = $this->parseNotaLancamento(is_string($valorRaw) ? $valorRaw : '');
+            if (empty($parsed['ok'])) {
+                $this->setFlashMessage(
+                    $parsed['message'] === 'Nota inválida.'
+                        ? 'Nota inválida para um ou mais alunos.'
+                        : (string) $parsed['message'],
+                    'error'
+                );
+                $this->redirect('/professor/provas/evento-lancar-notas/' . (int) $evento_id . '?materia_id=' . $materiaId);
+                return;
+            }
+            $linhas[] = [
+                'turma_id' => $turmaId,
+                'aluno_id' => $alunoId,
+                'nota' => $parsed['nota'],
+                'observacao' => $obs,
+            ];
+        }
+        $notasModel = new ExamBlockManualGrade();
+        if (!$notasModel->tableExists()) {
+            $this->setFlashMessage('Tabela de notas ainda não existe. Execute a migração SQL no banco.', 'error');
+            $this->redirect('/professor/provas/evento-lancar-notas/' . (int) $evento_id . '?materia_id=' . $materiaId);
+            return;
+        }
+        $notaUnicaTodasMaterias = !empty($evento['nota_unica_todas_materias']);
+        try {
+            if (!$notaUnicaTodasMaterias) {
+                $notasModel->upsertLinhas((int) $evento_id, (int) $professor['id'], $materiaId, $linhas);
+            } else {
+                $mapPorAluno = [];
+                foreach ($linhas as $ln) {
+                    $aid = (int) ($ln['aluno_id'] ?? 0);
+                    if ($aid <= 0) {
+                        continue;
+                    }
+                    $mapPorAluno[$aid] = [
+                        'nota' => $ln['nota'] ?? null,
+                        'observacao' => (string) ($ln['observacao'] ?? ''),
+                    ];
+                }
+                $this->replicarNotasUnicasTodasMaterias(
+                    (int) $evento_id,
+                    $professor,
+                    $evento,
+                    $mapPorAluno,
+                    $notasModel
+                );
+            }
+        } catch (\RuntimeException $e) {
+            $this->setFlashMessage($e->getMessage(), 'error');
+            $this->redirect('/professor/provas/evento-lancar-notas/' . (int) $evento_id . '?materia_id=' . $materiaId);
+            return;
+        }
+
+        $this->setFlashMessage(
+            $notaUnicaTodasMaterias
+                ? 'Notas salvas e replicadas para todas as matérias do evento.'
+                : 'Notas salvas com sucesso.',
+            'success'
+        );
         $this->redirect('/professor/provas/evento-lancar-notas/' . (int) $evento_id . '?materia_id=' . $materiaId);
     }
 

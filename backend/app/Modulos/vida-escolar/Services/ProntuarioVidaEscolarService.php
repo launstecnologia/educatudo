@@ -634,6 +634,46 @@ class ProntuarioVidaEscolarService
     }
 
     /**
+     * Quadro de impressão de um boletim construído (assistente), para Modelos de Documentos.
+     */
+    public function htmlQuadroPorBoletim(int $alunoId, int $boletimId): string
+    {
+        $regraId = $this->resolverRegraImpressaoDoBoletim($boletimId);
+        if ($regraId <= 0) {
+            return '';
+        }
+        return $this->htmlDeRegraBoletimAluno($alunoId, $regraId);
+    }
+
+    /**
+     * Regra de impressão ligada ao cadastro do boletim (não o esqueleto Média/Faltas).
+     */
+    public function resolverRegraImpressaoDoBoletim(int $boletimId): int
+    {
+        if ($boletimId <= 0) {
+            return 0;
+        }
+        $regraCadastro = 0;
+        try {
+            $row = $this->db->fetch(
+                'SELECT regra_id FROM boletins WHERE id = :id AND ativo = 1 AND excluido_em IS NULL LIMIT 1',
+                ['id' => $boletimId]
+            );
+            if (!is_array($row)) {
+                $row = $this->db->fetch(
+                    'SELECT regra_id FROM boletins WHERE id = :id AND ativo = 1 LIMIT 1',
+                    ['id' => $boletimId]
+                );
+            }
+            $regraCadastro = is_array($row) ? (int) ($row['regra_id'] ?? 0) : 0;
+        } catch (\Throwable $e) {
+            $regraCadastro = 0;
+        }
+
+        return $this->regraIdImpressaoDoBoletim($boletimId, $regraCadastro);
+    }
+
+    /**
      * Mesmo layout do boletim criado no assistente (PP/PU/CH/PE/FAL…), para a Vida do Aluno e PDF.
      * Usa a regra do modelo da turma — não o Quadro SM genérico (MU/Situação).
      *

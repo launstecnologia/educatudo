@@ -1578,6 +1578,10 @@ class ModeloDocumentoService
         if ($campos !== []) {
             $base['campos_variaveis'] = $campos;
         }
+        $fonteBoletimId = (int) ($estrutura['fonte_boletim_id'] ?? 0);
+        if ($fonteBoletimId > 0) {
+            $base['fonte_boletim_id'] = $fonteBoletimId;
+        }
         return $this->estruturaSemLogoDuplicado($base);
     }
 

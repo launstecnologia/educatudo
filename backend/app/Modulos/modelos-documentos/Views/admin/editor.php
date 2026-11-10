@@ -116,6 +116,8 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                     <select id="edoc-demo-turma"><option value="">Carregando turmas…</option></select>
                     <label for="edoc-demo-aluno">Aluno</label>
                     <select id="edoc-demo-aluno"><option value="">Escolha a turma</option></select>
+                    <label for="edoc-fonte-boletim">Boletim a exibir</label>
+                    <select id="edoc-fonte-boletim"><option value="">Carregando boletins…</option></select>
                     <label class="edoc-demo-check" for="edoc-demo-real">
                         <input type="checkbox" id="edoc-demo-real" checked>
                         Mostrar dados reais na folha

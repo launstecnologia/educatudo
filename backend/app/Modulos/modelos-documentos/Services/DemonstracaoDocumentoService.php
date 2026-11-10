@@ -23,6 +23,7 @@ class DemonstracaoDocumentoService
         'unidades' => true,
         'boletim_resultados_gerados' => true,
         'boletim_regras' => true,
+        'boletins' => true,
     ];
 
     /** @var array<string, bool> */
@@ -35,15 +36,23 @@ class DemonstracaoDocumentoService
     /**
      * @return array<string, mixed>
      */
-    public function pacote(int $turmaId, int $alunoId, string $chave): array
+    public function pacote(int $turmaId, int $alunoId, string $chave, int $boletimId = 0): array
     {
         $chave = $this->chaveGrade($chave);
         $turmas = $this->listarTurmas();
         $alunos = $turmaId > 0 ? $this->listarAlunos($turmaId) : [];
+        $anoLista = 0;
+        if ($turmaId > 0) {
+            $turmaLista = $this->turmaPorId($turmaId);
+            $anoLista = is_array($turmaLista) ? (int) ($turmaLista['ano_letivo'] ?? 0) : 0;
+        }
         $out = [
             'ok' => true,
             'turmas' => $turmas,
             'alunos' => $alunos,
+            'boletins' => $this->listarBoletinsAtivos($anoLista > 0 ? $anoLista : null),
+            'boletim_id' => $boletimId > 0 ? $boletimId : null,
+            'html_quadro' => '',
             'componentes' => [],
             'periodos' => $this->periodosPublicos($chave),
             'vars' => null,
@@ -62,6 +71,9 @@ class DemonstracaoDocumentoService
         if ($ano <= 0) {
             $ano = (int) ($turma['ano_letivo'] ?? 0);
         }
+        if ($ano > 0) {
+            $out['boletins'] = $this->listarBoletinsAtivos($ano);
+        }
         $linhas = $this->linhasNotas($alunoId, $turmaId, $ano, (int) ($turma['matriz_curricular_id'] ?? 0));
         $atalhos = $this->atalhosDeComponentes($linhas, $chave);
         $vars = ModeloDocumentoService::varsExemplo();
@@ -71,13 +83,100 @@ class DemonstracaoDocumentoService
         $vars = GradeSoltaService::completar($this->gradeDaDemonstracao($chave, $atalhos), $vars);
         unset($vars['_grade_fonte']);
         $vars['componentes_serie_html'] = $this->htmlComponentes($linhas);
-        $vars['quadro_notas_html'] = ModeloDocumentoService::htmlQuadroDeLinhasBimestrais($linhas);
+        $quadroBoletim = $boletimId > 0 ? $this->htmlQuadroDoBoletim($alunoId, $boletimId) : '';
+        if ($quadroBoletim !== '') {
+            $vars['quadro_notas_html'] = $quadroBoletim;
+            $out['html_quadro'] = $quadroBoletim;
+            $out['boletim_id'] = $boletimId;
+        } else {
+            $vars['quadro_notas_html'] = ModeloDocumentoService::htmlQuadroDeLinhasBimestrais($linhas);
+            if ($boletimId > 0) {
+                $out['resumo'] = 'Boletim sem quadro de impressão montado. Construa o boletim no assistente e conclua.';
+            }
+        }
         $vars['historico_html'] = $this->htmlHistoricoDoAno($linhas, $ano, $vars);
         $out['linhas'] = $linhas;
         $out['vars'] = $this->variaveisTexto($vars);
         $out['componentes'] = $atalhos;
-        $out['resumo'] = trim((string) ($aluno['nome_exibir'] ?? '')) . ' · ' . $this->rotuloTurma($turma);
+        if (($out['resumo'] ?? '') === '') {
+            $out['resumo'] = trim((string) ($aluno['nome_exibir'] ?? '')) . ' · ' . $this->rotuloTurma($turma);
+        }
         return $out;
+    }
+
+    /**
+     * Boletins ativos para o seletor do editor (opcionalmente filtrados pelo ano da turma).
+     *
+     * @return list<array{id:int,nome:string,ano_letivo:?int,finalidade:string}>
+     */
+    public function listarBoletinsAtivos(?int $anoLetivo = null): array
+    {
+        if (!$this->tabelaExiste('boletins')) {
+            return [];
+        }
+        $params = [];
+        $sql = 'SELECT id, nome, ano_letivo, finalidade
+                FROM boletins
+                WHERE ativo = 1';
+        if ($this->temColuna('boletins', 'excluido_em')) {
+            $sql .= ' AND excluido_em IS NULL';
+        }
+        if ($anoLetivo !== null && $anoLetivo > 0) {
+            $sql .= ' AND (ano_letivo = :ano OR ano_letivo IS NULL)';
+            $params['ano'] = $anoLetivo;
+        }
+        $sql .= ' ORDER BY ano_letivo DESC, nome ASC, id DESC LIMIT 100';
+        try {
+            $rows = $this->db->fetchAll($sql, $params) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $id = (int) ($row['id'] ?? 0);
+            $nome = trim((string) ($row['nome'] ?? ''));
+            if ($id <= 0 || $nome === '') {
+                continue;
+            }
+            $ano = isset($row['ano_letivo']) && $row['ano_letivo'] !== null ? (int) $row['ano_letivo'] : null;
+            $finalidade = (string) ($row['finalidade'] ?? 'oficial');
+            $rotulo = $nome;
+            if ($ano !== null && $ano > 0) {
+                $rotulo .= ' · ' . $ano;
+            }
+            if ($finalidade === 'complementar') {
+                $rotulo .= ' · extra';
+            }
+            $out[] = [
+                'id' => $id,
+                'nome' => $nome,
+                'rotulo' => $rotulo,
+                'ano_letivo' => $ano,
+                'finalidade' => $finalidade,
+            ];
+        }
+        return $out;
+    }
+
+    private function htmlQuadroDoBoletim(int $alunoId, int $boletimId): string
+    {
+        if ($alunoId <= 0 || $boletimId <= 0) {
+            return '';
+        }
+        try {
+            if (!class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)) {
+                return '';
+            }
+            $html = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
+                ->htmlQuadroPorBoletim($alunoId, $boletimId);
+            return is_string($html) ? trim($html) : '';
+        } catch (\Throwable $e) {
+            error_log('DemonstracaoDocumento quadro boletim: ' . $e->getMessage());
+            return '';
+        }
     }
 
     /**

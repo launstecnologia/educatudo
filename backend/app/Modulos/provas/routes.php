@@ -78,6 +78,7 @@ $router->delete('/admin/provas/tipos-avaliacao/{id}', 'Modulos/provas/ExamEvalua
 $router->get('/professor/provas', 'Modulos/provas/ExamController@index');
 $router->get('/professor/provas/criar', 'Modulos/provas/ExamController@criar');
 $router->get('/professor/provas/evento-lancar-notas/{evento_id}', 'Modulos/provas/ExamController@eventoLancarNotas');
+$router->post('/professor/provas/evento-lancar-notas/{evento_id}/ajax', 'Modulos/provas/ExamController@eventoLancarNotasSalvarAjax');
 $router->post('/professor/provas/evento-lancar-notas/{evento_id}', 'Modulos/provas/ExamController@eventoLancarNotasSalvar');
 $router->get('/professor/provas/criar/evento/{evento_id}', 'Modulos/provas/ExamController@criar');
 $router->post('/professor/provas/salvar', 'Modulos/provas/ExamController@salvar');
