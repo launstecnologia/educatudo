@@ -4490,6 +4490,8 @@ class BoletimConfig
 
     /**
      * Notas digitadas na pauta do bloco (evento lançamento_nota), no mesmo escopo de datas que provas online.
+     * Inclui lançamento mesmo se a matéria não estiver mais em provas_blocos_professores
+     * (comum após reimport/seed com vínculo incompleto no 1º bimestre).
      *
      * @param list<int> $blocoIds
      * @return list<array<string,mixed>>
@@ -4553,12 +4555,9 @@ class BoletimConfig
                 WHERE n.aluno_id = ?
                   AND n.bloco_id IN ($placeholders)
                   AND n.nota IS NOT NULL
-                  AND n.materia_id > 0
-                  AND EXISTS (
-                    SELECT 1 FROM provas_blocos_professores pbp_ok
-                    WHERE pbp_ok.bloco_id = n.bloco_id
-                      AND pbp_ok.materia_id = n.materia_id
-                  )";
+                  AND n.materia_id > 0";
+        // Sem filtro em provas_blocos_professores: a pauta pode ter nota de matéria
+        // que depois saiu do vínculo do bloco (ex.: Arte no 1SM24 com lançamento órfão).
 
         $params = array_merge([$alunoId], $blocoIds);
         if ($inicio !== null && $fim !== null) {
@@ -4643,12 +4642,8 @@ class BoletimConfig
                 WHERE n.aluno_id IN ($phAlunos)
                   AND n.bloco_id IN ($phBlocos)
                   AND n.nota IS NOT NULL
-                  AND n.materia_id > 0
-                  AND EXISTS (
-                    SELECT 1 FROM provas_blocos_professores pbp_ok
-                    WHERE pbp_ok.bloco_id = n.bloco_id
-                      AND pbp_ok.materia_id = n.materia_id
-                  )";
+                  AND n.materia_id > 0";
+        // Idem fetch por aluno: nota na pauta vale mesmo sem linha atual em pbp.
 
         $params = array_merge($alunoIds, $blocoIds);
         if ($inicio !== null && $fim !== null) {
