@@ -474,7 +474,7 @@ class BoletimCadastroService
      * Mínima e arredondamento vêm da regra acadêmica vinculada (fallback 6 se não houver).
      *
      * @param array<string,mixed> $item
-     * @return array{nota_minima_aprovacao:float,round_mode:string,decimal_places:int,escopo_arredondamento:string,regra:?array}
+     * @return array{nota_minima_aprovacao:float,round_mode:string,decimal_places:int,escopo_arredondamento:string,regra:?array,boletim_id?:int,minima_origem?:string,regra_nome?:string}
      */
     public function criteriosDoBoletim(array $item): array
     {
@@ -499,6 +499,9 @@ class BoletimCadastroService
                 ),
                 'escopo_arredondamento' => $escopo,
                 'regra' => $regra,
+                'boletim_id' => (int) ($item['id'] ?? 0),
+                'minima_origem' => 'regra',
+                'regra_nome' => trim((string) ($regra['nome'] ?? '')),
             ];
         }
         return [
@@ -507,7 +510,125 @@ class BoletimCadastroService
             'decimal_places' => 2,
             'escopo_arredondamento' => 'medias',
             'regra' => null,
+            'boletim_id' => (int) ($item['id'] ?? 0),
+            'minima_origem' => 'padrao',
+            'regra_nome' => '',
         ];
+    }
+
+    /**
+     * Critérios da regra de aprovação para o documento/prévia do boletim.
+     * Quadro de impressão (sem modelo) também precisa dessas casas/arredondamento/mínima.
+     *
+     * @param list<int> $seriesIds
+     * @return array{nota_minima_aprovacao:float,round_mode:string,decimal_places:int,escopo_arredondamento:string,regra:?array,boletim_id:int,minima_origem:string,regra_nome:string}
+     */
+    public function criteriosEfetivosParaDocumento(
+        ?int $boletimId = null,
+        ?int $anoLetivo = null,
+        array $seriesIds = [],
+        string $finalidade = 'oficial'
+    ): array {
+        $padrao = [
+            'nota_minima_aprovacao' => 6.0,
+            'round_mode' => 'none',
+            'decimal_places' => 2,
+            'escopo_arredondamento' => 'medias',
+            'regra' => null,
+            'boletim_id' => 0,
+            'minima_origem' => 'padrao',
+            'regra_nome' => '',
+        ];
+        $boletimId = (int) ($boletimId ?? 0);
+        $item = null;
+        if ($boletimId > 0) {
+            $item = $this->model->findById($boletimId);
+            if (!is_array($item) || !empty($item['excluido_em'])) {
+                $item = null;
+            }
+        }
+        if ($item === null) {
+            $item = $this->encontrarBoletimParaCriterios($anoLetivo, $seriesIds, $finalidade);
+        }
+        if ($item === null) {
+            return $padrao;
+        }
+        $criterios = $this->criteriosDoBoletim($item);
+        $criterios['boletim_id'] = (int) ($item['id'] ?? 0);
+        $criterios['minima_origem'] = ($criterios['regra'] ?? null) !== null ? 'regra' : 'padrao';
+        $criterios['regra_nome'] = is_array($criterios['regra'] ?? null)
+            ? trim((string) ($criterios['regra']['nome'] ?? ''))
+            : '';
+
+        return $criterios;
+    }
+
+    /**
+     * Cadastro oficial do ano (com regra de aprovação) para critérios do quadro de impressão.
+     *
+     * @param list<int> $seriesIds
+     * @return array<string,mixed>|null
+     */
+    public function encontrarBoletimParaCriterios(
+        ?int $anoLetivo = null,
+        array $seriesIds = [],
+        string $finalidade = 'oficial'
+    ): ?array {
+        $finalidade = $finalidade === 'complementar' ? 'complementar' : 'oficial';
+        $anoLetivo = $anoLetivo && $anoLetivo >= 2000 ? (int) $anoLetivo : null;
+        $seriesIds = array_values(array_unique(array_filter(array_map('intval', $seriesIds), static function ($id) {
+            return $id > 0;
+        })));
+        $candidatos = [];
+        foreach ($this->model->listar(true) as $row) {
+            if (!is_array($row) || !empty($row['excluido_em'])) {
+                continue;
+            }
+            if (((string) ($row['finalidade'] ?? 'oficial')) !== $finalidade) {
+                continue;
+            }
+            // Só cadastro amarrado à regra de aprovação — evita chute sem critério.
+            if ((int) ($row['regra_academica_id'] ?? 0) <= 0) {
+                continue;
+            }
+            $anoRow = !empty($row['ano_letivo']) ? (int) $row['ano_letivo'] : 0;
+            if ($anoLetivo !== null && $anoRow > 0 && $anoRow !== $anoLetivo) {
+                continue;
+            }
+            $score = 0;
+            if ($anoLetivo !== null && $anoRow === $anoLetivo) {
+                $score += 100;
+            } elseif ($anoLetivo !== null && $anoRow <= 0) {
+                $score += 10; // cadastro “qualquer ano”
+            }
+            $seriesRow = is_array($row['series_ids'] ?? null) ? $row['series_ids'] : $this->model->decodeIds($row['series_ids'] ?? []);
+            $seriesRow = array_map('intval', (array) $seriesRow);
+            if ($seriesIds !== [] && $seriesRow !== []) {
+                if (array_intersect($seriesIds, $seriesRow) !== []) {
+                    $score += 20;
+                } else {
+                    continue;
+                }
+            }
+            $candidatos[] = [
+                'score' => $score,
+                'id' => (int) ($row['id'] ?? 0),
+                'row' => $row,
+            ];
+        }
+        if ($candidatos === []) {
+            return null;
+        }
+        usort($candidatos, static function (array $a, array $b): int {
+            $cmp = $b['score'] <=> $a['score'];
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+
+            return $a['id'] <=> $b['id'];
+        });
+
+        return $candidatos[0]['row'];
     }
 
     /**

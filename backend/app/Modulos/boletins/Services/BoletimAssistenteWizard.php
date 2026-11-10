@@ -483,45 +483,76 @@ class BoletimAssistenteWizard
     }
 
     /**
+     * Critérios da regra de aprovação no documento de boletim (modelo ou impressão do zero).
+     *
      * @param array<string,mixed> $estado
      */
     private function aplicarEscopoDoBoletimCadastro(array &$estado): void
     {
         $id = (int) ($estado['boletim_id'] ?? 0);
-        if ($id <= 0) {
-            return;
-        }
-        $bol = null;
-        foreach ($this->catalogoBoletins() as $b) {
-            if ((int) ($b['id'] ?? 0) === $id) {
-                $bol = $b;
-                break;
+        $ehDocumentoBoletim = (($estado['exibir_em'] ?? '') === 'boletim')
+            || (int) ($estado['layout_boletim_id'] ?? 0) > 0
+            || !empty($estado['quadro_livre'])
+            || in_array((string) ($estado['origem'] ?? ''), ['quadro-impressao', 'santa-maria', 'composto'], true);
+
+        // Modelo vinculado: preenche matérias/séries (também no demonstrativo).
+        $bol = $id > 0 ? $this->buscarBoletimCatalogo($id) : null;
+        if (is_array($bol)) {
+            if (($estado['finalidade'] ?? '') !== 'complementar') {
+                $estado['finalidade'] = (($bol['finalidade'] ?? '') === 'complementar') ? 'complementar' : 'oficial';
+            }
+            foreach (['materias_ids', 'series_ids', 'turmas_ids'] as $campo) {
+                if (!empty($estado[$campo]) && is_array($estado[$campo])) {
+                    continue;
+                }
+                $estado[$campo] = array_values(array_filter(
+                    array_map('intval', (array) ($bol[$campo] ?? [])),
+                    static fn ($n) => $n > 0
+                ));
             }
         }
-        if (!is_array($bol)) {
+
+        // Round/casas/mínima da regra de aprovação: só no documento de boletim
+        // (impressão/modelo). Demonstrativo mantém o que o evento já tinha.
+        if (!$ehDocumentoBoletim) {
             return;
         }
-        if (($estado['finalidade'] ?? '') !== 'complementar') {
-            $estado['finalidade'] = (($bol['finalidade'] ?? '') === 'complementar') ? 'complementar' : 'oficial';
-        }
-        foreach (['materias_ids', 'series_ids', 'turmas_ids'] as $campo) {
-            if (!empty($estado[$campo]) && is_array($estado[$campo])) {
-                continue;
+
+        $criterios = null;
+        if (is_array($bol)) {
+            $criterios = [
+                'nota_minima_aprovacao' => $bol['nota_minima_aprovacao'] ?? 6,
+                'round_mode' => $bol['round_mode'] ?? 'none',
+                'decimal_places' => $bol['decimal_places'] ?? 2,
+                'minima_origem' => (($bol['minima_origem'] ?? '') === 'regra') ? 'regra' : 'padrao',
+                'regra_nome' => (string) ($bol['regra_nome'] ?? ''),
+                'regra' => (($bol['minima_origem'] ?? '') === 'regra') ? ['nome' => (string) ($bol['regra_nome'] ?? '')] : null,
+            ];
+        } else {
+            try {
+                require_once __DIR__ . '/BoletimCadastroService.php';
+                $criterios = (new \App\Modulos\Boletins\Services\BoletimCadastroService())->criteriosEfetivosParaDocumento(
+                    null,
+                    (int) ($estado['ano_letivo'] ?? 0) ?: null,
+                    is_array($estado['series_ids'] ?? null) ? $estado['series_ids'] : [],
+                    (string) ($estado['finalidade'] ?? 'oficial')
+                );
+            } catch (\Throwable $e) {
+                error_log('aplicarEscopoDoBoletimCadastro criterios: ' . $e->getMessage());
+                $criterios = null;
             }
-            $estado[$campo] = array_values(array_filter(
-                array_map('intval', (array) ($bol[$campo] ?? [])),
-                static fn ($n) => $n > 0
-            ));
         }
-        if (!isset($estado['nota_minima_aprovacao']) || $estado['nota_minima_aprovacao'] === '' || $estado['nota_minima_aprovacao'] === null) {
-            $estado['nota_minima_aprovacao'] = $bol['nota_minima_aprovacao'] ?? 6;
+        if (!is_array($criterios) || ($criterios['regra'] ?? null) === null) {
+            return;
         }
-        // Critérios do boletim (regra de aprovação) prevalecem sobre default half do assistente.
-        $roundBol = strtolower(trim((string) ($bol['round_mode'] ?? 'none')));
+        $roundBol = strtolower(trim((string) ($criterios['round_mode'] ?? 'none')));
         $estado['round_mode'] = in_array($roundBol, ['none', 'half', 'places'], true) ? $roundBol : 'none';
         $estado['decimal_places'] = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
-            $bol['decimal_places'] ?? 2
+            $criterios['decimal_places'] ?? 2
         );
+        $estado['nota_minima_aprovacao'] = (float) ($criterios['nota_minima_aprovacao'] ?? 6);
+        $estado['nota_minima_origem'] = 'regra';
+        $estado['nota_minima_regra_nome'] = (string) ($criterios['regra_nome'] ?? '');
     }
 
     /**
@@ -1077,6 +1108,7 @@ class BoletimAssistenteWizard
     {
         $estado = $this->normalizarEstado($estado);
         $this->aplicarNomeAutomatico($estado);
+        $this->aplicarEscopoDoBoletimCadastro($estado);
         $this->aplicarMinimaResolvida($estado);
         $erros = $this->errosGrupoLinha($estado);
 

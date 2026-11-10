@@ -225,6 +225,28 @@ class BoletimAssistenteController extends BaseController
 
         $rascunho = $this->rascunhoComFontesSalvas($rascunho, $estado);
         $rascunho = $this->aplicarJornadaDoEstadoNoRascunhoPreview($rascunho, $estado);
+        // Documento de boletim (impressão) precisa desses campos para puxar a regra de aprovação.
+        foreach (['exibir_em', 'ano_letivo', 'finalidade', 'origem'] as $campoPreview) {
+            if (empty($rascunho[$campoPreview]) && !empty($estado[$campoPreview])) {
+                $rascunho[$campoPreview] = $estado[$campoPreview];
+            }
+        }
+        if ((int) ($rascunho['layout_boletim_id'] ?? 0) <= 0 && (int) ($estado['layout_boletim_id'] ?? 0) > 0) {
+            $rascunho['layout_boletim_id'] = (int) $estado['layout_boletim_id'];
+        }
+        if ((int) ($rascunho['boletim_id'] ?? 0) <= 0 && (int) ($estado['boletim_id'] ?? 0) > 0) {
+            $rascunho['boletim_id'] = (int) $estado['boletim_id'];
+        }
+        if (empty($rascunho['series_ids']) && !empty($estado['series_ids']) && is_array($estado['series_ids'])) {
+            $rascunho['series_ids'] = $estado['series_ids'];
+        }
+        $forcarDocumentoBoletim = ($estado['exibir_em'] ?? '') === 'boletim'
+            || (int) ($estado['layout_boletim_id'] ?? 0) > 0
+            || (int) ($rascunho['layout_boletim_id'] ?? 0) > 0
+            || in_array((string) ($estado['origem'] ?? ''), ['quadro-impressao', 'santa-maria', 'composto'], true);
+        if ($forcarDocumentoBoletim) {
+            $rascunho['exibir_em'] = 'boletim';
+        }
         [$periodoRef, $dataInicio, $dataFim] = $this->resolverPeriodoPreview($rascunho, $estado);
 
         try {

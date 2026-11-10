@@ -64,8 +64,8 @@ class BoletimConfigController extends BaseController
     private array $expansaoRegraCache = [];
     /** @var array<string, array<string, mixed>> */
     private array $simulacaoAlunoCache = [];
-    /** @var array<int, string> */
-    private array $roundModeBoletimCache = [];
+    /** @var array<string, array<string,mixed>> */
+    private array $criteriosDocumentoCache = [];
     /** @var array<int, int> */
     private array $casasDecimaisBoletimCache = [];
     /** @var array<int, string> */
@@ -10318,68 +10318,94 @@ class BoletimConfigController extends BaseController
 
     /**
      * Arredondamento efetivo da simulação/geração.
-     * Com modelo de boletim vinculado, usa a regra de aprovação (convencional/faixa).
-     * Sem boletim, mantém o round_mode da própria regra (default none).
+     * Documento de boletim (mesmo impressão sem modelo) usa a regra de aprovação do cadastro do ano.
+     * Demonstrativo (exibir_em=notas) sem boletim_id mantém o round_mode da própria regra.
      *
      * @param array<string,mixed> $regra
      */
     private function resolverRoundModeEfetivoDaRegra(array $regra): string
     {
-        $boletimId = (int) ($regra['boletim_id'] ?? 0);
-        if ($boletimId > 0) {
-            if (isset($this->roundModeBoletimCache[$boletimId])) {
-                return $this->roundModeBoletimCache[$boletimId];
-            }
-            try {
-                $cadastro = new BoletimCadastroService();
-                $item = $cadastro->model()->findById($boletimId);
-                if (is_array($item) && empty($item['excluido_em'])) {
-                    $criterios = $cadastro->criteriosDoBoletim($item);
-                    $modo = $this->normalizeRoundMode((string) ($criterios['round_mode'] ?? 'none'));
-                    $this->roundModeBoletimCache[$boletimId] = $modo;
-
-                    return $modo;
-                }
-            } catch (\Throwable $e) {
-                error_log('resolverRoundModeEfetivoDaRegra boletim #' . $boletimId . ': ' . $e->getMessage());
-            }
+        $criterios = $this->criteriosEfetivosDaRegraDocumento($regra);
+        if ($criterios !== null) {
+            return $this->normalizeRoundMode((string) ($criterios['round_mode'] ?? 'none'));
         }
 
         return $this->normalizeRoundMode((string) ($regra['round_mode'] ?? 'none'));
     }
 
     /**
-     * Casas decimais efetivas: regra de aprovação do modelo de boletim manda sobre o documento.
+     * Casas decimais efetivas: regra de aprovação do boletim manda sobre o documento.
      *
      * @param array<string,mixed> $regra
      */
     public function resolverCasasDecimaisEfetivasDaRegra(array $regra): int
     {
-        $boletimId = (int) ($regra['boletim_id'] ?? 0);
-        if ($boletimId > 0) {
-            if (isset($this->casasDecimaisBoletimCache[$boletimId])) {
-                return $this->casasDecimaisBoletimCache[$boletimId];
-            }
-            try {
-                $cadastro = new BoletimCadastroService();
-                $item = $cadastro->model()->findById($boletimId);
-                if (is_array($item) && empty($item['excluido_em'])) {
-                    $criterios = $cadastro->criteriosDoBoletim($item);
-                    $casas = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
-                        $criterios['decimal_places'] ?? 2
-                    );
-                    $this->casasDecimaisBoletimCache[$boletimId] = $casas;
-
-                    return $casas;
-                }
-            } catch (\Throwable $e) {
-                error_log('resolverCasasDecimaisEfetivasDaRegra boletim #' . $boletimId . ': ' . $e->getMessage());
-            }
+        $criterios = $this->criteriosEfetivosDaRegraDocumento($regra);
+        if ($criterios !== null) {
+            return \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
+                $criterios['decimal_places'] ?? 2
+            );
         }
 
         return \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
             $regra['decimal_places'] ?? 2
         );
+    }
+
+    /**
+     * Critérios da regra de aprovação quando o evento é documento de boletim
+     * (inclui quadro de impressão sem boletim_id no rascunho).
+     *
+     * @param array<string,mixed> $regra
+     * @return array<string,mixed>|null
+     */
+    private function criteriosEfetivosDaRegraDocumento(array $regra): ?array
+    {
+        $boletimId = (int) ($regra['boletim_id'] ?? 0);
+        $exibirEm = strtolower(trim((string) ($regra['exibir_em'] ?? 'notas')));
+        $ehDocumentoBoletim = $exibirEm === 'boletim'
+            || (int) ($regra['layout_boletim_id'] ?? 0) > 0
+            || !empty($regra['quadro_livre'])
+            || in_array((string) ($regra['origem'] ?? ''), ['quadro-impressao', 'santa-maria', 'composto'], true);
+        if ($boletimId <= 0 && !$ehDocumentoBoletim) {
+            return null;
+        }
+        $cacheKey = $boletimId > 0
+            ? 'id:' . $boletimId
+            : 'ano:' . (int) ($regra['ano_letivo'] ?? 0)
+                . ':fin:' . ((($regra['finalidade'] ?? '') === 'complementar') ? 'c' : 'o')
+                . ':ser:' . implode(',', array_map('intval', (array) ($regra['series_ids'] ?? [])));
+        if (isset($this->criteriosDocumentoCache[$cacheKey])) {
+            return $this->criteriosDocumentoCache[$cacheKey];
+        }
+        try {
+            $cadastro = new BoletimCadastroService();
+            $criterios = $cadastro->criteriosEfetivosParaDocumento(
+                $boletimId > 0 ? $boletimId : null,
+                (int) ($regra['ano_letivo'] ?? 0) ?: null,
+                is_array($regra['series_ids'] ?? null) ? $regra['series_ids'] : [],
+                (string) ($regra['finalidade'] ?? 'oficial')
+            );
+            if (($criterios['regra'] ?? null) === null && $boletimId <= 0) {
+                // Sem cadastro/regra no ano: não força none sobre o que o evento já tinha.
+                return null;
+            }
+            $this->criteriosDocumentoCache[$cacheKey] = $criterios;
+            $bidCache = (int) ($criterios['boletim_id'] ?? 0);
+            if ($bidCache > 0) {
+                $this->casasDecimaisBoletimCache[$bidCache] = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
+                    $criterios['decimal_places'] ?? 2
+                );
+                $escopo = strtolower(trim((string) ($criterios['escopo_arredondamento'] ?? 'medias')));
+                $this->escopoArredondamentoBoletimCache[$bidCache] = $escopo === 'todas' ? 'todas' : 'medias';
+            }
+
+            return $criterios;
+        } catch (\Throwable $e) {
+            error_log('criteriosEfetivosDaRegraDocumento: ' . $e->getMessage());
+        }
+
+        return null;
     }
 
     private function applyRoundMode(?float $value, string $mode): ?float
@@ -10441,27 +10467,11 @@ class BoletimConfigController extends BaseController
      */
     public function resolverEscopoArredondamentoEfetivoDaRegra(array $regra): string
     {
-        $boletimId = (int) ($regra['boletim_id'] ?? 0);
-        if ($boletimId > 0) {
-            if (isset($this->escopoArredondamentoBoletimCache[$boletimId])) {
-                return $this->escopoArredondamentoBoletimCache[$boletimId];
-            }
-            try {
-                $cadastro = new BoletimCadastroService();
-                $item = $cadastro->model()->findById($boletimId);
-                if (is_array($item) && empty($item['excluido_em'])) {
-                    $criterios = $cadastro->criteriosDoBoletim($item);
-                    $escopo = strtolower(trim((string) ($criterios['escopo_arredondamento'] ?? 'medias')));
-                    if ($escopo !== 'todas') {
-                        $escopo = 'medias';
-                    }
-                    $this->escopoArredondamentoBoletimCache[$boletimId] = $escopo;
+        $criterios = $this->criteriosEfetivosDaRegraDocumento($regra);
+        if ($criterios !== null) {
+            $escopo = strtolower(trim((string) ($criterios['escopo_arredondamento'] ?? 'medias')));
 
-                    return $escopo;
-                }
-            } catch (\Throwable $e) {
-                error_log('resolverEscopoArredondamentoEfetivoDaRegra boletim #' . $boletimId . ': ' . $e->getMessage());
-            }
+            return $escopo === 'todas' ? 'todas' : 'medias';
         }
         $escopo = strtolower(trim((string) ($regra['escopo_arredondamento'] ?? 'medias')));
 
