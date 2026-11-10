@@ -8588,8 +8588,12 @@ $boletimWizardSteps = [
                 btnCriar.textContent = 'Novo título do período';
             }, 1200);
         }
-        var quadro = document.querySelector('#bw-preview-wrap .bw-preview-table');
-        if (quadro && quadro.scrollIntoView) quadro.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        var listaTitulos = document.getElementById('bw-colunas-lista');
+        if (listaTitulos && listaTitulos.scrollIntoView) {
+            listaTitulos.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        var campoNome = document.getElementById('bw-linha-nome');
+        if (campoNome && campoNome.focus) campoNome.focus();
         agendarMontar();
     }
 
