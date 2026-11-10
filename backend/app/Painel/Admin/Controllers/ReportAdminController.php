@@ -334,6 +334,7 @@ class ReportAdminController extends AdminBaseController
         $cursoId = max(0, (int) ($_POST['curso_id'] ?? 0));
         $params = [
             'fonte' => $fonte,
+            'modelo_documento_id' => max(0, (int) ($_POST['modelo_documento_id'] ?? 0)),
             'ano_letivo' => $anoLetivo,
             'periodo' => max(0, (int) ($_POST['periodo'] ?? 0)),
             'curso_id' => $cursoId,
@@ -492,6 +493,8 @@ class ReportAdminController extends AdminBaseController
             'page_title' => $paginaPropriaRelatorio ? 'Relatórios' : 'Boletins',
             'user' => $user,
             'current_page' => 'reports_boletim_coordenacao',
+            'modelos_boletim_documento' => (new \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService($this->db))->listarBoletinsParaEmissao(),
+            'modelo_documento_id' => max(0, (int) ($_GET['modelo_documento_id'] ?? 0)),
             'fonte' => $fonte,
             'incluir_antigas' => $incluirAntigas,
             'anos_letivos' => $anosLista = $this->listarAnosBoletimCoordenacao($anoLetivo),
@@ -805,6 +808,15 @@ class ReportAdminController extends AdminBaseController
     private function exportarBoletinsVidaEscolarLote(array $relatorio, string $filenameBase): void
     {
         $voltar = $this->urlVoltarBoletimCoordenacao();
+        $modeloId = max(0, (int) ($_GET['modelo_documento_id'] ?? 0));
+        if ($modeloId > 0) {
+            $modelo = (new \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService($this->db))->findById($modeloId);
+            if (!$modelo || empty($modelo['ativo']) || !\App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService::modeloEhBoletim($modelo)) {
+                $this->setFlashMessage('Escolha um modelo de boletim ativo em Documentos.', 'error');
+                $this->redirect($voltar);
+                return;
+            }
+        }
         if (!class_exists('LayoutHelper', false)) {
         }
         if (!\App\Core\LayoutHelper::isModuleEnabled('vida_escolar')) {
@@ -886,7 +898,7 @@ class ReportAdminController extends AdminBaseController
             return;
         }
         $pendente = $this->db->fetch(
-            "SELECT id, status, user_id
+            "SELECT id, status, user_id, payload
              FROM ai_jobs
              WHERE job_type = :tipo AND status IN ('pending', 'processing')
              ORDER BY id DESC
@@ -896,6 +908,12 @@ class ReportAdminController extends AdminBaseController
         if (is_array($pendente) && (int) ($pendente['id'] ?? 0) > 0) {
             $jobIdPendente = (int) $pendente['id'];
             if ($userId > 0 && (int) ($pendente['user_id'] ?? 0) === $userId) {
+                $pedidoAnterior = json_decode((string) ($pendente['payload'] ?? ''), true);
+                if ((int) ($pedidoAnterior['modelo_documento_id'] ?? 0) !== $modeloId) {
+                    $this->setFlashMessage('Já existe um ZIP em geração com outro modelo. Aguarde terminar e exporte novamente com o modelo escolhido.', 'error');
+                    $this->redirect($voltar);
+                    return;
+                }
                 $_SESSION['vida_escolar_boletins_zip_job'] = $jobIdPendente;
                 $this->setFlashMessage(
                     'Os boletins ainda estão sendo gerados em segundo plano. O download começa quando o ZIP ficar pronto.',
@@ -920,6 +938,7 @@ class ReportAdminController extends AdminBaseController
                     'ano_letivo' => $anoLetivo,
                     'user_id' => $userId,
                     'tenant_slug' => $tenantSlug,
+                    'modelo_documento_id' => max(0, (int) ($_GET['modelo_documento_id'] ?? 0)),
                     'nome_download' => 'boletins_vida_escolar_' . $filenameBase . '.zip',
                 ],
                 $userId,
@@ -1079,6 +1098,7 @@ class ReportAdminController extends AdminBaseController
     {
         $params = [
             'fonte' => $this->parseFonteBoletimCoordenacao(),
+            'modelo_documento_id' => max(0, (int) ($_GET['modelo_documento_id'] ?? 0)),
             'evento' => (string) ($_GET['evento'] ?? ''),
             'incluir_antigas' => !empty($_GET['incluir_antigas']) ? 1 : 0,
             'ano_letivo' => max(0, (int) ($_GET['ano_letivo'] ?? 0)),

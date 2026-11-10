@@ -414,7 +414,7 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
 
 <dialog class="edoc-html-dialog" id="edoc-html-dialog" aria-labelledby="edoc-html-title">
     <form id="edoc-html-form">
-        <header><div><h2 id="edoc-html-title">Editar HTML do boletim</h2><p>Mantenha {{quadro_notas_html}} para trazer as notas do aluno na emissão.</p></div><button type="button" class="edoc-btn" id="edoc-html-indent">Indentar código</button></header>
+        <header><div><h2 id="edoc-html-title">Editar HTML do boletim</h2><p>Os campos entre {{...}} são preenchidos para cada aluno. Edite a estrutura e os estilos à vontade.</p></div><button type="button" class="edoc-btn" id="edoc-html-indent">Indentar código</button></header>
         <label class="edoc-sr-only" for="edoc-html-code">Código HTML do boletim</label>
         <textarea id="edoc-html-code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea>
         <footer><span>As alterações entram na folha ao clicar em Aplicar.</span><div><button type="button" class="edoc-btn" id="edoc-html-cancel">Cancelar</button><button type="submit" class="edoc-btn edoc-btn-primary">Aplicar alterações</button></div></footer>
@@ -432,6 +432,7 @@ window.EDOC = {
   modelo: <?= json_encode(['id' => $id, 'nome' => $nome, 'codigo' => $codigo, 'descricao' => (string) ($modelo['descricao'] ?? '')], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
   estrutura: <?= json_encode($estrutura, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
   varsPreview: <?= json_encode($vars_preview ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
+  modeloQuadroHtml: <?= json_encode(\App\Modulos\ModelosDocumentos\Services\QuadroBoletimEditavelService::expor((string) (($vars_preview ?? [])['quadro_notas_html'] ?? ''))['html'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
   catalogo: <?= json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
   layoutSugerido: <?= json_encode($layout_sugerido ?? null, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
   iaUrl: <?= json_encode(!empty($ia_disponivel) ? (URL . '/admin/modelos-documentos/reproduzir-imagem') : '', JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,

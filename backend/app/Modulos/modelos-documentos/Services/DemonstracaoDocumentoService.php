@@ -24,6 +24,7 @@ class DemonstracaoDocumentoService
         'boletim_resultados_gerados' => true,
         'boletim_regras' => true,
         'boletins' => true,
+        'boletim_layouts' => true,
     ];
 
     /** @var array<string, bool> */
@@ -74,6 +75,11 @@ class DemonstracaoDocumentoService
         if ($ano > 0) {
             $out['boletins'] = $this->listarBoletinsAtivos($ano);
         }
+        $anoFonte = $boletimId > 0 ? $this->anoDoLayoutOuBoletim($boletimId) : 0;
+        if ($anoFonte > 0 && $ano > 0 && $anoFonte !== $ano) {
+            $out['resumo'] = 'O boletim vinculado é de ' . $anoFonte . ', mas o aluno selecionado é de ' . $ano . '. Escolha um boletim do mesmo ano letivo.';
+            return $out;
+        }
         $linhas = $this->linhasNotas($alunoId, $turmaId, $ano, (int) ($turma['matriz_curricular_id'] ?? 0));
         $atalhos = $this->atalhosDeComponentes($linhas, $chave);
         $vars = ModeloDocumentoService::varsExemplo();
@@ -121,6 +127,9 @@ class DemonstracaoDocumentoService
         }
         $vars['historico_html'] = $this->htmlHistoricoDoAno($linhas, $ano, $vars);
         $out['linhas'] = $linhas;
+        $editavel = QuadroBoletimEditavelService::expor((string) ($vars['quadro_notas_html'] ?? ''));
+        $out['modelo_quadro_html'] = $editavel['celulas'] > 0 ? $editavel['html'] : '';
+        $vars = array_replace($vars, $editavel['variaveis']);
         $out['vars'] = $this->variaveisTexto($vars);
         $out['componentes'] = $atalhos;
         if (($out['resumo'] ?? '') === '') {
@@ -311,7 +320,7 @@ class DemonstracaoDocumentoService
         return $css . '<div class="doc-quadro-fit">' . $html . '</div>';
     }
 
-    private function anoDoLayoutOuBoletim(int $id): int
+    public function anoDoLayoutOuBoletim(int $id): int
     {
         if ($id <= 0) {
             return 0;

@@ -614,6 +614,7 @@
       if (bag && Object.prototype.hasOwnProperty.call(bag, k) && String(bag[k]) !== '') {
         return String(bag[k]);
       }
+      if (k.indexOf('boletim_celula_') === 0) return '—';
       var campo = campoVariavelPorChave(k);
       if (campo) return '<span class="edoc-ph">' + esc(campo.rotulo) + '</span>';
       return '<span class="edoc-ph">{{' + k + '}}</span>';
@@ -2064,8 +2065,8 @@
     if (t === 'boletim' || t === 'tabela_notas') {
       var liveQuadro = String((varsDaFolha() || {}).quadro_notas_html || '').trim();
       var htmlBol = String((p.html || '')).trim();
-      // Com dados reais na folha, sempre mostra o quadro vivo da aluna (não HTML estático antigo).
-      if ((state.demo || state.preview) && liveQuadro) {
+      // O HTML do modelo define o layout; os campos recebem os dados do aluno.
+      if (!htmlBol && (state.demo || state.preview) && liveQuadro) {
         return '<div class="edoc-quadro-notas edoc-el-body" style="' + st + '">'
           + sanitizeHtml(liveQuadro) + '</div>';
       }
@@ -3934,10 +3935,10 @@
 
   var alvoHtmlExpandido = null;
 
-  function abrirHtmlExpandido(target) {
+  function abrirHtmlExpandido(target, codigoInicial) {
     persistirEdicaoSeHouver();
     alvoHtmlExpandido = target.id;
-    $('#edoc-html-code').value = indentarHtmlDocumento((target.props || {}).html || '');
+    $('#edoc-html-code').value = indentarHtmlDocumento(codigoInicial != null ? codigoInicial : ((target.props || {}).html || ''));
     $('#edoc-html-dialog').showModal();
     $('#edoc-html-code').focus();
     $('#edoc-html-code').setSelectionRange(0, 0);
@@ -3997,10 +3998,10 @@
         garantirHtmlBoletimPadrao(el);
         p = el.props || {};
       }
-      html += '<p class="edoc-hint">Quem tem experiência pode editar o HTML. Margem e tamanho à direita atualizam o HTML automaticamente. Use <code>{{quadro_notas_html}}</code> para o quadro dinâmico na emissão.</p>';
+      html += '<p class="edoc-hint">Edite o quadro automático ou use <strong>Expor tabela completa</strong> para personalizar todas as linhas e células. Os campos entre <code>{{...}}</code> recebem as notas de cada aluno.</p>';
       html += '<div class="edoc-prop-row" style="margin-bottom:6px;">'
         + '<button type="button" class="edoc-btn" id="edoc-boletim-html-dinamico" title="Wrapper com variável dinâmica">HTML dinâmico</button>'
-        + '<button type="button" class="edoc-btn" id="edoc-boletim-html-previa" title="Colar o HTML da prévia atual">Da prévia</button>'
+        + '<button type="button" class="edoc-btn" id="edoc-boletim-html-previa" title="Editar a estrutura completa com notas dinâmicas">Expor tabela completa</button>'
         + '</div>';
       html += '<div class="edoc-html-label"><label for="edoc-boletim-html">HTML do boletim</label>'
         + '<button type="button" class="edoc-btn" id="edoc-html-expand"><i class="fa-solid fa-expand" aria-hidden="true"></i> Expandir editor</button></div>';
@@ -4218,24 +4219,19 @@
       }
       if (btnPrev) {
         btnPrev.addEventListener('click', function () {
-          var previa = htmlBoletimDaPrevia();
-          if (!previa) {
-            setStatus('Carregue boletim e aluna na prévia antes de copiar o HTML.');
+          var existente = String((target.props || {}).html || '');
+          if (existente.indexOf('{{boletim_celula_') >= 0) {
+            abrirHtmlExpandido(target);
             return;
           }
-          // Mantém {{quadro_notas_html}} para a emissão trazer a aluna certa; só reaproveita <style> da prévia.
-          var estilos = '';
-          String(previa).replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, function (m) {
-            estilos += m;
-            return '';
-          });
-          target.props = target.props || {};
-          target.props.html = estilos
-            + '<div class="quadro-notas-wrap doc-quadro-fit">{{quadro_notas_html}}</div>';
-          sincronizarHtmlBoletimComEstilo(target);
-          pushHist();
-          render();
-          setStatus('Estilos da prévia aplicados com {{quadro_notas_html}} dinâmico.');
+          var modelo = String(C.modeloQuadroHtml || '');
+          if (!modelo || modelo.indexOf('{{boletim_celula_') < 0) {
+            setStatus('Escolha o boletim e um aluno com notas para expor a tabela completa.');
+            abrirCardBoletim(true);
+            return;
+          }
+          // A estrutura contém campos dinâmicos, nunca as notas do aluno da prévia.
+          abrirHtmlExpandido(target, '<div class="quadro-notas-wrap doc-quadro-fit">' + modelo + '</div>');
         });
       }
     }
@@ -4939,9 +4935,16 @@
       if (Array.isArray(data.periodos) && data.periodos.length) demoPacote.periodos = data.periodos;
       demoPacote.html_quadro = data.html_quadro || '';
       pintarComponentes(data.componentes || []);
+      if (!data.vars && data.resumo) {
+        C.varsPreview = { quadro_notas_html: '' };
+        C.modeloQuadroHtml = '';
+        state.demo = !!(real && real.checked);
+        render();
+      }
       if (data.vars) {
         persistirEdicaoSeHouver();
         C.varsPreview = data.vars;
+        C.modeloQuadroHtml = data.modelo_quadro_html || '';
         if (data.html_quadro) {
           C.varsPreview.quadro_notas_html = data.html_quadro;
           garantirPaisagemBoletim();

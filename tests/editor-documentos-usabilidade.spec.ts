@@ -286,3 +286,24 @@ test('expandir logo depois de editar o campo lateral funciona no primeiro clique
   await expect(page.getByRole('dialog', { name: 'Editar HTML do boletim' })).toBeVisible();
   await expect(page.getByLabel('Código HTML do boletim', { exact: true })).toHaveValue(/Editado na lateral/);
 });
+
+test('expõe tabela inteira com campos dinâmicos sem aplicar até confirmar', async ({ page }) => {
+  await selecionarHtmlBoletim(page, '<div>{{quadro_notas_html}}</div>');
+  await page.getByRole('button', { name: 'Expor tabela completa', exact: true }).click();
+  const campo = page.getByLabel('Código HTML do boletim', { exact: true });
+  await expect(campo).toHaveValue(/<thead>/);
+  await expect(campo).toHaveValue(/<tbody>/);
+  await expect(campo).toHaveValue(/\{\{boletim_celula_t1_m17_b1_pp\}\}/);
+  expect(await campo.inputValue()).not.toContain('>7,5<');
+  await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await expect(page.locator('#edoc-boletim-html')).toHaveValue(/\{\{quadro_notas_html\}\}/);
+  await page.getByRole('button', { name: 'Expor tabela completa', exact: true }).click();
+  await campo.fill((await campo.inputValue()).replace('Matemática', 'Matemática do TI'));
+  await page.getByRole('button', { name: 'Aplicar alterações', exact: true }).click();
+  await expect(page.locator('#edoc-paper')).toContainText('Matemática do TI');
+  await expect(page.locator('#edoc-paper')).toContainText('7,5');
+  await expect(page.locator('#edoc-paper')).not.toContainText('{{boletim_celula_');
+  await page.locator('#edoc-save').click();
+  await expect(page.locator('#edoc-status')).toHaveText('Salvo automaticamente');
+  expect(ultimoSalvo.estrutura.body.sections[0].columns[0].elements[0].props.html).toContain('{{boletim_celula_t1_m17_b1_pp}}');
+});

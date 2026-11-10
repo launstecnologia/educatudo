@@ -433,19 +433,14 @@ class DocumentoRenderer
         if ($html === '') {
             $html = '<div class="quadro-notas-wrap">{{quadro_notas_html}}</div>';
         }
-        // Preserva placeholders, sanitiza o restante (mesmo padrão do título).
-        $parts = preg_split('/(\{\{\s*[a-z0-9_]+\s*\}\})/i', $html, -1, PREG_SPLIT_DELIM_CAPTURE);
-        if (!is_array($parts)) {
-            $parts = [$html];
-        }
-        $out = '';
-        foreach ($parts as $part) {
-            if (preg_match('/^\{\{\s*([a-z0-9_]+)\s*\}\}$/i', $part, $m)) {
-                $out .= '{{' . strtolower($m[1]) . '}}';
-            } else {
-                $out .= self::htmlPermitido($part);
-            }
-        }
+        // Protege os blocos CSS para não virarem texto no PDF ao sanitizar o HTML.
+        $estilos = [];
+        $html = preg_replace_callback('/<style\b[^>]*>(.*?)<\/style>/is', static function (array $m) use (&$estilos): string {
+            $chave = 'EDOC_ESTILO_BOLETIM_' . count($estilos) . '_FIM';
+            $estilos[$chave] = '<style type="text/css">' . $m[1] . '</style>';
+            return $chave;
+        }, $html) ?? $html;
+        $out = strtr(self::htmlPermitido($html), $estilos);
 
         return $this->blocoHtmlLivre($out, $css);
     }

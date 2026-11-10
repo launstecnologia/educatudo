@@ -863,7 +863,7 @@ class VidaEscolarAdminController extends \App\Controllers\Admin\AdminBaseControl
         $pdf = new VidaEscolarPdfService();
         try {
             if ($tipo === 'boletim') {
-                $pdf->emitirBoletim($dados, VidaEscolarService::PERIODOS, $this->config, 'boletim_' . $slug . '.pdf');
+                $pdf->emitirBoletim($dados, VidaEscolarService::PERIODOS, $this->config, 'boletim_' . $slug . '.pdf', max(0, (int) ($_GET['modelo_documento_id'] ?? 0)), !empty($_GET['previa']));
             } elseif ($tipo === 'pacote') {
                 $pdf->emitirPacote($dados, VidaEscolarService::PERIODOS, $this->config, 'pacote_transferencia_' . $slug . '.pdf');
             } elseif ($tipo === 'sed') {

@@ -1,5 +1,7 @@
 # Tasks — backlog atual
 
+- [x] Boletim: expor HTML completo com campos de notas dinâmicos para o TI; unificar modelo vinculado ao curso/série na impressão do aluno, permitir escolher modelo de Documentos no relatório e preservá-lo nos PDFs do ZIP. Validado com 22 testes Playwright, 10 testes PHP (28 asserções), lint e code-reviewer; preserva ano da ficha e notas de cada aluno. — 2026-11-10
+
 - [x] HTML do boletim: botão Expandir editor, janela ampla com indentação automática de HTML/CSS, Indentar código, Aplicar e Cancelar; preserva variáveis e fragmentos inline. 18 testes de uso do editor aprovados e PHP lint. — 2026-11-10
 
 - [x] Editor de documentos: painel Inserir com busca, grupos e orientações; resultado da impressão exibe o PDF real validado dentro do editor; criação guiada de tabelas com linhas/colunas/cabeçalho, edição na folha, ações nomeadas e zoom que ajusta à tela. 12 testes Playwright de uso, persistência, compatibilidade com HTML misto e erros de prévia; PHP lint e code-reviewer aprovados. — 2026-11-10

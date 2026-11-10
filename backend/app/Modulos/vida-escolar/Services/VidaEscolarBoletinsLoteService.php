@@ -107,7 +107,7 @@ class VidaEscolarBoletinsLoteService
                         throw new \RuntimeException('Prontuário vazio.');
                     }
                     $dados['planilha_sed'] = $prontuarioSvc->planilhaSed($dados);
-                    $out = $pdfSvc->htmlBoletim($dados, $periodos, null);
+                    $out = $pdfSvc->htmlBoletim($dados, $periodos, null, max(0, (int) ($payload['modelo_documento_id'] ?? 0)));
                     $binario = $pdfSvc->gerarPdfBinario($out['html'], $out['modelo']);
                     if ($binario === '') {
                         throw new \RuntimeException('PDF vazio.');

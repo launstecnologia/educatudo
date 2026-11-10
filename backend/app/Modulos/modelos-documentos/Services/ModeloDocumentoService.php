@@ -2131,6 +2131,52 @@ class ModeloDocumentoService
         return $out;
     }
 
+    /** Usa na emissão o mesmo boletim-fonte vinculado no editor do documento. */
+    public function aplicarFonteBoletimDoModelo(array $modelo, array $vars, int $alunoId, int $turmaId, int $anoLetivo = 0): array
+    {
+        $estrutura = $this->estruturaDoModelo($modelo);
+        $fonteId = (int) ($estrutura['fonte_boletim_id'] ?? 0);
+        if ($fonteId <= 0) {
+            return $vars;
+        }
+        if ($alunoId <= 0 || $turmaId <= 0) {
+            throw new \RuntimeException('Aluno e turma são necessários para emitir o boletim vinculado ao documento.');
+        }
+        $demonstracao = new DemonstracaoDocumentoService($this->db);
+        $anoFonte = $demonstracao->anoDoLayoutOuBoletim($fonteId);
+        if ($anoLetivo > 0 && $anoFonte > 0 && $anoLetivo !== $anoFonte) {
+            throw new \RuntimeException('O boletim vinculado é de ' . $anoFonte . ', mas a ficha emitida é de ' . $anoLetivo . '. Selecione um modelo com boletim do mesmo ano letivo.');
+        }
+        $pacote = $demonstracao->pacote($turmaId, $alunoId, '1127a', $fonteId);
+        $quadro = trim((string) ($pacote['html_quadro'] ?? ''));
+        if ($quadro === '') {
+            throw new \RuntimeException((string) ($pacote['resumo'] ?? 'O boletim vinculado não possui quadro para este aluno.'));
+        }
+        $vars['quadro_notas_html'] = $quadro;
+        return $vars;
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function listarBoletinsParaEmissao(): array
+    {
+        if (!$this->schemaReady() || !$this->temColuna('estrutura_json')) {
+            return [];
+        }
+        $rows = $this->db->fetchAll('SELECT id, nome, codigo, ativo, estrutura_json FROM secretaria_modelos_documentos WHERE ativo = 1 ORDER BY nome ASC') ?: [];
+        return array_values(array_filter($rows, [self::class, 'modeloEhBoletim']));
+    }
+
+    public static function modeloEhBoletim(array $modelo): bool
+    {
+        $estrutura = is_array($modelo['estrutura'] ?? null) ? $modelo['estrutura'] : json_decode((string) ($modelo['estrutura_json'] ?? ''), true);
+        if (is_array($estrutura) && (($estrutura['emissao']['tipo'] ?? '') === 'boletim')) {
+            return true;
+        }
+        $json = json_encode($estrutura);
+        return str_contains((string) ($modelo['codigo'] ?? ''), 'boletim')
+            || (is_string($json) && preg_match('/"type"\s*:\s*"(?:boletim|tabela_notas)"/', $json) === 1);
+    }
+
     public function codigoParaEmissao(string $tipo, int $cursoId, int $serieId): ?string
     {
         $chave = str_starts_with($tipo, 'relatorio_') ? 'relatorio' : $tipo;
@@ -3524,7 +3570,7 @@ HTML;
             ];
             $out[$k] = in_array($k, $htmlKeys, true) ? $v : $esc($v);
         }
-        return $out;
+        return array_replace($out, QuadroBoletimEditavelService::variaveis($out['quadro_notas_html'] ?? ''));
     }
 
     /**
@@ -3536,6 +3582,10 @@ HTML;
             return '';
         }
 
+        if (preg_match('/\{\{\s*boletim_celula_/i', $html) === 1) {
+            $vars = array_replace($vars, QuadroBoletimEditavelService::variaveis((string) ($vars['quadro_notas_html'] ?? '')));
+        }
+
         // 0) Blocos condicionais {{#se:campo}}...{{/se:campo}} e atalho {{#se_resp2}}...{{/se_resp2}}
         $html = $this->aplicarBlocosCondicionais($html, $vars);
 
@@ -3545,7 +3595,7 @@ HTML;
             static function (array $m) use ($vars): string {
                 $key = strtolower($m[1]);
                 if (!array_key_exists($key, $vars)) {
-                    return '';
+                    return str_starts_with($key, QuadroBoletimEditavelService::PREFIXO) ? '—' : '';
                 }
                 return (string) $vars[$key];
             },

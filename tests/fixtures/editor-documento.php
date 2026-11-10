@@ -20,7 +20,8 @@ $estrutura = ModeloDocumentoService::estruturaVazia('a4', 'paisagem', 8);
 $estrutura['body']['sections'] = [ModeloDocumentoService::secaoPadrao([100])];
 $catalogo = ModeloDocumentoService::catalogoElementosEditor();
 $csrf_token = 'csrf-teste-local';
-$vars_preview = ['aluno_nome' => 'Aluno de demonstração'];
+$vars_preview = ['aluno_nome' => 'Aluno de demonstração', 'quadro_notas_html' => '<table><thead><tr><th>Matéria</th><th>Nota</th></tr></thead><tbody><tr data-boletim-materia="17"><td>Matemática</td><td data-boletim-coluna="b1_pp">7,5</td></tr></tbody></table>'];
+$vars_preview = array_merge($vars_preview, \App\Modulos\ModelosDocumentos\Services\QuadroBoletimEditavelService::variaveis($vars_preview['quadro_notas_html']));
 // A identidade visual da escola depende do banco; o restante da view é o arquivo de produção.
 $view = file_get_contents(BASE_PATH . '/app/Modulos/modelos-documentos/Views/admin/editor.php');
 $view = str_replace('<?= \\App\\Core\\LayoutHelper::generateCustomCSS() ?>', '', $view);

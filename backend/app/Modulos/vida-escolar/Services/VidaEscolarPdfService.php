@@ -21,6 +21,7 @@ class VidaEscolarPdfService
 
     private ModeloDocumentoService $modelos;
     private $db;
+    private array $cacheModelosBoletim = [];
 
     public function __construct(?Database $db = null)
     {
@@ -32,11 +33,11 @@ class VidaEscolarPdfService
      * @param array<string,mixed> $prontuario
      * @param array<string,mixed>|null $config
      */
-    public function emitirBoletim(array $prontuario, array $periodos, ?array $config, string $filename): void
+    public function emitirBoletim(array $prontuario, array $periodos, ?array $config, string $filename, int $modeloDocumentoId = 0, bool $previa = false): void
     {
-        $out = $this->htmlBoletim($prontuario, $periodos, $config);
+        $out = $this->htmlBoletim($prontuario, $periodos, $config, $modeloDocumentoId);
         $aluno = is_array($prontuario['aluno'] ?? null) ? $prontuario['aluno'] : [];
-        $this->enviarPdf($out['html'], $filename, $out['modelo'], (int) ($aluno['id'] ?? 0), 'Boletim Escolar', $config);
+        $this->enviarPdf($out['html'], $filename, $out['modelo'], $previa ? 0 : (int) ($aluno['id'] ?? 0), 'Boletim Escolar', $config, $previa);
     }
 
     /**
@@ -48,8 +49,18 @@ class VidaEscolarPdfService
      * @param array<string,mixed>|null $config
      * @return array{html:string,modelo:array<string,mixed>}
      */
-    public function htmlBoletim(array $prontuario, array $periodos, ?array $config): array
+    public function htmlBoletim(array $prontuario, array $periodos, ?array $config, int $modeloDocumentoId = 0): array
     {
+        $modelo = $this->resolverModeloBoletim($prontuario, $modeloDocumentoId);
+        if ($modelo !== null) {
+            $prontuario = $this->aplicarQuadroImpressaoSeHouver($prontuario);
+            $vars = $this->varsDoProntuario($prontuario, $periodos, 'Boletim Escolar');
+            $vars = $this->modelos->aplicarFonteBoletimDoModelo(
+                $modelo, $vars, (int) ($prontuario['aluno']['id'] ?? 0), (int) ($this->turmaDoBoletim($prontuario)['id'] ?? 0),
+                (int) ($prontuario['quadro']['ficha']['ano_letivo'] ?? $prontuario['matricula']['ano_letivo'] ?? 0)
+            );
+            return ['html' => $this->modelos->renderHtml($modelo, $vars, ModeloDocumentoService::estiloDoModelo($modelo), $config), 'modelo' => $modelo];
+        }
         $codigo = self::CODIGO_BOLETIM;
         $prontuario = $this->aplicarQuadroImpressaoSeHouver($prontuario);
         $temQuadroCriado = !empty($prontuario['_quadro_sm_html'])
@@ -111,6 +122,32 @@ class VidaEscolarPdfService
             . implode('', $partes)
             . '</body></html>';
         $this->enviarPdf($html, $filename, $modelo);
+    }
+
+    /** @return array<string,mixed>|null */
+    private function resolverModeloBoletim(array $prontuario, int $modeloId): ?array
+    {
+        if ($modeloId > 0) {
+            if (isset($this->cacheModelosBoletim[$modeloId])) return $this->cacheModelosBoletim[$modeloId];
+            $modelo = $this->modelos->findById($modeloId);
+            if (!$modelo || empty($modelo['ativo']) || !ModeloDocumentoService::modeloEhBoletim($modelo)) {
+                throw new \RuntimeException('O modelo de boletim escolhido não está disponível nesta escola.');
+            }
+            return $this->cacheModelosBoletim[$modeloId] = $modelo;
+        }
+        $turma = $this->turmaDoBoletim($prontuario);
+        $codigo = $this->modelos->codigoParaEmissao('boletim', (int) ($turma['curso_novo_id'] ?? 0), (int) ($turma['serie_id'] ?? 0));
+        return $codigo ? $this->modelos->findByCodigo($codigo) : null;
+    }
+
+    /** @return array<string,mixed> */
+    private function turmaDoBoletim(array $prontuario): array
+    {
+        $turmaId = (int) ($prontuario['quadro']['ficha']['turma_id'] ?? $prontuario['matricula']['turma_id'] ?? $prontuario['aluno']['turma_id'] ?? 0);
+        if ($turmaId > 0) {
+            return $this->db->fetch('SELECT id, curso_novo_id, serie_id FROM turmas WHERE id = :id LIMIT 1', ['id' => $turmaId]) ?: [];
+        }
+        return $this->db->fetch('SELECT t.id, t.curso_novo_id, t.serie_id FROM alunos a INNER JOIN turmas t ON t.id = a.turma_id WHERE a.id = :id LIMIT 1', ['id' => (int) ($prontuario['aluno']['id'] ?? 0)]) ?: [];
     }
 
     private function extrairCssHtml(string $html): string
@@ -991,7 +1028,7 @@ class VidaEscolarPdfService
      * @param array<string,mixed> $modelo
      * @param array<string,mixed>|null $config
      */
-    private function enviarPdf(string $html, string $filename, array $modelo, int $alunoId = 0, string $titulo = '', ?array $config = null): void
+    private function enviarPdf(string $html, string $filename, array $modelo, int $alunoId = 0, string $titulo = '', ?array $config = null, bool $inline = false): void
     {
         $filename = preg_replace('/[^a-zA-Z0-9._-]+/', '_', $filename) ?: 'documento.pdf';
         if (!str_ends_with(strtolower($filename), '.pdf')) {
@@ -1010,7 +1047,7 @@ class VidaEscolarPdfService
             $bin = $this->gerarPdfBinario($html, $modelo);
             $this->arquivarPdfAluno($alunoId, $titulo, $filename, $bin, $config);
             header('Content-Type: application/pdf');
-            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            header('Content-Disposition: ' . ($inline ? 'inline' : 'attachment') . '; filename="' . $filename . '"');
             header('Content-Length: ' . strlen($bin));
             header('Cache-Control: private, max-age=0, must-revalidate');
             header('Pragma: public');

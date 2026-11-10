@@ -169,7 +169,7 @@ td.boletim-quadro-grupo-sep {
                 $ehPai = !empty($linS['eh_grupo_pai']);
                 $ehFilho = !empty($linS['eh_grupo_filho']);
             ?>
-                <tr class="<?= $bgS ?><?= $ehPai ? ' font-semibold' : '' ?>">
+                <tr class="<?= $bgS ?><?= $ehPai ? ' font-semibold' : '' ?>" data-boletim-materia="<?= (int) ($linS['materia_id'] ?? 0) ?>">
                     <td class="border border-gray-300 px-3 py-1.5 text-left text-gray-900 whitespace-nowrap<?= $ehPai ? ' font-bold' : ' font-medium' ?><?= $ehFilho ? ' pl-7 text-gray-800' : '' ?>">
                         <?php if ($ehFilho): ?>
                             <span class="text-gray-400 mr-1" aria-hidden="true">↳</span>
@@ -196,7 +196,7 @@ td.boletim-quadro-grupo-sep {
                         $colGlobal = !empty($oc['valor_global']);
                         $mostrarIdem = $edicaoSimples !== null && is_numeric($nv) && $colGlobal && $iS > 1;
                     ?>
-                        <td class="border border-gray-300 px-1 py-1<?= $clsSepCel ?> <?= is_numeric($nv) ? 'text-emerald-800 font-semibold' : 'text-gray-500' ?><?= $isCalcEditavel ? ' boletim-cell-editavel cursor-pointer' : '' ?>"
+                        <td data-boletim-coluna="<?= htmlspecialchars($codO, ENT_QUOTES, 'UTF-8') ?>" class="border border-gray-300 px-1 py-1<?= $clsSepCel ?> <?= is_numeric($nv) ? 'text-emerald-800 font-semibold' : 'text-gray-500' ?><?= $isCalcEditavel ? ' boletim-cell-editavel cursor-pointer' : '' ?>"
                             <?php if ($isCalcEditavel): ?>
                             data-cell-editavel="1"
                             data-componente-id="<?= (int) ($oc['id'] ?? 0) ?>"

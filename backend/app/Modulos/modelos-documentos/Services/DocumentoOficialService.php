@@ -294,6 +294,9 @@ class DocumentoOficialService
         $modelo = $this->buscarModelo($codigo);
         if ($modelo) {
             $svc = new \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService($this->db);
+            if ($tipo === 'boletim') {
+                $vars = $svc->aplicarFonteBoletimDoModelo($modelo, $vars, (int) ($payload['aluno']['id'] ?? 0), (int) ($payload['turma']['id'] ?? 0), (int) ($payload['periodo']['ano_letivo'] ?? 0));
+            }
             $html = $svc->renderHtml($modelo, $vars, \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService::estiloDoModelo($modelo), $configApp);
             return [
                 'html' => $html,

@@ -27,7 +27,10 @@ foreach ((array) ($eventos_selecionados ?? []) as $valorSelecionado) {
     }
 }
 $selecionarTodos = !empty($selecionar_todos);
+$modeloDocumentoId = max(0, (int) ($modelo_documento_id ?? $_GET['modelo_documento_id'] ?? 0));
+$modelosBoletimDocumento = is_array($modelos_boletim_documento ?? null) ? $modelos_boletim_documento : [];
 $queryExport = [
+    'modelo_documento_id' => $modeloDocumentoId,
     'fonte' => $fonte,
     'ano_letivo' => $anoSelecionado,
     'periodo' => max(0, (int) ($periodo ?? 0)),
@@ -134,6 +137,16 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
     <input type="hidden" name="boletim_id" value="<?= $boletimContextoId ?>">
     <?php endif; ?>
     <div class="p-5 md:p-6 space-y-5">
+    <label class="block" id="campo-modelo-boletim-documento" style="<?= $fonte !== 'vida_escolar' ? 'display:none' : '' ?>" <?= $fonte !== 'vida_escolar' ? 'hidden' : '' ?>>
+        <span class="block text-sm font-medium text-gray-700 mb-1.5">Modelo do boletim (Documentos)</span>
+        <select name="modelo_documento_id" id="modelo-boletim-documento" class="<?= $campoClasse ?>">
+            <option value="0">Automático pelo curso e pela série do aluno</option>
+            <?php foreach ($modelosBoletimDocumento as $modeloDocumento): ?>
+            <option value="<?= (int) $modeloDocumento['id'] ?>" <?= $modeloDocumentoId === (int) $modeloDocumento['id'] ? 'selected' : '' ?>><?= htmlspecialchars((string) $modeloDocumento['nome'], ENT_QUOTES, 'UTF-8') ?></option>
+            <?php endforeach; ?>
+        </select>
+        <span class="block text-xs text-gray-500 mt-1.5">A visualização, o PDF do aluno e os PDFs do ZIP usam este mesmo modelo. Os dados são preenchidos para cada aluno.</span>
+    </label>
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <label class="block">
             <span class="block text-sm font-medium text-gray-700 mb-1.5">Exibir</span>
@@ -364,7 +377,7 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
             }
             $fichaAluno = (int) ($aluno['ficha_id'] ?? 0);
             $pdfOficial = $fonteRelatorio === 'vida_escolar' && (int) ($aluno['id'] ?? 0) > 0 && $fichaAluno > 0
-                ? URL . '/admin/students/' . (int) $aluno['id'] . '/vida-escolar/pdf?ficha_id=' . $fichaAluno
+                ? URL . '/admin/students/' . (int) $aluno['id'] . '/vida-escolar/pdf?ficha_id=' . $fichaAluno . '&modelo_documento_id=' . $modeloDocumentoId
                 : '';
             ?>
             <section class="bg-white rounded-xl border border-gray-200 shadow-sm mb-4 overflow-hidden <?= $transferidoAluno ? 'opacity-90' : '' ?>" data-print-title="<?= htmlspecialchars($tituloImpressao, ENT_QUOTES, 'UTF-8') ?>">
@@ -392,7 +405,13 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
                 $htmlDemonstrativo = trim((string) ($aluno['demonstrativo_html'] ?? ''));
                 $materiasAluno = (array) ($aluno['materias'] ?? []);
                 ?>
-                <?php if ($htmlDemonstrativo !== ''): ?>
+                <?php if ($fonteRelatorio === 'vida_escolar' && $pdfOficial !== ''): ?>
+                <details class="p-4" data-boletim-previa data-pdf-url="<?= htmlspecialchars($pdfOficial . '&previa=1', ENT_QUOTES, 'UTF-8') ?>">
+                    <summary class="cursor-pointer text-sm font-semibold text-gray-700">Visualizar boletim no modelo do documento</summary>
+                    <p class="text-sm text-gray-500 my-3" data-boletim-mensagem>Abra para gerar a prévia deste aluno com o mesmo layout do PDF e do ZIP.</p>
+                    <iframe title="Boletim de <?= htmlspecialchars($nomeAluno, ENT_QUOTES, 'UTF-8') ?>" class="w-full border border-gray-200 rounded-lg" style="height:70vh;min-height:420px" hidden></iframe>
+                </details>
+                <?php elseif ($htmlDemonstrativo !== ''): ?>
                 <div class="p-4 overflow-x-auto">
                     <?= $aluno['demonstrativo_html'] ?>
                 </div>
@@ -1115,3 +1134,5 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 <?php endif; ?>
+
+<script src="<?= URL ?>/static/js/previa-boletim-relatorio.js?v=<?= (int) filemtime(BASE_PATH . '/public/static/js/previa-boletim-relatorio.js') ?>"></script>
