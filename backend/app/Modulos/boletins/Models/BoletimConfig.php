@@ -5723,12 +5723,18 @@ class BoletimConfig
             return $this->filtroBlocosCache[$cacheKey];
         }
         $placeholdersIds = implode(',', array_fill(0, count($blocoIds), '?'));
-        $placeholdersBims = implode(',', array_fill(0, count($bims), '?'));
-        $sql = "SELECT id FROM provas_blocos
-                WHERE deleted_at IS NULL
-                  AND id IN ({$placeholdersIds})
-                  AND (bimestre IS NULL OR bimestre = 0 OR bimestre IN ({$placeholdersBims}))";
-        $params = array_merge($blocoIds, $bims);
+        $placeholdersBimsPb = implode(',', array_fill(0, count($bims), '?'));
+        $placeholdersBimsEv = implode(',', array_fill(0, count($bims), '?'));
+        // Não aceita bimestre NULL/0 como curinga — isso fazia CH do 3º vazar no 1º.
+        $sql = "SELECT pb.id
+                  FROM provas_blocos pb
+                  LEFT JOIN eventos_avaliativos e
+                    ON e.id = pb.evento_avaliativo_id AND e.deleted_at IS NULL
+                 WHERE pb.deleted_at IS NULL
+                   AND pb.id IN ({$placeholdersIds})
+                   AND (pb.bimestre IN ({$placeholdersBimsPb})
+                        OR e.bimestre IN ({$placeholdersBimsEv}))";
+        $params = array_merge($blocoIds, $bims, $bims);
         $rows = $this->db->fetchAll($sql, $params) ?: [];
         $out = [];
         foreach ($rows as $row) {
@@ -5806,7 +5812,8 @@ class BoletimConfig
                 $ph[] = ':' . $key;
                 $params[$key] = $n;
             }
-            $sql .= ' AND (bimestre IS NULL OR bimestre = 0 OR bimestre IN (' . implode(',', $ph) . '))';
+            // Sem curinga NULL/0: evita misturar CH/PP de outro bimestre.
+            $sql .= ' AND bimestre IN (' . implode(',', $ph) . ')';
         }
         $sql .= ' ORDER BY data_prova DESC, id DESC LIMIT 400';
         $rows = $this->db->fetchAll($sql, $params) ?: [];

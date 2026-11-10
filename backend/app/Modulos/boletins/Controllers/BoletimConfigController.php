@@ -13932,11 +13932,23 @@ class BoletimConfigController extends BaseController
                 }
             }
             if ($ids !== []) {
+                $bimsEv = $this->parseProvaBimestresFromComponente($componente);
+                if ($bimsEv === []) {
+                    $codEv = strtolower(trim((string) ($componente['codigo'] ?? '')));
+                    if (preg_match('/^b([1-4])_/', $codEv, $mEv) === 1) {
+                        $bimsEv = [(int) $mEv[1]];
+                    }
+                }
+                if ($bimsEv !== []) {
+                    $ids = $this->boletimConfig->filtrarBlocoIdsPorBimestres($ids, $bimsEv);
+                }
+
                 return array_values(array_unique($ids));
             }
         }
 
         // Seed reimportado: evento_avaliativo_id antigo some. Recasa por tipo + bimestre.
+        // Sem bimestre explícito NÃO busca todos os bimestres (evita CH do 3º vazar no 1º).
         return $this->resolverBlocoIdsPorTipoEBimestreDoComponente($componente, $cfg);
     }
 
@@ -13952,6 +13964,16 @@ class BoletimConfigController extends BaseController
             return [];
         }
         $bims = $this->parseProvaBimestresFromComponente($componente);
+        if ($bims === []) {
+            $cod = strtolower(trim((string) ($componente['codigo'] ?? '')));
+            if (preg_match('/^b([1-4])_/', $cod, $mCod) === 1) {
+                $bims = [(int) $mCod[1]];
+            }
+        }
+        // Sem bimestre: não expandir para o ano inteiro (PP/PU/CH de outros períodos).
+        if ($bims === []) {
+            return [];
+        }
         try {
             $sql = 'SELECT pb.id
                       FROM provas_blocos pb
@@ -13959,20 +13981,18 @@ class BoletimConfigController extends BaseController
                      WHERE pb.deleted_at IS NULL
                        AND pb.tipo_avaliacao_id = :tipo';
             $params = ['tipo' => $tipoId];
-            if ($bims !== []) {
-                $phPb = [];
-                $phEv = [];
-                foreach (array_values($bims) as $i => $bim) {
-                    $kPb = 'bp' . $i;
-                    $kEv = 'be' . $i;
-                    $phPb[] = ':' . $kPb;
-                    $phEv[] = ':' . $kEv;
-                    $params[$kPb] = (int) $bim;
-                    $params[$kEv] = (int) $bim;
-                }
-                $sql .= ' AND (pb.bimestre IN (' . implode(',', $phPb) . ')'
-                    . ' OR e.bimestre IN (' . implode(',', $phEv) . '))';
+            $phPb = [];
+            $phEv = [];
+            foreach (array_values($bims) as $i => $bim) {
+                $kPb = 'bp' . $i;
+                $kEv = 'be' . $i;
+                $phPb[] = ':' . $kPb;
+                $phEv[] = ':' . $kEv;
+                $params[$kPb] = (int) $bim;
+                $params[$kEv] = (int) $bim;
             }
+            $sql .= ' AND (pb.bimestre IN (' . implode(',', $phPb) . ')'
+                . ' OR e.bimestre IN (' . implode(',', $phEv) . '))';
             $sql .= ' ORDER BY pb.id ASC LIMIT 20';
             $rows = Database::getInstance()->fetchAll($sql, $params) ?: [];
         } catch (\Throwable $e) {
