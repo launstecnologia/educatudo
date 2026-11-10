@@ -720,7 +720,7 @@ class BoletimConfigController extends BaseController
             $boletimId > 0
             || $voltar === 'boletins'
         );
-        $estadoInicial = null;
+            $estadoInicial = null;
         $catalogoInicial = null;
         $rascunhoInicial = null;
         $resumoInicial = null;
@@ -734,6 +734,9 @@ class BoletimConfigController extends BaseController
             $formSeed = [];
             if ($boletimId > 0) {
                 $formSeed['boletim_id'] = $boletimId;
+            }
+            if ($layoutBoletimId > 0) {
+                $formSeed['layout_boletim_id'] = $layoutBoletimId;
             }
             // Com regra existente, ano e bimestre ficam só na volta.
             // No seed, eles impedem o carregamento da configuração já salva.

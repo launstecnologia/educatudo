@@ -490,10 +490,19 @@ class BoletimAssistenteWizard
     private function aplicarEscopoDoBoletimCadastro(array &$estado): void
     {
         $id = (int) ($estado['boletim_id'] ?? 0);
+        $layoutId = (int) ($estado['layout_boletim_id'] ?? 0);
         $ehDocumentoBoletim = (($estado['exibir_em'] ?? '') === 'boletim')
-            || (int) ($estado['layout_boletim_id'] ?? 0) > 0
+            || $layoutId > 0
             || !empty($estado['quadro_livre'])
             || in_array((string) ($estado['origem'] ?? ''), ['quadro-impressao', 'santa-maria', 'composto'], true);
+
+        // Boletim → Montar quadro: matérias sempre da regra de aprovação do layout.
+        if ($layoutId > 0) {
+            $idsRegra = $this->materiasIdsDoLayoutImpressao($layoutId);
+            if ($idsRegra !== []) {
+                $estado['materias_ids'] = $idsRegra;
+            }
+        }
 
         // Modelo vinculado: preenche matérias/séries (também no demonstrativo).
         $bol = $id > 0 ? $this->buscarBoletimCatalogo($id) : null;
@@ -816,6 +825,9 @@ class BoletimAssistenteWizard
             }
             if (!empty($estadoFormulario['boletim_id'])) {
                 $estado['boletim_id'] = (int) $estadoFormulario['boletim_id'];
+            }
+            if (!empty($estadoFormulario['layout_boletim_id'])) {
+                $estado['layout_boletim_id'] = (int) $estadoFormulario['layout_boletim_id'];
             }
             if (!empty($estadoFormulario['grupo_regras_notas_id'])) {
                 $estado['grupo_regras_notas_id'] = (int) $estadoFormulario['grupo_regras_notas_id'];
@@ -11260,6 +11272,50 @@ class BoletimAssistenteWizard
      * @param list<string> $fallback
      * @return list<string>
      */
+    /**
+     * @return list<int>
+     */
+    private function materiasIdsDoLayoutImpressao(int $layoutId): array
+    {
+        if ($layoutId <= 0) {
+            return [];
+        }
+        try {
+            $layout = (new \App\Modulos\EventosAvaliativos\Models\BoletimLayout())->find($layoutId);
+        } catch (\Throwable $e) {
+            return [];
+        }
+        if (!is_array($layout)) {
+            return [];
+        }
+        $ids = [];
+        $regraAcadId = (int) ($layout['regra_academica_id'] ?? 0);
+        if ($regraAcadId > 0) {
+            try {
+                $ids = (new \App\Modulos\RegrasAcademicas\Models\RegraAcademica())->listarMateriasIds($regraAcadId);
+            } catch (\Throwable $e) {
+                $ids = [];
+            }
+        }
+        if ($ids === []) {
+            $ids = array_map('intval', (array) ($layout['materias_ids'] ?? []));
+        }
+        $ids = array_values(array_filter($ids, static fn ($id) => $id > 0));
+        if ($ids === []) {
+            return [];
+        }
+        try {
+            $comp = new \App\Dominio\Escola\Models\ComponenteCurricular();
+            $ids = $comp->expandirIdsComFilhos($ids);
+            $pais = $comp->idsComFilhos();
+            $ids = array_values(array_filter($ids, static fn ($id) => empty($pais[$id])));
+        } catch (\Throwable $e) {
+            // mantém ids crus
+        }
+
+        return $ids;
+    }
+
     private function materiasPreview(array $estado, array $fallback): array
     {
         $selecionadas = array_values(array_unique(array_filter(
@@ -11267,9 +11323,18 @@ class BoletimAssistenteWizard
             static fn ($id) => $id > 0
         )));
 
-        // Modelo de boletim: matérias vêm da regra de aprovação (com desdobramentos).
+        // Quadro de impressão (Boletim → Montar quadro): matérias da regra de aprovação do layout.
+        $layoutId = (int) ($estado['layout_boletim_id'] ?? 0);
+        if ($layoutId > 0) {
+            $idsLayout = $this->materiasIdsDoLayoutImpressao($layoutId);
+            if ($idsLayout !== []) {
+                $selecionadas = $idsLayout;
+            }
+        }
+
+        // Modelo de cadastro (boletins): matérias da regra de aprovação vinculada.
         $boletimId = (int) ($estado['boletim_id'] ?? 0);
-        if ($boletimId > 0) {
+        if ($selecionadas === [] && $boletimId > 0) {
             $bol = $this->buscarBoletimCatalogo($boletimId);
             if (is_array($bol) && !empty($bol['materias_ids'])) {
                 $selecionadas = array_values(array_unique(array_filter(

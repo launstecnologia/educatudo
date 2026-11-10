@@ -45,7 +45,7 @@ class BoletimVisaoImpressaoService
         $nome = $nome . ' — impressão';
         $ano = (int) ($layout['ano_letivo'] ?? 0);
         $finalidade = ((string) ($layout['finalidade'] ?? '')) === 'complementar' ? 'complementar' : 'oficial';
-        $materiasJson = $this->jsonIds($layout['materias_ids'] ?? null);
+        $materiasJson = $this->jsonIds($this->materiasDoLayoutParaImpressao($layout));
         $seriesJson = $this->jsonIds($layout['series_ids'] ?? null);
         $turmasJson = $this->jsonIds($layout['turmas_ids'] ?? null);
         $extras = json_encode([
@@ -128,6 +128,8 @@ class BoletimVisaoImpressaoService
             'origem' => 'quadro-impressao',
             'modelo_santa_maria' => 0,
         ]);
+        // Matérias do quadro = regra de aprovação do modelo (com desdobramentos).
+        $this->sincronizarMateriasDaRegraAcademica($layoutId, $regraId);
 
         return ['ok' => true, 'regra_id' => $regraId];
     }
@@ -505,6 +507,84 @@ class BoletimVisaoImpressaoService
         ]);
         if ($destinoAntigoId > 0 && $destinoAntigoId !== $copiaId) {
             $this->config->deactivateRule($destinoAntigoId);
+        }
+    }
+
+    /**
+     * Matérias lançáveis do modelo: regra de aprovação (oficiais → desdobramentos).
+     *
+     * @param array<string,mixed> $layout
+     * @return list<int>
+     */
+    private function materiasDoLayoutParaImpressao(array $layout): array
+    {
+        $ids = [];
+        $regraAcadId = (int) ($layout['regra_academica_id'] ?? 0);
+        if ($regraAcadId > 0) {
+            try {
+                $ids = (new \App\Modulos\RegrasAcademicas\Models\RegraAcademica())->listarMateriasIds($regraAcadId);
+            } catch (\Throwable $e) {
+                $ids = [];
+            }
+        }
+        if ($ids === []) {
+            $bruto = $layout['materias_ids'] ?? [];
+            if (is_string($bruto) && $bruto !== '') {
+                $decoded = json_decode($bruto, true);
+                $bruto = is_array($decoded) ? $decoded : [];
+            }
+            $ids = array_values(array_filter(array_map('intval', (array) $bruto), static fn ($id) => $id > 0));
+        }
+        if ($ids === []) {
+            return [];
+        }
+        try {
+            $comp = new \App\Dominio\Escola\Models\ComponenteCurricular();
+            $ids = $comp->expandirIdsComFilhos($ids);
+            $pais = $comp->idsComFilhos();
+            $ids = array_values(array_filter($ids, static fn ($id) => $id > 0 && empty($pais[$id])));
+        } catch (\Throwable $e) {
+            $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn ($id) => $id > 0)));
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Espelha as matérias da regra de aprovação no layout e na visão de impressão.
+     */
+    private function sincronizarMateriasDaRegraAcademica(int $layoutId, int $boletimRegraId): void
+    {
+        if ($layoutId <= 0) {
+            return;
+        }
+        $layout = $this->layouts->find($layoutId);
+        if (!is_array($layout)) {
+            return;
+        }
+        $ids = $this->materiasDoLayoutParaImpressao($layout);
+        $json = $ids === [] ? null : json_encode(array_values($ids), JSON_UNESCAPED_UNICODE);
+        if ($json === false) {
+            return;
+        }
+        $db = \App\Core\Database::getInstance();
+        try {
+            $db->query(
+                'UPDATE boletim_layouts SET materias_ids = :mats WHERE id = :id',
+                ['mats' => $json, 'id' => $layoutId]
+            );
+        } catch (\Throwable $e) {
+            // layout sem coluna / schema antigo
+        }
+        if ($boletimRegraId > 0) {
+            try {
+                $db->query(
+                    'UPDATE boletim_regras SET materias_ids = :mats WHERE id = :id AND ativo = 1',
+                    ['mats' => $json, 'id' => $boletimRegraId]
+                );
+            } catch (\Throwable $e) {
+                // regra sem coluna
+            }
         }
     }
 

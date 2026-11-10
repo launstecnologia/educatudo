@@ -1799,7 +1799,7 @@ class BoletimAssistenteFerramentas
             error_log('BoletimAssistenteFerramentas catalogo turmas: ' . $e->getMessage());
         }
         try {
-            $materias = array_slice($this->listarMaterias(200), 0, 80);
+            $materias = array_slice($this->listarMaterias(500), 0, 300);
         } catch (\Throwable $e) {
             error_log('BoletimAssistenteFerramentas catalogo materias: ' . $e->getMessage());
         }
