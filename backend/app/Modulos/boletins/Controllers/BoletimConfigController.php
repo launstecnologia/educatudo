@@ -14043,15 +14043,25 @@ class BoletimConfigController extends BaseController
                 }
             }
 
+            if ($blocoId <= 0 && $blocosIds !== []) {
+                $blocoId = (int) $blocosIds[0];
+            }
             $eventoVivo = $eventoId > 0 && $this->eventoAvaliativoExiste($eventoId);
             $blocoSemEventoVivo = false;
-            if ($blocoId > 0 && !$eventoVivo) {
-                // bloco_id órfão (sem evento) típico do seed antigo — precisa recasar.
-                $blocoSemEventoVivo = !$this->blocoTemEventoVivo($blocoId);
+            if (!$eventoVivo) {
+                $candidatosBloco = $blocoId > 0 ? array_values(array_unique(array_merge([$blocoId], $blocosIds))) : $blocosIds;
+                foreach ($candidatosBloco as $bidCand) {
+                    $bidCand = (int) $bidCand;
+                    if ($bidCand > 0 && !$this->blocoTemEventoVivo($bidCand)) {
+                        // bloco órfão (sem evento) típico do seed antigo — precisa recasar.
+                        $blocoSemEventoVivo = true;
+                        break;
+                    }
+                }
             }
             $precisaRecasar = ($eventoId > 0 && !$eventoVivo)
                 || ($eventoId <= 0 && $blocoSemEventoVivo)
-                || ($eventoId <= 0 && $blocoId <= 0 && $this->componentePareceColunaEvento($comp, $cfg));
+                || ($eventoId <= 0 && $blocoId <= 0 && $blocosIds === [] && $this->componentePareceColunaEvento($comp, $cfg));
 
             if ($precisaRecasar) {
                 $vivo = $this->encontrarEventoBlocoVivoPorComponente($comp, $cfg, $anoLetivo);
