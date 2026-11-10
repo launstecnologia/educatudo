@@ -4248,16 +4248,20 @@
           return;
         }
         gravarFonteBoletim(bid);
-        var htmlQuadro = demoPacote.html_quadro
-          || (C.varsPreview && C.varsPreview.quadro_notas_html)
-          || '';
+        // Só o HTML do quadro montado no assistente — nunca a grade genérica Nota/Falta.
+        var htmlQuadro = demoPacote.html_quadro || '';
         if (!htmlQuadro) {
-          if (status) status.textContent = 'Este boletim ainda não tem quadro de impressão. Construa no assistente e conclua.';
+          if (status) {
+            status.textContent = 'Este boletim ainda não tem o quadro de impressão (PP/PU/CH…). Abra o assistente, monte o quadro e conclua.';
+          }
           return;
+        }
+        if (C.varsPreview) {
+          C.varsPreview.quadro_notas_html = htmlQuadro;
         }
         inserirPersonalizado(
           '<div class="edoc-html-raw edoc-quadro-notas">{{quadro_notas_html}}</div>',
-          'Quadro do boletim na folha — o formato é o que você montou no assistente.'
+          'Quadro do boletim na folha — o mesmo formato do assistente (PP/PU/CH…).'
         );
         return;
       }

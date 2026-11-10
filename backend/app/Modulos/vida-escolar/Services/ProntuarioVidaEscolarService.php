@@ -647,30 +647,107 @@ class ProntuarioVidaEscolarService
 
     /**
      * Regra de impressão ligada ao cadastro do boletim (não o esqueleto Média/Faltas).
+     * 1) regras com boletim_id  2) layouts do mesmo ano/regra acadêmica/nome  3) layout por id.
      */
     public function resolverRegraImpressaoDoBoletim(int $boletimId): int
     {
         if ($boletimId <= 0) {
             return 0;
         }
-        $regraCadastro = 0;
+        $boletim = null;
         try {
-            $row = $this->db->fetch(
-                'SELECT regra_id FROM boletins WHERE id = :id AND ativo = 1 AND excluido_em IS NULL LIMIT 1',
+            $boletim = $this->db->fetch(
+                'SELECT id, nome, ano_letivo, regra_id, regra_academica_id
+                 FROM boletins
+                 WHERE id = :id AND ativo = 1 AND excluido_em IS NULL
+                 LIMIT 1',
                 ['id' => $boletimId]
             );
-            if (!is_array($row)) {
-                $row = $this->db->fetch(
-                    'SELECT regra_id FROM boletins WHERE id = :id AND ativo = 1 LIMIT 1',
+            if (!is_array($boletim)) {
+                $boletim = $this->db->fetch(
+                    'SELECT id, nome, ano_letivo, regra_id, regra_academica_id
+                     FROM boletins
+                     WHERE id = :id AND ativo = 1
+                     LIMIT 1',
                     ['id' => $boletimId]
                 );
             }
-            $regraCadastro = is_array($row) ? (int) ($row['regra_id'] ?? 0) : 0;
         } catch (\Throwable $e) {
-            $regraCadastro = 0;
+            $boletim = null;
+        }
+        if (!is_array($boletim)) {
+            return 0;
         }
 
-        return $this->regraIdImpressaoDoBoletim($boletimId, $regraCadastro);
+        $regraCadastro = (int) ($boletim['regra_id'] ?? 0);
+        $viaBoletim = $this->regraIdImpressaoDoBoletim($boletimId, $regraCadastro);
+        if ($viaBoletim > 0) {
+            return $viaBoletim;
+        }
+
+        return $this->regraIdImpressaoPorLayoutsDoBoletim($boletim, $regraCadastro);
+    }
+
+    /**
+     * Quando a regra de impressão não gravou boletim_id, acha pelo layout (ano + regra acadêmica/nome).
+     *
+     * @param array<string,mixed> $boletim
+     */
+    private function regraIdImpressaoPorLayoutsDoBoletim(array $boletim, int $regraCadastro = 0): int
+    {
+        $ano = (int) ($boletim['ano_letivo'] ?? 0);
+        $regraAcad = (int) ($boletim['regra_academica_id'] ?? 0);
+        $nomeBol = strtolower(trim((string) ($boletim['nome'] ?? '')));
+        if ($ano <= 0 && $regraAcad <= 0 && $nomeBol === '') {
+            return 0;
+        }
+        try {
+            $layouts = $this->db->fetchAll(
+                "SELECT id, nome, regra_academica_id, ano_letivo
+                 FROM boletim_layouts
+                 WHERE ativo = 1
+                   AND (:ano = 0 OR ano_letivo = :ano2)
+                 ORDER BY id DESC
+                 LIMIT 80",
+                ['ano' => $ano, 'ano2' => $ano]
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return 0;
+        }
+
+        $melhor = 0;
+        $melhorPts = -1;
+        foreach ($layouts as $layout) {
+            if (!is_array($layout)) {
+                continue;
+            }
+            $layoutId = (int) ($layout['id'] ?? 0);
+            if ($layoutId <= 0) {
+                continue;
+            }
+            $ptsLayout = 0;
+            if ($regraAcad > 0 && (int) ($layout['regra_academica_id'] ?? 0) === $regraAcad) {
+                $ptsLayout += 50;
+            }
+            $nomeLay = strtolower(trim((string) ($layout['nome'] ?? '')));
+            if ($nomeBol !== '' && $nomeLay !== '' && ($nomeLay === $nomeBol || str_contains($nomeLay, $nomeBol) || str_contains($nomeBol, $nomeLay))) {
+                $ptsLayout += 40;
+            }
+            if ($ptsLayout <= 0) {
+                continue;
+            }
+            $regra = $this->escolherMelhorRegraImpressao($this->regrasDoLayoutImpressao($layoutId), $regraCadastro);
+            if ($regra <= 0) {
+                continue;
+            }
+            $pts = $ptsLayout;
+            if ($pts > $melhorPts) {
+                $melhorPts = $pts;
+                $melhor = $regra;
+            }
+        }
+
+        return $melhor;
     }
 
     /**

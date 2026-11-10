@@ -84,15 +84,19 @@ class DemonstracaoDocumentoService
         unset($vars['_grade_fonte']);
         $vars['componentes_serie_html'] = $this->htmlComponentes($linhas);
         $quadroBoletim = $boletimId > 0 ? $this->htmlQuadroDoBoletim($alunoId, $boletimId) : '';
-        if ($quadroBoletim !== '') {
-            $vars['quadro_notas_html'] = $quadroBoletim;
-            $out['html_quadro'] = $quadroBoletim;
+        if ($boletimId > 0) {
             $out['boletim_id'] = $boletimId;
+            if ($quadroBoletim !== '') {
+                // Só o quadro montado no assistente (PP/PU/CH…), nunca a grade genérica Nota/Falta.
+                $vars['quadro_notas_html'] = $quadroBoletim;
+                $out['html_quadro'] = $quadroBoletim;
+            } else {
+                $vars['quadro_notas_html'] = '';
+                $out['html_quadro'] = '';
+                $out['resumo'] = 'Este boletim ainda não tem o quadro de impressão (PP/PU/CH…). Abra o assistente, monte o quadro e conclua.';
+            }
         } else {
             $vars['quadro_notas_html'] = ModeloDocumentoService::htmlQuadroDeLinhasBimestrais($linhas);
-            if ($boletimId > 0) {
-                $out['resumo'] = 'Boletim sem quadro de impressão montado. Construa o boletim no assistente e conclua.';
-            }
         }
         $vars['historico_html'] = $this->htmlHistoricoDoAno($linhas, $ano, $vars);
         $out['linhas'] = $linhas;
