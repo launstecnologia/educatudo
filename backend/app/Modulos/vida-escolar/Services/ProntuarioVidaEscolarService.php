@@ -685,7 +685,105 @@ class ProntuarioVidaEscolarService
             return $viaBoletim;
         }
 
-        return $this->regraIdImpressaoPorLayoutsDoBoletim($boletim, $regraCadastro);
+        $viaLayout = $this->regraIdImpressaoPorLayoutsDoBoletim($boletim, $regraCadastro);
+        if ($viaLayout > 0) {
+            return $viaLayout;
+        }
+
+        return $this->regraIdImpressaoPorNomeAnoDoBoletim($boletim, $regraCadastro);
+    }
+
+    /**
+     * Último recurso: regras de impressão do mesmo ano com nome parecido ao boletim.
+     *
+     * @param array<string,mixed> $boletim
+     */
+    private function regraIdImpressaoPorNomeAnoDoBoletim(array $boletim, int $regraCadastro = 0): int
+    {
+        $ano = (int) ($boletim['ano_letivo'] ?? 0);
+        $nomeBol = strtolower(trim((string) ($boletim['nome'] ?? '')));
+        if ($ano <= 0 || $nomeBol === '') {
+            return 0;
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT id, nome, extras_json, updated_at
+                 FROM boletim_regras
+                 WHERE ativo = 1
+                   AND exibir_em = 'boletim'
+                   AND ano_letivo = :ano
+                 ORDER BY updated_at DESC, id DESC
+                 LIMIT 250",
+                ['ano' => $ano]
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return 0;
+        }
+
+        $candidatos = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $extras = json_decode((string) ($row['extras_json'] ?? ''), true);
+            if (!is_array($extras)) {
+                $extras = [];
+            }
+            $origem = strtolower(trim((string) ($extras['origem'] ?? '')));
+            $temQuadro = in_array($origem, ['quadro-impressao', 'santa-maria', 'composto'], true)
+                || !empty($extras['quadro_livre'])
+                || (!empty($extras['linhas_layout']) && is_array($extras['linhas_layout']));
+            if (!$temQuadro) {
+                continue;
+            }
+            $nomeRegra = strtolower(trim((string) ($row['nome'] ?? '')));
+            if (!$this->nomesBoletimParecidos($nomeBol, $nomeRegra)) {
+                continue;
+            }
+            $candidatos[] = $row;
+        }
+
+        return $this->escolherMelhorRegraImpressao($candidatos, $regraCadastro);
+    }
+
+    private function nomesBoletimParecidos(string $a, string $b): bool
+    {
+        $a = trim($a);
+        $b = trim($b);
+        if ($a === '' || $b === '') {
+            return false;
+        }
+        if ($a === $b || str_contains($a, $b) || str_contains($b, $a)) {
+            return true;
+        }
+        $norm = static function (string $s): string {
+            $s = preg_replace('/[^a-z0-9\s]+/u', ' ', $s) ?? $s;
+            $s = preg_replace('/\s+/', ' ', $s) ?? $s;
+            return trim($s);
+        };
+        $na = $norm($a);
+        $nb = $norm($b);
+        if ($na === '' || $nb === '') {
+            return false;
+        }
+        if (str_contains($na, $nb) || str_contains($nb, $na)) {
+            return true;
+        }
+        // Tokens significativos (ex.: "santa maria" em ambos).
+        $stop = ['de', 'da', 'do', 'das', 'dos', 'e', 'a', 'o', 'em', 'ano', 'serie', 'série'];
+        $tokA = array_values(array_filter(explode(' ', $na), static function (string $t) use ($stop): bool {
+            return strlen($t) >= 3 && !in_array($t, $stop, true);
+        }));
+        $tokB = array_values(array_filter(explode(' ', $nb), static function (string $t) use ($stop): bool {
+            return strlen($t) >= 3 && !in_array($t, $stop, true);
+        }));
+        if ($tokA === [] || $tokB === []) {
+            return false;
+        }
+        $inter = array_intersect($tokA, $tokB);
+        $min = min(count($tokA), count($tokB));
+
+        return $min > 0 && count($inter) >= max(2, (int) ceil($min * 0.5));
     }
 
     /**
@@ -730,7 +828,7 @@ class ProntuarioVidaEscolarService
                 $ptsLayout += 50;
             }
             $nomeLay = strtolower(trim((string) ($layout['nome'] ?? '')));
-            if ($nomeBol !== '' && $nomeLay !== '' && ($nomeLay === $nomeBol || str_contains($nomeLay, $nomeBol) || str_contains($nomeBol, $nomeLay))) {
+            if ($nomeBol !== '' && $nomeLay !== '' && $this->nomesBoletimParecidos($nomeBol, $nomeLay)) {
                 $ptsLayout += 40;
             }
             if ($ptsLayout <= 0) {

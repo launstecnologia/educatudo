@@ -118,6 +118,7 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                     <select id="edoc-demo-aluno"><option value="">Escolha a turma</option></select>
                     <label for="edoc-fonte-boletim">Boletim a exibir</label>
                     <select id="edoc-fonte-boletim"><option value="">Carregando boletins…</option></select>
+                    <p class="edoc-hint">1) Escolha o boletim · 2) Clique em Boletim para colocar na folha · 3) Escolha a aluna só para a prévia.</p>
                     <label class="edoc-demo-check" for="edoc-demo-real">
                         <input type="checkbox" id="edoc-demo-real" checked>
                         Mostrar dados reais na folha

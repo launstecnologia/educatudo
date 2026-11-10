@@ -4243,25 +4243,21 @@
       if (qual === 'notas' || qual === 'boletim') {
         var bid = boletimSelecionadoId();
         if (!bid) {
-          if (status) status.textContent = 'Escolha o boletim a exibir antes de inserir o quadro.';
+          if (status) status.textContent = 'Primeiro escolha o boletim a exibir; depois clique em Boletim para colocar na folha.';
           if (fonteBoletim) fonteBoletim.focus();
           return;
         }
         gravarFonteBoletim(bid);
-        // Só o HTML do quadro montado no assistente — nunca a grade genérica Nota/Falta.
         var htmlQuadro = demoPacote.html_quadro || '';
-        if (!htmlQuadro) {
-          if (status) {
-            status.textContent = 'Este boletim ainda não tem o quadro de impressão (PP/PU/CH…). Abra o assistente, monte o quadro e conclua.';
-          }
-          return;
-        }
-        if (C.varsPreview) {
+        if (htmlQuadro && C.varsPreview) {
           C.varsPreview.quadro_notas_html = htmlQuadro;
         }
+        // Sempre vincula o token na folha. A aluna só alimenta a prévia.
         inserirPersonalizado(
           '<div class="edoc-html-raw edoc-quadro-notas">{{quadro_notas_html}}</div>',
-          'Quadro do boletim na folha — o mesmo formato do assistente (PP/PU/CH…).'
+          htmlQuadro
+            ? 'Boletim na folha. Troque a aluna para atualizar a prévia com as notas.'
+            : 'Boletim vinculado na folha. Escolha uma aluna do ano desse boletim para ver a prévia (PP/PU/CH…).'
         );
         return;
       }

@@ -93,7 +93,12 @@ class DemonstracaoDocumentoService
             } else {
                 $vars['quadro_notas_html'] = '';
                 $out['html_quadro'] = '';
-                $out['resumo'] = 'Este boletim ainda não tem o quadro de impressão (PP/PU/CH…). Abra o assistente, monte o quadro e conclua.';
+                $anoBoletim = $this->anoDoBoletim($boletimId);
+                if ($anoBoletim > 0 && $ano > 0 && $anoBoletim !== $ano) {
+                    $out['resumo'] = 'Boletim vinculado (ano ' . $anoBoletim . '). Escolha uma aluna de ' . $anoBoletim . ' para ver a prévia do quadro.';
+                } else {
+                    $out['resumo'] = 'Boletim vinculado. Se a prévia não aparecer, abra o assistente desse boletim, monte o quadro e conclua.';
+                }
             }
         } else {
             $vars['quadro_notas_html'] = ModeloDocumentoService::htmlQuadroDeLinhasBimestrais($linhas);
@@ -204,6 +209,22 @@ class DemonstracaoDocumentoService
         } catch (\Throwable $e) {
             error_log('DemonstracaoDocumento quadro boletim: ' . $e->getMessage());
             return '';
+        }
+    }
+
+    private function anoDoBoletim(int $boletimId): int
+    {
+        if ($boletimId <= 0 || !$this->tabelaExiste('boletins')) {
+            return 0;
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT ano_letivo FROM boletins WHERE id = :id LIMIT 1',
+                ['id' => $boletimId]
+            );
+            return is_array($row) ? (int) ($row['ano_letivo'] ?? 0) : 0;
+        } catch (\Throwable $e) {
+            return 0;
         }
     }
 
