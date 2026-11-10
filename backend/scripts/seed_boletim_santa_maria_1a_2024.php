@@ -800,6 +800,9 @@ final class SeedBoletimSantaMaria1A
                 'ch' => '2ª Chamada',
                 'pe' => 'Ponto Extra',
             ] as $slug => $nome) {
+                if ($slug === 'ch' && $bimestre !== 3) {
+                    continue;
+                }
                 $chave = $bimestre . ':' . $slug;
                 $tituloEvento = PREFIXO . ' ' . $nome;
                 $exist = $this->db->fetch(
