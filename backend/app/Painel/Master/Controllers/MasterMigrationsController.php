@@ -116,8 +116,9 @@ class MasterMigrationsController extends BaseController
             $exec = $executadasMap[$e['id']] ?? [];
             $pendentesSchema = array_values(array_diff($schemaFiles, $exec));
             $cargasPendentes = array_values(array_diff($cargasFiles, $exec));
+            // Seeds de homologação: sempre listar (mesmo já executados) para poder apagar/recarregar.
             $cargasRepetiveis = array_values(array_filter($cargasFiles, static function ($f) {
-                return stripos($f, 'escola_teste_em_2025') !== false;
+                return MysqlProvisioningService::migrationCargaRepetivel((string) $f);
             }));
             $escolherLista = array_values(array_unique(array_merge($pendentesSchema, $cargasPendentes, $cargasRepetiveis)));
             $totalPendentes += count($pendentesSchema);

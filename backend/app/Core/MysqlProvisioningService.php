@@ -235,6 +235,16 @@ class MysqlProvisioningService
     }
 
     /**
+     * Seeds de homologação que o Master pode listar e reexecutar mesmo após já rodarem.
+     */
+    public static function migrationCargaRepetivel(string $file): bool
+    {
+        $f = strtolower($file);
+        return strpos($f, 'escola_teste_em_2025') !== false
+            || strpos($f, 'santa_maria_ana_2024') !== false;
+    }
+
+    /**
      * Dumps, rollbacks, master e seeds de demo não entram no bootstrap de escola nova.
      */
     private static function arquivoMigrationTenantDeveSerIgnorado(string $file): bool
@@ -365,15 +375,15 @@ class MysqlProvisioningService
         if (empty($selectedFiles)) {
             return;
         }
-        $repetirCarga2025 = false;
+        $repetirCargaHomolog = false;
         foreach ($selectedFiles as $rawName) {
-            if (stripos((string) $rawName, 'escola_teste_em_2025') !== false) {
-                $repetirCarga2025 = true;
+            if (self::migrationCargaRepetivel((string) $rawName)) {
+                $repetirCargaHomolog = true;
                 break;
             }
         }
         if (function_exists('set_time_limit')) {
-            @set_time_limit($repetirCarga2025 ? 0 : 180);
+            @set_time_limit($repetirCargaHomolog ? 0 : 180);
         }
         $list = self::resolverArquivosMigrationSelecionados($selectedFiles);
         if ($list === []) {
@@ -394,7 +404,7 @@ class MysqlProvisioningService
             "INSERT IGNORE INTO migrations_escolas (escola_id, migration_name) VALUES (?, ?)"
         );
         foreach ($list as $m) {
-            $repetir = stripos($m['file'], 'escola_teste_em_2025') !== false;
+            $repetir = self::migrationCargaRepetivel($m['file']);
             if (isset($executadas[$m['file']]) && !$repetir) {
                 continue;
             }

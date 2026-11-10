@@ -747,7 +747,7 @@ $masterPendentes = $master_pendentes ?? [];
             var label = document.createElement('label');
             label.htmlFor = cb.id;
             label.className = 'text-sm text-slate-700 font-mono cursor-pointer';
-            label.textContent = file + (ehApagar ? '  (apagar seed 2025)' : (isCarga ? '  (carga)' : ''));
+            label.textContent = file + (ehApagar ? '  (apagar seed)' : (isCarga ? '  (carga)' : ''));
             li.appendChild(cb);
             li.appendChild(label);
             modalLista.appendChild(li);
