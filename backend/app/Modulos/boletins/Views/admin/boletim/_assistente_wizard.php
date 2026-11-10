@@ -191,6 +191,15 @@ $boletimWizardSteps = [
 .bw-preview-table.boletim tr:nth-child(even) td { background: #f8fafc; }
 .bw-preview-table.boletim td.ok { color: #047857; font-weight: 700; }
 .bw-preview-table.boletim td.nok { color: #b91c1c; font-weight: 700; }
+/* Separação visual entre títulos de período (I BIM / II BIM / semestre…) */
+.bw-preview-table.boletim th.grupo-sep,
+.bw-preview-table.boletim th.sub.grupo-sep,
+.bw-preview-table.boletim td.grupo-sep {
+    border-left: 3px solid color-mix(in srgb, var(--sidebar-bg-color, #1e3a5f) 55%, #64748b);
+}
+.bw-preview-table.boletim th.grupo-sep {
+    border-left-color: color-mix(in srgb, var(--sidebar-bg-color, #1e3a5f) 40%, #fff);
+}
 .bw-builder { display: grid; grid-template-columns: minmax(14rem, 17rem) minmax(0, 1fr); gap: 0.75rem; align-items: stretch; }
 @media (max-width: 900px) { .bw-builder { grid-template-columns: 1fr; } }
 .bw-catalogo { border: 1px solid #e2e8f0; border-radius: 0.75rem; background: #fff; min-height: 16rem; max-height: 28rem; overflow: auto; display: flex; flex-direction: column; }
@@ -221,10 +230,10 @@ $boletimWizardSteps = [
 .bw-col-chip.calc { background: #fef3c7; border-color: #fcd34d; color: #92400e; text-transform: none; letter-spacing: 0; }
 .bw-col-chip.aberta { box-shadow: 0 0 0 2px #f59e0b; }
 .bw-col-chip.marcada { box-shadow: 0 0 0 2px #4f46e5; background: #e0e7ff; }
-.bw-linha-caixa { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px 10px; border: 1px solid #a5b4fc; border-radius: 0.75rem; background: #fff; min-width: 9rem; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); transition: border-color .2s ease, box-shadow .2s ease, background .2s ease; }
-.bw-linha-caixa.confirmado { border-color: #86efac; background: #f0fdf4; box-shadow: 0 1px 2px rgba(22, 163, 74, 0.08); }
-.bw-linha-cols { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; align-content: flex-start; min-height: 3.25rem; min-width: 5rem; padding: 0.45rem; border: 1px dashed #c7d2fe; border-radius: 0.55rem; background: #f8fafc; }
-.bw-linha-caixa.confirmado .bw-linha-cols { border-color: #bbf7d0; background: #ecfdf5; }
+.bw-linha-caixa { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px; border: 2.5px solid #818cf8; border-radius: 0.85rem; background: #fff; min-width: 9.5rem; box-shadow: 0 2px 8px rgba(79, 70, 229, 0.10); transition: border-color .2s ease, box-shadow .2s ease, background .2s ease; }
+.bw-linha-caixa.confirmado { border-color: #22c55e; border-width: 2.5px; background: #f0fdf4; box-shadow: 0 2px 8px rgba(22, 163, 74, 0.12); }
+.bw-linha-cols { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; align-content: flex-start; min-height: 3.25rem; min-width: 5rem; padding: 0.55rem; border: 1.5px dashed #a5b4fc; border-radius: 0.55rem; background: #f8fafc; }
+.bw-linha-caixa.confirmado .bw-linha-cols { border-color: #86efac; border-style: solid; background: #ecfdf5; }
 .bw-linha-cols:empty::before { content: 'Solte colunas aqui'; color: #94a3b8; font-size: 11px; font-weight: 600; }
 .bw-linha-topo { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .bw-linha-grip { cursor: grab; opacity: 0.55; letter-spacing: -1px; font-size: 13px; line-height: 1; padding: 2px 2px 2px 0; color: #3730a3; touch-action: none; user-select: none; }
@@ -5562,13 +5571,15 @@ $boletimWizardSteps = [
         var html = '<div class="overflow-x-auto max-h-[28rem] border border-gray-300 rounded-lg bg-white mb-4">';
         html += '<table class="bw-preview-table boletim"><thead><tr>';
         html += '<th rowspan="2" class="mat text-left">' + esc(tab.titulo || 'Matéria') + '</th>';
-        grupos.forEach(function (g) {
-            html += '<th colspan="' + Math.max(1, (g.cols || []).length) + '">' + esc(g.label || g.key) + '</th>';
+        grupos.forEach(function (g, gi) {
+            var clsCab = gi > 0 ? ' class="grupo-sep"' : '';
+            html += '<th colspan="' + Math.max(1, (g.cols || []).length) + '"' + clsCab + '>' + esc(g.label || g.key) + '</th>';
         });
         html += '</tr><tr>';
-        grupos.forEach(function (g) {
-            (g.cols || []).forEach(function (c) {
-                html += '<th class="sub">' + esc(c.nome || c.codigo) + '</th>';
+        grupos.forEach(function (g, gi) {
+            (g.cols || []).forEach(function (c, ci) {
+                var clsSub = 'sub' + (gi > 0 && ci === 0 ? ' grupo-sep' : '');
+                html += '<th class="' + clsSub + '">' + esc(c.nome || c.codigo) + '</th>';
             });
         });
         html += '</tr></thead><tbody>';
@@ -5580,10 +5591,12 @@ $boletimWizardSteps = [
             var nomeMat = esc(lin.materia_nome);
             if (lin.eh_grupo_filho) nomeMat = '<span class="text-gray-400 mr-1" aria-hidden="true">↳</span>' + nomeMat;
             html += '<tr' + (lin.eh_grupo_pai ? ' class="font-semibold"' : '') + '><td class="' + clsMat + '">' + nomeMat + '</td>';
-            grupos.forEach(function (g) {
-                (g.cols || []).forEach(function (c) {
+            grupos.forEach(function (g, gi) {
+                (g.cols || []).forEach(function (c, ci) {
                     var v = notaDaLinhaPreview(notas, c.codigo);
-                    html += '<td class="' + classePreviewCelula(v, c) + '">' + fmtPreviewCelula(v, c) + '</td>';
+                    var clsCel = classePreviewCelula(v, c);
+                    if (gi > 0 && ci === 0) clsCel = (clsCel ? clsCel + ' ' : '') + 'grupo-sep';
+                    html += '<td class="' + clsCel + '">' + fmtPreviewCelula(v, c) + '</td>';
                 });
             });
             html += '</tr>';
@@ -7137,7 +7150,7 @@ $boletimWizardSteps = [
         html += '<button type="button" id="bw-criar-linha" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">Novo título do período</button>';
         html += '<button type="button" id="bw-tirar-linha" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50">Tirar título</button>';
         html += '</div>';
-        html += '<div id="bw-colunas-lista" class="flex flex-wrap items-start gap-2 min-h-[8rem]">';
+        html += '<div id="bw-colunas-lista" class="flex flex-wrap items-start gap-4 min-h-[8rem]">';
         var visiveis = [];
         cols.forEach(function (c) {
             if (!colunaSegueBlocoSemanal(c)) visiveis.push(c);
