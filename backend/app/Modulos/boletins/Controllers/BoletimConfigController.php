@@ -5997,18 +5997,23 @@ class BoletimConfigController extends BaseController
                     }
                 }
             } else {
-                $usouNotaFinalTipo = $this->preencherComponenteComNotaFinalTipo(
-                    $componente,
-                    $alunoId,
-                    $regra,
-                    $periodoRef,
-                    $codigo,
-                    $roundMode,
-                    $valor,
-                    $detalhes,
-                    $matrizPorCodigo,
-                    $materiaNomesPorId
-                );
+                $cfgAntesTipo = $this->decodeComponenteConfig($componente);
+                $eventoAntesTipo = (int) ($cfgAntesTipo['evento_avaliativo_id'] ?? $componente['evento_avaliativo_id'] ?? 0);
+                // Com evento_avaliativo_id a nota vem só desse evento — não usa nota_final do tipo.
+                $usouNotaFinalTipo = $eventoAntesTipo > 0
+                    ? false
+                    : $this->preencherComponenteComNotaFinalTipo(
+                        $componente,
+                        $alunoId,
+                        $regra,
+                        $periodoRef,
+                        $codigo,
+                        $roundMode,
+                        $valor,
+                        $detalhes,
+                        $matrizPorCodigo,
+                        $materiaNomesPorId
+                    );
                 if ($usouNotaFinalTipo) {
                     // nota_final do tipo — boletim não varre eventos
                 } else {
@@ -6017,20 +6022,28 @@ class BoletimConfigController extends BaseController
                 $materiaFiltroConsulta = $materiasFiltro !== []
                     ? null
                     : ($materiaFiltro > 0 ? $materiaFiltro : null);
+                $cfgBlocos = $this->decodeComponenteConfig($componente);
+                $eventoIdComp = (int) ($cfgBlocos['evento_avaliativo_id'] ?? $componente['evento_avaliativo_id'] ?? 0);
+                // Coluna amarrada a um Evento Avaliativo: só esse ID (não busca por tipo/sigla).
+                $vinculoEventoEstrito = $eventoIdComp > 0;
                 $blocoIds = $this->resolveBlocoIdsFromComponentePersisted($componente);
                 $bimestresComp = $this->bimestresDoComponenteOuRegra($componente, $regra);
-                $cfgBlocos = $this->decodeComponenteConfig($componente);
-                if ($blocoIds !== [] && $bimestresComp !== [] && empty($cfgBlocos['blocos_ids_manual'])) {
+                if ($blocoIds !== [] && $bimestresComp !== [] && empty($cfgBlocos['blocos_ids_manual']) && !$vinculoEventoEstrito) {
                     $blocoIds = $this->boletimConfig->filtrarBlocoIdsPorBimestres($blocoIds, $bimestresComp);
                 }
-                $resolvidoQuadro = $this->resolverBlocosQuadroDoComponente(
-                    $componente,
-                    $blocoIds,
-                    $range['inicio'] ?? null,
-                    $range['fim'] ?? null,
-                    $bimestresComp,
-                    (int) ($regra['ano_letivo'] ?? 0)
-                );
+                if ($vinculoEventoEstrito) {
+                    // Sem bloco no evento → vazio. Nunca amplia por tipo (evitava CH de outro bimestre).
+                    $resolvidoQuadro = ['bloco_ids' => $blocoIds, 'forcada' => true];
+                } else {
+                    $resolvidoQuadro = $this->resolverBlocosQuadroDoComponente(
+                        $componente,
+                        $blocoIds,
+                        $range['inicio'] ?? null,
+                        $range['fim'] ?? null,
+                        $bimestresComp,
+                        (int) ($regra['ano_letivo'] ?? 0)
+                    );
+                }
                 $blocoIds = $resolvidoQuadro['bloco_ids'];
                 $quadroForcado = !empty($resolvidoQuadro['forcada']);
                 $filtroTitulo = trim((string) ($componente['filtro_titulo'] ?? ''));
@@ -6049,9 +6062,17 @@ class BoletimConfigController extends BaseController
                     );
                     $rows = $this->restringirProvasAosBlocosDaTurma($rows, $blocoIds, $alunoId);
                     $detalhes['blocos_ids'] = $blocoIds;
-                } elseif ($quadroForcado) {
+                    if ($vinculoEventoEstrito) {
+                        $detalhes['evento_avaliativo_id'] = $eventoIdComp;
+                    }
+                } elseif ($quadroForcado || $vinculoEventoEstrito) {
                     $rows = [];
-                    $detalhes['aviso_semana'] = 'Nenhum evento de prova correspondente a esta coluna do quadro.';
+                    $detalhes['aviso_semana'] = $vinculoEventoEstrito
+                        ? 'Evento sem lançamento para esta coluna.'
+                        : 'Nenhum evento de prova correspondente a esta coluna do quadro.';
+                    if ($vinculoEventoEstrito) {
+                        $detalhes['evento_avaliativo_id'] = $eventoIdComp;
+                    }
                 } elseif ($tinhaBlocos) {
                     $rows = [];
                 } else {
@@ -14023,7 +14044,16 @@ class BoletimConfigController extends BaseController
             }
 
             $eventoVivo = $eventoId > 0 && $this->eventoAvaliativoExiste($eventoId);
-            if ($eventoId > 0 && !$eventoVivo) {
+            $blocoSemEventoVivo = false;
+            if ($blocoId > 0 && !$eventoVivo) {
+                // bloco_id órfão (sem evento) típico do seed antigo — precisa recasar.
+                $blocoSemEventoVivo = !$this->blocoTemEventoVivo($blocoId);
+            }
+            $precisaRecasar = ($eventoId > 0 && !$eventoVivo)
+                || ($eventoId <= 0 && $blocoSemEventoVivo)
+                || ($eventoId <= 0 && $blocoId <= 0 && $this->componentePareceColunaEvento($comp, $cfg));
+
+            if ($precisaRecasar) {
                 $vivo = $this->encontrarEventoBlocoVivoPorComponente($comp, $cfg, $anoLetivo);
                 if ($vivo !== null) {
                     $eventoId = (int) $vivo['evento_id'];
@@ -14034,7 +14064,7 @@ class BoletimConfigController extends BaseController
                         $cfg['tipo_avaliacao_id'] = (int) $vivo['tipo_avaliacao_id'];
                     }
                     $eventoVivo = true;
-                } else {
+                } elseif ($eventoId > 0 && !$eventoVivo) {
                     // Sem substituto confiável: zera vínculo para não puxar bloco morto/errado.
                     $cfg['evento_avaliativo_id'] = null;
                     $eventoId = 0;
@@ -14080,6 +14110,50 @@ class BoletimConfigController extends BaseController
         }
     }
 
+    private function blocoTemEventoVivo(int $blocoId): bool
+    {
+        if ($blocoId <= 0) {
+            return false;
+        }
+        try {
+            $row = Database::getInstance()->fetch(
+                'SELECT pb.id
+                   FROM provas_blocos pb
+                   INNER JOIN eventos_avaliativos e
+                           ON e.id = pb.evento_avaliativo_id AND e.deleted_at IS NULL
+                  WHERE pb.id = :id AND pb.deleted_at IS NULL
+                  LIMIT 1',
+                ['id' => $blocoId]
+            );
+
+            return is_array($row) && (int) ($row['id'] ?? 0) === $blocoId;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $componente
+     * @param array<string,mixed> $cfg
+     */
+    private function componentePareceColunaEvento(array $componente, array $cfg): bool
+    {
+        $src = strtolower(trim((string) ($componente['source_type'] ?? '')));
+        if ($src !== '' && $src !== 'provas_sistema') {
+            return false;
+        }
+        $cod = strtolower(trim((string) ($componente['codigo'] ?? '')));
+        if (preg_match('/^b[1-4]_(pp|pu|ch|pe|rec)$/', $cod) === 1) {
+            return true;
+        }
+        if (preg_match('/^(pp|pu|ch|pe|rec|pf)$/', $cod) === 1) {
+            return true;
+        }
+        $nome = strtoupper(trim((string) ($componente['nome'] ?? '')));
+
+        return preg_match('/\b(PP|PU|CH|PE|REC|PF)\b/', $nome) === 1;
+    }
+
     /**
      * @param array<string,mixed> $componente
      * @param array<string,mixed> $cfg
@@ -14106,9 +14180,23 @@ class BoletimConfigController extends BaseController
             $bim = 90;
         }
         if ($bim <= 0) {
+            foreach ((array) ($cfg['prova_bimestres'] ?? []) as $bProva) {
+                $nBim = (int) $bProva;
+                if ($nBim >= 1 && $nBim <= 4) {
+                    $bim = $nBim;
+                    break;
+                }
+            }
+        }
+        if ($bim <= 0) {
             $grupo = strtolower(trim((string) ($cfg['layout_group'] ?? $componente['layout_group'] ?? '')));
             if (preg_match('/^b([1-4])$/', $grupo, $mG) === 1) {
                 $bim = (int) $mG[1];
+            }
+        }
+        if ($sigla === '') {
+            if (preg_match('/^(pp|pu|ch|pe|rec|pf)$/', $cod) === 1) {
+                $sigla = strtoupper($cod);
             }
         }
         if ($sigla === '') {
