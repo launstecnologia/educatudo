@@ -3760,6 +3760,7 @@ $boletimWizardSteps = [
         if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
         if (!Array.isArray(estado.blocos_calc)) estado.blocos_calc = [];
         var codigo = novoCodigoBloco();
+        mostrarColuna(codigo);
         if (estado.blocos_calc.indexOf(codigo) < 0) estado.blocos_calc.push(codigo);
         if (!Array.isArray(estado.colunas_ordem)) estado.colunas_ordem = [];
         if (estado.colunas_ordem.indexOf(codigo) < 0) {
@@ -3922,6 +3923,7 @@ $boletimWizardSteps = [
         aplicarTituloBloco(estado.bloco_calc, nome);
         flushEscalaAberta();
         var codigoSalvo = estado.bloco_calc;
+        if (codigoSalvo) mostrarColuna(codigoSalvo);
         if (codigoSalvo && estado.blocos_calc.indexOf(codigoSalvo) < 0) {
             estado.blocos_calc.push(codigoSalvo);
         }
@@ -3976,32 +3978,91 @@ $boletimWizardSteps = [
     function ocultarColuna(codigo) {
         if (!estado || !codigo) return;
         if (!Array.isArray(estado.colunas_ocultas)) estado.colunas_ocultas = [];
-        if (estado.colunas_ocultas.indexOf(codigo) < 0) estado.colunas_ocultas.push(codigo);
+        var low = String(codigo).toLowerCase();
+        var ja = (estado.colunas_ocultas || []).some(function (c) {
+            return String(c || '').toLowerCase() === low;
+        });
+        if (!ja) estado.colunas_ocultas.push(codigo);
     }
 
     function colunaOculta(codigo) {
-        return !!estado && (estado.colunas_ocultas || []).indexOf(codigo) >= 0;
+        if (!estado || !codigo) return false;
+        var low = String(codigo).toLowerCase();
+        return (estado.colunas_ocultas || []).some(function (c) {
+            return String(c || '').toLowerCase() === low;
+        });
+    }
+
+    function mostrarColuna(codigo) {
+        if (!estado || !codigo) return;
+        var low = String(codigo).toLowerCase();
+        estado.colunas_ocultas = (estado.colunas_ocultas || []).filter(function (c) {
+            return String(c || '').toLowerCase() !== low;
+        });
+    }
+
+    function tirarColunaDoRascunho(codigo) {
+        var low = String(codigo || '').toLowerCase();
+        if (!low) return;
+        function filtrarComps(lista) {
+            return (lista || []).filter(function (c) {
+                if (!c) return false;
+                return String(c.codigo || '').toLowerCase() !== low;
+            });
+        }
+        if (rascunhoAtual && Array.isArray(rascunhoAtual.componentes)) {
+            rascunhoAtual.componentes = filtrarComps(rascunhoAtual.componentes);
+        }
+        if (estado && estado.rascunho_preservado && Array.isArray(estado.rascunho_preservado.componentes)) {
+            estado.rascunho_preservado.componentes = filtrarComps(estado.rascunho_preservado.componentes);
+        }
+        if (previewAtual && Array.isArray(previewAtual.colunas)) {
+            previewAtual.colunas = previewAtual.colunas.filter(function (c) {
+                return c && String(c.codigo || '').toLowerCase() !== low;
+            });
+        }
     }
 
     function removerBlocoCalc(codigo) {
         if (!codigo) return;
+        var low = String(codigo).toLowerCase();
         ocultarColuna(codigo);
-        if (codigo === '_semanal' || codigo === 'media_sem') {
+        if (codigo === '_semanal' || codigo === 'media_sem' || low === '_semanal' || low === 'media_sem') {
             ocultarColuna('_semanal');
             ocultarColuna('media_sem');
             ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8'].forEach(ocultarColuna);
         }
-        var peca = pecaDaColuna(codigo);
+        var peca = pecaDaColuna(codigo) || pecaDaColuna(low);
         if (peca) {
             estado.pecas = (estado.pecas || []).filter(function (p) { return p !== peca; });
         }
-        estado.blocos_calc = (estado.blocos_calc || []).filter(function (c) { return c !== codigo; });
-        if (estado.formulas_blocos) delete estado.formulas_blocos[codigo];
-        if (estado.formulas_materias_blocos) delete estado.formulas_materias_blocos[codigo];
-        if (estado.nomes_blocos) delete estado.nomes_blocos[codigo];
-        if (estado.escalas_blocos) delete estado.escalas_blocos[codigo];
-        estado.colunas_ordem = (estado.colunas_ordem || []).filter(function (c) { return c !== codigo; });
-        if (estado.bloco_calc === codigo) {
+        estado.blocos_calc = (estado.blocos_calc || []).filter(function (c) {
+            return String(c || '').toLowerCase() !== low;
+        });
+        if (estado.formulas_blocos) {
+            Object.keys(estado.formulas_blocos).forEach(function (k) {
+                if (String(k).toLowerCase() === low) delete estado.formulas_blocos[k];
+            });
+        }
+        if (estado.formulas_materias_blocos) {
+            Object.keys(estado.formulas_materias_blocos).forEach(function (k) {
+                if (String(k).toLowerCase() === low) delete estado.formulas_materias_blocos[k];
+            });
+        }
+        if (estado.nomes_blocos) {
+            Object.keys(estado.nomes_blocos).forEach(function (k) {
+                if (String(k).toLowerCase() === low) delete estado.nomes_blocos[k];
+            });
+        }
+        if (estado.escalas_blocos) {
+            Object.keys(estado.escalas_blocos).forEach(function (k) {
+                if (String(k).toLowerCase() === low) delete estado.escalas_blocos[k];
+            });
+        }
+        estado.colunas_ordem = (estado.colunas_ordem || []).filter(function (c) {
+            return String(c || '').toLowerCase() !== low;
+        });
+        if (String(estado.bloco_calc || '').toLowerCase() === low) {
             estado.bloco_calc = '';
             estado.materia_calc = 0;
             estado.formula_tokens = [];
@@ -4011,10 +4072,81 @@ $boletimWizardSteps = [
         if (Array.isArray(estado.linhas_layout)) {
             estado.linhas_layout = estado.linhas_layout.map(function (lin) {
                 if (!lin) return lin;
-                lin.colunas = (lin.colunas || []).filter(function (c) { return c !== codigo; });
+                lin.colunas = (lin.colunas || []).filter(function (c) {
+                    return String(c || '').toLowerCase() !== low;
+                });
                 return lin;
             }).filter(function (lin) { return lin && (lin.colunas || []).length >= 1; });
         }
+        if (colunasMarcadas && colunasMarcadas[codigo]) delete colunasMarcadas[codigo];
+        if (colunasMarcadas && colunasMarcadas[low]) delete colunasMarcadas[low];
+        tirarColunaDoRascunho(codigo);
+        estado.quadro_chips_manuais = 1;
+        aplicarOrdemNoPreview(previewAtual);
+        renderRevisarDinamico();
+        agendarMontar();
+    }
+
+    function limparTodosChipsQuadro() {
+        if (!estado) return;
+        var codigos = {};
+        function marcar(cod) {
+            cod = String(cod || '');
+            if (!cod || cod === '_semanal') return;
+            codigos[cod] = true;
+        }
+        (estado.colunas_ordem || []).forEach(marcar);
+        (estado.blocos_calc || []).forEach(marcar);
+        Object.keys(estado.formulas_blocos || {}).forEach(marcar);
+        (estado.linhas_layout || []).forEach(function (lin) {
+            (lin && lin.colunas || []).forEach(marcar);
+        });
+        (((rascunhoAtual || {}).componentes) || []).forEach(function (c) {
+            if (c && c.codigo) marcar(c.codigo);
+        });
+        ((previewAtual && previewAtual.colunas) || []).forEach(function (c) {
+            if (c && c.codigo) marcar(c.codigo);
+        });
+        var lista = Object.keys(codigos);
+        if (!lista.length) {
+            avisoLinha = { tipo: 'ok', texto: 'Não há chips no quadro para excluir.' };
+            renderRevisarDinamico();
+            return;
+        }
+        // Remove em lote sem remount a cada item.
+        lista.forEach(function (codigo) {
+            var low = String(codigo).toLowerCase();
+            ocultarColuna(codigo);
+            if (codigo === '_semanal' || codigo === 'media_sem' || low === '_semanal' || low === 'media_sem') {
+                ocultarColuna('_semanal');
+                ocultarColuna('media_sem');
+                ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8'].forEach(ocultarColuna);
+            }
+            var peca = pecaDaColuna(codigo) || pecaDaColuna(low);
+            if (peca) {
+                estado.pecas = (estado.pecas || []).filter(function (p) { return p !== peca; });
+            }
+            tirarColunaDoRascunho(codigo);
+        });
+        estado.blocos_calc = [];
+        estado.formulas_blocos = {};
+        estado.formulas_materias_blocos = {};
+        estado.nomes_blocos = {};
+        estado.escalas_blocos = {};
+        estado.colunas_ordem = [];
+        estado.linhas_layout = [];
+        estado.cabecalhos_manuais = 1;
+        estado.titulos_periodo_ok = {};
+        estado.limpar_titulos_periodo = 1;
+        estado.bloco_calc = '';
+        estado.materia_calc = 0;
+        estado.formula_tokens = [];
+        estado.quadro_chips_manuais = 1;
+        colunasMarcadas = {};
+        var edAll = document.getElementById('bw-formula-editor');
+        if (edAll) edAll.classList.add('hidden');
+        if (previewAtual) previewAtual.colunas = [];
+        avisoLinha = { tipo: 'ok', texto: 'Todos os chips foram excluídos. Clique nos eventos à esquerda para montar de novo.' };
         aplicarOrdemNoPreview(previewAtual);
         renderRevisarDinamico();
         agendarMontar();
@@ -6335,7 +6467,9 @@ $boletimWizardSteps = [
     }
 
     function mesclarColunasExtrasDoEstado(cols) {
-        cols = (cols || []).slice();
+        cols = (cols || []).slice().filter(function (c) {
+            return c && c.codigo && !colunaOculta(c.codigo);
+        });
         var vistos = {};
         var vivos = codigosVivosDoRascunho();
         // Blocos de cálculo (MU amarelo) e fórmulas vivem no estado — não filtrar como fantasma.
@@ -6380,7 +6514,7 @@ $boletimWizardSteps = [
         });
         function add(codigo, nome, tipo) {
             codigo = String(codigo || '');
-            if (!codigo || vistos[codigo]) return;
+            if (!codigo || vistos[codigo] || colunaOculta(codigo)) return;
             var low = String(codigo).toLowerCase();
             var ehCalc = (estado.blocos_calc || []).indexOf(codigo) >= 0
                 || (estado.blocos_calc || []).indexOf(low) >= 0
@@ -6511,6 +6645,7 @@ $boletimWizardSteps = [
         });
         var codigo = codigoColunaDoEventoJs(ev, vistos);
         if (!codigo) return false;
+        mostrarColuna(codigo);
         estado.quadro_chips_manuais = 1;
         if (!Array.isArray(estado.colunas_ordem)) estado.colunas_ordem = [];
         if (estado.colunas_ordem.map(function (c) { return String(c || '').toLowerCase(); }).indexOf(codigo) < 0) {
@@ -6763,6 +6898,7 @@ $boletimWizardSteps = [
             html += '<button type="button" id="bw-add-media" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-amber-300 text-amber-950 bg-amber-50 hover:bg-amber-100">Bloco de cálculo</button>';
         }
         html += '<button type="button" id="bw-limpar-cabecalhos" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-rose-300 text-rose-800 bg-rose-50 hover:bg-rose-100">Limpar títulos</button>';
+        html += '<button type="button" id="bw-excluir-todos-chips" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-rose-400 text-rose-900 bg-white hover:bg-rose-50" title="Remove todos os chips do quadro">Excluir todos os chips</button>';
         html += '</div></div>';
         html += '<div class="bw-quadro-corpo">';
         html += '<p id="bw-linha-aviso" class="text-xs font-medium mb-2 ' + clsDica + '">' + esc(textoDica) + '</p>';
@@ -7215,6 +7351,12 @@ $boletimWizardSteps = [
                 limparTodosCabecalhos();
                 return;
             }
+            if (e.target.closest('#bw-excluir-todos-chips')) {
+                e.preventDefault();
+                if (!window.confirm('Excluir todos os chips do quadro?')) return;
+                limparTodosChipsQuadro();
+                return;
+            }
             var okCab = e.target.closest('#bw-colunas-lista .bw-linha-ok');
             if (okCab) {
                 e.preventDefault();
@@ -7232,6 +7374,7 @@ $boletimWizardSteps = [
             var xcol = e.target.closest('#bw-colunas-lista .bw-col-x');
             if (xcol) {
                 e.preventDefault();
+                e.stopPropagation();
                 removerBlocoCalc(xcol.getAttribute('data-codigo'));
                 return;
             }
@@ -10100,6 +10243,7 @@ $boletimWizardSteps = [
                     : [];
                 var ordemLocal = Array.isArray(estado && estado.colunas_ordem) ? estado.colunas_ordem.slice() : [];
                 var blocosCalcLocal = Array.isArray(estado && estado.blocos_calc) ? estado.blocos_calc.slice() : [];
+                var ocultasLocal = Array.isArray(estado && estado.colunas_ocultas) ? estado.colunas_ocultas.slice() : [];
                 var cabecalhosManuaisLocal = Number(estado && estado.cabecalhos_manuais || 0) === 1 ? 1 : 0;
                 var chipsManuaisLocal = Number(estado && estado.quadro_chips_manuais || 0) === 1 ? 1 : 0;
                 var titulosOkLocal = (estado && estado.titulos_periodo_ok && typeof estado.titulos_periodo_ok === 'object')
@@ -10112,6 +10256,17 @@ $boletimWizardSteps = [
                 estado = remoto;
                 estado.linhas_layout = linhasLocais;
                 estado.titulos_periodo_ok = titulosOkLocal;
+                // Chips excluídos com X não podem voltar no remount do servidor.
+                var ocultasRemotas = Array.isArray(estado.colunas_ocultas) ? estado.colunas_ocultas : [];
+                var ocultasFundidas = [];
+                var vistoOculta = {};
+                ocultasLocal.concat(ocultasRemotas).forEach(function (cod) {
+                    var low = String(cod || '').toLowerCase();
+                    if (!low || vistoOculta[low]) return;
+                    vistoOculta[low] = true;
+                    ocultasFundidas.push(cod);
+                });
+                estado.colunas_ocultas = ocultasFundidas;
                 // Não perde os eventos já no quadro após remount.
                 var eventosRemotos = Array.isArray(estado.eventos_avaliativos_ids)
                     ? estado.eventos_avaliativos_ids.map(Number).filter(function (id) { return id > 0; })
@@ -10149,15 +10304,21 @@ $boletimWizardSteps = [
                 var blocosRemotos = Array.isArray(estado.blocos_calc) ? estado.blocos_calc.slice() : [];
                 blocosCalcLocal.forEach(function (cod) {
                     cod = String(cod || '');
-                    if (!cod || blocosRemotos.indexOf(cod) >= 0) return;
+                    if (!cod || blocosRemotos.indexOf(cod) >= 0 || colunaOculta(cod)) return;
                     blocosRemotos.push(cod);
                 });
+                blocosRemotos = blocosRemotos.filter(function (cod) { return !colunaOculta(cod); });
                 estado.blocos_calc = blocosRemotos;
+                if (estado.formulas_blocos && typeof estado.formulas_blocos === 'object') {
+                    Object.keys(estado.formulas_blocos).forEach(function (cod) {
+                        if (colunaOculta(cod)) delete estado.formulas_blocos[cod];
+                    });
+                }
                 var ordemRemota = Array.isArray(estado.colunas_ordem) ? estado.colunas_ordem : [];
                 // Quadro do zero: não importa colunas remotas que o admin não adicionou.
                 if (!(cabecalhosManuaisLocal || (estado.quadro_livre || estado.origem === 'quadro-impressao'))) {
                     ordemRemota.forEach(function (cod, idx) {
-                        if (!cod) return;
+                        if (!cod || colunaOculta(cod)) return;
                         if (ordemLocal.indexOf(cod) >= 0) return;
                         var anterior = idx > 0 ? ordemRemota[idx - 1] : '';
                         var pos = anterior ? ordemLocal.indexOf(anterior) : -1;
@@ -10166,9 +10327,14 @@ $boletimWizardSteps = [
                     });
                 }
                 blocosRemotos.forEach(function (cod) {
-                    if (cod && ordemLocal.indexOf(cod) < 0) ordemLocal.push(cod);
+                    if (cod && !colunaOculta(cod) && ordemLocal.indexOf(cod) < 0) ordemLocal.push(cod);
                 });
-                estado.colunas_ordem = ordemLocal;
+                estado.colunas_ordem = ordemLocal.filter(function (cod) { return !colunaOculta(cod); });
+                if (rascunhoAtual && Array.isArray(rascunhoAtual.componentes)) {
+                    rascunhoAtual.componentes = rascunhoAtual.componentes.filter(function (c) {
+                        return c && c.codigo && !colunaOculta(c.codigo);
+                    });
+                }
                 if (nomeManual !== null) {
                     estado.nome = nomeManual;
                     estado.nome_automatico = false;
@@ -10181,10 +10347,20 @@ $boletimWizardSteps = [
                 }
             }
             rascunhoAtual = j.rascunho || null;
+            if (rascunhoAtual && Array.isArray(rascunhoAtual.componentes)) {
+                rascunhoAtual.componentes = rascunhoAtual.componentes.filter(function (c) {
+                    return c && c.codigo && !colunaOculta(c.codigo);
+                });
+            }
             garantirArredondamentoGrupoNoRascunho(rascunhoAtual);
             gravarEscolhasGrupoNoRascunho(rascunhoAtual);
             limparOrdemColunasFantasma();
             previewAtual = j.preview || previewAtual;
+            if (previewAtual && Array.isArray(previewAtual.colunas)) {
+                previewAtual.colunas = previewAtual.colunas.filter(function (c) {
+                    return c && c.codigo && !colunaOculta(c.codigo);
+                });
+            }
             aplicarOrdemNoPreview(previewAtual);
             aplicarTitulosDosSubeventos();
             if (previewAtual && estado && estado.nomes_blocos) {
