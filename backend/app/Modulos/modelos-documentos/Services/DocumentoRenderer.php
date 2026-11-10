@@ -182,7 +182,7 @@ class DocumentoRenderer
                 'Série' => '{{serie}}',
                 'Ano' => '{{ano_letivo}}',
             ], $css),
-            'tabela_notas' => $this->blocoHtmlLivre(
+            'boletim', 'tabela_notas' => $this->blocoHtmlLivre(
                 '<div class="quadro-notas-wrap">{{quadro_notas_html}}</div>',
                 $css
             ),

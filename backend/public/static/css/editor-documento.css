@@ -764,6 +764,12 @@ td.edoc-celula-sel, th.edoc-celula-sel {
   color: #334155;
 }
 .edoc-demo-check input { margin: 0; }
+.edoc-boletim-card {
+  margin-top: 10px;
+  border: 1px solid #93c5fd;
+  background: #eff6ff;
+}
+.edoc-boletim-card h4 { color: #1e3a8a; }
 .edoc-atalhos { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
 .edoc-atalhos .edoc-btn { font-size: 11px; padding: 4px 8px; }
 .edoc-demo .edoc-var-drop { margin-top: 8px; background: #fff; }

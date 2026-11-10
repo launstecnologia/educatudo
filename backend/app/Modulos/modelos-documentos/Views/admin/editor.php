@@ -110,26 +110,28 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                 <p class="edoc-hint" style="margin-top:10px">Clique em Tabela ou Imagem para inserir. Cole uma imagem ou uma tabela do Excel com Ctrl+V.</p>
                 <?php endif; ?>
                 <?php if ($grp === 'dados'): ?>
-                <div class="edoc-demo" id="edoc-demo">
-                    <h4>Demonstração</h4>
+                <div class="edoc-demo edoc-boletim-card" id="edoc-boletim-card" hidden>
+                    <h4>Boletim na folha</h4>
+                    <p class="edoc-hint">Escolha o boletim e a aluna. O layout montado no assistente aparece na prévia.</p>
+                    <label for="edoc-fonte-boletim">Boletim</label>
+                    <select id="edoc-fonte-boletim"><option value="">Carregando boletins…</option></select>
                     <label for="edoc-demo-turma">Turma / série</label>
                     <select id="edoc-demo-turma"><option value="">Carregando turmas…</option></select>
-                    <label for="edoc-demo-aluno">Aluno</label>
+                    <label for="edoc-demo-aluno">Aluna (prévia)</label>
                     <select id="edoc-demo-aluno"><option value="">Escolha a turma</option></select>
-                    <label for="edoc-fonte-boletim">Boletim a exibir</label>
-                    <select id="edoc-fonte-boletim"><option value="">Carregando boletins…</option></select>
-                    <p class="edoc-hint">1) Escolha o boletim · 2) Clique em Boletim para colocar na folha · 3) Escolha a aluna só para a prévia.</p>
                     <label class="edoc-demo-check" for="edoc-demo-real">
                         <input type="checkbox" id="edoc-demo-real" checked>
                         Mostrar dados reais na folha
                     </label>
-                    <p class="edoc-hint" id="edoc-demo-status">A folha usa um exemplo até escolher o aluno.</p>
+                    <p class="edoc-hint" id="edoc-demo-status">Escolha o boletim e a aluna — o layout aparece na folha.</p>
+                </div>
+                <div class="edoc-demo" id="edoc-demo">
+                    <h4>Outros dados</h4>
                     <label class="edoc-demo-check" for="edoc-demo-sigla">
                         <input type="checkbox" id="edoc-demo-sigla">
                         Sigla no lugar do nome
                     </label>
                     <div class="edoc-atalhos">
-                        <button type="button" class="edoc-btn" data-atalho="boletim">Boletim</button>
                         <button type="button" class="edoc-btn" data-atalho="glossario">Glossário</button>
                         <button type="button" class="edoc-btn" data-atalho="componentes">Disciplinas</button>
                         <button type="button" class="edoc-btn" data-atalho="serie">Série e turma</button>
@@ -138,7 +140,7 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                         <button type="button" data-drag-var="situacao_final" title="Arraste o resultado do aluno">Situação</button>
                         <button type="button" data-drag-var="frequencia_percentual" title="Arraste a frequência">Frequência</button>
                     </div>
-                    <p class="edoc-hint">Arraste a disciplina, a nota ou o resultado para a célula. A sigla você troca no campo e no glossário.</p>
+                    <p class="edoc-hint">Arraste a disciplina, a nota ou o resultado para a célula.</p>
                     <details class="edoc-var-drop" id="edoc-demo-comps-drop" hidden>
                         <summary>Componentes da série <span class="edoc-var-count" id="edoc-demo-comps-count"></span></summary>
                         <div class="edoc-var-chips" id="edoc-demo-comps"></div>

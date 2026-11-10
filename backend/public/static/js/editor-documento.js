@@ -342,7 +342,7 @@
       dados_escola: 'Escola', dados_aluno: 'Aluno', dados_responsavel: 'Responsável', dados_turma: 'Turma',
       frequencia: 'Frequência', observacoes: 'Observações', assinaturas: 'Assinaturas',
       tabela_aluno: 'Tabela aluno', tabela_notas: 'Notas', tabela_frequencia: 'Freq. tabela',
-      historico: 'Histórico', resultado_final: 'Resultado', qrcode: 'QR Code'
+      boletim: 'Boletim', historico: 'Histórico', resultado_final: 'Resultado', qrcode: 'QR Code'
     };
     return map[t] || t;
   }
@@ -1677,8 +1677,18 @@
     if (t === 'pagina') return '<p style="' + st + 'text-align:center">Página ' + ph('{{pagina}}') + ' de ' + ph('{{total_paginas}}') + '</p>';
     if (t === 'quebra_pagina') return '<div style="border-top:2px dashed #f59e0b;margin:12px 0;color:#b45309;font-size:10px;text-align:center">Quebra de página</div>';
     if (t === 'qrcode') return '<div class="edoc-logo-slot">QR</div>';
-    if (t === 'tabela_notas') {
-      return htmlBlocoHtml('quadro_notas_html', st, 'edoc-quadro-notas');
+    if (t === 'boletim' || t === 'tabela_notas') {
+      var fonteBol = parseInt((state.estrutura && state.estrutura.fonte_boletim_id) || 0, 10) || 0;
+      if (t === 'boletim' && fonteBol <= 0) {
+        return '<div class="edoc-quadro-notas edoc-el-body" style="' + st + '">'
+          + '<span class="edoc-ph">Escolha o boletim e a aluna no card ao lado para ver o layout</span></div>';
+      }
+      return htmlBlocoHtml(
+        'quadro_notas_html',
+        st,
+        'edoc-quadro-notas',
+        t === 'boletim' ? 'Escolha a aluna no card ao lado para ver o layout' : ''
+      );
     }
     if (t === 'tabela_coletiva') {
       return htmlBlocoHtml('tabela_html', st, 'edoc-html-raw');
@@ -1747,9 +1757,11 @@
     return ph(v);
   }
 
-  function htmlBlocoHtml(chave, st, classe) {
+  function htmlBlocoHtml(chave, st, classe, vazio) {
     var miolo = htmlVar(chave);
-    if (!miolo) miolo = '<span class="edoc-ph">{{' + chave + '}}</span>';
+    if (!miolo) {
+      miolo = '<span class="edoc-ph">' + esc(vazio || ('{{' + chave + '}}')) + '</span>';
+    }
     return '<div class="' + classe + ' edoc-el-body" style="' + st + '">' + miolo + '</div>';
   }
 
@@ -2033,6 +2045,7 @@
     bindCanvas();
     renderTree();
     renderProps();
+    syncCardBoletim();
     var zl = $('#edoc-zoom-label');
     if (zl) zl.textContent = state.zoom + '%';
     atualizarLinkPdf();
@@ -2841,7 +2854,7 @@
     if (tipo === 'imagem') el.props = { width: 180, align: 'center', vAlign: 'middle' };
     if (tipo === 'espacador') el.props = { height: 16 };
     if (tipo === 'assinaturas') el.props = { quantidade: 2 };
-    if (tipo === 'tabela_notas') el.style = { fontSize: 8 };
+    if (tipo === 'boletim' || tipo === 'tabela_notas') el.style = { fontSize: 7 };
     if (tipo === 'html') el.props = { html: '<p></p>' };
     if (tipo === 'tabela') {
       el.type = 'html';
@@ -3071,6 +3084,10 @@
     state.selected = { id: el.id, kind: 'element' };
     if (!skipHist) pushHist();
     render();
+    if (tipo === 'boletim') {
+      abrirCardBoletim(true);
+      setStatus('Boletim na folha — escolha o boletim e a aluna no card');
+    }
     if (tipo === 'tabela') {
       var node = paper && paper.querySelector('.edoc-el[data-id="' + el.id + '"]');
       if (node) {
@@ -3386,6 +3403,10 @@
         + '</div>';
       html += '<button type="button" class="edoc-btn" id="edoc-insert-var" style="margin-top:6px">{ } Variáveis</button>';
       html += painelMedidasFolha(p.html || '');
+    }
+    if (el.type === 'boletim') {
+      html += '<p class="edoc-hint">O layout do assistente (PP/PU/CH…) aparece na folha. No card Boletim (abaixo de Dados) escolha o boletim e a aluna da prévia.</p>';
+      abrirCardBoletim(false);
     }
     if (el.type === 'tabela_notas') {
       html += '<p class="edoc-hint">Quadro com 1º ao 4º bimestre e final (nota e falta). O tamanho do texto abaixo vale para a tabela inteira — diminua para caber em uma folha.</p>';
@@ -3902,15 +3923,69 @@
     render();
   }
 
+  function elementoEhBoletim(el) {
+    if (!el) return false;
+    if (el.type === 'boletim' || el.type === 'tabela_notas') return true;
+    if (el.type === 'html') {
+      return String((el.props || {}).html || '').indexOf('quadro_notas_html') >= 0;
+    }
+    return false;
+  }
+
+  function estruturaTemBoletim() {
+    var roles = ['header', 'body', 'footer'];
+    for (var r = 0; r < roles.length; r++) {
+      var secs = (areaOf(roles[r]).sections || []);
+      for (var i = 0; i < secs.length; i++) {
+        var cols = secs[i].columns || [];
+        for (var j = 0; j < cols.length; j++) {
+          var els = cols[j].elements || [];
+          for (var k = 0; k < els.length; k++) {
+            if (elementoEhBoletim(els[k])) return true;
+          }
+        }
+      }
+    }
+    return !!(state.estrutura && state.estrutura.fonte_boletim_id);
+  }
+
+  function abrirCardBoletim(focar) {
+    var card = $('#edoc-boletim-card');
+    if (!card) return;
+    card.hidden = false;
+    var status = $('#edoc-demo-status');
+    if (status && !status.textContent) {
+      status.textContent = 'Escolha o boletim e a aluna para ver o layout na folha.';
+    }
+    if (focar) {
+      var fonte = $('#edoc-fonte-boletim');
+      if (fonte) {
+        try { fonte.focus(); } catch (e) {}
+      }
+      try { card.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e2) {}
+    }
+  }
+
+  function syncCardBoletim() {
+    var card = $('#edoc-boletim-card');
+    if (!card) return;
+    var sel = state.selected ? findPath(state.selected.id) : null;
+    if ((sel && sel.element && elementoEhBoletim(sel.element)) || estruturaTemBoletim()) {
+      card.hidden = false;
+    }
+  }
+
   function bindDemonstracao() {
     var box = $('#edoc-demo');
+    var card = $('#edoc-boletim-card');
     var turma = $('#edoc-demo-turma');
     var aluno = $('#edoc-demo-aluno');
     var fonteBoletim = $('#edoc-fonte-boletim');
     var real = $('#edoc-demo-real');
     var status = $('#edoc-demo-status');
     var comps = $('#edoc-demo-comps');
-    if (!box || !turma || !aluno || !C.demoUrl) return;
+    if (!turma || !aluno || !C.demoUrl) return;
+    if (estruturaTemBoletim()) abrirCardBoletim(false);
     var req = 0;
     var demoPacote = { componentes: [], periodos: [], html_quadro: '' };
     function boletimSelecionadoId() {
@@ -4176,15 +4251,26 @@
       if (data.vars) {
         persistirEdicaoSeHouver();
         C.varsPreview = data.vars;
+        if (data.html_quadro) {
+          C.varsPreview.quadro_notas_html = data.html_quadro;
+        }
         state.demo = !!(real && real.checked);
-        if (status) status.textContent = data.resumo || 'Dados reais na folha.';
+        if (status) {
+          if (boletimSelecionadoId() && data.html_quadro) {
+            status.textContent = data.resumo || 'Layout do boletim na folha. Troque a aluna para atualizar a prévia.';
+          } else if (boletimSelecionadoId()) {
+            status.textContent = data.resumo || 'Boletim escolhido. Se o layout não aparecer, monte o quadro no assistente desse boletim.';
+          } else {
+            status.textContent = data.resumo || 'Dados reais na folha.';
+          }
+        }
         render();
         return;
       }
       if (status) {
         if (data.resumo) status.textContent = data.resumo;
         else if (turma.value && (!data.alunos || !data.alunos.length)) status.textContent = 'Esta turma não tem alunos matriculados.';
-        else if (turma.value) status.textContent = 'Escolha o aluno para ver a folha com os dados reais.';
+        else if (turma.value) status.textContent = 'Escolha a aluna para ver o layout na folha.';
         else status.textContent = 'Nenhuma turma ativa encontrada.';
       }
     }
@@ -4219,6 +4305,10 @@
       }
       fonteBoletim.addEventListener('change', function () {
         gravarFonteBoletim(fonteBoletim.value);
+        abrirCardBoletim(false);
+        if (!estruturaTemBoletim()) {
+          insertElement(colunaAlvo() || garantirColunaCorpo(), 'boletim');
+        }
         carregar();
       });
     }
@@ -4228,43 +4318,24 @@
         render();
       });
     }
-    box.addEventListener('click', function (e) {
-      var atalho = e.target.closest('[data-atalho]');
-      if (!atalho) return;
-      var qual = atalho.getAttribute('data-atalho');
-      if (qual === 'serie') {
-        inserirBlocoHtml('<p>Série: {{serie}}<br>Turma: {{turma_nome}}<br>Curso: {{curso_nome}}<br>Ano letivo: {{ano_letivo}}</p>');
-        return;
-      }
-      if (qual === 'componentes') {
-        inserirPersonalizado(htmlListaEditavel(), 'Lista na folha. Troque o nome pela sigla direto na célula.');
-        return;
-      }
-      if (qual === 'notas' || qual === 'boletim') {
-        var bid = boletimSelecionadoId();
-        if (!bid) {
-          if (status) status.textContent = 'Primeiro escolha o boletim a exibir; depois clique em Boletim para colocar na folha.';
-          if (fonteBoletim) fonteBoletim.focus();
+    if (box) {
+      box.addEventListener('click', function (e) {
+        var atalho = e.target.closest('[data-atalho]');
+        if (!atalho) return;
+        var qual = atalho.getAttribute('data-atalho');
+        if (qual === 'serie') {
+          inserirBlocoHtml('<p>Série: {{serie}}<br>Turma: {{turma_nome}}<br>Curso: {{curso_nome}}<br>Ano letivo: {{ano_letivo}}</p>');
           return;
         }
-        gravarFonteBoletim(bid);
-        var htmlQuadro = demoPacote.html_quadro || '';
-        if (htmlQuadro && C.varsPreview) {
-          C.varsPreview.quadro_notas_html = htmlQuadro;
+        if (qual === 'componentes') {
+          inserirPersonalizado(htmlListaEditavel(), 'Lista na folha. Troque o nome pela sigla direto na célula.');
+          return;
         }
-        // Sempre vincula o token na folha. A aluna só alimenta a prévia.
-        inserirPersonalizado(
-          '<div class="edoc-html-raw edoc-quadro-notas">{{quadro_notas_html}}</div>',
-          htmlQuadro
-            ? 'Boletim na folha. Troque a aluna para atualizar a prévia com as notas.'
-            : 'Boletim vinculado na folha. Escolha uma aluna do ano desse boletim para ver a prévia (PP/PU/CH…).'
-        );
-        return;
-      }
-      if (qual === 'glossario') {
-        inserirPersonalizado(htmlGlossario(), 'Glossário na folha. Edite a sigla e o nome como quiser.');
-      }
-    });
+        if (qual === 'glossario') {
+          inserirPersonalizado(htmlGlossario(), 'Glossário na folha. Edite a sigla e o nome como quiser.');
+        }
+      });
+    }
     carregar();
   }
 
