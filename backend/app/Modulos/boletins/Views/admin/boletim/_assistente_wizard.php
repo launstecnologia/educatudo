@@ -2678,6 +2678,9 @@ $boletimWizardSteps = [
         formulaVersao++;
         marcarEdicaoManual();
         estado.formula_tokens = envolverSomaAntesDeDivisao(estado.formula_tokens || []);
+        (estado.formula_tokens || []).forEach(function (t) {
+            if (t && t.type === 'peca') garantirColunaFormulaSemQuadro(t.value);
+        });
         if (estado.bloco_calc) {
             gravarTokensBlocoAberto();
         }
@@ -3515,11 +3518,107 @@ $boletimWizardSteps = [
     function garantirPecaNaFormula(key) {
         if (!estado || !key) return;
         if (key === 'media_sem' || key === 'media_bim' || key === 'media_final') return;
-        if (!Array.isArray(estado.pecas)) estado.pecas = [];
-        if (estado.pecas.indexOf(key) >= 0) return;
-        estado.pecas.push(key);
-        if (!estado.pecas_opcoes || typeof estado.pecas_opcoes !== 'object') estado.pecas_opcoes = {};
-        if (!estado.pecas_opcoes[key]) estado.pecas_opcoes[key] = pecasOpcoesPadraoJs(key);
+        if (ehCodigoBlocoCalc(key)) return;
+        // Peça genérica (legado): mantém em estado.pecas.
+        var pecasConhecidas = {};
+        ((catalogo && catalogo.pecas) || []).forEach(function (p) {
+            if (p && p.key) pecasConhecidas[String(p.key)] = true;
+        });
+        if (pecasConhecidas[key]) {
+            if (!Array.isArray(estado.pecas)) estado.pecas = [];
+            if (estado.pecas.indexOf(key) < 0) estado.pecas.push(key);
+            if (!estado.pecas_opcoes || typeof estado.pecas_opcoes !== 'object') estado.pecas_opcoes = {};
+            if (!estado.pecas_opcoes[key]) estado.pecas_opcoes[key] = pecasOpcoesPadraoJs(key);
+        }
+        // Evento/coluna: liga ao cálculo mesmo sem chip no quadro do boletim.
+        garantirColunaFormulaSemQuadro(key);
+    }
+
+    /**
+     * Garante evento/coluna na fórmula sem obrigar chip no quadro.
+     * Fica oculta na impressão, mas com componente + evento no cálculo.
+     */
+    function garantirColunaFormulaSemQuadro(codigo) {
+        codigo = String(codigo || '');
+        if (!codigo || codigo === '_semanal' || ehCodigoBlocoCalc(codigo)) return;
+        var ev = encontrarEventoPorCodigoColuna(codigo);
+        if (ev) {
+            var id = Number(ev.id || 0);
+            if (id > 0) {
+                if (!Array.isArray(estado.eventos_avaliativos_ids)) estado.eventos_avaliativos_ids = [];
+                if (estado.eventos_avaliativos_ids.map(Number).indexOf(id) < 0) {
+                    estado.eventos_avaliativos_ids.push(id);
+                }
+            }
+        }
+        var nome = tituloColuna(codigo)
+            || (ev ? (String(siglaDoEvento(ev) || '').trim() || String(ev.nome || '')) : '')
+            || codigo;
+        if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
+        if (!estado.nomes_blocos[codigo]) estado.nomes_blocos[codigo] = nome;
+        garantirComponenteManualNoRascunho(codigo, nome);
+        anexarEventoAoComponenteFormula(codigo, ev);
+        if (!colunaEventoJaVisivelNoQuadro(codigo)) {
+            ocultarColuna(codigo);
+        }
+    }
+
+    function colunaEventoJaVisivelNoQuadro(codigo) {
+        var low = String(codigo || '').toLowerCase();
+        if (!low || colunaOculta(low)) return false;
+        if ((estado.colunas_ordem || []).some(function (c) {
+            return String(c || '').toLowerCase() === low;
+        })) return true;
+        return (estado.linhas_layout || []).some(function (lin) {
+            return (lin && lin.colunas || []).some(function (c) {
+                return String(c || '').toLowerCase() === low;
+            });
+        });
+    }
+
+    function encontrarEventoPorCodigoColuna(codigo) {
+        var low = String(codigo || '').toLowerCase();
+        if (!low) return null;
+        var lista = eventosAvaliativosDoAnoQuadro() || [];
+        var i;
+        for (i = 0; i < lista.length; i++) {
+            var ev = lista[i];
+            var pref = String(codigoPreferidoEvento(ev) || '').toLowerCase();
+            if (pref && pref === low) return ev;
+            var id = Number(ev && ev.id || 0);
+            if (id > 0 && (low === ('eva' + id) || low === ('eva_' + id))) return ev;
+            var sig = String(siglaDoEvento(ev) || '').toLowerCase().replace(/[^a-z0-9_]+/g, '');
+            if (sig && sig === low) return ev;
+        }
+        return null;
+    }
+
+    function anexarEventoAoComponenteFormula(codigo, ev) {
+        if (!ev) return;
+        var id = Number(ev.id || 0);
+        var blocos = [];
+        ((ev.subeventos) || []).forEach(function (sub) {
+            var sid = Number(sub && sub.id || 0);
+            if (sid > 0) blocos.push(sid);
+        });
+        [rascunhoAtual, estado && estado.rascunho_preservado].forEach(function (r) {
+            if (!r || !Array.isArray(r.componentes)) return;
+            r.componentes.forEach(function (c) {
+                if (!c || String(c.codigo || '') !== String(codigo)) return;
+                if (!c.config || typeof c.config !== 'object') c.config = {};
+                if (id > 0) {
+                    c.config.evento_avaliativo_id = id;
+                    c.evento_avaliativo_id = id;
+                }
+                if (blocos.length) {
+                    c.blocos_ids = blocos.slice();
+                    c.config.blocos_ids = blocos.slice();
+                    if (c.source_type === 'nenhuma' || !c.source_type) {
+                        c.source_type = 'provas_sistema';
+                    }
+                }
+            });
+        });
     }
 
     function chaveCicloDeGrupoLayout(g) {
@@ -3730,6 +3829,15 @@ $boletimWizardSteps = [
                 calc: true,
                 chave: chaveDup
             });
+        });
+
+        // Todos os eventos do ano — mesmo sem chip no quadro (só entram no cálculo).
+        (eventosAvaliativosDoAnoQuadro() || []).forEach(function (ev) {
+            var cod = codigoPreferidoEvento(ev);
+            if (!cod) cod = codigoColunaDoEventoJs(ev, {});
+            if (!cod) return;
+            var label = String(siglaDoEvento(ev) || '').trim() || String(ev.nome || cod).trim();
+            add(cod, label);
         });
 
         if (!itens.length) {
@@ -4103,12 +4211,37 @@ $boletimWizardSteps = [
     function removerBlocoCalc(codigo) {
         if (!codigo) return;
         var low = String(codigo).toLowerCase();
+        var ehCalc = ehCodigoBlocoCalc(codigo);
         ocultarColuna(codigo);
         if (codigo === '_semanal' || codigo === 'media_sem' || low === '_semanal' || low === 'media_sem') {
             ocultarColuna('_semanal');
             ocultarColuna('media_sem');
             ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8'].forEach(ocultarColuna);
         }
+        estado.colunas_ordem = (estado.colunas_ordem || []).filter(function (c) {
+            return String(c || '').toLowerCase() !== low;
+        });
+        if (Array.isArray(estado.linhas_layout)) {
+            estado.linhas_layout = estado.linhas_layout.map(function (lin) {
+                if (!lin) return lin;
+                lin.colunas = (lin.colunas || []).filter(function (c) {
+                    return String(c || '').toLowerCase() !== low;
+                });
+                return lin;
+            }).filter(function (lin) { return lin && (lin.colunas || []).length >= 1; });
+        }
+        if (colunasMarcadas && colunasMarcadas[codigo]) delete colunasMarcadas[codigo];
+        if (colunasMarcadas && colunasMarcadas[low]) delete colunasMarcadas[low];
+
+        // Evento/nota: some do quadro do boletim, mas permanece na fórmula.
+        if (!ehCalc) {
+            estado.quadro_chips_manuais = 1;
+            aplicarOrdemNoPreview(previewAtual);
+            renderRevisarDinamico();
+            agendarMontar();
+            return;
+        }
+
         var peca = pecaDaColuna(codigo) || pecaDaColuna(low);
         if (peca) {
             estado.pecas = (estado.pecas || []).filter(function (p) { return p !== peca; });
@@ -4136,9 +4269,6 @@ $boletimWizardSteps = [
                 if (String(k).toLowerCase() === low) delete estado.escalas_blocos[k];
             });
         }
-        estado.colunas_ordem = (estado.colunas_ordem || []).filter(function (c) {
-            return String(c || '').toLowerCase() !== low;
-        });
         if (String(estado.bloco_calc || '').toLowerCase() === low) {
             estado.bloco_calc = '';
             estado.materia_calc = 0;
@@ -4146,17 +4276,6 @@ $boletimWizardSteps = [
             var ed = document.getElementById('bw-formula-editor');
             if (ed) ed.classList.add('hidden');
         }
-        if (Array.isArray(estado.linhas_layout)) {
-            estado.linhas_layout = estado.linhas_layout.map(function (lin) {
-                if (!lin) return lin;
-                lin.colunas = (lin.colunas || []).filter(function (c) {
-                    return String(c || '').toLowerCase() !== low;
-                });
-                return lin;
-            }).filter(function (lin) { return lin && (lin.colunas || []).length >= 1; });
-        }
-        if (colunasMarcadas && colunasMarcadas[codigo]) delete colunasMarcadas[codigo];
-        if (colunasMarcadas && colunasMarcadas[low]) delete colunasMarcadas[low];
         tirarColunaDoRascunho(codigo);
         estado.quadro_chips_manuais = 1;
         aplicarOrdemNoPreview(previewAtual);
@@ -9286,7 +9405,7 @@ $boletimWizardSteps = [
                 html += '<p id="bw-formula-bloco-titulo" class="text-sm font-semibold text-amber-950">Cálculo de <span id="bw-formula-bloco-nome">' + esc(nomeBlocoCalc(estado.bloco_calc || 'média')) + '</span></p>';
                 html += '<p id="bw-formula-bloco-ajuda" class="text-xs text-amber-900/80 mt-0.5 mb-2">A média é a soma entre parênteses, depois ÷ quantidade. Ex.: (Prova + Trabalho + Participação) ÷ 3.</p>';
                 html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-1.5">Usar no cálculo</p>';
-                html += '<p class="text-[11px] text-slate-500 mb-1.5">Separado por ciclo (bimestre/semestre) para não misturar colunas iguais de períodos diferentes.</p>';
+                html += '<p class="text-[11px] text-slate-500 mb-1.5">Todos os eventos do ano aparecem aqui, mesmo sem chip no quadro — dá para calcular sem mostrar a coluna no boletim. Separado por ciclo para não misturar períodos.</p>';
                 html += '<div id="bw-formula-pecas-pal" class="bw-palette"></div>';
                 html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mt-3 mb-1.5">Sinais</p>';
                 html += '<div class="bw-palette flex flex-wrap gap-2 items-center">';
