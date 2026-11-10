@@ -123,7 +123,7 @@ BEGIN
   DECLARE v_ev INT DEFAULT 0;
   DECLARE v_bloco INT DEFAULT 0;
   DECLARE v_evento INT DEFAULT 0;
-  DECLARE v_hash VARCHAR(255) DEFAULT '$2y$12$g4Hk.FLLobz5ap2lxQZY9.6z7DNtlvSmuxlqecDcEdZomOENrUq0.';
+  DECLARE v_hash VARCHAR(255) DEFAULT '$2y$12$HCY0v/uyhq06DA23ku.vWe8M876EQj3pgQhY9s7uAwwwYAF0q4FVC';
   DECLARE v_data VARCHAR(10);
   DECLARE v_nome_ev VARCHAR(120);
   DECLARE v_sigla VARCHAR(12);
@@ -721,15 +721,36 @@ BEGIN
       );
       SET v_bloco = LAST_INSERT_ID();
       INSERT IGNORE INTO provas_blocos_turmas (bloco_id, turma_id) VALUES (v_bloco, v_turma);
+      -- Preferência: matéria da escola com o mesmo nome; fallback SM24-*.
       INSERT INTO provas_blocos_professores (bloco_id, professor_id, materia_id, quantidade_questoes)
       SELECT v_bloco, v_prof, m.id, 1
       FROM materias m
-      WHERE m.codigo LIKE 'SM24-%' AND m.permite_avaliacao = 1;
+      WHERE m.permite_avaliacao = 1
+        AND COALESCE(m.ativo, 1) = 1
+        AND m.id = (
+          SELECT m2.id FROM materias m2
+          WHERE m2.nome = m.nome
+            AND m2.permite_avaliacao = 1
+            AND COALESCE(m2.ativo, 1) = 1
+          ORDER BY (CASE WHEN m2.codigo LIKE 'SM24-%' THEN 1 ELSE 0 END) ASC, m2.id ASC
+          LIMIT 1
+        )
+        AND (
+          m.codigo LIKE 'SM24-%'
+          OR EXISTS (SELECT 1 FROM materias sx WHERE sx.codigo LIKE 'SM24-%' AND sx.nome = m.nome)
+        );
 
       INSERT INTO provas_blocos_notas_lancadas (bloco_id, professor_id, materia_id, turma_id, aluno_id, nota)
       SELECT v_bloco, v_prof, m.id, v_turma, v_aluno, t.nota
       FROM sm24_tmp_notas t
-      INNER JOIN materias m ON m.nome = t.materia AND m.codigo LIKE 'SM24-%'
+      INNER JOIN materias m ON m.id = (
+        SELECT m2.id FROM materias m2
+        WHERE m2.nome = t.materia
+          AND m2.permite_avaliacao = 1
+          AND COALESCE(m2.ativo, 1) = 1
+        ORDER BY (CASE WHEN m2.codigo LIKE 'SM24-%' THEN 1 ELSE 0 END) ASC, m2.id ASC
+        LIMIT 1
+      )
       WHERE t.bim = v_bim AND t.tipo = LOWER(v_sigla) AND t.nota IS NOT NULL;
 
       SET v_ev = v_ev + 1;
@@ -767,12 +788,32 @@ BEGIN
   FROM provas_blocos pb
   CROSS JOIN materias m
   WHERE pb.descricao = 'SM24' AND pb.bimestre IN (81, 82, 90) AND pb.deleted_at IS NULL
-    AND m.codigo LIKE 'SM24-%' AND m.permite_avaliacao = 1;
+    AND m.permite_avaliacao = 1
+    AND COALESCE(m.ativo, 1) = 1
+    AND m.id = (
+      SELECT m2.id FROM materias m2
+      WHERE m2.nome = m.nome
+        AND m2.permite_avaliacao = 1
+        AND COALESCE(m2.ativo, 1) = 1
+      ORDER BY (CASE WHEN m2.codigo LIKE 'SM24-%' THEN 1 ELSE 0 END) ASC, m2.id ASC
+      LIMIT 1
+    )
+    AND (
+      m.codigo LIKE 'SM24-%'
+      OR EXISTS (SELECT 1 FROM materias sx WHERE sx.codigo LIKE 'SM24-%' AND sx.nome = m.nome)
+    );
 
   INSERT INTO provas_blocos_notas_lancadas (bloco_id, professor_id, materia_id, turma_id, aluno_id, nota)
   SELECT pb.id, v_prof, m.id, v_turma, v_aluno, t.nota
   FROM sm24_tmp_notas t
-  INNER JOIN materias m ON m.nome = t.materia AND m.codigo LIKE 'SM24-%'
+  INNER JOIN materias m ON m.id = (
+    SELECT m2.id FROM materias m2
+    WHERE m2.nome = t.materia
+      AND m2.permite_avaliacao = 1
+      AND COALESCE(m2.ativo, 1) = 1
+    ORDER BY (CASE WHEN m2.codigo LIKE 'SM24-%' THEN 1 ELSE 0 END) ASC, m2.id ASC
+    LIMIT 1
+  )
   INNER JOIN provas_blocos pb ON pb.descricao = 'SM24' AND pb.bimestre = 81 AND pb.deleted_at IS NULL
   WHERE t.bim = 81 AND t.tipo = 'rec' AND t.nota IS NOT NULL;
 
@@ -783,7 +824,14 @@ BEGIN
   INSERT INTO faltas_lancamentos (evento_id, aluno_id, materia_id, faltas, created_by)
   SELECT e.id, v_aluno, m.id, f.faltas, v_admin
   FROM sm24_tmp_fal f
-  INNER JOIN materias m ON m.nome = f.materia AND m.codigo LIKE 'SM24-%'
+  INNER JOIN materias m ON m.id = (
+    SELECT m2.id FROM materias m2
+    WHERE m2.nome = f.materia
+      AND m2.permite_avaliacao = 1
+      AND COALESCE(m2.ativo, 1) = 1
+    ORDER BY (CASE WHEN m2.codigo LIKE 'SM24-%' THEN 1 ELSE 0 END) ASC, m2.id ASC
+    LIMIT 1
+  )
   INNER JOIN faltas_eventos e ON e.nome = CONCAT('SM24 Faltas ', f.bim, 'º bimestre 2024')
   WHERE f.faltas > 0;
 

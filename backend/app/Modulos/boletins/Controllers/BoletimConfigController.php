@@ -6818,6 +6818,101 @@ class BoletimConfigController extends BaseController
     }
 
     /**
+     * Copia notas de matérias homônimas (ex.: SM24-Arte) para os IDs do modelo/evento
+     * (ex.: Arte da escola) antes do filtro por materias_ids.
+     *
+     * @param array<string, array<int, float|null>> $matrizPorCodigo
+     * @param array<int, string> $materiaNomesPorId
+     * @param list<int> $materiasSelecionadas
+     * @param array<int, string> $nomesCatalogoById
+     */
+    private function remapearMatrizNotasParaMateriasSelecionadas(
+        array &$matrizPorCodigo,
+        array &$materiaNomesPorId,
+        array $materiasSelecionadas,
+        array $nomesCatalogoById
+    ): void {
+        $destinoPorNome = [];
+        $faltandoNome = [];
+        foreach ($materiasSelecionadas as $midSel) {
+            $midSel = (int) $midSel;
+            if ($midSel <= 0) {
+                continue;
+            }
+            $nomeSel = trim((string) ($materiaNomesPorId[$midSel] ?? ($nomesCatalogoById[$midSel] ?? '')));
+            if ($nomeSel === '') {
+                $faltandoNome[$midSel] = $midSel;
+                continue;
+            }
+            $chave = $this->canonicalMateriaNomeKey($nomeSel);
+            if ($chave === '') {
+                continue;
+            }
+            if (!isset($destinoPorNome[$chave])) {
+                $destinoPorNome[$chave] = $midSel;
+            }
+            if (!isset($materiaNomesPorId[$midSel])) {
+                $materiaNomesPorId[$midSel] = $nomeSel;
+            }
+        }
+        // Pais-rótulo (permite_avaliacao=0) podem ficar fora do catálogo da pauta.
+        if ($faltandoNome !== []) {
+            try {
+                $ph = implode(',', array_fill(0, count($faltandoNome), '?'));
+                $rowsNome = $this->db->fetchAll(
+                    "SELECT id, nome FROM materias WHERE id IN ({$ph})",
+                    array_values($faltandoNome)
+                ) ?: [];
+                foreach ($rowsNome as $rowNome) {
+                    $midNome = (int) ($rowNome['id'] ?? 0);
+                    $nomeDb = trim((string) ($rowNome['nome'] ?? ''));
+                    if ($midNome <= 0 || $nomeDb === '') {
+                        continue;
+                    }
+                    $materiaNomesPorId[$midNome] = $nomeDb;
+                    $nomesCatalogoById[$midNome] = $nomeDb;
+                    $chave = $this->canonicalMateriaNomeKey($nomeDb);
+                    if ($chave !== '' && !isset($destinoPorNome[$chave])) {
+                        $destinoPorNome[$chave] = $midNome;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // remapeamento parcial pelos nomes já conhecidos
+            }
+        }
+        if ($destinoPorNome === []) {
+            return;
+        }
+
+        foreach ($matrizPorCodigo as $codigo => $mapVals) {
+            if (!is_array($mapVals)) {
+                continue;
+            }
+            foreach ($mapVals as $midOrigem => $valor) {
+                $midOrigem = (int) $midOrigem;
+                if ($midOrigem <= 0 || !is_numeric($valor)) {
+                    continue;
+                }
+                $nomeOrigem = trim((string) ($materiaNomesPorId[$midOrigem] ?? ($nomesCatalogoById[$midOrigem] ?? '')));
+                $chaveOrigem = $this->canonicalMateriaNomeKey($nomeOrigem);
+                if ($chaveOrigem === '' || !isset($destinoPorNome[$chaveOrigem])) {
+                    continue;
+                }
+                $midDestino = (int) $destinoPorNome[$chaveOrigem];
+                if ($midDestino === $midOrigem) {
+                    continue;
+                }
+                $valorDestino = $matrizPorCodigo[$codigo][$midDestino] ?? null;
+                if (!is_numeric($valorDestino)) {
+                    $matrizPorCodigo[$codigo][$midDestino] = (float) $valor;
+                } elseif (abs((float) $valorDestino) < 0.00001 && abs((float) $valor) > 0.00001) {
+                    $matrizPorCodigo[$codigo][$midDestino] = (float) $valor;
+                }
+            }
+        }
+    }
+
+    /**
      * Prova única (última nota) de dois professores da mesma matéria:
      * com "juntar matérias iguais" usa soma ou média conforme materia_unica_modo.
      * A média semanal continua média (agrega semanas); a deduplicação já aplica o modo.
@@ -7640,6 +7735,34 @@ class BoletimConfigController extends BaseController
                     $nomesGruposVirtuais[$nomeKeyGrupo] = true;
                 }
             }
+            $selSemNome = [];
+            foreach ($materiasSelecionadas as $midSel) {
+                $midSel = (int) $midSel;
+                if ($midSel <= 0) {
+                    continue;
+                }
+                if (!isset($nomesCatalogoById[$midSel]) && !isset($materiaNomesPorId[$midSel])) {
+                    $selSemNome[$midSel] = $midSel;
+                }
+            }
+            if ($selSemNome !== []) {
+                try {
+                    $phSel = implode(',', array_fill(0, count($selSemNome), '?'));
+                    $rowsSelNome = $this->db->fetchAll(
+                        "SELECT id, nome FROM materias WHERE id IN ({$phSel})",
+                        array_values($selSemNome)
+                    ) ?: [];
+                    foreach ($rowsSelNome as $rowSelNome) {
+                        $midSn = (int) ($rowSelNome['id'] ?? 0);
+                        $nomeSn = trim((string) ($rowSelNome['nome'] ?? ''));
+                        if ($midSn > 0 && $nomeSn !== '') {
+                            $nomesCatalogoById[$midSn] = $nomeSn;
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // segue só com o catálogo já carregado
+                }
+            }
             foreach ($materiasSelecionadas as $midSel) {
                 $midSel = (int) $midSel;
                 if ($midSel <= 0) {
@@ -7742,13 +7865,60 @@ class BoletimConfigController extends BaseController
                 return $mid <= 0 || !isset($materiasAgrupadas[$mid]);
             }));
         }
+        // Seed/homologação pode lançar em matéria homônima (ex.: SM24-Arte vs Arte da escola).
+        // Remapeia notas pelo nome canônico para os IDs do modelo/evento antes do filtro.
+        if ($materiasSelecionadas !== []) {
+            $this->remapearMatrizNotasParaMateriasSelecionadas(
+                $matrizPorCodigo,
+                $materiaNomesPorId,
+                $materiasSelecionadas,
+                $nomesCatalogoById
+            );
+            foreach ($matrizPorCodigo as $mapRemap) {
+                if (!is_array($mapRemap)) {
+                    continue;
+                }
+                foreach (array_keys($mapRemap) as $midRemap) {
+                    $allMids[(int) $midRemap] = true;
+                }
+            }
+            $midsOrdenados = array_keys($allMids);
+            if ($materiasAgrupadas !== []) {
+                $midsOrdenados = array_values(array_filter($midsOrdenados, static function (int $mid) use ($materiasAgrupadas) {
+                    return $mid <= 0 || !isset($materiasAgrupadas[$mid]);
+                }));
+            }
+        }
         // Com lista do modelo/evento: só exibe essas matérias (notas órfãs de disciplina
         // desmarcada — ex. Redação — não entram na simulação).
         if ($materiasSelecionadas !== []) {
             $set = array_fill_keys($materiasSelecionadas, true);
-            $midsOrdenados = array_values(array_filter($midsOrdenados, static function (int $mid) use ($set) {
+            $filtradosSel = array_values(array_filter($midsOrdenados, static function (int $mid) use ($set) {
                 return $mid <= 0 || isset($set[$mid]);
             }));
+            if ($filtradosSel !== []) {
+                $midsOrdenados = $filtradosSel;
+            } elseif ($midsOrdenados !== []) {
+                // Homônimas do seed (SM24-*) ficaram de fora do modelo: mantém só quem tem nota.
+                $comNota = [];
+                foreach ($midsOrdenados as $midKeep) {
+                    $midKeep = (int) $midKeep;
+                    foreach ($matrizPorCodigo as $mapKeep) {
+                        if (!is_array($mapKeep)) {
+                            continue;
+                        }
+                        if (isset($mapKeep[$midKeep]) && is_numeric($mapKeep[$midKeep])) {
+                            $comNota[$midKeep] = true;
+                            break;
+                        }
+                    }
+                }
+                if ($comNota !== []) {
+                    $midsOrdenados = array_keys($comNota);
+                } else {
+                    $midsOrdenados = [];
+                }
+            }
         }
         // Filhas marcadas na linha única entram mesmo se o modelo só tinha o pai
         // (a nota pode estar no id da filha e o filtro do boletim ter ficado no rótulo).
