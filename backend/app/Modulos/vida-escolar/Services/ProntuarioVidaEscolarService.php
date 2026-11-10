@@ -1185,6 +1185,153 @@ class ProntuarioVidaEscolarService
     }
 
     /**
+     * Colunas na ordem/título do assistente (linhas_layout + componentes), sem as ocultas.
+     *
+     * @param array<string,mixed> $regra
+     * @return list<array<string,mixed>>
+     */
+    private function colunasVisuaisDaRegraImpressao(array $regra): array
+    {
+        $extras = [];
+        if (is_array($regra['extras'] ?? null)) {
+            $extras = $regra['extras'];
+        } else {
+            $decoded = json_decode((string) ($regra['extras_json'] ?? ''), true);
+            if (is_array($decoded)) {
+                $extras = $decoded;
+            }
+        }
+
+        $ocultas = [];
+        foreach ((array) ($extras['colunas_ocultas'] ?? []) as $codOc) {
+            $codOc = strtolower(trim((string) $codOc));
+            if ($codOc !== '') {
+                $ocultas[$codOc] = true;
+            }
+        }
+
+        $porCodigo = [];
+        foreach ((array) ($regra['componentes'] ?? []) as $comp) {
+            if (!is_array($comp)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($comp['codigo'] ?? '')));
+            if ($cod === '' || isset($ocultas[$cod])) {
+                continue;
+            }
+            $cfg = [];
+            if (is_array($comp['config'] ?? null)) {
+                $cfg = $comp['config'];
+            } else {
+                $cfgDecoded = json_decode((string) ($comp['config_json'] ?? ''), true);
+                if (is_array($cfgDecoded)) {
+                    $cfg = $cfgDecoded;
+                }
+            }
+            if (!empty($cfg['ocultar_no_quadro'])) {
+                continue;
+            }
+            $linhaCab = trim((string) ($cfg['linha_cabecalho'] ?? ''));
+            if ($linhaCab !== '') {
+                $linhaCab = function_exists('mb_substr') ? mb_substr($linhaCab, 0, 40) : substr($linhaCab, 0, 40);
+            }
+            $coluna = [
+                'id' => (int) ($comp['id'] ?? 0),
+                'codigo' => (string) ($comp['codigo'] ?? $cod),
+                'nome' => (string) ($comp['nome'] ?? $cod),
+                'source_type' => (string) ($comp['source_type'] ?? 'provas_sistema'),
+                'escala_max' => max(0.01, (float) ($comp['escala_max'] ?? 10)),
+                'valor_global' => ((string) ($comp['source_type'] ?? '')) === 'manual',
+            ];
+            if ($linhaCab !== '') {
+                $coluna['linha_cabecalho'] = $linhaCab;
+            }
+            $porCodigo[$cod] = $coluna;
+        }
+
+        $ordenadas = [];
+        $visto = [];
+        foreach ((array) ($extras['linhas_layout'] ?? []) as $faixa) {
+            if (!is_array($faixa)) {
+                continue;
+            }
+            $nomeFaixa = trim((string) ($faixa['nome'] ?? ''));
+            foreach ((array) ($faixa['colunas'] ?? []) as $codRaw) {
+                $cod = strtolower(trim((string) $codRaw));
+                if ($cod === '' || isset($visto[$cod]) || isset($ocultas[$cod]) || !isset($porCodigo[$cod])) {
+                    continue;
+                }
+                $col = $porCodigo[$cod];
+                if ($nomeFaixa !== '' && trim((string) ($col['linha_cabecalho'] ?? '')) === '') {
+                    $col['linha_cabecalho'] = function_exists('mb_substr')
+                        ? mb_substr($nomeFaixa, 0, 40)
+                        : substr($nomeFaixa, 0, 40);
+                }
+                $ordenadas[] = $col;
+                $visto[$cod] = true;
+            }
+        }
+
+        if ($ordenadas === []) {
+            foreach ($porCodigo as $cod => $col) {
+                if (isset($visto[$cod])) {
+                    continue;
+                }
+                $ordenadas[] = $col;
+            }
+        }
+
+        return $ordenadas;
+    }
+
+    /**
+     * Troca a estrutura das colunas pela canônica do assistente, preservando metas úteis do snapshot.
+     *
+     * @param list<array<string,mixed>> $colsAtuais
+     * @param list<array<string,mixed>> $colsCanonicas
+     * @return list<array<string,mixed>>
+     */
+    private function aplicarColunasCanonicasNoQuadro(array $colsAtuais, array $colsCanonicas): array
+    {
+        if ($colsCanonicas === []) {
+            return $colsAtuais;
+        }
+        $porCodigo = [];
+        foreach ($colsAtuais as $col) {
+            if (!is_array($col)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($col['codigo'] ?? '')));
+            if ($cod !== '') {
+                $porCodigo[$cod] = $col;
+            }
+        }
+        $out = [];
+        foreach ($colsCanonicas as $can) {
+            if (!is_array($can)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($can['codigo'] ?? '')));
+            if ($cod === '') {
+                continue;
+            }
+            $base = is_array($porCodigo[$cod] ?? null) ? $porCodigo[$cod] : [];
+            $merged = array_merge($base, $can);
+            // Cabeçalho do assistente manda.
+            if (trim((string) ($can['linha_cabecalho'] ?? '')) !== '') {
+                $merged['linha_cabecalho'] = $can['linha_cabecalho'];
+            }
+            if (trim((string) ($can['nome'] ?? '')) !== '') {
+                $merged['nome'] = $can['nome'];
+            }
+            $merged['codigo'] = $can['codigo'] ?? ($base['codigo'] ?? $cod);
+            $out[] = $merged;
+        }
+
+        return $out;
+    }
+
+    /**
      * Renderiza o quadro exatamente como no assistente (boletim_quadro_tabela).
      * Prefere resultado gerado da regra; senão simula ao vivo.
      */
@@ -1259,6 +1406,13 @@ class ProntuarioVidaEscolarService
 
             if ($cols === [] || $linhas === []) {
                 return '';
+            }
+
+            // Estrutura visual = assistente (títulos de período / ordem / ocultas).
+            // Snapshot gerado costuma perder linha_cabecalho e vira "MU | MU | MU".
+            $colsCanonicas = $this->colunasVisuaisDaRegraImpressao($regra);
+            if ($colsCanonicas !== []) {
+                $cols = $this->aplicarColunasCanonicasNoQuadro($cols, $colsCanonicas);
             }
 
             // Casas da regra de aprovação (Modelos → critério), não o snapshot antigo do documento.
@@ -1459,6 +1613,20 @@ class ProntuarioVidaEscolarService
         $linhas = is_array($escolhido['linhas'] ?? null) ? $escolhido['linhas'] : [];
         if ($cols === [] || $linhas === []) {
             return '';
+        }
+
+        if ($regraId > 0) {
+            try {
+                $regraCanon = isset($regra) && is_array($regra) ? $regra : $cfg->getRuleById($regraId);
+                if (is_array($regraCanon)) {
+                    $colsCanonicas = $this->colunasVisuaisDaRegraImpressao($regraCanon);
+                    if ($colsCanonicas !== []) {
+                        $cols = $this->aplicarColunasCanonicasNoQuadro($cols, $colsCanonicas);
+                    }
+                }
+            } catch (\Throwable $e) {
+                // mantém colunas do snapshot
+            }
         }
 
         return $this->renderizarQuadroBoletimTabela(
