@@ -172,6 +172,64 @@ $boletimWizardSteps = [
 .bw-palette-grupo-titulo { font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #64748b; margin-bottom: 0.35rem; }
 .bw-palette-grupo.calc .bw-palette-grupo-titulo { color: #92400e; }
 .bw-palette-grupo-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+/* Editor de fórmula: peças à esquerda, montagem fixa à direita */
+.bw-formula-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: 0.85rem;
+    align-items: start;
+}
+@media (max-width: 900px) {
+    .bw-formula-workspace { grid-template-columns: 1fr; }
+    .bw-formula-montagem { order: -1; position: static !important; top: auto !important; }
+}
+.bw-formula-pecas-col,
+.bw-formula-montagem {
+    border: 1px solid #e2e8f0;
+    border-radius: 0.85rem;
+    background: #fff;
+    padding: 0.7rem 0.75rem 0.85rem;
+    min-width: 0;
+}
+.bw-formula-montagem {
+    position: sticky;
+    top: 0.5rem;
+    border-color: #fcd34d;
+    background: #fffbeb;
+    box-shadow: 0 2px 10px rgba(245, 158, 11, 0.08);
+    z-index: 2;
+}
+.bw-palette-shell { display: flex; flex-direction: column; gap: 0.55rem; }
+.bw-palette-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    padding-bottom: 0.15rem;
+}
+.bw-palette-tab {
+    appearance: none;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+    padding: 0.35rem 0.6rem;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background .12s, border-color .12s, color .12s;
+}
+.bw-palette-tab:hover { border-color: #a5b4fc; background: #eef2ff; color: #3730a3; }
+.bw-palette-tab.ativo { border-color: #4f46e5; background: #4f46e5; color: #fff; }
+.bw-palette-tab.calc { border-color: #fcd34d; background: #fffbeb; color: #92400e; }
+.bw-palette-tab.calc.ativo { border-color: #d97706; background: #d97706; color: #fff; }
+.bw-palette-painel {
+    max-height: 18rem;
+    overflow: auto;
+    padding-right: 0.15rem;
+}
+.bw-palette-painel .bw-palette-grupos { gap: 0.45rem; }
+.bw-palette .bw-pal-chip { cursor: pointer; }
 .bw-canvas { min-height: 96px; border: 2px dashed #c7d2fe; border-radius: 0.75rem; padding: 10px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; background: #f8fafc; }
 .bw-canvas.drag-over { border-color: #6366f1; background: #eef2ff; }
 .bw-chip-x { margin-left: 2px; color: #64748b; font-size: 14px; line-height: 1; padding: 0 2px; }
@@ -334,6 +392,7 @@ $boletimWizardSteps = [
     var filaChat = [];
     var statusFilaEl = null;
     var formulaDrag = null;
+    var paletteCicloAtivo = 'todos';
     var previewAtual = dadosIniciais.preview || null;
     var colunasDrag = null;
     var colunasDragou = false;
@@ -2612,7 +2671,7 @@ $boletimWizardSteps = [
             if (midPh > 0) {
                 return '<p class="bw-canvas-ph">Fórmula só de ' + esc(materiaNome(midPh)) + '. Clique ou arraste as peças que esta matéria tem.</p>';
             }
-            return '<p class="bw-canvas-ph">Clique ou arraste os blocos para cá. Ex.: bimestral + semanal ÷ 2 · maior ( bimestral , ENAC )</p>';
+            return '<p class="bw-canvas-ph">Clique nas siglas à esquerda (ou nos sinais). Ex.: PP , PU , CH ) + PE</p>';
         }
         var html = '';
         toks.forEach(function (t, i) { html += chipHtml(t, i, false); });
@@ -3389,6 +3448,11 @@ $boletimWizardSteps = [
                 else el.classList.remove('aberta');
             });
         }
+        // Abre no período do bloco (ou em Cálculo) para não forçar rolagem pela lista inteira.
+        if (!mesmoBloco) {
+            var cicloBloco = chaveCicloPalette(codigo);
+            paletteCicloAtivo = (cicloBloco && cicloBloco !== 'outros') ? cicloBloco : 'calc';
+        }
         var pal = document.getElementById('bw-formula-pecas-pal');
         if (pal) pal.innerHTML = htmlPalettePecasExibir();
         atualizarBannerExcecao();
@@ -3862,8 +3926,29 @@ $boletimWizardSteps = [
             return ordemCicloPalette(a) - ordemCicloPalette(b);
         });
 
-        var html = '<div class="bw-palette-grupos">';
+        if (paletteCicloAtivo !== 'todos' && chaves.indexOf(paletteCicloAtivo) < 0) {
+            paletteCicloAtivo = 'todos';
+        }
+        var chavesVisiveis = paletteCicloAtivo === 'todos'
+            ? chaves
+            : chaves.filter(function (c) { return c === paletteCicloAtivo; });
+
+        var html = '<div class="bw-palette-shell">';
+        html += '<div class="bw-palette-tabs" role="tablist" aria-label="Filtrar por período">';
+        html += '<button type="button" class="bw-palette-tab' + (paletteCicloAtivo === 'todos' ? ' ativo' : '')
+            + '" data-ciclo="todos" role="tab" aria-selected="' + (paletteCicloAtivo === 'todos' ? 'true' : 'false') + '">Todos</button>';
         chaves.forEach(function (chave) {
+            var ehCalc = chave === 'calc';
+            var ativo = paletteCicloAtivo === chave;
+            var rotulo = ehCalc ? 'Cálculo' : rotuloCicloPalette(chave);
+            html += '<button type="button" class="bw-palette-tab' + (ehCalc ? ' calc' : '') + (ativo ? ' ativo' : '')
+                + '" data-ciclo="' + esc(chave) + '" role="tab" aria-selected="' + (ativo ? 'true' : 'false') + '">'
+                + esc(rotulo) + '</button>';
+        });
+        html += '</div>';
+        html += '<div class="bw-palette-painel">';
+        html += '<div class="bw-palette-grupos">';
+        chavesVisiveis.forEach(function (chave) {
             var lista = grupos[chave].slice().sort(function (a, b) {
                 var oa = ordemLeafPalette(a.value);
                 var ob = ordemLeafPalette(b.value);
@@ -3884,7 +3969,7 @@ $boletimWizardSteps = [
             });
             html += '</div></div>';
         });
-        html += '</div>';
+        html += '</div></div></div>';
         return html;
     }
 
@@ -4382,6 +4467,16 @@ $boletimWizardSteps = [
             if (e.target.closest('#bw-formula-salvar')) {
                 e.preventDefault();
                 salvarBlocoCalc();
+                return;
+            }
+            var tabCiclo = e.target.closest('.bw-palette-tab');
+            if (tabCiclo && bodyEl.contains(tabCiclo)) {
+                e.preventDefault();
+                var ciclo = String(tabCiclo.getAttribute('data-ciclo') || 'todos');
+                if (ciclo === paletteCicloAtivo) return;
+                paletteCicloAtivo = ciclo || 'todos';
+                var palTab = document.getElementById('bw-formula-pecas-pal');
+                if (palTab) palTab.innerHTML = htmlPalettePecasExibir();
                 return;
             }
             var atalhoEsc = e.target.closest('.bw-escala-atalho');
@@ -9417,26 +9512,31 @@ $boletimWizardSteps = [
                 html += '<p class="text-[11px] text-amber-900/80 mb-2">Valor máximo corta o resultado da fórmula. Em <strong>Resultado Final × 2</strong>, use <strong>20</strong> (senão fica 10).</p>';
                 html += '<p id="bw-formula-bloco-titulo" class="text-sm font-semibold text-amber-950">Cálculo de <span id="bw-formula-bloco-nome">' + esc(nomeBlocoCalc(estado.bloco_calc || 'média')) + '</span></p>';
                 html += '<p id="bw-formula-bloco-ajuda" class="text-xs text-amber-900/80 mt-0.5 mb-2">A média é a soma entre parênteses, depois ÷ quantidade. Ex.: (Prova + Trabalho + Participação) ÷ 3.</p>';
-                html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-1.5">Usar no cálculo</p>';
-                html += '<p class="text-[11px] text-slate-500 mb-1.5">Todos os eventos do ano aparecem aqui, mesmo sem chip no quadro — dá para calcular sem mostrar a coluna no boletim. Separado por ciclo para não misturar períodos.</p>';
+                html += '<div class="bw-formula-workspace mt-1">';
+                html += '<div class="bw-formula-pecas-col">';
+                html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-1">Usar no cálculo</p>';
+                html += '<p class="text-[11px] text-slate-500 mb-2"><strong>Clique</strong> na sigla para inserir (não precisa arrastar). Filtre pelo período nas abas. Eventos sem chip no quadro também aparecem aqui.</p>';
                 html += '<div id="bw-formula-pecas-pal" class="bw-palette"></div>';
-                html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mt-3 mb-1.5">Sinais</p>';
+                html += '</div>';
+                html += '<div class="bw-formula-montagem">';
+                html += '<p id="bw-formula-canvas-label" class="text-[11px] font-semibold text-amber-950 uppercase tracking-wide mb-1.5">Fórmula desta coluna</p>';
+                html += '<div id="bw-formula-canvas" class="bw-canvas">' + htmlCanvasTokens() + '</div>';
+                html += '<p id="bw-formula-preview" class="mt-2 text-sm font-mono text-slate-800 break-all">' + esc(compilarTokensPreview(estado.formula_tokens || []) || 'Clique nas siglas à esquerda.') + '</p>';
+                html += '<p class="text-[11px] font-semibold text-amber-950 uppercase tracking-wide mt-3 mb-1.5">Sinais</p>';
                 html += '<div class="bw-palette flex flex-wrap gap-2 items-center">';
                 operadoresFormula().forEach(function (op) { html += chipHtml(op, -1, true); });
-                html += '<label class="inline-flex items-center gap-1.5 text-xs text-gray-600 ml-1">Número';
-                html += '<input id="bw-formula-num" type="text" inputmode="decimal" class="h-8 w-16 border rounded-md px-2 text-sm" placeholder="2">';
-                html += '<button type="button" id="bw-formula-num-add" class="h-8 px-2 text-xs rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50">Inserir</button></label></div>';
+                html += '<label class="inline-flex items-center gap-1.5 text-xs text-amber-950/80 ml-1">Número';
+                html += '<input id="bw-formula-num" type="text" inputmode="decimal" class="h-8 w-16 border border-amber-200 rounded-md px-2 text-sm bg-white" placeholder="2">';
+                html += '<button type="button" id="bw-formula-num-add" class="h-8 px-2 text-xs rounded-md border border-amber-300 text-amber-950 bg-white hover:bg-amber-50">Inserir</button></label></div>';
                 html += '<div class="mt-2 flex flex-wrap gap-2">';
-                html += '<button type="button" id="bw-formula-media" class="px-2.5 py-1.5 text-xs rounded-lg border border-indigo-200 text-indigo-700 hover:bg-indigo-50">Média das peças</button>';
-                html += '<button type="button" id="bw-formula-max" class="px-2.5 py-1.5 text-xs rounded-lg border border-amber-200 text-amber-800 hover:bg-amber-50">Maior entre as duas primeiras</button>';
-                html += '<button type="button" id="bw-formula-substituta" class="px-2.5 py-1.5 text-xs rounded-lg border border-emerald-200 text-emerald-800 hover:bg-emerald-50" title="Média das notas principais; a substituta entra no lugar da primeira nota ausente">Média com nota substituta</button>';
-                html += '<button type="button" id="bw-formula-composicao" class="px-2.5 py-1.5 text-xs rounded-lg border border-violet-200 text-violet-800 hover:bg-violet-50" title="Sem recuperação: fica a média. Com recuperação: (média + recuperação) ÷ 2">Média com recuperação</button>';
-                html += '<button type="button" id="bw-formula-limpar" class="px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">Limpar</button></div>';
-                html += '<p class="mt-1.5 text-[11px] text-slate-500"><strong>Média com nota substituta</strong> já calcula a média das notas principais; a substituta entra só no lugar da primeira nota ausente. Não coloque <code class="bg-white/80 px-1 rounded">÷ 2</code> de novo — a nota fica na metade. Some outra nota depois, se precisar: <code class="bg-white/80 px-1 rounded">… + nota</code>.</p>';
-                html += '<p class="mt-1 text-[11px] text-slate-500"><strong>Média com recuperação</strong> monta <code class="bg-white/80 px-1 rounded">média c/ rec((média 1 + média 2)÷2, recuperação)</code>: sem recuperação fica só a média; com recuperação vira (média+recuperação)÷2.</p>';
-                html += '<p id="bw-formula-canvas-label" class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mt-3 mb-1.5">Fórmula desta coluna</p>';
-                html += '<div id="bw-formula-canvas" class="bw-canvas">' + htmlCanvasTokens() + '</div>';
-                html += '<p id="bw-formula-preview" class="mt-2 text-sm font-mono text-slate-800 break-all">' + esc(compilarTokensPreview(estado.formula_tokens || []) || 'Clique nos blocos acima.') + '</p>';
+                html += '<button type="button" id="bw-formula-media" class="px-2.5 py-1.5 text-xs rounded-lg border border-indigo-200 text-indigo-700 bg-white hover:bg-indigo-50">Média das peças</button>';
+                html += '<button type="button" id="bw-formula-max" class="px-2.5 py-1.5 text-xs rounded-lg border border-amber-300 text-amber-900 bg-white hover:bg-amber-100">Maior entre as duas primeiras</button>';
+                html += '<button type="button" id="bw-formula-substituta" class="px-2.5 py-1.5 text-xs rounded-lg border border-emerald-200 text-emerald-800 bg-white hover:bg-emerald-50" title="Média das notas principais; a substituta entra no lugar da primeira nota ausente">Média com nota substituta</button>';
+                html += '<button type="button" id="bw-formula-composicao" class="px-2.5 py-1.5 text-xs rounded-lg border border-violet-200 text-violet-800 bg-white hover:bg-violet-50" title="Sem recuperação: fica a média. Com recuperação: (média + recuperação) ÷ 2">Média com recuperação</button>';
+                html += '<button type="button" id="bw-formula-limpar" class="px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 text-gray-600 bg-white hover:bg-gray-50">Limpar</button></div>';
+                html += '<p class="mt-1.5 text-[11px] text-amber-950/70"><strong>Média com nota substituta</strong> já calcula a média das notas principais; a substituta entra só no lugar da primeira nota ausente. Não coloque <code class="bg-white/80 px-1 rounded">÷ 2</code> de novo.</p>';
+                html += '<p class="mt-1 text-[11px] text-amber-950/70"><strong>Média com recuperação</strong>: sem recuperação fica só a média; com recuperação vira (média+recuperação)÷2.</p>';
+                html += '</div></div>';
                 html += '<div class="mt-4 pt-3 border-t border-amber-200/80">';
                 html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-1">Exceção só nesta matéria</p>';
                 html += '<p class="text-xs text-gray-500 mb-2">Se uma matéria não tem um tipo de prova (ex.: sem semanal), some só o que ela tem — a fórmula geral continua nas outras.</p>';
