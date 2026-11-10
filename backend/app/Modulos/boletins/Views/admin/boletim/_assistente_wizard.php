@@ -7971,10 +7971,199 @@ $boletimWizardSteps = [
             var copia = JSON.parse(JSON.stringify(tok));
             if (copia.type === 'peca') {
                 var v = String(copia.value || '').toLowerCase();
-                if (mapa[v]) copia.value = mapa[v];
+                if (mapa[v]) {
+                    copia.value = mapa[v];
+                    if (copia.label) {
+                        var lab = String(copia.label);
+                        if (/1[ºo]/i.test(lab) && /s2_/.test(String(mapa[v] || ''))) {
+                            copia.label = lab.replace(/1[ºo]/gi, '2º');
+                        } else if (/2[ºo]/i.test(lab) && /s1_/.test(String(mapa[v] || ''))) {
+                            copia.label = lab.replace(/2[ºo]/gi, '1º');
+                        }
+                    }
+                }
             }
             return copia;
         });
+    }
+
+    function semestreDestinoClone(chavePeriodo, nomeNovo) {
+        var chave = String(chavePeriodo || '');
+        var mRec = chave.match(/^rec-sem-(\d+)$/);
+        if (mRec) {
+            var nRec = Number(mRec[1] || 0);
+            return (nRec === 1 || nRec === 2) ? nRec : 0;
+        }
+        var bim = bimestreDaChavePeriodo(chave);
+        if (bim === 1 || bim === 2) return 1;
+        if (bim === 3 || bim === 4) return 2;
+        var nome = String(nomeNovo || '').toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (/sem/.test(nome)) {
+            if (/(^|[^a-z0-9])(2|ii|segundo)([^a-z0-9]|$)/.test(nome)) return 2;
+            if (/(^|[^a-z0-9])(1|i|primeiro)([^a-z0-9]|$)/.test(nome)) return 1;
+        }
+        return 0;
+    }
+
+    function semestreOrigemClone(cols) {
+        cols = cols || [];
+        if (cols.indexOf('s1_rec') >= 0 || cols.indexOf('s1_ms') >= 0) return 1;
+        if (cols.indexOf('s2_rec') >= 0 || cols.indexOf('s2_ms') >= 0) return 2;
+        return 0;
+    }
+
+    function garantirColunaRecSemestreClone(sem) {
+        sem = Number(sem || 0) === 2 ? 2 : 1;
+        var codigo = 's' + sem + '_rec';
+        var nome = sem === 2 ? 'REC 2º' : 'REC 1º';
+        if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
+        if (!Array.isArray(estado.colunas_ordem)) estado.colunas_ordem = [];
+        mostrarColuna(codigo);
+        estado.nomes_blocos[codigo] = nome;
+        garantirComponenteManualNoRascunho(codigo, nome);
+        [rascunhoAtual, estado.rascunho_preservado].forEach(function (r) {
+            if (!r || !Array.isArray(r.componentes)) return;
+            r.componentes.forEach(function (c) {
+                if (!c || String(c.codigo || '').toLowerCase() !== codigo) return;
+                c.nome = nome;
+                c.source_type = c.source_type || 'nenhuma';
+                c.layout_type = 'rec';
+                if (!c.config || typeof c.config !== 'object') c.config = {};
+                c.config.layout_type = 'rec';
+                c.config.layout_group = 's' + sem;
+            });
+        });
+        if (estado.colunas_ordem.map(function (c) { return String(c || '').toLowerCase(); }).indexOf(codigo) < 0) {
+            estado.colunas_ordem.push(codigo);
+        }
+        return codigo;
+    }
+
+    function garantirColunaMsSemestreClone(sem) {
+        sem = Number(sem || 0) === 2 ? 2 : 1;
+        var codigo = 's' + sem + '_ms';
+        var nome = sem === 2 ? 'MS 2º' : 'MS 1º';
+        if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
+        if (!estado.formulas_blocos || typeof estado.formulas_blocos !== 'object') estado.formulas_blocos = {};
+        if (!Array.isArray(estado.blocos_calc)) estado.blocos_calc = [];
+        if (!Array.isArray(estado.colunas_ordem)) estado.colunas_ordem = [];
+        mostrarColuna(codigo);
+        estado.nomes_blocos[codigo] = nome;
+        if (estado.blocos_calc.indexOf(codigo) < 0) estado.blocos_calc.push(codigo);
+        garantirComponenteManualNoRascunho(codigo, nome);
+        [rascunhoAtual, estado.rascunho_preservado].forEach(function (r) {
+            if (!r || !Array.isArray(r.componentes)) return;
+            r.componentes.forEach(function (c) {
+                if (!c || String(c.codigo || '').toLowerCase() !== codigo) return;
+                c.nome = nome;
+                c.source_type = 'calculado';
+                c.layout_type = 'media';
+                if (!c.config || typeof c.config !== 'object') c.config = {};
+                c.config.layout_type = 'media';
+                c.config.layout_group = 's' + sem;
+            });
+        });
+        if (estado.colunas_ordem.map(function (c) { return String(c || '').toLowerCase(); }).indexOf(codigo) < 0) {
+            estado.colunas_ordem.push(codigo);
+        }
+        return codigo;
+    }
+
+    function mapaMuEntreSemestresClone(semOrig, semDest) {
+        var mapa = {};
+        if (semOrig === 1 && semDest === 2) {
+            mapa.b1_mu = 'b3_mu';
+            mapa.b2_mu = 'b4_mu';
+        } else if (semOrig === 2 && semDest === 1) {
+            mapa.b3_mu = 'b1_mu';
+            mapa.b4_mu = 'b2_mu';
+        }
+        var bimsOrig = semOrig === 1 ? [1, 2] : (semOrig === 2 ? [3, 4] : []);
+        var bimsDest = semDest === 1 ? [1, 2] : (semDest === 2 ? [3, 4] : []);
+        if (bimsOrig.length !== 2 || bimsDest.length !== 2) return mapa;
+
+        function muDoBimestre(bim) {
+            var achou = '';
+            (estado.linhas_layout || []).forEach(function (lin) {
+                if (!lin || achou) return;
+                var cols = (lin.colunas || []).map(function (c) { return String(c || '').toLowerCase(); });
+                var temBim = cols.some(function (c) {
+                    return c.indexOf('b' + bim + '_') === 0;
+                });
+                if (!temBim) {
+                    var nome = String(lin.nome || '').toLowerCase();
+                    var romanos = { 1: 'i', 2: 'ii', 3: 'iii', 4: 'iv' };
+                    if (!(nome.indexOf(bim + '') >= 0 || nome.indexOf(romanos[bim] + ' ') >= 0 || nome.indexOf(romanos[bim] + 'b') >= 0)) {
+                        return;
+                    }
+                }
+                cols.forEach(function (c) {
+                    if (achou) return;
+                    if (c === ('b' + bim + '_mu')) achou = c;
+                    else if (ehCodigoBlocoCalc(c) && /mu/i.test(String((estado.nomes_blocos && estado.nomes_blocos[c]) || c))) {
+                        achou = c;
+                    }
+                });
+            });
+            return achou;
+        }
+
+        var i;
+        for (i = 0; i < 2; i += 1) {
+            var de = muDoBimestre(bimsOrig[i]);
+            var para = muDoBimestre(bimsDest[i]) || ('b' + bimsDest[i] + '_mu');
+            if (de && para) mapa[de] = para;
+        }
+        return mapa;
+    }
+
+    function titulosComPeriodoDestino(chavePeriodo, linhaOrigemId) {
+        chavePeriodo = String(chavePeriodo || '');
+        linhaOrigemId = String(linhaOrigemId || '');
+        if (!chavePeriodo || !estado) return [];
+        var bim = bimestreDaChavePeriodo(chavePeriodo);
+        var prefixoBim = (bim >= 1 && bim <= 4) ? ('b' + bim + '_') : '';
+        var codigosDestino = {};
+        eventosCatalogoBuilder().forEach(function (ev) {
+            if (!ev || chavePeriodoItem(ev) !== chavePeriodo) return;
+            var cod = String(codigoColunaExistenteDoEvento(ev) || codigoPreferidoEvento(ev) || '').toLowerCase();
+            if (cod) codigosDestino[cod] = true;
+        });
+        if (prefixoBim) {
+            ['pp', 'pu', 'ch', 'pe', 'fal', 'mu'].forEach(function (leaf) {
+                codigosDestino[prefixoBim + leaf] = true;
+            });
+        }
+        var semDestChk = semestreDestinoClone(chavePeriodo, '');
+        if (semDestChk === 1) {
+            codigosDestino.s1_rec = true;
+            codigosDestino.s1_ms = true;
+        } else if (semDestChk === 2) {
+            codigosDestino.s2_rec = true;
+            codigosDestino.s2_ms = true;
+        }
+        var nomes = [];
+        (estado.linhas_layout || []).forEach(function (lin) {
+            if (!lin) return;
+            var id = String(lin.id || '');
+            var nome = String(lin.nome || '').trim();
+            if (!nome) return;
+            if (id === linhaOrigemId
+                || ('cab:' + nome.toLowerCase()) === linhaOrigemId
+                || nome === linhaOrigemId) {
+                return;
+            }
+            var tem = (lin.colunas || []).some(function (c) {
+                var low = String(c || '').toLowerCase();
+                if (!low) return false;
+                if (codigosDestino[low]) return true;
+                if (prefixoBim && low.indexOf(prefixoBim) === 0) return true;
+                return false;
+            });
+            if (tem) nomes.push(nome);
+        });
+        return nomes;
     }
 
     function clonarTituloPeriodo(linhaId, nomeNovo, chavePeriodoDestino) {
@@ -8013,17 +8202,59 @@ $boletimWizardSteps = [
             renderRevisarDinamico();
             return false;
         }
+        var jaTem = titulosComPeriodoDestino(chavePeriodoDestino, linhaId);
+        if (jaTem.length) {
+            var rotuloDest = '';
+            opcoesPeriodoClone().forEach(function (o) {
+                if (o.chave === chavePeriodoDestino) rotuloDest = o.rotulo;
+            });
+            if (!rotuloDest) rotuloDest = chavePeriodoDestino;
+            var msgJa = 'Esse bimestre já está adicionado'
+                + (rotuloDest ? (' (“' + rotuloDest + '”)') : '')
+                + ' no título “' + jaTem.join('”, “') + '”. '
+                + 'Troque o bimestre destino antes de criar a cópia.';
+            avisoLinha = { tipo: 'erro', texto: msgJa };
+            try { window.alert(msgJa); } catch (errAlert) { /* ignore */ }
+            renderRevisarDinamico();
+            return false;
+        }
+        var nomeDuplicado = (estado.linhas_layout || []).some(function (lin) {
+            if (!lin) return false;
+            var id = String(lin.id || '');
+            var n = String(lin.nome || '').trim().toLowerCase();
+            if (id === linhaId || ('cab:' + n) === linhaId) return false;
+            return n === nomeNovo.toLowerCase();
+        });
+        if (nomeDuplicado) {
+            var msgNome = 'Já existe um título “' + nomeNovo + '” no quadro. Altere o novo título antes de clonar.';
+            avisoLinha = { tipo: 'erro', texto: msgNome };
+            try { window.alert(msgNome); } catch (errNome) { /* ignore */ }
+            renderRevisarDinamico();
+            return false;
+        }
         var bimDest = bimestreDaChavePeriodo(chavePeriodoDestino);
+        var semOrig = semestreOrigemClone(colsOrig);
+        var semDest = semestreDestinoClone(chavePeriodoDestino, nomeNovo);
+        if (!semDest && semOrig) semDest = semOrig === 1 ? 2 : 1;
         var mapa = {};
         var pulados = [];
         var ehSm = !!(estado.modelo_santa_maria || estado.origem === 'santa-maria');
+        if (semOrig && semDest && semOrig !== semDest) {
+            var mapaMuSem = mapaMuEntreSemestresClone(semOrig, semDest);
+            Object.keys(mapaMuSem).forEach(function (k) { mapa[k] = mapaMuSem[k]; });
+        }
 
         function ehCalcClone(cod) {
-            return ehCodigoBlocoCalc(cod) || /^b[1-4]_mu$/i.test(cod);
+            return ehCodigoBlocoCalc(cod) || /^b[1-4]_mu$/i.test(cod) || /^s[12]_ms$/i.test(cod);
         }
 
         colsOrig.forEach(function (cod) {
             if (ehCalcClone(cod)) return;
+            if (/^s[12]_rec$/i.test(cod)) {
+                var semRec = semDest || (/^s2_/.test(cod) ? 1 : 2);
+                mapa[cod] = garantirColunaRecSemestreClone(semRec);
+                return;
+            }
             var mB = cod.match(/^b([1-4])_(pp|pu|ch|pe|fal|faltas)$/);
             if (mB && bimDest >= 1 && bimDest <= 4) {
                 var leaf = mB[2] === 'faltas' ? 'fal' : mB[2];
@@ -8047,8 +8278,22 @@ $boletimWizardSteps = [
             }
             var evOrig = eventoPorCodigoNoCatalogo(cod);
             if (evOrig) {
-                var par = eventoParNoPeriodoClone(evOrig, chavePeriodoDestino);
+                var bimEv = Number(evOrig.bimestre || 0);
+                var ehRecOrig = (bimEv === 81 || bimEv === 61 || bimEv === 62 || bimEv === 82 || bimEv === 63 || bimEv === 64
+                    || normalizarSiglaClone(siglaDoEvento(evOrig)) === 'rec');
+                if (ehRecOrig && semDest) {
+                    mapa[cod] = garantirColunaRecSemestreClone(semDest);
+                    return;
+                }
+                var chaveBusca = chavePeriodoDestino;
+                if (ehRecOrig && semDest) chaveBusca = 'rec-sem-' + semDest;
+                var par = eventoParNoPeriodoClone(evOrig, chaveBusca)
+                    || eventoParNoPeriodoClone(evOrig, chavePeriodoDestino);
                 if (!par) {
+                    if (ehRecOrig && semDest) {
+                        mapa[cod] = garantirColunaRecSemestreClone(semDest);
+                        return;
+                    }
                     pulados.push(String(siglaDoEvento(evOrig) || cod).toUpperCase());
                     return;
                 }
@@ -8074,8 +8319,11 @@ $boletimWizardSteps = [
         colsOrig.forEach(function (cod) {
             if (!ehCalcClone(cod)) return;
             var ehMuSm = /^b[1-4]_mu$/i.test(cod);
+            var ehMsSem = /^s[12]_ms$/i.test(cod);
             var novoCod = '';
-            if (ehMuSm && ehSm && bimDest >= 1 && bimDest <= 4) {
+            if (ehMsSem) {
+                novoCod = garantirColunaMsSemestreClone(semDest || (/^s2_/.test(cod) ? 1 : 2));
+            } else if (ehMuSm && ehSm && bimDest >= 1 && bimDest <= 4) {
                 novoCod = 'b' + bimDest + '_mu';
             } else {
                 novoCod = novoCodigoBloco();
@@ -8083,9 +8331,14 @@ $boletimWizardSteps = [
             mapa[cod] = novoCod;
             var toksOrig = estado.formulas_blocos[cod] || estado.formulas_blocos[String(cod).toLowerCase()] || [];
             estado.formulas_blocos[novoCod] = remapearTokensFormulaClone(toksOrig, mapa);
-            estado.nomes_blocos[novoCod] = estado.nomes_blocos[cod]
-                || estado.nomes_blocos[String(cod).toLowerCase()]
-                || 'MU';
+            if (ehMsSem) {
+                var semMsNome = semDest || (/^s2_/.test(cod) ? 1 : 2);
+                estado.nomes_blocos[novoCod] = semMsNome === 2 ? 'MS 2º' : 'MS 1º';
+            } else {
+                estado.nomes_blocos[novoCod] = estado.nomes_blocos[cod]
+                    || estado.nomes_blocos[String(cod).toLowerCase()]
+                    || 'MU';
+            }
             if (estado.escalas_blocos[cod] != null) {
                 estado.escalas_blocos[novoCod] = estado.escalas_blocos[cod];
             } else if (estado.escalas_blocos[novoCod] == null) {
