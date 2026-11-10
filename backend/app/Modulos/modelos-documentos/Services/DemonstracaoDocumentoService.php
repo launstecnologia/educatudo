@@ -93,10 +93,14 @@ class DemonstracaoDocumentoService
             } else {
                 $vars['quadro_notas_html'] = '';
                 $out['html_quadro'] = '';
-                $anoBoletim = $this->anoDoBoletim($boletimId);
+                $anoBoletim = $this->anoDoLayoutOuBoletim($boletimId);
                 $regraDbg = 0;
                 try {
-                    if (class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)) {
+                    if (class_exists(\App\Modulos\Boletins\Services\BoletimVisaoImpressaoService::class)) {
+                        $regraDbg = (new \App\Modulos\Boletins\Services\BoletimVisaoImpressaoService())
+                            ->encontrarRegraDoLayout($boletimId);
+                    }
+                    if ($regraDbg <= 0 && class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)) {
                         $regraDbg = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
                             ->resolverRegraImpressaoDoBoletim($boletimId);
                     }
@@ -126,7 +130,7 @@ class DemonstracaoDocumentoService
     }
 
     /**
-     * Mesmos Modelos de Boletim da tela Acadêmico → Boletim (ativos, não excluídos).
+     * Mesmos Modelos de Boletim da tela Acadêmico → Boletim (boletim_layouts).
      * Prioriza o ano da turma, mas lista todos para o select não ficar vazio.
      *
      * @return list<array{id:int,nome:string,rotulo:string,ano_letivo:?int,finalidade:string}>
@@ -135,12 +139,19 @@ class DemonstracaoDocumentoService
     {
         $rows = [];
         try {
-            if (class_exists(\App\Modulos\Boletins\Models\Boletim::class)) {
-                $rows = (new \App\Modulos\Boletins\Models\Boletim())->listar(true) ?: [];
+            if (class_exists(\App\Modulos\EventosAvaliativos\Models\BoletimLayout::class)) {
+                $layout = new \App\Modulos\EventosAvaliativos\Models\BoletimLayout();
+                $anoFiltro = ($anoLetivo !== null && $anoLetivo > 0) ? $anoLetivo : 0;
+                $rows = $layout->listar($anoFiltro) ?: [];
+                // Se filtrou por ano e veio vazio, lista todos (como a tela Boletim com "Todos").
+                if ($rows === [] && $anoFiltro > 0) {
+                    $rows = $layout->listar(0) ?: [];
+                }
             }
         } catch (\Throwable $e) {
             $rows = [];
         }
+        // Fallback legado: cadastro em boletins (não é o menu Boletim).
         if ($rows === [] && $this->tabelaExiste('boletins')) {
             $sql = 'SELECT id, nome, ano_letivo, finalidade
                     FROM boletins
@@ -164,6 +175,9 @@ class DemonstracaoDocumentoService
             $id = (int) ($row['id'] ?? 0);
             $nome = trim((string) ($row['nome'] ?? ''));
             if ($id <= 0 || $nome === '') {
+                continue;
+            }
+            if (isset($row['ativo']) && (int) $row['ativo'] !== 1) {
                 continue;
             }
             $ano = isset($row['ano_letivo']) && $row['ano_letivo'] !== null && $row['ano_letivo'] !== ''
@@ -211,6 +225,27 @@ class DemonstracaoDocumentoService
         if ($alunoId <= 0 || $boletimId <= 0) {
             return '';
         }
+
+        // Preferência: quadro montado em Acadêmico → Boletim → Montar quadro (layout_boletim_id).
+        try {
+            if (class_exists(\App\Modulos\Boletins\Services\BoletimVisaoImpressaoService::class)
+                && class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)
+            ) {
+                $regraLayout = (new \App\Modulos\Boletins\Services\BoletimVisaoImpressaoService())
+                    ->encontrarRegraDoLayout($boletimId);
+                if ($regraLayout > 0) {
+                    $html = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
+                        ->htmlQuadroPorRegraImpressao($alunoId, $regraLayout);
+                    $html = is_string($html) ? trim($html) : '';
+                    if ($html !== '') {
+                        return $html;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('DemonstracaoDocumento quadro layout boletim: ' . $e->getMessage());
+        }
+
         try {
             if (class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)) {
                 $html = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
@@ -226,7 +261,7 @@ class DemonstracaoDocumentoService
 
         // Fallback Santa Maria (PP/PU/CH…) e demais quadros gerados do ano.
         try {
-            $ano = $this->anoDoBoletim($boletimId);
+            $ano = $this->anoDoLayoutOuBoletim($boletimId);
             if ($ano <= 0) {
                 return '';
             }
@@ -241,20 +276,26 @@ class DemonstracaoDocumentoService
         return '';
     }
 
-    private function nomeDoBoletim(int $boletimId): string
+    private function anoDoLayoutOuBoletim(int $id): int
     {
-        if ($boletimId <= 0 || !$this->tabelaExiste('boletins')) {
-            return '';
+        if ($id <= 0) {
+            return 0;
         }
-        try {
-            $row = $this->db->fetch(
-                'SELECT nome FROM boletins WHERE id = :id LIMIT 1',
-                ['id' => $boletimId]
-            );
-            return is_array($row) ? trim((string) ($row['nome'] ?? '')) : '';
-        } catch (\Throwable $e) {
-            return '';
+        if ($this->tabelaExiste('boletim_layouts')) {
+            try {
+                $row = $this->db->fetch(
+                    'SELECT ano_letivo FROM boletim_layouts WHERE id = :id LIMIT 1',
+                    ['id' => $id]
+                );
+                $ano = is_array($row) ? (int) ($row['ano_letivo'] ?? 0) : 0;
+                if ($ano > 0) {
+                    return $ano;
+                }
+            } catch (\Throwable $e) {
+                // continua no fallback
+            }
         }
+        return $this->anoDoBoletim($id);
     }
 
     private function anoDoBoletim(int $boletimId): int

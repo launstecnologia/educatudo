@@ -646,6 +646,14 @@ class ProntuarioVidaEscolarService
     }
 
     /**
+     * Quadro de uma regra de impressão já resolvida (ex.: layout do menu Boletim).
+     */
+    public function htmlQuadroPorRegraImpressao(int $alunoId, int $regraId): string
+    {
+        return $this->htmlDeRegraBoletimAluno($alunoId, $regraId);
+    }
+
+    /**
      * Regra de impressão ligada ao cadastro do boletim (não o esqueleto Média/Faltas).
      * 1) regras com boletim_id  2) layouts do mesmo ano/regra acadêmica/nome  3) layout por id.
      */
