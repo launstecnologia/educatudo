@@ -681,13 +681,21 @@ td.edoc-celula-sel, th.edoc-celula-sel {
 .edoc-el[data-type="boletim"],
 .edoc-el[data-type="tabela_notas"] {
   max-width: 100%;
+  width: 100%;
   overflow: hidden;
 }
 .edoc-quadro-notas { font-size: inherit; width: 100%; max-width: 100%; overflow: hidden; }
 .edoc-quadro-notas [data-edoc-quadro-shell] { width: 100%; max-width: 100%; overflow: hidden; }
-.edoc-quadro-notas [data-edoc-quadro-fit] { transform-origin: top left; display: inline-block; }
+.edoc-quadro-notas [data-edoc-quadro-fit] { transform-origin: top left; width: 100%; max-width: 100%; }
 .edoc-quadro-notas .overflow-x-auto,
-.edoc-quadro-notas .overflow-auto { overflow: visible !important; max-width: none !important; }
+.edoc-quadro-notas .overflow-auto,
+.edoc-quadro-notas .space-y-8,
+.edoc-quadro-notas .doc-quadro-fit {
+  overflow: visible !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
 .edoc-quadro-notas table.quadro-notas,
 .edoc-quadro-notas table.dados,
 .edoc-quadro-notas table.boletim-quadro-tabela,

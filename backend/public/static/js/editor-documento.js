@@ -398,24 +398,28 @@
     if (!wraps.length) return;
     var avail = larguraUtilFolhaPx();
     if (avail <= 0) return;
+    var alvo = Math.floor(avail);
 
     wraps.forEach(function (wrap) {
-      var table = wrap.querySelector('table');
-      if (!table) return;
+      var tables = wrap.querySelectorAll('table');
+      if (!tables.length) return;
 
       var host = wrap.closest('.edoc-el');
       if (host) {
         host.style.maxWidth = '100%';
+        host.style.width = '100%';
         host.style.overflow = 'hidden';
       }
       wrap.style.maxWidth = '100%';
       wrap.style.width = '100%';
       wrap.style.overflow = 'hidden';
 
-      wrap.querySelectorAll('.overflow-x-auto, .overflow-auto, .space-y-8').forEach(function (n) {
+      // Nunca usar max-content aqui: com width:100% na tabela vira loop e explode a largura.
+      wrap.querySelectorAll('.overflow-x-auto, .overflow-auto, .space-y-8, .doc-quadro-fit').forEach(function (n) {
+        n.style.width = '100%';
+        n.style.maxWidth = '100%';
+        n.style.minWidth = '0';
         n.style.overflow = 'visible';
-        n.style.maxWidth = 'none';
-        n.style.width = 'max-content';
       });
 
       var scaleEl = wrap.querySelector('[data-edoc-quadro-fit]');
@@ -431,41 +435,40 @@
       }
       if (!shell) shell = wrap;
 
-      scaleEl.style.transform = 'none';
-      scaleEl.style.width = 'max-content';
-      scaleEl.style.maxWidth = 'none';
+      scaleEl.style.transform = '';
+      scaleEl.style.transformOrigin = 'top left';
+      scaleEl.style.width = '100%';
+      scaleEl.style.maxWidth = '100%';
       shell.style.width = '100%';
+      shell.style.maxWidth = '100%';
       shell.style.height = 'auto';
       shell.style.overflow = 'hidden';
 
-      table.style.setProperty('width', 'max-content', 'important');
-      table.style.setProperty('max-width', 'none', 'important');
-      table.style.setProperty('min-width', '0', 'important');
-      table.style.setProperty('table-layout', 'auto', 'important');
-
-      var need = Math.max(scaleEl.scrollWidth || 0, table.scrollWidth || 0, 0);
-      if (need <= 0) return;
-
-      var s = Math.min(1, avail / need);
-      if (s < 0.28) s = 0.28;
-      scaleEl.style.transformOrigin = 'top left';
-
-      if (s >= 0.999) {
-        scaleEl.style.transform = '';
-        scaleEl.style.width = '100%';
-        table.style.setProperty('width', '100%', 'important');
+      Array.prototype.forEach.call(tables, function (table) {
+        table.style.setProperty('width', alvo + 'px', 'important');
         table.style.setProperty('max-width', '100%', 'important');
+        table.style.setProperty('min-width', '0', 'important');
         table.style.setProperty('table-layout', 'fixed', 'important');
-        shell.style.width = '100%';
-        shell.style.height = 'auto';
-        return;
-      }
+        Array.prototype.forEach.call(table.querySelectorAll('th, td'), function (cel) {
+          cel.style.setProperty('white-space', 'normal', 'important');
+          cel.style.setProperty('word-break', 'break-word', 'important');
+          cel.style.setProperty('min-width', '0', 'important');
+          cel.style.setProperty('padding', '1px 2px', 'important');
+          cel.style.setProperty('font-size', 'inherit', 'important');
+          cel.style.setProperty('line-height', '1.05', 'important');
+        });
+      });
 
-      scaleEl.style.transform = 'scale(' + s + ')';
-      var naturalH = Math.max(scaleEl.scrollHeight || 0, scaleEl.offsetHeight || 0, table.scrollHeight || 0);
-      shell.style.width = Math.ceil(need * s) + 'px';
-      shell.style.height = Math.ceil(naturalH * s) + 'px';
-      shell.style.maxWidth = '100%';
+      // Se ainda passar da área útil, escala de verdade (medida com a tabela já limitada).
+      var need = Math.max(scaleEl.scrollWidth || 0, wrap.scrollWidth || 0, 0);
+      if (need > alvo + 2) {
+        var s = Math.min(1, alvo / need);
+        if (s < 0.35) s = 0.35;
+        scaleEl.style.transform = 'scale(' + s + ')';
+        var naturalH = Math.max(scaleEl.scrollHeight || 0, scaleEl.offsetHeight || 0);
+        shell.style.height = Math.ceil(naturalH * s) + 'px';
+        shell.style.width = Math.ceil(alvo) + 'px';
+      }
     });
   }
 
