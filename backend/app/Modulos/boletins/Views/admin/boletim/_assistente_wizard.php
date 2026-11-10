@@ -2972,6 +2972,9 @@ $boletimWizardSteps = [
             if (bim === 82 || bim === 63 || bim === 64) {
                 estado.nomes_blocos.s2_rec = (sig === 'REC') ? 'REC 2º' : sig;
             }
+            if (bim === 90 || sig === 'PF') {
+                estado.nomes_blocos.pf = 'PF';
+            }
             ((ev.subeventos) || []).forEach(function (sub, idx) {
                 var sid = Number(sub && sub.id || 0);
                 if (sid <= 0) return;
@@ -3736,12 +3739,17 @@ $boletimWizardSteps = [
         if (m) return 'p-' + m[1];
         if (g === 's1') return 's1';
         if (g === 's2') return 's2';
+        if (g === 'final' || g === 'ano' || g === 'rec-ano' || g === 'resultado') return 'final';
         return '';
     }
 
     function chaveCicloDeNomeCabecalho(nome) {
         var n = String(nome || '').toUpperCase();
         if (!n) return '';
+        if (/RECUPERA|.?\s*FINAL|RESULTADO\s*FINAL|PROVA\s*FINAL|\bPF\b/.test(n)
+            && !/1\s*[ºO]?\s*SEM|2\s*[ºO]?\s*SEM/.test(n)) {
+            return 'final';
+        }
         if (/\bIV\b|4\s*[ºO]|QUARTO/.test(n)) return 'p-4';
         if (/\bIII\b|3\s*[ºO]|TERCEIRO/.test(n)) return 'p-3';
         if (/\bII\b|2\s*[ºO]|SEGUNDO/.test(n) && !/\bIII\b/.test(n)) return 'p-2';
@@ -3757,6 +3765,10 @@ $boletimWizardSteps = [
         if (m) return 'p-' + m[1];
         if (cod.indexOf('s1_') === 0) return 's1';
         if (cod.indexOf('s2_') === 0) return 's2';
+        if (cod === 'pf' || cod === 'ma' || cod === 'mf' || cod === 'situacao'
+            || cod === 'rec' || cod === 'recuperacao' || cod === 'rec_final') {
+            return 'final';
+        }
 
         // Blocos de cálculo (MU/MS…): ciclo = cabeçalho onde o chip está no quadro.
         var linhas = (estado && estado.linhas_layout) || [];
@@ -3772,6 +3784,7 @@ $boletimWizardSteps = [
                 if (mm) return 'p-' + mm[1];
                 if (cols[j].indexOf('s1_') === 0) return 's1';
                 if (cols[j].indexOf('s2_') === 0) return 's2';
+                if (cols[j] === 'pf' || cols[j] === 'ma' || cols[j] === 'mf') return 'final';
             }
             var porNome = chaveCicloDeNomeCabecalho(lin.nome);
             if (porNome) return porNome;
@@ -3798,6 +3811,7 @@ $boletimWizardSteps = [
         }
         if (chave === 's1') return '1º semestre';
         if (chave === 's2') return '2º semestre';
+        if (chave === 'final') return 'Recuperação Final';
         return 'Geral / outros';
     }
 
@@ -3806,6 +3820,7 @@ $boletimWizardSteps = [
         if (chave.indexOf('p-') === 0) return Number(chave.slice(2)) || 0;
         if (chave === 's1') return 100;
         if (chave === 's2') return 101;
+        if (chave === 'final') return 200;
         return 900;
     }
 
@@ -3813,11 +3828,15 @@ $boletimWizardSteps = [
         var cod = String(codigo || '').toLowerCase();
         var m = cod.match(/^b[1-4]_(.+)$/);
         var leaf = m ? m[1] : cod;
-        var pref = { pp: 1, pu: 2, ch: 3, pe: 4, mu: 5, fal: 6, faltas: 6, rec: 7, ms: 8 };
+        var pref = {
+            pp: 1, pu: 2, ch: 3, pe: 4, mu: 5, fal: 6, faltas: 6,
+            rec: 7, ms: 8, ma: 9, pf: 10, mf: 11, situacao: 12
+        };
         if (pref[leaf] != null) return pref[leaf];
         var nome = String(nomeBlocoCalc(codigo) || tituloColuna(codigo) || '').toUpperCase().trim();
         if (nome === 'MU' || /^MU\b/.test(nome)) return 5;
         if (nome === 'MS' || /^MS\b/.test(nome)) return 8;
+        if (nome === 'PF' || /PROVA\s*FINAL|RECUPERA/.test(nome)) return 10;
         if (leaf.indexOf('rec') === 0 || nome.indexOf('REC') === 0) return 7;
         if (leaf.indexOf('ms') === 0) return 8;
         if (ehCodigoBlocoCalc(codigo)) return 5;
@@ -7011,6 +7030,8 @@ $boletimWizardSteps = [
         }
         if (bim === 81 || bim === 61 || bim === 62) return 's1_rec';
         if (bim === 82 || bim === 63 || bim === 64) return 's2_rec';
+        // Recuperação final / Prova Final (ano).
+        if (bim === 90 || sigla === 'pf' || sigla === 'prova_final' || sigla === 'provafinal') return 'pf';
         if (sigla) return sigla;
         if (bim >= 60) return 'rec';
         return id > 0 ? ('eva' + id) : '';
@@ -9653,7 +9674,7 @@ $boletimWizardSteps = [
             return 'Recuperação · ' + (periodoNumeroValido(nBim, ano) ? rotuloPeriodoNumero(nBim, ano) : (nBim + 'º ' + rotuloCampoPeriodo(ano)));
         }
         if (bim >= 80 && bim <= 82) return 'Recuperação · ' + (bim - 80) + 'º semestre';
-        if (bim === 90) return 'Recuperação · ano';
+        if (bim === 90) return 'Recuperação Final';
         if (periodoNumeroValido(bim, ano)) return rotuloPeriodoNumero(bim, ano);
         if (bim > 0) return 'Período ' + bim;
         return 'Ano letivo';
