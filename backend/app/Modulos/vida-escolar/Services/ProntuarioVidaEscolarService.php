@@ -1559,6 +1559,98 @@ class ProntuarioVidaEscolarService
     }
 
     /**
+     * Regras de impressão às vezes gravam só o layout (extras) e deixam boletim_componentes vazio.
+     * Reaproveita os componentes dos demonstrativos (exibir_em=notas) do mesmo boletim/ano.
+     *
+     * @param array<string,mixed> $regra
+     * @return array<string,mixed>
+     */
+    private function hidratarComponentesDaRegraImpressao(array $regra, \App\Models\System\BoletimConfig $cfg): array
+    {
+        $extras = [];
+        if (is_array($regra['extras'] ?? null)) {
+            $extras = $regra['extras'];
+        } else {
+            $decoded = json_decode((string) ($regra['extras_json'] ?? ''), true);
+            if (is_array($decoded)) {
+                $extras = $decoded;
+            }
+        }
+        $boletimId = (int) ($regra['boletim_id'] ?? 0);
+        if ($boletimId <= 0) {
+            $boletimId = (int) ($extras['boletim_id'] ?? $extras['layout_boletim_id'] ?? 0);
+        }
+        $ano = (int) ($regra['ano_letivo'] ?? 0);
+        $idsFonte = [];
+        try {
+            if ($boletimId > 0) {
+                $rows = $this->db->fetchAll(
+                    "SELECT id
+                     FROM boletim_regras
+                     WHERE ativo = 1
+                       AND exibir_em = 'notas'
+                       AND boletim_id = :bid
+                     ORDER BY bimestre ASC, id ASC",
+                    ['bid' => $boletimId]
+                ) ?: [];
+                foreach ($rows as $row) {
+                    $id = (int) ($row['id'] ?? 0);
+                    if ($id > 0) {
+                        $idsFonte[] = $id;
+                    }
+                }
+            }
+            if ($idsFonte === [] && $ano > 0) {
+                $rows = $this->db->fetchAll(
+                    "SELECT id
+                     FROM boletim_regras
+                     WHERE ativo = 1
+                       AND exibir_em = 'notas'
+                       AND ano_letivo = :ano
+                     ORDER BY bimestre ASC, id ASC
+                     LIMIT 20",
+                    ['ano' => $ano]
+                ) ?: [];
+                foreach ($rows as $row) {
+                    $id = (int) ($row['id'] ?? 0);
+                    if ($id > 0) {
+                        $idsFonte[] = $id;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('Hidratar componentes impressão: ' . $e->getMessage());
+            return $regra;
+        }
+
+        $merged = [];
+        $vistos = [];
+        foreach ($idsFonte as $fonteId) {
+            $fonte = $cfg->getRuleById($fonteId);
+            if (!is_array($fonte) || empty($fonte['componentes']) || !is_array($fonte['componentes'])) {
+                continue;
+            }
+            foreach ($fonte['componentes'] as $comp) {
+                if (!is_array($comp)) {
+                    continue;
+                }
+                $cod = strtolower(trim((string) ($comp['codigo'] ?? '')));
+                $chave = $cod !== '' ? $cod : ('id:' . (int) ($comp['id'] ?? 0));
+                if ($chave === 'id:0' || isset($vistos[$chave])) {
+                    continue;
+                }
+                $vistos[$chave] = true;
+                $merged[] = $comp;
+            }
+        }
+        if ($merged !== []) {
+            $regra['componentes'] = $merged;
+        }
+
+        return $regra;
+    }
+
+    /**
      * Colunas na ordem/título do assistente (linhas_layout + componentes), sem as ocultas.
      *
      * @param array<string,mixed> $regra
@@ -1735,7 +1827,13 @@ class ProntuarioVidaEscolarService
         try {
             $cfg = new \App\Models\System\BoletimConfig();
             $regra = $cfg->getRuleById($regraId);
-            if (!is_array($regra) || empty($regra['componentes'])) {
+            if (!is_array($regra)) {
+                return '';
+            }
+            if (empty($regra['componentes']) || !is_array($regra['componentes'])) {
+                $regra = $this->hidratarComponentesDaRegraImpressao($regra, $cfg);
+            }
+            if (empty($regra['componentes']) || !is_array($regra['componentes'])) {
                 return '';
             }
             $motor = new \App\Modulos\Boletins\Controllers\BoletimConfigController(true);
