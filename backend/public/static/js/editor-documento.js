@@ -2322,22 +2322,21 @@
     var a = $('#edoc-pdf');
     if (!a || !C.previewUrl) return;
     var url = C.previewUrl;
-    if (state.demo) {
-      var turma = $('#edoc-demo-turma');
-      var aluno = $('#edoc-demo-aluno');
-      var fonteBol = $('#edoc-fonte-boletim');
-      var tid = turma && turma.value ? turma.value : '';
-      var aid = aluno && aluno.value ? aluno.value : '';
-      var bid = fonteBol && fonteBol.value
-        ? (parseInt(fonteBol.value, 10) || 0)
-        : (parseInt((state.estrutura && state.estrutura.fonte_boletim_id) || 0, 10) || 0);
-      if (tid && aid) {
-        url += (url.indexOf('?') >= 0 ? '&' : '?')
-          + 'turma_id=' + encodeURIComponent(tid)
-          + '&aluno_id=' + encodeURIComponent(aid);
-        if (bid > 0) {
-          url += '&boletim_id=' + encodeURIComponent(String(bid));
-        }
+    var turma = $('#edoc-demo-turma');
+    var aluno = $('#edoc-demo-aluno');
+    var fonteBol = $('#edoc-fonte-boletim');
+    var tid = turma && turma.value ? turma.value : '';
+    var aid = aluno && aluno.value ? aluno.value : '';
+    var bid = fonteBol && fonteBol.value
+      ? (parseInt(fonteBol.value, 10) || 0)
+      : (parseInt((state.estrutura && state.estrutura.fonte_boletim_id) || 0, 10) || 0);
+    // Sempre leva turma/aluno/boletim — senão o PDF cai no quadro genérico Nota/Falta.
+    if (tid && aid) {
+      url += (url.indexOf('?') >= 0 ? '&' : '?')
+        + 'turma_id=' + encodeURIComponent(tid)
+        + '&aluno_id=' + encodeURIComponent(aid);
+      if (bid > 0) {
+        url += '&boletim_id=' + encodeURIComponent(String(bid));
       }
     }
     a.href = url;
@@ -4960,8 +4959,13 @@
       e.preventDefault();
       save().then(function (j) {
         if (!j || !j.ok || !C.previewUrl) return;
-        var sep = C.previewUrl.indexOf('?') >= 0 ? '&' : '?';
-        window.open(C.previewUrl + sep + 't=' + Date.now(), '_blank');
+        // Garante turma/aluno/boletim na URL (mesmo da prévia na folha).
+        state.demo = true;
+        atualizarLinkPdf();
+        var a = $('#edoc-pdf');
+        var base = (a && a.href) ? a.href : C.previewUrl;
+        var sep = base.indexOf('?') >= 0 ? '&' : '?';
+        window.open(base + sep + 't=' + Date.now(), '_blank');
       });
     });
     document.addEventListener('edoc-tree', renderTree);

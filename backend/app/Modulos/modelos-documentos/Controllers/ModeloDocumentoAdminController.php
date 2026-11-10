@@ -352,6 +352,14 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
                         }
                     }
                 }
+                // Garante o quadro do assistente (PP/PU/CH…), não a grade genérica Nota/Falta.
+                $htmlQuadro = trim((string) ($pacote['html_quadro'] ?? ''));
+                if ($htmlQuadro === '' && is_string($pacote['vars']['quadro_notas_html'] ?? null)) {
+                    $htmlQuadro = trim((string) $pacote['vars']['quadro_notas_html']);
+                }
+                if ($boletimId > 0 && $htmlQuadro !== '') {
+                    $vars['quadro_notas_html'] = $htmlQuadro;
+                }
                 if (is_array($pacote['linhas'] ?? null) && $pacote['linhas'] !== []) {
                     $vars['_grade_fonte'] = ['componentes' => $pacote['linhas']];
                 }
