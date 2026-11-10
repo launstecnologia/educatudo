@@ -4,7 +4,7 @@ Manual de cada tela do menu **Como a escola avalia**: o que cada botão faz e pa
 
 A regra de aprovação é o combinado da escola para aquele ano e aquele curso. Ela diz a média mínima, a frequência, a escala da nota, quem pode ver o documento e se existe recuperação. Evento, demonstrativo e boletim não pedem esses números de novo. Eles apontam para a regra.
 
-A nota entra no **evento avaliativo**. O **demonstrativo** é a conta detalhada do período. O **boletim** é o documento oficial. O **relatório** só imprime o que já foi calculado.
+A nota entra no **evento avaliativo**. O **demonstrativo** é o quadro ao vivo do período (monta no início do mês; cada lançamento aparece sozinho — não precisa regenerar). O **boletim** é o documento oficial (ao concluir, salva e calcula). O **relatório** só imprime o que já foi calculado.
 
 Menu do admin:
 

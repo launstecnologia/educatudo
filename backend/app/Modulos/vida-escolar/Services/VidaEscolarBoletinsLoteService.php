@@ -102,18 +102,12 @@ class VidaEscolarBoletinsLoteService
 
                 $fichaId = (int) ($porAluno[$alunoId] ?? 0);
                 try {
-                    $dados = $prontuarioSvc->montar($alunoId, $vida, $fichaId);
+                    $dados = $prontuarioSvc->montar($alunoId, $vida, $fichaId, true);
                     if ($dados === []) {
                         throw new \RuntimeException('Prontuário vazio.');
                     }
                     $dados['planilha_sed'] = $prontuarioSvc->planilhaSed($dados);
-                    $out = $pdfSvc->htmlProntuario(
-                        VidaEscolarPdfService::CODIGO_BOLETIM,
-                        'Boletim Escolar',
-                        $dados,
-                        $periodos,
-                        null
-                    );
+                    $out = $pdfSvc->htmlBoletim($dados, $periodos, null);
                     $binario = $pdfSvc->gerarPdfBinario($out['html'], $out['modelo']);
                     if ($binario === '') {
                         throw new \RuntimeException('PDF vazio.');

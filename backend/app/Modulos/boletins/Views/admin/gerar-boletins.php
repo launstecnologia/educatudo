@@ -31,6 +31,7 @@ $bimestreEv = is_array($regra) ? (int) ($regra['bimestre'] ?? 0) : 0;
 
 $page_header_back_url = URL . '/admin/boletins';
 $page_header_title = 'Notas / Boletins';
+$page_header_icon = 'fa-solid fa-file-circle-check';
 $page_header_subtitle_html = 'Modelo: <strong>' . htmlspecialchars($boletimNome !== '' ? $boletimNome : '—', ENT_QUOTES, 'UTF-8') . '</strong>'
     . ' · Simule um aluno e gere o boletim do período.';
 include __DIR__ . '/../../../../Views/admin/_partials/page_header_form.php';

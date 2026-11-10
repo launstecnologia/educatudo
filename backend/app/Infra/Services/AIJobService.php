@@ -564,6 +564,9 @@ class AIJobService
             case 'grade_horaria_importar_imagem':
                 return self::dispatchGradeHorariaImportarImagem($payload);
 
+            case 'boletim_ler_modelo':
+                return self::dispatchBoletimLerModelo($payload);
+
             case 'modelo_documento_reproduzir_imagem':
                 return self::dispatchModeloDocumentoReproduzirImagem($payload);
 
@@ -819,6 +822,38 @@ class AIJobService
         }
 
         return self::montarPreviewGradeHoraria($itens);
+    }
+
+    private static function dispatchBoletimLerModelo(array $payload): array
+    {
+        $path = (string) ($payload['arquivo']['path'] ?? '');
+        $mime = (string) ($payload['arquivo']['mime'] ?? 'image/jpeg');
+        $nomeOriginal = (string) ($payload['arquivo']['nome_original'] ?? basename($path));
+        $slug = strtolower((string) ($payload['arquivo']['slug'] ?? ''));
+        if (defined('TENANT_SLUG')) {
+            $slugTenant = strtolower((string) preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG));
+            if ($slugTenant !== '' && $slug !== $slugTenant) {
+                throw new \RuntimeException('Arquivo do boletim não encontrado.');
+            }
+        }
+        if (!preg_match('/^[a-z0-9_-]+$/', $slug)) {
+            throw new \RuntimeException('Arquivo do boletim não encontrado.');
+        }
+
+        $base = realpath(dirname(__DIR__, 3) . '/storage/tmp/boletim_modelo_ia/' . $slug);
+        $real = $path !== '' ? realpath($path) : false;
+        if ($base === false || $real === false || !is_file($real) || !str_starts_with($real, $base . DIRECTORY_SEPARATOR)) {
+            throw new \RuntimeException('Arquivo do boletim não encontrado.');
+        }
+
+        try {
+            $service = new \App\Modulos\Boletins\Services\BoletimModeloLeituraService();
+            $rascunho = $service->processarArquivo($real, $mime, $nomeOriginal);
+        } finally {
+            @unlink($real);
+        }
+
+        return ['rascunho' => $rascunho];
     }
 
     private static function dispatchModeloDocumentoReproduzirImagem(array $payload): array

@@ -40,6 +40,8 @@ $router->get('/admin/students/exercicio-ia/{sessaoId}', 'Admin/StudentAdminContr
 $router->post('/admin/students/excluir-lista-exercicio-ia', 'Admin/StudentAdminController@excluirListaExercicioIA');
 $router->get('/admin/students/{id}', 'Admin/StudentAdminController@mostrarAluno');
 $router->get('/admin/students/{id}/tab/provas', 'Admin/StudentAdminController@provasTabFragment');
+$router->get('/admin/students/{id}/tab/notas', 'Admin/StudentAdminController@notasTabFragment');
+$router->get('/admin/students/{id}/tab/quadro-impressao', 'Admin/StudentAdminController@quadroImpressaoFragment');
 $router->get('/admin/students/{id}/auditoria', 'Admin/StudentAdminController@auditoriaAluno');
 $router->post('/admin/students/{id}/boletim/observacao', 'Admin/StudentAdminController@salvarObservacaoBoletim');
 $router->post('/admin/students/{id}/boletim/observacao/limpar', 'Admin/StudentAdminController@limparObservacaoBoletim');

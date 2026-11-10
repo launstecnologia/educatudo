@@ -1,5 +1,7 @@
 # Tasks — backlog atual
 
+- [x] Separar Demonstrativo de notas (quadro ao vivo, sem gerar snapshot) e Boletim oficial (Concluir e aplicar salva + calcula): gate em `salvarRegra`, CTAs do assistente, portal aluno/pais prioriza ao vivo na aba Notas e boletim na aba Boletim. — 2026-11-10
+
 - [x] Relatório completo em `/admin/relatorios/completo`: a escola marca os bancos (cadastro, ficha, responsáveis, matrícula, documentos, chamada, notas, resultado final, frequência, faltas, ocorrências, redações, provas e exercícios) e baixa Excel ou PDF. Sem senha. Limite de 1.500 alunos por arquivo. — 2026-11-04
 
 - [x] Calendário único no admin: o cadastro fica no Calendário Letivo, com a opção Avisar a família (hora, prioridade e público). O aviso no app acompanha edição, desmarcação e exclusão. A tela de Comunicação lista os avisos já enviados. Migration `2026_10_31_calendario_aviso_familia.sql`. — 2026-10-31

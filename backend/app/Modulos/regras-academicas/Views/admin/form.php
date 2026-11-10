@@ -20,18 +20,14 @@ $val = static function (?array $item, string $key, $default = '') {
     }
     return $item[$key] ?? $default;
 };
+$page_header_title = $isEdit ? 'Editar regra de aprovação' : 'Nova regra de aprovação';
+$page_header_subtitle = 'Define como a escola aprova, recupera e exige frequência.';
+$page_header_icon = 'fa-solid fa-scale-balanced';
+$page_header_back_url = URL . '/admin/regras-academicas';
+$page_header_back_label = 'Voltar';
+include __DIR__ . '/../../../../Views/admin/_partials/page_header_form.php';
+include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 ?>
-<div class="mb-8">
-    <div class="flex justify-between items-center">
-        <div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2"><?= $isEdit ? 'Editar regra de aprovação' : 'Nova regra de aprovação' ?></h2>
-            <p class="text-gray-600">Define como a escola aprova, recupera e exige frequência. Modelo, público e disciplinas desta regra valem para o demonstrativo e o boletim.</p>
-        </div>
-        <a href="<?= URL ?>/admin/regras-academicas" class="text-gray-600 hover:text-gray-900">← Voltar</a>
-    </div>
-</div>
-
-<?php include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php'; ?>
 
 <form id="regra-aprovacao-form" method="POST" action="<?= htmlspecialchars($action) ?>" class="space-y-6">
     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">

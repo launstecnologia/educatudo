@@ -12,6 +12,7 @@ $schemaPronto = !empty($schema_pronto);
 
 $page_header_title = $regraNome !== '' ? 'Eventos Avaliativos - ' . $regraNome : 'Eventos Avaliativos';
 $page_header_subtitle = 'Visualize a estrutura dos eventos avaliativos do período letivo.';
+$page_header_icon = 'fa-solid fa-clipboard-list';
 $page_header_actions = '<a href="' . URL . '/admin/eventos-avaliativos" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"><i class="fa-solid fa-arrow-left mr-2 text-gray-500" aria-hidden="true"></i>Regras de Nota</a>';
 include \App\Core\ViewPaths::adminPartial('page_header_list.php');
 include \App\Core\ViewPaths::adminPartial('flash_message.php');

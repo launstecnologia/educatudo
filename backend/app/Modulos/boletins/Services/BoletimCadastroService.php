@@ -4,10 +4,12 @@ namespace App\Modulos\Boletins\Services;
 
 
 use App\Modulos\Boletins\Models\Boletim;
+use App\Modulos\RegrasAcademicas\Models\RecuperacaoConfig;
 use App\Modulos\RegrasAcademicas\Models\RegraAcademica;
 use App\Services\BoletimAssistenteWizard;
 use App\Models\System\BoletimConfig;
 use App\Core\Database;
+use App\Core\PeriodoLetivo;
 use Throwable;
 
 /**
@@ -286,6 +288,147 @@ class BoletimCadastroService
     }
 
     /**
+     * Períodos do menu "Períodos do boletim": bimestres/trimestres + recuperações
+     * da regra (R1/R2/RF etc.), na mesma ordem da tela de Eventos Avaliativos.
+     *
+     * @param array<string,mixed> $item
+     * @param list<array<string,mixed>> $eventosNotas
+     * @return list<array{bimestre:int,regra_id:int,ano_letivo:int,rotulo:string}>
+     */
+    public function periodosDoMenuNotas(array $item, array $eventosNotas): array
+    {
+        $ano = (int) ($item['ano_letivo'] ?? 0);
+        if ($ano <= 0) {
+            $ano = (int) date('Y');
+        }
+        $porCodigo = [];
+        foreach ($eventosNotas as $evento) {
+            if (!is_array($evento)) {
+                continue;
+            }
+            $codigo = (int) ($evento['bimestre'] ?? 0);
+            $regraId = (int) ($evento['id'] ?? 0);
+            if ($codigo <= 0 || $regraId <= 0) {
+                continue;
+            }
+            // A consulta ordena por id: o último do mesmo código fica no menu.
+            $porCodigo[$codigo] = $regraId;
+        }
+        // Sem evento de notas ainda: mantém o fluxo "Configurar primeiro período".
+        if ($porCodigo === []) {
+            return [];
+        }
+
+        $rotulosRegime = PeriodoLetivo::doAno($ano)['rotulos'] ?? [];
+        if (!is_array($rotulosRegime) || $rotulosRegime === []) {
+            $rotulosRegime = [1 => '1º período', 2 => '2º período', 3 => '3º período', 4 => '4º período'];
+        }
+
+        $pares = [];
+        $ciclos = [];
+        $final = null;
+        $regraAcademicaId = (int) ($item['regra_academica_id'] ?? 0);
+        if ($regraAcademicaId > 0) {
+            try {
+                $rec = new RecuperacaoConfig();
+                if ($rec->tabelaPronta()) {
+                    foreach ($rec->slotsParaTela($ano, [], $regraAcademicaId) as $slot) {
+                        if (!is_array($slot)) {
+                            continue;
+                        }
+                        $codigoSlot = (int) ($slot['codigo'] ?? 0);
+                        $rotuloSlot = trim((string) ($slot['rotulo'] ?? 'Recuperação'));
+                        if ($codigoSlot === RecuperacaoConfig::CODIGO_FINAL) {
+                            $final = ['codigo' => $codigoSlot, 'rotulo' => $rotuloSlot !== '' ? $rotuloSlot : 'Prova Final'];
+                            continue;
+                        }
+                        if ($codigoSlot > RecuperacaoConfig::CODIGO_PAR_BASE
+                            && $codigoSlot < RecuperacaoConfig::CODIGO_FINAL) {
+                            $pares[$codigoSlot - RecuperacaoConfig::CODIGO_PAR_BASE] = [
+                                'codigo' => $codigoSlot,
+                                'rotulo' => $rotuloSlot !== '' ? $rotuloSlot : 'Recuperação Semestral',
+                            ];
+                            continue;
+                        }
+                        if ($codigoSlot > RecuperacaoConfig::CODIGO_CICLO_BASE
+                            && $codigoSlot < RecuperacaoConfig::CODIGO_PAR_BASE) {
+                            $ciclos[$codigoSlot - RecuperacaoConfig::CODIGO_CICLO_BASE] = [
+                                'codigo' => $codigoSlot,
+                                'rotulo' => $rotuloSlot !== '' ? $rotuloSlot : 'Recuperação',
+                            ];
+                        }
+                    }
+                }
+            } catch (Throwable $e) {
+                error_log('BoletimCadastroService periodosDoMenuNotas: ' . $e->getMessage());
+            }
+        }
+
+        $montar = static function (int $codigo, string $rotulo) use ($porCodigo, $ano): array {
+            return [
+                'bimestre' => $codigo,
+                'regra_id' => (int) ($porCodigo[$codigo] ?? 0),
+                'ano_letivo' => $ano,
+                'rotulo' => $rotulo,
+            ];
+        };
+
+        $out = [];
+        $vistos = [];
+        $numeros = [];
+        foreach ($rotulosRegime as $numero => $rotulo) {
+            $numeros[] = (int) $numero;
+        }
+        sort($numeros);
+        $total = count($numeros);
+        // Mesma agrupagem da tela Eventos Avaliativos: pares de períodos + slot do meio.
+        for ($indiceGrupo = 0; $indiceGrupo < $total; $indiceGrupo += 2) {
+            $fatia = array_slice($numeros, $indiceGrupo, 2);
+            foreach ($fatia as $numero) {
+                $rotuloPeriodo = trim((string) ($rotulosRegime[$numero] ?? ''));
+                if ($rotuloPeriodo === '') {
+                    $rotuloPeriodo = PeriodoLetivo::rotulo($ano, $numero) ?: ($numero . 'º período');
+                }
+                $out[] = $montar($numero, $rotuloPeriodo);
+                $vistos[$numero] = true;
+                if (isset($ciclos[$numero])) {
+                    $out[] = $montar((int) $ciclos[$numero]['codigo'], (string) $ciclos[$numero]['rotulo']);
+                    $vistos[(int) $ciclos[$numero]['codigo']] = true;
+                }
+            }
+            $indicePar = (int) floor($indiceGrupo / 2) + 1;
+            if (isset($pares[$indicePar])) {
+                $out[] = $montar((int) $pares[$indicePar]['codigo'], (string) $pares[$indicePar]['rotulo']);
+                $vistos[(int) $pares[$indicePar]['codigo']] = true;
+            }
+        }
+        if ($final !== null) {
+            $out[] = $montar((int) $final['codigo'], (string) $final['rotulo']);
+            $vistos[(int) $final['codigo']] = true;
+        }
+
+        // Configurações já gravadas fora da regra (órfãs) continuam no menu.
+        ksort($porCodigo);
+        foreach ($porCodigo as $codigo => $regraId) {
+            $codigo = (int) $codigo;
+            if ($codigo <= 0 || isset($vistos[$codigo])) {
+                continue;
+            }
+            $rotuloExtra = PeriodoLetivo::rotulo($ano, $codigo);
+            if ($rotuloExtra === '' || $codigo >= 60) {
+                $rotuloExtra = $codigo === RecuperacaoConfig::CODIGO_FINAL
+                    ? 'Prova Final'
+                    : ($codigo > RecuperacaoConfig::CODIGO_PAR_BASE
+                        ? 'Recuperação Semestral'
+                        : ($codigo > RecuperacaoConfig::CODIGO_CICLO_BASE ? 'Recuperação' : ('Período ' . $codigo)));
+            }
+            $out[] = $montar($codigo, $rotuloExtra);
+        }
+
+        return $out;
+    }
+
+    /**
      * Mínima e arredondamento vêm da regra acadêmica vinculada (fallback 6 se não houver).
      *
      * @param array<string,mixed> $item
@@ -462,14 +605,34 @@ class BoletimCadastroService
      */
     public function encontrarOficialParaTurma(int $turmaId, int $serieId, int $anoLetivo, ?int $preferidoId = null): ?array
     {
+        return $this->encontrarModeloParaTurma($turmaId, $serieId, $anoLetivo, 'oficial', $preferidoId);
+    }
+
+    /**
+     * Modelo ativo (oficial ou complementar/extra) que melhor atende a turma.
+     *
+     * @param 'oficial'|'complementar'|null $finalidade null = qualquer
+     * @return array<string,mixed>|null
+     */
+    public function encontrarModeloParaTurma(
+        int $turmaId,
+        int $serieId,
+        int $anoLetivo,
+        ?string $finalidade = null,
+        ?int $preferidoId = null
+    ): ?array {
         if (!$this->model->tabelasProntas()) {
             return null;
         }
+        $finalidade = $finalidade !== null
+            ? (strtolower(trim($finalidade)) === 'complementar' ? 'complementar' : 'oficial')
+            : null;
         $preferidoId = (int) $preferidoId;
         $melhor = null;
         $melhorPts = -1;
         foreach ($this->model->listar(true) as $row) {
-            if (($row['finalidade'] ?? '') !== 'oficial') {
+            $finRow = (($row['finalidade'] ?? 'oficial') === 'complementar') ? 'complementar' : 'oficial';
+            if ($finalidade !== null && $finRow !== $finalidade) {
                 continue;
             }
             if (!$this->modeloAtendeTurma($row, $turmaId, $serieId)) {
@@ -491,6 +654,9 @@ class BoletimCadastroService
             $series = array_map('intval', (array) ($row['series_ids'] ?? []));
             if ($serieId > 0 && in_array($serieId, $series, true)) {
                 $pts += 10;
+            }
+            if ($finRow === 'oficial') {
+                $pts += 1;
             }
             if ($pts > $melhorPts) {
                 $melhorPts = $pts;

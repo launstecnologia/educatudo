@@ -1580,10 +1580,11 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
         } catch (\Throwable $e) {
             $provasMatrizBlocos = ['tabelas' => [], 'tem_dados' => false];
         }
-        $boletinsPortalNotas = $this->boletinsVisiveisNoPortal((int) $aluno['id'], 'aluno', 'notas');
-        $notasEventosAoVivo = $this->notasEventosAoVivoDoAluno($aluno, $boletinsPortalNotas);
+        // Demonstrativo = quadro ao vivo; boletim oficial = snapshot/ficha.
+        $notasEventosAoVivo = $this->notasEventosAoVivoDoAluno($aluno, []);
         $fichaIdPortal = isset($_GET['ficha_id']) ? (int) $_GET['ficha_id'] : 0;
         $boletimOficial = $this->boletimOficialPortal((int) $aluno['id'], $fichaIdPortal);
+        $boletinsPortalOficiais = $this->boletinsVisiveisNoPortal((int) $aluno['id'], 'aluno', 'boletim');
 
         $primaryColor = LayoutHelper::get('primary_color', $this->config['school']['colors']['primary'] ?? '#3b82f6');
 
@@ -1596,10 +1597,11 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
             'provas_matriz_blocos' => $provasMatrizBlocos,
             'notas_lancamento_eventos' => [],
             'boletins_gerados' => [],
-            'boletins_gerados_notas' => $boletinsPortalNotas,
+            // Legado: snapshots de demonstrativo — portal prioriza ao vivo; mantém lista vazia na UI principal.
+            'boletins_gerados_notas' => [],
             'notas_eventos_ao_vivo' => $notasEventosAoVivo,
             'boletins_gerados_notas_extra' => [],
-            'boletins_gerados_boletim' => [],
+            'boletins_gerados_boletim' => $boletinsPortalOficiais,
             'boletim_oficial' => $boletimOficial,
             'boletim_url_ficha' => rtrim((string) URL, '/') . '/notas-boletins',
             'boletins_gerados_complementar' => [],
@@ -1616,7 +1618,8 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
     }
 
     /**
-     * Notas lançadas dos eventos marcados. Some quando o boletim daquele período já está visível.
+     * Demonstrativo ao vivo: notas lançadas nos eventos.
+     * $boletinsVisiveis só filtra se for boletim oficial do período (não snapshot de demonstrativo).
      *
      * @param array<string,mixed> $aluno
      * @param list<array<string,mixed>> $boletinsVisiveis
@@ -1634,9 +1637,16 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
             error_log('Notas ao vivo do aluno #' . (int) ($aluno['id'] ?? 0) . ': ' . $e->getMessage());
             return [];
         }
+        if ($boletinsVisiveis === []) {
+            return is_array($periodos) ? $periodos : [];
+        }
         $fechados = [];
         foreach ($boletinsVisiveis as $boletim) {
             if (!is_array($boletim)) {
+                continue;
+            }
+            // Só snapshot de boletim oficial fecha o ao vivo — demonstrativo (notas) não.
+            if (strtolower(trim((string) ($boletim['exibir_em'] ?? 'boletim'))) === 'notas') {
                 continue;
             }
             $ano = (int) ($boletim['ano_letivo'] ?? 0);
@@ -1644,6 +1654,9 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
             if ($ano > 0 && $bimestre > 0) {
                 $fechados[$ano . ':' . $bimestre] = true;
             }
+        }
+        if ($fechados === []) {
+            return is_array($periodos) ? $periodos : [];
         }
         $abertos = [];
         foreach ($periodos as $periodo) {

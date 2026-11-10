@@ -534,8 +534,11 @@ class ResultadoAcademicoService
     }
 
     /**
-     * Avalia fórmula com códigos de bloco, max() e min(). Extraído do boletim
-     * para ser a fonte única.
+     * Avalia fórmula com códigos de bloco, max(), min() e chamada()/substituta().
+     * Extraído do boletim para ser a fonte única.
+     *
+     * chamada(base1, base2, …, substituta) = média das bases, preenchendo
+     * só a primeira base ausente com a substituta (ex.: CH no lugar de PP ou PU).
      *
      * @param array<string, float|int|string|null> $valoresPorCodigo
      * @return array{ok:bool,valor?:float,expressao?:string,erro?:string}
@@ -555,7 +558,28 @@ class ResultadoAcademicoService
             $valoresPorCodigoInsensitive[strtolower($ks)] = $v;
             $valoresPorCodigoNormalized[$normKey($ks)] = $v;
         }
+        $temNota = static function (string $cod) use ($valoresPorCodigo, $valoresPorCodigoInsensitive, $valoresPorCodigoNormalized, $normKey): bool {
+            $cod = trim($cod);
+            if ($cod === '') {
+                return false;
+            }
+            if (array_key_exists($cod, $valoresPorCodigo) && is_numeric($valoresPorCodigo[$cod])) {
+                return true;
+            }
+            $tl = strtolower($cod);
+            if (array_key_exists($tl, $valoresPorCodigoInsensitive) && is_numeric($valoresPorCodigoInsensitive[$tl])) {
+                return true;
+            }
+            $tn = $normKey($cod);
+
+            return $tn !== ''
+                && array_key_exists($tn, $valoresPorCodigoNormalized)
+                && is_numeric($valoresPorCodigoNormalized[$tn]);
+        };
+
         $expr = preg_replace('/(?<=\d),(?=\d)/', '.', $formula) ?? $formula;
+        // Alias legível no editor → nome canônico da função.
+        $expr = preg_replace('/\bsubstituta\s*\(/i', 'chamada(', $expr) ?? $expr;
 
         $codeKeys = array_keys($valoresPorCodigo);
         usort($codeKeys, static function ($a, $b) {
@@ -589,10 +613,16 @@ class ResultadoAcademicoService
             }
         }
 
+        try {
+            $expr = $this->expandirFuncoesChamada((string) $expr, $temNota);
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'erro' => 'Erro na fórmula final: ' . $e->getMessage()];
+        }
+
         $expr = preg_replace_callback('/\b[a-zA-Z_][a-zA-Z0-9_]*\b/', function ($m) use ($valoresPorCodigo, $valoresPorCodigoInsensitive, $valoresPorCodigoNormalized, $normKey) {
             $token = $m[0];
             $tl = strtolower($token);
-            if ($tl === 'max' || $tl === 'min') {
+            if ($tl === 'max' || $tl === 'min' || $tl === 'chamada' || $tl === 'substituta') {
                 return $token;
             }
             if (array_key_exists($token, $valoresPorCodigo) && is_numeric($valoresPorCodigo[$token])) {
@@ -616,6 +646,92 @@ class ResultadoAcademicoService
         } catch (\Throwable $e) {
             return ['ok' => false, 'erro' => 'Erro na fórmula final: ' . $e->getMessage()];
         }
+    }
+
+    /**
+     * Expande chamada(base1, base2, …, substituta) para a média das bases,
+     * trocando só a primeira base sem nota pela substituta.
+     *
+     * @param callable(string):bool $temNota
+     */
+    private function expandirFuncoesChamada(string $expr, callable $temNota): string
+    {
+        $guard = 0;
+        while (preg_match('/\b(chamada|substituta)\s*\(/i', $expr)) {
+            if (++$guard > 80) {
+                throw new \RuntimeException('Limite de aninhamento em chamada/substituta.');
+            }
+            if (!preg_match('/\b(chamada|substituta)\s*\(/i', $expr, $m, PREG_OFFSET_CAPTURE)) {
+                break;
+            }
+            $startFn = (int) $m[0][1];
+            $openParen = $startFn + strlen($m[0][0]) - 1;
+            [$args, $closePos] = $this->extrairArgumentosFuncao($expr, $openParen);
+            if (count($args) < 2) {
+                throw new \RuntimeException('chamada/substituta precisa de ao menos 2 argumentos (bases…, substituta).');
+            }
+            $substituta = array_pop($args);
+            $bases = $args;
+            $preencheu = false;
+            $termos = [];
+            foreach ($bases as $base) {
+                $baseTrim = trim($base);
+                $ehIdent = (bool) preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $baseTrim);
+                if ($ehIdent && !$temNota($baseTrim) && !$preencheu) {
+                    $termos[] = '(' . $substituta . ')';
+                    $preencheu = true;
+                } else {
+                    $termos[] = '(' . $baseTrim . ')';
+                }
+            }
+            $n = count($termos);
+            $media = $n === 1
+                ? $termos[0]
+                : '((' . implode('+', $termos) . ')/' . $n . ')';
+            $expr = substr($expr, 0, $startFn) . $media . substr($expr, $closePos + 1);
+            // substituta já é média — remove ÷ N redundante (senão a nota cai na metade).
+            if ($n > 1) {
+                $cauda = substr($expr, $startFn + strlen($media));
+                if (preg_match('/^\s*\/\s*(\d+(?:[.,]\d+)?)/', $cauda, $divM)) {
+                    $divisor = (float) str_replace(',', '.', (string) ($divM[1] ?? ''));
+                    if (abs($divisor - $n) < 0.0001) {
+                        $expr = substr($expr, 0, $startFn + strlen($media)) . substr($cauda, strlen($divM[0]));
+                    }
+                }
+            }
+        }
+
+        return $expr;
+    }
+
+    /**
+     * @return array{0: list<string>, 1: int}
+     */
+    private function extrairArgumentosFuncao(string $expr, int $openParenIdx): array
+    {
+        $n = strlen($expr);
+        $i = $openParenIdx + 1;
+        $depth = 1;
+        $args = [];
+        $inicio = $i;
+        for (; $i < $n; $i++) {
+            $c = $expr[$i];
+            if ($c === '(') {
+                $depth++;
+            } elseif ($c === ')') {
+                $depth--;
+                if ($depth === 0) {
+                    $args[] = substr($expr, $inicio, $i - $inicio);
+
+                    return [$args, $i];
+                }
+            } elseif ($c === ',' && $depth === 1) {
+                $args[] = substr($expr, $inicio, $i - $inicio);
+                $inicio = $i + 1;
+            }
+        }
+
+        throw new \RuntimeException('Função com parênteses incompletos.');
     }
 
     private function avaliarExpressaoComMaxMin(string $expr): float

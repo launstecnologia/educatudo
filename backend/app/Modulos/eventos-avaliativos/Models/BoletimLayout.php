@@ -56,18 +56,24 @@ class BoletimLayout
     }
 
     /**
+     * @param int $ano Ano letivo; 0 = todos os anos
      * @return list<array<string,mixed>>
      */
-    public function listar(int $ano): array
+    public function listar(int $ano = 0): array
     {
-        if ($ano <= 0 || !$this->tabelaPronta()) {
+        if (!$this->tabelaPronta()) {
             return [];
         }
+        $filtrarAno = $ano > 0;
         if (!$this->identidadePronta()) {
-            $legado = $this->db->fetchAll(
-                'SELECT id, ano_letivo FROM boletim_layouts WHERE ano_letivo = :ano ORDER BY id ASC',
-                ['ano' => $ano]
-            );
+            $legado = $filtrarAno
+                ? $this->db->fetchAll(
+                    'SELECT id, ano_letivo FROM boletim_layouts WHERE ano_letivo = :ano ORDER BY ano_letivo DESC, id ASC',
+                    ['ano' => $ano]
+                )
+                : $this->db->fetchAll(
+                    'SELECT id, ano_letivo FROM boletim_layouts ORDER BY ano_letivo DESC, id ASC'
+                );
             $saida = [];
             foreach ($legado ?: [] as $row) {
             $saida[] = [
@@ -86,16 +92,18 @@ class BoletimLayout
             }
             return $saida;
         }
-        $rows = $this->db->fetchAll(
-            'SELECT bl.id, bl.nome, bl.finalidade, bl.ano_letivo, bl.vis_aluno, bl.vis_pais, bl.ativo,
+        $sql = 'SELECT bl.id, bl.nome, bl.finalidade, bl.ano_letivo, bl.vis_aluno, bl.vis_pais, bl.ativo,
                     bl.materias_ids, bl.layout_json,
                     ra.nome AS regra_academica_nome, ra.media_minima
              FROM boletim_layouts bl
-             LEFT JOIN regras_academicas ra ON ra.id = bl.regra_academica_id
-             WHERE bl.ano_letivo = :ano
-             ORDER BY FIELD(bl.finalidade, \'oficial\', \'complementar\'), bl.nome ASC, bl.id ASC',
-            ['ano' => $ano]
-        );
+             LEFT JOIN regras_academicas ra ON ra.id = bl.regra_academica_id';
+        $params = [];
+        if ($filtrarAno) {
+            $sql .= ' WHERE bl.ano_letivo = :ano';
+            $params['ano'] = $ano;
+        }
+        $sql .= ' ORDER BY bl.ano_letivo DESC, FIELD(bl.finalidade, \'oficial\', \'complementar\'), bl.nome ASC, bl.id ASC';
+        $rows = $this->db->fetchAll($sql, $params);
         $saida = [];
         foreach ($rows ?: [] as $row) {
             $anoLinha = (int) ($row['ano_letivo'] ?? 0);

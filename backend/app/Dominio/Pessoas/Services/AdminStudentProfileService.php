@@ -515,6 +515,8 @@ class AdminStudentProfileService
         $boletinsGeradosCoordenacao = [];
         $boletinsGeradosNotas = [];
         $boletinsGeradosNotasPorRegra = [];
+        // Perf: catálogo + demonstrativos sobem só na aba Notas (AJAX), não na carga do Detalhe.
+        if (!empty($opts['com_notas_eventos'])) {
         try {
             $boletimCfg = new \App\Models\System\BoletimConfig();
             // Auto-migração do boletim (~6 CREATE TABLE + ~30 checks em INFORMATION_SCHEMA)
@@ -591,6 +593,12 @@ class AdminStudentProfileService
                     'default_data_fim' => (string) ($ev['data_fim'] ?? ''),
                     'bimestre' => $ev['bimestre'] ?? null,
                     'ano_letivo' => $ev['ano_letivo'] ?? null,
+                    'finalidade' => strtolower(trim((string) ($ev['finalidade'] ?? 'oficial'))) === 'complementar'
+                        ? 'complementar'
+                        : 'oficial',
+                    'boletim_id' => (int) ($ev['boletim_id'] ?? 0),
+                    'turmas_ids' => $this->controller->parseSeriesIdsRaw($ev['turmas_ids'] ?? null),
+                    'series_ids' => $this->controller->parseSeriesIdsRaw($ev['series_ids'] ?? null),
                 ];
                 $exibir = strtolower(trim((string) ($ev['exibir_em'] ?? 'boletim')));
                 if ($exibir === 'notas') {
@@ -624,9 +632,16 @@ class AdminStudentProfileService
                 // de componentes em 1 query agrupada.
                 $rowsCatalogo = [];
                 try {
+                    $colsExtra = '';
+                    if ($this->temColuna('boletim_regras', 'finalidade')) {
+                        $colsExtra .= ', finalidade';
+                    }
+                    if ($this->temColuna('boletim_regras', 'boletim_id')) {
+                        $colsExtra .= ', boletim_id';
+                    }
                     $rowsCatalogo = $this->db->fetchAll(
                         "SELECT id, nome, codigo, updated_at, default_data_inicio, default_data_fim,
-                                bimestre, ano_letivo, series_ids, turmas_ids
+                                bimestre, ano_letivo, series_ids, turmas_ids{$colsExtra}
                          FROM boletim_regras
                          WHERE ativo = 1
                            AND vis_coordenacao = 1
@@ -694,6 +709,12 @@ class AdminStudentProfileService
                         'default_data_fim' => (string) ($full['default_data_fim'] ?? ''),
                         'bimestre' => isset($full['bimestre']) && $full['bimestre'] !== null ? (int) $full['bimestre'] : null,
                         'ano_letivo' => isset($full['ano_letivo']) && $full['ano_letivo'] !== null ? (int) $full['ano_letivo'] : null,
+                        'finalidade' => strtolower(trim((string) ($full['finalidade'] ?? 'oficial'))) === 'complementar'
+                            ? 'complementar'
+                            : 'oficial',
+                        'boletim_id' => (int) ($full['boletim_id'] ?? 0),
+                        'turmas_ids' => $turmasRegra,
+                        'series_ids' => $this->controller->parseSeriesIdsRaw($full['series_ids'] ?? null),
                     ];
                 }
 
@@ -702,8 +723,15 @@ class AdminStudentProfileService
             // respeitando a(s) série(s) ativa(s) do aluno.
             if (empty($boletimEventosNotas)) {
                 try {
+                    $colsExtraFb = '';
+                    if ($this->temColuna('boletim_regras', 'finalidade')) {
+                        $colsExtraFb .= ', finalidade';
+                    }
+                    if ($this->temColuna('boletim_regras', 'boletim_id')) {
+                        $colsExtraFb .= ', boletim_id';
+                    }
                     $rowsNotas = $this->db->fetchAll(
-                        "SELECT id, nome, codigo, updated_at, default_data_inicio, default_data_fim, series_ids, turmas_ids, bimestre, ano_letivo
+                        "SELECT id, nome, codigo, updated_at, default_data_inicio, default_data_fim, series_ids, turmas_ids, bimestre, ano_letivo{$colsExtraFb}
                          FROM boletim_regras
                          WHERE ativo = 1
                            AND vis_coordenacao = 1
@@ -746,9 +774,19 @@ class AdminStudentProfileService
                         'default_data_fim' => (string) ($rn['default_data_fim'] ?? ''),
                         'bimestre' => isset($rn['bimestre']) && $rn['bimestre'] !== null ? (int) $rn['bimestre'] : null,
                         'ano_letivo' => isset($rn['ano_letivo']) && $rn['ano_letivo'] !== null ? (int) $rn['ano_letivo'] : null,
+                        'finalidade' => strtolower(trim((string) ($rn['finalidade'] ?? 'oficial'))) === 'complementar'
+                            ? 'complementar'
+                            : 'oficial',
+                        'boletim_id' => (int) ($rn['boletim_id'] ?? 0),
+                        'turmas_ids' => $turmasRegra,
+                        'series_ids' => $this->controller->parseSeriesIdsRaw($rn['series_ids'] ?? null),
                     ];
                 }
             }
+            $boletimEventosNotas = $this->enriquecerEventosNotasComGrupo(
+                $boletimEventosNotas,
+                is_array($matriculas) ? $matriculas : []
+            );
         } catch (\Throwable $e) {
             $boletimEventosNotas = [];
             $boletimEventosBoletim = [];
@@ -756,8 +794,16 @@ class AdminStudentProfileService
             $boletinsGeradosNotas = [];
             $boletinsGeradosNotasPorRegra = [];
         }
+        }
 
-        $vidaEscolar = $this->carregarVidaEscolar($id, (int) ($opts['ficha_id'] ?? 0), $adminPermissions);
+        $vidaEscolar = !empty($opts['sem_vida_escolar'])
+            ? [
+                'vida_escolar_prontuario' => [],
+                'vida_escolar_schema' => false,
+                'vida_escolar_kpis' => ['media' => null, 'frequencia' => null],
+                'vida_escolar_pode_ler_ia' => false,
+            ]
+            : $this->carregarVidaEscolar($id, (int) ($opts['ficha_id'] ?? 0), $adminPermissions);
 
         return array_merge([
             'student' => $aluno,
@@ -793,9 +839,33 @@ class AdminStudentProfileService
             'boletim_pode_excluir' => $this->controller->coordenacaoPodeEditarBoletim($user),
             'admin_permissions' => $adminPermissions,
             'user' => $user,
-            'paineis_notas' => $this->paineisNotasDoAluno((int) $id),
+            'paineis_notas' => !empty($opts['com_notas_eventos']) ? $this->paineisNotasDoAluno((int) $id) : [],
             'kpis_por_turma_ano' => $this->kpisPorTurmaAno($matriculas, $vidaEscolar),
         ], $vidaEscolar);
+    }
+
+    /**
+     * Dados da aba "Notas" (demonstrativo / eventos), carregados sob demanda via AJAX
+     * (StudentAdminController::notasTabFragment) para não atrasar o Detalhe do aluno.
+     *
+     * @return array<string,mixed>
+     */
+    public function getNotasTabData(int $id, array $user): array
+    {
+        $data = $this->getStudentProfile($id, $user, [
+            'com_notas_eventos' => true,
+            'sem_vida_escolar' => true,
+        ]);
+
+        return [
+            'student' => $data['student'] ?? [],
+            'boletim_eventos_notas' => $data['boletim_eventos_notas'] ?? [],
+            'boletins_gerados_notas' => $data['boletins_gerados_notas'] ?? [],
+            'boletins_gerados_notas_por_regra' => $data['boletins_gerados_notas_por_regra'] ?? [],
+            'paineis_notas' => $data['paineis_notas'] ?? [],
+            'boletim_pode_excluir' => $data['boletim_pode_excluir'] ?? false,
+            'admin_permissions' => $data['admin_permissions'] ?? [],
+        ];
     }
 
     /**
@@ -886,7 +956,9 @@ class AdminStudentProfileService
                 return $vazio;
             }
             $svc = new \App\Modulos\VidaEscolar\Services\VidaEscolarService();
-            $prontuario = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())->montar($alunoId, $svc, $fichaId);
+            // Quadro de impressão (PP/PU/CH…) é pesado: sobe sob demanda na aba Boletim.
+            $prontuario = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
+                ->montar($alunoId, $svc, $fichaId, false);
             if ($prontuario === []) {
                 return $vazio;
             }
@@ -1198,6 +1270,214 @@ class AdminStudentProfileService
         } catch (\Throwable $e) {
             return [];
         }
+    }
+
+    /**
+     * Agrupa demonstrativos por curso/turma (regular vs extra) para abas na Vida do Aluno.
+     *
+     * @param list<array<string,mixed>> $eventos
+     * @param list<array<string,mixed>> $matriculas
+     * @return list<array<string,mixed>>
+     */
+    private function enriquecerEventosNotasComGrupo(array $eventos, array $matriculas): array
+    {
+        $turmasAtivas = [];
+        foreach ($matriculas as $mat) {
+            if (!is_array($mat) || ($mat['status'] ?? '') !== 'ativa') {
+                continue;
+            }
+            $tid = (int) ($mat['turma_id'] ?? 0);
+            if ($tid <= 0) {
+                continue;
+            }
+            $turmasAtivas[$tid] = [
+                'curso_tipo' => strtolower(trim((string) ($mat['curso_tipo'] ?? 'regular'))) === 'extra'
+                    ? 'extra'
+                    : 'regular',
+                'turma_nome' => trim((string) ($mat['turma_nome'] ?? ('Turma #' . $tid))),
+            ];
+        }
+
+        $metaPorRegra = [];
+        $idsRegra = [];
+        foreach ($eventos as $evPre) {
+            if (!is_array($evPre)) {
+                continue;
+            }
+            $ridPre = (int) ($evPre['id'] ?? 0);
+            if ($ridPre <= 0) {
+                continue;
+            }
+            $turmasPre = array_values(array_filter(array_map('intval', (array) ($evPre['turmas_ids'] ?? []))));
+            $precisaMeta = $turmasPre === []
+                || (int) ($evPre['boletim_id'] ?? 0) <= 0
+                || !isset($evPre['finalidade']);
+            if ($precisaMeta) {
+                $idsRegra[$ridPre] = $ridPre;
+            }
+        }
+        if ($idsRegra !== []) {
+            try {
+                $colsMeta = 'id';
+                if ($this->temColuna('boletim_regras', 'boletim_id')) {
+                    $colsMeta .= ', boletim_id';
+                }
+                if ($this->temColuna('boletim_regras', 'finalidade')) {
+                    $colsMeta .= ', finalidade';
+                }
+                $colsMeta .= ', turmas_ids, series_ids';
+                $listaIds = array_values($idsRegra);
+                $ph = [];
+                $params = [];
+                foreach ($listaIds as $i => $ridMeta) {
+                    $k = 'r' . $i;
+                    $ph[] = ':' . $k;
+                    $params[$k] = $ridMeta;
+                }
+                $rowsMeta = $this->db->fetchAll(
+                    'SELECT ' . $colsMeta . ' FROM boletim_regras WHERE id IN (' . implode(',', $ph) . ')',
+                    $params
+                ) ?: [];
+                foreach ($rowsMeta as $rm) {
+                    $ridMeta = (int) ($rm['id'] ?? 0);
+                    if ($ridMeta <= 0) {
+                        continue;
+                    }
+                    $metaPorRegra[$ridMeta] = [
+                        'boletim_id' => (int) ($rm['boletim_id'] ?? 0),
+                        'finalidade' => strtolower(trim((string) ($rm['finalidade'] ?? 'oficial'))) === 'complementar'
+                            ? 'complementar'
+                            : 'oficial',
+                        'turmas_ids' => $this->controller->parseSeriesIdsRaw($rm['turmas_ids'] ?? null),
+                        'series_ids' => $this->controller->parseSeriesIdsRaw($rm['series_ids'] ?? null),
+                    ];
+                }
+            } catch (\Throwable $e) {
+                $metaPorRegra = [];
+            }
+        }
+
+        $boletimIdsUsados = [];
+        foreach ($eventos as $evBol) {
+            if (!is_array($evBol)) {
+                continue;
+            }
+            $bid = (int) ($evBol['boletim_id'] ?? 0);
+            if ($bid <= 0) {
+                $ridBol = (int) ($evBol['id'] ?? 0);
+                $bid = (int) (($metaPorRegra[$ridBol]['boletim_id'] ?? 0));
+            }
+            if ($bid > 0) {
+                $boletimIdsUsados[$bid] = $bid;
+            }
+        }
+
+        $nomesBoletim = [];
+        if ($boletimIdsUsados !== [] && $this->temTabela('boletins')) {
+            try {
+                $listaBol = array_values($boletimIdsUsados);
+                $phBol = [];
+                $paramsBol = [];
+                foreach ($listaBol as $i => $bid) {
+                    $k = 'b' . $i;
+                    $phBol[] = ':' . $k;
+                    $paramsBol[$k] = $bid;
+                }
+                $colsBol = 'id, nome';
+                if ($this->temColuna('boletins', 'finalidade')) {
+                    $colsBol .= ', finalidade';
+                }
+                $rowsBol = $this->db->fetchAll(
+                    'SELECT ' . $colsBol . ' FROM boletins WHERE id IN (' . implode(',', $phBol) . ')',
+                    $paramsBol
+                ) ?: [];
+                foreach ($rowsBol as $bol) {
+                    $bid = (int) ($bol['id'] ?? 0);
+                    if ($bid > 0) {
+                        $nomesBoletim[$bid] = [
+                            'nome' => trim((string) ($bol['nome'] ?? '')),
+                            'finalidade' => strtolower(trim((string) ($bol['finalidade'] ?? 'oficial'))) === 'complementar'
+                                ? 'complementar'
+                                : 'oficial',
+                        ];
+                    }
+                }
+            } catch (\Throwable $e) {
+                $nomesBoletim = [];
+            }
+        }
+
+        $out = [];
+        foreach ($eventos as $ev) {
+            if (!is_array($ev)) {
+                continue;
+            }
+            $rid = (int) ($ev['id'] ?? 0);
+            $meta = $metaPorRegra[$rid] ?? null;
+            $turmasRegra = array_values(array_filter(array_map('intval', (array) ($ev['turmas_ids'] ?? []))));
+            if ($turmasRegra === [] && is_array($meta)) {
+                $turmasRegra = array_values(array_filter(array_map('intval', (array) ($meta['turmas_ids'] ?? []))));
+            }
+            $finalidade = strtolower(trim((string) ($ev['finalidade'] ?? ''))) === 'complementar'
+                ? 'complementar'
+                : 'oficial';
+            if ($finalidade === 'oficial' && is_array($meta) && ($meta['finalidade'] ?? '') === 'complementar') {
+                $finalidade = 'complementar';
+            }
+            $boletimId = (int) ($ev['boletim_id'] ?? 0);
+            if ($boletimId <= 0 && is_array($meta)) {
+                $boletimId = (int) ($meta['boletim_id'] ?? 0);
+            }
+            if ($boletimId > 0 && isset($nomesBoletim[$boletimId]) && $finalidade === 'oficial') {
+                $finalidade = $nomesBoletim[$boletimId]['finalidade'];
+            }
+
+            $matchExtra = null;
+            $matchRegular = null;
+            foreach ($turmasRegra as $tid) {
+                if (!isset($turmasAtivas[$tid])) {
+                    continue;
+                }
+                if ($turmasAtivas[$tid]['curso_tipo'] === 'extra') {
+                    $matchExtra = $tid;
+                    break;
+                }
+                if ($matchRegular === null) {
+                    $matchRegular = $tid;
+                }
+            }
+
+            if ($matchExtra !== null) {
+                $chave = 'extra-' . $matchExtra;
+                $rotulo = $nomesBoletim[$boletimId]['nome'] ?? $turmasAtivas[$matchExtra]['turma_nome'];
+                $cursoTipo = 'extra';
+            } elseif ($finalidade === 'complementar') {
+                $chave = 'extra-' . ($boletimId > 0 ? ('bol-' . $boletimId) : 'geral');
+                $rotulo = $nomesBoletim[$boletimId]['nome'] ?? 'Curso extra';
+                $cursoTipo = 'extra';
+            } elseif ($matchRegular !== null) {
+                $chave = 'regular-' . $matchRegular;
+                $rotulo = $nomesBoletim[$boletimId]['nome'] ?? $turmasAtivas[$matchRegular]['turma_nome'];
+                $cursoTipo = 'regular';
+            } else {
+                $chave = 'regular';
+                $rotulo = $nomesBoletim[$boletimId]['nome'] ?? 'Demonstrativo';
+                $cursoTipo = 'regular';
+            }
+            if ($rotulo === '') {
+                $rotulo = $cursoTipo === 'extra' ? 'Curso extra' : 'Demonstrativo';
+            }
+
+            $ev['boletim_id'] = $boletimId;
+            $ev['turmas_ids'] = $turmasRegra;
+            $ev['grupo_chave'] = $chave;
+            $ev['grupo_rotulo'] = $rotulo;
+            $ev['curso_tipo'] = $cursoTipo;
+            $ev['finalidade'] = $finalidade;
+            $out[] = $ev;
+        }
+
+        return $out;
     }
 
     /**

@@ -12,6 +12,11 @@ $router->post('/admin/eventos-avaliativos/boletim/novo', 'Modulos/eventos-avalia
 $router->get('/admin/eventos-avaliativos/boletim/{id}/dados', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@dadosBoletim');
 $router->post('/admin/eventos-avaliativos/boletim/{id}/dados', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@atualizarBoletim');
 $router->post('/admin/eventos-avaliativos/boletim/{id}/excluir', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@excluirBoletim');
+$router->get('/admin/eventos-avaliativos/boletim/{id}/montar-quadro', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@montarQuadroBoletim');
+$router->get('/admin/eventos-avaliativos/boletim/{id}/montar-do-zero', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@montarQuadroLivreBoletim');
+$router->post('/admin/eventos-avaliativos/boletim/{id}/aplicar-santa-maria', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@aplicarPrintSantaMariaBoletim');
+$router->get('/admin/eventos-avaliativos/boletim/{id}/puxar-demonstrativo', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@puxarDemonstrativoBoletim');
+$router->post('/admin/eventos-avaliativos/boletim/{id}/puxar-demonstrativo', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@puxarDemonstrativoBoletimExecutar');
 $router->get('/admin/eventos-avaliativos/boletim/{id}', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@layoutBoletim');
 $router->post('/admin/eventos-avaliativos/boletim/{id}', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@salvarBoletim');
 $router->get('/admin/eventos-avaliativos/criar', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@criar');

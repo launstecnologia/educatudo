@@ -4,6 +4,9 @@ $selectedRegraId = (int) ($selected_regra_id ?? 0);
 $boletimId = (int) ($boletim_id ?? 0);
 $voltarBoletins = !empty($voltar_boletins);
 $voltarBoletimLayout = !empty($voltar_boletim_layout);
+$quadroSantaMaria = !empty($quadro_santa_maria);
+$quadroComposto = !empty($quadro_composto) || $quadroSantaMaria;
+$quadroImpressao = !empty($quadro_impressao);
 $voltarGerarAvaliacoes = !empty($voltar_gerar_avaliacoes);
 $boletimAssistenteDisponivel = !empty($boletim_assistente_disponivel);
 $boletimAssistentePageMode = true;
@@ -44,12 +47,30 @@ foreach ((array) ($catalogoCabecalho['boletins'] ?? []) as $boletimCabecalho) {
 $rotuloPeriodoContexto = ($anoContexto > 0 && $bimestreContexto > 0)
     ? \App\Core\PeriodoLetivo::rotulo($anoContexto, $bimestreContexto)
     : '';
-$contextoEvento = ($nomeModeloContexto !== '' ? $nomeModeloContexto : 'Sem modelo')
-    . ' · ' . ($anoContexto > 0 ? (string) $anoContexto : 'Ano não informado')
-    . ' · ' . ($rotuloPeriodoContexto !== '' ? $rotuloPeriodoContexto : 'Período não informado');
-if ($refEventoCabecalho > 0) {
-    $contextoEvento .= ' · Ref ' . $refEventoCabecalho;
+
+$page_header_title = $nomeEventoCabecalho !== ''
+    ? $nomeEventoCabecalho
+    : ($quadroSantaMaria ? 'Print Santa Maria' : ($quadroComposto ? 'Quadro do boletim' : ($quadroImpressao ? 'Quadro livre' : 'Evento de Notas')));
+
+$subtituloPartes = [];
+if ($nomeModeloContexto !== '') {
+    $subtituloPartes[] = $nomeModeloContexto;
 }
+if ($anoContexto > 0) {
+    $subtituloPartes[] = (string) $anoContexto;
+}
+if ($rotuloPeriodoContexto !== '') {
+    $subtituloPartes[] = $rotuloPeriodoContexto;
+}
+if ($refEventoCabecalho > 0) {
+    $subtituloPartes[] = 'Ref ' . $refEventoCabecalho;
+}
+$page_header_subtitle = $subtituloPartes !== []
+    ? implode(' · ', $subtituloPartes)
+    : ($quadroImpressao || $quadroComposto || $quadroSantaMaria
+        ? 'Monte o quadro de impressão do boletim'
+        : 'Configure o evento de notas');
+
 $urlListaPeriodos = URL . '/admin/boletim';
 if ($navegacaoLista !== []) {
     $filtrosVolta = [];
@@ -74,53 +95,71 @@ if ($navegacaoLista !== []) {
         $urlListaPeriodos .= '?' . http_build_query($filtrosVolta);
     }
 }
-$page_header_back_url = $boletimAssistenteReturnUrl;
-$page_header_back_label = $rotuloRetornoAssistente;
-$page_header_title = $nomeEventoCabecalho !== '' ? $nomeEventoCabecalho : 'Evento de Notas';
-$page_header_title_id = 'evento-notas-titulo';
-$page_header_subtitle = $contextoEvento;
-$page_header_subtitle_id = 'evento-notas-ref';
+
+$trilhaManual = [];
+if ($voltarBoletimLayout || $quadroImpressao || $quadroComposto || $quadroSantaMaria) {
+    $trilhaManual = [
+        ['rotulo' => 'Acadêmico', 'url' => URL . '/admin/academico'],
+        ['rotulo' => 'Boletim', 'url' => URL . '/admin/eventos-avaliativos/boletim' . ($anoContexto > 0 ? ('?ano=' . $anoContexto) : '')],
+        ['rotulo' => 'Modelos de Boletim', 'url' => $boletimAssistenteReturnUrl],
+        ['rotulo' => $quadroImpressao || $quadroComposto || $quadroSantaMaria ? 'Quadro de impressão' : 'Configurar'],
+    ];
+} elseif ($voltarBoletins) {
+    $trilhaManual = [
+        ['rotulo' => 'Acadêmico', 'url' => URL . '/admin/academico'],
+        ['rotulo' => 'Demonstrativo de notas', 'url' => URL . '/admin/boletins'],
+        ['rotulo' => 'Modelos', 'url' => $boletimAssistenteReturnUrl],
+        ['rotulo' => 'Configurar notas'],
+    ];
+} elseif ($voltarGerarAvaliacoes) {
+    $trilhaManual = [
+        ['rotulo' => 'Acadêmico', 'url' => URL . '/admin/academico'],
+        ['rotulo' => 'Demonstrativo de notas', 'url' => URL . '/admin/boletins'],
+        ['rotulo' => 'Adicionar períodos', 'url' => $boletimAssistenteReturnUrl],
+        ['rotulo' => 'Configurar notas'],
+    ];
+} else {
+    $trilhaManual = [
+        ['rotulo' => 'Acadêmico', 'url' => URL . '/admin/academico'],
+        ['rotulo' => 'Boletins', 'url' => URL . '/admin/boletins'],
+        ['rotulo' => 'Períodos e fórmulas', 'url' => $urlListaPeriodos],
+        ['rotulo' => 'Configurar notas'],
+    ];
+}
+$trilhaItens = \App\Helpers\TrilhaAdmin::montar(
+    '/admin/boletim-configuracao/assistente',
+    $page_header_title,
+    $trilhaManual
+);
+
+$iconeCabecalho = ($quadroImpressao || $quadroComposto || $quadroSantaMaria || $voltarBoletimLayout)
+    ? 'fa-file-circle-check'
+    : 'fa-table-cells';
 ?>
-<nav aria-label="Caminho" class="mb-3 text-sm text-gray-500 flex flex-wrap items-center gap-1">
-    <?php if ($voltarBoletimLayout): ?>
-    <a href="<?= URL ?>/admin/eventos-avaliativos/boletim?ano=<?= (int) $anoContexto ?>" class="hover:text-gray-800">Boletim</a>
-    <?php else: ?>
-    <a href="<?= URL ?>/admin/boletins" class="hover:text-gray-800">Boletins</a>
-    <?php endif; ?>
-    <span aria-hidden="true">/</span>
-    <?php if ($voltarGerarAvaliacoes): ?>
-    <a href="<?= htmlspecialchars($boletimAssistenteReturnUrl, ENT_QUOTES, 'UTF-8') ?>" class="hover:text-gray-800">Adicionar períodos</a>
-    <?php elseif ($voltarBoletimLayout): ?>
-    <a href="<?= htmlspecialchars($boletimAssistenteReturnUrl, ENT_QUOTES, 'UTF-8') ?>" class="hover:text-gray-800">Layout</a>
-    <?php elseif ($voltarBoletins): ?>
-    <a href="<?= htmlspecialchars($boletimAssistenteReturnUrl, ENT_QUOTES, 'UTF-8') ?>" class="hover:text-gray-800">Modelos</a>
-    <?php else: ?>
-    <a href="<?= htmlspecialchars($urlListaPeriodos, ENT_QUOTES, 'UTF-8') ?>" class="hover:text-gray-800">Períodos e fórmulas</a>
-    <?php if ($voltarEvento || (!$voltarPeriodos && $selectedRegraId > 0)): ?>
-    <span aria-hidden="true">/</span>
-    <a href="<?= htmlspecialchars($boletimAssistenteReturnUrl, ENT_QUOTES, 'UTF-8') ?>" class="hover:text-gray-800">Evento</a>
-    <?php endif; ?>
-    <?php endif; ?>
-    <span aria-hidden="true">/</span>
-    <span class="text-gray-900">Configurar notas</span>
-</nav>
-<?php
-include \App\Core\ViewPaths::adminPartial('page_header_form.php');
-include \App\Core\ViewPaths::adminPartial('flash_message.php');
-?>
+<div class="mb-6">
+    <?php include \App\Core\ViewPaths::layoutComponent('trilha.php'); ?>
+    <div class="mt-4 flex justify-between items-center gap-4">
+        <div class="flex items-center gap-3 min-w-0">
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
+                <i class="fa-solid <?= htmlspecialchars($iconeCabecalho, ENT_QUOTES, 'UTF-8') ?> text-lg" aria-hidden="true"></i>
+            </span>
+            <div class="min-w-0">
+                <h2 id="evento-notas-titulo" class="text-xl font-bold text-gray-900 truncate"><?= htmlspecialchars($page_header_title, ENT_QUOTES, 'UTF-8') ?></h2>
+                <p id="evento-notas-ref" class="text-sm text-gray-500 mt-0.5 truncate"><?= htmlspecialchars($page_header_subtitle, ENT_QUOTES, 'UTF-8') ?></p>
+            </div>
+        </div>
+        <div class="flex items-center justify-end gap-3 flex-shrink-0 ml-auto">
+            <a href="<?= htmlspecialchars($boletimAssistenteReturnUrl, ENT_QUOTES, 'UTF-8') ?>"
+               class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                <i class="fa-solid fa-arrow-left mr-2 text-gray-500" aria-hidden="true"></i>
+                <?= htmlspecialchars($rotuloRetornoAssistente, ENT_QUOTES, 'UTF-8') ?>
+            </a>
+        </div>
+    </div>
+</div>
+
+<?php include \App\Core\ViewPaths::adminPartial('flash_message.php'); ?>
 
 <div class="space-y-6">
-    <?php if ($voltarGerarAvaliacoes): ?>
-    <div class="p-4 rounded-lg bg-white border border-gray-200 text-sm text-gray-700">
-        Salvar sem gerar notas grava a fórmula deste período e não publica as notas dos alunos.
-        <a href="<?= htmlspecialchars($boletimAssistenteReturnUrl, ENT_QUOTES, 'UTF-8') ?>" class="font-semibold text-indigo-700 underline"><?= htmlspecialchars($rotuloRetornoAssistente, ENT_QUOTES, 'UTF-8') ?></a>.
-    </div>
-    <?php elseif ($voltarBoletins || $voltarPeriodos || $voltarEvento): ?>
-    <div class="p-4 rounded-lg bg-white border border-gray-200 text-sm text-gray-700">
-        Confira o modelo, o ano e o período antes de salvar. Abrir esta tela não grava o período.
-        Salvar sem gerar notas grava a configuração e não publica as notas dos alunos.
-        <a href="<?= htmlspecialchars($boletimAssistenteReturnUrl, ENT_QUOTES, 'UTF-8') ?>" class="font-semibold text-indigo-700 underline"><?= htmlspecialchars($rotuloRetornoAssistente, ENT_QUOTES, 'UTF-8') ?></a>.
-    </div>
-    <?php endif; ?>
     <?php include __DIR__ . '/_assistente_wizard.php'; ?>
 </div>

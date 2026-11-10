@@ -8,6 +8,9 @@
 $router->get('/admin/boletins', 'Modulos/boletins/BoletimCadastroAdminController@index');
 $router->get('/admin/boletins/novo', 'Modulos/boletins/BoletimCadastroAdminController@novo');
 $router->post('/admin/boletins', 'Modulos/boletins/BoletimCadastroAdminController@salvar');
+$router->get('/admin/boletins/importar-modelo', 'Modulos/boletins/BoletimModeloIaController@index');
+$router->post('/admin/boletins/importar-modelo/analisar', 'Modulos/boletins/BoletimModeloIaController@analisar');
+$router->post('/admin/boletins/importar-modelo/preparar', 'Modulos/boletins/BoletimModeloIaController@preparar');
 $router->get('/admin/boletins/{id}/editar', 'Modulos/boletins/BoletimCadastroAdminController@editar');
 $router->post('/admin/boletins/{id}/update', 'Modulos/boletins/BoletimCadastroAdminController@atualizar');
 $router->post('/admin/boletins/{id}/delete', 'Modulos/boletins/BoletimCadastroAdminController@excluir');

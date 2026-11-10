@@ -228,6 +228,13 @@ class CreditosModuleRegistry
             'feature_modules' => [],
             'pagador' => 'escola',
         ],
+        'boletim_ler_modelo' => [
+            'label' => 'Boletim — ler modelo por IA',
+            'grupo' => 'Boletim',
+            'escopo_ui' => 'acao',
+            'feature_modules' => ['boletim'],
+            'pagador' => 'escola',
+        ],
         'provas_aluno_assistente_mensagem' => [
             'label' => 'Assistente de provas do aluno (IA)',
             'grupo' => 'Avaliações',

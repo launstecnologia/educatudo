@@ -39,6 +39,7 @@ $urlContinuar = $urlAssistente . '&continuar=1';
 $page_header_title = 'Gerar avaliações do ano';
 $page_header_subtitle = 'Cria as configurações dos ' . $rotuloPlural . ' a partir do calendário letivo (tipo Avaliação) ou dos períodos padrão do ano, limitados ao ano letivo.';
 $page_header_back_url = URL . '/admin/boletins';
+$page_header_icon = 'fa-solid fa-table-cells';
 include __DIR__ . '/../../../../Views/admin/_partials/page_header_form.php';
 include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 

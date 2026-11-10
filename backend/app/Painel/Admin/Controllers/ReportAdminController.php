@@ -2571,6 +2571,15 @@ class ReportAdminController extends AdminBaseController
         if (!class_exists('AlunoLancamentoNotaHelper', false)) {
         }
 
+        $layoutBoletimCodigo = '';
+        $usarQuadroSantaMaria = false;
+        try {
+            $layoutBoletimCodigo = (string) (new \App\Models\Education\ResultadoAcademico())->getLayoutCodigo('boletim');
+            $usarQuadroSantaMaria = \App\Modulos\ModelosDocumentos\Services\QuadroBoletimSantaMariaService::codigoEhSantaMaria($layoutBoletimCodigo);
+        } catch (\Throwable $e) {
+            $usarQuadroSantaMaria = false;
+        }
+
         $alunos = [];
         foreach ($fichasPagina as $ficha) {
             $fichaId = (int) ($ficha['id'] ?? 0);
@@ -2607,6 +2616,18 @@ class ReportAdminController extends AdminBaseController
             }
             $obsAluno = $obs[$alunoId] ?? [];
             $transferidoVe = !empty($ficha['transferido']);
+            $demonstrativoHtml = '';
+            if ($usarQuadroSantaMaria) {
+                try {
+                    $quadroSm = (new \App\Modulos\ModelosDocumentos\Services\QuadroBoletimSantaMariaService($this->db))
+                        ->montarHtml($alunoId, $anoLetivo);
+                    if ((int) ($quadroSm['linhas'] ?? 0) > 0) {
+                        $demonstrativoHtml = (string) ($quadroSm['html'] ?? '');
+                    }
+                } catch (\Throwable $e) {
+                    $demonstrativoHtml = '';
+                }
+            }
             $alunos[] = [
                 'id' => $alunoId,
                 'ficha_id' => $fichaId,
@@ -2620,6 +2641,7 @@ class ReportAdminController extends AdminBaseController
                 'observacao' => (string) ($obsAluno['conteudo'] ?? ''),
                 'observacao_updated_at' => $obsAluno['updated_at'] ?? null,
                 'materias' => $materias,
+                'demonstrativo_html' => $demonstrativoHtml,
             ];
         }
 

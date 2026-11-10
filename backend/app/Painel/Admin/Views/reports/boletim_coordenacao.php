@@ -69,25 +69,31 @@ $modeloEventoRelatorio = class_exists(\App\Core\LayoutHelper::class)
     && \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos');
 ?>
 <?php if ($modeloEventoRelatorio): ?>
-<div class="mb-6">
-    <div class="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900">Relatórios</h1>
-            <p class="text-sm text-gray-600 mt-1">Escolha o boletim ou o demonstrativo de notas. O demonstrativo usa a versão vigente.</p>
-        </div>
-        <a href="<?= URL ?>/admin/academico"
-           class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-            <i class="fa-solid fa-arrow-left mr-2 text-gray-500" aria-hidden="true"></i>
-            Voltar
-        </a>
-    </div>
-</div>
+<?php
+$page_header_title = 'Relatórios';
+$page_header_subtitle = 'Escolha o boletim ou o demonstrativo de notas. O demonstrativo usa a versão vigente.';
+$page_header_icon = 'fa-solid fa-chart-column';
+$trilhaItens = \App\Helpers\TrilhaAdmin::montar(
+    '/admin/reports/boletim-coordenacao',
+    'Relatórios',
+    [
+        ['rotulo' => 'Acadêmico', 'url' => URL . '/admin/academico'],
+        ['rotulo' => 'Relatórios'],
+    ]
+);
+ob_start();
+?>
+<a href="<?= URL ?>/admin/academico"
+   class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+    <i class="fa-solid fa-arrow-left mr-2 text-gray-500" aria-hidden="true"></i>
+    Voltar
+</a>
+<?php
+$page_header_actions = ob_get_clean();
+include \App\Core\ViewPaths::adminPartial('page_header_list.php');
+?>
 <?php else: ?>
 <?php $boletins_aba = 'relatorios'; include \App\Core\ViewPaths::adminPartial('boletins_area_nav.php'); ?>
-<div class="mb-6">
-    <h2 class="text-lg font-semibold text-gray-900">Relatórios</h2>
-    <p class="text-gray-600 mt-1">Escolha o boletim ou o demonstrativo de notas. O demonstrativo usa a versão vigente.</p>
-</div>
 <?php endif; ?>
 <?php
 $boletimContextoId = max(0, (int) ($_GET['boletim_id'] ?? 0));
@@ -386,7 +392,7 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
                 $htmlDemonstrativo = trim((string) ($aluno['demonstrativo_html'] ?? ''));
                 $materiasAluno = (array) ($aluno['materias'] ?? []);
                 ?>
-                <?php if ($fonteRelatorio === 'demonstrativo' && $htmlDemonstrativo !== ''): ?>
+                <?php if ($htmlDemonstrativo !== ''): ?>
                 <div class="p-4 overflow-x-auto">
                     <?= $aluno['demonstrativo_html'] ?>
                 </div>

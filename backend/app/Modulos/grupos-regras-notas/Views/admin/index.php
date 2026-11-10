@@ -9,6 +9,7 @@ $urlNovo = URL . '/admin/quadros-notas/novo' . ($retorno !== '' ? '?retorno=' . 
 
 $page_header_title = 'Quadro de Notas';
 $page_header_subtitle = 'O quadro define as colunas usadas no lançamento de notas, como Prova, Trabalho e outras avaliações.';
+$page_header_icon = 'fa-solid fa-layer-group';
 ob_start();
 if (!$acessoBloqueado && $podeCadastrar):
 ?>

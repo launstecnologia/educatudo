@@ -4,6 +4,7 @@ namespace App\Modulos\Boletins\Services;
 
 
 use App\Modulos\Boletins\Models\Boletim;
+use App\Modulos\RegrasAcademicas\Models\RecuperacaoConfig;
 use App\Models\System\BoletimConfig;
 use App\Core\Database;
 use App\Core\PeriodoLetivo;
@@ -151,6 +152,70 @@ class GeradorAvaliacoesAnualService
         return PeriodoLetivo::rotulo($ano > 0 ? $ano : (int) date('Y'), $bimestre) ?: ('Período ' . $bimestre);
     }
 
+    /**
+     * Inclui na prévia os slots de recuperação da regra acadêmica do modelo (R1/R2/RF…).
+     *
+     * @param list<array<string,mixed>> $periodos
+     * @param array<string,mixed> $boletim
+     * @return list<array<string,mixed>>
+     */
+    private function anexarPeriodosRecuperacao(
+        array $periodos,
+        array $boletim,
+        int $ano,
+        ?string $anoInicio,
+        ?string $anoFim
+    ): array {
+        $regraAcademicaId = (int) ($boletim['regra_academica_id'] ?? 0);
+        if ($regraAcademicaId <= 0) {
+            return $periodos;
+        }
+        try {
+            $rec = new RecuperacaoConfig();
+            if (!$rec->tabelaPronta()) {
+                return $periodos;
+            }
+            $slots = $rec->slotsParaTela($ano, [], $regraAcademicaId);
+        } catch (Throwable $e) {
+            error_log('[GeradorAvaliacoesAnual] slots recuperação: ' . $e->getMessage());
+            return $periodos;
+        }
+        if ($slots === []) {
+            return $periodos;
+        }
+
+        $usados = [];
+        foreach ($periodos as $periodo) {
+            $usados[(int) ($periodo['bimestre'] ?? 0)] = true;
+        }
+
+        $inicioPadrao = $anoInicio ?: ($ano . '-02-01');
+        $fimPadrao = $anoFim ?: ($ano . '-12-15');
+        foreach ($slots as $slot) {
+            if (!is_array($slot)) {
+                continue;
+            }
+            $codigo = (int) ($slot['codigo'] ?? 0);
+            if ($codigo < 60 || $codigo > 90 || isset($usados[$codigo])) {
+                continue;
+            }
+            $rotulo = trim((string) ($slot['rotulo'] ?? 'Recuperação'));
+            if ($rotulo === '') {
+                $rotulo = $codigo === RecuperacaoConfig::CODIGO_FINAL ? 'Prova Final' : 'Recuperação';
+            }
+            $periodos[] = self::clipPeriodo([
+                'bimestre' => $codigo,
+                'nome' => $rotulo,
+                'inicio' => $inicioPadrao,
+                'fim' => $fimPadrao,
+                'origem' => 'recuperacao',
+            ], $anoInicio, $anoFim);
+            $usados[$codigo] = true;
+        }
+
+        return $periodos;
+    }
+
     public static function bimestreDaDescricao(string $descricao, int $fallback): int
     {
         $fallback = ($fallback >= 1 && $fallback <= 4) ? $fallback : 1;
@@ -260,6 +325,7 @@ class GeradorAvaliacoesAnualService
         ));
         $eventos = $this->eventosAvaliacaoDoAno($ano, $seriesBoletim);
         $periodos = self::periodosPrevistos($ano, $eventos, $datasAno['inicio'], $datasAno['fim']);
+        $periodos = $this->anexarPeriodosRecuperacao($periodos, $boletim, $ano, $datasAno['inicio'], $datasAno['fim']);
         $existentes = $this->boletimConfig->fontesBimestresDoBoletim($boletimId);
         $idsExistentes = [];
         foreach ($periodos as &$p) {
@@ -609,7 +675,8 @@ class GeradorAvaliacoesAnualService
         $pulados = [];
         foreach ($prev['periodos'] as $periodo) {
             $bim = (int) ($periodo['bimestre'] ?? 0);
-            if (!PeriodoLetivo::numeroValido($ano, $bim)) {
+            $ehRecuperacao = $bim >= 60 && $bim <= 90;
+            if (!$ehRecuperacao && !PeriodoLetivo::numeroValido($ano, $bim)) {
                 continue;
             }
             $jaExiste = !empty($periodo['ja_existe']);
@@ -630,9 +697,12 @@ class GeradorAvaliacoesAnualService
                 $modeloRegraId = $this->modeloPadraoParaBimestre($permitidos, $bim);
             }
             if ($modeloRegraId <= 0 || !isset($idsPermitidos[$modeloRegraId])) {
+                $rotuloErro = $ehRecuperacao
+                    ? (string) ($periodo['nome'] ?? ('Recuperação ' . $bim))
+                    : self::nomeBimestre($bim, $ano);
                 return [
                     'success' => false,
-                    'error' => 'Escolha a configuração de origem do ' . self::nomeBimestre($bim, $ano) . '.',
+                    'error' => 'Escolha a configuração de origem do ' . $rotuloErro . '.',
                 ];
             }
             $modelo = $this->boletimConfig->getRuleById($modeloRegraId);
@@ -655,7 +725,10 @@ class GeradorAvaliacoesAnualService
                 return ['success' => false, 'error' => 'Não foi possível duplicar o evento modelo.'];
             }
             $this->boletimConfig->setBoletimId($novoId, $boletimId);
-            $nome = $nomeBaseModelo . ' — ' . self::nomeBimestre($bim, $ano);
+            $rotuloPeriodo = $ehRecuperacao
+                ? (string) ($periodo['nome'] ?? ('Recuperação ' . $bim))
+                : self::nomeBimestre($bim, $ano);
+            $nome = $nomeBaseModelo . ' — ' . $rotuloPeriodo;
             $codigo = $this->boletimConfig->codigoUnicoPara('avaliacao-' . $ano . '-b' . $bim);
             $this->boletimConfig->atualizarEventoGerado($novoId, [
                 'nome' => $nome,

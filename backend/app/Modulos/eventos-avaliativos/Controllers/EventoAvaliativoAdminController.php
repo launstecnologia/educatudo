@@ -3,6 +3,8 @@
 namespace App\Modulos\EventosAvaliativos\Controllers;
 
 use App\Core\PeriodoLetivo;
+use App\Modulos\Boletins\Services\AgrupamentoLinhaDemonstrativoService;
+use App\Modulos\Boletins\Services\BoletimVisaoImpressaoService;
 use App\Modulos\EventosAvaliativos\Models\BoletimLayout;
 use App\Modulos\EventosAvaliativos\Models\EventoAvaliativo;
 use App\Modulos\EventosAvaliativos\Services\EventoAvaliativoService;
@@ -217,6 +219,7 @@ class EventoAvaliativoAdminController extends AdminBaseController
             'criterios_professores' => TipoNotaRegraService::CRITERIOS_PROFESSORES,
             'canais' => TipoNotaRegraService::CANAIS_ORIGEM,
             'modos_offline' => TipoNotaRegraService::MODOS_OFFLINE,
+            'agrupar' => $this->dadosAgrupar($ano, $periodoNum, []),
         ]));
     }
 
@@ -266,7 +269,15 @@ class EventoAvaliativoAdminController extends AdminBaseController
             $this->redirect('/admin/eventos-avaliativos/criar?ano=' . (int) ($_POST['ano_letivo'] ?? 0) . '&periodo=' . (int) ($_POST['bimestre'] ?? 0));
             return;
         }
-        $this->setFlashMessage('Evento avaliativo criado.', 'success');
+        $agruparRes = $this->salvarAgruparDoPost($_POST);
+        if (!empty($agruparRes['error'])) {
+            $this->setFlashMessage(
+                'Evento avaliativo criado. Agrupar não foi salvo: ' . $agruparRes['error'],
+                'error'
+            );
+        } else {
+            $this->setFlashMessage('Evento avaliativo criado.', 'success');
+        }
         $this->redirect($this->urlListaEvento(
             (int) ($_POST['ano_letivo'] ?? 0),
             (int) ($_POST['bimestre'] ?? 0),
@@ -288,6 +299,13 @@ class EventoAvaliativoAdminController extends AdminBaseController
         $ano = (int) ($edicao['ano_letivo'] ?? date('Y'));
         $regraId = (int) ($_GET['regra'] ?? 0);
         $catalogo = $this->service->catalogoFormulario($ano);
+        $materiasEvento = [];
+        foreach ((array) ($edicao['pares'] ?? []) as $par) {
+            $mid = (int) ($par['materia_id'] ?? 0);
+            if ($mid > 0) {
+                $materiasEvento[$mid] = $mid;
+            }
+        }
         $flash = $this->getFlashMessage();
         $this->viewWithLayout('admin', 'admin/eventos-avaliativos/form', $this->dados([
             'flash_status' => ($flash['type'] ?? '') === 'error' ? 'error' : (($flash['message'] ?? '') !== '' ? 'success' : ''),
@@ -308,6 +326,7 @@ class EventoAvaliativoAdminController extends AdminBaseController
             'criterios_professores' => TipoNotaRegraService::CRITERIOS_PROFESSORES,
             'canais' => TipoNotaRegraService::CANAIS_ORIGEM,
             'modos_offline' => TipoNotaRegraService::MODOS_OFFLINE,
+            'agrupar' => $this->dadosAgrupar($ano, (int) ($edicao['bimestre'] ?? 0), array_values($materiasEvento)),
         ]));
     }
 
@@ -338,7 +357,15 @@ class EventoAvaliativoAdminController extends AdminBaseController
             $this->redirect($voltar);
             return;
         }
-        $this->setFlashMessage('Evento atualizado.', 'success');
+        $agruparRes = $this->salvarAgruparDoPost($_POST);
+        if (!empty($agruparRes['error'])) {
+            $this->setFlashMessage(
+                'Evento atualizado. Agrupar não foi salvo: ' . $agruparRes['error'],
+                'error'
+            );
+        } else {
+            $this->setFlashMessage('Evento atualizado.', 'success');
+        }
         $this->redirect($this->urlListaEvento(
             (int) ($evento['ano_letivo'] ?? 0),
             (int) ($_POST['bimestre'] ?? ($evento['bimestre'] ?? 0)),
@@ -429,7 +456,11 @@ class EventoAvaliativoAdminController extends AdminBaseController
         if (!$this->boletimPermitido('visualizar')) {
             return;
         }
-        $ano = $this->anoNoCadastro((int) ($_REQUEST['ano'] ?? 0));
+        $anoRaw = strtolower(trim((string) ($_REQUEST['ano'] ?? '0')));
+        // Padrão: todos os anos. Filtro só quando o usuário escolhe um ano específico.
+        $ano = ($anoRaw === '' || $anoRaw === '0' || $anoRaw === 'todos' || $anoRaw === 'all')
+            ? 0
+            : $this->anoNoCadastro((int) $anoRaw);
         $layout = new BoletimLayout();
         $flash = $this->getFlashMessage();
         $this->viewWithLayout('admin', 'admin/eventos-avaliativos/boletim_lista', $this->dados([
@@ -472,8 +503,15 @@ class EventoAvaliativoAdminController extends AdminBaseController
             return;
         }
         $this->vincularVidaEscolarDoBoletim((int) $res['id']);
-        $this->setFlashMessage('Boletim criado. Monte as linhas do layout.', 'success');
-        $this->redirect('/admin/eventos-avaliativos/boletim/' . (int) $res['id']);
+        $idNovo = (int) $res['id'];
+        $abrirZero = !empty($_POST['abrir_quadro_zero']) || !empty($_GET['do_zero']);
+        if ($abrirZero) {
+            $this->setFlashMessage('Boletim criado. Monte colunas e cabeçalhos do zero.', 'success');
+            $this->redirect('/admin/eventos-avaliativos/boletim/' . $idNovo . '/montar-do-zero');
+            return;
+        }
+        $this->setFlashMessage('Boletim criado. Configure os Demonstrativos e as colunas no Montar quadro.', 'success');
+        $this->redirect('/admin/eventos-avaliativos/boletim/' . $idNovo . '/montar-quadro');
     }
 
     public function dadosBoletim($id): void
@@ -615,6 +653,190 @@ class EventoAvaliativoAdminController extends AdminBaseController
     }
 
     /**
+     * Abre o builder do boletim (Demonstrativos + Eventos + colunas/cabeçalhos).
+     */
+    public function montarQuadroBoletim($id): void
+    {
+        if (!$this->boletimPermitido('alterar')) {
+            return;
+        }
+        $id = (int) $id;
+        $layout = new BoletimLayout();
+        $item = $layout->find($id);
+        if ($item === null) {
+            $this->setFlashMessage('Boletim não encontrado.', 'error');
+            $this->redirect('/admin/eventos-avaliativos/boletim');
+            return;
+        }
+        $ano = (int) ($item['ano_letivo'] ?? 0);
+        $svc = new BoletimVisaoImpressaoService();
+        // Builder editável: Demonstrativos de notas + eventos avulsos + fórmula.
+        $res = $svc->prepararMontarQuadro($id);
+        if (empty($res['ok']) || (int) ($res['regra_id'] ?? 0) <= 0) {
+            $this->setFlashMessage((string) ($res['erro'] ?? 'Não foi possível abrir o quadro de impressão.'), 'error');
+            $this->redirect('/admin/eventos-avaliativos/boletim?ano=' . $ano);
+            return;
+        }
+        $regraId = (int) $res['regra_id'];
+        $q = http_build_query([
+            'regra_id' => $regraId,
+            'voltar' => 'boletim-layout',
+            'ano_letivo' => $ano,
+            'quadro' => 'impressao',
+            'layout_id' => $id,
+        ]);
+        $this->redirect('/admin/boletim-configuracao/assistente?' . $q);
+    }
+
+    /**
+     * Abre o builder livre para montar colunas e cabeçalhos do zero.
+     */
+    public function montarQuadroLivreBoletim($id): void
+    {
+        if (!$this->boletimPermitido('alterar')) {
+            return;
+        }
+        $id = (int) $id;
+        $layout = new BoletimLayout();
+        $item = $layout->find($id);
+        if ($item === null) {
+            $this->setFlashMessage('Boletim não encontrado.', 'error');
+            $this->redirect('/admin/eventos-avaliativos/boletim');
+            return;
+        }
+        $ano = (int) ($item['ano_letivo'] ?? 0);
+        $svc = new BoletimVisaoImpressaoService();
+        $res = $svc->prepararQuadroLivre($id);
+        if (empty($res['ok']) || (int) ($res['regra_id'] ?? 0) <= 0) {
+            $this->setFlashMessage((string) ($res['erro'] ?? 'Não foi possível abrir o quadro livre.'), 'error');
+            $this->redirect('/admin/eventos-avaliativos/boletim?ano=' . $ano);
+            return;
+        }
+        $regraId = (int) $res['regra_id'];
+        $q = http_build_query([
+            'regra_id' => $regraId,
+            'voltar' => 'boletim-layout',
+            'ano_letivo' => $ano,
+            'quadro' => 'impressao',
+            'layout_id' => $id,
+        ]);
+        $this->redirect('/admin/boletim-configuracao/assistente?' . $q);
+    }
+
+    /**
+     * Aplica o print Santa Maria (PP/PU/PE/MU/FAL) usando os demonstrativos do ano.
+     */
+    public function aplicarPrintSantaMariaBoletim($id): void
+    {
+        if (!$this->boletimPermitido('alterar')) {
+            return;
+        }
+        $id = (int) $id;
+        $layout = new BoletimLayout();
+        $item = $layout->find($id);
+        if ($item === null) {
+            $this->setFlashMessage('Boletim não encontrado.', 'error');
+            $this->redirect('/admin/eventos-avaliativos/boletim');
+            return;
+        }
+        $ano = (int) ($item['ano_letivo'] ?? 0);
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Token inválido. Tente novamente.', 'error');
+            $this->redirect('/admin/eventos-avaliativos/boletim?ano=' . $ano);
+            return;
+        }
+        $svc = new BoletimVisaoImpressaoService();
+        $res = $svc->aplicarPrintSantaMaria($id);
+        if (empty($res['ok']) || (int) ($res['regra_id'] ?? 0) <= 0) {
+            $this->setFlashMessage((string) ($res['erro'] ?? 'Não foi possível aplicar o print Santa Maria.'), 'error');
+            $this->redirect('/admin/eventos-avaliativos/boletim?ano=' . $ano);
+            return;
+        }
+        $msg = 'Print Santa Maria aplicado (PP/PU/PE → MU). Revise as fontes por bimestre e salve.';
+        if (!empty($res['aviso'])) {
+            $msg .= ' ' . (string) $res['aviso'];
+        }
+        $this->setFlashMessage($msg, 'success');
+        $q = http_build_query([
+            'regra_id' => (int) $res['regra_id'],
+            'voltar' => 'boletim-layout',
+            'ano_letivo' => $ano,
+            'quadro' => 'santa-maria',
+            'layout_id' => $id,
+        ]);
+        $this->redirect('/admin/boletim-configuracao/assistente?' . $q);
+    }
+
+    /**
+     * Tela intermediária: puxar colunas de um Demonstrativo de notas.
+     */
+    public function puxarDemonstrativoBoletim($id): void
+    {
+        if (!$this->boletimPermitido('alterar')) {
+            return;
+        }
+        $id = (int) $id;
+        $layout = new BoletimLayout();
+        $item = $layout->find($id);
+        if ($item === null) {
+            $this->setFlashMessage('Boletim não encontrado.', 'error');
+            $this->redirect('/admin/eventos-avaliativos/boletim');
+            return;
+        }
+        $ano = (int) ($item['ano_letivo'] ?? 0);
+        $svc = new BoletimVisaoImpressaoService();
+        $flash = $this->getFlashMessage();
+        $this->viewWithLayout('admin', 'admin/eventos-avaliativos/boletim_puxar_demonstrativo', $this->dados([
+            'title' => 'Puxar do Demonstrativo - EducaTudo',
+            'current_page' => 'boletim-layout',
+            'boletim_id' => $id,
+            'boletim_nome' => (string) ($item['nome'] ?? ''),
+            'ano' => $ano,
+            'demonstrativos' => $svc->listarDemonstrativosDoAno($ano),
+            'flash_status' => ($flash['type'] ?? '') === 'error' ? 'error' : (($flash['message'] ?? '') !== '' ? 'success' : ''),
+            'flash_message' => (string) ($flash['message'] ?? ''),
+        ]));
+    }
+
+    public function puxarDemonstrativoBoletimExecutar($id): void
+    {
+        if (!$this->boletimPermitido('alterar')) {
+            return;
+        }
+        $id = (int) $id;
+        $layout = new BoletimLayout();
+        $item = $layout->find($id);
+        $ano = (int) ($item['ano_letivo'] ?? 0);
+        if ($item === null) {
+            $this->setFlashMessage('Boletim não encontrado.', 'error');
+            $this->redirect('/admin/eventos-avaliativos/boletim');
+            return;
+        }
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Token inválido. Tente novamente.', 'error');
+            $this->redirect('/admin/eventos-avaliativos/boletim/' . $id . '/puxar-demonstrativo');
+            return;
+        }
+        $fonteId = (int) ($_POST['regra_notas_id'] ?? 0);
+        $svc = new BoletimVisaoImpressaoService();
+        $res = $svc->puxarDoDemonstrativo($id, $fonteId);
+        if (empty($res['ok']) || (int) ($res['regra_id'] ?? 0) <= 0) {
+            $this->setFlashMessage((string) ($res['erro'] ?? 'Não foi possível puxar o demonstrativo.'), 'error');
+            $this->redirect('/admin/eventos-avaliativos/boletim/' . $id . '/puxar-demonstrativo');
+            return;
+        }
+        $this->setFlashMessage('Colunas do demonstrativo copiadas. Ajuste e salve a visão de impressão.', 'success');
+        $q = http_build_query([
+            'regra_id' => (int) $res['regra_id'],
+            'voltar' => 'boletim-layout',
+            'ano_letivo' => $ano,
+            'quadro' => 'impressao',
+            'layout_id' => $id,
+        ]);
+        $this->redirect('/admin/boletim-configuracao/assistente?' . $q);
+    }
+
+    /**
      * @param array<string,mixed>|null $item
      */
     private function renderBoletimForm(?array $item): void
@@ -625,8 +847,11 @@ class EventoAvaliativoAdminController extends AdminBaseController
             $this->redirect('/admin/eventos-avaliativos/boletim');
             return;
         }
-        $ano = (int) ($item['ano_letivo'] ?? $this->anoNoCadastro(0));
+        $ano = (int) ($item['ano_letivo'] ?? $this->anoNoCadastro((int) ($_GET['ano'] ?? 0)));
         $flash = $this->getFlashMessage();
+        $doZero = $item === null && (
+            !empty($_GET['do_zero']) || strtolower(trim((string) ($_GET['do_zero'] ?? ''))) === '1'
+        );
         $this->viewWithLayout('admin', 'admin/eventos-avaliativos/boletim_form', $this->dados([
             'title' => ($item ? 'Editar boletim' : 'Novo boletim') . ' - EducaTudo',
             'current_page' => 'boletim-layout',
@@ -638,6 +863,7 @@ class EventoAvaliativoAdminController extends AdminBaseController
             'turmas' => $this->turmasDoBoletim(),
             'regras_academicas' => $this->regrasDoBoletim((int) ($item['regra_academica_id'] ?? 0)),
             'so_regra' => (new \App\Modulos\RegrasAcademicas\Models\RegraAcademica())->boletimPronto(),
+            'abrir_quadro_zero' => $doZero || $item === null,
             'flash_status' => ($flash['type'] ?? '') === 'error' ? 'error' : (($flash['message'] ?? '') !== '' ? 'success' : ''),
             'flash_message' => (string) ($flash['message'] ?? ''),
         ]));
@@ -821,7 +1047,8 @@ class EventoAvaliativoAdminController extends AdminBaseController
         $regras = new RegraAcademica();
         $itens = [];
         if ($regras->schemaPronto()) {
-            $consulta = [];
+            // Só regras ativas: inativas ficam no histórico de Regras de Aprovação.
+            $consulta = ['ativo' => 1];
             if ($anoFiltro > 0) {
                 $consulta['ano_letivo'] = $anoFiltro;
             }
@@ -875,6 +1102,64 @@ class EventoAvaliativoAdminController extends AdminBaseController
         }
 
         return $url;
+    }
+
+    /**
+     * @param list<int> $materiasEscopo
+     * @return array<string,mixed>
+     */
+    private function dadosAgrupar(int $ano, int $bimestre, array $materiasEscopo = []): array
+    {
+        try {
+            return (new AgrupamentoLinhaDemonstrativoService())->dadosParaFormulario($ano, $bimestre, $materiasEscopo);
+        } catch (\Throwable $e) {
+            return [
+                'disponivel' => false,
+                'motivo' => 'Não foi possível carregar o agrupamento.',
+                'demonstrativo_id' => 0,
+                'demonstrativo_nome' => '',
+                'assistente_url' => '',
+                'grupo' => [
+                    'ativo' => false,
+                    'nome' => '',
+                    'modo' => 'media',
+                    'materias_ids' => [],
+                    'aplicar_em' => 'boletim',
+                    'arredondamento' => 'todos',
+                    'exemplo_sem_filhas' => false,
+                    'agrupamento_id' => 0,
+                ],
+                'familias' => [],
+                'familias_titulo' => [],
+                'tem_ajuste_peca' => false,
+            ];
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $post
+     * @return array{error?:string}
+     */
+    private function salvarAgruparDoPost(array $post): array
+    {
+        if (empty($post['grupo_linha_enviar'])) {
+            return [];
+        }
+        $ano = (int) ($post['ano_letivo'] ?? 0);
+        $bimestre = (int) ($post['bimestre'] ?? 0);
+        try {
+            $res = (new AgrupamentoLinhaDemonstrativoService())->salvarDoPost($ano, $bimestre, $post);
+        } catch (\Throwable $e) {
+            return ['error' => 'Falha ao salvar o agrupamento.'];
+        }
+        if (!empty($res['skipped'])) {
+            return [];
+        }
+        if (empty($res['success'])) {
+            return ['error' => (string) ($res['error'] ?? 'Não foi possível salvar o agrupamento.')];
+        }
+
+        return [];
     }
 
     private function exigirSchema(): bool

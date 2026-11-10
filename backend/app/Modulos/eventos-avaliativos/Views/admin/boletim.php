@@ -34,6 +34,16 @@ $page_header_back_url = URL . '/admin/eventos-avaliativos/boletim?ano=' . $ano;
 $page_header_back_label = 'Voltar ao boletim';
 $page_header_title = 'Layout — ' . $boletimNome;
 $page_header_subtitle = $boletimFinalidade . ' · ' . $ano;
+$page_header_icon = 'fa-solid fa-file-circle-check';
+$trilhaItens = \App\Helpers\TrilhaAdmin::montar(
+    '/admin/eventos-avaliativos/boletim',
+    'Layout',
+    [
+        ['rotulo' => 'Acadêmico', 'url' => URL . '/admin/academico'],
+        ['rotulo' => 'Boletim', 'url' => URL . '/admin/eventos-avaliativos/boletim?ano=' . $ano],
+        ['rotulo' => 'Layout'],
+    ]
+);
 $ui_wizard_steps = [
     ['label' => 'Linhas', 'sub' => 'Colunas'],
     ['label' => 'Fórmula', 'sub' => 'Média'],
@@ -41,13 +51,6 @@ $ui_wizard_steps = [
 ];
 $ui_wizard_current = 1;
 $ui_wizard_nav_id = 'boletim-layout-steps';
-?>
-<nav aria-label="Caminho" class="mb-3 text-sm text-gray-500 flex flex-wrap items-center gap-1">
-    <a href="<?= URL ?>/admin/eventos-avaliativos/boletim?ano=<?= $ano ?>" class="hover:text-gray-800">Boletim</a>
-    <span aria-hidden="true">/</span>
-    <span class="text-gray-900">Layout</span>
-</nav>
-<?php
 include \App\Core\ViewPaths::adminPartial('page_header_form.php');
 include \App\Core\ViewPaths::adminPartial('flash_message.php');
 ?>

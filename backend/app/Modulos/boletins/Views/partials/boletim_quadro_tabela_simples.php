@@ -112,21 +112,9 @@ $fmtNotaSimples = static function ($valor) use ($decSimples): string {
                 <?php else:
                     for ($kCab = (int) $faixaCab['ini']; $kCab < (int) $faixaCab['fim']; $kCab++):
                         $oc = $colsVisiveis[$kCab];
-                        $ltOc = strtolower(trim((string) ($oc['layout_type'] ?? '')));
-                        $isFaltasCab = \App\Helpers\BoletimQuadroLayoutHelper::colunaEhFaltas($oc);
-                        $mostraValor10 = !$isFaltasCab && (
-                            in_array($ltOc, ['media', 'media_sem', 'resultado', ''], true)
-                            || $ltOc === 'other'
-                            || $ltOc === 'prova'
-                            || $ltOc === 'jornada'
-                            || $ltOc === 'enac'
-                        );
                 ?>
                     <th class="boletim-quadro-th-border px-2 py-1 font-semibold align-middle leading-tight min-w-[4.5rem]" rowspan="2">
                         <?= htmlspecialchars(\App\Helpers\BoletimQuadroLayoutHelper::rotuloColunaQuadro($oc), ENT_QUOTES, 'UTF-8') ?>
-                        <?php if ($mostraValor10): ?>
-                            <div class="text-[10px] font-normal opacity-80">Valor 10</div>
-                        <?php endif; ?>
                     </th>
                 <?php endfor; endif; endforeach; ?>
             </tr>
@@ -138,21 +126,9 @@ $fmtNotaSimples = static function ($valor) use ($decSimples): string {
                     }
                     for ($kCab = (int) $faixaCab['ini']; $kCab < (int) $faixaCab['fim']; $kCab++):
                         $oc = $colsVisiveis[$kCab];
-                        $ltOc = strtolower(trim((string) ($oc['layout_type'] ?? '')));
-                        $isFaltasCab = \App\Helpers\BoletimQuadroLayoutHelper::colunaEhFaltas($oc);
-                        $mostraValor10 = !$isFaltasCab && (
-                            in_array($ltOc, ['media', 'media_sem', 'resultado', ''], true)
-                            || $ltOc === 'other'
-                            || $ltOc === 'prova'
-                            || $ltOc === 'jornada'
-                            || $ltOc === 'enac'
-                        );
                 ?>
                     <th class="boletim-quadro-th-border px-2 py-1 font-semibold align-middle leading-tight min-w-[4.5rem]">
                         <?= htmlspecialchars(\App\Helpers\BoletimQuadroLayoutHelper::rotuloColunaQuadro($oc), ENT_QUOTES, 'UTF-8') ?>
-                        <?php if ($mostraValor10): ?>
-                            <div class="text-[10px] font-normal opacity-80">Valor 10</div>
-                        <?php endif; ?>
                     </th>
                 <?php endfor; endforeach; ?>
             </tr>
@@ -161,22 +137,9 @@ $fmtNotaSimples = static function ($valor) use ($decSimples): string {
                 <th class="boletim-quadro-th-border px-3 py-2 text-left font-semibold align-middle whitespace-nowrap">
                     <?= htmlspecialchars($tituloSimples, ENT_QUOTES, 'UTF-8') ?>
                 </th>
-                <?php foreach ($colsVisiveis as $oc):
-                    $ltOc = strtolower(trim((string) ($oc['layout_type'] ?? '')));
-                    $isFaltasCab = \App\Helpers\BoletimQuadroLayoutHelper::colunaEhFaltas($oc);
-                    $mostraValor10 = !$isFaltasCab && (
-                        in_array($ltOc, ['media', 'media_sem', 'resultado', ''], true)
-                        || $ltOc === 'other'
-                        || $ltOc === 'prova'
-                        || $ltOc === 'jornada'
-                        || $ltOc === 'enac'
-                    );
-                ?>
+                <?php foreach ($colsVisiveis as $oc): ?>
                     <th class="boletim-quadro-th-border px-2 py-1 font-semibold align-middle leading-tight min-w-[4.5rem]">
                         <?= htmlspecialchars(\App\Helpers\BoletimQuadroLayoutHelper::rotuloColunaQuadro($oc), ENT_QUOTES, 'UTF-8') ?>
-                        <?php if ($mostraValor10): ?>
-                            <div class="text-[10px] font-normal opacity-80">Valor 10</div>
-                        <?php endif; ?>
                     </th>
                 <?php endforeach; ?>
             </tr>

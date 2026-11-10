@@ -20,6 +20,7 @@ $resultados = is_array($prontuario['resultados'] ?? null) ? $prontuario['resulta
 $emissoes = is_array($prontuario['emissoes'] ?? null) ? $prontuario['emissoes'] : [];
 $fichas = is_array($prontuario['fichas'] ?? null) ? $prontuario['fichas'] : [];
 $quadro = $prontuario['quadro'] ?? null;
+$quadro_impressao_html = (string) ($prontuario['quadro_impressao_html'] ?? '');
 $trajetoria = is_array($prontuario['trajetoria'] ?? null) ? $prontuario['trajetoria'] : ['anos' => []];
 $importacoes = is_array($prontuario['importacoes'] ?? null) ? $prontuario['importacoes'] : [];
 $materias = is_array($prontuario['materias'] ?? null) ? $prontuario['materias'] : [];
@@ -150,6 +151,8 @@ $veBannerOrigem = true;
 
     <div id="ve-painel-boletim" class="ve-painel <?= $veAba === 'boletim' ? '' : 'hidden' ?>" data-ve-aba="boletim">
         <?php
+        // Na Vida do Aluno as notas vêm do boletim gerado: só leitura; observação continua editável.
+        $boletim_notas_somente_leitura = true;
         $partial = $modDir . '/_aba_boletim.php';
         if ($podeVidaEscolar && is_file($partial)) {
             include $partial;
@@ -161,8 +164,15 @@ $veBannerOrigem = true;
 
     <div id="ve-painel-notas" class="ve-painel <?= $veAba === 'notas' ? '' : 'hidden' ?>" data-ve-aba="notas" data-perm-key="tab_notas" data-perm-action="visualizar">
         <div class="student-card">
-            <div class="student-card-body">
-                <?php include __DIR__ . '/_secao_notas_eventos.php'; ?>
+            <div class="student-card-body"
+                 id="ve-notas-lazy"
+                 data-lazy-ve="notas"
+                 data-lazy-loaded="0"
+                 data-aluno-id="<?= (int) ($student['id'] ?? $aluno_id ?? 0) ?>">
+                <div class="text-center py-10 text-slate-500 text-sm">
+                    <i class="fa-solid fa-spinner fa-spin mr-2" aria-hidden="true"></i>
+                    Carregando demonstrativo de notas…
+                </div>
             </div>
         </div>
     </div>
@@ -202,5 +212,45 @@ function selecionarVeAba(nome) {
         url.searchParams.set('ve_aba', nome);
         history.replaceState(null, '', url.pathname + url.search + url.hash);
     } catch (e) {}
+    if (nome === 'notas') {
+        carregarVeNotasSobDemanda();
+    }
+    if (nome === 'boletim' && typeof carregarVeQuadroImpressaoSobDemanda === 'function') {
+        carregarVeQuadroImpressaoSobDemanda();
+    }
+}
+
+function carregarVeNotasSobDemanda() {
+    var box = document.getElementById('ve-notas-lazy');
+    if (!box || box.getAttribute('data-lazy-loaded') === '1') {
+        return;
+    }
+    var alunoId = parseInt(box.getAttribute('data-aluno-id') || '0', 10) || 0;
+    if (alunoId <= 0) {
+        return;
+    }
+    box.setAttribute('data-lazy-loaded', '1');
+    fetch(<?= json_encode(URL . '/admin/students/', JSON_UNESCAPED_SLASHES) ?> + alunoId + '/tab/notas', { credentials: 'same-origin' })
+        .then(function (r) {
+            if (!r.ok) { throw new Error('HTTP ' + r.status); }
+            return r.text();
+        })
+        .then(function (html) {
+            box.innerHTML = html;
+            // innerHTML não executa <script>; reativa o JS do fragmento (abas/modal).
+            box.querySelectorAll('script').forEach(function (oldScript) {
+                var s = document.createElement('script');
+                if (oldScript.src) {
+                    s.src = oldScript.src;
+                } else {
+                    s.textContent = oldScript.textContent;
+                }
+                oldScript.parentNode.replaceChild(s, oldScript);
+            });
+        })
+        .catch(function () {
+            box.setAttribute('data-lazy-loaded', '0');
+            box.innerHTML = '<div class="text-center py-10 text-red-600 text-sm">Erro ao carregar notas. <button type="button" class="underline" onclick="document.getElementById(\'ve-notas-lazy\').setAttribute(\'data-lazy-loaded\',\'0\');carregarVeNotasSobDemanda();">Tentar novamente</button></div>';
+        });
 }
 </script>

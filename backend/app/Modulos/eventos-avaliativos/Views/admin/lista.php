@@ -11,6 +11,7 @@ $filtrosAtivos = (int) ($filtros_ativos ?? 0);
 
 $page_header_title = 'Eventos Avaliativos';
 $page_header_subtitle = 'Escolha a regra de nota para abrir os períodos e as recuperações.';
+$page_header_icon = 'fa-solid fa-clipboard-list';
 ob_start();
 ?>
 <button type="button" onclick="openFilterDrawer()"

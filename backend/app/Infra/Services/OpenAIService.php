@@ -2567,6 +2567,66 @@ Revise: você inventou alguma palavra? Se sim, substitua por [Não Entendi].
         }
     }
 
+    public function extrairLayoutBoletimModeloOpenAI(string $b64, string $mime): string
+    {
+        try {
+            $systemPrompt = 'Você extrai layout visual de boletim escolar. Responda apenas JSON válido, sem texto extra.';
+            $prompt = "Leia a imagem de um boletim/print e extraia apenas elementos VISUAIS visíveis.\n"
+                . "Retorne EXATAMENTE um JSON neste formato:\n"
+                . "{\n"
+                . "  \"colunas\": [{\"chave\":\"c1\",\"rotulo\":\"PP\",\"grupo\":\"1º bimestre\",\"tipo_sugerido\":\"lancamento|media|faltas|rec|situacao|outro\",\"confianca\":0.0}],\n"
+                . "  \"legendas\": [{\"sigla\":\"PP\",\"descricao\":\"Prova Parcial\",\"confianca\":0.0}],\n"
+                . "  \"componentes\": [{\"nome\":\"Arte\",\"confianca\":0.0}],\n"
+                . "  \"observacoes_layout\": \"\"\n"
+                . "}\n"
+                . "Regras obrigatórias:\n"
+                . "- NÃO invente IDs do sistema.\n"
+                . "- Extraia somente o que aparece no documento.\n"
+                . "- confianca deve ser número entre 0 e 1.\n"
+                . "- Se não encontrar um campo, retorne lista vazia.\n"
+                . "- Em componentes, liste só disciplinas/linhas de nota (ex.: História 1, História 2).\n"
+                . "- NÃO coloque em componentes títulos de área/agrupamento (ex.: só \"História\" acima de História 1/2).\n"
+                . "- Não use markdown.";
+
+            $response = $this->fazerRequisicao([
+                'model' => 'gpt-4o',
+                'messages' => [
+                    [
+                        'role' => 'system',
+                        'content' => $systemPrompt,
+                    ],
+                    [
+                        'role' => 'user',
+                        'content' => [
+                            [
+                                'type' => 'text',
+                                'text' => $prompt,
+                            ],
+                            [
+                                'type' => 'image_url',
+                                'image_url' => [
+                                    'url' => 'data:' . $mime . ';base64,' . $b64,
+                                    'detail' => 'high',
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+                'max_tokens' => 6000,
+                'temperature' => 0.0,
+            ]);
+
+            if (!isset($response['choices'][0]['message']['content'])) {
+                throw new \Exception('Resposta inválida da OpenAI');
+            }
+
+            return (string) $response['choices'][0]['message']['content'];
+        } catch (\Exception $e) {
+            error_log('ERRO em OpenAIService::extrairLayoutBoletimModeloOpenAI: ' . $e->getMessage());
+            throw $e;
+        }
+    }
+
     public function reproduzirModeloDocumentoImagem(string $imageData, string $mimeType, string $systemPrompt, string $prompt): string
     {
         try {

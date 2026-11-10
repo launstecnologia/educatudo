@@ -804,20 +804,20 @@ class ModeloDocumentoService
         };
 
         $html = '<table class="quadro-notas dados"><thead><tr>'
-            . self::thQuadro('Componente', ' class="comp" rowspan="2"', '#e5e7eb');
+            . self::thQuadro('Componente', ' class="comp" rowspan="2"', '#9ca3af');
         foreach ($periodos as $i => $rotulo) {
             $final = $ehColunaFinal((int) $i);
             $html .= self::thQuadro(
                 htmlspecialchars((string) $rotulo, ENT_QUOTES, 'UTF-8'),
                 ' colspan="2"' . ($final ? ' class="final"' : ''),
-                $final ? '#dbe3ee' : '#e5e7eb'
+                $final ? '#6b7280' : '#9ca3af'
             );
         }
         $html .= '</tr><tr>';
         for ($i = 0; $i < $nPer; $i++) {
             $final = $ehColunaFinal($i);
             $cls = $final ? ' class="final"' : '';
-            $bg = $final ? '#dbe3ee' : '#eef0f3';
+            $bg = $final ? '#6b7280' : '#9ca3af';
             $html .= self::thQuadro('Nota', $cls, $bg) . self::thQuadro('Falta', $cls, $bg);
         }
         $html .= '</tr></thead><tbody>';
@@ -854,14 +854,15 @@ class ModeloDocumentoService
         return $html . '</tbody></table>';
     }
 
-    private static function thQuadro(string $html, string $attrs = '', string $bg = '#eef0f3'): string
+    private static function thQuadro(string $html, string $attrs = '', string $bg = '#9ca3af'): string
     {
-        return '<th' . $attrs . ' bgcolor="' . $bg . '" style="background-color:' . $bg . ';">' . $html . '</th>';
+        $cor = ($bg === '#6b7280') ? '#fff' : '#111';
+        return '<th' . $attrs . ' bgcolor="' . $bg . '" style="background-color:' . $bg . ';color:' . $cor . ';">' . $html . '</th>';
     }
 
     public static function htmlIdentificacaoBoletim(): string
     {
-        $lab = static fn (string $r): string => '<td class="label" bgcolor="#f3f4f6" style="background-color:#f3f4f6;font-weight:bold;">' . $r . '</td>';
+        $lab = static fn (string $r): string => '<td class="label" bgcolor="#9ca3af" style="background-color:#9ca3af;color:#111;font-weight:bold;">' . $r . '</td>';
 
         return '<table class="ident-boletim dados">'
             . '<tr>'
@@ -3661,7 +3662,7 @@ HTML;
   p { margin: 0 0 8px; }
   table { width: 100%; border-collapse: collapse; margin: 8px 0; }
   th, td { border: 1px solid #ccc; padding: 4px 6px; }
-  th { background: #f3f4f6; }
+  th { background: #9ca3af; color: #111; }
   table.quadro-notas { font-size: inherit; }
   table.quadro-notas th, table.quadro-notas td { font-size: inherit !important; padding: 3px 4px; }
   .page-break { page-break-after: always; break-after: page; }
@@ -3713,7 +3714,7 @@ CSS;
   table.dados td, table.dados th { border: 1px solid #ccc; }
   table.ident-boletim { width: 100%; border-collapse: collapse; margin: 0 0 10px; }
   table.ident-boletim td { border: 1px solid #d1d5db; padding: 4px 6px; font-size: 8pt; }
-  table.ident-boletim td.label { background-color: #f3f4f6; font-weight: bold; width: 12%; }
+  table.ident-boletim td.label { background-color: #9ca3af; color: #111; font-weight: bold; width: 12%; }
   table.quadro-notas { width: 100%; border-collapse: collapse; margin: 4px 0 8px; font-size: inherit; border: 1px solid #9ca3af; }
   table.quadro-notas th, table.quadro-notas td { border: 1px solid #d1d5db; padding: 4px 5px; font-size: inherit !important; }
   table.quadro-notas th { font-weight: bold; text-align: center; text-transform: uppercase; letter-spacing: .02em; color: #374151; }
@@ -3891,11 +3892,13 @@ CSS;
     word-break: normal;
   }
   body.folha-impressa table.edoc-ficha-grade:not(.doc-linha) th {
-    background: #f3f4f6;
+    background: #9ca3af;
+    color: #111;
     font-weight: 600;
   }
   body.folha-impressa table.edoc-ficha-grade:not(.doc-linha) th[colspan] {
-    background: #e5e7eb;
+    background: #6b7280;
+    color: #fff;
     text-align: center;
   }
   body.folha-impressa table.edoc-ficha-grade:not(.doc-linha) td:not(:nth-child(2)) {
@@ -3934,7 +3937,8 @@ CSS;
   body.folha-impressa table.edoc-ficha-campos:has(colgroup) { table-layout: fixed; }
   body.folha-impressa table.edoc-ficha-campos:not(.doc-linha) tr th:not([colspan]) {
     font-weight: 700;
-    background: #f3f4f6;
+    background: #9ca3af;
+    color: #111;
     white-space: nowrap;
   }
   body.folha-impressa table.edoc-ficha-campos:not(.doc-linha):not(:has(colgroup)) tr th:not([colspan]) {
@@ -4085,7 +4089,7 @@ CSS;
   h1.doc-title { text-align: center; font-size: 15pt; color: #111827; letter-spacing: 1px; text-transform: uppercase; margin: 4px 0 8px 0; }
   table.ident-boletim { width: 100%; border-collapse: collapse; margin: 0 0 10px; }
   table.ident-boletim td { border: 1px solid #d1d5db; padding: 4px 6px; font-size: 8pt; }
-  table.ident-boletim td.label { background-color: #f3f4f6; font-weight: bold; }
+  table.ident-boletim td.label { background-color: #9ca3af; color: #111; font-weight: bold; }
   table.quadro-notas { margin: 4px 0 8px; font-size: inherit; border: 1px solid #9ca3af; }
   table.quadro-notas th, table.quadro-notas td { font-size: inherit !important; padding: 4px 5px; }
   table.quadro-notas th { font-weight: bold; text-align: center; text-transform: uppercase; letter-spacing: .02em; color: #374151; }
@@ -4097,7 +4101,7 @@ CSS;
   .destaque { font-weight: bold; color: #111827; }
   table.dados { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: inherit; }
   table.dados td { border: 1px solid #d1d5db; padding: 6px 9px; font-size: inherit; }
-  table.dados td.label { background: #f3f4f6; font-weight: bold; width: 38%; }
+  table.dados td.label { background: #9ca3af; color: #111; font-weight: bold; width: 38%; }
   table.seed-compacta, table.dados[style*="font-size:8px"], table.dados[style*="font-size:9px"] {
     width: 100% !important; table-layout: fixed; border-collapse: collapse; margin: 2px 0;
     page-break-inside: avoid;

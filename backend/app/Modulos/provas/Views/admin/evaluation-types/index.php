@@ -1,6 +1,7 @@
 <?php
 $page_header_title = 'Tipos de Nota';
 $page_header_subtitle = 'Cadastre todos os eventos avaliativos.';
+$page_header_icon = 'fa-solid fa-tags';
 ob_start();
 ?>
 <a href="<?= URL ?>/admin/provas/tipos-avaliacao/criar"

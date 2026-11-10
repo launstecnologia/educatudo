@@ -5,6 +5,7 @@ namespace App\Modulos\VidaEscolar\Services;
 
 use App\Modulos\ModelosDocumentos\Services\GeradorPdfFolhaService;
 use App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService;
+use App\Modulos\ModelosDocumentos\Services\QuadroBoletimSantaMariaService;
 use App\Core\Database;
 /**
  * Emite PDFs da Vida Escolar no papel timbrado (Layout de documentos).
@@ -33,7 +34,35 @@ class VidaEscolarPdfService
      */
     public function emitirBoletim(array $prontuario, array $periodos, ?array $config, string $filename): void
     {
-        $this->emitir(self::CODIGO_BOLETIM, 'Boletim Escolar', $prontuario, $periodos, $config, $filename);
+        $out = $this->htmlBoletim($prontuario, $periodos, $config);
+        $aluno = is_array($prontuario['aluno'] ?? null) ? $prontuario['aluno'] : [];
+        $this->enviarPdf($out['html'], $filename, $out['modelo'], (int) ($aluno['id'] ?? 0), 'Boletim Escolar', $config);
+    }
+
+    /**
+     * HTML do boletim: prioriza o quadro do boletim criado (assistente);
+     * só usa o Quadro SM genérico se não houver layout próprio.
+     *
+     * @param array<string,mixed> $prontuario
+     * @param array<int,string> $periodos
+     * @param array<string,mixed>|null $config
+     * @return array{html:string,modelo:array<string,mixed>}
+     */
+    public function htmlBoletim(array $prontuario, array $periodos, ?array $config): array
+    {
+        $codigo = self::CODIGO_BOLETIM;
+        $prontuario = $this->aplicarQuadroImpressaoSeHouver($prontuario);
+        $temQuadroCriado = !empty($prontuario['_quadro_sm_html'])
+            && is_string($prontuario['_quadro_sm_html'])
+            && stripos($prontuario['_quadro_sm_html'], '<table') !== false;
+        if (!$temQuadroCriado && $this->escolaUsaBoletimSantaMaria()) {
+            $prontuario = $this->aplicarQuadroSantaMariaSeHouver($prontuario);
+            $sm = $this->modelos->findByCodigo(QuadroBoletimSantaMariaService::CODIGO_MODELO);
+            if ($sm) {
+                $codigo = QuadroBoletimSantaMariaService::CODIGO_MODELO;
+            }
+        }
+        return $this->htmlProntuario($codigo, 'Boletim Escolar', $prontuario, $periodos, $config);
     }
 
     /**
@@ -53,18 +82,21 @@ class VidaEscolarPdfService
         }
         @set_time_limit(180);
         $this->garantirModelos();
-        $modelo = $this->modelos->findByCodigo(self::CODIGO_BOLETIM);
-        if (!$modelo) {
-            throw new \RuntimeException('Modelo vida_escolar_boletim indisponível. Cadastre-o em Layout de documentos.');
-        }
         $css = '';
         $corpos = [];
+        $modelo = null;
         foreach ($prontuarios as $prontuario) {
-            $out = $this->htmlProntuario(self::CODIGO_BOLETIM, 'Boletim Escolar', $prontuario, $periodos, $config);
+            $out = $this->htmlBoletim($prontuario, $periodos, $config);
+            if ($modelo === null) {
+                $modelo = $out['modelo'];
+            }
             if ($css === '') {
                 $css = $this->extrairCssHtml($out['html']);
             }
             $corpos[] = $this->extrairCorpoHtml($out['html']);
+        }
+        if ($modelo === null) {
+            throw new \RuntimeException('Modelo de boletim indisponível. Cadastre-o em Layout de documentos.');
         }
         $ultimo = count($corpos) - 1;
         $partes = [];
@@ -310,7 +342,11 @@ class VidaEscolarPdfService
         }
         $vars['identidade_html'] = $this->tabelaChaveValor($planilha);
         $vars['trajetoria_html'] = $this->trajetoriaHtml(is_array($prontuario['trajetoria']['anos'] ?? null) ? $prontuario['trajetoria']['anos'] : []);
-        $vars['quadro_notas_html'] = $this->quadroHtml($quadro, $periodos);
+        if (!empty($prontuario['_quadro_sm_html']) && is_string($prontuario['_quadro_sm_html'])) {
+            $vars['quadro_notas_html'] = $this->prepararQuadroHtmlParaPdf($prontuario['_quadro_sm_html']);
+        } else {
+            $vars['quadro_notas_html'] = $this->prepararQuadroHtmlParaPdf($this->quadroHtml($quadro, $periodos));
+        }
         $vars['documentos_html'] = $this->checklistHtml(is_array($prontuario['docs_checklist']['itens'] ?? null) ? $prontuario['docs_checklist']['itens'] : []);
         $vars['sed_html'] = $this->sedHtml(
             is_array($prontuario['sed']['itens'] ?? null) ? $prontuario['sed']['itens'] : [],
@@ -381,6 +417,99 @@ class VidaEscolarPdfService
                 . '<td>' . $this->esc($ano['resultado'] ?? '—') . '</td></tr>';
         }
         return $html . '</table>';
+    }
+
+    private function escolaUsaBoletimSantaMaria(): bool
+    {
+        try {
+            $codigo = (new \App\Models\Education\ResultadoAcademico())->getLayoutCodigo('boletim');
+            return QuadroBoletimSantaMariaService::codigoEhSantaMaria((string) $codigo);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Injeta o HTML do boletim criado (mesmo do detalhe) no PDF.
+     *
+     * @param array<string,mixed> $prontuario
+     * @return array<string,mixed>
+     */
+    private function aplicarQuadroImpressaoSeHouver(array $prontuario): array
+    {
+        if (!empty($prontuario['_quadro_sm_html']) && is_string($prontuario['_quadro_sm_html'])) {
+            return $prontuario;
+        }
+        $impressao = trim((string) ($prontuario['quadro_impressao_html'] ?? ''));
+        if ($impressao !== '' && stripos($impressao, '<table') !== false) {
+            $prontuario['_quadro_sm_html'] = $impressao;
+        }
+        return $prontuario;
+    }
+
+    /**
+     * PDF: sem "Valor 10" nos cabeçalhos e com títulos em cinza mais escuro.
+     */
+    private function prepararQuadroHtmlParaPdf(string $html): string
+    {
+        $html = trim($html);
+        if ($html === '') {
+            return '';
+        }
+        // Remove a escala "Valor 10" / "Valor 10,0" do partial web.
+        $html = (string) preg_replace(
+            '/<div\b[^>]*>\s*Valor\s*10(?:[.,]0+)?\s*<\/div>/iu',
+            '',
+            $html
+        );
+        $html = (string) preg_replace(
+            '/\bValor\s*10(?:[.,]0+)?\b/iu',
+            '',
+            $html
+        );
+
+        $css = '<style type="text/css">'
+            . '.ve-quadro-pdf th,'
+            . '.ve-quadro-pdf .boletim-quadro-th,'
+            . '.ve-quadro-pdf .boletim-quadro-th-sub{'
+            . 'background:#9ca3af !important;color:#111 !important;'
+            . 'border-color:#6b7280 !important;}'
+            . '.ve-quadro-pdf th[colspan]{background:#6b7280 !important;color:#fff !important;}'
+            . '.ve-quadro-pdf table{width:100%;border-collapse:collapse;font-size:7pt;}'
+            . '.ve-quadro-pdf th,.ve-quadro-pdf td{padding:2px 3px;border:1px solid #6b7280;}'
+            . '</style>';
+
+        return $css . '<div class="ve-quadro-pdf">' . $html . '</div>';
+    }
+
+    /**
+     * Fallback: Quadro SM genérico só quando não há layout do assistente.
+     *
+     * @param array<string,mixed> $prontuario
+     * @return array<string,mixed>
+     */
+    private function aplicarQuadroSantaMariaSeHouver(array $prontuario): array
+    {
+        if (!empty($prontuario['_quadro_sm_html'])) {
+            return $prontuario;
+        }
+        $aluno = is_array($prontuario['aluno'] ?? null) ? $prontuario['aluno'] : [];
+        $ficha = is_array($prontuario['quadro']['ficha'] ?? null) ? $prontuario['quadro']['ficha'] : [];
+        $capa = is_array($prontuario['capa'] ?? null) ? $prontuario['capa'] : [];
+        $alunoId = (int) ($aluno['id'] ?? 0);
+        $ano = (int) ($ficha['ano_letivo'] ?? $capa['ano_letivo'] ?? $aluno['turma_ano_letivo'] ?? 0);
+        if ($alunoId <= 0 || $ano < 2000) {
+            return $prontuario;
+        }
+        try {
+            $quadro = (new QuadroBoletimSantaMariaService($this->db))->montarHtml($alunoId, $ano);
+            if ((int) ($quadro['linhas'] ?? 0) > 0 && trim((string) ($quadro['html'] ?? '')) !== '') {
+                $prontuario['_quadro_sm_html'] = (string) $quadro['html'];
+            }
+        } catch (\Throwable $e) {
+            // mantém quadro padrão da vida escolar
+        }
+        return $prontuario;
     }
 
     /**

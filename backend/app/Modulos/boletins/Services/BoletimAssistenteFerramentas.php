@@ -114,6 +114,54 @@ class BoletimAssistenteFerramentas
     }
 
     /**
+     * Catálogo para casar OCR/print: inclui unidades/agrupadores (ex.: História pai de História 1/2).
+     *
+     * @return list<array{id:int,nome:string,ordem:int,eh_agrupador:bool}>
+     */
+    public function listarMateriasParaCasamentoModelo(int $limit = 600): array
+    {
+        $limit = max(1, min($limit, 2000));
+        $ordem = $this->boletimConfig->mapaOrdemBoletimMaterias();
+        $sql = "SELECT m.id, m.nome,
+                       CASE WHEN EXISTS (
+                           SELECT 1 FROM materias f WHERE f.pai_id = m.id LIMIT 1
+                       ) THEN 1 ELSE 0 END AS eh_agrupador
+                FROM materias m
+                ORDER BY m.nome ASC
+                LIMIT {$limit}";
+        try {
+            $rows = $this->db->fetchAll($sql) ?: [];
+        } catch (\Throwable $e) {
+            // Fallback sem coluna pai_id
+            $rows = $this->db->fetchAll(
+                "SELECT m.id, m.nome, 0 AS eh_agrupador FROM materias m ORDER BY m.nome ASC LIMIT {$limit}"
+            ) ?: [];
+        }
+
+        $out = [];
+        foreach ($rows as $materia) {
+            $id = (int) ($materia['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $out[] = [
+                'id' => $id,
+                'nome' => trim((string) ($materia['nome'] ?? '')),
+                'ordem' => (int) ($ordem[$id] ?? (100000 + $id)),
+                'eh_agrupador' => !empty($materia['eh_agrupador']),
+            ];
+        }
+        usort($out, static function (array $a, array $b): int {
+            if ((int) $a['ordem'] !== (int) $b['ordem']) {
+                return (int) $a['ordem'] <=> (int) $b['ordem'];
+            }
+            return ((int) $a['id']) <=> ((int) $b['id']);
+        });
+
+        return $out;
+    }
+
+    /**
      * @return list<array{id:int,nome:string,turma_nome:?string}>
      */
     public function listarAlunos(int $limit = 300): array
@@ -1864,7 +1912,16 @@ class BoletimAssistenteFerramentas
             'materias_ids' => $this->decodeIdsJson($regra['materias_ids'] ?? null),
             'series_ids' => $this->decodeIdsJson($regra['series_ids'] ?? null),
             'round_mode' => (string) ($regra['round_mode'] ?? 'none'),
+            'decimal_places' => ((int) ($regra['decimal_places'] ?? 2) === 1) ? 1 : 2,
             'nota_minima_aprovacao' => isset($regra['nota_minima_aprovacao']) ? (float) $regra['nota_minima_aprovacao'] : null,
+            // Sem extras_json o assistente perde REC/PF/eventos_avaliativos_ids ao reabrir.
+            'extras_json' => is_string($regra['extras_json'] ?? null)
+                ? (string) $regra['extras_json']
+                : (is_array($regra['extras_json'] ?? null)
+                    ? (string) json_encode($regra['extras_json'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                    : (is_array($regra['extras'] ?? null)
+                        ? (string) json_encode($regra['extras'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                        : null)),
             'componentes' => $componentes,
         ];
     }

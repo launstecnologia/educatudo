@@ -2631,9 +2631,8 @@ class BoletimConfig
             $params['codigo'] = trim((string) $campos['codigo']);
         }
         if (array_key_exists('bimestre', $campos)) {
-            $bim = (int) $campos['bimestre'];
             $set[] = 'bimestre = :bimestre';
-            $params['bimestre'] = ($bim >= 1 && $bim <= 4) ? $bim : null;
+            $params['bimestre'] = $this->normalizeBimestre((int) $campos['bimestre']);
         }
         if (array_key_exists('default_data_inicio', $campos)) {
             $set[] = 'default_data_inicio = :default_data_inicio';
@@ -5349,7 +5348,7 @@ class BoletimConfig
     }
 
     /**
-     * @return array<int,int> bimestre => regra_id
+     * @return array<int,int> bimestre => regra_id (inclui códigos de recuperação 61–90)
      */
     public function fontesBimestresDoBoletim(int $boletimId): array
     {
@@ -5365,9 +5364,10 @@ class BoletimConfig
         ) ?: [];
         foreach ($rows as $row) {
             $bim = (int) ($row['bimestre'] ?? 0);
-            if ($bim >= 1 && $bim <= 4) {
-                $out[$bim] = (int) ($row['id'] ?? 0);
+            if ($this->normalizeBimestre($bim) === null) {
+                continue;
             }
+            $out[$bim] = (int) ($row['id'] ?? 0);
         }
         return $out;
     }
@@ -5440,7 +5440,11 @@ class BoletimConfig
      */
     public function alinharComponentesAoBimestre(int $regraId, int $bimestre): void
     {
-        $bimestre = max(1, min(4, $bimestre));
+        $bimestreNormalizado = $this->normalizeBimestre($bimestre);
+        if ($bimestreNormalizado === null) {
+            $bimestreNormalizado = max(1, min(4, $bimestre));
+        }
+        $bimestre = $bimestreNormalizado;
         if ($regraId <= 0) {
             return;
         }
@@ -5536,7 +5540,14 @@ class BoletimConfig
     private function normalizeBimestre(?int $bimestre): ?int
     {
         $b = (int) ($bimestre ?? 0);
-        return in_array($b, [1, 2, 3, 4], true) ? $b : null;
+        if ($b >= 1 && $b <= 4) {
+            return $b;
+        }
+        // Mesmos códigos de Eventos Avaliativos: ciclo 61–64, par 81–82, final 90.
+        if ($b >= 60 && $b <= 90) {
+            return $b;
+        }
+        return null;
     }
 
     private function normalizeRoundMode(string $value): string

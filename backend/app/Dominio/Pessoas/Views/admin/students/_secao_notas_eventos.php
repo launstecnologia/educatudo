@@ -62,6 +62,10 @@ foreach ($boletim_eventos_notas as $ev) {
     $resumo = $resumoPorChave[$rid . ':' . $ano . ':' . $bim]
         ?? $resumoPorChave['0:' . $ano . ':' . $bim]
         ?? null;
+    $grupoChave = trim((string) ($ev['grupo_chave'] ?? 'regular'));
+    if ($grupoChave === '') {
+        $grupoChave = 'regular';
+    }
     $linhasPeriodo[$chave] = [
         'ano' => $ano,
         'numero' => $bim,
@@ -70,6 +74,9 @@ foreach ($boletim_eventos_notas as $ev) {
         'data_inicio' => trim((string) ($ev['default_data_inicio'] ?? '')),
         'data_fim' => trim((string) ($ev['default_data_fim'] ?? '')),
         'resumo' => is_array($resumo) ? $resumo : null,
+        'grupo_chave' => $grupoChave,
+        'grupo_rotulo' => trim((string) ($ev['grupo_rotulo'] ?? 'Demonstrativo')),
+        'curso_tipo' => (($ev['curso_tipo'] ?? '') === 'extra') ? 'extra' : 'regular',
     ];
 }
 if ($linhasPeriodo === []) {
@@ -87,6 +94,9 @@ if ($linhasPeriodo === []) {
             'data_inicio' => '',
             'data_fim' => '',
             'resumo' => $resumo,
+            'grupo_chave' => 'regular',
+            'grupo_rotulo' => 'Demonstrativo',
+            'curso_tipo' => 'regular',
         ];
     }
 }
@@ -425,14 +435,6 @@ foreach ($linhasPeriodo as &$linhaP) {
     $idResumo = 'fonte-notas-resumo-' . $idxLinha;
     $idQuadro = 'fonte-notas-quadro-' . $anoP . '-' . $bimP . '-' . $ridP . '-' . $idxLinha;
     $htmlResumo = '';
-    if ($ridP > 0 && $alunoIdNotas > 0) {
-        $htmlResumo = $renderNotasAoVivo(
-            $alunoIdNotas,
-            $ridP,
-            (string) ($linhaP['data_inicio'] ?? ''),
-            (string) ($linhaP['data_fim'] ?? '')
-        );
-    }
     $chaveEv = $ridP . ':' . $anoP . ':' . $bimP;
     $evNotas = $geradoPorChave[$chaveEv] ?? null;
     if (!is_array($evNotas) && $ridP > 0) {
@@ -448,11 +450,20 @@ foreach ($linhasPeriodo as &$linhaP) {
             break;
         }
     }
-    if ($htmlResumo === '' && is_array($evNotas) && !empty($evNotas['linhas']) && !empty($evNotas['colunas'])) {
+    // Preferir resultado gerado (rápido). Simulação ao vivo só se não houver gerado.
+    if (is_array($evNotas) && !empty($evNotas['linhas']) && !empty($evNotas['colunas'])) {
         $evNotas = $semFilhasExcluidas($evNotas);
         if (!empty($evNotas['linhas'])) {
             $htmlResumo = $renderNotasComoCoordenacao($evNotas);
         }
+    }
+    if ($htmlResumo === '' && $ridP > 0 && $alunoIdNotas > 0) {
+        $htmlResumo = $renderNotasAoVivo(
+            $alunoIdNotas,
+            $ridP,
+            (string) ($linhaP['data_inicio'] ?? ''),
+            (string) ($linhaP['data_fim'] ?? '')
+        );
     }
     if ($htmlResumo === '' && is_array($linhaP['resumo'] ?? null)) {
         $resumos_notas = [$linhaP['resumo']];
@@ -465,8 +476,47 @@ foreach ($linhasPeriodo as &$linhaP) {
     $chaveQuadro = $ridP . ':' . $anoP . ':' . $bimP;
     if (!array_key_exists($chaveQuadro, $htmlQuadroPorChave)) {
         $htmlQuadroPorChave[$chaveQuadro] = '';
-        // 1) Mesmo Demonstrativo de Notas/Boletins (simulação ao vivo).
-        if ($ridP > 0 && $alunoIdNotas > 0) {
+        // 1) Resultado gerado (rápido).
+        $evGerado = $geradoPorChave[$chaveQuadro] ?? null;
+        if ($evGerado === null && $ridP > 0) {
+            foreach ($geradosNotasLista as $evCand) {
+                if (!is_array($evCand)) {
+                    continue;
+                }
+                if ((int) ($evCand['regra_id'] ?? 0) !== $ridP) {
+                    continue;
+                }
+                $bimCand = (int) ($evCand['bimestre'] ?? 0);
+                if ($bimP > 0 && $bimCand > 0 && $bimCand !== $bimP) {
+                    continue;
+                }
+                $evGerado = $evCand;
+                break;
+            }
+        }
+        if (is_array($evGerado) && !empty($evGerado['linhas']) && !empty($evGerado['colunas'])) {
+            $evGerado = $semFilhasExcluidas($evGerado);
+        }
+        if (is_array($evGerado) && !empty($evGerado['linhas']) && !empty($evGerado['colunas'])) {
+            $colsGer = is_array($evGerado['colunas']) ? $evGerado['colunas'] : [];
+            if (\App\Helpers\BoletimQuadroLayoutHelper::ehLayoutQuadro($colsGer) || $ridP <= 0) {
+                $boletinsGeradosBackup = $boletins_gerados ?? [];
+                $boletimPodeExcluirBackup = $boletim_pode_excluir ?? false;
+                $boletimAlunoIdBackup = $boletim_aluno_id ?? 0;
+                ob_start();
+                $boletins_gerados = [$evGerado];
+                $boletim_pode_excluir = false;
+                $boletim_aluno_id = 0;
+                require \App\Core\ViewPaths::partial('boletins_gerados.php');
+                $htmlGeradoLista = (string) ob_get_clean();
+                $htmlQuadroPorChave[$chaveQuadro] = stripos($htmlGeradoLista, '<table') === false ? '' : $htmlGeradoLista;
+                $boletins_gerados = $boletinsGeradosBackup;
+                $boletim_pode_excluir = $boletimPodeExcluirBackup;
+                $boletim_aluno_id = $boletimAlunoIdBackup;
+            }
+        }
+        // 2) Simulação ao vivo só se ainda não houver quadro.
+        if (trim($htmlQuadroPorChave[$chaveQuadro]) === '' && $ridP > 0 && $alunoIdNotas > 0) {
             $htmlQuadroPorChave[$chaveQuadro] = $renderQuadroDemonstrativo(
                 $alunoIdNotas,
                 $ridP,
@@ -474,47 +524,6 @@ foreach ($linhasPeriodo as &$linhaP) {
                 (string) ($linhaP['data_fim'] ?? ''),
                 'aluno-quadro-' . $ridP . '-' . $anoP . '-' . $bimP . '-' . $idxLinha
             );
-        }
-        // 2) Resultado já gerado (layout Matérias Bloco A/B) — só se for quadro.
-        if (trim($htmlQuadroPorChave[$chaveQuadro]) === '') {
-            $evGerado = $geradoPorChave[$chaveQuadro] ?? null;
-            if ($evGerado === null && $ridP > 0) {
-                foreach ($geradosNotasLista as $evCand) {
-                    if (!is_array($evCand)) {
-                        continue;
-                    }
-                    if ((int) ($evCand['regra_id'] ?? 0) !== $ridP) {
-                        continue;
-                    }
-                    $bimCand = (int) ($evCand['bimestre'] ?? 0);
-                    if ($bimP > 0 && $bimCand > 0 && $bimCand !== $bimP) {
-                        continue;
-                    }
-                    $evGerado = $evCand;
-                    break;
-                }
-            }
-            if (is_array($evGerado) && !empty($evGerado['linhas']) && !empty($evGerado['colunas'])) {
-                $evGerado = $semFilhasExcluidas($evGerado);
-            }
-            if (is_array($evGerado) && !empty($evGerado['linhas']) && !empty($evGerado['colunas'])) {
-                $colsGer = is_array($evGerado['colunas']) ? $evGerado['colunas'] : [];
-                if (\App\Helpers\BoletimQuadroLayoutHelper::ehLayoutQuadro($colsGer) || $ridP <= 0) {
-                    $boletinsGeradosBackup = $boletins_gerados ?? [];
-                    $boletimPodeExcluirBackup = $boletim_pode_excluir ?? false;
-                    $boletimAlunoIdBackup = $boletim_aluno_id ?? 0;
-                    ob_start();
-                    $boletins_gerados = [$evGerado];
-                    $boletim_pode_excluir = false;
-                    $boletim_aluno_id = 0;
-                    require \App\Core\ViewPaths::partial('boletins_gerados.php');
-                    $htmlGeradoLista = (string) ob_get_clean();
-                    $htmlQuadroPorChave[$chaveQuadro] = stripos($htmlGeradoLista, '<table') === false ? '' : $htmlGeradoLista;
-                    $boletins_gerados = $boletinsGeradosBackup;
-                    $boletim_pode_excluir = $boletimPodeExcluirBackup;
-                    $boletim_aluno_id = $boletimAlunoIdBackup;
-                }
-            }
         }
         // 3) Painel vivo legado só quando não há regra de notas (evita Semanais e Blocos no lugar do Demonstrativo).
         if (trim($htmlQuadroPorChave[$chaveQuadro]) === '' && $ridP <= 0) {
@@ -576,6 +585,33 @@ $celulaPeriodo = static function (int $ano, int $numero, string $cabPeriodo): st
     }
     return $numero . 'º';
 };
+
+$gruposNotas = [];
+foreach ($linhasPeriodo as $chaveLinha => $linhaGrupo) {
+    $gChave = trim((string) ($linhaGrupo['grupo_chave'] ?? 'regular'));
+    if ($gChave === '') {
+        $gChave = 'regular';
+    }
+    if (!isset($gruposNotas[$gChave])) {
+        $gruposNotas[$gChave] = [
+            'chave' => $gChave,
+            'rotulo' => trim((string) ($linhaGrupo['grupo_rotulo'] ?? 'Demonstrativo')) ?: 'Demonstrativo',
+            'curso_tipo' => (($linhaGrupo['curso_tipo'] ?? '') === 'extra') ? 'extra' : 'regular',
+            'linhas' => [],
+        ];
+    }
+    $gruposNotas[$gChave]['linhas'][$chaveLinha] = $linhaGrupo;
+}
+uasort($gruposNotas, static function (array $a, array $b): int {
+    $prioA = ($a['curso_tipo'] ?? '') === 'extra' ? 1 : 0;
+    $prioB = ($b['curso_tipo'] ?? '') === 'extra' ? 1 : 0;
+    if ($prioA !== $prioB) {
+        return $prioA <=> $prioB;
+    }
+    return strnatcasecmp((string) ($a['rotulo'] ?? ''), (string) ($b['rotulo'] ?? ''));
+});
+$temAbasNotas = count($gruposNotas) > 1;
+$grupoAtivoNotas = (string) array_key_first($gruposNotas);
 ?>
 
 <?php
@@ -590,62 +626,131 @@ $ocultarRefNotas = !empty($ocultar_ref_notas);
         <p class="text-gray-500"><?= $esc($notasMensagemVazia) ?></p>
     </div>
 <?php else: ?>
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <?php if (!$ocultarRefNotas): ?>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ref</th>
+    <div class="space-y-4">
+        <p class="text-sm text-gray-600">Quadro ao vivo: as notas aparecem conforme o lançamento. O boletim oficial fica na aba Boletim.</p>
+
+        <?php if ($temAbasNotas): ?>
+        <div class="border-b border-gray-200">
+            <nav class="flex flex-wrap gap-1 -mb-px" aria-label="Demonstrativos por curso" id="notas-demo-abas">
+                <?php foreach ($gruposNotas as $gIdx => $grupoNav): ?>
+                    <?php
+                    $ativaNav = $gIdx === $grupoAtivoNotas;
+                    $classeNav = $ativaNav
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300';
+                    ?>
+                    <button type="button"
+                            class="js-notas-demo-aba inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 <?= $classeNav ?>"
+                            data-grupo="<?= $esc($grupoNav['chave']) ?>"
+                            <?= $ativaNav ? 'aria-current="page"' : '' ?>>
+                        <span><?= $esc($grupoNav['rotulo']) ?></span>
+                        <?php if (($grupoNav['curso_tipo'] ?? '') === 'extra'): ?>
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide <?= $ativaNav ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600' ?>">Extra</span>
                         <?php endif; ?>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ano letivo</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><?= $esc($cabPeriodo) ?></th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    <?php foreach ($linhasPeriodo as $linhaP): ?>
-                        <?php
-                        $anoP = (int) $linhaP['ano'];
-                        $bimP = (int) $linhaP['numero'];
-                        $refP = (int) ($linhaP['regra_id'] ?? 0);
-                        $descricao = trim((string) $linhaP['descricao']);
-                        $tituloModal = $descricao !== ''
-                            ? $descricao
-                            : ($anoP > 0 && $bimP > 0 ? \App\Core\PeriodoLetivo::rotulo($anoP, $bimP) : 'Notas');
-                        ?>
-                        <tr class="hover:bg-gray-50">
-                            <?php if (!$ocultarRefNotas): ?>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?= $refP > 0 ? $refP : '—' ?></td>
-                            <?php endif; ?>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?= $anoP > 0 ? $anoP : '—' ?></td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800"><?= $esc($celulaPeriodo($anoP, $bimP, $cabPeriodo)) ?></td>
-                            <td class="px-6 py-4 text-sm text-gray-800"><?= $esc($descricao !== '' ? $descricao : '—') ?></td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right">
-                                <div class="flex flex-wrap items-center justify-end gap-2">
-                                    <?php if (!empty($linhaP['tem_quadro'])): ?>
-                                        <?php
-                                        $ui_btn_variant = 'primary';
-                                        $ui_btn_label = 'Demonstrativo de Notas';
-                                        $ui_btn_icon = 'fa-solid fa-table-cells';
-                                        $ui_btn_class = 'px-3 py-1.5';
-                                        $ui_btn_onclick = $jsAbrir((string) $linhaP['id_quadro'], 'Demonstrativo de Notas — ' . $tituloModal);
-                                        require $btnNotasPartial;
-                                        ?>
-                                    <?php else: ?>
-                                        <button type="button" disabled class="inline-flex items-center px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-400 bg-gray-50 cursor-not-allowed">
-                                            <i class="fa-solid fa-table-cells mr-2"></i> Demonstrativo de Notas
-                                        </button>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+                    </button>
+                <?php endforeach; ?>
+            </nav>
         </div>
+        <?php endif; ?>
+
+        <?php foreach ($gruposNotas as $gIdx => $grupoPainel): ?>
+        <div class="js-notas-demo-painel <?= (!$temAbasNotas || $gIdx === $grupoAtivoNotas) ? '' : 'hidden' ?>"
+             data-grupo="<?= $esc($grupoPainel['chave']) ?>">
+            <?php if (!$temAbasNotas): ?>
+            <p class="text-xs text-gray-500 mb-2"><?= $esc($grupoPainel['rotulo']) ?></p>
+            <?php endif; ?>
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <?php if (!$ocultarRefNotas): ?>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ref</th>
+                                <?php endif; ?>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ano letivo</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><?= $esc($cabPeriodo) ?></th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <?php foreach ($grupoPainel['linhas'] as $linhaP): ?>
+                                <?php
+                                $anoP = (int) $linhaP['ano'];
+                                $bimP = (int) $linhaP['numero'];
+                                $refP = (int) ($linhaP['regra_id'] ?? 0);
+                                $descricao = trim((string) $linhaP['descricao']);
+                                $tituloModal = $descricao !== ''
+                                    ? $descricao
+                                    : ($anoP > 0 && $bimP > 0 ? \App\Core\PeriodoLetivo::rotulo($anoP, $bimP) : 'Notas');
+                                ?>
+                                <tr class="hover:bg-gray-50">
+                                    <?php if (!$ocultarRefNotas): ?>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?= $refP > 0 ? $refP : '—' ?></td>
+                                    <?php endif; ?>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?= $anoP > 0 ? $anoP : '—' ?></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800"><?= $esc($celulaPeriodo($anoP, $bimP, $cabPeriodo)) ?></td>
+                                    <td class="px-6 py-4 text-sm text-gray-800"><?= $esc($descricao !== '' ? $descricao : '—') ?></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right">
+                                        <div class="flex flex-wrap items-center justify-end gap-2">
+                                            <?php if (!empty($linhaP['tem_quadro'])): ?>
+                                                <?php
+                                                $ui_btn_variant = 'primary';
+                                                $ui_btn_label = 'Demonstrativo de Notas';
+                                                $ui_btn_icon = 'fa-solid fa-table-cells';
+                                                $ui_btn_class = 'px-3 py-1.5';
+                                                $ui_btn_onclick = $jsAbrir((string) $linhaP['id_quadro'], 'Demonstrativo de Notas — ' . $tituloModal);
+                                                require $btnNotasPartial;
+                                                ?>
+                                            <?php else: ?>
+                                                <button type="button" disabled class="inline-flex items-center px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-400 bg-gray-50 cursor-not-allowed">
+                                                    <i class="fa-solid fa-table-cells mr-2"></i> Demonstrativo de Notas
+                                                </button>
+                                            <?php endif; ?>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <?php endforeach; ?>
     </div>
+    <?php if ($temAbasNotas): ?>
+    <script>
+    (function () {
+        var nav = document.getElementById('notas-demo-abas');
+        if (!nav || nav.getAttribute('data-bound') === '1') return;
+        nav.setAttribute('data-bound', '1');
+        nav.addEventListener('click', function (e) {
+            var btn = e.target.closest('.js-notas-demo-aba');
+            if (!btn) return;
+            var grupo = btn.getAttribute('data-grupo') || '';
+            nav.querySelectorAll('.js-notas-demo-aba').forEach(function (b) {
+                var on = b === btn;
+                b.classList.toggle('border-primary', on);
+                b.classList.toggle('text-primary', on);
+                b.classList.toggle('border-transparent', !on);
+                b.classList.toggle('text-gray-500', !on);
+                if (on) b.setAttribute('aria-current', 'page');
+                else b.removeAttribute('aria-current');
+                var badge = b.querySelector('span.uppercase');
+                if (badge) {
+                    badge.classList.toggle('bg-amber-100', on);
+                    badge.classList.toggle('text-amber-800', on);
+                    badge.classList.toggle('bg-gray-100', !on);
+                    badge.classList.toggle('text-gray-600', !on);
+                }
+            });
+            document.querySelectorAll('.js-notas-demo-painel').forEach(function (painel) {
+                painel.classList.toggle('hidden', painel.getAttribute('data-grupo') !== grupo);
+            });
+        });
+    })();
+    </script>
+    <?php endif; ?>
 <?php endif; ?>
 
 <?php foreach ($fontesNotas as $fonteId => $fonteHtml): ?>

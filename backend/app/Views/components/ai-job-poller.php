@@ -70,12 +70,12 @@
 
             var path = window.location && window.location.pathname ? window.location.pathname : '';
             if (path.indexOf('/professor') !== -1) {
-                urls.push(absUrl('/professor/jornadas/corrigir-redacao-ia/status/' + id));
-                urls.push(absUrl('/professor/jornadas/ai-job/' + id + '/status'));
                 urls.push(absUrl('/professor/ai-job/' + id + '/status'));
+                urls.push(absUrl('/professor/jornadas/ai-job/' + id + '/status'));
+                urls.push(absUrl('/professor/jornadas/corrigir-redacao-ia/status/' + id));
             } else if (path.indexOf('/admin') !== -1) {
-                urls.push(absUrl('/admin/jornadas/ai-job/' + id + '/status'));
                 urls.push(absUrl('/admin/ai-job/' + id + '/status'));
+                urls.push(absUrl('/admin/jornadas/ai-job/' + id + '/status'));
             }
             urls.push(absUrl('/ai-job/' + id + '/status'));
 
@@ -184,7 +184,7 @@
                                 http: r.status,
                                 snippet: text.substring(0, 200)
                             });
-                            if (r.status === 404 && index + 1 < urls.length) {
+                            if (index + 1 < urls.length) {
                                 return fetchStatus(urls, index + 1);
                             }
                             if (r.status === 404) {

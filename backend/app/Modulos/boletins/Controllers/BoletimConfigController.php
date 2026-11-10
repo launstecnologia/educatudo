@@ -64,6 +64,8 @@ class BoletimConfigController extends BaseController
     private array $expansaoRegraCache = [];
     /** @var array<string, array<string, mixed>> */
     private array $simulacaoAlunoCache = [];
+    /** @var array<int, string> */
+    private array $roundModeBoletimCache = [];
     /** Simulação só lê o quadro; não grava extras_json da regra. */
     private bool $simulacaoSomenteLeitura = false;
     /** @var list<int> */
@@ -138,6 +140,14 @@ class BoletimConfigController extends BaseController
     public function listagem()
     {
         $user = $this->auth->getUser();
+
+        // Com Eventos Avaliativos o Demonstrativo é ao vivo (sem fórmulas/períodos nesta área).
+        if (class_exists(\App\Core\LayoutHelper::class)
+            && \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos')
+        ) {
+            $this->redirect('/admin/boletins');
+            return;
+        }
 
         $filtroNome = trim((string) ($_GET['nome'] ?? ''));
         $filtroAno = trim((string) ($_GET['ano_letivo'] ?? ''));
@@ -451,7 +461,21 @@ class BoletimConfigController extends BaseController
             $_SESSION['boletim_flash'] = 'Não havia geração na fila; o processo no banco foi encerrado se ainda estivesse preso.';
             $_SESSION['boletim_flash_type'] = 'info';
         }
-        $this->redirect('/admin/boletim');
+        $retorno = trim((string) ($_POST['retorno'] ?? ''));
+        if (
+            $retorno !== ''
+            && $retorno[0] === '/'
+            && !str_contains($retorno, '//')
+            && !str_contains($retorno, '..')
+            && !str_contains($retorno, "\n")
+            && !str_contains($retorno, "\r")
+            && preg_match('#^/admin/boletim(?:-configuracao/gerados)?(?:\?.*)?$#', $retorno)
+        ) {
+            $this->redirect($retorno);
+        }
+        $this->redirect($regraId > 0
+            ? $this->urlAposGeracaoBoletim($regraId)
+            : '/admin/boletim');
     }
 
     public function index()
@@ -675,6 +699,15 @@ class BoletimConfigController extends BaseController
         $voltarPeriodos = $voltar === 'periodos';
         $voltarEvento = $voltar === 'evento';
         $voltarLayoutBoletim = $voltar === 'boletim-layout';
+        $quadroGet = strtolower(trim((string) ($_GET['quadro'] ?? '')));
+        $quadroSantaMaria = $quadroGet === 'santa-maria';
+        $quadroComposto = $quadroGet === 'composto' || $quadroSantaMaria;
+        // Quadro livre só quando pedido explicitamente (não no fluxo padrão do Boletim).
+        $quadroImpressao = $quadroGet === 'impressao';
+        $layoutBoletimId = max(0, (int) ($_GET['layout_id'] ?? 0));
+        if ($voltarLayoutBoletim && $quadroGet === '' && !$quadroImpressao) {
+            $quadroComposto = true;
+        }
         $voltarBoletins = !$voltarGerar && !$voltarPeriodos && !$voltarEvento && !$voltarLayoutBoletim && (
             $boletimId > 0
             || $voltar === 'boletins'
@@ -708,16 +741,147 @@ class BoletimConfigController extends BaseController
             if ($selectedRegraId <= 0 && is_array($estadoInicial)) {
                 $selectedRegraId = (int) ($estadoInicial['regra_id'] ?? 0);
             }
+            if ($quadroImpressao && is_array($estadoInicial)) {
+                $estadoInicial['exibir_em'] = 'boletim';
+                $estadoInicial['origem'] = 'quadro-impressao';
+                $estadoInicial['quadro_livre'] = 1;
+                $estadoInicial['bimestre'] = 0;
+                $estadoInicial['cabecalhos_manuais'] = 1;
+                // Do zero: quadro começa vazio (admin clica no catálogo para adicionar).
+                if ($selectedRegraId <= 0) {
+                    $estadoInicial['colunas_ordem'] = [];
+                    $estadoInicial['linhas_layout'] = [];
+                }
+                if ($layoutBoletimId > 0) {
+                    // layout_boletim_id = layout de impressão; NÃO confundir com modelo de boletim (cadastro).
+                    $estadoInicial['layout_boletim_id'] = $layoutBoletimId;
+                    if ((int) ($estadoInicial['boletim_id'] ?? 0) === $layoutBoletimId) {
+                        $estadoInicial['boletim_id'] = 0;
+                    }
+                }
+            }
+            if ($quadroComposto && is_array($estadoInicial)) {
+                $estadoInicial['exibir_em'] = 'boletim';
+                $estadoInicial['origem'] = $quadroSantaMaria ? 'santa-maria' : 'composto';
+                $estadoInicial['quadro_livre'] = 0;
+                if ($quadroSantaMaria) {
+                    $estadoInicial['modelo_santa_maria'] = 1;
+                }
+                if ($layoutBoletimId > 0) {
+                    $estadoInicial['layout_boletim_id'] = $layoutBoletimId;
+                }
+                if ($selectedRegraId > 0) {
+                    $regraComp = $this->boletimConfig->getRuleById($selectedRegraId);
+                    $extrasComp = json_decode((string) ($regraComp['extras_json'] ?? ''), true);
+                    if (!is_array($extrasComp)) {
+                        $extrasComp = [];
+                    }
+                    if (is_array($extrasComp['fontes_bimestres'] ?? null)) {
+                        $estadoInicial['fontes_bimestres'] = $extrasComp['fontes_bimestres'];
+                    }
+                    if (!empty($extrasComp['modelo_santa_maria']) || ((string) ($extrasComp['origem'] ?? '')) === 'santa-maria') {
+                        $estadoInicial['modelo_santa_maria'] = 1;
+                        $estadoInicial['origem'] = 'santa-maria';
+                    }
+                }
+            }
             $catalogoInicial = $wizard->catalogo();
             if ($selectedRegraId > 0) {
+                // Congela títulos/ordem salvos — o montar não pode apagar o que o admin configurou.
+                $linhasAntesMontar = is_array($estadoInicial['linhas_layout'] ?? null)
+                    ? $estadoInicial['linhas_layout']
+                    : [];
+                $ordemAntesMontar = is_array($estadoInicial['colunas_ordem'] ?? null)
+                    ? $estadoInicial['colunas_ordem']
+                    : [];
+                $cabAntesMontar = !empty($estadoInicial['cabecalhos_manuais']) ? 1 : 0;
+                $chipsAntesMontar = !empty($estadoInicial['quadro_chips_manuais']) ? 1 : 0;
+                $titulosOkAntes = is_array($estadoInicial['titulos_periodo_ok'] ?? null)
+                    ? $estadoInicial['titulos_periodo_ok']
+                    : [];
+                $eventosAntesMontar = is_array($estadoInicial['eventos_avaliativos_ids'] ?? null)
+                    ? $estadoInicial['eventos_avaliativos_ids']
+                    : [];
                 $montado = $wizard->enriquecerSaida($wizard->montar($estadoInicial));
                 $estadoInicial = $montado['estado'] ?? $estadoInicial;
+                if ($linhasAntesMontar !== []) {
+                    $estadoInicial['linhas_layout'] = $linhasAntesMontar;
+                    $estadoInicial['cabecalhos_manuais'] = 1;
+                    $estadoInicial['quadro_chips_manuais'] = 1;
+                } elseif ($cabAntesMontar) {
+                    $estadoInicial['cabecalhos_manuais'] = 1;
+                }
+                if ($ordemAntesMontar !== []) {
+                    $estadoInicial['colunas_ordem'] = $ordemAntesMontar;
+                    $estadoInicial['quadro_chips_manuais'] = 1;
+                }
+                if ($chipsAntesMontar) {
+                    $estadoInicial['quadro_chips_manuais'] = 1;
+                }
+                if ($titulosOkAntes !== []) {
+                    $estadoInicial['titulos_periodo_ok'] = $titulosOkAntes;
+                }
+                if ($eventosAntesMontar !== []) {
+                    $estadoInicial['eventos_avaliativos_ids'] = $eventosAntesMontar;
+                }
+                if ($quadroImpressao && is_array($estadoInicial)) {
+                    $estadoInicial['exibir_em'] = 'boletim';
+                    $estadoInicial['origem'] = 'quadro-impressao';
+                    $estadoInicial['quadro_livre'] = 1;
+                    $estadoInicial['bimestre'] = 0;
+                    $estadoInicial['cabecalhos_manuais'] = 1;
+                    if ($linhasAntesMontar !== []) {
+                        $estadoInicial['linhas_layout'] = $linhasAntesMontar;
+                    }
+                    if ($ordemAntesMontar !== []) {
+                        $estadoInicial['colunas_ordem'] = $ordemAntesMontar;
+                    }
+                    if ($layoutBoletimId > 0) {
+                        $estadoInicial['layout_boletim_id'] = $layoutBoletimId;
+                        if ((int) ($estadoInicial['boletim_id'] ?? 0) === $layoutBoletimId) {
+                            $estadoInicial['boletim_id'] = 0;
+                        }
+                    }
+                }
+                if ($quadroComposto && is_array($estadoInicial)) {
+                    $estadoInicial['exibir_em'] = 'boletim';
+                    $estadoInicial['origem'] = (!empty($estadoInicial['modelo_santa_maria']) || $quadroSantaMaria)
+                        ? 'santa-maria'
+                        : 'composto';
+                    $estadoInicial['quadro_livre'] = 0;
+                    if (!empty($estadoInicial['modelo_santa_maria']) || $quadroSantaMaria) {
+                        $estadoInicial['modelo_santa_maria'] = 1;
+                    }
+                    if ($layoutBoletimId > 0) {
+                        $estadoInicial['layout_boletim_id'] = $layoutBoletimId;
+                    }
+                }
                 $rascunhoInicial = $montado['rascunho'] ?? null;
                 $resumoInicial = isset($montado['resumo']) ? (string) $montado['resumo'] : null;
                 $errosIniciais = is_array($montado['erros'] ?? null) ? $montado['erros'] : [];
                 $formulasIniciais = is_array($montado['formulas_disponiveis'] ?? null) ? $montado['formulas_disponiveis'] : [];
                 $previewInicial = $montado['preview'] ?? null;
-                if (!is_array($rascunhoInicial) || empty($rascunhoInicial['componentes'])) {
+                $ehVisaoComposta = is_array($estadoInicial)
+                    && (
+                        !empty($estadoInicial['modelo_santa_maria'])
+                        || in_array((string) ($estadoInicial['origem'] ?? ''), ['santa-maria', 'composto'], true)
+                        || (
+                            (string) ($estadoInicial['exibir_em'] ?? '') === 'boletim'
+                            && empty($estadoInicial['quadro_livre'])
+                        )
+                    );
+                $ehVisaoImpressaoNova = is_array($estadoInicial)
+                    && (
+                        !empty($estadoInicial['quadro_livre'])
+                        || in_array((string) ($estadoInicial['origem'] ?? ''), ['quadro-impressao', 'santa-maria'], true)
+                        || (int) ($estadoInicial['layout_boletim_id'] ?? 0) > 0
+                        || $quadroImpressao
+                        || $quadroComposto
+                        || $quadroSantaMaria
+                        || $layoutBoletimId > 0
+                    );
+                // Visão nova/vazia de impressão é esperada — não assusta o admin.
+                if ((!$ehVisaoComposta) && (!$ehVisaoImpressaoNova) && (!is_array($rascunhoInicial) || empty($rascunhoInicial['componentes']))) {
                     $avisoInicial = 'Não consegui carregar a configuração do evento #' . $selectedRegraId . '. Confira se ele existe e está ativo neste ambiente/escola.';
                 }
             }
@@ -793,6 +957,10 @@ class BoletimConfigController extends BaseController
             'bimestre_assistente' => $bimestreRetorno,
             'voltar_boletins' => $voltarBoletins,
             'voltar_boletim_layout' => $voltarLayoutBoletim,
+            'quadro_impressao' => $quadroImpressao,
+            'quadro_composto' => $quadroComposto,
+            'quadro_santa_maria' => $quadroSantaMaria,
+            'layout_boletim_id' => $layoutBoletimId,
             'voltar_periodos' => $voltarPeriodos,
             'voltar_evento' => $voltarEvento,
             'voltar_gerar_avaliacoes' => $voltarGerar,
@@ -859,6 +1027,12 @@ class BoletimConfigController extends BaseController
         if (!in_array($exibirEm, ['boletim', 'notas'], true)) {
             $exibirEm = '';
         }
+        $modeloEvento = class_exists(\App\Core\LayoutHelper::class)
+            && \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos');
+        // Com Eventos Avaliativos, Resultados e versões ficam só no Boletim (não no Demonstrativo).
+        if ($modeloEvento) {
+            $exibirEm = 'boletim';
+        }
         $previewFilter = strtolower(trim((string) ($_GET['preview'] ?? 'all')));
         if (!in_array($previewFilter, ['0', '1', 'all'], true)) {
             $previewFilter = 'all';
@@ -888,11 +1062,49 @@ class BoletimConfigController extends BaseController
         $totalPages = $perPage > 0 ? (int) ceil($total / $perPage) : 1;
         if ($totalPages < 1) { $totalPages = 1; }
 
+        $statusGeracaoPorRegra = $this->boletimConfig->mapearStatusGeracaoAssincrona();
+        $geracaoJobIds = [];
+        $temGeracaoEmAndamento = false;
+        $geracaoConcluidaMsg = '';
+        $geracaoFalhouMsg = '';
+        $statusAlvos = $regraId > 0
+            ? (isset($statusGeracaoPorRegra[$regraId]) ? [$regraId => $statusGeracaoPorRegra[$regraId]] : [])
+            : $statusGeracaoPorRegra;
+        foreach ($statusAlvos as $stGeracao) {
+            if (!is_array($stGeracao)) {
+                continue;
+            }
+            $st = (string) ($stGeracao['status'] ?? '');
+            $jobId = (int) ($stGeracao['job_id'] ?? 0);
+            if (in_array($st, ['pending', 'processing'], true) && $jobId > 0) {
+                $geracaoJobIds[] = $jobId;
+                $temGeracaoEmAndamento = true;
+            }
+            $completedAt = trim((string) ($stGeracao['completed_at'] ?? ''));
+            $concluidaEm = $completedAt !== '' ? strtotime($completedAt) : false;
+            $recente = $concluidaEm !== false && (time() - $concluidaEm) <= 180;
+            if (
+                $geracaoConcluidaMsg === ''
+                && $st === 'done'
+                && trim((string) ($stGeracao['mensagem'] ?? '')) !== ''
+                && $recente
+            ) {
+                $geracaoConcluidaMsg = (string) $stGeracao['mensagem'];
+            }
+            if ($geracaoFalhouMsg === '' && $st === 'failed' && $recente) {
+                $erroJob = trim((string) ($stGeracao['error'] ?? ''));
+                $geracaoFalhouMsg = $erroJob !== ''
+                    ? ('A geração do boletim falhou: ' . $erroJob)
+                    : 'A geração do boletim falhou. Tente gerar de novo.';
+            }
+        }
+        $geracaoJobIds = array_values(array_unique($geracaoJobIds));
+
         $data = [
-            'title' => 'Boletins — Resultados e versões',
-            'page_title' => 'Boletins',
+            'title' => $modeloEvento ? 'Boletim — Resultados e versões' : 'Boletins — Resultados e versões',
+            'page_title' => $modeloEvento ? 'Boletim' : 'Boletins',
             'user' => $user,
-            'current_page' => 'boletins',
+            'current_page' => $modeloEvento ? 'boletim-layout' : 'boletins',
             'csrf_token' => $this->generateCsrfToken(),
             'regras_catalogo' => $this->boletimConfig->listRulesCatalog(300),
             'rows' => $rows,
@@ -913,6 +1125,11 @@ class BoletimConfigController extends BaseController
             ],
             'flash_message' => $_SESSION['boletim_flash'] ?? '',
             'flash_type' => $_SESSION['boletim_flash_type'] ?? 'success',
+            'tem_geracao_em_andamento' => $temGeracaoEmAndamento,
+            'geracao_job_ids' => $geracaoJobIds,
+            'geracao_concluida_msg' => $geracaoConcluidaMsg,
+            'geracao_falhou_msg' => $geracaoFalhouMsg,
+            'modelo_evento' => $modeloEvento,
         ];
 
         $this->viewWithLayout('admin', 'admin/boletim/gerados', $data);
@@ -937,6 +1154,13 @@ class BoletimConfigController extends BaseController
         $exibirEm = strtolower(trim((string) ($_GET['exibir_em'] ?? '')));
         if (!in_array($exibirEm, ['boletim', 'notas'], true)) {
             $exibirEm = '';
+        }
+        if (
+            $exibirEm === ''
+            && class_exists(\App\Core\LayoutHelper::class)
+            && \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos')
+        ) {
+            $exibirEm = 'boletim';
         }
         $previewFilter = strtolower(trim((string) ($_GET['preview'] ?? 'all')));
         if (!in_array($previewFilter, ['0', '1', 'all'], true)) {
@@ -1729,11 +1953,25 @@ class BoletimConfigController extends BaseController
         $materiasIds = $this->parseMateriasIdsFromPost($_POST['materias_ids'] ?? []);
         $seriesIds = $this->parseSeriesIdsFromPost($_POST['series_ids'] ?? []);
         $turmasIds = $this->parseSeriesIdsFromPost($_POST['turmas_ids'] ?? []);
-        $exibirEm = 'notas';
+        $exibirEmPost = strtolower(trim((string) ($_POST['exibir_em'] ?? '')));
+        $fluxoRetornoSave = strtolower(trim((string) ($_POST['retorno_fluxo'] ?? '')));
+        $layoutBoletimIdEarly = max(0, (int) ($_POST['layout_boletim_id'] ?? 0));
+        $exibirEm = (
+            $fluxoRetornoSave === 'boletim-layout'
+            || $layoutBoletimIdEarly > 0
+            || $exibirEmPost === 'boletim'
+        ) ? 'boletim' : 'notas';
         $boletimIdPost = (int) ($_POST['boletim_id'] ?? 0);
         $finalidade = $this->boletimConfig->normalizeFinalidade($_POST['finalidade'] ?? 'oficial');
         $cadastroBoletim = null;
         $criteriosBol = null;
+        // Quadro de impressão usa layout_boletim_id; não exige modelo de boletim (cadastro).
+        $fluxoImpressaoSave = $fluxoRetornoSave === 'boletim-layout'
+            || $layoutBoletimIdEarly > 0;
+        if ($boletimIdPost > 0 && $layoutBoletimIdEarly > 0 && $boletimIdPost === $layoutBoletimIdEarly) {
+            // ID do layout foi mandado por engano como boletim_id.
+            $boletimIdPost = 0;
+        }
         if ($boletimIdPost > 0) {
             try {
                 $cadastroBoletim = (new BoletimCadastroService())->model()->findById($boletimIdPost);
@@ -1741,9 +1979,14 @@ class BoletimConfigController extends BaseController
                 $cadastroBoletim = null;
             }
             if (!is_array($cadastroBoletim)) {
-                $_SESSION['boletim_flash'] = 'Modelo de boletim inválido. Cadastre ou selecione um modelo em Acadêmico → Modelo de Boletim.';
-                $_SESSION['boletim_flash_type'] = 'error';
-                $this->redirectFalhaConfiguracao($regraId);
+                if ($fluxoImpressaoSave) {
+                    // Montar quadro / layout: segue sem modelo de cadastro.
+                    $boletimIdPost = 0;
+                } else {
+                    $_SESSION['boletim_flash'] = 'Modelo de boletim inválido. Cadastre ou selecione um modelo em Acadêmico → Modelo de Boletim.';
+                    $_SESSION['boletim_flash_type'] = 'error';
+                    $this->redirectFalhaConfiguracao($regraId);
+                }
             }
         }
         if (is_array($cadastroBoletim)) {
@@ -1935,13 +2178,100 @@ class BoletimConfigController extends BaseController
         }
 
         if (!empty($_POST['origem_assistente'])) {
-            $linhasLayout = $this->linhasLayoutDoRascunhoPost((string) ($_POST['assistente_rascunho'] ?? ''));
-            if ($linhasLayout === []) {
-                unset($decodedExtras['linhas_layout']);
-            } else {
-                $decodedExtras['linhas_layout'] = $linhasLayout;
+            $rascunhoPost = json_decode((string) ($_POST['assistente_rascunho'] ?? ''), true);
+            if (!is_array($rascunhoPost)) {
+                $rascunhoPost = [];
             }
-            $this->sincronizarLinhaCabecalho($componentesNormalizados, $linhasLayout);
+            // Campo dedicado é mais confiável que o JSON gigante do rascunho.
+            $linhasLayout = $this->linhasLayoutDePayload(
+                (string) ($_POST['linhas_layout_json'] ?? ''),
+                (string) ($_POST['assistente_rascunho'] ?? ''),
+                $rascunhoPost
+            );
+            $limparTitulosPost = (string) ($_POST['limpar_titulos_periodo'] ?? '') === '1';
+            if ($linhasLayout !== []) {
+                $decodedExtras['linhas_layout'] = $linhasLayout;
+                $decodedExtras['cabecalhos_manuais'] = 1;
+                $decodedExtras['quadro_chips_manuais'] = 1;
+                $this->sincronizarLinhaCabecalho($componentesNormalizados, $linhasLayout);
+            } elseif ($limparTitulosPost) {
+                unset($decodedExtras['linhas_layout'], $decodedExtras['cabecalhos_manuais'], $decodedExtras['titulos_periodo_ok']);
+                $decodedExtras['cabecalhos_manuais'] = 1;
+                foreach ($componentesNormalizados as &$compLimpar) {
+                    if (!is_array($compLimpar)) {
+                        continue;
+                    }
+                    $cfgLimpar = [];
+                    $jsonLimpar = $compLimpar['config_json'] ?? null;
+                    if (is_string($jsonLimpar) && trim($jsonLimpar) !== '') {
+                        $tmpLimpar = json_decode($jsonLimpar, true);
+                        if (is_array($tmpLimpar)) {
+                            $cfgLimpar = $tmpLimpar;
+                        }
+                    }
+                    unset($cfgLimpar['linha_cabecalho']);
+                    $compLimpar['config_json'] = $cfgLimpar === []
+                        ? null
+                        : json_encode($cfgLimpar, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                }
+                unset($compLimpar);
+            }
+            // POST sem linhas NÃO apaga títulos já salvos (bug que “não fixava” após Aplicar).
+            if (!empty($rascunhoPost['quadro_chips_manuais'])
+                || $linhasLayout !== []
+                || !empty($_POST['quadro_chips_manuais'])
+                || !empty($decodedExtras['linhas_layout'])
+            ) {
+                $decodedExtras['quadro_chips_manuais'] = 1;
+            }
+            if (!empty($_POST['cabecalhos_manuais']) || $linhasLayout !== [] || !empty($decodedExtras['linhas_layout'])) {
+                $decodedExtras['cabecalhos_manuais'] = 1;
+            }
+            $ordemPost = null;
+            if (trim((string) ($_POST['colunas_ordem_json'] ?? '')) !== '') {
+                $ordemDecoded = json_decode((string) $_POST['colunas_ordem_json'], true);
+                if (is_array($ordemDecoded)) {
+                    $ordemPost = $ordemDecoded;
+                }
+            }
+            if ($ordemPost === null && is_array($rascunhoPost['colunas_ordem'] ?? null)) {
+                $ordemPost = $rascunhoPost['colunas_ordem'];
+            }
+            if (is_array($ordemPost)) {
+                $decodedExtras['colunas_ordem'] = array_values(array_filter(array_map(
+                    static function ($c) {
+                        $c = strtolower(trim((string) $c));
+
+                        return preg_match('/^[a-z][a-z0-9_]{0,40}$/', $c) ? $c : '';
+                    },
+                    $ordemPost
+                )));
+            }
+            $titulosOkPost = null;
+            if (trim((string) ($_POST['titulos_periodo_ok_json'] ?? '')) !== '') {
+                $titulosDecoded = json_decode((string) $_POST['titulos_periodo_ok_json'], true);
+                if (is_array($titulosDecoded)) {
+                    $titulosOkPost = $titulosDecoded;
+                }
+            }
+            if ($titulosOkPost === null && is_array($rascunhoPost['titulos_periodo_ok'] ?? null)) {
+                $titulosOkPost = $rascunhoPost['titulos_periodo_ok'];
+            }
+            if (is_array($titulosOkPost)) {
+                $decodedExtras['titulos_periodo_ok'] = $titulosOkPost;
+            }
+            // REC/PF/eventos marcados no assistente — grava no extras junto com o saveRule
+            // (antes só ia no patch de layout e sumia ao reabrir).
+            $eventosIdsPost = $this->eventosAvaliativosIdsDePayload(
+                (string) ($_POST['eventos_avaliativos_ids_json'] ?? ''),
+                $rascunhoPost
+            );
+            if ($eventosIdsPost !== null) {
+                $decodedExtras['eventos_avaliativos_ids'] = $eventosIdsPost;
+            }
+            if (is_array($rascunhoPost['eventos_avaliativos_subs'] ?? null)) {
+                $decodedExtras['eventos_avaliativos_subs'] = $rascunhoPost['eventos_avaliativos_subs'];
+            }
         }
 
         if ($decodedExtras !== []) {
@@ -1984,6 +2314,85 @@ class BoletimConfigController extends BaseController
                         error_log('salvarRegra sincronizarDocumento: ' . $e->getMessage());
                     }
                 }
+                $layoutBoletimIdPost = max(0, (int) ($_POST['layout_boletim_id'] ?? 0));
+                if ($layoutBoletimIdPost > 0 || $this->retornoFluxoAtual() === 'boletim-layout') {
+                    $extrasAtuais = [];
+                    $regraSalva = $this->boletimConfig->getRuleById((int) $savedId);
+                    if (is_array($regraSalva)) {
+                        $decodedExtras = json_decode((string) ($regraSalva['extras_json'] ?? ''), true);
+                        if (is_array($decodedExtras)) {
+                            $extrasAtuais = $decodedExtras;
+                        }
+                    }
+                    $rascunhoPost = json_decode((string) ($_POST['assistente_rascunho'] ?? ''), true);
+                    if (!is_array($rascunhoPost)) {
+                        $rascunhoPost = [];
+                    }
+                    $origemRascunho = (string) ($rascunhoPost['origem'] ?? '');
+                    $origemAtual = $origemRascunho !== ''
+                        ? $origemRascunho
+                        : (string) ($extrasAtuais['origem'] ?? '');
+                    $ehSantaMaria = !empty($rascunhoPost['modelo_santa_maria'])
+                        || !empty($extrasAtuais['modelo_santa_maria'])
+                        || $origemAtual === 'santa-maria';
+                    $quadroLivrePost = array_key_exists('quadro_livre', $rascunhoPost)
+                        ? !empty($rascunhoPost['quadro_livre'])
+                        : null;
+                    if ($quadroLivrePost === null) {
+                        $quadroLivrePost = array_key_exists('quadro_livre', $extrasAtuais)
+                            ? !empty($extrasAtuais['quadro_livre'])
+                            : ($origemAtual === 'quadro-impressao');
+                    }
+                    // Novo quadro "do zero": se veio do assistente de impressão, não vira composto.
+                    if ($origemAtual === '' && ($fluxoRetornoSave === 'boletim-layout' || $layoutBoletimIdPost > 0)) {
+                        $origemAtual = $ehSantaMaria ? 'santa-maria' : ($quadroLivrePost ? 'quadro-impressao' : 'composto');
+                    }
+                    $ehComposto = $ehSantaMaria || $origemAtual === 'composto' || !$quadroLivrePost;
+                    $patchExtras = [
+                        'layout_boletim_id' => $layoutBoletimIdPost > 0
+                            ? $layoutBoletimIdPost
+                            : ($extrasAtuais['layout_boletim_id'] ?? null),
+                        'quadro_livre' => $ehComposto ? 0 : 1,
+                        'origem' => $ehSantaMaria ? 'santa-maria' : ($ehComposto ? 'composto' : 'quadro-impressao'),
+                        'modelo_santa_maria' => $ehSantaMaria ? 1 : ($extrasAtuais['modelo_santa_maria'] ?? 0),
+                    ];
+                    // Remerge NÃO pode perder títulos do período / ordem do quadro.
+                    $linhasPosSave = $this->linhasLayoutDePayload(
+                        (string) ($_POST['linhas_layout_json'] ?? ''),
+                        (string) ($_POST['assistente_rascunho'] ?? ''),
+                        $rascunhoPost
+                    );
+                    if ($linhasPosSave !== []) {
+                        $patchExtras['linhas_layout'] = $linhasPosSave;
+                        $patchExtras['cabecalhos_manuais'] = 1;
+                        $patchExtras['quadro_chips_manuais'] = 1;
+                    } elseif (!empty($extrasAtuais['linhas_layout'])) {
+                        $patchExtras['linhas_layout'] = $extrasAtuais['linhas_layout'];
+                        $patchExtras['cabecalhos_manuais'] = 1;
+                        $patchExtras['quadro_chips_manuais'] = 1;
+                    }
+                    if (is_array($rascunhoPost['colunas_ordem'] ?? null) && $rascunhoPost['colunas_ordem'] !== []) {
+                        $patchExtras['colunas_ordem'] = $rascunhoPost['colunas_ordem'];
+                    } elseif (!empty($extrasAtuais['colunas_ordem'])) {
+                        $patchExtras['colunas_ordem'] = $extrasAtuais['colunas_ordem'];
+                    }
+                    if (is_array($rascunhoPost['titulos_periodo_ok'] ?? null)) {
+                        $patchExtras['titulos_periodo_ok'] = $rascunhoPost['titulos_periodo_ok'];
+                    } elseif (!empty($extrasAtuais['titulos_periodo_ok'])) {
+                        $patchExtras['titulos_periodo_ok'] = $extrasAtuais['titulos_periodo_ok'];
+                    }
+                    $eventosIdsPatch = $this->eventosAvaliativosIdsDePayload(
+                        (string) ($_POST['eventos_avaliativos_ids_json'] ?? ''),
+                        $rascunhoPost
+                    );
+                    if ($eventosIdsPatch !== null) {
+                        $patchExtras['eventos_avaliativos_ids'] = $eventosIdsPatch;
+                    }
+                    if (is_array($rascunhoPost['eventos_avaliativos_subs'] ?? null)) {
+                        $patchExtras['eventos_avaliativos_subs'] = $rascunhoPost['eventos_avaliativos_subs'];
+                    }
+                    $this->boletimConfig->mesclarExtrasJson((int) $savedId, $patchExtras);
+                }
             }
             $versaoConfig = 0;
             if ($savedId > 0) {
@@ -1996,25 +2405,33 @@ class BoletimConfigController extends BaseController
                 $regraId = $savedId;
                 unset($_SESSION['boletim_assistente_rascunho']);
             }
-            $publicarNotas = $exibirEm === 'notas'
+            // Só o BOLETIM oficial gera snapshot ao concluir.
+            // Demonstrativo (exibir_em=notas) é quadro ao vivo: salva config e as notas aparecem no lançamento.
+            $publicarBoletim = $exibirEm === 'boletim'
                 && (string) ($_POST['gerar_nova_versao'] ?? '') === '1';
             $alunoSomenteId = (int) ($_POST['gerar_somente_aluno_id'] ?? 0);
-            if ($savedId > 0 && $publicarNotas && $alunoSomenteId > 0) {
+            if ($savedId > 0 && $publicarBoletim && $alunoSomenteId > 0) {
                 $this->iniciarNovaVersaoNotasDoAluno((int) $savedId, $versaoConfig, $alunoSomenteId);
                 return;
             }
-            if ($savedId > 0 && $publicarNotas && $this->iniciarNovaVersaoNotas((int) $savedId, $versaoConfig)) {
+            if ($savedId > 0 && $publicarBoletim && $this->iniciarNovaVersaoNotas((int) $savedId, $versaoConfig)) {
                 return;
             }
-            $soConfiguracao = $exibirEm === 'notas' && !empty($_POST['origem_assistente']);
-            $_SESSION['boletim_flash'] = $versaoConfig > 0
-                ? ('Configuração salva na versão ' . $versaoConfig . '.'
-                    . ($soConfiguracao
-                        ? ' As notas não foram geradas. Para publicá-las no aluno, use Concluir e aplicar.'
-                        : ' Dá para recuperar esta versão no final do Configurar Notas.'))
-                : ($soConfiguracao
-                    ? 'Evento de notas salvo. As notas não foram geradas.'
-                    : 'Evento de notas salvo com sucesso.');
+            $pediuGerar = (string) ($_POST['gerar_nova_versao'] ?? '') === '1';
+            $soConfiguracao = !empty($_POST['origem_assistente']);
+            if ($exibirEm === 'notas') {
+                $_SESSION['boletim_flash'] = $versaoConfig > 0
+                    ? ('Demonstrativo salvo na versão ' . $versaoConfig . '. As notas aparecem no quadro conforme forem lançadas — não é preciso gerar.')
+                    : 'Demonstrativo salvo. As notas aparecem no quadro conforme forem lançadas.';
+            } elseif ($soConfiguracao && !$pediuGerar) {
+                $_SESSION['boletim_flash'] = $versaoConfig > 0
+                    ? ('Quadro do boletim salvo na versão ' . $versaoConfig . '. Para calcular e publicar, use Concluir e aplicar.')
+                    : 'Quadro do boletim salvo. Para calcular e publicar, use Concluir e aplicar.';
+            } else {
+                $_SESSION['boletim_flash'] = $versaoConfig > 0
+                    ? ('Configuração salva na versão ' . $versaoConfig . '.')
+                    : 'Configuração salva com sucesso.';
+            }
             $_SESSION['boletim_flash_type'] = 'success';
         } catch (\Throwable $e) {
             error_log('Erro ao salvar regra de boletim: ' . $e->getMessage());
@@ -2039,6 +2456,12 @@ class BoletimConfigController extends BaseController
                 unset($_SESSION['boletim_flash'], $_SESSION['boletim_flash_type']);
                 $this->setFlashMessage($msgSalva, 'success');
                 $this->redirect($this->urlGerarAvaliacoes($this->boletimIdRetorno(), $this->anoRetornoFluxo()));
+            }
+            if ($salvou && !$pediuPublicar && $this->retornoFluxoAtual() === 'boletim-layout') {
+                // Volta ao assistente da regra salva — senão o admin reabre o layout antigo sem REC/PF.
+                $_SESSION['boletim_flash'] = 'Quadro de impressão do boletim salvo.';
+                $_SESSION['boletim_flash_type'] = 'success';
+                $this->redirect($this->urlAssistenteComRetorno($redirId));
             }
             if ($salvou && !$pediuPublicar && in_array($this->retornoFluxoAtual(), ['boletins', 'periodos', 'evento'], true)) {
                 $gravada = (string) ($_SESSION['boletim_flash'] ?? '');
@@ -2164,18 +2587,23 @@ class BoletimConfigController extends BaseController
             $_SESSION['boletim_flash_type'] = 'error';
             $this->redirect($this->urlAssistenteComRetorno($regraId));
         }
+        $ehBoletim = strtolower(trim((string) ($regra['exibir_em'] ?? ''))) === 'boletim';
         $prefixoSalvo = 'Configuração salva'
             . ($versaoConfig > 0 ? (' na versão ' . $versaoConfig) : '')
             . '.';
-        $mensagemFila = $prefixoSalvo . ' A geração das notas foi iniciada. O boletim oficial só muda quando essa geração terminar.';
+        $mensagemFila = $ehBoletim
+            ? ($prefixoSalvo . ' A geração do boletim foi iniciada. Acompanhe o andamento e o resultado nesta tela (Resultados e versões).')
+            : ($prefixoSalvo . ' A geração das notas foi iniciada. O boletim oficial só muda quando essa geração terminar.');
         if ($this->enfileirarGeracaoBoletim($regraId, $periodoRef, $dataInicio, $dataFim, 'gerar', $mensagemFila)) {
             return true;
         }
         $resultado = $this->executarGeracaoMassaInterna($regra, $regraId, $periodoRef, $dataInicio, $dataFim, $alunos, 'gerar');
-        $mensagem = $prefixoSalvo . ' Esta versão passa a ser a vigente no detalhe do aluno e substitui a nota no boletim oficial. A anterior fica no histórico.';
+        $mensagem = $ehBoletim
+            ? ($prefixoSalvo . ' Boletim gerado. Esta versão passa a ser a vigente no aluno; a anterior fica no histórico.')
+            : ($prefixoSalvo . ' Esta versão passa a ser a vigente no detalhe do aluno e substitui a nota no boletim oficial. A anterior fica no histórico.');
         $_SESSION['boletim_flash'] = $mensagem . ' ' . (string) ($resultado['mensagem'] ?? '');
         $_SESSION['boletim_flash_type'] = ((int) ($resultado['erros'] ?? 0) > 0) ? 'error' : 'success';
-        $this->redirect('/admin/boletim');
+        $this->redirect($this->urlAposGeracaoBoletim($regraId, $regra));
         return true;
     }
 
@@ -2235,10 +2663,10 @@ class BoletimConfigController extends BaseController
         $resultado = $this->executarGeracaoDeUmAluno($regra, $regraId, $periodoRef, $dataInicio, $dataFim, $escolhido);
         $nome = trim((string) ($escolhido['nome'] ?? ''));
         $quem = $nome !== '' ? $nome : ('aluno #' . $alunoId);
-        $_SESSION['boletim_flash'] = $prefixoSalvo . ' Notas e boletim gerados só para ' . $quem . '. Os outros alunos não foram recalculados. '
+        $_SESSION['boletim_flash'] = $prefixoSalvo . ' Boletim gerado só para ' . $quem . '. Os outros alunos não foram recalculados. '
             . (string) ($resultado['mensagem'] ?? '');
         $_SESSION['boletim_flash_type'] = ((int) ($resultado['erros'] ?? 0) > 0) ? 'error' : 'success';
-        $this->redirect('/admin/boletim');
+        $this->redirect($this->urlAposGeracaoBoletim($regraId, $regra, $alunoId));
     }
 
     /**
@@ -2837,7 +3265,8 @@ class BoletimConfigController extends BaseController
         );
         $_SESSION['boletim_flash'] = $resultado['mensagem'];
         $_SESSION['boletim_flash_type'] = ((int) ($resultado['erros'] ?? 0) > 0) ? 'error' : 'success';
-        $this->redirect($this->urlRetornoGeracaoModelo() ?? '/admin/boletim');
+        $regraIdRedirect = (int) ($regra['id'] ?? $regraId);
+        $this->redirect($this->urlRetornoGeracaoModelo() ?? $this->urlAposGeracaoBoletim($regraIdRedirect, is_array($regra) ? $regra : []));
     }
 
     /**
@@ -3124,7 +3553,8 @@ class BoletimConfigController extends BaseController
         );
         $_SESSION['boletim_flash'] = $resultado['mensagem'];
         $_SESSION['boletim_flash_type'] = ((int) ($resultado['erros'] ?? 0) > 0) ? 'error' : 'success';
-        $this->redirect($this->urlRetornoGeracaoModelo() ?? '/admin/boletim');
+        $regraIdRedirect = (int) ($regra['id'] ?? $regraId);
+        $this->redirect($this->urlRetornoGeracaoModelo() ?? $this->urlAposGeracaoBoletim($regraIdRedirect, is_array($regra) ? $regra : []));
     }
 
     /**
@@ -3195,13 +3625,17 @@ class BoletimConfigController extends BaseController
         string $modo,
         string $mensagem = ''
     ): bool {
+        $regraFila = $this->boletimConfig->getRuleById($regraId);
+        $urlApos = $this->urlRetornoGeracaoModelo()
+            ?? $this->urlAposGeracaoBoletim($regraId, is_array($regraFila) ? $regraFila : []);
+
         if ($this->boletimConfig->temGeracaoEmAndamento($regraId)) {
             $avisoFila = 'Já existe uma geração em andamento para este evento. Aguarde terminar para gerar de novo.';
             $_SESSION['boletim_flash'] = $mensagem !== ''
-                ? ('A configuração foi salva. ' . $avisoFila . ' Se ela ainda não começou, esta versão entra quando rodar. Se já estiver calculando, salve outra vez ao terminar.')
+                ? ('A configuração foi salva. ' . $avisoFila . ' Acompanhe o andamento em Resultados e versões.')
                 : $avisoFila;
             $_SESSION['boletim_flash_type'] = 'error';
-            $this->redirect($this->urlRetornoGeracaoModelo() ?? '/admin/boletim');
+            $this->redirect($urlApos);
         }
 
         $db = Database::getInstance();
@@ -3229,10 +3663,44 @@ class BoletimConfigController extends BaseController
 
         $_SESSION['boletim_flash'] = $mensagem !== ''
             ? $mensagem
-            : 'Geração iniciada em segundo plano. Acompanhe o status na listagem — a página atualiza sozinha quando terminar.';
+            : 'Geração do boletim iniciada em segundo plano. Acompanhe nesta tela — atualiza quando terminar.';
         $_SESSION['boletim_flash_type'] = 'info';
-        $this->redirect($this->urlRetornoGeracaoModelo() ?? '/admin/boletim');
+        $this->redirect($urlApos);
         return true;
+    }
+
+    /**
+     * Após gerar boletim: Resultados e versões filtrados pela regra (não a lista do Demonstrativo).
+     *
+     * @param array<string,mixed> $regra
+     */
+    private function urlAposGeracaoBoletim(int $regraId, array $regra = [], int $alunoId = 0): string
+    {
+        $qs = [];
+        if ($regraId > 0) {
+            $qs['regra_id'] = $regraId;
+        }
+        $exibir = strtolower(trim((string) ($regra['exibir_em'] ?? '')));
+        if ($exibir === '') {
+            $exibir = 'boletim';
+        }
+        // Demonstrativo (notas) é ao vivo; resultados publicados ficam no Boletim.
+        $qs['exibir_em'] = 'boletim';
+        if ($exibir === 'notas'
+            && class_exists(\App\Core\LayoutHelper::class)
+            && !\App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos')
+        ) {
+            $qs['exibir_em'] = 'notas';
+        }
+        $boletimId = (int) ($regra['boletim_id'] ?? 0);
+        if ($boletimId > 0) {
+            $qs['boletim_id'] = $boletimId;
+        }
+        if ($alunoId > 0) {
+            $qs['aluno_id'] = $alunoId;
+        }
+
+        return '/admin/boletim-configuracao/gerados?' . http_build_query($qs);
     }
 
     /**
@@ -3554,6 +4022,7 @@ class BoletimConfigController extends BaseController
      */
     private function regraTemGrupoDeLinha(array $regra): bool
     {
+        $regra = $this->enriquecerRegraComGroupLinesDasFontes($regra);
         $componentes = $this->componentesParaSimulacao($regra)['componentes'] ?? [];
         foreach ($componentes as $comp) {
             if (is_array($comp) && $this->parseGroupLineConfigFromComponente($comp) !== null) {
@@ -4919,16 +5388,27 @@ class BoletimConfigController extends BaseController
         bool $pularAgrupamentoLinhas = false
     ): array
     {
+        // Critérios de aprovação do boletim mandam no arredondamento (ex.: convencional),
+        // mesmo se a regra/quadro tiver ficado salva com half por default antigo.
+        // Pull de evento_boletim pode fixar none via _round_mode_fixo (não reconsultar boletim).
+        if (empty($regra['_round_mode_fixo'])) {
+            $regra['round_mode'] = $this->resolverRoundModeEfetivoDaRegra($regra);
+        } else {
+            $regra['round_mode'] = $this->normalizeRoundMode((string) ($regra['round_mode'] ?? 'none'));
+        }
+
         $regraIdCache = (int) ($regra['id'] ?? 0);
+        $roundModeCache = $this->normalizeRoundMode((string) ($regra['round_mode'] ?? 'none'));
         $chaveSimulacao = $regraIdCache . ':' . $alunoId . ':' . $periodoRef . ':'
             . (string) ($rangeInicioOverride ?? '') . ':' . (string) ($rangeFimOverride ?? '')
             . ':' . ($forcarAgrupamentoLinhas ? 'agrupar' : 'auto')
-            . ':' . ($pularAgrupamentoLinhas ? 'sem-grupo' : 'com-grupo');
+            . ':' . ($pularAgrupamentoLinhas ? 'sem-grupo' : 'com-grupo')
+            . ':rm:' . $roundModeCache;
         if ($regraIdCache > 0 && isset($this->simulacaoAlunoCache[$chaveSimulacao])) {
             return $this->simulacaoAlunoCache[$chaveSimulacao];
         }
 
-        $roundMode = $this->normalizeRoundMode((string) ($regra['round_mode'] ?? 'none'));
+        $roundMode = $roundModeCache;
         $range = [
             'inicio' => $rangeInicioOverride ? ($rangeInicioOverride . ' 00:00:00') : null,
             'fim' => $rangeFimOverride ? ($rangeFimOverride . ' 23:59:59') : null,
@@ -5207,8 +5687,14 @@ class BoletimConfigController extends BaseController
                             if ($codColuna === '') {
                                 $detalhes['componente_codigo'] = $codColunaResolvido;
                             }
+                            // Nota lançada no evento de origem deve chegar intacta; o
+                            // arredondamento (regra de aprovação / quadro) aplica só no destino.
+                            // Senão half no Demonstrativo “asse” 8,8→9 antes do boletim.
+                            $refRegraPull = $refRegra;
+                            $refRegraPull['round_mode'] = 'none';
+                            $refRegraPull['_round_mode_fixo'] = true;
                             $resRef = $this->simularRegraAluno(
-                                $refRegra,
+                                $refRegraPull,
                                 $alunoId,
                                 $periodoRef,
                                 null,
@@ -7657,6 +8143,10 @@ class BoletimConfigController extends BaseController
             return $simulacao;
         }
 
+        // Quadro/boletim puxa PP/PU de outros eventos: o "Título no boletim"
+        // (group_line) fica na origem — herda aqui para montar HISTÓRIA → 1/2.
+        $regra = $this->enriquecerRegraComGroupLinesDasFontes($regra);
+
         $grupos = [];
         $modoPorCodigo = [];
         $modoPorPeca = [];
@@ -7865,7 +8355,7 @@ class BoletimConfigController extends BaseController
 
             // Cada coluna usa o modo da própria peça (média na semanal, soma na bimestral).
             $arredGrupo = $this->normalizarArredondamentoGrupo($g['arredondamento'] ?? 'todos');
-            $roundModeGrupo = $this->normalizeRoundMode((string) ($regra['round_mode'] ?? 'half'));
+            $roundModeGrupo = $this->normalizeRoundMode((string) ($regra['round_mode'] ?? 'none'));
             $paiNotas = $this->agregarNotasLinhasFilhosGrupo(
                 $filhosLinhas,
                 $g['mode'],
@@ -7931,6 +8421,123 @@ class BoletimConfigController extends BaseController
         $simulacao['matriz_materias'] = $matriz;
 
         return $simulacao;
+    }
+
+    /**
+     * Copia group_line (Título no boletim) dos Demonstrativos de origem para o
+     * quadro/boletim que só referencia essas colunas via evento_boletim.
+     *
+     * @param array<string,mixed> $regra
+     * @return array<string,mixed>
+     */
+    private function enriquecerRegraComGroupLinesDasFontes(array $regra): array
+    {
+        $componentes = is_array($regra['componentes'] ?? null) ? $regra['componentes'] : [];
+        if ($componentes === []) {
+            return $regra;
+        }
+
+        $keysLocais = [];
+        foreach ($componentes as $comp) {
+            if (!is_array($comp)) {
+                continue;
+            }
+            $grp = $this->parseGroupLineConfigFromComponente($comp);
+            if ($grp === null) {
+                continue;
+            }
+            $gk = (string) ($grp['key'] ?? '');
+            if ($gk !== '') {
+                $keysLocais[$gk] = true;
+            }
+        }
+
+        $codigosOrigem = [];
+        foreach ($componentes as $comp) {
+            if (!is_array($comp) || ($comp['source_type'] ?? '') !== 'evento_boletim') {
+                continue;
+            }
+            $cfg = $this->parseEventoConfigFromComponente($comp);
+            $codEv = trim((string) ($cfg['regra_codigo'] ?? ''));
+            if ($codEv !== '') {
+                $codigosOrigem[$codEv] = true;
+            }
+        }
+        if ($codigosOrigem === []) {
+            return $regra;
+        }
+
+        if (!isset($this->boletimConfig) || !is_object($this->boletimConfig)) {
+            return $regra;
+        }
+
+        $ancoras = [];
+        foreach (array_keys($codigosOrigem) as $codEv) {
+            try {
+                $ref = $this->boletimConfig->getRuleByCode((string) $codEv);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            if (!is_array($ref)) {
+                continue;
+            }
+            foreach ((array) ($ref['componentes'] ?? []) as $compRef) {
+                if (!is_array($compRef)) {
+                    continue;
+                }
+                $grp = $this->parseGroupLineConfigFromComponente($compRef);
+                if ($grp === null) {
+                    continue;
+                }
+                // parseGroupLineConfigFromComponente já normaliza aplicar_em para boletim|ambos.
+                $aplicar = strtolower(trim((string) ($grp['aplicar_em'] ?? 'ambos')));
+                if ($aplicar !== 'boletim' && $aplicar !== 'ambos') {
+                    continue;
+                }
+                $gk = (string) ($grp['key'] ?? '');
+                if ($gk === '' || isset($keysLocais[$gk]) || isset($ancoras[$gk])) {
+                    continue;
+                }
+                $filhos = [];
+                foreach ((array) ($grp['materias_ids'] ?? []) as $midF) {
+                    $midF = (int) $midF;
+                    if ($midF > 0) {
+                        $filhos[] = $midF;
+                    }
+                }
+                if (count($filhos) < 2) {
+                    continue;
+                }
+                $label = trim((string) ($grp['label'] ?? ''));
+                if ($label === '') {
+                    $label = 'Grupo';
+                }
+                $ancoras[$gk] = [
+                    'codigo' => 'grp_' . $gk,
+                    'nome' => $label,
+                    'source_type' => 'nenhuma',
+                    'config' => [
+                        'papel_wizard' => 'exibe',
+                        'titulo_boletim' => 1,
+                        'group_line' => array_merge($grp, [
+                            'enabled' => true,
+                            'materias_ids' => array_values(array_unique($filhos)),
+                            'label' => $label,
+                            'aplicar_em' => $aplicar,
+                        ]),
+                    ],
+                ];
+                $keysLocais[$gk] = true;
+            }
+        }
+
+        if ($ancoras === []) {
+            return $regra;
+        }
+
+        $regra['componentes'] = array_merge($componentes, array_values($ancoras));
+
+        return $regra;
     }
 
     /**
@@ -8146,7 +8753,7 @@ class BoletimConfigController extends BaseController
         string $mode,
         array $modoPorCodigo = [],
         array $modoPorPeca = [],
-        string $roundMode = 'half',
+        string $roundMode = 'none',
         string $arredondamento = 'todos'
     ): array
     {
@@ -8261,7 +8868,7 @@ class BoletimConfigController extends BaseController
      */
     private function aplicarFormulasCalculadasNaLinhaGrupo(array $notas, array $regra, string $arredondamento = 'todos'): array
     {
-        $roundMode = $this->normalizeRoundMode((string) ($regra['round_mode'] ?? 'half'));
+        $roundMode = $this->normalizeRoundMode((string) ($regra['round_mode'] ?? 'none'));
         $exprs = [];
         foreach ((array) ($regra['componentes'] ?? []) as $comp) {
             if (!is_array($comp)) {
@@ -8347,7 +8954,7 @@ class BoletimConfigController extends BaseController
         array $matrizPercentStatsPorCodigo = [],
         string $exibirEm = 'boletim',
         bool $forcarAgrupamento = false,
-        string $roundMode = 'half'
+        string $roundMode = 'none'
     ): array
     {
         $roundMode = $this->normalizeRoundMode($roundMode);
@@ -9303,6 +9910,38 @@ class BoletimConfigController extends BaseController
         return $this->resultadoAcademico()->normalizeRoundMode($value);
     }
 
+    /**
+     * Arredondamento efetivo da simulação/geração.
+     * Com modelo de boletim vinculado, usa a regra de aprovação (convencional/faixa).
+     * Sem boletim, mantém o round_mode da própria regra (default none).
+     *
+     * @param array<string,mixed> $regra
+     */
+    private function resolverRoundModeEfetivoDaRegra(array $regra): string
+    {
+        $boletimId = (int) ($regra['boletim_id'] ?? 0);
+        if ($boletimId > 0) {
+            if (isset($this->roundModeBoletimCache[$boletimId])) {
+                return $this->roundModeBoletimCache[$boletimId];
+            }
+            try {
+                $cadastro = new BoletimCadastroService();
+                $item = $cadastro->model()->findById($boletimId);
+                if (is_array($item)) {
+                    $criterios = $cadastro->criteriosDoBoletim($item);
+                    $modo = $this->normalizeRoundMode((string) ($criterios['round_mode'] ?? 'none'));
+                    $this->roundModeBoletimCache[$boletimId] = $modo;
+
+                    return $modo;
+                }
+            } catch (\Throwable $e) {
+                error_log('resolverRoundModeEfetivoDaRegra boletim #' . $boletimId . ': ' . $e->getMessage());
+            }
+        }
+
+        return $this->normalizeRoundMode((string) ($regra['round_mode'] ?? 'none'));
+    }
+
     private function applyRoundMode(?float $value, string $mode): ?float
     {
         return $this->resultadoAcademico()->applyRoundMode($value, $mode);
@@ -9313,6 +9952,9 @@ class BoletimConfigController extends BaseController
      * arredondamento do evento (round_mode da regra), mas o componente pode
      * sobrescrever individualmente via config_json.round_mode_override
      * ('none' ou 'half'). Qualquer outro valor (ou ausência) = herda do evento.
+     *
+     * Colunas puxadas de outro evento (PP/PU/…) mantêm a nota lançada: a faixa
+     * .00/.50 aplica-se a MS/MA/MF. MU do print SM usa override none (7,9 não vira 8).
      */
     private function resolveRoundModeComponente(array $componente, string $roundModeEvento): string
     {
@@ -9330,7 +9972,18 @@ class BoletimConfigController extends BaseController
             $decoded = array_replace($decoded, $componente['config']);
         }
         $override = strtolower(trim((string) ($decoded['round_mode_override'] ?? 'herdar')));
-        return in_array($override, ['none', 'half'], true) ? $override : $roundModeEvento;
+        if (in_array($override, ['none', 'half'], true)) {
+            return $override;
+        }
+        // Nota já lançada (Demonstrativo ou Evento avaliativo PP/PU/PE): chega intacta.
+        if (($componente['source_type'] ?? '') === 'evento_boletim') {
+            return 'none';
+        }
+        if ((int) ($decoded['evento_avaliativo_id'] ?? $componente['evento_avaliativo_id'] ?? 0) > 0) {
+            return 'none';
+        }
+
+        return $roundModeEvento;
     }
 
     /**
@@ -10545,11 +11198,34 @@ class BoletimConfigController extends BaseController
             }
         }
         $out = [];
+        $ehMuBimestre = (bool) preg_match('/^b[1-4]_mu$/i', (string) $codigoProprio);
+        $ehMsSemestre = (bool) preg_match('/^s[12]_ms$/i', (string) $codigoProprio);
+        $ehMaAnual = strtolower(trim((string) $codigoProprio)) === 'ma';
         foreach (array_keys($unionMids) as $mid) {
             $valoresFormula = [];
+            $faltouMu = false;
             foreach ($refs as $rc) {
                 $notaRef = $this->notaNaMatrizPorApelido($matrizPorCodigo, (string) $rc, (int) $mid);
+                $codRef = strtolower(trim((string) $rc));
+                // Manual SM: MU = ((PP+PU)/2)+PE — PE/CH ausente = 0; sem PP ou PU = traço.
+                if ($ehMuBimestre && $notaRef === null && preg_match('/_(pp|pu)$/', $codRef)) {
+                    $faltouMu = true;
+                    break;
+                }
+                // MS = (MU1+MU2)/2 — sem as duas MUs não fecha o semestre.
+                if ($ehMsSemestre && $notaRef === null && preg_match('/_mu$/', $codRef)) {
+                    $faltouMu = true;
+                    break;
+                }
+                // MA = (MS1+MS2)/2 — só com os dois semestres.
+                if ($ehMaAnual && $notaRef === null && preg_match('/^s[12]_ms$/', $codRef)) {
+                    $faltouMu = true;
+                    break;
+                }
                 $valoresFormula[$rc] = $notaRef ?? 0.0;
+            }
+            if ($faltouMu) {
+                continue;
             }
             $exprUse = trim((string) ($exprs[(string) ((int) $mid)] ?? $fallbackExpr));
             if ($exprUse === '') {
@@ -12635,8 +13311,106 @@ class BoletimConfigController extends BaseController
         if (strtolower(trim((string) ($cfgManual['papel_wizard'] ?? ''))) === 'exibe') {
             $payload['papel_wizard'] = 'exibe';
         }
+        // REC/PF e eventos avulsos: sem isso o Aplicar grava a coluna mas perde o vínculo.
+        $eventoAvulsoId = (int) ($cfgManual['evento_avaliativo_id'] ?? $componente['evento_avaliativo_id'] ?? 0);
+        if ($eventoAvulsoId > 0) {
+            $payload['evento_avaliativo_id'] = $eventoAvulsoId;
+        }
+        if (!empty($cfgManual['recuperacao_exibe']) || !empty($componente['recuperacao_exibe'])) {
+            $payload['recuperacao_exibe'] = 1;
+        }
 
         return $payload;
+    }
+
+    /**
+     * IDs de Eventos avaliativos marcados no assistente (campo dedicado ou rascunho).
+     *
+     * @param array<string,mixed> $rascunhoPost
+     * @return list<int>|null null = payload sem a chave (não sobrescreve)
+     */
+    private function eventosAvaliativosIdsDePayload(string $jsonDedicado, array $rascunhoPost = []): ?array
+    {
+        $normalizar = static function ($raw): array {
+            if (!is_array($raw)) {
+                return [];
+            }
+
+            return array_values(array_unique(array_filter(array_map(
+                static fn ($id): int => (int) $id,
+                $raw
+            ), static fn (int $id): bool => $id > 0)));
+        };
+
+        $doJson = null;
+        $jsonDedicado = trim($jsonDedicado);
+        if ($jsonDedicado !== '') {
+            $decoded = json_decode($jsonDedicado, true);
+            if (is_array($decoded)) {
+                $doJson = $normalizar($decoded);
+            }
+        }
+
+        $doRascunho = null;
+        if (array_key_exists('eventos_avaliativos_ids', $rascunhoPost)) {
+            $doRascunho = is_array($rascunhoPost['eventos_avaliativos_ids'])
+                ? $normalizar($rascunhoPost['eventos_avaliativos_ids'])
+                : [];
+        }
+
+        if ($doJson === null && $doRascunho === null) {
+            return null;
+        }
+        // Prefere lista não vazia: JSON [] não pode apagar IDs ainda presentes no rascunho.
+        if ($doJson !== null && $doJson !== []) {
+            return $doJson;
+        }
+        if ($doRascunho !== null && $doRascunho !== []) {
+            return $doRascunho;
+        }
+
+        return $doJson ?? $doRascunho ?? [];
+    }
+
+    /**
+     * @param array<string,mixed> $rascunhoPost
+     * @return list<array{id:string,nome:string,colunas:list<string>}>
+     */
+    private function linhasLayoutDePayload(string $linhasJson, string $rascunhoRaw, array $rascunhoPost = []): array
+    {
+        $direto = $this->linhasLayoutDoJson($linhasJson);
+        if ($direto !== []) {
+            return $direto;
+        }
+        if (is_array($rascunhoPost['linhas_layout'] ?? null)) {
+            $doRascunho = $this->normalizarLinhasLayoutPayload($rascunhoPost['linhas_layout']);
+            if ($doRascunho !== []) {
+                return $doRascunho;
+            }
+        }
+
+        return $this->linhasLayoutDoRascunhoPost($rascunhoRaw);
+    }
+
+    /**
+     * @return list<array{id:string,nome:string,colunas:list<string>}>
+     */
+    private function linhasLayoutDoJson(string $raw): array
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return [];
+        }
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+        // Aceita tanto a lista pura quanto { linhas_layout: [...] }.
+        if (array_key_exists('linhas_layout', $decoded) && is_array($decoded['linhas_layout'])) {
+            $decoded = $decoded['linhas_layout'];
+        }
+
+        return $this->normalizarLinhasLayoutPayload($decoded);
     }
 
     /**
@@ -12652,9 +13426,19 @@ class BoletimConfigController extends BaseController
         if (!is_array($decoded)) {
             return [];
         }
+
+        return $this->normalizarLinhasLayoutPayload($decoded['linhas_layout'] ?? []);
+    }
+
+    /**
+     * @param mixed $raw
+     * @return list<array{id:string,nome:string,colunas:list<string>}>
+     */
+    private function normalizarLinhasLayoutPayload($raw): array
+    {
         $out = [];
         $usadas = [];
-        foreach ((array) ($decoded['linhas_layout'] ?? []) as $linha) {
+        foreach ((array) $raw as $linha) {
             if (!is_array($linha)) {
                 continue;
             }
@@ -12675,7 +13459,7 @@ class BoletimConfigController extends BaseController
                     break;
                 }
             }
-            if (count($cols) < 2) {
+            if ($cols === []) {
                 continue;
             }
             $id = strtolower(trim((string) ($linha['id'] ?? '')));
@@ -12697,6 +13481,10 @@ class BoletimConfigController extends BaseController
      */
     private function sincronizarLinhaCabecalho(array &$componentes, array $linhas): void
     {
+        if ($linhas === []) {
+            // Sem títulos no POST: não apaga linha_cabecalho já gravada nos componentes.
+            return;
+        }
         $porCodigo = [];
         foreach ($linhas as $linha) {
             $nome = (string) ($linha['nome'] ?? '');
@@ -12720,9 +13508,8 @@ class BoletimConfigController extends BaseController
             if ($cod !== '' && isset($porCodigo[$cod])) {
                 $cfg['linha_cabecalho'] = $porCodigo[$cod];
                 $cfg['papel_wizard'] = 'exibe';
-            } else {
-                unset($cfg['linha_cabecalho']);
             }
+            // Colunas fora dos títulos: mantém cabeçalho antigo (não limpa no Aplicar).
             $componente['config_json'] = $cfg === []
                 ? null
                 : json_encode($cfg, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -12969,7 +13756,7 @@ class BoletimConfigController extends BaseController
                 'exibir_em' => (string) ($post['exibir_em'] ?? 'notas'),
                 'ano_letivo' => (int) ($post['ano_letivo'] ?? 0),
                 'bimestre' => (int) ($post['bimestre'] ?? 0),
-                'round_mode' => (string) ($post['round_mode'] ?? 'half'),
+                'round_mode' => (string) ($post['round_mode'] ?? 'none'),
                 'nota_minima_aprovacao' => $post['nota_minima_aprovacao'] ?? 6,
                 'componentes' => $comps,
             ];
@@ -13046,7 +13833,7 @@ class BoletimConfigController extends BaseController
     {
         $fluxo = strtolower(trim((string) ($_POST['retorno_fluxo'] ?? '')));
 
-        return in_array($fluxo, ['gerar-avaliacoes', 'boletins', 'periodos', 'evento'], true) ? $fluxo : '';
+        return in_array($fluxo, ['gerar-avaliacoes', 'boletins', 'periodos', 'evento', 'boletim-layout'], true) ? $fluxo : '';
     }
 
     private function retornoFluxoEhGerar(): bool
@@ -13283,6 +14070,13 @@ class BoletimConfigController extends BaseController
         $bimestre = (int) ($_POST['bimestre'] ?? 0);
         if ($bimestre > 0) {
             $query['bimestre'] = $bimestre;
+        }
+        if ($fluxo === 'boletim-layout') {
+            $query['quadro'] = 'impressao';
+            $layoutId = max(0, (int) ($_POST['layout_boletim_id'] ?? 0));
+            if ($layoutId > 0) {
+                $query['layout_id'] = $layoutId;
+            }
         }
         $query = array_merge($query, $this->paramsListaNaQuery($this->filtrosListaPeriodos($_POST)));
 

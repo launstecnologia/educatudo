@@ -352,20 +352,38 @@ class VidaEscolar
     }
 
     /**
-     * Só boletim oficial da matriz regular — ignora notas e boletim complementar.
+     * Filtra resultados por finalidade do evento (oficial ou complementar/extra).
+     *
+     * @param 'oficial'|'complementar' $finalidade
      */
-    private function sqlFiltroBoletimOficial(): string
+    private function sqlFiltroBoletimFinalidade(string $finalidade = 'oficial'): string
     {
         $sql = " AND (r.exibir_em IS NULL OR r.exibir_em IN ('boletim', 'notas'))";
+        $finalidade = $finalidade === 'complementar' ? 'complementar' : 'oficial';
         try {
             $col = $this->db->fetch("SHOW COLUMNS FROM boletim_regras LIKE 'finalidade'");
             if ($col) {
-                $sql .= " AND (r.finalidade IS NULL OR r.finalidade = 'oficial')";
+                if ($finalidade === 'complementar') {
+                    $sql .= " AND r.finalidade = 'complementar'";
+                } else {
+                    $sql .= " AND (r.finalidade IS NULL OR r.finalidade = 'oficial')";
+                }
+            } elseif ($finalidade === 'complementar') {
+                // Sem coluna: não há boletim extra no schema antigo.
+                $sql .= ' AND 1 = 0';
             }
         } catch (\Throwable $e) {
-            // coluna ainda não migrada
+            if ($finalidade === 'complementar') {
+                $sql .= ' AND 1 = 0';
+            }
         }
         return $sql;
+    }
+
+    /** @deprecated use sqlFiltroBoletimFinalidade('oficial') */
+    private function sqlFiltroBoletimOficial(): string
+    {
+        return $this->sqlFiltroBoletimFinalidade('oficial');
     }
 
     /**
@@ -398,6 +416,15 @@ class VidaEscolar
      */
     public function listarResultadosGeradosOficiais(int $alunoId): array
     {
+        return $this->listarResultadosGeradosPorFinalidade($alunoId, 'oficial');
+    }
+
+    /**
+     * @param 'oficial'|'complementar' $finalidade
+     * @return list<array<string,mixed>>
+     */
+    public function listarResultadosGeradosPorFinalidade(int $alunoId, string $finalidade = 'oficial'): array
+    {
         try {
             $tem = $this->db->fetch("SHOW TABLES LIKE 'boletim_resultados_gerados'");
             if (!$tem) {
@@ -420,7 +447,7 @@ class VidaEscolar
                     g.periodo_ref, g.ordem_linha, r.exibir_em, r.bimestre, r.ano_letivo{$this->sqlSelectBoletimId()}
              FROM boletim_resultados_gerados g
              INNER JOIN boletim_regras r ON r.id = g.regra_id
-             WHERE g.aluno_id = :aid AND g.preview = 0{$vigenteSql}{$this->sqlFiltroBoletimOficial()}{$this->sqlFiltroExibicaoCoordenacao()}
+             WHERE g.aluno_id = :aid AND g.preview = 0{$vigenteSql}{$this->sqlFiltroBoletimFinalidade($finalidade)}{$this->sqlFiltroExibicaoCoordenacao()}
              ORDER BY g.id ASC",
             ['aid' => $alunoId]
         );

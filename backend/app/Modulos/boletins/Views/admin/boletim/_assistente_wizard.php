@@ -44,7 +44,8 @@ $boletimWizardSteps = [
      data-boletim-id="<?= (int) ($boletimId ?? $boletim_id ?? 0) ?>"
      data-ano-letivo="<?= (int) ($anoAssistente ?? $ano_letivo_assistente ?? 0) ?>"
      data-bimestre="<?= (int) ($bimestreAssistente ?? $bimestre_assistente ?? 0) ?>"
-     data-retorno-fluxo="<?= htmlspecialchars(!empty($voltarGerarAvaliacoes) ? 'gerar-avaliacoes' : (!empty($voltarPeriodos) ? 'periodos' : (!empty($voltarEvento) ? 'evento' : (!empty($voltarBoletins) ? 'boletins' : ''))), ENT_QUOTES, 'UTF-8') ?>"
+     data-retorno-fluxo="<?= htmlspecialchars(!empty($voltarGerarAvaliacoes) ? 'gerar-avaliacoes' : (!empty($voltarPeriodos) ? 'periodos' : (!empty($voltarEvento) ? 'evento' : (!empty($voltarBoletimLayout) || !empty($quadroImpressao) || !empty($quadroComposto) || !empty($quadroSantaMaria) ? 'boletim-layout' : (!empty($voltarBoletins) ? 'boletins' : '')))), ENT_QUOTES, 'UTF-8') ?>"
+     data-layout-boletim-id="<?= (int) ($layout_boletim_id ?? 0) ?>"
      data-lista="<?= htmlspecialchars(json_encode(is_array($navegacaoLista ?? null) ? $navegacaoLista : [], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
      data-continuar="<?= !empty($continuarRascunhoAssistente) ? '1' : '0' ?>"
      data-url-quadros="<?= htmlspecialchars(URL . '/admin/quadros-notas', ENT_QUOTES, 'UTF-8') ?>"
@@ -56,10 +57,6 @@ $boletimWizardSteps = [
     <div id="boletim-wizard-overlay" class="<?= $boletimAssistentePageMode ? 'block' : 'hidden fixed inset-0 z-[10000] bg-slate-900/50 backdrop-blur-[1px] p-2 sm:p-5' ?>">
         <div class="<?= $boletimAssistentePageMode ? 'w-full space-y-6' : 'mx-auto w-full max-w-[min(1180px,calc(100vw-1rem))] h-[min(94vh,900px)] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden' ?>">
             <?php if ($boletimAssistentePageMode): ?>
-            <div class="p-4 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-sm">
-                <i class="fa-solid fa-circle-info mr-2"></i>
-                Use este assistente para montar a regra do boletim por etapas. As provas, eventos e jornadas serão buscados pelo bimestre selecionado na peça.
-            </div>
             <?php if (!empty($boletimAssistenteDadosIniciais['aviso'])): ?>
             <div class="p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm">
                 <i class="fa-solid fa-triangle-exclamation mr-2"></i>
@@ -164,10 +161,17 @@ $boletimWizardSteps = [
 .bw-chip { display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 9999px; border: 1px solid; font-size: 13px; line-height: 1.2; user-select: none; cursor: grab; }
 .bw-chip:active { cursor: grabbing; }
 .bw-chip-peca { background: #eef2ff; border-color: #c7d2fe; color: #3730a3; font-weight: 600; }
+.bw-chip-calc { background: #fef3c7; border-color: #fcd34d; color: #92400e; font-weight: 700; }
 .bw-chip-op { background: #f8fafc; border-color: #cbd5e1; color: #0f172a; font-weight: 700; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; min-width: 2rem; justify-content: center; }
 .bw-chip-fn { background: #fef3c7; border-color: #fcd34d; color: #92400e; font-weight: 600; }
 .bw-chip-num { background: #ecfdf5; border-color: #a7f3d0; color: #047857; font-weight: 600; }
 .bw-palette .bw-chip { cursor: pointer; }
+.bw-palette-grupos { display: flex; flex-direction: column; gap: 0.55rem; }
+.bw-palette-grupo { border: 1px solid #e2e8f0; border-radius: 0.65rem; background: #fff; padding: 0.4rem 0.55rem 0.5rem; }
+.bw-palette-grupo.calc { border-color: #fcd34d; background: #fffbeb; }
+.bw-palette-grupo-titulo { font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #64748b; margin-bottom: 0.35rem; }
+.bw-palette-grupo.calc .bw-palette-grupo-titulo { color: #92400e; }
+.bw-palette-grupo-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
 .bw-canvas { min-height: 96px; border: 2px dashed #c7d2fe; border-radius: 0.75rem; padding: 10px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; background: #f8fafc; }
 .bw-canvas.drag-over { border-color: #6366f1; background: #eef2ff; }
 .bw-chip-x { margin-left: 2px; color: #64748b; font-size: 14px; line-height: 1; padding: 0 2px; }
@@ -187,20 +191,61 @@ $boletimWizardSteps = [
 .bw-preview-table.boletim tr:nth-child(even) td { background: #f8fafc; }
 .bw-preview-table.boletim td.ok { color: #047857; font-weight: 700; }
 .bw-preview-table.boletim td.nok { color: #b91c1c; font-weight: 700; }
-.bw-col-chip { display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 0.5rem; border: 1px solid #c7d2fe; background: #eef2ff; color: #3730a3; font-size: 12px; font-weight: 600; cursor: grab; user-select: none; touch-action: none; }
+.bw-builder { display: grid; grid-template-columns: minmax(14rem, 17rem) minmax(0, 1fr); gap: 0.75rem; align-items: stretch; }
+@media (max-width: 900px) { .bw-builder { grid-template-columns: 1fr; } }
+.bw-catalogo { border: 1px solid #e2e8f0; border-radius: 0.75rem; background: #fff; min-height: 16rem; max-height: 28rem; overflow: auto; display: flex; flex-direction: column; }
+.bw-catalogo-topo { position: sticky; top: 0; z-index: 1; padding: 0.65rem 0.75rem; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+.bw-catalogo-corpo { padding: 0.5rem 0.65rem 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.bw-catalogo-grupo { border: 1px solid #e2e8f0; border-radius: 0.65rem; background: #f8fafc; overflow: hidden; }
+.bw-catalogo-grupo > summary { list-style: none; cursor: pointer; padding: 0.45rem 0.65rem; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: #475569; background: #f1f5f9; }
+.bw-catalogo-grupo > summary::-webkit-details-marker { display: none; }
+.bw-catalogo-grupo > summary::before { content: '▸'; display: inline-block; width: 0.9rem; color: #64748b; }
+.bw-catalogo-grupo[open] > summary::before { content: '▾'; }
+.bw-catalogo-add-todos { width: 100%; font-size: 10px; font-weight: 700; line-height: 1.2; padding: 0.35rem 0.55rem; border-radius: 0.45rem; border: 1px dashed #a5b4fc; background: #eef2ff; color: #3730a3; cursor: pointer; text-align: center; }
+.bw-catalogo-add-todos:hover { background: #e0e7ff; border-style: solid; }
+.bw-catalogo-add-todos:disabled { opacity: .55; cursor: default; border-style: solid; background: #f8fafc; color: #64748b; }
+.bw-catalogo-itens { display: flex; flex-direction: column; gap: 0.35rem; padding: 0.45rem; }
+.bw-catalogo-item { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%; text-align: left; padding: 0.45rem 0.55rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; background: #fff; color: #0f172a; font-size: 12px; cursor: pointer; transition: border-color .12s, background .12s, box-shadow .12s; }
+.bw-catalogo-item:hover { border-color: #a5b4fc; background: #eef2ff; box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.12); }
+.bw-catalogo-item.no-quadro { border-color: #c7d2fe; background: #eef2ff; }
+.bw-catalogo-item .bw-cat-nome { flex: 1; min-width: 0; font-weight: 600; line-height: 1.25; }
+.bw-catalogo-item .bw-cat-sigla { flex: 0 0 auto; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #3730a3; background: #e0e7ff; border-radius: 999px; padding: 0.15rem 0.45rem; }
+.bw-quadro { border: 1px solid #c7d2fe; border-radius: 0.75rem; background: #f8fafc; min-height: 16rem; display: flex; flex-direction: column; }
+.bw-quadro-topo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.65rem 0.75rem; border-bottom: 1px solid #e2e8f0; background: #fff; border-radius: 0.75rem 0.75rem 0 0; }
+.bw-quadro-acoes { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.bw-quadro-corpo { padding: 0.65rem 0.75rem 0.85rem; flex: 1; }
+.bw-quadro-vazio { display: flex; align-items: center; justify-content: center; min-height: 8rem; padding: 1.25rem; border: 1px dashed #c7d2fe; border-radius: 0.65rem; background: #fff; color: #64748b; font-size: 13px; text-align: center; }
+.bw-col-chip { display: inline-flex; align-items: center; gap: 3px; padding: 4px 8px; border-radius: 0.45rem; border: 1px solid #c7d2fe; background: #eef2ff; color: #3730a3; font-size: 11px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; cursor: grab; user-select: none; touch-action: none; }
 .bw-col-chip.travada, .bw-col-chip.fixa { cursor: default; touch-action: auto; }
 .bw-col-chip.travada { background: #f1f5f9; border-color: #cbd5e1; color: #475569; }
-.bw-col-chip.calc { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+.bw-col-chip.calc { background: #fef3c7; border-color: #fcd34d; color: #92400e; text-transform: none; letter-spacing: 0; }
 .bw-col-chip.aberta { box-shadow: 0 0 0 2px #f59e0b; }
 .bw-col-chip.marcada { box-shadow: 0 0 0 2px #4f46e5; background: #e0e7ff; }
-.bw-linha-caixa { display: flex; flex-direction: column; gap: 4px; padding: 6px 8px 8px; border: 1px solid #818cf8; border-radius: 0.75rem; background: #e0e7ff; }
-.bw-linha-rotulo { font-size: 11px; font-weight: 700; color: #312e81; line-height: 1.2; }
+.bw-linha-caixa { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px 10px; border: 1px solid #a5b4fc; border-radius: 0.75rem; background: #fff; min-width: 9rem; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); transition: border-color .2s ease, box-shadow .2s ease, background .2s ease; }
+.bw-linha-caixa.confirmado { border-color: #86efac; background: #f0fdf4; box-shadow: 0 1px 2px rgba(22, 163, 74, 0.08); }
+.bw-linha-cols { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; align-content: flex-start; min-height: 3.25rem; min-width: 5rem; padding: 0.45rem; border: 1px dashed #c7d2fe; border-radius: 0.55rem; background: #f8fafc; }
+.bw-linha-caixa.confirmado .bw-linha-cols { border-color: #bbf7d0; background: #ecfdf5; }
+.bw-linha-cols:empty::before { content: 'Solte colunas aqui'; color: #94a3b8; font-size: 11px; font-weight: 600; }
+.bw-linha-topo { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.bw-linha-grip { cursor: grab; opacity: 0.55; letter-spacing: -1px; font-size: 13px; line-height: 1; padding: 2px 2px 2px 0; color: #3730a3; touch-action: none; user-select: none; }
+.bw-linha-rotulo { font-size: 12px; font-weight: 700; color: #312e81; line-height: 1.2; outline: none; border-radius: 0.35rem; padding: 2px 6px; min-width: 3rem; flex: 1; cursor: text; }
+.bw-linha-caixa.confirmado .bw-linha-rotulo { color: #166534; }
+.bw-linha-rotulo:hover, .bw-linha-rotulo:focus { background: #eef2ff; box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.35); }
+.bw-linha-ok { margin-left: 2px; flex-shrink: 0; font-size: 11px; font-weight: 700; line-height: 1.2; padding: 3px 8px; border-radius: 999px; border: 1px solid #86efac; background: #fff; color: #15803d; cursor: pointer; transition: background .15s ease, color .15s ease, border-color .15s ease; }
+.bw-linha-ok:hover { background: #dcfce7; }
+.bw-linha-ok.ativo { background: #16a34a; border-color: #16a34a; color: #fff; cursor: default; }
+.bw-linha-x { margin-left: 2px; color: #4338ca; font-size: 14px; line-height: 1; padding: 0 3px; opacity: 0.55; cursor: pointer; border: 0; background: transparent; }
+.bw-linha-x:hover { opacity: 1; color: #b91c1c; }
+.bw-linha-caixa.dragging { opacity: 0.4; box-shadow: 0 10px 22px rgba(15, 23, 42, 0.18); }
+#bw-criar-linha.bw-btn-ok-flash { background: #16a34a !important; border-color: #16a34a !important; }
 .bw-col-chip.dragging { opacity: 0.35; cursor: grabbing; position: relative; z-index: 5; box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18); }
 #bw-colunas-lista.arrastando { cursor: grabbing; }
 .bw-col-marca { width: 3px; align-self: stretch; min-height: 2rem; border-radius: 999px; background: #4f46e5; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.22); pointer-events: none; flex: 0 0 3px; }
-.bw-col-grip { cursor: grab; opacity: 0.45; letter-spacing: -1px; font-size: 13px; line-height: 1; padding-right: 2px; }
-#bw-colunas-lista.arrastando .bw-col-grip { cursor: grabbing; }
-.bw-col-x { margin-left: 2px; color: #92400e; font-size: 14px; line-height: 1; padding: 0 2px; opacity: 0.6; cursor: pointer; }
+.bw-col-grip { cursor: grab; opacity: 0.45; letter-spacing: -1px; font-size: 12px; line-height: 1; padding-right: 1px; }
+#bw-colunas-lista.arrastando .bw-col-grip,
+#bw-colunas-lista.arrastando .bw-linha-grip { cursor: grabbing; }
+.bw-col-x { margin-left: 1px; color: #64748b; font-size: 13px; line-height: 1; padding: 0 2px; opacity: 0.55; cursor: pointer; text-transform: none; font-weight: 700; }
+.bw-col-chip.calc .bw-col-x { color: #92400e; }
 .bw-col-x:hover { opacity: 1; color: #b91c1c; }
 #bw-formula-editor.bw-editor-excecao { border-color: #4f46e5; background: #eef2ff; box-shadow: 0 0 0 3px rgba(79,70,229,.18); }
 #bw-formula-editor.bw-editor-excecao .bw-canvas { border-color: #4f46e5; border-style: solid; background: #fff; }
@@ -270,6 +315,12 @@ $boletimWizardSteps = [
     var montarTimer = null;
     var montarSeq = 0;
     var formulaVersao = 0;
+    var fecharFormulaAposSalvar = true;
+    try {
+        var prefFecha = window.localStorage && localStorage.getItem('bw_fechar_formula_apos_salvar');
+        if (prefFecha === '0') fecharFormulaAposSalvar = false;
+        if (prefFecha === '1') fecharFormulaAposSalvar = true;
+    } catch (ePrefFecha) { /* ignore */ }
     var vistaPreview = 'quadro';
     var filaChat = [];
     var statusFilaEl = null;
@@ -278,9 +329,11 @@ $boletimWizardSteps = [
     var colunasDrag = null;
     var colunasDragou = false;
     var arrasteColuna = null;
+    var arrasteGrupo = null;
     var colunasMarcadas = {};
     var nomeLinhaRascunho = '';
     var avisoLinha = null;
+    var editandoCabecalho = false;
 
     function coletarEstadoFormulario() {
         if (!document.getElementById('form-regra-boletim')) {
@@ -366,6 +419,14 @@ $boletimWizardSteps = [
             if (k === 'rascunho_preservado') return;
             copy[k] = estado[k];
         });
+        if (ehDemonstrativoNotas()) {
+            copy.formulas_blocos = {};
+            copy.formulas_materias_blocos = {};
+            copy.blocos_calc = [];
+            copy.bloco_calc = '';
+            copy.formula_final = '';
+            copy.formula_tokens = [];
+        }
         return JSON.stringify(copy);
     }
 
@@ -526,8 +587,27 @@ $boletimWizardSteps = [
 
     function boletimEscolhido() {
         var id = Number(estado && estado.boletim_id ? estado.boletim_id : 0);
-        if (!id) return null;
-        return (catalogo.boletins || []).filter(function (b) { return Number(b.id) === id; })[0] || null;
+        var layoutId = Number(estado && estado.layout_boletim_id ? estado.layout_boletim_id : 0)
+            || Number(root.getAttribute('data-layout-boletim-id') || 0);
+        // layout_boletim_id nunca é modelo de cadastro — não usa como id do catálogo.
+        if (id > 0 && layoutId > 0 && id === layoutId) id = 0;
+        var impressao = !!(layoutId > 0
+            || retornoFluxo === 'boletim-layout'
+            || (estado && (estado.exibir_em === 'boletim' || estado.quadro_livre || estado.origem === 'quadro-impressao')));
+        if (!id) {
+            if (!impressao) return null;
+            return {
+                id: 0,
+                nome: (estado && estado.nome) || 'Quadro de impressão',
+                materias_ids: (estado && estado.materias_ids) || []
+            };
+        }
+        var noCatalogo = (catalogo.boletins || []).filter(function (b) { return Number(b.id) === id; })[0] || null;
+        if (noCatalogo) return noCatalogo;
+        if (impressao) {
+            return { id: 0, nome: (estado && estado.nome) || 'Quadro de impressão', materias_ids: (estado && estado.materias_ids) || [] };
+        }
+        return null;
     }
 
     function materiasCatalogoDoEscopo() {
@@ -1789,7 +1869,7 @@ $boletimWizardSteps = [
             nota_minima_aprovacao: 6,
             nota_minima_origem: 'padrao',
             nota_minima_regra_nome: '',
-            round_mode: 'half',
+            round_mode: 'none',
             decimal_places: 2,
             pecas: [],
             pecas_opcoes: {},
@@ -1812,6 +1892,12 @@ $boletimWizardSteps = [
             linhas_layout: [],
             fontes_bimestres: { 1: 0, 2: 0, 3: 0, 4: 0 },
             fontes_faltas: { 1: 0, 2: 0, 3: 0, 4: 0 },
+            demonstrativos_ids: [],
+            eventos_avaliativos_ids: [],
+            eventos_avaliativos_subs: {},
+            cabecalhos_manuais: 0,
+            titulos_periodo_ok: {},
+            quadro_chips_manuais: 0,
             data_inicio: '',
             data_fim: '',
             jornada_modo: 'bimestre',
@@ -1846,7 +1932,30 @@ $boletimWizardSteps = [
         if (!estado.finalidade) estado.finalidade = 'oficial';
         if (estado.boletim_id == null) estado.boletim_id = 0;
         if (estado.grupo_regras_notas_id == null) estado.grupo_regras_notas_id = 0;
-        estado.exibir_em = 'notas';
+        // Não zerar visão de impressão do boletim (Montar quadro / quadro livre / SM).
+        var layoutBoletimCtx = Number(root.getAttribute('data-layout-boletim-id') || 0);
+        var impressaoCtx = retornoFluxo === 'boletim-layout'
+            || layoutBoletimCtx > 0
+            || estado.origem === 'quadro-impressao'
+            || estado.origem === 'santa-maria'
+            || estado.origem === 'composto'
+            || !!estado.quadro_livre
+            || !!estado.modelo_santa_maria
+            || Number(estado.layout_boletim_id || 0) > 0
+            || estado.exibir_em === 'boletim';
+        if (impressaoCtx) {
+            estado.exibir_em = 'boletim';
+            if (layoutBoletimCtx > 0 && !Number(estado.layout_boletim_id || 0)) {
+                estado.layout_boletim_id = layoutBoletimCtx;
+            }
+            var layoutAtual = Number(estado.layout_boletim_id || layoutBoletimCtx || 0);
+            // layout_boletim_id ≠ modelo de boletim (cadastro)
+            if (layoutAtual > 0 && Number(estado.boletim_id || 0) === layoutAtual) {
+                estado.boletim_id = 0;
+            }
+        } else {
+            estado.exibir_em = 'notas';
+        }
         if (estado.materia_unica == null) estado.materia_unica = 0;
         if (estado.materia_unica_modo !== 'media') estado.materia_unica_modo = 'soma';
         if (estado.materia_unica_tocada == null) estado.materia_unica_tocada = false;
@@ -1877,6 +1986,25 @@ $boletimWizardSteps = [
         if (!Array.isArray(estado.colunas_ordem)) estado.colunas_ordem = [];
         if (!Array.isArray(estado.colunas_ocultas)) estado.colunas_ocultas = [];
         if (!Array.isArray(estado.linhas_layout)) estado.linhas_layout = [];
+        if (!Array.isArray(estado.demonstrativos_ids)) estado.demonstrativos_ids = [];
+        if (!Array.isArray(estado.eventos_avaliativos_ids)) estado.eventos_avaliativos_ids = [];
+        if (!estado.eventos_avaliativos_subs || typeof estado.eventos_avaliativos_subs !== 'object' || Array.isArray(estado.eventos_avaliativos_subs)) {
+            estado.eventos_avaliativos_subs = {};
+        }
+        if (estado.cabecalhos_manuais == null) estado.cabecalhos_manuais = 0;
+        if (!estado.titulos_periodo_ok || typeof estado.titulos_periodo_ok !== 'object' || Array.isArray(estado.titulos_periodo_ok)) {
+            estado.titulos_periodo_ok = {};
+        }
+        if (estado.quadro_chips_manuais == null) estado.quadro_chips_manuais = 0;
+        // Reabrir layout já montado: não zera chips nem títulos do período.
+        if (Array.isArray(estado.linhas_layout) && estado.linhas_layout.length) {
+            estado.cabecalhos_manuais = 1;
+            estado.quadro_chips_manuais = 1;
+        }
+        if (!estado.quadro_chips_manuais && Number(estado.regra_id || 0) > 0
+            && ((estado.colunas_ordem && estado.colunas_ordem.length) || (estado.linhas_layout && estado.linhas_layout.length))) {
+            estado.quadro_chips_manuais = 1;
+        }
         if (!estado.fontes_bimestres || typeof estado.fontes_bimestres !== 'object') {
             estado.fontes_bimestres = { 1: 0, 2: 0, 3: 0, 4: 0 };
         } else {
@@ -1906,6 +2034,9 @@ $boletimWizardSteps = [
         var anoOrigem = Number(root.getAttribute('data-ano-letivo') || 0);
         var bimOrigem = Number(root.getAttribute('data-bimestre') || 0);
         var bolOrigem = Number(root.getAttribute('data-boletim-id') || 0);
+        var layoutOrigem = Number(root.getAttribute('data-layout-boletim-id') || 0);
+        // data-boletim-id ≠ layout de impressão
+        if (bolOrigem > 0 && layoutOrigem > 0 && bolOrigem === layoutOrigem) bolOrigem = 0;
         var origemExplicita = anoOrigem >= 2000 && anoOrigem <= 2100 && bolOrigem > 0 && estado.modo !== 'editar';
         if (origemExplicita && !estado.contexto_origem_aplicado) {
             estado.contexto_origem_aplicado = true;
@@ -1939,7 +2070,8 @@ $boletimWizardSteps = [
                 }
             }
         }
-        if (!estado.boletim_id && catalogo.boletins && catalogo.boletins.length === 1) {
+        if (!estado.boletim_id && catalogo.boletins && catalogo.boletins.length === 1
+            && !(estado.exibir_em === 'boletim' || estado.origem === 'quadro-impressao' || estado.origem === 'santa-maria' || estado.quadro_livre || estado.modelo_santa_maria)) {
             estado.boletim_id = Number(catalogo.boletins[0].id || 0) || 0;
         }
         if (estado.nome_automatico !== true && estado.nome_automatico !== false) {
@@ -1960,6 +2092,8 @@ $boletimWizardSteps = [
                 estado.nome_automatico = false;
             }
         }
+        removerMuAutomaticaDoEstado();
+        zerarFormulasDemonstrativoNotas();
         window.boletimWizardEstadoAtual = function () { return estado; };
         return estado;
     }
@@ -2061,7 +2195,11 @@ $boletimWizardSteps = [
 
     function labelToken(tok) {
         if (!tok) return '';
-        if (tok.type === 'fn') return tok.value === 'min' ? 'menor (' : 'maior (';
+        if (tok.type === 'fn') {
+            if (tok.value === 'min') return 'menor (';
+            if (tok.value === 'chamada' || tok.value === 'substituta') return 'substituta (';
+            return 'maior (';
+        }
         if (tok.type === 'op' && tok.value === '*') return '×';
         if (tok.type === 'op' && tok.value === '/') return '÷';
         if (tok.type === 'op' && tok.value === '-') return '−';
@@ -2094,7 +2232,8 @@ $boletimWizardSteps = [
             { type: 'op', value: ')', label: ')' },
             { type: 'op', value: ',', label: ',' },
             { type: 'fn', value: 'max', label: 'maior (' },
-            { type: 'fn', value: 'min', label: 'menor (' }
+            { type: 'fn', value: 'min', label: 'menor (' },
+            { type: 'fn', value: 'chamada', label: 'substituta (' }
         ];
     }
 
@@ -2163,12 +2302,16 @@ $boletimWizardSteps = [
         var parts = [];
         (tokens || []).forEach(function (t) {
             if (!t) return;
-            if (t.type === 'fn') parts.push((t.value === 'min' ? 'min' : 'max') + '(');
-            else if (t.type === 'peca') parts.push(t.value);
+            if (t.type === 'fn') {
+                var fn = String(t.value || '').toLowerCase();
+                if (fn === 'min') parts.push('min(');
+                else if (fn === 'chamada' || fn === 'substituta') parts.push('chamada(');
+                else parts.push('max(');
+            } else if (t.type === 'peca') parts.push(t.value);
             else parts.push(t.value);
         });
         var exp = parts.join(' ').replace(/\( /g, '(').replace(/ \)/g, ')').replace(/ ,/g, ',');
-        return exp.replace(/\b(max|min)\(\s+/g, '$1(').trim();
+        return exp.replace(/\b(max|min|chamada|substituta)\(\s+/g, '$1(').trim();
     }
 
     function envolverSomaAntesDeDivisao(tokens) {
@@ -2280,15 +2423,102 @@ $boletimWizardSteps = [
         ];
     }
 
+    function sufixoColunaSm(cod) {
+        var c = String(cod || '').toLowerCase();
+        var m = c.match(/_(pp|pu|pe|ch|mu|fal)$/);
+        if (m) return m[1];
+        if (/^(pp|pu|pe|ch|mu|fal)$/.test(c)) return c;
+        return '';
+    }
+
+    /** Modelo: substituta(PP, PU, CH) — média das bases; CH preenche a 1ª ausente. */
+    function tokensMediaComSubstituta() {
+        var cols = [];
+        function pushCol(c) {
+            c = String(c || '').toLowerCase();
+            if (!c || c === '_semanal') return;
+            if (ehCodigoBlocoCalc(c)) return;
+            if (cols.indexOf(c) < 0) cols.push(c);
+        }
+        (estado && estado.colunas_ordem || []).forEach(pushCol);
+        if (cols.length < 2) {
+            (((rascunhoAtual || {}).componentes) || []).forEach(function (comp) {
+                pushCol(comp && comp.codigo);
+            });
+        }
+        if (cols.length < 2) {
+            ((estado && estado.pecas) || []).forEach(pushCol);
+        }
+        if (cols.length < 2) return tokensMediaDasPecas();
+
+        var porSuf = {};
+        cols.forEach(function (c) {
+            var s = sufixoColunaSm(c);
+            if (s && !porSuf[s]) porSuf[s] = c;
+        });
+        var bases = [];
+        var subst = '';
+        if (porSuf.pp || porSuf.pu) {
+            if (porSuf.pp) bases.push(porSuf.pp);
+            if (porSuf.pu) bases.push(porSuf.pu);
+            subst = porSuf.ch || '';
+        }
+        if (!subst) {
+            cols.forEach(function (c) {
+                if (sufixoColunaSm(c) === 'ch' || /(^|_)ch$/.test(c) || /segunda.?chamada|2a.?chamada/.test(c)) {
+                    if (!subst) subst = c;
+                }
+            });
+        }
+        if (!bases.length || !subst) {
+            // Fallback: últimas colunas — bases = todas menos a última, substituta = última.
+            subst = cols[cols.length - 1];
+            bases = cols.slice(0, cols.length - 1).filter(function (c) {
+                return c !== subst && sufixoColunaSm(c) !== 'pe' && sufixoColunaSm(c) !== 'fal';
+            });
+            if (!bases.length) bases = cols.slice(0, Math.max(1, cols.length - 1));
+        }
+        bases = bases.filter(function (c) { return c && c !== subst; });
+        if (!bases.length) return tokensMediaDasPecas();
+
+        var toks = [{ type: 'fn', value: 'chamada', label: 'substituta (' }];
+        bases.forEach(function (cod, idx) {
+            if (idx > 0) toks.push({ type: 'op', value: ',', label: ',' });
+            toks.push({ type: 'peca', value: cod, label: tituloColuna(cod) || pecaLabel(cod) || cod });
+        });
+        toks.push({ type: 'op', value: ',', label: ',' });
+        toks.push({ type: 'peca', value: subst, label: tituloColuna(subst) || pecaLabel(subst) || subst });
+        toks.push({ type: 'op', value: ')', label: ')' });
+        return toks;
+    }
+
+    function ehCodigoBlocoCalc(codigo) {
+        var cod = String(codigo || '');
+        var low = cod.toLowerCase();
+        if (!cod) return false;
+        if ((estado.blocos_calc || []).indexOf(cod) >= 0 || (estado.blocos_calc || []).indexOf(low) >= 0) return true;
+        if (estado.formulas_blocos && (estado.formulas_blocos[cod] || estado.formulas_blocos[low])) return true;
+        if (/^media_(\d+|bim|final|sem)$/i.test(low)) return true;
+        return false;
+    }
+
     function chipHtml(tok, idx, paleta) {
         var kind = tok.type === 'fn' ? 'fn' : tok.type;
-        var mostrado = labelToken(tok);
+        if (tok && tok.type === 'peca' && (tok.calc || ehCodigoBlocoCalc(tok.value))) kind = 'calc';
+        var mostrado = (tok && tok.label != null && String(tok.label) !== '')
+            ? String(tok.label)
+            : labelToken(tok);
         var completo = tok && (tok.label || tok.value) ? String(tok.label || tok.value) : '';
-        var dica = tok && tok.type === 'peca' && mostrado !== completo ? ' title="' + esc(completo) + '"' : '';
+        var dica = '';
+        if (tok && tok.type === 'peca' && ehCodigoBlocoCalc(tok.value)) {
+            dica = ' title="' + esc('Bloco de cálculo: ' + (completo || tok.value)) + '"';
+        } else if (tok && tok.type === 'peca' && mostrado !== completo) {
+            dica = ' title="' + esc(completo) + '"';
+        }
         var html = '<span class="bw-chip bw-chip-' + kind + (paleta ? ' bw-pal-chip' : '') + '" draggable="true"'
             + ' data-type="' + esc(tok.type) + '" data-value="' + esc(tok.value) + '" data-label="' + esc(mostrado) + '"' + dica;
         if (!paleta) html += ' data-idx="' + idx + '"';
-        html += '><span>' + esc(labelToken(tok)) + '</span>';
+        html += '><span>' + esc(mostrado) + '</span>';
         if (!paleta) html += '<button type="button" class="bw-chip-x" draggable="false" data-idx="' + idx + '" aria-label="Remover">&times;</button>';
         html += '</span>';
         return html;
@@ -2407,22 +2637,170 @@ $boletimWizardSteps = [
         return 'Matéria #' + n;
     }
 
+    function rotuloSemestreColuna(codigo, rotulo) {
+        codigo = String(codigo || '').toLowerCase();
+        var r = String(rotulo || '').trim();
+        var mapa = {
+            s1_rec: 'REC 1º',
+            s2_rec: 'REC 2º',
+            s1_ms: 'MS 1º',
+            s2_ms: 'MS 2º'
+        };
+        if (!mapa[codigo]) return r;
+        if (!r || /^(rec|ms|recuperacao)$/i.test(r)) return mapa[codigo];
+        // Já distingue semestre (1º/2º, s1/s2, etc.) — mantém.
+        if (/[12]\s*º|semestr|[_\s-]s[12]\b/i.test(r)) return r;
+        return r + (codigo.indexOf('s1_') === 0 ? ' 1º' : ' 2º');
+    }
+
+    function siglaTituloColunaJs(codigo, nome) {
+        var raw = String(codigo || '').toLowerCase();
+        if (raw === 's1_rec') return 'REC 1º';
+        if (raw === 's2_rec') return 'REC 2º';
+        if (raw === 's1_ms') return 'MS 1º';
+        if (raw === 's2_ms') return 'MS 2º';
+        var leaf = raw;
+        var m = leaf.match(/^b[1-4]_(.+)$/);
+        if (m) leaf = m[1];
+        m = leaf.match(/^s[12]_(.+)$/);
+        if (m) leaf = m[1];
+        var conhecidos = {
+            pp: 'PP', pu: 'PU', pe: 'PE', ch: 'CH', mu: 'MU', fal: 'FAL', faltas: 'FAL',
+            rec: 'REC', recuperacao: 'REC', pf: 'PF', mf: 'MF', ms: 'MS', ma: 'MA'
+        };
+        if (conhecidos[leaf]) return conhecidos[leaf];
+        if (leaf && leaf.length <= 5 && /^[a-z0-9]+$/.test(leaf)) return leaf.toUpperCase();
+        var nomeNorm = String(nome || '').toLocaleLowerCase('pt-BR');
+        nomeNorm = nomeNorm.normalize ? nomeNorm.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : nomeNorm;
+        nomeNorm = nomeNorm.replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+        var porNome = {
+            'prova parcial': 'PP',
+            'prova de unidade': 'PU',
+            'ponto extra': 'PE',
+            '2a chamada': 'CH',
+            'segunda chamada': 'CH',
+            'media da unidade': 'MU',
+            'faltas': 'FAL',
+            'recuperacao': 'REC',
+            'prova final': 'PF',
+            'media semestral': 'MS',
+            'media anual': 'MA',
+            'media final': 'MF'
+        };
+        if (porNome[nomeNorm]) return porNome[nomeNorm];
+        return '';
+    }
+
     function tituloColuna(codigo) {
         codigo = String(codigo || '');
-        if (!codigo || !estado || !estado.nomes_blocos) return '';
-        if (estado.nomes_blocos[codigo]) return estado.nomes_blocos[codigo];
-        var quadro = pecaCodigoQuadro(codigo);
-        if (quadro && quadro !== codigo && estado.nomes_blocos[quadro]) return estado.nomes_blocos[quadro];
-        var aliases = {
-            media_sem: 'semanal', semanal: 'media_sem',
-            prova_bim: 'bimestral', bimestral: 'prova_bim',
-            rec: 'recuperacao', recuperacao: 'rec',
-            trab: 'trabalho', trabalho: 'trab',
-            part: 'participacao', participacao: 'part'
-        };
-        var outro = aliases[codigo] || '';
-        if (outro && estado.nomes_blocos[outro]) return estado.nomes_blocos[outro];
+        if (!codigo) return '';
+        var sigCod = siglaTituloColunaJs(codigo, '');
+        // No Montar quadro / impressão preferimos sempre a sigla (PP), não "Prova Parcial".
+        if (typeof ehVisaoImpressaoEditavel === 'function' && ehVisaoImpressaoEditavel() && sigCod) {
+            return rotuloSemestreColuna(codigo, sigCod);
+        }
+        if (estado && estado.nomes_blocos) {
+            var custom = '';
+            if (estado.nomes_blocos[codigo]) custom = estado.nomes_blocos[codigo];
+            var low = codigo.toLowerCase();
+            if (!custom && estado.nomes_blocos[low]) custom = estado.nomes_blocos[low];
+            var quadro = pecaCodigoQuadro(codigo);
+            if (!custom && quadro && quadro !== codigo && estado.nomes_blocos[quadro]) custom = estado.nomes_blocos[quadro];
+            var aliases = {
+                media_sem: 'semanal', semanal: 'media_sem',
+                prova_bim: 'bimestral', bimestral: 'prova_bim',
+                rec: 'recuperacao', recuperacao: 'rec',
+                trab: 'trabalho', trabalho: 'trab',
+                part: 'participacao', participacao: 'part'
+            };
+            var outro = aliases[codigo] || aliases[low] || '';
+            if (!custom && outro && estado.nomes_blocos[outro]) custom = estado.nomes_blocos[outro];
+            if (custom) {
+                var sigCustom = siglaTituloColunaJs(codigo, custom);
+                // Se o custom ainda for nome longo conhecido, troca pela sigla.
+                if (sigCustom && String(custom).length > 6) {
+                    return rotuloSemestreColuna(codigo, sigCustom);
+                }
+                return rotuloSemestreColuna(codigo, custom);
+            }
+        }
+        if (sigCod) return rotuloSemestreColuna(codigo, sigCod);
+        var sigEv = siglaColunaEventoAvaliativo(codigo);
+        if (sigEv) return rotuloSemestreColuna(codigo, sigEv);
         return '';
+    }
+
+    function siglaColunaEventoAvaliativo(codigo) {
+        codigo = String(codigo || '');
+        if (!codigo) return '';
+        var peloCodigo = siglaPeloCodigoColuna(codigo);
+        if (peloCodigo) return peloCodigo;
+        var low = codigo.toLowerCase();
+        var lista = (catalogo && catalogo.eventos_avaliativos) || [];
+        for (var i = 0; i < lista.length; i++) {
+            var ev = lista[i];
+            var sig = siglaDoEvento(ev);
+            if (!sig) continue;
+            if (sig.toLowerCase() === low) return sig.toUpperCase();
+            if (('eva' + Number(ev.id || 0)) === low || ('eva_' + Number(ev.id || 0)) === low) {
+                return sig.toUpperCase();
+            }
+        }
+        var comp = componentePorCodigo(codigo);
+        if (comp) {
+            var cfg = comp.config || {};
+            if (typeof cfg === 'string') {
+                try { cfg = JSON.parse(cfg) || {}; } catch (e) { cfg = {}; }
+            }
+            var evId = Number((cfg && cfg.evento_avaliativo_id) || 0);
+            if (evId > 0) {
+                for (var j = 0; j < lista.length; j++) {
+                    if (Number(lista[j].id) === evId && siglaDoEvento(lista[j])) {
+                        return String(siglaDoEvento(lista[j])).toUpperCase();
+                    }
+                }
+            }
+        }
+        return '';
+    }
+
+    function aplicarSiglasEventosAvulsosNosTitulos() {
+        if (!estado) return;
+        if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
+        var lista = (catalogo && catalogo.eventos_avaliativos) || [];
+        eventosAvaliativosMarcados().forEach(function (id) {
+            var ev = null;
+            for (var i = 0; i < lista.length; i++) {
+                if (Number(lista[i].id) === id) { ev = lista[i]; break; }
+            }
+            if (!ev) return;
+            var sig = String(siglaDoEvento(ev) || '').toUpperCase();
+            if (!sig) return;
+            var codSigla = sig.toLowerCase().replace(/[^a-z0-9_]+/g, '');
+            if (codSigla) estado.nomes_blocos[codSigla] = sig;
+            estado.nomes_blocos['eva' + id] = sig;
+            estado.nomes_blocos['eva_' + id] = sig;
+            var bim = Number(ev.bimestre || 0);
+            if (bim >= 1 && bim <= 4 && codSigla) {
+                var leaf = codSigla === 'faltas' ? 'fal' : codSigla;
+                if (['pp', 'pu', 'ch', 'pe', 'fal'].indexOf(leaf) >= 0) {
+                    estado.nomes_blocos['b' + bim + '_' + leaf] = sig;
+                }
+            }
+            if (bim === 81 || bim === 61 || bim === 62) {
+                estado.nomes_blocos.s1_rec = (sig === 'REC') ? 'REC 1º' : sig;
+            }
+            if (bim === 82 || bim === 63 || bim === 64) {
+                estado.nomes_blocos.s2_rec = (sig === 'REC') ? 'REC 2º' : sig;
+            }
+            ((ev.subeventos) || []).forEach(function (sub, idx) {
+                var sid = Number(sub && sub.id || 0);
+                if (sid <= 0) return;
+                var rotulo = ((ev.subeventos || []).length <= 1) ? sig : (sig + String(idx + 1));
+                estado.nomes_blocos['sev' + sid] = rotulo;
+                estado.nomes_blocos['sev_' + sid] = rotulo;
+            });
+        });
     }
 
     function nomeTituloParaCodigo(codigo) {
@@ -2624,7 +3002,7 @@ $boletimWizardSteps = [
                 continue;
             }
             var rest = t.slice(i);
-            var fn = rest.match(/^(menor|maior|min|max)(?![a-z0-9_])/);
+            var fn = rest.match(/^(menor|maior|min|max|chamada|substituta)(?![a-z0-9_])/);
             if (fn) {
                 var qual = fn[1];
                 var posFn = i + qual.length;
@@ -2632,7 +3010,10 @@ $boletimWizardSteps = [
                 if (t.charAt(posFn) !== '(') {
                     return { ok: false, erro: 'A função ' + qual + ' precisa abrir com parêntese.', tokens: [] };
                 }
-                flat.push({ k: 'fn', v: (qual === 'menor' || qual === 'min') ? 'min' : 'max' });
+                var fnVal = 'max';
+                if (qual === 'menor' || qual === 'min') fnVal = 'min';
+                else if (qual === 'chamada' || qual === 'substituta') fnVal = 'chamada';
+                flat.push({ k: 'fn', v: fnVal });
                 i = posFn + 1;
                 continue;
             }
@@ -2671,7 +3052,10 @@ $boletimWizardSteps = [
         if (profundidade !== 0) return { ok: false, erro: 'Os parênteses da fórmula não fecham.', tokens: [] };
         var toks = [];
         flat.forEach(function (item) {
-            if (item.k === 'fn') toks.push({ type: 'fn', value: item.v, label: item.v === 'min' ? 'menor (' : 'maior (' });
+            if (item.k === 'fn') {
+                var labFn = item.v === 'min' ? 'menor (' : (item.v === 'chamada' || item.v === 'substituta' ? 'substituta (' : 'maior (');
+                toks.push({ type: 'fn', value: item.v, label: labFn });
+            }
             else if (item.k === 'num') toks.push({ type: 'num', value: item.v, label: item.v });
             else if (item.k === 'peca') toks.push({ type: 'peca', value: item.v, label: item.label || nomeBlocoCalc(item.v) });
             else if (item.k === 'op') {
@@ -2845,6 +3229,38 @@ $boletimWizardSteps = [
         por = {};
         estado.formulas_materias_blocos[codigo] = por;
         return por;
+    }
+
+    function removerMuAutomaticaDoEstado() {
+        if (!estado) return;
+        // Print Santa Maria: MU faz parte do modelo oficial — não remove.
+        if (estado.modelo_santa_maria || estado.origem === 'santa-maria') return;
+        function ehMuAuto(cod) { return /^b[1-4]_mu$/i.test(String(cod || '')); }
+        estado.blocos_calc = (estado.blocos_calc || []).filter(function (c) { return !ehMuAuto(c); });
+        estado.colunas_ordem = (estado.colunas_ordem || []).filter(function (c) { return !ehMuAuto(c); });
+        ['formulas_blocos', 'nomes_blocos', 'escalas_blocos', 'formulas_materias_blocos'].forEach(function (chave) {
+            if (!estado[chave] || typeof estado[chave] !== 'object') return;
+            Object.keys(estado[chave]).forEach(function (cod) {
+                if (ehMuAuto(cod)) delete estado[chave][cod];
+            });
+        });
+        if (Array.isArray(estado.linhas_layout)) {
+            estado.linhas_layout = estado.linhas_layout.map(function (lin) {
+                if (!lin) return lin;
+                lin.colunas = (lin.colunas || []).filter(function (c) { return !ehMuAuto(c); });
+                return lin;
+            }).filter(function (lin) { return lin && (lin.colunas || []).length >= 1; });
+        }
+        if (estado.bloco_calc && ehMuAuto(estado.bloco_calc)) {
+            estado.bloco_calc = '';
+            estado.formula_tokens = [];
+        }
+        [rascunhoAtual, estado.rascunho_preservado].forEach(function (r) {
+            if (!r || !Array.isArray(r.componentes)) return;
+            r.componentes = r.componentes.filter(function (c) {
+                return !(c && ehMuAuto(c.codigo));
+            });
+        });
     }
 
     function abrirFormulaBloco(codigo) {
@@ -3029,44 +3445,313 @@ $boletimWizardSteps = [
         if (!estado.pecas_opcoes[key]) estado.pecas_opcoes[key] = pecasOpcoesPadraoJs(key);
     }
 
-    function htmlPalettePecasExibir() {
-        var html = '';
-        var visto = {};
-        function add(value, label) {
-            value = String(value || '');
-            if (!value || visto[value] || value === '_semanal') return;
-            if (estado.bloco_calc && (value === estado.bloco_calc || value === pecaCodigoQuadro(estado.bloco_calc))) return;
-            visto[value] = true;
-            visto[pecaCodigoQuadro(value)] = true;
-            html += chipHtml({ type: 'peca', value: value, label: label || pecaLabel(value) }, -1, true);
+    function chaveCicloDeGrupoLayout(g) {
+        g = String(g || '').toLowerCase();
+        var m = g.match(/^b([1-4])$/);
+        if (m) return 'p-' + m[1];
+        if (g === 's1') return 's1';
+        if (g === 's2') return 's2';
+        return '';
+    }
+
+    function chaveCicloDeNomeCabecalho(nome) {
+        var n = String(nome || '').toUpperCase();
+        if (!n) return '';
+        if (/\bIV\b|4\s*[ºO]|QUARTO/.test(n)) return 'p-4';
+        if (/\bIII\b|3\s*[ºO]|TERCEIRO/.test(n)) return 'p-3';
+        if (/\bII\b|2\s*[ºO]|SEGUNDO/.test(n) && !/\bIII\b/.test(n)) return 'p-2';
+        if (/\bI\b|1\s*[ºO]|PRIMEIRO/.test(n)) return 'p-1';
+        if (/1\s*[ºO]?\s*SEM/.test(n)) return 's1';
+        if (/2\s*[ºO]?\s*SEM/.test(n)) return 's2';
+        return '';
+    }
+
+    function chaveCicloPalette(codigo) {
+        var cod = String(codigo || '').toLowerCase();
+        var m = cod.match(/^b([1-4])_/);
+        if (m) return 'p-' + m[1];
+        if (cod.indexOf('s1_') === 0) return 's1';
+        if (cod.indexOf('s2_') === 0) return 's2';
+
+        // Blocos de cálculo (MU/MS…): ciclo = cabeçalho onde o chip está no quadro.
+        var linhas = (estado && estado.linhas_layout) || [];
+        var i;
+        for (i = 0; i < linhas.length; i++) {
+            var lin = linhas[i];
+            if (!lin || !Array.isArray(lin.colunas)) continue;
+            var cols = lin.colunas.map(function (c) { return String(c || '').toLowerCase(); });
+            if (cols.indexOf(cod) < 0) continue;
+            var j;
+            for (j = 0; j < cols.length; j++) {
+                var mm = cols[j].match(/^b([1-4])_/);
+                if (mm) return 'p-' + mm[1];
+                if (cols[j].indexOf('s1_') === 0) return 's1';
+                if (cols[j].indexOf('s2_') === 0) return 's2';
+            }
+            var porNome = chaveCicloDeNomeCabecalho(lin.nome);
+            if (porNome) return porNome;
         }
+
+        // Fallback: layout_group / linha_cabecalho do componente no rascunho.
+        var achou = '';
+        (((rascunhoAtual || {}).componentes) || []).some(function (c) {
+            if (!c || String(c.codigo || '').toLowerCase() !== cod) return false;
+            var cfg = configDoComp(c);
+            achou = chaveCicloDeGrupoLayout(cfg.layout_group)
+                || chaveCicloDeNomeCabecalho(cfg.linha_cabecalho || c.linha_cabecalho);
+            return !!achou;
+        });
+        if (achou) return achou;
+
+        return 'outros';
+    }
+
+    function rotuloCicloPalette(chave) {
+        if (chave.indexOf('p-') === 0) {
+            var n = Number(chave.slice(2)) || 0;
+            return rotuloPeriodoNumero(n) || (n + 'º período');
+        }
+        if (chave === 's1') return '1º semestre';
+        if (chave === 's2') return '2º semestre';
+        return 'Geral / outros';
+    }
+
+    function ordemCicloPalette(chave) {
+        if (chave === 'calc') return -10;
+        if (chave.indexOf('p-') === 0) return Number(chave.slice(2)) || 0;
+        if (chave === 's1') return 100;
+        if (chave === 's2') return 101;
+        return 900;
+    }
+
+    function ordemLeafPalette(codigo) {
+        var cod = String(codigo || '').toLowerCase();
+        var m = cod.match(/^b[1-4]_(.+)$/);
+        var leaf = m ? m[1] : cod;
+        var pref = { pp: 1, pu: 2, ch: 3, pe: 4, mu: 5, fal: 6, faltas: 6, rec: 7, ms: 8 };
+        if (pref[leaf] != null) return pref[leaf];
+        var nome = String(nomeBlocoCalc(codigo) || tituloColuna(codigo) || '').toUpperCase().trim();
+        if (nome === 'MU' || /^MU\b/.test(nome)) return 5;
+        if (nome === 'MS' || /^MS\b/.test(nome)) return 8;
+        if (leaf.indexOf('rec') === 0 || nome.indexOf('REC') === 0) return 7;
+        if (leaf.indexOf('ms') === 0) return 8;
+        if (ehCodigoBlocoCalc(codigo)) return 5;
+        return 50;
+    }
+
+    function rotuloPaletteItem(codigo, labelBase) {
+        var nome = String(labelBase || nomeBlocoCalc(codigo) || tituloColuna(codigo) || pecaLabel(codigo) || codigo).trim();
+        if (!ehCodigoBlocoCalc(codigo)) {
+            var sig = siglaTituloColunaJs(codigo, nome) || nome;
+            if (/^b[1-4]_/.test(String(codigo)) || /^s[12]_/.test(String(codigo))) return sig;
+            return nome;
+        }
+        // MU · I BIMESTRE — distingue blocos com o mesmo nome em ciclos diferentes.
+        var ciclo = chaveCicloPalette(codigo);
+        if (ciclo && ciclo !== 'outros' && ciclo !== 'calc') {
+            var rotCiclo = rotuloCicloPalette(ciclo);
+            // Encurta "1º Bimestre" → "1º"
+            var curto = rotCiclo.replace(/\s*bimestre\s*/i, '').replace(/\s*semestre\s*/i, ' sem').trim();
+            return nome + ' · ' + curto;
+        }
+        return nome;
+    }
+
+    function listaCodigosBlocosCalcPalette() {
+        var out = [];
+        var visto = {};
+        function push(cod) {
+            cod = String(cod || '');
+            var low = cod.toLowerCase();
+            if (!cod || visto[low] || cod === '_semanal') return;
+            if (estado.bloco_calc && (cod === estado.bloco_calc || low === String(estado.bloco_calc).toLowerCase())) return;
+            if (!ehCodigoBlocoCalc(cod)) return;
+            visto[low] = true;
+            out.push(cod);
+        }
+        (estado.blocos_calc || []).forEach(push);
+        Object.keys(estado.formulas_blocos || {}).forEach(push);
+        Object.keys(estado.nomes_blocos || {}).forEach(function (cod) {
+            if (ehCodigoBlocoCalc(cod)) push(cod);
+        });
+        (estado.linhas_layout || []).forEach(function (lin) {
+            (lin && lin.colunas || []).forEach(push);
+        });
+        (((rascunhoAtual || {}).componentes) || []).forEach(function (c) {
+            if (c && (c.source_type === 'calculado' || ehCodigoBlocoCalc(c.codigo))) push(c.codigo);
+        });
+        return out;
+    }
+
+    function htmlPalettePecasExibir() {
+        var visto = {};
+        var itens = [];
+        function add(value, label, forcarChave) {
+            value = String(value || '');
+            var low = value.toLowerCase();
+            if (!value || visto[low] || value === '_semanal') return;
+            if (estado.bloco_calc) {
+                var aberto = String(estado.bloco_calc);
+                if (value === aberto || low === aberto.toLowerCase()) return;
+                if (value === pecaCodigoQuadro(aberto) || low === String(pecaCodigoQuadro(aberto)).toLowerCase()) return;
+            }
+            visto[low] = true;
+            // Não marca pecaCodigoQuadro para blocos calc — evita sumir MU duplicado.
+            if (!ehCodigoBlocoCalc(value)) {
+                var quadro = String(pecaCodigoQuadro(value) || '').toLowerCase();
+                if (quadro) visto[quadro] = true;
+            }
+            var rotulo = rotuloPaletteItem(value, label);
+            itens.push({
+                value: value,
+                label: rotulo,
+                calc: ehCodigoBlocoCalc(value),
+                chave: forcarChave || chaveCicloPalette(value)
+            });
+        }
+
+        // 1) Blocos de cálculo criados antes — seção própria no topo.
+        listaCodigosBlocosCalcPalette().forEach(function (cod) {
+            add(cod, nomeBlocoCalc(cod) || tituloColuna(cod), 'calc');
+        });
+
         (estado.pecas || []).forEach(function (k) {
-            if (!k) return;
+            if (!k || ehCodigoBlocoCalc(k)) return;
             add(k, pecaLabel(k));
         });
-        var calc = (estado.blocos_calc || []).concat(Object.keys(estado.formulas_blocos || {}));
-        if ((estado.pecas || []).indexOf('semanal') >= 0) calc.push('media_sem');
-        calc.forEach(function (cod) {
-            if (!cod || (estado.pecas || []).indexOf(cod) >= 0) return;
-            add(cod, nomeBlocoCalc(cod));
-        });
+        if ((estado.pecas || []).indexOf('semanal') >= 0) add('media_sem', nomeBlocoCalc('media_sem'));
+
         var pv = previewEfetivo();
         ((pv && pv.colunas) || []).forEach(function (c) {
             if (!c || c.travada || c.codigo === '_semanal' || c.tipo === 'semana_grupo') return;
+            if (ehCodigoBlocoCalc(c.codigo)) return; // já no grupo calc
             add(c.codigo, c.nome || nomeBlocoCalc(c.codigo));
         });
         ((pv && pv.tabelas) || []).forEach(function (t) {
             (t.outras || []).concat(t.semanas || []).forEach(function (c) {
-                if (!c || !c.codigo) return;
+                if (!c || !c.codigo || ehCodigoBlocoCalc(c.codigo)) return;
                 add(c.codigo, c.nome || nomeBlocoCalc(c.codigo));
             });
         });
         ((rascunhoAtual && rascunhoAtual.componentes) || []).forEach(function (c) {
-            if (!c || !c.codigo || c.codigo === '_semanal') return;
+            if (!c || !c.codigo || c.codigo === '_semanal' || ehCodigoBlocoCalc(c.codigo)) return;
             add(c.codigo, c.nome || nomeBlocoCalc(c.codigo));
         });
-        if (!html) html = '<p class="text-xs text-gray-500">Volte em Tipo de Notas e marque ao menos uma.</p>';
+        // Também espelha calc nos ciclos (PP…MU…FAL), além da seção amarela.
+        listaCodigosBlocosCalcPalette().forEach(function (cod) {
+            var ciclo = chaveCicloPalette(cod);
+            if (!ciclo || ciclo === 'outros') return;
+            // Permite o mesmo código em "calc" e no bimestre (outra entrada visual).
+            var chaveDup = ciclo;
+            var jaNoCiclo = (itens || []).some(function (it) {
+                return it.chave === chaveDup && String(it.value).toLowerCase() === String(cod).toLowerCase();
+            });
+            if (jaNoCiclo) return;
+            itens.push({
+                value: cod,
+                label: nomeBlocoCalc(cod) || tituloColuna(cod) || cod,
+                calc: true,
+                chave: chaveDup
+            });
+        });
+
+        if (!itens.length) {
+            return '<p class="text-xs text-gray-500">Volte em Tipo de Notas e marque ao menos uma.</p>';
+        }
+
+        var grupos = {};
+        itens.forEach(function (it) {
+            if (!grupos[it.chave]) grupos[it.chave] = [];
+            grupos[it.chave].push(it);
+        });
+        var chaves = Object.keys(grupos).sort(function (a, b) {
+            return ordemCicloPalette(a) - ordemCicloPalette(b);
+        });
+
+        var html = '<div class="bw-palette-grupos">';
+        chaves.forEach(function (chave) {
+            var lista = grupos[chave].slice().sort(function (a, b) {
+                var oa = ordemLeafPalette(a.value);
+                var ob = ordemLeafPalette(b.value);
+                if (oa !== ob) return oa - ob;
+                return String(a.label || '').localeCompare(String(b.label || ''), 'pt-BR');
+            });
+            var ehCalcGrupo = chave === 'calc';
+            html += '<div class="bw-palette-grupo' + (ehCalcGrupo ? ' calc' : '') + '">';
+            html += '<p class="bw-palette-grupo-titulo">'
+                + esc(ehCalcGrupo ? 'Blocos de cálculo (MU, MS…)' : rotuloCicloPalette(chave))
+                + '</p>';
+            if (ehCalcGrupo) {
+                html += '<p class="text-[10px] text-amber-900/80 mb-1.5">Clique para usar no MS/fórmula. Amarelo = bloco que você criou.</p>';
+            }
+            html += '<div class="bw-palette-grupo-chips">';
+            lista.forEach(function (it) {
+                html += chipHtml({ type: 'peca', value: it.value, label: it.label, calc: !!it.calc }, -1, true);
+            });
+            html += '</div></div>';
+        });
+        html += '</div>';
         return html;
+    }
+
+    function adicionarColunaManual() {
+        if (!estado) return;
+        if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
+        if (!Array.isArray(estado.colunas_ordem)) estado.colunas_ordem = [];
+        var codigo = novoCodigoColunaManual();
+        if (estado.colunas_ordem.indexOf(codigo) < 0) estado.colunas_ordem.push(codigo);
+        estado.nomes_blocos[codigo] = 'Nova coluna';
+        garantirComponenteManualNoRascunho(codigo, 'Nova coluna');
+        marcarEdicaoManual();
+        previewAtual = null;
+        if (estado.passo !== 'formula' && estado.passo !== 'revisar') {
+            estado.passo = 'formula';
+            renderAll();
+        } else {
+            renderRevisarDinamico();
+        }
+        agendarMontar();
+    }
+
+    function novoCodigoColunaManual() {
+        var base = 'col';
+        var n = 1;
+        var usados = {};
+        (estado.colunas_ordem || []).forEach(function (c) { usados[String(c)] = true; });
+        (((rascunhoAtual || {}).componentes) || []).forEach(function (c) {
+            if (c && c.codigo) usados[String(c.codigo)] = true;
+        });
+        Object.keys(estado.nomes_blocos || {}).forEach(function (c) { usados[c] = true; });
+        while (usados[base + n]) n += 1;
+        return base + n;
+    }
+
+    function garantirComponenteManualNoRascunho(codigo, nome) {
+        codigo = String(codigo || '');
+        if (!codigo) return;
+        [rascunhoAtual, estado && estado.rascunho_preservado].forEach(function (r) {
+            if (!r) return;
+            if (!Array.isArray(r.componentes)) r.componentes = [];
+            var achou = false;
+            r.componentes.forEach(function (c) {
+                if (!c || String(c.codigo || '') !== codigo) return;
+                achou = true;
+                c.nome = nome || c.nome || codigo;
+                c.source_type = c.source_type || 'nenhuma';
+            });
+            if (!achou) {
+                r.componentes.push({
+                    codigo: codigo,
+                    nome: nome || codigo,
+                    source_type: 'nenhuma',
+                    calc_type: 'media',
+                    peso: 1,
+                    escala_max: 10,
+                    obrigatorio: 0,
+                    config: {}
+                });
+            }
+        });
     }
 
     function adicionarBlocoMedia() {
@@ -3077,7 +3762,18 @@ $boletimWizardSteps = [
         var codigo = novoCodigoBloco();
         if (estado.blocos_calc.indexOf(codigo) < 0) estado.blocos_calc.push(codigo);
         if (!Array.isArray(estado.colunas_ordem)) estado.colunas_ordem = [];
-        if (estado.colunas_ordem.indexOf(codigo) < 0) estado.colunas_ordem.push(codigo);
+        if (estado.colunas_ordem.indexOf(codigo) < 0) {
+            // Se há coluna marcada (borda azul), encaixa o bloco logo depois dela.
+            var marcadas = codigosMarcados().map(function (c) { return String(c || '').toLowerCase(); });
+            var pos = -1;
+            if (marcadas.length === 1) {
+                pos = estado.colunas_ordem.map(function (c) {
+                    return String(c || '').toLowerCase();
+                }).indexOf(marcadas[0]);
+            }
+            if (pos >= 0) estado.colunas_ordem.splice(pos + 1, 0, codigo);
+            else estado.colunas_ordem.push(codigo);
+        }
         if (!estado.formulas_blocos[codigo] || !estado.formulas_blocos[codigo].length) {
             estado.formulas_blocos[codigo] = tokensMediaDasPecas();
         }
@@ -3087,10 +3783,17 @@ $boletimWizardSteps = [
         }
         if (!estado.escalas_blocos || typeof estado.escalas_blocos !== 'object') estado.escalas_blocos = {};
         if (estado.escalas_blocos[codigo] == null) estado.escalas_blocos[codigo] = 10;
+        estado.quadro_chips_manuais = 1;
         marcarEdicaoManual();
         previewAtual = null;
-        renderRevisarDinamico();
-        abrirFormulaBloco(codigo);
+        if (estado.passo !== 'formula' && estado.passo !== 'revisar') {
+            estado.passo = 'formula';
+            renderAll();
+            abrirFormulaBloco(codigo);
+        } else {
+            renderRevisarDinamico();
+            abrirFormulaBloco(codigo);
+        }
         agendarMontar();
     }
 
@@ -3174,6 +3877,37 @@ $boletimWizardSteps = [
         renderFormulaCanvas();
     }
 
+    function fecharFormulaBloco() {
+        if (!estado) return;
+        estado.bloco_calc = '';
+        estado.materia_calc = 0;
+        estado.formula_tokens = [];
+        estado.titulo_codigo = '';
+        var ed = document.getElementById('bw-formula-editor');
+        if (ed) ed.classList.add('hidden');
+        var lista = document.getElementById('bw-colunas-lista');
+        if (lista) {
+            lista.querySelectorAll('.bw-col-chip.aberta').forEach(function (el) {
+                el.classList.remove('aberta');
+            });
+        }
+    }
+
+    function gravarFlagFecharAposSalvar(on) {
+        fecharFormulaAposSalvar = !!on;
+        try {
+            if (window.localStorage) {
+                localStorage.setItem('bw_fechar_formula_apos_salvar', fecharFormulaAposSalvar ? '1' : '0');
+            }
+        } catch (eGravaFecha) { /* ignore */ }
+    }
+
+    function lerFlagFecharAposSalvar() {
+        var el = document.getElementById('bw-formula-fechar-apos');
+        if (el) gravarFlagFecharAposSalvar(!!el.checked);
+        return !!fecharFormulaAposSalvar;
+    }
+
     function salvarBlocoCalc() {
         if (!estado || !estado.bloco_calc) {
             var edVazio = document.getElementById('bw-formula-editor');
@@ -3183,17 +3917,44 @@ $boletimWizardSteps = [
         var inp = document.getElementById('bw-formula-bloco-nome-input');
         var nome = String((inp && inp.value) || '').trim().slice(0, 60);
         if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
+        if (!Array.isArray(estado.blocos_calc)) estado.blocos_calc = [];
+        if (!Array.isArray(estado.colunas_ordem)) estado.colunas_ordem = [];
         aplicarTituloBloco(estado.bloco_calc, nome);
         flushEscalaAberta();
         var codigoSalvo = estado.bloco_calc;
+        if (codigoSalvo && estado.blocos_calc.indexOf(codigoSalvo) < 0) {
+            estado.blocos_calc.push(codigoSalvo);
+        }
+        if (codigoSalvo && estado.colunas_ordem.indexOf(codigoSalvo) < 0) {
+            estado.colunas_ordem.push(codigoSalvo);
+        }
         formulaVersao++;
         gravarTokensBlocoAberto();
         marcarEdicaoManual();
-        abrirFormulaBloco(codigoSalvo);
+        var fecharAgora = lerFlagFecharAposSalvar();
+        if (fecharAgora) {
+            fecharFormulaBloco();
+        } else {
+            abrirFormulaBloco(codigoSalvo);
+        }
         var avisoSalvo = document.getElementById('bw-formula-salva');
         if (avisoSalvo) {
             avisoSalvo.textContent = 'Salvo.';
             avisoSalvo.classList.remove('hidden');
+        }
+        // Atualiza a ordem das colunas na hora — não espera o remount apagar o chip amarelo.
+        if (estado.passo === 'formula' || estado.passo === 'revisar') {
+            renderRevisarDinamico();
+            if (fecharAgora) {
+                fecharFormulaBloco();
+            } else {
+                abrirFormulaBloco(codigoSalvo);
+                avisoSalvo = document.getElementById('bw-formula-salva');
+                if (avisoSalvo) {
+                    avisoSalvo.textContent = 'Salvo.';
+                    avisoSalvo.classList.remove('hidden');
+                }
+            }
         }
         agendarMontar();
     }
@@ -3252,7 +4013,7 @@ $boletimWizardSteps = [
                 if (!lin) return lin;
                 lin.colunas = (lin.colunas || []).filter(function (c) { return c !== codigo; });
                 return lin;
-            }).filter(function (lin) { return lin && (lin.colunas || []).length >= 2; });
+            }).filter(function (lin) { return lin && (lin.colunas || []).length >= 1; });
         }
         aplicarOrdemNoPreview(previewAtual);
         renderRevisarDinamico();
@@ -3276,6 +4037,10 @@ $boletimWizardSteps = [
         if (bodyEl._bwFormulaBound) return;
         bodyEl._bwFormulaBound = true;
         var formulaArrastando = false;
+        bodyEl.addEventListener('change', function (e) {
+            if (!e.target || e.target.id !== 'bw-formula-fechar-apos') return;
+            gravarFlagFecharAposSalvar(!!e.target.checked);
+        });
         bodyEl.addEventListener('click', function (e) {
             if (e.target.closest('#bw-formula-salvar')) {
                 e.preventDefault();
@@ -3317,6 +4082,11 @@ $boletimWizardSteps = [
             }
             if (e.target.closest('#bw-formula-max')) {
                 estado.formula_tokens = tokensMaiorDuas();
+                afterFormulaChange();
+                return;
+            }
+            if (e.target.closest('#bw-formula-substituta')) {
+                estado.formula_tokens = tokensMediaComSubstituta();
                 afterFormulaChange();
                 return;
             }
@@ -3565,7 +4335,8 @@ $boletimWizardSteps = [
         if ((col.source_type || '') === 'faltas_evento') return true;
         var cod = String(col.codigo || '').toLowerCase();
         var nome = String(col.nome || '').toLowerCase();
-        return cod.indexOf('falta') >= 0 || nome.indexOf('falta') >= 0;
+        if (/^b[1-4]_fal(tas)?$/.test(cod) || /(^|_)fal$/.test(cod)) return true;
+        return cod.indexOf('falta') >= 0 || nome.indexOf('falta') >= 0 || nome === 'fal';
     }
 
     function fmtPreviewCelula(v, col) {
@@ -3689,7 +4460,234 @@ $boletimWizardSteps = [
         return html;
     }
 
+    function ehModeloSantaMaria() {
+        return !!(estado && (estado.modelo_santa_maria || estado.origem === 'santa-maria'));
+    }
+
+    function linhasLayoutSantaMariaPadrao() {
+        return [
+            { id: 'sm_b1', nome: 'I BIMESTRE', colunas: ['b1_pp', 'b1_pu', 'b1_ch', 'b1_pe', 'b1_mu', 'b1_fal'] },
+            { id: 'sm_b2', nome: 'II BIMESTRE', colunas: ['b2_pp', 'b2_pu', 'b2_ch', 'b2_pe', 'b2_mu', 'b2_fal'] },
+            { id: 'sm_s1', nome: '1º SEMESTRE', colunas: ['s1_rec', 's1_ms'] },
+            { id: 'sm_b3', nome: 'III BIMESTRE', colunas: ['b3_pp', 'b3_pu', 'b3_ch', 'b3_pe', 'b3_mu', 'b3_fal'] },
+            { id: 'sm_b4', nome: 'IV BIMESTRE', colunas: ['b4_pp', 'b4_pu', 'b4_ch', 'b4_pe', 'b4_mu', 'b4_fal'] },
+            { id: 'sm_s2', nome: '2º SEMESTRE', colunas: ['s2_rec', 's2_ms'] },
+            { id: 'sm_fin', nome: 'RESULTADO FINAL', colunas: ['ma', 'pf', 'mf', 'situacao'] }
+        ];
+    }
+
+    /** Injeta bN_mu entre PE e FAL em layouts SM legados sem a coluna. */
+    function garantirMuNasLinhasSantaMariaJs() {
+        if (!ehModeloSantaMaria() || !estado || !Array.isArray(estado.linhas_layout)) return;
+        estado.linhas_layout = estado.linhas_layout.map(function (lin) {
+            if (!lin) return lin;
+            var cols = (lin.colunas || []).map(function (c) { return String(c || '').toLowerCase(); }).filter(Boolean);
+            var out = [];
+            cols.forEach(function (c) {
+                var m = /^b([1-4])_fal$/.exec(c);
+                if (m) {
+                    var mu = 'b' + m[1] + '_mu';
+                    if (out.indexOf(mu) < 0) out.push(mu);
+                }
+                if (out.indexOf(c) < 0) out.push(c);
+            });
+            [1, 2, 3, 4].forEach(function (b) {
+                var pe = 'b' + b + '_pe';
+                var mu = 'b' + b + '_mu';
+                if (out.indexOf(pe) >= 0 && out.indexOf(mu) < 0) {
+                    out.splice(out.indexOf(pe) + 1, 0, mu);
+                }
+            });
+            lin.colunas = out;
+            return lin;
+        });
+    }
+
+    function linhasLayoutTemSemestresSantaMaria(linhas) {
+        var temS1 = false;
+        var temS2 = false;
+        (linhas || []).forEach(function (lin) {
+            var cols = (lin && lin.colunas) || [];
+            var nome = String((lin && lin.nome) || '').toLowerCase();
+            if (nome.indexOf('1º semestre') >= 0 || nome.indexOf('1o semestre') >= 0 || cols.indexOf('s1_ms') >= 0 || cols.indexOf('s1_rec') >= 0) temS1 = true;
+            if (nome.indexOf('2º semestre') >= 0 || nome.indexOf('2o semestre') >= 0 || cols.indexOf('s2_ms') >= 0 || cols.indexOf('s2_rec') >= 0) temS2 = true;
+        });
+        return temS1 && temS2;
+    }
+
+    function garantirLinhasLayoutSantaMaria() {
+        if (!ehModeloSantaMaria() || !estado) return;
+        // Usuário limpou/editou cabeçalhos para montar do zero — não reinsere o padrão.
+        if (Number(estado.cabecalhos_manuais || 0) === 1) {
+            garantirMuNasLinhasSantaMariaJs();
+            return;
+        }
+        if (Array.isArray(estado.linhas_layout) && estado.linhas_layout.length && linhasLayoutTemSemestresSantaMaria(estado.linhas_layout)) {
+            garantirMuNasLinhasSantaMariaJs();
+            return;
+        }
+        estado.linhas_layout = linhasLayoutSantaMariaPadrao();
+    }
+
+    function colunasPadraoSantaMariaMapa() {
+        var mapa = {};
+        function add(codigo, nome, layoutType, sourceType) {
+            mapa[codigo] = {
+                codigo: codigo,
+                nome: nome,
+                layout_type: layoutType || 'media',
+                source_type: sourceType || 'nenhuma'
+            };
+        }
+        [1, 2, 3, 4].forEach(function (b) {
+            add('b' + b + '_pp', 'PP');
+            add('b' + b + '_pu', 'PU');
+            add('b' + b + '_ch', 'CH');
+            add('b' + b + '_pe', 'PE');
+            add('b' + b + '_mu', 'MU', 'media', 'calculado');
+            add('b' + b + '_fal', 'FAL', 'faltas');
+        });
+        add('s1_rec', 'REC 1º', 'rec');
+        add('s1_ms', 'MS 1º', 'media', 'calculado');
+        add('s2_rec', 'REC 2º', 'rec');
+        add('s2_ms', 'MS 2º', 'media', 'calculado');
+        add('ma', 'MA', 'media', 'calculado');
+        add('pf', 'PF');
+        add('mf', 'MF', 'media', 'calculado');
+        add('situacao', 'Situação', 'resultado');
+        return mapa;
+    }
+
+    function montarGruposDeFaixas(flat) {
+        return faixasCabecalhoPreview(flat || []).map(function (f, idx) {
+            if (f.tipo === 'grupo') {
+                return { key: 'cab' + idx, label: f.nome, cols: f.cols || [] };
+            }
+            var c = f.col || {};
+            return { key: 'col' + idx, label: c.nome || c.codigo || '', cols: [c] };
+        });
+    }
+
+    function flatColsDeGrupos(grupos) {
+        var flat = [];
+        (grupos || []).forEach(function (g) {
+            (g.cols || []).forEach(function (c) { if (c) flat.push(c); });
+        });
+        return flat;
+    }
+
+    function previewLocalBoletimSantaMaria() {
+        garantirLinhasLayoutSantaMaria();
+        var mapa = colunasPadraoSantaMariaMapa();
+        Object.keys(estado.nomes_blocos || {}).forEach(function (cod) {
+            if (!mapa[cod]) {
+                mapa[cod] = {
+                    codigo: cod,
+                    nome: estado.nomes_blocos[cod] || tituloColuna(cod) || cod,
+                    layout_type: 'media',
+                    source_type: (estado.formulas_blocos && estado.formulas_blocos[cod]) ? 'calculado' : 'nenhuma'
+                };
+            } else if (estado.nomes_blocos[cod]) {
+                mapa[cod].nome = estado.nomes_blocos[cod];
+            }
+        });
+        (estado.blocos_calc || []).forEach(function (cod) {
+            if (!cod || mapa[cod]) return;
+            mapa[cod] = {
+                codigo: cod,
+                nome: nomeBlocoCalc(cod),
+                layout_type: 'media',
+                source_type: 'calculado'
+            };
+        });
+        var ordem = [];
+        var visto = {};
+        function pushCod(cod) {
+            cod = String(cod || '').toLowerCase();
+            if (!cod || visto[cod]) return;
+            visto[cod] = true;
+            ordem.push(cod);
+        }
+        (estado.colunas_ordem || []).forEach(pushCod);
+        (estado.linhas_layout || []).forEach(function (lin) {
+            (lin.colunas || []).forEach(pushCod);
+        });
+        Object.keys(mapa).forEach(pushCod);
+        var flat = ordem.map(function (cod) {
+            var base = mapa[cod] || {
+                codigo: cod,
+                nome: tituloColuna(cod) || cod,
+                layout_type: 'media',
+                source_type: (estado.formulas_blocos && estado.formulas_blocos[cod]) ? 'calculado' : 'nenhuma'
+            };
+            return Object.assign({}, base, {
+                nome: tituloColuna(cod) || base.nome || cod,
+                tipo: base.source_type === 'calculado' ? 'calculado' : 'peca',
+                travada: false
+            });
+        });
+        flat = ordenarColunasLista(flat);
+        var grupos = montarGruposDeFaixas(flat);
+        function notasLinha(nome) {
+            var h = hashNome(nome) + hashPreviewAluno();
+            var notas = {};
+            var mus = {};
+            [1, 2, 3, 4].forEach(function (b) {
+                // PP/PU/PE/MU: sem half (nota lançada / MU do manual). Half só em MS/MA/MF.
+                var pp = Math.round(10 * (5 + Math.abs(h + b * 3) % 51) / 10) / 10;
+                var pu = Math.round(10 * (5 + Math.abs(h + b * 7) % 51) / 10) / 10;
+                var pe = Math.round(10 * (Math.abs(h + b) % 16) / 10) / 10;
+                var mu = Math.round((((pp + pu) / 2) + pe) * 100) / 100;
+                notas['b' + b + '_pp'] = pp;
+                notas['b' + b + '_pu'] = pu;
+                notas['b' + b + '_ch'] = '—';
+                notas['b' + b + '_pe'] = pe;
+                notas['b' + b + '_mu'] = mu;
+                notas['b' + b + '_fal'] = Math.abs(h + b * 5) % 9;
+                mus[b] = mu;
+            });
+            notas.s1_rec = '—';
+            notas.s1_ms = roundPreviewValor((mus[1] + mus[2]) / 2);
+            notas.s2_rec = '—';
+            notas.s2_ms = roundPreviewValor((mus[3] + mus[4]) / 2);
+            notas.ma = roundPreviewValor((notas.s1_ms + notas.s2_ms) / 2);
+            notas.pf = '—';
+            notas.mf = notas.ma;
+            notas.situacao = 'Cursando';
+            return notas;
+        }
+        var mats = materiasPreviewLocal(['Língua Portuguesa', 'Matemática', 'História', 'Geografia', 'Ciências']);
+        var colunas = flat.map(function (c) {
+            return {
+                codigo: c.codigo,
+                nome: c.nome || c.codigo,
+                tipo: c.source_type === 'calculado' || c.tipo === 'calculado' ? 'calculado' : 'peca',
+                travada: false
+            };
+        });
+        var linhasSm = mats.map(function (n) { return { materia_nome: n, notas: notasLinha(n) }; });
+        linhasSm = linhasComTituloBoletim(linhasSm, flat.slice(), []);
+        return {
+            modo: 'boletim',
+            modelo_santa_maria: 1,
+            aviso: 'Preview no formato do print Santa Maria. Arraste colunas/blocos e edite os títulos do período — a tabela abaixo acompanha. Dados fictícios.',
+            grupos: grupos,
+            colunas: colunas,
+            pecas_disponiveis: [],
+            tabelas: [{
+                key: 'u',
+                titulo: 'COMPONENTES CURRICULARES',
+                subtitulo: '',
+                semanas: [],
+                outras: flat.slice(),
+                grupos: grupos,
+                linhas: linhasSm
+            }]
+        };
+    }
+
     function previewLocalBoletim() {
+        if (ehModeloSantaMaria()) return previewLocalBoletimSantaMaria();
         var fontes = (estado && estado.fontes_bimestres) || {};
         var faltas = (estado && estado.fontes_faltas) || {};
         var bims = [1, 2, 3, 4].filter(function (b) {
@@ -3740,18 +4738,29 @@ $boletimWizardSteps = [
             return notas;
         }
         var mats = materiasPreviewLocal(['Língua Portuguesa', 'Matemática', 'História', 'Geografia', 'Ciências']);
+        var colunas = [];
+        grupos.forEach(function (g) {
+            (g.cols || []).forEach(function (c) {
+                colunas.push({
+                    codigo: c.codigo,
+                    nome: c.nome || c.codigo,
+                    tipo: c.source_type === 'calculado' ? 'calculado' : 'peca',
+                    travada: false
+                });
+            });
+        });
         return {
             modo: 'boletim',
             aviso: 'Exemplo com dados fictícios — não são notas reais.',
             grupos: grupos,
-            colunas: [],
+            colunas: colunas,
             pecas_disponiveis: [],
             tabelas: [{
                 key: 'u',
                 titulo: 'Matérias',
                 subtitulo: '',
                 semanas: [],
-                outras: [],
+                outras: colunas.slice(),
                 grupos: grupos,
                 linhas: mats.map(function (n) { return { materia_nome: n, notas: notasLinha(n) }; })
             }]
@@ -3885,7 +4894,18 @@ $boletimWizardSteps = [
                 pecas_disponiveis: []
             };
         }
+        // Montar quadro / impressão: Exemplo acompanha arraste e cabeçalhos na hora.
+        if (typeof ehVisaoImpressaoEditavel === 'function' && ehVisaoImpressaoEditavel()) {
+            if (ehModeloSantaMaria()) return previewLocalBoletimSantaMaria();
+            return previewLocalQuadroImpressao();
+        }
         if (ehBoletimComposto()) {
+            if (ehModeloSantaMaria()) {
+                var gruposSm = (previewAtual && previewAtual.grupos) || [];
+                if (!(previewAtual && previewAtual.modo === 'boletim' && gruposTemSemestresSantaMaria(gruposSm))) {
+                    return previewLocalBoletimSantaMaria();
+                }
+            }
             if (previewAtual && previewAtual.modo === 'boletim' && (previewAtual.tabelas || []).length) {
                 return previewAtual;
             }
@@ -3895,13 +4915,322 @@ $boletimWizardSteps = [
         return previewLocal();
     }
 
+    /** Preview local do Montar quadro: todas as colunas + cabeçalhos na ordem do arraste. */
+    function quadroManualDoZero() {
+        return !!(estado && (estado.quadro_livre || estado.origem === 'quadro-impressao' || Number(estado.cabecalhos_manuais || 0) === 1));
+    }
+
+    function garantirChPorBimestreLocal(mapa) {
+        mapa = mapa || {};
+        // Do zero: CH só entra se o admin clicou no catálogo (já está em colunas_ordem).
+        if (quadroManualDoZero()) return mapa;
+        var bims = {};
+        Object.keys(mapa).forEach(function (cod) {
+            var m = String(cod || '').toLowerCase().match(/^b([1-4])_/);
+            if (m) bims[Number(m[1])] = true;
+        });
+        if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
+        if (!Array.isArray(estado.colunas_ordem)) estado.colunas_ordem = [];
+        [1, 2, 3, 4].forEach(function (bim) {
+            if (!bims[bim]) return;
+            var cod = 'b' + bim + '_ch';
+            var jaTemCh = !!mapa[cod];
+            if (!jaTemCh) {
+                Object.keys(mapa).forEach(function (c) {
+                    if (!String(c).match(new RegExp('^b' + bim + '_'))) return;
+                    if (String(siglaTituloColunaJs(c, (mapa[c] && mapa[c].nome) || '') || '').toUpperCase() === 'CH') {
+                        jaTemCh = true;
+                    }
+                });
+            }
+            if (jaTemCh) return;
+            mapa[cod] = {
+                codigo: cod,
+                nome: 'CH',
+                layout_type: 'media',
+                source_type: 'nenhuma',
+                tipo: 'peca',
+                travada: false
+            };
+            estado.nomes_blocos[cod] = 'CH';
+            if (estado.colunas_ordem.indexOf(cod) < 0) {
+                var pu = 'b' + bim + '_pu';
+                var idxPu = estado.colunas_ordem.indexOf(pu);
+                if (idxPu >= 0) estado.colunas_ordem.splice(idxPu + 1, 0, cod);
+                else estado.colunas_ordem.push(cod);
+            }
+            if (Array.isArray(estado.linhas_layout)) {
+                estado.linhas_layout.forEach(function (lin) {
+                    if (!lin || !Array.isArray(lin.colunas)) return;
+                    var cols = lin.colunas.map(function (c) { return String(c || '').toLowerCase(); });
+                    var temBim = cols.some(function (c) { return c.indexOf('b' + bim + '_') === 0; });
+                    if (!temBim || cols.indexOf(cod) >= 0) return;
+                    var iPu = cols.indexOf('b' + bim + '_pu');
+                    if (iPu >= 0) cols.splice(iPu + 1, 0, cod);
+                    else {
+                        var iFirst = -1;
+                        cols.forEach(function (c, i) {
+                            if (iFirst < 0 && c.indexOf('b' + bim + '_') === 0) iFirst = i;
+                        });
+                        if (iFirst >= 0) cols.splice(iFirst + 1, 0, cod);
+                        else cols.push(cod);
+                    }
+                    lin.colunas = cols;
+                });
+            }
+        });
+        return mapa;
+    }
+
+    function garantirFalPorBimestreLocal(mapa) {
+        mapa = mapa || {};
+        // Do zero: FAL só entra se o admin clicou no catálogo.
+        if (quadroManualDoZero()) return mapa;
+        var bims = {};
+        Object.keys(mapa).forEach(function (cod) {
+            var m = String(cod || '').toLowerCase().match(/^b([1-4])_/);
+            if (m) bims[Number(m[1])] = true;
+        });
+        if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
+        if (!Array.isArray(estado.colunas_ordem)) estado.colunas_ordem = [];
+        if (!estado.fontes_faltas || typeof estado.fontes_faltas !== 'object') {
+            estado.fontes_faltas = { 1: 0, 2: 0, 3: 0, 4: 0 };
+        }
+        var ano = Number((estado && estado.ano_letivo) || 0);
+        [1, 2, 3, 4].forEach(function (bim) {
+            if (!bims[bim]) return;
+            var cod = 'b' + bim + '_fal';
+            var jaTemFal = !!mapa[cod] || !!mapa['b' + bim + '_faltas'];
+            if (!jaTemFal) {
+                Object.keys(mapa).forEach(function (c) {
+                    if (!String(c).match(new RegExp('^b' + bim + '_'))) return;
+                    var col = mapa[c] || {};
+                    if (colunaEhFaltas(col) || String(siglaTituloColunaJs(c, col.nome || '') || '').toUpperCase() === 'FAL') {
+                        jaTemFal = true;
+                    }
+                });
+            }
+            if (jaTemFal) {
+                if (mapa['b' + bim + '_faltas'] && !mapa[cod]) {
+                    mapa[cod] = Object.assign({}, mapa['b' + bim + '_faltas'], {
+                        codigo: cod,
+                        nome: 'FAL',
+                        layout_type: 'faltas'
+                    });
+                    delete mapa['b' + bim + '_faltas'];
+                }
+                return;
+            }
+            if (!Number(estado.fontes_faltas[bim] || 0)) {
+                ((catalogo && catalogo.faltas_eventos) || []).some(function (fe) {
+                    if (!fe) return false;
+                    if (ano > 0 && Number(fe.ano_letivo || 0) !== ano) return false;
+                    if (Number(fe.bimestre || 0) !== bim) return false;
+                    var fid = Number(fe.id || 0);
+                    if (fid <= 0) return false;
+                    estado.fontes_faltas[bim] = fid;
+                    return true;
+                });
+            }
+            var idFal = Number(estado.fontes_faltas[bim] || 0);
+            mapa[cod] = {
+                codigo: cod,
+                nome: 'FAL',
+                layout_type: 'faltas',
+                source_type: idFal > 0 ? 'faltas_evento' : 'nenhuma',
+                tipo: 'peca',
+                travada: false
+            };
+            estado.nomes_blocos[cod] = 'FAL';
+            if (estado.colunas_ordem.indexOf(cod) < 0) {
+                var pe = 'b' + bim + '_pe';
+                var idxPe = estado.colunas_ordem.indexOf(pe);
+                if (idxPe >= 0) estado.colunas_ordem.splice(idxPe + 1, 0, cod);
+                else estado.colunas_ordem.push(cod);
+            }
+            if (Array.isArray(estado.linhas_layout)) {
+                estado.linhas_layout.forEach(function (lin) {
+                    if (!lin || !Array.isArray(lin.colunas)) return;
+                    var cols = lin.colunas.map(function (c) { return String(c || '').toLowerCase(); });
+                    var temBim = cols.some(function (c) { return c.indexOf('b' + bim + '_') === 0; });
+                    if (!temBim || cols.indexOf(cod) >= 0) return;
+                    var iPe = cols.indexOf('b' + bim + '_pe');
+                    if (iPe >= 0) cols.splice(iPe + 1, 0, cod);
+                    else {
+                        var iLast = -1;
+                        cols.forEach(function (c, i) {
+                            if (c.indexOf('b' + bim + '_') === 0) iLast = i;
+                        });
+                        if (iLast >= 0) cols.splice(iLast + 1, 0, cod);
+                        else cols.push(cod);
+                    }
+                    lin.colunas = cols;
+                });
+            }
+        });
+        return mapa;
+    }
+
+    function previewLocalQuadroImpressao() {
+        var mapa = {};
+        function upsert(cod, nome, sourceType, layoutType) {
+            cod = String(cod || '').toLowerCase();
+            if (!cod || colunaOculta(cod)) return;
+            if (!mapa[cod]) {
+                mapa[cod] = {
+                    codigo: cod,
+                    nome: nome || tituloColuna(cod) || siglaTituloColunaJs(cod, nome) || cod,
+                    layout_type: layoutType || 'media',
+                    source_type: sourceType || 'nenhuma',
+                    tipo: sourceType === 'calculado' ? 'calculado' : 'peca',
+                    travada: false
+                };
+            }
+            var rotulo = tituloColuna(cod) || siglaTituloColunaJs(cod, mapa[cod].nome) || mapa[cod].nome;
+            if (rotulo) mapa[cod].nome = rotulo;
+        }
+        // Fonte da verdade: componentes do rascunho atual (Demonstrativos + eventos marcados).
+        ((rascunhoAtual && rascunhoAtual.componentes) || []).forEach(function (c) {
+            if (!c) return;
+            var cfg = configDoComp(c);
+            upsert(c.codigo, c.nome, c.source_type, cfg.layout_type || '');
+        });
+        (estado.blocos_calc || []).forEach(function (cod) {
+            upsert(cod, nomeBlocoCalc(cod), 'calculado', 'media');
+        });
+        Object.keys(estado.formulas_blocos || {}).forEach(function (cod) {
+            upsert(cod, nomeBlocoCalc(cod), 'calculado', 'media');
+        });
+        Object.keys(estado.nomes_blocos || {}).forEach(function (cod) {
+            var low = String(cod || '').toLowerCase();
+            var ehCalc = (estado.blocos_calc || []).indexOf(cod) >= 0
+                || (estado.blocos_calc || []).indexOf(low) >= 0
+                || !!(estado.formulas_blocos && (estado.formulas_blocos[cod] || estado.formulas_blocos[low]));
+            if (!mapa[low] && !ehCalc) return;
+            upsert(cod, estado.nomes_blocos[cod], ehCalc ? 'calculado' : 'nenhuma', 'media');
+        });
+        // Garante códigos só presentes em linhas_layout (ex.: MU no I BIMESTRE).
+        (estado.linhas_layout || []).forEach(function (lin) {
+            (lin && lin.colunas || []).forEach(function (cod) {
+                var low = String(cod || '').toLowerCase();
+                if (!low || mapa[low]) return;
+                var ehCalc = (estado.blocos_calc || []).indexOf(cod) >= 0
+                    || (estado.blocos_calc || []).indexOf(low) >= 0
+                    || !!(estado.formulas_blocos && (estado.formulas_blocos[cod] || estado.formulas_blocos[low]));
+                upsert(low, nomeBlocoCalc(low) || tituloColuna(low) || low, ehCalc ? 'calculado' : 'nenhuma', 'media');
+            });
+        });
+        mapa = garantirChPorBimestreLocal(mapa);
+        mapa = garantirFalPorBimestreLocal(mapa);
+
+        var ordem = [];
+        var visto = {};
+        function pushCod(cod) {
+            cod = String(cod || '').toLowerCase();
+            if (!cod || !mapa[cod] || visto[cod] || colunaOculta(cod)) return;
+            visto[cod] = true;
+            ordem.push(cod);
+        }
+        (estado.colunas_ordem || []).forEach(pushCod);
+        (estado.linhas_layout || []).forEach(function (lin) {
+            (lin.colunas || []).forEach(pushCod);
+        });
+        Object.keys(mapa).forEach(pushCod);
+
+        var flat = ordem.map(function (cod) {
+            var base = mapa[cod];
+            return Object.assign({}, base, {
+                nome: tituloColuna(cod) || siglaTituloColunaJs(cod, base.nome) || base.nome || cod
+            });
+        });
+        flat = ordenarColunasLista(flat);
+        var grupos = montarGruposDeFaixas(flat);
+        function notasLinha(nome) {
+            var h = hashNome(nome) + hashPreviewAluno();
+            var notas = {};
+            flat.forEach(function (o, idx) {
+                if (!o || !o.codigo) return;
+                if (o.layout_type === 'resultado') {
+                    notas[o.codigo] = 'Cursando';
+                    return;
+                }
+                if (o.layout_type === 'faltas') {
+                    notas[o.codigo] = Math.abs(h + idx * 5) % 9;
+                    return;
+                }
+                if (String(o.codigo).indexOf('rec') >= 0 || o.layout_type === 'rec' || String(o.nome || '').toUpperCase() === 'REC' || String(o.nome || '').toUpperCase() === 'PF') {
+                    notas[o.codigo] = '—';
+                    return;
+                }
+                if (o.source_type === 'calculado' || o.tipo === 'calculado') {
+                    notas[o.codigo] = roundPreviewValor(Math.round(10 * (5 + Math.abs(h + idx * 7) % 51) / 10) / 10);
+                    return;
+                }
+                notas[o.codigo] = roundPreviewValor(Math.round(10 * (5 + Math.abs(h + o.codigo.length * 7 + idx) % 51) / 10) / 10);
+            });
+            return notas;
+        }
+        var mats = materiasPreviewLocal(['Literatura', 'Geografia', 'Língua Inglesa', 'Matemática', 'História']);
+        var colunas = flat.map(function (c) {
+            return {
+                codigo: c.codigo,
+                nome: c.nome || c.codigo,
+                tipo: c.source_type === 'calculado' || c.tipo === 'calculado' ? 'calculado' : 'peca',
+                travada: false,
+                layout_type: c.layout_type || ''
+            };
+        });
+        return {
+            modo: 'boletim',
+            aviso: 'Exemplo com dados fictícios — arraste títulos do período e colunas para ver o quadro atualizar.',
+            grupos: grupos,
+            colunas: colunas,
+            pecas_disponiveis: [],
+            tabelas: [{
+                key: 'u',
+                titulo: 'Matérias',
+                subtitulo: 'Exemplo',
+                semanas: [],
+                outras: colunas.slice(),
+                grupos: grupos,
+                linhas: mats.map(function (n) { return { materia_nome: n, notas: notasLinha(n) }; })
+            }]
+        };
+    }
+
+    function gruposTemSemestresSantaMaria(grupos) {
+        var temS1 = false;
+        var temS2 = false;
+        (grupos || []).forEach(function (g) {
+            var key = String((g && g.key) || '').toLowerCase();
+            var label = String((g && g.label) || '').toLowerCase();
+            if (key === 's1' || label.indexOf('1º semestre') >= 0 || label.indexOf('1o semestre') >= 0) temS1 = true;
+            if (key === 's2' || label.indexOf('2º semestre') >= 0 || label.indexOf('2o semestre') >= 0) temS2 = true;
+        });
+        return temS1 && temS2;
+    }
+
+    function gruposBoletimComCabecalhos(tab) {
+        if (ehModeloSantaMaria()) garantirLinhasLayoutSantaMaria();
+        var grupos = (tab && tab.grupos) || [];
+        var flat = flatColsDeGrupos(grupos);
+        if (!flat.length && tab && (tab.outras || []).length) {
+            flat = (tab.outras || []).slice();
+        }
+        if (!flat.length) return grupos;
+        flat = ordenarColunasLista(flat);
+        var montados = montarGruposDeFaixas(flat);
+        if (!montados.length) return grupos;
+        return montados;
+    }
+
     function htmlTabelaPreviewBoletim(tab) {
-        var grupos = tab.grupos || [];
+        var grupos = gruposBoletimComCabecalhos(tab);
         var html = '<div class="overflow-x-auto max-h-[28rem] border border-gray-300 rounded-lg bg-white mb-4">';
         html += '<table class="bw-preview-table boletim"><thead><tr>';
         html += '<th rowspan="2" class="mat text-left">' + esc(tab.titulo || 'Matéria') + '</th>';
         grupos.forEach(function (g) {
-            html += '<th colspan="' + (g.cols || []).length + '">' + esc(g.label || g.key) + '</th>';
+            html += '<th colspan="' + Math.max(1, (g.cols || []).length) + '">' + esc(g.label || g.key) + '</th>';
         });
         html += '</tr><tr>';
         grupos.forEach(function (g) {
@@ -3912,7 +5241,12 @@ $boletimWizardSteps = [
         html += '</tr></thead><tbody>';
         (tab.linhas || []).forEach(function (lin) {
             var notas = lin.notas || {};
-            html += '<tr><td class="mat">' + esc(lin.materia_nome) + '</td>';
+            var clsMat = 'mat';
+            if (lin.eh_grupo_pai) clsMat += ' font-bold';
+            if (lin.eh_grupo_filho) clsMat += ' pl-7 text-gray-800';
+            var nomeMat = esc(lin.materia_nome);
+            if (lin.eh_grupo_filho) nomeMat = '<span class="text-gray-400 mr-1" aria-hidden="true">↳</span>' + nomeMat;
+            html += '<tr' + (lin.eh_grupo_pai ? ' class="font-semibold"' : '') + '><td class="' + clsMat + '">' + nomeMat + '</td>';
             grupos.forEach(function (g) {
                 (g.cols || []).forEach(function (c) {
                     var v = notaDaLinhaPreview(notas, c.codigo);
@@ -3951,45 +5285,155 @@ $boletimWizardSteps = [
             if (!lin || !Array.isArray(lin.colunas)) continue;
             if (lin.colunas.indexOf(codigo) >= 0) return lin;
         }
+        // Com cabeçalhos manuais (limpou / montou do zero), não usa "Avaliações" vindo do Demonstrativo.
+        if (Number(estado && estado.cabecalhos_manuais || 0) === 1) return null;
         var nomeCab = coluna ? String(coluna.linha_cabecalho || '').trim() : '';
         if (nomeCab) return { id: 'cab:' + nomeCab.toLowerCase(), nome: nomeCab, colunas: [codigo] };
         return null;
     }
 
+    function ordenarColsPeloLayout(cols, lin) {
+        cols = cols || [];
+        if (!lin || !Array.isArray(lin.colunas) || !lin.colunas.length || cols.length < 2) return cols;
+        var map = {};
+        cols.forEach(function (c) {
+            if (!c || !c.codigo) return;
+            map[String(c.codigo).toLowerCase()] = c;
+        });
+        var out = [];
+        var visto = {};
+        lin.colunas.forEach(function (cod) {
+            cod = String(cod || '').toLowerCase();
+            if (!cod || !map[cod] || visto[cod]) return;
+            visto[cod] = true;
+            out.push(map[cod]);
+        });
+        cols.forEach(function (c) {
+            var cod = String((c && c.codigo) || '').toLowerCase();
+            if (!cod || visto[cod]) return;
+            visto[cod] = true;
+            out.push(c);
+        });
+        return out;
+    }
+
+    /** Ordem flat: cabeçalhos (na ordem de linhas_layout) + colunas soltas. */
+    function ordemColunasApartirDoLayout() {
+        var ordem = [];
+        var visto = {};
+        function push(cod) {
+            cod = String(cod || '').toLowerCase();
+            if (!cod || visto[cod]) return;
+            visto[cod] = true;
+            ordem.push(cod);
+        }
+        (estado && estado.linhas_layout || []).forEach(function (lin) {
+            (lin && lin.colunas || []).forEach(push);
+        });
+        (estado && estado.colunas_ordem || []).forEach(push);
+        return ordem;
+    }
+
+    function sincronizarOrdemComLinhasLayout() {
+        if (!estado) return;
+        var nova = ordemColunasApartirDoLayout();
+        if (nova.length) estado.colunas_ordem = nova;
+    }
+
     function faixasCabecalhoPreview(outras) {
-        var faixas = [];
-        var i = 0;
         outras = outras || [];
-        while (i < outras.length) {
-            var o = outras[i] || {};
+        var grupos = {};
+        var ordemGrupos = [];
+        outras.forEach(function (o, idx) {
+            if (!o) return;
+            var lin = linhaLayoutDaColuna(o.codigo, o);
+            if (!lin || !String(lin.nome || '').trim()) return;
+            var gid = String(lin.id || ('cab:' + String(lin.nome).toLowerCase()));
+            if (!grupos[gid]) {
+                grupos[gid] = { nome: lin.nome, lin: lin, cols: [], firstIdx: idx };
+                ordemGrupos.push(gid);
+            }
+            grupos[gid].cols.push(o);
+        });
+        // Dentro do cabeçalho, respeita a ordem dos chips (linhas_layout), não a flat antiga.
+        Object.keys(grupos).forEach(function (gid) {
+            grupos[gid].cols = ordenarColsPeloLayout(grupos[gid].cols, grupos[gid].lin);
+        });
+        // Emite o grupo inteiro na 1ª aparição de qualquer coluna dele —
+        // assim MU/bloco de cálculo entra no cabeçalho mesmo se a ordem flat
+        // ainda não estiver contígua após o remount.
+        var faixas = [];
+        var emitidos = {};
+        // Preferência: ordem dos cabeçalhos em linhas_layout (como o admin montou).
+        (estado && estado.linhas_layout || []).forEach(function (lin) {
+            if (!lin || !String(lin.nome || '').trim()) return;
+            var gid = String(lin.id || ('cab:' + String(lin.nome).toLowerCase()));
+            if (!grupos[gid] || emitidos[gid]) return;
+            emitidos[gid] = true;
+            faixas.push({ tipo: 'grupo', nome: grupos[gid].nome, cols: grupos[gid].cols });
+        });
+        outras.forEach(function (o) {
+            if (!o) return;
             var lin = linhaLayoutDaColuna(o.codigo, o);
             if (lin && String(lin.nome || '').trim()) {
-                var cols = [o];
-                var j = i + 1;
-                while (j < outras.length && linhaLayoutDaColuna((outras[j] || {}).codigo, outras[j]) && linhaLayoutDaColuna((outras[j] || {}).codigo, outras[j]).id === lin.id) {
-                    cols.push(outras[j]);
-                    j++;
-                }
-                if (cols.length > 1) {
-                    faixas.push({ tipo: 'grupo', nome: lin.nome, cols: cols });
-                    i = j;
-                    continue;
-                }
+                var gid = String(lin.id || ('cab:' + String(lin.nome).toLowerCase()));
+                if (emitidos[gid]) return;
+                emitidos[gid] = true;
+                faixas.push({ tipo: 'grupo', nome: grupos[gid].nome, cols: grupos[gid].cols });
+                return;
             }
             faixas.push({ tipo: 'sozinha', col: o });
-            i++;
-        }
+        });
         return faixas;
     }
 
     function aplicarOrdemNoPreview(pv) {
         if (!pv) return pv;
-        pv.colunas = ordenarColunasLista(pv.colunas || []);
+        var forcarGrupos = (pv.modo === 'boletim')
+            || ehModeloSantaMaria()
+            || (typeof ehVisaoImpressaoEditavel === 'function' && ehVisaoImpressaoEditavel());
+        // Inclui blocos de cálculo (MU) do estado — o servidor às vezes ainda não devolveu no preview.
+        pv.colunas = ordenarColunasLista(mesclarColunasExtrasDoEstado(pv.colunas || []));
+        if ((pv.grupos || []).length || forcarGrupos) {
+            var flatTop = ordenarColunasLista(flatColsDeGrupos(pv.grupos));
+            if (!flatTop.length) flatTop = (pv.colunas || []).slice();
+            flatTop = ordenarColunasLista(mesclarColunasExtrasDoEstado(flatTop));
+            pv.grupos = montarGruposDeFaixas(flatTop);
+        }
         (pv.tabelas || []).forEach(function (t) {
             if (!t) return;
-            t.outras = ordenarColunasLista(t.outras || []);
+            var flat = flatColsDeGrupos(t.grupos || []);
+            if (!flat.length) flat = (t.outras || []).slice();
+            if (!flat.length && (pv.grupos || []).length) flat = flatColsDeGrupos(pv.grupos);
+            if (!flat.length) flat = (pv.colunas || []).slice();
+            flat = ordenarColunasLista(mesclarColunasExtrasDoEstado(flat.length ? flat : (t.outras || [])));
+            t.outras = flat;
+            if ((t.grupos || []).length || forcarGrupos) {
+                t.grupos = montarGruposDeFaixas(flat);
+            }
         });
         return pv;
+    }
+
+    /** Junta as colunas de um cabeçalho na ordem do arraste (faixa fecha no Exemplo). */
+    function compactarColunasOrdem(codigosJuntos) {
+        if (!estado) return;
+        var bloco = (codigosJuntos || []).map(function (c) { return String(c || '').toLowerCase(); })
+            .filter(function (c, i, arr) { return c && arr.indexOf(c) === i; });
+        if (bloco.length < 2) return;
+        var ordem = (estado.colunas_ordem || []).map(function (c) { return String(c || '').toLowerCase(); });
+        var setBloco = {};
+        bloco.forEach(function (c) { setBloco[c] = true; });
+        var semBloco = ordem.filter(function (c) { return !setBloco[c]; });
+        var idxs = bloco.map(function (c) { return ordem.indexOf(c); }).filter(function (i) { return i >= 0; });
+        var insertAt = idxs.length ? Math.min.apply(null, idxs) : semBloco.length;
+        if (insertAt < 0) insertAt = 0;
+        if (insertAt > semBloco.length) insertAt = semBloco.length;
+        var nova = semBloco.slice(0, insertAt).concat(bloco).concat(semBloco.slice(insertAt));
+        bloco.forEach(function (c) {
+            if (nova.indexOf(c) < 0) nova.push(c);
+        });
+        estado.colunas_ordem = nova;
     }
 
     function codigosMarcados() {
@@ -4172,17 +5616,84 @@ $boletimWizardSteps = [
         return Number(direto);
     }
 
+    function extrairArgsFuncaoJs(src, openIdx) {
+        var n = src.length;
+        var i = openIdx + 1;
+        var depth = 1;
+        var args = [];
+        var inicio = i;
+        for (; i < n; i++) {
+            var c = src.charAt(i);
+            if (c === '(') depth++;
+            else if (c === ')') {
+                depth--;
+                if (depth === 0) {
+                    args.push(src.slice(inicio, i));
+                    return { args: args, close: i };
+                }
+            } else if (c === ',' && depth === 1) {
+                args.push(src.slice(inicio, i));
+                inicio = i + 1;
+            }
+        }
+        return null;
+    }
+
+    /** Expande chamada/substituta(bases…, subst) → média das bases (1ª ausente recebe a subst). */
+    function expandirChamadaJs(src, notas) {
+        var out = String(src || '');
+        var guard = 0;
+        while (/\b(?:chamada|substituta)\s*\(/i.test(out) && guard++ < 40) {
+            var m = out.match(/\b(?:chamada|substituta)\s*\(/i);
+            if (!m) break;
+            var startFn = m.index;
+            var openParen = startFn + m[0].length - 1;
+            var parsed = extrairArgsFuncaoJs(out, openParen);
+            if (!parsed || parsed.args.length < 2) return null;
+            var args = parsed.args.slice();
+            var subst = args.pop();
+            var preencheu = false;
+            var termos = args.map(function (base) {
+                var b = String(base || '').trim();
+                var ehIdent = /^[A-Za-z_][A-Za-z0-9_]*$/.test(b);
+                if (ehIdent && notaFormulaGrupo(notas, b) == null && !preencheu) {
+                    preencheu = true;
+                    return '(' + subst + ')';
+                }
+                return '(' + b + ')';
+            });
+            var media = termos.length === 1
+                ? termos[0]
+                : '((' + termos.join('+') + ')/' + termos.length + ')';
+            out = out.slice(0, startFn) + media + out.slice(parsed.close + 1);
+            // substituta já é média — tira ÷ N redundante (ex.: …/2 → nota pela metade).
+            if (termos.length > 1) {
+                var cauda = out.slice(startFn + media.length);
+                var divRedundante = cauda.match(/^\s*\/\s*(\d+(?:[.,]\d+)?)/);
+                if (divRedundante && Number(String(divRedundante[1]).replace(',', '.')) === termos.length) {
+                    out = out.slice(0, startFn + media.length) + cauda.slice(divRedundante[0].length);
+                }
+            }
+        }
+        return out;
+    }
+
     function avaliarExpressaoGrupo(exp, notas) {
         var src = String(exp || '').trim();
         if (!src) return null;
+        src = src.replace(/\bsubstituta\s*\(/ig, 'chamada(');
+        if (/\bchamada\s*\(/i.test(src)) {
+            src = expandirChamadaJs(src, notas);
+            if (src == null) return null;
+        }
         src = src.replace(/[A-Za-z_][A-Za-z0-9_]*/g, function (nome) {
             var baixo = nome.toLowerCase();
-            if (baixo === 'max' || baixo === 'min') return baixo;
+            if (baixo === 'max' || baixo === 'min' || baixo === 'chamada' || baixo === 'substituta') return baixo;
             var v = notaFormulaGrupo(notas, nome);
             if (v == null || !isFinite(v)) return '0';
             return String(v);
         });
-        if (!/^[\d\s+\-*/().,]+$/.test(src.replace(/\b(?:max|min)\b/g, ''))) return null;
+        if (!/^[\d\s+\-*/().,]+$/.test(src.replace(/\b(?:max|min|chamada|substituta)\b/g, ''))) return null;
         src = src.replace(/\bmax\b/g, 'Math.max').replace(/\bmin\b/g, 'Math.min');
         try {
             var n = Function('"use strict"; return (' + src + ');')();
@@ -4234,12 +5745,48 @@ $boletimWizardSteps = [
         }).filter(function (m) { return m.id > 0 && m.nome; });
     }
 
-    function linhasDoDemonstrativo(brutas, outras, semanas) {
-        var lista = (brutas || []).slice();
-        var gl = (estado && estado.grupo_linha) || {};
-        if (!gl.ativo || !(gl.materias_ids || []).length) {
-            return lista;
+    /** Áreas com título no boletim (mãe + filhos). No SM, todas as famílias do escopo. */
+    function gruposTituloParaPreview() {
+        var out = [];
+        var visto = {};
+        function pushGrupo(g) {
+            if (!g || !g.ativo) return;
+            var ids = (g.materias_ids || []).map(Number).filter(function (n) { return n > 0; });
+            if (ids.length < 2) return;
+            var nome = String(g.nome || '').trim() || 'Grupo';
+            var key = chaveNomeMateria(nome) + '|' + ids.slice().sort(function (a, b) { return a - b; }).join(',');
+            if (visto[key]) return;
+            visto[key] = true;
+            out.push({
+                ativo: true,
+                nome: nome,
+                materias_ids: ids,
+                modo: g.modo === 'soma' ? 'soma' : 'media',
+                modos: g.modos || {},
+                exemplo_sem_filhas: !!g.exemplo_sem_filhas,
+                arredondamento: g.arredondamento || 'todos'
+            });
         }
+        // Print SM / boletim: cada área com desdobramento vira linha-mãe (História → 1/2).
+        if (ehModeloSantaMaria() || (estado && estado.exibir_em === 'boletim')) {
+            familiasDoEscopo().forEach(function (f) {
+                pushGrupo({
+                    ativo: true,
+                    nome: f.nome,
+                    materias_ids: (f.materias_ids || []).slice(),
+                    modo: 'soma',
+                    exemplo_sem_filhas: false
+                });
+            });
+        }
+        var gl = (estado && estado.grupo_linha) || {};
+        if (gl.ativo) pushGrupo(gl);
+        return out;
+    }
+
+    function aplicarUmGrupoLinha(listaIn, gl, outras, semanas) {
+        var lista = (listaIn || []).slice();
+        if (!gl || !gl.ativo || !(gl.materias_ids || []).length) return lista;
         var idsGrupo = {};
         (gl.materias_ids || []).forEach(function (id) {
             id = Number(id || 0);
@@ -4254,18 +5801,12 @@ $boletimWizardSteps = [
             nomePorId[id] = m.nome;
         });
         var filhosNaLista = 0;
-        var temPai = false;
         lista.forEach(function (lin) {
-            if (!lin) return;
-            if (lin.eh_grupo_pai) temPai = true;
-            if (lin.eh_grupo_pai) return;
+            if (!lin || lin.eh_grupo_pai) return;
             if (idsGrupo[Number(lin.materia_id)] || nomesGrupo[chaveNomeMateria(lin.materia_nome)]) filhosNaLista++;
         });
-        // Cada bloco do quadro chama esta função. Sem filha neste bloco, não inventa
-        // outra Língua Portuguesa vazia no bloco ao lado.
-        if (filhosNaLista === 0) {
-            return lista;
-        }
+        // Sem filha neste bloco, não inventa outra área vazia.
+        if (filhosNaLista === 0) return lista;
         Object.keys(idsGrupo).forEach(function (id) {
             id = Number(id);
             var nome = nomePorId[id] || '';
@@ -4279,15 +5820,23 @@ $boletimWizardSteps = [
             }
         });
         var notasMae = null;
-        lista.forEach(function (lin) {
-            if (lin && lin.eh_grupo_pai && lin.notas) notasMae = lin.notas;
-        });
         var nomeMae = chaveNomeMateria(gl.nome);
+        lista.forEach(function (lin) {
+            if (!lin || !lin.eh_grupo_pai) return;
+            if (chaveNomeMateria(lin.materia_nome) === nomeMae && lin.notas) notasMae = lin.notas;
+        });
         var membros = [];
         var out = [];
         var pos = -1;
+        var nomePai = String(gl.nome || 'Grupo').trim() || 'Grupo';
         lista.forEach(function (lin) {
-            if (!lin || lin.eh_grupo_pai) return;
+            if (!lin) return;
+            // Mantém outras mães já montadas; a desta área some (recria abaixo).
+            if (lin.eh_grupo_pai) {
+                if (chaveNomeMateria(lin.materia_nome) === nomeMae) return;
+                out.push(lin);
+                return;
+            }
             var entra = idsGrupo[Number(lin.materia_id)] || nomesGrupo[chaveNomeMateria(lin.materia_nome)];
             if (!entra) {
                 if (nomeMae && chaveNomeMateria(lin.materia_nome) === nomeMae && !idsGrupo[Number(lin.materia_id)]) {
@@ -4304,10 +5853,11 @@ $boletimWizardSteps = [
             membros.push(Object.assign({}, lin, {
                 eh_grupo_filho: 1,
                 eh_grupo_pai: 0,
-                grupo_pai_nome: String(gl.nome || 'Grupo').trim() || 'Grupo'
+                grupo_pai_nome: nomePai,
+                grupo_key: chaveNomeMateria(nomePai)
             }));
         });
-        if (membros.length < 2 || pos < 0) return (brutas || []).slice();
+        if (membros.length < 2 || pos < 0) return (listaIn || []).slice();
         membros.sort(function (a, b) {
             return chaveNomeMateria(a.materia_nome).localeCompare(chaveNomeMateria(b.materia_nome));
         });
@@ -4321,18 +5871,36 @@ $boletimWizardSteps = [
             });
         }
         aplicarFormulasNaLinhaGrupo(notasPai);
-        var pai = {
+        out[pos] = {
             materia_id: 0,
-            materia_nome: String(gl.nome || 'Grupo').trim() || 'Grupo',
+            materia_nome: nomePai,
             notas: notasPai,
             eh_grupo_pai: 1,
-            eh_grupo_filho: 0
+            eh_grupo_filho: 0,
+            grupo_key: chaveNomeMateria(nomePai)
         };
-        out[pos] = pai;
         if (!gl.exemplo_sem_filhas) {
             Array.prototype.splice.apply(out, [pos + 1, 0].concat(membros));
         }
         return out.filter(Boolean);
+    }
+
+    function linhasDoDemonstrativo(brutas, outras, semanas) {
+        return linhasComTituloBoletim(brutas, outras, semanas);
+    }
+
+    function linhasComTituloBoletim(brutas, outras, semanas) {
+        var lista = (brutas || []).slice();
+        // Servidor já mandou mãe + filhos (Título no boletim herdado).
+        if (lista.some(function (l) { return l && l.eh_grupo_pai; })) {
+            return lista;
+        }
+        var grupos = gruposTituloParaPreview();
+        if (!grupos.length) return lista;
+        grupos.forEach(function (gl) {
+            lista = aplicarUmGrupoLinha(lista, gl, outras, semanas);
+        });
+        return lista;
     }
 
     function ordenarLinhasPorNome(lista) {
@@ -4346,9 +5914,8 @@ $boletimWizardSteps = [
     }
 
     function linhasDoBoletim(pv, outras) {
-        if (pv && Array.isArray(pv.linhas_boletim) && pv.linhas_boletim.length) {
-            return ordenarLinhasPorNome(pv.linhas_boletim.slice());
-        }
+        // Preferir hierarquia completa (mãe + filhos) quando o servidor já montou
+        // o "Título no boletim" — não usar a matriz colapsada só com a mãe.
         var brutas = (pv && Array.isArray(pv.linhas_completas) && pv.linhas_completas.length)
             ? pv.linhas_completas.slice()
             : [];
@@ -4357,11 +5924,12 @@ $boletimWizardSteps = [
                 (t.linhas || []).forEach(function (lin) { brutas.push(lin); });
             });
         }
-        // Se veio hierarquia do Demonstrativo, colapsa para só a mãe (vista Boletim).
         if (brutas.some(function (l) { return l && l.eh_grupo_pai; })) {
-            return ordenarLinhasPorNome(brutas.filter(function (l) {
-                return l && !l.eh_grupo_filho;
-            }));
+            // Mantém HISTÓRIA → História 1 / História 2 na ordem do servidor.
+            return brutas.filter(Boolean);
+        }
+        if (pv && Array.isArray(pv.linhas_boletim) && pv.linhas_boletim.length) {
+            return ordenarLinhasPorNome(pv.linhas_boletim.slice());
         }
         var porId = {};
         var porNome = {};
@@ -4451,6 +6019,8 @@ $boletimWizardSteps = [
         if (!o) return '';
         var custom = tituloColuna(o.codigo);
         if (custom) return custom;
+        var sig = siglaTituloColunaJs(o.codigo, o.nome);
+        if (sig) return sig;
         var cod = String(o.codigo || '').toLowerCase();
         var nome = String(o.nome || '');
         var nomeNorm = nome.toLocaleLowerCase('pt-BR');
@@ -4510,7 +6080,12 @@ $boletimWizardSteps = [
         html += '</tr></thead><tbody>';
         linhas.forEach(function (lin) {
             var notas = lin.notas || {};
-            html += '<tr><td class="mat">' + esc(lin.materia_nome) + '</td>';
+            var clsMat = 'mat';
+            if (lin.eh_grupo_pai) clsMat += ' font-bold';
+            if (lin.eh_grupo_filho) clsMat += ' pl-7 text-gray-800';
+            var nomeMat = esc(lin.materia_nome);
+            if (lin.eh_grupo_filho) nomeMat = '<span class="text-gray-400 mr-1" aria-hidden="true">↳</span>' + nomeMat;
+            html += '<tr' + (lin.eh_grupo_pai ? ' class="font-semibold"' : '') + '><td class="' + clsMat + '">' + nomeMat + '</td>';
             outras.forEach(function (o) {
                 html += '<td>' + fmtPreviewCelula(notaDaLinhaPreview(notas, o.codigo), o) + '</td>';
             });
@@ -4522,6 +6097,20 @@ $boletimWizardSteps = [
 
     function ehEventoNotasPreview() {
         return !!(estado && estado.exibir_em === 'notas' && !ehBoletimComposto());
+    }
+
+    function ehDemonstrativoNotas() {
+        return !!(estado && estado.exibir_em === 'notas' && !ehBoletimComposto() && !ehVisaoImpressaoEditavel() && !ehModeloSantaMaria());
+    }
+
+    function zerarFormulasDemonstrativoNotas() {
+        if (!ehDemonstrativoNotas()) return;
+        estado.formulas_blocos = {};
+        estado.formulas_materias_blocos = {};
+        estado.blocos_calc = [];
+        estado.bloco_calc = '';
+        estado.formula_final = '';
+        estado.formula_tokens = [];
     }
 
     function htmlCelulaOficial(v, col) {
@@ -4558,8 +6147,8 @@ $boletimWizardSteps = [
                 quadro += htmlTabelaPreview(tab);
             });
             html += htmlBlocoVistaOficial(
-                'Demonstrativo de Notas',
-                'Blocos, semanas e médias.',
+                ehModeloSantaMaria() ? 'Boletim (print Santa Maria)' : 'Demonstrativo de Notas',
+                ehModeloSantaMaria() ? 'PP/PU/CH/PE/MU/FAL · semestres · final.' : 'Blocos, semanas e médias.',
                 quadro
             );
             return html;
@@ -4573,18 +6162,28 @@ $boletimWizardSteps = [
                 return html + htmlTabelaSomenteNotas(pv);
             }
         }
+        var corpoBoletim = '';
         (pv.tabelas || []).forEach(function (t) {
             if (pv.modo === 'boletim' && !(t.grupos || []).length && (pv.grupos || []).length) {
                 t = Object.assign({}, t, { grupos: pv.grupos });
             }
-            if (vistaPreview !== 'boletim' && !(t.grupos || []).length) {
-                t = Object.assign({}, t, {
-                    linhas: linhasDoDemonstrativo(t.linhas || [], t.outras || [], t.semanas || [])
-                });
-            }
-            html += htmlTabelaPreview(t);
+            // Sempre monta mãe + filhos (ex.: História → 1/2), inclusive no print SM com grupos.
+            t = Object.assign({}, t, {
+                linhas: linhasComTituloBoletim(t.linhas || [], t.outras || [], t.semanas || [])
+            });
+            corpoBoletim += htmlTabelaPreview(t);
         });
-        return html;
+        if (pv.modo === 'boletim' || ehModeloSantaMaria() || pv.modelo_santa_maria) {
+            html += htmlBlocoVistaOficial(
+                (ehModeloSantaMaria() || pv.modelo_santa_maria) ? 'Boletim (print Santa Maria)' : 'Boletim',
+                (ehModeloSantaMaria() || pv.modelo_santa_maria)
+                    ? 'I–IV bimestre · PP/PU/CH/PE/MU/FAL · semestres · resultado final.'
+                    : 'Médias e faltas por bimestre.',
+                corpoBoletim
+            );
+            return html;
+        }
+        return html + corpoBoletim;
     }
 
     function colunaSegueBlocoSemanal(c) {
@@ -4592,7 +6191,9 @@ $boletimWizardSteps = [
     }
 
     function ordenarColunasLista(cols) {
-        var ordem = (estado && estado.colunas_ordem) || [];
+        // Preferência: ordem dos chips nos cabeçalhos (linhas_layout) + soltas.
+        var ordem = ordemColunasApartirDoLayout();
+        if (!ordem.length) ordem = (estado && estado.colunas_ordem) || [];
         if (!cols || !cols.length) return cols || [];
         var map = {};
         var travadas = [];
@@ -4603,7 +6204,8 @@ $boletimWizardSteps = [
             if (c.travada || c.codigo === '_semanal') travadas.push(c);
             else if (colunaSegueBlocoSemanal(c)) pinadas.push(c);
             else {
-                map[c.codigo] = c;
+                var key = String(c.codigo || '').toLowerCase();
+                map[key] = c;
                 moveis.push(c);
             }
         });
@@ -4612,74 +6214,650 @@ $boletimWizardSteps = [
         var out = base.slice();
         var visto = {};
         ordem.forEach(function (cod) {
-            if (map[cod] && !visto[cod]) {
-                out.push(map[cod]);
-                visto[cod] = true;
+            var key = String(cod || '').toLowerCase();
+            if (map[key] && !visto[key]) {
+                out.push(map[key]);
+                visto[key] = true;
             }
         });
         moveis.forEach(function (c) {
-            if (!visto[c.codigo]) out.push(c);
+            var key = String(c.codigo || '').toLowerCase();
+            if (!visto[key]) out.push(c);
         });
         return out;
     }
 
-    function htmlColunasOrdem(pv) {
-        var cols = ordenarColunasLista((pv && pv.colunas) || []);
-        var html = '<div class="flex flex-wrap items-center justify-between gap-2 mb-2">';
-        html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Ordem das colunas</p>';
-        html += '<button type="button" id="bw-add-media" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-amber-300 text-amber-950 bg-amber-50 hover:bg-amber-100">Adicionar bloco de cálculo</button>';
-        html += '</div>';
-        if (usaEventosAvaliativosNaNota()) {
-            html += '<p class="text-xs text-gray-500 mb-2">1. Clique nas colunas que ficam juntas — a borda fica azul. 2. Escreva o nome. 3. Clique em <strong>Criar linha</strong>. O nome sobe para cima delas. Arraste para mudar a ordem. O × tira a coluna. A fórmula não muda.</p>';
-            var marcadas = codigosMarcados();
-            var textoDica = 'Clique nas colunas que vão ficar juntas. A borda azul marca a escolha. Precisa de pelo menos duas.';
-            var clsDica = 'text-indigo-800';
-            if (avisoLinha && avisoLinha.texto) {
-                textoDica = avisoLinha.texto;
-                clsDica = avisoLinha.tipo === 'ok' ? 'text-emerald-700' : 'text-amber-800';
-            } else if (marcadas.length >= 2) {
-                textoDica = marcadas.length + ' colunas com borda azul. Escreva o nome e clique em Criar linha.';
-            }
-            html += '<p id="bw-linha-aviso" class="text-xs font-medium mb-2 ' + clsDica + '">' + esc(textoDica) + '</p>';
-            html += '<div class="flex flex-wrap items-center gap-2 mb-2">';
-            html += '<input type="text" id="bw-linha-nome" maxlength="40" value="' + esc(nomeLinhaRascunho) + '" placeholder="Nome da linha. Ex.: Prova Semanal" class="px-3 py-1.5 text-xs border border-gray-300 rounded-lg w-64">';
-            html += '<button type="button" id="bw-criar-linha" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">Criar linha</button>';
-            html += '<button type="button" id="bw-tirar-linha" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50">Tirar da linha</button>';
-            html += '</div>';
-        } else {
-            html += '<p class="text-xs text-gray-500 mb-2">Arraste para mudar a ordem. O × tira a coluna.</p>';
+    function codigosVivosDoRascunho() {
+        var set = {};
+        [rascunhoAtual, estado && estado.rascunho_preservado].forEach(function (r) {
+            if (!r || !Array.isArray(r.componentes)) return;
+            r.componentes.forEach(function (c) {
+                var cod = String((c && c.codigo) || '').toLowerCase();
+                if (cod) set[cod] = true;
+            });
+        });
+        return set;
+    }
+
+    function limparOrdemColunasFantasma() {
+        if (!estado) return;
+        var manualDoZero = quadroManualDoZero();
+        var vivos = codigosVivosDoRascunho();
+        // Blocos de cálculo (MU amarelo) vivem em blocos_calc/formulas — não são fantasma.
+        (estado.blocos_calc || []).forEach(function (cod) {
+            var c = String(cod || '').toLowerCase();
+            if (c) vivos[c] = true;
+        });
+        Object.keys(estado.formulas_blocos || {}).forEach(function (cod) {
+            var c = String(cod || '').toLowerCase();
+            if (c) vivos[c] = true;
+        });
+        // Do zero: nomes_blocos (siglas de eventos marcados) NÃO entram sozinhas no quadro.
+        if (!manualDoZero) {
+            Object.keys(estado.nomes_blocos || {}).forEach(function (cod) {
+                var c = String(cod || '').toLowerCase();
+                if (c && !/^(eva|sev|rcv)_?\d+$/.test(c)) vivos[c] = true;
+            });
         }
-        html += '<div id="bw-colunas-lista" class="flex flex-wrap items-start gap-2 min-h-[2.5rem] p-2 rounded-lg border border-dashed border-indigo-200 bg-slate-50">';
+        var temVivos = Object.keys(vivos).length > 0;
+        estado.colunas_ordem = (estado.colunas_ordem || []).map(function (c) {
+            return String(c || '').toLowerCase();
+        }).filter(function (c, i, arr) {
+            if (!c || arr.indexOf(c) !== i) return false;
+            // Manual: mantém o que o admin adicionou (mesmo sem rascunho ainda).
+            if (manualDoZero) return true;
+            return !temVivos || !!vivos[c];
+        });
+        // Nunca espalha todos os vivos no board no quadro do zero.
+        if (!manualDoZero && temVivos) {
+            Object.keys(vivos).forEach(function (c) {
+                if (estado.colunas_ordem.indexOf(c) < 0) estado.colunas_ordem.push(c);
+            });
+        }
+        if (Array.isArray(estado.linhas_layout)) {
+            estado.linhas_layout = estado.linhas_layout.map(function (lin) {
+                if (!lin) return lin;
+                lin.colunas = (lin.colunas || []).map(function (c) {
+                    return String(c || '').toLowerCase();
+                }).filter(function (c) {
+                    if (!c) return false;
+                    if (manualDoZero) return true;
+                    return !temVivos || !!vivos[c];
+                });
+                return lin;
+            }).filter(function (lin) { return lin && (lin.colunas || []).length >= 1; });
+        }
+        if (estado.nomes_blocos && typeof estado.nomes_blocos === 'object') {
+            Object.keys(estado.nomes_blocos).forEach(function (cod) {
+                var low = String(cod || '').toLowerCase();
+                if (low && !vivos[low] && /^(eva|sev|rcv)_?\d+$/.test(low)) {
+                    delete estado.nomes_blocos[cod];
+                }
+            });
+        }
+        removerMuAutomaticaDoEstado();
+        // Cabeçalhos manuais: ordem do demonstrativo = ordem dos chips no cabeçalho.
+        sincronizarOrdemComLinhasLayout();
+        (estado.linhas_layout || []).forEach(function (lin) {
+            if (lin && (lin.colunas || []).length >= 1) compactarColunasOrdem(lin.colunas);
+        });
+        sincronizarOrdemComLinhasLayout();
+    }
+
+    /** Quadro do zero: zera chips automáticos (só entram pelo clique no catálogo). */
+    function zerarQuadroColunasSeAutomatico() {
+        if (!estado || !quadroManualDoZero()) return;
+        if (estado.quadro_chips_manuais) return;
+        // Títulos do período manuais não podem ser apagados só porque o flag de chips falhou.
+        if (Number(estado.cabecalhos_manuais || 0) === 1
+            && Array.isArray(estado.linhas_layout) && estado.linhas_layout.length) {
+            estado.quadro_chips_manuais = 1;
+            return;
+        }
+        estado.colunas_ordem = [];
+        estado.linhas_layout = [];
+        if (rascunhoAtual && Array.isArray(rascunhoAtual.componentes)) {
+            rascunhoAtual.componentes = (rascunhoAtual.componentes || []).filter(function (c) {
+                if (!c) return false;
+                var cod = String(c.codigo || '').toLowerCase();
+                if (!cod || cod === '_semanal') return false;
+                return ehCodigoBlocoCalc(cod) || !!(estado.formulas_blocos && estado.formulas_blocos[cod]);
+            });
+        }
+        if (estado.rascunho_preservado && Array.isArray(estado.rascunho_preservado.componentes)) {
+            estado.rascunho_preservado.componentes = (estado.rascunho_preservado.componentes || []).filter(function (c) {
+                if (!c) return false;
+                var cod = String(c.codigo || '').toLowerCase();
+                if (!cod || cod === '_semanal') return false;
+                return ehCodigoBlocoCalc(cod) || !!(estado.formulas_blocos && estado.formulas_blocos[cod]);
+            });
+        }
+    }
+
+    function mesclarColunasExtrasDoEstado(cols) {
+        cols = (cols || []).slice();
+        var vistos = {};
+        var vivos = codigosVivosDoRascunho();
+        // Blocos de cálculo (MU amarelo) e fórmulas vivem no estado — não filtrar como fantasma.
+        (estado.blocos_calc || []).forEach(function (cod) {
+            var c = String(cod || '').toLowerCase();
+            if (c) vivos[c] = true;
+        });
+        Object.keys(estado.formulas_blocos || {}).forEach(function (cod) {
+            var c = String(cod || '').toLowerCase();
+            if (c) vivos[c] = true;
+        });
+        var soVivos = Object.keys(vivos).length > 0;
+        var manualDoZero = quadroManualDoZero();
+        // Do zero: preview não pode trazer chips que o admin não adicionou.
+        if (manualDoZero) {
+            var permitidos = {};
+            (estado.colunas_ordem || []).forEach(function (cod) {
+                var low = String(cod || '').toLowerCase();
+                if (low) permitidos[low] = true;
+            });
+            (estado.blocos_calc || []).forEach(function (cod) {
+                var low = String(cod || '').toLowerCase();
+                if (low) permitidos[low] = true;
+            });
+            Object.keys(estado.formulas_blocos || {}).forEach(function (cod) {
+                var low = String(cod || '').toLowerCase();
+                if (low) permitidos[low] = true;
+            });
+            (estado.linhas_layout || []).forEach(function (lin) {
+                (lin && lin.colunas || []).forEach(function (cod) {
+                    var low = String(cod || '').toLowerCase();
+                    if (low) permitidos[low] = true;
+                });
+            });
+            cols = cols.filter(function (c) {
+                if (!c || !c.codigo) return false;
+                return !!permitidos[String(c.codigo).toLowerCase()];
+            });
+        }
+        cols.forEach(function (c) {
+            if (c && c.codigo) vistos[String(c.codigo)] = true;
+        });
+        function add(codigo, nome, tipo) {
+            codigo = String(codigo || '');
+            if (!codigo || vistos[codigo]) return;
+            var low = String(codigo).toLowerCase();
+            var ehCalc = (estado.blocos_calc || []).indexOf(codigo) >= 0
+                || (estado.blocos_calc || []).indexOf(low) >= 0
+                || !!(estado.formulas_blocos && (estado.formulas_blocos[codigo] || estado.formulas_blocos[low]));
+            // No Montar quadro não reinsere EVA/SEV fantasma da ordem antiga.
+            if (soVivos && !vivos[low] && !ehCalc) return;
+            vistos[codigo] = true;
+            cols.push({
+                codigo: codigo,
+                nome: nome || tituloColuna(codigo) || codigo,
+                tipo: tipo || (ehCalc ? 'calculado' : 'peca'),
+                travada: false
+            });
+        }
+        (estado.colunas_ordem || []).forEach(function (cod) { add(cod, tituloColuna(cod)); });
+        (estado.blocos_calc || []).forEach(function (cod) { add(cod, nomeBlocoCalc(cod), 'calculado'); });
+        // Do zero: não espalha nomes_blocos (siglas de todos os eventos) como chips.
+        if (!manualDoZero) {
+            Object.keys(estado.nomes_blocos || {}).forEach(function (cod) { add(cod, estado.nomes_blocos[cod]); });
+        }
+        Object.keys(estado.formulas_blocos || {}).forEach(function (cod) { add(cod, nomeBlocoCalc(cod), 'calculado'); });
+        (((rascunhoAtual || {}).componentes) || []).forEach(function (c) {
+            if (!c || !c.codigo || c.codigo === '_semanal') return;
+            if (manualDoZero) {
+                var lowC = String(c.codigo).toLowerCase();
+                var naOrdem = (estado.colunas_ordem || []).some(function (x) {
+                    return String(x || '').toLowerCase() === lowC;
+                });
+                var ehCalcC = (estado.blocos_calc || []).indexOf(c.codigo) >= 0
+                    || (estado.blocos_calc || []).indexOf(lowC) >= 0
+                    || !!(estado.formulas_blocos && (estado.formulas_blocos[c.codigo] || estado.formulas_blocos[lowC]));
+                if (!naOrdem && !ehCalcC) return;
+            }
+            add(c.codigo, c.nome || c.codigo, c.source_type === 'calculado' ? 'calculado' : 'peca');
+        });
+        return cols;
+    }
+
+    function eventosCatalogoBuilder() {
+        var todos = eventosAvaliativosDoAnoQuadro();
+        var marcados = eventosAvaliativosMarcados();
+        if (!marcados.length) return todos;
+        var set = {};
+        marcados.forEach(function (id) { set[Number(id)] = true; });
+        var filtrados = todos.filter(function (ev) { return !!set[Number(ev && ev.id || 0)]; });
+        return filtrados.length ? filtrados : todos;
+    }
+
+    function codigoPreferidoEvento(ev) {
+        if (!ev) return '';
+        var sigla = String(ev.sigla || '').toLowerCase().replace(/[^a-z0-9_]+/g, '');
+        var bim = Number(ev.bimestre || 0);
+        var id = Number(ev.id || 0);
+        if (bim >= 1 && bim <= 4 && ['pp', 'pu', 'ch', 'pe', 'fal', 'faltas'].indexOf(sigla) >= 0) {
+            return 'b' + bim + '_' + (sigla === 'faltas' ? 'fal' : sigla);
+        }
+        if (bim === 81 || bim === 61 || bim === 62) return 's1_rec';
+        if (bim === 82 || bim === 63 || bim === 64) return 's2_rec';
+        if (sigla) return sigla;
+        if (bim >= 60) return 'rec';
+        return id > 0 ? ('eva' + id) : '';
+    }
+
+    function codigoColunaDoEventoJs(ev, vistos) {
+        vistos = vistos || {};
+        var pref = codigoPreferidoEvento(ev);
+        if (pref && !vistos[pref]) return pref;
+        var bim = Number((ev && ev.bimestre) || 0);
+        if (bim >= 60) {
+            if (!vistos.rec) return 'rec';
+            if (!vistos.recuperacao) return 'recuperacao';
+        }
+        var id = Number((ev && ev.id) || 0);
+        var base = 'eva' + id;
+        if (id > 0 && !vistos[base]) return base;
+        return id > 0 ? ('eva_' + id) : '';
+    }
+
+    function colunaEventoJaNoQuadro(ev) {
+        if (!ev || !estado) return false;
+        var pref = String(codigoPreferidoEvento(ev) || '').toLowerCase();
+        var id = Number(ev.id || 0);
+        var ordem = {};
+        function marcar(cod) {
+            var low = String(cod || '').toLowerCase();
+            if (low) ordem[low] = true;
+        }
+        (estado.colunas_ordem || []).forEach(marcar);
+        (((rascunhoAtual || {}).componentes) || []).forEach(function (c) { marcar(c && c.codigo); });
+        (estado.linhas_layout || []).forEach(function (lin) {
+            (lin && lin.colunas || []).forEach(marcar);
+        });
+        if (pref && ordem[pref]) return true;
+        if (id > 0 && (ordem['eva' + id] || ordem['eva_' + id])) return true;
+        return false;
+    }
+
+    function adicionarColunaDoEvento(ev, opcoes) {
+        if (!estado || !ev) return false;
+        opcoes = opcoes || {};
+        var silencioso = !!opcoes.silencioso;
+        var id = Number(ev.id || 0);
+        if (id <= 0) return false;
+        if (!Array.isArray(estado.eventos_avaliativos_ids)) estado.eventos_avaliativos_ids = [];
+        var idsNum = estado.eventos_avaliativos_ids.map(Number);
+        if (idsNum.indexOf(id) < 0) estado.eventos_avaliativos_ids.push(id);
+        if (colunaEventoJaNoQuadro(ev)) {
+            if (!silencioso) {
+                avisoLinha = { tipo: 'ok', texto: 'Essa coluna já está no quadro (só a sigla). Arraste para um título do período se quiser.' };
+                renderRevisarDinamico();
+            }
+            return false;
+        }
+        var vistos = {};
+        (estado.colunas_ordem || []).forEach(function (c) {
+            var low = String(c || '').toLowerCase();
+            if (low) vistos[low] = true;
+        });
+        (((rascunhoAtual || {}).componentes) || []).forEach(function (c) {
+            var low = String((c && c.codigo) || '').toLowerCase();
+            if (low) vistos[low] = true;
+        });
+        (estado.linhas_layout || []).forEach(function (lin) {
+            (lin && lin.colunas || []).forEach(function (c) {
+                var low = String(c || '').toLowerCase();
+                if (low) vistos[low] = true;
+            });
+        });
+        var codigo = codigoColunaDoEventoJs(ev, vistos);
+        if (!codigo) return false;
+        estado.quadro_chips_manuais = 1;
+        if (!Array.isArray(estado.colunas_ordem)) estado.colunas_ordem = [];
+        if (estado.colunas_ordem.map(function (c) { return String(c || '').toLowerCase(); }).indexOf(codigo) < 0) {
+            estado.colunas_ordem.push(codigo);
+        }
+        if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
+        var sigla = String(siglaDoEvento(ev) || '').toUpperCase();
+        var titulo = sigla || String(ev.nome || codigo);
+        if (!estado.nomes_blocos[codigo]) estado.nomes_blocos[codigo] = titulo;
+        // Garante chip imediato no quadro mesmo com rascunho já carregado (evita filtro de fantasma).
+        garantirComponenteManualNoRascunho(codigo, titulo);
+        if (!silencioso) {
+            aplicarSiglasEventosAvulsosNosTitulos();
+            marcarEdicaoManual();
+            avisoLinha = { tipo: 'ok', texto: 'Coluna “' + (sigla || codigo) + '” adicionada. Arraste para um título do período ou marque e use Novo título do período.' };
+            previewAtual = null;
+            renderRevisarDinamico();
+            agendarMontar();
+        }
+        return true;
+    }
+
+    function bimestreDaChavePeriodo(chave) {
+        var m = String(chave || '').match(/^p-(\d+)$/);
+        if (!m) return 0;
+        var bim = Number(m[1] || 0);
+        return (bim >= 1 && bim <= 4) ? bim : 0;
+    }
+
+    function colunaFalJaNoQuadro(bim) {
+        bim = Number(bim || 0);
+        if (bim < 1 || bim > 4 || !estado) return false;
+        var cod = 'b' + bim + '_fal';
+        var codAlt = 'b' + bim + '_faltas';
+        var ordem = {};
+        function marcar(c) {
+            var low = String(c || '').toLowerCase();
+            if (low) ordem[low] = true;
+        }
+        (estado.colunas_ordem || []).forEach(marcar);
+        (((rascunhoAtual || {}).componentes) || []).forEach(function (c) { marcar(c && c.codigo); });
+        (estado.linhas_layout || []).forEach(function (lin) {
+            (lin && lin.colunas || []).forEach(marcar);
+        });
+        if (ordem[cod] || ordem[codAlt]) return true;
+        return Object.keys(ordem).some(function (c) {
+            if (!c.match(new RegExp('^b' + bim + '_'))) return false;
+            if (/(^|_)fal(tas)?$/.test(c)) return true;
+            return String(siglaTituloColunaJs(c, (estado.nomes_blocos && estado.nomes_blocos[c]) || '') || '').toUpperCase() === 'FAL';
+        });
+    }
+
+    function resolverFonteFaltasBim(bim) {
+        bim = Number(bim || 0);
+        if (bim < 1 || bim > 4 || !estado) return 0;
+        if (!estado.fontes_faltas || typeof estado.fontes_faltas !== 'object') {
+            estado.fontes_faltas = { 1: 0, 2: 0, 3: 0, 4: 0 };
+        }
+        var atual = Number(estado.fontes_faltas[bim] || 0);
+        if (atual > 0) return atual;
+        var ano = Number((estado && estado.ano_letivo) || 0);
+        var achou = 0;
+        (eventosFaltasDoAno() || []).some(function (fe) {
+            if (!fe) return false;
+            if (ano > 0 && Number(fe.ano_letivo || 0) > 0 && Number(fe.ano_letivo || 0) !== ano) return false;
+            if (Number(fe.bimestre || 0) !== bim) return false;
+            var fid = Number(fe.id || 0);
+            if (fid <= 0) return false;
+            achou = fid;
+            estado.fontes_faltas[bim] = fid;
+            return true;
+        });
+        return achou;
+    }
+
+    /** Chip FAL do bimestre (não vem de Evento Avaliativo — precisa de botão próprio no catálogo). */
+    function adicionarColunaFal(bim, opcoes) {
+        if (!estado) return false;
+        bim = Number(bim || 0);
+        opcoes = opcoes || {};
+        var silencioso = !!opcoes.silencioso;
+        if (bim < 1 || bim > 4) return false;
+        var codigo = 'b' + bim + '_fal';
+        if (colunaFalJaNoQuadro(bim)) {
+            if (!silencioso) {
+                avisoLinha = { tipo: 'ok', texto: 'A coluna FAL deste bimestre já está no quadro.' };
+                renderRevisarDinamico();
+            }
+            return false;
+        }
+        var idFal = resolverFonteFaltasBim(bim);
+        estado.quadro_chips_manuais = 1;
+        if (!Array.isArray(estado.colunas_ordem)) estado.colunas_ordem = [];
+        if (estado.colunas_ordem.map(function (c) { return String(c || '').toLowerCase(); }).indexOf(codigo) < 0) {
+            var pe = 'b' + bim + '_pe';
+            var idxPe = estado.colunas_ordem.map(function (c) { return String(c || '').toLowerCase(); }).indexOf(pe);
+            if (idxPe >= 0) estado.colunas_ordem.splice(idxPe + 1, 0, codigo);
+            else estado.colunas_ordem.push(codigo);
+        }
+        if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
+        estado.nomes_blocos[codigo] = 'FAL';
+        garantirComponenteManualNoRascunho(codigo, 'FAL');
+        [rascunhoAtual, estado.rascunho_preservado].forEach(function (r) {
+            if (!r || !Array.isArray(r.componentes)) return;
+            r.componentes.forEach(function (c) {
+                if (!c || String(c.codigo || '').toLowerCase() !== codigo) return;
+                c.nome = 'FAL';
+                c.source_type = idFal > 0 ? 'faltas_evento' : 'nenhuma';
+                c.layout_type = 'faltas';
+                if (!c.config || typeof c.config !== 'object') c.config = {};
+                c.config.layout_type = 'faltas';
+                if (idFal > 0) c.config.evento_id = idFal;
+            });
+        });
+        if (!silencioso) {
+            aplicarSiglasEventosAvulsosNosTitulos();
+            marcarEdicaoManual();
+            avisoLinha = {
+                tipo: 'ok',
+                texto: idFal > 0
+                    ? ('Coluna FAL do ' + bim + 'º bimestre adicionada.')
+                    : ('Coluna FAL do ' + bim + 'º bimestre adicionada (sem evento de faltas vinculado — escolha a fonte em Eventos, se houver).')
+            };
+            previewAtual = null;
+            renderRevisarDinamico();
+            agendarMontar();
+        }
+        return true;
+    }
+
+    function adicionarTodasColunasDoPeriodo(chavePeriodo) {
+        if (!estado) return;
+        chavePeriodo = String(chavePeriodo || '');
+        var eventos = eventosCatalogoBuilder().filter(function (ev) {
+            return chavePeriodoItem(ev) === chavePeriodo;
+        });
+        var bimFal = bimestreDaChavePeriodo(chavePeriodo);
+        if (!eventos.length && bimFal < 1) return;
+        var adicionados = 0;
+        eventos.forEach(function (ev) {
+            if (colunaEventoJaNoQuadro(ev)) return;
+            if (adicionarColunaDoEvento(ev, { silencioso: true })) adicionados += 1;
+        });
+        if (bimFal >= 1 && !colunaFalJaNoQuadro(bimFal) && adicionarColunaFal(bimFal, { silencioso: true })) {
+            adicionados += 1;
+        }
+        aplicarSiglasEventosAvulsosNosTitulos();
+        marcarEdicaoManual();
+        previewAtual = null;
+        var rotulo = '';
+        agruparItensPorPeriodo(eventos).forEach(function (g) {
+            if (String(g.chave) === chavePeriodo) rotulo = g.rotulo || '';
+        });
+        if (!rotulo && bimFal >= 1) rotulo = bimFal + 'º bimestre';
+        if (!rotulo) rotulo = 'período';
+        if (adicionados > 0) {
+            avisoLinha = {
+                tipo: 'ok',
+                texto: adicionados === 1
+                    ? ('1 coluna do ' + rotulo + ' adicionada ao quadro.')
+                    : (adicionados + ' colunas do ' + rotulo + ' adicionadas ao quadro.')
+            };
+        } else {
+            avisoLinha = {
+                tipo: 'ok',
+                texto: 'Todas as colunas do ' + rotulo + ' já estão no quadro.'
+            };
+        }
+        renderRevisarDinamico();
+        if (adicionados > 0) agendarMontar();
+    }
+
+    function htmlCatalogoEventosBuilder() {
+        var eventos = eventosCatalogoBuilder();
+        var html = '<aside class="bw-catalogo" aria-label="Catálogo de eventos">';
+        html += '<div class="bw-catalogo-topo">';
+        html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Eventos por bimestre</p>';
+        html += '<p class="text-[11px] text-slate-500 mt-0.5">Clique para adicionar a sigla no quadro. Use <strong>Todos</strong> no período (inclui FAL).</p>';
+        html += '</div><div class="bw-catalogo-corpo">';
+        if (!eventos.length) {
+            html += '<p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">Nenhum evento neste ano. Marque no passo anterior ou cadastre Eventos Avaliativos.</p>';
+            html += '</div></aside>';
+            return html;
+        }
+        agruparItensPorPeriodo(eventos).forEach(function (grupo, idx) {
+            var bimFal = bimestreDaChavePeriodo(grupo.chave);
+            var falPendente = bimFal >= 1 && !colunaFalJaNoQuadro(bimFal);
+            var faltam = (grupo.itens || []).filter(function (ev) {
+                return Number(ev && ev.id || 0) > 0 && !colunaEventoJaNoQuadro(ev);
+            }).length + (falPendente ? 1 : 0);
+            html += '<details class="bw-catalogo-grupo"' + (idx < 4 ? ' open' : '') + '>';
+            html += '<summary>' + esc(grupo.rotulo || 'Período') + '</summary>';
+            html += '<div class="bw-catalogo-itens">';
+            if ((grupo.itens || []).length || bimFal >= 1) {
+                html += '<button type="button" class="bw-catalogo-add-todos" data-catalogo-periodo="' + esc(String(grupo.chave || '')) + '"'
+                    + ' title="Adicionar todas as siglas deste período no quadro (inclui FAL)"'
+                    + (faltam ? '' : ' disabled') + '>'
+                    + (faltam ? ('Adicionar todos (' + faltam + ')') : 'Todos já no quadro') + '</button>';
+            }
+            (grupo.itens || []).forEach(function (ev) {
+                var id = Number(ev.id || 0);
+                if (id <= 0) return;
+                var nome = String(ev.nome || ('Evento #' + id));
+                var sigla = String(siglaDoEvento(ev) || '').toUpperCase() || ('#' + id);
+                var noQuadro = colunaEventoJaNoQuadro(ev);
+                html += '<button type="button" class="bw-catalogo-item' + (noQuadro ? ' no-quadro' : '') + '" data-catalogo-evento="' + id + '" title="' + esc(nome + ' → ' + sigla) + '">';
+                html += '<span class="bw-cat-nome">' + esc(nome) + '</span>';
+                html += '<span class="bw-cat-sigla">' + esc(sigla) + '</span>';
+                html += '</button>';
+            });
+            if (bimFal >= 1) {
+                var falNoQuadro = colunaFalJaNoQuadro(bimFal);
+                html += '<button type="button" class="bw-catalogo-item' + (falNoQuadro ? ' no-quadro' : '') + '" data-catalogo-fal="' + bimFal + '" title="Faltas do ' + bimFal + 'º bimestre → FAL">';
+                html += '<span class="bw-cat-nome">Faltas</span>';
+                html += '<span class="bw-cat-sigla">FAL</span>';
+                html += '</button>';
+            }
+            html += '</div></details>';
+        });
+        html += '</div></aside>';
+        return html;
+    }
+
+    function htmlColunasOrdem(pv) {
+        zerarQuadroColunasSeAutomatico();
+        removerMuAutomaticaDoEstado();
+        var cols = ordenarColunasLista(mesclarColunasExtrasDoEstado((pv && pv.colunas) || []));
+        var marcadas = codigosMarcados();
+        var textoDica = 'Clique num evento à esquerda para adicionar a sigla. Marque chips azuis, digite o nome e use Novo título do período. Depois clique em Confirmar (fica verdinho).';
+        var clsDica = 'text-indigo-800';
+        if (avisoLinha && avisoLinha.texto) {
+            textoDica = avisoLinha.texto;
+            clsDica = avisoLinha.tipo === 'ok' ? 'text-emerald-700' : 'text-amber-800';
+        } else if (marcadas.length >= 1) {
+            textoDica = marcadas.length === 1
+                ? '1 coluna marcada. Digite o nome e clique em Novo título do período.'
+                : (marcadas.length + ' colunas marcadas. Digite o nome e clique em Novo título do período.');
+        }
+
+        var html = '<div class="bw-builder">';
+        html += htmlCatalogoEventosBuilder();
+        html += '<section class="bw-quadro" aria-label="Quadro de montagem">';
+        html += '<div class="bw-quadro-topo">';
+        html += '<div>';
+        html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Quadro de colunas</p>';
+        html += '<p class="text-[11px] text-slate-500 mt-0.5">Só a sigla no chip. Arraste para o título do período.</p>';
+        html += '</div>';
+        html += '<div class="bw-quadro-acoes">';
+        if (!ehDemonstrativoNotas()) {
+            html += '<button type="button" id="bw-add-media" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-amber-300 text-amber-950 bg-amber-50 hover:bg-amber-100">Bloco de cálculo</button>';
+        }
+        html += '<button type="button" id="bw-limpar-cabecalhos" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-rose-300 text-rose-800 bg-rose-50 hover:bg-rose-100">Limpar títulos</button>';
+        html += '</div></div>';
+        html += '<div class="bw-quadro-corpo">';
+        html += '<p id="bw-linha-aviso" class="text-xs font-medium mb-2 ' + clsDica + '">' + esc(textoDica) + '</p>';
+        html += '<div class="flex flex-wrap items-center gap-2 mb-3">';
+        html += '<input type="text" id="bw-linha-nome" maxlength="40" value="' + esc(nomeLinhaRascunho) + '" placeholder="Ex.: I BIMESTRE" class="px-3 py-1.5 text-xs border border-gray-300 rounded-lg w-56 bg-white">';
+        html += '<button type="button" id="bw-criar-linha" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">Novo título do período</button>';
+        html += '<button type="button" id="bw-tirar-linha" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50">Tirar título</button>';
+        html += '</div>';
+        html += '<div id="bw-colunas-lista" class="flex flex-wrap items-start gap-2 min-h-[8rem]">';
         var visiveis = [];
         cols.forEach(function (c) {
             if (!colunaSegueBlocoSemanal(c)) visiveis.push(c);
         });
-        if (!visiveis.length) html += '<span class="text-xs text-gray-400">Nenhuma coluna ainda.</span>';
-        faixasCabecalhoPreview(visiveis).forEach(function (faixa) {
-            if (faixa.tipo === 'grupo') {
-                html += '<div class="bw-linha-caixa"><span class="bw-linha-rotulo">' + esc(faixa.nome) + '</span><span class="flex flex-wrap gap-2">';
-                faixa.cols.forEach(function (c) { html += htmlChipColuna(c); });
-                html += '</span></div>';
-                return;
-            }
-            html += htmlChipColuna(faixa.col);
-        });
-        html += '</div>';
+        if (!visiveis.length) {
+            html += '<div class="bw-quadro-vazio w-full">Clique num evento à esquerda para começar</div>';
+        } else {
+            faixasCabecalhoPreview(visiveis).forEach(function (faixa) {
+                if (faixa.tipo === 'grupo') {
+                    var linRef = linhaLayoutDaColuna((faixa.cols[0] || {}).codigo, faixa.cols[0]) || {};
+                    var linId = String(linRef.id || ('cab:' + String(faixa.nome || '').toLowerCase()));
+                    var confirmado = !!(estado && estado.titulos_periodo_ok && estado.titulos_periodo_ok[linId]);
+                    html += '<div class="bw-linha-caixa' + (confirmado ? ' confirmado' : '') + '" data-linha-id="' + esc(linId) + '" data-linha-nome="' + esc(faixa.nome) + '">';
+                    html += '<div class="bw-linha-topo">';
+                    html += '<span class="bw-linha-grip" title="Arrastar bloco" aria-hidden="true">⋮⋮</span>';
+                    html += '<span class="bw-linha-rotulo" contenteditable="true" spellcheck="false" title="Clique para editar o título do período" data-linha-id="' + esc(linId) + '">' + esc(faixa.nome) + '</span>';
+                    if (confirmado) {
+                        html += '<button type="button" class="bw-linha-ok ativo" data-linha-id="' + esc(linId) + '" title="Título do período concluído" aria-label="Concluído">Concluído ✓</button>';
+                    } else {
+                        html += '<button type="button" class="bw-linha-ok" data-linha-id="' + esc(linId) + '" title="Confirmar este título do período" aria-label="Confirmar título do período">Confirmar</button>';
+                    }
+                    html += '<button type="button" class="bw-linha-x" data-linha-id="' + esc(linId) + '" title="Remover este título do período" aria-label="Remover título do período">×</button>';
+                    html += '</div><span class="bw-linha-cols">';
+                    faixa.cols.forEach(function (c) { html += htmlChipColuna(c); });
+                    html += '</span></div>';
+                    return;
+                }
+                html += htmlChipColuna(faixa.col);
+            });
+        }
+        html += '</div></div></section></div>';
         return html;
     }
 
     function htmlChipColuna(c) {
         if (!c) return '';
         var fixa = c.codigo === '_semanal' || c.codigo === 'media_sem';
-        var cls = 'bw-col-chip' + (c.travada ? ' travada' : '') + (fixa ? ' fixa' : '') + (c.tipo === 'calculado' ? ' calc' : '');
+        var ehCalc = c.tipo === 'calculado'
+            || String(c.source_type || '') === 'calculado'
+            || ehCodigoBlocoCalc(c.codigo);
+        var cls = 'bw-col-chip' + (c.travada ? ' travada' : '') + (fixa ? ' fixa' : '') + (ehCalc ? ' calc' : '');
         if (colunasMarcadas[c.codigo]) cls += ' marcada';
         if (estado && ((estado.titulo_codigo && c.codigo === estado.titulo_codigo) || (estado.bloco_calc && c.codigo === estado.bloco_calc))) cls += ' aberta';
-        var html = '<span class="' + cls + '" data-codigo="' + esc(c.codigo) + '" data-tipo="' + esc(c.tipo || '') + '">';
+        var rotulo = tituloColuna(c.codigo) || siglaColunaEventoAvaliativo(c.codigo) || siglaTituloColunaJs(c.codigo, c.nome) || c.nome;
+        rotulo = rotuloSemestreColuna(c.codigo, rotulo);
+        var dica = '';
+        var codLow = String(c.codigo || '').toLowerCase();
+        if (codLow === 's1_rec' || codLow === 's1_ms') dica = '1º semestre';
+        if (codLow === 's2_rec' || codLow === 's2_ms') dica = '2º semestre';
+        if (ehCalc) dica = 'Clique para editar a fórmula · arraste pelo ⋮⋮';
+        var html = '<span class="' + cls + '" data-codigo="' + esc(c.codigo) + '" data-tipo="' + esc(ehCalc ? 'calculado' : (c.tipo || '')) + '"'
+            + (dica ? ' title="' + esc(dica) + '"' : '') + '>';
         if (!c.travada && !fixa) html += '<span class="bw-col-grip" title="Arrastar" aria-hidden="true">⋮⋮</span>';
-        html += '<span class="bw-col-nome">' + esc(tituloColuna(c.codigo) || c.nome) + '</span>';
+        html += '<span class="bw-col-nome">' + esc(rotulo) + '</span>';
         html += '<button type="button" class="bw-col-x" data-codigo="' + esc(c.codigo) + '" aria-label="Remover">×</button>';
         html += '</span>';
         return html;
+    }
+
+    function abrirEdicaoBlocoCalc(codigo) {
+        if (ehDemonstrativoNotas()) return false;
+        codigo = String(codigo || '');
+        if (!codigo || codigo === 'media_sem' || codigo === '_semanal') return false;
+        if (!ehCodigoBlocoCalc(codigo) && !(estado && (estado.formulas_blocos || {})[codigo])) {
+            // Ainda assim abre se o chip veio como calculado no preview.
+        }
+        estado.titulo_codigo = codigo;
+        if (!Array.isArray(estado.blocos_calc)) estado.blocos_calc = [];
+        if (estado.blocos_calc.indexOf(codigo) < 0) estado.blocos_calc.push(codigo);
+        if (!estado.formulas_blocos || typeof estado.formulas_blocos !== 'object') estado.formulas_blocos = {};
+        if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
+        if (!estado.nomes_blocos[codigo]) {
+            estado.nomes_blocos[codigo] = tituloColuna(codigo) || (codigo === 'media_final' ? 'Resultado Final' : nomeBlocoCalc(codigo));
+        }
+        if (estado.passo !== 'formula' && estado.passo !== 'revisar') {
+            estado.passo = 'formula';
+            estado.bloco_calc = codigo;
+            renderAll();
+            agendarMontar();
+            return true;
+        }
+        renderRevisarDinamico();
+        abrirFormulaBloco(codigo);
+        var ed = document.getElementById('bw-formula-editor');
+        if (ed && ed.scrollIntoView) ed.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        return true;
     }
 
     function configDoComp(c) {
@@ -4733,6 +6911,50 @@ $boletimWizardSteps = [
 
     function realinharLinhasPelosComponentes() {
         if (!estado) return;
+        // Admin limpou/editou: não recria cabeçalhos a partir do Demonstrativo.
+        if (Number(estado.cabecalhos_manuais || 0) === 1) {
+            if (typeof ehVisaoImpressaoEditavel === 'function' && ehVisaoImpressaoEditavel()
+                && Array.isArray(estado.linhas_layout) && estado.linhas_layout.length) {
+                var ordemManual = (estado.colunas_ordem || []).map(function (c) { return String(c || '').toLowerCase(); });
+                estado.linhas_layout = estado.linhas_layout.map(function (lin) {
+                    if (!lin) return lin;
+                    var cols = (lin.colunas || []).map(function (c) { return String(c || '').toLowerCase(); });
+                    if (ordemManual.length) {
+                        cols.sort(function (a, b) {
+                            var ia = ordemManual.indexOf(a);
+                            var ib = ordemManual.indexOf(b);
+                            if (ia < 0) ia = 9999;
+                            if (ib < 0) ib = 9999;
+                            return ia - ib;
+                        });
+                    }
+                    lin.colunas = cols;
+                    return lin;
+                }).filter(function (lin) { return lin && (lin.colunas || []).length >= 1; });
+            }
+            return;
+        }
+        // No print/boletim editável a ordem vem do arraste (colunas_ordem + linhas_layout).
+        if (typeof ehVisaoImpressaoEditavel === 'function' && ehVisaoImpressaoEditavel()
+            && Array.isArray(estado.linhas_layout) && estado.linhas_layout.length) {
+            var ordemLocal = (estado.colunas_ordem || []).map(function (c) { return String(c || '').toLowerCase(); });
+            estado.linhas_layout = estado.linhas_layout.map(function (lin) {
+                if (!lin) return lin;
+                var cols = (lin.colunas || []).map(function (c) { return String(c || '').toLowerCase(); });
+                if (ordemLocal.length) {
+                    cols.sort(function (a, b) {
+                        var ia = ordemLocal.indexOf(a);
+                        var ib = ordemLocal.indexOf(b);
+                        if (ia < 0) ia = 9999;
+                        if (ib < 0) ib = 9999;
+                        return ia - ib;
+                    });
+                }
+                lin.colunas = cols;
+                return lin;
+            }).filter(function (lin) { return lin && (lin.colunas || []).length >= 1; });
+            return;
+        }
         var comps = (rascunhoAtual && rascunhoAtual.componentes) || [];
         var porNome = {};
         var ordem = [];
@@ -4764,14 +6986,163 @@ $boletimWizardSteps = [
     }
 
     function renderRevisarDinamico() {
+        removerMuAutomaticaDoEstado();
         realinharLinhasPelosComponentes();
         aplicarTitulosDosSubeventos();
         var col = document.getElementById('bw-colunas-wrap');
         var pvEl = document.getElementById('bw-preview-wrap');
         var pv = aplicarOrdemNoPreview(previewEfetivo());
-        if (col) col.innerHTML = htmlColunasOrdem(pv);
+        // Quadro editável só no passo Fórmula/Colunas. Na revisão, só a prévia.
+        var editaQuadro = !!(estado && estado.passo === 'formula' && col);
+        if (editaQuadro && !editandoCabecalho) col.innerHTML = htmlColunasOrdem(pv);
         if (pvEl) pvEl.innerHTML = htmlPreview(pv);
-        bindRevisarOnce();
+        if (editaQuadro) bindRevisarOnce();
+    }
+
+    function atualizarPreviewCabecalhosAoVivo() {
+        if (!estado || !editandoCabecalho) return;
+        var rot = document.activeElement;
+        if (!rot || !rot.classList || !rot.classList.contains('bw-linha-rotulo')) return;
+        var id = String(rot.getAttribute('data-linha-id') || '');
+        var nome = String(rot.textContent || '').trim().slice(0, 40);
+        if (!nome) return;
+        var caixa = rot.closest('.bw-linha-caixa');
+        var nomeAntigo = caixa ? String(caixa.getAttribute('data-linha-nome') || '') : '';
+        (estado.linhas_layout || []).forEach(function (lin) {
+            if (!lin) return;
+            if ((id && String(lin.id || '') === id) || (nomeAntigo && String(lin.nome || '') === nomeAntigo)) {
+                lin.nome = nome;
+            }
+        });
+        if (caixa) caixa.setAttribute('data-linha-nome', nome);
+        var pvEl = document.getElementById('bw-preview-wrap');
+        if (!pvEl) return;
+        pvEl.innerHTML = htmlPreview(aplicarOrdemNoPreview(previewEfetivo()));
+    }
+
+    function coletarOrdemChipsDoDom() {
+        var lista = document.getElementById('bw-colunas-lista');
+        if (!lista) return (estado && estado.colunas_ordem) || [];
+        var ordem = [];
+        var visto = {};
+        lista.querySelectorAll('.bw-col-chip').forEach(function (el) {
+            var c = String(el.getAttribute('data-codigo') || '').toLowerCase();
+            if (!c || c === '_semanal' || c === 'media_sem' || visto[c]) return;
+            visto[c] = true;
+            ordem.push(c);
+        });
+        return ordem;
+    }
+
+    function sincronizarLinhasLayoutComDom() {
+        if (!estado) return;
+        var lista = document.getElementById('bw-colunas-lista');
+        if (!lista) return;
+        var linhas = [];
+        lista.querySelectorAll('.bw-linha-caixa').forEach(function (caixa) {
+            var nomeEl = caixa.querySelector('.bw-linha-rotulo');
+            var nome = String((nomeEl && nomeEl.textContent) || caixa.getAttribute('data-linha-nome') || '').trim().slice(0, 40);
+            if (!nome) return;
+            var cols = [];
+            caixa.querySelectorAll('.bw-col-chip').forEach(function (chip) {
+                var c = String(chip.getAttribute('data-codigo') || '').toLowerCase();
+                if (c && cols.indexOf(c) < 0) cols.push(c);
+            });
+            if (!cols.length) return;
+            var id = String(caixa.getAttribute('data-linha-id') || '').trim() || idLinhaPorNome(nome);
+            linhas.push({ id: id, nome: nome, colunas: cols });
+        });
+        estado.linhas_layout = linhas;
+        var todos = [];
+        linhas.forEach(function (lin) { (lin.colunas || []).forEach(function (c) { todos.push(c); }); });
+        gravarLinhaNosComponentes(todos);
+    }
+
+    function aplicarNomeCabecalho(linhaId, nomeNovo) {
+        if (!estado) return;
+        nomeNovo = String(nomeNovo || '').trim().slice(0, 40);
+        if (!nomeNovo) return;
+        var alvo = String(linhaId || '');
+        var cols = [];
+        estado.linhas_layout = (estado.linhas_layout || []).map(function (lin) {
+            if (!lin) return lin;
+            var id = String(lin.id || '');
+            var nomeAnt = String(lin.nome || '');
+            if (id !== alvo && ('cab:' + nomeAnt.toLowerCase()) !== alvo && nomeAnt !== alvo) return lin;
+            lin.nome = nomeNovo;
+            cols = (lin.colunas || []).slice();
+            return lin;
+        });
+        if (cols.length) gravarLinhaNosComponentes(cols);
+        estado.cabecalhos_manuais = 1;
+        if (estado.titulos_periodo_ok && typeof estado.titulos_periodo_ok === 'object') {
+            delete estado.titulos_periodo_ok[alvo];
+            delete estado.titulos_periodo_ok['cab:' + String(nomeNovo || '').toLowerCase()];
+        }
+        avisoLinha = { tipo: 'ok', texto: 'Título do período renomeado para “' + nomeNovo + '”. Confirme de novo quando terminar.' };
+        nomeLinhaRascunho = '';
+        renderRevisarDinamico();
+        agendarMontar();
+    }
+
+    function confirmarTituloPeriodo(linhaId) {
+        if (!estado) return;
+        linhaId = String(linhaId || '');
+        if (!linhaId) return;
+        if (!estado.titulos_periodo_ok || typeof estado.titulos_periodo_ok !== 'object') {
+            estado.titulos_periodo_ok = {};
+        }
+        if (estado.titulos_periodo_ok[linhaId]) return;
+        estado.titulos_periodo_ok[linhaId] = 1;
+        var nome = '';
+        (estado.linhas_layout || []).forEach(function (lin) {
+            if (!lin) return;
+            var id = String(lin.id || '');
+            var n = String(lin.nome || '');
+            if (id === linhaId || ('cab:' + n.toLowerCase()) === linhaId || n === linhaId) {
+                nome = n;
+            }
+        });
+        avisoLinha = {
+            tipo: 'ok',
+            texto: nome
+                ? ('Título do período “' + nome + '” concluído ✓')
+                : 'Título do período concluído ✓'
+        };
+        renderRevisarDinamico();
+    }
+
+    function moverCodigoParaCabecalho(codigo, nomeCab, linhaId) {
+        codigo = String(codigo || '').toLowerCase();
+        if (!codigo || !estado) return;
+        if (!Array.isArray(estado.linhas_layout)) estado.linhas_layout = [];
+        estado.linhas_layout = estado.linhas_layout.map(function (lin) {
+            if (!lin) return lin;
+            lin.colunas = (lin.colunas || []).filter(function (c) { return String(c).toLowerCase() !== codigo; });
+            return lin;
+        }).filter(function (lin) { return lin && (lin.colunas || []).length >= 1; });
+        nomeCab = String(nomeCab || '').trim().slice(0, 40);
+        if (!nomeCab) {
+            gravarLinhaNosComponentes([codigo]);
+            return;
+        }
+        var destino = null;
+        estado.linhas_layout.forEach(function (lin) {
+            if (!lin) return;
+            if (linhaId && String(lin.id) === String(linhaId)) destino = lin;
+            else if (!destino && String(lin.nome || '') === nomeCab) destino = lin;
+        });
+        if (!destino) {
+            destino = { id: String(linhaId || idLinhaPorNome(nomeCab)), nome: nomeCab, colunas: [] };
+            estado.linhas_layout.push(destino);
+        }
+        if (destino.colunas.indexOf(codigo) < 0) destino.colunas.push(codigo);
+        // Trava o layout manual para o montar do servidor não apagar MU/bloco de cálculo do cabeçalho.
+        estado.cabecalhos_manuais = 1;
+        estado.quadro_chips_manuais = 1;
+        // Garante MU contíguo às demais colunas do cabeçalho na ordem do arraste.
+        compactarColunasOrdem(destino.colunas.slice());
+        gravarLinhaNosComponentes([codigo]);
     }
 
     function bindRevisarOnce() {
@@ -4784,8 +7155,35 @@ $boletimWizardSteps = [
                 renderRevisarDinamico();
                 return;
             }
+            var catTodos = e.target.closest('[data-catalogo-periodo]');
+            if (catTodos) {
+                e.preventDefault();
+                e.stopPropagation();
+                adicionarTodasColunasDoPeriodo(catTodos.getAttribute('data-catalogo-periodo') || '');
+                return;
+            }
+            var catFal = e.target.closest('[data-catalogo-fal]');
+            if (catFal) {
+                e.preventDefault();
+                adicionarColunaFal(Number(catFal.getAttribute('data-catalogo-fal') || 0));
+                return;
+            }
+            var catItem = e.target.closest('[data-catalogo-evento]');
+            if (catItem) {
+                e.preventDefault();
+                var evIdCat = Number(catItem.getAttribute('data-catalogo-evento') || 0);
+                var evCat = ((catalogo && catalogo.eventos_avaliativos) || []).filter(function (x) {
+                    return Number(x && x.id || 0) === evIdCat;
+                })[0];
+                if (evCat) adicionarColunaDoEvento(evCat);
+                return;
+            }
+            if (e.target.closest('#bw-add-coluna')) {
+                adicionarColunaManual();
+                return;
+            }
             if (e.target.closest('#bw-add-media')) {
-                adicionarBlocoMedia();
+                if (!ehDemonstrativoNotas()) adicionarBlocoMedia();
                 return;
             }
             if (e.target.closest('#bw-criar-linha')) {
@@ -4793,14 +7191,14 @@ $boletimWizardSteps = [
                 var campoLinha = document.getElementById('bw-linha-nome');
                 nomeLinhaRascunho = campoLinha ? String(campoLinha.value || '') : nomeLinhaRascunho;
                 if (!String(nomeLinhaRascunho || '').trim()) {
-                    avisoLinha = { tipo: 'erro', texto: 'Escreva o nome que vai aparecer em cima das colunas. Ex.: Prova Semanal.' };
+                    avisoLinha = { tipo: 'erro', texto: 'Escreva o título do período. Ex.: I BIMESTRE.' };
                     renderRevisarDinamico();
                     campoLinha = document.getElementById('bw-linha-nome');
                     if (campoLinha) campoLinha.focus();
                     return;
                 }
-                if (codigosMarcados().length < 2) {
-                    avisoLinha = { tipo: 'erro', texto: 'Clique em pelo menos duas colunas antes. A borda azul mostra quais entram na linha.' };
+                if (codigosMarcados().length < 1) {
+                    avisoLinha = { tipo: 'erro', texto: 'Clique em pelo menos uma coluna (borda azul) antes de criar o título do período — ou arraste chips para dentro de um título.' };
                     renderRevisarDinamico();
                     return;
                 }
@@ -4809,12 +7207,26 @@ $boletimWizardSteps = [
             }
             if (e.target.closest('#bw-tirar-linha')) {
                 e.preventDefault();
-                if (!codigosMarcados().length) {
-                    avisoLinha = { tipo: 'erro', texto: 'Clique nas colunas que quer tirar da linha (borda azul) e depois em Tirar da linha.' };
-                    renderRevisarDinamico();
-                    return;
-                }
                 tirarLinhaLayout();
+                return;
+            }
+            if (e.target.closest('#bw-limpar-cabecalhos')) {
+                e.preventDefault();
+                limparTodosCabecalhos();
+                return;
+            }
+            var okCab = e.target.closest('#bw-colunas-lista .bw-linha-ok');
+            if (okCab) {
+                e.preventDefault();
+                if (!okCab.classList.contains('ativo')) {
+                    confirmarTituloPeriodo(okCab.getAttribute('data-linha-id') || '');
+                }
+                return;
+            }
+            var xCab = e.target.closest('#bw-colunas-lista .bw-linha-x');
+            if (xCab) {
+                e.preventDefault();
+                removerCabecalhoPorId(xCab.getAttribute('data-linha-id') || '');
                 return;
             }
             var xcol = e.target.closest('#bw-colunas-lista .bw-col-x');
@@ -4825,23 +7237,14 @@ $boletimWizardSteps = [
             }
             var chipCalc = e.target.closest('#bw-colunas-lista .bw-col-chip.calc');
             if (chipCalc) {
-                if (colunasDragou || e.target.closest('.bw-col-grip')) {
+                if (colunasDragou || e.target.closest('.bw-col-grip') || e.target.closest('.bw-col-x')) {
                     colunasDragou = false;
                     return;
                 }
+                e.preventDefault();
                 var codCalc = chipCalc.getAttribute('data-codigo');
-                if (codCalc && codCalc !== 'media_sem') {
-                    estado.titulo_codigo = codCalc;
-                    if (estado.passo !== 'formula') {
-                        estado.passo = 'formula';
-                        estado.bloco_calc = codCalc;
-                        renderAll();
-                        agendarMontar();
-                        return;
-                    }
-                    renderRevisarDinamico();
-                    abrirFormulaBloco(codCalc);
-                }
+                if (codCalc) abrirEdicaoBlocoCalc(codCalc);
+                return;
             }
         });
         bodyEl.addEventListener('focusin', function (e) {
@@ -4867,6 +7270,13 @@ $boletimWizardSteps = [
             box.classList.add('hidden');
         });
         bodyEl.addEventListener('input', function (e) {
+            if (e.target && e.target.classList && e.target.classList.contains('bw-linha-rotulo')) {
+                nomeLinhaRascunho = String(e.target.textContent || '').trim();
+                var campoSync = document.getElementById('bw-linha-nome');
+                if (campoSync) campoSync.value = nomeLinhaRascunho;
+                atualizarPreviewCabecalhosAoVivo();
+                return;
+            }
             if (e.target && e.target.id === 'bw-linha-nome') {
                 nomeLinhaRascunho = String(e.target.value || '');
                 return;
@@ -4893,8 +7303,23 @@ $boletimWizardSteps = [
             agendarMontar();
         });
         bodyEl.addEventListener('pointerdown', function (e) {
+            if (e.button > 0) return;
+            if (e.target.closest('.bw-linha-rotulo') || e.target.closest('.bw-linha-ok') || e.target.closest('.bw-linha-x') || e.target.closest('.bw-col-x')) return;
+            var gripGrupo = e.target.closest('#bw-colunas-lista .bw-linha-grip');
+            var caixaGrupo = gripGrupo ? gripGrupo.closest('.bw-linha-caixa') : null;
+            if (caixaGrupo) {
+                arrasteGrupo = {
+                    id: String(caixaGrupo.getAttribute('data-linha-id') || ''),
+                    caixa: caixaGrupo,
+                    x: e.clientX,
+                    y: e.clientY,
+                    ativo: false,
+                    pointerId: e.pointerId
+                };
+                return;
+            }
             var chip = e.target.closest('#bw-colunas-lista .bw-col-chip');
-            if (!chip || e.button > 0 || e.target.closest('.bw-col-x')) return;
+            if (!chip) return;
             var cod = chip.getAttribute('data-codigo') || '';
             if (!cod || cod === '_semanal' || cod === 'media_sem' || chip.classList.contains('travada')) return;
             arrasteColuna = {
@@ -4907,6 +7332,22 @@ $boletimWizardSteps = [
             };
         });
         bodyEl.addEventListener('pointermove', function (e) {
+            if (arrasteGrupo && e.pointerId === arrasteGrupo.pointerId) {
+                var gdx = e.clientX - arrasteGrupo.x;
+                var gdy = e.clientY - arrasteGrupo.y;
+                if (!arrasteGrupo.ativo) {
+                    if ((gdx * gdx) + (gdy * gdy) < 16) return;
+                    arrasteGrupo.ativo = true;
+                    colunasDragou = true;
+                    arrasteGrupo.caixa.classList.add('dragging');
+                    var listaG = document.getElementById('bw-colunas-lista');
+                    if (listaG) listaG.classList.add('arrastando');
+                    try { arrasteGrupo.caixa.setPointerCapture(e.pointerId); } catch (errG) { /* ignore */ }
+                }
+                e.preventDefault();
+                posicionarMarcaGrupo(e.clientX, e.clientY);
+                return;
+            }
             if (!arrasteColuna || e.pointerId !== arrasteColuna.pointerId) return;
             var dx = e.clientX - arrasteColuna.x;
             var dy = e.clientY - arrasteColuna.y;
@@ -4924,6 +7365,22 @@ $boletimWizardSteps = [
             posicionarMarcaColuna(e.clientX, e.clientY);
         });
         bodyEl.addEventListener('pointerup', function (e) {
+            if (arrasteGrupo && e.pointerId === arrasteGrupo.pointerId) {
+                var ativoG = arrasteGrupo.ativo;
+                var idG = arrasteGrupo.id;
+                if (arrasteGrupo.caixa) arrasteGrupo.caixa.classList.remove('dragging');
+                var listaG2 = document.getElementById('bw-colunas-lista');
+                if (listaG2) listaG2.classList.remove('arrastando');
+                arrasteGrupo = null;
+                if (!ativoG) {
+                    colunasDragou = false;
+                    return;
+                }
+                e.preventDefault();
+                soltarGrupoNaMarca(idG);
+                setTimeout(function () { colunasDragou = false; }, 80);
+                return;
+            }
             if (!arrasteColuna || e.pointerId !== arrasteColuna.pointerId) return;
             var ativo = arrasteColuna.ativo;
             var codigo = arrasteColuna.codigo;
@@ -4934,9 +7391,14 @@ $boletimWizardSteps = [
             colunasDrag = null;
             if (!ativo) {
                 colunasDragou = false;
-                if (usaEventosAvaliativosNaNota() && !e.target.closest('.bw-col-x') && !e.target.closest('.bw-col-chip.calc')) {
+                if (!e.target.closest('.bw-col-x')) {
                     var chipClique = e.target.closest('#bw-colunas-lista .bw-col-chip');
                     if (chipClique && chipClique.getAttribute('data-codigo') === codigo) {
+                        // Bloco de cálculo (MU / Resultado Final): clique abre o editor.
+                        if (chipClique.classList.contains('calc') || ehCodigoBlocoCalc(codigo)) {
+                            abrirEdicaoBlocoCalc(codigo);
+                            return;
+                        }
                         if (colunasMarcadas[codigo]) delete colunasMarcadas[codigo];
                         else colunasMarcadas[codigo] = true;
                         avisoLinha = null;
@@ -4950,6 +7412,15 @@ $boletimWizardSteps = [
             setTimeout(function () { colunasDragou = false; }, 80);
         });
         bodyEl.addEventListener('pointercancel', function (e) {
+            if (arrasteGrupo && e.pointerId === arrasteGrupo.pointerId) {
+                limparMarcaColuna();
+                if (arrasteGrupo.caixa) arrasteGrupo.caixa.classList.remove('dragging');
+                var listaGC = document.getElementById('bw-colunas-lista');
+                if (listaGC) listaGC.classList.remove('arrastando');
+                arrasteGrupo = null;
+                setTimeout(function () { colunasDragou = false; }, 80);
+                return;
+            }
             if (!arrasteColuna || e.pointerId !== arrasteColuna.pointerId) return;
             limparMarcaColuna();
             if (arrasteColuna.chip) arrasteColuna.chip.classList.remove('dragging');
@@ -4959,6 +7430,84 @@ $boletimWizardSteps = [
             colunasDrag = null;
             setTimeout(function () { colunasDragou = false; }, 80);
         });
+        bodyEl.addEventListener('focusin', function (e) {
+            if (!e.target || !e.target.classList || !e.target.classList.contains('bw-linha-rotulo')) return;
+            editandoCabecalho = true;
+            var caixa = e.target.closest('.bw-linha-caixa');
+            if (caixa) {
+                colunasMarcadas = {};
+                caixa.querySelectorAll('.bw-col-chip').forEach(function (chip) {
+                    var c = chip.getAttribute('data-codigo');
+                    if (c) colunasMarcadas[c] = true;
+                });
+                nomeLinhaRascunho = String(e.target.textContent || '').trim();
+                var campo = document.getElementById('bw-linha-nome');
+                if (campo) campo.value = nomeLinhaRascunho;
+            }
+        });
+        bodyEl.addEventListener('focusout', function (e) {
+            if (!e.target || !e.target.classList || !e.target.classList.contains('bw-linha-rotulo')) return;
+            var nome = String(e.target.textContent || '').trim().slice(0, 40);
+            var id = e.target.getAttribute('data-linha-id') || '';
+            var nomeAntigo = '';
+            var caixa = e.target.closest('.bw-linha-caixa');
+            if (caixa) nomeAntigo = String(caixa.getAttribute('data-linha-nome') || '').trim();
+            editandoCabecalho = false;
+            if (!nome) {
+                e.target.textContent = nomeAntigo || 'Título do período';
+                return;
+            }
+            if (nome === nomeAntigo) return;
+            aplicarNomeCabecalho(id || nomeAntigo, nome);
+        });
+        bodyEl.addEventListener('keydown', function (e) {
+            if (!e.target || !e.target.classList || !e.target.classList.contains('bw-linha-rotulo')) return;
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                e.target.blur();
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                var caixaEsc = e.target.closest('.bw-linha-caixa');
+                e.target.textContent = caixaEsc ? String(caixaEsc.getAttribute('data-linha-nome') || '') : e.target.textContent;
+                editandoCabecalho = false;
+                e.target.blur();
+            }
+        });
+    }
+
+    function posicionarMarcaGrupo(x, y) {
+        var lista = document.getElementById('bw-colunas-lista');
+        if (!lista || !arrasteGrupo) return;
+        var marca = document.getElementById('bw-col-marca');
+        if (!marca) {
+            marca = document.createElement('span');
+            marca.id = 'bw-col-marca';
+            marca.className = 'bw-col-marca';
+            marca.setAttribute('aria-hidden', 'true');
+        }
+        var destino = null;
+        var melhor = Infinity;
+        lista.querySelectorAll('.bw-linha-caixa').forEach(function (el) {
+            if (el === arrasteGrupo.caixa) return;
+            var r = el.getBoundingClientRect();
+            var d = Math.abs(y - (r.top + r.height / 2)) * 2 + Math.abs(x - (r.left + r.width / 2));
+            if (d < melhor) {
+                melhor = d;
+                destino = el;
+            }
+        });
+        if (!destino) {
+            lista.appendChild(marca);
+            return;
+        }
+        var box = destino.getBoundingClientRect();
+        var antes = x < box.left + box.width / 2;
+        if (antes) {
+            if (marca.nextSibling !== destino) lista.insertBefore(marca, destino);
+        } else if (destino.nextSibling !== marca) {
+            lista.insertBefore(marca, destino.nextSibling);
+        }
     }
 
     function limparMarcaColuna() {
@@ -4989,6 +7538,42 @@ $boletimWizardSteps = [
                 destino = el;
             }
         });
+        // Preferir soltar dentro do cabeçalho sob o ponteiro (cálculo / chip entra na faixa).
+        // Hit-area generosa: padding extra e prioridade à zona .bw-linha-cols.
+        var caixaSob = null;
+        var melhorCaixa = Infinity;
+        lista.querySelectorAll('.bw-linha-caixa').forEach(function (cx) {
+            var zona = cx.querySelector('.bw-linha-cols') || cx;
+            var rZona = zona.getBoundingClientRect();
+            var rCx = cx.getBoundingClientRect();
+            var pad = 18;
+            var dentroZona = x >= rZona.left - pad && x <= rZona.right + pad && y >= rZona.top - pad && y <= rZona.bottom + pad;
+            var dentroCx = x >= rCx.left - 10 && x <= rCx.right + 10 && y >= rCx.top - 10 && y <= rCx.bottom + 10;
+            if (!dentroZona && !dentroCx) return;
+            var alvo = dentroZona ? rZona : rCx;
+            var d = Math.abs(y - (alvo.top + alvo.height / 2)) + Math.abs(x - (alvo.left + alvo.width / 2)) * 0.2;
+            if (dentroZona) d -= 40;
+            if (d < melhorCaixa) {
+                melhorCaixa = d;
+                caixaSob = cx;
+            }
+        });
+        if (caixaSob) {
+            var colsBox = caixaSob.querySelector('.bw-linha-cols') || caixaSob;
+            if (destino && colsBox.contains(destino)) {
+                var boxChip = destino.getBoundingClientRect();
+                var antesChip = x < boxChip.left + boxChip.width / 2;
+                if (antesChip) {
+                    if (marca.nextSibling !== destino) colsBox.insertBefore(marca, destino);
+                } else if (destino.nextSibling !== marca) {
+                    colsBox.insertBefore(marca, destino.nextSibling);
+                }
+                return;
+            }
+            // Cabeçalho vazio ou soltou na área do título — coloca no fim das colunas do grupo.
+            colsBox.appendChild(marca);
+            return;
+        }
         if (!destino) {
             lista.appendChild(marca);
             return;
@@ -5010,22 +7595,115 @@ $boletimWizardSteps = [
             limparMarcaColuna();
             return;
         }
+        codigo = String(codigo || '').toLowerCase();
+        var caixaDestino = marca ? marca.closest('.bw-linha-caixa') : null;
+        var nomeCab = '';
+        var linhaId = '';
+        var colsNoCab = [];
+        if (caixaDestino) {
+            var rot = caixaDestino.querySelector('.bw-linha-rotulo');
+            nomeCab = String((rot && rot.textContent) || caixaDestino.getAttribute('data-linha-nome') || '').trim();
+            linhaId = String(caixaDestino.getAttribute('data-linha-id') || '');
+            // Ordem real do drop dentro do título (não jogar a coluna pro fim).
+            var zona = caixaDestino.querySelector('.bw-linha-cols') || caixaDestino;
+            zona.querySelectorAll('.bw-col-chip, #bw-col-marca').forEach(function (el) {
+                if (el === marca || el.id === 'bw-col-marca') {
+                    if (colsNoCab.indexOf(codigo) < 0) colsNoCab.push(codigo);
+                    return;
+                }
+                var cZ = String(el.getAttribute('data-codigo') || '').toLowerCase();
+                if (!cZ || cZ === codigo || cZ === '_semanal' || cZ === 'media_sem') return;
+                if (colsNoCab.indexOf(cZ) < 0) colsNoCab.push(cZ);
+            });
+        }
         var ordem = [];
+        var visto = {};
         lista.querySelectorAll('.bw-col-chip, #bw-col-marca').forEach(function (el) {
-            if (el === marca) {
-                ordem.push(codigo);
+            if (el === marca || el.id === 'bw-col-marca') {
+                if (!visto[codigo]) {
+                    ordem.push(codigo);
+                    visto[codigo] = true;
+                }
                 return;
             }
-            var c = el.getAttribute('data-codigo');
-            if (!c || c === codigo || c === '_semanal' || c === 'media_sem') return;
+            var c = String(el.getAttribute('data-codigo') || '').toLowerCase();
+            if (!c || c === codigo || c === '_semanal' || c === 'media_sem' || visto[c]) return;
+            visto[c] = true;
             ordem.push(c);
         });
         limparMarcaColuna();
-        if (ordem.indexOf(codigo) < 0) ordem.push(codigo);
-        var anterior = (estado.colunas_ordem || []).join('|');
-        if (anterior === ordem.join('|')) return;
+        if (!visto[codigo]) ordem.push(codigo);
         estado.colunas_ordem = ordem;
+
+        if (!Array.isArray(estado.linhas_layout)) estado.linhas_layout = [];
+        estado.linhas_layout = estado.linhas_layout.map(function (lin) {
+            if (!lin) return lin;
+            lin.colunas = (lin.colunas || []).filter(function (c) {
+                return String(c).toLowerCase() !== codigo;
+            });
+            return lin;
+        }).filter(function (lin) { return lin && (lin.colunas || []).length >= 1; });
+
+        if (nomeCab) {
+            var destino = null;
+            estado.linhas_layout.forEach(function (lin) {
+                if (!lin) return;
+                if (linhaId && String(lin.id) === String(linhaId)) destino = lin;
+                else if (!destino && String(lin.nome || '') === nomeCab) destino = lin;
+            });
+            if (!destino) {
+                destino = { id: String(linhaId || idLinhaPorNome(nomeCab)), nome: nomeCab, colunas: [] };
+                estado.linhas_layout.push(destino);
+            }
+            destino.colunas = colsNoCab.length ? colsNoCab.slice() : destino.colunas.concat([codigo]);
+            if (destino.colunas.indexOf(codigo) < 0) destino.colunas.push(codigo);
+            estado.cabecalhos_manuais = 1;
+            estado.quadro_chips_manuais = 1;
+            compactarColunasOrdem(destino.colunas.slice());
+            gravarLinhaNosComponentes(destino.colunas.slice());
+        } else {
+            gravarLinhaNosComponentes([codigo]);
+        }
+
         aplicarOrdemNoPreview(previewAtual);
+        renderRevisarDinamico();
+        agendarMontar();
+    }
+
+    function soltarGrupoNaMarca(linhaId) {
+        var lista = document.getElementById('bw-colunas-lista');
+        var marca = document.getElementById('bw-col-marca');
+        if (!lista || !linhaId || !estado) {
+            limparMarcaColuna();
+            return;
+        }
+        var caixas = Array.prototype.slice.call(lista.querySelectorAll('.bw-linha-caixa'));
+        var movida = null;
+        caixas.forEach(function (cx) {
+            if (String(cx.getAttribute('data-linha-id') || '') === String(linhaId)) movida = cx;
+        });
+        if (!movida || !marca) {
+            limparMarcaColuna();
+            return;
+        }
+        if (marca.parentNode === lista) {
+            lista.insertBefore(movida, marca);
+        } else {
+            var caixaMarca = marca.closest('.bw-linha-caixa');
+            if (caixaMarca && caixaMarca !== movida) {
+                var antes = marca.compareDocumentPosition(caixaMarca) & Node.DOCUMENT_POSITION_FOLLOWING;
+                if (antes) lista.insertBefore(movida, caixaMarca);
+                else lista.insertBefore(movida, caixaMarca.nextSibling);
+            }
+        }
+        limparMarcaColuna();
+        estado.colunas_ordem = coletarOrdemChipsDoDom();
+        sincronizarLinhasLayoutComDom();
+        estado.cabecalhos_manuais = 1;
+        // Mantém colunas de cada cabeçalho juntas — o Exemplo só fecha a faixa se estiverem lado a lado.
+        (estado.linhas_layout || []).forEach(function (lin) {
+            if (lin && (lin.colunas || []).length >= 1) compactarColunasOrdem(lin.colunas);
+        });
         renderRevisarDinamico();
         agendarMontar();
     }
@@ -5043,20 +7721,28 @@ $boletimWizardSteps = [
             if (ib < 0) ib = 999;
             return ia - ib;
         });
-        if (cols.length < 2) {
-            avisoLinha = { tipo: 'erro', texto: 'Clique em pelo menos duas colunas antes. A borda azul mostra quais entram na linha.' };
+        if (cols.length < 1) {
+            avisoLinha = { tipo: 'erro', texto: 'Clique em pelo menos uma coluna (borda azul) antes de criar o título do período.' };
             renderRevisarDinamico();
             return;
         }
-        var idxs = cols.map(function (c) { return ordem.indexOf(c); }).filter(function (i) { return i >= 0; });
-        var ladoALado = idxs.length === cols.length && (idxs[idxs.length - 1] - idxs[0] === idxs.length - 1);
         if (!Array.isArray(estado.linhas_layout)) estado.linhas_layout = [];
         estado.linhas_layout = estado.linhas_layout.map(function (lin) {
             if (!lin) return lin;
             lin.colunas = (lin.colunas || []).filter(function (c) { return cols.indexOf(c) < 0; });
             return lin;
-        }).filter(function (lin) { return lin && (lin.colunas || []).length >= 2; });
-        estado.linhas_layout.push({ id: 'lin' + Date.now().toString(36), nome: nome.slice(0, 40), colunas: cols });
+        }).filter(function (lin) { return lin && (lin.colunas || []).length >= 1; });
+        var novoId = 'lin' + Date.now().toString(36);
+        estado.linhas_layout.push({ id: novoId, nome: nome.slice(0, 40), colunas: cols });
+        estado.cabecalhos_manuais = 1;
+        estado.quadro_chips_manuais = 1;
+        estado.limpar_titulos_periodo = 0;
+        if (!estado.titulos_periodo_ok || typeof estado.titulos_periodo_ok !== 'object') {
+            estado.titulos_periodo_ok = {};
+        }
+        delete estado.titulos_periodo_ok[novoId];
+        compactarColunasOrdem(cols);
+        sincronizarOrdemComLinhasLayout();
         gravarLinhaNosComponentes(cols);
         var pvNomes = {};
         (((previewEfetivo() || {}).colunas) || []).forEach(function (c) {
@@ -5065,12 +7751,21 @@ $boletimWizardSteps = [
         var nomesCols = cols.map(function (c) { return tituloColuna(c) || pvNomes[c] || c; }).join(', ');
         avisoLinha = {
             tipo: 'ok',
-            texto: 'Linha “' + nome + '” em cima de ' + nomesCols + '.'
-                + (ladoALado ? ' A faixa aparece aqui e no quadro abaixo. A fórmula não mudou.' : ' Arraste essas colunas para ficarem lado a lado, senão a faixa não fecha.')
+            texto: 'Título do período “' + nome + '” em cima de ' + nomesCols + '. Clique em Confirmar para marcar como concluído.'
         };
         colunasMarcadas = {};
         nomeLinhaRascunho = '';
         renderRevisarDinamico();
+        var btnCriar = document.getElementById('bw-criar-linha');
+        if (btnCriar) {
+            btnCriar.classList.add('bw-btn-ok-flash');
+            btnCriar.textContent = 'Criado ✓';
+            setTimeout(function () {
+                if (!btnCriar.isConnected) return;
+                btnCriar.classList.remove('bw-btn-ok-flash');
+                btnCriar.textContent = 'Novo título do período';
+            }, 1200);
+        }
         var quadro = document.querySelector('#bw-preview-wrap .bw-preview-table');
         if (quadro && quadro.scrollIntoView) quadro.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         agendarMontar();
@@ -5079,15 +7774,65 @@ $boletimWizardSteps = [
     function tirarLinhaLayout() {
         if (!estado || !Array.isArray(estado.linhas_layout)) return;
         var cols = codigosMarcados().map(function (c) { return String(c).toLowerCase(); });
-        if (!cols.length) return;
+        if (!cols.length) {
+            limparTodosCabecalhos();
+            return;
+        }
         estado.linhas_layout = estado.linhas_layout.map(function (lin) {
             if (!lin) return lin;
             lin.colunas = (lin.colunas || []).filter(function (c) { return cols.indexOf(c) < 0; });
             return lin;
-        }).filter(function (lin) { return lin && (lin.colunas || []).length >= 2; });
-        avisoLinha = { tipo: 'ok', texto: 'Essas colunas saíram da linha e voltam a aparecer sozinhas.' };
+        }).filter(function (lin) { return lin && (lin.colunas || []).length >= 1; });
+        estado.cabecalhos_manuais = 1;
+        avisoLinha = { tipo: 'ok', texto: 'Essas colunas saíram do título do período e voltam a aparecer sozinhas.' };
         colunasMarcadas = {};
         gravarLinhaNosComponentes(cols);
+        renderRevisarDinamico();
+        agendarMontar();
+    }
+
+    function limparTodosCabecalhos() {
+        if (!estado) return;
+        var todos = [];
+        (estado.linhas_layout || []).forEach(function (lin) {
+            (lin.colunas || []).forEach(function (c) {
+                c = String(c || '').toLowerCase();
+                if (c && todos.indexOf(c) < 0) todos.push(c);
+            });
+        });
+        estado.linhas_layout = [];
+        estado.cabecalhos_manuais = 1;
+        estado.titulos_periodo_ok = {};
+        estado.limpar_titulos_periodo = 1;
+        colunasMarcadas = {};
+        if (todos.length) gravarLinhaNosComponentes(todos);
+        avisoLinha = { tipo: 'ok', texto: 'Todos os títulos do período foram removidos. Monte do zero: marque colunas e use Novo título do período.' };
+        renderRevisarDinamico();
+        agendarMontar();
+    }
+
+    function removerCabecalhoPorId(linhaId) {
+        if (!estado || !Array.isArray(estado.linhas_layout)) return;
+        linhaId = String(linhaId || '');
+        var cols = [];
+        estado.linhas_layout = estado.linhas_layout.filter(function (lin) {
+            if (!lin) return false;
+            var id = String(lin.id || '');
+            var nome = String(lin.nome || '');
+            var bate = id === linhaId || ('cab:' + nome.toLowerCase()) === linhaId || nome === linhaId;
+            if (!bate) return true;
+            (lin.colunas || []).forEach(function (c) {
+                c = String(c || '').toLowerCase();
+                if (c && cols.indexOf(c) < 0) cols.push(c);
+            });
+            return false;
+        });
+        estado.cabecalhos_manuais = 1;
+        if (estado.titulos_periodo_ok && typeof estado.titulos_periodo_ok === 'object') {
+            delete estado.titulos_periodo_ok[linhaId];
+        }
+        if (cols.length) gravarLinhaNosComponentes(cols);
+        avisoLinha = { tipo: 'ok', texto: 'Título do período removido. As colunas ficaram soltas.' };
         renderRevisarDinamico();
         agendarMontar();
     }
@@ -5309,27 +8054,383 @@ $boletimWizardSteps = [
     }
 
     function ehBoletimComposto() {
-        return !!(estado && estado.exibir_em === 'boletim' && estado.origem !== 'clonar');
+        if (!estado) return false;
+        if (estado.origem === 'quadro-impressao' || estado.origem === 'clonar' || estado.quadro_livre) {
+            return false;
+        }
+        return estado.exibir_em === 'boletim';
+    }
+
+    /** Visão de impressão do boletim: builder completo (colunas, arraste, fórmulas, cabeçalhos). */
+    function forcarContextoImpressaoBoletim() {
+        if (!estado) return;
+        var layoutId = Number(root.getAttribute('data-layout-boletim-id') || 0);
+        var veioDoBoletim = retornoFluxo === 'boletim-layout' || layoutId > 0;
+        if (!veioDoBoletim) return;
+        estado.exibir_em = 'boletim';
+        estado.bimestre = 0;
+        if (layoutId > 0) {
+            estado.layout_boletim_id = layoutId;
+            if (Number(estado.boletim_id || 0) === layoutId) estado.boletim_id = 0;
+        }
+        if (!estado.modelo_santa_maria) {
+            estado.quadro_livre = 1;
+            estado.origem = 'quadro-impressao';
+            estado.cabecalhos_manuais = 1;
+            zerarQuadroColunasSeAutomatico();
+        } else {
+            estado.origem = 'santa-maria';
+            estado.quadro_livre = 0;
+        }
+        if (!Array.isArray(estado.demonstrativos_ids)) estado.demonstrativos_ids = [];
+        if (!Array.isArray(estado.eventos_avaliativos_ids)) estado.eventos_avaliativos_ids = [];
+        garantirMapaSubsEventosAvulsos();
+        // Boletim impressão não usa mais Quadro de Notas.
+        estado.grupo_regras_notas_id = 0;
+    }
+
+    function ehVisaoImpressaoEditavel() {
+        if (!estado) return false;
+        forcarContextoImpressaoBoletim();
+        if (ehQuadroImpressaoLivre() || ehModeloSantaMaria()) return true;
+        if (Number(estado.layout_boletim_id || 0) > 0 && estado.exibir_em === 'boletim') return true;
+        if (retornoFluxo === 'boletim-layout' && estado.exibir_em === 'boletim') return true;
+        if (retornoFluxo === 'boletim-layout') return true;
+        return false;
     }
 
     function passosVisiveis() {
-        var vis = ehBoletimComposto()
-            ? PASSOS.filter(function (p) {
+        var vis;
+        if (ehVisaoImpressaoEditavel()) {
+            vis = PASSOS.filter(function (p) {
+                return ['identidade', 'pecas', 'agrupar', 'formula', 'revisar'].indexOf(p.id) >= 0;
+            });
+        } else if (ehBoletimComposto()) {
+            vis = PASSOS.filter(function (p) {
                 return ['inicio', 'identidade', 'publico', 'revisar'].indexOf(p.id) >= 0;
-            })
-            : PASSOS.slice();
-        if (estado && estado.modo === 'editar' && estado.origem === 'formulario') {
+            });
+        } else {
+            vis = PASSOS.slice();
+        }
+        if (estado && estado.modo === 'editar' && estado.origem === 'formulario' && !ehVisaoImpressaoEditavel()) {
             vis = vis.filter(function (p) {
                 return p.id !== 'inicio';
             });
         }
-        if (usaEventosAvaliativosNaNota()) {
+        if (ehVisaoImpressaoEditavel()) {
+            vis = vis.map(function (p) {
+                if (p.id === 'pecas') {
+                    return {
+                        id: p.id,
+                        label: '2. Eventos',
+                        sub: 'por ' + String(rotuloCampoPeriodo() || 'período').toLocaleLowerCase('pt-BR')
+                    };
+                }
+                if (p.id === 'agrupar') return { id: p.id, label: '3. Agrupar', sub: 'Linha' };
+                if (p.id === 'formula') return { id: p.id, label: '4. Fórmula', sub: 'Colunas' };
+                if (p.id === 'revisar') return { id: p.id, label: '5. Revisão', sub: 'Confirmar' };
+                if (p.id === 'identidade') return { id: p.id, label: '1. Identidade', sub: 'Evento' };
+                return p;
+            });
+        } else if (usaEventosAvaliativosNaNota()) {
             vis = vis.map(function (p) {
                 if (p.id !== 'pecas') return p;
                 return { id: p.id, label: '3. Eventos', sub: 'Avaliativos' };
             });
         }
+        if (ehDemonstrativoNotas()) {
+            vis = vis.map(function (p, idx) {
+                if (p.id !== 'formula') return p;
+                return {
+                    id: p.id,
+                    label: (idx + 1) + '. Colunas',
+                    sub: usaEventosAvaliativosNaNota() ? 'Eventos' : 'Montagem'
+                };
+            });
+        }
         return vis;
+    }
+
+    function demonstrativosMarcados() {
+        var ids = (estado && estado.demonstrativos_ids) || [];
+        return ids.map(Number).filter(function (id) { return id > 0; });
+    }
+
+    function eventosAvaliativosMarcados() {
+        var ids = (estado && estado.eventos_avaliativos_ids) || [];
+        return ids.map(Number).filter(function (id) { return id > 0; });
+    }
+
+    function chavePeriodoItem(item) {
+        var bim = Number((item && item.bimestre) || 0);
+        if (bim >= 60 && bim <= 71) return 'rec-bim-' + (bim - 60);
+        if (bim >= 80 && bim <= 82) return 'rec-sem-' + (bim - 80);
+        if (bim === 90) return 'rec-ano';
+        if (periodoNumeroValido(bim)) return 'p-' + bim;
+        if (bim > 0) return 'outro-' + bim;
+        return 'ano';
+    }
+
+    function rotuloPeriodoEventoAvaliativo(ev) {
+        var bim = Number((ev && ev.bimestre) || 0);
+        var ano = Number((ev && ev.ano_letivo) || (estado && estado.ano_letivo) || 0);
+        if (bim >= 60 && bim <= 71) {
+            var nBim = bim - 60;
+            return 'Recuperação · ' + (periodoNumeroValido(nBim, ano) ? rotuloPeriodoNumero(nBim, ano) : (nBim + 'º ' + rotuloCampoPeriodo(ano)));
+        }
+        if (bim >= 80 && bim <= 82) return 'Recuperação · ' + (bim - 80) + 'º semestre';
+        if (bim === 90) return 'Recuperação · ano';
+        if (periodoNumeroValido(bim, ano)) return rotuloPeriodoNumero(bim, ano);
+        if (bim > 0) return 'Período ' + bim;
+        return 'Ano letivo';
+    }
+
+    function ordemChavePeriodo(chave) {
+        if (chave === 'ano') return 9000;
+        if (chave.indexOf('p-') === 0) return Number(chave.slice(2)) || 0;
+        if (chave.indexOf('rec-bim-') === 0) return 1000 + (Number(chave.slice(8)) || 0);
+        if (chave.indexOf('rec-sem-') === 0) return 2000 + (Number(chave.slice(8)) || 0);
+        if (chave === 'rec-ano') return 3000;
+        if (chave.indexOf('outro-') === 0) return 8000 + (Number(chave.slice(6)) || 0);
+        return 9500;
+    }
+
+    function agruparItensPorPeriodo(itens) {
+        var grupos = {};
+        (itens || []).forEach(function (item) {
+            if (!item) return;
+            var chave = chavePeriodoItem(item);
+            if (!grupos[chave]) {
+                grupos[chave] = {
+                    chave: chave,
+                    rotulo: rotuloPeriodoEventoAvaliativo(item),
+                    itens: []
+                };
+            }
+            grupos[chave].itens.push(item);
+        });
+        return Object.keys(grupos).map(function (k) { return grupos[k]; }).sort(function (a, b) {
+            return ordemChavePeriodo(a.chave) - ordemChavePeriodo(b.chave);
+        });
+    }
+
+    function eventosAvaliativosDoAnoQuadro() {
+        var ano = Number((estado && estado.ano_letivo) || 0);
+        return ((catalogo && catalogo.eventos_avaliativos) || []).filter(function (ev) {
+            if (!ev) return false;
+            if (ano > 0 && Number(ev.ano_letivo || 0) !== ano) return false;
+            return Number(ev.id || 0) > 0;
+        }).slice().sort(function (a, b) {
+            var oa = ordemChavePeriodo(chavePeriodoItem(a));
+            var ob = ordemChavePeriodo(chavePeriodoItem(b));
+            if (oa !== ob) return oa - ob;
+            return String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR');
+        });
+    }
+
+    function sincronizarFontesComDemonstrativos() {
+        if (!estado) return;
+        if (!estado.fontes_bimestres || typeof estado.fontes_bimestres !== 'object') {
+            estado.fontes_bimestres = { 1: 0, 2: 0, 3: 0, 4: 0 };
+        }
+        var porBim = {};
+        var i;
+        for (i = 1; i <= maxPeriodo(); i++) porBim[i] = 0;
+        demonstrativosMarcados().forEach(function (id) {
+            var r = ((catalogo && catalogo.regras) || []).filter(function (x) { return Number(x.id) === id; })[0];
+            if (!r) return;
+            var b = Number(r.bimestre || 0);
+            if (periodoNumeroValido(b) && !porBim[b]) porBim[b] = id;
+        });
+        for (i = 1; i <= maxPeriodo(); i++) {
+            if (porBim[i]) estado.fontes_bimestres[i] = porBim[i];
+        }
+    }
+
+    function htmlPuxarDemonstrativosQuadro() {
+        // No boletim / Montar quadro não usamos mais Quadro de Notas:
+        // a fonte são os Eventos Avaliativos, separados por bimestre/trimestre.
+        return htmlPuxarEventosAvaliativosQuadro(true);
+    }
+
+    function garantirMapaSubsEventosAvulsos() {
+        if (!estado) return;
+        if (!estado.eventos_avaliativos_subs || typeof estado.eventos_avaliativos_subs !== 'object' || Array.isArray(estado.eventos_avaliativos_subs)) {
+            estado.eventos_avaliativos_subs = {};
+        }
+    }
+
+    function idsSubeventosDoEvento(ev) {
+        var ids = [];
+        ((ev && ev.subeventos) || []).forEach(function (sub) {
+            var sid = Number(sub && sub.id || 0);
+            if (sid > 0) ids.push(sid);
+        });
+        return ids;
+    }
+
+    function subeventosAvulsosMarcados(eventoId) {
+        garantirMapaSubsEventosAvulsos();
+        var raw = estado.eventos_avaliativos_subs[eventoId] || estado.eventos_avaliativos_subs[String(eventoId)] || [];
+        if (!Array.isArray(raw)) return [];
+        return raw.map(Number).filter(function (id) { return id > 0; });
+    }
+
+    function subeventoAvulsoMarcado(eventoId, subId) {
+        return subeventosAvulsosMarcados(eventoId).indexOf(Number(subId)) >= 0;
+    }
+
+    function htmlSubeventosAvulsosQuadro(ev) {
+        var subs = (ev && ev.subeventos) || [];
+        if (subs.length < 2) return '';
+        var eventoId = Number(ev.id || 0);
+        var marcados = subeventosAvulsosMarcados(eventoId);
+        // Sem seleção explícita: todos entram (mesmo comportamento do backend).
+        var todosOn = !marcados.length;
+        var html = '<div class="mt-3 pl-7 space-y-2 border-t border-gray-100 pt-3">';
+        html += '<div class="flex flex-wrap items-center justify-between gap-2">';
+        html += '<p class="text-xs font-medium text-gray-600">Sub-eventos</p>';
+        html += '<label class="inline-flex items-center gap-1.5 text-xs text-indigo-800 cursor-pointer">'
+            + '<input type="checkbox" class="bw-evento-avulso-subs-todos rounded border-gray-300 text-indigo-600" data-evento="' + eventoId + '"'
+            + (todosOn || marcados.length === subs.length ? ' checked' : '') + '> Selecionar todos</label>';
+        html += '</div>';
+        html += '<div class="grid sm:grid-cols-2 gap-2">';
+        subs.forEach(function (sub) {
+            var sid = Number(sub.id || 0);
+            if (sid <= 0) return;
+            var on = todosOn || subeventoAvulsoMarcado(eventoId, sid);
+            var data = typeof dataProvaBr === 'function' ? dataProvaBr(sub.data_prova) : '';
+            html += '<label class="inline-flex items-start gap-2 text-sm border rounded-lg px-3 py-2 bg-white cursor-pointer">';
+            html += '<input type="checkbox" class="bw-evento-avulso-sub mt-0.5 rounded border-gray-300 text-indigo-600" data-evento="' + eventoId + '" value="' + sid + '"' + (on ? ' checked' : '') + '>';
+            html += '<span>' + esc(sub.titulo || ('Sub-evento #' + sid)) + (data ? ' · ' + esc(data) : '') + '</span></label>';
+        });
+        html += '</div></div>';
+        return html;
+    }
+
+    function htmlCardEventoAvaliativoQuadro(ev, marcados) {
+        var id = Number(ev.id || 0);
+        if (id <= 0) return '';
+        var on = !!marcados[id];
+        var lab = ev.nome || ('Evento #' + id);
+        if (ev.sigla) lab = String(ev.sigla).toUpperCase() + ' — ' + lab;
+        var nSub = Number(ev.total_subeventos || (ev.subeventos || []).length || 0);
+        var html = '<div class="bw-card' + (on ? ' selected' : '') + '">';
+        html += '<label class="flex items-start gap-3 cursor-pointer">';
+        html += '<input type="checkbox" class="mt-1 bw-evento-avulso" value="' + id + '"' + (on ? ' checked' : '') + '>';
+        html += '<span><span class="text-sm font-semibold text-gray-900">' + esc(lab) + '</span>';
+        html += '<span class="block text-xs text-gray-500">' + esc(rotuloPeriodoEventoAvaliativo(ev));
+        if (nSub) html += ' · ' + nSub + (nSub === 1 ? ' subevento' : ' subeventos');
+        if (ev.turmas_nomes) html += ' · ' + esc(ev.turmas_nomes);
+        html += '</span></span></label>';
+        if (on) html += htmlSubeventosAvulsosQuadro(ev);
+        html += '</div>';
+        return html;
+    }
+
+    /** Garante IDs dos eventos já no quadro (evita erro no Aplicar quando a lista se perde). */
+    function sincronizarEventosIdsDoQuadro() {
+        if (!estado) return;
+        if (!Array.isArray(estado.eventos_avaliativos_ids)) estado.eventos_avaliativos_ids = [];
+        var ids = estado.eventos_avaliativos_ids.map(Number).filter(function (id) { return id > 0; });
+        var set = {};
+        ids.forEach(function (id) { set[id] = true; });
+        eventosCatalogoBuilder().forEach(function (ev) {
+            var id = Number(ev && ev.id || 0);
+            if (id <= 0 || set[id]) return;
+            if (!colunaEventoJaNoQuadro(ev)) return;
+            ids.push(id);
+            set[id] = true;
+        });
+        estado.eventos_avaliativos_ids = ids;
+    }
+
+    /**
+     * Lê checkboxes de eventos do DOM.
+     * @param {{preservarLayout?: boolean}} opcoes preservarLayout=true no Aplicar
+     *   (não zera títulos/ordem do quadro).
+     */
+    function sincronizarSelecaoEventosAvulsosDoDom(opcoes) {
+        if (!estado || !bodyEl) return;
+        opcoes = opcoes || {};
+        var preservarLayout = !!opcoes.preservarLayout;
+        garantirMapaSubsEventosAvulsos();
+        // Fora do passo Eventos não há checkboxes — não zera a seleção já feita.
+        var checks = bodyEl.querySelectorAll('.bw-evento-avulso');
+        if (!checks.length) {
+            sincronizarEventosIdsDoQuadro();
+            return;
+        }
+        estado.eventos_avaliativos_ids = [];
+        bodyEl.querySelectorAll('.bw-evento-avulso:checked').forEach(function (c) {
+            var id = parseInt(c.value, 10) || 0;
+            if (id > 0) estado.eventos_avaliativos_ids.push(id);
+        });
+        sincronizarEventosIdsDoQuadro();
+        var novoSubs = {};
+        estado.eventos_avaliativos_ids.forEach(function (id) {
+            var marcados = [];
+            bodyEl.querySelectorAll('.bw-evento-avulso-sub[data-evento="' + id + '"]:checked').forEach(function (sub) {
+                var sid = parseInt(sub.value, 10) || 0;
+                if (sid > 0) marcados.push(sid);
+            });
+            var ev = ((catalogo && catalogo.eventos_avaliativos) || []).filter(function (x) {
+                return Number(x.id) === id;
+            })[0];
+            var todos = idsSubeventosDoEvento(ev);
+            // Só grava lista quando o usuário restringiu; vazio = todos.
+            if (todos.length >= 2 && marcados.length && marcados.length < todos.length) {
+                novoSubs[id] = marcados;
+            }
+        });
+        estado.eventos_avaliativos_subs = novoSubs;
+        // Ao marcar novos períodos, libera cabeçalhos automáticos para remontar I/II/III…
+        // No Aplicar preserva o layout já montado.
+        if (!preservarLayout && !estado.cabecalhos_manuais) {
+            estado.linhas_layout = [];
+            estado.colunas_ordem = [];
+        }
+        aplicarSiglasEventosAvulsosNosTitulos();
+    }
+
+    function htmlPuxarEventosAvaliativosQuadro(comoPassoPrincipal) {
+        if (!(catalogo && catalogo.modulo_eventos_avaliativos)) {
+            return '<p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Módulo de <strong>Eventos Avaliativos</strong> desativado nesta escola.</p>';
+        }
+        garantirMapaSubsEventosAvulsos();
+        var eventos = eventosAvaliativosDoAnoQuadro();
+        var marcados = {};
+        eventosAvaliativosMarcados().forEach(function (id) { marcados[id] = true; });
+        var campo = String(rotuloCampoPeriodo() || 'período').toLocaleLowerCase('pt-BR');
+        var html = comoPassoPrincipal ? '' : '<div class="mt-6 pt-4 border-t border-gray-200">';
+        html += '<p class="text-sm text-gray-700">Quais <strong>Eventos avaliativos</strong> entram neste boletim?</p>';
+        html += '<p class="text-xs text-gray-500 mt-1">Separados por <strong>' + esc(campo) + '</strong>. Use <strong>Selecionar todos</strong> no período (e nos sub-eventos, se houver).</p>';
+        if (!eventos.length) {
+            html += '<p class="mt-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Nenhum Evento avaliativo neste ano. Cadastre em <strong>Eventos Avaliativos</strong> e volte.</p>';
+            if (!comoPassoPrincipal) html += '</div>';
+            return html;
+        }
+        var grupos = agruparItensPorPeriodo(eventos);
+        html += '<div class="mt-3 space-y-4">';
+        grupos.forEach(function (grupo) {
+            var idsGrupo = grupo.itens.map(function (ev) { return Number(ev.id || 0); }).filter(function (id) { return id > 0; });
+            var todosMarcados = idsGrupo.length > 0 && idsGrupo.every(function (id) { return !!marcados[id]; });
+            html += '<div class="rounded-xl border border-gray-200 bg-gray-50/60 p-3" data-periodo-chave="' + esc(grupo.chave) + '">';
+            html += '<div class="flex flex-wrap items-center justify-between gap-2 mb-2">';
+            html += '<p class="text-xs font-semibold uppercase tracking-wide text-gray-700">' + esc(grupo.rotulo) + '</p>';
+            html += '<label class="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-800 cursor-pointer">'
+                + '<input type="checkbox" class="bw-evento-avulso-periodo-todos rounded border-gray-300 text-indigo-600" data-periodo="' + esc(grupo.chave) + '"'
+                + (todosMarcados ? ' checked' : '') + '> Selecionar todos</label>';
+            html += '</div>';
+            html += '<div class="grid gap-3">';
+            grupo.itens.forEach(function (ev) {
+                html += htmlCardEventoAvaliativoQuadro(ev, marcados);
+            });
+            html += '</div></div>';
+        });
+        html += '</div>';
+        if (!comoPassoPrincipal) html += '</div>';
+        return html;
     }
 
     function finalidadeAtual() {
@@ -5352,39 +8453,66 @@ $boletimWizardSteps = [
     }
 
     function sugerirFontesBimestres() {
+        var i;
         if (!estado.fontes_bimestres || typeof estado.fontes_bimestres !== 'object') {
-            estado.fontes_bimestres = { 1: 0, 2: 0, 3: 0, 4: 0 };
+            estado.fontes_bimestres = {};
+        }
+        for (i = 1; i <= maxPeriodo(); i++) {
+            estado.fontes_bimestres[i] = Number(estado.fontes_bimestres[i] || 0) || 0;
         }
         regrasNotasDoAno().forEach(function (r) {
             var b = Number(r.bimestre || 0);
-            if (b < 1 || b > 4) return;
+            if (!periodoNumeroValido(b)) return;
             if (!Number(estado.fontes_bimestres[b] || 0)) {
                 estado.fontes_bimestres[b] = Number(r.id);
             }
         });
         if (!estado.fontes_faltas || typeof estado.fontes_faltas !== 'object') {
-            estado.fontes_faltas = { 1: 0, 2: 0, 3: 0, 4: 0 };
+            estado.fontes_faltas = {};
+        }
+        for (i = 1; i <= maxPeriodo(); i++) {
+            estado.fontes_faltas[i] = Number(estado.fontes_faltas[i] || 0) || 0;
         }
         eventosFaltasDoAno().forEach(function (ev) {
             var b = Number(ev.bimestre || 0);
-            if (b < 1 || b > 4) return;
+            if (!periodoNumeroValido(b)) return;
             if (!Number(estado.fontes_faltas[b] || 0)) {
                 estado.fontes_faltas[b] = Number(ev.id);
             }
         });
     }
 
+    function ehQuadroImpressaoLivre() {
+        return !!(estado && (estado.quadro_livre || estado.origem === 'quadro-impressao'));
+    }
+
     function aplicarExibirEm(valor, reRender) {
-        estado.exibir_em = 'notas';
-        if (!estado.bimestre) {
+        if (ehBoletimComposto() || ehQuadroImpressaoLivre() || ehModeloSantaMaria()) {
+            estado.exibir_em = 'boletim';
+            estado.bimestre = 0;
+            if (reRender) renderAll();
+            return;
+        }
+        var v = String(valor || 'notas');
+        estado.exibir_em = v === 'boletim' ? 'boletim' : 'notas';
+        if (estado.exibir_em === 'notas' && !estado.bimestre) {
             estado.bimestre = 1;
+        }
+        if (estado.exibir_em === 'boletim') {
+            estado.bimestre = 0;
         }
         if (reRender) renderAll();
     }
 
     function aplicarBoletimCadastro(id, reRender) {
         estado.boletim_id = Number(id) || 0;
-        estado.exibir_em = 'notas';
+        // Visão de impressão do boletim NÃO vira Demonstrativo de notas.
+        if (!(ehBoletimComposto() || ehQuadroImpressaoLivre() || ehModeloSantaMaria() || estado.exibir_em === 'boletim')) {
+            estado.exibir_em = 'notas';
+        } else {
+            estado.exibir_em = 'boletim';
+            estado.bimestre = 0;
+        }
         var bol = (catalogo.boletins || []).filter(function (b) { return Number(b.id) === Number(id); })[0];
         if (bol) {
             estado.finalidade = bol.finalidade === 'complementar' ? 'complementar' : 'oficial';
@@ -5406,7 +8534,13 @@ $boletimWizardSteps = [
             rascunhoAtual.nota_minima_origem = estado.nota_minima_origem;
             rascunhoAtual.nota_minima_regra_nome = estado.nota_minima_regra_nome;
             rascunhoAtual.boletim_id = estado.boletim_id;
+            rascunhoAtual.round_mode = estado.round_mode || 'none';
+            rascunhoAtual.decimal_places = Number(estado.decimal_places) === 1 ? 1 : 2;
         }
+        var roundEl = document.querySelector('[name="round_mode"]');
+        if (roundEl && estado.round_mode) roundEl.value = estado.round_mode;
+        var decEl = document.querySelector('[name="decimal_places"]');
+        if (decEl && estado.decimal_places != null) decEl.value = String(estado.decimal_places);
         if (reRender) renderAll();
     }
 
@@ -5443,50 +8577,33 @@ $boletimWizardSteps = [
     }
 
     function htmlFontesBimestres() {
-        var regras = regrasNotasDoAno();
+        // Mantido para fluxos legados; no Montar quadro do boletim a UI lista só Eventos Avaliativos por período.
         var faltas = eventosFaltasDoAno();
         var html = '<div class="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/70 p-3 space-y-3">';
-        html += '<p class="text-sm font-semibold text-indigo-950">Médias e faltas de cada bimestre</p>';
-        html += '<p class="text-xs text-indigo-900/80">O boletim <strong>não monta o cálculo de novo</strong>. Ele puxa a média final do evento de ' + (finalidadeAtual() === 'complementar' ? '<strong>Notas extra</strong>' : '<strong>Notas da série</strong>') + ' e as faltas de cada bimestre (quadro 1º–4º + Final).</p>';
-        [1, 2, 3, 4].forEach(function (b) {
-            var sel = Number((estado.fontes_bimestres && estado.fontes_bimestres[b]) || 0);
-            var selF = Number((estado.fontes_faltas && estado.fontes_faltas[b]) || 0);
-            var doBim = regras.filter(function (r) { return Number(r.bimestre || 0) === b; });
-            var outras = regras.filter(function (r) { return Number(r.bimestre || 0) !== b; });
-            var faltasBim = faltas.filter(function (ev) { return Number(ev.bimestre || 0) === b; });
-            var faltasOut = faltas.filter(function (ev) { return Number(ev.bimestre || 0) !== b; });
-            html += '<div class="rounded-lg border border-indigo-100 bg-white/80 p-2.5 space-y-2">';
-            html += '<p class="text-xs font-semibold text-gray-800">' + b + 'º bimestre</p>';
-            html += '<div class="grid sm:grid-cols-2 gap-2">';
-            html += '<label class="block text-xs font-medium text-gray-700">Média (evento de Notas)';
-            html += '<select class="bw-fonte-bim mt-1 w-full h-10 border border-indigo-200 rounded-lg px-3 text-sm bg-white" data-bim="' + b + '">';
-            html += '<option value="0">Não usar este bimestre</option>';
-            doBim.concat(outras).forEach(function (r) {
-                var lab = r.nome || ('Evento #' + r.id);
-                if (r.bimestre) lab += ' · ' + r.bimestre + 'º bim';
-                if (r.formula_final) lab += ' · col. ' + r.formula_final;
-                html += '<option value="' + Number(r.id) + '"' + (sel === Number(r.id) ? ' selected' : '') + '>' + esc(lab) + '</option>';
-            });
-            html += '</select></label>';
-            html += '<label class="block text-xs font-medium text-gray-700">Faltas (evento de Faltas)';
-            html += '<select class="bw-fonte-faltas mt-1 w-full h-10 border border-indigo-200 rounded-lg px-3 text-sm bg-white" data-bim="' + b + '">';
-            html += '<option value="0">Sem faltas neste bimestre</option>';
-            faltasBim.concat(faltasOut).forEach(function (ev) {
-                var labF = ev.nome || ('Faltas #' + ev.id);
-                if (ev.bimestre_rotulo) labF += ' · ' + ev.bimestre_rotulo;
-                else if (ev.bimestre) labF += ' · ' + ev.bimestre + 'º bim';
-                html += '<option value="' + Number(ev.id) + '"' + (selF === Number(ev.id) ? ' selected' : '') + '>' + esc(labF) + '</option>';
-            });
-            html += '</select></label>';
-            html += '</div></div>';
-        });
-        if (!regras.length) {
-            html += finalidadeAtual() === 'complementar'
-                ? '<p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">Nenhum evento de <strong>Notas extra</strong> neste ano. Crie primeiro a tabela extra de cada bimestre (Exibir em: Notas + Notas extra) e volte aqui.</p>'
-                : '<p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">Nenhum evento de <strong>Notas da série</strong> neste ano. Crie primeiro o quadro de notas de cada bimestre (Exibir em: Notas) e volte aqui.</p>';
+        html += '<p class="text-sm font-semibold text-indigo-950">Faltas por ' + esc(String(rotuloCampoPeriodo() || 'período').toLocaleLowerCase('pt-BR')) + '</p>';
+        html += '<p class="text-xs text-indigo-900/80">Opcional. Escolha o evento de faltas de cada período para a coluna no boletim.</p>';
+        var i;
+        for (i = 1; i <= maxPeriodo(); i++) {
+            (function (b) {
+                var selF = Number((estado.fontes_faltas && estado.fontes_faltas[b]) || 0);
+                var faltasBim = faltas.filter(function (ev) { return Number(ev.bimestre || 0) === b; });
+                var faltasOut = faltas.filter(function (ev) { return Number(ev.bimestre || 0) !== b; });
+                html += '<div class="rounded-lg border border-indigo-100 bg-white/80 p-2.5 space-y-2">';
+                html += '<p class="text-xs font-semibold text-gray-800">' + esc(rotuloPeriodoNumero(b)) + '</p>';
+                html += '<label class="block text-xs font-medium text-gray-700">Faltas (evento de Faltas)';
+                html += '<select class="bw-fonte-faltas mt-1 w-full h-10 border border-indigo-200 rounded-lg px-3 text-sm bg-white" data-bim="' + b + '">';
+                html += '<option value="0">Sem faltas neste período</option>';
+                faltasBim.concat(faltasOut).forEach(function (ev) {
+                    var labF = ev.nome || ('Faltas #' + ev.id);
+                    if (ev.bimestre_rotulo) labF += ' · ' + ev.bimestre_rotulo;
+                    else if (ev.bimestre) labF += ' · ' + rotuloPeriodoEventoAvaliativo(ev);
+                    html += '<option value="' + Number(ev.id) + '"' + (selF === Number(ev.id) ? ' selected' : '') + '>' + esc(labF) + '</option>';
+                });
+                html += '</select></label></div>';
+            })(i);
         }
         if (!faltas.length) {
-            html += '<p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">Nenhum evento de <strong>Faltas</strong> neste ano. Cadastre em Faltas (bimestre + turmas) para aparecer a coluna no boletim.</p>';
+            html += '<p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">Nenhum evento de <strong>Faltas</strong> neste ano. Cadastre em Faltas (período + turmas) para aparecer a coluna no boletim.</p>';
         }
         html += '</div>';
         return html;
@@ -5587,9 +8704,22 @@ $boletimWizardSteps = [
             });
         }
         btnVoltar.disabled = curIdx <= 0;
-        var label = cur === 'revisar' ? 'Concluir e aplicar' : (cur === 'formula' ? 'Salvar e continuar' : 'Continuar');
-        if (btnAplicar && pageMode && ehEventoNotasPreview()) {
-            btnAplicar.textContent = cur === 'revisar' ? 'Salvar sem gerar notas' : 'Aplicar na configuração';
+        // Demonstrativo: só salva o quadro (ao vivo). Boletim: concluir gera o oficial.
+        var label;
+        if (cur === 'revisar') {
+            label = ehEventoNotasPreview() ? 'Salvar demonstrativo' : 'Concluir e aplicar';
+        } else if (cur === 'formula') {
+            label = 'Salvar e continuar';
+        } else {
+            label = 'Continuar';
+        }
+        if (btnAplicar && pageMode) {
+            if (ehEventoNotasPreview()) {
+                btnAplicar.classList.add('hidden');
+            } else {
+                btnAplicar.classList.remove('hidden');
+                btnAplicar.textContent = cur === 'revisar' ? 'Salvar sem gerar' : 'Aplicar na configuração';
+            }
         }
         atualizarBotaoGerarAluno();
         if (pageMode) {
@@ -5769,15 +8899,26 @@ $boletimWizardSteps = [
         }
 
         if (passo === 'identidade') {
-            if (estado.boletim_id && estado.modo !== 'editar') {
+            var ocultarModeloBoletim = ehVisaoImpressaoEditavel() || ehBoletimComposto() || ehQuadroImpressaoLivre() || ehModeloSantaMaria()
+                || estado.exibir_em === 'boletim';
+            if (estado.boletim_id && estado.modo !== 'editar' && !ocultarModeloBoletim) {
                 aplicarBoletimCadastro(estado.boletim_id, false);
+            }
+            // No Montar quadro o layout já é o boletim — não zera nem pede modelo de novo.
+            if (ocultarModeloBoletim) {
+                var layoutBol = Number(estado.layout_boletim_id || root.getAttribute('data-layout-boletim-id') || 0);
+                if (layoutBol > 0) {
+                    estado.layout_boletim_id = layoutBol;
+                    // Não usa o ID do layout como modelo de boletim (cadastro).
+                    if (Number(estado.boletim_id || 0) === layoutBol) estado.boletim_id = 0;
+                }
             }
             html += '<div class="grid gap-3">';
             html += '<div><label class="text-sm font-medium text-gray-700">Nome do evento</label>'
                 + '<input id="bw-nome" type="text" class="mt-1 w-full h-10 border rounded-lg px-3 text-sm" value="' + esc(estado.nome) + '"></div>';
             html += '<div class="grid grid-cols-2 gap-3"><div><label class="text-sm font-medium text-gray-700">Ano letivo</label>'
                 + '<input id="bw-ano" type="number" class="mt-1 w-full h-10 border rounded-lg px-3 text-sm" value="' + (estado.ano_letivo || '') + '"></div>';
-            if (ehBoletimComposto()) {
+            if (ehBoletimComposto() || ehQuadroImpressaoLivre() || ehModeloSantaMaria()) {
                 html += '<div><label class="text-sm font-medium text-gray-700">' + esc(rotuloCampoPeriodo()) + '</label>'
                     + '<p class="mt-1 h-10 flex items-center text-sm text-gray-600">Ano todo (1º ao ' + maxPeriodo() + 'º)</p></div></div>';
             } else {
@@ -5786,46 +8927,41 @@ $boletimWizardSteps = [
                     + htmlOpcoesPeriodo(estado.ano_letivo, estado.bimestre)
                     + '</select></div></div>';
             }
-            var boletimOpcional = estado.exibir_em === 'notas';
-            html += '<div><label class="text-sm font-medium text-gray-700">Boletim'
-                + (boletimOpcional ? ' <span class="font-normal text-gray-400">(opcional)</span>' : '')
-                + '</label>'
-                + '<select id="bw-boletim" class="mt-1 w-full h-10 border rounded-lg px-3 text-sm">';
-            html += '<option value="">' + (boletimOpcional ? 'Nenhum' : 'Selecione um Boletim') + '</option>';
-            (catalogo.boletins || []).forEach(function (b) {
-                var label = b.nome || ('Boletim #' + b.id);
-                label += b.finalidade === 'complementar' ? ' · Extra' : ' · Oficial';
-                if (b.ano_letivo) label += ' · ' + b.ano_letivo;
-                html += '<option value="' + Number(b.id) + '"' + (Number(estado.boletim_id) === Number(b.id) ? ' selected' : '') + '>' + esc(label) + '</option>';
-            });
-            html += '</select>';
-            html += htmlMinimaAprovacao();
-            if (!(catalogo.boletins || []).length) {
-                html += '<p class="text-xs text-amber-800 mt-1">Nenhum modelo apareceu. Cadastre em <a href="<?= URL ?>/admin/boletins" class="underline">Acadêmico → Modelo de Boletim</a>. Sem vínculo, a mínima sugerida fica 6 e o público é o que você marcar nesta identidade — não o da turma do modelo.</p>';
-            } else if (boletimOpcional) {
-                html += '<p class="text-xs text-gray-500 mt-1">Nenhum deixa este evento fora do boletim oficial. Escolha o modelo para levar a mínima, as matérias e as turmas dele para a vida escolar e para a geração dos períodos.</p>';
-            }
-            html += '</div>';
-            if (!(catalogo.modulo_eventos_avaliativos && estado.exibir_em === 'notas' && !ehBoletimComposto())) {
-                html += '<div><label class="text-sm font-medium text-gray-700" for="bw-quadro">Quadro de Notas (opcional)</label>'
-                    + '<select id="bw-quadro" class="mt-1 w-full h-10 border rounded-lg px-3 text-sm">';
-                html += '<option value="">' + esc(rotuloOpcaoQuadro()) + '</option>';
-                (catalogo.quadros_notas || []).forEach(function (q) {
-                    html += '<option value="' + Number(q.id) + '"' + (Number(estado.grupo_regras_notas_id) === Number(q.id) ? ' selected' : '') + '>' + esc(q.nome || ('Quadro #' + q.id)) + '</option>';
+            if (!ocultarModeloBoletim) {
+                var boletimOpcional = estado.exibir_em === 'notas';
+                html += '<div><label class="text-sm font-medium text-gray-700">Boletim'
+                    + (boletimOpcional ? ' <span class="font-normal text-gray-400">(opcional)</span>' : '')
+                    + '</label>'
+                    + '<select id="bw-boletim" class="mt-1 w-full h-10 border rounded-lg px-3 text-sm">';
+                html += '<option value="">' + (boletimOpcional ? 'Nenhum' : 'Selecione um Boletim') + '</option>';
+                (catalogo.boletins || []).forEach(function (b) {
+                    var label = b.nome || ('Boletim #' + b.id);
+                    label += b.finalidade === 'complementar' ? ' · Extra' : ' · Oficial';
+                    if (b.ano_letivo) label += ' · ' + b.ano_letivo;
+                    html += '<option value="' + Number(b.id) + '"' + (Number(estado.boletim_id) === Number(b.id) ? ' selected' : '') + '>' + esc(label) + '</option>';
                 });
                 html += '</select>';
-                html += htmlAvisoQuadro();
+                html += htmlMinimaAprovacao();
+                if (!(catalogo.boletins || []).length) {
+                    html += '<p class="text-xs text-amber-800 mt-1">Nenhum modelo apareceu. Cadastre em <a href="<?= URL ?>/admin/boletins" class="underline">Acadêmico → Modelo de Boletim</a>. Sem vínculo, a mínima sugerida fica 6 e o público é o que você marcar nesta identidade — não o da turma do modelo.</p>';
+                } else if (boletimOpcional) {
+                    html += '<p class="text-xs text-gray-500 mt-1">Nenhum deixa este evento fora do boletim oficial. Escolha o modelo para levar a mínima, as matérias e as turmas dele para a vida escolar e para a geração dos períodos.</p>';
+                }
                 html += '</div>';
+            } else {
+                html += '<div>' + htmlMinimaAprovacao() + '</div>';
             }
+            // Boletim / Montar quadro: sem Quadro de Notas — fontes são Eventos Avaliativos por período.
             html += '</div>';
-            if (ehBoletimComposto()) html += htmlFontesBimestres();
         }
 
-        if (passo === 'pecas' && usaEventosAvaliativosNaNota()) {
+        if (passo === 'pecas' && ehVisaoImpressaoEditavel()) {
+            html += htmlPuxarDemonstrativosQuadro();
+            sugerirFontesBimestres();
+            html += htmlFontesBimestres();
+        } else if (passo === 'pecas' && usaEventosAvaliativosNaNota()) {
             html += htmlPecasEventosAvaliativos();
-        }
-
-        if (passo === 'pecas' && !usaEventosAvaliativosNaNota()) {
+        } else if (passo === 'pecas' && !usaEventosAvaliativosNaNota()) {
             html += '<p class="text-sm text-gray-700">Quais notas entram neste boletim?</p>';
             html += '<p class="text-xs text-gray-500 mt-1">Marque o que entra e o ' + esc(rotuloCampoPeriodo().toLocaleLowerCase('pt-BR')) + ' de cada tipo. Ordem das colunas e o cálculo ficam no passo <strong>Fórmula</strong>.</p>';
             html += '<div class="grid gap-3 mt-3">';
@@ -5857,9 +8993,17 @@ $boletimWizardSteps = [
         if (passo === 'formula') {
             if (estado.origem === 'clonar') {
                 html += '<p class="text-sm text-gray-600">No modo clonar, a ordem e as fórmulas do evento de origem são mantidas. Avance para revisar.</p>';
+            } else if (ehDemonstrativoNotas()) {
+                html += '<p class="text-sm text-gray-700">Como o demonstrativo <strong>aparece</strong></p>';
+                html += '<p class="text-xs text-gray-500 mt-1">Catálogo à esquerda: clique para adicionar a sigla de cada coluna. À direita, monte os títulos do período, arraste as siglas e clique em <strong>Confirmar</strong> quando o período estiver pronto. Não é necessário montar fórmula de cálculo.</p>';
+                html += '<div class="mt-3">' + htmlEscopoPecasSelecionadas() + '</div>';
+                html += '<div id="bw-colunas-wrap" class="mt-3"></div>';
+                html += '<div id="bw-preview-wrap" class="mt-4"></div>';
             } else {
                 html += '<p class="text-sm text-gray-700">Como o boletim <strong>aparece</strong></p>';
-                html += '<p class="text-xs text-gray-500 mt-1">Em cima: adicione um bloco de cálculo, dê o nome e monte a fórmula. Arraste as colunas. Ao terminar, clique em <strong>Salvar bloco</strong> e depois em <strong>Salvar e continuar</strong>.</p>';
+                html += '<p class="text-xs text-gray-500 mt-1">' + (ehVisaoImpressaoEditavel()
+                    ? 'À esquerda: catálogo por bimestre (clique adiciona a sigla). À direita: arraste chips para títulos do período e use <strong>Bloco de cálculo</strong> para média com nome livre (ex. MU). Clique em <strong>Confirmar</strong> quando o período estiver pronto.'
+                    : 'Catálogo à esquerda adiciona a sigla. Monte títulos do período e blocos de cálculo à direita. Ao terminar, clique em <strong>Salvar bloco</strong> e depois em <strong>Salvar e continuar</strong>.') + '</p>';
                 html += '<div class="mt-3">' + htmlEscopoPecasSelecionadas() + '</div>';
                 html += '<div id="bw-colunas-wrap" class="mt-3"></div>';
                 html += '<div id="bw-formula-editor" class="' + (estado.bloco_calc ? '' : 'hidden') + ' mt-4 rounded-xl border border-amber-200 bg-amber-50/40 p-3">';
@@ -5876,14 +9020,20 @@ $boletimWizardSteps = [
                     html += '<button type="button" class="bw-escala-atalho h-8 px-2 text-xs rounded-md border border-amber-200 text-amber-900 hover:bg-amber-100" data-escala="' + v + '">' + v + '</button>';
                 });
                 html += '</div>';
+                html += '<div class="flex flex-col items-end gap-1">';
                 html += '<button type="button" id="bw-formula-salvar" class="h-10 px-4 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700">Salvar bloco</button>';
+                html += '<label class="inline-flex items-center gap-1.5 text-[11px] text-amber-950/80 cursor-pointer select-none">'
+                    + '<input type="checkbox" id="bw-formula-fechar-apos" class="rounded border-amber-300 text-amber-600"'
+                    + (fecharFormulaAposSalvar ? ' checked' : '') + '> Fechar ao salvar</label>';
                 html += '<p id="bw-formula-salva" class="hidden text-sm font-semibold text-emerald-700">Salvo.</p>';
+                html += '</div>';
                 html += '</div>';
                 html += '<p class="text-[11px] text-amber-900/80 mb-2">Valor máximo corta o resultado da fórmula. Em <strong>Resultado Final × 2</strong>, use <strong>20</strong> (senão fica 10).</p>';
                 html += '<p id="bw-formula-bloco-titulo" class="text-sm font-semibold text-amber-950">Cálculo de <span id="bw-formula-bloco-nome">' + esc(nomeBlocoCalc(estado.bloco_calc || 'média')) + '</span></p>';
                 html += '<p id="bw-formula-bloco-ajuda" class="text-xs text-amber-900/80 mt-0.5 mb-2">A média é a soma entre parênteses, depois ÷ quantidade. Ex.: (Prova + Trabalho + Participação) ÷ 3.</p>';
                 html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-1.5">Usar no cálculo</p>';
-                html += '<div id="bw-formula-pecas-pal" class="bw-palette flex flex-wrap gap-2"></div>';
+                html += '<p class="text-[11px] text-slate-500 mb-1.5">Separado por ciclo (bimestre/semestre) para não misturar PP/PU iguais.</p>';
+                html += '<div id="bw-formula-pecas-pal" class="bw-palette"></div>';
                 html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mt-3 mb-1.5">Sinais</p>';
                 html += '<div class="bw-palette flex flex-wrap gap-2 items-center">';
                 operadoresFormula().forEach(function (op) { html += chipHtml(op, -1, true); });
@@ -5893,7 +9043,9 @@ $boletimWizardSteps = [
                 html += '<div class="mt-2 flex flex-wrap gap-2">';
                 html += '<button type="button" id="bw-formula-media" class="px-2.5 py-1.5 text-xs rounded-lg border border-indigo-200 text-indigo-700 hover:bg-indigo-50">Média das peças</button>';
                 html += '<button type="button" id="bw-formula-max" class="px-2.5 py-1.5 text-xs rounded-lg border border-amber-200 text-amber-800 hover:bg-amber-50">Maior entre as duas primeiras</button>';
+                html += '<button type="button" id="bw-formula-substituta" class="px-2.5 py-1.5 text-xs rounded-lg border border-emerald-200 text-emerald-800 hover:bg-emerald-50" title="Média de PP e PU; CH entra no lugar da primeira nota ausente">Substituta (PP/PU + CH)</button>';
                 html += '<button type="button" id="bw-formula-limpar" class="px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">Limpar</button></div>';
+                html += '<p class="mt-1.5 text-[11px] text-slate-500">Substituta já calcula a <strong>média</strong> (<code class="bg-white/80 px-1 rounded">chamada(PP, PU, CH)</code>). Não coloque <code class="bg-white/80 px-1 rounded">÷ 2</code> de novo — a nota fica na metade. Some a PE depois, se precisar: <code class="bg-white/80 px-1 rounded">… + PE</code>.</p>';
                 html += '<p id="bw-formula-canvas-label" class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mt-3 mb-1.5">Fórmula desta coluna</p>';
                 html += '<div id="bw-formula-canvas" class="bw-canvas">' + htmlCanvasTokens() + '</div>';
                 html += '<p id="bw-formula-preview" class="mt-2 text-sm font-mono text-slate-800 break-all">' + esc(compilarTokensPreview(estado.formula_tokens || []) || 'Clique nos blocos acima.') + '</p>';
@@ -6048,41 +9200,49 @@ $boletimWizardSteps = [
         if (passo === 'revisar') {
             html += '<p class="text-sm text-gray-700">' + (ehEventoNotasPreview()
                 ? 'Confira o <strong>demonstrativo de notas</strong>'
-                : 'Confira o <strong>exemplo</strong> do boletim') + '</p>';
-            if (!Number(estado.boletim_id)) {
+                : 'Confira a <strong>prévia</strong> do boletim') + '</p>';
+            if (!Number(estado.boletim_id) && !(ehVisaoImpressaoEditavel() || ehBoletimComposto() || estado.exibir_em === 'boletim')) {
                 html += '<p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 mt-2">Sem boletim vinculado, os números abaixo são exemplo e o público ainda não é o de uma turma específica.</p>';
             }
-            html += '<p class="text-xs text-gray-500 mt-1">' + (ehBoletimComposto()
-                ? 'Layout oficial: 1º–4º bimestre (Média e Faltas) e FINAL (Média, Rec., Faltas, Resultado). Dados fictícios.'
-                : (ehEventoNotasPreview()
-                    ? 'É o quadro com blocos e semanas. Escolha um aluno para usar as notas lançadas. Para mudar ordem ou fórmula, volte em <strong>Fórmula</strong>.'
-                    : 'Dados fictícios. Para mudar ordem ou fórmula, volte em <strong>Fórmula</strong>.')) + '</p>';
+            html += '<p class="text-xs text-gray-500 mt-1">' + (ehVisaoImpressaoEditavel()
+                ? 'Só visualização. Para mudar colunas, títulos ou fórmulas, volte em <strong>Fórmula / Colunas</strong>.'
+                : (ehBoletimComposto()
+                    ? 'Layout oficial: 1º–4º bimestre (Média e Faltas) e FINAL (Média, Rec., Faltas, Resultado). Dados fictícios.'
+                    : (ehDemonstrativoNotas()
+                        ? 'É o quadro com blocos e semanas. Escolha um aluno para usar as notas lançadas. Para mudar ordem ou colunas, volte em <strong>Colunas</strong>.'
+                        : (ehEventoNotasPreview()
+                            ? 'É o quadro com blocos e semanas. Escolha um aluno para usar as notas lançadas. Para mudar ordem ou fórmula, volte em <strong>Fórmula</strong>.'
+                            : 'Dados fictícios. Para mudar ordem ou fórmula, volte em <strong>Fórmula</strong>.')))) + '</p>';
             html += '<div class="mt-3">' + htmlEscopoPecasSelecionadas() + '</div>';
+            // Revisão: só a prévia. Quadro/catálogo/fórmula ficam no passo Fórmula.
             html += '<div id="bw-preview-wrap" class="mt-4"></div>';
-            html += htmlAvisoQuadro();
+            if (!ehVisaoImpressaoEditavel()) {
+                html += htmlAvisoQuadro();
+            }
             if (retornoFluxo === 'gerar-avaliacoes' && returnUrl) {
                 html += '<p class="text-sm text-gray-700 mt-3"><a class="font-semibold text-indigo-700 underline" href="' + esc(returnUrl) + '">Voltar e configurar os demais períodos</a></p>';
             }
             html += '<div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">';
             if (ehEventoNotasPreview()) {
-                html += '<p class="text-sm text-gray-800"><strong>Salvar sem gerar notas</strong><span class="block text-xs text-gray-600 font-normal mt-1">Grava só a versão da configuração. O detalhe do aluno e o boletim oficial continuam com as notas que já estão vigentes.</span></p>';
-                html += '<p class="text-sm text-gray-800"><strong>Concluir e aplicar</strong><span class="block text-xs text-gray-600 font-normal mt-1">Grava a configuração e inicia a geração das notas de todos os alunos do evento. O boletim oficial só muda quando essa geração terminar. Se ela não concluir, a configuração salva permanece e a geração pode ser retomada na página do evento.</span></p>';
-                html += '<p class="text-sm text-gray-800"><strong>Gerar só este aluno</strong><span class="block text-xs text-gray-600 font-normal mt-1">Aparece quando há um aluno no demonstrativo. Grava a configuração e publica notas e boletim oficial só dele. O restante da turma continua com as notas vigentes. A ficha da vida escolar usa a turma principal do cadastro.</span></p>';
+                html += '<p class="text-sm text-gray-800"><strong>Demonstrativo de notas</strong><span class="block text-xs text-gray-600 font-normal mt-1">É o quadro do período. Monte no início do mês; cada prova lançada aparece sozinha para aluno, pais e painel. Não gera snapshot — não precisa “concluir” toda hora.</span></p>';
+                html += '<p class="text-sm text-gray-800"><strong>Salvar demonstrativo</strong><span class="block text-xs text-gray-600 font-normal mt-1">Grava só colunas, ordem e fórmula do quadro. O boletim oficial é outro fluxo (menu Boletim).</span></p>';
             } else {
-                html += '<p class="text-sm text-gray-800"><strong>Esta versão entra no aluno</strong><span class="block text-xs text-gray-600 font-normal mt-1">Ao salvar, ela passa a ser a do detalhe do aluno e substitui a nota no boletim oficial da vida escolar. A anterior fica no histórico.</span></p>';
+                html += '<p class="text-sm text-gray-800"><strong>Boletim oficial</strong><span class="block text-xs text-gray-600 font-normal mt-1">Documento do período (print / ficha). Separado do demonstrativo ao vivo.</span></p>';
+                html += '<p class="text-sm text-gray-800"><strong>Salvar sem gerar</strong><span class="block text-xs text-gray-600 font-normal mt-1">Grava só o quadro (colunas, fórmulas, REC/PF). Ainda não publica no aluno.</span></p>';
+                html += '<p class="text-sm text-gray-800"><strong>Concluir e aplicar</strong><span class="block text-xs text-gray-600 font-normal mt-1">Grava o quadro e calcula o boletim de todos os alunos no escopo. O oficial só muda quando a geração terminar.</span></p>';
             }
-            html += '<p class="text-xs text-gray-600">Para usar outra, recupere uma configuração antiga aqui ou escolha o evento em Gerar avaliações do ano.</p>';
+            html += '<p class="text-xs text-gray-600">Para usar outra configuração, recupere uma versão antiga aqui.</p>';
             html += htmlVersoesConfiguracao();
             html += '</div>';
             html += '<p class="text-xs text-indigo-700 mt-4">' + (ehEventoNotasPreview()
-                ? 'Para guardar a fórmula sem publicar, use <strong>Salvar sem gerar notas</strong>. Para publicar no aluno, <strong>Concluir e aplicar</strong>.'
-                : 'Se estiver certo, clique em <strong>Concluir e aplicar</strong>.') + '</p>';
+                ? 'Clique em <strong>Salvar demonstrativo</strong>. As notas entram no quadro conforme o lançamento.'
+                : 'Para só gravar o quadro, <strong>Salvar sem gerar</strong>. Para calcular e publicar o boletim, <strong>Concluir e aplicar</strong>.') + '</p>';
         }
 
         bodyEl.innerHTML = html;
         bindBodyEvents();
         if (passo === 'revisar' || passo === 'formula' || (passo === 'publico' && estado.grupo_linha && estado.grupo_linha.exemplo_sem_filhas)) renderRevisarDinamico();
-        if (passo === 'formula' && estado.bloco_calc) abrirFormulaBloco(estado.bloco_calc);
+        if (passo === 'formula' && estado.bloco_calc && !ehDemonstrativoNotas()) abrirFormulaBloco(estado.bloco_calc);
     }
 
     function esc(s) {
@@ -6152,6 +9312,86 @@ $boletimWizardSteps = [
                 if (el.checked) estado.pecas.push('jornada');
                 if (!estado.pecas_opcoes) estado.pecas_opcoes = {};
                 if (!estado.pecas_opcoes.jornada) estado.pecas_opcoes.jornada = pecasOpcoesPadraoJs('jornada');
+                marcarEdicaoManual();
+                renderAll();
+                agendarMontar();
+            });
+        });
+        bodyEl.querySelectorAll('.bw-demonstrativo').forEach(function (el) {
+            el.addEventListener('change', function () {
+                estado.demonstrativos_ids = [];
+                bodyEl.querySelectorAll('.bw-demonstrativo:checked').forEach(function (c) {
+                    var id = parseInt(c.value, 10) || 0;
+                    if (id > 0) estado.demonstrativos_ids.push(id);
+                });
+                sincronizarFontesComDemonstrativos();
+                marcarEdicaoManual();
+                renderAll();
+                agendarMontar();
+            });
+        });
+        bodyEl.querySelectorAll('.bw-evento-avulso-periodo-todos').forEach(function (el) {
+            el.addEventListener('change', function () {
+                var box = el.closest('[data-periodo-chave]');
+                if (!box) return;
+                box.querySelectorAll('.bw-evento-avulso').forEach(function (cb) {
+                    cb.checked = el.checked;
+                });
+                if (el.checked) {
+                    box.querySelectorAll('.bw-evento-avulso-sub, .bw-evento-avulso-subs-todos').forEach(function (cb) {
+                        cb.checked = true;
+                    });
+                }
+                sincronizarSelecaoEventosAvulsosDoDom();
+                marcarEdicaoManual();
+                renderAll();
+                agendarMontar();
+            });
+        });
+        bodyEl.querySelectorAll('.bw-evento-avulso').forEach(function (el) {
+            el.addEventListener('change', function () {
+                var id = parseInt(el.value, 10) || 0;
+                if (el.checked && id > 0) {
+                    // Ao marcar o evento, marca todos os sub-eventos visíveis.
+                    bodyEl.querySelectorAll('.bw-evento-avulso-sub[data-evento="' + id + '"], .bw-evento-avulso-subs-todos[data-evento="' + id + '"]').forEach(function (cb) {
+                        cb.checked = true;
+                    });
+                }
+                sincronizarSelecaoEventosAvulsosDoDom();
+                marcarEdicaoManual();
+                renderAll();
+                agendarMontar();
+            });
+        });
+        bodyEl.querySelectorAll('.bw-evento-avulso-subs-todos').forEach(function (el) {
+            el.addEventListener('change', function () {
+                var id = parseInt(el.getAttribute('data-evento') || '0', 10) || 0;
+                bodyEl.querySelectorAll('.bw-evento-avulso-sub[data-evento="' + id + '"]').forEach(function (cb) {
+                    cb.checked = el.checked;
+                });
+                if (el.checked) {
+                    var pai = bodyEl.querySelector('.bw-evento-avulso[value="' + id + '"]');
+                    if (pai) pai.checked = true;
+                }
+                sincronizarSelecaoEventosAvulsosDoDom();
+                marcarEdicaoManual();
+                renderAll();
+                agendarMontar();
+            });
+        });
+        bodyEl.querySelectorAll('.bw-evento-avulso-sub').forEach(function (el) {
+            el.addEventListener('change', function () {
+                var id = parseInt(el.getAttribute('data-evento') || '0', 10) || 0;
+                var subs = bodyEl.querySelectorAll('.bw-evento-avulso-sub[data-evento="' + id + '"]');
+                var marcados = 0;
+                subs.forEach(function (cb) { if (cb.checked) marcados++; });
+                var todos = bodyEl.querySelector('.bw-evento-avulso-subs-todos[data-evento="' + id + '"]');
+                if (todos) todos.checked = marcados > 0 && marcados === subs.length;
+                if (marcados > 0) {
+                    var pai = bodyEl.querySelector('.bw-evento-avulso[value="' + id + '"]');
+                    if (pai) pai.checked = true;
+                }
+                sincronizarSelecaoEventosAvulsosDoDom();
                 marcarEdicaoManual();
                 renderAll();
                 agendarMontar();
@@ -6698,7 +9938,10 @@ $boletimWizardSteps = [
     function renderAll() {
         var scroll = capturarScroll();
         garantirEstado();
-        if (ehBoletimComposto() && ['pecas', 'formula'].indexOf(estado.passo) >= 0) {
+        if (ehBoletimComposto() && !ehVisaoImpressaoEditavel() && ['pecas', 'formula'].indexOf(estado.passo) >= 0) {
+            estado.passo = 'identidade';
+        }
+        if (ehVisaoImpressaoEditavel() && estado.passo === 'inicio') {
             estado.passo = 'identidade';
         }
         if (estado.modo === 'editar' && estado.origem === 'formulario' && estado.passo === 'inicio') {
@@ -6733,9 +9976,11 @@ $boletimWizardSteps = [
     function montarAgora() {
         garantirEstado();
         flushTituloAberto();
+        sincronizarEventosIdsDoQuadro();
         aplicarNomesNoRascunho(estado && estado.rascunho_preservado);
         aplicarMateriaUnicaNasPecas();
-        if (estado.bloco_calc) gravarTokensBlocoAberto();
+        zerarFormulasDemonstrativoNotas();
+        if (estado.bloco_calc && !ehDemonstrativoNotas()) gravarTokensBlocoAberto();
         var versaoEnvio = formulaVersao;
         var nomesLocal = JSON.parse(JSON.stringify(estado.nomes_blocos || {}));
         var escalasLocal = JSON.parse(JSON.stringify(estado.escalas_blocos || {}));
@@ -6744,6 +9989,9 @@ $boletimWizardSteps = [
         var tokensLocal = (estado.formula_tokens || []).slice();
         var blocoLocal = estado.bloco_calc || '';
         var materiaLocal = Number(estado.materia_calc || 0);
+        var eventosIdsLocal = Array.isArray(estado.eventos_avaliativos_ids)
+            ? estado.eventos_avaliativos_ids.map(Number).filter(function (id) { return id > 0; })
+            : [];
         var fd = new FormData();
         fd.append('_token', csrf);
         fd.append('wizard_estado', JSON.stringify(estado));
@@ -6847,18 +10095,78 @@ $boletimWizardSteps = [
                     remoto.grupo_linha.arredondamento = arredLocal;
                 }
                 var nomeManual = estado && estado.nome_automatico === false ? String(estado.nome || '') : null;
-                var linhasLocais = Array.isArray(estado && estado.linhas_layout) ? estado.linhas_layout.slice() : [];
+                var linhasLocais = Array.isArray(estado && estado.linhas_layout)
+                    ? JSON.parse(JSON.stringify(estado.linhas_layout))
+                    : [];
                 var ordemLocal = Array.isArray(estado && estado.colunas_ordem) ? estado.colunas_ordem.slice() : [];
+                var blocosCalcLocal = Array.isArray(estado && estado.blocos_calc) ? estado.blocos_calc.slice() : [];
+                var cabecalhosManuaisLocal = Number(estado && estado.cabecalhos_manuais || 0) === 1 ? 1 : 0;
+                var chipsManuaisLocal = Number(estado && estado.quadro_chips_manuais || 0) === 1 ? 1 : 0;
+                var titulosOkLocal = (estado && estado.titulos_periodo_ok && typeof estado.titulos_periodo_ok === 'object')
+                    ? JSON.parse(JSON.stringify(estado.titulos_periodo_ok))
+                    : {};
+                // IDs marcados enquanto o fetch estava no ar (ex.: REC/PF) — não podem sumir.
+                var eventosDuranteFetch = Array.isArray(estado && estado.eventos_avaliativos_ids)
+                    ? estado.eventos_avaliativos_ids.map(Number).filter(function (id) { return id > 0; })
+                    : [];
                 estado = remoto;
                 estado.linhas_layout = linhasLocais;
+                estado.titulos_periodo_ok = titulosOkLocal;
+                // Não perde os eventos já no quadro após remount.
+                var eventosRemotos = Array.isArray(estado.eventos_avaliativos_ids)
+                    ? estado.eventos_avaliativos_ids.map(Number).filter(function (id) { return id > 0; })
+                    : [];
+                if (eventosIdsLocal.length || eventosDuranteFetch.length) {
+                    var setEv = {};
+                    var fundido = [];
+                    eventosIdsLocal.concat(eventosDuranteFetch).concat(eventosRemotos).forEach(function (id) {
+                        if (!id || setEv[id]) return;
+                        setEv[id] = true;
+                        fundido.push(id);
+                    });
+                    estado.eventos_avaliativos_ids = fundido;
+                }
+                if (cabecalhosManuaisLocal || (linhasLocais && linhasLocais.length)) {
+                    estado.cabecalhos_manuais = 1;
+                    cabecalhosManuaisLocal = 1;
+                }
+                if (chipsManuaisLocal || cabecalhosManuaisLocal || (ordemLocal && ordemLocal.length)) {
+                    estado.quadro_chips_manuais = 1;
+                    chipsManuaisLocal = 1;
+                } else if (!chipsManuaisLocal && (estado.quadro_livre || estado.origem === 'quadro-impressao')) {
+                    // Só zera o quadro vazio do zero — nunca apaga títulos já montados.
+                    if (!(linhasLocais && linhasLocais.length) && !(ordemLocal && ordemLocal.length)) {
+                        estado.quadro_chips_manuais = 0;
+                        zerarQuadroColunasSeAutomatico();
+                        ordemLocal = [];
+                        linhasLocais = [];
+                        estado.linhas_layout = [];
+                    } else {
+                        estado.quadro_chips_manuais = 1;
+                        chipsManuaisLocal = 1;
+                    }
+                }
+                var blocosRemotos = Array.isArray(estado.blocos_calc) ? estado.blocos_calc.slice() : [];
+                blocosCalcLocal.forEach(function (cod) {
+                    cod = String(cod || '');
+                    if (!cod || blocosRemotos.indexOf(cod) >= 0) return;
+                    blocosRemotos.push(cod);
+                });
+                estado.blocos_calc = blocosRemotos;
                 var ordemRemota = Array.isArray(estado.colunas_ordem) ? estado.colunas_ordem : [];
-                ordemRemota.forEach(function (cod, idx) {
-                    if (!cod) return;
-                    if (ordemLocal.indexOf(cod) >= 0) return;
-                    var anterior = idx > 0 ? ordemRemota[idx - 1] : '';
-                    var pos = anterior ? ordemLocal.indexOf(anterior) : -1;
-                    if (pos >= 0) ordemLocal.splice(pos + 1, 0, cod);
-                    else ordemLocal.push(cod);
+                // Quadro do zero: não importa colunas remotas que o admin não adicionou.
+                if (!(cabecalhosManuaisLocal || (estado.quadro_livre || estado.origem === 'quadro-impressao'))) {
+                    ordemRemota.forEach(function (cod, idx) {
+                        if (!cod) return;
+                        if (ordemLocal.indexOf(cod) >= 0) return;
+                        var anterior = idx > 0 ? ordemRemota[idx - 1] : '';
+                        var pos = anterior ? ordemLocal.indexOf(anterior) : -1;
+                        if (pos >= 0) ordemLocal.splice(pos + 1, 0, cod);
+                        else ordemLocal.push(cod);
+                    });
+                }
+                blocosRemotos.forEach(function (cod) {
+                    if (cod && ordemLocal.indexOf(cod) < 0) ordemLocal.push(cod);
                 });
                 estado.colunas_ordem = ordemLocal;
                 if (nomeManual !== null) {
@@ -6875,6 +10183,7 @@ $boletimWizardSteps = [
             rascunhoAtual = j.rascunho || null;
             garantirArredondamentoGrupoNoRascunho(rascunhoAtual);
             gravarEscolhasGrupoNoRascunho(rascunhoAtual);
+            limparOrdemColunasFantasma();
             previewAtual = j.preview || previewAtual;
             aplicarOrdemNoPreview(previewAtual);
             aplicarTitulosDosSubeventos();
@@ -6891,7 +10200,7 @@ $boletimWizardSteps = [
             if (estado && (estado.passo === 'formula' || estado.passo === 'revisar')) {
                 renderRevisarDinamico();
             }
-            if (estado && estado.passo === 'formula' && estado.bloco_calc) {
+            if (estado && estado.passo === 'formula' && estado.bloco_calc && !ehDemonstrativoNotas()) {
                 renderFormulaCanvas();
                 atualizarBannerExcecao();
                 renderExcecoesMateria();
@@ -6911,26 +10220,49 @@ $boletimWizardSteps = [
             overlay.classList.remove('hidden');
             document.body.style.overflow = 'hidden';
         }
+        // Ao abrir pelo Boletim (Montar quadro), descarta sessão antiga de Evento de Notas antes de restaurar.
+        var veioDoBoletimLayout = retornoFluxo === 'boletim-layout'
+            || Number(root.getAttribute('data-layout-boletim-id') || 0) > 0;
+        if (veioDoBoletimLayout) {
+            try {
+                sessionStorage.removeItem('boletim_assistente_estado_navegacao');
+                sessionStorage.removeItem('boletim_assistente_rascunho');
+            } catch (eSess) { /* ignore */ }
+        }
         garantirEstado();
-        if (root.getAttribute('data-continuar') === '1') {
+        forcarContextoImpressaoBoletim();
+        if (!veioDoBoletimLayout && root.getAttribute('data-continuar') === '1') {
             restaurarEstadoNavegacao();
+            forcarContextoImpressaoBoletim();
+        }
+        if (ehVisaoImpressaoEditavel() && estado && (!estado.passo || estado.passo === 'inicio' || estado.passo === 'pecas' && usaEventosAvaliativosNaNota())) {
+            // Se veio preso no fluxo de notas, manda para Demonstrativos.
+            if (estado.passo === 'inicio' || (estado.exibir_em === 'notas')) {
+                estado.passo = 'identidade';
+            }
+            if (['inicio'].indexOf(estado.passo) >= 0) estado.passo = 'identidade';
         }
         renderAll();
         atualizarCabecalhoEvento();
         if (iniciado) return;
         iniciado = true;
         if (dadosIniciais.estado) {
-            if (root.getAttribute('data-continuar') === '1') {
+            if (root.getAttribute('data-continuar') === '1' && retornoFluxo !== 'boletim-layout') {
                 var rascunhoLocal = rascunhoSessaoCompativel();
                 if (rascunhoLocal) {
                     aplicarRascunhoNoWizard(rascunhoLocal);
                     aplicarQuadroRecemCriado();
+                    forcarContextoImpressaoBoletim();
                     renderAll();
                     renderResumo('Esta é a configuração já iniciada neste navegador. Confira e salve. Salvar atualiza este evento e não cria outro.', []);
                     return;
                 }
             }
             aplicarQuadroRecemCriado();
+            forcarContextoImpressaoBoletim();
+            if (ehVisaoImpressaoEditavel() && estado && (estado.passo === 'inicio' || !estado.passo)) {
+                estado.passo = 'identidade';
+            }
             renderAll();
             renderResumo(dadosIniciais.resumo, dadosIniciais.erros || []);
             return;
@@ -7008,7 +10340,9 @@ $boletimWizardSteps = [
         r.nota_minima_regra_nome = infoMinSalvar.nome || '';
         var comps = normalizarComponentesRascunho(r.componentes);
         if (!comps.length) {
-            renderResumo('O assistente montou o evento, mas sem blocos.', ['Volte em Tipo de Notas, marque as colunas e monte a média em Fórmula. Depois clique de novo em Concluir e aplicar.']);
+            renderResumo('O assistente montou o evento, mas sem blocos.', [ehDemonstrativoNotas()
+                ? 'Volte em Tipo de Notas, marque as colunas e monte a ordem em Colunas. Depois clique de novo em Concluir e aplicar.'
+                : 'Volte em Tipo de Notas, marque as colunas e monte a média em Fórmula. Depois clique de novo em Concluir e aplicar.']);
             return false;
         }
         r.componentes = comps;
@@ -7035,15 +10369,27 @@ $boletimWizardSteps = [
                 });
             }
             add('_token', csrf);
-            add('regra_id', r.modo === 'editar' && r.regra_id ? r.regra_id : (regraId > 0 ? regraId : 0));
+            // Sempre regrava a regra aberta (layout SM). Senão cria órfã e a tela reabre a antiga sem REC.
+            var regraIdSalvar = Number(r.regra_id || (estado && estado.regra_id) || regraId || 0) || 0;
+            add('regra_id', regraIdSalvar > 0 ? regraIdSalvar : 0);
             add('regra_nome', r.nome || 'Evento padrão da escola');
             add('regra_codigo', r.codigo || '');
             add('regra_descricao_curta', r.descricao_curta || '');
             add('formula_final', r.formula_final || '');
             add('formula_materias_json', r.formula_materias_json || '');
-            add('exibir_em', 'notas');
+            var exibirPost = (retornoFluxo === 'boletim-layout' || r.exibir_em === 'boletim' || r.quadro_livre || r.origem === 'quadro-impressao')
+                ? 'boletim'
+                : 'notas';
+            add('exibir_em', exibirPost);
             add('finalidade', r.finalidade === 'complementar' ? 'complementar' : 'oficial');
-            add('boletim_id', r.boletim_id || (estado && estado.boletim_id) || '');
+            var layoutPostJs = parseInt(root.getAttribute('data-layout-boletim-id') || '0', 10)
+                || Number((estado && estado.layout_boletim_id) || (r.layout_boletim_id) || 0)
+                || 0;
+            var boletimPostJs = Number(r.boletim_id || (estado && estado.boletim_id) || 0) || 0;
+            // Quadro de impressão: não envia o ID do layout como modelo de boletim.
+            if (layoutPostJs > 0 && boletimPostJs === layoutPostJs) boletimPostJs = 0;
+            if (exibirPost === 'boletim' && layoutPostJs > 0 && !boletimPostJs) boletimPostJs = 0;
+            add('boletim_id', boletimPostJs > 0 ? boletimPostJs : '');
             add('grupo_regras_notas_id', r.grupo_regras_notas_id || (estado && estado.grupo_regras_notas_id) || '');
             add('ano_letivo', r.ano_letivo || anoLetivoPadraoJs());
             add('bimestre', r.bimestre || '');
@@ -7069,9 +10415,84 @@ $boletimWizardSteps = [
             var alunoSomenteId = Number(r._gerar_somente_aluno_id || 0);
             delete r._gerar_somente_aluno;
             delete r._gerar_somente_aluno_id;
+            var layoutBoletimIdPost = layoutPostJs
+                || parseInt(root.getAttribute('data-layout-boletim-id') || '0', 10)
+                || 0;
+            if (layoutBoletimIdPost > 0) {
+                add('layout_boletim_id', String(layoutBoletimIdPost));
+            }
+            // Enriquecer o rascunho ANTES do JSON (eventos/layout não podem sumir no POST).
+            if (exibirPost === 'boletim') {
+                r.exibir_em = 'boletim';
+                r.layout_boletim_id = layoutBoletimIdPost;
+                if (Number(r.boletim_id || 0) === layoutBoletimIdPost) r.boletim_id = 0;
+                if (estado) {
+                    if (estado.quadro_livre) r.quadro_livre = 1;
+                    if (estado.origem) r.origem = estado.origem;
+                    if (estado.modelo_santa_maria) r.modelo_santa_maria = 1;
+                    if (Array.isArray(estado.eventos_avaliativos_ids)) {
+                        r.eventos_avaliativos_ids = estado.eventos_avaliativos_ids.slice();
+                    }
+                    if (estado.eventos_avaliativos_subs && typeof estado.eventos_avaliativos_subs === 'object') {
+                        r.eventos_avaliativos_subs = estado.eventos_avaliativos_subs;
+                    }
+                    if (Array.isArray(estado.linhas_layout)) r.linhas_layout = estado.linhas_layout;
+                    if (Array.isArray(estado.colunas_ordem)) r.colunas_ordem = estado.colunas_ordem;
+                    if (estado.formulas_blocos) r.formulas_blocos = estado.formulas_blocos;
+                    if (estado.blocos_calc) r.blocos_calc = estado.blocos_calc;
+                    if (estado.nomes_blocos) r.nomes_blocos = estado.nomes_blocos;
+                    // Flags do quadro: sem isso, ao reabrir some o título do período.
+                    r.cabecalhos_manuais = Number(estado.cabecalhos_manuais || 0) === 1
+                        || (Array.isArray(estado.linhas_layout) && estado.linhas_layout.length)
+                        ? 1 : 0;
+                    r.quadro_chips_manuais = Number(estado.quadro_chips_manuais || 0) === 1
+                        || (Array.isArray(estado.colunas_ordem) && estado.colunas_ordem.length)
+                        || r.cabecalhos_manuais
+                        ? 1 : 0;
+                    if (estado.titulos_periodo_ok && typeof estado.titulos_periodo_ok === 'object') {
+                        r.titulos_periodo_ok = estado.titulos_periodo_ok;
+                    }
+                }
+            }
+            // Campos dedicados: o servidor prioriza estes sobre o JSON do rascunho.
+            var linhasPost = Array.isArray(r.linhas_layout) ? r.linhas_layout
+                : (estado && Array.isArray(estado.linhas_layout) ? estado.linhas_layout : []);
+            var ordemPost = Array.isArray(r.colunas_ordem) ? r.colunas_ordem
+                : (estado && Array.isArray(estado.colunas_ordem) ? estado.colunas_ordem : []);
+            var titulosOkPost = (r.titulos_periodo_ok && typeof r.titulos_periodo_ok === 'object')
+                ? r.titulos_periodo_ok
+                : ((estado && estado.titulos_periodo_ok && typeof estado.titulos_periodo_ok === 'object')
+                    ? estado.titulos_periodo_ok : {});
+            add('linhas_layout_json', JSON.stringify(linhasPost || []));
+            add('colunas_ordem_json', JSON.stringify(ordemPost || []));
+            add('titulos_periodo_ok_json', JSON.stringify(titulosOkPost || {}));
+            // Dom/estado no clique do Aplicar — nunca confiar só no rascunho remoto do montar.
+            try { sincronizarSelecaoEventosAvulsosDoDom({ preservarLayout: true }); } catch (eEvSave) { /* ignore */ }
+            var eventosPost = [];
+            var setEvPost = {};
+            function pushEvPost(id) {
+                id = Number(id) || 0;
+                if (id <= 0 || setEvPost[id]) return;
+                setEvPost[id] = true;
+                eventosPost.push(id);
+            }
+            (Array.isArray(estado && estado.eventos_avaliativos_ids) ? estado.eventos_avaliativos_ids : []).forEach(pushEvPost);
+            (Array.isArray(r.eventos_avaliativos_ids) ? r.eventos_avaliativos_ids : []).forEach(pushEvPost);
+            r.eventos_avaliativos_ids = eventosPost.slice();
+            if (estado) estado.eventos_avaliativos_ids = eventosPost.slice();
+            add('eventos_avaliativos_ids_json', JSON.stringify(eventosPost));
+            if (Number(r.cabecalhos_manuais || 0) === 1 || (linhasPost && linhasPost.length)) {
+                add('cabecalhos_manuais', '1');
+            }
+            if (Number(r.quadro_chips_manuais || 0) === 1 || (ordemPost && ordemPost.length) || (linhasPost && linhasPost.length)) {
+                add('quadro_chips_manuais', '1');
+            }
+            if ((!linhasPost || !linhasPost.length) && Number((estado && estado.limpar_titulos_periodo) || 0) === 1) {
+                add('limpar_titulos_periodo', '1');
+            }
             add('assistente_rascunho', JSON.stringify(r));
             add('origem_assistente', '1');
-            if (retornoFluxo === 'gerar-avaliacoes' || retornoFluxo === 'boletins' || retornoFluxo === 'periodos' || retornoFluxo === 'evento') {
+            if (retornoFluxo === 'gerar-avaliacoes' || retornoFluxo === 'boletins' || retornoFluxo === 'periodos' || retornoFluxo === 'evento' || retornoFluxo === 'boletim-layout') {
                 add('retorno_fluxo', retornoFluxo);
                 add('retorno_boletim_id', root.getAttribute('data-boletim-id') || (r.boletim_id || ''));
                 add('retorno_ano_letivo', r.ano_letivo || root.getAttribute('data-ano-letivo') || '');
@@ -7085,7 +10506,8 @@ $boletimWizardSteps = [
                     });
                 }
             }
-            if (gerarNotas === true && ehEventoNotasPreview()) {
+            // Só boletim oficial dispara geração. Demonstrativo = quadro ao vivo (só salva config).
+            if (gerarNotas === true && exibirPost === 'boletim') {
                 add('gerar_nova_versao', '1');
                 if (alunoSomenteId > 0) {
                     add('gerar_somente_aluno_id', alunoSomenteId);
@@ -7106,7 +10528,11 @@ $boletimWizardSteps = [
 
     function atualizarBotaoGerarAluno() {
         if (!btnGerarAluno) return;
-        var mostrar = pageMode && ehEventoNotasPreview() && estado && estado.passo === 'revisar' && Number(estado.aluno_preview_id || 0) > 0;
+        // Geração individual só no boletim oficial — demonstrativo é ao vivo.
+        var mostrar = pageMode && !ehEventoNotasPreview() && estado
+            && estado.exibir_em === 'boletim'
+            && estado.passo === 'revisar'
+            && Number(estado.aluno_preview_id || 0) > 0;
         btnGerarAluno.classList.toggle('hidden', !mostrar);
     }
 
@@ -7116,6 +10542,8 @@ $boletimWizardSteps = [
             return false;
         }
         flushTituloAberto();
+        // Dom é a fonte da verdade dos títulos visíveis no quadro.
+        try { sincronizarLinhasLayoutComDom(); } catch (eSyncLin) { /* ignore */ }
         aplicarNomesNoRascunho(j.rascunho);
         aplicarNomesNoRascunho(estado && estado.rascunho_preservado);
         garantirArredondamentoGrupoNoRascunho(j.rascunho);
@@ -7126,7 +10554,27 @@ $boletimWizardSteps = [
             return false;
         }
         if (estado && Array.isArray(estado.linhas_layout)) {
-            j.rascunho.linhas_layout = estado.linhas_layout;
+            j.rascunho.linhas_layout = JSON.parse(JSON.stringify(estado.linhas_layout));
+            if (estado.linhas_layout.length) {
+                j.rascunho.cabecalhos_manuais = 1;
+                j.rascunho.quadro_chips_manuais = 1;
+            }
+        }
+        if (estado) {
+            if (Number(estado.cabecalhos_manuais || 0) === 1) j.rascunho.cabecalhos_manuais = 1;
+            if (Number(estado.quadro_chips_manuais || 0) === 1) j.rascunho.quadro_chips_manuais = 1;
+            if (Array.isArray(estado.colunas_ordem)) j.rascunho.colunas_ordem = estado.colunas_ordem.slice();
+            if (estado.titulos_periodo_ok && typeof estado.titulos_periodo_ok === 'object') {
+                j.rascunho.titulos_periodo_ok = JSON.parse(JSON.stringify(estado.titulos_periodo_ok));
+            }
+            if (Array.isArray(estado.eventos_avaliativos_ids) && estado.eventos_avaliativos_ids.length) {
+                j.rascunho.eventos_avaliativos_ids = estado.eventos_avaliativos_ids.map(Number).filter(function (id) {
+                    return id > 0;
+                });
+            }
+            if (estado.eventos_avaliativos_subs && typeof estado.eventos_avaliativos_subs === 'object') {
+                j.rascunho.eventos_avaliativos_subs = estado.eventos_avaliativos_subs;
+            }
         }
         if (!Number(j.rascunho.boletim_id || 0) && estado && Number(estado.boletim_id || 0)) {
             j.rascunho.boletim_id = Number(estado.boletim_id);
@@ -7134,7 +10582,16 @@ $boletimWizardSteps = [
         if (!Number(j.rascunho.grupo_regras_notas_id || 0) && estado && Number(estado.grupo_regras_notas_id || 0)) {
             j.rascunho.grupo_regras_notas_id = Number(estado.grupo_regras_notas_id);
         }
-        if (!Number(j.rascunho.boletim_id || 0) && !(estado && estado.exibir_em === 'notas')) {
+        var dispensaModeloBoletim = !!(estado && (
+            estado.exibir_em === 'boletim'
+            || estado.origem === 'quadro-impressao'
+            || estado.origem === 'santa-maria'
+            || estado.quadro_livre
+            || estado.modelo_santa_maria
+            || Number(estado.layout_boletim_id || 0) > 0
+            || retornoFluxo === 'boletim-layout'
+        ));
+        if (!Number(j.rascunho.boletim_id || 0) && !(estado && estado.exibir_em === 'notas') && !dispensaModeloBoletim) {
             renderResumo('Falta o modelo de boletim.', ['Volte em Identidade e selecione o Boletim.']);
             return false;
         }
@@ -7161,7 +10618,41 @@ $boletimWizardSteps = [
         vis.forEach(function (p, idx) { if (p.id === estado.passo) i = idx; });
         if (estado.passo === 'revisar') {
             if (btnAvancar) btnAvancar.disabled = true;
+            if (montarTimer) { clearTimeout(montarTimer); montarTimer = null; }
+            try { sincronizarSelecaoEventosAvulsosDoDom({ preservarLayout: true }); } catch (eDomEvAv) { /* ignore */ }
+            sincronizarEventosIdsDoQuadro();
+            try { sincronizarLinhasLayoutComDom(); } catch (eDomAv) { /* ignore */ }
+            var snapLinhasAv = Array.isArray(estado.linhas_layout)
+                ? JSON.parse(JSON.stringify(estado.linhas_layout))
+                : [];
+            var snapOrdemAv = Array.isArray(estado.colunas_ordem) ? estado.colunas_ordem.slice() : [];
+            var snapEventosAv = Array.isArray(estado.eventos_avaliativos_ids)
+                ? estado.eventos_avaliativos_ids.map(Number).filter(function (id) { return id > 0; })
+                : [];
+            var snapTitulosAv = (estado.titulos_periodo_ok && typeof estado.titulos_periodo_ok === 'object')
+                ? JSON.parse(JSON.stringify(estado.titulos_periodo_ok))
+                : {};
             montarAgora().then(function (j) {
+                if (estado) {
+                    if (snapLinhasAv.length) {
+                        estado.linhas_layout = snapLinhasAv;
+                        estado.cabecalhos_manuais = 1;
+                        estado.quadro_chips_manuais = 1;
+                    }
+                    if (snapOrdemAv.length) estado.colunas_ordem = snapOrdemAv;
+                    if (snapEventosAv.length) estado.eventos_avaliativos_ids = snapEventosAv;
+                    estado.titulos_periodo_ok = snapTitulosAv;
+                }
+                if (j && j.rascunho) {
+                    if (snapLinhasAv.length) {
+                        j.rascunho.linhas_layout = snapLinhasAv;
+                        j.rascunho.cabecalhos_manuais = 1;
+                        j.rascunho.quadro_chips_manuais = 1;
+                    }
+                    if (snapOrdemAv.length) j.rascunho.colunas_ordem = snapOrdemAv;
+                    if (snapEventosAv.length) j.rascunho.eventos_avaliativos_ids = snapEventosAv;
+                    j.rascunho.titulos_periodo_ok = snapTitulosAv;
+                }
                 var aplicado = aplicarRascunhoSeOk(j, pageMode ? 'Aplicado. Salvando o evento…' : 'Aplicado no formulário. Revise os blocos e clique em Salvar evento.', true);
                 if (!aplicado) {
                     if (btnAvancar) btnAvancar.disabled = false;
@@ -7179,10 +10670,23 @@ $boletimWizardSteps = [
             return;
         }
         if (estado.passo === 'identidade' && estado.exibir_em !== 'notas' && !boletimEscolhido()) {
-            renderResumo('', ['Selecione um boletim.']);
-            return;
+            var dispensaBoletimAvancar = ehVisaoImpressaoEditavel()
+                || ehBoletimComposto()
+                || ehQuadroImpressaoLivre()
+                || ehModeloSantaMaria()
+                || Number(estado.layout_boletim_id || 0) > 0
+                || retornoFluxo === 'boletim-layout';
+            if (!dispensaBoletimAvancar) {
+                renderResumo('', ['Selecione um boletim.']);
+                return;
+            }
+            var layoutAvancar = Number(estado.layout_boletim_id || root.getAttribute('data-layout-boletim-id') || 0);
+            if (layoutAvancar > 0) {
+                estado.layout_boletim_id = layoutAvancar;
+                if (Number(estado.boletim_id || 0) === layoutAvancar) estado.boletim_id = 0;
+            }
         }
-        if (estado.passo === 'formula' && estado.bloco_calc) {
+        if (estado.passo === 'formula' && estado.bloco_calc && !ehDemonstrativoNotas()) {
             var inpNome = document.getElementById('bw-formula-bloco-nome-input');
             var nomeAv = String((inpNome && inpNome.value) || '').trim().slice(0, 60);
             if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
@@ -7190,6 +10694,7 @@ $boletimWizardSteps = [
             flushEscalaAberta();
             gravarTokensBlocoAberto();
         }
+        if (ehDemonstrativoNotas()) zerarFormulasDemonstrativoNotas();
         var next = vis[Math.min(i + 1, vis.length - 1)].id;
         if (estado.origem === 'clonar') {
             if (estado.passo === 'inicio') next = 'identidade';
@@ -7444,8 +10949,55 @@ $boletimWizardSteps = [
     if (btnAplicar) {
         btnAplicar.addEventListener('click', function () {
             garantirEstado();
+            // Cancela montar agendado (checkbox REC) — senão a race descarta o Aplicar.
+            if (montarTimer) { clearTimeout(montarTimer); montarTimer = null; }
+            // Dom dos checkboxes de REC/PF/eventos — senão o Aplicar grava sem a marcação.
+            try { sincronizarSelecaoEventosAvulsosDoDom({ preservarLayout: true }); } catch (eDomEv) { /* ignore */ }
+            sincronizarEventosIdsDoQuadro();
+            // Dom → estado antes do snapshot (títulos visíveis não podem depender só da memória).
+            try { sincronizarLinhasLayoutComDom(); } catch (eDomSnap) { /* ignore */ }
+            // Congela o quadro visual ANTES do montar (senão o remount perde título do período).
+            var snapLinhas = Array.isArray(estado.linhas_layout)
+                ? JSON.parse(JSON.stringify(estado.linhas_layout))
+                : [];
+            var snapOrdem = Array.isArray(estado.colunas_ordem) ? estado.colunas_ordem.slice() : [];
+            var snapCab = Number(estado.cabecalhos_manuais || 0) === 1 || snapLinhas.length ? 1 : 0;
+            var snapChips = Number(estado.quadro_chips_manuais || 0) === 1 || snapOrdem.length || snapLinhas.length ? 1 : 0;
+            var snapTitulosOk = (estado.titulos_periodo_ok && typeof estado.titulos_periodo_ok === 'object')
+                ? JSON.parse(JSON.stringify(estado.titulos_periodo_ok))
+                : {};
+            var snapEventos = Array.isArray(estado.eventos_avaliativos_ids)
+                ? estado.eventos_avaliativos_ids.map(Number).filter(function (id) { return id > 0; })
+                : [];
             renderResumo('Montando o quadro...', []);
             montarAgora().then(function (j) {
+                if (estado) {
+                    if (snapLinhas.length) {
+                        estado.linhas_layout = snapLinhas;
+                        estado.cabecalhos_manuais = 1;
+                        estado.quadro_chips_manuais = 1;
+                    } else if (snapCab) {
+                        estado.cabecalhos_manuais = 1;
+                    }
+                    if (snapOrdem.length) {
+                        estado.colunas_ordem = snapOrdem;
+                        estado.quadro_chips_manuais = 1;
+                    } else if (snapChips) {
+                        estado.quadro_chips_manuais = 1;
+                    }
+                    estado.titulos_periodo_ok = snapTitulosOk;
+                    if (snapEventos.length) estado.eventos_avaliativos_ids = snapEventos;
+                }
+                if (j && j.rascunho) {
+                    if (snapLinhas.length) {
+                        j.rascunho.linhas_layout = snapLinhas;
+                        j.rascunho.cabecalhos_manuais = 1;
+                        j.rascunho.quadro_chips_manuais = 1;
+                    }
+                    if (snapOrdem.length) j.rascunho.colunas_ordem = snapOrdem;
+                    j.rascunho.titulos_periodo_ok = snapTitulosOk;
+                    if (snapEventos.length) j.rascunho.eventos_avaliativos_ids = snapEventos;
+                }
                 aplicarRascunhoSeOk(j, pageMode ? 'Configuração salva. As notas não foram geradas.' : 'Aplicado no formulário (ainda não salvo). Salve o evento para valer na simulação.', false);
             });
         });

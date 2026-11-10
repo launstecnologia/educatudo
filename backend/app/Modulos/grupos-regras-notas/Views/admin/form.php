@@ -13,6 +13,7 @@ $retorno = (string) ($retorno ?? '');
 $page_header_back_url = $retorno !== '' ? (URL . $retorno) : (URL . '/admin/quadros-notas');
 $page_header_title = $ehEdicao ? 'Editar quadro de notas' : 'Novo quadro de notas';
 $page_header_subtitle = 'Molde anual: gere S1…SN do bimestre mais longo e intercale A/B. Em Lançamento de Notas você escolhe o bloco e a semana daquele período entra sozinha.';
+$page_header_icon = 'fa-solid fa-layer-group';
 include \App\Core\ViewPaths::adminPartial('page_header_form.php');
 include \App\Core\ViewPaths::adminPartial('flash_message.php');
 

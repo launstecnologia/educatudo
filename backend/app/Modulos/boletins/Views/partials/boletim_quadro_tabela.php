@@ -174,16 +174,9 @@ if ($tabelasQuadro === [] || $linhasQuadro === []) {
                         <?php if ($semanasCols !== []): ?>
                             <th colspan="2" class="boletim-quadro-th-border px-2 py-1 font-semibold">Total</th>
                         <?php endif; ?>
-                        <?php foreach ($outrasCols as $oc):
-                            $ltOc = strtolower(trim((string) ($oc['layout_type'] ?? '')));
-                            $mostraValor10 = in_array($ltOc, ['media', 'media_sem', 'resultado', ''], true)
-                                || $ltOc === 'other';
-                        ?>
+                        <?php foreach ($outrasCols as $oc): ?>
                             <th rowspan="2" class="boletim-quadro-th-border px-2 py-1 font-semibold align-middle leading-tight min-w-[4.5rem]">
                                 <?= htmlspecialchars(\App\Helpers\BoletimQuadroLayoutHelper::rotuloColunaQuadro($oc), ENT_QUOTES, 'UTF-8') ?>
-                                <?php if ($mostraValor10 && $ltOc !== 'faltas' && $ltOc !== 'rec'): ?>
-                                    <div class="text-[10px] font-normal opacity-80">Valor 10</div>
-                                <?php endif; ?>
                             </th>
                         <?php endforeach; ?>
                     </tr>

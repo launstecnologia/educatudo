@@ -16,10 +16,14 @@ $acao = $ehEdicao
     ? URL . '/admin/eventos-avaliativos/boletim/' . (int) $item['id'] . '/dados'
     : URL . '/admin/eventos-avaliativos/boletim/novo';
 
-$page_header_title = $ehEdicao ? 'Editar boletim' : 'Novo boletim';
-$page_header_subtitle = !empty($so_regra)
-    ? 'O boletim só vincula uma regra de aprovação. Modelo, público, ativo e disciplinas ficam na regra. O desenho das colunas fica no layout.'
-    : 'Defina se é o oficial da vida escolar ou um extra, e quais disciplinas entram. O desenho das colunas fica no layout.';
+$abrirQuadroZero = !empty($abrir_quadro_zero);
+$page_header_title = $ehEdicao ? 'Editar boletim' : 'Novo boletim (do zero)';
+$page_header_icon = 'fa-solid fa-file-circle-check';
+$page_header_subtitle = $abrirQuadroZero && !$ehEdicao
+    ? 'Preencha os dados do modelo. Ao salvar, você entra no builder livre para criar colunas e cabeçalhos (ex.: I BIMESTRE → PP/PU/CH/PE/MU/FAL).'
+    : (!empty($so_regra)
+        ? 'O boletim só vincula uma regra de aprovação. Modelo, público, ativo e disciplinas ficam na regra. O desenho das colunas fica no layout.'
+        : 'Defina se é o oficial da vida escolar ou um extra, e quais disciplinas entram. O desenho das colunas fica no layout.');
 $page_header_actions = '<a href="' . URL . '/admin/eventos-avaliativos/boletim?ano=' . $anoSel . '" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Voltar</a>';
 include \App\Core\ViewPaths::adminPartial('page_header_list.php');
 include \App\Core\ViewPaths::adminPartial('flash_message.php');
@@ -27,6 +31,9 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
 
 <form method="POST" action="<?= $acao ?>" class="w-full">
     <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+    <?php if ($abrirQuadroZero && !$ehEdicao): ?>
+    <input type="hidden" name="abrir_quadro_zero" value="1">
+    <?php endif; ?>
     <div class="bg-white rounded-xl shadow-lg p-6 w-full">
         <?php if (!empty($so_regra)): ?>
         <div class="mb-6">

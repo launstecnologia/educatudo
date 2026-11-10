@@ -23,6 +23,10 @@ $secaoInicial = in_array($secaoPedida, ['boletim', 'notas', 'provas'], true) ? $
 
     <div data-painel-portal="notas" id="notas" class="hidden">
         <?php
+        $arquivoNotasAoVivo = realpath(__DIR__ . '/../../../Modulos/eventos-avaliativos/Views/aluno/notas_ao_vivo.php');
+        if ($arquivoNotasAoVivo && is_file($arquivoNotasAoVivo)) {
+            require $arquivoNotasAoVivo;
+        }
         $notas_perfil = 'pais';
         require \App\Core\ViewPaths::partial('notas_portal_coordenacao.php');
         ?>

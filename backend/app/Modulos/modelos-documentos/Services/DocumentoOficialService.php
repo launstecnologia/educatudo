@@ -122,9 +122,26 @@ class DocumentoOficialService
         if ($payload === null) {
             throw new \RuntimeException('Não foi possível montar o boletim deste aluno.');
         }
-        $payload['quadro_notas_html'] = \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService::htmlQuadroDeLinhasBimestrais(
-            is_array($payload['componentes_ficha'] ?? null) ? $payload['componentes_ficha'] : []
-        );
+        $modeloCodigo = '';
+        try {
+            $modeloCodigo = (string) $this->model->getLayoutCodigo('boletim');
+        } catch (\Throwable $e) {
+            $modeloCodigo = '';
+        }
+        if (QuadroBoletimSantaMariaService::codigoEhSantaMaria($modeloCodigo)) {
+            $quadroSm = (new QuadroBoletimSantaMariaService($this->db))->montarHtml($alunoId, $anoLetivo);
+            if ((int) ($quadroSm['linhas'] ?? 0) > 0) {
+                $payload['quadro_notas_html'] = (string) ($quadroSm['html'] ?? '');
+            } else {
+                $payload['quadro_notas_html'] = ModeloDocumentoService::htmlQuadroDeLinhasBimestrais(
+                    is_array($payload['componentes_ficha'] ?? null) ? $payload['componentes_ficha'] : []
+                );
+            }
+        } else {
+            $payload['quadro_notas_html'] = ModeloDocumentoService::htmlQuadroDeLinhasBimestrais(
+                is_array($payload['componentes_ficha'] ?? null) ? $payload['componentes_ficha'] : []
+            );
+        }
         return $this->emitirDocumento('boletim', $payload, $usuarioId, $configApp, $alunoId, $turmaId, $registrarEmissao);
     }
 

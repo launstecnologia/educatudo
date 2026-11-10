@@ -26,45 +26,38 @@ if (!empty($filterStatus)) {
 $qsListaAtual = http_build_query($_GET ?? []);
 $voltarListaPath = '/admin/provas' . ($qsListaAtual !== '' ? ('?' . $qsListaAtual) : '');
 $editarVoltarQs = $qsListaAtual !== '' ? ('?voltar=' . rawurlencode($voltarListaPath)) : '';
+$page_header_title = 'Lançamento de Notas';
+$page_header_subtitle = 'Gerencie os blocos de provas e o lançamento de notas.';
+$page_header_icon = 'fa-regular fa-clipboard';
+ob_start();
 ?>
-<!-- Header Section -->
-<div class="mb-8">
-    <div class="flex justify-between items-center">
-        <div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">
-                Avaliações e Notas
-            </h2>
-            <p class="text-gray-600">
-                Gerencie todos os blocos de provas online do sistema
-            </p>
-        </div>
-        <div class="flex items-center gap-3 flex-wrap">
-            <button type="button" onclick="openFilterDrawer()"
-                    class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-                <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
-                Filtros
-                <?php if ($filtrosAtivosCount > 0): ?>
-                <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold"><?= $filtrosAtivosCount ?></span>
-                <?php endif; ?>
-            </button>
-            <a href="<?= URL ?>/admin/provas/tipos-avaliacao"
-               class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-                <i class="fa-solid fa-layer-group mr-2 text-gray-500"></i>
-                Tipo de Nota
-            </a>
-            <a href="<?= URL ?>/admin/blocos-modelo"
-               class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-                <i class="fa-solid fa-table-cells mr-2 text-gray-500"></i>
-                Bloco Professor
-            </a>
-            <a href="<?= URL ?>/admin/provas/blocos/criar<?= htmlspecialchars($editarVoltarQs) ?>"
-               class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity shadow-sm">
-                <i class="fa-solid fa-plus mr-2"></i>
-                Novo Evento
-            </a>
-        </div>
-    </div>
-</div>
+<button type="button" onclick="openFilterDrawer()"
+        class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+    <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
+    Filtros
+    <?php if ($filtrosAtivosCount > 0): ?>
+    <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold"><?= $filtrosAtivosCount ?></span>
+    <?php endif; ?>
+</button>
+<a href="<?= URL ?>/admin/provas/tipos-avaliacao"
+   class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+    <i class="fa-solid fa-layer-group mr-2 text-gray-500"></i>
+    Tipo de Nota
+</a>
+<a href="<?= URL ?>/admin/blocos-modelo"
+   class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+    <i class="fa-solid fa-table-cells mr-2 text-gray-500"></i>
+    Bloco Professor
+</a>
+<a href="<?= URL ?>/admin/provas/blocos/criar<?= htmlspecialchars($editarVoltarQs) ?>"
+   class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity shadow-sm">
+    <i class="fa-solid fa-plus mr-2"></i>
+    Novo Evento
+</a>
+<?php
+$page_header_actions = ob_get_clean();
+include \App\Core\ViewPaths::adminPartial('page_header_list.php');
+?>
 
 <!-- Stats Cards -->
 <?php if (isset($stats)): ?>

@@ -1,28 +1,17 @@
 <?php
-$ano = (int) ($ano ?? date('Y'));
-$anos = is_array($anos ?? null) ? $anos : [$ano];
+$ano = (int) ($ano ?? 0);
+$anos = is_array($anos ?? null) ? $anos : [];
 $itens = is_array($itens ?? null) ? $itens : [];
 $schemaPronto = !empty($schema_pronto);
 $podeAlterar = !empty($pode_alterar);
 $podeExcluir = !empty($pode_excluir);
 $csrf_token = (string) ($csrf_token ?? '');
+$anoNovo = $ano > 0 ? $ano : ((int) ($anos[0] ?? date('Y')));
 
 include \App\Core\ViewPaths::adminPartial('flash_message.php');
 ?>
 
-<div class="mb-6">
-    <div class="flex items-start justify-between gap-3 flex-wrap mb-4">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900">Boletim</h1>
-            <p class="text-sm text-gray-600 mt-1">Crie o boletim oficial da vida escolar e, se a escola tiver, um boletim extra. Cada um tem o seu layout.</p>
-        </div>
-        <a href="<?= URL ?>/admin/academico"
-           class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-            <i class="fa-solid fa-arrow-left mr-2 text-gray-500" aria-hidden="true"></i>
-            Voltar
-        </a>
-    </div>
-</div>
+<?php $boletim_aba = 'modelos'; include \App\Core\ViewPaths::adminPartial('boletim_area_nav.php'); ?>
 
 <?php if (!$schemaPronto): ?>
 <div class="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
@@ -33,22 +22,32 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
 <div class="mb-6 flex items-start justify-between gap-3 flex-wrap">
     <div>
         <h2 class="text-lg font-semibold text-gray-900">Modelos de Boletim</h2>
-        <p class="text-sm text-gray-600 mt-1">Defina as matérias, as turmas e a regra de aprovação de cada boletim.</p>
+        <p class="text-sm text-gray-600 mt-1">Cadastre o boletim e monte o quadro: do zero, pelos Demonstrativos ou pelo print Santa Maria.</p>
     </div>
-    <?php if ($schemaPronto && $podeAlterar): ?>
-    <a href="<?= URL ?>/admin/eventos-avaliativos/boletim/novo?ano=<?= $ano ?>"
-       class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
-        <i class="fa-solid fa-plus mr-2" aria-hidden="true"></i>
-        Novo boletim
-    </a>
-    <?php endif; ?>
+    <div class="flex flex-wrap items-center gap-2">
+        <?php if ($podeAlterar): ?>
+        <a href="<?= URL ?>/admin/boletins/importar-modelo"
+           class="inline-flex items-center px-4 py-2.5 border border-indigo-200 rounded-lg text-sm font-semibold text-indigo-800 bg-indigo-50 hover:bg-indigo-100 transition-colors">
+            <i class="fa-solid fa-wand-magic-sparkles mr-2" aria-hidden="true"></i>
+            Importar modelo (IA)
+        </a>
+        <?php endif; ?>
+        <?php if ($schemaPronto && $podeAlterar): ?>
+        <a href="<?= URL ?>/admin/eventos-avaliativos/boletim/novo?ano=<?= (int) $anoNovo ?>&do_zero=1"
+           class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
+            <i class="fa-solid fa-plus mr-2" aria-hidden="true"></i>
+            Novo boletim (do zero)
+        </a>
+        <?php endif; ?>
+    </div>
 </div>
 
 <form method="GET" action="<?= URL ?>/admin/eventos-avaliativos/boletim" class="mb-6 flex items-end gap-3">
     <div>
         <label class="block text-sm font-medium text-gray-700 mb-2" for="boletim-ano">Ano</label>
         <select name="ano" id="boletim-ano" onchange="this.form.submit()"
-                class="w-32 pl-4 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                class="w-40 pl-4 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <option value="0" <?= $ano === 0 ? 'selected' : '' ?>>Todos</option>
             <?php foreach ($anos as $opcao): ?>
                 <option value="<?= (int) $opcao ?>" <?= (int) $opcao === $ano ? 'selected' : '' ?>><?= (int) $opcao ?></option>
             <?php endforeach; ?>
@@ -74,7 +73,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                 <?php if ($itens === []): ?>
                 <tr>
                     <td colspan="7" class="px-6 py-12 text-center text-gray-500">
-                        <p>Nenhum boletim em <?= $ano ?>.</p>
+                        <p><?= $ano > 0 ? ('Nenhum boletim em ' . $ano . '.') : 'Nenhum boletim cadastrado.' ?></p>
                         <p class="text-sm mt-1">Crie o oficial da vida escolar e, se precisar, um extra.</p>
                     </td>
                 </tr>
@@ -114,11 +113,13 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                             Editar o boletim
                         </a>
                         <?php endif; ?>
-                        <a href="<?= URL ?>/admin/eventos-avaliativos/boletim/<?= $id ?>"
+                        <?php if ($podeAlterar): ?>
+                        <a href="<?= URL ?>/admin/eventos-avaliativos/boletim/<?= $id ?>/montar-quadro"
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                            <i class="fa-solid fa-table-cells text-gray-400 w-4 text-center shrink-0" aria-hidden="true"></i>
-                            Layout do boletim
+                            <i class="fa-solid fa-calculator text-gray-400 w-4 text-center shrink-0" aria-hidden="true"></i>
+                            Montar quadro
                         </a>
+                        <?php endif; ?>
                         <?php if ($podeExcluir && $schemaPronto): ?>
                         <div class="border-t border-gray-100 my-1"></div>
                         <form method="POST" action="<?= URL ?>/admin/eventos-avaliativos/boletim/<?= $id ?>/excluir" onsubmit="return confirm('Excluir este boletim?');">

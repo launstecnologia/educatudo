@@ -44,7 +44,26 @@ class EventoAvaliativoService
         $professores = $this->db->fetchAll(
             'SELECT id, nome, materias FROM professores WHERE ativo = 1 ORDER BY nome ASC'
         ) ?: [];
-        $materias = (new ComponenteCurricular())->getAvaliaveis(true);
+        $cc = new ComponenteCurricular();
+        $materias = $cc->getAvaliaveis(true);
+        $nomesPai = [];
+        foreach ($cc->getAll(true) ?: [] as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $nomesPai[$id] = trim((string) ($row['nome'] ?? ''));
+            }
+        }
+        foreach ($materias as $i => $mat) {
+            if (!is_array($mat)) {
+                continue;
+            }
+            $paiId = (int) ($mat['pai_id'] ?? 0);
+            $materias[$i]['pai_id'] = $paiId;
+            $materias[$i]['pai_nome'] = $paiId > 0 ? (string) ($nomesPai[$paiId] ?? '') : '';
+        }
         $turmas = $this->db->fetchAll(
             'SELECT t.id, t.nome, t.tipo_ensino, t.serie_id, COALESCE(NULLIF(s.nome, \'\'), NULLIF(t.serie, \'\')) AS serie
              FROM turmas t

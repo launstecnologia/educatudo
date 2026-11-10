@@ -17,6 +17,7 @@ $csrf_token = (string) ($csrf_token ?? '');
 
 $page_header_title = 'Recuperação';
 $page_header_subtitle = 'Cada linha é uma forma de recuperação deste ano. Os cards de Eventos Avaliativos seguem esta lista.';
+$page_header_icon = 'fa-solid fa-arrows-rotate';
 ob_start();
 ?>
 <?php if ($podeCadastrar && $schemaPronto): ?>

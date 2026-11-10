@@ -974,8 +974,38 @@ class ParentController extends BaseController
         $notasLancamentoEventos = [];
         $notasLancamentoEventosBase = [];
         $boletinsGerados = [];
-        $boletinsNotas = $this->filtrarBoletinsPortalPorPeriodo(
-            $this->boletinsVisiveisNoPortal((int) $filho['id'], 'pais', 'notas'),
+        // Demonstrativo = ao vivo; não prioriza snapshot antigo de exibir_em=notas.
+        $boletinsNotas = [];
+        $notasEventosAoVivo = [];
+        try {
+            if (\App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos')) {
+                $notasEventosAoVivo = (new \App\Modulos\EventosAvaliativos\Services\EventoAvaliativoService())
+                    ->notasAoVivoDoAluno((int) ($filho['id'] ?? 0), (int) ($filho['turma_id'] ?? 0));
+                if (!is_array($notasEventosAoVivo)) {
+                    $notasEventosAoVivo = [];
+                }
+                if ($anoLetivo || $bimestre) {
+                    $notasEventosAoVivo = array_values(array_filter($notasEventosAoVivo, static function ($p) use ($anoLetivo, $bimestre) {
+                        if (!is_array($p)) {
+                            return false;
+                        }
+                        if ($anoLetivo && (int) ($p['ano'] ?? 0) !== (int) $anoLetivo) {
+                            return false;
+                        }
+                        if ($bimestre && (int) ($p['bimestre'] ?? 0) !== (int) $bimestre) {
+                            return false;
+                        }
+
+                        return true;
+                    }));
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('Notas ao vivo pais filho #' . (int) ($filho['id'] ?? 0) . ': ' . $e->getMessage());
+            $notasEventosAoVivo = [];
+        }
+        $boletinsOficiais = $this->filtrarBoletinsPortalPorPeriodo(
+            $this->boletinsVisiveisNoPortal((int) $filho['id'], 'pais', 'boletim'),
             $anoLetivo,
             $bimestre
         );
@@ -1029,8 +1059,9 @@ class ParentController extends BaseController
             'notas_lancamento_eventos' => $notasLancamentoEventos,
             'boletins_gerados' => $boletinsGerados,
             'boletins_gerados_notas' => $boletinsNotas,
+            'notas_eventos_ao_vivo' => $notasEventosAoVivo,
             'boletins_gerados_notas_extra' => $boletinsNotasExtra,
-            'boletins_gerados_boletim' => [],
+            'boletins_gerados_boletim' => $boletinsOficiais,
             'boletim_oficial' => $boletimOficial,
             'boletim_url_ficha' => rtrim((string) URL, '/') . '/pais/filhos/' . (int) $filho['id'] . '/notas?secao=boletim',
             'boletins_gerados_complementar' => $boletinsComplementar,

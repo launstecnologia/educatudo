@@ -444,6 +444,16 @@ function selecionarAbaAluno(abaId, atualizarUrl) {
             history.replaceState(null, '', url.pathname + url.search + url.hash);
         } catch (e) {}
     }
+    if (abaId === 'vida-escolar') {
+        try {
+            var veAtual = new URLSearchParams(window.location.search).get('ve_aba') || 'boletim';
+            if (typeof selecionarVeAba === 'function') {
+                selecionarVeAba(veAtual);
+            } else if (typeof carregarVeQuadroImpressaoSobDemanda === 'function') {
+                carregarVeQuadroImpressaoSobDemanda();
+            }
+        } catch (eVe) {}
+    }
 }
 
 function initAbasAluno() {

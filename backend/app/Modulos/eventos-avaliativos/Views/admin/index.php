@@ -38,6 +38,7 @@ $totalTurmas = count($turmasUnicas);
 
 $page_header_title = 'Eventos Avaliativos';
 $page_header_subtitle = 'Gerencie os eventos avaliativos do período letivo.';
+$page_header_icon = 'fa-solid fa-clipboard-list';
 $page_header_actions = '<a href="' . htmlspecialchars($urlPeriodos, ENT_QUOTES, 'UTF-8') . '" class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"><i class="fa-solid fa-arrow-left mr-2"></i>Períodos</a>';
 include \App\Core\ViewPaths::adminPartial('page_header_list.php');
 include \App\Core\ViewPaths::adminPartial('flash_message.php');

@@ -64,6 +64,8 @@ $catalogoJs = [
         return [
             'id' => (int) ($materia['id'] ?? 0),
             'nome' => (string) ($materia['nome'] ?? ''),
+            'pai_id' => (int) ($materia['pai_id'] ?? 0),
+            'pai_nome' => (string) ($materia['pai_nome'] ?? ''),
         ];
     }, $materias),
     'turmas' => array_map(static function (array $turma): array {
@@ -74,6 +76,7 @@ $catalogoJs = [
             'serie_id' => (int) ($turma['serie_id'] ?? 0),
         ];
     }, $turmas),
+    'familias' => [],
 ];
 
 $page_header_back_url = URL . '/admin/eventos-avaliativos?ano=' . $ano . '&periodo=' . (int) ($bimestre_selecionado ?? 0);
@@ -81,6 +84,7 @@ $page_header_title = $editando ? 'Editar evento avaliativo' : 'Novo evento avali
 $page_header_subtitle = $editando
     ? 'Identidade, estrutura e revisão antes de salvar.'
     : 'Identidade, estrutura e revisão antes de criar.';
+$page_header_icon = 'fa-solid fa-clipboard-list';
 include \App\Core\ViewPaths::adminPartial('page_header_form.php');
 include \App\Core\ViewPaths::adminPartial('flash_message.php');
 
@@ -117,12 +121,62 @@ if ($editando) {
 }
 $ui_wizard_current = 1;
 $ui_wizard_nav_id = 'evento-wizard-steps';
+
+$agrupar = is_array($agrupar ?? null) ? $agrupar : [];
+$agruparGrupo = is_array($agrupar['grupo'] ?? null) ? $agrupar['grupo'] : [];
+$agruparFamilias = is_array($agrupar['familias'] ?? null) ? $agrupar['familias'] : [];
+$agruparDisponivel = !empty($agrupar['disponivel']);
+$agruparAtivo = !empty($agruparGrupo['ativo']);
+$agruparModo = ((string) ($agruparGrupo['modo'] ?? 'media')) === 'soma' ? 'soma' : 'media';
+$agruparAplicar = ((string) ($agruparGrupo['aplicar_em'] ?? 'boletim')) === 'ambos' ? 'ambos' : 'boletim';
+$agruparArred = (string) ($agruparGrupo['arredondamento'] ?? 'todos');
+if (!in_array($agruparArred, ['todos', 'filhas', 'mae'], true)) {
+    $agruparArred = 'todos';
+}
+$agruparMateriasIds = [];
+foreach ((array) ($agruparGrupo['materias_ids'] ?? []) as $midAgr) {
+    $midAgr = (int) $midAgr;
+    if ($midAgr > 0) {
+        $agruparMateriasIds[$midAgr] = true;
+    }
+}
+$familiasTituloJs = is_array($agrupar['familias_titulo'] ?? null) ? $agrupar['familias_titulo'] : [];
+$catalogoJs['familias'] = array_values(array_map(static function (array $fam): array {
+    return [
+        'pai_id' => (int) ($fam['pai_id'] ?? 0),
+        'nome' => (string) ($fam['nome'] ?? ''),
+        'materias_ids' => array_values(array_map('intval', (array) ($fam['materias_ids'] ?? []))),
+        'filhos' => array_values(array_map(static function ($filho): array {
+            return [
+                'id' => (int) ($filho['id'] ?? 0),
+                'nome' => (string) ($filho['nome'] ?? ''),
+            ];
+        }, (array) ($fam['filhos'] ?? []))),
+    ];
+}, $agruparFamilias));
+$catalogoJs['familias_titulo'] = [];
+foreach ($familiasTituloJs as $paiTitulo => $cfgTitulo) {
+    $paiTitulo = (int) $paiTitulo;
+    if ($paiTitulo <= 0 || !is_array($cfgTitulo)) {
+        continue;
+    }
+    $catalogoJs['familias_titulo'][$paiTitulo] = [
+        'ativo' => !empty($cfgTitulo['ativo']),
+        'modo' => (($cfgTitulo['modo'] ?? '') === 'soma') ? 'soma' : 'media',
+    ];
+}
 ?>
 
 <form method="POST" action="<?= URL ?>/admin/eventos-avaliativos<?= $editando ? '/' . $eventoIdForm : '' ?>" id="form-evento-avaliativo" class="space-y-6" novalidate<?= $editando ? ' data-edicao="1"' : '' ?>>
     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8') ?>">
     <input type="hidden" name="origem" id="campo-origem" value="lancamento_direto">
     <input type="hidden" name="incluir_media" id="incluir_media" value="1">
+    <input type="hidden" name="regra" value="<?= (int) ($regra_id ?? 0) ?>">
+    <?php if ($agruparDisponivel): ?>
+    <input type="hidden" name="grupo_linha_enviar" value="1">
+    <input type="hidden" name="familia_titulo_enviar" value="1">
+    <input type="hidden" name="grupo_demonstrativo_id" value="<?= (int) ($agrupar['demonstrativo_id'] ?? 0) ?>">
+    <?php endif; ?>
 
     <?php include $ui . '/wizard_steps.php'; ?>
 
@@ -343,6 +397,132 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
                 <div class="p-5">
                 <div id="pares-padrao" data-prefix="pares_padrao" data-par="0">
                     <div class="js-pares space-y-3"></div>
+                </div>
+
+                <div id="agrupar-materias-box" class="hidden" aria-hidden="true">
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">Agrupar matérias numa linha</p>
+                        <p class="text-xs text-gray-500 mt-0.5">Igual ao Demonstrativo: junta desdobramentos (ex.: Biologia 1 + Biologia 2) numa linha só no boletim. Grava no Demonstrativo deste bimestre.</p>
+                    </div>
+                    <?php if (!$agruparDisponivel): ?>
+                        <p class="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                            <?= htmlspecialchars((string) ($agrupar['motivo'] ?? 'Demonstrativo indisponível para este bimestre.'), ENT_QUOTES, 'UTF-8') ?>
+                            <?php if (!empty($agrupar['assistente_url'])): ?>
+                                <a class="font-semibold text-indigo-700 underline ml-1" href="<?= URL . htmlspecialchars((string) $agrupar['assistente_url'], ENT_QUOTES, 'UTF-8') ?>">Abrir assistente</a>
+                            <?php endif; ?>
+                        </p>
+                    <?php else: ?>
+                        <?php if (!empty($agrupar['tem_ajuste_peca'])): ?>
+                            <p class="text-xs text-indigo-900 bg-white/80 border border-indigo-200 rounded-lg px-3 py-2">
+                                Este Demonstrativo já tem <strong>ajuste por peça</strong> no assistente. Ao salvar aqui, o padrão Média/Soma muda, mas o ajuste por peça é preservado.
+                                <a class="font-semibold underline" href="<?= URL . htmlspecialchars((string) ($agrupar['assistente_url'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">Abrir assistente</a>
+                            </p>
+                        <?php endif; ?>
+                        <p class="text-xs text-gray-600">Demonstrativo: <strong><?= htmlspecialchars((string) ($agrupar['demonstrativo_nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></strong></p>
+                        <label class="inline-flex items-start gap-2 text-sm text-gray-800">
+                            <input type="checkbox" name="grupo_ativo" id="grupo_ativo" value="1" class="mt-0.5 rounded border-gray-300 text-indigo-600"<?= $agruparAtivo ? ' checked' : '' ?>>
+                            <span><strong>Linha única no boletim</strong><span class="block text-xs text-gray-600 font-normal">Junta os desdobramentos numa linha só. Ex.: Biologia 1 + Biologia 2 → “Biologia”.</span></span>
+                        </label>
+                        <div id="grupo-linha-opcoes" class="<?= $agruparAtivo ? '' : 'hidden' ?> space-y-3 ml-0 sm:ml-6">
+                            <?php if ($agruparFamilias !== []): ?>
+                                <div>
+                                    <span class="text-xs font-medium text-gray-600">Área (já cadastrada em Componentes)</span>
+                                    <div class="mt-2 space-y-2" id="grupo-familias">
+                                        <?php foreach ($agruparFamilias as $fam): ?>
+                                            <?php
+                                            $famIds = array_map('intval', (array) ($fam['materias_ids'] ?? []));
+                                            $famOn = $agruparMateriasIds !== [] && count(array_diff($famIds, array_keys($agruparMateriasIds))) === 0
+                                                && count(array_diff(array_keys($agruparMateriasIds), $famIds)) === 0;
+                                            $nomesFilhos = [];
+                                            foreach ((array) ($fam['filhos'] ?? []) as $filho) {
+                                                $nomesFilhos[] = (string) ($filho['nome'] ?? '');
+                                            }
+                                            ?>
+                                            <label class="flex items-start gap-2 text-sm text-gray-800 border rounded-lg p-3 bg-white">
+                                                <input type="radio" name="grupo_familia" class="js-grupo-familia mt-0.5" value="<?= (int) ($fam['pai_id'] ?? 0) ?>"
+                                                       data-nome="<?= htmlspecialchars((string) ($fam['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                                                       data-ids="<?= htmlspecialchars(implode(',', $famIds), ENT_QUOTES, 'UTF-8') ?>"
+                                                       <?= $famOn ? ' checked' : '' ?>>
+                                                <span><strong><?= htmlspecialchars((string) ($fam['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?></strong>
+                                                    <span class="block text-xs text-gray-600 font-normal"><?= htmlspecialchars(implode(', ', $nomesFilhos), ENT_QUOTES, 'UTF-8') ?></span>
+                                                </span>
+                                            </label>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+                            <div>
+                                <span class="text-xs font-medium text-gray-600">Matérias nesta área (neste evento)</span>
+                                <p class="text-xs text-gray-500 mt-0.5 mb-2">Altera só o Demonstrativo deste bimestre. Marque ou desmarque para incluir/excluir filhas.</p>
+                                <div class="grid sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto border rounded-lg p-3 bg-white" id="grupo-materias-lista">
+                                    <?php
+                                    $materiasGrupoUi = [];
+                                    foreach ($agruparFamilias as $fam) {
+                                        foreach ((array) ($fam['filhos'] ?? []) as $filho) {
+                                            $fid = (int) ($filho['id'] ?? 0);
+                                            if ($fid > 0) {
+                                                $materiasGrupoUi[$fid] = (string) ($filho['nome'] ?? '');
+                                            }
+                                        }
+                                    }
+                                    if ($materiasGrupoUi === []) {
+                                        foreach ($materias as $matUi) {
+                                            $fid = (int) ($matUi['id'] ?? 0);
+                                            if ($fid > 0) {
+                                                $materiasGrupoUi[$fid] = (string) ($matUi['nome'] ?? '');
+                                            }
+                                        }
+                                    }
+                                    foreach ($materiasGrupoUi as $fid => $fnome):
+                                    ?>
+                                        <label class="inline-flex items-center gap-2 text-sm">
+                                            <input type="checkbox" name="grupo_materias[]" class="js-grupo-materia rounded border-gray-300 text-indigo-600" value="<?= $fid ?>"<?= !empty($agruparMateriasIds[$fid]) ? ' checked' : '' ?>>
+                                            <?= htmlspecialchars($fnome, ENT_QUOTES, 'UTF-8') ?>
+                                        </label>
+                                    <?php endforeach; ?>
+                                    <?php if ($materiasGrupoUi === []): ?>
+                                        <p class="text-xs text-gray-500">Cadastre áreas pai/filhos em Componentes Curriculares.</p>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="text-xs font-medium text-gray-600">Como juntar as notas dessas matérias</span>
+                                <div class="mt-1 flex flex-wrap gap-3 text-sm">
+                                    <label class="inline-flex items-center gap-1.5"><input type="radio" name="grupo_modo" value="media"<?= $agruparModo !== 'soma' ? ' checked' : '' ?>> Média</label>
+                                    <label class="inline-flex items-center gap-1.5"><input type="radio" name="grupo_modo" value="soma"<?= $agruparModo === 'soma' ? ' checked' : '' ?>> Soma</label>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="text-xs font-medium text-gray-600">Arredondamento da área</span>
+                                <div class="mt-1 space-y-1.5 text-sm">
+                                    <label class="flex items-start gap-2"><input type="radio" name="grupo_arred" value="todos" class="mt-0.5"<?= $agruparArred === 'todos' ? ' checked' : '' ?>><span><strong>Todos</strong><span class="block text-xs text-gray-600 font-normal">Filhas e linha-mãe.</span></span></label>
+                                    <label class="flex items-start gap-2"><input type="radio" name="grupo_arred" value="filhas" class="mt-0.5"<?= $agruparArred === 'filhas' ? ' checked' : '' ?>><span><strong>Só filhas</strong><span class="block text-xs text-gray-600 font-normal">Arredonda as matérias; a mãe fica com a média/soma exata.</span></span></label>
+                                    <label class="flex items-start gap-2"><input type="radio" name="grupo_arred" value="mae" class="mt-0.5"<?= $agruparArred === 'mae' ? ' checked' : '' ?>><span><strong>Só mãe</strong><span class="block text-xs text-gray-600 font-normal">Filhas sem arredondamento especial; só a linha-mãe arredonda.</span></span></label>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="text-xs font-medium text-gray-600">Onde essa linha única aparece</span>
+                                <div class="mt-2 space-y-2">
+                                    <label class="flex items-start gap-2 text-sm text-gray-800"><input type="radio" name="grupo_aplicar" value="boletim" class="mt-0.5"<?= $agruparAplicar !== 'ambos' ? ' checked' : '' ?>><span><strong>Só no boletim</strong><span class="block text-xs text-gray-600 font-normal">Nas notas, as matérias continuam em linhas separadas.</span></span></label>
+                                    <label class="flex items-start gap-2 text-sm text-gray-800"><input type="radio" name="grupo_aplicar" value="ambos" class="mt-0.5"<?= $agruparAplicar === 'ambos' ? ' checked' : '' ?>><span><strong>No boletim e nas notas</strong><span class="block text-xs text-gray-600 font-normal">Junta as matérias nos dois lugares.</span></span></label>
+                                </div>
+                            </div>
+                            <details class="text-xs text-gray-600">
+                                <summary class="cursor-pointer">Nome da linha (avançado)</summary>
+                                <div class="mt-2">
+                                    <label class="text-xs text-gray-600" for="grupo_nome">Nome da linha</label>
+                                    <input id="grupo_nome" name="grupo_nome" type="text" maxlength="80"
+                                           class="mt-1 w-full h-10 border rounded-lg px-3 text-sm"
+                                           placeholder="Biologia"
+                                           value="<?= htmlspecialchars((string) ($agruparGrupo['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                                </div>
+                            </details>
+                            <label class="inline-flex items-start gap-2 text-sm text-gray-800">
+                                <input type="checkbox" name="grupo_exemplo_sem_filhas" value="1" class="mt-0.5 rounded border-gray-300 text-indigo-600"<?= !empty($agruparGrupo['exemplo_sem_filhas']) ? ' checked' : '' ?>>
+                                <span>Exibir só a linha-mãe, sem as matérias filhas (detalhe do aluno, PDF e portal).</span>
+                            </label>
+                        </div>
+                    <?php endif; ?>
                 </div>
                 </div>
             </div>
@@ -730,7 +910,7 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
         return null;
     }
     function pintarResumoPar(card) {
-        var campos = card.querySelector('.js-par-campos');
+        var campos = camposDoPar(card) || card.querySelector('.js-par-campos');
         var titulo = card.querySelector('.js-par-titulo');
         var resumo = card.querySelector('.js-par-resumo');
         if (!campos || !titulo || !resumo) return;
@@ -751,6 +931,231 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
         partes.push(nomeProf || (professorOpcional() ? 'Sem professor' : 'Professor não definido'));
         partes.push(turmas.length ? turmas.join(', ') : 'Nenhuma turma');
         resumo.textContent = partes.join(' · ');
+    }
+    function materiaCatalogoPorId(id) {
+        id = parseInt(id, 10) || 0;
+        if (id <= 0) return null;
+        return (catalogo.materias || []).filter(function (m) { return Number(m.id) === id; })[0] || null;
+    }
+    function familiasCatalogo() {
+        if ((catalogo.familias || []).length) return catalogo.familias;
+        var porPai = {};
+        (catalogo.materias || []).forEach(function (m) {
+            var pai = parseInt(m.pai_id || 0, 10);
+            if (pai <= 0) return;
+            if (!porPai[pai]) {
+                porPai[pai] = {
+                    pai_id: pai,
+                    nome: String(m.pai_nome || '').trim() || ('Área #' + pai),
+                    filhos: [],
+                    materias_ids: []
+                };
+            }
+            porPai[pai].filhos.push({ id: Number(m.id), nome: String(m.nome || '') });
+            porPai[pai].materias_ids.push(Number(m.id));
+        });
+        return Object.keys(porPai).map(function (k) { return porPai[k]; })
+            .filter(function (f) { return (f.filhos || []).length >= 2; });
+    }
+    function familiaPorPai(paiId) {
+        paiId = parseInt(paiId, 10) || 0;
+        return familiasCatalogo().filter(function (f) { return Number(f.pai_id) === paiId; })[0] || null;
+    }
+    var assinaturaFamiliasPares = '';
+    var modoGrupoPadrao = <?= json_encode($agruparModo === 'soma' ? 'soma' : 'media') ?>;
+    function modoDaFamiliaCard(wrap) {
+        var marcado = wrap ? wrap.querySelector('.js-familia-modo:checked') : null;
+        return marcado && marcado.value === 'soma' ? 'soma' : 'media';
+    }
+    function aplicarModoNoAgrupar(modo) {
+        modo = modo === 'soma' ? 'soma' : 'media';
+        document.querySelectorAll('input[name="grupo_modo"]').forEach(function (el) {
+            el.checked = el.value === modo;
+        });
+    }
+    function sincronizarAgruparComFamilias(familiasAtivas, forcar) {
+        var ativo = document.getElementById('grupo_ativo');
+        if (!ativo || !familiasAtivas.length) return;
+        var assinatura = familiasAtivas.map(function (f) { return String(f.pai_id); }).sort().join(',');
+        if (!forcar && assinatura === assinaturaFamiliasPares) return;
+        assinaturaFamiliasPares = assinatura;
+        ativo.checked = true;
+        ativo.dispatchEvent(new Event('change', { bubbles: true }));
+        var primeira = familiasAtivas[0];
+        var wrap = document.querySelector('.js-familia-card[data-pai-id="' + primeira.pai_id + '"]');
+        aplicarModoNoAgrupar(modoDaFamiliaCard(wrap) || modoGrupoPadrao);
+        var radio = document.querySelector('.js-grupo-familia[value="' + primeira.pai_id + '"]');
+        if (radio) {
+            radio.checked = true;
+            radio.dispatchEvent(new Event('change', { bubbles: true }));
+        } else {
+            var ids = {};
+            (primeira.materias_ids || []).forEach(function (id) { ids[Number(id)] = true; });
+            document.querySelectorAll('.js-grupo-materia').forEach(function (cb) {
+                cb.checked = !!ids[parseInt(cb.value, 10) || 0];
+            });
+            var nome = document.getElementById('grupo_nome');
+            if (nome) nome.value = String(primeira.nome || '');
+        }
+    }
+    function tituloSalvoDaFamilia(paiId) {
+        var mapa = (catalogo && catalogo.familias_titulo) || {};
+        var cfg = mapa[paiId] || mapa[String(paiId)] || null;
+        if (!cfg || typeof cfg !== 'object') return { ativo: false, modo: modoGrupoPadrao };
+        return {
+            ativo: !!cfg.ativo,
+            modo: cfg.modo === 'soma' ? 'soma' : 'media'
+        };
+    }
+    function organizarFamiliasPares(box) {
+        if (!box) return;
+        var lista = box.querySelector('.js-pares');
+        if (!lista) return;
+        var modosSalvos = {};
+        var titulosSalvos = {};
+        Array.from(lista.querySelectorAll('.js-familia-card')).forEach(function (wrap) {
+            var pai = parseInt(wrap.getAttribute('data-pai-id') || '0', 10);
+            if (pai <= 0) return;
+            modosSalvos[pai] = modoDaFamiliaCard(wrap);
+            var chkTitulo = wrap.querySelector('.js-familia-titulo');
+            titulosSalvos[pai] = !!(chkTitulo && chkTitulo.checked);
+        });
+        // Desfaz wraps anteriores.
+        Array.from(lista.querySelectorAll(':scope > .js-familia-card')).forEach(function (wrap) {
+            var filhasBox = wrap.querySelector('.js-familia-filhas');
+            Array.from((filhasBox || wrap).querySelectorAll('.js-par')).forEach(function (card) {
+                lista.insertBefore(card, wrap);
+            });
+            wrap.remove();
+        });
+        var cards = Array.from(lista.querySelectorAll(':scope > .js-par'));
+        var porPai = {};
+        cards.forEach(function (card) {
+            var campos = camposDoPar(card);
+            var mid = campos ? parseInt((campos.querySelector('.js-mat') || {}).value || '0', 10) : 0;
+            var mat = materiaCatalogoPorId(mid);
+            var pai = mat ? parseInt(mat.pai_id || 0, 10) : 0;
+            if (pai <= 0) return;
+            if (!porPai[pai]) porPai[pai] = [];
+            porPai[pai].push(card);
+        });
+        var familiasAtivas = [];
+        Object.keys(porPai).forEach(function (paiKey) {
+            var grupo = porPai[paiKey];
+            if (grupo.length < 2) return;
+            var paiId = parseInt(paiKey, 10);
+            var fam = familiaPorPai(paiId) || {
+                pai_id: paiId,
+                nome: (materiaCatalogoPorId((camposDoPar(grupo[0]).querySelector('.js-mat') || {}).value) || {}).pai_nome || 'Área',
+                materias_ids: [],
+                filhos: []
+            };
+            var nomesFilhas = grupo.map(function (card) {
+                var campos = camposDoPar(card);
+                var sel = campos ? campos.querySelector('.js-mat') : null;
+                return sel && sel.value ? ((sel.selectedOptions[0] || {}).textContent || '').trim() : '';
+            }).filter(Boolean);
+            var salvoTitulo = tituloSalvoDaFamilia(paiId);
+            var modoAtual = modosSalvos[paiId] || salvoTitulo.modo || modoGrupoPadrao;
+            var tituloAtivo = Object.prototype.hasOwnProperty.call(titulosSalvos, paiId)
+                ? !!titulosSalvos[paiId]
+                : !!salvoTitulo.ativo;
+            var wrap = document.createElement('div');
+            wrap.className = 'js-familia-card rounded-xl border-2 border-indigo-200 bg-indigo-50/50 p-3 space-y-2';
+            wrap.setAttribute('data-pai-id', String(paiId));
+            wrap.innerHTML =
+                '<div class="flex flex-wrap items-center justify-between gap-3">'
+                    + '<div class="min-w-0">'
+                        + '<p class="text-sm font-semibold text-gray-900">' + esc(fam.nome || 'Área') + '</p>'
+                        + '<p class="text-xs text-gray-600 mt-0.5">' + esc(nomesFilhas.join(' · ')) + '</p>'
+                    + '</div>'
+                    + '<div class="flex flex-wrap items-center gap-3">'
+                        + '<span class="inline-flex items-center gap-3 text-sm text-gray-800">'
+                            + '<label class="inline-flex items-center gap-1.5 cursor-pointer">'
+                                + '<input type="radio" class="js-familia-modo" name="familia_modo[' + paiId + ']" value="media"'
+                                + (modoAtual !== 'soma' ? ' checked' : '') + '> Média</label>'
+                            + '<label class="inline-flex items-center gap-1.5 cursor-pointer">'
+                                + '<input type="radio" class="js-familia-modo" name="familia_modo[' + paiId + ']" value="soma"'
+                                + (modoAtual === 'soma' ? ' checked' : '') + '> Soma</label>'
+                        + '</span>'
+                        + '<label class="inline-flex items-center gap-1.5 text-sm text-indigo-900 cursor-pointer" title="Cria a linha-mãe no boletim (ex.: Matemática) com as filhas embaixo">'
+                            + '<input type="checkbox" class="js-familia-titulo rounded border-gray-300 text-indigo-600" name="familia_titulo[]" value="' + paiId + '"'
+                            + (tituloAtivo ? ' checked' : '') + '>'
+                            + '<span class="font-medium">Título no boletim</span>'
+                        + '</label>'
+                        + '<span class="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-1 text-[11px] font-semibold text-indigo-800">Agrupado</span>'
+                    + '</div>'
+                + '</div>'
+                + '<div class="js-familia-filhas space-y-2"></div>';
+            var filhasBox = wrap.querySelector('.js-familia-filhas');
+            lista.insertBefore(wrap, grupo[0]);
+            grupo.forEach(function (card) {
+                card.classList.add('border-indigo-100', 'shadow-sm');
+                filhasBox.appendChild(card);
+            });
+            function sincronizarFamiliaNoAgrupar() {
+                aplicarModoNoAgrupar(modoDaFamiliaCard(wrap));
+                var ids = {};
+                (fam.materias_ids || []).forEach(function (id) { ids[Number(id)] = true; });
+                if (!Object.keys(ids).length) {
+                    grupo.forEach(function (card) {
+                        var campos = camposDoPar(card);
+                        var mid = campos ? parseInt((campos.querySelector('.js-mat') || {}).value || '0', 10) : 0;
+                        if (mid > 0) ids[mid] = true;
+                    });
+                }
+                var famRadio = document.querySelector('.js-grupo-familia[value="' + paiId + '"]');
+                if (famRadio) {
+                    famRadio.checked = true;
+                    famRadio.dispatchEvent(new Event('change', { bubbles: true }));
+                } else {
+                    document.querySelectorAll('.js-grupo-materia').forEach(function (cb) {
+                        cb.checked = !!ids[parseInt(cb.value, 10) || 0];
+                    });
+                    var nome = document.getElementById('grupo_nome');
+                    if (nome) nome.value = String(fam.nome || '');
+                }
+                var ativo = document.getElementById('grupo_ativo');
+                var temTitulo = !!wrap.querySelector('.js-familia-titulo:checked')
+                    || !!document.querySelector('.js-familia-titulo:checked');
+                if (ativo) {
+                    ativo.checked = temTitulo || ativo.checked;
+                    ativo.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (!catalogo.familias_titulo || typeof catalogo.familias_titulo !== 'object') {
+                    catalogo.familias_titulo = {};
+                }
+                catalogo.familias_titulo[paiId] = {
+                    ativo: !!wrap.querySelector('.js-familia-titulo:checked'),
+                    modo: modoDaFamiliaCard(wrap)
+                };
+            }
+            wrap.querySelectorAll('.js-familia-modo').forEach(function (radio) {
+                radio.addEventListener('change', function () {
+                    if (!radio.checked) return;
+                    sincronizarFamiliaNoAgrupar();
+                });
+            });
+            var chkTituloEl = wrap.querySelector('.js-familia-titulo');
+            if (chkTituloEl) {
+                chkTituloEl.addEventListener('change', sincronizarFamiliaNoAgrupar);
+            }
+            familiasAtivas.push({
+                pai_id: paiId,
+                nome: fam.nome || '',
+                materias_ids: (fam.materias_ids && fam.materias_ids.length)
+                    ? fam.materias_ids
+                    : grupo.map(function (card) {
+                        var campos = camposDoPar(card);
+                        return campos ? parseInt((campos.querySelector('.js-mat') || {}).value || '0', 10) : 0;
+                    }).filter(function (n) { return n > 0; })
+            });
+        });
+        if (familiasAtivas.length) {
+            sincronizarAgruparComFamilias(familiasAtivas);
+        } else {
+            assinaturaFamiliasPares = '';
+        }
     }
     function guardarDisciplina() {
         if (!parAberto) return;
@@ -840,6 +1245,7 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
             var sel = campos ? campos.querySelector('.js-prof') : null;
             preencherProfessores(sel, this.value, sel ? sel.value : '');
             pintarResumoPar(card);
+            organizarFamiliasPares(row);
         });
         card.querySelector('.js-editar-par').addEventListener('click', function () { abrirDisciplina(card); });
         card.querySelector('.js-remover-par').addEventListener('click', function () {
@@ -851,6 +1257,7 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
                 fecharDisciplina();
             }
             card.remove();
+            organizarFamiliasPares(row);
         });
         card.querySelector('.js-marcar-turmas').addEventListener('click', function () {
             var campos = camposDoPar(card);
@@ -860,6 +1267,7 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
         row.querySelector('.js-pares').appendChild(card);
         atualizarParesUi();
         pintarResumoPar(card);
+        organizarFamiliasPares(row);
         if (abrir) abrirDisciplina(card);
     }
     function lerPares(row) {
@@ -2365,6 +2773,8 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
                     ? 'A escola lança a nota. O professor é opcional.'
                     : 'O resumo fica aqui. No painel, professor e disciplina se filtram um pelo outro.');
         });
+        var boxPadrao = document.getElementById('pares-padrao');
+        if (boxPadrao) organizarFamiliasPares(boxPadrao);
     }
 
     function sync() {
@@ -2724,5 +3134,38 @@ $ui_wizard_nav_id = 'evento-wizard-steps';
     }
 
     carregar();
+})();
+</script>
+<script>
+(function () {
+    var ativo = document.getElementById('grupo_ativo');
+    var opcoes = document.getElementById('grupo-linha-opcoes');
+    var nome = document.getElementById('grupo_nome');
+    if (!ativo || !opcoes) return;
+
+    function syncAtivo() {
+        opcoes.classList.toggle('hidden', !ativo.checked);
+    }
+    ativo.addEventListener('change', syncAtivo);
+    syncAtivo();
+
+    document.querySelectorAll('.js-grupo-familia').forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            if (!radio.checked) return;
+            var ids = String(radio.getAttribute('data-ids') || '').split(',').map(function (v) {
+                return parseInt(v, 10) || 0;
+            }).filter(function (n) { return n > 0; });
+            var set = {};
+            ids.forEach(function (id) { set[id] = true; });
+            document.querySelectorAll('.js-grupo-materia').forEach(function (cb) {
+                cb.checked = !!set[parseInt(cb.value, 10) || 0];
+            });
+            if (nome && !String(nome.value || '').trim()) {
+                nome.value = String(radio.getAttribute('data-nome') || '');
+            } else if (nome) {
+                nome.value = String(radio.getAttribute('data-nome') || nome.value || '');
+            }
+        });
+    });
 })();
 </script>

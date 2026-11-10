@@ -15,8 +15,8 @@ if ($periodos === []) {
         ?>
         <section class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-100">
-                <h2 class="text-lg font-semibold text-gray-900"><?= htmlspecialchars((string) ($periodo['titulo'] ?? 'Notas'), ENT_QUOTES, 'UTF-8') ?></h2>
-                <p class="text-sm text-gray-500 mt-1">Notas já lançadas. A média deste período aparece quando o boletim for gerado.</p>
+                <h2 class="text-lg font-semibold text-gray-900"><?= htmlspecialchars((string) ($periodo['titulo'] ?? 'Demonstrativo de notas'), ENT_QUOTES, 'UTF-8') ?></h2>
+                <p class="text-sm text-gray-500 mt-1">Quadro ao vivo: cada prova lançada aparece aqui. O boletim oficial é outra aba e só muda quando for gerado.</p>
             </div>
             <?php if ($linhas === []): ?>
                 <p class="px-6 py-5 text-sm text-gray-500">Nenhuma nota lançada ainda.</p>

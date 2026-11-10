@@ -435,6 +435,27 @@ class ExamBlockManualGrade
                 );
             }
 
+            // Campo vazio = sem lançamento (traço no boletim). Não grava linha com nota NULL.
+            // Zero só permanece se o professor digitou 0 de propósito.
+            if ($notaNova === null && $obsNova === null) {
+                if (isset($atuais[$chave])) {
+                    $this->db->query(
+                        'DELETE FROM provas_blocos_notas_lancadas
+                          WHERE bloco_id = :bloco_id AND professor_id = :professor_id
+                            AND materia_id = :materia_id AND turma_id = :turma_id AND aluno_id = :aluno_id',
+                        [
+                            'bloco_id' => $blocoId,
+                            'professor_id' => $professorId,
+                            'materia_id' => $materiaId,
+                            'turma_id' => $tid,
+                            'aluno_id' => $aid,
+                        ]
+                    );
+                }
+                $alunosFechar[$aid] = $tid;
+                continue;
+            }
+
             $this->db->query(
                 'INSERT INTO provas_blocos_notas_lancadas (bloco_id, professor_id, materia_id, turma_id, aluno_id, nota, observacao)
                  VALUES (:bloco_id, :professor_id, :materia_id, :turma_id, :aluno_id, :nota, :observacao)

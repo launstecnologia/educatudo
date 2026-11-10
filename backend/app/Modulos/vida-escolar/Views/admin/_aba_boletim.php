@@ -23,9 +23,11 @@ if ($periodosQuadro === []) {
 $rotuloPeriodoCampo = mb_strtolower((string) ($infoPeriodo['rotulo_campo'] ?? 'bimestre'), 'UTF-8');
 $fichas = is_array($fichas ?? null) ? $fichas : [];
 $somenteLeitura = !empty($boletim_somente_leitura);
-$editavelFicha = !$somenteLeitura && $ficha && ($ficha['status'] ?? '') !== 'homologada';
+$notasSomenteLeitura = $somenteLeitura || !empty($boletim_notas_somente_leitura);
+$editavelFicha = !$notasSomenteLeitura && $ficha && ($ficha['status'] ?? '') !== 'homologada';
 $fichaHomologada = (bool) $ficha && ($ficha['status'] ?? '') === 'homologada';
-$podeAlterarBoletim = !$somenteLeitura && !empty($admin_permissions['vida_escolar']['alterar']);
+$podeAlterarBoletim = !$notasSomenteLeitura && !empty($admin_permissions['vida_escolar']['alterar']);
+$podeObsBoletim = !$somenteLeitura;
 $rotuloStatusFicha = [
     'homologada' => 'Homologada',
     'em_curso' => 'Em curso',
@@ -49,6 +51,18 @@ $layoutFormula = (string) ($layoutExibicao['formula_final_media'] ?? '');
 $layoutNome = trim((string) ($layoutExibicao['nome'] ?? ''));
 $escalaNota = (string) ($quadro['escala_nota'] ?? ($layoutExibicao['escala'] ?? '10'));
 $escalaMax = \App\Modulos\RegrasAcademicas\Services\EscalaNota::maximo($escalaNota);
+$quadroImpressaoHtml = trim((string) ($quadro_impressao_html ?? ''));
+$usarQuadroImpressaoPronto = $quadroImpressaoHtml !== '' && stripos($quadroImpressaoHtml, '<table') !== false;
+$moduloEventosAvaliativos = class_exists(\App\Core\LayoutHelper::class)
+    && \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos');
+// Quadro do assistente sobe via AJAX (montagem pesada); placeholder evita cair no Quadro SM.
+$quadroImpressaoLazy = !$usarQuadroImpressaoPronto
+    && $moduloEventosAvaliativos
+    && is_array($ficha)
+    && (int) ($ficha['id'] ?? $ficha_id ?? 0) > 0;
+$usarQuadroImpressao = $usarQuadroImpressaoPronto || $quadroImpressaoLazy;
+$alunoIdQuadro = (int) ($aluno_id ?? $student['id'] ?? 0);
+$fichaIdQuadro = (int) ($ficha['id'] ?? $ficha_id ?? 0);
 $fmtNota = static function ($c): string {
     if (!is_array($c)) {
         return '—';
@@ -62,20 +76,51 @@ $fmtNota = static function ($c): string {
     return number_format((float) $c['nota'], 1, ',', '');
 };
 ?>
-<?php if ($fichas !== []): ?>
-<div class="mb-4 flex flex-wrap gap-2">
+<?php if (count($fichas) > 1): ?>
+<div class="mb-4 border-b border-gray-200">
+    <nav class="flex flex-wrap gap-1 -mb-px" aria-label="Boletins do aluno">
     <?php foreach ($fichas as $f): ?>
-        <?php $pillComLink = !$somenteLeitura || (isset($hrefAba) && is_callable($hrefAba)); ?>
+        <?php
+            $fichaAtiva = (int) $ficha_id === (int) ($f['id'] ?? 0);
+            $abaRotulo = trim((string) ($f['aba_rotulo'] ?? ''));
+            if ($abaRotulo === '') {
+                $abaRotulo = trim((string) (($f['ano_letivo'] ?? '') . ' · ' . ($f['turma_nome'] ?? 'turma')));
+            }
+            $ehExtra = (($f['boletim_finalidade'] ?? '') === 'complementar')
+                || (($f['curso_tipo'] ?? '') === 'extra');
+            $pillComLink = !$somenteLeitura || (isset($hrefAba) && is_callable($hrefAba));
+            $hrefFicha = isset($hrefAba) && is_callable($hrefAba)
+                ? $hrefAba('boletim', ['ficha_id' => (int) $f['id']])
+                : ($base . '?aba=boletim&ficha_id=' . (int) $f['id']);
+            $classeAba = $fichaAtiva
+                ? 'border-primary text-primary'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300';
+        ?>
         <?php if (!$pillComLink): ?>
-        <span class="px-3 py-1.5 rounded-full text-xs font-medium <?= (int) $ficha_id === (int) $f['id'] ? 'bg-primary text-white' : 'bg-slate-100 text-slate-700' ?>">
+        <span class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 <?= $classeAba ?>">
         <?php else: ?>
-        <a href="<?= isset($hrefAba) && is_callable($hrefAba) ? $esc($hrefAba('boletim', ['ficha_id' => (int) $f['id']])) : ($base . '?aba=boletim&amp;ficha_id=' . (int) $f['id']) ?>"
-           class="px-3 py-1.5 rounded-full text-xs font-medium <?= (int) $ficha_id === (int) $f['id'] ? 'bg-primary text-white' : 'bg-slate-100 text-slate-700' ?>">
+        <a href="<?= $esc($hrefFicha) ?>"
+           class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 <?= $classeAba ?>"
+           <?= $fichaAtiva ? 'aria-current="page"' : '' ?>>
         <?php endif; ?>
-            <?= (int) $f['ano_letivo'] ?> · <?= $esc($f['turma_nome'] ?? 'turma') ?> · <?= $esc($rotuloStatusFicha[(string) ($f['status'] ?? '')] ?? ($f['status'] ?? '')) ?>
+            <span><?= $esc($abaRotulo) ?></span>
+            <?php if ($ehExtra): ?>
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide <?= $fichaAtiva ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600' ?>">Extra</span>
+            <?php endif; ?>
+            <span class="text-xs <?= $fichaAtiva ? 'text-primary/70' : 'text-gray-400' ?>"><?= (int) ($f['ano_letivo'] ?? 0) ?></span>
         <?php if (!$pillComLink): ?></span><?php else: ?></a><?php endif; ?>
     <?php endforeach; ?>
+    </nav>
 </div>
+<?php elseif (count($fichas) === 1): ?>
+<?php
+    $fUnica = $fichas[0];
+    $rotuloUnico = trim((string) ($fUnica['aba_rotulo'] ?? ''));
+    if ($rotuloUnico === '') {
+        $rotuloUnico = trim((string) (($fUnica['turma_nome'] ?? 'turma')));
+    }
+?>
+<p class="mb-3 text-xs text-gray-500"><?= $esc($rotuloUnico) ?> · <?= (int) ($fUnica['ano_letivo'] ?? 0) ?></p>
 <?php endif; ?>
 
 <div class="bg-white rounded-xl shadow-lg p-6">
@@ -89,13 +134,17 @@ $fmtNota = static function ($c): string {
                 } else {
                     echo 'Conforme o modelo de boletim oficial da turma. ';
                 }
-                if ($layoutFaixas !== []) {
+                if ($usarQuadroImpressao) {
+                    echo 'Mesmo layout do boletim criado (médias e faltas por período). ';
+                } elseif ($layoutFaixas !== []) {
                     echo 'As colunas seguem o layout deste boletim. ';
                 } else {
                     echo 'Cada ' . $esc($rotuloPeriodoCampo) . ': nota à esquerda, falta à direita. ';
                 }
-            ?><span class="text-violet-700">¹</span> = escola anterior.</p>
-            <?php if ($fichaHomologada && !$somenteLeitura): ?>
+            ?><?php if (!$usarQuadroImpressao): ?><span class="text-violet-700">¹</span> = escola anterior.<?php endif; ?></p>
+            <?php if ($notasSomenteLeitura && !$somenteLeitura): ?>
+            <p class="mt-2 text-sm text-slate-600">Notas somente leitura. Para registrar comentário use a observação abaixo.</p>
+            <?php elseif ($fichaHomologada && !$somenteLeitura): ?>
             <p class="mt-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Boletim homologado — notas travadas. Para corrigir, reabra o período abaixo (motivo obrigatório; fica na auditoria).</p>
             <?php elseif ($fichaHomologada): ?>
             <p class="mt-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Boletim homologado.</p>
@@ -103,10 +152,12 @@ $fmtNota = static function ($c): string {
         </div>
         <?php if (!$somenteLeitura): ?>
         <div class="flex flex-wrap gap-2">
+            <?php if (!$notasSomenteLeitura): ?>
             <form method="post" action="<?= $base ?>/garantir">
                 <input type="hidden" name="_token" value="<?= $esc($token) ?>">
                 <button class="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium hover:bg-gray-50">Criar ficha do ano</button>
             </form>
+            <?php endif; ?>
             <?php if ($ficha): ?>
             <a href="<?= $base ?>/pdf?ficha_id=<?= (int) $ficha['id'] ?>" download class="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium hover:bg-gray-50">Baixar boletim (PDF)</a>
             <?php endif; ?>
@@ -122,10 +173,192 @@ $fmtNota = static function ($c): string {
         <?php endif; ?>
     </div>
 
-    <?php if (!$quadro): ?>
+    <?php if (!$quadro && !$usarQuadroImpressao): ?>
         <p class="text-sm text-gray-500"><?= $somenteLeitura ? 'Nenhum boletim disponível.' : 'Nenhuma ficha neste ano. Vincule o aluno a uma turma ou clique em “Criar ficha do ano”.' ?></p>
     <?php else: ?>
-        <?php if ($layoutFaixas !== []): ?>
+        <?php if ($usarQuadroImpressao): ?>
+        <div class="ve-boletim-zoom mb-2 flex flex-wrap items-center gap-2 <?= $quadroImpressaoLazy ? 'hidden' : '' ?>" data-ve-boletim-zoom>
+            <span class="text-xs text-gray-500 mr-1">Zoom do boletim</span>
+            <button type="button" data-ve-boletim-zoom-out
+                    class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                    title="Diminuir" aria-label="Diminuir zoom">
+                <i class="fa-solid fa-magnifying-glass-minus text-sm" aria-hidden="true"></i>
+            </button>
+            <span class="min-w-[3.25rem] text-center text-xs font-semibold text-gray-700 tabular-nums" data-ve-boletim-zoom-label>100%</span>
+            <button type="button" data-ve-boletim-zoom-in
+                    class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                    title="Ampliar" aria-label="Ampliar zoom">
+                <i class="fa-solid fa-magnifying-glass-plus text-sm" aria-hidden="true"></i>
+            </button>
+            <button type="button" data-ve-boletim-zoom-fit
+                    class="inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50"
+                    title="Ajustar à largura da tela">
+                <i class="fa-solid fa-expand text-xs" aria-hidden="true"></i>
+                Caber na tela
+            </button>
+        </div>
+        <div class="ve-boletim-fit w-full overflow-auto border border-gray-200 rounded-lg bg-white max-h-[70vh]"
+             data-ve-boletim-fit
+             data-ve-quadro-lazy="<?= $quadroImpressaoLazy ? '1' : '0' ?>"
+             data-ve-quadro-loaded="<?= $usarQuadroImpressaoPronto ? '1' : '0' ?>"
+             data-aluno-id="<?= $alunoIdQuadro ?>"
+             data-ficha-id="<?= $fichaIdQuadro ?>">
+            <div data-ve-boletim-fit-scroll>
+                <div class="ve-boletim-fit-scale origin-top-left inline-block" data-ve-boletim-fit-scale>
+                    <?php if ($quadroImpressaoLazy): ?>
+                    <div class="p-8 text-center text-slate-500 text-sm" data-ve-quadro-loading>
+                        <i class="fa-solid fa-spinner fa-spin mr-2" aria-hidden="true"></i>
+                        Carregando boletim…
+                    </div>
+                    <?php else: ?>
+                    <?= $quadroImpressaoHtml ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        <style>
+            [data-ve-boletim-fit] .boletim-quadro-tabela,
+            [data-ve-boletim-fit] table {
+                font-size: 11px !important;
+            }
+            [data-ve-boletim-fit] th,
+            [data-ve-boletim-fit] td {
+                padding: 3px 4px !important;
+                white-space: nowrap;
+            }
+            [data-ve-boletim-fit] .overflow-x-auto {
+                overflow: visible !important;
+            }
+        </style>
+        <script>
+        function initVeBoletimZoom() {
+            var root = document.querySelector('[data-ve-boletim-fit]');
+            var bar = document.querySelector('[data-ve-boletim-zoom]');
+            if (!root || !bar || root.getAttribute('data-ve-zoom-ready') === '1') return;
+            var scrollBox = root.querySelector('[data-ve-boletim-fit-scroll]');
+            var inner = root.querySelector('[data-ve-boletim-fit-scale]');
+            var label = bar.querySelector('[data-ve-boletim-zoom-label]');
+            var btnIn = bar.querySelector('[data-ve-boletim-zoom-in]');
+            var btnOut = bar.querySelector('[data-ve-boletim-zoom-out]');
+            var btnFit = bar.querySelector('[data-ve-boletim-zoom-fit]');
+            if (!inner || !scrollBox) return;
+            if (!inner.querySelector('table')) return;
+
+            root.setAttribute('data-ve-zoom-ready', '1');
+            bar.classList.remove('hidden');
+
+            var fitScale = 1;
+            var naturalW = 0;
+            var naturalH = 0;
+            var userScale = null;
+            var passo = 0.1;
+            var minZoom = 0.35;
+            var maxZoom = 2.5;
+
+            var medirNatural = function () {
+                inner.style.transform = 'none';
+                scrollBox.style.width = 'auto';
+                scrollBox.style.height = 'auto';
+                naturalW = Math.max(inner.scrollWidth || 0, inner.offsetWidth || 0);
+                naturalH = Math.max(inner.scrollHeight || 0, inner.offsetHeight || 0);
+                var disponivel = root.clientWidth || root.offsetWidth || 0;
+                if (disponivel <= 0 || naturalW <= 0) {
+                    fitScale = 1;
+                    return;
+                }
+                fitScale = Math.min(1, disponivel / naturalW);
+                if (fitScale < minZoom) fitScale = minZoom;
+            };
+
+            var aplicar = function () {
+                medirNatural();
+                var escala = userScale === null ? fitScale : userScale;
+                escala = Math.max(minZoom, Math.min(maxZoom, escala));
+                inner.style.transformOrigin = 'top left';
+                inner.style.transform = (escala >= 0.999 && escala <= 1.001) ? '' : ('scale(' + escala + ')');
+                var visW = Math.ceil(naturalW * escala);
+                var visH = Math.ceil(naturalH * escala);
+                scrollBox.style.width = visW > 0 ? visW + 'px' : 'auto';
+                scrollBox.style.height = visH > 0 ? visH + 'px' : 'auto';
+                if (label) label.textContent = Math.round(escala * 100) + '%';
+            };
+
+            var zoomPor = function (delta) {
+                medirNatural();
+                var base = userScale === null ? fitScale : userScale;
+                userScale = Math.max(minZoom, Math.min(maxZoom, Math.round((base + delta) * 100) / 100));
+                aplicar();
+            };
+
+            if (btnIn) btnIn.addEventListener('click', function () { zoomPor(passo); });
+            if (btnOut) btnOut.addEventListener('click', function () { zoomPor(-passo); });
+            if (btnFit) btnFit.addEventListener('click', function () {
+                userScale = null;
+                aplicar();
+            });
+
+            aplicar();
+            if (typeof ResizeObserver !== 'undefined') {
+                new ResizeObserver(function () {
+                    if (userScale === null) aplicar();
+                }).observe(root);
+            } else {
+                window.addEventListener('resize', function () {
+                    if (userScale === null) aplicar();
+                });
+            }
+            window.addEventListener('load', aplicar);
+            setTimeout(aplicar, 50);
+            setTimeout(aplicar, 250);
+        }
+
+        function carregarVeQuadroImpressaoSobDemanda() {
+            var root = document.querySelector('[data-ve-boletim-fit]');
+            if (!root || root.getAttribute('data-ve-quadro-lazy') !== '1') {
+                initVeBoletimZoom();
+                return;
+            }
+            if (root.getAttribute('data-ve-quadro-loaded') === '1') {
+                initVeBoletimZoom();
+                return;
+            }
+            var alunoId = parseInt(root.getAttribute('data-aluno-id') || '0', 10) || 0;
+            var fichaId = parseInt(root.getAttribute('data-ficha-id') || '0', 10) || 0;
+            var inner = root.querySelector('[data-ve-boletim-fit-scale]');
+            if (alunoId <= 0 || !inner) return;
+            root.setAttribute('data-ve-quadro-loaded', '1');
+            var url = <?= json_encode(URL . '/admin/students/', JSON_UNESCAPED_SLASHES) ?> + alunoId + '/tab/quadro-impressao';
+            if (fichaId > 0) url += '?ficha_id=' + fichaId;
+            fetch(url, { credentials: 'same-origin' })
+                .then(function (r) {
+                    if (!r.ok) { throw new Error('HTTP ' + r.status); }
+                    return r.text();
+                })
+                .then(function (html) {
+                    if (!html || html.indexOf('<table') === -1) {
+                        inner.innerHTML = '<p class="p-6 text-sm text-slate-500">Boletim de impressão indisponível para esta ficha.</p>';
+                        return;
+                    }
+                    inner.innerHTML = html;
+                    initVeBoletimZoom();
+                })
+                .catch(function () {
+                    root.setAttribute('data-ve-quadro-loaded', '0');
+                    inner.innerHTML = '<div class="p-6 text-center text-red-600 text-sm">Erro ao carregar boletim. <button type="button" class="underline" onclick="document.querySelector(\'[data-ve-boletim-fit]\').setAttribute(\'data-ve-quadro-loaded\',\'0\');carregarVeQuadroImpressaoSobDemanda();">Tentar novamente</button></div>';
+                });
+        }
+
+        if (document.querySelector('[data-ve-boletim-fit][data-ve-quadro-lazy="1"]')) {
+            // Só busca quando a subaba Boletim estiver visível (selecionarVeAba / init).
+            var painelBol = document.getElementById('ve-painel-boletim');
+            if (painelBol && !painelBol.classList.contains('hidden')) {
+                carregarVeQuadroImpressaoSobDemanda();
+            }
+        } else {
+            initVeBoletimZoom();
+        }
+        </script>
+        <?php elseif ($layoutFaixas !== []): ?>
         <?php
             $layoutCalc = new \App\Modulos\EventosAvaliativos\Models\BoletimLayout();
             $layoutColunas = 0;
@@ -326,7 +559,14 @@ $fmtNota = static function ($c): string {
         </div>
         <?php endif; ?>
 
-        <?php if ($somenteLeitura): ?>
+        <?php if ($podeObsBoletim): ?>
+            <?php
+            $obsPartial = \App\Core\ViewPaths::dominio('Pessoas', 'Views/admin/students/_bloco_observacao_boletim.php');
+            if (is_file($obsPartial)) {
+                include $obsPartial;
+            }
+            ?>
+        <?php else: ?>
             <?php $obsLeitura = trim((string) (($boletim_observacao['conteudo'] ?? '') ?: '')); ?>
             <?php if ($obsLeitura !== ''): ?>
             <div class="mt-6 rounded-xl border border-gray-200 bg-white p-5">
@@ -334,12 +574,7 @@ $fmtNota = static function ($c): string {
                 <p class="text-sm text-gray-800 whitespace-pre-wrap break-words"><?= $esc($obsLeitura) ?></p>
             </div>
             <?php endif; ?>
-        <?php else:
-            $obsPartial = \App\Core\ViewPaths::dominio('Pessoas', 'Views/admin/students/_bloco_observacao_boletim.php');
-            if (is_file($obsPartial)) {
-                include $obsPartial;
-            }
-        endif; ?>
+        <?php endif; ?>
 
         <?php if ($podeAlterarBoletim): ?>
         <div class="mt-6 grid grid-cols-1 <?= $editavelFicha ? 'lg:grid-cols-2' : '' ?> gap-4">

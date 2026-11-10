@@ -12,6 +12,7 @@ $csrf_token = $csrf_token ?? '';
 
 $page_header_title = 'Regras de Aprovação';
 $page_header_subtitle = 'Critérios de aprovação, recuperação e frequência. O boletim usa esta regra para definir a situação do aluno.';
+$page_header_icon = 'fa-solid fa-scale-balanced';
 $filtrosAtivos = 0;
 if ((int) ($filtros['ano_letivo'] ?? 0) > 0) {
     $filtrosAtivos++;

@@ -45,20 +45,16 @@ if ($anoSel <= 0 || !in_array($anoSel, array_map('intval', $anosLetivos), true))
 $regrasAcademicas = is_array($regras_academicas ?? null) ? $regras_academicas : [];
 $regraAcademicaId = (int) ($item['regra_academica_id'] ?? 0);
 $criterios = is_array($criterios ?? null) ? $criterios : ['nota_minima_aprovacao' => 6.0, 'round_mode' => 'none', 'decimal_places' => 2];
+$page_header_title = $ehEdicao ? 'Editar modelo de boletim' : 'Novo modelo de boletim';
+$page_header_subtitle = !empty($so_regra)
+    ? 'O demonstrativo só vincula uma regra de aprovação. Modelo, público, ativo e disciplinas ficam na regra.'
+    : 'Defina se é o oficial da vida escolar ou um extra, e quais disciplinas entram.';
+$page_header_icon = 'fa-solid fa-table-cells';
+$page_header_back_url = URL . '/admin/boletins';
+$page_header_back_label = 'Voltar';
+include __DIR__ . '/../../../../Views/admin/_partials/page_header_form.php';
+include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 ?>
-<div class="mb-8">
-    <div class="flex justify-between items-center">
-        <div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2"><?= $ehEdicao ? 'Editar modelo de boletim' : 'Novo modelo de boletim' ?></h2>
-            <p class="text-gray-600"><?= !empty($so_regra)
-                ? 'O demonstrativo só vincula uma regra de aprovação. Modelo, público, ativo e disciplinas ficam na regra.'
-                : 'Defina se é o oficial da vida escolar ou um extra, e quais disciplinas entram. A nota mínima vem da regra de aprovação. O cálculo das provas fica na Avaliação.' ?></p>
-        </div>
-        <a href="<?= URL ?>/admin/boletins" class="text-gray-600 hover:text-gray-900">← Voltar</a>
-    </div>
-</div>
-
-<?php include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php'; ?>
 
 <?php if (!$schemaPronto): ?>
 <div class="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-6">

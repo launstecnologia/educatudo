@@ -863,6 +863,96 @@ class StudentAdminController extends AdminBaseController
     }
 
     /**
+     * Fragmento HTML da subaba "Notas" (demonstrativo) do Detalhe do Aluno.
+     * Carregado sob demanda para não atrasar a abertura da ficha (~4s com simulação).
+     */
+    public function notasTabFragment($id)
+    {
+        $user = $this->auth->getUser();
+        if (!$user) {
+            http_response_code(403);
+            exit;
+        }
+
+        $id = (int) $id;
+        $aluno = $this->db->fetch('SELECT id FROM alunos WHERE id = :id', ['id' => $id]);
+        if (!$aluno) {
+            http_response_code(404);
+            exit;
+        }
+
+        $perms = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser($this->db, is_array($user) ? $user : []);
+        $podeNotas = \App\Core\AdminPermissionMatrix::can($perms, 'tab_notas', 'visualizar')
+            || \App\Core\AdminPermissionMatrix::can($perms, 'vida_escolar', 'visualizar');
+        if (!$podeNotas) {
+            http_response_code(403);
+            exit;
+        }
+
+        $service = new \App\Services\AdminStudentProfileService($this->db, $this);
+        $tabData = $service->getNotasTabData($id, is_array($user) ? $user : []);
+        extract($tabData);
+        require \App\Core\ViewPaths::dominio('Pessoas', 'Views/admin/students/_secao_notas_eventos.php');
+        exit;
+    }
+
+    /**
+     * HTML do quadro de impressão do boletim (PP/PU/CH…), sob demanda na aba Boletim.
+     */
+    public function quadroImpressaoFragment($id)
+    {
+        $user = $this->auth->getUser();
+        if (!$user) {
+            http_response_code(403);
+            exit;
+        }
+
+        $id = (int) $id;
+        $fichaId = (int) ($_GET['ficha_id'] ?? 0);
+        $aluno = $this->db->fetch('SELECT id FROM alunos WHERE id = :id', ['id' => $id]);
+        if (!$aluno) {
+            http_response_code(404);
+            exit;
+        }
+
+        if (!\App\Core\LayoutHelper::isModuleEnabled('vida_escolar')) {
+            http_response_code(404);
+            echo '';
+            exit;
+        }
+
+        $perms = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser($this->db, is_array($user) ? $user : []);
+        if (!\App\Core\AdminPermissionMatrix::can($perms, 'vida_escolar', 'visualizar')) {
+            http_response_code(403);
+            echo '';
+            exit;
+        }
+
+        try {
+            $svc = new \App\Modulos\VidaEscolar\Services\VidaEscolarService();
+            $prontuarioSvc = new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService();
+            $prontuario = $prontuarioSvc->montar($id, $svc, $fichaId, false);
+            $quadro = is_array($prontuario['quadro'] ?? null) ? $prontuario['quadro'] : [];
+            $ficha = is_array($quadro['ficha'] ?? null) ? $quadro['ficha'] : [];
+            if ($ficha === [] && $fichaId > 0) {
+                foreach ((array) ($prontuario['fichas'] ?? []) as $f) {
+                    if (is_array($f) && (int) ($f['id'] ?? 0) === $fichaId) {
+                        $ficha = $f;
+                        break;
+                    }
+                }
+            }
+            $html = $prontuarioSvc->htmlQuadroImpressaoParaAluno($id, $ficha);
+            header('Content-Type: text/html; charset=UTF-8');
+            echo $html;
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo '';
+        }
+        exit;
+    }
+
+    /**
      * Histórico de auditoria do aluno — página própria (antes ficava embutido na
      * carga principal do perfil, rodando SHOW TABLES + SELECT em toda visita,
      * mesmo sem ninguém abrir essa seção).

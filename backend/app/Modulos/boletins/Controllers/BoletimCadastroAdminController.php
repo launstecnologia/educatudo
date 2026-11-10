@@ -53,27 +53,16 @@ class BoletimCadastroAdminController extends \App\Controllers\Admin\AdminBaseCon
             if ($anoPeriodos <= 0) {
                 $anoPeriodos = (int) date('Y');
             }
-            $periodosDistintos = [];
-            foreach ($eventosDoItem as $eventoPeriodo) {
-                if (!is_array($eventoPeriodo)) {
-                    continue;
+            $periodosMenu = $this->service->periodosDoMenuNotas($item, $eventosDoItem);
+            $item['periodos'] = $periodosMenu;
+            // Contagem da coluna: só períodos já configurados (com regra de notas).
+            $periodosConfigurados = 0;
+            foreach ($periodosMenu as $periodoMenu) {
+                if ((int) ($periodoMenu['regra_id'] ?? 0) > 0) {
+                    $periodosConfigurados++;
                 }
-                $numeroPeriodo = (int) ($eventoPeriodo['bimestre'] ?? 0);
-                $regraPeriodoId = (int) ($eventoPeriodo['id'] ?? 0);
-                if ($numeroPeriodo <= 0 || $regraPeriodoId <= 0) {
-                    continue;
-                }
-                // A consulta ordena por id: o último do mesmo número fica no menu. Os anteriores continuam no banco.
-                $periodosDistintos[$numeroPeriodo] = [
-                    'bimestre' => $numeroPeriodo,
-                    'regra_id' => $regraPeriodoId,
-                    'ano_letivo' => $anoPeriodos,
-                    'rotulo' => \App\Core\PeriodoLetivo::rotulo($anoPeriodos, $numeroPeriodo),
-                ];
             }
-            ksort($periodosDistintos);
-            $item['periodos'] = array_values($periodosDistintos);
-            $item['periodos_qtd'] = count($periodosDistintos);
+            $item['periodos_qtd'] = $periodosConfigurados;
             $rotulosRegime = \App\Core\PeriodoLetivo::doAno($anoPeriodos)['rotulos'] ?? [];
             $primeiroPeriodo = 1;
             foreach ($rotulosRegime as $numeroRegime => $rotuloRegime) {

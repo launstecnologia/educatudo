@@ -10,6 +10,11 @@ $totalPages = (int) ($total_pages ?? 1);
 
 $flashMessage = trim((string) ($flash_message ?? ''));
 $flashType = (string) ($flash_type ?? 'success');
+$temGeracaoEmAndamento = !empty($tem_geracao_em_andamento);
+$geracaoJobIds = array_values(array_filter(array_map('intval', $geracao_job_ids ?? [])));
+$geracaoConcluidaMsg = trim((string) ($geracao_concluida_msg ?? ''));
+$geracaoFalhouMsg = trim((string) ($geracao_falhou_msg ?? ''));
+$csrfToken = (string) ($csrf_token ?? '');
 if (!class_exists('PeriodoLetivo')) {
 }
 
@@ -76,9 +81,15 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
     return URL . '/admin/boletim-configuracao/gerados' . ($qs !== '' ? ('?' . $qs) : '');
 };
 
+$modeloEventoGerados = !empty($modelo_evento)
+    || (class_exists(\App\Core\LayoutHelper::class) && \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos'));
 ?>
 <div class="space-y-6">
-    <?php $boletins_aba = 'resultados'; include \App\Core\ViewPaths::adminPartial('boletins_area_nav.php'); ?>
+    <?php if ($modeloEventoGerados): ?>
+        <?php $boletim_aba = 'resultados'; include \App\Core\ViewPaths::adminPartial('boletim_area_nav.php'); ?>
+    <?php else: ?>
+        <?php $boletins_aba = 'resultados'; include \App\Core\ViewPaths::adminPartial('boletins_area_nav.php'); ?>
+    <?php endif; ?>
     <div class="flex items-start justify-between gap-3 flex-wrap">
         <div>
             <h2 class="text-lg font-semibold text-gray-900">Resultados e versões</h2>
@@ -144,6 +155,9 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
             <label class="block text-sm font-medium text-gray-700 mb-1.5">Aluno (nome ou RA)</label>
             <input type="text" name="aluno_q" value="<?= htmlspecialchars($alunoQ, ENT_QUOTES, 'UTF-8') ?>" placeholder="Ex.: João, 2026..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
         </div>
+        <?php if ($modeloEventoGerados): ?>
+        <input type="hidden" name="exibir_em" value="boletim">
+        <?php else: ?>
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1.5">Exibido em</label>
             <select name="exibir_em" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
@@ -152,6 +166,7 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
                 <option value="notas" <?= $exibirEmFilter === 'notas' ? 'selected' : '' ?>>Notas</option>
             </select>
         </div>
+        <?php endif; ?>
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1.5">Tipo</label>
             <select name="preview" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
@@ -174,7 +189,7 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
         </div>
         </div>
         <div class="px-6 py-4 border-t border-gray-200 flex gap-3 bg-gray-50">
-            <a href="<?= URL ?>/admin/boletim-configuracao/gerados"
+            <a href="<?= URL ?>/admin/boletim-configuracao/gerados<?= $modeloEventoGerados ? '?exibir_em=boletim' : '' ?>"
                class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors text-center">
                 Limpar
             </a>
@@ -187,8 +202,56 @@ $buildPageUrl = static function (int $p) use ($queryBaseParams): string {
     </aside>
 
     <?php if ($flashMessage !== ''): ?>
-        <?php $bgClass = $flashType === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'; ?>
+        <?php
+        if ($flashType === 'error') {
+            $bgClass = 'bg-red-50 border-red-200 text-red-800';
+        } elseif ($flashType === 'info') {
+            $bgClass = 'bg-amber-50 border-amber-200 text-amber-900';
+        } else {
+            $bgClass = 'bg-green-50 border-green-200 text-green-800';
+        }
+        ?>
         <div class="p-4 rounded-lg border <?= $bgClass ?>"><?= htmlspecialchars($flashMessage, ENT_QUOTES, 'UTF-8') ?></div>
+    <?php endif; ?>
+
+    <?php if ($flashMessage === '' && $geracaoFalhouMsg !== ''): ?>
+        <div class="p-4 rounded-lg border bg-red-50 border-red-200 text-red-800"><?= htmlspecialchars($geracaoFalhouMsg, ENT_QUOTES, 'UTF-8') ?></div>
+    <?php elseif ($flashMessage === '' && $geracaoConcluidaMsg !== ''): ?>
+        <div class="p-4 rounded-lg border bg-green-50 border-green-200 text-green-800"><?= htmlspecialchars($geracaoConcluidaMsg, ENT_QUOTES, 'UTF-8') ?></div>
+    <?php endif; ?>
+
+    <?php if ($temGeracaoEmAndamento): ?>
+        <div class="p-4 rounded-lg border border-amber-200 bg-amber-50 text-amber-900 flex items-start justify-between gap-3 flex-wrap">
+            <div class="flex items-start gap-3">
+                <i class="fa-solid fa-spinner fa-spin mt-0.5"></i>
+                <div class="min-w-[16rem] flex-1">
+                    <p class="font-semibold">Gerando boletim em segundo plano</p>
+                    <p class="text-sm mt-0.5">A lista abaixo atualiza quando a geração terminar. Acompanhe o passo atual aqui.</p>
+                    <div id="boletim-geracao-progresso" class="mt-3 max-w-md">
+                        <div class="flex items-center justify-between text-xs mb-1">
+                            <span id="boletim-geracao-rotulo">Preparando o cálculo…</span>
+                            <span id="boletim-geracao-pct">0%</span>
+                        </div>
+                        <div class="h-2 rounded-full overflow-hidden" style="background-color:#fde68a;">
+                            <div id="boletim-geracao-barra" class="h-full rounded-full" style="width:0%;background-color:#d97706;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <form method="POST" action="<?= URL ?>/admin/boletim/cancelar-geracao" class="shrink-0"
+                  onsubmit="return confirm('Parar a geração em andamento? Os boletins já gravados deste lote ficam como estão.');">
+                <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
+                <?php if ($selectedRegraId > 0): ?>
+                <input type="hidden" name="regra_id" value="<?= (int) $selectedRegraId ?>">
+                <?php endif; ?>
+                <input type="hidden" name="retorno" value="<?= htmlspecialchars('/admin/boletim-configuracao/gerados' . ($queryBaseParams !== [] ? ('?' . http_build_query($queryBaseParams)) : ''), ENT_QUOTES, 'UTF-8') ?>">
+                <button type="submit"
+                        class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold text-white bg-red-600 hover:bg-red-700">
+                    <i class="fa-solid fa-stop mr-2"></i>
+                    Parar geração
+                </button>
+            </form>
+        </div>
     <?php endif; ?>
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -421,5 +484,111 @@ document.addEventListener('keydown', function (e) {
         }
         carregarPreview(d, 0);
     });
+})();
+
+(function pollGeracaoBoletimGerados() {
+    const jobIds = <?= json_encode($geracaoJobIds, JSON_UNESCAPED_UNICODE) ?>;
+    if (!Array.isArray(jobIds) || jobIds.length === 0) {
+        return;
+    }
+    const ids = jobIds.map(function (id) { return Number(id); }).filter(function (id) { return id > 0; });
+    const url = <?= json_encode(URL . '/admin/boletim/geracao-status', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
+        + '?ids=' + encodeURIComponent(ids.join(','));
+    let tentativas = 0;
+    const maxTentativas = 450;
+
+    function aindaRodando(jobs) {
+        if (!jobs || typeof jobs !== 'object') {
+            return true;
+        }
+        return ids.some(function (id) {
+            const st = jobs[String(id)] || jobs[id];
+            if (!st) {
+                return false;
+            }
+            return st.status === 'pending' || st.status === 'processing';
+        });
+    }
+
+    function pctDoPasso(passo, feitos, total) {
+        if (passo === 'gravando') return 90;
+        if (passo === 'fichas') return 95;
+        if (passo === 'boletim_oficial') return 98;
+        if (total <= 0) return 0;
+        return Math.max(0, Math.min(85, Math.round((feitos / total) * 85)));
+    }
+
+    function textoPasso(passo, feitos, total) {
+        if (passo === 'gravando') return 'Gravando as notas no boletim…';
+        if (passo === 'fichas') return 'Atualizando a ficha da vida escolar…';
+        if (passo === 'boletim_oficial') return 'Notas prontas. Montando o boletim oficial…';
+        if (total > 0) return 'Calculando as notas: ' + feitos + ' de ' + total + ' alunos';
+        return 'Preparando o cálculo…';
+    }
+
+    function atualizarBarra(jobs) {
+        let feitos = 0;
+        let total = 0;
+        let pct = 100;
+        let passoBanner = 'calculando';
+        ids.forEach(function (id) {
+            const st = jobs[String(id)] || jobs[id];
+            if (!st || (st.status !== 'pending' && st.status !== 'processing')) {
+                return;
+            }
+            const f = Number(st.progresso_feitos || 0);
+            const t = Number(st.progresso_total || 0);
+            const passo = String(st.progresso_passo || 'calculando');
+            const p = pctDoPasso(passo, f, t);
+            if (p < pct) {
+                pct = p;
+                passoBanner = passo;
+            }
+            if (passo === 'calculando' && t > 0) {
+                feitos += f;
+                total += t;
+            }
+        });
+        const rotulo = document.getElementById('boletim-geracao-rotulo');
+        const pctEl = document.getElementById('boletim-geracao-pct');
+        const barra = document.getElementById('boletim-geracao-barra');
+        if (!rotulo || !pctEl || !barra) {
+            return;
+        }
+        if (pct === 100 && total <= 0 && passoBanner === 'calculando') {
+            rotulo.textContent = 'Preparando o cálculo…';
+            pctEl.textContent = '0%';
+            barra.style.width = '0%';
+            return;
+        }
+        rotulo.textContent = textoPasso(passoBanner, feitos, total);
+        pctEl.textContent = pct + '%';
+        barra.style.width = pct + '%';
+    }
+
+    function tick() {
+        tentativas += 1;
+        if (tentativas > maxTentativas) {
+            return;
+        }
+        fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (!data || !data.ok) {
+                    setTimeout(tick, 4000);
+                    return;
+                }
+                atualizarBarra(data.jobs || {});
+                if (!aindaRodando(data.jobs)) {
+                    window.location.reload();
+                    return;
+                }
+                setTimeout(tick, 2000);
+            })
+            .catch(function () {
+                setTimeout(tick, 4000);
+            });
+    }
+    setTimeout(tick, 1500);
 })();
 </script>

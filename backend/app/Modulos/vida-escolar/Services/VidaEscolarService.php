@@ -1064,15 +1064,20 @@ class VidaEscolarService
 
         $n = 0;
         $linhasTocadas = [];
-        $modeloBoletimId = (int) (($this->modeloOficialDaFicha($ficha) ?? [])['id'] ?? 0);
+        $modeloFicha = $this->modeloOficialDaFicha($ficha);
+        $modeloBoletimId = (int) (($modeloFicha ?? [])['id'] ?? 0);
         $boletimOficialTurmaId = $this->idBoletimOficialDaTurma(is_array($ficha) ? $ficha : []);
+        $finalidadeResultados = (($modeloFicha['finalidade'] ?? '') === 'complementar'
+            || $this->cursoTipoDaTurma((int) ($ficha['turma_id'] ?? 0)) === 'extra')
+            ? 'complementar'
+            : 'oficial';
         /** @var array<int, array<int, array{nota:?float, faltas:?int, prio:int}>> */
         $propostas = [];
-        foreach ($this->model->listarResultadosGeradosOficiais($alunoId) as $row) {
+        foreach ($this->model->listarResultadosGeradosPorFinalidade($alunoId, $finalidadeResultados) as $row) {
             if (!$this->eventoPertenceAoAno($row, $ano)) {
                 continue;
             }
-            if (!$this->resultadoPertenceAoModelo($row, $modeloBoletimId, $boletimOficialTurmaId)) {
+            if (!$this->resultadoPertenceAoModelo($row, $modeloBoletimId, $boletimOficialTurmaId, $finalidadeResultados)) {
                 continue;
             }
             $mid = (int) ($row['materia_id'] ?? 0);
@@ -3726,20 +3731,56 @@ class VidaEscolarService
         $ano = (int) ($ficha['ano_letivo'] ?? 0);
         $alunoId = (int) ($ficha['aluno_id'] ?? 0);
         $preferido = $alunoId > 0 ? $this->boletimIdDicaDoAluno($alunoId, $ano) : 0;
-        $chave = $turmaId . ':' . $ano . ':' . $preferido;
+        $cursoTipo = $this->cursoTipoDaTurma($turmaId);
+        $finalidadePref = $cursoTipo === 'extra' ? 'complementar' : 'oficial';
+        $chave = $turmaId . ':' . $ano . ':' . $preferido . ':' . $finalidadePref;
         if (array_key_exists($chave, $this->modeloBoletimCache)) {
             return $this->modeloBoletimCache[$chave];
         }
         $turma = $this->turmaPorIdCache($turmaId);
         $serieId = (int) ($turma['serie_id'] ?? 0);
-        $this->modeloBoletimCache[$chave] = $this->boletimCadastro()->encontrarOficialParaTurma(
+        $cadastro = $this->boletimCadastro();
+        $modelo = $cadastro->encontrarModeloParaTurma(
             $turmaId,
             $serieId,
             $ano,
+            $finalidadePref,
             $preferido > 0 ? $preferido : null
         );
+        if ($modelo === null && $finalidadePref === 'complementar') {
+            $modelo = $cadastro->encontrarModeloParaTurma(
+                $turmaId,
+                $serieId,
+                $ano,
+                'oficial',
+                $preferido > 0 ? $preferido : null
+            );
+        }
+        $this->modeloBoletimCache[$chave] = $modelo;
 
         return $this->modeloBoletimCache[$chave];
+    }
+
+    private function cursoTipoDaTurma(int $turmaId): string
+    {
+        if ($turmaId <= 0) {
+            return 'regular';
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT COALESCE(c.tipo, 'regular') AS curso_tipo
+                 FROM turmas t
+                 LEFT JOIN curso c ON c.id = t.curso_novo_id
+                 WHERE t.id = :id
+                 LIMIT 1",
+                ['id' => $turmaId]
+            );
+            $tipo = strtolower(trim((string) (is_array($row) ? ($row['curso_tipo'] ?? 'regular') : 'regular')));
+
+            return $tipo === 'extra' ? 'extra' : 'regular';
+        } catch (\Throwable $e) {
+            return 'regular';
+        }
     }
 
     /**
@@ -3771,14 +3812,26 @@ class VidaEscolarService
         $turma = $this->turmaPorIdCache($turmaId);
         $serieId = (int) (is_array($turma) ? ($turma['serie_id'] ?? 0) : 0);
         $preferido = $alunoId > 0 ? $this->boletimIdDicaDoAluno($alunoId, $anoLetivo) : 0;
-        $modelo = $this->boletimCadastro()->encontrarOficialParaTurma(
+        $finalidadePref = $this->cursoTipoDaTurma($turmaId) === 'extra' ? 'complementar' : 'oficial';
+        $cadastro = $this->boletimCadastro();
+        $modelo = $cadastro->encontrarModeloParaTurma(
             $turmaId,
             $serieId,
             $anoLetivo,
+            $finalidadePref,
             $preferido > 0 ? $preferido : null
         );
+        if ($modelo === null && $finalidadePref === 'complementar') {
+            $modelo = $cadastro->encontrarModeloParaTurma(
+                $turmaId,
+                $serieId,
+                $anoLetivo,
+                'oficial',
+                $preferido > 0 ? $preferido : null
+            );
+        }
         if (is_array($modelo)) {
-            $comps = $this->boletimCadastro()->componentesParaFicha($modelo);
+            $comps = $cadastro->componentesParaFicha($modelo);
             if ($comps !== []) {
                 return $comps;
             }
@@ -3871,13 +3924,23 @@ class VidaEscolarService
     /**
      * @param array<string,mixed> $row
      */
-    private function resultadoPertenceAoModelo(array $row, int $boletimId, int $boletimOficialTurmaId = 0): bool
-    {
+    private function resultadoPertenceAoModelo(
+        array $row,
+        int $boletimId,
+        int $boletimOficialTurmaId = 0,
+        string $finalidade = 'oficial'
+    ): bool {
         if ($boletimId <= 0) {
-            return true;
+            return $finalidade !== 'complementar';
         }
         $rowBoletim = (int) ($row['boletim_id'] ?? 0);
-        if ($rowBoletim <= 0 || $rowBoletim === $boletimId) {
+        if ($rowBoletim === $boletimId) {
+            return true;
+        }
+        if ($finalidade === 'complementar') {
+            return false;
+        }
+        if ($rowBoletim <= 0) {
             return true;
         }
         // Boletim já gerado do modelo oficial da turma, quando a dica da ficha veio do evento de notas.
