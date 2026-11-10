@@ -2440,24 +2440,22 @@ class BoletimConfigController extends BaseController
                 $regraId = $savedId;
                 unset($_SESSION['boletim_assistente_rascunho']);
             }
-            // Só o BOLETIM oficial gera snapshot ao concluir.
-            // Demonstrativo (exibir_em=notas) é quadro ao vivo: salva config e as notas aparecem no lançamento.
-            $publicarBoletim = $exibirEm === 'boletim'
-                && (string) ($_POST['gerar_nova_versao'] ?? '') === '1';
+            // Salvar demonstrativo (notas) ou Concluir boletim com gerar_nova_versao=1 publica para os alunos.
+            $pediuGerar = (string) ($_POST['gerar_nova_versao'] ?? '') === '1';
+            $publicarNotas = $pediuGerar && in_array($exibirEm, ['boletim', 'notas'], true);
             $alunoSomenteId = (int) ($_POST['gerar_somente_aluno_id'] ?? 0);
-            if ($savedId > 0 && $publicarBoletim && $alunoSomenteId > 0) {
+            if ($savedId > 0 && $publicarNotas && $alunoSomenteId > 0) {
                 $this->iniciarNovaVersaoNotasDoAluno((int) $savedId, $versaoConfig, $alunoSomenteId);
                 return;
             }
-            if ($savedId > 0 && $publicarBoletim && $this->iniciarNovaVersaoNotas((int) $savedId, $versaoConfig)) {
+            if ($savedId > 0 && $publicarNotas && $this->iniciarNovaVersaoNotas((int) $savedId, $versaoConfig)) {
                 return;
             }
-            $pediuGerar = (string) ($_POST['gerar_nova_versao'] ?? '') === '1';
             $soConfiguracao = !empty($_POST['origem_assistente']);
             if ($exibirEm === 'notas') {
                 $_SESSION['boletim_flash'] = $versaoConfig > 0
-                    ? ('Demonstrativo salvo na versão ' . $versaoConfig . '. As notas aparecem no quadro conforme forem lançadas — não é preciso gerar.')
-                    : 'Demonstrativo salvo. As notas aparecem no quadro conforme forem lançadas.';
+                    ? ('Demonstrativo salvo na versão ' . $versaoConfig . '. Clique de novo em Salvar demonstrativo para gerar as notas dos alunos.')
+                    : 'Demonstrativo salvo. Clique de novo em Salvar demonstrativo para gerar as notas dos alunos.';
             } elseif ($soConfiguracao && !$pediuGerar) {
                 $_SESSION['boletim_flash'] = $versaoConfig > 0
                     ? ('Quadro do boletim salvo na versão ' . $versaoConfig . '. Para calcular e publicar, use Concluir e aplicar.')
@@ -2500,9 +2498,17 @@ class BoletimConfigController extends BaseController
             }
             if ($salvou && !$pediuPublicar && in_array($this->retornoFluxoAtual(), ['boletins', 'periodos', 'evento'], true)) {
                 $gravada = (string) ($_SESSION['boletim_flash'] ?? '');
-                $msgSalva = 'Configuração salva. As notas dos alunos não foram geradas.';
-                if (preg_match('/versão\s+(\d+)/u', $gravada, $versaoSalvaLista)) {
-                    $msgSalva = 'Configuração salva na versão ' . $versaoSalvaLista[1] . '. As notas dos alunos não foram geradas.';
+                $exibirRedir = strtolower(trim((string) ($_POST['exibir_em'] ?? '')));
+                if ($exibirRedir === 'notas') {
+                    $msgSalva = 'Demonstrativo salvo. As notas dos alunos ainda não foram geradas — use Salvar demonstrativo com geração.';
+                    if (preg_match('/versão\s+(\d+)/u', $gravada, $versaoSalvaLista)) {
+                        $msgSalva = 'Demonstrativo salvo na versão ' . $versaoSalvaLista[1] . '. As notas dos alunos ainda não foram geradas.';
+                    }
+                } else {
+                    $msgSalva = 'Configuração salva. As notas dos alunos não foram geradas.';
+                    if (preg_match('/versão\s+(\d+)/u', $gravada, $versaoSalvaLista)) {
+                        $msgSalva = 'Configuração salva na versão ' . $versaoSalvaLista[1] . '. As notas dos alunos não foram geradas.';
+                    }
                 }
                 $_SESSION['boletim_flash'] = $msgSalva;
                 $_SESSION['boletim_flash_type'] = 'success';
@@ -2623,19 +2629,20 @@ class BoletimConfigController extends BaseController
             $this->redirect($this->urlAssistenteComRetorno($regraId));
         }
         $ehBoletim = strtolower(trim((string) ($regra['exibir_em'] ?? ''))) === 'boletim';
-        $prefixoSalvo = 'Configuração salva'
+        $ehDemonstrativo = strtolower(trim((string) ($regra['exibir_em'] ?? ''))) === 'notas';
+        $prefixoSalvo = ($ehDemonstrativo ? 'Demonstrativo salvo' : 'Configuração salva')
             . ($versaoConfig > 0 ? (' na versão ' . $versaoConfig) : '')
             . '.';
         $mensagemFila = $ehBoletim
             ? ($prefixoSalvo . ' A geração do boletim foi iniciada. Acompanhe o andamento e o resultado nesta tela (Resultados e versões).')
-            : ($prefixoSalvo . ' A geração das notas foi iniciada. O boletim oficial só muda quando essa geração terminar.');
+            : ($prefixoSalvo . ' A geração do demonstrativo de notas foi iniciada. Acompanhe o resultado nesta tela.');
         if ($this->enfileirarGeracaoBoletim($regraId, $periodoRef, $dataInicio, $dataFim, 'gerar', $mensagemFila)) {
             return true;
         }
         $resultado = $this->executarGeracaoMassaInterna($regra, $regraId, $periodoRef, $dataInicio, $dataFim, $alunos, 'gerar');
         $mensagem = $ehBoletim
             ? ($prefixoSalvo . ' Boletim gerado. Esta versão passa a ser a vigente no aluno; a anterior fica no histórico.')
-            : ($prefixoSalvo . ' Esta versão passa a ser a vigente no detalhe do aluno e substitui a nota no boletim oficial. A anterior fica no histórico.');
+            : ($prefixoSalvo . ' Demonstrativo de notas gerado para os alunos. A versão anterior fica no histórico.');
         $_SESSION['boletim_flash'] = $mensagem . ' ' . (string) ($resultado['mensagem'] ?? '');
         $_SESSION['boletim_flash_type'] = ((int) ($resultado['erros'] ?? 0) > 0) ? 'error' : 'success';
         $this->redirect($this->urlAposGeracaoBoletim($regraId, $regra));

@@ -10271,10 +10271,10 @@ $boletimWizardSteps = [
             });
         }
         btnVoltar.disabled = curIdx <= 0;
-        // Demonstrativo: só salva o quadro (ao vivo). Boletim: concluir gera o oficial.
+        // Demonstrativo: salva e gera notas. Boletim: concluir gera o oficial.
         var label;
         if (cur === 'revisar') {
-            label = ehEventoNotasPreview() ? 'Salvar demonstrativo' : 'Concluir e aplicar';
+            label = ehEventoNotasPreview() ? 'Salvar e gerar demonstrativo' : 'Concluir e aplicar';
         } else if (cur === 'formula') {
             label = 'Salvar e continuar';
         } else {
@@ -10807,8 +10807,8 @@ $boletimWizardSteps = [
             }
             html += '<div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">';
             if (ehEventoNotasPreview()) {
-                html += '<p class="text-sm text-gray-800"><strong>Demonstrativo de notas</strong><span class="block text-xs text-gray-600 font-normal mt-1">É o quadro do período. Monte no início do mês; cada prova lançada aparece sozinha para aluno, pais e painel. Não gera snapshot — não precisa “concluir” toda hora.</span></p>';
-                html += '<p class="text-sm text-gray-800"><strong>Salvar demonstrativo</strong><span class="block text-xs text-gray-600 font-normal mt-1">Grava só colunas, ordem e fórmula do quadro. O boletim oficial é outro fluxo (menu Boletim).</span></p>';
+                html += '<p class="text-sm text-gray-800"><strong>Demonstrativo de notas</strong><span class="block text-xs text-gray-600 font-normal mt-1">É o quadro do período. Ao salvar, o sistema gera o demonstrativo para os alunos da série/turma.</span></p>';
+                html += '<p class="text-sm text-gray-800"><strong>Salvar e gerar demonstrativo</strong><span class="block text-xs text-gray-600 font-normal mt-1">Grava colunas, ordem e fórmula e publica as notas no detalhe do aluno. O boletim oficial é outro fluxo (menu Boletim).</span></p>';
             } else {
                 html += '<p class="text-sm text-gray-800"><strong>Boletim oficial</strong><span class="block text-xs text-gray-600 font-normal mt-1">Documento do período (print / ficha). Separado do demonstrativo ao vivo.</span></p>';
                 html += '<p class="text-sm text-gray-800"><strong>Salvar sem gerar</strong><span class="block text-xs text-gray-600 font-normal mt-1">Grava só o quadro (colunas, fórmulas, REC/PF). Ainda não publica no aluno.</span></p>';
@@ -10818,7 +10818,7 @@ $boletimWizardSteps = [
             html += htmlVersoesConfiguracao();
             html += '</div>';
             html += '<p class="text-xs text-indigo-700 mt-4">' + (ehEventoNotasPreview()
-                ? 'Clique em <strong>Salvar demonstrativo</strong>. As notas entram no quadro conforme o lançamento.'
+                ? 'Clique em <strong>Salvar e gerar demonstrativo</strong> para publicar as notas nos alunos.'
                 : 'Para só gravar o quadro, <strong>Salvar sem gerar</strong>. Para calcular e publicar o boletim, <strong>Concluir e aplicar</strong>.') + '</p>';
         }
 
@@ -12119,10 +12119,10 @@ $boletimWizardSteps = [
                     });
                 }
             }
-            // Só boletim oficial dispara geração. Demonstrativo = quadro ao vivo (só salva config).
-            if (gerarNotas === true && exibirPost === 'boletim') {
+            // Demonstrativo e boletim oficial: Salvar/Concluir com gerarNotas publica para os alunos.
+            if (gerarNotas === true && (exibirPost === 'boletim' || exibirPost === 'notas')) {
                 add('gerar_nova_versao', '1');
-                if (alunoSomenteId > 0) {
+                if (alunoSomenteId > 0 && exibirPost === 'boletim') {
                     add('gerar_somente_aluno_id', alunoSomenteId);
                 }
             }
