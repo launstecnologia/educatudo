@@ -16,7 +16,7 @@ $linhasVista = is_array($linhas ?? null) ? $linhas : [];
 $linhasVistaBoletim = is_array($linhasBoletim ?? null) && $linhasBoletim !== []
     ? $linhasBoletim
     : $linhasVista;
-$decVista = ((int) ($decimalPlaces ?? 2) === 1) ? 1 : 2;
+$decVista = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($decimalPlaces ?? 2);
 $fmtVista = is_callable($formatNotaBoletim ?? null)
     ? $formatNotaBoletim
     : static function ($valor) use ($decVista): string {

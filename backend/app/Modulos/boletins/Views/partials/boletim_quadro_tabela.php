@@ -23,7 +23,7 @@ if ($grupoIdQuadro > 0) {
     );
 }
 $linhasQuadro = is_array($linhas ?? null) ? $linhas : [];
-$decQuadro = ((int) ($decimalPlaces ?? 2) === 1) ? 1 : 2;
+$decQuadro = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($decimalPlaces ?? 2);
 $tabelasQuadro = \App\Helpers\BoletimQuadroLayoutHelper::partirTabelas($colsQuadro);
 
 $fmtNotaQuadro = static function ($valor) use ($decQuadro): string {

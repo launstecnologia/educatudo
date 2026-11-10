@@ -167,9 +167,12 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1" for="regra-arredondamento">Regra de Arredondamento</label>
                 <select name="round_mode" id="regra-arredondamento" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                    <option value="none" <?= (string) $val($item, 'round_mode', 'none') === 'none' ? 'selected' : '' ?>>Arredondamento convencional</option>
-                    <option value="half" <?= (string) $val($item, 'round_mode', 'none') === 'half' ? 'selected' : '' ?>>Faixa .00 / .50 / próximo inteiro</option>
+                    <?php $roundAtual = (string) $val($item, 'round_mode', 'none'); ?>
+                    <option value="none" <?= $roundAtual === 'none' ? 'selected' : '' ?>>Arredondamento convencional</option>
+                    <option value="places" <?= $roundAtual === 'places' ? 'selected' : '' ?>>Conforme casas decimais (ex.: 7,95 → 8,0)</option>
+                    <option value="half" <?= $roundAtual === 'half' ? 'selected' : '' ?>>Faixa .00 / .50 / próximo inteiro</option>
                 </select>
+                <p class="mt-1 text-xs text-gray-500">“Conforme casas” usa o campo ao lado: com 1 casa, (8,0+7,9)/2 = 7,95 vira 8,0.</p>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1" for="regra-casas">Casas Decimais da Nota</label>
@@ -180,7 +183,55 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                     <option value="2" <?= $casasAtuais === 2 ? 'selected' : '' ?>>2 casas (6,50)</option>
                 </select>
             </div>
+            <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-1" for="regra-escopo-arredondamento">Onde aplicar o arredondamento</label>
+                <select name="escopo_arredondamento" id="regra-escopo-arredondamento" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    <?php
+                        $escopoAtual = (string) $val($item, 'escopo_arredondamento', 'medias');
+                        if (!isset(\App\Modulos\RegrasAcademicas\Models\RegraAcademica::ESCOPOS_ARREDONDAMENTO[$escopoAtual])) {
+                            $escopoAtual = 'medias';
+                        }
+                        foreach (\App\Modulos\RegrasAcademicas\Models\RegraAcademica::ESCOPOS_ARREDONDAMENTO as $escopoValor => $escopoRotulo):
+                    ?>
+                    <option value="<?= htmlspecialchars($escopoValor, ENT_QUOTES, 'UTF-8') ?>" <?= $escopoAtual === $escopoValor ? 'selected' : '' ?>><?= htmlspecialchars($escopoRotulo, ENT_QUOTES, 'UTF-8') ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <div id="regra-arredondamento-resumo" class="mt-2 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm text-indigo-950"></div>
+            </div>
         </div>
+        <script>
+        (function () {
+            var modo = document.getElementById('regra-arredondamento');
+            var casas = document.getElementById('regra-casas');
+            var escopo = document.getElementById('regra-escopo-arredondamento');
+            var resumo = document.getElementById('regra-arredondamento-resumo');
+            if (!modo || !casas || !escopo || !resumo) return;
+            function rotuloCasas(v) {
+                if (String(v) === '0') return 'sem casas (6)';
+                if (String(v) === '1') return '1 casa (6,5)';
+                return '2 casas (6,50)';
+            }
+            function atualizar() {
+                var m = modo.value;
+                var c = casas.value;
+                var e = escopo.value;
+                var onde = e === 'todas'
+                    ? 'em <strong>todas as notas</strong> (PP, PU, CH, MU, MS…)'
+                    : 'somente nas <strong>médias e cálculos</strong> (ex.: MS). PP/PU/CH ficam como lançados';
+                var como = 'sem arredondamento especial (mantém precisão convencional)';
+                if (m === 'places') {
+                    como = 'arredonda conforme ' + rotuloCasas(c) + ' — exemplo: (8,0+7,9)/2 = 7,95 → <strong>8,0</strong>';
+                } else if (m === 'half') {
+                    como = 'usa faixa .00 / .50 / próximo inteiro';
+                }
+                resumo.innerHTML = 'Confirmação: o arredondamento vale ' + onde + '. Modo: ' + como + '.';
+            }
+            modo.addEventListener('change', atualizar);
+            casas.addEventListener('change', atualizar);
+            escopo.addEventListener('change', atualizar);
+            atualizar();
+        })();
+        </script>
         <div class="space-y-3">
             <label class="flex items-start gap-3 rounded-lg border border-gray-200 p-3 cursor-pointer hover:bg-gray-50">
                 <input type="checkbox" name="usar_frequencia" value="1" class="mt-0.5 rounded border-gray-300 text-teal-600 focus:ring-teal-500" <?= !empty($item['usar_frequencia']) ? 'checked' : '' ?>>

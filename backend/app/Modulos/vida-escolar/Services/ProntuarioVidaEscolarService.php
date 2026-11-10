@@ -1063,10 +1063,13 @@ class ProntuarioVidaEscolarService
                 return '';
             }
 
+            // Casas da regra de aprovação (Modelos → critério), não o snapshot antigo do documento.
+            $casas = $motor->resolverCasasDecimaisEfetivasDaRegra($regra);
+
             return $this->renderizarQuadroBoletimTabela(
                 $cols,
                 $linhas,
-                (int) ($regra['decimal_places'] ?? 2),
+                $casas,
                 (string) ($regra['exibir_em'] ?? 'boletim')
             );
         } catch (\Throwable $e) {
@@ -1086,7 +1089,7 @@ class ProntuarioVidaEscolarService
     {
         $nivelBuffer = ob_get_level();
         try {
-            $decimalPlaces = ($decimalPlaces === 1) ? 1 : 2;
+            $decimalPlaces = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($decimalPlaces);
             $edicaoSimulacao = null;
             $ev = [
                 'exibir_em' => $exibirEm !== '' ? $exibirEm : 'boletim',
@@ -1201,11 +1204,15 @@ class ProntuarioVidaEscolarService
         }
 
         $regraId = (int) ($escolhido['regra_id'] ?? 0);
+        $casas = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
+            $escolhido['decimal_places'] ?? 2
+        );
         if ($regraId > 0) {
             try {
                 $regra = $cfg->getRuleById($regraId);
                 if (is_array($regra) && !empty($regra['componentes'])) {
                     $motor = new \App\Modulos\Boletins\Controllers\BoletimConfigController(true);
+                    $casas = $motor->resolverCasasDecimaisEfetivasDaRegra($regra);
                     $linhasBase = is_array($escolhido['linhas']) ? $escolhido['linhas'] : [];
                     $regraHier = $this->enriquecerRegraComAgrupamentosCadastro($regra, $linhasBase);
                     $sim = [
@@ -1237,7 +1244,7 @@ class ProntuarioVidaEscolarService
         return $this->renderizarQuadroBoletimTabela(
             $cols,
             $linhas,
-            (int) ($escolhido['decimal_places'] ?? 2),
+            $casas,
             (string) ($escolhido['exibir_em'] ?? 'boletim')
         );
     }

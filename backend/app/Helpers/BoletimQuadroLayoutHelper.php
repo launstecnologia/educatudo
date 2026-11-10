@@ -1164,7 +1164,7 @@ class BoletimQuadroLayoutHelper
             'bimestre' => $bimestre,
             'ano_letivo' => $ano,
             'regra_id' => $regraId,
-            'decimal_places' => ((int) ($evento['decimal_places'] ?? 2) === 1) ? 1 : 2,
+            'decimal_places' => \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($evento['decimal_places'] ?? 2),
             'colunas' => $chaves,
             'rotulos' => $rotulos,
             'linhas' => $linhas,

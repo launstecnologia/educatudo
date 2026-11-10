@@ -105,11 +105,26 @@ $_mostrarHeaderRegra = (bool) ($boletim_pode_excluir ?? false);
             <?php
             $cols = is_array($ev['colunas'] ?? null) ? $ev['colunas'] : [];
             $linhas = is_array($ev['linhas'] ?? null) ? $ev['linhas'] : [];
-            $decimalPlaces = ((int) ($ev['decimal_places'] ?? 2) === 1) ? 1 : 2;
+            $decimalPlaces = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
+                $ev['decimal_places'] ?? 2
+            );
+            $_regraIdLinha = (int) ($ev['regra_id'] ?? 0);
+            // Snapshot gerado pode estar com 2 casas; a regra de aprovação do modelo manda.
+            if ($_regraIdLinha > 0) {
+                try {
+                    $cfgCasas = new \App\Models\System\BoletimConfig();
+                    $regraCasas = $cfgCasas->getRuleById($_regraIdLinha);
+                    if (is_array($regraCasas)) {
+                        $motorCasas = new \App\Modulos\Boletins\Controllers\BoletimConfigController(true);
+                        $decimalPlaces = $motorCasas->resolverCasasDecimaisEfetivasDaRegra($regraCasas);
+                    }
+                } catch (\Throwable $eCasas) {
+                    // mantém casas do snapshot
+                }
+            }
             if ($cols === [] || $linhas === []) {
                 continue;
             }
-            $_regraIdLinha = (int) ($ev['regra_id'] ?? 0);
             $_regraNomeLinha = (string) ($ev['regra_nome'] ?? '');
             $_regraCodigoLinha = (string) ($ev['regra_codigo'] ?? '');
             $_mostrarHeaderInfo = $_mostrarHeaderRegra && $_regraIdLinha > 0;

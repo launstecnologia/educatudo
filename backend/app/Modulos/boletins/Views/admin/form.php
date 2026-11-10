@@ -156,7 +156,10 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             <p id="boletim-criterios-regra" class="text-sm text-gray-800 mt-2<?= $regraAcademicaId > 0 ? '' : ' hidden' ?>">
                 Mínima: <strong id="boletim-criterio-minima"><?= htmlspecialchars(number_format((float) ($criterios['nota_minima_aprovacao'] ?? 6), 2, ',', ''), ENT_QUOTES, 'UTF-8') ?></strong>
                 <span class="text-gray-400 mx-1">·</span>
-                Arredondamento: <strong id="boletim-criterio-round"><?= (($criterios['round_mode'] ?? 'none') === 'half') ? 'faixa .00 / .50' : 'sem especial' ?></strong>
+                Arredondamento: <strong id="boletim-criterio-round"><?php
+                    $rmCri = (string) ($criterios['round_mode'] ?? 'none');
+                    echo $rmCri === 'half' ? 'faixa .00 / .50' : ($rmCri === 'places' ? 'conforme casas decimais' : 'sem especial');
+                ?></strong>
             </p>
         </div>
 
@@ -254,7 +257,10 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
         }
         var min = parseFloat(opt.getAttribute('data-minima') || '6');
         if (minEl) minEl.textContent = (isNaN(min) ? 6 : min).toFixed(2).replace('.', ',');
-        if (roundEl) roundEl.textContent = opt.getAttribute('data-round') === 'half' ? 'faixa .00 / .50' : 'sem especial';
+        if (roundEl) {
+            var rm = opt.getAttribute('data-round') || 'none';
+            roundEl.textContent = rm === 'half' ? 'faixa .00 / .50' : (rm === 'places' ? 'conforme casas decimais' : 'sem especial');
+        }
         box.classList.remove('hidden');
     }
     sel.addEventListener('change', atualizar);

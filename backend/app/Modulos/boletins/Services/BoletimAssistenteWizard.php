@@ -518,8 +518,10 @@ class BoletimAssistenteWizard
         }
         // Critérios do boletim (regra de aprovação) prevalecem sobre default half do assistente.
         $roundBol = strtolower(trim((string) ($bol['round_mode'] ?? 'none')));
-        $estado['round_mode'] = in_array($roundBol, ['none', 'half'], true) ? $roundBol : 'none';
-        $estado['decimal_places'] = ((int) ($bol['decimal_places'] ?? 2) === 1) ? 1 : 2;
+        $estado['round_mode'] = in_array($roundBol, ['none', 'half', 'places'], true) ? $roundBol : 'none';
+        $estado['decimal_places'] = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
+            $bol['decimal_places'] ?? 2
+        );
     }
 
     /**
@@ -2077,10 +2079,12 @@ class BoletimAssistenteWizard
         $merged['nota_minima_aprovacao'] = isset($merged['nota_minima_aprovacao']) && $merged['nota_minima_aprovacao'] !== ''
             ? (float) $merged['nota_minima_aprovacao']
             : 6.0;
-        $merged['round_mode'] = in_array((string) ($merged['round_mode'] ?? ''), ['none', 'half'], true)
+        $merged['round_mode'] = in_array((string) ($merged['round_mode'] ?? ''), ['none', 'half', 'places'], true)
             ? (string) $merged['round_mode']
             : 'none';
-        $merged['decimal_places'] = ((int) ($merged['decimal_places'] ?? 2) === 1) ? 1 : 2;
+        $merged['decimal_places'] = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
+            $merged['decimal_places'] ?? 2
+        );
         $pecas = [];
         foreach ((array) ($merged['pecas'] ?? []) as $p) {
             $p = strtolower(trim((string) $p));
@@ -11539,8 +11543,9 @@ class BoletimAssistenteWizard
     private function notasFicticiasLinhaBoletim(string $materia, array $comps, float $notaMin, array $estado): array
     {
         $hash = abs(crc32(mb_strtolower($materia))) + $this->hashAlunoPreview($estado);
-        $roundMode = ((string) ($estado['round_mode'] ?? 'none')) === 'half' ? 'half' : 'none';
-        $casas = ((int) ($estado['decimal_places'] ?? 2) === 1) ? 1 : 2;
+        $roundRaw = (string) ($estado['round_mode'] ?? 'none');
+        $roundMode = in_array($roundRaw, ['none', 'half', 'places'], true) ? $roundRaw : 'none';
+        $casas = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($estado['decimal_places'] ?? 2);
         $notas = [];
         foreach ($comps as $c) {
             if (!is_array($c)) {
@@ -11715,8 +11720,9 @@ class BoletimAssistenteWizard
         $hash = abs(crc32(mb_strtolower($materia))) + $this->hashAlunoPreview($estado);
         $hashJornadaUnica = 1700 + $this->hashAlunoPreview($estado);
         $jornadaNotaUnicaEstado = ((string) ($estado['jornada_distribuicao_notas'] ?? '')) === 'nota_unica_todas_linhas';
-        $roundMode = ((string) ($estado['round_mode'] ?? 'none')) === 'half' ? 'half' : 'none';
-        $casas = ((int) ($estado['decimal_places'] ?? 2) === 1) ? 1 : 2;
+        $roundRawLinha = (string) ($estado['round_mode'] ?? 'none');
+        $roundMode = in_array($roundRawLinha, ['none', 'half', 'places'], true) ? $roundRawLinha : 'none';
+        $casas = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($estado['decimal_places'] ?? 2);
         $notas = [];
         $sumN = 0;
         $sumQ = 0;

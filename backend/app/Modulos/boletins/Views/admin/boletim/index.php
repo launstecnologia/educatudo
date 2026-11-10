@@ -37,7 +37,7 @@ $alunosTravados = is_array($alunos_travados ?? null) ? $alunos_travados : [];
 $alunoTravado = !empty($aluno_travado);
 $versoesAluno = is_array($versoes_aluno ?? null) ? $versoes_aluno : [];
 $roundModeSelected = strtolower(trim((string) ($regra['round_mode'] ?? 'none')));
-if (!in_array($roundModeSelected, ['none', 'half'], true)) {
+if (!in_array($roundModeSelected, ['none', 'half', 'places'], true)) {
     $roundModeSelected = 'none';
 }
 $exibirEm = 'notas';
@@ -46,13 +46,17 @@ if (!in_array($finalidade, ['oficial', 'complementar'], true)) {
     $finalidade = 'oficial';
 }
 $boletimIdSelecionado = (int) ($regra['boletim_id'] ?? 0);
-$decimalPlacesSelected = ((int) ($regra['decimal_places'] ?? 2) === 1) ? 1 : 2;
+$decimalPlacesSelected = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
+    $regra['decimal_places'] ?? 2
+);
 if ($boletimIdSelecionado > 0) {
     foreach ($boletinsCadastro as $bolOptDec) {
         if ((int) ($bolOptDec['id'] ?? 0) !== $boletimIdSelecionado) {
             continue;
         }
-        $decimalPlacesSelected = ((int) ($bolOptDec['decimal_places'] ?? $decimalPlacesSelected) === 1) ? 1 : 2;
+        $decimalPlacesSelected = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
+            $bolOptDec['decimal_places'] ?? $decimalPlacesSelected
+        );
         break;
     }
 }

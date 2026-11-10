@@ -14,7 +14,7 @@ if (!class_exists('BoletimQuadroLayoutHelper', false)) {
 
 $colsSimples = is_array($cols ?? null) ? $cols : [];
 $linhasSimples = is_array($linhas ?? null) ? $linhas : [];
-$decSimples = ((int) ($decimalPlaces ?? 2) === 1) ? 1 : 2;
+$decSimples = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($decimalPlaces ?? 2);
 $tituloSimples = trim((string) ($tituloTabelaSimples ?? 'Matérias'));
 if ($tituloSimples === '') {
     $tituloSimples = 'Matérias';

@@ -76,6 +76,12 @@ class RegraAcademica
         'formula' => 'Fórmula própria',
     ];
 
+    /** Onde aplicar round_mode + casas decimais no boletim. */
+    public const ESCOPOS_ARREDONDAMENTO = [
+        'medias' => 'Só nas médias e cálculos (ex.: MS, MU calculada)',
+        'todas' => 'Em todas as notas (PP, PU, CH, médias…)',
+    ];
+
     public function __construct()
     {
         $this->db = Database::getInstance();
@@ -233,11 +239,16 @@ class RegraAcademica
     {
         $escala = $this->escalaPronta();
         $boletim = $this->boletimPronto();
+        $escopo = $this->escopoArredondamentoPronto();
         $cols = $escala ? ', escala, conceito_minimo' : '';
         $vals = $escala ? ', :escala, :conceito_minimo' : '';
         if ($boletim) {
             $cols .= ', finalidade, vis_aluno, vis_pais';
             $vals .= ', :finalidade, :vis_aluno, :vis_pais';
+        }
+        if ($escopo) {
+            $cols .= ', escopo_arredondamento';
+            $vals .= ', :escopo_arredondamento';
         }
         return (int) $this->db->insert(
             "INSERT INTO regras_academicas (
@@ -255,7 +266,7 @@ class RegraAcademica
                 :componentes_sem_nota, :aprovacao_so_frequencia, :situacoes_json, :observacoes,
                 :versao, :ativo{$vals}
              )",
-            $this->paramsFromData($data, $escala, $boletim)
+            $this->paramsFromData($data, $escala, $boletim, $escopo)
         );
     }
 
@@ -263,7 +274,8 @@ class RegraAcademica
     {
         $escala = $this->escalaPronta();
         $boletim = $this->boletimPronto();
-        $params = $this->paramsFromData($data, $escala, $boletim);
+        $escopo = $this->escopoArredondamentoPronto();
+        $params = $this->paramsFromData($data, $escala, $boletim, $escopo);
         $params['id'] = $id;
         $setEscala = $escala ? ",
                 escala = :escala,
@@ -272,6 +284,8 @@ class RegraAcademica
                 finalidade = :finalidade,
                 vis_aluno = :vis_aluno,
                 vis_pais = :vis_pais" : '';
+        $setEscopo = $escopo ? ',
+                escopo_arredondamento = :escopo_arredondamento' : '';
         return (bool) $this->db->update(
             "UPDATE regras_academicas SET
                 nome = :nome,
@@ -300,7 +314,7 @@ class RegraAcademica
                 situacoes_json = :situacoes_json,
                 observacoes = :observacoes,
                 versao = :versao,
-                ativo = :ativo{$setEscala}{$setBoletim}
+                ativo = :ativo{$setEscala}{$setBoletim}{$setEscopo}
              WHERE id = :id",
             $params
         );
@@ -638,11 +652,20 @@ class RegraAcademica
         return false;
     }
 
+    public function escopoArredondamentoPronto(): bool
+    {
+        return $this->temColuna('escopo_arredondamento');
+    }
+
     /**
      * @return array<string, mixed>
      */
-    private function paramsFromData(array $data, bool $comEscala = false, bool $comBoletim = false): array
-    {
+    private function paramsFromData(
+        array $data,
+        bool $comEscala = false,
+        bool $comBoletim = false,
+        bool $comEscopo = false
+    ): array {
         $params = [
             'nome' => (string) ($data['nome'] ?? ''),
             'codigo' => $data['codigo'] ?? null,
@@ -680,6 +703,10 @@ class RegraAcademica
             $params['finalidade'] = ((string) ($data['finalidade'] ?? '')) === 'complementar' ? 'complementar' : 'oficial';
             $params['vis_aluno'] = (int) ($data['vis_aluno'] ?? 0) === 1 ? 1 : 0;
             $params['vis_pais'] = (int) ($data['vis_pais'] ?? 0) === 1 ? 1 : 0;
+        }
+        if ($comEscopo) {
+            $escopo = strtolower(trim((string) ($data['escopo_arredondamento'] ?? 'medias')));
+            $params['escopo_arredondamento'] = isset(self::ESCOPOS_ARREDONDAMENTO[$escopo]) ? $escopo : 'medias';
         }
         return $params;
     }

@@ -474,15 +474,19 @@ class BoletimCadastroService
      * Mínima e arredondamento vêm da regra acadêmica vinculada (fallback 6 se não houver).
      *
      * @param array<string,mixed> $item
-     * @return array{nota_minima_aprovacao:float,round_mode:string,decimal_places:int,regra:?array}
+     * @return array{nota_minima_aprovacao:float,round_mode:string,decimal_places:int,escopo_arredondamento:string,regra:?array}
      */
     public function criteriosDoBoletim(array $item): array
     {
         $regra = $this->carregarRegraAcademica((int) ($item['regra_academica_id'] ?? 0));
         if ($regra !== null) {
             $round = strtolower(trim((string) ($regra['round_mode'] ?? 'none')));
-            if (!in_array($round, ['none', 'half'], true)) {
+            if (!in_array($round, ['none', 'half', 'places'], true)) {
                 $round = 'none';
+            }
+            $escopo = strtolower(trim((string) ($regra['escopo_arredondamento'] ?? 'medias')));
+            if (!isset(RegraAcademica::ESCOPOS_ARREDONDAMENTO[$escopo])) {
+                $escopo = 'medias';
             }
             $minima = isset($regra['media_minima']) && is_numeric($regra['media_minima'])
                 ? (float) $regra['media_minima']
@@ -490,7 +494,10 @@ class BoletimCadastroService
             return [
                 'nota_minima_aprovacao' => $minima,
                 'round_mode' => $round,
-                'decimal_places' => ((int) ($regra['decimal_places'] ?? 2) === 1) ? 1 : 2,
+                'decimal_places' => \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
+                    $regra['decimal_places'] ?? 2
+                ),
+                'escopo_arredondamento' => $escopo,
                 'regra' => $regra,
             ];
         }
@@ -498,6 +505,7 @@ class BoletimCadastroService
             'nota_minima_aprovacao' => 6.0,
             'round_mode' => 'none',
             'decimal_places' => 2,
+            'escopo_arredondamento' => 'medias',
             'regra' => null,
         ];
     }

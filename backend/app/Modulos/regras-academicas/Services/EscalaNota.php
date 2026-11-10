@@ -64,4 +64,13 @@ class EscalaNota
 
         return $nota >= $minima;
     }
+
+    /**
+     * Casas decimais da regra de aprovação: 0, 1 ou 2 (padrão 2).
+     */
+    public static function casasDecimais(mixed $valor): int
+    {
+        $n = (int) $valor;
+        return in_array($n, [0, 1, 2], true) ? $n : 2;
+    }
 }

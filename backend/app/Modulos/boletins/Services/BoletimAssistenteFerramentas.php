@@ -1233,7 +1233,8 @@ class BoletimAssistenteFerramentas
         $rascunho['exibir_em'] = in_array($exibir, ['notas', 'boletim'], true) ? $exibir : 'boletim';
         $finalidade = strtolower(trim((string) ($rascunho['finalidade'] ?? 'oficial')));
         $rascunho['finalidade'] = $finalidade === 'complementar' ? 'complementar' : 'oficial';
-        $rascunho['round_mode'] = (($rascunho['round_mode'] ?? '') === 'half') ? 'half' : 'none';
+        $rmRasc = strtolower(trim((string) ($rascunho['round_mode'] ?? 'none')));
+        $rascunho['round_mode'] = in_array($rmRasc, ['none', 'half', 'places'], true) ? $rmRasc : 'none';
 
         return [
             'ok' => $erros === [],
@@ -2276,7 +2277,9 @@ class BoletimAssistenteFerramentas
             'turmas_ids' => $this->normalizarIds($opcoes['turmas_ids'] ?? []),
             'materias_ids' => $this->normalizarIds($opcoes['materias_ids'] ?? []),
             'series_ids' => $this->normalizarIds($opcoes['series_ids'] ?? []),
-            'round_mode' => (($opcoes['round_mode'] ?? '') === 'half') ? 'half' : 'none',
+            'round_mode' => in_array(strtolower(trim((string) ($opcoes['round_mode'] ?? 'none'))), ['none', 'half', 'places'], true)
+                ? strtolower(trim((string) ($opcoes['round_mode'] ?? 'none')))
+                : 'none',
             'nota_minima_aprovacao' => isset($opcoes['nota_minima_aprovacao'])
                 ? (float) $opcoes['nota_minima_aprovacao']
                 : 6.0,

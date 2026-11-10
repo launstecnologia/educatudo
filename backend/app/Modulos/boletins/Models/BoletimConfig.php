@@ -109,7 +109,7 @@ class BoletimConfig
         $this->ensureRegraColumn('vis_aluno', "ALTER TABLE boletim_regras ADD COLUMN vis_aluno TINYINT(1) NOT NULL DEFAULT 1 AFTER exibir_em");
         $this->ensureRegraColumn('vis_pais', "ALTER TABLE boletim_regras ADD COLUMN vis_pais TINYINT(1) NOT NULL DEFAULT 1 AFTER vis_aluno");
         $this->ensureRegraColumn('vis_coordenacao', "ALTER TABLE boletim_regras ADD COLUMN vis_coordenacao TINYINT(1) NOT NULL DEFAULT 1 AFTER vis_pais");
-        $this->ensureRegraColumn('round_mode', "ALTER TABLE boletim_regras ADD COLUMN round_mode ENUM('none','half') NOT NULL DEFAULT 'none' AFTER vis_coordenacao");
+        $this->ensureRegraColumn('round_mode', "ALTER TABLE boletim_regras ADD COLUMN round_mode ENUM('none','half','places') NOT NULL DEFAULT 'none' AFTER vis_coordenacao");
         $this->ensureRegraColumn('decimal_places', "ALTER TABLE boletim_regras ADD COLUMN decimal_places TINYINT(1) NOT NULL DEFAULT 2 AFTER round_mode");
         $this->ensureRegraColumn('default_data_inicio', "ALTER TABLE boletim_regras ADD COLUMN default_data_inicio DATE NULL AFTER round_mode");
         $this->ensureRegraColumn('default_data_fim', "ALTER TABLE boletim_regras ADD COLUMN default_data_fim DATE NULL AFTER default_data_inicio");
@@ -1400,7 +1400,7 @@ class BoletimConfig
             'vis_pais' => (int) ($regra['vis_pais'] ?? 1),
             'vis_coordenacao' => (int) ($regra['vis_coordenacao'] ?? 1),
             'round_mode' => (string) ($regra['round_mode'] ?? 'none'),
-            'decimal_places' => (int) ($regra['decimal_places'] ?? 2) === 1 ? 1 : 2,
+            'decimal_places' => $this->normalizeDecimalPlaces((int) ($regra['decimal_places'] ?? 2)),
             'default_data_inicio' => (string) ($regra['default_data_inicio'] ?? ''),
             'default_data_fim' => (string) ($regra['default_data_fim'] ?? ''),
             'nota_minima_aprovacao' => $regra['nota_minima_aprovacao'] ?? null,
@@ -5568,7 +5568,7 @@ class BoletimConfig
     private function normalizeRoundMode(string $value): string
     {
         $v = strtolower(trim($value));
-        return in_array($v, ['none', 'half'], true) ? $v : 'none';
+        return in_array($v, ['none', 'half', 'places'], true) ? $v : 'none';
     }
 
     private function normalizeNotaMinimaAprovacao(?float $value): ?float
@@ -5588,7 +5588,7 @@ class BoletimConfig
 
     private function normalizeDecimalPlaces(int $value): int
     {
-        return $value === 1 ? 1 : 2;
+        return \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($value);
     }
 
     /**

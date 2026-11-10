@@ -18,7 +18,7 @@ if ($colsSim === [] || $linhasSim === []) {
     return;
 }
 
-$decSim = ((int) ($decimalPlaces ?? 2) === 1) ? 1 : 2;
+$decSim = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($decimalPlaces ?? 2);
 $ehQuadroSim = \App\Helpers\BoletimQuadroLayoutHelper::partirTabelas($colsSim) !== [];
 $edicaoGuardada = is_array($edicaoSimulacao ?? null) ? $edicaoSimulacao : null;
 $cols = $colsSim;

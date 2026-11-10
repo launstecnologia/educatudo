@@ -66,6 +66,12 @@ class BoletimConfigController extends BaseController
     private array $simulacaoAlunoCache = [];
     /** @var array<int, string> */
     private array $roundModeBoletimCache = [];
+    /** @var array<int, int> */
+    private array $casasDecimaisBoletimCache = [];
+    /** @var array<int, string> */
+    private array $escopoArredondamentoBoletimCache = [];
+    /** Escopo efetivo da simulação atual: medias|todas. */
+    private string $escopoArredondamentoAtual = 'medias';
     /** Ano da regra/simulação atual — usado no recasamento de blocos órfãos. */
     private int $anoLetivoContextoSimulacao = 0;
     /** Simulação só lê o quadro; não grava extras_json da regra. */
@@ -2012,11 +2018,15 @@ class BoletimConfigController extends BaseController
         $notaMinimaAprovacao = $notaMinimaAprovacaoRaw === '' ? null : (float) str_replace(',', '.', $notaMinimaAprovacaoRaw);
         $usarResultadoAprovacao = !empty($_POST['usar_resultado_aprovacao']) ? 1 : 0;
         $roundMode = $this->normalizeRoundMode((string) ($_POST['round_mode'] ?? 'none'));
-        $decimalPlaces = ((int) ($_POST['decimal_places'] ?? 2) === 1) ? 1 : 2;
+        $decimalPlaces = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
+            $_POST['decimal_places'] ?? 2
+        );
         if (is_array($criteriosBol)) {
             $notaMinimaAprovacao = (float) ($criteriosBol['nota_minima_aprovacao'] ?? 6);
             $roundMode = $this->normalizeRoundMode((string) ($criteriosBol['round_mode'] ?? $roundMode));
-            $decimalPlaces = ((int) ($criteriosBol['decimal_places'] ?? $decimalPlaces) === 1) ? 1 : 2;
+            $decimalPlaces = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
+                $criteriosBol['decimal_places'] ?? $decimalPlaces
+            );
         }
         $defaultDataInicio = $this->normalizarDataYmdOpcional((string) ($_POST['default_data_inicio'] ?? ''));
         $defaultDataFim = $this->normalizarDataYmdOpcional((string) ($_POST['default_data_fim'] ?? ''));
@@ -2517,7 +2527,7 @@ class BoletimConfigController extends BaseController
                 (int) ($snap['vis_pais'] ?? 1),
                 (int) ($snap['vis_coordenacao'] ?? 1),
                 (string) ($snap['round_mode'] ?? 'none'),
-                (int) ($snap['decimal_places'] ?? 2) === 1 ? 1 : 2,
+                \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($snap['decimal_places'] ?? 2),
                 $this->normalizarDataYmdOpcional((string) ($snap['default_data_inicio'] ?? '')),
                 $this->normalizarDataYmdOpcional((string) ($snap['default_data_fim'] ?? '')),
                 $notaMin,
@@ -5398,14 +5408,21 @@ class BoletimConfigController extends BaseController
         bool $pularAgrupamentoLinhas = false
     ): array
     {
-        // Critérios de aprovação do boletim mandam no arredondamento (ex.: convencional),
-        // mesmo se a regra/quadro tiver ficado salva com half por default antigo.
+        // Critérios de aprovação do boletim mandam no arredondamento e nas casas decimais,
+        // mesmo se a regra/quadro tiver ficado salva com valores antigos.
         // Pull de evento_boletim pode fixar none via _round_mode_fixo (não reconsultar boletim).
         if (empty($regra['_round_mode_fixo'])) {
             $regra['round_mode'] = $this->resolverRoundModeEfetivoDaRegra($regra);
         } else {
             $regra['round_mode'] = $this->normalizeRoundMode((string) ($regra['round_mode'] ?? 'none'));
         }
+        $regra['decimal_places'] = $this->resolverCasasDecimaisEfetivasDaRegra($regra);
+        $casasCache = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
+            $regra['decimal_places'] ?? 2
+        );
+        $this->resultadoAcademico()->definirCasasArredondamento($casasCache);
+        $this->escopoArredondamentoAtual = $this->resolverEscopoArredondamentoEfetivoDaRegra($regra);
+        $regra['escopo_arredondamento'] = $this->escopoArredondamentoAtual;
 
         $regraIdCache = (int) ($regra['id'] ?? 0);
         $roundModeCache = $this->normalizeRoundMode((string) ($regra['round_mode'] ?? 'none'));
@@ -5413,7 +5430,9 @@ class BoletimConfigController extends BaseController
             . (string) ($rangeInicioOverride ?? '') . ':' . (string) ($rangeFimOverride ?? '')
             . ':' . ($forcarAgrupamentoLinhas ? 'agrupar' : 'auto')
             . ':' . ($pularAgrupamentoLinhas ? 'sem-grupo' : 'com-grupo')
-            . ':rm:' . $roundModeCache;
+            . ':rm:' . $roundModeCache
+            . ':dec:' . $casasCache
+            . ':esc:' . $this->escopoArredondamentoAtual;
         if ($regraIdCache > 0 && isset($this->simulacaoAlunoCache[$chaveSimulacao])) {
             return $this->simulacaoAlunoCache[$chaveSimulacao];
         }
@@ -5710,6 +5729,8 @@ class BoletimConfigController extends BaseController
                             $refRegraPull = $refRegra;
                             $refRegraPull['round_mode'] = 'none';
                             $refRegraPull['_round_mode_fixo'] = true;
+                            $escopoAntesPull = $this->escopoArredondamentoAtual;
+                            $casasAntesPull = $casasCache;
                             $resRef = $this->simularRegraAluno(
                                 $refRegraPull,
                                 $alunoId,
@@ -5719,6 +5740,9 @@ class BoletimConfigController extends BaseController
                                 $stack,
                                 true
                             );
+                            // Recursão do pull sobrescreve escopo/casas do destino — restaura.
+                            $this->escopoArredondamentoAtual = $escopoAntesPull;
+                            $this->resultadoAcademico()->definirCasasArredondamento($casasAntesPull);
                             $matrizRef = $resRef['matriz_materias'] ?? null;
                             $linhasRef = is_array($matrizRef) ? ($matrizRef['linhas'] ?? []) : [];
                             $codColunaResolvido = $this->resolveEventoComponenteCodigoNasLinhas(
@@ -10135,7 +10159,7 @@ class BoletimConfigController extends BaseController
             try {
                 $cadastro = new BoletimCadastroService();
                 $item = $cadastro->model()->findById($boletimId);
-                if (is_array($item)) {
+                if (is_array($item) && empty($item['excluido_em'])) {
                     $criterios = $cadastro->criteriosDoBoletim($item);
                     $modo = $this->normalizeRoundMode((string) ($criterios['round_mode'] ?? 'none'));
                     $this->roundModeBoletimCache[$boletimId] = $modo;
@@ -10150,6 +10174,40 @@ class BoletimConfigController extends BaseController
         return $this->normalizeRoundMode((string) ($regra['round_mode'] ?? 'none'));
     }
 
+    /**
+     * Casas decimais efetivas: regra de aprovação do modelo de boletim manda sobre o documento.
+     *
+     * @param array<string,mixed> $regra
+     */
+    public function resolverCasasDecimaisEfetivasDaRegra(array $regra): int
+    {
+        $boletimId = (int) ($regra['boletim_id'] ?? 0);
+        if ($boletimId > 0) {
+            if (isset($this->casasDecimaisBoletimCache[$boletimId])) {
+                return $this->casasDecimaisBoletimCache[$boletimId];
+            }
+            try {
+                $cadastro = new BoletimCadastroService();
+                $item = $cadastro->model()->findById($boletimId);
+                if (is_array($item) && empty($item['excluido_em'])) {
+                    $criterios = $cadastro->criteriosDoBoletim($item);
+                    $casas = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
+                        $criterios['decimal_places'] ?? 2
+                    );
+                    $this->casasDecimaisBoletimCache[$boletimId] = $casas;
+
+                    return $casas;
+                }
+            } catch (\Throwable $e) {
+                error_log('resolverCasasDecimaisEfetivasDaRegra boletim #' . $boletimId . ': ' . $e->getMessage());
+            }
+        }
+
+        return \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
+            $regra['decimal_places'] ?? 2
+        );
+    }
+
     private function applyRoundMode(?float $value, string $mode): ?float
     {
         return $this->resultadoAcademico()->applyRoundMode($value, $mode);
@@ -10158,11 +10216,10 @@ class BoletimConfigController extends BaseController
     /**
      * Resolve o arredondamento efetivo de um componente: por padrão "herda" o
      * arredondamento do evento (round_mode da regra), mas o componente pode
-     * sobrescrever individualmente via config_json.round_mode_override
-     * ('none' ou 'half'). Qualquer outro valor (ou ausência) = herda do evento.
+     * sobrescrever individualmente via config_json.round_mode_override.
      *
-     * Colunas puxadas de outro evento (PP/PU/…) mantêm a nota lançada: a faixa
-     * .00/.50 aplica-se a MS/MA/MF. MU do print SM usa override none (7,9 não vira 8).
+     * Escopo "medias": só source_type=calculado (MS/MU/fórmulas).
+     * Escopo "todas": aplica também em notas lançadas (PP/PU/CH…).
      */
     private function resolveRoundModeComponente(array $componente, string $roundModeEvento): string
     {
@@ -10180,18 +10237,61 @@ class BoletimConfigController extends BaseController
             $decoded = array_replace($decoded, $componente['config']);
         }
         $override = strtolower(trim((string) ($decoded['round_mode_override'] ?? 'herdar')));
-        if (in_array($override, ['none', 'half'], true)) {
+        if (in_array($override, ['none', 'half', 'places'], true)) {
             return $override;
         }
-        // Nota já lançada (Demonstrativo ou Evento avaliativo PP/PU/PE): chega intacta.
-        if (($componente['source_type'] ?? '') === 'evento_boletim') {
-            return 'none';
-        }
-        if ((int) ($decoded['evento_avaliativo_id'] ?? $componente['evento_avaliativo_id'] ?? 0) > 0) {
+
+        $layoutType = strtolower(trim((string) ($decoded['layout_type'] ?? $componente['layout_type'] ?? '')));
+        if ($layoutType === 'faltas') {
             return 'none';
         }
 
+        $source = strtolower(trim((string) ($componente['source_type'] ?? '')));
+        $ehCalculado = $source === 'calculado';
+        $escopo = $this->escopoArredondamentoAtual === 'todas' ? 'todas' : 'medias';
+
+        if ($escopo === 'medias') {
+            // Só médias/cálculos; PP/PU/CH e eventos lançados ficam intactos.
+            if (!$ehCalculado) {
+                return 'none';
+            }
+            return $roundModeEvento;
+        }
+
+        // todas as notas
         return $roundModeEvento;
+    }
+
+    /**
+     * @param array<string,mixed> $regra
+     */
+    public function resolverEscopoArredondamentoEfetivoDaRegra(array $regra): string
+    {
+        $boletimId = (int) ($regra['boletim_id'] ?? 0);
+        if ($boletimId > 0) {
+            if (isset($this->escopoArredondamentoBoletimCache[$boletimId])) {
+                return $this->escopoArredondamentoBoletimCache[$boletimId];
+            }
+            try {
+                $cadastro = new BoletimCadastroService();
+                $item = $cadastro->model()->findById($boletimId);
+                if (is_array($item) && empty($item['excluido_em'])) {
+                    $criterios = $cadastro->criteriosDoBoletim($item);
+                    $escopo = strtolower(trim((string) ($criterios['escopo_arredondamento'] ?? 'medias')));
+                    if ($escopo !== 'todas') {
+                        $escopo = 'medias';
+                    }
+                    $this->escopoArredondamentoBoletimCache[$boletimId] = $escopo;
+
+                    return $escopo;
+                }
+            } catch (\Throwable $e) {
+                error_log('resolverEscopoArredondamentoEfetivoDaRegra boletim #' . $boletimId . ': ' . $e->getMessage());
+            }
+        }
+        $escopo = strtolower(trim((string) ($regra['escopo_arredondamento'] ?? 'medias')));
+
+        return $escopo === 'todas' ? 'todas' : 'medias';
     }
 
     /**
@@ -12361,7 +12461,7 @@ class BoletimConfigController extends BaseController
         $roundOverride = null;
         if (isset($componente['config']) && is_array($componente['config'])) {
             $rmRaw = strtolower(trim((string) ($componente['config']['round_mode_override'] ?? '')));
-            if (in_array($rmRaw, ['none', 'half'], true)) {
+            if (in_array($rmRaw, ['none', 'half', 'places'], true)) {
                 $roundOverride = $rmRaw;
             }
         }

@@ -219,7 +219,9 @@ class ResultadoAcademicoService
             'frequencia_minima' => FrequencyService::MINIMO_LEGAL,
             'usar_frequencia' => 0,
             'round_mode' => $round,
-            'decimal_places' => (int) ($eventoBoletim['decimal_places'] ?? 2) === 1 ? 1 : 2,
+            'decimal_places' => \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
+                $eventoBoletim['decimal_places'] ?? 2
+            ),
             'formula_final' => $eventoBoletim['formula_final'] ?? null,
             'recuperacao_tipo' => 'nenhuma',
             'recuperacao_composicao' => 'maior_nota',
@@ -443,6 +445,9 @@ class ResultadoAcademicoService
             ? (float) $regra['media_minima']
             : 6.0;
         $round = $this->normalizeRoundMode((string) ($regra['round_mode'] ?? 'none'));
+        $this->definirCasasArredondamento(
+            (int) ($regra['decimal_places'] ?? $this->casasArredondamento)
+        );
 
         $final = $media;
         $usou = false;
@@ -507,10 +512,18 @@ class ResultadoAcademicoService
         return $this->freqCache[$cacheKey];
     }
 
+    /** Casas usadas quando round_mode = places (ex.: 7,95 → 8,0 com 1 casa). */
+    private int $casasArredondamento = 2;
+
+    public function definirCasasArredondamento(int $casas): void
+    {
+        $this->casasArredondamento = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($casas);
+    }
+
     public function normalizeRoundMode(string $value): string
     {
         $v = strtolower(trim($value));
-        return in_array($v, ['none', 'half'], true) ? $v : 'none';
+        return in_array($v, ['none', 'half', 'places'], true) ? $v : 'none';
     }
 
     public function applyRoundMode(?float $value, string $mode): ?float
@@ -519,6 +532,11 @@ class ResultadoAcademicoService
             return null;
         }
         $v = (float) $value;
+        $mode = $this->normalizeRoundMode($mode);
+        if ($mode === 'places') {
+            // Ex.: (8,0 + 7,9)/2 = 7,95 com 1 casa → 8,0
+            return round($v, $this->casasArredondamento);
+        }
         if ($mode !== 'half') {
             return round($v, 2);
         }

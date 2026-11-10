@@ -120,7 +120,7 @@ class RegraAcademicaService
         }
 
         $roundMode = strtolower(trim((string) ($input['round_mode'] ?? 'none')));
-        if (!in_array($roundMode, ['none', 'half'], true)) {
+        if (!in_array($roundMode, ['none', 'half', 'places'], true)) {
             $roundMode = 'none';
         }
 
@@ -179,6 +179,10 @@ class RegraAcademicaService
             'usar_frequencia' => !empty($input['usar_frequencia']) ? 1 : 0,
             'round_mode' => $roundMode,
             'decimal_places' => $dec,
+            'escopo_arredondamento' => (($escopo = strtolower(trim((string) ($input['escopo_arredondamento'] ?? 'medias'))))
+                && isset(RegraAcademica::ESCOPOS_ARREDONDAMENTO[$escopo]))
+                ? $escopo
+                : 'medias',
             'formula_media' => $formulaMedia !== '' ? $formulaMedia : null,
             'formula_final' => $formulaFinal !== '' ? $formulaFinal : null,
             'recuperacao_tipo' => $recTipo,

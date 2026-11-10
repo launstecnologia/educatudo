@@ -265,7 +265,7 @@ $simularQuadroAluno = static function (
         }
         $simulacao = $motor->montarMatrizDemonstrativoComGrupoHierarquico($simulacao, $regra);
         $simulacao['_regra_nome'] = (string) ($regra['nome'] ?? '');
-        $simulacao['_decimal_places'] = (int) ($regra['decimal_places'] ?? 2);
+        $simulacao['_decimal_places'] = $motor->resolverCasasDecimaisEfetivasDaRegra($regra);
         $simulacaoQuadroCache[$chaveSim] = $simulacao;
 
         return $simulacao;
@@ -293,7 +293,9 @@ $renderQuadroDemonstrativo = static function (
         if ($cols === [] || $linhas === []) {
             return '';
         }
-        $decimalPlaces = ((int) ($simulacao['_decimal_places'] ?? 2) === 1) ? 1 : 2;
+        $decimalPlaces = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
+            $simulacao['_decimal_places'] ?? 2
+        );
         $edicaoSimulacao = null;
         $htmlQuadroVivo = '';
         if (\App\Helpers\BoletimQuadroLayoutHelper::partirTabelas($cols) !== []) {
@@ -348,7 +350,9 @@ $renderNotasAoVivo = static function (
     if ($cols === [] || $linhas === []) {
         return '';
     }
-    $decimalPlaces = ((int) ($simulacao['_decimal_places'] ?? 2) === 1) ? 1 : 2;
+    $decimalPlaces = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
+        $simulacao['_decimal_places'] ?? 2
+    );
     $tituloTabelaSimples = 'Matéria';
     $ocultar_grupo_hierarquia = false;
     ob_start();
@@ -357,7 +361,25 @@ $renderNotasAoVivo = static function (
     return (string) ob_get_clean();
 };
 
-$renderNotasComoCoordenacao = static function (array $ev): string {
+$resolverCasasDoEvento = static function (array $ev) use ($obterMotorDemonstrativo, $obterCfgBoletim): int {
+    $dec = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($ev['decimal_places'] ?? 2);
+    $rid = (int) ($ev['regra_id'] ?? 0);
+    if ($rid <= 0) {
+        return $dec;
+    }
+    try {
+        $regraEv = $obterCfgBoletim()->getRuleById($rid);
+        if (is_array($regraEv)) {
+            return $obterMotorDemonstrativo()->resolverCasasDecimaisEfetivasDaRegra($regraEv);
+        }
+    } catch (\Throwable $eCasasEv) {
+        // mantém snapshot
+    }
+
+    return $dec;
+};
+
+$renderNotasComoCoordenacao = static function (array $ev) use ($resolverCasasDoEvento): string {
     $cols = \App\Helpers\BoletimQuadroLayoutHelper::colunasDetalheCoordenacao(
         is_array($ev['colunas'] ?? null) ? $ev['colunas'] : []
     );
@@ -365,7 +387,7 @@ $renderNotasComoCoordenacao = static function (array $ev): string {
     if ($cols === [] || $linhasEv === []) {
         return '';
     }
-    $dec = max(0, min(2, (int) ($ev['decimal_places'] ?? 1)));
+    $dec = $resolverCasasDoEvento($ev);
     $fmt = static function ($value) use ($dec): string {
         if ($value === null || $value === '') {
             return '—';
@@ -500,6 +522,7 @@ foreach ($linhasPeriodo as &$linhaP) {
         if (is_array($evGerado) && !empty($evGerado['linhas']) && !empty($evGerado['colunas'])) {
             $colsGer = is_array($evGerado['colunas']) ? $evGerado['colunas'] : [];
             if (\App\Helpers\BoletimQuadroLayoutHelper::ehLayoutQuadro($colsGer) || $ridP <= 0) {
+                $evGerado['decimal_places'] = $resolverCasasDoEvento($evGerado);
                 $boletinsGeradosBackup = $boletins_gerados ?? [];
                 $boletimPodeExcluirBackup = $boletim_pode_excluir ?? false;
                 $boletimAlunoIdBackup = $boletim_aluno_id ?? 0;
