@@ -2526,7 +2526,7 @@ class BoletimAssistenteWizard
                 $fnLabel = $fnVal === 'min'
                     ? 'menor ('
                     : ($fnVal === 'chamada'
-                        ? 'substituta ('
+                        ? 'nota substituta ('
                         : ($fnVal === 'composicao' ? 'média c/ rec (' : 'maior ('));
                 $tokens[] = [
                     'type' => 'fn',
@@ -5999,7 +5999,7 @@ class BoletimAssistenteWizard
                     'label' => $value === 'min'
                         ? 'menor ('
                         : ($value === 'chamada'
-                            ? 'substituta ('
+                            ? 'nota substituta ('
                             : ($value === 'composicao' ? 'média c/ rec (' : 'maior (')),
                 ];
             }

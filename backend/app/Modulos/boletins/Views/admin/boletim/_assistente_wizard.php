@@ -2197,7 +2197,7 @@ $boletimWizardSteps = [
         if (!tok) return '';
         if (tok.type === 'fn') {
             if (tok.value === 'min') return 'menor (';
-            if (tok.value === 'chamada' || tok.value === 'substituta') return 'substituta (';
+            if (tok.value === 'chamada' || tok.value === 'substituta') return 'nota substituta (';
             if (tok.value === 'composicao') return 'média c/ rec (';
             return 'maior (';
         }
@@ -2234,7 +2234,7 @@ $boletimWizardSteps = [
             { type: 'op', value: ',', label: ',' },
             { type: 'fn', value: 'max', label: 'maior (' },
             { type: 'fn', value: 'min', label: 'menor (' },
-            { type: 'fn', value: 'chamada', label: 'substituta (' },
+            { type: 'fn', value: 'chamada', label: 'nota substituta (' },
             { type: 'fn', value: 'composicao', label: 'média c/ rec (' }
         ];
     }
@@ -2434,7 +2434,7 @@ $boletimWizardSteps = [
         return '';
     }
 
-    /** Modelo: substituta(PP, PU, CH) — média das bases; CH preenche a 1ª ausente. */
+    /** Modelo: nota substituta(nota1, nota2, substituta) — média das bases; substituta preenche a 1ª ausente. */
     function tokensMediaComSubstituta() {
         var cols = [];
         function pushCol(c) {
@@ -2484,7 +2484,7 @@ $boletimWizardSteps = [
         bases = bases.filter(function (c) { return c && c !== subst; });
         if (!bases.length) return tokensMediaDasPecas();
 
-        var toks = [{ type: 'fn', value: 'chamada', label: 'substituta (' }];
+        var toks = [{ type: 'fn', value: 'chamada', label: 'nota substituta (' }];
         bases.forEach(function (cod, idx) {
             if (idx > 0) toks.push({ type: 'op', value: ',', label: ',' });
             toks.push({ type: 'peca', value: cod, label: tituloColuna(cod) || pecaLabel(cod) || cod });
@@ -3129,7 +3129,7 @@ $boletimWizardSteps = [
                 var labFn = item.v === 'min'
                     ? 'menor ('
                     : (item.v === 'chamada' || item.v === 'substituta'
-                        ? 'substituta ('
+                        ? 'nota substituta ('
                         : (item.v === 'composicao' ? 'média c/ rec (' : 'maior ('));
                 toks.push({ type: 'fn', value: item.v, label: labFn });
             }
@@ -9286,7 +9286,7 @@ $boletimWizardSteps = [
                 html += '<p id="bw-formula-bloco-titulo" class="text-sm font-semibold text-amber-950">Cálculo de <span id="bw-formula-bloco-nome">' + esc(nomeBlocoCalc(estado.bloco_calc || 'média')) + '</span></p>';
                 html += '<p id="bw-formula-bloco-ajuda" class="text-xs text-amber-900/80 mt-0.5 mb-2">A média é a soma entre parênteses, depois ÷ quantidade. Ex.: (Prova + Trabalho + Participação) ÷ 3.</p>';
                 html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-1.5">Usar no cálculo</p>';
-                html += '<p class="text-[11px] text-slate-500 mb-1.5">Separado por ciclo (bimestre/semestre) para não misturar PP/PU iguais.</p>';
+                html += '<p class="text-[11px] text-slate-500 mb-1.5">Separado por ciclo (bimestre/semestre) para não misturar colunas iguais de períodos diferentes.</p>';
                 html += '<div id="bw-formula-pecas-pal" class="bw-palette"></div>';
                 html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mt-3 mb-1.5">Sinais</p>';
                 html += '<div class="bw-palette flex flex-wrap gap-2 items-center">';
@@ -9297,10 +9297,10 @@ $boletimWizardSteps = [
                 html += '<div class="mt-2 flex flex-wrap gap-2">';
                 html += '<button type="button" id="bw-formula-media" class="px-2.5 py-1.5 text-xs rounded-lg border border-indigo-200 text-indigo-700 hover:bg-indigo-50">Média das peças</button>';
                 html += '<button type="button" id="bw-formula-max" class="px-2.5 py-1.5 text-xs rounded-lg border border-amber-200 text-amber-800 hover:bg-amber-50">Maior entre as duas primeiras</button>';
-                html += '<button type="button" id="bw-formula-substituta" class="px-2.5 py-1.5 text-xs rounded-lg border border-emerald-200 text-emerald-800 hover:bg-emerald-50" title="Média de PP e PU; CH entra no lugar da primeira nota ausente">Substituta (PP/PU + CH)</button>';
+                html += '<button type="button" id="bw-formula-substituta" class="px-2.5 py-1.5 text-xs rounded-lg border border-emerald-200 text-emerald-800 hover:bg-emerald-50" title="Média das notas principais; a substituta entra no lugar da primeira nota ausente">Média com nota substituta</button>';
                 html += '<button type="button" id="bw-formula-composicao" class="px-2.5 py-1.5 text-xs rounded-lg border border-violet-200 text-violet-800 hover:bg-violet-50" title="Sem recuperação: fica a média. Com recuperação: (média + recuperação) ÷ 2">Média com recuperação</button>';
                 html += '<button type="button" id="bw-formula-limpar" class="px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">Limpar</button></div>';
-                html += '<p class="mt-1.5 text-[11px] text-slate-500">Substituta já calcula a <strong>média</strong> (<code class="bg-white/80 px-1 rounded">chamada(PP, PU, CH)</code>). Não coloque <code class="bg-white/80 px-1 rounded">÷ 2</code> de novo — a nota fica na metade. Some a PE depois, se precisar: <code class="bg-white/80 px-1 rounded">… + PE</code>.</p>';
+                html += '<p class="mt-1.5 text-[11px] text-slate-500"><strong>Média com nota substituta</strong> já calcula a média das notas principais; a substituta entra só no lugar da primeira nota ausente. Não coloque <code class="bg-white/80 px-1 rounded">÷ 2</code> de novo — a nota fica na metade. Some outra nota depois, se precisar: <code class="bg-white/80 px-1 rounded">… + nota</code>.</p>';
                 html += '<p class="mt-1 text-[11px] text-slate-500"><strong>Média com recuperação</strong> monta <code class="bg-white/80 px-1 rounded">média c/ rec((média 1 + média 2)÷2, recuperação)</code>: sem recuperação fica só a média; com recuperação vira (média+recuperação)÷2.</p>';
                 html += '<p id="bw-formula-canvas-label" class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mt-3 mb-1.5">Fórmula desta coluna</p>';
                 html += '<div id="bw-formula-canvas" class="bw-canvas">' + htmlCanvasTokens() + '</div>';
