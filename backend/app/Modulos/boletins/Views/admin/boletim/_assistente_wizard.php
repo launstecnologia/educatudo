@@ -6737,6 +6737,9 @@ $boletimWizardSteps = [
             return false;
         }
         var idFal = resolverFonteFaltasBim(bim);
+        // Se a FAL já tinha sido excluída (X / limpar todos), precisa sair de colunas_ocultas.
+        mostrarColuna(codigo);
+        mostrarColuna('b' + bim + '_faltas');
         estado.quadro_chips_manuais = 1;
         if (!Array.isArray(estado.colunas_ordem)) estado.colunas_ordem = [];
         if (estado.colunas_ordem.map(function (c) { return String(c || '').toLowerCase(); }).indexOf(codigo) < 0) {

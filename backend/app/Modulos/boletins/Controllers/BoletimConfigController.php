@@ -6888,6 +6888,9 @@ class BoletimConfigController extends BaseController
      * Copia notas de matérias homônimas (ex.: SM24-Arte) para os IDs do modelo/evento
      * (ex.: Arte da escola) antes do filtro por materias_ids.
      *
+     * Em produção o lançamento costuma ficar num id (seed/homologação) e o modelo lista
+     * o id oficial da escola com o mesmo nome — sem hidratar os dois lados, a prévia fica "—".
+     *
      * @param array<string, array<int, float|null>> $matrizPorCodigo
      * @param array<int, string> $materiaNomesPorId
      * @param list<int> $materiasSelecionadas
@@ -6897,10 +6900,29 @@ class BoletimConfigController extends BaseController
         array &$matrizPorCodigo,
         array &$materiaNomesPorId,
         array $materiasSelecionadas,
-        array $nomesCatalogoById
+        array &$nomesCatalogoById
     ): void {
+        $idsInteressados = [];
+        foreach ($materiasSelecionadas as $midSel) {
+            $midSel = (int) $midSel;
+            if ($midSel > 0) {
+                $idsInteressados[$midSel] = $midSel;
+            }
+        }
+        foreach ($matrizPorCodigo as $mapVals) {
+            if (!is_array($mapVals)) {
+                continue;
+            }
+            foreach (array_keys($mapVals) as $midOrigem) {
+                $midOrigem = (int) $midOrigem;
+                if ($midOrigem > 0) {
+                    $idsInteressados[$midOrigem] = $midOrigem;
+                }
+            }
+        }
+        $this->hidratarNomesMateriasPorIds($idsInteressados, $materiaNomesPorId, $nomesCatalogoById);
+
         $destinoPorNome = [];
-        $faltandoNome = [];
         foreach ($materiasSelecionadas as $midSel) {
             $midSel = (int) $midSel;
             if ($midSel <= 0) {
@@ -6908,7 +6930,6 @@ class BoletimConfigController extends BaseController
             }
             $nomeSel = trim((string) ($materiaNomesPorId[$midSel] ?? ($nomesCatalogoById[$midSel] ?? '')));
             if ($nomeSel === '') {
-                $faltandoNome[$midSel] = $midSel;
                 continue;
             }
             $chave = $this->canonicalMateriaNomeKey($nomeSel);
@@ -6920,31 +6941,6 @@ class BoletimConfigController extends BaseController
             }
             if (!isset($materiaNomesPorId[$midSel])) {
                 $materiaNomesPorId[$midSel] = $nomeSel;
-            }
-        }
-        // Pais-rótulo (permite_avaliacao=0) podem ficar fora do catálogo da pauta.
-        if ($faltandoNome !== []) {
-            try {
-                $ph = implode(',', array_fill(0, count($faltandoNome), '?'));
-                $rowsNome = Database::getInstance()->fetchAll(
-                    "SELECT id, nome FROM materias WHERE id IN ({$ph})",
-                    array_values($faltandoNome)
-                ) ?: [];
-                foreach ($rowsNome as $rowNome) {
-                    $midNome = (int) ($rowNome['id'] ?? 0);
-                    $nomeDb = trim((string) ($rowNome['nome'] ?? ''));
-                    if ($midNome <= 0 || $nomeDb === '') {
-                        continue;
-                    }
-                    $materiaNomesPorId[$midNome] = $nomeDb;
-                    $nomesCatalogoById[$midNome] = $nomeDb;
-                    $chave = $this->canonicalMateriaNomeKey($nomeDb);
-                    if ($chave !== '' && !isset($destinoPorNome[$chave])) {
-                        $destinoPorNome[$chave] = $midNome;
-                    }
-                }
-            } catch (\Throwable $e) {
-                // remapeamento parcial pelos nomes já conhecidos
             }
         }
         if ($destinoPorNome === []) {
@@ -6977,6 +6973,170 @@ class BoletimConfigController extends BaseController
                 }
             }
         }
+    }
+
+    /**
+     * Garante nome de matéria para IDs da matriz e do modelo (evita remap mudo em produção).
+     *
+     * @param array<int, int> $ids
+     * @param array<int, string> $materiaNomesPorId
+     * @param array<int, string> $nomesCatalogoById
+     */
+    private function hidratarNomesMateriasPorIds(
+        array $ids,
+        array &$materiaNomesPorId,
+        array &$nomesCatalogoById
+    ): void {
+        $faltando = [];
+        foreach ($ids as $mid) {
+            $mid = (int) $mid;
+            if ($mid <= 0) {
+                continue;
+            }
+            $nome = trim((string) ($materiaNomesPorId[$mid] ?? ($nomesCatalogoById[$mid] ?? '')));
+            if ($nome === '') {
+                $faltando[$mid] = $mid;
+            }
+        }
+        if ($faltando === []) {
+            return;
+        }
+        try {
+            $ph = implode(',', array_fill(0, count($faltando), '?'));
+            $rowsNome = Database::getInstance()->fetchAll(
+                "SELECT id, nome FROM materias WHERE id IN ({$ph})",
+                array_values($faltando)
+            ) ?: [];
+            foreach ($rowsNome as $rowNome) {
+                $midNome = (int) ($rowNome['id'] ?? 0);
+                $nomeDb = trim((string) ($rowNome['nome'] ?? ''));
+                if ($midNome <= 0 || $nomeDb === '') {
+                    continue;
+                }
+                $materiaNomesPorId[$midNome] = $nomeDb;
+                $nomesCatalogoById[$midNome] = $nomeDb;
+            }
+        } catch (\Throwable $e) {
+            // hidratação parcial: remap usa o que já tiver
+        }
+    }
+
+    /**
+     * Se a linha do modelo ficou sem nota e existe homônima com lançamento, usa a homônima.
+     * Cobre o caso em que o remap não copiou (nome ausente) mas a nota existe na matriz.
+     *
+     * @param list<int> $midsOrdenados
+     * @param array<string, array<int, float|null>> $matrizPorCodigo
+     * @param array<int, string> $materiaNomesPorId
+     * @param array<int, string> $nomesCatalogoById
+     * @param array<int, bool> $allMids
+     * @return list<int>
+     */
+    private function substituirSelecionadasVaziasPorHomologasComNota(
+        array $midsOrdenados,
+        array &$matrizPorCodigo,
+        array &$materiaNomesPorId,
+        array &$nomesCatalogoById,
+        array &$allMids
+    ): array {
+        $idsMatriz = [];
+        foreach ($matrizPorCodigo as $mapVals) {
+            if (!is_array($mapVals)) {
+                continue;
+            }
+            foreach (array_keys($mapVals) as $mid) {
+                $mid = (int) $mid;
+                if ($mid > 0) {
+                    $idsMatriz[$mid] = $mid;
+                }
+            }
+        }
+        foreach ($midsOrdenados as $midOrd) {
+            $midOrd = (int) $midOrd;
+            if ($midOrd > 0) {
+                $idsMatriz[$midOrd] = $midOrd;
+            }
+        }
+        $this->hidratarNomesMateriasPorIds($idsMatriz, $materiaNomesPorId, $nomesCatalogoById);
+
+        $comNotaPorNome = [];
+        foreach ($idsMatriz as $mid) {
+            $mid = (int) $mid;
+            $temNota = false;
+            foreach ($matrizPorCodigo as $mapVals) {
+                if (!is_array($mapVals)) {
+                    continue;
+                }
+                if (isset($mapVals[$mid]) && is_numeric($mapVals[$mid])) {
+                    $temNota = true;
+                    break;
+                }
+            }
+            if (!$temNota) {
+                continue;
+            }
+            $nome = trim((string) ($materiaNomesPorId[$mid] ?? ($nomesCatalogoById[$mid] ?? '')));
+            $chave = $this->canonicalMateriaNomeKey($nome);
+            if ($chave === '') {
+                continue;
+            }
+            if (!isset($comNotaPorNome[$chave])) {
+                $comNotaPorNome[$chave] = $mid;
+            }
+        }
+        if ($comNotaPorNome === []) {
+            return $midsOrdenados;
+        }
+
+        $ja = [];
+        $out = [];
+        foreach ($midsOrdenados as $mid) {
+            $mid = (int) $mid;
+            if ($mid <= 0) {
+                $out[] = $mid;
+                continue;
+            }
+            $temNota = false;
+            foreach ($matrizPorCodigo as $mapVals) {
+                if (!is_array($mapVals)) {
+                    continue;
+                }
+                if (isset($mapVals[$mid]) && is_numeric($mapVals[$mid])) {
+                    $temNota = true;
+                    break;
+                }
+            }
+            $nome = trim((string) ($materiaNomesPorId[$mid] ?? ($nomesCatalogoById[$mid] ?? '')));
+            $chave = $this->canonicalMateriaNomeKey($nome);
+            $midFinal = $mid;
+            if (!$temNota && $chave !== '' && isset($comNotaPorNome[$chave])) {
+                $midHomologa = (int) $comNotaPorNome[$chave];
+                if ($midHomologa > 0 && $midHomologa !== $mid) {
+                    // Copia para o id do modelo (mantém a linha esperada) e também aceita a homologa.
+                    foreach ($matrizPorCodigo as $codigo => $mapVals) {
+                        if (!is_array($mapVals) || !isset($mapVals[$midHomologa]) || !is_numeric($mapVals[$midHomologa])) {
+                            continue;
+                        }
+                        $atual = $matrizPorCodigo[$codigo][$mid] ?? null;
+                        if (!is_numeric($atual)) {
+                            $matrizPorCodigo[$codigo][$mid] = (float) $mapVals[$midHomologa];
+                        }
+                    }
+                    if (!isset($materiaNomesPorId[$mid]) && $nome !== '') {
+                        $materiaNomesPorId[$mid] = $nome;
+                    }
+                    $midFinal = $mid;
+                    $allMids[$mid] = true;
+                }
+            }
+            if (isset($ja[$midFinal])) {
+                continue;
+            }
+            $ja[$midFinal] = true;
+            $out[] = $midFinal;
+        }
+
+        return $out;
     }
 
     /**
@@ -7932,8 +8092,8 @@ class BoletimConfigController extends BaseController
                 return $mid <= 0 || !isset($materiasAgrupadas[$mid]);
             }));
         }
-        // Seed/homologação pode lançar em matéria homônima (ex.: SM24-Arte vs Arte da escola).
-        // Remapeia notas pelo nome canônico para os IDs do modelo/evento antes do filtro.
+        // Seed/homologação / produção: lançamento num id e modelo noutro com o mesmo nome
+        // (ex.: SM24-Arte vs Arte da escola). Copia a nota para o id exibido antes do filtro.
         if ($materiasSelecionadas !== []) {
             $this->remapearMatrizNotasParaMateriasSelecionadas(
                 $matrizPorCodigo,
@@ -7965,6 +8125,15 @@ class BoletimConfigController extends BaseController
             }));
             if ($filtradosSel !== []) {
                 $midsOrdenados = $filtradosSel;
+                // Modelo ficou com a linha da escola vazia e a nota na homônima fora da lista:
+                // troca a linha vazia pela que tem nota (mesmo nome), típico de produção.
+                $midsOrdenados = $this->substituirSelecionadasVaziasPorHomologasComNota(
+                    $midsOrdenados,
+                    $matrizPorCodigo,
+                    $materiaNomesPorId,
+                    $nomesCatalogoById,
+                    $allMids
+                );
             } elseif ($midsOrdenados !== []) {
                 // Homônimas do seed (SM24-*) ficaram de fora do modelo: mantém só quem tem nota.
                 $comNota = [];
