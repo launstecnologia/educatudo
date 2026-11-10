@@ -5731,12 +5731,16 @@ class BoletimConfigController extends BaseController
                             $refRegraPull['_round_mode_fixo'] = true;
                             $escopoAntesPull = $this->escopoArredondamentoAtual;
                             $casasAntesPull = $casasCache;
+                            // Intervalo do evento/demonstrativo de origem (não o RANGE do pai).
+                            // Cada coluna puxa por ID de evento; o período do origem define o escopo.
+                            $iniPull = $this->normalizarDataYmdOpcional((string) ($refRegra['default_data_inicio'] ?? ''));
+                            $fimPull = $this->normalizarDataYmdOpcional((string) ($refRegra['default_data_fim'] ?? ''));
                             $resRef = $this->simularRegraAluno(
                                 $refRegraPull,
                                 $alunoId,
                                 $periodoRef,
-                                null,
-                                null,
+                                $iniPull,
+                                $fimPull,
                                 $stack,
                                 true
                             );
@@ -5869,6 +5873,7 @@ class BoletimConfigController extends BaseController
                                         $map[$localMid] = (float) $valRef;
                                         $materiaNomesPorId[$localMid] = $nomeRef !== '' ? $nomeRef : 'Redação';
                                     } elseif ($midRef > 0) {
+                                        // Nota do evento de origem: o materia_id do lançamento manda.
                                         $map[$midRef] = (float) $valRef;
                                         if ($nomeRef !== '') {
                                             $materiaNomesPorId[$midRef] = $nomeRef;
@@ -6921,7 +6926,7 @@ class BoletimConfigController extends BaseController
         if ($faltandoNome !== []) {
             try {
                 $ph = implode(',', array_fill(0, count($faltandoNome), '?'));
-                $rowsNome = $this->db->fetchAll(
+                $rowsNome = Database::getInstance()->fetchAll(
                     "SELECT id, nome FROM materias WHERE id IN ({$ph})",
                     array_values($faltandoNome)
                 ) ?: [];
@@ -7810,7 +7815,7 @@ class BoletimConfigController extends BaseController
             if ($selSemNome !== []) {
                 try {
                     $phSel = implode(',', array_fill(0, count($selSemNome), '?'));
-                    $rowsSelNome = $this->db->fetchAll(
+                    $rowsSelNome = Database::getInstance()->fetchAll(
                         "SELECT id, nome FROM materias WHERE id IN ({$phSel})",
                         array_values($selSemNome)
                     ) ?: [];

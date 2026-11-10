@@ -179,20 +179,17 @@ foreach ($blocos as $b) {
 }
 
 $materiasIds = [];
+// Só matérias SM24 lançáveis nos eventos SM24 (mesmo materia_id das notas).
 $matRows = $db->fetchAll(
     "SELECT id FROM materias
-      WHERE ativo = 1 AND (
-            codigo LIKE 'SM24-%'
-         OR nome IN (
-            'Redação','Literatura','Arte','Geografia','Sociologia','Filosofia','Língua Inglesa','Educação Física',
-            'História 1','História 2','Matemática 1','Matemática 2','Física 1','Física 2',
-            'Química 1','Química 2','Biologia 1','Biologia 2'
-         )
-      )
+      WHERE ativo = 1 AND codigo LIKE 'SM24-%' AND permite_avaliacao = 1
       ORDER BY id ASC"
 ) ?: [];
 foreach ($matRows as $m) {
     $materiasIds[] = (int) $m['id'];
+}
+if ($materiasIds === []) {
+    fail('Nenhuma matéria SM24-*. Rode o seed antes.');
 }
 $materiasJson = json_encode(array_values(array_unique($materiasIds)), JSON_UNESCAPED_UNICODE);
 $seriesJson = $serieId > 0 ? json_encode([$serieId]) : '[]';

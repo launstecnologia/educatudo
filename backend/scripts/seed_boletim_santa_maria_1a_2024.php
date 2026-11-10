@@ -435,9 +435,13 @@ final class SeedBoletimSantaMaria1A
         $precisamos = array_values(array_unique($precisamos));
 
         foreach ($precisamos as $nome) {
+            // Prefere matéria SM24 (código PREFIXO-*). Nota fica no mesmo materia_id
+            // do evento/subevento; não misturar com homônima da escola.
             $row = $this->db->fetch(
-                'SELECT id, pai_id, permite_avaliacao FROM materias WHERE nome = :n ORDER BY id ASC LIMIT 1',
-                ['n' => $nome]
+                'SELECT id, pai_id, permite_avaliacao FROM materias
+                  WHERE codigo LIKE :pref AND nome = :n
+                  ORDER BY id ASC LIMIT 1',
+                ['pref' => PREFIXO . '-%', 'n' => $nome]
             );
             if ($row) {
                 $this->materiaIds[$nome] = (int) $row['id'];
