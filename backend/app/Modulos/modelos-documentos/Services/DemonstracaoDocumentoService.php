@@ -200,14 +200,53 @@ class DemonstracaoDocumentoService
             return '';
         }
         try {
-            if (!class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)) {
-                return '';
+            if (class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)) {
+                $html = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
+                    ->htmlQuadroPorBoletim($alunoId, $boletimId);
+                $html = is_string($html) ? trim($html) : '';
+                if ($html !== '') {
+                    return $html;
+                }
             }
-            $html = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
-                ->htmlQuadroPorBoletim($alunoId, $boletimId);
-            return is_string($html) ? trim($html) : '';
         } catch (\Throwable $e) {
             error_log('DemonstracaoDocumento quadro boletim: ' . $e->getMessage());
+        }
+
+        // Fallback Santa Maria (PP/PU/CH…): se o assistente não resolveu a regra de impressão.
+        try {
+            $ano = $this->anoDoBoletim($boletimId);
+            if ($ano <= 0) {
+                return '';
+            }
+            $nome = $this->nomeDoBoletim($boletimId);
+            $pareceSm = $nome !== '' && (
+                str_contains(mb_strtolower($nome), 'santa maria')
+                || str_contains(mb_strtolower($nome), 'santa_maria')
+            );
+            if (!$pareceSm) {
+                return '';
+            }
+            $quadro = (new QuadroBoletimSantaMariaService($this->db))->montarHtml($alunoId, $ano);
+            $htmlSm = trim((string) ($quadro['html'] ?? ''));
+            return ((int) ($quadro['linhas'] ?? 0) > 0 && $htmlSm !== '') ? $htmlSm : '';
+        } catch (\Throwable $e) {
+            error_log('DemonstracaoDocumento quadro Santa Maria: ' . $e->getMessage());
+            return '';
+        }
+    }
+
+    private function nomeDoBoletim(int $boletimId): string
+    {
+        if ($boletimId <= 0 || !$this->tabelaExiste('boletins')) {
+            return '';
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT nome FROM boletins WHERE id = :id LIMIT 1',
+                ['id' => $boletimId]
+            );
+            return is_array($row) ? trim((string) ($row['nome'] ?? '')) : '';
+        } catch (\Throwable $e) {
             return '';
         }
     }
