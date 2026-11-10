@@ -14352,6 +14352,60 @@ class BoletimConfigController extends BaseController
     {
         $avisos = [];
         $boletimId = (int) ($regra['boletim_id'] ?? 0);
+        $extras = [];
+        $rawExtras = $regra['extras_json'] ?? '';
+        if (is_array($rawExtras)) {
+            $extras = $rawExtras;
+        } elseif (is_string($rawExtras) && trim($rawExtras) !== '') {
+            $decExtras = json_decode($rawExtras, true);
+            if (is_array($decExtras)) {
+                $extras = $decExtras;
+            }
+        }
+        $origem = strtolower(trim((string) ($extras['origem'] ?? '')));
+        $layoutId = (int) ($extras['layout_boletim_id'] ?? 0);
+        // Quadro de impressão / Santa Maria: o próprio evento já é o modelo de colunas.
+        // Não exige vínculo a outro cadastro em "Modelo de Boletim".
+        $ehQuadroImpressao = in_array($origem, ['quadro-impressao', 'santa-maria'], true)
+            || $layoutId > 0
+            || !empty($extras['quadro_livre'])
+            || !empty($extras['modelo_santa_maria']);
+
+        if ($ehQuadroImpressao && $boletimId <= 0) {
+            $bloqueios = [];
+            $materias = $this->parseMateriasIdsFromRegra($regra);
+            if ($materias === []) {
+                $bloqueios[] = 'Selecione as matérias deste boletim antes de gerar.';
+            }
+            $series = [];
+            foreach ((array) ($regra['series_ids'] ?? []) as $sid) {
+                $sid = (int) $sid;
+                if ($sid > 0) {
+                    $series[] = $sid;
+                }
+            }
+            if (is_string($regra['series_ids'] ?? null) && $series === []) {
+                $decSeries = json_decode((string) $regra['series_ids'], true);
+                if (is_array($decSeries)) {
+                    foreach ($decSeries as $sid) {
+                        $sid = (int) $sid;
+                        if ($sid > 0) {
+                            $series[] = $sid;
+                        }
+                    }
+                }
+            }
+            if ($series === []) {
+                $bloqueios[] = 'Selecione a série deste boletim antes de gerar.';
+            }
+
+            return [
+                'ok' => $bloqueios === [],
+                'bloqueios' => $bloqueios,
+                'avisos' => $avisos,
+            ];
+        }
+
         $modeloEncontrado = true;
         $regraAprovacaoId = 0;
         if ($boletimId > 0) {
