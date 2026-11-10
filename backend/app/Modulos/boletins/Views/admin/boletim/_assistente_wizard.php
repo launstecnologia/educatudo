@@ -4054,8 +4054,9 @@ $boletimWizardSteps = [
             if (pos >= 0) estado.colunas_ordem.splice(pos + 1, 0, codigo);
             else estado.colunas_ordem.push(codigo);
         }
-        if (!estado.formulas_blocos[codigo] || !estado.formulas_blocos[codigo].length) {
-            estado.formulas_blocos[codigo] = tokensMediaDasPecas();
+        // Bloco novo abre sem fórmula — o usuário monta (atalhos "Média das peças" etc. continuam).
+        if (!Array.isArray(estado.formulas_blocos[codigo])) {
+            estado.formulas_blocos[codigo] = [];
         }
         if (!estado.nomes_blocos[codigo]) {
             estado.nomes_blocos[codigo] = codigo === 'media_bim' ? 'Média Bim'
