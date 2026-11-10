@@ -313,8 +313,19 @@ $boletimWizardSteps = [
 .bw-linha-ok { margin-left: 2px; flex-shrink: 0; font-size: 11px; font-weight: 700; line-height: 1.2; padding: 3px 8px; border-radius: 999px; border: 1px solid #86efac; background: #fff; color: #15803d; cursor: pointer; transition: background .15s ease, color .15s ease, border-color .15s ease; }
 .bw-linha-ok:hover { background: #dcfce7; }
 .bw-linha-ok.ativo { background: #16a34a; border-color: #16a34a; color: #fff; cursor: default; }
+.bw-linha-clonar { margin-left: 2px; flex-shrink: 0; font-size: 11px; font-weight: 700; line-height: 1.2; padding: 3px 8px; border-radius: 999px; border: 1px solid #a5b4fc; background: #fff; color: #3730a3; cursor: pointer; }
+.bw-linha-clonar:hover { background: #eef2ff; }
 .bw-linha-x { margin-left: 2px; color: #4338ca; font-size: 14px; line-height: 1; padding: 0 3px; opacity: 0.55; cursor: pointer; border: 0; background: transparent; }
 .bw-linha-x:hover { opacity: 1; color: #b91c1c; }
+.bw-clone-painel { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.35rem; padding: 0.55rem 0.6rem; border: 1px solid #c7d2fe; border-radius: 0.55rem; background: #eef2ff; }
+.bw-clone-painel label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 10px; font-weight: 700; color: #4338ca; text-transform: uppercase; letter-spacing: .03em; }
+.bw-clone-painel input, .bw-clone-painel select { font-size: 12px; font-weight: 600; color: #0f172a; text-transform: none; letter-spacing: 0; border: 1px solid #c7d2fe; border-radius: 0.4rem; padding: 0.35rem 0.5rem; background: #fff; }
+.bw-clone-acoes { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.bw-clone-acoes button { font-size: 11px; font-weight: 700; padding: 0.3rem 0.65rem; border-radius: 0.4rem; cursor: pointer; }
+.bw-clone-ok { border: 0; background: #4f46e5; color: #fff; }
+.bw-clone-ok:hover { background: #4338ca; }
+.bw-clone-cancel { border: 1px solid #cbd5e1; background: #fff; color: #475569; }
+.bw-clone-cancel:hover { background: #f8fafc; }
 .bw-linha-caixa.dragging { opacity: 0.4; box-shadow: 0 10px 22px rgba(15, 23, 42, 0.18); }
 #bw-criar-linha.bw-btn-ok-flash { background: #16a34a !important; border-color: #16a34a !important; }
 .bw-col-chip.dragging { opacity: 0.35; cursor: grabbing; position: relative; z-index: 5; box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18); }
@@ -415,6 +426,9 @@ $boletimWizardSteps = [
     var avisoLinha = null;
     var editandoCabecalho = false;
     var tituloPeriodoAtivo = { id: '', nome: '' };
+    var clonePainelLinhaId = '';
+    var clonePainelNome = '';
+    var clonePainelChave = '';
 
     function coletarEstadoFormulario() {
         if (!document.getElementById('form-regra-boletim')) {
@@ -7509,10 +7523,14 @@ $boletimWizardSteps = [
                     } else {
                         html += '<button type="button" class="bw-linha-ok" data-linha-id="' + esc(linId) + '" title="Confirmar este título do período" aria-label="Confirmar título do período">Confirmar</button>';
                     }
+                    html += '<button type="button" class="bw-linha-clonar" data-linha-id="' + esc(linId) + '" title="Clonar este título para outro bimestre" aria-label="Clonar título do período">Clonar</button>';
                     html += '<button type="button" class="bw-linha-x" data-linha-id="' + esc(linId) + '" title="Remover este título do período" aria-label="Remover título do período">×</button>';
                     html += '</div><span class="bw-linha-cols">';
                     (faixa.cols || []).forEach(function (c) { html += htmlChipColuna(c); });
                     html += '</span>';
+                    if (String(clonePainelLinhaId || '') === linId) {
+                        html += htmlPainelClonarTitulo(linId, faixa.nome);
+                    }
                     html += '<p class="bw-linha-dica">Vincule os eventos do menu da lateral.</p>';
                     html += '</div>';
                     return;
@@ -7829,6 +7847,323 @@ $boletimWizardSteps = [
         renderRevisarDinamico();
     }
 
+    function normalizarSiglaClone(sigla) {
+        return String(sigla || '').toLowerCase().replace(/[^a-z0-9_]+/g, '');
+    }
+
+    function opcoesPeriodoClone() {
+        return agruparItensPorPeriodo(eventosCatalogoBuilder()).map(function (g) {
+            return { chave: String(g.chave || ''), rotulo: String(g.rotulo || g.chave || '') };
+        }).filter(function (o) { return !!o.chave; });
+    }
+
+    function sugestaoTituloClone(chavePeriodo) {
+        var bim = bimestreDaChavePeriodo(chavePeriodo);
+        if (bim >= 1 && bim <= 4) {
+            return ['', 'I', 'II', 'III', 'IV'][bim] + ' BIMESTRE';
+        }
+        var op = opcoesPeriodoClone().filter(function (o) { return o.chave === chavePeriodo; })[0];
+        return op ? String(op.rotulo || '').toUpperCase() : '';
+    }
+
+    function htmlPainelClonarTitulo(linhaId, nomeOrigem) {
+        var opcoes = opcoesPeriodoClone();
+        var chave = String(clonePainelChave || (opcoes[0] && opcoes[0].chave) || 'p-2');
+        var nome = String(clonePainelNome || '').trim();
+        if (!nome) nome = sugestaoTituloClone(chave) || ('Cópia de ' + String(nomeOrigem || 'período'));
+        var html = '<div class="bw-clone-painel" data-clone-linha="' + esc(linhaId) + '">';
+        html += '<label>Novo título<input type="text" id="bw-clone-nome" maxlength="40" value="' + esc(nome) + '" placeholder="Ex.: II BIMESTRE"></label>';
+        html += '<label>Bimestre destino<select id="bw-clone-periodo">';
+        if (!opcoes.length) {
+            html += '<option value="p-1">1º bimestre</option>';
+            html += '<option value="p-2">2º bimestre</option>';
+            html += '<option value="p-3">3º bimestre</option>';
+            html += '<option value="p-4">4º bimestre</option>';
+        } else {
+            opcoes.forEach(function (o) {
+                html += '<option value="' + esc(o.chave) + '"' + (o.chave === chave ? ' selected' : '') + '>' + esc(o.rotulo) + '</option>';
+            });
+        }
+        html += '</select></label>';
+        html += '<div class="bw-clone-acoes">';
+        html += '<button type="button" class="bw-clone-ok" data-clone-aplicar="' + esc(linhaId) + '">Criar cópia</button>';
+        html += '<button type="button" class="bw-clone-cancel" data-clone-cancelar="1">Cancelar</button>';
+        html += '</div></div>';
+        return html;
+    }
+
+    function abrirPainelClonarTitulo(linhaId) {
+        linhaId = String(linhaId || '');
+        if (!linhaId) return;
+        var nomeOrigem = '';
+        (estado && estado.linhas_layout || []).forEach(function (lin) {
+            if (!lin) return;
+            var id = String(lin.id || '');
+            var n = String(lin.nome || '');
+            if (id === linhaId || ('cab:' + n.toLowerCase()) === linhaId || n === linhaId) {
+                nomeOrigem = n;
+            }
+        });
+        var opcoes = opcoesPeriodoClone();
+        var chavePadrao = 'p-2';
+        if (opcoes.length) {
+            var achou = opcoes.filter(function (o) { return o.chave === 'p-2'; })[0];
+            chavePadrao = achou ? achou.chave : opcoes[0].chave;
+        }
+        clonePainelLinhaId = linhaId;
+        clonePainelChave = chavePadrao;
+        clonePainelNome = sugestaoTituloClone(chavePadrao) || ('Cópia de ' + (nomeOrigem || 'período'));
+        selecionarTituloPeriodo(linhaId, nomeOrigem);
+        renderRevisarDinamico();
+        var campo = document.getElementById('bw-clone-nome');
+        if (campo && campo.focus) {
+            campo.focus();
+            campo.select();
+        }
+    }
+
+    function fecharPainelClonarTitulo() {
+        clonePainelLinhaId = '';
+        clonePainelNome = '';
+        clonePainelChave = '';
+        renderRevisarDinamico();
+    }
+
+    function eventoParNoPeriodoClone(evOrigem, chaveDestino) {
+        if (!evOrigem) return null;
+        var sigla = normalizarSiglaClone(siglaDoEvento(evOrigem));
+        if (!sigla) return null;
+        return eventosCatalogoBuilder().filter(function (ev) {
+            if (!ev || chavePeriodoItem(ev) !== chaveDestino) return false;
+            return normalizarSiglaClone(siglaDoEvento(ev)) === sigla;
+        })[0] || null;
+    }
+
+    function eventoPorCodigoNoCatalogo(codigo) {
+        codigo = String(codigo || '').toLowerCase();
+        if (!codigo) return null;
+        var mB = codigo.match(/^b([1-4])_(pp|pu|ch|pe|fal|faltas)$/);
+        if (mB) {
+            var leaf = mB[2] === 'faltas' ? 'fal' : mB[2];
+            var bim = Number(mB[1]);
+            return eventosCatalogoBuilder().filter(function (ev) {
+                if (Number(ev && ev.bimestre || 0) !== bim) return false;
+                return normalizarSiglaClone(siglaDoEvento(ev)) === leaf;
+            })[0] || null;
+        }
+        var mEva = codigo.match(/^eva_?(\d+)$/);
+        if (mEva) {
+            var id = Number(mEva[1] || 0);
+            return ((catalogo && catalogo.eventos_avaliativos) || []).filter(function (x) {
+                return Number(x && x.id || 0) === id;
+            })[0] || null;
+        }
+        var siglaNome = normalizarSiglaClone((estado && estado.nomes_blocos && estado.nomes_blocos[codigo]) || '');
+        if (!siglaNome) return null;
+        return eventosCatalogoBuilder().filter(function (ev) {
+            return normalizarSiglaClone(siglaDoEvento(ev)) === siglaNome;
+        })[0] || null;
+    }
+
+    function remapearTokensFormulaClone(tokens, mapa) {
+        return (tokens || []).map(function (tok) {
+            if (!tok || typeof tok !== 'object') return tok;
+            var copia = JSON.parse(JSON.stringify(tok));
+            if (copia.type === 'peca') {
+                var v = String(copia.value || '').toLowerCase();
+                if (mapa[v]) copia.value = mapa[v];
+            }
+            return copia;
+        });
+    }
+
+    function clonarTituloPeriodo(linhaId, nomeNovo, chavePeriodoDestino) {
+        if (!estado) return false;
+        linhaId = String(linhaId || '');
+        nomeNovo = String(nomeNovo || '').trim().slice(0, 40);
+        chavePeriodoDestino = String(chavePeriodoDestino || '');
+        if (!linhaId) return false;
+        if (!nomeNovo) {
+            avisoLinha = { tipo: 'erro', texto: 'Informe o novo título do período.' };
+            renderRevisarDinamico();
+            return false;
+        }
+        if (!chavePeriodoDestino) {
+            avisoLinha = { tipo: 'erro', texto: 'Escolha o bimestre destino.' };
+            renderRevisarDinamico();
+            return false;
+        }
+        var origem = null;
+        (estado.linhas_layout || []).forEach(function (lin) {
+            if (!lin || origem) return;
+            var id = String(lin.id || '');
+            var n = String(lin.nome || '');
+            if (id === linhaId || ('cab:' + n.toLowerCase()) === linhaId || n === linhaId) origem = lin;
+        });
+        if (!origem) {
+            avisoLinha = { tipo: 'erro', texto: 'Não encontrei o título de origem para clonar.' };
+            renderRevisarDinamico();
+            return false;
+        }
+        var colsOrig = (origem.colunas || []).map(function (c) {
+            return String(c || '').toLowerCase();
+        }).filter(Boolean);
+        if (!colsOrig.length) {
+            avisoLinha = { tipo: 'erro', texto: 'O título de origem não tem colunas para clonar.' };
+            renderRevisarDinamico();
+            return false;
+        }
+        var bimDest = bimestreDaChavePeriodo(chavePeriodoDestino);
+        var mapa = {};
+        var pulados = [];
+        var ehSm = !!(estado.modelo_santa_maria || estado.origem === 'santa-maria');
+
+        function ehCalcClone(cod) {
+            return ehCodigoBlocoCalc(cod) || /^b[1-4]_mu$/i.test(cod);
+        }
+
+        colsOrig.forEach(function (cod) {
+            if (ehCalcClone(cod)) return;
+            var mB = cod.match(/^b([1-4])_(pp|pu|ch|pe|fal|faltas)$/);
+            if (mB && bimDest >= 1 && bimDest <= 4) {
+                var leaf = mB[2] === 'faltas' ? 'fal' : mB[2];
+                if (leaf === 'fal') {
+                    adicionarColunaFal(bimDest, { silencioso: true });
+                    mapa[cod] = 'b' + bimDest + '_fal';
+                    return;
+                }
+                var evLeaf = eventosCatalogoBuilder().filter(function (ev) {
+                    if (chavePeriodoItem(ev) !== chavePeriodoDestino) return false;
+                    return normalizarSiglaClone(siglaDoEvento(ev)) === leaf;
+                })[0];
+                if (!evLeaf) {
+                    pulados.push(leaf.toUpperCase());
+                    return;
+                }
+                adicionarColunaDoEvento(evLeaf, { silencioso: true });
+                mapa[cod] = String(codigoColunaExistenteDoEvento(evLeaf) || codigoPreferidoEvento(evLeaf) || '').toLowerCase();
+                if (!mapa[cod]) pulados.push(leaf.toUpperCase());
+                return;
+            }
+            var evOrig = eventoPorCodigoNoCatalogo(cod);
+            if (evOrig) {
+                var par = eventoParNoPeriodoClone(evOrig, chavePeriodoDestino);
+                if (!par) {
+                    pulados.push(String(siglaDoEvento(evOrig) || cod).toUpperCase());
+                    return;
+                }
+                adicionarColunaDoEvento(par, { silencioso: true });
+                mapa[cod] = String(codigoColunaExistenteDoEvento(par) || codigoPreferidoEvento(par) || '').toLowerCase();
+                if (!mapa[cod]) pulados.push(String(siglaDoEvento(evOrig) || cod).toUpperCase());
+                return;
+            }
+            if (/^b[1-4]_fal(tas)?$/.test(cod) && bimDest >= 1 && bimDest <= 4) {
+                adicionarColunaFal(bimDest, { silencioso: true });
+                mapa[cod] = 'b' + bimDest + '_fal';
+                return;
+            }
+            pulados.push(String((estado.nomes_blocos && estado.nomes_blocos[cod]) || cod).toUpperCase());
+        });
+
+        if (!estado.formulas_blocos || typeof estado.formulas_blocos !== 'object') estado.formulas_blocos = {};
+        if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
+        if (!estado.escalas_blocos || typeof estado.escalas_blocos !== 'object') estado.escalas_blocos = {};
+        if (!Array.isArray(estado.blocos_calc)) estado.blocos_calc = [];
+        if (!Array.isArray(estado.colunas_ordem)) estado.colunas_ordem = [];
+
+        colsOrig.forEach(function (cod) {
+            if (!ehCalcClone(cod)) return;
+            var ehMuSm = /^b[1-4]_mu$/i.test(cod);
+            var novoCod = '';
+            if (ehMuSm && ehSm && bimDest >= 1 && bimDest <= 4) {
+                novoCod = 'b' + bimDest + '_mu';
+            } else {
+                novoCod = novoCodigoBloco();
+            }
+            mapa[cod] = novoCod;
+            var toksOrig = estado.formulas_blocos[cod] || estado.formulas_blocos[String(cod).toLowerCase()] || [];
+            estado.formulas_blocos[novoCod] = remapearTokensFormulaClone(toksOrig, mapa);
+            estado.nomes_blocos[novoCod] = estado.nomes_blocos[cod]
+                || estado.nomes_blocos[String(cod).toLowerCase()]
+                || 'MU';
+            if (estado.escalas_blocos[cod] != null) {
+                estado.escalas_blocos[novoCod] = estado.escalas_blocos[cod];
+            } else if (estado.escalas_blocos[novoCod] == null) {
+                estado.escalas_blocos[novoCod] = 10;
+            }
+            if (estado.blocos_calc.indexOf(novoCod) < 0) estado.blocos_calc.push(novoCod);
+            mostrarColuna(novoCod);
+            garantirComponenteManualNoRascunho(novoCod, estado.nomes_blocos[novoCod]);
+            if (estado.colunas_ordem.map(function (c) { return String(c || '').toLowerCase(); }).indexOf(novoCod) < 0) {
+                estado.colunas_ordem.push(novoCod);
+            }
+            var excecoes = mapaExcecoesBloco(cod, false);
+            if (excecoes && typeof excecoes === 'object' && Object.keys(excecoes).length) {
+                var destinoExc = mapaExcecoesBloco(novoCod, true);
+                Object.keys(excecoes).forEach(function (mid) {
+                    destinoExc[mid] = remapearTokensFormulaClone(excecoes[mid], mapa);
+                });
+            }
+        });
+
+        // Segunda passagem: tokens de cálculo que referenciam outros códigos mapeados depois.
+        Object.keys(mapa).forEach(function (codAntigo) {
+            var novo = mapa[codAntigo];
+            if (!novo || !ehCalcClone(codAntigo)) return;
+            if (!Array.isArray(estado.formulas_blocos[novo])) return;
+            estado.formulas_blocos[novo] = remapearTokensFormulaClone(estado.formulas_blocos[novo], mapa);
+        });
+
+        var novasCols = [];
+        colsOrig.forEach(function (cod) {
+            var dest = mapa[cod];
+            if (dest && novasCols.indexOf(dest) < 0) novasCols.push(dest);
+        });
+        if (!novasCols.length) {
+            avisoLinha = {
+                tipo: 'erro',
+                texto: 'Não foi possível clonar: nenhum evento correspondente no bimestre destino.'
+                    + (pulados.length ? (' Faltaram: ' + pulados.join(', ') + '.') : '')
+            };
+            renderRevisarDinamico();
+            return false;
+        }
+
+        var novoId = 'lin' + Date.now().toString(36);
+        if (!Array.isArray(estado.linhas_layout)) estado.linhas_layout = [];
+        estado.linhas_layout = estado.linhas_layout.map(function (lin) {
+            if (!lin) return lin;
+            lin.colunas = (lin.colunas || []).filter(function (c) {
+                return novasCols.indexOf(String(c || '').toLowerCase()) < 0;
+            });
+            return lin;
+        }).filter(function (lin) { return lin && String(lin.nome || '').trim(); });
+        estado.linhas_layout.push({ id: novoId, nome: nomeNovo, colunas: novasCols.slice() });
+        estado.cabecalhos_manuais = 1;
+        estado.quadro_chips_manuais = 1;
+        estado.limpar_titulos_periodo = 0;
+        if (!estado.titulos_periodo_ok || typeof estado.titulos_periodo_ok !== 'object') {
+            estado.titulos_periodo_ok = {};
+        }
+        delete estado.titulos_periodo_ok[novoId];
+        compactarColunasOrdem(novasCols);
+        sincronizarOrdemComLinhasLayout();
+        gravarLinhaNosComponentes(novasCols);
+        clonePainelLinhaId = '';
+        clonePainelNome = '';
+        clonePainelChave = '';
+        selecionarTituloPeriodo(novoId, nomeNovo);
+        var textoOk = 'Cópia “' + nomeNovo + '” criada com ' + novasCols.length + ' coluna'
+            + (novasCols.length === 1 ? '' : 's') + ' e cálculos remapeados.';
+        if (pulados.length) {
+            textoOk += ' Não achei no destino: ' + pulados.join(', ') + '.';
+        }
+        avisoLinha = { tipo: 'ok', texto: textoOk };
+        renderRevisarDinamico();
+        agendarMontar();
+        return true;
+    }
+
     function moverCodigoParaCabecalho(codigo, nomeCab, linhaId) {
         codigo = String(codigo || '').toLowerCase();
         if (!codigo || !estado) return;
@@ -7973,7 +8308,7 @@ $boletimWizardSteps = [
                 return;
             }
             var caixaSel = e.target.closest('#bw-colunas-lista .bw-linha-caixa');
-            if (caixaSel && !e.target.closest('.bw-linha-ok, .bw-linha-x, .bw-col-x, .bw-linha-grip, .bw-col-grip, .bw-col-chip')) {
+            if (caixaSel && !e.target.closest('.bw-linha-ok, .bw-linha-clonar, .bw-linha-x, .bw-col-x, .bw-linha-grip, .bw-col-grip, .bw-col-chip, .bw-clone-painel')) {
                 selecionarTituloPeriodo(
                     caixaSel.getAttribute('data-linha-id') || '',
                     caixaSel.getAttribute('data-linha-nome') || ''
@@ -8026,6 +8361,31 @@ $boletimWizardSteps = [
                 }
                 return;
             }
+            var clonarCab = e.target.closest('#bw-colunas-lista .bw-linha-clonar');
+            if (clonarCab) {
+                e.preventDefault();
+                e.stopPropagation();
+                abrirPainelClonarTitulo(clonarCab.getAttribute('data-linha-id') || '');
+                return;
+            }
+            var cloneAplicar = e.target.closest('[data-clone-aplicar]');
+            if (cloneAplicar) {
+                e.preventDefault();
+                e.stopPropagation();
+                var idClone = cloneAplicar.getAttribute('data-clone-aplicar') || '';
+                var nomeCloneEl = document.getElementById('bw-clone-nome');
+                var periodoCloneEl = document.getElementById('bw-clone-periodo');
+                clonePainelNome = nomeCloneEl ? String(nomeCloneEl.value || '') : clonePainelNome;
+                clonePainelChave = periodoCloneEl ? String(periodoCloneEl.value || '') : clonePainelChave;
+                clonarTituloPeriodo(idClone, clonePainelNome, clonePainelChave);
+                return;
+            }
+            if (e.target.closest('[data-clone-cancelar]')) {
+                e.preventDefault();
+                e.stopPropagation();
+                fecharPainelClonarTitulo();
+                return;
+            }
             var xCab = e.target.closest('#bw-colunas-lista .bw-linha-x');
             if (xCab) {
                 e.preventDefault();
@@ -8049,6 +8409,26 @@ $boletimWizardSteps = [
                 var codCalc = chipCalc.getAttribute('data-codigo');
                 if (codCalc) abrirEdicaoBlocoCalc(codCalc);
                 return;
+            }
+        });
+        bodyEl.addEventListener('input', function (e) {
+            if (!e.target || e.target.id !== 'bw-clone-nome') return;
+            clonePainelNome = String(e.target.value || '');
+        });
+        bodyEl.addEventListener('change', function (e) {
+            if (!e.target || e.target.id !== 'bw-clone-periodo') return;
+            clonePainelChave = String(e.target.value || '');
+            var sug = sugestaoTituloClone(clonePainelChave);
+            var nomeEl = document.getElementById('bw-clone-nome');
+            if (sug && nomeEl) {
+                var atual = String(nomeEl.value || '').trim();
+                var eraSugestao = !atual
+                    || /^[IVX]+ BIMESTRE$/i.test(atual)
+                    || /^Cópia de /i.test(atual);
+                if (eraSugestao) {
+                    nomeEl.value = sug;
+                    clonePainelNome = sug;
+                }
             }
         });
         bodyEl.addEventListener('focusin', function (e) {
@@ -8108,7 +8488,7 @@ $boletimWizardSteps = [
         });
         bodyEl.addEventListener('pointerdown', function (e) {
             if (e.button > 0) return;
-            if (e.target.closest('.bw-linha-rotulo') || e.target.closest('.bw-linha-ok') || e.target.closest('.bw-linha-x') || e.target.closest('.bw-col-x')) return;
+            if (e.target.closest('.bw-linha-rotulo') || e.target.closest('.bw-linha-ok') || e.target.closest('.bw-linha-clonar') || e.target.closest('.bw-linha-x') || e.target.closest('.bw-col-x') || e.target.closest('.bw-clone-painel')) return;
             var gripGrupo = e.target.closest('#bw-colunas-lista .bw-linha-grip');
             var caixaGrupo = gripGrupo ? gripGrupo.closest('.bw-linha-caixa') : null;
             if (caixaGrupo) {
@@ -8632,6 +9012,9 @@ $boletimWizardSteps = [
         estado.limpar_titulos_periodo = 1;
         colunasMarcadas = {};
         tituloPeriodoAtivo = { id: '', nome: '' };
+        clonePainelLinhaId = '';
+        clonePainelNome = '';
+        clonePainelChave = '';
         if (todos.length) gravarLinhaNosComponentes(todos);
         avisoLinha = { tipo: 'ok', texto: 'Todos os títulos do período foram removidos. Monte do zero: marque colunas e use Novo título do período.' };
         renderRevisarDinamico();
@@ -8663,6 +9046,11 @@ $boletimWizardSteps = [
             || String(tituloPeriodoAtivo.nome || '') === String(linhaId || '')
         )) {
             tituloPeriodoAtivo = { id: '', nome: '' };
+        }
+        if (String(clonePainelLinhaId || '') === String(linhaId || '')) {
+            clonePainelLinhaId = '';
+            clonePainelNome = '';
+            clonePainelChave = '';
         }
         if (cols.length) gravarLinhaNosComponentes(cols);
         avisoLinha = { tipo: 'ok', texto: 'Título do período removido. As colunas ficaram soltas.' };
