@@ -10221,10 +10221,9 @@ $boletimWizardSteps = [
         Object.keys(remoto || {}).forEach(function (cod) {
             out[cod] = Array.isArray(remoto[cod]) ? remoto[cod].slice() : remoto[cod];
         });
+        // Local manda para cada chave presente — inclusive lista vazia (botão Limpar).
         Object.keys(local || {}).forEach(function (cod) {
-            var loc = Array.isArray(local[cod]) ? local[cod] : [];
-            var rem = Array.isArray(out[cod]) ? out[cod] : [];
-            if (loc.length && !rem.length) out[cod] = loc.slice();
+            out[cod] = Array.isArray(local[cod]) ? local[cod].slice() : local[cod];
         });
         return out;
     }
@@ -10327,12 +10326,15 @@ $boletimWizardSteps = [
                     remoto.formula_tokens = tokensLocal.slice();
                     remoto.bloco_calc = blocoLocal;
                     remoto.materia_calc = materiaLocal;
-                } else if (blocoLocal && Array.isArray(tokensLocal) && tokensLocal.length) {
-                    var remTok = Array.isArray(remoto.formula_tokens) ? remoto.formula_tokens : [];
-                    if (!remTok.length || remoto.bloco_calc !== blocoLocal) {
-                        remoto.formula_tokens = tokensLocal.slice();
-                        remoto.bloco_calc = blocoLocal;
+                } else if (blocoLocal) {
+                    // Inclusive tokens vazios: Limpar não pode ser sobrescrito pelo remoto.
+                    remoto.formula_tokens = Array.isArray(tokensLocal) ? tokensLocal.slice() : [];
+                    remoto.bloco_calc = blocoLocal;
+                    remoto.materia_calc = 0;
+                    if (!remoto.formulas_blocos || typeof remoto.formulas_blocos !== 'object') {
+                        remoto.formulas_blocos = {};
                     }
+                    remoto.formulas_blocos[blocoLocal] = remoto.formula_tokens.slice();
                 }
                 }
                 var modosLocal = modosGrupoComoObjeto(estado && estado.grupo_linha ? estado.grupo_linha.modos : null);
