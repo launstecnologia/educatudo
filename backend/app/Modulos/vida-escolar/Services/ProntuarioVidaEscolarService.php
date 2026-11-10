@@ -733,7 +733,13 @@ class ProntuarioVidaEscolarService
                 return $regraImpressao;
             }
 
-            // 3) Só regras do ano com series_ids explícito desta série (sem “vale para todas”).
+            // 3) Qualquer layout do ano com quadro montado (linhas_layout), se a turma não casou acima.
+            $regraLayoutAno = $this->regraIdImpressaoDoLayoutTurma(0, 0, $ano, is_array($modelo) ? $modelo : null);
+            if ($regraLayoutAno > 0) {
+                return $regraLayoutAno;
+            }
+
+            // 4) Só regras do ano com series_ids explícito desta série (sem “vale para todas”).
             $regraAno = $this->regraIdImpressaoDoAno($ano, $serieId);
             if ($regraAno > 0) {
                 return $regraAno;
@@ -758,22 +764,98 @@ class ProntuarioVidaEscolarService
         if ($ano <= 0) {
             return 0;
         }
-        if (!class_exists(\App\Modulos\Boletins\Services\BoletimVisaoImpressaoService::class)) {
-            return 0;
-        }
         try {
-            $visao = new \App\Modulos\Boletins\Services\BoletimVisaoImpressaoService();
+            $melhor = 0;
+            $melhorPts = -1;
+            $melhorUpdated = -1;
             foreach ($this->layoutIdsDaTurma($turmaId, $serieId, $ano, $modelo) as $layoutId) {
-                $regraId = $visao->encontrarRegraDoLayout($layoutId);
-                if ($regraId > 0) {
-                    return $regraId;
+                foreach ($this->regrasDoLayoutImpressao($layoutId) as $row) {
+                    $id = (int) ($row['id'] ?? 0);
+                    if ($id <= 0) {
+                        continue;
+                    }
+                    $extras = json_decode((string) ($row['extras_json'] ?? ''), true);
+                    if (!is_array($extras)) {
+                        $extras = [];
+                    }
+                    $pts = 10;
+                    if (!empty($extras['linhas_layout']) && is_array($extras['linhas_layout'])) {
+                        $pts += 100;
+                    }
+                    $origem = strtolower(trim((string) ($extras['origem'] ?? '')));
+                    if (in_array($origem, ['quadro-impressao', 'santa-maria', 'composto'], true)) {
+                        $pts += 40;
+                    }
+                    if (!empty($extras['quadro_livre'])) {
+                        $pts += 20;
+                    }
+                    $updated = strtotime((string) ($row['updated_at'] ?? '')) ?: 0;
+                    if ($pts > $melhorPts || ($pts === $melhorPts && $updated > $melhorUpdated)) {
+                        $melhorPts = $pts;
+                        $melhorUpdated = $updated;
+                        $melhor = $id;
+                    }
                 }
             }
-            return 0;
+            return $melhor;
         } catch (\Throwable $e) {
             error_log('Regra impressão layout turma #' . $turmaId . ': ' . $e->getMessage());
             return 0;
         }
+    }
+
+    /**
+     * Todas as regras ativas ligadas a um layout de impressão.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function regrasDoLayoutImpressao(int $layoutId): array
+    {
+        if ($layoutId <= 0) {
+            return [];
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT id, extras_json, updated_at
+                 FROM boletim_regras
+                 WHERE ativo = 1
+                   AND exibir_em = 'boletim'
+                   AND extras_json IS NOT NULL
+                   AND JSON_VALID(extras_json)
+                   AND CAST(JSON_UNQUOTE(JSON_EXTRACT(extras_json, '$.layout_boletim_id')) AS UNSIGNED) = :lid
+                 ORDER BY updated_at DESC, id DESC
+                 LIMIT 30",
+                ['lid' => $layoutId]
+            );
+            if (is_array($rows) && $rows !== []) {
+                return $rows;
+            }
+        } catch (\Throwable $e) {
+            // Fallback sem JSON_EXTRACT
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT id, extras_json, updated_at
+                 FROM boletim_regras
+                 WHERE ativo = 1 AND exibir_em = 'boletim'
+                 ORDER BY updated_at DESC, id DESC
+                 LIMIT 300"
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            $extras = json_decode((string) ($row['extras_json'] ?? ''), true);
+            if (!is_array($extras)) {
+                continue;
+            }
+            if ((int) ($extras['layout_boletim_id'] ?? 0) === $layoutId) {
+                $out[] = $row;
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -1210,7 +1292,7 @@ class ProntuarioVidaEscolarService
             }
         }
 
-        $porCodigo = [];
+            $porCodigo = [];
         foreach ((array) ($regra['componentes'] ?? []) as $comp) {
             if (!is_array($comp)) {
                 continue;
@@ -1258,11 +1340,28 @@ class ProntuarioVidaEscolarService
             $nomeFaixa = trim((string) ($faixa['nome'] ?? ''));
             foreach ((array) ($faixa['colunas'] ?? []) as $codRaw) {
                 $cod = strtolower(trim((string) $codRaw));
-                if ($cod === '' || isset($visto[$cod]) || isset($ocultas[$cod]) || !isset($porCodigo[$cod])) {
+                if ($cod === '' || isset($visto[$cod]) || isset($ocultas[$cod])) {
                     continue;
                 }
+                // Chip no quadro (ex.: FAL) pode estar só no layout — sintetiza a coluna visual.
+                if (!isset($porCodigo[$cod])) {
+                    $nomeCol = strtoupper($cod);
+                    if (preg_match('/(^|_)fal(tas)?$/', $cod)) {
+                        $nomeCol = 'FAL';
+                    } elseif (preg_match('/(^|_)rec/', $cod)) {
+                        $nomeCol = 'REC';
+                    }
+                    $porCodigo[$cod] = [
+                        'id' => 0,
+                        'codigo' => $cod,
+                        'nome' => $nomeCol,
+                        'source_type' => preg_match('/(^|_)fal(tas)?$/', $cod) ? 'faltas' : 'nenhuma',
+                        'escala_max' => 10,
+                        'valor_global' => false,
+                    ];
+                }
                 $col = $porCodigo[$cod];
-                if ($nomeFaixa !== '' && trim((string) ($col['linha_cabecalho'] ?? '')) === '') {
+                if ($nomeFaixa !== '') {
                     $col['linha_cabecalho'] = function_exists('mb_substr')
                         ? mb_substr($nomeFaixa, 0, 40)
                         : substr($nomeFaixa, 0, 40);
@@ -1418,12 +1517,17 @@ class ProntuarioVidaEscolarService
             // Casas da regra de aprovação (Modelos → critério), não o snapshot antigo do documento.
             $casas = $motor->resolverCasasDecimaisEfetivasDaRegra($regra);
 
-            return $this->renderizarQuadroBoletimTabela(
+            $html = $this->renderizarQuadroBoletimTabela(
                 $cols,
                 $linhas,
                 $casas,
                 (string) ($regra['exibir_em'] ?? 'boletim')
             );
+            if ($html !== '') {
+                $html = '<!-- boletim-regra-impressao:' . $regraId . ' -->' . $html;
+            }
+
+            return $html;
         } catch (\Throwable $e) {
             while (ob_get_level() > $nivelBuffer) {
                 @ob_end_clean();
