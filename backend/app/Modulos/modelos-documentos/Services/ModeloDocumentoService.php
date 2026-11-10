@@ -3727,7 +3727,7 @@ CSS;
   table.quadro-notas td.num { text-align: center; }
   table.quadro-notas td.final, table.quadro-notas th.final { font-weight: 600; }
   .quadro-notas-wrap, .doc-quadro-fit {
-    font-size: 4.5pt; width: 100%; max-width: 100%; overflow: visible;
+    font-size: inherit; width: 100%; max-width: 100%; overflow: visible;
     page-break-inside: avoid; break-inside: avoid;
   }
   .quadro-notas-wrap .overflow-x-auto,
@@ -3739,15 +3739,18 @@ CSS;
   .doc-quadro-fit table,
   .doc-quadro-fit .boletim-quadro-tabela {
     width: 100% !important; max-width: 100% !important; min-width: 0 !important;
-    table-layout: fixed !important; border-collapse: collapse; font-size: 4.5pt !important;
+    table-layout: fixed !important; border-collapse: collapse; font-size: inherit !important;
     page-break-inside: avoid; break-inside: avoid;
   }
   .quadro-notas-wrap th, .quadro-notas-wrap td,
   .doc-quadro-fit th, .doc-quadro-fit td {
-    padding: 0 1px !important; font-size: 4.5pt !important; line-height: 1.02;
-    white-space: normal !important; word-break: break-word; overflow-wrap: anywhere;
+    padding: 1px 2px !important; font-size: inherit !important; line-height: 1.05 !important;
+    white-space: normal !important; word-break: normal !important; overflow-wrap: normal !important;
     min-width: 0 !important; border: 0.4pt solid #6b7280; vertical-align: middle;
   }
+  .quadro-notas-wrap table.boletim-quadro-tabela > thead > tr:first-child > th:first-child,
+  .doc-quadro-fit table.boletim-quadro-tabela > thead > tr:first-child > th:first-child { width: 14%; }
+  .quadro-notas-wrap tbody > tr > td:first-child, .doc-quadro-fit tbody > tr > td:first-child { text-align: left; }
   .quadro-notas-wrap thead, .doc-quadro-fit thead { display: table-header-group; }
   .quadro-notas-wrap tr, .doc-quadro-fit tr { page-break-inside: avoid; break-inside: avoid; }
   .doc-logo-el { max-width: 100%; }

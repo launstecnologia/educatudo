@@ -1,5 +1,7 @@
 # Tasks — backlog atual
 
+- [x] Corrigir renderização do modelo de documento Boletim: coluna de disciplinas legível, fontes pequenas/fracionárias configuráveis sem redução forçada, ajuste independente de zoom e prévia A4 paisagem. PHPUnit (8 assertions), Playwright com 24 disciplinas/31 colunas de resultado e PDFs Chrome/Dompdf em 1 página. Modelo 21 ausente no banco local; conferência exata do modelo da escola pendente. — 2026-11-10
+
 - [x] Separar Demonstrativo de notas (quadro ao vivo, sem gerar snapshot) e Boletim oficial (Concluir e aplicar salva + calcula): gate em `salvarRegra`, CTAs do assistente, portal aluno/pais prioriza ao vivo na aba Notas e boletim na aba Boletim. — 2026-11-10
 
 - [x] Relatório completo em `/admin/relatorios/completo`: a escola marca os bancos (cadastro, ficha, responsáveis, matrícula, documentos, chamada, notas, resultado final, frequência, faltas, ocorrências, redações, provas e exercícios) e baixa Excel ou PDF. Sem senha. Limite de 1.500 alunos por arquivo. — 2026-11-04

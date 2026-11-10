@@ -371,8 +371,8 @@
             if (!elementoEhBoletim(el)) return;
             el.style = el.style || {};
             var pt = parseFloat(el.style.fontSize);
-            if (!isFinite(pt) || pt > 5.5) {
-              el.style.fontSize = 5.5;
+            if (!isFinite(pt) || pt <= 0) {
+              el.style.fontSize = 7.5;
               mudou = true;
             }
             if (!String((el.props || {}).html || '').trim()) {
@@ -388,7 +388,7 @@
 
   function fonteBoletimPt(el) {
     var pt = parseFloat(el && el.style && el.style.fontSize);
-    return isFinite(pt) && pt > 0 ? pt : 5.5;
+    return isFinite(pt) && pt > 0 ? pt : 7.5;
   }
 
   function cssCaixaBoletim(st) {
@@ -416,7 +416,7 @@
     if (!el) return;
     el.props = el.props || {};
     el.style = el.style || {};
-    if (!el.style.fontSize) el.style.fontSize = 5.5;
+    if (!el.style.fontSize) el.style.fontSize = 7.5;
     el.props.html = '<div class="quadro-notas-wrap doc-quadro-fit" style="'
       + cssCaixaBoletim(el.style) + '">{{quadro_notas_html}}</div>';
   }
@@ -494,9 +494,9 @@
   function larguraUtilFolhaPx() {
     if (!paper) return 0;
     var pg = mmPage();
-    var rect = paper.getBoundingClientRect();
-    if (!rect.width || !pg.w) return 0;
-    var pxPorMm = rect.width / pg.w;
+    var largura = paper.offsetWidth;
+    if (!largura || !pg.w) return 0;
+    var pxPorMm = largura / pg.w;
     var utilMm = pg.w - (pg.margin.left || 0) - (pg.margin.right || 0);
     return Math.max(0, utilMm * pxPorMm);
   }
@@ -522,6 +522,8 @@
       wrap.style.maxWidth = '100%';
       wrap.style.width = '100%';
       wrap.style.overflow = 'hidden';
+      // clientWidth não inclui o zoom e respeita colunas e padding do bloco.
+      alvo = Math.floor(wrap.clientWidth || avail);
 
       // Nunca usar max-content aqui: com width:100% na tabela vira loop e explode a largura.
       wrap.querySelectorAll('.overflow-x-auto, .overflow-auto, .space-y-8, .doc-quadro-fit').forEach(function (n) {
@@ -554,13 +556,14 @@
       shell.style.overflow = 'hidden';
 
       Array.prototype.forEach.call(tables, function (table) {
-        table.style.setProperty('width', alvo + 'px', 'important');
+        table.style.setProperty('width', '100%', 'important');
         table.style.setProperty('max-width', '100%', 'important');
         table.style.setProperty('min-width', '0', 'important');
         table.style.setProperty('table-layout', 'fixed', 'important');
         Array.prototype.forEach.call(table.querySelectorAll('th, td'), function (cel) {
           cel.style.setProperty('white-space', 'normal', 'important');
-          cel.style.setProperty('word-break', 'break-word', 'important');
+          cel.style.setProperty('word-break', 'normal', 'important');
+          cel.style.setProperty('overflow-wrap', 'normal', 'important');
           cel.style.setProperty('min-width', '0', 'important');
           cel.style.setProperty('padding', '1px 2px', 'important');
           cel.style.setProperty('font-size', 'inherit', 'important');
@@ -2275,6 +2278,7 @@
     wrap.style.width = pg.w + 'mm';
     wrap.style.minHeight = pg.h + 'mm';
     paper.classList.toggle('edoc-preview', !!state.preview);
+    paper.classList.toggle('edoc-paper-boletim', estruturaTemBlocoBoletim());
     paper.classList.toggle('edoc-rodape-fim', !!(state.estrutura.page && state.estrutura.page.rodapeNoFim));
     var fiel = JSON.stringify(state.estrutura).indexOf('seed-folha') >= 0
       || JSON.stringify(state.estrutura).indexOf('edoc-grade-livre') >= 0;
@@ -3149,9 +3153,9 @@
     if (tipo === 'espacador') el.props = { height: 16 };
     if (tipo === 'assinaturas') el.props = { quantidade: 2 };
     if (tipo === 'boletim' || tipo === 'tabela_notas') {
-      el.style = { fontSize: 5.5 };
+      el.style = { fontSize: 7.5 };
       el.props = {
-        html: '<div class="quadro-notas-wrap doc-quadro-fit" style="font-size:5.5pt;width:100%;max-width:100%;">{{quadro_notas_html}}</div>'
+        html: '<div class="quadro-notas-wrap doc-quadro-fit" style="font-size:7.5pt;width:100%;max-width:100%;">{{quadro_notas_html}}</div>'
       };
     }
     if (tipo === 'html') el.props = { html: '<p></p>' };

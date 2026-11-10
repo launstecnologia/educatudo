@@ -495,9 +495,9 @@ class DocumentoRenderer
     private function cssTipo(array $est): string
     {
         $out = '';
-        $size = (int) ($est['fontSize'] ?? 0);
-        if ($size >= 8 && $size <= 72) {
-            $out .= 'font-size:' . $size . 'pt;';
+        $size = (float) ($est['fontSize'] ?? 0);
+        if (is_finite($size) && $size >= 4 && $size <= 72) {
+            $out .= 'font-size:' . rtrim(rtrim(number_format($size, 2, '.', ''), '0'), '.') . 'pt;';
         }
         $weight = (string) ($est['fontWeight'] ?? '');
         if (in_array($weight, ['normal', 'bold', '600', '700'], true)) {

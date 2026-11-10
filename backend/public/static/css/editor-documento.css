@@ -723,8 +723,8 @@ td.edoc-celula-sel, th.edoc-celula-sel {
   font-size: inherit !important;
   line-height: 1.05;
   white-space: normal !important;
-  word-break: break-word;
-  overflow-wrap: anywhere;
+  word-break: normal;
+  overflow-wrap: normal;
   min-width: 0 !important;
   max-width: none !important;
   vertical-align: middle;
@@ -741,6 +741,12 @@ td.edoc-celula-sel, th.edoc-celula-sel {
 .edoc-quadro-notas tr.zebra td { background: #f8fafc; }
 .edoc-quadro-notas .boletim-quadro-th,
 .edoc-quadro-notas .boletim-quadro-th-sub { letter-spacing: 0; }
+.edoc-quadro-notas table.boletim-quadro-tabela > thead > tr:first-child > th:first-child { width: 14%; }
+.edoc-quadro-notas tbody > tr > td:first-child { text-align: left; }
+/* A área editável acompanha o conteúdo também em A4 paisagem. */
+.edoc-paper-boletim .edoc-area[data-role="body"],
+.edoc-paper-boletim .edoc-area[data-role="body"] > .edoc-dropzone { min-height: 0; flex: 0 0 auto; }
+.edoc-preview .edoc-area-label, .edoc-preview .edoc-empty { display: none; }
 .edoc-html-raw table.ident-boletim { width: 100%; border-collapse: collapse; margin: 0 0 10px; }
 .edoc-html-raw table.ident-boletim td { border: 1px solid #d1d5db; padding: 4px 6px; font-size: 8pt; }
 .edoc-html-raw table.ident-boletim td.label { background: #f3f4f6; font-weight: 700; width: 12%; }

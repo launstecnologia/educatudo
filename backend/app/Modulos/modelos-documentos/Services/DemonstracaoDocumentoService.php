@@ -299,10 +299,12 @@ class DemonstracaoDocumentoService
             . '.doc-quadro-fit{width:100%;max-width:100%;}'
             . '.doc-quadro-fit .overflow-x-auto,.doc-quadro-fit .overflow-auto{overflow:visible!important;max-width:none!important;}'
             . '.doc-quadro-fit table{width:100%!important;max-width:100%!important;min-width:0!important;'
-            . 'table-layout:fixed!important;border-collapse:collapse;font-size:5.5pt!important;}'
+            . 'table-layout:fixed!important;border-collapse:collapse;font-size:inherit!important;}'
             . '.doc-quadro-fit th,.doc-quadro-fit td{padding:1px 2px!important;font-size:inherit!important;'
-            . 'line-height:1.05;white-space:normal!important;word-break:break-word;min-width:0!important;'
+            . 'line-height:1.05!important;white-space:normal!important;word-break:normal!important;overflow-wrap:normal!important;min-width:0!important;'
             . 'border:1px solid #6b7280;vertical-align:middle;}'
+            . '.doc-quadro-fit table.boletim-quadro-tabela>thead>tr:first-child>th:first-child{width:14%;}'
+            . '.doc-quadro-fit tbody>tr>td:first-child{text-align:left;}'
             . '</style>';
 
         return $css . '<div class="doc-quadro-fit">' . $html . '</div>';
