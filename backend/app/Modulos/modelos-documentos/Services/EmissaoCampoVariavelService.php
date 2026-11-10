@@ -13,6 +13,7 @@ class EmissaoCampoVariavelService
     private Database $db;
     private ModeloDocumentoService $modelos;
     private DeclarationService $declaracoes;
+    private ?GeradorPdfFolhaService $geradorFolha = null;
     /** @var array{aluno_id:int,titulo:string,nome:string,config:array<string,mixed>|null,usuario_id:?int,usuario_nome:string}|null */
     private ?array $arquivoAlunoPdf = null;
 
@@ -305,15 +306,13 @@ class EmissaoCampoVariavelService
     /**
      * @param array<string,mixed> $modelo
      */
-    /**
-     * @param array<string,mixed> $modelo
-     */
     public function binarioPdf(string $html, array $modelo): string
     {
-        $orientation = $this->modelos->orientacaoDompdf($modelo);
-        $paper = $this->modelos->papelDompdf($modelo);
-        $orientation = $orientation === 'landscape' ? 'landscape' : 'portrait';
-        $paper = strtoupper($paper) === 'A5' ? 'A5' : 'A4';
+        // O editor usa este mesmo motor para preservar margens, fontes e espaçamento.
+        $pdfFolha = ($this->geradorFolha ??= new GeradorPdfFolhaService())->gerarSeFolhaOficial($html);
+        if (is_string($pdfFolha)) {
+            return $pdfFolha;
+        }
         $options = new \Dompdf\Options();
         $options->set('isHtml5ParserEnabled', true);
         $options->set('isRemoteEnabled', false);
@@ -324,7 +323,7 @@ class EmissaoCampoVariavelService
         }
         $dompdf = new \Dompdf\Dompdf($options);
         $dompdf->loadHtml($html, 'UTF-8');
-        $dompdf->setPaper($paper, $orientation);
+        $this->modelos->aplicarPapelDompdf($dompdf, $modelo);
         $dompdf->render();
         return $dompdf->output();
     }

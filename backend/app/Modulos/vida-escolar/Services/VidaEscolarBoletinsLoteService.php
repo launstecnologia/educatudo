@@ -29,6 +29,11 @@ class VidaEscolarBoletinsLoteService
         $jobId = (int) ($payload['_job_id'] ?? 0);
         $anoLetivo = (int) ($payload['ano_letivo'] ?? 0);
         $slugTenant = $this->slugDePayload($payload);
+        $configPath = dirname(__DIR__, 4) . '/config/app.php';
+        $config = is_file($configPath) ? require $configPath : [];
+        $config = is_array($config) ? $config : [];
+        // O cron não tem TENANT_SLUG; as imagens locais precisam do tenant deste job.
+        $config['tenant']['slug'] = $slugTenant;
         $alunoIds = $this->normalizarIds($payload['aluno_ids'] ?? []);
         $iniciadoEm = date('Y-m-d H:i:s');
         if ($jobId > 0) {
@@ -107,7 +112,7 @@ class VidaEscolarBoletinsLoteService
                         throw new \RuntimeException('Prontuário vazio.');
                     }
                     $dados['planilha_sed'] = $prontuarioSvc->planilhaSed($dados);
-                    $out = $pdfSvc->htmlBoletim($dados, $periodos, null, max(0, (int) ($payload['modelo_documento_id'] ?? 0)));
+                    $out = $pdfSvc->htmlBoletim($dados, $periodos, $config, max(0, (int) ($payload['modelo_documento_id'] ?? 0)));
                     $binario = $pdfSvc->gerarPdfBinario($out['html'], $out['modelo']);
                     if ($binario === '') {
                         throw new \RuntimeException('PDF vazio.');
@@ -121,7 +126,7 @@ class VidaEscolarBoletinsLoteService
                             'boletim_' . $alunoId . '.pdf',
                             null,
                             '',
-                            null
+                            $config
                         );
                     } catch (\Throwable $eArq) {
                         error_log('Lote boletim arquivar PDF aluno #' . $alunoId . ': ' . $eArq->getMessage());
