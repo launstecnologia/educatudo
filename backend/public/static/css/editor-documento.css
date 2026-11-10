@@ -743,6 +743,7 @@ td.edoc-celula-sel, th.edoc-celula-sel {
 .edoc-quadro-notas .boletim-quadro-th-sub { letter-spacing: 0; }
 .edoc-quadro-notas table.boletim-quadro-tabela > thead > tr:first-child > th:first-child { width: 14%; }
 .edoc-quadro-notas tbody > tr > td:first-child { text-align: left; }
+.edoc-quadro-notas thead th[colspan="2"] { font-size: 0.85em !important; }
 /* A área editável acompanha o conteúdo também em A4 paisagem. */
 .edoc-paper-boletim .edoc-area[data-role="body"],
 .edoc-paper-boletim .edoc-area[data-role="body"] > .edoc-dropzone { min-height: 0; flex: 0 0 auto; }

@@ -305,6 +305,7 @@ class DemonstracaoDocumentoService
             . 'border:1px solid #6b7280;vertical-align:middle;}'
             . '.doc-quadro-fit table.boletim-quadro-tabela>thead>tr:first-child>th:first-child{width:14%;}'
             . '.doc-quadro-fit tbody>tr>td:first-child{text-align:left;}'
+            . '.doc-quadro-fit thead th[colspan="2"]{font-size:0.85em!important;}'
             . '</style>';
 
         return $css . '<div class="doc-quadro-fit">' . $html . '</div>';

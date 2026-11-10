@@ -566,7 +566,9 @@
           cel.style.setProperty('overflow-wrap', 'normal', 'important');
           cel.style.setProperty('min-width', '0', 'important');
           cel.style.setProperty('padding', '1px 2px', 'important');
-          cel.style.setProperty('font-size', 'inherit', 'important');
+          // Semestres agrupam só duas colunas: o título precisa de fonte menor.
+          var fonteCabecalho = cel.tagName === 'TH' && cel.colSpan === 2 ? '0.85em' : 'inherit';
+          cel.style.setProperty('font-size', fonteCabecalho, 'important');
           cel.style.setProperty('line-height', '1.05', 'important');
         });
       });

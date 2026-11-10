@@ -3751,6 +3751,7 @@ CSS;
   .quadro-notas-wrap table.boletim-quadro-tabela > thead > tr:first-child > th:first-child,
   .doc-quadro-fit table.boletim-quadro-tabela > thead > tr:first-child > th:first-child { width: 14%; }
   .quadro-notas-wrap tbody > tr > td:first-child, .doc-quadro-fit tbody > tr > td:first-child { text-align: left; }
+  .quadro-notas-wrap thead th[colspan="2"], .doc-quadro-fit thead th[colspan="2"] { font-size: 0.85em !important; }
   .quadro-notas-wrap thead, .doc-quadro-fit thead { display: table-header-group; }
   .quadro-notas-wrap tr, .doc-quadro-fit tr { page-break-inside: avoid; break-inside: avoid; }
   .doc-logo-el { max-width: 100%; }
