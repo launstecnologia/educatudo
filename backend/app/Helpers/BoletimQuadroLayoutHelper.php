@@ -182,12 +182,100 @@ class BoletimQuadroLayoutHelper
         if (self::colunaEhResultadoFinalOficial($col)) {
             return 'Resultado Final';
         }
+        $codigo = trim((string) ($col['codigo'] ?? ''));
         $nome = trim((string) ($col['nome'] ?? ''));
+        $sigla = self::siglaTituloColuna($codigo, $nome);
+        if ($sigla !== '') {
+            return $sigla;
+        }
         if ($nome !== '') {
             return $nome;
         }
 
-        return trim((string) ($col['codigo'] ?? ''));
+        return $codigo;
+    }
+
+    /**
+     * Sigla curta da coluna (PP, PU, PE…) a partir do código ou do nome do evento.
+     */
+    public static function siglaTituloColuna(string $codigo, string $nome = ''): string
+    {
+        $raw = strtolower(trim($codigo));
+        if ($raw === 's1_rec') {
+            return 'REC 1º';
+        }
+        if ($raw === 's2_rec') {
+            return 'REC 2º';
+        }
+        if ($raw === 's1_ms') {
+            return 'MS 1º';
+        }
+        if ($raw === 's2_ms') {
+            return 'MS 2º';
+        }
+        $leaf = $raw;
+        if (preg_match('/^b[1-4]_(.+)$/', $leaf, $m)) {
+            $leaf = $m[1];
+        }
+        if (preg_match('/^s[12]_(.+)$/', $leaf, $m)) {
+            $leaf = $m[1];
+        }
+        $conhecidos = [
+            'pp' => 'PP',
+            'pu' => 'PU',
+            'pe' => 'PE',
+            'ch' => 'CH',
+            'mu' => 'MU',
+            'fal' => 'FAL',
+            'faltas' => 'FAL',
+            'rec' => 'REC',
+            'recuperacao' => 'REC',
+            'pf' => 'PF',
+            'mf' => 'MF',
+            'ms' => 'MS',
+            'ma' => 'MA',
+        ];
+        if (isset($conhecidos[$leaf])) {
+            return $conhecidos[$leaf];
+        }
+        if ($leaf !== '' && strlen($leaf) <= 5 && preg_match('/^[a-z0-9]+$/', $leaf)) {
+            return strtoupper($leaf);
+        }
+
+        $nomeParaNorm = str_replace(['ª', 'º', '°'], ['a', 'o', 'o'], $nome);
+        $nomeNorm = self::nomeColunaSemAcento(['nome' => $nomeParaNorm]);
+        $porNome = [
+            'prova parcial' => 'PP',
+            'prova de unidade' => 'PU',
+            'ponto extra' => 'PE',
+            '2a chamada' => 'CH',
+            '2o chamada' => 'CH',
+            'segunda chamada' => 'CH',
+            'media da unidade' => 'MU',
+            'faltas' => 'FAL',
+            'falta' => 'FAL',
+            'recuperacao' => 'REC',
+            'prova final' => 'PF',
+            'media semestral' => 'MS',
+            'media anual' => 'MA',
+            'media final' => 'MF',
+        ];
+        if (isset($porNome[$nomeNorm])) {
+            return $porNome[$nomeNorm];
+        }
+        // Eventos com prefixo (ex.: "1sm24 prova parcial").
+        foreach ($porNome as $chave => $sigla) {
+            if ($nomeNorm === $chave || str_ends_with($nomeNorm, ' ' . $chave)) {
+                return $sigla;
+            }
+        }
+
+        $nome = trim($nome);
+        if ($nome !== '' && (function_exists('mb_strlen') ? mb_strlen($nome) : strlen($nome)) <= 6) {
+            return function_exists('mb_strtoupper') ? mb_strtoupper($nome) : strtoupper($nome);
+        }
+
+        return '';
     }
 
     private static function nomeColunaSemAcento(array $col): string
@@ -965,7 +1053,7 @@ class BoletimQuadroLayoutHelper
             }
             $selected[] = [
                 'codigo' => $codigo,
-                'label' => (string) ($column['nome'] ?? $codigo),
+                'label' => self::rotuloColunaQuadro($column),
             ];
         }
 

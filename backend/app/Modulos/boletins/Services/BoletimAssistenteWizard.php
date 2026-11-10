@@ -3949,6 +3949,7 @@ class BoletimAssistenteWizard
                 $nomeNorm = $conv;
             }
         }
+        $nomeNorm = str_replace(['ª', 'º', '°'], ['a', 'o', 'o'], $nomeNorm);
         $nomeNorm = preg_replace('/[^a-z0-9]+/', ' ', $nomeNorm) ?? $nomeNorm;
         $nomeNorm = trim(preg_replace('/\s+/', ' ', $nomeNorm) ?? $nomeNorm);
         $porNome = [
@@ -3956,6 +3957,7 @@ class BoletimAssistenteWizard
             'prova de unidade' => 'PU',
             'ponto extra' => 'PE',
             '2a chamada' => 'CH',
+            '2o chamada' => 'CH',
             'segunda chamada' => 'CH',
             'media da unidade' => 'MU',
             'faltas' => 'FAL',
@@ -3968,6 +3970,12 @@ class BoletimAssistenteWizard
         ];
         if (isset($porNome[$nomeNorm])) {
             return $porNome[$nomeNorm];
+        }
+        // Eventos com prefixo (ex.: "1sm24 prova parcial").
+        foreach ($porNome as $chave => $sigla) {
+            if ($nomeNorm === $chave || str_ends_with($nomeNorm, ' ' . $chave)) {
+                return $sigla;
+            }
         }
 
         $nome = trim($nome);

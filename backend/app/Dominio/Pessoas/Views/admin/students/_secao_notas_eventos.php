@@ -472,20 +472,20 @@ foreach ($linhasPeriodo as &$linhaP) {
             break;
         }
     }
-    // Preferir resultado gerado (rápido). Simulação ao vivo só se não houver gerado.
-    if (is_array($evNotas) && !empty($evNotas['linhas']) && !empty($evNotas['colunas'])) {
-        $evNotas = $semFilhasExcluidas($evNotas);
-        if (!empty($evNotas['linhas'])) {
-            $htmlResumo = $renderNotasComoCoordenacao($evNotas);
-        }
-    }
-    if ($htmlResumo === '' && $ridP > 0 && $alunoIdNotas > 0) {
+    // Demonstrativo: ao vivo após Salvar (não depende de gerar boletim/snapshot).
+    if ($ridP > 0 && $alunoIdNotas > 0) {
         $htmlResumo = $renderNotasAoVivo(
             $alunoIdNotas,
             $ridP,
             (string) ($linhaP['data_inicio'] ?? ''),
             (string) ($linhaP['data_fim'] ?? '')
         );
+    }
+    if ($htmlResumo === '' && is_array($evNotas) && !empty($evNotas['linhas']) && !empty($evNotas['colunas'])) {
+        $evNotas = $semFilhasExcluidas($evNotas);
+        if (!empty($evNotas['linhas'])) {
+            $htmlResumo = $renderNotasComoCoordenacao($evNotas);
+        }
     }
     if ($htmlResumo === '' && is_array($linhaP['resumo'] ?? null)) {
         $resumos_notas = [$linhaP['resumo']];
@@ -498,48 +498,8 @@ foreach ($linhasPeriodo as &$linhaP) {
     $chaveQuadro = $ridP . ':' . $anoP . ':' . $bimP;
     if (!array_key_exists($chaveQuadro, $htmlQuadroPorChave)) {
         $htmlQuadroPorChave[$chaveQuadro] = '';
-        // 1) Resultado gerado (rápido).
-        $evGerado = $geradoPorChave[$chaveQuadro] ?? null;
-        if ($evGerado === null && $ridP > 0) {
-            foreach ($geradosNotasLista as $evCand) {
-                if (!is_array($evCand)) {
-                    continue;
-                }
-                if ((int) ($evCand['regra_id'] ?? 0) !== $ridP) {
-                    continue;
-                }
-                $bimCand = (int) ($evCand['bimestre'] ?? 0);
-                if ($bimP > 0 && $bimCand > 0 && $bimCand !== $bimP) {
-                    continue;
-                }
-                $evGerado = $evCand;
-                break;
-            }
-        }
-        if (is_array($evGerado) && !empty($evGerado['linhas']) && !empty($evGerado['colunas'])) {
-            $evGerado = $semFilhasExcluidas($evGerado);
-        }
-        if (is_array($evGerado) && !empty($evGerado['linhas']) && !empty($evGerado['colunas'])) {
-            $colsGer = is_array($evGerado['colunas']) ? $evGerado['colunas'] : [];
-            if (\App\Helpers\BoletimQuadroLayoutHelper::ehLayoutQuadro($colsGer) || $ridP <= 0) {
-                $evGerado['decimal_places'] = $resolverCasasDoEvento($evGerado);
-                $boletinsGeradosBackup = $boletins_gerados ?? [];
-                $boletimPodeExcluirBackup = $boletim_pode_excluir ?? false;
-                $boletimAlunoIdBackup = $boletim_aluno_id ?? 0;
-                ob_start();
-                $boletins_gerados = [$evGerado];
-                $boletim_pode_excluir = false;
-                $boletim_aluno_id = 0;
-                require \App\Core\ViewPaths::partial('boletins_gerados.php');
-                $htmlGeradoLista = (string) ob_get_clean();
-                $htmlQuadroPorChave[$chaveQuadro] = stripos($htmlGeradoLista, '<table') === false ? '' : $htmlGeradoLista;
-                $boletins_gerados = $boletinsGeradosBackup;
-                $boletim_pode_excluir = $boletimPodeExcluirBackup;
-                $boletim_aluno_id = $boletimAlunoIdBackup;
-            }
-        }
-        // 2) Simulação ao vivo só se ainda não houver quadro.
-        if (trim($htmlQuadroPorChave[$chaveQuadro]) === '' && $ridP > 0 && $alunoIdNotas > 0) {
+        // 1) Demonstrativo ao vivo (Salvar demonstrativo já reflete no detalhe).
+        if ($ridP > 0 && $alunoIdNotas > 0) {
             $htmlQuadroPorChave[$chaveQuadro] = $renderQuadroDemonstrativo(
                 $alunoIdNotas,
                 $ridP,
@@ -547,6 +507,48 @@ foreach ($linhasPeriodo as &$linhaP) {
                 (string) ($linhaP['data_fim'] ?? ''),
                 'aluno-quadro-' . $ridP . '-' . $anoP . '-' . $bimP . '-' . $idxLinha
             );
+        }
+        // 2) Snapshot gerado só se a simulação ao vivo não montar o quadro.
+        if (trim($htmlQuadroPorChave[$chaveQuadro]) === '') {
+            $evGerado = $geradoPorChave[$chaveQuadro] ?? null;
+            if ($evGerado === null && $ridP > 0) {
+                foreach ($geradosNotasLista as $evCand) {
+                    if (!is_array($evCand)) {
+                        continue;
+                    }
+                    if ((int) ($evCand['regra_id'] ?? 0) !== $ridP) {
+                        continue;
+                    }
+                    $bimCand = (int) ($evCand['bimestre'] ?? 0);
+                    if ($bimP > 0 && $bimCand > 0 && $bimCand !== $bimP) {
+                        continue;
+                    }
+                    $evGerado = $evCand;
+                    break;
+                }
+            }
+            if (is_array($evGerado) && !empty($evGerado['linhas']) && !empty($evGerado['colunas'])) {
+                $evGerado = $semFilhasExcluidas($evGerado);
+            }
+            if (is_array($evGerado) && !empty($evGerado['linhas']) && !empty($evGerado['colunas'])) {
+                $colsGer = is_array($evGerado['colunas']) ? $evGerado['colunas'] : [];
+                if (\App\Helpers\BoletimQuadroLayoutHelper::ehLayoutQuadro($colsGer) || $ridP <= 0) {
+                    $evGerado['decimal_places'] = $resolverCasasDoEvento($evGerado);
+                    $boletinsGeradosBackup = $boletins_gerados ?? [];
+                    $boletimPodeExcluirBackup = $boletim_pode_excluir ?? false;
+                    $boletimAlunoIdBackup = $boletim_aluno_id ?? 0;
+                    ob_start();
+                    $boletins_gerados = [$evGerado];
+                    $boletim_pode_excluir = false;
+                    $boletim_aluno_id = 0;
+                    require \App\Core\ViewPaths::partial('boletins_gerados.php');
+                    $htmlGeradoLista = (string) ob_get_clean();
+                    $htmlQuadroPorChave[$chaveQuadro] = stripos($htmlGeradoLista, '<table') === false ? '' : $htmlGeradoLista;
+                    $boletins_gerados = $boletinsGeradosBackup;
+                    $boletim_pode_excluir = $boletimPodeExcluirBackup;
+                    $boletim_aluno_id = $boletimAlunoIdBackup;
+                }
+            }
         }
         // 3) Painel vivo legado só quando não há regra de notas (evita Semanais e Blocos no lugar do Demonstrativo).
         if (trim($htmlQuadroPorChave[$chaveQuadro]) === '' && $ridP <= 0) {

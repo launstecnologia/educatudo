@@ -177,16 +177,11 @@ $_mostrarHeaderRegra = (bool) ($boletim_pode_excluir ?? false);
                                 <th class="px-3 py-2 text-left text-xs font-semibold text-slate-700 uppercase tracking-wide sticky left-0 bg-slate-50 z-10 border-r border-gray-200">Matéria</th>
                                 <?php foreach ($cols as $mc): ?>
                                     <?php
-                                    $isFaltasCab = ((string) ($mc['source_type'] ?? '')) === 'faltas_evento'
-                                        || strtolower((string) ($mc['layout_type'] ?? '')) === 'faltas';
-                                    $escalaCab = (float) ($mc['escala_max'] ?? 10);
-                                    $mostrarValorCab = $exibirEmEv === 'notas' && !$isFaltasCab && $escalaCab > 0 && $escalaCab <= 100;
+                                    $rotuloCabMc = \App\Helpers\BoletimQuadroLayoutHelper::rotuloColunaQuadro(is_array($mc) ? $mc : []);
                                     ?>
                                     <th class="px-3 py-2 text-center text-xs font-semibold text-slate-700 min-w-[5.5rem]">
-                                        <span class="block truncate max-w-[8rem] mx-auto"><?= htmlspecialchars((string) ($mc['nome'] ?? $mc['codigo'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
-                                        <?php if ($mostrarValorCab): ?>
-                                            <span class="block text-[10px] font-normal text-slate-400 normal-case">Valor <?= htmlspecialchars((string) (int) round($escalaCab), ENT_QUOTES, 'UTF-8') ?></span>
-                                        <?php elseif ($exibirEmEv !== 'notas'): ?>
+                                        <span class="block truncate max-w-[8rem] mx-auto"><?= htmlspecialchars($rotuloCabMc !== '' ? $rotuloCabMc : (string) ($mc['nome'] ?? $mc['codigo'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
+                                        <?php if ($exibirEmEv !== 'notas'): ?>
                                             <span class="block text-[10px] font-normal text-slate-400 normal-case">(<?= htmlspecialchars((string) ($mc['codigo'] ?? ''), ENT_QUOTES, 'UTF-8') ?>)</span>
                                         <?php endif; ?>
                                     </th>

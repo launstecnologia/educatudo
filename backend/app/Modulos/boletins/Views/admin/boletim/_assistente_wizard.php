@@ -2864,6 +2864,7 @@ $boletimWizardSteps = [
         if (conhecidos[leaf]) return conhecidos[leaf];
         if (leaf && leaf.length <= 5 && /^[a-z0-9]+$/.test(leaf)) return leaf.toUpperCase();
         var nomeNorm = String(nome || '').toLocaleLowerCase('pt-BR');
+        nomeNorm = nomeNorm.replace(/[ªº°]/g, function (ch) { return ch === 'ª' ? 'a' : 'o'; });
         nomeNorm = nomeNorm.normalize ? nomeNorm.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : nomeNorm;
         nomeNorm = nomeNorm.replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
         var porNome = {
@@ -2871,6 +2872,7 @@ $boletimWizardSteps = [
             'prova de unidade': 'PU',
             'ponto extra': 'PE',
             '2a chamada': 'CH',
+            '2o chamada': 'CH',
             'segunda chamada': 'CH',
             'media da unidade': 'MU',
             'faltas': 'FAL',
@@ -2881,6 +2883,13 @@ $boletimWizardSteps = [
             'media final': 'MF'
         };
         if (porNome[nomeNorm]) return porNome[nomeNorm];
+        // Eventos com prefixo (ex.: "1sm24 prova parcial").
+        for (var chaveNome in porNome) {
+            if (!Object.prototype.hasOwnProperty.call(porNome, chaveNome)) continue;
+            if (nomeNorm === chaveNome || nomeNorm.slice(-(chaveNome.length + 1)) === (' ' + chaveNome)) {
+                return porNome[chaveNome];
+            }
+        }
         return '';
     }
 
@@ -5810,7 +5819,7 @@ $boletimWizardSteps = [
     }
 
     function extraValorColuna(o) {
-        return (colunaEhFaltas(o) || o.layout_type === 'rec') ? '' : '<div class="text-[9px] font-normal opacity-80">Valor 10</div>';
+        return '';
     }
 
     function linhaLayoutDaColuna(codigo, coluna) {
@@ -6677,8 +6686,7 @@ $boletimWizardSteps = [
         html += '<table class="bw-preview-table"><thead><tr>';
         html += '<th class="text-left">Matéria</th>';
         outras.forEach(function (o) {
-            var extra = colunaEhFaltas(o) ? '' : '<div class="text-[9px] font-normal opacity-80">Valor 10</div>';
-            html += '<th>' + esc(rotuloColunaPreview(o)) + extra + '</th>';
+            html += '<th>' + esc(rotuloColunaPreview(o)) + '</th>';
         });
         html += '</tr></thead><tbody>';
         linhas.forEach(function (lin) {
