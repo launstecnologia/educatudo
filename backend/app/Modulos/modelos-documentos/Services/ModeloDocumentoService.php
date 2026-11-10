@@ -3726,7 +3726,24 @@ CSS;
   table.quadro-notas td.comp, table.quadro-notas th.comp { text-align: left; text-transform: none; letter-spacing: 0; color: #111827; font-weight: 600; }
   table.quadro-notas td.num { text-align: center; }
   table.quadro-notas td.final, table.quadro-notas th.final { font-weight: 600; }
-  .quadro-notas-wrap { font-size: inherit; }
+  .quadro-notas-wrap, .doc-quadro-fit { font-size: inherit; width: 100%; max-width: 100%; overflow: visible; }
+  .quadro-notas-wrap .overflow-x-auto,
+  .quadro-notas-wrap .overflow-auto,
+  .doc-quadro-fit .overflow-x-auto,
+  .doc-quadro-fit .overflow-auto { overflow: visible !important; max-width: none !important; }
+  .quadro-notas-wrap table,
+  .quadro-notas-wrap .boletim-quadro-tabela,
+  .doc-quadro-fit table,
+  .doc-quadro-fit .boletim-quadro-tabela {
+    width: 100% !important; max-width: 100% !important; min-width: 0 !important;
+    table-layout: fixed !important; border-collapse: collapse; font-size: 5.5pt !important;
+  }
+  .quadro-notas-wrap th, .quadro-notas-wrap td,
+  .doc-quadro-fit th, .doc-quadro-fit td {
+    padding: 1px 2px !important; font-size: inherit !important; line-height: 1.05;
+    white-space: normal !important; word-break: break-word; overflow-wrap: anywhere;
+    min-width: 0 !important; border: 1px solid #6b7280; vertical-align: middle;
+  }
   .doc-logo-el { max-width: 100%; }
   .doc-logo-el img {
     max-width: 100% !important; max-height: none !important;

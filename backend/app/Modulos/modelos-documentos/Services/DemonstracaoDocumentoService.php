@@ -226,6 +226,8 @@ class DemonstracaoDocumentoService
             return '';
         }
 
+        $html = '';
+
         // Preferência: quadro montado em Acadêmico → Boletim → Montar quadro (layout_boletim_id).
         try {
             if (class_exists(\App\Modulos\Boletins\Services\BoletimVisaoImpressaoService::class)
@@ -234,11 +236,11 @@ class DemonstracaoDocumentoService
                 $regraLayout = (new \App\Modulos\Boletins\Services\BoletimVisaoImpressaoService())
                     ->encontrarRegraDoLayout($boletimId);
                 if ($regraLayout > 0) {
-                    $html = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
+                    $candidato = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
                         ->htmlQuadroPorRegraImpressao($alunoId, $regraLayout);
-                    $html = is_string($html) ? trim($html) : '';
-                    if ($html !== '') {
-                        return $html;
+                    $candidato = is_string($candidato) ? trim($candidato) : '';
+                    if ($candidato !== '') {
+                        $html = $candidato;
                     }
                 }
             }
@@ -246,34 +248,64 @@ class DemonstracaoDocumentoService
             error_log('DemonstracaoDocumento quadro layout boletim: ' . $e->getMessage());
         }
 
-        try {
-            if (class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)) {
-                $html = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
-                    ->htmlQuadroPorBoletim($alunoId, $boletimId);
-                $html = is_string($html) ? trim($html) : '';
-                if ($html !== '') {
-                    return $html;
+        if ($html === '') {
+            try {
+                if (class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)) {
+                    $candidato = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
+                        ->htmlQuadroPorBoletim($alunoId, $boletimId);
+                    $candidato = is_string($candidato) ? trim($candidato) : '';
+                    if ($candidato !== '') {
+                        $html = $candidato;
+                    }
                 }
+            } catch (\Throwable $e) {
+                error_log('DemonstracaoDocumento quadro boletim: ' . $e->getMessage());
             }
-        } catch (\Throwable $e) {
-            error_log('DemonstracaoDocumento quadro boletim: ' . $e->getMessage());
         }
 
         // Fallback Santa Maria (PP/PU/CH…) e demais quadros gerados do ano.
-        try {
-            $ano = $this->anoDoLayoutOuBoletim($boletimId);
-            if ($ano <= 0) {
-                return '';
+        if ($html === '') {
+            try {
+                $ano = $this->anoDoLayoutOuBoletim($boletimId);
+                if ($ano > 0) {
+                    $quadro = (new QuadroBoletimSantaMariaService($this->db))->montarHtml($alunoId, $ano);
+                    $htmlSm = trim((string) ($quadro['html'] ?? ''));
+                    if ((int) ($quadro['linhas'] ?? 0) > 0 && $htmlSm !== '') {
+                        $html = $htmlSm;
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log('DemonstracaoDocumento quadro Santa Maria: ' . $e->getMessage());
             }
-            $quadro = (new QuadroBoletimSantaMariaService($this->db))->montarHtml($alunoId, $ano);
-            $htmlSm = trim((string) ($quadro['html'] ?? ''));
-            if ((int) ($quadro['linhas'] ?? 0) > 0 && $htmlSm !== '') {
-                return $htmlSm;
-            }
-        } catch (\Throwable $e) {
-            error_log('DemonstracaoDocumento quadro Santa Maria: ' . $e->getMessage());
         }
-        return '';
+
+        return $this->envolverQuadroCompacto($html);
+    }
+
+    /**
+     * Empacota o HTML do assistente para caber em A4 paisagem (editor + PDF).
+     */
+    private function envolverQuadroCompacto(string $html): string
+    {
+        $html = trim($html);
+        if ($html === '' || stripos($html, '<table') === false) {
+            return $html;
+        }
+        if (str_contains($html, 'doc-quadro-fit')) {
+            return $html;
+        }
+
+        $css = '<style type="text/css">'
+            . '.doc-quadro-fit{width:100%;max-width:100%;}'
+            . '.doc-quadro-fit .overflow-x-auto,.doc-quadro-fit .overflow-auto{overflow:visible!important;max-width:none!important;}'
+            . '.doc-quadro-fit table{width:100%!important;max-width:100%!important;min-width:0!important;'
+            . 'table-layout:fixed!important;border-collapse:collapse;font-size:5.5pt!important;}'
+            . '.doc-quadro-fit th,.doc-quadro-fit td{padding:1px 2px!important;font-size:inherit!important;'
+            . 'line-height:1.05;white-space:normal!important;word-break:break-word;min-width:0!important;'
+            . 'border:1px solid #6b7280;vertical-align:middle;}'
+            . '</style>';
+
+        return $css . '<div class="doc-quadro-fit">' . $html . '</div>';
     }
 
     private function anoDoLayoutOuBoletim(int $id): int

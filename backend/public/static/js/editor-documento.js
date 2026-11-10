@@ -335,6 +335,140 @@
     return { w: w, h: h, margin: p.margin || { top: 15, right: 15, bottom: 15, left: 15 } };
   }
 
+  /** Quadro PP/PU/CH… só cabe como no PDF de referência: A4 paisagem + tipografia densa. */
+  function garantirPaisagemBoletim() {
+    state.estrutura = state.estrutura || {};
+    state.estrutura.page = state.estrutura.page || {};
+    var page = state.estrutura.page;
+    var mudou = false;
+    if ((page.orientation || 'portrait') !== 'landscape') {
+      page.orientation = 'landscape';
+      mudou = true;
+    }
+    if (String(page.size || 'A4').toUpperCase() !== 'A4') {
+      page.size = 'A4';
+      mudou = true;
+    }
+    page.margin = page.margin || { top: 10, right: 8, bottom: 8, left: 8 };
+    ['top', 'right', 'bottom', 'left'].forEach(function (lado) {
+      var atual = parseFloat(page.margin[lado]);
+      var alvo = lado === 'top' ? 10 : 8;
+      if (!isFinite(atual) || atual > alvo) {
+        page.margin[lado] = alvo;
+        mudou = true;
+      }
+    });
+    return mudou;
+  }
+
+  function densificarElementosBoletim() {
+    var mudou = false;
+    ['header', 'body', 'footer'].forEach(function (role) {
+      var secs = (areaOf(role).sections || []);
+      secs.forEach(function (sec) {
+        (sec.columns || []).forEach(function (col) {
+          (col.elements || []).forEach(function (el) {
+            if (!elementoEhBoletim(el)) return;
+            el.style = el.style || {};
+            var pt = parseFloat(el.style.fontSize);
+            if (!isFinite(pt) || pt > 5.5) {
+              el.style.fontSize = 5.5;
+              mudou = true;
+            }
+          });
+        });
+      });
+    });
+    return mudou;
+  }
+
+  function larguraUtilFolhaPx() {
+    if (!paper) return 0;
+    var pg = mmPage();
+    var rect = paper.getBoundingClientRect();
+    if (!rect.width || !pg.w) return 0;
+    var pxPorMm = rect.width / pg.w;
+    var utilMm = pg.w - (pg.margin.left || 0) - (pg.margin.right || 0);
+    return Math.max(0, utilMm * pxPorMm);
+  }
+
+  function ajustarQuadroNotasNaFolha() {
+    if (!paper) return;
+    var wraps = paper.querySelectorAll('.edoc-quadro-notas');
+    if (!wraps.length) return;
+    var avail = larguraUtilFolhaPx();
+    if (avail <= 0) return;
+
+    wraps.forEach(function (wrap) {
+      var table = wrap.querySelector('table');
+      if (!table) return;
+
+      var host = wrap.closest('.edoc-el');
+      if (host) {
+        host.style.maxWidth = '100%';
+        host.style.overflow = 'hidden';
+      }
+      wrap.style.maxWidth = '100%';
+      wrap.style.width = '100%';
+      wrap.style.overflow = 'hidden';
+
+      wrap.querySelectorAll('.overflow-x-auto, .overflow-auto, .space-y-8').forEach(function (n) {
+        n.style.overflow = 'visible';
+        n.style.maxWidth = 'none';
+        n.style.width = 'max-content';
+      });
+
+      var scaleEl = wrap.querySelector('[data-edoc-quadro-fit]');
+      var shell = wrap.querySelector('[data-edoc-quadro-shell]');
+      if (!scaleEl) {
+        scaleEl = document.createElement('div');
+        scaleEl.setAttribute('data-edoc-quadro-fit', '1');
+        while (wrap.firstChild) scaleEl.appendChild(wrap.firstChild);
+        shell = document.createElement('div');
+        shell.setAttribute('data-edoc-quadro-shell', '1');
+        shell.appendChild(scaleEl);
+        wrap.appendChild(shell);
+      }
+      if (!shell) shell = wrap;
+
+      scaleEl.style.transform = 'none';
+      scaleEl.style.width = 'max-content';
+      scaleEl.style.maxWidth = 'none';
+      shell.style.width = '100%';
+      shell.style.height = 'auto';
+      shell.style.overflow = 'hidden';
+
+      table.style.setProperty('width', 'max-content', 'important');
+      table.style.setProperty('max-width', 'none', 'important');
+      table.style.setProperty('min-width', '0', 'important');
+      table.style.setProperty('table-layout', 'auto', 'important');
+
+      var need = Math.max(scaleEl.scrollWidth || 0, table.scrollWidth || 0, 0);
+      if (need <= 0) return;
+
+      var s = Math.min(1, avail / need);
+      if (s < 0.28) s = 0.28;
+      scaleEl.style.transformOrigin = 'top left';
+
+      if (s >= 0.999) {
+        scaleEl.style.transform = '';
+        scaleEl.style.width = '100%';
+        table.style.setProperty('width', '100%', 'important');
+        table.style.setProperty('max-width', '100%', 'important');
+        table.style.setProperty('table-layout', 'fixed', 'important');
+        shell.style.width = '100%';
+        shell.style.height = 'auto';
+        return;
+      }
+
+      scaleEl.style.transform = 'scale(' + s + ')';
+      var naturalH = Math.max(scaleEl.scrollHeight || 0, scaleEl.offsetHeight || 0, table.scrollHeight || 0);
+      shell.style.width = Math.ceil(need * s) + 'px';
+      shell.style.height = Math.ceil(naturalH * s) + 'px';
+      shell.style.maxWidth = '100%';
+    });
+  }
+
   function labelTipo(t) {
     var map = {
       titulo: 'Título', texto: 'Texto', texto_rico: 'Texto rico', logo: 'Logo', imagem: 'Imagem',
@@ -1996,6 +2130,14 @@
 
   function render() {
     persistirEdicaoSeHouver();
+    if (estruturaTemBlocoBoletim()) {
+      var ajustouFolha = garantirPaisagemBoletim();
+      var ajustouFonte = densificarElementosBoletim();
+      if (ajustouFolha || ajustouFonte) {
+        state.dirty = true;
+        scheduleSave();
+      }
+    }
     pintarCamposVariaveis();
     var pg = mmPage();
     var z = state.zoom / 100;
@@ -2049,6 +2191,14 @@
     var zl = $('#edoc-zoom-label');
     if (zl) zl.textContent = state.zoom + '%';
     atualizarLinkPdf();
+    requestAnimationFrame(function () {
+      ajustarQuadroNotasNaFolha();
+      avisoFolha(mmPage());
+      setTimeout(function () {
+        ajustarQuadroNotasNaFolha();
+        avisoFolha(mmPage());
+      }, 80);
+    });
   }
 
   function atualizarLinkPdf() {
@@ -2854,7 +3004,7 @@
     if (tipo === 'imagem') el.props = { width: 180, align: 'center', vAlign: 'middle' };
     if (tipo === 'espacador') el.props = { height: 16 };
     if (tipo === 'assinaturas') el.props = { quantidade: 2 };
-    if (tipo === 'boletim' || tipo === 'tabela_notas') el.style = { fontSize: 7 };
+    if (tipo === 'boletim' || tipo === 'tabela_notas') el.style = { fontSize: 5.5 };
     if (tipo === 'html') el.props = { html: '<p></p>' };
     if (tipo === 'tabela') {
       el.type = 'html';
@@ -3082,11 +3232,14 @@
     path.column.elements = path.column.elements || [];
     path.column.elements.push(el);
     state.selected = { id: el.id, kind: 'element' };
+    if (tipo === 'boletim') {
+      garantirPaisagemBoletim();
+    }
     if (!skipHist) pushHist();
     render();
     if (tipo === 'boletim') {
       abrirCardBoletim(true);
-      setStatus('Boletim na folha — escolha o boletim e a aluna no card');
+      setStatus('Boletim na folha (paisagem) — escolha o boletim e a aluna no card');
     }
     if (tipo === 'tabela') {
       var node = paper && paper.querySelector('.edoc-el[data-id="' + el.id + '"]');
@@ -3448,8 +3601,9 @@
         ]) + '</div>';
     }
     if (el.type !== 'logo' && el.type !== 'imagem') {
+      var minPt = (el.type === 'boletim' || el.type === 'tabela_notas') ? '4' : '8';
       html += '<div class="edoc-sec-label">TIPOGRAFIA</div><div class="edoc-prop-row">'
-        + '<div><label>Tamanho (pt)</label>' + inp('fontSize', st.fontSize || '', 'type="number" min="8" max="72"') + '</div>'
+        + '<div><label>Tamanho (pt)</label>' + inp('fontSize', st.fontSize || '', 'type="number" min="' + minPt + '" max="72" step="0.5"') + '</div>'
         + '<div><label>Peso do bloco</label><select data-f="fontWeight"><option value="">Normal</option><option value="bold">Negrito</option></select></div></div>'
         + '<label>Cor</label>' + inp('color', st.color || '#111111', 'type="color"');
     }
@@ -3816,19 +3970,18 @@
 
   function aplicarLayoutSugerido() {
     if (!C.layoutSugerido) return;
-    if (!window.confirm('Montar o layout organizado do boletim? O conteúdo atual do cabeçalho, do corpo e do rodapé será substituído. O tamanho da folha permanece o mesmo.')) {
+    if (!window.confirm('Montar o layout organizado do boletim? O conteúdo atual do cabeçalho, do corpo e do rodapé será substituído. A folha passa para A4 paisagem (como o boletim impresso).')) {
       return;
     }
-    var page = clone(state.estrutura.page || {});
     var camposMantidos = camposVariaveisValidos(state.estrutura.campos_variaveis);
     state.estrutura = normalizarEstrutura(clone(C.layoutSugerido));
-    state.estrutura.page = page;
+    garantirPaisagemBoletim();
     if (camposMantidos.length) state.estrutura.campos_variaveis = camposMantidos;
     state.selected = null;
     pushHist();
     render();
     scheduleSave();
-    setStatus('Layout do boletim aplicado — confira e salve');
+    setStatus('Layout do boletim aplicado em paisagem — confira e salve');
   }
 
   function scheduleSave() {
@@ -3956,6 +4109,10 @@
   function garantirBlocoBoletimNaFolha() {
     var existente = acharElementoBoletim();
     if (existente) {
+      if (garantirPaisagemBoletim()) {
+        pushHist();
+        render();
+      }
       state.selected = { id: existente.id, kind: 'element' };
       return existente;
     }
@@ -3966,6 +4123,10 @@
   function abrirCardBoletim(focar) {
     var card = $('#edoc-boletim-card');
     if (!card) return;
+    if (estruturaTemBlocoBoletim() && garantirPaisagemBoletim()) {
+      pushHist();
+      render();
+    }
     card.hidden = false;
     var status = $('#edoc-demo-status');
     if (status && !status.textContent) {
@@ -4271,6 +4432,7 @@
         C.varsPreview = data.vars;
         if (data.html_quadro) {
           C.varsPreview.quadro_notas_html = data.html_quadro;
+          garantirPaisagemBoletim();
         }
         state.demo = !!(real && real.checked);
         if (boletimSelecionadoId() > 0) {

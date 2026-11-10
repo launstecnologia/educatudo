@@ -678,17 +678,43 @@ td.edoc-celula-sel, th.edoc-celula-sel {
   outline: 1px solid #93c5fd;
   outline-offset: -1px;
 }
-.edoc-quadro-notas { font-size: inherit; width: 100%; }
+.edoc-el[data-type="boletim"],
+.edoc-el[data-type="tabela_notas"] {
+  max-width: 100%;
+  overflow: hidden;
+}
+.edoc-quadro-notas { font-size: inherit; width: 100%; max-width: 100%; overflow: hidden; }
+.edoc-quadro-notas [data-edoc-quadro-shell] { width: 100%; max-width: 100%; overflow: hidden; }
+.edoc-quadro-notas [data-edoc-quadro-fit] { transform-origin: top left; display: inline-block; }
+.edoc-quadro-notas .overflow-x-auto,
+.edoc-quadro-notas .overflow-auto { overflow: visible !important; max-width: none !important; }
 .edoc-quadro-notas table.quadro-notas,
-.edoc-quadro-notas table.dados {
-  width: 100%; border-collapse: collapse; margin: 4px 0 8px; font-size: inherit;
+.edoc-quadro-notas table.dados,
+.edoc-quadro-notas table.boletim-quadro-tabela,
+.edoc-quadro-notas table {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  table-layout: fixed !important;
+  border-collapse: collapse;
+  margin: 2px 0 6px;
+  font-size: inherit;
 }
 .edoc-quadro-notas th, .edoc-quadro-notas td {
-  border: 1px solid #d1d5db; padding: 4px 5px; font-size: inherit;
+  border: 1px solid #9ca3af;
+  padding: 1px 2px !important;
+  font-size: inherit !important;
+  line-height: 1.05;
+  white-space: normal !important;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  min-width: 0 !important;
+  max-width: none !important;
+  vertical-align: middle;
 }
 .edoc-quadro-notas th {
   background: #e5e7eb; font-weight: 700; text-align: center;
-  text-transform: uppercase; letter-spacing: .02em; color: #374151;
+  text-transform: uppercase; letter-spacing: 0; color: #374151;
 }
 .edoc-quadro-notas td.comp, .edoc-quadro-notas th.comp {
   text-align: left; text-transform: none; letter-spacing: 0; color: #111827; font-weight: 600;
@@ -696,6 +722,8 @@ td.edoc-celula-sel, th.edoc-celula-sel {
 .edoc-quadro-notas td.num { text-align: center; }
 .edoc-quadro-notas th.final, .edoc-quadro-notas td.final { background: #e8eef6; font-weight: 600; }
 .edoc-quadro-notas tr.zebra td { background: #f8fafc; }
+.edoc-quadro-notas .boletim-quadro-th,
+.edoc-quadro-notas .boletim-quadro-th-sub { letter-spacing: 0; }
 .edoc-html-raw table.ident-boletim { width: 100%; border-collapse: collapse; margin: 0 0 10px; }
 .edoc-html-raw table.ident-boletim td { border: 1px solid #d1d5db; padding: 4px 6px; font-size: 8pt; }
 .edoc-html-raw table.ident-boletim td.label { background: #f3f4f6; font-weight: 700; width: 12%; }
