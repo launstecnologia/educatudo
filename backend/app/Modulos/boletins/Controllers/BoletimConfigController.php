@@ -10218,8 +10218,8 @@ class BoletimConfigController extends BaseController
      * arredondamento do evento (round_mode da regra), mas o componente pode
      * sobrescrever individualmente via config_json.round_mode_override.
      *
-     * Escopo "medias": só source_type=calculado (MS/MU/fórmulas).
-     * Escopo "todas": aplica também em notas lançadas (PP/PU/CH…).
+     * Escopo "medias": só source_type=calculado (médias/resultados).
+     * Escopo "todas": aplica também em notas lançadas.
      */
     private function resolveRoundModeComponente(array $componente, string $roundModeEvento): string
     {
@@ -10251,7 +10251,7 @@ class BoletimConfigController extends BaseController
         $escopo = $this->escopoArredondamentoAtual === 'todas' ? 'todas' : 'medias';
 
         if ($escopo === 'medias') {
-            // Só médias/cálculos; PP/PU/CH e eventos lançados ficam intactos.
+            // Só médias/resultados calculados; notas lançadas ficam intactas.
             if (!$ehCalculado) {
                 return 'none';
             }

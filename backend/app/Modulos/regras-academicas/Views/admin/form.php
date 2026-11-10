@@ -216,8 +216,8 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                 var c = casas.value;
                 var e = escopo.value;
                 var onde = e === 'todas'
-                    ? 'em <strong>todas as notas</strong> (PP, PU, CH, MU, MS…)'
-                    : 'somente nas <strong>médias e cálculos</strong> (ex.: MS). PP/PU/CH ficam como lançados';
+                    ? 'em <strong>todas as notas</strong> do boletim'
+                    : 'somente nas <strong>médias e resultados calculados</strong>. Notas lançadas ficam como digitadas';
                 var como = 'sem arredondamento especial (mantém precisão convencional)';
                 if (m === 'places') {
                     como = 'arredonda conforme ' + rotuloCasas(c) + ' — exemplo: (8,0+7,9)/2 = 7,95 → <strong>8,0</strong>';

@@ -10,7 +10,7 @@ SET @tem := (
 SET @sql := IF(@tem = 0,
   "ALTER TABLE `regras_academicas`
    ADD COLUMN `escopo_arredondamento` ENUM('medias','todas') NOT NULL DEFAULT 'medias'
-   COMMENT 'medias = só MS/MU/cálculos; todas = todas as notas'
+   COMMENT 'medias = só médias/resultados calculados; todas = todas as notas'
    AFTER `decimal_places`",
   'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

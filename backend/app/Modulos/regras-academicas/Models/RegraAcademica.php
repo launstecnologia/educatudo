@@ -78,8 +78,8 @@ class RegraAcademica
 
     /** Onde aplicar round_mode + casas decimais no boletim. */
     public const ESCOPOS_ARREDONDAMENTO = [
-        'medias' => 'Só nas médias e cálculos (ex.: MS, MU calculada)',
-        'todas' => 'Em todas as notas (PP, PU, CH, médias…)',
+        'medias' => 'Só nas médias e resultados calculados',
+        'todas' => 'Em todas as notas',
     ];
 
     public function __construct()
