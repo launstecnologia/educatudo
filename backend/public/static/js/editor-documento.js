@@ -375,11 +375,120 @@
               el.style.fontSize = 5.5;
               mudou = true;
             }
+            if (!String((el.props || {}).html || '').trim()) {
+              garantirHtmlBoletimPadrao(el);
+              mudou = true;
+            }
           });
         });
       });
     });
     return mudou;
+  }
+
+  function fonteBoletimPt(el) {
+    var pt = parseFloat(el && el.style && el.style.fontSize);
+    return isFinite(pt) && pt > 0 ? pt : 5.5;
+  }
+
+  function cssCaixaBoletim(st) {
+    st = st || {};
+    var m = st.margin || {};
+    var p = st.padding || {};
+    var pt = fonteBoletimPt({ style: st });
+    var out = 'font-size:' + pt + 'pt;width:100%;max-width:100%;';
+    if ((m.top || m.right || m.bottom || m.left)) {
+      out += 'margin:' + (parseInt(m.top, 10) || 0) + 'px '
+        + (parseInt(m.right, 10) || 0) + 'px '
+        + (parseInt(m.bottom, 10) || 0) + 'px '
+        + (parseInt(m.left, 10) || 0) + 'px;';
+    }
+    if ((p.top || p.right || p.bottom || p.left)) {
+      out += 'padding:' + (parseInt(p.top, 10) || 0) + 'px '
+        + (parseInt(p.right, 10) || 0) + 'px '
+        + (parseInt(p.bottom, 10) || 0) + 'px '
+        + (parseInt(p.left, 10) || 0) + 'px;';
+    }
+    return out;
+  }
+
+  function garantirHtmlBoletimPadrao(el) {
+    if (!el) return;
+    el.props = el.props || {};
+    el.style = el.style || {};
+    if (!el.style.fontSize) el.style.fontSize = 5.5;
+    el.props.html = '<div class="quadro-notas-wrap doc-quadro-fit" style="'
+      + cssCaixaBoletim(el.style) + '">{{quadro_notas_html}}</div>';
+  }
+
+  /** Espelha margem/tamanho do painel dentro do HTML do boletim. */
+  function sincronizarHtmlBoletimComEstilo(el) {
+    if (!el || !elementoEhBoletim(el)) return;
+    el.props = el.props || {};
+    el.style = el.style || {};
+    var html = String(el.props.html || '').trim();
+    var box = cssCaixaBoletim(el.style);
+    var pt = fonteBoletimPt(el);
+    if (!html) {
+      garantirHtmlBoletimPadrao(el);
+      return;
+    }
+    if (/<(div)\b[^>]*class="[^"]*(?:quadro-notas-wrap|doc-quadro-fit)[^"]*"/i.test(html)) {
+      html = html.replace(/<(div)(\b[^>]*class="[^"]*(?:quadro-notas-wrap|doc-quadro-fit)[^"]*"[^>]*)>/i, function (full, tag, attrs) {
+        if (/style\s*=\s*"/i.test(attrs)) {
+          attrs = attrs.replace(/style\s*=\s*"([^"]*)"/i, function (_, s) {
+            s = String(s)
+              .replace(/font-size\s*:\s*[^;]+;?/ig, '')
+              .replace(/margin\s*:\s*[^;]+;?/ig, '')
+              .replace(/padding\s*:\s*[^;]+;?/ig, '')
+              .replace(/width\s*:\s*[^;]+;?/ig, '')
+              .replace(/max-width\s*:\s*[^;]+;?/ig, '')
+              .replace(/;{2,}/g, ';')
+              .replace(/^;|;$/g, '');
+            return 'style="' + box + (s ? s + ';' : '') + '"';
+          });
+        } else {
+          attrs += ' style="' + box + '"';
+        }
+        return '<' + tag + attrs + '>';
+      });
+    } else if (html.indexOf('{{quadro_notas_html}}') >= 0) {
+      html = '<div class="quadro-notas-wrap doc-quadro-fit" style="' + box + '">' + html + '</div>';
+    } else {
+      html = '<div class="quadro-notas-wrap doc-quadro-fit" style="' + box + '">' + html + '</div>';
+    }
+    html = html.replace(/<table\b([^>]*)>/gi, function (full, attrs) {
+      if (/style\s*=\s*"/i.test(attrs)) {
+        attrs = attrs.replace(/style\s*=\s*"([^"]*)"/i, function (_, s) {
+          s = String(s).replace(/font-size\s*:\s*[^;]+;?/ig, '').replace(/;{2,}/g, ';').replace(/^;|;$/g, '');
+          return 'style="font-size:' + pt + 'pt;' + (s ? s + ';' : '') + '"';
+        });
+        return '<table' + attrs + '>';
+      }
+      return '<table style="font-size:' + pt + 'pt;"' + attrs + '>';
+    });
+    el.props.html = html;
+  }
+
+  function htmlBoletimDaPrevia() {
+    var bag = varsDaFolha() || {};
+    return String(bag.quadro_notas_html || '').trim();
+  }
+
+  function atualizarCanvasBoletim(el) {
+    if (!paper || !el) return;
+    var node = paper.querySelector('.edoc-el[data-id="' + el.id + '"]');
+    if (!node) return;
+    var inner = corpoDoElemento(node);
+    if (!inner) return;
+    var custom = String((el.props || {}).html || '').trim();
+    if (custom) {
+      inner.innerHTML = sanitizeHtml(ph(custom));
+    }
+    inner.setAttribute('style', cssBox(el.style));
+    requestAnimationFrame(function () {
+      ajustarQuadroNotasNaFolha();
+    });
   }
 
   function larguraUtilFolhaPx() {
@@ -1815,6 +1924,11 @@
     if (t === 'quebra_pagina') return '<div style="border-top:2px dashed #f59e0b;margin:12px 0;color:#b45309;font-size:10px;text-align:center">Quebra de página</div>';
     if (t === 'qrcode') return '<div class="edoc-logo-slot">QR</div>';
     if (t === 'boletim' || t === 'tabela_notas') {
+      var htmlBol = String((p.html || '')).trim();
+      if (htmlBol) {
+        return '<div class="edoc-quadro-notas edoc-el-body" style="' + st + '">'
+          + sanitizeHtml(ph(htmlBol)) + '</div>';
+      }
       var fonteBol = parseInt((state.estrutura && state.estrutura.fonte_boletim_id) || 0, 10) || 0;
       if (t === 'boletim' && fonteBol <= 0) {
         return '<div class="edoc-quadro-notas edoc-el-body" style="' + st + '">'
@@ -3007,7 +3121,12 @@
     if (tipo === 'imagem') el.props = { width: 180, align: 'center', vAlign: 'middle' };
     if (tipo === 'espacador') el.props = { height: 16 };
     if (tipo === 'assinaturas') el.props = { quantidade: 2 };
-    if (tipo === 'boletim' || tipo === 'tabela_notas') el.style = { fontSize: 5.5 };
+    if (tipo === 'boletim' || tipo === 'tabela_notas') {
+      el.style = { fontSize: 5.5 };
+      el.props = {
+        html: '<div class="quadro-notas-wrap doc-quadro-fit" style="font-size:5.5pt;width:100%;max-width:100%;">{{quadro_notas_html}}</div>'
+      };
+    }
     if (tipo === 'html') el.props = { html: '<p></p>' };
     if (tipo === 'tabela') {
       el.type = 'html';
@@ -3560,12 +3679,20 @@
       html += '<button type="button" class="edoc-btn" id="edoc-insert-var" style="margin-top:6px">{ } Variáveis</button>';
       html += painelMedidasFolha(p.html || '');
     }
-    if (el.type === 'boletim') {
-      html += '<p class="edoc-hint">O layout do assistente (PP/PU/CH…) aparece na folha. No card Boletim (abaixo de Dados) escolha o boletim e a aluna da prévia.</p>';
+    if (el.type === 'boletim' || el.type === 'tabela_notas') {
       abrirCardBoletim(false);
-    }
-    if (el.type === 'tabela_notas') {
-      html += '<p class="edoc-hint">Quadro com 1º ao 4º bimestre e final (nota e falta). O tamanho do texto abaixo vale para a tabela inteira — diminua para caber em uma folha.</p>';
+      if (!String((p.html || '')).trim()) {
+        garantirHtmlBoletimPadrao(el);
+        p = el.props || {};
+      }
+      html += '<p class="edoc-hint">Quem tem experiência pode editar o HTML. Margem e tamanho à direita atualizam o HTML automaticamente. Use <code>{{quadro_notas_html}}</code> para o quadro dinâmico na emissão.</p>';
+      html += '<div class="edoc-prop-row" style="margin-bottom:6px;">'
+        + '<button type="button" class="edoc-btn" id="edoc-boletim-html-dinamico" title="Wrapper com variável dinâmica">HTML dinâmico</button>'
+        + '<button type="button" class="edoc-btn" id="edoc-boletim-html-previa" title="Colar o HTML da prévia atual">Da prévia</button>'
+        + '</div>';
+      html += '<label>HTML do boletim</label>';
+      html += '<textarea data-f="html" id="edoc-boletim-html" class="edoc-html-src" rows="14" spellcheck="false">'
+        + esc(p.html || '') + '</textarea>';
     }
     if (el.type === 'titulo') {
       html += '<label>Nível</label><select data-f="tag"><option value="h1">Título</option><option value="h2">Subtítulo</option><option value="h3">Seção</option></select>';
@@ -3758,6 +3885,34 @@
         });
       }
     }
+    if (kind === 'element' && elementoEhBoletim(target)) {
+      var btnDin = $('#edoc-boletim-html-dinamico', box);
+      var btnPrev = $('#edoc-boletim-html-previa', box);
+      if (btnDin) {
+        btnDin.addEventListener('click', function () {
+          garantirHtmlBoletimPadrao(target);
+          sincronizarHtmlBoletimComEstilo(target);
+          pushHist();
+          render();
+          setStatus('HTML dinâmico com {{quadro_notas_html}}');
+        });
+      }
+      if (btnPrev) {
+        btnPrev.addEventListener('click', function () {
+          var previa = htmlBoletimDaPrevia();
+          if (!previa) {
+            setStatus('Carregue boletim e aluna na prévia antes de copiar o HTML.');
+            return;
+          }
+          target.props = target.props || {};
+          target.props.html = previa;
+          sincronizarHtmlBoletimComEstilo(target);
+          pushHist();
+          render();
+          setStatus('HTML da prévia colado — ajuste e salve. Na emissão, prefira o modo dinâmico.');
+        });
+      }
+    }
   }
 
   function atualizarBotoesRte(box) {
@@ -3911,7 +4066,7 @@
       target.props = target.props || {};
       target.style = target.style || {};
       if (name === 'text' || name === 'html') {
-        if (target.type === 'html' || (String(val).indexOf('<') >= 0)) {
+        if (target.type === 'html' || elementoEhBoletim(target) || (String(val).indexOf('<') >= 0)) {
           target.props.html = val;
           delete target.props.text;
         } else {
@@ -3926,13 +4081,21 @@
         target.style[key] = target.style[key] || {};
         target.style[key][side] = parseInt(val, 10) || 0;
       } else if (['fontSize', 'borderWidth', 'borderRadius'].indexOf(name) >= 0) {
-        target.style[name] = parseInt(val, 10) || 0;
+        if (name === 'fontSize') {
+          var ptFs = parseFloat(String(val).replace(',', '.'));
+          target.style[name] = isFinite(ptFs) ? ptFs : 0;
+        } else {
+          target.style[name] = parseInt(val, 10) || 0;
+        }
       } else if (['fontWeight', 'color', 'borderStyle', 'borderColor'].indexOf(name) >= 0) {
         target.style[name] = val;
       } else if (name === 'hideIfEmpty') {
         target.hideIfEmpty = !!val;
       } else {
         target.props[name] = val;
+      }
+      if (elementoEhBoletim(target) && (name === 'fontSize' || name.indexOf('m_') === 0 || name.indexOf('p_') === 0)) {
+        sincronizarHtmlBoletimComEstilo(target);
       }
     }
     if (!silent) { pushHist(); render(); }
@@ -3942,7 +4105,18 @@
       var node = paper && paper.querySelector('[data-id="' + target.id + '"]');
       if (node && (name === 'text' || name === 'html')) {
         var inner = corpoDoElemento(node);
-        if (inner) inner.innerHTML = htmlTextoInterno(target);
+        if (inner) {
+          if (elementoEhBoletim(target)) {
+            inner.innerHTML = sanitizeHtml(ph(String((target.props || {}).html || '')));
+            requestAnimationFrame(ajustarQuadroNotasNaFolha);
+          } else {
+            inner.innerHTML = htmlTextoInterno(target);
+          }
+        }
+      } else if (elementoEhBoletim(target) && (name === 'fontSize' || name.indexOf('m_') === 0 || name.indexOf('p_') === 0)) {
+        var taBol = document.querySelector('#edoc-boletim-html');
+        if (taBol) taBol.value = (target.props || {}).html || '';
+        atualizarCanvasBoletim(target);
       }
     }
   }

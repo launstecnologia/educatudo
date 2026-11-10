@@ -431,6 +431,15 @@ body.edoc-body {
   width: 100%; border: 1px solid #d1d5db; border-radius: 8px; padding: 6px 8px; font-size: 13px;
   box-sizing: border-box; background: #fff;
 }
+.edoc-prop textarea.edoc-html-src {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.35;
+  min-height: 220px;
+  resize: vertical;
+  white-space: pre;
+  tab-size: 2;
+}
 .edoc-prop input[type="color"] { height: 36px; padding: 3px; cursor: pointer; }
 .edoc-prop-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .edoc-box4 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

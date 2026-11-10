@@ -182,10 +182,7 @@ class DocumentoRenderer
                 'Série' => '{{serie}}',
                 'Ano' => '{{ano_letivo}}',
             ], $css),
-            'boletim', 'tabela_notas' => $this->blocoHtmlLivre(
-                '<div class="quadro-notas-wrap">{{quadro_notas_html}}</div>',
-                $css
-            ),
+            'boletim', 'tabela_notas' => $this->blocoBoletim($props, $css),
             'tabela_coletiva' => $this->blocoHtmlLivre(
                 '<div class="tabela-coletiva-wrap">{{tabela_html}}</div>',
                 $css
@@ -423,6 +420,34 @@ class DocumentoRenderer
     private function blocoHtmlLivre(string $inner, string $css): string
     {
         return '<div style="' . $css . '">' . $inner . '</div>';
+    }
+
+    /**
+     * Boletim: HTML editável no editor (props.html). Se vazio, usa o quadro dinâmico.
+     *
+     * @param array<string,mixed> $props
+     */
+    private function blocoBoletim(array $props, string $css): string
+    {
+        $html = trim((string) ($props['html'] ?? ''));
+        if ($html === '') {
+            $html = '<div class="quadro-notas-wrap">{{quadro_notas_html}}</div>';
+        }
+        // Preserva placeholders, sanitiza o restante (mesmo padrão do título).
+        $parts = preg_split('/(\{\{\s*[a-z0-9_]+\s*\}\})/i', $html, -1, PREG_SPLIT_DELIM_CAPTURE);
+        if (!is_array($parts)) {
+            $parts = [$html];
+        }
+        $out = '';
+        foreach ($parts as $part) {
+            if (preg_match('/^\{\{\s*([a-z0-9_]+)\s*\}\}$/i', $part, $m)) {
+                $out .= '{{' . strtolower($m[1]) . '}}';
+            } else {
+                $out .= self::htmlPermitido($part);
+            }
+        }
+
+        return $this->blocoHtmlLivre($out, $css);
     }
 
     /**
