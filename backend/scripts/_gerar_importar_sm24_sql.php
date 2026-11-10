@@ -381,44 +381,42 @@ BEGIN
   WHILE v_bim <= 4 DO
     SET v_ev = 1;
     WHILE v_ev <= 4 DO
-      -- CH (v_ev=3) só no 3º bimestre: no PDF a 2ª chamada aparece só ali.
-      IF NOT (v_ev = 3 AND v_bim <> 3) THEN
-        SET v_sigla = ELT(v_ev, 'PP', 'PU', 'CH', 'PE');
-        SET v_nome_ev = CONCAT('SM24 ', ELT(v_ev, 'Prova Parcial', 'Prova de Unidade', '2ª Chamada', 'Ponto Extra'));
-        SET v_tipo = ELT(v_ev, v_tipo_pp, v_tipo_pu, v_tipo_ch, v_tipo_pe);
-        SET v_data = ELT(v_bim,
-          ELT(v_ev, '2024-03-08','2024-04-12','2024-04-13','2024-04-15'),
-          ELT(v_ev, '2024-05-17','2024-06-21','2024-06-22','2024-06-24'),
-          ELT(v_ev, '2024-08-16','2024-09-20','2024-09-21','2024-09-23'),
-          ELT(v_ev, '2024-10-18','2024-11-22','2024-11-23','2024-11-25')
-        );
+      -- CH existe nos 4 bimestres (estrutura do quadro); nota CH só no 3º onde o PDF traz valor.
+      SET v_sigla = ELT(v_ev, 'PP', 'PU', 'CH', 'PE');
+      SET v_nome_ev = CONCAT('SM24 ', ELT(v_ev, 'Prova Parcial', 'Prova de Unidade', '2ª Chamada', 'Ponto Extra'));
+      SET v_tipo = ELT(v_ev, v_tipo_pp, v_tipo_pu, v_tipo_ch, v_tipo_pe);
+      SET v_data = ELT(v_bim,
+        ELT(v_ev, '2024-03-08','2024-04-12','2024-04-13','2024-04-15'),
+        ELT(v_ev, '2024-05-17','2024-06-21','2024-06-22','2024-06-24'),
+        ELT(v_ev, '2024-08-16','2024-09-20','2024-09-21','2024-09-23'),
+        ELT(v_ev, '2024-10-18','2024-11-22','2024-11-23','2024-11-25')
+      );
 
-        INSERT INTO eventos_avaliativos (nome, sigla, descricao, ano_letivo, bimestre, tipo_avaliacao_id, ativo, liberar_nota_aluno, criado_por)
-        VALUES (v_nome_ev, v_sigla, 'SM24', 2024, v_bim, v_tipo, 1, 1, v_admin);
-        SET v_evento = LAST_INSERT_ID();
+      INSERT INTO eventos_avaliativos (nome, sigla, descricao, ano_letivo, bimestre, tipo_avaliacao_id, ativo, liberar_nota_aluno, criado_por)
+      VALUES (v_nome_ev, v_sigla, 'SM24', 2024, v_bim, v_tipo, 1, 1, v_admin);
+      SET v_evento = LAST_INSERT_ID();
 
-        INSERT INTO provas_blocos (
-          titulo, descricao, data_prova, hora_inicio, hora_fim, criado_por, tipo_prova,
-          formato_evento, configuracao_nota, ano_letivo, bimestre, tipo_avaliacao_id,
-          evento_avaliativo_id, visivel_no_portal_aluno, ativo, liberado, status, turma_id
-        ) VALUES (
-          v_nome_ev, 'SM24', v_data, '07:10:00', '09:40:00', v_admin, 'original',
-          'lancamento_nota', 'coordenacao_calcula', 2024, v_bim, v_tipo,
-          v_evento, 1, 1, 1, 'liberado', v_turma
-        );
-        SET v_bloco = LAST_INSERT_ID();
-        INSERT IGNORE INTO provas_blocos_turmas (bloco_id, turma_id) VALUES (v_bloco, v_turma);
-        INSERT INTO provas_blocos_professores (bloco_id, professor_id, materia_id, quantidade_questoes)
-        SELECT v_bloco, v_prof, m.id, 1
-        FROM materias m
-        WHERE m.codigo LIKE 'SM24-%' AND m.permite_avaliacao = 1;
+      INSERT INTO provas_blocos (
+        titulo, descricao, data_prova, hora_inicio, hora_fim, criado_por, tipo_prova,
+        formato_evento, configuracao_nota, ano_letivo, bimestre, tipo_avaliacao_id,
+        evento_avaliativo_id, visivel_no_portal_aluno, ativo, liberado, status, turma_id
+      ) VALUES (
+        v_nome_ev, 'SM24', v_data, '07:10:00', '09:40:00', v_admin, 'original',
+        'lancamento_nota', 'coordenacao_calcula', 2024, v_bim, v_tipo,
+        v_evento, 1, 1, 1, 'liberado', v_turma
+      );
+      SET v_bloco = LAST_INSERT_ID();
+      INSERT IGNORE INTO provas_blocos_turmas (bloco_id, turma_id) VALUES (v_bloco, v_turma);
+      INSERT INTO provas_blocos_professores (bloco_id, professor_id, materia_id, quantidade_questoes)
+      SELECT v_bloco, v_prof, m.id, 1
+      FROM materias m
+      WHERE m.codigo LIKE 'SM24-%' AND m.permite_avaliacao = 1;
 
-        INSERT INTO provas_blocos_notas_lancadas (bloco_id, professor_id, materia_id, turma_id, aluno_id, nota)
-        SELECT v_bloco, v_prof, m.id, v_turma, v_aluno, t.nota
-        FROM sm24_tmp_notas t
-        INNER JOIN materias m ON m.nome = t.materia AND m.codigo LIKE 'SM24-%'
-        WHERE t.bim = v_bim AND t.tipo = LOWER(v_sigla) AND t.nota IS NOT NULL;
-      END IF;
+      INSERT INTO provas_blocos_notas_lancadas (bloco_id, professor_id, materia_id, turma_id, aluno_id, nota)
+      SELECT v_bloco, v_prof, m.id, v_turma, v_aluno, t.nota
+      FROM sm24_tmp_notas t
+      INNER JOIN materias m ON m.nome = t.materia AND m.codigo LIKE 'SM24-%'
+      WHERE t.bim = v_bim AND t.tipo = LOWER(v_sigla) AND t.nota IS NOT NULL;
 
       SET v_ev = v_ev + 1;
     END WHILE;

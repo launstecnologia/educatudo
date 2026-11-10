@@ -13708,9 +13708,12 @@ class BoletimConfigController extends BaseController
     {
         $rawBlocos = $componente['blocos_ids'] ?? '';
         if (is_array($rawBlocos)) {
-            return array_values(array_unique(array_filter(array_map('intval', $rawBlocos), static function ($id) {
+            $ids = array_values(array_unique(array_filter(array_map('intval', $rawBlocos), static function ($id) {
                 return $id > 0;
             })));
+            if ($ids !== []) {
+                return $ids;
+            }
         }
         $raw = trim((string) $rawBlocos);
         if ($raw !== '') {
@@ -13718,14 +13721,43 @@ class BoletimConfigController extends BaseController
             foreach (explode(',', $raw) as $part) {
                 $ids[] = (int) trim($part);
             }
-
-            return array_values(array_unique(array_filter($ids, static function ($id) {
+            $ids = array_values(array_unique(array_filter($ids, static function ($id) {
                 return $id > 0;
             })));
+            if ($ids !== []) {
+                return $ids;
+            }
         }
         $bid = (int) ($componente['bloco_id'] ?? 0);
+        if ($bid > 0) {
+            return [$bid];
+        }
 
-        return $bid > 0 ? [$bid] : [];
+        // Assistente: coluna ligada ao Evento avaliativo sem blocos_ids gravados.
+        $cfg = $this->decodeComponenteConfig($componente);
+        $eventoId = (int) ($cfg['evento_avaliativo_id'] ?? $componente['evento_avaliativo_id'] ?? 0);
+        if ($eventoId <= 0) {
+            return [];
+        }
+        try {
+            $rows = Database::getInstance()->fetchAll(
+                'SELECT id FROM provas_blocos
+                  WHERE deleted_at IS NULL AND evento_avaliativo_id = :e
+                  ORDER BY id ASC',
+                ['e' => $eventoId]
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $ids = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+
+        return array_values(array_unique($ids));
     }
 
     /**

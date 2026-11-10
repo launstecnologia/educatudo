@@ -925,10 +925,6 @@ final class SeedSantaMariaAna2024Base
                 'ch' => '2ª Chamada',
                 'pe' => 'Ponto Extra',
             ] as $slug => $nome) {
-                // CH só no 3º bimestre (único com valor no PDF).
-                if ($slug === 'ch' && $bimestre !== 3) {
-                    continue;
-                }
                 $chave = $bimestre . ':' . $slug;
                 $tituloEvento = PREFIXO . ' ' . $nome;
                 $exist = $this->db->fetch(
