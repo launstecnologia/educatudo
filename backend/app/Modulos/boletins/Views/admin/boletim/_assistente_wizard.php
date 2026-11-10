@@ -686,6 +686,15 @@ $boletimWizardSteps = [
         if (!ids.length) return todas;
         var set = {};
         ids.forEach(function (id) { set[id] = true; });
+        // Regra/modelo podem guardar só o oficial (pai); o catálogo lista os desdobramentos.
+        (catalogo.familias_componentes || []).forEach(function (f) {
+            var pai = Number(f && f.pai_id ? f.pai_id : 0);
+            if (!pai || !set[pai]) return;
+            (f.filhos || []).forEach(function (ch) {
+                var cid = Number(ch && ch.id ? ch.id : 0);
+                if (cid > 0) set[cid] = true;
+            });
+        });
         return todas.filter(function (m) { return set[Number(m.id)]; });
     }
 

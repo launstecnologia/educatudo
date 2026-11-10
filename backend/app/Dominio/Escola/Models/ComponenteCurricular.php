@@ -269,6 +269,30 @@ class ComponenteCurricular
     }
 
     /**
+     * Filho → pai oficial (área/unidade). Folha sem pai permanece.
+     * Usado na regra de aprovação / modelo de boletim, que marcam só oficiais.
+     *
+     * @param list<int> $ids
+     * @return list<int>
+     */
+    public function comprimirParaOficiais(array $ids): array
+    {
+        $paiPorFilho = $this->mapaPaiPorFilho();
+        $out = [];
+        foreach ($ids as $id) {
+            $id = (int) $id;
+            if ($id <= 0) {
+                continue;
+            }
+            $raiz = (int) ($paiPorFilho[$id] ?? $id);
+            if ($raiz > 0) {
+                $out[$raiz] = $raiz;
+            }
+        }
+        return array_values($out);
+    }
+
+    /**
      * @return list<int>
      */
     public function listarFilhosIds(int $paiId): array

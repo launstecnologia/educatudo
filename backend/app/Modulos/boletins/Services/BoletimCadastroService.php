@@ -243,8 +243,25 @@ class BoletimCadastroService
         } catch (Throwable $e) {
             $componentes = null;
         }
+        $regraModel = null;
+        try {
+            $regraModel = new RegraAcademica();
+        } catch (Throwable $e) {
+            $regraModel = null;
+        }
         foreach ($this->model->listar(true) as $row) {
-            $ids = is_array($row['materias_ids'] ?? null) ? $row['materias_ids'] : [];
+            $ids = [];
+            $regraId = (int) ($row['regra_academica_id'] ?? 0);
+            if ($regraModel !== null && $regraId > 0) {
+                try {
+                    $ids = $regraModel->listarMateriasIds($regraId);
+                } catch (Throwable $e) {
+                    $ids = [];
+                }
+            }
+            if ($ids === []) {
+                $ids = is_array($row['materias_ids'] ?? null) ? $row['materias_ids'] : [];
+            }
             if ($componentes !== null) {
                 $ids = $componentes->expandirIdsComFilhos($ids);
             }
@@ -850,14 +867,40 @@ class BoletimCadastroService
      */
     public function componentesParaFicha(array $boletim): array
     {
+        // Matérias vêm da regra de aprovação; o JSON do modelo é espelho/legado.
         $ids = [];
-        foreach ((array) ($boletim['materias_ids'] ?? []) as $id) {
-            $id = (int) $id;
-            if ($id > 0) {
-                $ids[] = $id;
+        $regraId = (int) ($boletim['regra_academica_id'] ?? 0);
+        if ($regraId > 0) {
+            try {
+                $ids = (new \App\Modulos\RegrasAcademicas\Models\RegraAcademica())->listarMateriasIds($regraId);
+            } catch (Throwable $e) {
+                $ids = [];
+            }
+        }
+        if ($ids === []) {
+            foreach ((array) ($boletim['materias_ids'] ?? []) as $id) {
+                $id = (int) $id;
+                if ($id > 0) {
+                    $ids[] = $id;
+                }
             }
         }
         $ids = array_values(array_unique($ids));
+        if ($ids !== []) {
+            try {
+                $ids = (new \App\Models\Education\ComponenteCurricular())->expandirIdsComFilhos($ids);
+            } catch (Throwable $e) {
+                // mantém ids crus
+            }
+        }
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn ($id) => $id > 0)));
+        // Ficha mostra linhas lançáveis — tira rótulo-pai se os filhos já entraram.
+        try {
+            $paisComFilho = (new \App\Models\Education\ComponenteCurricular())->idsComFilhos();
+            $ids = array_values(array_filter($ids, static fn ($id) => empty($paisComFilho[$id])));
+        } catch (Throwable $e) {
+            // mantém lista expandida
+        }
         if ($ids === []) {
             return [];
         }

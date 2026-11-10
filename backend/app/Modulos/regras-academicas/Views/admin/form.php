@@ -256,10 +256,22 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
         $finalidadeRegra = ((string) $val($item, 'finalidade', 'oficial')) === 'complementar' ? 'complementar' : 'oficial';
         $materiasRegra = is_array($materias ?? null) ? $materias : [];
         $materiasMarcadas = [];
+        $paiPorFilhoMarcacao = [];
+        try {
+            $paiPorFilhoMarcacao = (new \App\Dominio\Escola\Models\ComponenteCurricular())->mapaPaiPorFilho();
+        } catch (Throwable $e) {
+            $paiPorFilhoMarcacao = [];
+        }
         foreach ((array) ($item['materias_ids'] ?? []) as $midMarcada) {
             $midMarcada = (int) $midMarcada;
-            if ($midMarcada > 0) {
-                $materiasMarcadas[$midMarcada] = true;
+            if ($midMarcada <= 0) {
+                continue;
+            }
+            // Seed/legado pode ter gravado o desdobramento; a UI lista só o oficial (pai).
+            $materiasMarcadas[$midMarcada] = true;
+            $paiMarcado = (int) ($paiPorFilhoMarcacao[$midMarcada] ?? 0);
+            if ($paiMarcado > 0) {
+                $materiasMarcadas[$paiMarcado] = true;
             }
         }
     ?>

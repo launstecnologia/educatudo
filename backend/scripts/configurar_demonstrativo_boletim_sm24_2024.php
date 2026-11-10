@@ -31,6 +31,7 @@ require_once $basePath . '/vendor/autoload.php';
 require_once $basePath . '/config/app.php';
 
 use App\Core\Database;
+use App\Dominio\Escola\Models\ComponenteCurricular;
 use App\Modulos\Boletins\Controllers\BoletimConfigController;
 use App\Modulos\Boletins\Models\BoletimConfig;
 use App\Modulos\Boletins\Services\BoletimCadastroService;
@@ -178,7 +179,7 @@ foreach ($blocos as $b) {
     $porBim[$bim][$sigla] = $b;
 }
 
-$materiasIds = [];
+$materiasIdsFolhas = [];
 // Só matérias SM24 lançáveis nos eventos SM24 (mesmo materia_id das notas).
 $matRows = $db->fetchAll(
     "SELECT id FROM materias
@@ -186,12 +187,15 @@ $matRows = $db->fetchAll(
       ORDER BY id ASC"
 ) ?: [];
 foreach ($matRows as $m) {
-    $materiasIds[] = (int) $m['id'];
+    $materiasIdsFolhas[] = (int) $m['id'];
 }
-if ($materiasIds === []) {
+if ($materiasIdsFolhas === []) {
     fail('Nenhuma matéria SM24-*. Rode o seed antes.');
 }
-$materiasJson = json_encode(array_values(array_unique($materiasIds)), JSON_UNESCAPED_UNICODE);
+// Regra marca oficiais (pai). Demonstrativo/modelo usam folhas lançáveis.
+$compSeed = new ComponenteCurricular();
+$materiasIds = $compSeed->comprimirParaOficiais($materiasIdsFolhas);
+$materiasJson = json_encode(array_values(array_unique($materiasIdsFolhas)), JSON_UNESCAPED_UNICODE);
 $seriesJson = $serieId > 0 ? json_encode([$serieId]) : '[]';
 $turmasJson = json_encode([$turmaId]);
 

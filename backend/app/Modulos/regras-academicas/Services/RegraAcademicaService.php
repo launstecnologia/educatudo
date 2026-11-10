@@ -41,6 +41,7 @@ class RegraAcademicaService
         $id = $this->model->create($data);
         if ($this->model->boletimPronto()) {
             $this->model->substituirMaterias($id, (array) ($data['materias_ids'] ?? []));
+            $this->espelharMateriasNosBoletins($id, (array) ($data['materias_ids'] ?? []));
         }
         if ($this->model->seriesProntas()) {
             $this->model->substituirSeries($id, (array) ($data['series_ids'] ?? []));
@@ -73,6 +74,7 @@ class RegraAcademicaService
         $this->model->update($id, $data);
         if ($this->model->boletimPronto()) {
             $this->model->substituirMaterias($id, (array) ($data['materias_ids'] ?? []));
+            $this->espelharMateriasNosBoletins($id, (array) ($data['materias_ids'] ?? []));
         }
         if ($this->model->seriesProntas()) {
             $this->model->substituirSeries($id, (array) ($data['series_ids'] ?? []));
@@ -84,6 +86,40 @@ class RegraAcademicaService
         }
 
         return ['success' => true];
+    }
+
+    /**
+     * Modelo de boletim herda as disciplinas da regra (com desdobramentos).
+     *
+     * @param list<int> $materiasOficiais
+     */
+    private function espelharMateriasNosBoletins(int $regraId, array $materiasOficiais): void
+    {
+        if ($regraId <= 0 || !$this->model->boletimPronto()) {
+            return;
+        }
+        $ids = array_values(array_filter(array_map('intval', $materiasOficiais), static fn ($id) => $id > 0));
+        try {
+            $ids = (new \App\Dominio\Escola\Models\ComponenteCurricular())->expandirIdsComFilhos($ids);
+        } catch (\Throwable $e) {
+            // mantém oficiais
+        }
+        $json = json_encode(array_values(array_unique($ids)), JSON_UNESCAPED_UNICODE);
+        if ($json === false) {
+            return;
+        }
+        try {
+            $db = \App\Core\Database::getInstance();
+            $db->query(
+                'UPDATE boletins
+                    SET materias_ids = :mats
+                  WHERE regra_academica_id = :regra
+                    AND excluido_em IS NULL',
+                ['mats' => $json, 'regra' => $regraId]
+            );
+        } catch (\Throwable $e) {
+            // tabela/coluna ainda não pronta
+        }
     }
 
     /**
@@ -197,8 +233,27 @@ class RegraAcademicaService
             'finalidade' => ((string) ($input['finalidade'] ?? '')) === 'complementar' ? 'complementar' : 'oficial',
             'vis_aluno' => !empty($input['vis_aluno']) ? 1 : 0,
             'vis_pais' => !empty($input['vis_pais']) ? 1 : 0,
-            'materias_ids' => $this->idsPositivos($input['materias_ids'] ?? []),
+            'materias_ids' => $this->materiasOficiais($input['materias_ids'] ?? []),
         ];
+    }
+
+    /**
+     * Disciplinas da regra = oficiais da matriz (pai). Filho vira o pai.
+     *
+     * @param mixed $bruto
+     * @return list<int>
+     */
+    private function materiasOficiais($bruto): array
+    {
+        $ids = $this->idsPositivos($bruto);
+        if ($ids === []) {
+            return [];
+        }
+        try {
+            return (new \App\Dominio\Escola\Models\ComponenteCurricular())->comprimirParaOficiais($ids);
+        } catch (\Throwable $e) {
+            return $ids;
+        }
     }
 
     private function validar(array $data): ?string

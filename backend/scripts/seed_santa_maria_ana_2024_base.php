@@ -780,13 +780,15 @@ final class SeedSantaMariaAna2024Base
                 'a' => ANO,
             ]
         );
-        $materiasIds = [];
+        $materiasIdsFolhas = [];
         foreach (array_keys(NOTAS) as $nome) {
             $mid = $this->materiaIds[$nome] ?? 0;
             if ($mid > 0) {
-                $materiasIds[] = $mid;
+                $materiasIdsFolhas[] = $mid;
             }
         }
+        // UI da regra lista só oficiais (pai); folhas viram a área/unidade.
+        $materiasIds = (new ComponenteCurricular())->comprimirParaOficiais($materiasIdsFolhas);
         $payload = [
             'nome' => NOME_REGRA,
             'codigo' => CODIGO_REGRA,

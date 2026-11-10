@@ -447,6 +447,12 @@ class RegraAcademica
             $series = $serieId > 0 ? [$serieId] : [];
         }
         $finalidade = ((string) ($regra['finalidade'] ?? '')) === 'complementar' ? 'complementar' : 'oficial';
+        $materias = $this->listarMateriasIds($regraId);
+        try {
+            $materias = (new \App\Dominio\Escola\Models\ComponenteCurricular())->expandirIdsComFilhos($materias);
+        } catch (Throwable $e) {
+            // mantém oficiais
+        }
         return [
             'nome' => trim((string) ($regra['nome'] ?? '')),
             'ano_letivo' => (int) ($regra['ano_letivo'] ?? 0),
@@ -454,7 +460,7 @@ class RegraAcademica
             'vis_aluno' => (int) ($regra['vis_aluno'] ?? 0) === 1 ? 1 : 0,
             'vis_pais' => (int) ($regra['vis_pais'] ?? 0) === 1 ? 1 : 0,
             'ativo' => (int) ($regra['ativo'] ?? 0) === 1 ? 1 : 0,
-            'materias_ids' => $this->listarMateriasIds($regraId),
+            'materias_ids' => $materias,
             'series_ids' => $series,
             'turmas_ids' => [],
         ];
