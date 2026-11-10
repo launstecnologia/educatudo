@@ -123,7 +123,7 @@ BEGIN
   DECLARE v_ev INT DEFAULT 0;
   DECLARE v_bloco INT DEFAULT 0;
   DECLARE v_evento INT DEFAULT 0;
-  DECLARE v_hash VARCHAR(255) DEFAULT '$2y$12$HCY0v/uyhq06DA23ku.vWe8M876EQj3pgQhY9s7uAwwwYAF0q4FVC';
+  DECLARE v_hash VARCHAR(255) DEFAULT '$2y$12$MG6daodoS53Vfn0JgiHwDOqT/G2EGb3cqHsQYLf6J8Bh7j4pFOyku';
   DECLARE v_data VARCHAR(10);
   DECLARE v_nome_ev VARCHAR(120);
   DECLARE v_sigla VARCHAR(12);
@@ -482,7 +482,7 @@ BEGIN
     ('Física 1', 3, 'pp', NULL),
     ('Física 1', 3, 'pu', 3.2),
     ('Física 1', 3, 'pe', 0.5),
-    ('Física 1', 3, 'ch', 2.3),
+    ('Física 1', 3, 'ch', NULL),
     ('Física 1', 4, 'pp', NULL),
     ('Física 1', 4, 'pu', NULL),
     ('Física 1', 4, 'pe', NULL),
@@ -499,7 +499,7 @@ BEGIN
     ('Física 2', 3, 'pp', NULL),
     ('Física 2', 3, 'pu', 3.1),
     ('Física 2', 3, 'pe', NULL),
-    ('Física 2', 3, 'ch', 2.3),
+    ('Física 2', 3, 'ch', NULL),
     ('Física 2', 4, 'pp', NULL),
     ('Física 2', 4, 'pu', NULL),
     ('Física 2', 4, 'pe', NULL),
@@ -516,7 +516,7 @@ BEGIN
     ('Química 1', 3, 'pp', NULL),
     ('Química 1', 3, 'pu', 3.2),
     ('Química 1', 3, 'pe', NULL),
-    ('Química 1', 3, 'ch', 2.3),
+    ('Química 1', 3, 'ch', NULL),
     ('Química 1', 4, 'pp', NULL),
     ('Química 1', 4, 'pu', NULL),
     ('Química 1', 4, 'pe', NULL),
@@ -533,7 +533,7 @@ BEGIN
     ('Química 2', 3, 'pp', NULL),
     ('Química 2', 3, 'pu', 3.1),
     ('Química 2', 3, 'pe', NULL),
-    ('Química 2', 3, 'ch', 2.3),
+    ('Química 2', 3, 'ch', NULL),
     ('Química 2', 4, 'pp', NULL),
     ('Química 2', 4, 'pu', NULL),
     ('Química 2', 4, 'pe', NULL),
@@ -550,7 +550,7 @@ BEGIN
     ('Biologia 1', 3, 'pp', NULL),
     ('Biologia 1', 3, 'pu', 3.2),
     ('Biologia 1', 3, 'pe', NULL),
-    ('Biologia 1', 3, 'ch', 2.3),
+    ('Biologia 1', 3, 'ch', NULL),
     ('Biologia 1', 4, 'pp', NULL),
     ('Biologia 1', 4, 'pu', NULL),
     ('Biologia 1', 4, 'pe', NULL),
@@ -567,7 +567,7 @@ BEGIN
     ('Biologia 2', 3, 'pp', NULL),
     ('Biologia 2', 3, 'pu', 3.1),
     ('Biologia 2', 3, 'pe', NULL),
-    ('Biologia 2', 3, 'ch', 2.3),
+    ('Biologia 2', 3, 'ch', NULL),
     ('Biologia 2', 4, 'pp', NULL),
     ('Biologia 2', 4, 'pu', NULL),
     ('Biologia 2', 4, 'pe', NULL),
@@ -695,7 +695,7 @@ BEGIN
   WHILE v_bim <= 4 DO
     SET v_ev = 1;
     WHILE v_ev <= 4 DO
-      -- CH existe nos 4 bimestres (estrutura do quadro); nota CH só no 3º onde o PDF traz valor.
+      -- CH existe nos 4 bimestres (estrutura do quadro), sem nota lançada.
       SET v_sigla = ELT(v_ev, 'PP', 'PU', 'CH', 'PE');
       SET v_nome_ev = CONCAT('SM24 ', ELT(v_ev, 'Prova Parcial', 'Prova de Unidade', '2ª Chamada', 'Ponto Extra'));
       SET v_tipo = ELT(v_ev, v_tipo_pp, v_tipo_pu, v_tipo_ch, v_tipo_pe);

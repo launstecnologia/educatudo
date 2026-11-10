@@ -23,7 +23,7 @@ $notas = [
     'Filosofia' => ['pp' => [1 => 8.5, 2 => 6.0, 3 => 9.5, 4 => null], 'pu' => [1 => 8.1, 2 => 9.1, 3 => 9.6, 4 => null], 'pe' => [1 => null, 2 => null, 3 => null, 4 => null], 'fal' => [1 => 0, 2 => 0, 3 => 2, 4 => 0], 'rec_s1' => null],
     'Matemática 1' => ['pp' => [1 => 3.0, 2 => 3.0, 3 => 4.0, 4 => null], 'pu' => [1 => 1.7, 2 => 2.4, 3 => 3.1, 4 => null], 'pe' => [1 => 0.5, 2 => 0.5, 3 => 0.5, 4 => null], 'fal' => [1 => 0, 2 => 0, 3 => 4, 4 => 0], 'rec_s1' => 3.5],
     'Matemática 2' => ['pp' => [1 => 2.1, 2 => 0.5, 3 => 4.9, 4 => null], 'pu' => [1 => 1.7, 2 => 2.4, 3 => 3.1, 4 => null], 'pe' => [1 => null, 2 => null, 3 => null, 4 => null], 'fal' => [1 => 0, 2 => 0, 3 => 2, 4 => 0], 'rec_s1' => 3.5],
-    // 3º bim: PDF com PP vazio e CH 2,3 (2ª chamada no lugar da PP) em Fís/Qui/Bio.
+    // 3º bim: PDF com PP vazio em Fís/Qui/Bio. CH existe no quadro sem nota lançada.
     'Física 1' => ['pp' => [1 => 3.0, 2 => 2.1, 3 => null, 4 => null], 'pu' => [1 => 2.8, 2 => 3.2, 3 => 3.2, 4 => null], 'pe' => [1 => null, 2 => 0.5, 3 => 0.5, 4 => null], 'fal' => [1 => 0, 2 => 0, 3 => 2, 4 => 0], 'rec_s1' => 3.5],
     'Física 2' => ['pp' => [1 => 4.0, 2 => 3.0, 3 => null, 4 => null], 'pu' => [1 => 2.7, 2 => 3.1, 3 => 3.1, 4 => null], 'pe' => [1 => null, 2 => null, 3 => null, 4 => null], 'fal' => [1 => 0, 2 => 0, 3 => 2, 4 => 0], 'rec_s1' => 3.5],
     'Química 1' => ['pp' => [1 => 2.5, 2 => 2.0, 3 => null, 4 => null], 'pu' => [1 => 2.8, 2 => 3.2, 3 => 3.2, 4 => null], 'pe' => [1 => null, 2 => null, 3 => null, 4 => null], 'fal' => [1 => 0, 2 => 0, 3 => 2, 4 => 0], 'rec_s1' => 5.0],
@@ -33,12 +33,8 @@ $notas = [
     'Língua Inglesa' => ['pp' => [1 => 6.0, 2 => 4.5, 3 => 8.0, 4 => null], 'pu' => [1 => 7.5, 2 => 8.8, 3 => 7.1, 4 => null], 'pe' => [1 => null, 2 => null, 3 => null, 4 => null], 'fal' => [1 => 0, 2 => 0, 3 => 2, 4 => 0], 'rec_s1' => null],
     'Educação Física' => ['pp' => [1 => 10.0, 2 => 10.0, 3 => 9.0, 4 => 10.0], 'pu' => [1 => 7.5, 2 => 8.8, 3 => 7.1, 4 => null], 'pe' => [1 => null, 2 => null, 3 => null, 4 => null], 'fal' => [1 => 0, 2 => 0, 3 => 1, 4 => 0], 'rec_s1' => null],
 ];
-// CH só no 3º bimestre e só onde o PDF traz valor (sem Matemática).
-$ch = [
-    'Física 1' => [3 => 2.3], 'Física 2' => [3 => 2.3],
-    'Química 1' => [3 => 2.3], 'Química 2' => [3 => 2.3],
-    'Biologia 1' => [3 => 2.3], 'Biologia 2' => [3 => 2.3],
-];
+// CH: só o evento no quadro (sem nota), como no PDF de referência.
+$ch = [];
 
 $esc = static fn (string $s): string => str_replace("'", "''", $s);
 $num = static function ($v): string {
@@ -381,7 +377,7 @@ BEGIN
   WHILE v_bim <= 4 DO
     SET v_ev = 1;
     WHILE v_ev <= 4 DO
-      -- CH existe nos 4 bimestres (estrutura do quadro); nota CH só no 3º onde o PDF traz valor.
+      -- CH existe nos 4 bimestres (estrutura do quadro), sem nota lançada.
       SET v_sigla = ELT(v_ev, 'PP', 'PU', 'CH', 'PE');
       SET v_nome_ev = CONCAT('SM24 ', ELT(v_ev, 'Prova Parcial', 'Prova de Unidade', '2ª Chamada', 'Ponto Extra'));
       SET v_tipo = ELT(v_ev, v_tipo_pp, v_tipo_pu, v_tipo_ch, v_tipo_pe);

@@ -63,18 +63,11 @@ const DATAS = [
 ];
 
 /**
- * Notas de 2ª Chamada (CH) — só onde o boletim anexo traz valor.
+ * Notas de 2ª Chamada (CH) — evento no quadro, sem lançamento (como no PDF).
  *
  * @var array<string, array<int, float>>
  */
-const CH_NOTAS = [
-    'Física 1' => [3 => 2.3],
-    'Física 2' => [3 => 2.3],
-    'Química 1' => [3 => 2.3],
-    'Química 2' => [3 => 2.3],
-    'Biologia 1' => [3 => 2.3],
-    'Biologia 2' => [3 => 2.3],
-];
+const CH_NOTAS = [];
 
 /**
  * Notas do boletim. Chave = matéria lançável.

@@ -13405,6 +13405,13 @@ class BoletimConfigController extends BaseController
                 $out[] = $n;
             }
         }
+        // Quadro do assistente: b1–b4 no layout_group amarra a peça ao bimestre do título.
+        if ($out === []) {
+            $grupo = strtolower(trim((string) ($cfg['layout_group'] ?? $componente['layout_group'] ?? '')));
+            if (preg_match('/^b([1-4])$/', $grupo, $mGrupo) === 1) {
+                $out[] = (int) $mGrupo[1];
+            }
+        }
 
         return $out;
     }
