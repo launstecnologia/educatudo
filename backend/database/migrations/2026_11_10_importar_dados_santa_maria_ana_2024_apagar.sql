@@ -54,8 +54,8 @@ BEGIN
   END IF;
 
   IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'recuperacoes') > 0 THEN
-    DELETE FROM recuperacoes WHERE nome IN ('Recuperação semestral', 'Prova Final')
-      AND (ano_letivo = 2024 OR regra_id IN (SELECT id FROM regras_academicas WHERE codigo = 'sm24-aprovacao-2024'));
+    DELETE FROM recuperacoes
+     WHERE regra_id IN (SELECT id FROM regras_academicas WHERE codigo = 'sm24-aprovacao-2024');
   END IF;
 
   DELETE FROM regras_academicas_materias
