@@ -1,5 +1,7 @@
 # Manual de fórmulas do boletim
 
+Versão para leigo em PDF (completa, com exemplos numéricos): [`manual-formulas-boletim.pdf`](./manual-formulas-boletim.pdf) · HTML fonte: [`manual-formulas-boletim-leigo.html`](./manual-formulas-boletim-leigo.html).
+
 Guia do editor de cálculo (coluna amarela: MU, Média Bim, Resultado Final, etc.) em **Boletim → Montar quadro** / assistente de evento.
 
 A fórmula define **como a coluna é calculada**. As colunas usadas na conta (PP, PU, PE…) podem ficar ocultas na grade — elas continuam entrando no cálculo.

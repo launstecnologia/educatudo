@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Manual de Fórmulas do Boletim — EducaTudo</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 11.5pt;
+    line-height: 1.45;
+    color: #1a1a1a;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 12px 8px 40px;
+  }
+  h1 {
+    font-size: 22pt;
+    color: #1e3a5f;
+    margin: 0 0 6px;
+    border-bottom: 3px solid #1e3a5f;
+    padding-bottom: 8px;
+  }
+  h2 {
+    font-size: 14pt;
+    color: #1e3a5f;
+    margin: 28px 0 10px;
+    padding: 6px 10px;
+    background: #eef3f9;
+    border-left: 5px solid #1e3a5f;
+    page-break-after: avoid;
+  }
+  h3 {
+    font-size: 12.5pt;
+    color: #0f5132;
+    margin: 20px 0 8px;
+    page-break-after: avoid;
+  }
+  h4 {
+    font-size: 11.5pt;
+    color: #664d03;
+    margin: 14px 0 6px;
+  }
+  p { margin: 0 0 10px; }
+  ul, ol { margin: 0 0 12px; padding-left: 22px; }
+  li { margin-bottom: 5px; }
+  .capa {
+    text-align: center;
+    padding: 40px 20px 30px;
+    margin-bottom: 24px;
+    background: linear-gradient(180deg, #eef3f9 0%, #fff 100%);
+    border: 1px solid #c5d4e8;
+    border-radius: 8px;
+  }
+  .capa .sub {
+    font-size: 13pt;
+    color: #334155;
+    margin-top: 8px;
+  }
+  .capa .meta {
+    font-size: 10pt;
+    color: #64748b;
+    margin-top: 16px;
+  }
+  .destaque {
+    background: #fff8e6;
+    border: 1px solid #f0d78c;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 12px 0;
+  }
+  .importante {
+    background: #fef2f2;
+    border: 1px solid #f5c2c7;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 12px 0;
+  }
+  .dica {
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 12px 0;
+  }
+  .caixa {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 12px 0;
+  }
+  code, .formula {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    background: #f1f5f9;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 10.5pt;
+  }
+  .formula-bloco {
+    display: block;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    background: #1e3a5f;
+    color: #fff;
+    padding: 12px 14px;
+    border-radius: 6px;
+    margin: 10px 0 14px;
+    font-size: 12pt;
+    text-align: center;
+    letter-spacing: 0.3px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0 16px;
+    font-size: 10.5pt;
+  }
+  th, td {
+    border: 1px solid #94a3b8;
+    padding: 7px 8px;
+    vertical-align: top;
+    text-align: left;
+  }
+  th {
+    background: #1e3a5f;
+    color: #fff;
+    font-weight: 600;
+  }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .passo {
+    counter-reset: passo;
+    list-style: none;
+    padding-left: 0;
+  }
+  .passo li {
+    counter-increment: passo;
+    position: relative;
+    padding: 8px 10px 8px 48px;
+    margin-bottom: 8px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+  }
+  .passo li::before {
+    content: counter(passo);
+    position: absolute;
+    left: 10px;
+    top: 8px;
+    width: 26px;
+    height: 26px;
+    background: #1e3a5f;
+    color: #fff;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 26px;
+    font-weight: 700;
+    font-size: 11pt;
+  }
+  .sigla {
+    display: inline-block;
+    min-width: 2.2em;
+    text-align: center;
+    background: #dbeafe;
+    color: #1e3a5f;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 10pt;
+  }
+  .toc a { color: #1e3a5f; text-decoration: none; }
+  .toc li { margin-bottom: 4px; }
+  .rodape {
+    margin-top: 36px;
+    padding-top: 12px;
+    border-top: 1px solid #cbd5e1;
+    font-size: 9.5pt;
+    color: #64748b;
+  }
+  .page-break { page-break-before: always; }
+</style>
+</head>
+<body>
+
+<div class="capa">
+  <h1 style="border:none; padding:0; margin:0;">Manual de Fórmulas do Boletim</h1>
+  <p class="sub">Como montar o cálculo das notas no EducaTudo<br>— explicado para quem não é de informática —</p>
+  <p class="meta">EducaTudo · Boletim / Montar quadro · Linguagem simples · Exemplos com números</p>
+</div>
+
+<div class="destaque">
+  <strong>Para que serve este manual?</strong><br>
+  Ele ensina, passo a passo, como a escola monta a <strong>conta</strong> que transforma as notas lançadas
+  (PP, PU, PE, provas, trabalhos…) na coluna final que aparece no boletim (por exemplo a <strong>MU</strong>).
+  Você não precisa saber programar. Basta clicar nas bolinhas (chips) e nos botões prontos.
+</div>
+
+<h2>Sumário</h2>
+<ol class="toc">
+  <li><a href="#o-que-e">O que é uma fórmula no boletim?</a></li>
+  <li><a href="#onde">Onde eu monto a fórmula?</a></li>
+  <li><a href="#pecas">Peças, colunas e o que cada sigla significa</a></li>
+  <li><a href="#botoes">Os botões prontos (um por um)</a></li>
+  <li><a href="#sinais">Os sinais (+ − × ÷) e o que cada um faz</a></li>
+  <li><a href="#peso">Como colocar peso na média (muito importante)</a></li>
+  <li><a href="#substituta">Nota substituta (CH no lugar de PP ou PU)</a></li>
+  <li><a href="#rec">Média com recuperação</a></li>
+  <li><a href="#sm">Exemplo completo: Santa Maria (MU)</a></li>
+  <li><a href="#so-mu">Quero ver só a coluna MU no boletim</a></li>
+  <li><a href="#erros">Erros comuns e como evitar</a></li>
+  <li><a href="#checklist">Checklist final</a></li>
+</ol>
+
+<h2 id="o-que-e">1. O que é uma fórmula no boletim?</h2>
+
+<p>
+Imagine que o professor lançou várias notas do aluno no sistema:
+prova parcial, prova unificada, pontos extras, etc.
+O boletim precisa mostrar <strong>uma nota só</strong> daquele bimestre — a famosa <strong>MU</strong> (média da unidade),
+ou “Média do bimestre”, ou “Resultado final”.
+</p>
+
+<p>
+A <strong>fórmula</strong> é a <em>receita de bolo</em> que diz ao computador:
+<em>“Pegue estas notas, some assim, divida assim, e mostre o resultado nesta coluna.”</em>
+</p>
+
+<div class="caixa">
+  <strong>Analogia simples</strong><br>
+  · As notas lançadas = os ingredientes (farinha, ovos, açúcar)<br>
+  · A fórmula = a receita (misture 2 de farinha + 1 de açúcar…)<br>
+  · A coluna calculada (MU) = o bolo pronto que aparece na mesa (boletim)
+</div>
+
+<p>
+Você monta a receita <strong>uma vez</strong> no quadro do boletim.
+Depois o sistema aplica a mesma conta para <strong>todos os alunos</strong> e todas as matérias
+(salvo quando você cria uma exceção para uma matéria específica).
+</p>
+
+<h2 id="onde">2. Onde eu monto a fórmula?</h2>
+
+<ol class="passo">
+  <li>No admin, abra <strong>Boletim</strong> (Como a escola avalia).</li>
+  <li>Entre no boletim / quadro da escola (ex.: print Santa Maria) e use <strong>Montar quadro</strong>.</li>
+  <li>Na etapa de aparência/fórmula, clique no <strong>bloco de cálculo</strong> amarelo (ex.: coluna <strong>MU</strong>).</li>
+  <li>Abre o editor: à esquerda as siglas para usar; à direita a “Fórmula desta coluna”.</li>
+  <li>Monte a conta → clique em <strong>Salvar bloco</strong> → confira a prévia.</li>
+</ol>
+
+<div class="dica">
+  <strong>Dica:</strong> no próprio editor existe o botão/caixa
+  <em>“Manual rápido das fórmulas”</em>. Este PDF é a versão completa, com mais exemplos.
+</div>
+
+<h2 id="pecas">3. Peças, colunas e o que cada sigla significa</h2>
+
+<p>
+No print estilo Santa Maria (muito usado), as colunas do bimestre costumam ser:
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Sigla</th>
+      <th>Nome completo (em geral)</th>
+      <th>É lançada ou calculada?</th>
+      <th>Explicação em português claro</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><span class="sigla">PP</span></td>
+      <td>Prova Parcial</td>
+      <td>Lançada pelo professor</td>
+      <td>Nota que o professor digita. Entra na média da MU.</td>
+    </tr>
+    <tr>
+      <td><span class="sigla">PU</span></td>
+      <td>Prova Unificada</td>
+      <td>Lançada</td>
+      <td>Outra nota digitada. Também entra na média da MU.</td>
+    </tr>
+    <tr>
+      <td><span class="sigla">CH</span></td>
+      <td>2ª chamada / chamada substituta</td>
+      <td>Lançada (quando houver)</td>
+      <td>Só entra se faltar PP ou PU. Não soma “por cima” se as duas já existem.</td>
+    </tr>
+    <tr>
+      <td><span class="sigla">PE</span></td>
+      <td>Pontos extras</td>
+      <td>Lançada</td>
+      <td>Entra <strong>somando</strong> depois da média (não divide junto com PP/PU).</td>
+    </tr>
+    <tr>
+      <td><span class="sigla">MU</span></td>
+      <td>Média da Unidade (bimestre)</td>
+      <td><strong>Calculada</strong> pela fórmula</td>
+      <td>É o resultado que o boletim mostra. Você monta a receita dela.</td>
+    </tr>
+    <tr>
+      <td><span class="sigla">FAL</span></td>
+      <td>Faltas</td>
+      <td>Lançada / evento de faltas</td>
+      <td>Não entra na média de nota; é presença.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="importante">
+  <strong>Atenção:</strong> PP, PU, CH, PE e FAL <em>não têm fórmula</em> — são o que o professor lança.
+  Quem tem fórmula é a coluna amarela (MU, MS, MA, MF, Média Bim, Resultado Final…).
+</div>
+
+<h2 id="botoes">4. Os botões prontos (um por um)</h2>
+
+<p>
+Embaixo da área da fórmula existem botões verdes/azuis que <strong>montam a conta sozinhos</strong>.
+Você clica, confere, ajusta se precisar e salva.
+</p>
+
+<h3>4.1 Botão “Média das peças”</h3>
+
+<p><strong>Em português:</strong> “Some todas as notas marcadas e divida pela quantidade.”</p>
+
+<div class="formula-bloco">(Prova + Trabalho + Participação) ÷ 3</div>
+
+<p><strong>Quando usar:</strong> todas as notas têm o <em>mesmo valor</em> (mesmo peso). Nenhuma vale mais que a outra.</p>
+
+<p><strong>Exemplo com números:</strong></p>
+<ul>
+  <li>Prova = 8,0</li>
+  <li>Trabalho = 6,0</li>
+  <li>Participação = 10,0</li>
+  <li>Conta: (8 + 6 + 10) ÷ 3 = <strong>8,0</strong></li>
+</ul>
+
+<div class="destaque">
+  Se uma nota vale o dobro da outra, <strong>não use este botão</strong>.
+  Vá na seção <a href="#peso">Média com peso</a>.
+</div>
+
+<h3>4.2 Botão “Maior entre as duas primeiras”</h3>
+
+<p><strong>Em português:</strong> “Fica a maior nota entre as duas primeiras peças.”</p>
+
+<div class="formula-bloco">maior (Nota1, Nota2)</div>
+
+<p><strong>Quando usar:</strong> a escola quer aproveitar a <em>melhor</em> entre duas provas.</p>
+
+<p><strong>Exemplo:</strong> Nota1 = 5,0 e Nota2 = 8,5 → resultado <strong>8,5</strong>.</p>
+
+<p>Também existe o sinal <strong>menor (</strong>, que faz o contrário (fica a menor).</p>
+
+<h3>4.3 Botão “Média com nota substituta”</h3>
+
+<p><strong>Em português:</strong>
+“Faça a média das notas principais.
+Se faltar a primeira delas, use a nota substituta (ex.: 2ª chamada) no lugar.
+Se as principais estiverem preenchidas, ignore a substituta.”</p>
+
+<div class="formula-bloco">nota substituta (PP, PU, CH)</div>
+
+<p>No Santa Maria, este botão monta exatamente isso: PP e PU na média, CH como substituta.</p>
+
+<div class="importante">
+  <strong>Não coloque ÷ 2 de novo depois!</strong>
+  A função já calcula a média por dentro.
+  Se você dividir de novo, a nota do aluno cai pela metade.
+</div>
+
+<p>
+<strong>Para a MU do Santa Maria</strong> você ainda precisa <strong>somar o PE</strong> depois
+(veja a seção 9). O botão sozinho <em>não</em> coloca o PE.
+</p>
+
+<h3>4.4 Botão “Média com recuperação”</h3>
+
+<p><strong>Em português:</strong>
+“Se o aluno não fez recuperação, fica a média normal.
+Se fez, a nota final vira a média entre a média e a recuperação.”</p>
+
+<div class="formula-bloco">média c/ rec ( (MS1 + MS2) ÷ 2 , REC )</div>
+
+<table>
+  <thead>
+    <tr><th>Situação do aluno</th><th>O que o sistema faz</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Sem recuperação (traço —)</td>
+      <td>Mostra só a média. A recuperação <em>não</em> vira zero.</td>
+    </tr>
+    <tr>
+      <td>Com recuperação lançada</td>
+      <td>(média + recuperação) ÷ 2</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Exemplo:</strong> média = 5,0 e REC = 7,0 → (5 + 7) ÷ 2 = <strong>6,0</strong>.</p>
+<p><strong>Exemplo sem REC:</strong> média = 5,0 e REC = — → resultado <strong>5,0</strong> (não vira 2,5).</p>
+
+<h3>4.5 Botão “Limpar”</h3>
+
+<p>Apaga a conta da coluna para você começar de novo.
+<strong>Não apaga</strong> o título da coluna nem o “valor máximo”.</p>
+
+<div class="page-break"></div>
+
+<h2 id="sinais">5. Os sinais (+ − × ÷) e o que cada um faz</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Sinal na tela</th>
+      <th>Nome</th>
+      <th>Para que serve (leigo)</th>
+      <th>Exemplo</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>+</strong></td>
+      <td>Mais (soma)</td>
+      <td>Junta valores</td>
+      <td>PP + PU</td>
+    </tr>
+    <tr>
+      <td><strong>−</strong></td>
+      <td>Menos (subtração)</td>
+      <td>Tira um valor do outro (raro em média escolar)</td>
+      <td>10 − faltas (casos especiais)</td>
+    </tr>
+    <tr>
+      <td><strong>×</strong></td>
+      <td>Vezes (multiplicação)</td>
+      <td>Dá <strong>peso</strong> a uma nota (vale mais)</td>
+      <td>PP × 2</td>
+    </tr>
+    <tr>
+      <td><strong>÷</strong></td>
+      <td>Dividido por</td>
+      <td>Fecha a média (divide pela quantidade ou pela soma dos pesos)</td>
+      <td>(PP + PU) ÷ 2</td>
+    </tr>
+    <tr>
+      <td><strong>( )</strong></td>
+      <td>Parênteses</td>
+      <td>Diz “primeiro resolva isto aqui dentro”</td>
+      <td>((PP × 2) + PU) ÷ 3</td>
+    </tr>
+    <tr>
+      <td><strong>,</strong></td>
+      <td>Vírgula</td>
+      <td>Separa itens dentro de maior / substituta / rec</td>
+      <td>maior (PP, PU)</td>
+    </tr>
+    <tr>
+      <td><strong>Número + Inserir</strong></td>
+      <td>Número fixo</td>
+      <td>Coloca 2, 3, 0,5… na conta (peso ou divisor)</td>
+      <td>Inserir o número 3</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="dica">
+  <strong>Regra de ouro da média:</strong>
+  some sempre as notas <em>entre parênteses</em> e só depois divida.<br>
+  Certo: <span class="formula">(8 + 6 + 10) ÷ 3</span><br>
+  Errado (sem parêntese mental): pensar que “÷ 3” pega só o último número.
+</div>
+
+<h2 id="peso">6. Como colocar peso na média (muito importante)</h2>
+
+<p>
+Às vezes a escola diz:
+<em>“A prova parcial vale o dobro da unificada”</em>
+ou
+<em>“A prova vale 60% e o trabalho 40%”</em>.
+</p>
+
+<p>
+Isso se chama <strong>média ponderada</strong> (média com peso).
+<strong>Não existe um botão chamado “peso”</strong>.
+Você monta com <strong>×</strong> (vezes) e <strong>÷</strong> (dividido).
+</p>
+
+<h3>A receita universal do peso</h3>
+
+<div class="formula-bloco">((Nota1 × Peso1) + (Nota2 × Peso2)) ÷ (Peso1 + Peso2)</div>
+
+<p>Em português:</p>
+<ol>
+  <li>Multiplique cada nota pelo quanto ela “vale”.</li>
+  <li>Some esses resultados.</li>
+  <li>Divida pela <strong>soma dos pesos</strong> (não pela quantidade de notas!).</li>
+</ol>
+
+<h3>Exemplo A — PP vale o dobro de PU</h3>
+
+<p>Peso do PP = 2 · Peso do PU = 1 · Soma dos pesos = 3</p>
+<div class="formula-bloco">((PP × 2) + PU) ÷ 3</div>
+
+<p>Números: PP = 8,0 e PU = 5,0</p>
+<ul>
+  <li>(8 × 2) = 16</li>
+  <li>16 + 5 = 21</li>
+  <li>21 ÷ 3 = <strong>7,0</strong></li>
+</ul>
+<p>Se fosse média simples (mesmo peso): (8+5)÷2 = 6,5 — diferente!</p>
+
+<h3>Exemplo B — Prova 60% e Trabalho 40%</h3>
+
+<p>Use pesos 6 e 4 (ou 3 e 2). Soma = 10 (ou 5).</p>
+<div class="formula-bloco">((Prova × 6) + (Trabalho × 4)) ÷ 10</div>
+
+<p>Números: Prova = 7,0 · Trabalho = 10,0 → (42 + 40) ÷ 10 = <strong>8,2</strong>.</p>
+
+<h3>Exemplo C — Semanal peso 1, Bimestral peso 2</h3>
+<div class="formula-bloco">((Semanal × 1) + (Bimestral × 2)) ÷ 3</div>
+
+<h3>Passo a passo no editor (clique a clique)</h3>
+<ol class="passo">
+  <li>Abra o bloco amarelo da coluna (ex.: Média Bim ou MU).</li>
+  <li>Clique em <strong>(</strong> (parêntese que abre).</li>
+  <li>Clique de novo em <strong>(</strong>.</li>
+  <li>Clique na sigla da nota que tem mais peso (ex.: PP).</li>
+  <li>Clique em <strong>×</strong>.</li>
+  <li>No campo Número, digite <strong>2</strong> e clique em <strong>Inserir</strong>.</li>
+  <li>Clique em <strong>)</strong>.</li>
+  <li>Clique em <strong>+</strong>.</li>
+  <li>Clique na outra sigla (ex.: PU).</li>
+  <li>Clique em <strong>)</strong>.</li>
+  <li>Clique em <strong>÷</strong>.</li>
+  <li>Insira o número <strong>3</strong> (soma dos pesos 2+1).</li>
+  <li>Olhe o texto embaixo: deve aparecer algo como <span class="formula">((PP × 2) + PU) ÷ 3</span>.</li>
+  <li>Clique em <strong>Salvar bloco</strong>.</li>
+</ol>
+
+<div class="importante">
+  <strong>Erro clássico:</strong> multiplicar pelo peso e <em>esquecer de dividir pela soma dos pesos</em>.
+  Aí a nota explode (vai para 16, 20…) e o “valor máximo” corta em 10.
+  Sempre feche a conta com <strong>÷ soma dos pesos</strong>.
+</div>
+
+<h2 id="substituta">7. Nota substituta (CH no lugar de PP ou PU)</h2>
+
+<p>
+Pense assim: a escola permite uma <strong>2ª chamada</strong> (CH) quando o aluno faltou a PP ou a PU.
+A CH <strong>não é uma terceira nota na média</strong>.
+Ela <strong>substitui</strong> a que faltou.
+</p>
+
+<div class="formula-bloco">nota substituta (PP, PU, CH)</div>
+
+<p>Leitura da esquerda para a direita:</p>
+<ul>
+  <li><strong>PP</strong> e <strong>PU</strong> = notas principais (bases da média)</li>
+  <li><strong>CH</strong> = a última da lista = a substituta</li>
+</ul>
+
+<table>
+  <thead>
+    <tr>
+      <th>PP</th>
+      <th>PU</th>
+      <th>CH</th>
+      <th>O que a conta faz</th>
+      <th>Resultado da média</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>8,0</td>
+      <td>6,0</td>
+      <td>—</td>
+      <td>As duas bases existem → CH ignorada</td>
+      <td>(8+6)÷2 = <strong>7,0</strong></td>
+    </tr>
+    <tr>
+      <td>—</td>
+      <td>6,0</td>
+      <td>7,0</td>
+      <td>Falta PP → CH entra no lugar do PP</td>
+      <td>(7+6)÷2 = <strong>6,5</strong></td>
+    </tr>
+    <tr>
+      <td>8,0</td>
+      <td>—</td>
+      <td>5,0</td>
+      <td>Falta PU → CH entra no lugar da 1ª ausente (PU)</td>
+      <td>(8+5)÷2 = <strong>6,5</strong></td>
+    </tr>
+    <tr>
+      <td>8,0</td>
+      <td>6,0</td>
+      <td>10,0</td>
+      <td>As duas bases existem → CH <strong>não</strong> sobe a média</td>
+      <td>(8+6)÷2 = <strong>7,0</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="destaque">
+  A substituta cobre <strong>só a primeira nota ausente</strong>.
+  Se faltar PP <em>e</em> PU, o ideal é o aluno ter pelo menos uma base lançada.
+</div>
+
+<h2 id="rec">8. Média com recuperação</h2>
+
+<p>
+Use no fechamento (semestre/ano), quando existe uma coluna de recuperação (REC, PF, etc.).
+</p>
+
+<div class="formula-bloco">média c/ rec ( média , REC )</div>
+
+<table>
+  <thead>
+    <tr><th>Média</th><th>REC</th><th>Resultado</th><th>Por quê</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>4,0</td><td>—</td><td><strong>4,0</strong></td><td>Sem REC, mantém a média</td></tr>
+    <tr><td>4,0</td><td>8,0</td><td><strong>6,0</strong></td><td>(4+8)÷2</td></tr>
+    <tr><td>7,0</td><td>5,0</td><td><strong>6,0</strong></td><td>(7+5)÷2 — cuidado: REC baixa também puxa</td></tr>
+  </tbody>
+</table>
+
+<div class="importante">
+  <strong>Não faça</strong> <span class="formula">(média + REC) ÷ 2</span> com o sinal de + comum
+  se a REC puder estar em branco.
+  Nota em branco na conta “crua” vira 0 e a média cai pela metade.
+  Use sempre o botão / função <strong>média c/ rec</strong>.
+</div>
+
+<div class="page-break"></div>
+
+<h2 id="sm">9. Exemplo completo: Santa Maria (coluna MU)</h2>
+
+<p>
+Regra oficial do print SM para a média da unidade:
+</p>
+
+<div class="formula-bloco">MU = ((PP + PU) ÷ 2) + PE</div>
+
+<p>
+Em português:
+<strong>faça a média de PP e PU; depois some os pontos extras (PE).</strong>
+O PE <em>não</em> entra dentro da divisão.
+</p>
+
+<h3>Versão recomendada com 2ª chamada (CH)</h3>
+
+<div class="formula-bloco">nota substituta (PP, PU, CH) + PE</div>
+
+<h4>Como montar no sistema</h4>
+<ol class="passo">
+  <li>Clique na coluna amarela <strong>MU</strong>.</li>
+  <li>Clique no botão <strong>Média com nota substituta</strong>
+      (deve aparecer: nota substituta (PP, PU, CH)).</li>
+  <li>Clique no sinal <strong>+</strong>.</li>
+  <li>Na aba do 1º bimestre (ou do bimestre correspondente), clique em <strong>PE</strong>.</li>
+  <li>Confira o texto: <span class="formula">nota substituta (PP, PU, CH) + PE</span>.</li>
+  <li>Valor máximo da coluna: normalmente <strong>10</strong>.</li>
+  <li><strong>Salvar bloco</strong>.</li>
+  <li>Se quiser, oculte PP, PU, CH, PE e FAL na grade e deixe <strong>só MU</strong> visível.</li>
+  <li>Abra a prévia com um aluno real e confira os números.</li>
+</ol>
+
+<h4>Contas de exemplo (MU)</h4>
+<table>
+  <thead>
+    <tr>
+      <th>PP</th><th>PU</th><th>CH</th><th>PE</th><th>Conta</th><th>MU</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>8,0</td><td>6,0</td><td>—</td><td>1,0</td>
+      <td>((8+6)÷2)+1</td>
+      <td><strong>8,0</strong></td>
+    </tr>
+    <tr>
+      <td>—</td><td>6,0</td><td>7,0</td><td>1,0</td>
+      <td>((7+6)÷2)+1</td>
+      <td><strong>7,5</strong></td>
+    </tr>
+    <tr>
+      <td>9,0</td><td>9,0</td><td>10,0</td><td>0,5</td>
+      <td>((9+9)÷2)+0,5 · CH ignorada</td>
+      <td><strong>9,5</strong></td>
+    </tr>
+    <tr>
+      <td>7,0</td><td>5,0</td><td>—</td><td>0</td>
+      <td>((7+5)÷2)+0</td>
+      <td><strong>6,0</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+<h4>Outras colunas do print SM (resumo)</h4>
+<table>
+  <thead>
+    <tr><th>Coluna</th><th>Ideia em português</th><th>Fórmula típica</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>MS (semestre)</td>
+      <td>Média das duas MUs do semestre</td>
+      <td>(MU1 + MU2) ÷ 2</td>
+    </tr>
+    <tr>
+      <td>MA</td>
+      <td>Média anual dos dois semestres</td>
+      <td>(MS1 + MS2) ÷ 2</td>
+    </tr>
+    <tr>
+      <td>MF</td>
+      <td>Média final com recuperação opcional</td>
+      <td>média c/ rec (MA, PF)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="so-mu">10. Quero ver só a coluna MU no boletim</h2>
+
+<p>
+Isso é comum no print: o responsável vê só a média do bimestre, sem as colunas PP, PU, CH, PE.
+</p>
+
+<ol class="passo">
+  <li>Monte e salve a fórmula da MU <strong>antes</strong> (com PP, PU, CH, PE na conta).</li>
+  <li>Na grade do quadro, use o <strong>×</strong> / ocultar nas colunas que não quer imprimir.</li>
+  <li>Deixe visível só <strong>MU</strong> (e o que mais a escola quiser, ex.: FAL).</li>
+  <li>Salve / avance e confira a prévia.</li>
+</ol>
+
+<div class="dica">
+  <strong>Ocultar não apaga a conta.</strong>
+  É como esconder o rascunho e mostrar só o resultado limpo.
+  PP/PU/PE continuam alimentando a MU por baixo dos panos.
+</div>
+
+<div class="importante">
+  Se a prévia mostrar <strong>0,0</strong> nas linhas-mãe (Biologia, História…) e traço nas filhas,
+  confira se:
+  <ul style="margin:8px 0 0;">
+    <li>a fórmula da MU foi salva;</li>
+    <li>o demonstrativo do bimestre está ligado (fontes / eventos);</li>
+    <li>o aluno tem notas lançadas em PP/PU (ou CH);</li>
+    <li>você recarregou a prévia depois de salvar.</li>
+  </ul>
+</div>
+
+<h2 id="erros">11. Erros comuns e como evitar</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>O que a pessoa faz</th>
+      <th>O que acontece</th>
+      <th>Como consertar</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Coloca ÷ 2 depois da nota substituta</td>
+      <td>Nota pela metade</td>
+      <td>A função já faz a média — não divida de novo</td>
+    </tr>
+    <tr>
+      <td>Esquece de somar o PE na MU</td>
+      <td>MU fica só a média PP/PU</td>
+      <td>Use … + PE no final</td>
+    </tr>
+    <tr>
+      <td>Dá peso (× 2) e não divide pela soma</td>
+      <td>Nota inflada / cortada no teto</td>
+      <td>Sempre ÷ (soma dos pesos)</td>
+    </tr>
+    <tr>
+      <td>Valor máximo 10 com fórmula × 2</td>
+      <td>Resultado trava em 10</td>
+      <td>Suba o valor máximo para 20</td>
+    </tr>
+    <tr>
+      <td>Faz (média + REC) ÷ 2 com + comum</td>
+      <td>Sem REC a média vira metade</td>
+      <td>Use o botão “Média com recuperação”</td>
+    </tr>
+    <tr>
+      <td>Acha que ocultar PP/PU “desliga” o cálculo</td>
+      <td>Confusão na prévia</td>
+      <td>Ocultar só esconde; a fórmula continua</td>
+    </tr>
+    <tr>
+      <td>Salva a fórmula mas não atualiza a prévia</td>
+      <td>Parece que “não aplicou”</td>
+      <td>Salvar bloco + recarregar / reabrir a prévia do aluno</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="checklist">12. Checklist final (imprima e marque)</h2>
+
+<div class="caixa">
+  <ol>
+    <li>☐ Abri o bloco amarelo da coluna certa (ex.: MU do 1º bimestre).</li>
+    <li>☐ Título da coluna está correto (MU, Média Bim…).</li>
+    <li>☐ Valor máximo está certo (10 na maioria; 20 se a fórmula multiplica por 2).</li>
+    <li>☐ Usei uma fórmula pronta <em>ou</em> montei com chips + sinais.</li>
+    <li>☐ Se tem peso: multipliquei e dividi pela <strong>soma dos pesos</strong>.</li>
+    <li>☐ Se é MU SM: conferi <span class="formula">nota substituta (PP, PU, CH) + PE</span>.</li>
+    <li>☐ Cliquei em <strong>Salvar bloco</strong>.</li>
+    <li>☐ Se quero só MU na impressão: ocultei PP/PU/CH/PE (sem apagar a fórmula).</li>
+    <li>☐ Prévia com aluno real: os números batem com a conta no papel.</li>
+    <li>☐ Conferi uma matéria com desdobramento (ex.: História 1 / História 2).</li>
+  </ol>
+</div>
+
+<h2>Glossário rápido</h2>
+<table>
+  <thead>
+    <tr><th>Palavra</th><th>Significado simples</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Fórmula</td><td>Receita que calcula a coluna</td></tr>
+    <tr><td>Chip / bolinha</td><td>Peça clicável (PP, +, ÷…)</td></tr>
+    <tr><td>Bloco de cálculo</td><td>Coluna amarela calculada</td></tr>
+    <tr><td>Peça</td><td>Tipo de nota (prova, trabalho…)</td></tr>
+    <tr><td>Peso</td><td>Quanto uma nota vale a mais que outra</td></tr>
+    <tr><td>Substituta</td><td>Nota que entra no lugar de outra faltando</td></tr>
+    <tr><td>Valor máximo</td><td>Teto da coluna (corta o que passar)</td></tr>
+    <tr><td>Prévia</td><td>Simulação na tela antes de publicar</td></tr>
+    <tr><td>Ocultar coluna</td><td>Esconde na impressão, mas mantém no cálculo</td></tr>
+  </tbody>
+</table>
+
+<div class="rodape">
+  EducaTudo — Manual de Fórmulas do Boletim (versão para leigos).<br>
+  Documento de apoio à tela de Montar quadro / editor de fórmula.
+  Em caso de dúvida, abra no editor o “Manual rápido das fórmulas” ou peça suporte com um print da fórmula e da prévia.
+</div>
+
+</body>
+</html>

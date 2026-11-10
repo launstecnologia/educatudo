@@ -10817,9 +10817,7 @@ class BoletimAssistenteWizard
                     break;
                 }
             }
-            if (count($cols) < 1) {
-                continue;
-            }
+            // Título de período pode nascer vazio — chips entram depois por arraste.
             $id = strtolower(trim((string) ($linha['id'] ?? '')));
             if (!(bool) preg_match('/^lin[a-z0-9_]{0,20}$/', $id)) {
                 $id = 'lin' . substr(sha1($nome . implode(',', $cols)), 0, 8);

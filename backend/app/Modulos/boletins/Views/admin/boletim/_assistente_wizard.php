@@ -264,17 +264,29 @@ $boletimWizardSteps = [
 .bw-catalogo-topo { position: sticky; top: 0; z-index: 1; padding: 0.65rem 0.75rem; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
 .bw-catalogo-corpo { padding: 0.5rem 0.65rem 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
 .bw-catalogo-grupo { border: 1px solid #e2e8f0; border-radius: 0.65rem; background: #f8fafc; overflow: hidden; }
-.bw-catalogo-grupo > summary { list-style: none; cursor: pointer; padding: 0.45rem 0.65rem; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: #475569; background: #f1f5f9; }
+.bw-catalogo-grupo > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.55rem 0.65rem; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: #334155; background: #f1f5f9; user-select: none; }
 .bw-catalogo-grupo > summary::-webkit-details-marker { display: none; }
-.bw-catalogo-grupo > summary::before { content: '▸'; display: inline-block; width: 0.9rem; color: #64748b; }
-.bw-catalogo-grupo[open] > summary::before { content: '▾'; }
+.bw-catalogo-grupo > summary:hover { background: #e2e8f0; }
+.bw-catalogo-grupo > summary .bw-cat-abrir { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 0.25rem; font-size: 10px; font-weight: 800; letter-spacing: .02em; text-transform: none; color: #3730a3; background: #e0e7ff; border: 1px solid #a5b4fc; border-radius: 999px; padding: 0.2rem 0.55rem; }
+.bw-catalogo-grupo > summary .bw-cat-abrir::after { content: '▼'; font-size: 8px; line-height: 1; }
+.bw-catalogo-grupo[open] > summary { background: #eef2ff; border-bottom: 1px solid #e2e8f0; }
+.bw-catalogo-grupo[open] > summary .bw-cat-abrir { background: #4338ca; border-color: #4338ca; color: #fff; }
+.bw-catalogo-grupo[open] > summary .bw-cat-abrir::after { content: '▲'; }
+.bw-catalogo-grupo[open] > summary .bw-cat-abrir-txt::before { content: 'Fechar'; }
+.bw-catalogo-grupo:not([open]) > summary .bw-cat-abrir-txt::before { content: 'Abrir'; }
 .bw-catalogo-add-todos { width: 100%; font-size: 10px; font-weight: 700; line-height: 1.2; padding: 0.35rem 0.55rem; border-radius: 0.45rem; border: 1px dashed #a5b4fc; background: #eef2ff; color: #3730a3; cursor: pointer; text-align: center; }
 .bw-catalogo-add-todos:hover { background: #e0e7ff; border-style: solid; }
 .bw-catalogo-add-todos:disabled { opacity: .55; cursor: default; border-style: solid; background: #f8fafc; color: #64748b; }
 .bw-catalogo-itens { display: flex; flex-direction: column; gap: 0.35rem; padding: 0.45rem; }
-.bw-catalogo-item { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%; text-align: left; padding: 0.45rem 0.55rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; background: #fff; color: #0f172a; font-size: 12px; cursor: pointer; transition: border-color .12s, background .12s, box-shadow .12s; }
+.bw-catalogo-item { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%; text-align: left; padding: 0.45rem 0.55rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; background: #fff; color: #0f172a; font-size: 12px; cursor: grab; transition: border-color .12s, background .12s, box-shadow .12s; touch-action: none; }
 .bw-catalogo-item:hover { border-color: #a5b4fc; background: #eef2ff; box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.12); }
 .bw-catalogo-item.no-quadro { border-color: #c7d2fe; background: #eef2ff; }
+.bw-catalogo-item.dragging { opacity: 0.45; cursor: grabbing; }
+.bw-linha-caixa.soltar-catalogo { border-color: #4f46e5 !important; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.25); background: #eef2ff; }
+.bw-linha-caixa.soltar-catalogo .bw-linha-cols { border-color: #6366f1; background: #e0e7ff; }
+.bw-linha-caixa.selecionado { border-color: #4f46e5 !important; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.28); background: #eef2ff; }
+.bw-linha-caixa.selecionado .bw-linha-cols { border-color: #6366f1; background: #e0e7ff; }
+.bw-linha-dica { margin: 0; font-size: 10px; line-height: 1.3; color: #64748b; font-weight: 600; }
 .bw-catalogo-item .bw-cat-nome { flex: 1; min-width: 0; font-weight: 600; line-height: 1.25; }
 .bw-catalogo-item .bw-cat-sigla { flex: 0 0 auto; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #3730a3; background: #e0e7ff; border-radius: 999px; padding: 0.15rem 0.45rem; }
 .bw-quadro { border: 1px solid #c7d2fe; border-radius: 0.75rem; background: #f8fafc; min-height: 16rem; display: flex; flex-direction: column; }
@@ -292,7 +304,7 @@ $boletimWizardSteps = [
 .bw-linha-caixa.confirmado { border-color: #22c55e; border-width: 2.5px; background: #f0fdf4; box-shadow: 0 2px 8px rgba(22, 163, 74, 0.12); }
 .bw-linha-cols { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; align-content: flex-start; min-height: 3.25rem; min-width: 5rem; padding: 0.55rem; border: 1.5px dashed #a5b4fc; border-radius: 0.55rem; background: #f8fafc; }
 .bw-linha-caixa.confirmado .bw-linha-cols { border-color: #86efac; border-style: solid; background: #ecfdf5; }
-.bw-linha-cols:empty::before { content: 'Solte colunas aqui'; color: #94a3b8; font-size: 11px; font-weight: 600; }
+.bw-linha-cols:empty::before { content: 'Arraste eventos da esquerda para cá'; color: #94a3b8; font-size: 11px; font-weight: 600; }
 .bw-linha-topo { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .bw-linha-grip { cursor: grab; opacity: 0.55; letter-spacing: -1px; font-size: 13px; line-height: 1; padding: 2px 2px 2px 0; color: #3730a3; touch-action: none; user-select: none; }
 .bw-linha-rotulo { font-size: 12px; font-weight: 700; color: #312e81; line-height: 1.2; outline: none; border-radius: 0.35rem; padding: 2px 6px; min-width: 3rem; flex: 1; cursor: text; }
@@ -402,6 +414,7 @@ $boletimWizardSteps = [
     var nomeLinhaRascunho = '';
     var avisoLinha = null;
     var editandoCabecalho = false;
+    var tituloPeriodoAtivo = { id: '', nome: '' };
 
     function coletarEstadoFormulario() {
         if (!document.getElementById('form-regra-boletim')) {
@@ -3406,7 +3419,7 @@ $boletimWizardSteps = [
                 if (!lin) return lin;
                 lin.colunas = (lin.colunas || []).filter(function (c) { return !ehMuAuto(c); });
                 return lin;
-            }).filter(function (lin) { return lin && (lin.colunas || []).length >= 1; });
+            }).filter(function (lin) { return lin && String(lin.nome || '').trim(); });
         }
         if (estado.bloco_calc && ehMuAuto(estado.bloco_calc)) {
             estado.bloco_calc = '';
@@ -4332,7 +4345,7 @@ $boletimWizardSteps = [
                     return String(c || '').toLowerCase() !== low;
                 });
                 return lin;
-            }).filter(function (lin) { return lin && (lin.colunas || []).length >= 1; });
+            }).filter(function (lin) { return lin && String(lin.nome || '').trim(); });
         }
         if (colunasMarcadas && colunasMarcadas[codigo]) delete colunasMarcadas[codigo];
         if (colunasMarcadas && colunasMarcadas[low]) delete colunasMarcadas[low];
@@ -5841,12 +5854,17 @@ $boletimWizardSteps = [
         var faixas = [];
         var emitidos = {};
         // Preferência: ordem dos cabeçalhos em linhas_layout (como o admin montou).
+        // Inclui título vazio (sem chips) para arrastar eventos depois.
         (estado && estado.linhas_layout || []).forEach(function (lin) {
             if (!lin || !String(lin.nome || '').trim()) return;
             var gid = String(lin.id || ('cab:' + String(lin.nome).toLowerCase()));
-            if (!grupos[gid] || emitidos[gid]) return;
+            if (emitidos[gid]) return;
             emitidos[gid] = true;
-            faixas.push({ tipo: 'grupo', nome: grupos[gid].nome, cols: grupos[gid].cols });
+            if (grupos[gid]) {
+                faixas.push({ tipo: 'grupo', nome: grupos[gid].nome, cols: grupos[gid].cols, id: gid });
+            } else {
+                faixas.push({ tipo: 'grupo', nome: String(lin.nome), cols: [], id: gid });
+            }
         });
         outras.forEach(function (o) {
             if (!o) return;
@@ -6823,7 +6841,7 @@ $boletimWizardSteps = [
                     return !temVivos || !!vivos[c];
                 });
                 return lin;
-            }).filter(function (lin) { return lin && (lin.colunas || []).length >= 1; });
+            }).filter(function (lin) { return lin && String(lin.nome || '').trim(); });
         }
         if (estado.nomes_blocos && typeof estado.nomes_blocos === 'object') {
             Object.keys(estado.nomes_blocos).forEach(function (cod) {
@@ -7018,6 +7036,27 @@ $boletimWizardSteps = [
         return false;
     }
 
+    /** Resolve o código da coluna do evento (mesmo se já estiver no quadro). */
+    function codigoColunaExistenteDoEvento(ev) {
+        if (!ev || !estado) return '';
+        var pref = String(codigoPreferidoEvento(ev) || '').toLowerCase();
+        var id = Number(ev.id || 0);
+        var ordem = {};
+        function marcar(cod) {
+            var low = String(cod || '').toLowerCase();
+            if (low) ordem[low] = true;
+        }
+        (estado.colunas_ordem || []).forEach(marcar);
+        (((rascunhoAtual || {}).componentes) || []).forEach(function (c) { marcar(c && c.codigo); });
+        (estado.linhas_layout || []).forEach(function (lin) {
+            (lin && lin.colunas || []).forEach(marcar);
+        });
+        if (pref && ordem[pref]) return pref;
+        if (id > 0 && ordem['eva' + id]) return 'eva' + id;
+        if (id > 0 && ordem['eva_' + id]) return 'eva_' + id;
+        return pref || (id > 0 ? ('eva' + id) : '');
+    }
+
     function adicionarColunaDoEvento(ev, opcoes) {
         if (!estado || !ev) return false;
         opcoes = opcoes || {};
@@ -7028,6 +7067,18 @@ $boletimWizardSteps = [
         var idsNum = estado.eventos_avaliativos_ids.map(Number);
         if (idsNum.indexOf(id) < 0) estado.eventos_avaliativos_ids.push(id);
         if (colunaEventoJaNoQuadro(ev)) {
+            if (opcoes.linhaId || opcoes.nomeCab) {
+                var codJa = codigoColunaExistenteDoEvento(ev);
+                if (codJa) {
+                    moverCodigoParaCabecalho(codJa, opcoes.nomeCab || '', opcoes.linhaId || '');
+                    if (!silencioso) {
+                        avisoLinha = { tipo: 'ok', texto: 'Coluna “' + (siglaDoEvento(ev) || codJa) + '” movida para o título do período.' };
+                        renderRevisarDinamico();
+                        agendarMontar();
+                    }
+                    return true;
+                }
+            }
             if (!silencioso) {
                 avisoLinha = { tipo: 'ok', texto: 'Essa coluna já está no quadro (só a sigla). Arraste para um título do período se quiser.' };
                 renderRevisarDinamico();
@@ -7063,10 +7114,18 @@ $boletimWizardSteps = [
         if (!estado.nomes_blocos[codigo]) estado.nomes_blocos[codigo] = titulo;
         // Garante chip imediato no quadro mesmo com rascunho já carregado (evita filtro de fantasma).
         garantirComponenteManualNoRascunho(codigo, titulo);
+        if (opcoes.linhaId || opcoes.nomeCab) {
+            moverCodigoParaCabecalho(codigo, opcoes.nomeCab || '', opcoes.linhaId || '');
+        }
         if (!silencioso) {
             aplicarSiglasEventosAvulsosNosTitulos();
             marcarEdicaoManual();
-            avisoLinha = { tipo: 'ok', texto: 'Coluna “' + (sigla || codigo) + '” adicionada. Arraste para um título do período ou marque e use Novo título do período.' };
+            avisoLinha = {
+                tipo: 'ok',
+                texto: (opcoes.linhaId || opcoes.nomeCab)
+                    ? ('Coluna “' + (sigla || codigo) + '” colocada no título do período.')
+                    : ('Coluna “' + (sigla || codigo) + '” adicionada. Arraste para um título do período se quiser.')
+            };
             previewAtual = null;
             renderRevisarDinamico();
             agendarMontar();
@@ -7136,6 +7195,15 @@ $boletimWizardSteps = [
         if (bim < 1 || bim > 4) return false;
         var codigo = 'b' + bim + '_fal';
         if (colunaFalJaNoQuadro(bim)) {
+            if (opcoes.linhaId || opcoes.nomeCab) {
+                moverCodigoParaCabecalho(codigo, opcoes.nomeCab || '', opcoes.linhaId || '');
+                if (!silencioso) {
+                    avisoLinha = { tipo: 'ok', texto: 'Coluna FAL movida para o título do período.' };
+                    renderRevisarDinamico();
+                    agendarMontar();
+                }
+                return true;
+            }
             if (!silencioso) {
                 avisoLinha = { tipo: 'ok', texto: 'A coluna FAL deste bimestre já está no quadro.' };
                 renderRevisarDinamico();
@@ -7169,20 +7237,99 @@ $boletimWizardSteps = [
                 if (idFal > 0) c.config.evento_id = idFal;
             });
         });
+        if (opcoes.linhaId || opcoes.nomeCab) {
+            moverCodigoParaCabecalho(codigo, opcoes.nomeCab || '', opcoes.linhaId || '');
+        }
         if (!silencioso) {
             aplicarSiglasEventosAvulsosNosTitulos();
             marcarEdicaoManual();
             avisoLinha = {
                 tipo: 'ok',
-                texto: idFal > 0
-                    ? ('Coluna FAL do ' + bim + 'º bimestre adicionada.')
-                    : ('Coluna FAL do ' + bim + 'º bimestre adicionada (sem evento de faltas vinculado — escolha a fonte em Eventos, se houver).')
+                texto: (opcoes.linhaId || opcoes.nomeCab)
+                    ? ('Coluna FAL do ' + bim + 'º bimestre colocada no título do período.')
+                    : (idFal > 0
+                        ? ('Coluna FAL do ' + bim + 'º bimestre adicionada.')
+                        : ('Coluna FAL do ' + bim + 'º bimestre adicionada (sem evento de faltas vinculado — escolha a fonte em Eventos, se houver).'))
             };
             previewAtual = null;
             renderRevisarDinamico();
             agendarMontar();
         }
         return true;
+    }
+
+    function soltarCatalogoNoTitulo(payload, linhaId, nomeCab) {
+        payload = String(payload || '');
+        linhaId = String(linhaId || '');
+        nomeCab = String(nomeCab || '').trim();
+        if (!payload || (!linhaId && !nomeCab)) return false;
+        var mEv = payload.match(/^ev:(\d+)$/);
+        if (mEv) {
+            var evId = Number(mEv[1] || 0);
+            var ev = ((catalogo && catalogo.eventos_avaliativos) || []).filter(function (x) {
+                return Number(x && x.id || 0) === evId;
+            })[0];
+            if (!ev) return false;
+            return adicionarColunaDoEvento(ev, { linhaId: linhaId, nomeCab: nomeCab });
+        }
+        var mFal = payload.match(/^fal:(\d+)$/);
+        if (mFal) {
+            return adicionarColunaFal(Number(mFal[1] || 0), { linhaId: linhaId, nomeCab: nomeCab });
+        }
+        return false;
+    }
+
+    function destinoTituloPeriodoAtivo() {
+        var id = String((tituloPeriodoAtivo && tituloPeriodoAtivo.id) || '').trim();
+        var nome = String((tituloPeriodoAtivo && tituloPeriodoAtivo.nome) || '').trim();
+        if (!id && !nome) return null;
+        if (Array.isArray(estado && estado.linhas_layout)) {
+            var achou = null;
+            estado.linhas_layout.forEach(function (lin) {
+                if (!lin || achou) return;
+                var lid = String(lin.id || '');
+                var lnome = String(lin.nome || '').trim();
+                if ((id && (lid === id || ('cab:' + lnome.toLowerCase()) === id || lnome === id))
+                    || (nome && lnome === nome)) {
+                    achou = { linhaId: lid || id, nomeCab: lnome || nome };
+                }
+            });
+            if (achou) return achou;
+        }
+        return id || nome ? { linhaId: id, nomeCab: nome } : null;
+    }
+
+    function codigoEstaNoTitulo(codigo, linhaId, nomeCab) {
+        codigo = String(codigo || '').toLowerCase();
+        if (!codigo || !estado || !Array.isArray(estado.linhas_layout)) return false;
+        linhaId = String(linhaId || '').trim();
+        nomeCab = String(nomeCab || '').trim();
+        var achou = false;
+        estado.linhas_layout.forEach(function (lin) {
+            if (!lin || achou) return;
+            var lid = String(lin.id || '');
+            var lnome = String(lin.nome || '').trim();
+            var bate = (linhaId && (lid === linhaId || ('cab:' + lnome.toLowerCase()) === linhaId || lnome === linhaId))
+                || (nomeCab && lnome === nomeCab);
+            if (!bate) return;
+            achou = (lin.colunas || []).some(function (c) {
+                return String(c || '').toLowerCase() === codigo;
+            });
+        });
+        return achou;
+    }
+
+    function selecionarTituloPeriodo(linhaId, nomeCab) {
+        linhaId = String(linhaId || '').trim();
+        nomeCab = String(nomeCab || '').trim();
+        tituloPeriodoAtivo = { id: linhaId, nome: nomeCab };
+        document.querySelectorAll('#bw-colunas-lista .bw-linha-caixa').forEach(function (cx) {
+            var cid = String(cx.getAttribute('data-linha-id') || '');
+            var cnome = String(cx.getAttribute('data-linha-nome') || '').trim();
+            var ativo = !!(linhaId && (cid === linhaId || cnome === linhaId))
+                || !!(nomeCab && cnome === nomeCab);
+            cx.classList.toggle('selecionado', ativo);
+        });
     }
 
     function adicionarTodasColunasDoPeriodo(chavePeriodo) {
@@ -7193,12 +7340,21 @@ $boletimWizardSteps = [
         });
         var bimFal = bimestreDaChavePeriodo(chavePeriodo);
         if (!eventos.length && bimFal < 1) return;
+        var destino = destinoTituloPeriodoAtivo();
+        if (!destino) {
+            avisoLinha = {
+                tipo: 'erro',
+                texto: 'Selecione um título do período no quadro e depois clique em Adicionar todos.'
+            };
+            renderRevisarDinamico();
+            return;
+        }
+        var opcoes = { silencioso: true, linhaId: destino.linhaId, nomeCab: destino.nomeCab };
         var adicionados = 0;
         eventos.forEach(function (ev) {
-            if (colunaEventoJaNoQuadro(ev)) return;
-            if (adicionarColunaDoEvento(ev, { silencioso: true })) adicionados += 1;
+            if (adicionarColunaDoEvento(ev, opcoes)) adicionados += 1;
         });
-        if (bimFal >= 1 && !colunaFalJaNoQuadro(bimFal) && adicionarColunaFal(bimFal, { silencioso: true })) {
+        if (bimFal >= 1 && adicionarColunaFal(bimFal, opcoes)) {
             adicionados += 1;
         }
         aplicarSiglasEventosAvulsosNosTitulos();
@@ -7210,17 +7366,18 @@ $boletimWizardSteps = [
         });
         if (!rotulo && bimFal >= 1) rotulo = bimFal + 'º bimestre';
         if (!rotulo) rotulo = 'período';
+        var nomeDest = destino.nomeCab || 'título do período';
         if (adicionados > 0) {
             avisoLinha = {
                 tipo: 'ok',
                 texto: adicionados === 1
-                    ? ('1 coluna do ' + rotulo + ' adicionada ao quadro.')
-                    : (adicionados + ' colunas do ' + rotulo + ' adicionadas ao quadro.')
+                    ? ('1 coluna do ' + rotulo + ' vinculada em “' + nomeDest + '”.')
+                    : (adicionados + ' colunas do ' + rotulo + ' vinculadas em “' + nomeDest + '”.')
             };
         } else {
             avisoLinha = {
                 tipo: 'ok',
-                texto: 'Todas as colunas do ' + rotulo + ' já estão no quadro.'
+                texto: 'Todas as colunas do ' + rotulo + ' já estão em “' + nomeDest + '”.'
             };
         }
         renderRevisarDinamico();
@@ -7232,7 +7389,7 @@ $boletimWizardSteps = [
         var html = '<aside class="bw-catalogo" aria-label="Catálogo de eventos">';
         html += '<div class="bw-catalogo-topo">';
         html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Eventos por bimestre</p>';
-        html += '<p class="text-[11px] text-slate-500 mt-0.5">Clique para adicionar a sigla no quadro. Use <strong>Todos</strong> no período (inclui FAL).</p>';
+        html += '<p class="text-[11px] text-slate-500 mt-0.5">Clique em <strong>Abrir</strong> no bimestre. Depois selecione um título no quadro e use <strong>Adicionar todos</strong>.</p>';
         html += '</div><div class="bw-catalogo-corpo">';
         if (!eventos.length) {
             html += '<p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">Nenhum evento neste ano. Marque no passo anterior ou cadastre Eventos Avaliativos.</p>';
@@ -7241,18 +7398,36 @@ $boletimWizardSteps = [
         }
         agruparItensPorPeriodo(eventos).forEach(function (grupo, idx) {
             var bimFal = bimestreDaChavePeriodo(grupo.chave);
-            var falPendente = bimFal >= 1 && !colunaFalJaNoQuadro(bimFal);
+            var destinoAtivo = destinoTituloPeriodoAtivo();
             var faltam = (grupo.itens || []).filter(function (ev) {
-                return Number(ev && ev.id || 0) > 0 && !colunaEventoJaNoQuadro(ev);
-            }).length + (falPendente ? 1 : 0);
-            html += '<details class="bw-catalogo-grupo"' + (idx < 4 ? ' open' : '') + '>';
-            html += '<summary>' + esc(grupo.rotulo || 'Período') + '</summary>';
+                if (Number(ev && ev.id || 0) <= 0) return false;
+                if (!colunaEventoJaNoQuadro(ev)) return true;
+                if (!destinoAtivo) return false;
+                var codEv = codigoColunaExistenteDoEvento(ev);
+                return !codigoEstaNoTitulo(codEv, destinoAtivo.linhaId, destinoAtivo.nomeCab);
+            }).length;
+            if (bimFal >= 1) {
+                if (!colunaFalJaNoQuadro(bimFal)) faltam += 1;
+                else if (destinoAtivo && !codigoEstaNoTitulo('b' + bimFal + '_fal', destinoAtivo.linhaId, destinoAtivo.nomeCab)) {
+                    faltam += 1;
+                }
+            }
+            var totalGrupo = (grupo.itens || []).filter(function (ev) {
+                return Number(ev && ev.id || 0) > 0;
+            }).length + (bimFal >= 1 ? 1 : 0);
+            html += '<details class="bw-catalogo-grupo">';
+            html += '<summary title="Clique para abrir ou fechar os eventos">'
+                + '<span>' + esc(grupo.rotulo || 'Período') + '</span>'
+                + '<span class="bw-cat-abrir"><span class="bw-cat-abrir-txt"></span></span>'
+                + '</summary>';
             html += '<div class="bw-catalogo-itens">';
-            if ((grupo.itens || []).length || bimFal >= 1) {
+            if (totalGrupo) {
                 html += '<button type="button" class="bw-catalogo-add-todos" data-catalogo-periodo="' + esc(String(grupo.chave || '')) + '"'
-                    + ' title="Adicionar todas as siglas deste período no quadro (inclui FAL)"'
+                    + ' title="Selecione um título do período e vincule todas as siglas nele (inclui FAL)"'
                     + (faltam ? '' : ' disabled') + '>'
-                    + (faltam ? ('Adicionar todos (' + faltam + ')') : 'Todos já no quadro') + '</button>';
+                    + (faltam
+                        ? ('Adicionar todos (' + faltam + ')')
+                        : (destinoAtivo ? 'Todos já neste título' : 'Todos já no quadro')) + '</button>';
             }
             (grupo.itens || []).forEach(function (ev) {
                 var id = Number(ev.id || 0);
@@ -7260,14 +7435,14 @@ $boletimWizardSteps = [
                 var nome = String(ev.nome || ('Evento #' + id));
                 var sigla = String(siglaDoEvento(ev) || '').toUpperCase() || ('#' + id);
                 var noQuadro = colunaEventoJaNoQuadro(ev);
-                html += '<button type="button" class="bw-catalogo-item' + (noQuadro ? ' no-quadro' : '') + '" data-catalogo-evento="' + id + '" title="' + esc(nome + ' → ' + sigla) + '">';
+                html += '<button type="button" draggable="true" class="bw-catalogo-item' + (noQuadro ? ' no-quadro' : '') + '" data-catalogo-evento="' + id + '" title="' + esc(nome + ' → arraste para o título do período') + '">';
                 html += '<span class="bw-cat-nome">' + esc(nome) + '</span>';
                 html += '<span class="bw-cat-sigla">' + esc(sigla) + '</span>';
                 html += '</button>';
             });
             if (bimFal >= 1) {
                 var falNoQuadro = colunaFalJaNoQuadro(bimFal);
-                html += '<button type="button" class="bw-catalogo-item' + (falNoQuadro ? ' no-quadro' : '') + '" data-catalogo-fal="' + bimFal + '" title="Faltas do ' + bimFal + 'º bimestre → FAL">';
+                html += '<button type="button" draggable="true" class="bw-catalogo-item' + (falNoQuadro ? ' no-quadro' : '') + '" data-catalogo-fal="' + bimFal + '" title="Faltas → arraste para o título do período">';
                 html += '<span class="bw-cat-nome">Faltas</span>';
                 html += '<span class="bw-cat-sigla">FAL</span>';
                 html += '</button>';
@@ -7282,17 +7457,6 @@ $boletimWizardSteps = [
         zerarQuadroColunasSeAutomatico();
         removerMuAutomaticaDoEstado();
         var cols = ordenarColunasLista(mesclarColunasExtrasDoEstado((pv && pv.colunas) || []));
-        var marcadas = codigosMarcados();
-        var textoDica = 'Clique num evento à esquerda para adicionar a sigla. Marque chips azuis, digite o nome e use Novo título do período. Depois clique em Confirmar (fica verdinho).';
-        var clsDica = 'text-indigo-800';
-        if (avisoLinha && avisoLinha.texto) {
-            textoDica = avisoLinha.texto;
-            clsDica = avisoLinha.tipo === 'ok' ? 'text-emerald-700' : 'text-amber-800';
-        } else if (marcadas.length >= 1) {
-            textoDica = marcadas.length === 1
-                ? '1 coluna marcada. Digite o nome e clique em Novo título do período.'
-                : (marcadas.length + ' colunas marcadas. Digite o nome e clique em Novo título do período.');
-        }
 
         var html = '<div class="bw-builder">';
         html += htmlCatalogoEventosBuilder();
@@ -7300,7 +7464,6 @@ $boletimWizardSteps = [
         html += '<div class="bw-quadro-topo">';
         html += '<div>';
         html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Quadro de colunas</p>';
-        html += '<p class="text-[11px] text-slate-500 mt-0.5">Só a sigla no chip. Arraste para o título do período.</p>';
         html += '</div>';
         html += '<div class="bw-quadro-acoes">';
         if (!ehDemonstrativoNotas()) {
@@ -7310,7 +7473,10 @@ $boletimWizardSteps = [
         html += '<button type="button" id="bw-excluir-todos-chips" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-rose-400 text-rose-900 bg-white hover:bg-rose-50" title="Remove todos os chips do quadro">Excluir todos os chips</button>';
         html += '</div></div>';
         html += '<div class="bw-quadro-corpo">';
-        html += '<p id="bw-linha-aviso" class="text-xs font-medium mb-2 ' + clsDica + '">' + esc(textoDica) + '</p>';
+        if (avisoLinha && avisoLinha.texto) {
+            var clsDica = avisoLinha.tipo === 'ok' ? 'text-emerald-700' : 'text-amber-800';
+            html += '<p id="bw-linha-aviso" class="text-xs font-medium mb-2 ' + clsDica + '">' + esc(avisoLinha.texto) + '</p>';
+        }
         html += '<div class="flex flex-wrap items-center gap-2 mb-3">';
         html += '<input type="text" id="bw-linha-nome" maxlength="40" value="' + esc(nomeLinhaRascunho) + '" placeholder="Ex.: I BIMESTRE" class="px-3 py-1.5 text-xs border border-gray-300 rounded-lg w-56 bg-white">';
         html += '<button type="button" id="bw-criar-linha" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">Novo título do período</button>';
@@ -7321,15 +7487,20 @@ $boletimWizardSteps = [
         cols.forEach(function (c) {
             if (!colunaSegueBlocoSemanal(c)) visiveis.push(c);
         });
-        if (!visiveis.length) {
-            html += '<div class="bw-quadro-vazio w-full">Clique num evento à esquerda para começar</div>';
+        var faixas = faixasCabecalhoPreview(visiveis);
+        if (!faixas.length) {
+            html += '<div class="bw-quadro-vazio w-full">Digite o título (ex.: IV BIMESTRE) e clique em Novo título do período — depois arraste os eventos da esquerda</div>';
         } else {
-            faixasCabecalhoPreview(visiveis).forEach(function (faixa) {
+            faixas.forEach(function (faixa) {
                 if (faixa.tipo === 'grupo') {
-                    var linRef = linhaLayoutDaColuna((faixa.cols[0] || {}).codigo, faixa.cols[0]) || {};
-                    var linId = String(linRef.id || ('cab:' + String(faixa.nome || '').toLowerCase()));
+                    var linRef = (faixa.cols[0] && linhaLayoutDaColuna(faixa.cols[0].codigo, faixa.cols[0])) || {};
+                    var linId = String(faixa.id || linRef.id || ('cab:' + String(faixa.nome || '').toLowerCase()));
                     var confirmado = !!(estado && estado.titulos_periodo_ok && estado.titulos_periodo_ok[linId]);
-                    html += '<div class="bw-linha-caixa' + (confirmado ? ' confirmado' : '') + '" data-linha-id="' + esc(linId) + '" data-linha-nome="' + esc(faixa.nome) + '">';
+                    var selecionado = !!(tituloPeriodoAtivo && (
+                        String(tituloPeriodoAtivo.id || '') === linId
+                        || String(tituloPeriodoAtivo.nome || '').trim() === String(faixa.nome || '').trim()
+                    ));
+                    html += '<div class="bw-linha-caixa' + (confirmado ? ' confirmado' : '') + (selecionado ? ' selecionado' : '') + '" data-linha-id="' + esc(linId) + '" data-linha-nome="' + esc(faixa.nome) + '" title="Clique para selecionar este título">';
                     html += '<div class="bw-linha-topo">';
                     html += '<span class="bw-linha-grip" title="Arrastar bloco" aria-hidden="true">⋮⋮</span>';
                     html += '<span class="bw-linha-rotulo" contenteditable="true" spellcheck="false" title="Clique para editar o título do período" data-linha-id="' + esc(linId) + '">' + esc(faixa.nome) + '</span>';
@@ -7340,8 +7511,10 @@ $boletimWizardSteps = [
                     }
                     html += '<button type="button" class="bw-linha-x" data-linha-id="' + esc(linId) + '" title="Remover este título do período" aria-label="Remover título do período">×</button>';
                     html += '</div><span class="bw-linha-cols">';
-                    faixa.cols.forEach(function (c) { html += htmlChipColuna(c); });
-                    html += '</span></div>';
+                    (faixa.cols || []).forEach(function (c) { html += htmlChipColuna(c); });
+                    html += '</span>';
+                    html += '<p class="bw-linha-dica">Vincule os eventos do menu da lateral.</p>';
+                    html += '</div>';
                     return;
                 }
                 html += htmlChipColuna(faixa.col);
@@ -7475,7 +7648,7 @@ $boletimWizardSteps = [
                     }
                     lin.colunas = cols;
                     return lin;
-                }).filter(function (lin) { return lin && (lin.colunas || []).length >= 1; });
+                }).filter(function (lin) { return lin && String(lin.nome || '').trim(); });
             }
             return;
         }
@@ -7497,7 +7670,7 @@ $boletimWizardSteps = [
                 }
                 lin.colunas = cols;
                 return lin;
-            }).filter(function (lin) { return lin && (lin.colunas || []).length >= 1; });
+            }).filter(function (lin) { return lin && String(lin.nome || '').trim(); });
             return;
         }
         var comps = (rascunhoAtual && rascunhoAtual.componentes) || [];
@@ -7593,14 +7766,13 @@ $boletimWizardSteps = [
                 var c = String(chip.getAttribute('data-codigo') || '').toLowerCase();
                 if (c && cols.indexOf(c) < 0) cols.push(c);
             });
-            if (!cols.length) return;
             var id = String(caixa.getAttribute('data-linha-id') || '').trim() || idLinhaPorNome(nome);
             linhas.push({ id: id, nome: nome, colunas: cols });
         });
         estado.linhas_layout = linhas;
         var todos = [];
         linhas.forEach(function (lin) { (lin.colunas || []).forEach(function (c) { todos.push(c); }); });
-        gravarLinhaNosComponentes(todos);
+        if (todos.length) gravarLinhaNosComponentes(todos);
     }
 
     function aplicarNomeCabecalho(linhaId, nomeNovo) {
@@ -7665,7 +7837,7 @@ $boletimWizardSteps = [
             if (!lin) return lin;
             lin.colunas = (lin.colunas || []).filter(function (c) { return String(c).toLowerCase() !== codigo; });
             return lin;
-        }).filter(function (lin) { return lin && (lin.colunas || []).length >= 1; });
+        }).filter(function (lin) { return lin && String(lin.nome || '').trim(); });
         nomeCab = String(nomeCab || '').trim().slice(0, 40);
         if (!nomeCab) {
             gravarLinhaNosComponentes([codigo]);
@@ -7693,6 +7865,71 @@ $boletimWizardSteps = [
     function bindRevisarOnce() {
         if (bodyEl._bwRevisarBound) return;
         bodyEl._bwRevisarBound = true;
+        var catalogoDragPayload = '';
+        var catalogoDragou = false;
+        bodyEl.addEventListener('dragstart', function (e) {
+            var item = e.target.closest('[data-catalogo-evento], [data-catalogo-fal]');
+            if (!item || !e.dataTransfer) return;
+            var evId = item.getAttribute('data-catalogo-evento');
+            var falBim = item.getAttribute('data-catalogo-fal');
+            catalogoDragPayload = evId ? ('ev:' + evId) : ('fal:' + falBim);
+            catalogoDragou = false;
+            try {
+                e.dataTransfer.setData('text/bw-catalogo', catalogoDragPayload);
+                e.dataTransfer.setData('text/plain', catalogoDragPayload);
+                e.dataTransfer.effectAllowed = 'copy';
+            } catch (errCat) { /* ignore */ }
+            item.classList.add('dragging');
+        });
+        bodyEl.addEventListener('dragend', function (e) {
+            var item = e.target.closest('.bw-catalogo-item');
+            if (item) item.classList.remove('dragging');
+            document.querySelectorAll('.bw-linha-caixa.soltar-catalogo').forEach(function (cx) {
+                cx.classList.remove('soltar-catalogo');
+            });
+            setTimeout(function () {
+                catalogoDragPayload = '';
+                catalogoDragou = false;
+            }, 80);
+        });
+        bodyEl.addEventListener('dragover', function (e) {
+            if (!catalogoDragPayload) return;
+            var caixa = e.target.closest('#bw-colunas-lista .bw-linha-caixa');
+            if (!caixa) return;
+            e.preventDefault();
+            try { e.dataTransfer.dropEffect = 'copy'; } catch (errOv) { /* ignore */ }
+            document.querySelectorAll('.bw-linha-caixa.soltar-catalogo').forEach(function (cx) {
+                if (cx !== caixa) cx.classList.remove('soltar-catalogo');
+            });
+            caixa.classList.add('soltar-catalogo');
+            catalogoDragou = true;
+        });
+        bodyEl.addEventListener('dragleave', function (e) {
+            if (!catalogoDragPayload) return;
+            var caixa = e.target.closest('#bw-colunas-lista .bw-linha-caixa');
+            if (!caixa) return;
+            if (e.relatedTarget && caixa.contains(e.relatedTarget)) return;
+            caixa.classList.remove('soltar-catalogo');
+        });
+        bodyEl.addEventListener('drop', function (e) {
+            if (!catalogoDragPayload) return;
+            var caixa = e.target.closest('#bw-colunas-lista .bw-linha-caixa');
+            if (!caixa) return;
+            e.preventDefault();
+            e.stopPropagation();
+            caixa.classList.remove('soltar-catalogo');
+            var payload = catalogoDragPayload;
+            try {
+                payload = e.dataTransfer.getData('text/bw-catalogo')
+                    || e.dataTransfer.getData('text/plain')
+                    || payload;
+            } catch (errDrop) { /* ignore */ }
+            var linhaId = String(caixa.getAttribute('data-linha-id') || '');
+            var rot = caixa.querySelector('.bw-linha-rotulo');
+            var nomeCab = String((rot && rot.textContent) || caixa.getAttribute('data-linha-nome') || '').trim();
+            catalogoDragou = true;
+            soltarCatalogoNoTitulo(payload, linhaId, nomeCab);
+        });
         bodyEl.addEventListener('click', function (e) {
             var vistaBtn = e.target.closest('[data-vista-preview]');
             if (vistaBtn) {
@@ -7710,17 +7947,37 @@ $boletimWizardSteps = [
             var catFal = e.target.closest('[data-catalogo-fal]');
             if (catFal) {
                 e.preventDefault();
-                adicionarColunaFal(Number(catFal.getAttribute('data-catalogo-fal') || 0));
+                if (catalogoDragou) return;
+                var destFal = destinoTituloPeriodoAtivo() || {};
+                adicionarColunaFal(Number(catFal.getAttribute('data-catalogo-fal') || 0), {
+                    linhaId: destFal.linhaId || '',
+                    nomeCab: destFal.nomeCab || ''
+                });
                 return;
             }
             var catItem = e.target.closest('[data-catalogo-evento]');
             if (catItem) {
                 e.preventDefault();
+                if (catalogoDragou) return;
                 var evIdCat = Number(catItem.getAttribute('data-catalogo-evento') || 0);
                 var evCat = ((catalogo && catalogo.eventos_avaliativos) || []).filter(function (x) {
                     return Number(x && x.id || 0) === evIdCat;
                 })[0];
-                if (evCat) adicionarColunaDoEvento(evCat);
+                if (evCat) {
+                    var destEv = destinoTituloPeriodoAtivo() || {};
+                    adicionarColunaDoEvento(evCat, {
+                        linhaId: destEv.linhaId || '',
+                        nomeCab: destEv.nomeCab || ''
+                    });
+                }
+                return;
+            }
+            var caixaSel = e.target.closest('#bw-colunas-lista .bw-linha-caixa');
+            if (caixaSel && !e.target.closest('.bw-linha-ok, .bw-linha-x, .bw-col-x, .bw-linha-grip, .bw-col-grip, .bw-col-chip')) {
+                selecionarTituloPeriodo(
+                    caixaSel.getAttribute('data-linha-id') || '',
+                    caixaSel.getAttribute('data-linha-nome') || ''
+                );
                 return;
             }
             if (e.target.closest('#bw-add-coluna')) {
@@ -7740,11 +7997,6 @@ $boletimWizardSteps = [
                     renderRevisarDinamico();
                     campoLinha = document.getElementById('bw-linha-nome');
                     if (campoLinha) campoLinha.focus();
-                    return;
-                }
-                if (codigosMarcados().length < 1) {
-                    avisoLinha = { tipo: 'erro', texto: 'Clique em pelo menos uma coluna (borda azul) antes de criar o título do período — ou arraste chips para dentro de um título.' };
-                    renderRevisarDinamico();
                     return;
                 }
                 criarLinhaLayout();
@@ -7946,6 +8198,13 @@ $boletimWizardSteps = [
                 if (!e.target.closest('.bw-col-x')) {
                     var chipClique = e.target.closest('#bw-colunas-lista .bw-col-chip');
                     if (chipClique && chipClique.getAttribute('data-codigo') === codigo) {
+                        var caixaChip = chipClique.closest('.bw-linha-caixa');
+                        if (caixaChip) {
+                            selecionarTituloPeriodo(
+                                caixaChip.getAttribute('data-linha-id') || '',
+                                caixaChip.getAttribute('data-linha-nome') || ''
+                            );
+                        }
                         // Bloco de cálculo (MU / Resultado Final): clique abre o editor.
                         if (chipClique.classList.contains('calc') || ehCodigoBlocoCalc(codigo)) {
                             abrirEdicaoBlocoCalc(codigo);
@@ -7987,6 +8246,10 @@ $boletimWizardSteps = [
             editandoCabecalho = true;
             var caixa = e.target.closest('.bw-linha-caixa');
             if (caixa) {
+                selecionarTituloPeriodo(
+                    caixa.getAttribute('data-linha-id') || '',
+                    caixa.getAttribute('data-linha-nome') || String(e.target.textContent || '').trim()
+                );
                 colunasMarcadas = {};
                 caixa.querySelectorAll('.bw-col-chip').forEach(function (chip) {
                     var c = chip.getAttribute('data-codigo');
@@ -8194,7 +8457,7 @@ $boletimWizardSteps = [
                 return String(c).toLowerCase() !== codigo;
             });
             return lin;
-        }).filter(function (lin) { return lin && (lin.colunas || []).length >= 1; });
+        }).filter(function (lin) { return lin && String(lin.nome || '').trim(); });
 
         if (nomeCab) {
             var destino = null;
@@ -8273,19 +8536,16 @@ $boletimWizardSteps = [
             if (ib < 0) ib = 999;
             return ia - ib;
         });
-        if (cols.length < 1) {
-            avisoLinha = { tipo: 'erro', texto: 'Clique em pelo menos uma coluna (borda azul) antes de criar o título do período.' };
-            renderRevisarDinamico();
-            return;
-        }
         if (!Array.isArray(estado.linhas_layout)) estado.linhas_layout = [];
-        estado.linhas_layout = estado.linhas_layout.map(function (lin) {
-            if (!lin) return lin;
-            lin.colunas = (lin.colunas || []).filter(function (c) { return cols.indexOf(c) < 0; });
-            return lin;
-        }).filter(function (lin) { return lin && (lin.colunas || []).length >= 1; });
+        if (cols.length) {
+            estado.linhas_layout = estado.linhas_layout.map(function (lin) {
+                if (!lin) return lin;
+                lin.colunas = (lin.colunas || []).filter(function (c) { return cols.indexOf(c) < 0; });
+                return lin;
+            }).filter(function (lin) { return lin && String(lin.nome || '').trim(); });
+        }
         var novoId = 'lin' + Date.now().toString(36);
-        estado.linhas_layout.push({ id: novoId, nome: nome.slice(0, 40), colunas: cols });
+        estado.linhas_layout.push({ id: novoId, nome: nome.slice(0, 40), colunas: cols.slice() });
         estado.cabecalhos_manuais = 1;
         estado.quadro_chips_manuais = 1;
         estado.limpar_titulos_periodo = 0;
@@ -8293,18 +8553,28 @@ $boletimWizardSteps = [
             estado.titulos_periodo_ok = {};
         }
         delete estado.titulos_periodo_ok[novoId];
-        compactarColunasOrdem(cols);
-        sincronizarOrdemComLinhasLayout();
-        gravarLinhaNosComponentes(cols);
-        var pvNomes = {};
-        (((previewEfetivo() || {}).colunas) || []).forEach(function (c) {
-            if (c && c.codigo) pvNomes[String(c.codigo).toLowerCase()] = c.nome || '';
-        });
-        var nomesCols = cols.map(function (c) { return tituloColuna(c) || pvNomes[c] || c; }).join(', ');
-        avisoLinha = {
-            tipo: 'ok',
-            texto: 'Título do período “' + nome + '” em cima de ' + nomesCols + '. Clique em Confirmar para marcar como concluído.'
-        };
+        if (cols.length) {
+            compactarColunasOrdem(cols);
+            sincronizarOrdemComLinhasLayout();
+            gravarLinhaNosComponentes(cols);
+        }
+        selecionarTituloPeriodo(novoId, nome.slice(0, 40));
+        if (cols.length) {
+            var pvNomes = {};
+            (((previewEfetivo() || {}).colunas) || []).forEach(function (c) {
+                if (c && c.codigo) pvNomes[String(c.codigo).toLowerCase()] = c.nome || '';
+            });
+            var nomesCols = cols.map(function (c) { return tituloColuna(c) || pvNomes[c] || c; }).join(', ');
+            avisoLinha = {
+                tipo: 'ok',
+                texto: 'Título do período “' + nome + '” em cima de ' + nomesCols + '. Clique em Confirmar quando terminar.'
+            };
+        } else {
+            avisoLinha = {
+                tipo: 'ok',
+                texto: 'Título “' + nome + '” selecionado. Use Adicionar todos na lateral ou arraste os eventos para dentro dele.'
+            };
+        }
         colunasMarcadas = {};
         nomeLinhaRascunho = '';
         renderRevisarDinamico();
@@ -8334,7 +8604,7 @@ $boletimWizardSteps = [
             if (!lin) return lin;
             lin.colunas = (lin.colunas || []).filter(function (c) { return cols.indexOf(c) < 0; });
             return lin;
-        }).filter(function (lin) { return lin && (lin.colunas || []).length >= 1; });
+        }).filter(function (lin) { return lin && String(lin.nome || '').trim(); });
         estado.cabecalhos_manuais = 1;
         avisoLinha = { tipo: 'ok', texto: 'Essas colunas saíram do título do período e voltam a aparecer sozinhas.' };
         colunasMarcadas = {};
@@ -8357,6 +8627,7 @@ $boletimWizardSteps = [
         estado.titulos_periodo_ok = {};
         estado.limpar_titulos_periodo = 1;
         colunasMarcadas = {};
+        tituloPeriodoAtivo = { id: '', nome: '' };
         if (todos.length) gravarLinhaNosComponentes(todos);
         avisoLinha = { tipo: 'ok', texto: 'Todos os títulos do período foram removidos. Monte do zero: marque colunas e use Novo título do período.' };
         renderRevisarDinamico();
@@ -8382,6 +8653,12 @@ $boletimWizardSteps = [
         estado.cabecalhos_manuais = 1;
         if (estado.titulos_periodo_ok && typeof estado.titulos_periodo_ok === 'object') {
             delete estado.titulos_periodo_ok[linhaId];
+        }
+        if (tituloPeriodoAtivo && (
+            String(tituloPeriodoAtivo.id || '') === String(linhaId || '')
+            || String(tituloPeriodoAtivo.nome || '') === String(linhaId || '')
+        )) {
+            tituloPeriodoAtivo = { id: '', nome: '' };
         }
         if (cols.length) gravarLinhaNosComponentes(cols);
         avisoLinha = { tipo: 'ok', texto: 'Título do período removido. As colunas ficaram soltas.' };
