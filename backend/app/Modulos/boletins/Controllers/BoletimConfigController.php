@@ -13913,16 +13913,68 @@ class BoletimConfigController extends BaseController
         // Assistente: coluna ligada ao Evento avaliativo sem blocos_ids gravados.
         $cfg = $this->decodeComponenteConfig($componente);
         $eventoId = (int) ($cfg['evento_avaliativo_id'] ?? $componente['evento_avaliativo_id'] ?? 0);
-        if ($eventoId <= 0) {
+        if ($eventoId > 0) {
+            try {
+                $rows = Database::getInstance()->fetchAll(
+                    'SELECT id FROM provas_blocos
+                      WHERE deleted_at IS NULL AND evento_avaliativo_id = :e
+                      ORDER BY id ASC',
+                    ['e' => $eventoId]
+                ) ?: [];
+            } catch (\Throwable $e) {
+                $rows = [];
+            }
+            $ids = [];
+            foreach ($rows as $row) {
+                $id = (int) ($row['id'] ?? 0);
+                if ($id > 0) {
+                    $ids[] = $id;
+                }
+            }
+            if ($ids !== []) {
+                return array_values(array_unique($ids));
+            }
+        }
+
+        // Seed reimportado: evento_avaliativo_id antigo some. Recasa por tipo + bimestre.
+        return $this->resolverBlocoIdsPorTipoEBimestreDoComponente($componente, $cfg);
+    }
+
+    /**
+     * @param array<string,mixed> $componente
+     * @param array<string,mixed> $cfg
+     * @return list<int>
+     */
+    private function resolverBlocoIdsPorTipoEBimestreDoComponente(array $componente, array $cfg): array
+    {
+        $tipoId = (int) ($cfg['tipo_avaliacao_id'] ?? $componente['tipo_avaliacao_id'] ?? 0);
+        if ($tipoId <= 0) {
             return [];
         }
+        $bims = $this->parseProvaBimestresFromComponente($componente);
         try {
-            $rows = Database::getInstance()->fetchAll(
-                'SELECT id FROM provas_blocos
-                  WHERE deleted_at IS NULL AND evento_avaliativo_id = :e
-                  ORDER BY id ASC',
-                ['e' => $eventoId]
-            ) ?: [];
+            $sql = 'SELECT pb.id
+                      FROM provas_blocos pb
+                      LEFT JOIN eventos_avaliativos e ON e.id = pb.evento_avaliativo_id AND e.deleted_at IS NULL
+                     WHERE pb.deleted_at IS NULL
+                       AND pb.tipo_avaliacao_id = :tipo';
+            $params = ['tipo' => $tipoId];
+            if ($bims !== []) {
+                $phPb = [];
+                $phEv = [];
+                foreach (array_values($bims) as $i => $bim) {
+                    $kPb = 'bp' . $i;
+                    $kEv = 'be' . $i;
+                    $phPb[] = ':' . $kPb;
+                    $phEv[] = ':' . $kEv;
+                    $params[$kPb] = (int) $bim;
+                    $params[$kEv] = (int) $bim;
+                }
+                $sql .= ' AND (pb.bimestre IN (' . implode(',', $phPb) . ')'
+                    . ' OR e.bimestre IN (' . implode(',', $phEv) . '))';
+            }
+            $sql .= ' ORDER BY pb.id ASC LIMIT 20';
+            $rows = Database::getInstance()->fetchAll($sql, $params) ?: [];
         } catch (\Throwable $e) {
             return [];
         }

@@ -3152,6 +3152,264 @@ class BoletimAssistenteWizard
     }
 
     /**
+     * Após apagar/reimportar seed, os IDs salvos no quadro ficam órfãos.
+     * Recasa por sigla+bimestre (ou tipo+bimestre) e atualiza o estado/componentes.
+     *
+     * @param array<string,mixed> $estado
+     * @param list<array<string,mixed>> $catalogo
+     * @param array<int,array<string,mixed>> $porId
+     * @return array<int,int> mapa id_antigo => id_novo
+     */
+    private function repararEventosAvaliativosOrfaos(array &$estado, array $catalogo, array $porId): array
+    {
+        $ids = $this->idsEventosAvaliativos($estado);
+        if ($ids === [] || $catalogo === []) {
+            return [];
+        }
+
+        $comps = [];
+        foreach ([
+            is_array($estado['rascunho_preservado']['componentes'] ?? null) ? $estado['rascunho_preservado']['componentes'] : [],
+            is_array($estado['componentes'] ?? null) ? $estado['componentes'] : [],
+        ] as $lista) {
+            foreach ($lista as $c) {
+                if (is_array($c)) {
+                    $comps[] = $c;
+                }
+            }
+        }
+
+        $ano = (int) ($estado['ano_letivo'] ?? 0);
+        $mapa = [];
+        $novosIds = [];
+        $orfaoes = $ids;
+        foreach ($comps as $c) {
+            $cfg = is_array($c['config'] ?? null) ? $c['config'] : [];
+            $evComp = (int) ($cfg['evento_avaliativo_id'] ?? $c['evento_avaliativo_id'] ?? 0);
+            if ($evComp > 0 && !isset($porId[$evComp])) {
+                $orfaoes[] = $evComp;
+            }
+        }
+        $orfaoes = array_values(array_unique(array_filter(array_map('intval', $orfaoes))));
+
+        foreach ($orfaoes as $idAntigo) {
+            if (isset($porId[$idAntigo])) {
+                $novosIds[] = $idAntigo;
+                continue;
+            }
+            $dicas = $this->dicasEventoOrfaoDosComponentes($comps, $idAntigo);
+            $sub = $this->encontrarEventoAvaliativoNoCatalogo($catalogo, $dicas, $ano);
+            if ($sub === null) {
+                continue;
+            }
+            $idNovo = (int) ($sub['id'] ?? 0);
+            if ($idNovo <= 0) {
+                continue;
+            }
+            $mapa[$idAntigo] = $idNovo;
+            $novosIds[] = $idNovo;
+        }
+
+        // Mantém IDs que ainda existem e não eram órfãos.
+        foreach ($ids as $idOk) {
+            if (isset($porId[$idOk])) {
+                $novosIds[] = $idOk;
+            }
+        }
+
+        if ($mapa !== []) {
+            $this->aplicarMapaEventosNosComponentesDoEstado($estado, $mapa);
+        }
+        $estado['eventos_avaliativos_ids'] = array_values(array_unique(array_filter(
+            array_map('intval', $novosIds),
+            static fn (int $id): bool => $id > 0
+        )));
+
+        return $mapa;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $comps
+     * @return array{tipo_avaliacao_id:int,bimestre:int,sigla:string,nome:string}
+     */
+    private function dicasEventoOrfaoDosComponentes(array $comps, int $eventoId): array
+    {
+        $dicas = [
+            'tipo_avaliacao_id' => 0,
+            'bimestre' => 0,
+            'sigla' => '',
+            'nome' => '',
+        ];
+        foreach ($comps as $c) {
+            $cfg = is_array($c['config'] ?? null) ? $c['config'] : [];
+            if ($cfg === [] && is_string($c['config_json'] ?? null) && trim((string) $c['config_json']) !== '') {
+                $tmp = json_decode((string) $c['config_json'], true);
+                $cfg = is_array($tmp) ? $tmp : [];
+            }
+            $evCfg = (int) ($cfg['evento_avaliativo_id'] ?? $c['evento_avaliativo_id'] ?? 0);
+            if ($eventoId > 0 && $evCfg !== $eventoId) {
+                continue;
+            }
+            $tipo = (int) ($cfg['tipo_avaliacao_id'] ?? $c['tipo_avaliacao_id'] ?? 0);
+            if ($tipo > 0 && $dicas['tipo_avaliacao_id'] <= 0) {
+                $dicas['tipo_avaliacao_id'] = $tipo;
+            }
+            $bims = [];
+            foreach ((array) ($cfg['prova_bimestres'] ?? []) as $b) {
+                $n = (int) $b;
+                if ($n >= 1 && $n <= 4) {
+                    $bims[] = $n;
+                }
+            }
+            $grupo = strtolower(trim((string) ($cfg['layout_group'] ?? $c['layout_group'] ?? '')));
+            if ($bims === [] && preg_match('/^b([1-4])$/', $grupo, $mGrupo) === 1) {
+                $bims[] = (int) $mGrupo[1];
+            }
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if ($bims === [] && preg_match('/^b([1-4])_/', $cod, $mCod) === 1) {
+                $bims[] = (int) $mCod[1];
+            }
+            if ($bims !== [] && $dicas['bimestre'] <= 0) {
+                $dicas['bimestre'] = (int) $bims[0];
+            }
+            $sigla = '';
+            if (preg_match('/^b[1-4]_([a-z0-9]+)$/', $cod, $mSig) === 1) {
+                $sigla = strtoupper($mSig[1]);
+            } elseif (preg_match('/^[a-z]{1,6}$/', $cod) === 1) {
+                $sigla = strtoupper($cod);
+            }
+            $nome = trim((string) ($c['nome'] ?? ''));
+            if ($sigla === '' && preg_match('/\b(PP|PU|CH|PE|REC|PF)\b/i', $nome, $mNome) === 1) {
+                $sigla = strtoupper($mNome[1]);
+            }
+            if ($sigla !== '' && $dicas['sigla'] === '') {
+                $dicas['sigla'] = $sigla;
+            }
+            if ($nome !== '' && $dicas['nome'] === '') {
+                $dicas['nome'] = $nome;
+            }
+            if ($dicas['tipo_avaliacao_id'] > 0 || $dicas['sigla'] !== '') {
+                break;
+            }
+        }
+
+        return $dicas;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $catalogo
+     * @param array{tipo_avaliacao_id:int,bimestre:int,sigla:string,nome:string} $dicas
+     * @return array<string,mixed>|null
+     */
+    private function encontrarEventoAvaliativoNoCatalogo(array $catalogo, array $dicas, int $anoLetivo = 0): ?array
+    {
+        $tipo = (int) ($dicas['tipo_avaliacao_id'] ?? 0);
+        $bim = (int) ($dicas['bimestre'] ?? 0);
+        $sigla = strtoupper(trim((string) ($dicas['sigla'] ?? '')));
+        $nomeKey = strtolower(trim((string) ($dicas['nome'] ?? '')));
+        if ($tipo <= 0 && $sigla === '' && $nomeKey === '') {
+            return null;
+        }
+
+        $candidatos = [];
+        foreach ($catalogo as $ev) {
+            if (!is_array($ev)) {
+                continue;
+            }
+            $id = (int) ($ev['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            if ($anoLetivo > 0 && (int) ($ev['ano_letivo'] ?? 0) > 0 && (int) $ev['ano_letivo'] !== $anoLetivo) {
+                continue;
+            }
+            $bimEv = (int) ($ev['bimestre'] ?? 0);
+            if ($bim > 0 && $bimEv > 0 && $bimEv !== $bim) {
+                continue;
+            }
+            $score = 0;
+            if ($tipo > 0 && (int) ($ev['tipo_avaliacao_id'] ?? 0) === $tipo) {
+                $score += 4;
+            }
+            $siglaEv = strtoupper(trim((string) ($ev['sigla'] ?? '')));
+            if ($sigla !== '' && $siglaEv === $sigla) {
+                $score += 3;
+            }
+            $nomeEv = strtolower(trim((string) ($ev['nome'] ?? '')));
+            if ($nomeKey !== '' && $nomeEv !== '' && ($nomeEv === $nomeKey || str_contains($nomeEv, $nomeKey) || str_contains($nomeKey, $nomeEv))) {
+                $score += 1;
+            }
+            if ($bim > 0 && $bimEv === $bim) {
+                $score += 1;
+            }
+            if ($score < 3) {
+                continue;
+            }
+            $candidatos[] = ['score' => $score, 'ev' => $ev];
+        }
+        if ($candidatos === []) {
+            return null;
+        }
+        usort($candidatos, static function (array $a, array $b): int {
+            return ($b['score'] <=> $a['score']) ?: ((int) ($a['ev']['id'] ?? 0) <=> (int) ($b['ev']['id'] ?? 0));
+        });
+
+        return $candidatos[0]['ev'];
+    }
+
+    /**
+     * @param array<string,mixed> $estado
+     * @param array<int,int> $mapa
+     */
+    private function aplicarMapaEventosNosComponentesDoEstado(array &$estado, array $mapa): void
+    {
+        if ($mapa === []) {
+            return;
+        }
+        foreach (['rascunho_preservado', null] as $chave) {
+            if ($chave === null) {
+                if (!isset($estado['componentes']) || !is_array($estado['componentes'])) {
+                    continue;
+                }
+                $lista =& $estado['componentes'];
+            } else {
+                if (!isset($estado[$chave]['componentes']) || !is_array($estado[$chave]['componentes'])) {
+                    continue;
+                }
+                $lista =& $estado[$chave]['componentes'];
+            }
+            foreach ($lista as $i => $c) {
+                if (!is_array($c)) {
+                    continue;
+                }
+                $cfg = is_array($c['config'] ?? null) ? $c['config'] : [];
+                $evId = (int) ($cfg['evento_avaliativo_id'] ?? $c['evento_avaliativo_id'] ?? 0);
+                if ($evId <= 0 || !isset($mapa[$evId])) {
+                    continue;
+                }
+                $cfg['evento_avaliativo_id'] = $mapa[$evId];
+                $lista[$i]['config'] = $cfg;
+                $lista[$i]['evento_avaliativo_id'] = $mapa[$evId];
+            }
+            unset($lista);
+        }
+
+        $subs = $this->normalizarEventosAvaliativosSubs($estado['eventos_avaliativos_subs'] ?? []);
+        if ($subs !== []) {
+            $novosSubs = [];
+            foreach ($subs as $evId => $idsSub) {
+                $evId = (int) $evId;
+                $destino = $mapa[$evId] ?? $evId;
+                $novosSubs[$destino] = array_values(array_unique(array_merge(
+                    $novosSubs[$destino] ?? [],
+                    $idsSub
+                )));
+            }
+            $estado['eventos_avaliativos_subs'] = $novosSubs;
+        }
+    }
+
+    /**
      * Se o admin já colocou chips no quadro mas a lista de IDs se perdeu
      * (remount / Aplicar), reconstrói pelos códigos/siglas do board.
      *
@@ -3159,6 +3417,23 @@ class BoletimAssistenteWizard
      */
     private function preencherEventosAvaliativosAPartirDoQuadro(array &$estado): void
     {
+        try {
+            $catalogo = $this->ferramentas->listarEventosAvaliativosParaBoletim();
+        } catch (\Throwable $e) {
+            $catalogo = [];
+        }
+        $porId = [];
+        foreach ($catalogo as $evCat) {
+            if (!is_array($evCat)) {
+                continue;
+            }
+            $idCat = (int) ($evCat['id'] ?? 0);
+            if ($idCat > 0) {
+                $porId[$idCat] = $evCat;
+            }
+        }
+        $this->repararEventosAvaliativosOrfaos($estado, $catalogo, $porId);
+
         $ids = $this->idsEventosAvaliativos($estado);
 
         // 1) IDs gravados no config do componente (REC/PF/PP já mesclados).
@@ -3338,11 +3613,25 @@ class BoletimAssistenteWizard
                 $porId[$id] = $ev;
             }
         }
+        $this->repararEventosAvaliativosOrfaos($estado, $catalogo, $porId);
+        $ids = $this->idsEventosAvaliativos($estado);
         $out = [];
         foreach ($ids as $id) {
             if (!isset($porId[$id])) {
-                $erros[] = 'Evento avaliativo #' . $id . ' não encontrado.';
-                continue;
+                // Seed recriado: tenta casar de novo antes de reclamar.
+                $dicas = $this->dicasEventoOrfaoDosComponentes(
+                    is_array($estado['rascunho_preservado']['componentes'] ?? null)
+                        ? $estado['rascunho_preservado']['componentes']
+                        : [],
+                    $id
+                );
+                $sub = $this->encontrarEventoAvaliativoNoCatalogo($catalogo, $dicas, (int) ($estado['ano_letivo'] ?? 0));
+                if ($sub !== null && (int) ($sub['id'] ?? 0) > 0) {
+                    $id = (int) $sub['id'];
+                    $porId[$id] = $sub;
+                } else {
+                    continue;
+                }
             }
             $ev = $porId[$id];
             $bim = (int) ($ev['bimestre'] ?? 0);
