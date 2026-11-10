@@ -105,32 +105,36 @@ class DemonstracaoDocumentoService
     }
 
     /**
-     * Boletins ativos para o seletor do editor (opcionalmente filtrados pelo ano da turma).
+     * Mesmos Modelos de Boletim da tela Acadêmico → Boletim (ativos, não excluídos).
+     * Prioriza o ano da turma, mas lista todos para o select não ficar vazio.
      *
-     * @return list<array{id:int,nome:string,ano_letivo:?int,finalidade:string}>
+     * @return list<array{id:int,nome:string,rotulo:string,ano_letivo:?int,finalidade:string}>
      */
     public function listarBoletinsAtivos(?int $anoLetivo = null): array
     {
-        if (!$this->tabelaExiste('boletins')) {
-            return [];
-        }
-        $params = [];
-        $sql = 'SELECT id, nome, ano_letivo, finalidade
-                FROM boletins
-                WHERE ativo = 1';
-        if ($this->temColuna('boletins', 'excluido_em')) {
-            $sql .= ' AND excluido_em IS NULL';
-        }
-        if ($anoLetivo !== null && $anoLetivo > 0) {
-            $sql .= ' AND (ano_letivo = :ano OR ano_letivo IS NULL)';
-            $params['ano'] = $anoLetivo;
-        }
-        $sql .= ' ORDER BY ano_letivo DESC, nome ASC, id DESC LIMIT 100';
+        $rows = [];
         try {
-            $rows = $this->db->fetchAll($sql, $params) ?: [];
+            if (class_exists(\App\Modulos\Boletins\Models\Boletim::class)) {
+                $rows = (new \App\Modulos\Boletins\Models\Boletim())->listar(true) ?: [];
+            }
         } catch (\Throwable $e) {
-            return [];
+            $rows = [];
         }
+        if ($rows === [] && $this->tabelaExiste('boletins')) {
+            $sql = 'SELECT id, nome, ano_letivo, finalidade
+                    FROM boletins
+                    WHERE ativo = 1';
+            if ($this->temColuna('boletins', 'excluido_em')) {
+                $sql .= ' AND excluido_em IS NULL';
+            }
+            $sql .= ' ORDER BY ano_letivo DESC, finalidade ASC, nome ASC, id DESC LIMIT 100';
+            try {
+                $rows = $this->db->fetchAll($sql) ?: [];
+            } catch (\Throwable $e) {
+                return [];
+            }
+        }
+
         $out = [];
         foreach ($rows as $row) {
             if (!is_array($row)) {
@@ -141,7 +145,9 @@ class DemonstracaoDocumentoService
             if ($id <= 0 || $nome === '') {
                 continue;
             }
-            $ano = isset($row['ano_letivo']) && $row['ano_letivo'] !== null ? (int) $row['ano_letivo'] : null;
+            $ano = isset($row['ano_letivo']) && $row['ano_letivo'] !== null && $row['ano_letivo'] !== ''
+                ? (int) $row['ano_letivo']
+                : null;
             $finalidade = (string) ($row['finalidade'] ?? 'oficial');
             $rotulo = $nome;
             if ($ano !== null && $ano > 0) {
@@ -156,8 +162,26 @@ class DemonstracaoDocumentoService
                 'rotulo' => $rotulo,
                 'ano_letivo' => $ano,
                 'finalidade' => $finalidade,
+                '_prio' => ($anoLetivo !== null && $anoLetivo > 0 && $ano === $anoLetivo) ? 0 : 1,
             ];
         }
+        usort($out, static function (array $a, array $b): int {
+            $cmp = ($a['_prio'] ?? 1) <=> ($b['_prio'] ?? 1);
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+            $anoA = (int) ($a['ano_letivo'] ?? 0);
+            $anoB = (int) ($b['ano_letivo'] ?? 0);
+            if ($anoA !== $anoB) {
+                return $anoB <=> $anoA;
+            }
+            return strcmp((string) ($a['nome'] ?? ''), (string) ($b['nome'] ?? ''));
+        });
+        foreach ($out as &$item) {
+            unset($item['_prio']);
+        }
+        unset($item);
+
         return $out;
     }
 
