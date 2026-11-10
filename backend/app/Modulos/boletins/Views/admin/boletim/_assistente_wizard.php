@@ -2198,7 +2198,7 @@ $boletimWizardSteps = [
         if (tok.type === 'fn') {
             if (tok.value === 'min') return 'menor (';
             if (tok.value === 'chamada' || tok.value === 'substituta') return 'substituta (';
-            if (tok.value === 'composicao') return 'média+REC (';
+            if (tok.value === 'composicao') return 'média c/ rec (';
             return 'maior (';
         }
         if (tok.type === 'op' && tok.value === '*') return '×';
@@ -2235,7 +2235,7 @@ $boletimWizardSteps = [
             { type: 'fn', value: 'max', label: 'maior (' },
             { type: 'fn', value: 'min', label: 'menor (' },
             { type: 'fn', value: 'chamada', label: 'substituta (' },
-            { type: 'fn', value: 'composicao', label: 'média+REC (' }
+            { type: 'fn', value: 'composicao', label: 'média c/ rec (' }
         ];
     }
 
@@ -2496,8 +2496,8 @@ $boletimWizardSteps = [
     }
 
     /**
-     * Modelo único MS+REC: composicao((MU1+MU2)÷2, REC).
-     * Sem REC → só a média; com REC → (média+REC)÷2.
+     * Modelo genérico: composicao((média1+média2)÷2, recuperação).
+     * Sem recuperação → só a média; com recuperação → (média+rec)÷2.
      */
     function tokensMediaComRec() {
         var bases = [];
@@ -2542,7 +2542,7 @@ $boletimWizardSteps = [
         if (bases.length < 2 || !rec) {
             // Fallback: só abre a função para o usuário completar.
             return [
-                { type: 'fn', value: 'composicao', label: 'média+REC (' },
+                { type: 'fn', value: 'composicao', label: 'média c/ rec (' },
                 { type: 'op', value: '(', label: '(' },
                 { type: 'op', value: ')', label: ')' },
                 { type: 'op', value: ',', label: ',' },
@@ -2550,7 +2550,7 @@ $boletimWizardSteps = [
             ];
         }
         return [
-            { type: 'fn', value: 'composicao', label: 'média+REC (' },
+            { type: 'fn', value: 'composicao', label: 'média c/ rec (' },
             { type: 'op', value: '(', label: '(' },
             { type: 'peca', value: bases[0], label: nomeBlocoCalc(bases[0]) || bases[0], calc: true },
             { type: 'op', value: '+', label: '+' },
@@ -3130,7 +3130,7 @@ $boletimWizardSteps = [
                     ? 'menor ('
                     : (item.v === 'chamada' || item.v === 'substituta'
                         ? 'substituta ('
-                        : (item.v === 'composicao' ? 'média+REC (' : 'maior ('));
+                        : (item.v === 'composicao' ? 'média c/ rec (' : 'maior ('));
                 toks.push({ type: 'fn', value: item.v, label: labFn });
             }
             else if (item.k === 'num') toks.push({ type: 'num', value: item.v, label: item.v });
@@ -9298,10 +9298,10 @@ $boletimWizardSteps = [
                 html += '<button type="button" id="bw-formula-media" class="px-2.5 py-1.5 text-xs rounded-lg border border-indigo-200 text-indigo-700 hover:bg-indigo-50">Média das peças</button>';
                 html += '<button type="button" id="bw-formula-max" class="px-2.5 py-1.5 text-xs rounded-lg border border-amber-200 text-amber-800 hover:bg-amber-50">Maior entre as duas primeiras</button>';
                 html += '<button type="button" id="bw-formula-substituta" class="px-2.5 py-1.5 text-xs rounded-lg border border-emerald-200 text-emerald-800 hover:bg-emerald-50" title="Média de PP e PU; CH entra no lugar da primeira nota ausente">Substituta (PP/PU + CH)</button>';
-                html += '<button type="button" id="bw-formula-composicao" class="px-2.5 py-1.5 text-xs rounded-lg border border-violet-200 text-violet-800 hover:bg-violet-50" title="Se não houver REC, fica a média; se houver, (média+REC)÷2">MS com REC</button>';
+                html += '<button type="button" id="bw-formula-composicao" class="px-2.5 py-1.5 text-xs rounded-lg border border-violet-200 text-violet-800 hover:bg-violet-50" title="Sem recuperação: fica a média. Com recuperação: (média + recuperação) ÷ 2">Média com recuperação</button>';
                 html += '<button type="button" id="bw-formula-limpar" class="px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">Limpar</button></div>';
                 html += '<p class="mt-1.5 text-[11px] text-slate-500">Substituta já calcula a <strong>média</strong> (<code class="bg-white/80 px-1 rounded">chamada(PP, PU, CH)</code>). Não coloque <code class="bg-white/80 px-1 rounded">÷ 2</code> de novo — a nota fica na metade. Some a PE depois, se precisar: <code class="bg-white/80 px-1 rounded">… + PE</code>.</p>';
-                html += '<p class="mt-1 text-[11px] text-slate-500"><strong>MS com REC</strong> monta <code class="bg-white/80 px-1 rounded">composicao((Média Bim + Resultado Final)÷2, REC)</code>: sem REC fica só a média; com REC vira (média+REC)÷2 — um único cálculo.</p>';
+                html += '<p class="mt-1 text-[11px] text-slate-500"><strong>Média com recuperação</strong> monta <code class="bg-white/80 px-1 rounded">média c/ rec((média 1 + média 2)÷2, recuperação)</code>: sem recuperação fica só a média; com recuperação vira (média+recuperação)÷2.</p>';
                 html += '<p id="bw-formula-canvas-label" class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mt-3 mb-1.5">Fórmula desta coluna</p>';
                 html += '<div id="bw-formula-canvas" class="bw-canvas">' + htmlCanvasTokens() + '</div>';
                 html += '<p id="bw-formula-preview" class="mt-2 text-sm font-mono text-slate-800 break-all">' + esc(compilarTokensPreview(estado.formula_tokens || []) || 'Clique nos blocos acima.') + '</p>';

@@ -2527,7 +2527,7 @@ class BoletimAssistenteWizard
                     ? 'menor ('
                     : ($fnVal === 'chamada'
                         ? 'substituta ('
-                        : ($fnVal === 'composicao' ? 'média+REC (' : 'maior ('));
+                        : ($fnVal === 'composicao' ? 'média c/ rec (' : 'maior ('));
                 $tokens[] = [
                     'type' => 'fn',
                     'value' => $fnVal,
@@ -6000,7 +6000,7 @@ class BoletimAssistenteWizard
                         ? 'menor ('
                         : ($value === 'chamada'
                             ? 'substituta ('
-                            : ($value === 'composicao' ? 'média+REC (' : 'maior (')),
+                            : ($value === 'composicao' ? 'média c/ rec (' : 'maior (')),
                 ];
             }
             if (count($out) >= 80) {
