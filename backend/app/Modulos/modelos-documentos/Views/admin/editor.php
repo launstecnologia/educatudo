@@ -53,6 +53,7 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
     <link rel="stylesheet" href="<?= URL ?>/static/css/editor-documento.css?v=<?= $esc($vCss) ?>">
     <link rel="stylesheet" href="<?= URL ?>/static/css/folha-oficial.css?v=<?= $esc($vFolha) ?>">
     <style><?= \App\Core\LayoutHelper::generateCustomCSS() ?></style>
+    <?php include BASE_PATH . '/app/Views/layouts/components/form_control_safari.php'; ?>
 </head>
 <body class="edoc-body">
 <div class="edoc-app">
@@ -73,58 +74,124 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
         <button type="button" class="edoc-btn" id="edoc-ia" title="A IA monta o layout a partir de uma foto ou scan. Você pode colar a imagem."><i class="fa-solid fa-wand-magic-sparkles"></i> Reproduzir de imagem</button>
         <input type="file" id="edoc-ia-file" accept="image/png,image/jpeg,image/webp" hidden>
         <?php endif; ?>
-        <button type="button" class="edoc-btn" id="edoc-preview-mode"><i class="fa-solid fa-eye"></i> Preview</button>
-        <a class="edoc-btn" id="edoc-pdf" href="<?= $esc($previewUrl ?: '#') ?>" target="_blank" rel="noopener">Pré-visualizar PDF</a>
+        <button type="button" class="edoc-btn" id="edoc-preview-mode"><i class="fa-solid fa-eye"></i> Ver resultado</button>
+        <a class="edoc-btn" id="edoc-pdf" href="<?= $esc($previewUrl ?: '#') ?>" target="_blank" rel="noopener">Abrir PDF</a>
         <button type="button" class="edoc-btn edoc-btn-primary" id="edoc-save"><i class="fa-solid fa-floppy-disk"></i> Salvar modelo</button>
     </header>
 
     <div class="edoc-body-row">
         <aside class="edoc-left">
             <div class="edoc-tabs">
-                <button type="button" class="active" data-tab="pane-elementos">ELEMENTOS</button>
-                <button type="button" data-tab="pane-estrutura">ESTRUTURA</button>
+                <button type="button" class="active" data-tab="pane-elementos">Inserir</button>
+                <button type="button" data-tab="pane-estrutura">Organizar</button>
             </div>
             <div class="edoc-pane" id="pane-elementos">
-                <div class="edoc-sec-label">LAYOUT</div>
-                <div class="edoc-grid edoc-grid-3">
-                    <?php foreach (($catalogo['layout'] ?? []) as $lay):
-                        $cols = $lay['cols'] ?? [100];
-                    ?>
-                    <div class="edoc-layout" draggable="true" data-drag-layout="<?= $esc(json_encode($cols)) ?>" title="<?= $esc($lay['label'] ?? '') ?>">
-                        <?= $layoutBars($cols) ?>
-                        <span><?= $esc($lay['label'] ?? '') ?></span>
-                    </div>
-                    <?php endforeach; ?>
+                <div class="edoc-inserir-intro">
+                    <strong>Monte seu documento</strong>
+                    <p>Clique para adicionar. Para escolher o lugar, arraste até a folha.</p>
                 </div>
-                <?php foreach (['conteudo' => 'CONTEÚDO', 'dados' => 'DADOS', 'tabelas' => 'TABELAS', 'extras' => 'EXTRAS'] as $grp => $lab): ?>
-                <div class="edoc-sec-label"><?= $esc($lab) ?></div>
-                <div class="edoc-grid">
-                    <?php foreach (($catalogo[$grp] ?? []) as $it): ?>
-                    <div class="edoc-item" draggable="true" data-drag-type="<?= $esc($it['tipo'] ?? '') ?>" title="<?= $esc(($it['ajuda'] ?? '') !== '' ? $it['ajuda'] : 'Clique para inserir ou arraste para a folha') ?>">
-                        <i class="fa-solid <?= $esc($it['icone'] ?? 'fa-cube') ?>"></i>
-                        <?= $esc($it['label'] ?? '') ?>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-                <?php if ($grp === 'conteudo'): ?>
-                <p class="edoc-hint" style="margin-top:10px">Clique em Tabela ou Imagem para inserir. Cole uma imagem ou uma tabela do Excel com Ctrl+V.</p>
-                <?php endif; ?>
-                <?php if ($grp === 'dados'): ?>
-                <div class="edoc-demo edoc-boletim-card" id="edoc-boletim-card" hidden>
-                    <h4>Boletim na folha</h4>
-                    <p class="edoc-hint">Escolha o boletim e a aluna. O layout montado no assistente aparece na prévia.</p>
+                <details class="edoc-demo edoc-boletim-card" id="edoc-boletim-card" hidden>
+                    <summary>Conferir com dados de aluno</summary>
+                    <p class="edoc-hint">Escolha o boletim, a turma e o aluno para conferir o resultado.</p>
                     <label for="edoc-fonte-boletim">Boletim</label>
                     <select id="edoc-fonte-boletim"><option value="">Carregando boletins…</option></select>
                     <label for="edoc-demo-turma">Turma / série</label>
                     <select id="edoc-demo-turma"><option value="">Carregando turmas…</option></select>
-                    <label for="edoc-demo-aluno">Aluna (prévia)</label>
+                    <label for="edoc-demo-aluno">Aluno(a) da prévia</label>
                     <select id="edoc-demo-aluno"><option value="">Escolha a turma</option></select>
                     <label class="edoc-demo-check" for="edoc-demo-real">
                         <input type="checkbox" id="edoc-demo-real" checked>
                         Mostrar dados reais na folha
                     </label>
                     <p class="edoc-hint" id="edoc-demo-status">Escolha o boletim e a aluna — o layout aparece na folha.</p>
-                </div>
+                </details>
+                <label class="edoc-busca-label" for="edoc-element-search">O que você quer adicionar?</label>
+                <input type="search" id="edoc-element-search" class="edoc-var-search" placeholder="Buscar título, imagem, boletim…" autocomplete="off">
+                <p id="edoc-element-empty" class="edoc-hint" role="status" hidden>Nenhum elemento encontrado. Tente outro nome.</p>
+                <details class="edoc-tool-group" data-edoc-palette-group open>
+                    <summary><span>Dividir a folha</span><small>Coloque os elementos lado a lado</small></summary>
+                    <div class="edoc-grid edoc-layout-basico">
+                        <?php foreach (($catalogo['layout'] ?? []) as $lay):
+                            $cols = $lay['cols'] ?? [100];
+                            if (!in_array((string) ($lay['id'] ?? ''), ['100', '2col', '3col', '4col'], true)) continue;
+                        ?>
+                        <button type="button" class="edoc-layout" draggable="true" data-drag-layout="<?= $esc(json_encode($cols)) ?>" title="Adicionar uma linha com <?= count($cols) ?> coluna(s)">
+                            <?= $layoutBars($cols) ?>
+                            <span><?= $esc($lay['label'] ?? '') ?></span>
+                        </button>
+                        <?php endforeach; ?>
+                    </div>
+                    <details class="edoc-layout-mais">
+                        <summary>Mais proporções de colunas</summary>
+                        <div class="edoc-grid edoc-grid-3">
+                            <?php foreach (($catalogo['layout'] ?? []) as $lay):
+                                $cols = $lay['cols'] ?? [100];
+                                if (in_array((string) ($lay['id'] ?? ''), ['100', '50_50', '2col', '3col', '4col'], true)) continue;
+                            ?>
+                            <button type="button" class="edoc-layout" draggable="true" data-drag-layout="<?= $esc(json_encode($cols)) ?>" title="Largura das colunas: <?= $esc($lay['label'] ?? '') ?>%">
+                                <?= $layoutBars($cols) ?>
+                                <span><?= $esc($lay['label'] ?? '') ?></span>
+                            </button>
+                            <?php endforeach; ?>
+                        </div>
+                    </details>
+                </details>
+                <?php
+                $ajudasElementos = [
+                    'titulo' => ['Título', 'Nome do documento ou de uma seção'],
+                    'texto' => ['Texto simples', 'Parágrafos e informações curtas'],
+                    'texto_rico' => ['Texto formatado', 'Negrito, listas e links'],
+                    'logo' => ['Logo da escola', 'Usa a imagem cadastrada da escola'],
+                    'imagem' => ['Imagem', 'Envie uma foto, brasão ou assinatura'],
+                    'tabela' => ['Tabela editável', 'Crie células, linhas e colunas'],
+                    'dados_escola' => ['Escola', 'Nome e identificação da instituição'],
+                    'dados_aluno' => ['Aluno', 'Nome, RA e dados do estudante'],
+                    'dados_responsavel' => ['Responsável', 'Dados do responsável pelo aluno'],
+                    'dados_turma' => ['Turma', 'Série, curso e turma do aluno'],
+                    'boletim' => ['Boletim de notas', 'Quadro de notas do boletim escolhido'],
+                    'frequencia' => ['Frequência', 'Resumo de presença do aluno'],
+                    'observacoes' => ['Observações', 'Informações adicionais do documento'],
+                    'assinaturas' => ['Assinaturas', 'Espaço para os responsáveis assinarem'],
+                    'tabela_aluno' => ['Identificação do aluno', 'Dados do estudante em tabela'],
+                    'tabela_notas' => ['Quadro de notas', 'Notas e faltas por período'],
+                    'tabela_coletiva' => ['Tabela da turma', 'Resultados de vários alunos'],
+                    'tabela_frequencia' => ['Tabela de frequência', 'Presenças e faltas por período'],
+                    'historico' => ['Histórico escolar', 'Trajetória e resultados do aluno'],
+                    'resultado_final' => ['Resultado final', 'Situação final do estudante'],
+                    'linha' => ['Linha divisória', 'Separe partes do documento'],
+                    'espacador' => ['Espaço em branco', 'Ajuste a distância entre elementos'],
+                    'pagina' => ['Número da página', 'Numeração das páginas na emissão'],
+                    'quebra_pagina' => ['Nova página', 'Continue o conteúdo na próxima folha'],
+                    'qrcode' => ['QR Code', 'Código de verificação na emissão'],
+                ];
+                $gruposElementos = [
+                    'conteudo' => ['Adicionar conteúdo', 'Textos, imagens e tabelas'],
+                    'dados' => ['Dados automáticos', 'Preenchidos com os dados da escola e do aluno'],
+                    'tabelas' => ['Tabelas e resultados', 'Boletim, histórico e documentos da turma'],
+                    'extras' => ['Acabamento da página', 'Espaços, divisórias e numeração'],
+                ];
+                foreach ($gruposElementos as $grp => [$lab, $descricaoGrupo]): ?>
+                <details class="edoc-tool-group" data-edoc-palette-group <?= $grp === 'conteudo' ? 'open' : '' ?>>
+                    <summary><span><?= $esc($lab) ?></span><small><?= $esc($descricaoGrupo) ?></small></summary>
+                    <div class="edoc-element-list">
+                        <?php foreach (($catalogo[$grp] ?? []) as $it):
+                            $tipo = (string) ($it['tipo'] ?? '');
+                            [$rotulo, $descricao] = $ajudasElementos[$tipo] ?? [(string) ($it['label'] ?? ''), (string) ($it['ajuda'] ?? '')];
+                        ?>
+                        <button type="button" class="edoc-item" draggable="true" data-drag-type="<?= $esc($tipo) ?>" aria-label="<?= $esc($rotulo) ?>" title="<?= $esc($descricao) ?>">
+                            <i class="fa-solid <?= $esc($it['icone'] ?? 'fa-cube') ?>" aria-hidden="true"></i>
+                            <span class="edoc-item-text"><strong><?= $esc($rotulo) ?></strong><small><?= $esc($descricao) ?></small></span>
+                            <i class="fa-solid fa-plus edoc-item-add" aria-hidden="true"></i>
+                        </button>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php if ($grp === 'conteudo'): ?>
+                    <p class="edoc-palette-tip">Dica: cole imagens ou tabelas do Excel com Ctrl+V (⌘V no Mac).</p>
+                    <?php endif; ?>
+                </details>
+                <?php if ($grp === 'dados'): ?>
+                <details class="edoc-tool-group edoc-extra-fields">
+                    <summary><span>Campos e informações extras</span><small>Variáveis, disciplinas e campos da emissão</small></summary>
                 <div class="edoc-demo" id="edoc-demo">
                     <h4>Outros dados</h4>
                     <label class="edoc-demo-check" for="edoc-demo-sigla">
@@ -183,10 +250,12 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                     </div>
                 </details>
                 <?php endforeach; ?>
+                </details>
                 <?php endif; ?>
                 <?php endforeach; ?>
             </div>
             <div class="edoc-pane" id="pane-estrutura" style="display:none">
+                <p class="edoc-hint">Veja as partes do documento. Selecione um item para ajustar suas propriedades na lateral direita.</p>
                 <div id="edoc-tree" class="edoc-tree"></div>
             </div>
         </aside>
@@ -204,7 +273,7 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                 <span id="edoc-zoom-label" style="font-size:12px;min-width:48px;text-align:center">90%</span>
                 <button type="button" class="edoc-btn edoc-btn-icon" id="edoc-zoom-in"><i class="fa-solid fa-plus"></i></button>
                 <button type="button" class="edoc-btn" id="edoc-zoom-fit">Ajustar à tela</button>
-                <span class="edoc-canvas-hint">Medidas em mm. O zoom não altera a impressão. No histórico: selecione células, mescle, use texto na vertical e faixa cinza. O PDF repete a folha.</span>
+                <span class="edoc-canvas-hint">Edite na folha. Use Ver resultado para conferir as margens e as páginas da impressão.</span>
                 <span class="edoc-canvas-hint" id="edoc-folha-aviso"></span>
                 <?php if (!empty($layout_sugerido)): ?>
                 <button type="button" class="edoc-btn" id="edoc-layout-sugerido" title="Monta cabeçalho, identificação, notas e assinaturas lado a lado">
@@ -212,6 +281,15 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                 </button>
                 <?php endif; ?>
             </div>
+            <section class="edoc-pdf-preview" id="edoc-pdf-preview" aria-label="Resultado da impressão" hidden>
+                <div class="edoc-pdf-preview-bar">
+                    <div><strong>Resultado da impressão</strong><p>Confira as páginas como serão emitidas no PDF.</p></div>
+                    <button type="button" class="edoc-btn" id="edoc-pdf-refresh"><i class="fa-solid fa-rotate-right" aria-hidden="true"></i> Atualizar prévia</button>
+                </div>
+                <p class="edoc-pdf-message" id="edoc-pdf-message" role="status">Preparando a prévia…</p>
+                <iframe id="edoc-pdf-frame" title="Prévia do PDF que será emitido" hidden></iframe>
+                <p class="edoc-pdf-preview-help">Para alterar o documento, clique em <strong>Voltar à edição</strong>. Você também pode abrir o PDF em outra aba.</p>
+            </section>
             <div class="edoc-stage">
                 <div id="edoc-paper-wrap" class="edoc-paper-wrap">
                     <div class="edoc-ruler-h"></div>
@@ -317,6 +395,22 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
         <?php endforeach; ?>
     </div>
 </div>
+
+<dialog class="edoc-table-dialog" id="edoc-table-dialog" aria-labelledby="edoc-table-title">
+    <form id="edoc-table-form">
+        <h2 id="edoc-table-title">Criar tabela</h2>
+        <p>Escolha o tamanho. Depois, preencha as células diretamente na folha.</p>
+        <div class="edoc-table-dimensions">
+            <div><label for="edoc-table-rows">Linhas</label><input id="edoc-table-rows" type="number" value="4" min="1" max="40" step="1" required><small>De cima para baixo</small></div>
+            <div><label for="edoc-table-cols">Colunas</label><input id="edoc-table-cols" type="number" value="3" min="1" max="20" step="1" required><small>Da esquerda para a direita</small></div>
+        </div>
+        <label class="edoc-chk"><input id="edoc-table-header" type="checkbox" checked> Primeira linha como cabeçalho</label>
+        <div id="edoc-table-sample" class="edoc-table-sample" aria-hidden="true"></div>
+        <p id="edoc-table-description" aria-live="polite"></p>
+        <p class="edoc-hint">A tabela ocupa a largura da coluna escolhida. Você poderá adicionar linhas e colunas depois.</p>
+        <div class="edoc-table-dialog-actions"><button type="button" class="edoc-btn" id="edoc-table-cancel">Cancelar</button><button type="submit" class="edoc-btn edoc-btn-primary">Inserir tabela</button></div>
+    </form>
+</dialog>
 
 <script>
 window.EDOC = {

@@ -121,6 +121,7 @@
     estrutura: normalizarEstrutura(C.estrutura),
     selected: null,
     zoom: 90,
+    ajustarZoom: true,
     preview: false,
     demo: true,
     history: [],
@@ -131,6 +132,7 @@
 
   var paper = null;
   var editando = null;
+  var ultimaCelulaEditavel = null;
   var saveTimer = null;
   var saveP = null;
   var saveAgain = false;
@@ -753,8 +755,8 @@
     return ['titulo', 'texto', 'texto_rico', 'html'].indexOf(tipo) >= 0;
   }
 
-  function htmlBarraFmt(comImagem) {
-    return '<button type="button" data-fmt="bold" title="Negrito (Ctrl+B)"><i class="fa-solid fa-bold"></i></button>'
+  function htmlBarraFmt(comImagem, somenteTexto) {
+    var html = '<button type="button" data-fmt="bold" title="Negrito (Ctrl+B)"><i class="fa-solid fa-bold"></i></button>'
       + '<button type="button" data-fmt="italic" title="Itálico (Ctrl+I)"><i class="fa-solid fa-italic"></i></button>'
       + '<button type="button" data-fmt="underline" title="Sublinhado (Ctrl+U)"><i class="fa-solid fa-underline"></i></button>'
       + '<span class="edoc-fmt-sep"></span>'
@@ -766,8 +768,9 @@
       + '<button type="button" data-fmt="fontDec" title="Diminuir fonte">A−</button>'
       + '<span class="edoc-fmt-size" data-fmt-size>12</span>'
       + '<button type="button" data-fmt="fontInc" title="Aumentar fonte">A+</button>'
-      + '<span class="edoc-fmt-sep"></span>'
-      + '<button type="button" data-fmt="tableInsert" title="Inserir tabela"><i class="fa-solid fa-table"></i></button>'
+      + '<span class="edoc-fmt-sep"></span>';
+    if (somenteTexto) return html;
+    return html + '<button type="button" data-fmt="tableInsert" title="Inserir tabela"><i class="fa-solid fa-table"></i></button>'
       + '<button type="button" data-fmt="tableInsRow" title="Inserir linha"><i class="fa-solid fa-plus"></i></button>'
       + '<button type="button" data-fmt="tableInsCol" title="Inserir coluna"><i class="fa-solid fa-grip-lines-vertical"></i></button>'
       + '<button type="button" data-fmt="tableMerge" title="Mesclar células selecionadas"><i class="fa-solid fa-object-group"></i></button>'
@@ -959,21 +962,114 @@
     }
   }
 
-  function htmlTabelaVazia(linhas, cols) {
+  var destinoNovaTabela = null;
+
+  function abrirCriadorTabela(colunaId) {
+    persistirEdicaoSeHouver();
+    destinoNovaTabela = colunaId;
+    var dialogo = $('#edoc-table-dialog');
+    if (!dialogo) return;
+    atualizarAmostraTabela();
+    dialogo.showModal();
+    $('#edoc-table-rows').focus();
+  }
+
+  function atualizarAmostraTabela() {
+    var linhas = Math.max(1, Math.min(40, parseInt($('#edoc-table-rows').value, 10) || 1));
+    var colunas = Math.max(1, Math.min(20, parseInt($('#edoc-table-cols').value, 10) || 1));
+    var cabecalho = $('#edoc-table-header').checked;
+    var amostra = $('#edoc-table-sample');
+    amostra.style.gridTemplateColumns = 'repeat(' + Math.min(colunas, 8) + ', 1fr)';
+    var html = '';
+    for (var r = 0; r < Math.min(linhas, 5); r++) {
+      for (var c = 0; c < Math.min(colunas, 8); c++) html += '<span' + (cabecalho && r === 0 ? ' class="edoc-table-sample-header"' : '') + '></span>';
+    }
+    amostra.innerHTML = html;
+    $('#edoc-table-description').textContent = linhas + (linhas === 1 ? ' linha' : ' linhas') + ' × ' + colunas + (colunas === 1 ? ' coluna' : ' colunas') + (cabecalho ? ', incluindo a linha de cabeçalho.' : '.');
+  }
+
+  function bindCriadorTabela() {
+    var form = $('#edoc-table-form');
+    if (!form) return;
+    ['#edoc-table-rows', '#edoc-table-cols', '#edoc-table-header'].forEach(function (id) {
+      $(id).addEventListener('input', atualizarAmostraTabela);
+    });
+    $('#edoc-table-cancel').addEventListener('click', function () { $('#edoc-table-dialog').close(); });
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (!form.reportValidity()) return;
+      var config = {
+        linhas: parseInt($('#edoc-table-rows').value, 10),
+        colunas: parseInt($('#edoc-table-cols').value, 10),
+        cabecalho: $('#edoc-table-header').checked
+      };
+      $('#edoc-table-dialog').close();
+      insertElement(destinoNovaTabela || colunaAlvo(), 'tabela', false, config);
+    });
+  }
+
+  function tabelaDoElemento(el) {
+    if (!el || el.type !== 'html') return false;
+    var modelo = document.createElement('template');
+    modelo.innerHTML = String((el.props || {}).html || '');
+    var partes = Array.prototype.filter.call(modelo.content.childNodes, function (n) {
+      return n.nodeType === 1 ? n.tagName !== 'STYLE' : !!String(n.textContent || '').trim();
+    });
+    return partes.length === 1 && partes[0].nodeType === 1 && partes[0].tagName === 'TABLE';
+  }
+
+  function htmlAcoesTabela() {
+    var acoes = [
+      ['tableInsRow', 'Adicionar linha', 'fa-plus'],
+      ['tableInsCol', 'Adicionar coluna', 'fa-columns'],
+      ['tableMerge', 'Mesclar células', 'fa-object-group'],
+      ['cellFaixa', 'Fundo cinza', 'fa-fill-drip']
+    ];
+    var botoes = function (itens) {
+      return itens.map(function (a) {
+        return '<button type="button" class="edoc-btn" data-fmt="' + a[0] + '"><i class="fa-solid ' + a[2] + '" aria-hidden="true"></i>' + a[1] + '</button>';
+      }).join('');
+    };
+    return '<div class="edoc-table-actions">' + botoes(acoes) + '</div>'
+      + '<details class="edoc-table-advanced"><summary>Mais ações da tabela</summary><div class="edoc-table-actions">'
+      + botoes([['tableDelRow', 'Excluir linha', 'fa-minus'], ['tableDelCol', 'Excluir coluna', 'fa-minus'], ['tableSelCol', 'Selecionar coluna', 'fa-table-columns'], ['cellVertical', 'Texto vertical', 'fa-arrow-down-short-wide']])
+      + '</div></details>';
+  }
+
+  function bindAcoesTabela(box, target) {
+    $all('[data-fmt]', box).forEach(function (b) {
+      b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      b.addEventListener('click', function () {
+        var corpo = corpoVivoDoElemento(target);
+        if (!corpo || (!celulaDaSelecao(corpo) && !selecaoGrade && !colunaMarcada)) {
+          setStatus('Primeiro clique na célula da tabela que deseja alterar.');
+          return;
+        }
+        executarFmt(b.getAttribute('data-fmt'), target, corpo);
+        if (corpo.isConnected) sincronizarBloco(target, corpo);
+        atualizarLabelFonte(tamanhoFontePt(target, corpo));
+      });
+    });
+  }
+
+  function htmlTabelaVazia(linhas, cols, larguraMm, cabecalho) {
     linhas = Math.max(1, Math.min(40, parseInt(linhas, 10) || 5));
     cols = Math.max(1, Math.min(20, parseInt(cols, 10) || 6));
     var pg = mmPage();
-    var util = Math.max(20, pg.w - (pg.margin.left || 0) - (pg.margin.right || 0));
+    var util = Math.max(20, larguraMm || (pg.w - (pg.margin.left || 0) - (pg.margin.right || 0)));
     var colMm = Math.round((util / cols) * 10) / 10;
     var soma = Math.round(colMm * cols * 10) / 10;
-    var html = '<table class="dados seed-folha" style="width:' + soma.toFixed(1) + 'mm;border-collapse:collapse;table-layout:fixed;"><colgroup>';
+    var html = '<table class="dados seed-folha edoc-tabela-editavel" style="width:' + soma.toFixed(1) + 'mm;border-collapse:collapse;table-layout:fixed;"><colgroup>';
     var r;
     var c;
     for (c = 0; c < cols; c++) html += '<col style="width:' + colMm.toFixed(1) + 'mm;">';
     html += '</colgroup>';
     for (r = 0; r < linhas; r++) {
       html += '<tr style="height:6.0mm;">';
-      for (c = 0; c < cols; c++) html += '<td style="vertical-align:middle;">&nbsp;</td>';
+      for (c = 0; c < cols; c++) {
+        var tag = cabecalho && r === 0 ? 'th' : 'td';
+        html += '<' + tag + (tag === 'th' ? ' class="edoc-faixa" scope="col"' : '') + ' style="vertical-align:middle;">&nbsp;</' + tag + '>';
+      }
       html += '</tr>';
     }
     return html + '</table>';
@@ -1011,8 +1107,11 @@
     var sel = window.getSelection();
     var n = sel && sel.anchorNode;
     var el = n ? (n.nodeType === 1 ? n : n.parentElement) : null;
-    if (!el || !body.contains(el)) return null;
-    return el.closest('td,th');
+    if (el && body.contains(el)) {
+      var celula = el.closest('td,th');
+      if (celula) return celula;
+    }
+    return ultimaCelulaEditavel && ultimaCelulaEditavel.isConnected && body.contains(ultimaCelulaEditavel) ? ultimaCelulaEditavel : null;
   }
 
   function matrizTabela(table) {
@@ -1128,7 +1227,10 @@
     var largura = Math.max(1, larguraGrade(matrizTabela(table)));
     var nova = document.createElement('tr');
     var c;
-    for (c = 0; c < largura; c++) nova.appendChild(novaCelulaComo(td));
+    nova.style.height = tr.style.height;
+    var referencia = table.classList.contains('edoc-tabela-editavel') && td.tagName === 'TH'
+      ? (table.querySelector('td') || document.createElement('td')) : td;
+    for (c = 0; c < largura; c++) nova.appendChild(novaCelulaComo(referencia));
     tr.parentNode.insertBefore(nova, tr.nextSibling);
   }
 
@@ -1599,8 +1701,7 @@
 
   function alterarTabela(body, cmd) {
     if (cmd === 'tableInsert') {
-      document.execCommand('insertHTML', false, htmlTabelaVazia(5, 6));
-      setStatus('Tabela inserida. Clique numa célula para editar.');
+      abrirCriadorTabela(colunaAlvo());
       return;
     }
     if (cmd === 'tableMerge' && selecaoGrade && body.contains(selecaoGrade.table)) {
@@ -1609,10 +1710,6 @@
     }
     var td = celulaDaSelecao(body);
     if (!td) {
-      if (cmd === 'tableInsRow' || cmd === 'tableInsCol') {
-        document.execCommand('insertHTML', false, htmlTabelaVazia(cmd === 'tableInsRow' ? 2 : 3, cmd === 'tableInsCol' ? 2 : 4));
-        return;
-      }
       setStatus('Clique numa célula da tabela para usar esta ferramenta.');
       return;
     }
@@ -1675,7 +1772,7 @@
   }
 
   function restaurarMedidasMm(anterior, novo) {
-    if (!anterior || anterior.indexOf('seed-folha') < 0) return novo;
+    if (!anterior || anterior.indexOf('seed-folha') < 0 || anterior.indexOf('edoc-tabela-editavel') >= 0) return novo;
     var med = medidasMm(anterior);
     var cg = /<colgroup>[\s\S]*?<\/colgroup>/i.exec(anterior);
     if (cg && med.cols.length && medidasMm(novo).cols.length !== med.cols.length) {
@@ -1727,8 +1824,24 @@
     editando = null;
   }
 
+  function ajustarColunasTabelaEditavel(body) {
+    $all('table.edoc-tabela-editavel', body).forEach(function (tabela) {
+      var quantidade = larguraGrade(matrizTabela(tabela));
+      var grupo = tabela.querySelector('colgroup');
+      if (!grupo || !quantidade) return;
+      var incompleta = grupo.children.length !== quantidade || $all('col', grupo).some(function (c) { return !c.style.width; });
+      if (!incompleta) return;
+      var largura = /width:\s*([0-9.]+)mm/i.exec(tabela.getAttribute('style') || '');
+      if (!largura) return;
+      while (grupo.children.length > quantidade) grupo.lastElementChild.remove();
+      while (grupo.children.length < quantidade) grupo.appendChild(document.createElement('col'));
+      $all('col', grupo).forEach(function (c) { c.style.width = (parseFloat(largura[1]) / quantidade).toFixed(2) + 'mm'; });
+    });
+  }
+
   function sincronizarBloco(el, body) {
     if (!el || !body) return;
+    ajustarColunasTabelaEditavel(body);
     el.props = el.props || {};
     var anterior = el.props.html || '';
     el.props.html = restaurarMedidasMm(anterior, htmlDoEditor(body));
@@ -1801,6 +1914,7 @@
 
   function focarCelulaEditavel(celula) {
     if (!celula) return;
+    ultimaCelulaEditavel = celula;
     var body = celula.closest('.edoc-el-body') || celula.closest('.edoc-html-raw');
     if (body) {
       soltarCelulasEditaveis(body);
@@ -1835,6 +1949,25 @@
     mostrarBarraInline(node);
     atualizarLabelFonte(tamanhoFontePt(path.element, body));
     body.onkeydown = function (e) {
+      if (e.key === 'Tab') {
+        var atual = e.target.closest && e.target.closest('td, th');
+        var tabela = atual && atual.closest('table');
+        if (tabela && tabela.classList.contains('edoc-tabela-editavel')) {
+          var celulas = $all('th, td', tabela);
+          var indice = celulas.indexOf(atual);
+          var proxima = indice + (e.shiftKey ? -1 : 1);
+          if (proxima >= celulas.length) {
+            inserirLinhaApos(atual);
+            sincronizarBloco(path.element, body);
+            celulas = $all('th, td', tabela);
+          }
+          if (proxima >= 0 && celulas[proxima]) {
+            e.preventDefault();
+            focarCelulaEditavel(celulas[proxima]);
+          }
+          return;
+        }
+      }
       if (e.key === 'Enter') {
         if (celulaDaSelecao(body)) return;
         e.preventDefault();
@@ -2268,6 +2401,10 @@
     }
     pintarCamposVariaveis();
     var pg = mmPage();
+    var stage = $('.edoc-stage');
+    if (state.ajustarZoom && stage && stage.clientWidth) {
+      state.zoom = Math.max(25, Math.min(150, Math.floor((stage.clientWidth - 68) / (pg.w * 96 / 25.4) * 100)));
+    }
     var z = state.zoom / 100;
     paper = $('#edoc-paper');
     var wrap = $('#edoc-paper-wrap');
@@ -2599,8 +2736,9 @@
     var table = cell.closest('table');
     if (!table || !table.closest('.edoc-html-raw, .edoc-el-body')) return null;
     var rect = cell.getBoundingClientRect();
-    var direita = rect.right - e.clientX <= 8 && e.clientX <= rect.right + 3;
-    var esquerda = e.clientX - rect.left <= 8 && e.clientX >= rect.left - 3;
+    var tolerancia = Math.min(5, rect.width / 4);
+    var direita = rect.right - e.clientX <= tolerancia && e.clientX <= rect.right + 3;
+    var esquerda = e.clientX - rect.left <= tolerancia && e.clientX >= rect.left - 3;
     if (!direita && !esquerda) return null;
     var grid = matrizTabela(table);
     var pos = indiceVisualCelula(grid, cell);
@@ -2721,8 +2859,9 @@
     var table = cell.closest('table');
     if (!table || !table.closest('.edoc-html-raw, .edoc-el-body')) return null;
     var rect = cell.getBoundingClientRect();
-    var baixo = rect.bottom - e.clientY <= 6 && e.clientY <= rect.bottom + 3;
-    var cima = e.clientY - rect.top <= 6 && e.clientY >= rect.top - 3;
+    var tolerancia = Math.min(4, rect.height / 4);
+    var baixo = rect.bottom - e.clientY <= tolerancia && e.clientY <= rect.bottom + 3;
+    var cima = e.clientY - rect.top <= tolerancia && e.clientY >= rect.top - 3;
     if (!baixo && !cima) return null;
     var grid = matrizTabela(table);
     var pos = indiceVisualCelula(grid, cell);
@@ -2800,7 +2939,7 @@
     var tabela = celula.closest('table');
     var grade = tabela && matrizTabela(tabela);
     var pos = grade && indiceVisualCelula(grade, celula);
-    if (celula.tagName === 'TH' && tabela && grade && pos) {
+    if (celula.tagName === 'TH' && tabela && !tabela.classList.contains('edoc-tabela-editavel') && grade && pos) {
       var span = spanDe(celula, 'colspan');
       if (span < larguraGrade(grade)) {
         marcarColuna(tabela, pos.col);
@@ -3353,6 +3492,14 @@
   }
 
   function insertVariavelIntoSelection(chave) {
+    var selecionado = state.selected && findPath(state.selected.id);
+    if (selecionado && tabelaDoElemento(selecionado.element)) {
+      var corpo = corpoVivoDoElemento(selecionado.element);
+      var celula = corpo && celulaDaSelecao(corpo);
+      if (celula) inserirVariavelNaCelula(celula, chave);
+      else setStatus('Clique primeiro na célula que receberá o dado automático.');
+      return;
+    }
     var token = tokenDaChave(chave);
     var rte = document.querySelector('.edoc-rte');
     if (rte && state.selected) {
@@ -3380,10 +3527,19 @@
     insertVariavel(colId, chave);
   }
 
-  function insertElement(colId, tipo, skipHist) {
+  function insertElement(colId, tipo, skipHist, configTabela) {
+    if (tipo === 'tabela' && !configTabela) {
+      abrirCriadorTabela(colId);
+      return null;
+    }
     var path = findPath(colId);
     if (!path || !path.column) return;
     var el = defaultElement(tipo);
+    if (tipo === 'tabela' && configTabela) {
+      var coluna = paper && paper.querySelector('.edoc-col[data-id="' + colId + '"]');
+      var largura = coluna ? Math.max(20, (coluna.clientWidth - 4) * 25.4 / 96) : 0;
+      el.props.html = htmlTabelaVazia(configTabela.linhas, configTabela.colunas, largura, configTabela.cabecalho);
+    }
     path.column.elements = path.column.elements || [];
     path.column.elements.push(el);
     state.selected = { id: el.id, kind: 'element' };
@@ -3400,7 +3556,8 @@
       var node = paper && paper.querySelector('.edoc-el[data-id="' + el.id + '"]');
       if (node) {
         marcarSelecionado(node, el.id);
-        iniciarEdicaoNaFolha(node);
+        iniciarEdicaoNaFolha(node, node.querySelector('th, td'));
+        setStatus('Tabela criada. Digite na célula; use Tab para ir à próxima.');
       }
     }
     if (tipo === 'imagem') {
@@ -3641,7 +3798,7 @@
     if (!html || html.indexOf('seed-folha') < 0) return '';
     var med = medidasMm(html);
     if (!med.cols.length && !med.rows.length) return '';
-    var out = '<div class="edoc-sec-label">GRADE (mm)</div>'
+    var out = '<details class="edoc-table-advanced"><summary>Medidas avançadas (mm)</summary>'
       + '<p class="edoc-hint">Passo de 0,1 mm. A impressão usa estes números, sem reduzir para caber.</p>'
       + '<div class="edoc-grade-mm">';
     med.cols.forEach(function (mm, i) {
@@ -3650,7 +3807,7 @@
     med.rows.forEach(function (mm, i) {
       out += '<label>Linha ' + (i + 1) + '</label><input type="number" min="0.2" max="40" step="0.1" data-mm-row="' + i + '" value="' + mm + '">';
     });
-    return out + '</div>';
+    return out + '</div></details>';
   }
 
   function aplicarMedidaFolha(el, input) {
@@ -3701,16 +3858,22 @@
     var p = el.props || {};
     var st = el.style || {};
     var html = '<div class="edoc-sec-label">' + labelTipo(el.type).toUpperCase() + '</div>';
-    if (el.type === 'titulo' || el.type === 'texto' || el.type === 'texto_rico' || el.type === 'html') {
+    if (tabelaDoElemento(el)) {
+      html = '<div class="edoc-sec-label">TABELA</div>'
+        + '<p class="edoc-hint">Edite diretamente na folha: clique na célula e digite. Use Tab para avançar. Para mesclar, arraste sobre as células desejadas.</p>'
+        + htmlAcoesTabela()
+        + '<div class="edoc-sec-label">TEXTO DAS CÉLULAS</div>'
+        + '<div class="edoc-rte-bar">' + htmlBarraFmt(false, true) + '</div>'
+        + '<button type="button" class="edoc-btn" id="edoc-insert-var" style="margin-top:6px">Inserir dado automático</button>'
+        + painelMedidasFolha(p.html || '');
+    } else if (el.type === 'titulo' || el.type === 'texto' || el.type === 'texto_rico' || el.type === 'html') {
       html += '<div class="edoc-sec-label">FORMATO</div>';
       html += '<div class="edoc-rte-bar">' + htmlBarraFmt(true) + '</div>';
-      html += '<p class="edoc-hint">Clique na célula da folha. A+, A−, linha, coluna e mesclar aplicam nela.</p>';
       html += '<label>Conteúdo</label>';
       html += '<div class="edoc-rte-wrap">'
-        + '<div class="edoc-rte" contenteditable="true" role="textbox" aria-multiline="true" spellcheck="true"></div>'
+        + '<div class="edoc-rte" contenteditable="true" role="textbox" aria-label="Conteúdo do texto" aria-multiline="true" spellcheck="true"></div>'
         + '</div>';
       html += '<button type="button" class="edoc-btn" id="edoc-insert-var" style="margin-top:6px">{ } Variáveis</button>';
-      html += painelMedidasFolha(p.html || '');
     }
     if (el.type === 'boletim' || el.type === 'tabela_notas') {
       abrirCardBoletim(false);
@@ -3969,6 +4132,7 @@
   }
 
   function bindRte(box, target) {
+    if (tabelaDoElemento(target)) { bindAcoesTabela(box, target); return; }
     var rte = box.querySelector('.edoc-rte');
     if (!rte) return;
     rte.innerHTML = htmlParaEditor(target);
@@ -4163,12 +4327,19 @@
 
   function openVars(target, rte) {
     var modal = $('#edoc-vars');
+    var corpoTabela = tabelaDoElemento(target) ? corpoVivoDoElemento(target) : null;
+    var celulaDestino = corpoTabela && celulaDaSelecao(corpoTabela);
     modal.classList.add('open');
     modal.onclick = function (e) { if (e.target === modal) modal.classList.remove('open'); };
     $all('[data-var]', modal).forEach(function (b) {
       b.onclick = function () {
         var token = tokenDaChave(b.getAttribute('data-var'));
         modal.classList.remove('open');
+        if (corpoTabela) {
+          if (celulaDestino && celulaDestino.isConnected) inserirVariavelNaCelula(celulaDestino, b.getAttribute('data-var'));
+          else setStatus('Clique primeiro na célula que receberá o dado automático.');
+          return;
+        }
         if (rte) {
           if (typeof rte._edocRestore === 'function') rte._edocRestore();
           else rte.focus();
@@ -4350,6 +4521,7 @@
       status.textContent = 'Escolha o boletim e a aluna para ver o layout na folha.';
     }
     if (focar) {
+      card.open = true;
       var fonte = $('#edoc-fonte-boletim');
       if (fonte) {
         try { fonte.focus(); } catch (e) {}
@@ -4750,6 +4922,122 @@
     carregar();
   }
 
+  function bindBuscaElementos() {
+    var input = $('#edoc-element-search');
+    if (!input) return;
+    var grupos = $all('[data-edoc-palette-group]');
+    var abertos = null;
+    function normalizarBusca(texto) {
+      return String(texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    }
+    input.addEventListener('input', function () {
+      var busca = normalizarBusca(input.value).trim();
+      var total = 0;
+      if (busca && !abertos) abertos = $all('details', $('#pane-elementos')).map(function (g) { return { node: g, open: g.open }; });
+      grupos.forEach(function (grupo) {
+        var encontrados = 0;
+        $all('[data-drag-type], [data-drag-layout]', grupo).forEach(function (item) {
+          var texto = item.textContent + ' ' + (item.getAttribute('title') || '') + ' ' + (item.getAttribute('data-drag-type') || '');
+          item.hidden = !!busca && normalizarBusca(texto).indexOf(busca) < 0;
+          if (!item.hidden) encontrados++;
+        });
+        grupo.hidden = encontrados === 0;
+        if (busca && encontrados) {
+          grupo.open = true;
+          $all('details', grupo).forEach(function (g) { g.open = true; });
+        }
+        total += encontrados;
+      });
+      if (!busca && abertos) {
+        abertos.forEach(function (g) { g.node.open = g.open; });
+        abertos = null;
+      }
+      $('.edoc-left').classList.toggle('is-searching', !!busca);
+      $('#edoc-element-empty').hidden = total > 0;
+    });
+  }
+
+  var requisicaoPreviaPdf = 0;
+  var controlePreviaPdf = null;
+  var arquivoPreviaPdf = null;
+
+  function alternarResultadoPdf(ativo) {
+    state.preview = ativo;
+    document.body.classList.toggle('edoc-result-mode', ativo);
+    $('#edoc-pdf-preview').hidden = !ativo;
+    var botao = $('#edoc-preview-mode');
+    botao.classList.toggle('active', ativo);
+    botao.setAttribute('aria-pressed', String(ativo));
+    botao.innerHTML = ativo
+      ? '<i class="fa-solid fa-pen" aria-hidden="true"></i> Voltar à edição'
+      : '<i class="fa-solid fa-eye" aria-hidden="true"></i> Ver resultado';
+    if (!ativo) {
+      requisicaoPreviaPdf++;
+      if (controlePreviaPdf) controlePreviaPdf.abort();
+      $('#edoc-pdf-frame').removeAttribute('src');
+      if (arquivoPreviaPdf) URL.revokeObjectURL(arquivoPreviaPdf);
+      arquivoPreviaPdf = null;
+    }
+    render();
+    if (ativo) carregarResultadoPdf();
+  }
+
+  function carregarResultadoPdf() {
+    persistirEdicaoSeHouver();
+    clearTimeout(saveTimer);
+    var numero = ++requisicaoPreviaPdf;
+    if (controlePreviaPdf) controlePreviaPdf.abort();
+    controlePreviaPdf = new AbortController();
+    var sinal = controlePreviaPdf.signal;
+    var frame = $('#edoc-pdf-frame');
+    var mensagem = $('#edoc-pdf-message');
+    var atualizar = $('#edoc-pdf-refresh');
+    var selecao = (state.demoSel && state.demoSel.alunoId) ? clone(state.demoSel) : capturarDemoSel();
+    frame.onload = null;
+    frame.onerror = null;
+    frame.removeAttribute('src');
+    if (arquivoPreviaPdf) URL.revokeObjectURL(arquivoPreviaPdf);
+    arquivoPreviaPdf = null;
+    frame.hidden = true;
+    mensagem.hidden = false;
+    mensagem.textContent = 'Salvando e preparando o PDF…';
+    atualizar.disabled = true;
+    save().then(function (resposta) {
+      if (numero !== requisicaoPreviaPdf || !state.preview) return;
+      if (!resposta || !resposta.ok || !C.previewUrl) {
+        mensagem.textContent = 'Não foi possível salvar o documento. Volte à edição ou tente atualizar a prévia.';
+        atualizar.disabled = false;
+        return;
+      }
+      mensagem.textContent = 'Gerando o PDF. Aguarde…';
+      var url = urlPreviewComDemo(selecao);
+      url += (url.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now();
+      return fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/pdf' }, signal: sinal })
+        .then(function (respostaPdf) {
+          var tipo = (respostaPdf.headers.get('Content-Type') || '').toLowerCase();
+          if (!respostaPdf.ok || tipo.indexOf('application/pdf') !== 0) throw new Error('Resposta sem PDF');
+          return respostaPdf.blob();
+        }).then(function (arquivo) {
+          return arquivo.slice(0, 5).text().then(function (assinatura) {
+            if (assinatura !== '%PDF-') throw new Error('Arquivo PDF inválido');
+            if (numero !== requisicaoPreviaPdf || !state.preview) return;
+            if (arquivoPreviaPdf) URL.revokeObjectURL(arquivoPreviaPdf);
+            arquivoPreviaPdf = URL.createObjectURL(arquivo);
+            frame.src = arquivoPreviaPdf;
+            frame.hidden = false;
+            mensagem.hidden = true;
+            atualizar.disabled = false;
+          });
+        });
+    }).catch(function () {
+      if (numero !== requisicaoPreviaPdf || !state.preview) return;
+      mensagem.hidden = false;
+      mensagem.textContent = 'Não foi possível gerar o PDF. Verifique sua sessão e tente atualizar a prévia.';
+      frame.hidden = true;
+      atualizar.disabled = false;
+    });
+  }
+
   function bindPalette() {
     $all('[data-drag-type]').forEach(function (el) {
       el.setAttribute('draggable', 'true');
@@ -4990,26 +5278,20 @@
     }
     onClick('#edoc-undo', undo);
     onClick('#edoc-redo', redo);
-    onClick('#edoc-zoom-out', function () { state.zoom = Math.max(50, state.zoom - 10); render(); });
-    onClick('#edoc-zoom-in', function () { state.zoom = Math.min(150, state.zoom + 10); render(); });
-    onClick('#edoc-zoom-fit', function () { state.zoom = 90; render(); });
+    onClick('#edoc-zoom-out', function () { state.ajustarZoom = false; state.zoom = Math.max(25, state.zoom - 10); render(); });
+    onClick('#edoc-zoom-in', function () { state.ajustarZoom = false; state.zoom = Math.min(150, state.zoom + 10); render(); });
+    onClick('#edoc-zoom-fit', function () { state.ajustarZoom = true; render(); });
     onClick('#edoc-layout-sugerido', aplicarLayoutSugerido);
+    window.addEventListener('resize', function () { if (state.ajustarZoom && !state.preview) render(); });
     bindReproduzirImagem();
-    onClick('#edoc-preview-mode', function () {
-      state.preview = !state.preview;
-      this.classList.toggle('active', state.preview);
-      render();
-    });
+    onClick('#edoc-preview-mode', function () { alternarResultadoPdf(!state.preview); });
+    onClick('#edoc-pdf-refresh', carregarResultadoPdf);
     onClick('#edoc-save', save);
     bindEmissao();
     onClick('#edoc-pdf', function (e) {
       e.preventDefault();
       // Congela a aluna/turma da folha ANTES do save (select pode mudar no meio).
       var snap = (state.demoSel && state.demoSel.alunoId) ? state.demoSel : capturarDemoSel();
-      if (!snap.turmaId || !snap.alunoId) {
-        setStatus('Escolha turma e aluna no card Boletim antes de pré-visualizar o PDF.');
-        return;
-      }
       save().then(function (j) {
         if (!j || !j.ok || !C.previewUrl) return;
         state.demo = true;
@@ -5038,7 +5320,8 @@
       if (apagarSelecaoPeloTeclado(e)) return;
       var meta = e.metaKey || e.ctrlKey;
       var typing = estaDigitando(e.target);
-      if (meta && e.key === 's') { e.preventDefault(); save(); return; }
+      if (meta && e.key === 's') { e.preventDefault(); if (state.preview) carregarResultadoPdf(); else save(); return; }
+      if (state.preview) return;
       if (typing) return;
       if (meta && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
       if (meta && (e.key === 'Z' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
@@ -5094,6 +5377,8 @@
     state.history = [clone(state.estrutura)];
     state.histI = 0;
     bindPalette();
+    bindBuscaElementos();
+    bindCriadorTabela();
     bindVarSearch();
     bindCamposVariaveis();
     bindDemonstracao();

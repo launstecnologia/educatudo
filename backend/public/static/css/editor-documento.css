@@ -884,3 +884,64 @@ td.edoc-celula-sel, th.edoc-celula-sel {
 @media (max-width: 1024px) {
   .edoc-left, .edoc-right { width: 220px; flex-basis: 220px; }
 }
+
+/* Painel de inserção: instruções curtas, grupos e ações acessíveis por teclado. */
+.edoc-inserir-intro { padding: 2px 0 12px; }
+.edoc-inserir-intro strong { font-size: 14px; color: #111827; }
+.edoc-inserir-intro p { font-size: 12px; line-height: 1.5; margin: 5px 0 0; color: #64748b; }
+.edoc-busca-label { display: block; font-size: 11px; font-weight: 600; margin: 4px 0 6px; color: #475569; }
+.edoc-tool-group { border: 1px solid #e2e8f0; border-radius: 10px; margin: 0 0 10px; overflow: hidden; }
+.edoc-tool-group > summary { cursor: pointer; padding: 11px 12px; color: #334155; font-size: 12px; font-weight: 650; list-style: none; position: relative; padding-right: 30px; }
+.edoc-tool-group > summary::-webkit-details-marker { display: none; }
+.edoc-tool-group > summary::after { content: '+'; position: absolute; right: 12px; top: 12px; color: #64748b; font-size: 14px; }
+.edoc-tool-group[open] > summary::after { content: '−'; }
+.edoc-tool-group[open] > summary { background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+.edoc-tool-group > summary small { display: block; font-size: 10px; font-weight: 400; line-height: 1.4; color: #64748b; margin-top: 3px; }
+.edoc-layout-basico { padding: 9px; gap: 6px; }
+.edoc-layout-basico .edoc-layout { min-height: 42px; padding: 7px; }
+.edoc-layout-basico .edoc-layout-bars { height: 12px; }
+.edoc-layout-mais { padding: 0 9px 9px; }
+.edoc-layout-mais > summary { font-size: 11px; color: #64748b; cursor: pointer; padding: 5px 1px; }
+.edoc-layout-mais .edoc-grid { margin-top: 6px; }
+.edoc-layout-mais .edoc-layout { min-height: 38px; font-size: 10px; padding: 6px; }
+.edoc-element-list { padding: 5px; }
+.edoc-element-list .edoc-item { width: 100%; flex-direction: row; justify-content: flex-start; gap: 10px; padding: 9px 7px; border: 1px solid transparent; border-radius: 7px; text-align: left; font: inherit; }
+.edoc-element-list .edoc-item > i:first-child { width: 26px; height: 28px; display: grid; place-items: center; flex: 0 0 26px; border-radius: 6px; background: #f1f5f9; color: #475569; font-size: 13px; }
+.edoc-item-text { flex: 1; min-width: 0; }
+.edoc-item-text strong { display: block; font-size: 12px; font-weight: 600; color: #334155; }
+.edoc-item-text small { display: block; font-size: 10px; line-height: 1.4; color: #64748b; margin-top: 2px; }
+.edoc-item .edoc-item-add { font-size: 10px; color: #94a3b8; }
+.edoc-palette-tip { font-size: 10px; line-height: 1.5; margin: 0; padding: 4px 12px 10px; color: #64748b; }
+.edoc-layout:focus-visible, .edoc-item:focus-visible, .edoc-tool-group > summary:focus-visible { outline: 2px solid var(--color-primary, #2563eb); outline-offset: -2px; }
+.edoc-extra-fields > .edoc-demo { margin: 10px; }
+.edoc-extra-fields > .edoc-sec-label, .edoc-extra-fields > .edoc-hint, .edoc-extra-fields > .edoc-var-group-side { margin-left: 10px; margin-right: 10px; }
+.edoc-boletim-card > summary { cursor: pointer; font-size: 12px; font-weight: 600; color: #334155; }
+.edoc-boletim-card[open] > summary { margin-bottom: 10px; }
+.edoc-left.is-searching .edoc-extra-fields, .edoc-left.is-searching .edoc-boletim-card { display: none; }
+.edoc-tool-group[hidden], .edoc-item[hidden], .edoc-layout[hidden], .edoc-pdf-preview[hidden], #edoc-pdf-frame[hidden], #edoc-pdf-message[hidden] { display: none !important; }
+/* O modo de resultado apresenta o PDF real, sem sobrepor controles de edição. */
+.edoc-result-mode .edoc-left, .edoc-result-mode .edoc-right,
+.edoc-result-mode .edoc-canvas-tools, .edoc-result-mode .edoc-stage { display: none; }
+.edoc-pdf-preview { display: flex; flex-direction: column; flex: 1; min-height: 0; background: #e8edf3; }
+.edoc-pdf-preview-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; background: #fff; border-bottom: 1px solid #d1d5db; }
+.edoc-pdf-preview-bar strong { font-size: 13px; color: #1f2937; }
+.edoc-pdf-preview-bar p { font-size: 12px; color: #64748b; margin: 3px 0 0; }
+#edoc-pdf-frame { width: 100%; flex: 1; min-height: 0; border: 0; background: #525659; }
+.edoc-pdf-message { margin: auto; padding: 24px; color: #475569; font-size: 14px; text-align: center; }
+.edoc-pdf-preview-help { margin: 0; padding: 8px 16px; background: #fff; color: #64748b; font-size: 11px; }
+.edoc-table-dialog { width: min(440px, calc(100vw - 48px)); max-height: calc(100vh - 48px); overflow: auto; border: 1px solid #e2e8f0; border-radius: 14px; padding: 24px; box-shadow: 0 18px 60px #0f172a33; color: #334155; }
+.edoc-table-dialog::backdrop { background: #0f172a66; }
+.edoc-table-dialog h2 { margin: 0; font-size: 20px; color: #111827; }
+.edoc-table-dialog p { font-size: 13px; line-height: 1.5; color: #64748b; }
+.edoc-table-dimensions { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0 16px; }
+.edoc-table-dimensions label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.edoc-table-dimensions input { box-sizing: border-box; width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; font: inherit; }
+.edoc-table-dimensions small { display: block; font-size: 11px; color: #64748b; margin-top: 5px; }
+.edoc-table-sample { display: grid; gap: 2px; background: #cbd5e1; padding: 2px; margin-top: 18px; border-radius: 4px; }
+.edoc-table-sample span { height: 23px; background: #fff; }
+.edoc-table-sample .edoc-table-sample-header { background: #e2e8f0; }
+.edoc-table-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.edoc-table-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 10px 0; }
+.edoc-table-actions .edoc-btn { font-size: 11px; line-height: 1.4; padding: 8px 6px; }
+.edoc-table-advanced { margin: 10px 0; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+.edoc-table-advanced > summary { font-size: 12px; color: #475569; cursor: pointer; }

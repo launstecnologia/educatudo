@@ -1,5 +1,7 @@
 # Tasks — backlog atual
 
+- [x] Editor de documentos: painel Inserir com busca, grupos e orientações; resultado da impressão exibe o PDF real validado dentro do editor; criação guiada de tabelas com linhas/colunas/cabeçalho, edição na folha, ações nomeadas e zoom que ajusta à tela. 12 testes Playwright de uso, persistência, compatibilidade com HTML misto e erros de prévia; PHP lint e code-reviewer aprovados. — 2026-11-10
+
 - [x] Corrigir renderização do modelo de documento Boletim: coluna de disciplinas legível, fontes pequenas/fracionárias configuráveis sem redução forçada, ajuste independente de zoom e prévia A4 paisagem. PHPUnit (8 assertions), Playwright com 24 disciplinas/31 colunas de resultado e PDFs Chrome/Dompdf em 1 página. Modelo 21 ausente no banco local; conferência exata do modelo da escola pendente. — 2026-11-10
 
 - [x] Separar Demonstrativo de notas (quadro ao vivo, sem gerar snapshot) e Boletim oficial (Concluir e aplicar salva + calcula): gate em `salvarRegra`, CTAs do assistente, portal aluno/pais prioriza ao vivo na aba Notas e boletim na aba Boletim. — 2026-11-10
