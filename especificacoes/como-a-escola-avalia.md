@@ -505,8 +505,12 @@ Em cima, a lista **Eventos usados por peça** resume o que foi marcado.
 | Número e Inserir | Coloca um número fixo na fórmula. |
 | Média das peças | Monta sozinha a soma entre parênteses dividida pela quantidade. |
 | Maior entre as duas primeiras | Monta a função maior entre as duas primeiras peças. |
+| Média com nota substituta | Média das bases; a substituta (ex.: CH) cobre só a 1ª nota ausente. Na MU SM: some `+ PE` depois. |
+| Média com recuperação | Sem REC fica a média; com REC vira (média + REC) ÷ 2. |
 | Limpar | Esvazia a fórmula do bloco. |
 | × no bloco | Tira aquele pedaço da fórmula. |
+
+Manual completo das fórmulas prontas, funções e **média com peso** (ex.: `((PP × 2) + PU) ÷ 3`): [manual-formulas-boletim.md](./manual-formulas-boletim.md). No editor, o bloco **Manual rápido das fórmulas** resume o mesmo conteúdo.
 | Matéria | A matéria que terá uma conta diferente. |
 | Usar outra fórmula nesta matéria | Abre a exceção. A fórmula geral continua nas outras. Editar volta à conta daquela matéria. Remover apaga a exceção. |
 | Voltar à fórmula geral | Sai da exceção e volta à conta do bloco. |

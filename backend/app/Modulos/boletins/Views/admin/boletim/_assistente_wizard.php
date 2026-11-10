@@ -6014,11 +6014,23 @@ $boletimWizardSteps = [
                 notas[codigo] = roundNotaGrupo(total / vals.length, 'mae');
             }
         }
+        var codigosAgregados = {};
         (outras || []).forEach(function (col) {
             if (!col || !col.codigo) return;
             // Média Bim e as colunas seguintes saem da fórmula, não da soma das filhas.
             if (colunaEhCalculadaFormula(col)) return;
             agregarCodigo(col.codigo, colunaEhFaltas(col));
+            codigosAgregados[String(col.codigo).toLowerCase()] = true;
+        });
+        // Peças ocultas (ex.: PP/PU com só MU na grade) ainda sobem para a mãe calcular.
+        (membros || []).forEach(function (lin) {
+            Object.keys((lin && lin.notas) || {}).forEach(function (cod) {
+                var low = String(cod || '').toLowerCase();
+                if (!low || codigosAgregados[low] || /__(n|q)$/.test(low)) return;
+                if (ehCodigoBlocoCalc(cod)) return;
+                agregarCodigo(cod, /fal/.test(low));
+                codigosAgregados[low] = true;
+            });
         });
         (semanas || []).forEach(function (s) {
             if (!s || !s.codigo) return;
@@ -6206,6 +6218,29 @@ $boletimWizardSteps = [
         }
     }
 
+    function formulaGrupoFaltouPecaObrigatoria(codigo, exp, notas) {
+        var cod = String(codigo || '').toLowerCase();
+        var src = String(exp || '');
+        var temChamada = /\b(?:chamada|substituta)\s*\(/i.test(src);
+        var refs = src.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || [];
+        var i;
+        var algumaPeca = false;
+        for (i = 0; i < refs.length; i++) {
+            var ref = String(refs[i] || '');
+            var baixo = ref.toLowerCase();
+            if (baixo === 'max' || baixo === 'min' || baixo === 'chamada' || baixo === 'substituta' || baixo === 'composicao') {
+                continue;
+            }
+            var tem = notaFormulaGrupo(notas, ref) != null;
+            if (tem) algumaPeca = true;
+            // Sem nota substituta: MU exige PP e PU. Com substituta, CH pode cobrir.
+            if (!temChamada && /^b[1-4]_mu$/.test(cod) && /_(pp|pu)$/.test(baixo) && !tem) return true;
+            if (/^s[12]_ms$/.test(cod) && /_mu$/.test(baixo) && !tem) return true;
+            if (cod === 'ma' && /^s[12]_ms$/.test(baixo) && !tem) return true;
+        }
+        return !algumaPeca && refs.length > 0;
+    }
+
     function aplicarFormulasNaLinhaGrupo(notas) {
         var exprs = expressoesCalculadasDoGrupo();
         if (!exprs.length) return notas;
@@ -6213,6 +6248,7 @@ $boletimWizardSteps = [
         var j;
         for (i = 0; i < exprs.length; i++) {
             for (j = 0; j < exprs.length; j++) {
+                if (formulaGrupoFaltouPecaObrigatoria(exprs[j].codigo, exprs[j].expressao, notas)) continue;
                 var valor = avaliarExpressaoGrupo(exprs[j].expressao, notas);
                 if (valor == null) continue;
                 notas[exprs[j].codigo] = valor;
@@ -9569,8 +9605,17 @@ $boletimWizardSteps = [
                 html += '<button type="button" id="bw-formula-substituta" class="px-2.5 py-1.5 text-xs rounded-lg border border-emerald-200 text-emerald-800 bg-white hover:bg-emerald-50" title="Média das notas principais; a substituta entra no lugar da primeira nota ausente">Média com nota substituta</button>';
                 html += '<button type="button" id="bw-formula-composicao" class="px-2.5 py-1.5 text-xs rounded-lg border border-violet-200 text-violet-800 bg-white hover:bg-violet-50" title="Sem recuperação: fica a média. Com recuperação: (média + recuperação) ÷ 2">Média com recuperação</button>';
                 html += '<button type="button" id="bw-formula-limpar" class="px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 text-gray-600 bg-white hover:bg-gray-50">Limpar</button></div>';
-                html += '<p class="mt-1.5 text-[11px] text-amber-950/70"><strong>Média com nota substituta</strong> já calcula a média das notas principais; a substituta entra só no lugar da primeira nota ausente. Não coloque <code class="bg-white/80 px-1 rounded">÷ 2</code> de novo.</p>';
-                html += '<p class="mt-1 text-[11px] text-amber-950/70"><strong>Média com recuperação</strong>: sem recuperação fica só a média; com recuperação vira (média+recuperação)÷2.</p>';
+                html += '<details class="mt-2 rounded-lg border border-amber-200/80 bg-white/70 px-2.5 py-2">';
+                html += '<summary class="text-[11px] font-semibold text-amber-950 cursor-pointer select-none">Manual rápido das fórmulas</summary>';
+                html += '<div class="mt-2 space-y-1.5 text-[11px] text-amber-950/80 leading-snug">';
+                html += '<p><strong>Média das peças</strong> — (nota1 + nota2 + …) ÷ quantidade. Todas com o mesmo peso.</p>';
+                html += '<p><strong>Maior entre as duas primeiras</strong> — fica a maior nota entre as duas primeiras peças.</p>';
+                html += '<p><strong>Média com nota substituta</strong> — média das bases; a substituta (ex.: CH) entra só no lugar da 1ª ausente. Já divide sozinha: não coloque <code class="bg-amber-50 px-1 rounded">÷ 2</code> de novo. Na MU do Santa Maria, some o PE depois: <code class="bg-amber-50 px-1 rounded">nota substituta (PP, PU, CH) + PE</code>.</p>';
+                html += '<p><strong>Média com recuperação</strong> — sem REC fica a média; com REC vira (média + REC) ÷ 2.</p>';
+                html += '<p><strong>Média com peso</strong> — use × e ÷: <code class="bg-amber-50 px-1 rounded">((PP × 2) + PU) ÷ 3</code> (PP vale o dobro). Sempre divida pela soma dos pesos.</p>';
+                html += '<p><strong>maior (</strong> / <strong>menor (</strong> — maior ou menor valor entre as colunas listadas.</p>';
+                html += '<p class="text-amber-900/70">Manual completo: <code class="bg-amber-50 px-1 rounded">especificacoes/manual-formulas-boletim.md</code></p>';
+                html += '</div></details>';
                 html += '</div></div>';
                 html += '<div class="mt-4 pt-3 border-t border-amber-200/80">';
                 html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-1">Exceção só nesta matéria</p>';

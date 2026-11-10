@@ -7863,6 +7863,9 @@ class BoletimConfigController extends BaseController
         }
 
         $colunas = [];
+        // Colunas ocultas (só MU no print): saem da grade, mas as notas ficam na linha
+        // para a mãe agregar PP/PU/PE e recalcular MU — senão a fórmula vira 0,0.
+        $colunasOcultasCalc = [];
         foreach ($componentesRegra as $c) {
             $cod = trim((string) ($c['codigo'] ?? ''));
             if ($cod === '') {
@@ -7871,10 +7874,6 @@ class BoletimConfigController extends BaseController
             $stCol = (string) ($c['source_type'] ?? 'provas_sistema');
             $layoutMeta = $this->parseLayoutMetaFromComponente($c);
             $cfgCol = $this->decodeComponenteConfig($c);
-            // Continua no cálculo/fórmula; só some da grade visual.
-            if (!empty($cfgCol['ocultar_no_quadro']) || isset($ocultasQuadro[strtolower($cod)])) {
-                continue;
-            }
             $linhaCab = trim((string) ($cfgCol['linha_cabecalho'] ?? ''));
             if ($linhaCab !== '') {
                 $linhaCab = function_exists('mb_substr') ? mb_substr($linhaCab, 0, 40) : substr($linhaCab, 0, 40);
@@ -7892,6 +7891,11 @@ class BoletimConfigController extends BaseController
             ];
             if ($linhaCab !== '') {
                 $coluna['linha_cabecalho'] = $linhaCab;
+            }
+            // Continua no cálculo/fórmula; só some da grade visual.
+            if (!empty($cfgCol['ocultar_no_quadro']) || isset($ocultasQuadro[strtolower($cod)])) {
+                $colunasOcultasCalc[] = $coluna;
+                continue;
             }
             $colunas[] = $coluna;
         }
@@ -8282,7 +8286,7 @@ class BoletimConfigController extends BaseController
         }
 
         $colunasFaltasPorCodigo = [];
-        foreach ($colunas as $colMetaDup) {
+        foreach (array_merge($colunas, $colunasOcultasCalc) as $colMetaDup) {
             $codDup = trim((string) ($colMetaDup['codigo'] ?? ''));
             if ($codDup === '') {
                 continue;
@@ -8416,8 +8420,12 @@ class BoletimConfigController extends BaseController
         foreach ($midsOrdenados as $mid) {
             $notasLinha = [];
             $valoresFormula = [];
-            foreach ($colunas as $col) {
+            // Visíveis + ocultas: a grade usa só $colunas; PP/PU/PE ocultos alimentam a MU da mãe.
+            foreach (array_merge($colunas, $colunasOcultasCalc) as $col) {
                 $cod = $col['codigo'];
+                if ($cod === '' || array_key_exists($cod, $notasLinha)) {
+                    continue;
+                }
                 $mapCod = $matrizPorCodigo[$cod] ?? [];
                 $cell = $mapCod[$mid] ?? null;
                 $roundModeCol = (string) ($col['round_mode_efetivo'] ?? $roundMode);
@@ -9349,11 +9357,37 @@ class BoletimConfigController extends BaseController
             foreach ($exprs as $item) {
                 $refs = $this->codigosReferenciadosNaExpressao($item['expr'], array_keys($notas));
                 $vars = [];
+                $faltouMu = false;
+                $ehMuBimestre = (bool) preg_match('/^b[1-4]_mu$/i', (string) $item['codigo']);
+                $ehMsSemestre = (bool) preg_match('/^s[12]_ms$/i', (string) $item['codigo']);
+                $ehMaAnual = strtolower(trim((string) $item['codigo'])) === 'ma';
+                $exprTemChamada = (bool) preg_match('/\b(chamada|substituta)\s*\(/i', (string) $item['expr']);
                 foreach ($refs as $ref) {
                     $notaRef = $this->notaOpcionalGrupoPorCodigo($notas, (string) $ref);
+                    $codRef = strtolower(trim((string) $ref));
+                    // MU sem PP/PU = traço (exceto nota substituta, que cobre a 1ª ausente).
+                    if ($ehMuBimestre && !$exprTemChamada && $notaRef === null && preg_match('/_(pp|pu)$/', $codRef)) {
+                        $faltouMu = true;
+                        break;
+                    }
+                    if ($ehMsSemestre && $notaRef === null && preg_match('/_mu$/', $codRef)) {
+                        $faltouMu = true;
+                        break;
+                    }
+                    if ($ehMaAnual && $notaRef === null && preg_match('/^s[12]_ms$/', $codRef)) {
+                        $faltouMu = true;
+                        break;
+                    }
                     if ($notaRef !== null) {
                         $vars[(string) $ref] = $notaRef;
                     }
+                }
+                if ($faltouMu) {
+                    continue;
+                }
+                // Sem nenhuma peça da fórmula: não inventa 0 (ex.: só MU visível e filhas vazias).
+                if ($vars === [] && $refs !== []) {
+                    continue;
                 }
                 $resultado = $this->avaliarFormula($item['expr'], $vars);
                 if (empty($resultado['ok']) || !isset($resultado['valor']) || !is_numeric($resultado['valor'])) {
@@ -11385,7 +11419,7 @@ class BoletimConfigController extends BaseController
         if (preg_match_all('/\b[a-zA-Z_][a-zA-Z0-9_]*\b/', $expr, $m)) {
             foreach ($m[0] as $token) {
                 $tl = strtolower((string) $token);
-                if ($tl === 'max' || $tl === 'min') {
+                if (in_array($tl, ['max', 'min', 'chamada', 'substituta', 'composicao'], true)) {
                     continue;
                 }
                 $out[(string) $token] = true;
@@ -11759,6 +11793,10 @@ class BoletimConfigController extends BaseController
         $ehMuBimestre = (bool) preg_match('/^b[1-4]_mu$/i', (string) $codigoProprio);
         $ehMsSemestre = (bool) preg_match('/^s[12]_ms$/i', (string) $codigoProprio);
         $ehMaAnual = strtolower(trim((string) $codigoProprio)) === 'ma';
+        $exprTemChamada = (bool) preg_match(
+            '/\b(chamada|substituta)\s*\(/i',
+            implode(' ', array_map('strval', $exprs))
+        );
         foreach (array_keys($unionMids) as $mid) {
             $valoresFormula = [];
             $faltouMu = false;
@@ -11766,7 +11804,8 @@ class BoletimConfigController extends BaseController
                 $notaRef = $this->notaNaMatrizPorApelido($matrizPorCodigo, (string) $rc, (int) $mid);
                 $codRef = strtolower(trim((string) $rc));
                 // Manual SM: MU = ((PP+PU)/2)+PE — PE/CH ausente = 0; sem PP ou PU = traço.
-                if ($ehMuBimestre && $notaRef === null && preg_match('/_(pp|pu)$/', $codRef)) {
+                // Com nota substituta(…), CH pode cobrir a 1ª base ausente — não corta o mid.
+                if ($ehMuBimestre && !$exprTemChamada && $notaRef === null && preg_match('/_(pp|pu)$/', $codRef)) {
                     $faltouMu = true;
                     break;
                 }
@@ -11787,6 +11826,10 @@ class BoletimConfigController extends BaseController
                 }
             }
             if ($faltouMu) {
+                continue;
+            }
+            // Sem nenhuma peça: não avalia como 0 (ex.: chamada sem PP/PU/CH).
+            if ($valoresFormula === [] && $refs !== []) {
                 continue;
             }
             $exprUse = trim((string) ($exprs[(string) ((int) $mid)] ?? $fallbackExpr));
