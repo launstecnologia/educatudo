@@ -48,7 +48,11 @@ $layoutExibicao = is_array($quadro['layout_exibicao'] ?? null) ? $quadro['layout
 $layoutFaixas = is_array($layoutExibicao['faixas'] ?? null) ? $layoutExibicao['faixas'] : [];
 $layoutMinima = (float) ($layoutExibicao['media_minima'] ?? 6);
 $layoutFormula = (string) ($layoutExibicao['formula_final_media'] ?? '');
-$layoutNome = trim((string) ($layoutExibicao['nome'] ?? ''));
+// O que vale é o modelo de boletim do cadastro (Modelos), não layout órfão.
+$modeloNomeCadastro = trim((string) ($quadro['modelo_nome'] ?? ''));
+$layoutNome = $modeloNomeCadastro !== ''
+    ? $modeloNomeCadastro
+    : trim((string) ($layoutExibicao['nome'] ?? ''));
 $escalaNota = (string) ($quadro['escala_nota'] ?? ($layoutExibicao['escala'] ?? '10'));
 $escalaMax = \App\Modulos\RegrasAcademicas\Services\EscalaNota::maximo($escalaNota);
 $quadroImpressaoHtml = trim((string) ($quadro_impressao_html ?? ''));
@@ -128,11 +132,11 @@ $fmtNota = static function ($c): string {
         <div>
             <h3 class="text-lg font-semibold text-gray-900"><?= $layoutNome !== '' ? $esc($layoutNome) : 'Boletim oficial' ?></h3>
             <p class="text-sm text-gray-500"><?php
-                $modeloNome = $layoutNome !== '' ? $layoutNome : trim((string) ($quadro['modelo_nome'] ?? ''));
+                $modeloNome = $layoutNome;
                 if ($modeloNome !== '') {
                     echo 'Modelo: <span class="font-medium text-gray-700">' . $esc($modeloNome) . '</span>. ';
                 } else {
-                    echo 'Conforme o modelo de boletim oficial da turma. ';
+                    echo 'Nenhum modelo de boletim ativo para esta turma. Cadastre em Acadêmico → Boletim → Modelos. ';
                 }
                 if ($usarQuadroImpressao) {
                     echo 'Mesmo layout do boletim criado (médias e faltas por período). ';

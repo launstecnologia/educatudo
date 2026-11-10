@@ -291,10 +291,6 @@ class VidaEscolarService
             $this->turmaCache[(int) $turmaId] = $turma;
         }
         $matriculas = $this->model->matriculasPorAlunos(array_keys($faltantes));
-        $layoutPorTurma = [];
-        foreach (array_unique(array_values($faltantes)) as $turmaId) {
-            $layoutPorTurma[(int) $turmaId] = $this->componentesLayoutDaTurma((int) $turmaId, $ano);
-        }
 
         $paraInserir = [];
         foreach ($faltantes as $aid => $turmaId) {
@@ -331,10 +327,8 @@ class VidaEscolarService
                 $fichaIds[] = $fichaId;
                 $ordem = 0;
                 $jaTemMateria = [];
-                $componentes = $layoutPorTurma[$turmaId] ?? [];
-                if ($componentes === []) {
-                    $componentes = $this->componentesParaNovaFicha($turmaId, $ano, $aid);
-                }
+                // Cadastro (Modelos) manda; não herda layout de modelo já excluído.
+                $componentes = $this->componentesParaNovaFicha($turmaId, $ano, $aid);
                 foreach ($componentes as $comp) {
                     $materiaId = (int) ($comp['materia_id'] ?? 0);
                     if ($materiaId > 0 && isset($jaTemMateria[$materiaId])) {
@@ -3695,18 +3689,34 @@ class VidaEscolarService
     }
 
     /**
+     * Layout de colunas só vale se houver modelo de boletim ativo no cadastro.
+     * Modelo excluído não pode aparecer no detalhe do aluno via layout órfão.
+     *
      * @param array<string,mixed> $ficha
      * @return array<string,mixed>|null
      */
     private function layoutExibicaoDaFicha(array $ficha): ?array
     {
+        $modelo = $this->modeloOficialDaFicha($ficha);
+        if (!is_array($modelo)) {
+            return null;
+        }
         try {
             $layout = new \App\Modulos\EventosAvaliativos\Models\BoletimLayout();
             $turmaId = (int) ($ficha['turma_id'] ?? 0);
             $turma = $turmaId > 0 ? $this->model->turmaPorId($turmaId) : null;
             $serieId = (int) (is_array($turma) ? ($turma['serie_id'] ?? 0) : 0);
+            $preferNome = trim((string) ($modelo['nome'] ?? ''));
+            // Só regra acadêmica — regra_id aponta para boletim_regras, não para layouts.
+            $preferRegra = (int) ($modelo['regra_academica_id'] ?? 0);
 
-            return $layout->exibicaoOficial((int) ($ficha['ano_letivo'] ?? 0), $turmaId, $serieId);
+            return $layout->exibicaoOficial(
+                (int) ($ficha['ano_letivo'] ?? 0),
+                $turmaId,
+                $serieId,
+                $preferNome !== '' ? $preferNome : null,
+                $preferRegra > 0 ? $preferRegra : null
+            );
         } catch (\Throwable $e) {
             return null;
         }
@@ -3805,10 +3815,6 @@ class VidaEscolarService
      */
     private function componentesParaNovaFicha(int $turmaId, int $anoLetivo, int $alunoId = 0): array
     {
-        $doLayout = $this->componentesLayoutDaTurma($turmaId, $anoLetivo);
-        if ($doLayout !== []) {
-            return $doLayout;
-        }
         $turma = $this->turmaPorIdCache($turmaId);
         $serieId = (int) (is_array($turma) ? ($turma['serie_id'] ?? 0) : 0);
         $preferido = $alunoId > 0 ? $this->boletimIdDicaDoAluno($alunoId, $anoLetivo) : 0;
@@ -3837,6 +3843,7 @@ class VidaEscolarService
             }
         }
 
+        // Sem modelo ativo no cadastro, não usa layout órfão (modelo excluído).
         return $this->model->componentesDaTurma($turmaId);
     }
 
@@ -3851,16 +3858,11 @@ class VidaEscolarService
         if ($fichaId <= 0 || ($ficha['status'] ?? '') === 'homologada') {
             return;
         }
-        $turmaId = (int) ($ficha['turma_id'] ?? 0);
-        $ano = (int) ($ficha['ano_letivo'] ?? 0);
-        $comps = $this->componentesLayoutDaTurma($turmaId, $ano);
-        if ($comps === []) {
-            $modelo = $this->modeloOficialDaFicha($ficha);
-            if (!is_array($modelo)) {
-                return;
-            }
-            $comps = $this->boletimCadastro()->componentesParaFicha($modelo);
+        $modelo = $this->modeloOficialDaFicha($ficha);
+        if (!is_array($modelo)) {
+            return;
         }
+        $comps = $this->boletimCadastro()->componentesParaFicha($modelo);
         if ($comps === []) {
             return;
         }

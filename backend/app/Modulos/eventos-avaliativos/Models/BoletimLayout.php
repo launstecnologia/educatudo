@@ -227,6 +227,32 @@ class BoletimLayout
     }
 
     /**
+     * Desativa layouts que espelham o modelo de boletim (cadastro) excluído.
+     */
+    public function desativarPorCadastro(string $nome, int $ano, string $finalidade = 'oficial'): int
+    {
+        $nome = trim($nome);
+        if ($nome === '' || $ano <= 0 || !$this->identidadePronta()) {
+            return 0;
+        }
+        $finalidade = $finalidade === 'complementar' ? 'complementar' : 'oficial';
+
+        return (int) $this->db->update(
+            "UPDATE boletim_layouts
+             SET ativo = 0
+             WHERE ano_letivo = :ano
+               AND finalidade = :finalidade
+               AND nome = :nome
+               AND ativo = 1",
+            [
+                'ano' => $ano,
+                'finalidade' => $finalidade,
+                'nome' => $nome,
+            ]
+        );
+    }
+
+    /**
      * @param list<array<string,mixed>> $linhas
      */
     public function salvarDoBoletim(int $id, array $linhas, ?string $formulaMedia = null): bool
@@ -474,14 +500,24 @@ class BoletimLayout
     /**
      * Layout oficial ativo do ano, quando a turma e a série cabem nele.
      * Listas vazias de turma ou série valem para todas.
+     * Se $preferNome / $preferRegraId vierem do modelo de boletim (cadastro), só aceita layout que case —
+     * evita fantasma de modelo já excluído no detalhe do aluno.
      *
      * @return array{id:int,nome:string,formula_final_media:string,media_minima:float,escala:string,faixas:list<array{nome:string,colunas:list<array{codigo:string,nome:string,peca:string,periodo:int}>}>}|null
      */
-    public function exibicaoOficial(int $ano, int $turmaId, int $serieId): ?array
-    {
+    public function exibicaoOficial(
+        int $ano,
+        int $turmaId,
+        int $serieId,
+        ?string $preferNome = null,
+        ?int $preferRegraId = null
+    ): ?array {
         if ($ano <= 0 || !$this->identidadePronta()) {
             return null;
         }
+        $preferNome = $preferNome !== null ? trim($preferNome) : '';
+        $preferRegraId = (int) $preferRegraId;
+        $exigePreferencia = $preferNome !== '' || $preferRegraId > 0;
         $colunaEscala = '';
         try {
             if ((new RegraAcademica())->escalaPronta()) {
@@ -491,7 +527,7 @@ class BoletimLayout
             $colunaEscala = '';
         }
         $rows = $this->db->fetchAll(
-            'SELECT bl.id, bl.turmas_ids, bl.series_ids, ra.media_minima' . $colunaEscala . '
+            'SELECT bl.id, bl.nome, bl.regra_academica_id, bl.turmas_ids, bl.series_ids, ra.media_minima' . $colunaEscala . '
              FROM boletim_layouts bl
              LEFT JOIN regras_academicas ra ON ra.id = bl.regra_academica_id
              WHERE bl.ano_letivo = :ano AND bl.ativo = 1 AND bl.finalidade = \'oficial\'
@@ -499,6 +535,7 @@ class BoletimLayout
             ['ano' => $ano]
         ) ?: [];
         $escolhido = null;
+        $melhorPts = -1;
         foreach ($rows as $row) {
             $turmas = $this->idsJson((string) ($row['turmas_ids'] ?? ''));
             $series = $this->idsJson((string) ($row['series_ids'] ?? ''));
@@ -508,8 +545,21 @@ class BoletimLayout
             if ($series !== [] && !in_array($serieId, $series, true)) {
                 continue;
             }
-            $escolhido = $row;
-            break;
+            $pts = 0;
+            $nomeLayout = trim((string) ($row['nome'] ?? ''));
+            if ($preferNome !== '' && strcasecmp($nomeLayout, $preferNome) === 0) {
+                $pts += 100;
+            }
+            if ($preferRegraId > 0 && (int) ($row['regra_academica_id'] ?? 0) === $preferRegraId) {
+                $pts += 50;
+            }
+            if ($exigePreferencia && $pts <= 0) {
+                continue;
+            }
+            if ($pts > $melhorPts) {
+                $melhorPts = $pts;
+                $escolhido = $row;
+            }
         }
         if ($escolhido === null) {
             return null;

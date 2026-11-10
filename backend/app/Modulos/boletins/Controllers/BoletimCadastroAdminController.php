@@ -196,7 +196,7 @@ class BoletimCadastroAdminController extends \App\Controllers\Admin\AdminBaseCon
             $this->redirect('/admin/boletins');
             return;
         }
-        $this->setFlashMessage('Modelo ocultado da lista. O cadastro, as avaliações e as notas já geradas foram mantidos.', 'success');
+        $this->setFlashMessage('Modelo excluído. Ele deixa de aparecer na lista e no detalhe do aluno. Avaliações e notas já geradas foram mantidas.', 'success');
         $this->redirect('/admin/boletins');
     }
 

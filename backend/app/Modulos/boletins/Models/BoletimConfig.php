@@ -2495,6 +2495,21 @@ class BoletimConfig
         return $n > 0;
     }
 
+    /**
+     * Desativa todos os documentos/eventos vinculados ao modelo de boletim.
+     */
+    public function desativarRegrasDoBoletim(int $boletimId): int
+    {
+        if ($boletimId <= 0 || !$this->hasColumn('boletim_regras', 'boletim_id')) {
+            return 0;
+        }
+
+        return (int) $this->db->update(
+            "UPDATE boletim_regras SET ativo = 0 WHERE boletim_id = :boletim_id AND ativo = 1",
+            ['boletim_id' => $boletimId]
+        );
+    }
+
     public function updateRuleVisibility(int $ruleId, int $visAluno, int $visPais, ?int $visCoordenacao = null): bool
     {
         if ($ruleId <= 0) {

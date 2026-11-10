@@ -76,6 +76,8 @@ class BoletimCadastroService
     }
 
     /**
+     * Some da listagem e do detalhe do aluno. Desativa layouts/regras ligados ao modelo.
+     *
      * @return array{success:bool,error?:string}
      */
     public function excluir(int $id): array
@@ -84,13 +86,53 @@ class BoletimCadastroService
         if ($item === null) {
             return ['success' => false, 'error' => 'Boletim não encontrado.'];
         }
-        if (!empty($item['excluido_em'])) {
-            return ['success' => true];
+        if (empty($item['excluido_em'])) {
+            if (!$this->model->excluir($id)) {
+                return ['success' => false, 'error' => 'Não foi possível ocultar o modelo.'];
+            }
         }
-        if (!$this->model->excluir($id)) {
-            return ['success' => false, 'error' => 'Não foi possível ocultar o modelo.'];
-        }
+        // Idempotente: limpa layout/regra órfãos mesmo se o modelo já estava excluído.
+        $this->desativarDocumentosDoModelo($id, $item);
+
         return ['success' => true];
+    }
+
+    /**
+     * Layout de impressão e regras do cadastro deixam de valer no detalhe do aluno.
+     *
+     * @param array<string,mixed> $item
+     */
+    private function desativarDocumentosDoModelo(int $boletimId, array $item): void
+    {
+        try {
+            $this->boletimConfig->desativarRegrasDoBoletim($boletimId);
+        } catch (Throwable $e) {
+            error_log('BoletimCadastroService desativar regras #' . $boletimId . ': ' . $e->getMessage());
+        }
+
+        $regraId = (int) ($item['regra_id'] ?? 0);
+        if ($regraId > 0) {
+            try {
+                $this->boletimConfig->deactivateRule($regraId);
+            } catch (Throwable $e) {
+                error_log('BoletimCadastroService desativar regra #' . $regraId . ': ' . $e->getMessage());
+            }
+        }
+
+        $nome = trim((string) ($item['nome'] ?? ''));
+        $ano = (int) ($item['ano_letivo'] ?? 0);
+        $finalidade = (($item['finalidade'] ?? 'oficial') === 'complementar') ? 'complementar' : 'oficial';
+        if ($nome === '' || $ano <= 0) {
+            return;
+        }
+        try {
+            if (class_exists(\App\Modulos\EventosAvaliativos\Models\BoletimLayout::class)) {
+                (new \App\Modulos\EventosAvaliativos\Models\BoletimLayout())
+                    ->desativarPorCadastro($nome, $ano, $finalidade);
+            }
+        } catch (Throwable $e) {
+            error_log('BoletimCadastroService desativar layout do modelo #' . $boletimId . ': ' . $e->getMessage());
+        }
     }
 
     /**
@@ -635,12 +677,16 @@ class BoletimCadastroService
             if ($finalidade !== null && $finRow !== $finalidade) {
                 continue;
             }
+            $anoModelo = (int) ($row['ano_letivo'] ?? 0);
+            // Modelo de outro ano não pode aparecer no detalhe do aluno daquele ano.
+            if ($anoLetivo > 0 && $anoModelo > 0 && $anoModelo !== $anoLetivo) {
+                continue;
+            }
             if (!$this->modeloAtendeTurma($row, $turmaId, $serieId)) {
                 continue;
             }
             $pts = 0;
             $id = (int) ($row['id'] ?? 0);
-            $anoModelo = (int) ($row['ano_letivo'] ?? 0);
             if ($preferidoId > 0 && $id === $preferidoId) {
                 $pts += 1000;
             }

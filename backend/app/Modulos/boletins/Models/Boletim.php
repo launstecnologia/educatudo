@@ -217,7 +217,7 @@ class Boletim
     }
 
     /**
-     * Some da listagem. A linha, as avaliações e as notas permanecem.
+     * Some da listagem e deixa de valer no detalhe do aluno. Avaliações/notas permanecem.
      */
     public function excluir(int $id): bool
     {
@@ -226,7 +226,9 @@ class Boletim
             return false;
         }
         $this->db->update(
-            "UPDATE boletins SET excluido_em = NOW() WHERE id = :id AND excluido_em IS NULL",
+            "UPDATE boletins
+             SET excluido_em = NOW(), ativo = 0
+             WHERE id = :id AND excluido_em IS NULL",
             ['id' => $id]
         );
         return true;
