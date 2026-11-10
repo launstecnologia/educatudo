@@ -4816,10 +4816,35 @@ $boletimWizardSteps = [
     }
 
     function materiasPreviewLocal(fallback) {
+        // Escopo do modelo/regra (já expandido no catálogo) tem prioridade sobre estado cru.
+        var doEscopo = [];
+        try {
+            doEscopo = materiasCatalogoDoEscopo() || [];
+        } catch (eEscopo) {
+            doEscopo = [];
+        }
+        if (doEscopo.length) {
+            var nomesEscopo = [];
+            doEscopo.forEach(function (m) {
+                var nome = String((m && m.nome) || '').trim();
+                if (nome && nomesEscopo.indexOf(nome) < 0) nomesEscopo.push(nome);
+            });
+            if (nomesEscopo.length) return nomesEscopo;
+        }
+
         var selecionadas = {};
         (estado && Array.isArray(estado.materias_ids) ? estado.materias_ids : []).forEach(function (id) {
             id = Number(id || 0);
             if (id > 0) selecionadas[id] = true;
+        });
+        // Oficiais (pai) → incluir desdobramentos na prévia.
+        (catalogo.familias_componentes || []).forEach(function (f) {
+            var pai = Number(f && f.pai_id ? f.pai_id : 0);
+            if (!pai || !selecionadas[pai]) return;
+            (f.filhos || []).forEach(function (ch) {
+                var cid = Number(ch && ch.id ? ch.id : 0);
+                if (cid > 0) selecionadas[cid] = true;
+            });
         });
         var filtrar = Object.keys(selecionadas).length > 0;
         var lista = ((catalogo && catalogo.materias) || []).slice().sort(function (a, b) {

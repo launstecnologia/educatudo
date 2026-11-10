@@ -11266,6 +11266,33 @@ class BoletimAssistenteWizard
             array_map('intval', (array) ($estado['materias_ids'] ?? [])),
             static fn ($id) => $id > 0
         )));
+
+        // Modelo de boletim: matérias vêm da regra de aprovação (com desdobramentos).
+        $boletimId = (int) ($estado['boletim_id'] ?? 0);
+        if ($boletimId > 0) {
+            $bol = $this->buscarBoletimCatalogo($boletimId);
+            if (is_array($bol) && !empty($bol['materias_ids'])) {
+                $selecionadas = array_values(array_unique(array_filter(
+                    array_map('intval', (array) $bol['materias_ids']),
+                    static fn ($id) => $id > 0
+                )));
+            }
+        }
+
+        if ($selecionadas !== []) {
+            try {
+                $comp = new \App\Dominio\Escola\Models\ComponenteCurricular();
+                $selecionadas = $comp->expandirIdsComFilhos($selecionadas);
+                $pais = $comp->idsComFilhos();
+                $selecionadas = array_values(array_filter(
+                    $selecionadas,
+                    static fn ($id) => empty($pais[$id])
+                ));
+            } catch (\Throwable $e) {
+                // mantém ids crus
+            }
+        }
+
         $selecionadasSet = array_fill_keys($selecionadas, true);
         $itens = [];
 
