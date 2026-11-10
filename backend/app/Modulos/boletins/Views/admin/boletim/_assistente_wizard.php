@@ -2198,6 +2198,7 @@ $boletimWizardSteps = [
         if (tok.type === 'fn') {
             if (tok.value === 'min') return 'menor (';
             if (tok.value === 'chamada' || tok.value === 'substituta') return 'substituta (';
+            if (tok.value === 'composicao') return 'média+REC (';
             return 'maior (';
         }
         if (tok.type === 'op' && tok.value === '*') return '×';
@@ -2233,7 +2234,8 @@ $boletimWizardSteps = [
             { type: 'op', value: ',', label: ',' },
             { type: 'fn', value: 'max', label: 'maior (' },
             { type: 'fn', value: 'min', label: 'menor (' },
-            { type: 'fn', value: 'chamada', label: 'substituta (' }
+            { type: 'fn', value: 'chamada', label: 'substituta (' },
+            { type: 'fn', value: 'composicao', label: 'média+REC (' }
         ];
     }
 
@@ -2306,12 +2308,13 @@ $boletimWizardSteps = [
                 var fn = String(t.value || '').toLowerCase();
                 if (fn === 'min') parts.push('min(');
                 else if (fn === 'chamada' || fn === 'substituta') parts.push('chamada(');
+                else if (fn === 'composicao') parts.push('composicao(');
                 else parts.push('max(');
             } else if (t.type === 'peca') parts.push(t.value);
             else parts.push(t.value);
         });
         var exp = parts.join(' ').replace(/\( /g, '(').replace(/ \)/g, ')').replace(/ ,/g, ',');
-        return exp.replace(/\b(max|min|chamada|substituta)\(\s+/g, '$1(').trim();
+        return exp.replace(/\b(max|min|chamada|substituta|composicao)\(\s+/g, '$1(').trim();
     }
 
     function envolverSomaAntesDeDivisao(tokens) {
@@ -2490,6 +2493,75 @@ $boletimWizardSteps = [
         toks.push({ type: 'peca', value: subst, label: tituloColuna(subst) || pecaLabel(subst) || subst });
         toks.push({ type: 'op', value: ')', label: ')' });
         return toks;
+    }
+
+    /**
+     * Modelo único MS+REC: composicao((MU1+MU2)÷2, REC).
+     * Sem REC → só a média; com REC → (média+REC)÷2.
+     */
+    function tokensMediaComRec() {
+        var bases = [];
+        var rec = '';
+        function pushBase(c) {
+            c = String(c || '').toLowerCase();
+            if (!c || bases.indexOf(c) >= 0) return;
+            bases.push(c);
+        }
+        var blocos = (estado && estado.blocos_calc) || [];
+        var preferidos = ['media_bim', 'media_final', 'media_1', 'media_2'];
+        preferidos.forEach(function (cod) {
+            if (blocos.indexOf(cod) >= 0 || (estado.formulas_blocos && estado.formulas_blocos[cod])) {
+                pushBase(cod);
+            }
+        });
+        if (bases.length < 2) {
+            blocos.forEach(function (cod) {
+                if (bases.length >= 2) return;
+                pushBase(cod);
+            });
+        }
+        var cols = [];
+        function pushCol(c) {
+            c = String(c || '').toLowerCase();
+            if (!c || c === '_semanal' || ehCodigoBlocoCalc(c)) return;
+            if (cols.indexOf(c) < 0) cols.push(c);
+        }
+        (estado && estado.colunas_ordem || []).forEach(pushCol);
+        ((estado && estado.pecas) || []).forEach(pushCol);
+        cols.forEach(function (c) {
+            if (rec) return;
+            if (/(^|_)rec(_|$)/.test(c) || /recuperacao/.test(c) || sufixoColunaSm(c) === 'rec') rec = c;
+        });
+        if (!rec) {
+            Object.keys((estado && estado.titulos_coluna) || {}).forEach(function (c) {
+                if (rec) return;
+                var tit = String((estado.titulos_coluna || {})[c] || '').toLowerCase();
+                if (/rec(uperacao)?/.test(tit)) rec = String(c).toLowerCase();
+            });
+        }
+        if (bases.length < 2 || !rec) {
+            // Fallback: só abre a função para o usuário completar.
+            return [
+                { type: 'fn', value: 'composicao', label: 'média+REC (' },
+                { type: 'op', value: '(', label: '(' },
+                { type: 'op', value: ')', label: ')' },
+                { type: 'op', value: ',', label: ',' },
+                { type: 'op', value: ')', label: ')' }
+            ];
+        }
+        return [
+            { type: 'fn', value: 'composicao', label: 'média+REC (' },
+            { type: 'op', value: '(', label: '(' },
+            { type: 'peca', value: bases[0], label: nomeBlocoCalc(bases[0]) || bases[0], calc: true },
+            { type: 'op', value: '+', label: '+' },
+            { type: 'peca', value: bases[1], label: nomeBlocoCalc(bases[1]) || bases[1], calc: true },
+            { type: 'op', value: ')', label: ')' },
+            { type: 'op', value: '/', label: '÷' },
+            { type: 'num', value: '2', label: '2' },
+            { type: 'op', value: ',', label: ',' },
+            { type: 'peca', value: rec, label: tituloColuna(rec) || pecaLabel(rec) || rec },
+            { type: 'op', value: ')', label: ')' }
+        ];
     }
 
     function ehCodigoBlocoCalc(codigo) {
@@ -3002,7 +3074,7 @@ $boletimWizardSteps = [
                 continue;
             }
             var rest = t.slice(i);
-            var fn = rest.match(/^(menor|maior|min|max|chamada|substituta)(?![a-z0-9_])/);
+            var fn = rest.match(/^(menor|maior|min|max|chamada|substituta|composicao)(?![a-z0-9_])/);
             if (fn) {
                 var qual = fn[1];
                 var posFn = i + qual.length;
@@ -3013,6 +3085,7 @@ $boletimWizardSteps = [
                 var fnVal = 'max';
                 if (qual === 'menor' || qual === 'min') fnVal = 'min';
                 else if (qual === 'chamada' || qual === 'substituta') fnVal = 'chamada';
+                else if (qual === 'composicao') fnVal = 'composicao';
                 flat.push({ k: 'fn', v: fnVal });
                 i = posFn + 1;
                 continue;
@@ -3053,7 +3126,11 @@ $boletimWizardSteps = [
         var toks = [];
         flat.forEach(function (item) {
             if (item.k === 'fn') {
-                var labFn = item.v === 'min' ? 'menor (' : (item.v === 'chamada' || item.v === 'substituta' ? 'substituta (' : 'maior (');
+                var labFn = item.v === 'min'
+                    ? 'menor ('
+                    : (item.v === 'chamada' || item.v === 'substituta'
+                        ? 'substituta ('
+                        : (item.v === 'composicao' ? 'média+REC (' : 'maior ('));
                 toks.push({ type: 'fn', value: item.v, label: labFn });
             }
             else if (item.k === 'num') toks.push({ type: 'num', value: item.v, label: item.v });
@@ -4219,6 +4296,11 @@ $boletimWizardSteps = [
             }
             if (e.target.closest('#bw-formula-substituta')) {
                 estado.formula_tokens = tokensMediaComSubstituta();
+                afterFormulaChange();
+                return;
+            }
+            if (e.target.closest('#bw-formula-composicao')) {
+                estado.formula_tokens = tokensMediaComRec();
                 afterFormulaChange();
                 return;
             }
@@ -5810,6 +5892,28 @@ $boletimWizardSteps = [
         return out;
     }
 
+    /** Expande composicao(média, REC): sem REC → média; com REC → (média+REC)/2. */
+    function expandirComposicaoJs(src, notas) {
+        var out = String(src || '');
+        var guard = 0;
+        while (/\bcomposicao\s*\(/i.test(out) && guard++ < 40) {
+            var m = out.match(/\bcomposicao\s*\(/i);
+            if (!m) break;
+            var startFn = m.index;
+            var openParen = startFn + m[0].length - 1;
+            var parsed = extrairArgsFuncaoJs(out, openParen);
+            if (!parsed || parsed.args.length !== 2) return null;
+            var media = String(parsed.args[0] || '').trim();
+            var rec = String(parsed.args[1] || '').trim();
+            var ehIdent = /^[A-Za-z_][A-Za-z0-9_]*$/.test(rec);
+            var subst = (ehIdent && notaFormulaGrupo(notas, rec) == null)
+                ? '(' + media + ')'
+                : '((' + media + ')+(' + rec + '))/2';
+            out = out.slice(0, startFn) + subst + out.slice(parsed.close + 1);
+        }
+        return out;
+    }
+
     function avaliarExpressaoGrupo(exp, notas) {
         var src = String(exp || '').trim();
         if (!src) return null;
@@ -5818,14 +5922,18 @@ $boletimWizardSteps = [
             src = expandirChamadaJs(src, notas);
             if (src == null) return null;
         }
+        if (/\bcomposicao\s*\(/i.test(src)) {
+            src = expandirComposicaoJs(src, notas);
+            if (src == null) return null;
+        }
         src = src.replace(/[A-Za-z_][A-Za-z0-9_]*/g, function (nome) {
             var baixo = nome.toLowerCase();
-            if (baixo === 'max' || baixo === 'min' || baixo === 'chamada' || baixo === 'substituta') return baixo;
+            if (baixo === 'max' || baixo === 'min' || baixo === 'chamada' || baixo === 'substituta' || baixo === 'composicao') return baixo;
             var v = notaFormulaGrupo(notas, nome);
             if (v == null || !isFinite(v)) return '0';
             return String(v);
         });
-        if (!/^[\d\s+\-*/().,]+$/.test(src.replace(/\b(?:max|min|chamada|substituta)\b/g, ''))) return null;
+        if (!/^[\d\s+\-*/().,]+$/.test(src.replace(/\b(?:max|min|chamada|substituta|composicao)\b/g, ''))) return null;
         src = src.replace(/\bmax\b/g, 'Math.max').replace(/\bmin\b/g, 'Math.min');
         try {
             var n = Function('"use strict"; return (' + src + ');')();
@@ -9190,8 +9298,10 @@ $boletimWizardSteps = [
                 html += '<button type="button" id="bw-formula-media" class="px-2.5 py-1.5 text-xs rounded-lg border border-indigo-200 text-indigo-700 hover:bg-indigo-50">Média das peças</button>';
                 html += '<button type="button" id="bw-formula-max" class="px-2.5 py-1.5 text-xs rounded-lg border border-amber-200 text-amber-800 hover:bg-amber-50">Maior entre as duas primeiras</button>';
                 html += '<button type="button" id="bw-formula-substituta" class="px-2.5 py-1.5 text-xs rounded-lg border border-emerald-200 text-emerald-800 hover:bg-emerald-50" title="Média de PP e PU; CH entra no lugar da primeira nota ausente">Substituta (PP/PU + CH)</button>';
+                html += '<button type="button" id="bw-formula-composicao" class="px-2.5 py-1.5 text-xs rounded-lg border border-violet-200 text-violet-800 hover:bg-violet-50" title="Se não houver REC, fica a média; se houver, (média+REC)÷2">MS com REC</button>';
                 html += '<button type="button" id="bw-formula-limpar" class="px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">Limpar</button></div>';
                 html += '<p class="mt-1.5 text-[11px] text-slate-500">Substituta já calcula a <strong>média</strong> (<code class="bg-white/80 px-1 rounded">chamada(PP, PU, CH)</code>). Não coloque <code class="bg-white/80 px-1 rounded">÷ 2</code> de novo — a nota fica na metade. Some a PE depois, se precisar: <code class="bg-white/80 px-1 rounded">… + PE</code>.</p>';
+                html += '<p class="mt-1 text-[11px] text-slate-500"><strong>MS com REC</strong> monta <code class="bg-white/80 px-1 rounded">composicao((Média Bim + Resultado Final)÷2, REC)</code>: sem REC fica só a média; com REC vira (média+REC)÷2 — um único cálculo.</p>';
                 html += '<p id="bw-formula-canvas-label" class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mt-3 mb-1.5">Fórmula desta coluna</p>';
                 html += '<div id="bw-formula-canvas" class="bw-canvas">' + htmlCanvasTokens() + '</div>';
                 html += '<p id="bw-formula-preview" class="mt-2 text-sm font-mono text-slate-800 break-all">' + esc(compilarTokensPreview(estado.formula_tokens || []) || 'Clique nos blocos acima.') + '</p>';

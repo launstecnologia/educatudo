@@ -552,11 +552,12 @@ class ResultadoAcademicoService
     }
 
     /**
-     * Avalia fórmula com códigos de bloco, max(), min() e chamada()/substituta().
+     * Avalia fórmula com códigos de bloco, max(), min(), chamada()/substituta() e composicao().
      * Extraído do boletim para ser a fonte única.
      *
      * chamada(base1, base2, …, substituta) = média das bases, preenchendo
      * só a primeira base ausente com a substituta (ex.: CH no lugar de PP ou PU).
+     * composicao(média, REC) = média se REC ausente; (média+REC)/2 se houver REC.
      *
      * @param array<string, float|int|string|null> $valoresPorCodigo
      * @return array{ok:bool,valor?:float,expressao?:string,erro?:string}
@@ -633,6 +634,7 @@ class ResultadoAcademicoService
 
         try {
             $expr = $this->expandirFuncoesChamada((string) $expr, $temNota);
+            $expr = $this->expandirFuncoesComposicao((string) $expr, $temNota);
         } catch (\Throwable $e) {
             return ['ok' => false, 'erro' => 'Erro na fórmula final: ' . $e->getMessage()];
         }
@@ -640,7 +642,7 @@ class ResultadoAcademicoService
         $expr = preg_replace_callback('/\b[a-zA-Z_][a-zA-Z0-9_]*\b/', function ($m) use ($valoresPorCodigo, $valoresPorCodigoInsensitive, $valoresPorCodigoNormalized, $normKey) {
             $token = $m[0];
             $tl = strtolower($token);
-            if ($tl === 'max' || $tl === 'min' || $tl === 'chamada' || $tl === 'substituta') {
+            if ($tl === 'max' || $tl === 'min' || $tl === 'chamada' || $tl === 'substituta' || $tl === 'composicao') {
                 return $token;
             }
             if (array_key_exists($token, $valoresPorCodigo) && is_numeric($valoresPorCodigo[$token])) {
@@ -717,6 +719,42 @@ class ResultadoAcademicoService
                     }
                 }
             }
+        }
+
+        return $expr;
+    }
+
+    /**
+     * composicao(média, REC) → se REC tem nota: (média+REC)/2; senão: só a média.
+     * Evita tratar REC ausente como 0 (que cortaria a média pela metade).
+     *
+     * @param callable(string):bool $temNota
+     */
+    private function expandirFuncoesComposicao(string $expr, callable $temNota): string
+    {
+        $guard = 0;
+        while (preg_match('/\bcomposicao\s*\(/i', $expr)) {
+            if (++$guard > 80) {
+                throw new \RuntimeException('Limite de aninhamento em composicao.');
+            }
+            if (!preg_match('/\bcomposicao\s*\(/i', $expr, $m, PREG_OFFSET_CAPTURE)) {
+                break;
+            }
+            $startFn = (int) $m[0][1];
+            $openParen = $startFn + strlen($m[0][0]) - 1;
+            [$args, $closePos] = $this->extrairArgumentosFuncao($expr, $openParen);
+            if (count($args) !== 2) {
+                throw new \RuntimeException('composicao precisa de 2 argumentos: composicao(média, REC).');
+            }
+            $media = trim((string) $args[0]);
+            $rec = trim((string) $args[1]);
+            $ehIdent = (bool) preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $rec);
+            if ($ehIdent && !$temNota($rec)) {
+                $substituicao = '(' . $media . ')';
+            } else {
+                $substituicao = '((' . $media . ')+(' . $rec . '))/2';
+            }
+            $expr = substr($expr, 0, $startFn) . $substituicao . substr($expr, $closePos + 1);
         }
 
         return $expr;
