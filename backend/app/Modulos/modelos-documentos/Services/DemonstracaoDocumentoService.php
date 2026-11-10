@@ -94,10 +94,22 @@ class DemonstracaoDocumentoService
                 $vars['quadro_notas_html'] = '';
                 $out['html_quadro'] = '';
                 $anoBoletim = $this->anoDoBoletim($boletimId);
+                $regraDbg = 0;
+                try {
+                    if (class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)) {
+                        $regraDbg = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
+                            ->resolverRegraImpressaoDoBoletim($boletimId);
+                    }
+                } catch (\Throwable $e) {
+                    $regraDbg = 0;
+                }
+                $out['debug_regra_impressao'] = $regraDbg > 0 ? $regraDbg : null;
                 if ($anoBoletim > 0 && $ano > 0 && $anoBoletim !== $ano) {
                     $out['resumo'] = 'Boletim vinculado (ano ' . $anoBoletim . '). Escolha uma aluna de ' . $anoBoletim . ' para ver a prévia do quadro.';
+                } elseif ($regraDbg > 0) {
+                    $out['resumo'] = 'Boletim vinculado (regra #' . $regraDbg . '), mas o quadro veio vazio para esta aluna. Confira notas/demonstrativo no assistente.';
                 } else {
-                    $out['resumo'] = 'Boletim vinculado. Se a prévia não aparecer, abra o assistente desse boletim, monte o quadro e conclua.';
+                    $out['resumo'] = 'Boletim vinculado sem regra de impressão. Abra o assistente desse boletim, monte o quadro e conclua.';
                 }
             }
         } else {
@@ -212,27 +224,21 @@ class DemonstracaoDocumentoService
             error_log('DemonstracaoDocumento quadro boletim: ' . $e->getMessage());
         }
 
-        // Fallback Santa Maria (PP/PU/CH…): se o assistente não resolveu a regra de impressão.
+        // Fallback Santa Maria (PP/PU/CH…) e demais quadros gerados do ano.
         try {
             $ano = $this->anoDoBoletim($boletimId);
             if ($ano <= 0) {
                 return '';
             }
-            $nome = $this->nomeDoBoletim($boletimId);
-            $pareceSm = $nome !== '' && (
-                str_contains(mb_strtolower($nome), 'santa maria')
-                || str_contains(mb_strtolower($nome), 'santa_maria')
-            );
-            if (!$pareceSm) {
-                return '';
-            }
             $quadro = (new QuadroBoletimSantaMariaService($this->db))->montarHtml($alunoId, $ano);
             $htmlSm = trim((string) ($quadro['html'] ?? ''));
-            return ((int) ($quadro['linhas'] ?? 0) > 0 && $htmlSm !== '') ? $htmlSm : '';
+            if ((int) ($quadro['linhas'] ?? 0) > 0 && $htmlSm !== '') {
+                return $htmlSm;
+            }
         } catch (\Throwable $e) {
             error_log('DemonstracaoDocumento quadro Santa Maria: ' . $e->getMessage());
-            return '';
         }
+        return '';
     }
 
     private function nomeDoBoletim(int $boletimId): string

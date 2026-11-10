@@ -690,7 +690,84 @@ class ProntuarioVidaEscolarService
             return $viaLayout;
         }
 
-        return $this->regraIdImpressaoPorNomeAnoDoBoletim($boletim, $regraCadastro);
+        $viaNome = $this->regraIdImpressaoPorNomeAnoDoBoletim($boletim, $regraCadastro);
+        if ($viaNome > 0) {
+            return $viaNome;
+        }
+
+        return $this->resolverRegraImpressaoFolgaDoAno($boletimId);
+    }
+
+    /**
+     * Folga: qualquer regra de impressão do ano com quadro montado (assistente),
+     * preferindo nome parecido com o boletim. Cobre cadastro em que boletim_id não foi gravado.
+     */
+    private function resolverRegraImpressaoFolgaDoAno(int $boletimId): int
+    {
+        if ($boletimId <= 0) {
+            return 0;
+        }
+        try {
+            $boletim = $this->db->fetch(
+                'SELECT id, nome, ano_letivo, regra_id
+                 FROM boletins
+                 WHERE id = :id
+                 LIMIT 1',
+                ['id' => $boletimId]
+            );
+        } catch (\Throwable $e) {
+            return 0;
+        }
+        if (!is_array($boletim)) {
+            return 0;
+        }
+        $ano = (int) ($boletim['ano_letivo'] ?? 0);
+        $nomeBol = strtolower(trim((string) ($boletim['nome'] ?? '')));
+        $regraCadastro = (int) ($boletim['regra_id'] ?? 0);
+        if ($ano <= 0) {
+            return 0;
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT id, nome, extras_json, updated_at
+                 FROM boletim_regras
+                 WHERE ativo = 1
+                   AND exibir_em = 'boletim'
+                   AND ano_letivo = :ano
+                 ORDER BY updated_at DESC, id DESC
+                 LIMIT 250",
+                ['ano' => $ano]
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return 0;
+        }
+
+        $comNome = [];
+        $qualquer = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $extras = json_decode((string) ($row['extras_json'] ?? ''), true);
+            if (!is_array($extras)) {
+                $extras = [];
+            }
+            $origem = strtolower(trim((string) ($extras['origem'] ?? '')));
+            $temQuadro = in_array($origem, ['quadro-impressao', 'santa-maria', 'composto'], true)
+                || !empty($extras['quadro_livre'])
+                || (!empty($extras['linhas_layout']) && is_array($extras['linhas_layout']));
+            if (!$temQuadro) {
+                continue;
+            }
+            $qualquer[] = $row;
+            $nomeRegra = strtolower(trim((string) ($row['nome'] ?? '')));
+            if ($nomeBol !== '' && $nomeRegra !== '' && $this->nomesBoletimParecidos($nomeBol, $nomeRegra)) {
+                $comNome[] = $row;
+            }
+        }
+
+        $escolhido = $this->escolherMelhorRegraImpressao($comNome !== [] ? $comNome : $qualquer, $regraCadastro);
+        return $escolhido;
     }
 
     /**
