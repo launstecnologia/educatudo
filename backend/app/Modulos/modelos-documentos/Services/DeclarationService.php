@@ -129,7 +129,7 @@ class DeclarationService
              LIMIT 1",
             [$alunoId]
         );
-        return $row ?: null;
+        return $this->completarDadosTurma($row ?: null);
     }
 
     /**
@@ -154,7 +154,7 @@ class DeclarationService
              LIMIT 1",
             [$alunoId]
         );
-        return $row ?: null;
+        return $this->completarDadosTurma($row ?: null);
     }
 
     /**
@@ -216,7 +216,7 @@ class DeclarationService
         }
         try {
             $rows = $this->db->fetchAll(
-                "SELECT r.nome, r.cpf, r.email, r.telefone, ar.tipo_vinculo, ar.is_financeiro
+                "SELECT r.*, ar.tipo_vinculo, ar.is_financeiro
                  FROM alunos_responsaveis ar
                  INNER JOIN responsaveis r ON r.id = ar.responsavel_id
                  WHERE ar.aluno_id = ? AND ar.ativo = 1
@@ -313,6 +313,30 @@ class DeclarationService
             error_log('DeclarationService registrarEmissao: ' . $e->getMessage());
             return 0;
         }
+    }
+
+    /** Preserva a turma da matrícula consultada, inclusive nas emissões históricas. */
+    private function completarDadosTurma(?array $matricula): ?array
+    {
+        if (!$matricula || (int) ($matricula['turma_id'] ?? 0) <= 0) return $matricula;
+        try {
+            $turma = $this->db->fetch('SELECT * FROM turmas WHERE id = ? LIMIT 1', [(int) $matricula['turma_id']]);
+            if (!is_array($turma)) return $matricula;
+            $matricula['turno'] = (string) ($turma['turno'] ?? '');
+            $cursoId = (int) ($turma['curso_novo_id'] ?? 0);
+            if ($cursoId > 0) {
+                $curso = $this->db->fetch('SELECT nome FROM curso WHERE id = ? LIMIT 1', [$cursoId]);
+                $matricula['curso_nome'] = (string) ($curso['nome'] ?? '');
+            }
+            $serieId = (int) ($turma['serie_id'] ?? 0);
+            if ($serieId > 0) {
+                $serie = $this->db->fetch('SELECT nome FROM serie WHERE id = ? LIMIT 1', [$serieId]);
+                if (!empty($serie['nome'])) $matricula['turma_serie'] = (string) $serie['nome'];
+            }
+        } catch (\Throwable $e) {
+            // Esquemas antigos mantêm os dados já disponíveis na matrícula.
+        }
+        return $matricula;
     }
 
     private function tabelaExiste(string $tabela): bool

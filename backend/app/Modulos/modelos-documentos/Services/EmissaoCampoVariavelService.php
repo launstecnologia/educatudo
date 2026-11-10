@@ -206,6 +206,7 @@ class EmissaoCampoVariavelService
             'cidade_data' => $this->cidadeData(is_array($unidade) ? $unidade : null),
         ];
         $vars = $this->modelos->varsFromDeclaracao($viewData);
+        $vars = $this->modelos->aplicarFonteBoletimDoModelo($modelo, $vars, $alunoId, (int) ($viewData['dados']['matricula']['turma_id'] ?? $aluno['turma_id'] ?? 0), (int) ($viewData['dados']['matricula']['ano_letivo'] ?? 0));
         $vars = $this->modelos->mesclarCamposVariaveis($vars, $campos, $valores);
         return $this->modelos->renderHtml($modelo, $vars, 'auto', $config);
     }

@@ -85,6 +85,7 @@ class DemonstracaoDocumentoService
         $vars = ModeloDocumentoService::varsExemplo();
         $vars = $this->sobreporEscola($vars);
         $vars = $this->sobreporAlunoTurma($vars, $aluno, $turma);
+        $vars = array_replace($vars, ModeloDocumentoService::varsResponsaveis((new DeclarationService($this->db))->getResponsaveis($alunoId)));
         $vars['_grade_fonte'] = ['componentes' => $linhas];
         $vars = GradeSoltaService::completar($this->gradeDaDemonstracao($chave, $atalhos), $vars);
         unset($vars['_grade_fonte']);
@@ -131,7 +132,13 @@ class DemonstracaoDocumentoService
         $out['modelo_quadro_html'] = $editavel['celulas'] > 0 ? $editavel['html'] : '';
         $vars = array_replace($vars, $editavel['variaveis']);
         $out['vars'] = $this->variaveisTexto($vars);
-        $out['componentes'] = $atalhos;
+        $academico = CamposAcademicosDocumentoService::doQuadro((string) ($vars['quadro_notas_html'] ?? ''));
+        if ($academico['componentes'] !== []) {
+            $out['componentes'] = $academico['componentes'];
+            $out['vars'] = array_replace($out['vars'], $academico['vars']);
+        } else {
+            $out['componentes'] = $atalhos;
+        }
         if (($out['resumo'] ?? '') === '') {
             $out['resumo'] = trim((string) ($aluno['nome_exibir'] ?? '')) . ' · ' . $this->rotuloTurma($turma);
         }
@@ -536,8 +543,8 @@ class DemonstracaoDocumentoService
         if (!$this->tabelaExiste('matricula') || !$this->tabelaExiste('alunos')) {
             return null;
         }
-        $cols = ['a.id', 'a.nome'];
-        foreach (['nome_social', 'cpf', 'rg', 'data_nasc', 'email', 'ra', 'codigo_aluno', 'sexo', 'celular', 'telefone'] as $col) {
+        $cols = ['a.id', 'a.nome', 'm.id AS matricula_numero'];
+        foreach (['nome_social', 'cpf', 'rg', 'data_nasc', 'email', 'ra', 'codigo_aluno', 'sexo', 'celular', 'telefone', 'foto_url', 'endereco', 'cidade', 'nome_mae', 'nome_pai', 'naturalidade', 'nacionalidade', 'bairro', 'cep', 'uf', 'estado'] as $col) {
             if ($this->temColuna('alunos', $col)) {
                 $cols[] = 'a.' . $col;
             }
@@ -744,6 +751,14 @@ class DemonstracaoDocumentoService
         $nasc = $this->dataBr((string) ($aluno['data_nasc'] ?? ''));
         $cpf = trim((string) ($aluno['cpf'] ?? ''));
         $tel = trim((string) ($aluno['celular'] ?? $aluno['telefone'] ?? ''));
+        $vars['matricula_numero'] = $esc($aluno['matricula_numero'] ?? '—');
+        $vars['aluno_foto_html'] = (new ModeloDocumentoService($this->db))->fotoAlunoHtml($aluno);
+        $vars['aluno_endereco'] = $esc($aluno['endereco'] ?? '—');
+        foreach (['nome_mae', 'nome_pai', 'bairro', 'cep', 'uf'] as $campo) $vars['aluno_' . $campo] = $esc($aluno[$campo] ?? '—');
+        $vars['aluno_cidade'] = $esc($aluno['cidade'] ?? '—');
+        $vars['aluno_filiacao'] = $esc(trim(($aluno['nome_mae'] ?? '') . ' / ' . ($aluno['nome_pai'] ?? ''), ' /'));
+        $vars['aluno_naturalidade'] = $esc($aluno['naturalidade'] ?? '—');
+        $vars['aluno_nacionalidade'] = $esc($aluno['nacionalidade'] ?? '—');
         $vars['aluno_nome'] = $esc($nome !== '' ? $nome : '—');
         $vars['aluno_nome_civil'] = $esc($civil !== '' ? $civil : '—');
         $vars['aluno_cpf'] = $esc($cpf !== '' ? $cpf : '—');
@@ -791,7 +806,7 @@ class DemonstracaoDocumentoService
             return $vars;
         }
         $campos = [];
-        foreach (['nome', 'nome_fantasia', 'razao_social', 'cnpj', 'telefone', 'cidade', 'municipio', 'endereco', 'logradouro', 'numero', 'bairro', 'nre'] as $col) {
+        foreach (['nome', 'nome_fantasia', 'razao_social', 'cnpj', 'telefone', 'cidade', 'municipio', 'endereco', 'logradouro', 'numero', 'bairro', 'nre', 'email', 'codigo_inep', 'inep', 'cep', 'uf', 'estado'] as $col) {
             if ($this->temColuna('unidades', $col)) {
                 $campos[] = $col;
             }
@@ -809,6 +824,9 @@ class DemonstracaoDocumentoService
             return $vars;
         }
         $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
+        foreach (['email', 'numero', 'bairro', 'cep', 'uf'] as $campo) $vars['escola_' . $campo] = $esc($row[$campo] ?? '—');
+        $vars['escola_inep'] = $esc($row['codigo_inep'] ?? $row['inep'] ?? '—');
+        $vars['escola_logradouro'] = $esc($row['logradouro'] ?? $row['endereco'] ?? '—');
         $nome = trim((string) ($row['nome_fantasia'] ?? ''));
         if ($nome === '') {
             $nome = trim((string) ($row['nome'] ?? ''));

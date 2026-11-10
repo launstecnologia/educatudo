@@ -1,5 +1,7 @@
 # Tasks — backlog atual
 
+- [ ] Editor de documentos: organizar campos por Cadastro (aluno, responsáveis, escola, turma, série, curso e matrícula), Acadêmico e Documento; incluir foto do aluno; autorização como campos da emissão; notas/eventos e resultado final do boletim. Plano: catálogo e menu → valores reais e emissão → testes e revisão PHP. — 2026-11-10
+
 - [x] Secretaria/Documentos: excluir modelos oficiais do catálogo, incluindo códigos personalizados vinculados a boletim, histórico, ficha, ata ou relatório final; impedir emissão direta nesse painel. 17 testes PHP (18 asserções), lint e code-reviewer aprovados. — 2026-11-10
 
 - [x] Documentos: preservar na declaração emitida o motor PDF, margens e espaçamento da prévia; corrigir logo ausente no ZIP por falta do contexto de mídia do tenant no cron. 3 testes PHP (11 asserções), lint e code-reviewer aprovados; conferência em produção após deploy. — 2026-11-10

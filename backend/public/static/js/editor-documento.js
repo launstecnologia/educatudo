@@ -4892,8 +4892,9 @@
           html += '<button type="button" data-drag-var="' + esc(nota) + '" title="Nota de ' + esc(p.rotulo || '') + '">' + esc(String(p.n)) + 'º</button>';
           html += '<button type="button" data-drag-var="' + esc(falta) + '" title="Falta de ' + esc(p.rotulo || '') + '">F' + esc(String(p.n)) + '</button>';
         });
-        html += '<button type="button" data-drag-var="' + esc(c.media || ('media_final_' + c.slug)) + '">Média</button>';
-        html += '<button type="button" data-drag-var="' + esc(c.media || ('media_final_' + c.slug)) + '" title="Resultado final da disciplina">Resultado</button>';
+        html += '<button type="button" data-drag-var="' + esc(c.media || ('media_final_' + c.slug)) + '">Média final do boletim</button>';
+        html += '<button type="button" data-drag-var="' + esc('media_anual_' + c.slug) + '">Média anual</button>';
+        (c.eventos || []).forEach(function (evento) { html += '<button type="button" data-drag-var="' + esc(evento.chave) + '" title="' + esc(evento.rotulo) + '">' + esc(evento.rotulo) + '</button>'; });
         html += '</div></div>';
       });
       comps.innerHTML = html;
@@ -5062,8 +5063,8 @@
       if (busca && !abertos) abertos = $all('details', $('#pane-elementos')).map(function (g) { return { node: g, open: g.open }; });
       grupos.forEach(function (grupo) {
         var encontrados = 0;
-        $all('[data-drag-type], [data-drag-layout]', grupo).forEach(function (item) {
-          var texto = item.textContent + ' ' + (item.getAttribute('title') || '') + ' ' + (item.getAttribute('data-drag-type') || '');
+        $all('[data-drag-type], [data-drag-layout], [data-drag-var], [data-emissao-preset]', grupo).forEach(function (item) {
+          var texto = item.textContent + ' ' + (item.getAttribute('title') || '') + ' ' + (item.getAttribute('data-drag-type') || '') + ' ' + (item.getAttribute('data-drag-var') || '') + ' ' + (item.getAttribute('data-var-nome') || '');
           item.hidden = !!busca && normalizarBusca(texto).indexOf(busca) < 0;
           if (!item.hidden) encontrados++;
         });
@@ -5192,6 +5193,19 @@
       });
     });
     $all('[data-drag-var]').forEach(ligarArrasteVariavel);
+    $all('[data-emissao-preset]').forEach(function (botao) {
+      botao.addEventListener('click', function () {
+        var campo = JSON.parse(botao.getAttribute('data-emissao-preset'));
+        var campos = state.estrutura.campos_variaveis || [];
+        if (!campoVariavelPorChave(campo.chave)) {
+          if (campos.length >= 24) { setStatus('O modelo já tem 24 campos da emissão.'); return; }
+          state.estrutura.campos_variaveis = camposVariaveisValidos(campos.concat([campo]));
+        }
+        insertVariavelIntoSelection(campo.chave);
+        pintarCamposVariaveis();
+        setStatus('Campo adicionado. O valor será preenchido ao emitir.');
+      });
+    });
   }
 
   function ligarArrasteVariavel(el) {

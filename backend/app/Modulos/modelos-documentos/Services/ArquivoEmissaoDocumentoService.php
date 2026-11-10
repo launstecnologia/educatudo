@@ -41,7 +41,7 @@ class ArquivoEmissaoDocumentoService
         }
         try {
             $rows = $this->db->fetchAll(
-                'SELECT id, nome, codigo, estrutura_json
+                'SELECT id, nome, codigo, estrutura_json, cabecalho_html, corpo_html, rodape_html
                  FROM secretaria_modelos_documentos
                  WHERE ativo = 1
                  ORDER BY nome ASC'
@@ -59,13 +59,7 @@ class ArquivoEmissaoDocumentoService
             if (ModeloDocumentoService::modeloEhDocumentoOficial($row)) {
                 continue;
             }
-            $campos = [];
-            if (isset($row['estrutura_json'])) {
-                $est = json_decode((string) $row['estrutura_json'], true);
-                $campos = ModeloDocumentoService::camposVariaveisValidos(
-                    is_array($est) ? ($est['campos_variaveis'] ?? null) : null
-                );
-            }
+            $campos = $this->modelos->camposDoModelo($row);
             $out[] = [
                 'id' => (int) ($row['id'] ?? 0),
                 'nome' => (string) ($row['nome'] ?? ''),

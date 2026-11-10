@@ -307,3 +307,31 @@ test('expõe tabela inteira com campos dinâmicos sem aplicar até confirmar', a
   await expect(page.locator('#edoc-status')).toHaveText('Salvo automaticamente');
   expect(ultimoSalvo.estrutura.body.sections[0].columns[0].elements[0].props.html).toContain('{{boletim_celula_t1_m17_b1_pp}}');
 });
+
+test('cadastro organiza os campos individuais e a busca encontra foto e responsáveis', async ({ page }) => {
+  await expect(page.getByText('Dados automáticos', { exact: true })).toHaveCount(0);
+  await page.getByLabel('O que você quer adicionar?').fill('foto do aluno');
+  await expect(page.locator('[data-drag-var="aluno_foto_html"]:visible')).toHaveCount(1);
+  await expect(page.getByText('Cadastro', { exact: true })).toBeVisible();
+  await page.getByLabel('O que você quer adicionar?').fill('');
+  const cadastro = page.locator('.edoc-tool-group').filter({ has: page.locator('summary > span', { hasText: /^Cadastro$/ }) });
+  await cadastro.locator(':scope > summary').click();
+  for (const nome of ['Aluno', 'Pais e responsáveis', 'Escola', 'Turma', 'Série', 'Curso', 'Matrícula']) {
+    await expect(cadastro.locator('summary').filter({ hasText: new RegExp('^' + nome + '$') })).toBeVisible();
+  }
+});
+
+test('autorização adiciona campo de emissão obrigatório sem duplicar a definição', async ({ page }) => {
+  await page.getByLabel('O que você quer adicionar?').fill('Local');
+  const preset = page.locator('[data-emissao-preset]').filter({ hasText: /^Local/ });
+  await preset.click();
+  await expect(page.locator('#edoc-paper')).toContainText('Local');
+  await preset.click();
+  await page.locator('#edoc-save').click();
+  await expect(page.locator('#edoc-status')).toHaveText('Salvo automaticamente');
+  const campos = ultimoSalvo.estrutura.campos_variaveis;
+  expect(campos.filter((c: any) => c.chave === 'cv_aut_local')).toHaveLength(1);
+  expect(campos.find((c: any) => c.chave === 'cv_aut_local')).toMatchObject({ rotulo: 'Local', obrigatorio: true, mascara: 'texto' });
+  await page.reload();
+  expect(await page.evaluate(() => (window as any).EDOC.estrutura.campos_variaveis)).toContainEqual(expect.objectContaining({ chave: 'cv_aut_local' }));
+});

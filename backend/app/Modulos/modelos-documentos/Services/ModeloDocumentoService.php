@@ -15,10 +15,18 @@ class ModeloDocumentoService
         'escola_cnpj_numero' => 'CNPJ (somente número/formatado)',
         'escola_endereco' => 'Endereço',
         'escola_docs' => 'CNPJ / INEP / telefone',
+        'escola_email' => 'E-mail da escola',
+        'escola_inep' => 'Código INEP da escola',
+        'escola_logradouro' => 'Logradouro da escola',
+        'escola_numero' => 'Número do endereço da escola',
+        'escola_bairro' => 'Bairro da escola',
+        'escola_cep' => 'CEP da escola',
+        'escola_uf' => 'Estado (UF) da escola',
         'escola_origem' => 'Escola de origem do aluno',
         'logo_html' => 'Logo (HTML img)',
         'aluno_nome' => 'Nome do aluno (social, se houver)',
         'aluno_nome_civil' => 'Nome civil do aluno',
+        'aluno_foto_html' => 'Foto do aluno',
         'aluno_cpf' => 'CPF do aluno',
         'aluno_rg' => 'RG do aluno',
         'aluno_cpf_frase' => 'Frase “, CPF nº …”',
@@ -28,6 +36,11 @@ class ModeloDocumentoService
         'aluno_telefone' => 'Telefone do aluno',
         'aluno_endereco' => 'Endereço do aluno',
         'aluno_cidade' => 'Cidade do aluno',
+        'aluno_nome_mae' => 'Nome da mãe',
+        'aluno_nome_pai' => 'Nome do pai',
+        'aluno_bairro' => 'Bairro do aluno',
+        'aluno_cep' => 'CEP do aluno',
+        'aluno_uf' => 'Estado (UF) do aluno',
         'aluno_codigo' => 'Código do aluno',
         'aluno_ra' => 'RA do aluno',
         'matricula_numero' => 'Número de matrícula',
@@ -1046,7 +1059,7 @@ class ModeloDocumentoService
                 'label' => 'Escola',
                 'chaves' => [
                     'escola_nome', 'escola_cnpj', 'escola_cnpj_numero', 'escola_endereco',
-                    'escola_docs', 'escola_origem', 'logo_html', 'razao_social', 'cnpj_layout',
+                    'escola_email', 'escola_inep', 'escola_logradouro', 'escola_numero', 'escola_bairro', 'escola_cep', 'escola_uf', 'escola_docs', 'escola_origem', 'logo_html', 'razao_social', 'cnpj_layout',
                     'rodape_unidades', 'escola_telefone', 'escola_municipio', 'escola_nre',
                     'entidade_mantenedora',
                 ],
@@ -1054,9 +1067,9 @@ class ModeloDocumentoService
             'aluno' => [
                 'label' => 'Aluno',
                 'chaves' => [
-                    'aluno_nome', 'aluno_cpf', 'aluno_rg', 'aluno_cpf_frase', 'aluno_data_nasc',
+                    'aluno_nome', 'aluno_nome_civil', 'aluno_foto_html', 'aluno_filiacao', 'aluno_naturalidade', 'aluno_nacionalidade', 'aluno_cpf', 'aluno_rg', 'aluno_cpf_frase', 'aluno_data_nasc',
                     'aluno_nasc_frase', 'aluno_email', 'aluno_telefone', 'aluno_endereco',
-                    'aluno_cidade', 'aluno_codigo', 'aluno_ra', 'matricula_numero', 'aluno_sexo', 'aluno_pais',
+                    'aluno_cidade', 'aluno_nome_mae', 'aluno_nome_pai', 'aluno_bairro', 'aluno_cep', 'aluno_uf', 'aluno_codigo', 'aluno_ra', 'matricula_numero', 'aluno_sexo', 'aluno_pais',
                 ],
             ],
             'responsavel' => [
@@ -1917,6 +1930,32 @@ class ModeloDocumentoService
         return $out;
     }
 
+    public static function varsResponsaveis(array $responsaveis): array
+    {
+        $out = [];
+        $financeiro = [];
+        foreach ($responsaveis as $r) {
+            if (!empty($r['is_financeiro'])) { $financeiro = $r; break; }
+        }
+        foreach (['resp_' => $responsaveis[0] ?? [], 'resp2_' => $responsaveis[1] ?? [], 'resp_fin_' => $financeiro] as $prefixo => $r) {
+            foreach (['nome', 'cpf', 'rg', 'email', 'telefone', 'celular', 'endereco', 'bairro', 'cep', 'cidade', 'estado_civil'] as $campo) {
+                $out[$prefixo . $campo] = htmlspecialchars((string) ($r[$campo] ?? '—'), ENT_QUOTES, 'UTF-8');
+            }
+            $out[$prefixo . 'parentesco'] = htmlspecialchars((string) ($r['tipo_vinculo'] ?? '—'), ENT_QUOTES, 'UTF-8');
+        }
+        $out['se_resp2'] = empty($responsaveis[1]) ? '' : '1';
+        $out['se_resp_fin'] = $financeiro === [] ? '' : '1';
+        return $out;
+    }
+
+    /** Sugestões editáveis que usam o mesmo fluxo dos campos da emissão. */
+    public static function camposAutorizacao(): array
+    {
+        $mascaras = ['data_comparecimento' => 'data', 'data_evento' => 'data', 'aut_horario' => 'hora', 'aut_hora_saida' => 'hora', 'aut_hora_retorno' => 'hora'];
+        $chaves = ['data_comparecimento', 'periodo_texto', 'data_evento', 'aut_horario', 'aut_motivo', 'aut_nome_autorizado', 'aut_documento', 'aut_parentesco', 'aut_local', 'aut_hora_saida', 'aut_hora_retorno', 'aut_finalidade'];
+        return array_map(static fn ($chave) => ['chave' => 'cv_' . $chave, 'rotulo' => self::PLACEHOLDERS[$chave], 'mascara' => $mascaras[$chave] ?? 'texto', 'obrigatorio' => true], $chaves);
+    }
+
     /**
      * @param array<string,mixed> $modelo
      * @return list<array{chave:string,rotulo:string,mascara:string,obrigatorio:bool}>
@@ -1924,7 +1963,17 @@ class ModeloDocumentoService
     public function camposDoModelo(array $modelo): array
     {
         $est = $this->estruturaDoModelo($modelo);
-        return self::camposVariaveisValidos($est['campos_variaveis'] ?? null);
+        $campos = self::camposVariaveisValidos($est['campos_variaveis'] ?? null);
+        $existentes = array_column($campos, 'chave');
+        $html = (json_encode($est) ?: '') . (string) ($modelo['corpo_html'] ?? '') . (string) ($modelo['cabecalho_html'] ?? '') . (string) ($modelo['rodape_html'] ?? '');
+        foreach (self::camposAutorizacao() as $campo) {
+            $alias = substr($campo['chave'], 3);
+            if (preg_match('/\{\{\s*' . preg_quote($alias, '/') . '\s*\}\}/', $html) && !in_array($campo['chave'], $existentes, true)) {
+                $campos[] = $campo;
+                $existentes[] = $campo['chave'];
+            }
+        }
+        return self::camposVariaveisValidos($campos);
     }
 
     /**
@@ -2063,6 +2112,9 @@ class ModeloDocumentoService
                 throw new \InvalidArgumentException('Preencha o campo ' . $rotulo . '.');
             }
             $vars[$chave] = htmlspecialchars($formatado, ENT_QUOTES, 'UTF-8');
+            if (in_array($chave, array_column(self::camposAutorizacao(), 'chave'), true)) {
+                $vars[substr($chave, 3)] = $vars[$chave];
+            }
         }
         return $vars;
     }
@@ -2552,6 +2604,9 @@ class ModeloDocumentoService
             }
         }
 
+        if (isset($vars['_foto_aluno_ref'])) {
+            $vars['aluno_foto_html'] = $this->fotoAlunoHtml(['foto_url' => $vars['_foto_aluno_ref']], $config);
+        }
         if (trim((string) ($vars['logo_html'] ?? '')) === '') {
             $unidadeParaLogo = is_array($unidadeAssinatura) ? $unidadeAssinatura : null;
             if ($unidadeParaLogo === null) {
@@ -2971,6 +3026,34 @@ HTML;
         return '';
     }
 
+    /** Lê somente o avatar no storage do tenant; não busca imagens externas. */
+    public function fotoAlunoHtml(array $aluno, ?array $config = null): string
+    {
+        $ref = trim((string) ($aluno['foto_url'] ?? ''));
+        if ($ref === '') return '';
+        $url = parse_url($ref);
+        if (!is_array($url)) return '';
+        parse_str((string) ($url['query'] ?? ''), $query);
+        if (($query['type'] ?? '') !== 'avatars') return '';
+        $key = (string) ($query['key'] ?? '');
+        if (!preg_match('/^[a-zA-Z0-9_.-]+$/D', $key) || str_contains($key, '..')) return '';
+        if ($config === null) {
+            $config = require dirname(__DIR__, 4) . '/config/app.php';
+        }
+        $slug = $this->slugTenantAtual($config);
+        if ($slug === '' || (!empty($query['tenant']) && strcasecmp((string) $query['tenant'], $slug) !== 0)) return '';
+        $config['tenant']['slug'] = $slug;
+        try {
+            $bin = (new \App\Services\MediaStorageService($config))->getContents('avatars', $key);
+            if (!is_string($bin) || strlen($bin) > 10 * 1024 * 1024) return '';
+            $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bin);
+            if (!in_array($mime, ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], true) || @getimagesizefromstring($bin) === false) return '';
+            return '<img src="data:' . $mime . ';base64,' . base64_encode($bin) . '" alt="Foto do aluno" style="width:25mm;height:30mm;object-fit:cover;max-width:100%;">';
+        } catch (\Throwable $e) {
+            return '';
+        }
+    }
+
     private function htmlImgLogo(string $src): string
     {
         return '<img src="' . htmlspecialchars($src, ENT_QUOTES, 'UTF-8')
@@ -3335,18 +3418,27 @@ HTML;
             $dataEvento = '';
         }
 
-        return [
+        return array_replace([
             'escola_nome' => $esc($nomeUnidade),
             'escola_cnpj' => trim((string) ($unidade['cnpj'] ?? '')) !== ''
                 ? $esc('CNPJ: ' . $unidade['cnpj']) : '',
             'escola_endereco' => $esc($linhaEndereco),
             'escola_docs' => $esc($linhaDocs),
+            'escola_email' => $esc($unidade['email'] ?? '—'),
+            'escola_inep' => $esc($unidade['codigo_inep'] ?? $unidade['inep'] ?? '—'),
+            'escola_logradouro' => $esc($unidade['logradouro'] ?? $unidade['endereco'] ?? '—'),
+            'escola_numero' => $esc($unidade['numero'] ?? '—'),
+            'escola_bairro' => $esc($unidade['bairro'] ?? '—'),
+            'escola_cep' => $esc($unidade['cep'] ?? '—'),
+            'escola_uf' => $esc($unidade['uf'] ?? $unidade['estado'] ?? '—'),
             'escola_telefone' => $esc(trim((string) ($unidade['telefone'] ?? '')) ?: '—'),
             'escola_municipio' => $esc(trim((string) ($unidade['cidade'] ?? $unidade['municipio'] ?? '')) ?: '—'),
             'escola_nre' => $esc(trim((string) ($unidade['nre'] ?? '')) ?: '—'),
             'entidade_mantenedora' => $esc(trim((string) ($unidade['mantenedora'] ?? $unidade['razao_social'] ?? '')) ?: '—'),
             'logo_html' => $logoHtml,
             'aluno_nome' => $esc($alunoNome),
+            '_foto_aluno_ref' => (string) ($aluno['foto_url'] ?? ''),
+            'aluno_foto_html' => '',
             'aluno_nome_civil' => $esc($alunoNomeCivil !== '' ? $alunoNomeCivil : '—'),
             'aluno_cpf' => $esc($alunoCpf !== '' ? $alunoCpf : '—'),
             'aluno_rg' => $esc($alunoRg !== '' ? $alunoRg : '—'),
@@ -3356,10 +3448,21 @@ HTML;
             'aluno_email' => $esc($aluno['email'] ?? '—'),
             'aluno_telefone' => $esc($alunoTelefone !== '' ? $alunoTelefone : '—'),
             'aluno_endereco' => $esc($alunoEndereco !== '' ? $alunoEndereco : '—'),
+            'aluno_nome_mae' => $esc($aluno['nome_mae'] ?? '—'),
+            'aluno_nome_pai' => $esc($aluno['nome_pai'] ?? '—'),
+            'aluno_bairro' => $esc($aluno['bairro'] ?? '—'),
+            'aluno_cep' => $esc($aluno['cep'] ?? '—'),
+            'aluno_uf' => $esc($aluno['uf'] ?? $aluno['estado'] ?? '—'),
             'aluno_cidade' => $esc($alunoCidade !== '' ? $alunoCidade : '—'),
             'aluno_codigo' => $esc(trim((string) ($aluno['codigo_aluno'] ?? '')) ?: '—'),
             'aluno_ra' => $esc(trim((string) ($aluno['ra'] ?? '')) ?: '—'),
             'aluno_sexo' => $esc(self::rotuloSexo((string) ($aluno['sexo'] ?? ''))),
+            'aluno_filiacao' => $esc(trim((string) ($aluno['nome_mae'] ?? $aluno['mae'] ?? '')) . (empty($aluno['nome_pai'] ?? $aluno['pai'] ?? '') ? '' : ' / ' . ($aluno['nome_pai'] ?? $aluno['pai']))),
+            'aluno_naturalidade' => $esc($aluno['naturalidade'] ?? '—'),
+            'aluno_nacionalidade' => $esc($aluno['nacionalidade'] ?? '—'),
+            'curso_nome' => $esc($mat['curso_nome'] ?? $aluno['curso_nome'] ?? '—'),
+            'turno' => $esc($mat['turno'] ?? $aluno['turno'] ?? '—'),
+            'matricula_numero' => $esc($mat['numero_matricula'] ?? $mat['id'] ?? '—'),
             'aluno_pais' => $esc(trim((string) ($aluno['pais'] ?? $aluno['pais_origem'] ?? '')) ?: 'Brasil'),
             'resp_nome' => $esc($respNome !== '' ? $respNome : '________________________'),
             'resp_cpf' => $esc($resp0['cpf'] ?? '—'),
@@ -3411,7 +3514,7 @@ HTML;
             'aut_finalidade' => $esc($aut['finalidade'] ?? ''),
             'responsaveis_html' => $respHtml,
             'historico_html' => '',
-        ];
+        ], self::varsResponsaveis($responsaveis));
     }
 
     /**
@@ -3564,6 +3667,7 @@ HTML;
             'assinante_nome' => 'Diretor(a) Exemplo',
             'assinante_cargo' => 'Direção',
             'logo_html' => '',
+            'aluno_foto_html' => '<span style="display:inline-block;width:25mm;height:30mm;border:1px solid #ccc;text-align:center;padding-top:10mm;box-sizing:border-box;">Foto do aluno</span>',
             'quadro_notas_html' => self::htmlQuadroNotasAmostra(),
             'identidade_html' => '<table class="dados"><tr><td class="label">Nome</td><td>Maria Eduarda Silva</td></tr><tr><td class="label">CPF</td><td>123.456.789-00</td></tr></table>',
             'trajetoria_html' => '<table class="dados"><tr><td>2024</td><td>8º Ano</td><td>EMEF Exemplo</td><td>externo</td><td>Aprovado</td></tr></table>',
@@ -3595,7 +3699,7 @@ HTML;
         ];
         foreach ($amostra as $k => $v) {
             $htmlKeys = [
-                'logo_html', 'frequencia_html', 'info_pertinente_html', 'responsaveis_html',
+                'aluno_foto_html', 'logo_html', 'frequencia_html', 'info_pertinente_html', 'responsaveis_html',
                 'historico_html', 'quadro_notas_html', 'tabela_html',
                 'identidade_html', 'trajetoria_html', 'documentos_html', 'sed_html',
             ];
@@ -3613,6 +3717,10 @@ HTML;
             return '';
         }
 
+        if (preg_match('/\{\{\s*(?:nota_|falta_|media_final_|media_anual_|evento_)/i', $html)) {
+            $academico = CamposAcademicosDocumentoService::doQuadro((string) ($vars['quadro_notas_html'] ?? ''));
+            $vars = array_replace($vars, $academico['vars']);
+        }
         if (preg_match('/\{\{\s*boletim_celula_/i', $html) === 1) {
             $vars = array_replace($vars, QuadroBoletimEditavelService::variaveis((string) ($vars['quadro_notas_html'] ?? '')));
         }
