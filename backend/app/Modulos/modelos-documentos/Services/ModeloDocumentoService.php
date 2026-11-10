@@ -3726,7 +3726,10 @@ CSS;
   table.quadro-notas td.comp, table.quadro-notas th.comp { text-align: left; text-transform: none; letter-spacing: 0; color: #111827; font-weight: 600; }
   table.quadro-notas td.num { text-align: center; }
   table.quadro-notas td.final, table.quadro-notas th.final { font-weight: 600; }
-  .quadro-notas-wrap, .doc-quadro-fit { font-size: inherit; width: 100%; max-width: 100%; overflow: visible; }
+  .quadro-notas-wrap, .doc-quadro-fit {
+    font-size: 4.5pt; width: 100%; max-width: 100%; overflow: visible;
+    page-break-inside: avoid; break-inside: avoid;
+  }
   .quadro-notas-wrap .overflow-x-auto,
   .quadro-notas-wrap .overflow-auto,
   .doc-quadro-fit .overflow-x-auto,
@@ -3736,14 +3739,17 @@ CSS;
   .doc-quadro-fit table,
   .doc-quadro-fit .boletim-quadro-tabela {
     width: 100% !important; max-width: 100% !important; min-width: 0 !important;
-    table-layout: fixed !important; border-collapse: collapse; font-size: 5.5pt !important;
+    table-layout: fixed !important; border-collapse: collapse; font-size: 4.5pt !important;
+    page-break-inside: avoid; break-inside: avoid;
   }
   .quadro-notas-wrap th, .quadro-notas-wrap td,
   .doc-quadro-fit th, .doc-quadro-fit td {
-    padding: 1px 2px !important; font-size: inherit !important; line-height: 1.05;
+    padding: 0 1px !important; font-size: 4.5pt !important; line-height: 1.02;
     white-space: normal !important; word-break: break-word; overflow-wrap: anywhere;
-    min-width: 0 !important; border: 1px solid #6b7280; vertical-align: middle;
+    min-width: 0 !important; border: 0.4pt solid #6b7280; vertical-align: middle;
   }
+  .quadro-notas-wrap thead, .doc-quadro-fit thead { display: table-header-group; }
+  .quadro-notas-wrap tr, .doc-quadro-fit tr { page-break-inside: avoid; break-inside: avoid; }
   .doc-logo-el { max-width: 100%; }
   .doc-logo-el img {
     max-width: 100% !important; max-height: none !important;

@@ -1924,7 +1924,13 @@
     if (t === 'quebra_pagina') return '<div style="border-top:2px dashed #f59e0b;margin:12px 0;color:#b45309;font-size:10px;text-align:center">Quebra de página</div>';
     if (t === 'qrcode') return '<div class="edoc-logo-slot">QR</div>';
     if (t === 'boletim' || t === 'tabela_notas') {
+      var liveQuadro = String((varsDaFolha() || {}).quadro_notas_html || '').trim();
       var htmlBol = String((p.html || '')).trim();
+      // Com dados reais na folha, sempre mostra o quadro vivo da aluna (não HTML estático antigo).
+      if ((state.demo || state.preview) && liveQuadro) {
+        return '<div class="edoc-quadro-notas edoc-el-body" style="' + st + '">'
+          + sanitizeHtml(liveQuadro) + '</div>';
+      }
       if (htmlBol) {
         return '<div class="edoc-quadro-notas edoc-el-body" style="' + st + '">'
           + sanitizeHtml(ph(htmlBol)) + '</div>';
@@ -2318,28 +2324,50 @@
     });
   }
 
-  function atualizarLinkPdf() {
-    var a = $('#edoc-pdf');
-    if (!a || !C.previewUrl) return;
-    var url = C.previewUrl;
+  function capturarDemoSel() {
     var turma = $('#edoc-demo-turma');
     var aluno = $('#edoc-demo-aluno');
     var fonteBol = $('#edoc-fonte-boletim');
-    var tid = turma && turma.value ? turma.value : '';
-    var aid = aluno && aluno.value ? aluno.value : '';
+    var tid = turma && turma.value ? String(turma.value) : '';
+    var aid = aluno && aluno.value ? String(aluno.value) : '';
     var bid = fonteBol && fonteBol.value
       ? (parseInt(fonteBol.value, 10) || 0)
       : (parseInt((state.estrutura && state.estrutura.fonte_boletim_id) || 0, 10) || 0);
-    // Sempre leva turma/aluno/boletim — senão o PDF cai no quadro genérico Nota/Falta.
-    if (tid && aid) {
-      url += (url.indexOf('?') >= 0 ? '&' : '?')
-        + 'turma_id=' + encodeURIComponent(tid)
-        + '&aluno_id=' + encodeURIComponent(aid);
-      if (bid > 0) {
-        url += '&boletim_id=' + encodeURIComponent(String(bid));
-      }
+    return { turmaId: tid, alunoId: aid, boletimId: bid };
+  }
+
+  function registrarDemoSel(sel) {
+    if (!sel || !sel.turmaId || !sel.alunoId) return;
+    state.demoSel = {
+      turmaId: String(sel.turmaId),
+      alunoId: String(sel.alunoId),
+      boletimId: parseInt(sel.boletimId, 10) || 0
+    };
+  }
+
+  function urlPreviewComDemo(sel) {
+    if (!C.previewUrl) return '';
+    var url = C.previewUrl;
+    sel = sel || state.demoSel || capturarDemoSel();
+    var tid = sel.turmaId || '';
+    var aid = sel.alunoId || '';
+    var bid = parseInt(sel.boletimId, 10) || 0;
+    if (!tid || !aid) return url;
+    url += (url.indexOf('?') >= 0 ? '&' : '?')
+      + 'turma_id=' + encodeURIComponent(tid)
+      + '&aluno_id=' + encodeURIComponent(aid);
+    if (bid > 0) {
+      url += '&boletim_id=' + encodeURIComponent(String(bid));
     }
-    a.href = url;
+    return url;
+  }
+
+  function atualizarLinkPdf() {
+    var a = $('#edoc-pdf');
+    if (!a || !C.previewUrl) return;
+    // Prefere a última prévia carregada com sucesso (evita PDF da aluna errada).
+    var sel = (state.demoSel && state.demoSel.alunoId) ? state.demoSel : capturarDemoSel();
+    a.href = urlPreviewComDemo(sel);
   }
 
   function desenharReguas(pg) {
@@ -3903,12 +3931,19 @@
             setStatus('Carregue boletim e aluna na prévia antes de copiar o HTML.');
             return;
           }
+          // Mantém {{quadro_notas_html}} para a emissão trazer a aluna certa; só reaproveita <style> da prévia.
+          var estilos = '';
+          String(previa).replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, function (m) {
+            estilos += m;
+            return '';
+          });
           target.props = target.props || {};
-          target.props.html = previa;
+          target.props.html = estilos
+            + '<div class="quadro-notas-wrap doc-quadro-fit">{{quadro_notas_html}}</div>';
           sincronizarHtmlBoletimComEstilo(target);
           pushHist();
           render();
-          setStatus('HTML da prévia colado — ajuste e salve. Na emissão, prefira o modo dinâmico.');
+          setStatus('Estilos da prévia aplicados com {{quadro_notas_html}} dinâmico.');
         });
       }
     }
@@ -4610,6 +4645,12 @@
           C.varsPreview.quadro_notas_html = data.html_quadro;
           garantirPaisagemBoletim();
         }
+        registrarDemoSel({
+          turmaId: turma.value,
+          alunoId: aluno.value,
+          boletimId: boletimSelecionadoId()
+        });
+        atualizarLinkPdf();
         state.demo = !!(real && real.checked);
         if (boletimSelecionadoId() > 0) {
           garantirBlocoBoletimNaFolha();
@@ -4957,13 +4998,17 @@
     bindEmissao();
     onClick('#edoc-pdf', function (e) {
       e.preventDefault();
+      // Congela a aluna/turma da folha ANTES do save (select pode mudar no meio).
+      var snap = (state.demoSel && state.demoSel.alunoId) ? state.demoSel : capturarDemoSel();
+      if (!snap.turmaId || !snap.alunoId) {
+        setStatus('Escolha turma e aluna no card Boletim antes de pré-visualizar o PDF.');
+        return;
+      }
       save().then(function (j) {
         if (!j || !j.ok || !C.previewUrl) return;
-        // Garante turma/aluno/boletim na URL (mesmo da prévia na folha).
         state.demo = true;
-        atualizarLinkPdf();
-        var a = $('#edoc-pdf');
-        var base = (a && a.href) ? a.href : C.previewUrl;
+        registrarDemoSel(snap);
+        var base = urlPreviewComDemo(snap);
         var sep = base.indexOf('?') >= 0 ? '&' : '?';
         window.open(base + sep + 't=' + Date.now(), '_blank');
       });
