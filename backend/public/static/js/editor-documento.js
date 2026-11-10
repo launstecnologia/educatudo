@@ -3854,6 +3854,122 @@
     render();
   }
 
+  function indentarCssDocumento(css, nivel) {
+    var linhas = [];
+    var linha = '';
+    var profundidade = nivel;
+    var parenteses = 0;
+    var aspas = '';
+    var escapar = false;
+    function concluirLinha() {
+      if (linha.trim()) linhas.push('  '.repeat(Math.max(0, profundidade)) + linha.trim());
+      linha = '';
+    }
+    for (var i = 0; i < css.length; i++) {
+      var c = css[i];
+      if (aspas) {
+        linha += c;
+        if (escapar) escapar = false;
+        else if (c === '\\') escapar = true;
+        else if (c === aspas) aspas = '';
+        continue;
+      }
+      if (c === '"' || c === "'") { aspas = c; linha += c; continue; }
+      if (c === '\\' && i + 1 < css.length) { linha += c + css[++i]; continue; }
+      if (css.slice(i, i + 2) === '/*') {
+        var fimComentario = css.indexOf('*/', i + 2);
+        if (fimComentario < 0) { linha += css.slice(i); break; }
+        linha += css.slice(i, fimComentario + 2);
+        i = fimComentario + 1;
+        continue;
+      }
+      if (css.slice(i, i + 2) === '{{') {
+        var fimVariavel = css.indexOf('}}', i + 2);
+        if (fimVariavel >= 0) { linha += css.slice(i, fimVariavel + 2); i = fimVariavel + 1; continue; }
+      }
+      if (c === '(') parenteses++;
+      if (c === ')') parenteses = Math.max(0, parenteses - 1);
+      if (!parenteses && c === '{') { linha = linha.trimEnd() + ' {'; concluirLinha(); profundidade++; }
+      else if (!parenteses && c === '}') { concluirLinha(); profundidade = Math.max(nivel, profundidade - 1); linha = '}'; concluirLinha(); }
+      else if (!parenteses && c === ';') { linha += c; concluirLinha(); }
+      else linha += /\s/.test(c) ? (linha.endsWith(' ') ? '' : ' ') : c;
+    }
+    concluirLinha();
+    return linhas.join('\n');
+  }
+
+  function indentarHtmlDocumento(html) {
+    var modelo = document.createElement('template');
+    modelo.innerHTML = String(html || '');
+    var blocos = /^(ADDRESS|ARTICLE|ASIDE|BLOCKQUOTE|CAPTION|COLGROUP|DD|DETAILS|DIV|DL|DT|FIELDSET|FIGCAPTION|FIGURE|FOOTER|FORM|H[1-6]|HEADER|HR|LI|MAIN|NAV|OL|P|SECTION|STYLE|SUMMARY|TABLE|TBODY|TD|TFOOT|TH|THEAD|TR|UL)$/;
+    function formatar(no, nivel) {
+      var prefixo = '  '.repeat(nivel);
+      if (no.nodeType === 3) return no.textContent.trim() ? prefixo + esc(no.textContent.trim()) : '';
+      if (no.nodeType === 8) return prefixo + '<!--' + no.textContent + '-->';
+      if (no.nodeType !== 1) return '';
+      if (/^(PRE|TEXTAREA|SCRIPT)$/.test(no.tagName)) return prefixo + no.outerHTML;
+      if (no.tagName === 'STYLE') {
+        var estiloVazio = no.cloneNode(false).outerHTML;
+        return prefixo + estiloVazio.slice(0, estiloVazio.lastIndexOf('</')) + '\n'
+          + indentarCssDocumento(no.textContent, nivel + 1) + '\n' + prefixo + '</style>';
+      }
+      var filhos = Array.prototype.filter.call(no.childNodes, function (n) { return n.nodeType !== 3 || n.textContent.trim(); });
+      var tokenHtml = filhos.length === 1 && filhos[0].nodeType === 3 && /^\{\{\s*[a-z0-9_]+_html\s*\}\}$/i.test(filhos[0].textContent.trim());
+      var misturado = filhos.some(function (n) { return n.nodeType === 3 || (n.nodeType === 1 && !blocos.test(n.tagName)); });
+      if (!filhos.length || (misturado && !tokenHtml)) return prefixo + no.outerHTML;
+      var vazio = no.cloneNode(false).outerHTML;
+      var fim = vazio.lastIndexOf('</');
+      if (fim < 0) return prefixo + no.outerHTML;
+      return prefixo + vazio.slice(0, fim) + '\n'
+        + filhos.map(function (n) { return formatar(n, nivel + 1); }).filter(Boolean).join('\n')
+        + '\n' + prefixo + vazio.slice(fim);
+    }
+    var raizMista = Array.prototype.some.call(modelo.content.childNodes, function (n) {
+      return (n.nodeType === 3 && n.textContent.trim()) || (n.nodeType === 1 && !blocos.test(n.tagName));
+    });
+    // Espaços entre texto e elementos inline podem fazer parte do documento.
+    if (raizMista) return String(html || '');
+    return Array.prototype.map.call(modelo.content.childNodes, function (n) { return formatar(n, 0); }).filter(Boolean).join('\n');
+  }
+
+  var alvoHtmlExpandido = null;
+
+  function abrirHtmlExpandido(target) {
+    persistirEdicaoSeHouver();
+    alvoHtmlExpandido = target.id;
+    $('#edoc-html-code').value = indentarHtmlDocumento((target.props || {}).html || '');
+    $('#edoc-html-dialog').showModal();
+    $('#edoc-html-code').focus();
+    $('#edoc-html-code').setSelectionRange(0, 0);
+  }
+
+  function bindHtmlExpandido() {
+    var dialogo = $('#edoc-html-dialog');
+    var codigo = $('#edoc-html-code');
+    if (!dialogo || !codigo) return;
+    $('#edoc-html-cancel').addEventListener('click', function () { dialogo.close(); });
+    $('#edoc-html-indent').addEventListener('click', function () {
+      codigo.value = indentarHtmlDocumento(codigo.value);
+      codigo.focus();
+    });
+    codigo.addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab' || e.shiftKey) return;
+      e.preventDefault();
+      var inicio = codigo.selectionStart;
+      codigo.setRangeText('  ', inicio, codigo.selectionEnd, 'end');
+    });
+    $('#edoc-html-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var caminho = findPath(alvoHtmlExpandido);
+      var campo = $('#edoc-boletim-html');
+      if (!caminho || !caminho.element || !campo) return;
+      campo.value = codigo.value;
+      dialogo.close();
+      applyField('element', caminho.element, campo);
+      setStatus('HTML aplicado. Use Ver resultado para conferir o PDF.');
+    });
+  }
+
   function propsElement(el, coluna) {
     var p = el.props || {};
     var st = el.style || {};
@@ -3886,9 +4002,10 @@
         + '<button type="button" class="edoc-btn" id="edoc-boletim-html-dinamico" title="Wrapper com variável dinâmica">HTML dinâmico</button>'
         + '<button type="button" class="edoc-btn" id="edoc-boletim-html-previa" title="Colar o HTML da prévia atual">Da prévia</button>'
         + '</div>';
-      html += '<label>HTML do boletim</label>';
+      html += '<div class="edoc-html-label"><label for="edoc-boletim-html">HTML do boletim</label>'
+        + '<button type="button" class="edoc-btn" id="edoc-html-expand"><i class="fa-solid fa-expand" aria-hidden="true"></i> Expandir editor</button></div>';
       html += '<textarea data-f="html" id="edoc-boletim-html" class="edoc-html-src" rows="14" spellcheck="false">'
-        + esc(p.html || '') + '</textarea>';
+        + esc(indentarHtmlDocumento(p.html || '')) + '</textarea>';
     }
     if (el.type === 'titulo') {
       html += '<label>Nível</label><select data-f="tag"><option value="h1">Título</option><option value="h2">Subtítulo</option><option value="h3">Seção</option></select>';
@@ -4016,7 +4133,11 @@
     }
     ligarRodapeNoFim(box);
     $all('[data-f]', box).forEach(function (f) {
-      f.addEventListener('change', function () { applyField(kind, target, f); });
+      f.addEventListener('change', function () {
+        // Não recriar o botão Expandir entre o blur do HTML e seu clique.
+        if (f.id === 'edoc-boletim-html') { applyField(kind, target, f, true); pushHist(); }
+        else applyField(kind, target, f);
+      });
       if (f.tagName === 'TEXTAREA' || f.type === 'text' || f.type === 'number') {
         f.addEventListener('input', function () { applyField(kind, target, f, true); });
       }
@@ -4082,6 +4203,8 @@
       }
     }
     if (kind === 'element' && elementoEhBoletim(target)) {
+      var expandir = $('#edoc-html-expand', box);
+      if (expandir) expandir.addEventListener('click', function () { abrirHtmlExpandido(target); });
       var btnDin = $('#edoc-boletim-html-dinamico', box);
       var btnPrev = $('#edoc-boletim-html-previa', box);
       if (btnDin) {
@@ -5379,6 +5502,7 @@
     bindPalette();
     bindBuscaElementos();
     bindCriadorTabela();
+    bindHtmlExpandido();
     bindVarSearch();
     bindCamposVariaveis();
     bindDemonstracao();

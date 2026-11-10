@@ -412,6 +412,15 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
     </form>
 </dialog>
 
+<dialog class="edoc-html-dialog" id="edoc-html-dialog" aria-labelledby="edoc-html-title">
+    <form id="edoc-html-form">
+        <header><div><h2 id="edoc-html-title">Editar HTML do boletim</h2><p>Mantenha {{quadro_notas_html}} para trazer as notas do aluno na emissão.</p></div><button type="button" class="edoc-btn" id="edoc-html-indent">Indentar código</button></header>
+        <label class="edoc-sr-only" for="edoc-html-code">Código HTML do boletim</label>
+        <textarea id="edoc-html-code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea>
+        <footer><span>As alterações entram na folha ao clicar em Aplicar.</span><div><button type="button" class="edoc-btn" id="edoc-html-cancel">Cancelar</button><button type="submit" class="edoc-btn edoc-btn-primary">Aplicar alterações</button></div></footer>
+    </form>
+</dialog>
+
 <script>
 window.EDOC = {
   csrf: <?= json_encode((string) ($csrf_token ?? ''), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
