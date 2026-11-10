@@ -235,6 +235,15 @@ $boletimWizardSteps = [
 .bw-chip-x { margin-left: 2px; color: #64748b; font-size: 14px; line-height: 1; padding: 0 2px; }
 .bw-chip-x:hover { color: #b91c1c; }
 .bw-canvas-ph { width: 100%; font-size: 12px; color: #94a3b8; padding: 18px 8px; text-align: center; }
+.bw-preview-zoom-bar { display: inline-flex; align-items: center; gap: 0.25rem; flex-shrink: 0; border: 1px solid #cbd5e1; border-radius: 999px; background: #fff; padding: 0.15rem 0.25rem; }
+.bw-preview-zoom-bar .bw-zoom-btn { width: 1.7rem; height: 1.7rem; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 999px; background: transparent; color: #334155; font-size: 14px; font-weight: 800; line-height: 1; cursor: pointer; }
+.bw-preview-zoom-bar .bw-zoom-btn:hover { background: #e2e8f0; color: #0f172a; }
+.bw-preview-zoom-bar .bw-zoom-btn:disabled { opacity: 0.35; cursor: default; }
+.bw-preview-zoom-bar .bw-zoom-ico { font-size: 12px; line-height: 1; padding: 0 0.2rem; color: #64748b; }
+.bw-preview-zoom-bar .bw-zoom-pct { min-width: 2.6rem; text-align: center; font-size: 11px; font-weight: 700; color: #334155; }
+.bw-preview-zoom-shell { overflow: auto; max-height: 32rem; border: 1px solid #d1d5db; border-radius: 0.5rem; background: #fff; }
+.bw-preview-zoom-alvo { transform-origin: top left; min-width: 100%; }
+.bw-preview-zoom-alvo .overflow-x-auto { overflow: visible !important; max-height: none !important; border: 0 !important; margin-bottom: 0 !important; border-radius: 0 !important; }
 .bw-preview-table { border-collapse: collapse; width: 100%; font-size: 11px; text-align: center; }
 .bw-preview-table thead th { position: sticky; top: 0; z-index: 2; }
 .bw-preview-table thead tr:nth-child(2) th { top: 28px; z-index: 1; }
@@ -412,6 +421,11 @@ $boletimWizardSteps = [
         if (prefFecha === '1') fecharFormulaAposSalvar = true;
     } catch (ePrefFecha) { /* ignore */ }
     var vistaPreview = 'quadro';
+    var previewZoom = 1;
+    try {
+        var zSalvo = Number(window.localStorage && localStorage.getItem('bw_preview_zoom'));
+        if (zSalvo >= 0.7 && zSalvo <= 1.8) previewZoom = Math.round(zSalvo * 10) / 10;
+    } catch (eZoomInit) { /* ignore */ }
     var filaChat = [];
     var statusFilaEl = null;
     var formulaDrag = null;
@@ -6709,11 +6723,55 @@ $boletimWizardSteps = [
         return '<td' + cls + '>' + texto + '</td>';
     }
 
+    function htmlControlesZoomPreview() {
+        var pct = Math.round(previewZoom * 100);
+        var podeMenos = previewZoom > 0.7;
+        var podeMais = previewZoom < 1.8;
+        return '<div class="bw-preview-zoom-bar" role="group" aria-label="Zoom do boletim">'
+            + '<span class="bw-zoom-ico" aria-hidden="true" title="Zoom">🔍</span>'
+            + '<button type="button" class="bw-zoom-btn" data-bw-zoom="-0.1" title="Diminuir" aria-label="Diminuir zoom"'
+            + (podeMenos ? '' : ' disabled') + '>−</button>'
+            + '<span class="bw-zoom-pct">' + pct + '%</span>'
+            + '<button type="button" class="bw-zoom-btn" data-bw-zoom="0.1" title="Aumentar" aria-label="Aumentar zoom"'
+            + (podeMais ? '' : ' disabled') + '>+</button>'
+            + '</div>';
+    }
+
+    function htmlCorpoComZoomPreview(corpo) {
+        var z = Number(previewZoom) || 1;
+        if (z < 0.7) z = 0.7;
+        if (z > 1.8) z = 1.8;
+        // zoom (Chromium/Safari) afeta layout; transform é fallback (Firefox).
+        var estilo = 'zoom: ' + z + '; transform: scale(' + z + '); transform-origin: top left; width: ' + (100 / z) + '%;';
+        if (typeof CSS !== 'undefined' && CSS.supports && CSS.supports('zoom', '1')) {
+            estilo = 'zoom: ' + z + ';';
+        }
+        return '<div class="bw-preview-zoom-shell">'
+            + '<div class="bw-preview-zoom-alvo" style="' + estilo + '">' + corpo + '</div>'
+            + '</div>';
+    }
+
+    function ajustarZoomPreview(delta) {
+        var atual = Number(previewZoom) || 1;
+        var prox = Math.round((atual + Number(delta || 0)) * 10) / 10;
+        if (prox < 0.7) prox = 0.7;
+        if (prox > 1.8) prox = 1.8;
+        if (prox === atual) return;
+        previewZoom = prox;
+        try { localStorage.setItem('bw_preview_zoom', String(previewZoom)); } catch (eZ) { /* ignore */ }
+        renderRevisarDinamico();
+    }
+
     function htmlBlocoVistaOficial(titulo, texto, corpo) {
         return '<section class="mb-6">'
+            + '<div class="flex flex-wrap items-start justify-between gap-2 mb-2">'
+            + '<div class="min-w-0">'
             + '<h4 class="text-sm font-semibold text-gray-900">' + esc(titulo) + '</h4>'
-            + '<p class="text-xs text-gray-500 mt-0.5 mb-2">' + texto + '</p>'
-            + corpo
+            + '<p class="text-xs text-gray-500 mt-0.5">' + texto + '</p>'
+            + '</div>'
+            + htmlControlesZoomPreview()
+            + '</div>'
+            + htmlCorpoComZoomPreview(corpo)
             + '</section>';
     }
 
@@ -8544,6 +8602,12 @@ $boletimWizardSteps = [
             if (vistaBtn) {
                 vistaPreview = vistaBtn.getAttribute('data-vista-preview') === 'boletim' ? 'boletim' : 'quadro';
                 renderRevisarDinamico();
+                return;
+            }
+            var zoomBtn = e.target.closest('[data-bw-zoom]');
+            if (zoomBtn) {
+                e.preventDefault();
+                ajustarZoomPreview(zoomBtn.getAttribute('data-bw-zoom'));
                 return;
             }
             var catTodos = e.target.closest('[data-catalogo-periodo]');
