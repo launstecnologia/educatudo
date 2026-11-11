@@ -212,6 +212,17 @@ class DocumentoRenderer
         if ($ocultarVazio && $this->htmlVisualmenteVazio($html)) {
             return '';
         }
+        $larguraFoto = $props['fotoAlunoLargura'] ?? null;
+        if (is_numeric($larguraFoto) && (float) $larguraFoto > 0) {
+            $larguraFoto = (int) round(max(5, min(200, (float) $larguraFoto)));
+            $html = (string) preg_replace_callback(
+                '/<[^>]*>|(\{\{\s*aluno_foto_html\s*\}\})/i',
+                static fn (array $m): string => isset($m[1])
+                    ? '<span class="edoc-foto-aluno" style="width:' . $larguraFoto . 'mm;">' . $m[1] . '</span>'
+                    : $m[0],
+                $html
+            );
+        }
         return $html;
     }
 

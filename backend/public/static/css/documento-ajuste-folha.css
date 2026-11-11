@@ -38,3 +38,16 @@
   max-width: 100% !important;
   height: auto;
 }
+.edoc-foto-aluno {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: middle;
+}
+.edoc-foto-aluno > img,
+.edoc-foto-aluno > span {
+  width: 100% !important;
+  height: auto !important;
+}
+.edoc-foto-aluno > span {
+  padding-top: 0 !important;
+}

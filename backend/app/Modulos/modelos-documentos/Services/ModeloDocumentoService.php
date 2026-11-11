@@ -2761,7 +2761,7 @@ class ModeloDocumentoService
             $css .= "\n" . $this->cssFolhaImpressa($estruturaVisual);
         }
 
-        if (str_contains($htmlAll, 'edoc-ajuste-folha')) {
+        if (str_contains($htmlAll, 'edoc-ajuste-folha') || str_contains($htmlAll, 'edoc-foto-aluno')) {
             $css .= "\n" . DocumentoRenderer::cssAjusteFolha();
         }
 

@@ -323,6 +323,63 @@ test('Editar em HTML usa o mesmo painel para um bloco de texto', async ({ page }
   await expect(painel.getByLabel('Código HTML', { exact: true })).toHaveValue('Texto da autorização');
 });
 
+test('redimensiona foto dinâmica e centraliza apenas a assinatura em um bloco com tabela', async ({ page }) => {
+  const estrutura = await page.evaluate(() => (window as any).EDOC.estrutura);
+  const fonte = '<p>Aluno: {{aluno_nome}}</p><table><tr><td>{{aluno_foto_html}}</td><td>Dados da matrícula</td></tr></table>'
+    + '<p>Atenciosamente,<br>_______________<br>Assinatura do Diretor</p>';
+  estrutura.body.sections[0].columns[0].elements = [{ id: 'declaracao_foto', type: 'html', props: { html: fonte }, style: {} }];
+  ultimoSalvo = { estrutura };
+  await page.reload();
+
+  const bloco = page.locator('#edoc-paper [data-id="declaracao_foto"]');
+  const foto = bloco.getByRole('img', { name: 'Foto do aluno' });
+  await foto.click();
+  const largura = page.getByLabel('Largura da foto (mm)');
+  await largura.fill('12');
+  await largura.press('Tab');
+  await expect(foto).toHaveCSS('width', /45\.3\d+px/);
+  await largura.fill('36');
+  await largura.press('Tab');
+  await expect(foto).toHaveCSS('width', /136\.0\d+px/);
+  await expect.poll(() => foto.evaluate(img => img.getBoundingClientRect().width / img.getBoundingClientRect().height)).toBeCloseTo(1);
+
+  const paragrafo = bloco.locator('p').filter({ hasText: 'Atenciosamente,' });
+  await paragrafo.click();
+  await paragrafo.evaluate(p => {
+    const range = document.createRange();
+    range.setStartAfter(p.querySelector('br')!);
+    range.setEndAfter(p.lastChild!);
+    const selecao = window.getSelection()!;
+    selecao.removeAllRanges();
+    selecao.addRange(range);
+  });
+  await page.getByTitle('Centralizar', { exact: true }).click();
+  const assinatura = bloco.getByText('Assinatura do Diretor', { exact: true });
+  await expect(assinatura).toHaveCSS('text-align', 'center');
+  await expect(bloco.getByText('_______________', { exact: true })).toHaveCSS('text-align', 'center');
+  await expect(bloco.getByText('Atenciosamente,')).not.toHaveCSS('text-align', 'center');
+  await expect(bloco.getByText('Dados da matrícula')).not.toHaveCSS('text-align', 'center');
+
+  await page.locator('#edoc-save').click();
+  await expect(page.locator('#edoc-status')).toHaveText('Salvo automaticamente');
+  const salvo = ultimoSalvo.estrutura;
+  const props = salvo.body.sections[0].columns[0].elements[0].props;
+  expect(props.fotoAlunoLargura).toBe(36);
+  expect(props.html).toContain('{{aluno_foto_html}}');
+  expect(props.html).toContain('{{aluno_nome}}');
+  await page.reload();
+  await expect(assinatura).toHaveCSS('text-align', 'center');
+  await expect(foto).toHaveCSS('width', /136\.0\d+px/);
+
+  const impressao = execFileSync('php', [path.join(__dirname, 'fixtures/editor-documento.php'), '--impressao-ajustada'], {
+    cwd: raiz, encoding: 'utf8', input: JSON.stringify(salvo),
+  });
+  await page.emulateMedia({ media: 'print' });
+  await page.setContent(impressao);
+  await expect(page.getByRole('img', { name: 'Foto do aluno' })).toHaveCSS('width', /136\.0\d+px/);
+  await expect(page.getByText('Assinatura do Diretor', { exact: false })).toHaveCSS('text-align', 'center');
+});
+
 test('expõe tabela inteira com campos dinâmicos sem aplicar até confirmar', async ({ page }) => {
   await selecionarHtmlBoletim(page, '<div>{{boletim_html}}</div>');
   await page.getByRole('button', { name: 'Expor tabela completa', exact: true }).click();

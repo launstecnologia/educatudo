@@ -1,5 +1,7 @@
 # Tasks — backlog atual
 
+- [x] Editor de documentos: ajustar a largura da foto do aluno na folha e no PDF, alinhar as linhas selecionadas e exibir a logo cadastrada no rascunho do assistente. Validado no Chromium e no Dompdf. — 2026-11-11
+
 - [x] Editor de documentos: abrir as ações Editar em HTML e Expor tabela completa no mesmo painel lateral, com busca literal, contador e navegação entre ocorrências. Validado no Chromium.
 
 - [x] Chat de documentos: perguntar pelos dados do passeio, montar autorização com campos da emissão e mostrar o rascunho ao lado da conversa. Fluxo guiado local para escolas sem TudiCoins. Validado com 3 testes no Chromium, 8 testes PHP e revisão de código.

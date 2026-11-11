@@ -84,7 +84,7 @@ test('o chat explica variáveis e deixa revisar o HTML de uma proposta', async (
   const proposta = JSON.parse(execFileSync('php', [fixture, '--assistente'], {
     encoding: 'utf8', cwd: raiz, input: JSON.stringify({
       mensagem: 'Preparei uma autorização com o nome do aluno.',
-      html: '<h1>Autorização de passeio</h1><p>Aluno: {{aluno_nome}}</p><table><tr><td>Local: {{aut_local}}</td><td>Data: {{cv_data_evento}}</td></tr></table><script>alert(1)</script>',
+      html: '<p>{{logo_html}}</p><h1>Autorização de passeio</h1><p>Aluno: {{aluno_nome}}</p><table><tr><td>Local: {{aut_local}}</td><td>Data: {{cv_data_evento}}</td></tr></table><script>alert(1)</script>',
     }),
   }));
   const pedidos: { role: string; content: string }[][] = [];
@@ -155,6 +155,9 @@ test('o chat explica variáveis e deixa revisar o HTML de uma proposta', async (
   propostaConcluida = true;
   await expect(revisar).toBeVisible();
   await expect(page.frameLocator('#edoc-assistente-previa').getByText('Autorização de passeio')).toBeVisible();
+  const logo = page.frameLocator('#edoc-assistente-previa').getByRole('img', { name: 'Logo' });
+  await expect(logo).toBeVisible();
+  await expect.poll(() => logo.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
   await expect(page.frameLocator('#edoc-assistente-previa').getByText('Preencher na emissão · Local')).toBeVisible();
   await expect(page.frameLocator('#edoc-assistente-previa').getByText('Unidade I')).toHaveCount(0);
   expect(consultasDaProposta).toBeGreaterThanOrEqual(3);
@@ -170,6 +173,7 @@ test('o chat explica variáveis e deixa revisar o HTML de uma proposta', async (
   const codigo = dialogo.getByLabel('HTML gerado');
   const original = await codigo.inputValue();
   expect(original).toContain('{{aluno_nome}}');
+  expect(original).toContain('{{logo_html}}');
   expect(original).toContain('{{cv_aut_local}}');
   expect(original).not.toContain('<script');
   await dialogo.getByRole('button', { name: 'Descartar' }).click();

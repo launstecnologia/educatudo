@@ -690,35 +690,36 @@
   }
 
   function htmlLogoPreview() {
-    if (C.varsPreview && String(C.varsPreview.logo_html || '').trim() !== '') {
-      return String(C.varsPreview.logo_html);
-    }
-    if (C.varsAmostra && String(C.varsAmostra.logo_html || '').trim() !== '') {
-      return String(C.varsAmostra.logo_html);
-    }
+    var logo = [C.varsPreview, C.varsAmostra].map(function (vars) {
+      return String((vars && vars.logo_html) || '');
+    }).find(function (html) { return /<img\b/i.test(html); });
+    if (logo) return logo;
     var src = String(C.logoPreview || '').trim();
     if (!src) return '';
     return '<img src="' + src.replace(/"/g, '') + '" alt="Logo" style="max-height:64px;max-width:160px;width:auto;height:auto;object-fit:contain;">';
   }
 
-  function ph(html, camposEmissao) {
+  function ph(html, camposEmissao, props) {
     if (!html) return '';
     var bag = varsDaFolha();
     var out = String(html).replace(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi, function (_, k) {
-      var campoEmissao = camposEmissao && camposEmissao.get(k.toLowerCase());
+      k = k.toLowerCase();
+      var campoEmissao = camposEmissao && camposEmissao.get(k);
       if (campoEmissao) return '<span class="edoc-campo-emissao">Preencher na emissão · ' + esc(campoEmissao.rotulo) + '</span>';
       var campo = campoVariavelPorChave(k);
       if (campo) {
         return '<span class="edoc-ph" data-edoc-variavel="' + campo.chave + '" contenteditable="false">'
           + esc(campo.rotulo) + '</span>';
       }
-      if (bag && Object.prototype.hasOwnProperty.call(bag, k) && String(bag[k]) !== '') {
-        return String(bag[k]);
+      var valor = k === 'logo_html' ? htmlLogoPreview()
+        : (Object.prototype.hasOwnProperty.call(bag, k) ? String(bag[k] ?? '') : '');
+      if (props && (k === 'aluno_foto_html' || k === 'logo_html' || (valor && !/<[a-z!/]/i.test(valor)))) {
+        var largura = k === 'aluno_foto_html' && larguraFotoAluno(props.fotoAlunoLargura);
+        var tamanho = largura ? ' class="edoc-foto-aluno" style="width:' + largura + 'mm"' : '';
+        return '<span' + tamanho + ' data-edoc-variavel="' + k + '" contenteditable="false">'
+          + (valor || '<span class="edoc-ph">{{' + k + '}}</span>') + '</span>';
       }
-      if (k.toLowerCase() === 'logo_html') {
-        var logo = htmlLogoPreview();
-        if (logo) return logo;
-      }
+      if (valor) return valor;
       if (k.indexOf('boletim_celula_') === 0) return '—';
       return '<span class="edoc-ph">{{' + k + '}}</span>';
     });
@@ -762,10 +763,35 @@
   function htmlTextoInterno(el, fallback) {
     var p = el.props || {};
     var tx = p.html || p.text || fallback || '';
-    if (String(tx).indexOf('<') >= 0) {
-      return ph(sanitizeHtml(tx));
+    var fonte = String(tx).indexOf('<') >= 0 ? sanitizeHtml(tx) : esc(tx).replace(/\n/g, '<br>');
+    if (!fonte.includes('{{')) return fonte;
+    var modelo = document.createElement('template');
+    var substituto = document.createElement('template');
+    modelo.innerHTML = fonte;
+    modelo.content.querySelectorAll('*').forEach(function (node) {
+      Array.from(node.attributes).forEach(function (attr) {
+        if (!attr.value.includes('{{')) return;
+        substituto.innerHTML = ph(esc(attr.value));
+        attr.value = substituto.content.textContent;
+      });
+    });
+    var walker = document.createTreeWalker(modelo.content, NodeFilter.SHOW_TEXT);
+    var tokens = [];
+    while (walker.nextNode()) {
+      if (walker.currentNode.nodeValue.includes('{{') && walker.currentNode.parentElement?.tagName !== 'STYLE') {
+        tokens.push(walker.currentNode);
+      }
     }
-    return ph(esc(tx).replace(/\n/g, '<br>'));
+    tokens.forEach(function (node) {
+      substituto.innerHTML = ph(esc(node.nodeValue), null, p);
+      node.replaceWith(substituto.content);
+    });
+    return modelo.innerHTML;
+  }
+
+  function larguraFotoAluno(valor) {
+    var mm = Number(valor);
+    return Number.isFinite(mm) && mm > 0 ? Math.max(5, Math.min(200, Math.round(mm))) : 0;
   }
 
   function htmlParaEditor(el) {
@@ -779,9 +805,9 @@
   function htmlDoEditor(node) {
     if (!node) return '';
     var clone = node.cloneNode(true);
-    $all('.edoc-ph', clone).forEach(function (s) {
+    $all('[data-edoc-variavel], .edoc-ph', clone).forEach(function (s) {
       var chave = s.dataset.edocVariavel;
-      var texto = /^cv_[a-z0-9_]{1,40}$/.test(chave || '') ? tokenDaChave(chave) : s.textContent;
+      var texto = /^[a-z0-9_]+$/.test(chave || '') ? tokenDaChave(chave) : s.textContent;
       s.replaceWith(document.createTextNode(texto || ''));
     });
     $all('.edoc-col-marcada, .edoc-celula-sel, .edoc-celula-drop', clone).forEach(function (n) {
@@ -947,7 +973,7 @@
 
   function snapshotSelecao(root) {
     var sel = window.getSelection();
-    if (!sel || !sel.rangeCount || !root || !root.contains(sel.anchorNode)) return null;
+    if (!sel || !sel.rangeCount || !root || !root.contains(sel.anchorNode) || !root.contains(sel.focusNode)) return null;
     return sel.getRangeAt(0).cloneRange();
   }
 
@@ -1014,6 +1040,21 @@
   function executarFmt(cmd, el, body) {
     if (!el || !body) return;
     var snap = snapshotSelecao(body);
+    var alinhamentos = { justifyLeft: 'left', justifyCenter: 'center', justifyRight: 'right', justifyFull: 'justify' };
+    var align = alinhamentos[cmd];
+    if (align && snap) {
+      var origem = snap.commonAncestorContainer;
+      var celula = (origem.nodeType === 1 ? origem : origem.parentElement).closest('td, th');
+      var hostLocal = celula && body.contains(celula) ? celula : body;
+      var editavel = hostLocal.getAttribute('contenteditable');
+      hostLocal.contentEditable = 'true';
+      hostLocal.focus();
+      restoreSelecao(snap);
+      document.execCommand(cmd, false, null);
+      if (editavel === null) hostLocal.removeAttribute('contenteditable');
+      else hostLocal.setAttribute('contenteditable', editavel);
+      return;
+    }
     var host = body.querySelector('[contenteditable="true"]') || body;
     host.focus();
     restoreSelecao(snap);
@@ -1021,10 +1062,7 @@
       document.execCommand(cmd, false, null);
       return;
     }
-    if (cmd === 'justifyLeft' || cmd === 'justifyCenter' || cmd === 'justifyRight' || cmd === 'justifyFull') {
-      document.execCommand(cmd, false, null);
-      var map = { justifyLeft: 'left', justifyCenter: 'center', justifyRight: 'right', justifyFull: 'justify' };
-      var align = map[cmd];
+    if (align) {
       el.style = el.style || {};
       el.props = el.props || {};
       el.style.textAlign = align;
@@ -4528,6 +4566,12 @@
     if (el.type === 'titulo') {
       html += '<label>Nível</label><select data-f="tag"><option value="h1">Título</option><option value="h2">Subtítulo</option><option value="h3">Seção</option></select>';
     }
+    if (/\{\{\s*aluno_foto_html\s*\}\}/i.test(htmlFonteElemento(el))) {
+      html = '<div class="edoc-sec-label">FOTO DO ALUNO</div>'
+        + '<label for="edoc-foto-aluno-largura">Largura da foto (mm)</label>'
+        + '<input id="edoc-foto-aluno-largura" type="number" data-f="fotoAlunoLargura" min="5" max="200" step="1"'
+        + ' placeholder="Automática" value="' + (larguraFotoAluno(p.fotoAlunoLargura) || '') + '">' + html;
+    }
     if (el.type === 'imagem') {
       html += '<label>Arquivo</label><input type="file" id="edoc-img-file" accept="image/png,image/jpeg,image/gif,image/webp">';
       html += '<p class="edoc-hint">Cole com Ctrl+V, escolha um arquivo ou arraste a imagem para a folha.</p>';
@@ -4661,7 +4705,8 @@
       f.addEventListener('change', function () {
         applyField(kind, target, f);
       });
-      if (f.tagName === 'TEXTAREA' || f.type === 'text' || f.type === 'number') {
+      if ((f.tagName === 'TEXTAREA' || f.type === 'text' || f.type === 'number')
+        && f.getAttribute('data-f') !== 'fotoAlunoLargura') {
         f.addEventListener('input', function () { applyField(kind, target, f, true); });
       }
     });
@@ -4869,7 +4914,7 @@
       b.addEventListener('mousedown', function (e) { e.preventDefault(); });
       b.addEventListener('click', function () {
         var folha = corpoVivoDoElemento(target);
-        if (folha) {
+        if (folha && (snapshotSelecao(folha) || !savedRange)) {
           executarFmt(b.getAttribute('data-fmt'), target, folha);
           if (folha.isConnected) sincronizarBloco(target, folha);
           atualizarLabelFonte(tamanhoFontePt(target, folha));
@@ -4916,6 +4961,10 @@
           target.props.text = val;
           delete target.props.html;
         }
+      } else if (name === 'fotoAlunoLargura') {
+        var largura = larguraFotoAluno(val);
+        if (largura) target.props.fotoAlunoLargura = largura;
+        else delete target.props.fotoAlunoLargura;
       } else if (name === 'width' || name === 'height' || name === 'tag') {
         target.props[name] = name === 'tag' ? val : (parseInt(val, 10) || 0);
       } else if (name.indexOf('m_') === 0 || name.indexOf('p_') === 0) {
@@ -6274,6 +6323,7 @@
   function htmlElementosProposta(elementos) {
     return elementos.map(function (el) {
       var props = el.props || {};
+      if (el.type === 'logo') return '<p style="text-align:center">{{logo_html}}</p>';
       return props.html || '<p>' + esc(props.text || '') + '</p>';
     }).join('\n');
   }
@@ -6324,7 +6374,8 @@
   }
 
   function previaDaProposta(html, comCamposEmissao) {
-    var proposta = comCamposEmissao ? prepararCamposDaProposta(html) : { html: html };
+    var fonte = limparHtmlReproducao(html);
+    var proposta = comCamposEmissao ? prepararCamposDaProposta(fonte) : { html: fonte };
     return '<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src data:; style-src \'unsafe-inline\'">'
       + '<style>body{font:11pt Arial,sans-serif;color:#222;margin:12px}table{border-collapse:collapse;max-width:100%}td,th{vertical-align:middle}p{margin:0 0 8px}.edoc-vert{writing-mode:vertical-rl;transform:rotate(180deg)}.edoc-faixa{background:#d1d5db}</style>'
       + '<style>.edoc-campo-emissao{display:inline-block;color:#563884;background:#f1ebfa;border-radius:4px;padding:2px 5px;font:600 9pt Arial,sans-serif}</style>'

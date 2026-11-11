@@ -8,6 +8,9 @@ require BASE_PATH . '/vendor/autoload.php';
 use App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService;
 use App\Modulos\ModelosDocumentos\Services\AssistenteDocumentoService;
 
+$imagemTeste = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aF9sAAAAASUVORK5CYII=';
+$fotoTeste = '<img src="' . $imagemTeste . '" alt="Foto do aluno" style="width:25mm;height:30mm;">';
+
 if (in_array('--assistente', $argv, true)) {
     echo json_encode(AssistenteDocumentoService::interpretarResposta(file_get_contents('php://stdin')), JSON_THROW_ON_ERROR);
     exit;
@@ -26,7 +29,7 @@ if (in_array('--impressao-ajustada', $argv, true)) {
     };
     echo $servico->renderHtml(
         ['codigo' => 'teste_ajuste', 'estrutura_json' => json_encode($estrutura)],
-        ['assinante_nome' => 'Direção', 'assinante_cargo' => 'Direção', 'logo_html' => '<span></span>'],
+        ['assinante_nome' => 'Direção', 'assinante_cargo' => 'Direção', 'logo_html' => '<span></span>', 'aluno_foto_html' => $fotoTeste],
         'simples'
     );
     exit;
@@ -53,6 +56,9 @@ $grupos_placeholders = ModeloDocumentoService::gruposPlaceholders();
 $mascaras_campo = ModeloDocumentoService::MASCARAS_CAMPO;
 $vars_preview = ['aluno_nome' => 'Aluno de demonstração', 'quadro_notas_html' => '<table><thead><tr><th>Matéria</th><th>Nota</th></tr></thead><tbody><tr data-boletim-materia="17"><td>Matemática</td><td data-boletim-coluna="b1_pp">7,5</td></tr></tbody></table>'];
 $vars_preview['aut_local'] = 'Unidade I';
+$vars_preview['aluno_foto_html'] = $fotoTeste;
+$vars_preview['logo_html'] = '{{logo_html}}';
+$logo_preview = $imagemTeste;
 $vars_preview = array_merge($vars_preview, \App\Modulos\ModelosDocumentos\Services\QuadroBoletimEditavelService::variaveis($vars_preview['quadro_notas_html']));
 // A identidade visual da escola depende do banco; o restante da view é o arquivo de produção.
 $view = file_get_contents(BASE_PATH . '/app/Modulos/modelos-documentos/Views/admin/editor.php');
