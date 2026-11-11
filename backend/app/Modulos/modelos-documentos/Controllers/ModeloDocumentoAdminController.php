@@ -12,6 +12,7 @@ use App\Modulos\ModelosDocumentos\Services\EmissaoCampoVariavelService;
 use App\Modulos\ModelosDocumentos\Services\ImportadorModeloPlanilhaService;
 use App\Modulos\ModelosDocumentos\Services\LayoutsHistoricoEscolar;
 use App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService;
+use App\Modulos\ModelosDocumentos\Services\ReprodutorLayoutDocumentoService;
 
 if (!class_exists(__NAMESPACE__ . '\\ModeloDocumentoAdminController', false)) {
 class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseController
@@ -245,7 +246,7 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
      */
     public function reproduzirImagem(): void
     {
-        $creditoModulo = 'modelo_documento_reproduzir_imagem';
+        $creditoModulo = ReprodutorLayoutDocumentoService::ACAO;
         if (!class_exists('AdminPermissionMatrix')) {
         }
         $user = $this->auth->getUser() ?: [];
@@ -260,10 +261,11 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
             $this->json(['success' => false, 'error' => 'Sessão expirada.'], 403);
             return;
         }
-        if (!\App\Core\CreditosModuleRegistry::acaoIaDisponivel($creditoModulo)) {
+        if (!ReprodutorLayoutDocumentoService::iaDisponivel()) {
             $this->json(['success' => false, 'error' => 'Reproduzir de imagem indisponível. Ative TudiCoins para esta escola no Master.'], 403);
             return;
         }
+        $cobraTudicoins = \App\Core\CreditosModuleRegistry::acaoIaDisponivel($creditoModulo);
 
         $file = $_FILES['imagem'] ?? null;
         if (!is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
@@ -310,22 +312,30 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
             }
             @chmod($path, 0600);
 
-            $creditos = new \App\Services\CreditosService();
-            if (!$creditos->podeConsumir('escola', \App\Core\CreditosModuleRegistry::ESCOLA_CARTEIRA_USER_ID, $creditoModulo)) {
-                throw new \RuntimeException('TudiCoins insuficientes na carteira da escola.');
-            }
-            $creditos->consumirEscola($creditoModulo, $creditosRef);
-            $debitou = true;
-
-            $jobId = \App\Services\AIJobService::enqueue('modelo_documento_reproduzir_imagem', [
+            $payloadJob = [
                 'arquivo' => [
                     'path' => $path,
                     'mime' => $mime,
                     'slug' => $slug,
                 ],
-                'credits_ref' => $creditosRef,
-                'credits_modulo' => $creditoModulo,
-            ], (int) ($user['id'] ?? 0), 'admin');
+            ];
+            if ($cobraTudicoins) {
+                $creditos = new \App\Services\CreditosService();
+                if (!$creditos->podeConsumir('escola', \App\Core\CreditosModuleRegistry::ESCOLA_CARTEIRA_USER_ID, $creditoModulo)) {
+                    throw new \RuntimeException('TudiCoins insuficientes na carteira da escola.');
+                }
+                $creditos->consumirEscola($creditoModulo, $creditosRef);
+                $debitou = true;
+                $payloadJob['credits_ref'] = $creditosRef;
+                $payloadJob['credits_modulo'] = $creditoModulo;
+            }
+
+            $jobId = \App\Services\AIJobService::enqueue(
+                ReprodutorLayoutDocumentoService::ACAO,
+                $payloadJob,
+                (int) ($user['id'] ?? 0),
+                'admin'
+            );
 
             $this->json([
                 'success' => true,
@@ -744,7 +754,7 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
             'vars_preview' => $varsPreview,
             'logo_preview' => $logoPreview,
             'layout_sugerido' => $layoutSugerido,
-            'ia_disponivel' => \App\Core\CreditosModuleRegistry::acaoIaDisponivel('modelo_documento_reproduzir_imagem'),
+            'ia_disponivel' => ReprodutorLayoutDocumentoService::iaDisponivel(),
             'assistente_disponivel' => AssistenteDocumentoService::podeUsar($this->db, $this->auth->getUser() ?: []),
             'assistente_ia_disponivel' => AssistenteDocumentoService::iaDisponivel(),
             'cursos_emissao' => $this->service->listarCursosParaEmissao(),

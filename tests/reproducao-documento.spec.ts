@@ -6,8 +6,8 @@ const raiz = path.resolve(__dirname, '..');
 const fixture = path.join(__dirname, 'fixtures/editor-documento.php');
 const imagem = { name: 'referencia.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aF9sAAAAASUVORK5CYII=', 'base64') };
 
-test('reprodução revisa o HTML editável antes de inserir na folha', async ({ page }) => {
-  const html = execFileSync('php', [fixture], { encoding: 'utf8', cwd: raiz });
+test('reprodução sem TudiCoins no domínio de teste revisa o HTML antes de inserir', async ({ page }) => {
+  const html = execFileSync('php', [fixture, '--imagem-sem-tudicoins'], { encoding: 'utf8', cwd: raiz });
   const estrutura = JSON.parse(execFileSync('php', [fixture, '--reproducao'], {
     encoding: 'utf8', cwd: raiz, input: JSON.stringify({ orientacao: 'retrato', html: '<table style="width:320mm;min-width:320mm"><colgroup><col style="width:160mm"><col style="width:160mm"></colgroup><tr><th colspan="2">Histórico escolar da imagem</th></tr><tr><td rowspan="2" class="edoc-vert">Área</td><td>Disciplina</td></tr><tr><td>Matemática</td></tr></table>' }),
   }));

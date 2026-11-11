@@ -7,6 +7,7 @@ require BASE_PATH . '/vendor/autoload.php';
 
 use App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService;
 use App\Modulos\ModelosDocumentos\Services\AssistenteDocumentoService;
+use App\Modulos\ModelosDocumentos\Services\ReprodutorLayoutDocumentoService;
 
 $imagemTeste = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aF9sAAAAASUVORK5CYII=';
 $fotoTeste = '<img src="' . $imagemTeste . '" alt="Foto do aluno" style="width:25mm;height:30mm;">';
@@ -48,7 +49,13 @@ $estrutura = ModeloDocumentoService::estruturaVazia('a4', 'paisagem', 8);
 $estrutura['body']['sections'] = [ModeloDocumentoService::secaoPadrao([100])];
 $catalogo = ModeloDocumentoService::catalogoElementosEditor();
 $csrf_token = 'csrf-teste-local';
-$ia_disponivel = true;
+$semTudiCoins = in_array('--imagem-sem-tudicoins', $argv, true);
+if ($semTudiCoins) {
+    define('TENANT_DOMAIN', 'educa.educatudo.com');
+}
+$configLayout = new ReflectionProperty(\App\Core\LayoutHelper::class, 'config');
+$configLayout->setValue(null, ['creditos_habilitado' => $semTudiCoins ? '0' : '1']);
+$ia_disponivel = ReprodutorLayoutDocumentoService::iaDisponivel();
 $assistente_disponivel = true;
 $assistente_ia_disponivel = !in_array('--sem-ia-chat', $argv, true);
 $placeholders = ModeloDocumentoService::PLACEHOLDERS;

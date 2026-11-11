@@ -2,12 +2,17 @@
 
 namespace App\Modulos\ModelosDocumentos\Services;
 
+use App\Core\CreditosModuleRegistry;
 
 /**
  * Converte a resposta da IA (foto de um documento) na estrutura do editor.
  */
 class ReprodutorLayoutDocumentoService
 {
+    public const ACAO = 'modelo_documento_reproduzir_imagem';
+    // Liberação temporária no domínio usado para o teste (mesmo do assistente).
+    private const DOMINIO_TESTE_SEM_TUDICOINS = 'educa.educatudo.com';
+
     /** @var list<string> */
     private const TIPOS = [
         'titulo', 'texto', 'texto_rico', 'html', 'logo',
@@ -16,6 +21,12 @@ class ReprodutorLayoutDocumentoService
         'frequencia', 'observacoes', 'assinaturas', 'historico', 'resultado_final',
         'linha', 'espacador', 'pagina', 'quebra_pagina',
     ];
+
+    public static function iaDisponivel(): bool
+    {
+        return CreditosModuleRegistry::acaoIaDisponivel(self::ACAO)
+            || (defined('TENANT_DOMAIN') && strcasecmp(TENANT_DOMAIN, self::DOMINIO_TESTE_SEM_TUDICOINS) === 0);
+    }
 
     public static function promptSistema(): string
     {
