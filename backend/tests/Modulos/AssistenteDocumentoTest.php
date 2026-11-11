@@ -35,4 +35,13 @@ final class AssistenteDocumentoTest extends TestCase
             AssistenteDocumentoService::interpretarResposta("```json\n{\"mensagem\":\"Use {{aluno_foto_html}}.\",\"html\":\"\"}\n```")
         );
     }
+
+    public function testStreamingExibeSomenteTextoComEscapesCompletos(): void
+    {
+        self::assertSame('', AssistenteDocumentoService::mensagemParcial('{"mensa'));
+        self::assertSame('Olá', AssistenteDocumentoService::mensagemParcial('{"mensagem":"Olá\u00'));
+        self::assertSame("Olá\n\"turma\"", AssistenteDocumentoService::mensagemParcial(
+            '{"mensagem":"Ol\u00e1\n\"turma\"","html":"<p>rascunho'
+        ));
+    }
 }

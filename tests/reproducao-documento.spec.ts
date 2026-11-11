@@ -89,6 +89,7 @@ test('o chat explica variáveis e deixa revisar o HTML de uma proposta', async (
   }));
   const pedidos: { role: string; content: string }[][] = [];
   let consultasDaProposta = 0;
+  let propostaConcluida = false;
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());
     if (url.hostname !== 'editor.localhost') return route.abort();
@@ -110,6 +111,9 @@ test('o chat explica variáveis e deixa revisar o HTML de uma proposta', async (
     }
     if (url.pathname.endsWith('/ai-job/3/status')) {
       if (++consultasDaProposta === 1) return route.fulfill({ status: 503 });
+      if (!propostaConcluida) {
+        return route.fulfill({ json: { status: 'processing', mensagem_parcial: 'Preparei uma autorização' } });
+      }
       return route.fulfill({ json: { status: 'done', result: proposta } });
     }
     if (url.pathname.endsWith('/ai-job/4/status')) {
@@ -125,8 +129,13 @@ test('o chat explica variáveis e deixa revisar o HTML de uma proposta', async (
   await chat.click();
   const campo = page.getByLabel('Sua mensagem');
   const enviar = page.getByRole('button', { name: 'Enviar', exact: true });
+  await campo.fill('Primeira linha');
+  await campo.press('End');
+  await campo.press('Shift+Enter');
+  await expect(campo).toHaveValue('Primeira linha\n');
+  expect(pedidos).toHaveLength(0);
   await page.getByRole('button', { name: 'Qual variável insere a foto do aluno?' }).click();
-  await enviar.click();
+  await campo.press('Enter');
   await expect(page.getByText('Use {{aluno_foto_html}}.')).toBeVisible();
   await campo.fill('Monte uma autorização de passeio.');
   await enviar.click();
@@ -134,10 +143,14 @@ test('o chat explica variáveis e deixa revisar o HTML de uma proposta', async (
   await expect(page.getByText('Qual é o local do passeio?')).toBeVisible();
   await expect(revisar).not.toBeVisible();
   await campo.fill('Deixe o local para preencher na emissão.');
-  await enviar.click();
+  await campo.press('Enter');
+  await expect(page.getByText('Pensando…', { exact: true })).toBeVisible();
+  await expect(page.getByText('Preparei uma autorização', { exact: true })).toBeVisible();
+  await expect(revisar).not.toBeVisible();
+  propostaConcluida = true;
   await expect(revisar).toBeVisible();
   await expect(page.frameLocator('#edoc-assistente-previa').getByText('Autorização de passeio')).toBeVisible();
-  expect(consultasDaProposta).toBe(2);
+  expect(consultasDaProposta).toBeGreaterThanOrEqual(3);
   expect(pedidos).toHaveLength(3);
   expect(pedidos[2].map(mensagem => mensagem.role)).toEqual(['user', 'assistant', 'user', 'assistant', 'user']);
   expect(pedidos[2][3].content).toBe('Qual é o local do passeio?');

@@ -75,6 +75,9 @@ class AIJobController
             ];
 
             $decoded = json_decode((string) ($job['result'] ?? ''), true);
+            if ($job['job_type'] === AssistenteDocumentoService::ACAO && $job['status'] === 'processing') {
+                $response['mensagem_parcial'] = $decoded['mensagem_parcial'] ?? '';
+            }
             if (is_array($decoded)) {
                 if (!empty($decoded['iniciado_em'])) {
                     $response['iniciado_em'] = (string) $decoded['iniciado_em'];

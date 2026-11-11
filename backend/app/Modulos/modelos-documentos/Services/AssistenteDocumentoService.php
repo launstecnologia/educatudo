@@ -3,6 +3,7 @@
 namespace App\Modulos\ModelosDocumentos\Services;
 
 use App\Core\AdminPermissionMatrix;
+use App\Core\CreditosModuleRegistry;
 use App\Core\Database;
 use App\Services\AIJobService;
 use App\Services\CreditosService;
@@ -11,6 +12,14 @@ use App\Services\OpenAIService;
 class AssistenteDocumentoService
 {
     public const ACAO = 'modelo_documento_assistente';
+    // Liberação temporária do chat no domínio usado para o teste.
+    private const DOMINIO_TESTE_SEM_TUDICOINS = 'educa.educatudo.com';
+
+    public static function iaDisponivel(): bool
+    {
+        return CreditosModuleRegistry::acaoIaDisponivel(self::ACAO)
+            || (defined('TENANT_DOMAIN') && strcasecmp(TENANT_DOMAIN, self::DOMINIO_TESTE_SEM_TUDICOINS) === 0);
+    }
 
     public static function podeUsar(Database $db, array $usuario): bool
     {
@@ -55,20 +64,23 @@ class AssistenteDocumentoService
 
     public static function enfileirar(array $mensagens, int $usuarioId): int
     {
-        $referencia = 'modelo_doc_chat:' . bin2hex(random_bytes(10));
-        $creditos = new CreditosService();
-        $creditos->consumirEscola(self::ACAO, $referencia);
+        $payload = ['mensagens' => $mensagens];
+        if (CreditosModuleRegistry::acaoIaDisponivel(self::ACAO)) {
+            $creditos = new CreditosService();
+            $referencia = 'modelo_doc_chat:' . bin2hex(random_bytes(10));
+            $creditos->consumirEscola(self::ACAO, $referencia);
+            $payload['credits_ref'] = $referencia;
+            $payload['credits_modulo'] = self::ACAO;
+        }
         try {
-            $jobId = AIJobService::enqueue(self::ACAO, [
-                'mensagens' => $mensagens,
-                'credits_ref' => $referencia,
-                'credits_modulo' => self::ACAO,
-            ], $usuarioId, 'admin', false);
+            $jobId = AIJobService::enqueue(self::ACAO, $payload, $usuarioId, 'admin', false);
         } catch (\Throwable $e) {
-            try {
-                $creditos->estornarPorReferencia(self::ACAO, $referencia);
-            } catch (\Throwable $estornoErro) {
-                error_log('Assistente de documentos estorno: ' . $estornoErro->getMessage());
+            if (isset($creditos, $referencia)) {
+                try {
+                    $creditos->estornarPorReferencia(self::ACAO, $referencia);
+                } catch (\Throwable $estornoErro) {
+                    error_log('Assistente de documentos estorno: ' . $estornoErro->getMessage());
+                }
             }
             throw $e;
         }
@@ -76,15 +88,55 @@ class AssistenteDocumentoService
         return $jobId;
     }
 
-    public static function responder(array $mensagens): array
+    public static function responder(array $mensagens, int $jobId): array
     {
         try {
-            $retorno = (new OpenAIService())->chatCompletion($mensagens, self::prompt(), 'gpt-4o', 0.3, 6500);
-            return self::interpretarResposta($retorno['resposta']);
+            $db = Database::getInstance();
+            $db->query("UPDATE ai_jobs SET result = NULL WHERE id = ? AND status = 'processing'", [$jobId]);
+            $resposta = '';
+            $ultimaGravacao = 0.0;
+            $textoPublicado = '';
+            $pedido = [
+                'model' => 'gpt-4o',
+                'messages' => array_merge([['role' => 'system', 'content' => self::prompt()]], $mensagens),
+                'temperature' => 0.3,
+                'max_tokens' => 6500,
+                'response_format' => ['type' => 'json_object'],
+            ];
+            (new OpenAIService())->chatCompletionStream($pedido, static function (string $trecho) use (
+                $db, $jobId, &$resposta, &$ultimaGravacao, &$textoPublicado
+            ): void {
+                $resposta .= $trecho;
+                $agora = microtime(true);
+                if ($agora - $ultimaGravacao < 0.35) {
+                    return;
+                }
+                $ultimaGravacao = $agora;
+                $texto = self::mensagemParcial($resposta);
+                if ($texto !== '' && $texto !== $textoPublicado) {
+                    $db->query("UPDATE ai_jobs SET result = ? WHERE id = ? AND status = 'processing'", [
+                        json_encode(['mensagem_parcial' => $texto], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                        $jobId,
+                    ]);
+                    $textoPublicado = $texto;
+                }
+            });
+            return self::interpretarResposta($resposta);
         } catch (\Throwable $e) {
             error_log('Assistente de documentos IA: ' . $e->getMessage());
             throw new \RuntimeException('O assistente não conseguiu responder. Tente novamente.');
         }
+    }
+
+    public static function mensagemParcial(string $resposta): string
+    {
+        // Lê só o primeiro campo e ignora escapes JSON ainda incompletos.
+        $padrao = '~\A\s*\{\s*"mensagem"\s*:\s*"((?:[^"\x5c]|\x5c(?:["/bfnrt\x5c]|u[0-9a-fA-F]{4}))*+)~u';
+        if (!preg_match($padrao, $resposta, $partes)) {
+            return '';
+        }
+        $texto = json_decode('"' . $partes[1] . '"', true);
+        return is_string($texto) ? mb_substr($texto, 0, 4000) : '';
     }
 
     public static function prompt(): string
@@ -101,8 +153,9 @@ class AssistenteDocumentoService
         return <<<'PROMPT'
 Você é o assistente do editor de modelos de documentos escolares do EducaTudo.
 Ajude em português do Brasil com variáveis, campos preenchidos na emissão e montagem de layouts.
-Responda com um único objeto JSON válido, sem Markdown, no formato
+Responda com um único objeto JSON válido, sem Markdown, no formato abaixo. Escreva o campo mensagem primeiro, seguido de html e orientacao.
 {"mensagem":"Resposta curta em texto simples","html":"","orientacao":"retrato"}.
+Fale de forma direta e natural. Quando o tipo de autorização estiver ambíguo, pergunte o que precisa ser autorizado antes de sugerir um modelo.
 Em dúvidas, deixe html vazio. Cite as variáveis exatas do catálogo, com chaves duplas.
 Se não houver variável no catálogo, oriente a criar um Campo da emissão no editor ou a inserir texto.
 Quando o pedido de criação estiver aberto e faltar informação que muda o documento, faça até três perguntas objetivas na mesma resposta e deixe html vazio.

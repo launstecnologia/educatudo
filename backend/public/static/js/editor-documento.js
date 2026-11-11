@@ -6375,9 +6375,9 @@
     }, true);
   }
 
-  async function esperarRespostaAssistente(jobId, avisarDemora) {
+  async function esperarRespostaAssistente(jobId, exibirParcial, avisarDemora) {
     for (var tentativa = 0; ; tentativa++) {
-      var resposta = await fetch(C.urlBase + '/admin/ai-job/' + encodeURIComponent(jobId) + '/status')
+      var resposta = await fetch(C.urlBase + '/admin/ai-job/' + encodeURIComponent(jobId) + '/status', { cache: 'no-store' })
         .catch(function () { return null; });
       if (resposta && resposta.redirected) throw new Error('Sessão expirada. Recarregue o editor.');
       if (resposta && resposta.status < 500) {
@@ -6386,9 +6386,12 @@
         if (!resposta.ok || (job && ['done', 'failed', 'error', 'not_found', 'cancelled'].includes(job.status))) {
           throw new Error((job && job.error) || 'Não foi possível obter a resposta do assistente.');
         }
+        if (job && (job.status === 'pending' || job.status === 'processing')) {
+          exibirParcial(job.mensagem_parcial || '');
+        }
       }
-      if (tentativa === 30) avisarDemora();
-      await new Promise(function (resolver) { setTimeout(resolver, tentativa < 30 ? 2000 : 8000); });
+      if (tentativa === 60) avisarDemora();
+      await new Promise(function (resolver) { setTimeout(resolver, tentativa < 60 ? 500 : 2000); });
     }
   }
 
@@ -6572,6 +6575,12 @@
         ? 'Posso montar uma autorização de passeio aqui. Para gerar outros layouts com IA, a escola precisa ter TudiCoins ativo.'
         : consultarVariaveisAssistente(texto));
     }
+    campo.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
+        e.preventDefault();
+        if (!enviar.disabled) form.requestSubmit();
+      }
+    });
     form.addEventListener('submit', async function (e) {
       e.preventDefault();
       var texto = campo.value.trim();
@@ -6596,21 +6605,33 @@
       }).concat(mensagem)));
 
       enviar.disabled = true;
-      avisar('Preparando resposta…');
+      avisar('');
+      var linhaResposta = exibirMensagem('assistant', 'Pensando…');
+      var textoResposta = linhaResposta.querySelector('p');
+      linhaResposta.classList.add('edoc-assistente-pensando');
+      function atualizarResposta(parcial) {
+        var textoAtual = parcial || 'Pensando…';
+        if (textoResposta.textContent === textoAtual) return;
+        textoResposta.textContent = textoAtual;
+        linhaResposta.classList.toggle('edoc-assistente-pensando', !parcial);
+        mensagens.scrollTop = mensagens.scrollHeight;
+      }
       try {
         var resposta = await fetch(C.assistenteUrl, { method: 'POST', body: dados });
         var pedido = await resposta.json();
         if (!resposta.ok || !pedido.job_id) throw new Error(pedido.error || 'Não foi possível enviar a mensagem.');
-        var resultado = await esperarRespostaAssistente(pedido.job_id, function () {
+        var resultado = await esperarRespostaAssistente(pedido.job_id, atualizarResposta, function () {
           avisar('Ainda aguardando a resposta. Você pode continuar editando a folha.');
         });
         var estrutura = resultado.estrutura;
         var proposta = estrutura && estrutura.body.sections[0].columns[0].elements[0].props.html;
         historico = ultimas.concat(mensagem, { role: 'assistant', content: resultado.mensagem, html: proposta });
-        exibirMensagem('assistant', resultado.mensagem, estrutura);
+        atualizarResposta(resultado.mensagem);
+        if (estrutura) exibirRascunho(estrutura);
         avisar('');
       } catch (erro) {
         mensagemExibida.remove();
+        linhaResposta.remove();
         if (!campo.value.trim()) campo.value = texto;
         exemplos.hidden = historico.length > 0;
         avisar(erro instanceof SyntaxError ? 'Não foi possível ler a resposta do assistente.' : erro.message, true);

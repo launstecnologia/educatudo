@@ -220,7 +220,7 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
             $this->json(['success' => false, 'error' => 'Sessão expirada. Recarregue o editor.'], 403);
             return;
         }
-        if (!\App\Core\CreditosModuleRegistry::acaoIaDisponivel(AssistenteDocumentoService::ACAO)) {
+        if (!AssistenteDocumentoService::iaDisponivel()) {
             $this->json(['success' => false, 'error' => 'Chat indisponível. Ative TudiCoins para esta escola no Master.'], 403);
             return;
         }
@@ -716,7 +716,7 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
             'layout_sugerido' => $layoutSugerido,
             'ia_disponivel' => true,
             'assistente_disponivel' => AssistenteDocumentoService::podeUsar($this->db, $this->auth->getUser() ?: []),
-            'assistente_ia_disponivel' => \App\Core\CreditosModuleRegistry::acaoIaDisponivel(AssistenteDocumentoService::ACAO),
+            'assistente_ia_disponivel' => AssistenteDocumentoService::iaDisponivel(),
             'cursos_emissao' => $this->service->listarCursosParaEmissao(),
             'series_emissao' => $this->service->listarSeriesParaEmissao(),
             'mascaras_campo' => ModeloDocumentoService::MASCARAS_CAMPO,

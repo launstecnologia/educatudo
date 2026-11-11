@@ -336,10 +336,9 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
         <?php endif; ?>
     </div>
     <button type="button" class="edoc-btn edoc-btn-primary edoc-assistente-abrir" id="edoc-assistente-abrir"
-            aria-label="Abrir assistente de documentos" title="Assistente de documentos"
+            aria-label="Abrir assistente de documentos"
             aria-expanded="false" aria-controls="edoc-assistente-painel">
-        <img class="edoc-assistente-avatar" src="<?= $avatarAssistente ?>" width="44" height="44" alt="">
-        <span>Assistente</span>
+        <img class="edoc-assistente-avatar" src="<?= $avatarAssistente ?>" width="56" height="56" alt="">
     </button>
 </section>
 <?php endif; ?>

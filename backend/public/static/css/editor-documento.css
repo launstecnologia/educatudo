@@ -490,13 +490,10 @@ body.edoc-body {
   gap: 10px;
 }
 .edoc-assistente .edoc-assistente-abrir {
-  min-height: 54px;
-  gap: 10px;
-  padding: 4px 16px 4px 4px;
-  border-radius: 999px;
+  padding: 3px;
+  border-radius: 50%;
   background: var(--edoc-assistente-acento);
   box-shadow: 0 6px 20px #3d225745;
-  font-weight: 700;
 }
 .edoc-assistente-avatar {
   flex: 0 0 auto;
@@ -508,7 +505,7 @@ body.edoc-body {
   display: flex;
   flex-direction: column;
   width: min(390px, calc(100vw - 32px));
-  max-height: calc(100dvh - 96px);
+  max-height: calc(100dvh - 106px);
   overflow: auto;
   color: #0f172a;
   background: #fff;
@@ -612,6 +609,7 @@ body.edoc-body {
 }
 .edoc-assistente-balao strong { display: block; font-size: 11px; color: #694788; }
 .edoc-assistente-balao p { margin: 3px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.5; }
+.edoc-assistente-pensando .edoc-assistente-balao p { color: #694788; font-style: italic; }
 .edoc-assistente-form > div {
   display: flex;
   align-items: flex-end;

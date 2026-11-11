@@ -571,7 +571,7 @@ class AIJobService
                 return self::dispatchModeloDocumentoReproduzirImagem($payload);
 
             case 'modelo_documento_assistente':
-                return \App\Modulos\ModelosDocumentos\Services\AssistenteDocumentoService::responder($payload['mensagens']);
+                return \App\Modulos\ModelosDocumentos\Services\AssistenteDocumentoService::responder($payload['mensagens'], (int) $payload['_job_id']);
 
             case 'vida_escolar_ler_historico':
                 return self::dispatchVidaEscolarLerHistorico($payload);
