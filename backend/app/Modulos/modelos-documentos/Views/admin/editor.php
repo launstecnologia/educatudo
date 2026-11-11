@@ -112,7 +112,7 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                 <label class="edoc-busca-label" for="edoc-element-search">O que você quer adicionar?</label>
                 <input type="search" id="edoc-element-search" class="edoc-var-search" placeholder="Buscar título, imagem, boletim…" autocomplete="off">
                 <p id="edoc-element-empty" class="edoc-hint" role="status" hidden>Nenhum elemento encontrado. Tente outro nome.</p>
-                <details class="edoc-tool-group" data-edoc-palette-group open>
+                <details class="edoc-tool-group" data-edoc-palette-group>
                     <summary><span>Dividir a folha</span><small>Coloque os elementos lado a lado</small></summary>
                     <div class="edoc-grid edoc-layout-basico">
                         <?php foreach (($catalogo['layout'] ?? []) as $lay):
@@ -152,8 +152,8 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                     'dados_aluno' => ['Aluno', 'Nome, RA e dados do estudante'],
                     'dados_responsavel' => ['Responsável', 'Dados do responsável pelo aluno'],
                     'dados_turma' => ['Turma', 'Série, curso e turma do aluno'],
-                    'boletim' => ['Boletim', 'Layout criado em Acadêmico → Boletim (I/II/III/IV bimestre). Não é o Demonstrativo.'],
-                    'demonstrativo_notas' => ['Demonstrativo de Notas', 'Arraste cada bimestre/semestre da regra para a folha.'],
+                    'boletim' => ['Boletim', 'Insere o layout de Boletim criado em Acadêmico → Boletim'],
+                    'demonstrativo_notas' => ['Demonstrativo de Notas', 'Escolha o período configurado no Demonstrativo'],
                     'frequencia' => ['Frequência', 'Resumo de presença do aluno'],
                     'observacoes' => ['Observações', 'Informações adicionais do documento'],
                     'assinaturas' => ['Assinaturas', 'Espaço para os responsáveis assinarem'],

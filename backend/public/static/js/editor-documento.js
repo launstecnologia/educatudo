@@ -5037,17 +5037,9 @@
           hint.hidden = false;
           hint.textContent = 'Escolha a regra de aprovação na prévia para listar 1º, 2º bimestre…';
         }
-        if (btnAbrir) {
-          var smallVazio = btnAbrir.querySelector('small');
-          if (smallVazio) smallVazio.textContent = 'Escolha a regra na prévia e clique aqui';
-        }
         return;
       }
       if (hint) hint.hidden = true;
-      if (btnAbrir) {
-        var smallOk = btnAbrir.querySelector('small');
-        if (smallOk) smallOk.textContent = lista.length + ' período(s) configurado(s) — clique para escolher';
-      }
       var html = '';
       lista.forEach(function (p) {
         var n = Number(p.n || 0);

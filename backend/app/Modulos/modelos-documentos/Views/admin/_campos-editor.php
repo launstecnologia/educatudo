@@ -5,7 +5,7 @@ $renderElementos = static function (array $itens) use ($esc, $ajudasElementos): 
 <?php foreach ($itens as $it):
     $tipo = (string) ($it['tipo'] ?? '');
     [$rotulo, $ajuda] = $ajudasElementos[$tipo] ?? [(string) ($it['label'] ?? ''), (string) ($it['ajuda'] ?? '')]; ?>
-<button type="button" class="edoc-item" draggable="true" data-drag-type="<?= $esc($tipo) ?>" aria-label="<?= $esc($rotulo) ?>" title="<?= $esc($ajuda) ?>"><i class="fa-solid <?= $esc($it['icone'] ?? 'fa-cube') ?>" aria-hidden="true"></i><span class="edoc-item-text"><strong><?= $esc($rotulo) ?></strong><small><?= $esc($ajuda) ?></small></span><i class="fa-solid fa-plus edoc-item-add" aria-hidden="true"></i></button>
+<button type="button" class="edoc-item" draggable="true" data-drag-type="<?= $esc($tipo) ?>" aria-label="<?= $esc($rotulo) ?>" title="<?= $esc($ajuda) ?>"><i class="fa-solid <?= $esc($it['icone'] ?? 'fa-cube') ?>" aria-hidden="true"></i><span class="edoc-item-text"><strong><?= $esc($rotulo) ?></strong><?php if ($ajuda !== '' && $tipo !== 'boletim'): ?><small><?= $esc($ajuda) ?></small><?php endif; ?></span><i class="fa-solid fa-plus edoc-item-add" aria-hidden="true"></i></button>
 <?php endforeach; ?></div>
 <?php };
 $renderCampos = static function (string $titulo, array $chaves, string $icone = 'fa-folder') use ($esc, $placeholders, $rotuloVar): void {
@@ -29,7 +29,7 @@ $renderCampos = static function (string $titulo, array $chaves, string $icone = 
 </details>
 <?php };
 ?>
-<details class="edoc-tool-group" data-edoc-palette-group open>
+<details class="edoc-tool-group" data-edoc-palette-group>
 <summary><span>Adicionar conteúdo</span><small>Textos, imagens e tabelas</small></summary>
 <?php $renderElementos($catalogo['conteudo'] ?? []); ?>
 <p class="edoc-palette-tip">Dica: cole imagens ou tabelas do Excel com Ctrl+V (⌘V no Mac).</p>
@@ -59,7 +59,7 @@ $renderCampos('Contrato e valores', $grupos['contrato']['chaves'] ?? [], 'fa-fil
 <div class="edoc-demo-picker" id="edoc-demo-picker">
 <button type="button" class="edoc-item" id="edoc-demo-abrir" aria-haspopup="listbox" aria-expanded="false" aria-controls="edoc-demo-menu" title="Escolha o bimestre/semestre para inserir na folha">
 <i class="fa-solid fa-table-cells" aria-hidden="true"></i>
-<span class="edoc-item-text"><strong>Demonstrativo de Notas</strong><small>Períodos configurados no Demonstrativo</small></span>
+<span class="edoc-item-text"><strong>Demonstrativo de Notas</strong></span>
 <i class="fa-solid fa-chevron-down edoc-item-add" aria-hidden="true"></i>
 </button>
 <div class="edoc-demo-menu" id="edoc-demo-menu" role="listbox" hidden>
