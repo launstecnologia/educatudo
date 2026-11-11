@@ -1155,14 +1155,15 @@ td.edoc-celula-sel, th.edoc-celula-sel {
 .edoc-html-label label { margin: 0; }
 .edoc-html-label .edoc-btn { padding: 5px 7px; font-size: 11px; white-space: nowrap; }
 .edoc-html-stage {
-  flex: 1;
-  min-height: 0;
+  flex: 1 1 auto;
+  min-height: 280px;
   display: flex;
   flex-direction: column;
   background: #eef1f5;
   padding: 10px 12px 12px;
 }
 .edoc-html-stage[hidden] { display: none !important; }
+.edoc-center.is-html-editing .edoc-html-stage { display: flex !important; }
 .edoc-html-stage-form {
   flex: 1;
   min-height: 0;

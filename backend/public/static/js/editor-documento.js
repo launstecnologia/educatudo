@@ -4156,37 +4156,85 @@
     return 'Editar HTML — ' + labelTipo(el.type);
   }
 
+  function garantirPainelHtml() {
+    var stage = $('#edoc-html-stage');
+    if (stage) return stage;
+    var centro = document.querySelector('.edoc-center');
+    if (!centro) return null;
+    stage = document.createElement('section');
+    stage.id = 'edoc-html-stage';
+    stage.className = 'edoc-html-stage';
+    stage.setAttribute('aria-label', 'Editor HTML');
+    stage.hidden = true;
+    stage.innerHTML = '<form id="edoc-html-form" class="edoc-html-stage-form">'
+      + '<header><div><h2 id="edoc-html-title">Editar HTML</h2>'
+      + '<p id="edoc-html-desc">Edite o HTML do bloco selecionado.</p></div>'
+      + '<div class="edoc-html-stage-actions">'
+      + '<button type="button" class="edoc-btn" id="edoc-html-indent">Indentar código</button>'
+      + '<button type="button" class="edoc-btn" id="edoc-html-cancel">Voltar à folha</button>'
+      + '<button type="submit" class="edoc-btn edoc-btn-primary">Aplicar na folha</button>'
+      + '</div></header>'
+      + '<label class="edoc-sr-only" for="edoc-html-code">Código HTML</label>'
+      + '<textarea id="edoc-html-code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea>'
+      + '<footer><span>As alterações entram na folha ao clicar em Aplicar. Esc volta sem salvar.</span></footer>'
+      + '</form>';
+    centro.appendChild(stage);
+    return stage;
+  }
+
   function fecharHtmlExpandido() {
     var stage = $('#edoc-html-stage');
     var centro = document.querySelector('.edoc-center');
-    if (stage) stage.hidden = true;
+    if (stage) {
+      stage.hidden = true;
+      stage.setAttribute('hidden', '');
+    }
     if (centro) centro.classList.remove('is-html-editing');
     alvoHtmlExpandido = null;
   }
 
   function abrirHtmlExpandido(target, codigoInicial) {
-    if (!target || !elementoPermiteHtml(target)) return;
-    persistirEdicaoSeHouver();
-    var stage = $('#edoc-html-stage');
+    if (!target) {
+      setStatus('Selecione um bloco na folha para editar o HTML.');
+      return;
+    }
+    if (!elementoPermiteHtml(target)) {
+      setStatus('Este bloco não permite edição em HTML.');
+      return;
+    }
+    try { persistirEdicaoSeHouver(); } catch (ePersist) {}
+    var stage = garantirPainelHtml();
+    bindHtmlExpandido();
     var codigo = $('#edoc-html-code');
     var titulo = $('#edoc-html-title');
     var desc = $('#edoc-html-desc');
     var centro = document.querySelector('.edoc-center');
-    if (!stage || !codigo) return;
+    if (!stage || !codigo) {
+      setStatus('Não foi possível abrir o editor HTML. Recarregue a página.');
+      return;
+    }
     alvoHtmlExpandido = target.id;
     var fonte = codigoInicial != null ? codigoInicial : htmlFonteElemento(target);
-    codigo.value = indentarHtmlDocumento(fonte);
+    try {
+      codigo.value = indentarHtmlDocumento(fonte);
+    } catch (eIndent) {
+      codigo.value = String(fonte || '');
+    }
     if (titulo) titulo.textContent = tituloEditorHtml(target);
     if (desc) {
       desc.textContent = elementoEhBoletim(target) || target.type === 'demonstrativo_notas' || target.type === 'tabela_notas'
         ? 'Os campos entre {{...}} são preenchidos para cada aluno. Edite a estrutura e os estilos à vontade.'
         : 'Edite o HTML do bloco selecionado. Variáveis {{campo}} entram automaticamente na emissão.';
     }
+    stage.removeAttribute('hidden');
     stage.hidden = false;
     if (centro) centro.classList.add('is-html-editing');
     fecharInfoFolha();
-    codigo.focus();
-    codigo.setSelectionRange(0, 0);
+    window.setTimeout(function () {
+      codigo.focus();
+      try { codigo.setSelectionRange(0, 0); } catch (eSel) {}
+    }, 0);
+    setStatus('Editor HTML aberto no centro da tela.');
   }
 
   function mmParaPx(mm) {
@@ -4279,15 +4327,20 @@
   }
 
   function bindHtmlExpandido() {
-    var stage = $('#edoc-html-stage');
+    var stage = garantirPainelHtml();
     var codigo = $('#edoc-html-code');
     if (!stage || !codigo || stage._edocHtmlBound) return;
     stage._edocHtmlBound = true;
-    $('#edoc-html-cancel').addEventListener('click', function () { fecharHtmlExpandido(); });
-    $('#edoc-html-indent').addEventListener('click', function () {
-      codigo.value = indentarHtmlDocumento(codigo.value);
-      codigo.focus();
-    });
+    var btnCancel = $('#edoc-html-cancel');
+    var btnIndent = $('#edoc-html-indent');
+    var form = $('#edoc-html-form');
+    if (btnCancel) btnCancel.addEventListener('click', function () { fecharHtmlExpandido(); });
+    if (btnIndent) {
+      btnIndent.addEventListener('click', function () {
+        try { codigo.value = indentarHtmlDocumento(codigo.value); } catch (eIndent) {}
+        codigo.focus();
+      });
+    }
     codigo.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -4304,21 +4357,50 @@
       if (document.activeElement === codigo) return;
       fecharHtmlExpandido();
     });
-    $('#edoc-html-form').addEventListener('submit', function (e) {
-      e.preventDefault();
-      var caminho = findPath(alvoHtmlExpandido);
-      if (!caminho || !caminho.element) {
+    if (form) {
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var caminho = findPath(alvoHtmlExpandido);
+        if (!caminho || !caminho.element) {
+          fecharHtmlExpandido();
+          return;
+        }
+        var el = caminho.element;
+        el.props = el.props || {};
+        el.props.html = codigo.value;
+        delete el.props.text;
         fecharHtmlExpandido();
+        pushHist();
+        render();
+        setStatus('HTML aplicado na folha. Use Ver resultado para conferir o PDF.');
+      });
+    }
+  }
+
+  function bindBotaoEditarHtml() {
+    var props = $('#edoc-props');
+    if (!props || props._edocHtmlBtn) return;
+    props._edocHtmlBtn = true;
+    // mousedown: evita perder o clique quando o contenteditable da folha/RTE perde o foco e recria o painel.
+    props.addEventListener('mousedown', function (e) {
+      var btn = e.target.closest('#edoc-editar-html, #edoc-html-expand');
+      if (!btn || !props.contains(btn)) return;
+      e.preventDefault();
+    });
+    props.addEventListener('click', function (e) {
+      var btn = e.target.closest('#edoc-editar-html, #edoc-html-expand');
+      if (!btn || !props.contains(btn)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      var sel = state.selected ? findPath(state.selected.id) : null;
+      var alvo = sel && sel.element ? sel.element : null;
+      if (!alvo) {
+        setStatus('Selecione um bloco na folha para editar o HTML.');
         return;
       }
-      var el = caminho.element;
-      el.props = el.props || {};
-      el.props.html = codigo.value;
-      delete el.props.text;
-      fecharHtmlExpandido();
-      pushHist();
-      render();
-      setStatus('HTML aplicado na folha. Use Ver resultado para conferir o PDF.');
+      if (btn.id === 'edoc-html-expand' || btn.id === 'edoc-editar-html') {
+        abrirHtmlExpandido(alvo);
+      }
     });
   }
 
@@ -4565,13 +4647,7 @@
         });
       }
     }
-    if (kind === 'element') {
-      var btnHtml = $('#edoc-editar-html', box);
-      if (btnHtml) btnHtml.addEventListener('click', function () { abrirHtmlExpandido(target); });
-    }
     if (kind === 'element' && elementoEhBoletim(target)) {
-      var expandir = $('#edoc-html-expand', box);
-      if (expandir) expandir.addEventListener('click', function () { abrirHtmlExpandido(target); });
       var btnDin = $('#edoc-boletim-html-dinamico', box);
       var btnPrev = $('#edoc-boletim-html-previa', box);
       if (btnDin) {
@@ -6264,6 +6340,7 @@
     bindBuscaElementos();
     bindCriadorTabela();
     bindHtmlExpandido();
+    bindBotaoEditarHtml();
     bindInfoFolha();
     bindVarSearch();
     bindCamposVariaveis();
