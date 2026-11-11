@@ -277,19 +277,23 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
 </div>
 
 <?php if (!empty($assistente_disponivel) || !empty($ia_disponivel)): ?>
+<?php $avatarAssistente = $esc(URL . '/static/images/avatar-assistente-documentos.webp'); ?>
 <section class="edoc-assistente" aria-label="Assistente de documentos">
     <div class="edoc-assistente-painel" id="edoc-assistente-painel" hidden>
         <header>
-            <h2>Assistente de documentos</h2>
+            <div class="edoc-assistente-identidade">
+                <img class="edoc-assistente-avatar" id="edoc-assistente-avatar" src="<?= $avatarAssistente ?>" width="44" height="44" alt="">
+                <h2>Assistente de documentos</h2>
+            </div>
             <button type="button" class="edoc-btn edoc-btn-icon" id="edoc-assistente-fechar" aria-label="Fechar assistente">
-                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                <span aria-hidden="true">×</span>
             </button>
         </header>
         <div id="edoc-assistente-opcoes" class="edoc-assistente-opcoes">
             <?php if (!empty($assistente_disponivel)): ?>
             <button type="button" class="edoc-btn" id="edoc-assistente-chat">
                 <i class="fa-solid fa-comments" aria-hidden="true"></i>
-                <span><strong>Chat</strong><small><?= !empty($assistente_ia_disponivel) ? 'Pergunte sobre variáveis ou peça um layout.' : 'Consulte as variáveis do editor.' ?></small></span>
+                <span><strong>Chat</strong><small><?= !empty($assistente_ia_disponivel) ? 'Pergunte sobre variáveis ou peça um layout.' : 'Consulte variáveis ou monte uma autorização de passeio.' ?></small></span>
             </button>
             <?php endif; ?>
             <?php if (!empty($ia_disponivel)): ?>
@@ -300,36 +304,41 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
             <?php endif; ?>
         </div>
         <?php if (!empty($assistente_disponivel)): ?>
-        <div id="edoc-assistente-conversa" class="edoc-assistente-conversa" hidden>
-            <button type="button" class="edoc-btn" id="edoc-assistente-voltar">
+        <div id="edoc-assistente-trabalho" class="edoc-assistente-trabalho" hidden>
+          <div class="edoc-assistente-conversa">
+            <button type="button" class="edoc-btn edoc-assistente-voltar" id="edoc-assistente-voltar">
                 <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Opções do assistente
             </button>
             <div id="edoc-assistente-mensagens" class="edoc-assistente-mensagens" role="log" aria-label="Conversa do assistente" tabindex="0">
                 <?php if (empty($assistente_ia_disponivel)): ?>
-                <p class="edoc-hint">Você pode consultar as variáveis aqui. Para criar layouts pelo chat, a escola precisa ter TudiCoins ativo.</p>
+                <p class="edoc-hint">Você pode consultar variáveis e montar uma autorização de passeio. Para gerar outros layouts com IA, a escola precisa ter TudiCoins ativo.</p>
                 <?php endif; ?>
                 <div id="edoc-assistente-exemplos" class="edoc-assistente-exemplos">
-                    <button type="button" class="edoc-btn">Qual variável insere a foto do aluno?</button>
-                    <?php if (!empty($assistente_ia_disponivel)): ?>
-                    <button type="button" class="edoc-btn">Monte uma autorização de passeio.</button>
-                    <?php endif; ?>
+                    <button type="button" class="edoc-btn"><i class="fa-regular fa-image" aria-hidden="true"></i> Qual variável insere a foto do aluno?</button>
+                    <button type="button" class="edoc-btn"><i class="fa-regular fa-file-lines" aria-hidden="true"></i> Monte uma autorização de passeio.</button>
                 </div>
             </div>
-            <form id="edoc-assistente-form">
+            <form id="edoc-assistente-form" class="edoc-assistente-form">
                 <p id="edoc-assistente-status" role="status" hidden></p>
                 <label for="edoc-assistente-mensagem">Sua mensagem</label>
                 <div>
                     <textarea id="edoc-assistente-mensagem" rows="2" maxlength="2500" required></textarea>
-                    <button type="submit" class="edoc-btn edoc-btn-primary">Enviar</button>
+                    <button type="submit" class="edoc-btn edoc-btn-primary"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Enviar</button>
                 </div>
             </form>
+          </div>
+          <section id="edoc-assistente-rascunho" class="edoc-assistente-rascunho" aria-labelledby="edoc-assistente-rascunho-titulo" hidden>
+              <h3 id="edoc-assistente-rascunho-titulo">Rascunho do documento</h3>
+              <iframe id="edoc-assistente-previa" title="Prévia do rascunho" sandbox></iframe>
+              <button type="button" class="edoc-btn edoc-btn-primary" id="edoc-assistente-revisar">Revisar layout</button>
+          </section>
         </div>
         <?php endif; ?>
     </div>
     <button type="button" class="edoc-btn edoc-btn-primary edoc-assistente-abrir" id="edoc-assistente-abrir"
             aria-label="Abrir assistente de documentos" title="Assistente de documentos"
             aria-expanded="false" aria-controls="edoc-assistente-painel">
-        <i class="fa-solid fa-comment-dots" aria-hidden="true"></i>
+        <img class="edoc-assistente-avatar" src="<?= $avatarAssistente ?>" width="44" height="44" alt="">
         <span>Assistente</span>
     </button>
 </section>

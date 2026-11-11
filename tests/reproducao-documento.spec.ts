@@ -106,10 +106,13 @@ test('o chat explica variáveis e deixa revisar o HTML de uma proposta', async (
       return route.fulfill({ json: { status: 'done', result: { mensagem: 'Use {{aluno_foto_html}}.' } } });
     }
     if (url.pathname.endsWith('/ai-job/2/status')) {
+      return route.fulfill({ json: { status: 'done', result: { mensagem: 'Qual é o local do passeio?' } } });
+    }
+    if (url.pathname.endsWith('/ai-job/3/status')) {
       if (++consultasDaProposta === 1) return route.fulfill({ status: 503 });
       return route.fulfill({ json: { status: 'done', result: proposta } });
     }
-    if (url.pathname.endsWith('/ai-job/3/status')) {
+    if (url.pathname.endsWith('/ai-job/4/status')) {
       return route.fulfill({ json: { status: 'failed', error: 'Não foi possível gerar a revisão.' } });
     }
     return route.fulfill({ json: { ok: true, turmas: [], boletins: [] } });
@@ -128,10 +131,16 @@ test('o chat explica variáveis e deixa revisar o HTML de uma proposta', async (
   await campo.fill('Monte uma autorização de passeio.');
   await enviar.click();
   const revisar = page.getByRole('button', { name: 'Revisar layout' });
+  await expect(page.getByText('Qual é o local do passeio?')).toBeVisible();
+  await expect(revisar).not.toBeVisible();
+  await campo.fill('Deixe o local para preencher na emissão.');
+  await enviar.click();
   await expect(revisar).toBeVisible();
+  await expect(page.frameLocator('#edoc-assistente-previa').getByText('Autorização de passeio')).toBeVisible();
   expect(consultasDaProposta).toBe(2);
-  expect(pedidos).toHaveLength(2);
-  expect(pedidos[1].map(mensagem => mensagem.role)).toEqual(['user', 'assistant', 'user']);
+  expect(pedidos).toHaveLength(3);
+  expect(pedidos[2].map(mensagem => mensagem.role)).toEqual(['user', 'assistant', 'user', 'assistant', 'user']);
+  expect(pedidos[2][3].content).toBe('Qual é o local do passeio?');
 
   const folha = page.locator('#edoc-paper');
   await revisar.click();
@@ -154,7 +163,7 @@ test('o chat explica variáveis e deixa revisar o HTML de uma proposta', async (
   await enviar.click();
   await expect(page.getByText('Não foi possível gerar a revisão.')).toBeVisible();
   await expect(campo).toHaveValue('Mude o título da proposta.');
-  expect(pedidos[2][3].content).toContain('<h1>Autorização de passeio</h1>');
+  expect(pedidos[3][5].content).toContain('<h1>Autorização de passeio</h1>');
   await campo.press('Escape');
   await expect(assistente).toBeFocused();
   await expect(assistente).toHaveAttribute('aria-expanded', 'false');
@@ -163,7 +172,7 @@ test('o chat explica variáveis e deixa revisar o HTML de uma proposta', async (
   await expect(revisar).toBeVisible();
 });
 
-test('o chat aparece e consulta variáveis com a IA desativada', async ({ page }) => {
+test('sem IA, o chat consulta variáveis e monta uma autorização guiada', async ({ page }) => {
   const html = execFileSync('php', [fixture, '--sem-ia-chat'], { encoding: 'utf8', cwd: raiz });
   let pedidosIa = 0;
   await page.route('**/*', route => {
@@ -186,5 +195,30 @@ test('o chat aparece e consulta variáveis com a IA desativada', async ({ page }
   await page.getByLabel('Sua mensagem').fill('Qual variável insere o RA do aluno?');
   await page.getByRole('button', { name: 'Enviar', exact: true }).click();
   await expect(conversa).toContainText('RA do aluno — {{aluno_ra}}');
+  const campo = page.getByLabel('Sua mensagem');
+  const enviar = page.getByRole('button', { name: 'Enviar', exact: true });
+  for (const [mensagem, resposta] of [
+    ['Gostaria de criar um documento de autorização de passeio, vc consegue criar pra mim', 'Qual é o local do passeio?'],
+    ['Museu de Ciências', 'Em qual data será o passeio?'],
+    ['18/12/2026', 'Qual é o horário de saída?'],
+    ['08:00', 'Qual é o horário previsto de retorno?'],
+    ['pular', 'Montei o rascunho ao lado.'],
+  ]) {
+    await campo.fill(mensagem);
+    await enviar.click();
+    await expect(conversa).toContainText(resposta);
+  }
+  const previa = page.frameLocator('#edoc-assistente-previa');
+  await expect(previa.getByRole('heading', { name: 'Autorização de passeio escolar' })).toBeVisible();
+  await expect(previa.getByText('Museu de Ciências', { exact: false })).toBeVisible();
+  const folha = page.locator('#edoc-paper');
+  await expect(folha).not.toContainText('Museu de Ciências');
+  await page.getByRole('button', { name: 'Revisar layout' }).click();
+  const dialogo = page.getByRole('dialog', { name: 'Proposta de layout' });
+  const codigo = await dialogo.getByLabel('HTML gerado').inputValue();
+  expect(codigo).toContain('{{aut_hora_retorno}}');
+  expect(codigo).toContain('{{resp_nome}}');
+  await dialogo.getByRole('button', { name: 'Inserir na folha' }).click();
+  await expect(folha).toContainText('Museu de Ciências');
   expect(pedidosIa).toBe(0);
 });

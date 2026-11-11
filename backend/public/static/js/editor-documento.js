@@ -6184,33 +6184,41 @@
     return modelo.innerHTML;
   }
 
+  function elementosDaProposta(estrutura) {
+    return ['header', 'body', 'footer'].flatMap(function (area) {
+      return secoesDe(estrutura[area]).flatMap(function (secao) {
+        return (secao.columns || []).flatMap(function (coluna) { return coluna.elements || []; });
+      });
+    });
+  }
+
+  function htmlDaProposta(elementos) {
+    return elementos.map(function (el) {
+      var props = el.props || {};
+      return props.html || '<p>' + esc(props.text || '') + '</p>';
+    }).join('\n');
+  }
+
+  function previaDaProposta(html) {
+    return '<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src data:; style-src \'unsafe-inline\'">'
+      + '<style>body{font:11pt Arial,sans-serif;color:#222;margin:12px}table{border-collapse:collapse;max-width:100%}td,th{vertical-align:middle}p{margin:0 0 8px}.edoc-vert{writing-mode:vertical-rl;transform:rotate(180deg)}.edoc-faixa{background:#d1d5db}</style>'
+      + '<style>' + (C.cssAjusteFolha || '') + '</style>'
+      + '<main class="edoc-ajuste-folha">' + limparHtmlReproducao(ph(html)) + '</main>';
+  }
+
   function abrirRevisaoIa(estrutura, titulo) {
     var dialogo = $('#edoc-ia-revisao');
     $('#edoc-ia-revisao-titulo').textContent = titulo;
     var codigo = $('#edoc-ia-html');
     var previa = $('#edoc-ia-previa');
     var aviso = $('#edoc-ia-revisao-erro');
-    var elementos = [];
-    ['header', 'body', 'footer'].forEach(function (area) {
-      ((estrutura[area] || {}).sections || []).forEach(function (secao) {
-        (secao.columns || []).forEach(function (coluna) {
-          elementos = elementos.concat(coluna.elements || []);
-        });
-      });
-    });
+    var elementos = elementosDaProposta(estrutura);
     var editavel = elementos.length === 1 && elementos[0].type === 'html';
-    var html = elementos.map(function (el) {
-      var props = el.props || {};
-      return props.html || '<p>' + esc(props.text || '') + '</p>';
-    }).join('\n');
     codigo.readOnly = !editavel;
-    codigo.value = indentarHtmlDocumento(html);
+    codigo.value = indentarHtmlDocumento(htmlDaProposta(elementos));
     aviso.hidden = true;
     function atualizar() {
-      previa.srcdoc = '<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src data:; style-src \'unsafe-inline\'">'
-        + '<style>body{font:11pt Arial,sans-serif;color:#222;margin:12px}table{border-collapse:collapse;max-width:100%}td,th{vertical-align:middle}p{margin:0 0 8px}.edoc-vert{writing-mode:vertical-rl;transform:rotate(180deg)}.edoc-faixa{background:#d1d5db}</style>'
-        + '<style>' + (C.cssAjusteFolha || '') + '</style>'
-        + '<main class="edoc-ajuste-folha">' + limparHtmlReproducao(ph(codigo.value)) + '</main>';
+      previa.srcdoc = previaDaProposta(codigo.value);
     }
     codigo.oninput = atualizar;
     $('#edoc-ia-revisao-cancelar').onclick = function () { dialogo.close(); };
@@ -6384,6 +6392,36 @@
     }
   }
 
+  var camposPasseio = [
+    { pergunta: 'Qual é o local do passeio?', rotulo: 'Local', variavel: 'aut_local' },
+    { pergunta: 'Em qual data será o passeio?', rotulo: 'Data', variavel: 'data_evento' },
+    { pergunta: 'Qual é o horário de saída?', rotulo: 'Saída', variavel: 'aut_hora_saida' },
+    { pergunta: 'Qual é o horário previsto de retorno?', rotulo: 'Retorno', variavel: 'aut_hora_retorno' }
+  ];
+
+  function propostaAutorizacaoPasseio(respostas) {
+    var elemento = defaultElement('html');
+    var detalhes = camposPasseio.map(function (campo, indice) {
+      var resposta = respostas[indice];
+      var valor = resposta ? esc(resposta) : tokenDaChave(campo.variavel);
+      return '<p><strong>' + campo.rotulo + ':</strong> ' + valor + '</p>';
+    }).join('');
+    elemento.props.html = '<p style="text-align:center"><strong>{{escola_nome}}</strong></p>'
+      + '<h1 style="text-align:center;font-size:15pt">Autorização de passeio escolar</h1>'
+      + '<p>Eu, <strong>{{resp_nome}}</strong>, responsável por <strong>{{aluno_nome}}</strong>, da turma <strong>{{turma_nome}}</strong>, '
+      + 'autorizo sua participação no passeio escolar descrito abaixo.</p>'
+      + detalhes
+      + '<p style="margin-top:20pt">Data da assinatura: ____/____/________</p>'
+      + '<p style="margin-top:28pt">________________________________________</p>'
+      + '<p>Assinatura do responsável</p>';
+    return {
+      page: clone(state.estrutura.page),
+      body: { sections: [{ id: uid('s'), type: 'section', role: 'body', columns: [
+        { id: uid('c'), width: 100, vAlign: 'top', elements: [elemento] }
+      ] }] }
+    };
+  }
+
   function consultarVariaveisAssistente(texto) {
     function palavras(valor) {
       return valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().match(/[a-z0-9]+/g) || [];
@@ -6416,11 +6454,15 @@
     var opcoes = $('#edoc-assistente-opcoes');
     var chat = $('#edoc-assistente-chat');
     var imagem = $('#edoc-ia');
+    var trabalho = $('#edoc-assistente-trabalho');
+    var rascunho = $('#edoc-assistente-rascunho');
+    var estruturaRascunho;
     function alternarPainel(visivel, devolverFoco) {
       painel.hidden = !visivel;
       abrir.setAttribute('aria-expanded', String(visivel));
       if (visivel) {
-        if (conversa) conversa.hidden = true;
+        if (trabalho) trabalho.hidden = true;
+        painel.classList.remove('com-rascunho');
         opcoes.hidden = false;
         (chat || imagem).focus();
       } else if (devolverFoco) {
@@ -6434,52 +6476,63 @@
     });
     if (imagem) imagem.addEventListener('click', function () { alternarPainel(false, false); });
 
-    var conversa = $('#edoc-assistente-conversa');
-    if (!chat || !conversa) return;
+    if (!chat || !trabalho) return;
     var form = $('#edoc-assistente-form');
     var campo = $('#edoc-assistente-mensagem');
     var enviar = form.querySelector('button[type="submit"]');
     var mensagens = $('#edoc-assistente-mensagens');
     var exemplos = $('#edoc-assistente-exemplos');
     var status = $('#edoc-assistente-status');
+    var avatarAssistente = $('#edoc-assistente-avatar');
     var historico = [];
+    var respostasPasseio = null;
 
     function avisar(texto, erro) {
       status.textContent = texto;
       status.dataset.erro = String(!!erro);
       status.hidden = !texto;
     }
+    function exibirRascunho(estrutura) {
+      estruturaRascunho = estrutura;
+      $('#edoc-assistente-previa').srcdoc = previaDaProposta(htmlDaProposta(elementosDaProposta(estrutura)));
+      rascunho.hidden = false;
+      painel.classList.toggle('com-rascunho', !trabalho.hidden);
+    }
+    $('#edoc-assistente-revisar').addEventListener('click', function () {
+      abrirRevisaoIa(clone(estruturaRascunho), 'Proposta de layout');
+    });
     function exibirMensagem(papel, texto, estrutura) {
+      var linha = document.createElement('div');
+      linha.className = 'edoc-assistente-mensagem';
+      linha.dataset.papel = papel;
+      if (papel === 'assistant') {
+        var avatar = avatarAssistente.cloneNode();
+        avatar.removeAttribute('id');
+        linha.appendChild(avatar);
+      }
       var balao = document.createElement('div');
       balao.className = 'edoc-assistente-balao';
-      balao.dataset.papel = papel;
       var autor = document.createElement('strong');
       autor.textContent = papel === 'user' ? 'Você' : 'Assistente';
       var conteudo = document.createElement('p');
       conteudo.textContent = texto;
       balao.append(autor, conteudo);
-      if (estrutura) {
-        var revisar = document.createElement('button');
-        revisar.type = 'button';
-        revisar.className = 'edoc-btn';
-        revisar.textContent = 'Revisar layout';
-        revisar.addEventListener('click', function () {
-          abrirRevisaoIa(JSON.parse(JSON.stringify(estrutura)), 'Proposta de layout');
-        });
-        balao.appendChild(revisar);
-      }
-      mensagens.appendChild(balao);
+      linha.appendChild(balao);
+      if (estrutura) exibirRascunho(estrutura);
+      mensagens.appendChild(linha);
       mensagens.scrollTop = mensagens.scrollHeight;
-      return balao;
+      return linha;
     }
     chat.addEventListener('click', function () {
       opcoes.hidden = true;
-      conversa.hidden = false;
+      trabalho.hidden = false;
+      painel.classList.toggle('com-rascunho', !rascunho.hidden);
       mensagens.scrollTop = mensagens.scrollHeight;
       campo.focus();
     });
     $('#edoc-assistente-voltar').addEventListener('click', function () {
-      conversa.hidden = true;
+      trabalho.hidden = true;
+      painel.classList.remove('com-rascunho');
       opcoes.hidden = false;
       chat.focus();
     });
@@ -6489,6 +6542,36 @@
         campo.focus();
       });
     });
+    function responderSemIa(texto) {
+      var pedido = texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      if (respostasPasseio) {
+        if (pedido === 'cancelar') {
+          respostasPasseio = null;
+          exibirMensagem('assistant', 'Tudo bem. A autorização foi cancelada.');
+          return;
+        }
+        respostasPasseio.push(/^pular[.!]?$/.test(pedido) ? '' : texto);
+        if (respostasPasseio.length === camposPasseio.length) {
+          exibirMensagem('assistant', 'Montei o rascunho ao lado. Confira o texto e revise o layout antes de inserir na folha.',
+            propostaAutorizacaoPasseio(respostasPasseio));
+          respostasPasseio = null;
+          return;
+        }
+        exibirMensagem('assistant', camposPasseio[respostasPasseio.length].pergunta);
+        return;
+      }
+      var pedeDocumento = /\b(criar|crie|cria|montar|monte|monta|gerar|gere|gera|fazer|faca|faz|modelo)\b/.test(pedido);
+      var autorizacaoPasseio = /\bautorizacao\b/.test(pedido) && /\b(passeio|excursao|visita)\b/.test(pedido);
+      if (autorizacaoPasseio && (pedeDocumento || !/\bvariave(l|is)\b/.test(pedido))) {
+        respostasPasseio = [];
+        exibirMensagem('assistant', camposPasseio[0].pergunta
+          + '\n\nDigite “pular” para deixar qualquer campo para a emissão ou “cancelar” para encerrar.');
+        return;
+      }
+      exibirMensagem('assistant', pedeDocumento && /\b(documento|layout|declaracao|autorizacao|boletim|historico)\b/.test(pedido)
+        ? 'Posso montar uma autorização de passeio aqui. Para gerar outros layouts com IA, a escola precisa ter TudiCoins ativo.'
+        : consultarVariaveisAssistente(texto));
+    }
     form.addEventListener('submit', async function (e) {
       e.preventDefault();
       var texto = campo.value.trim();
@@ -6496,9 +6579,9 @@
       campo.value = '';
       campo.focus();
       exemplos.hidden = true;
-      var balao = exibirMensagem('user', texto);
+      var mensagemExibida = exibirMensagem('user', texto);
       if (!C.assistenteUrl) {
-        exibirMensagem('assistant', consultarVariaveisAssistente(texto));
+        responderSemIa(texto);
         return;
       }
       var mensagem = { role: 'user', content: texto };
@@ -6527,7 +6610,7 @@
         exibirMensagem('assistant', resultado.mensagem, estrutura);
         avisar('');
       } catch (erro) {
-        balao.remove();
+        mensagemExibida.remove();
         if (!campo.value.trim()) campo.value = texto;
         exemplos.hidden = historico.length > 0;
         avisar(erro instanceof SyntaxError ? 'Não foi possível ler a resposta do assistente.' : erro.message, true);
