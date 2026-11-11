@@ -2319,6 +2319,7 @@ $boletimWizardSteps = [
             if (tok.value === 'chamada' || tok.value === 'substituta') return 'nota substituta (';
             if (tok.value === 'composicao') return 'média c/ rec (';
             if (tok.value === 'media_lancado') return 'média (';
+            if (tok.value === 'media_ponderada') return 'média ponderada (';
             if (tok.value === 'se' || tok.value === 'if') return 'se (';
             return 'maior (';
         }
@@ -2371,6 +2372,7 @@ $boletimWizardSteps = [
             { type: 'fn', value: 'chamada', label: 'nota substituta (', ajuda: 'nota substituta ( bases… , CH ): média das bases; CH cobre a 1ª prova que faltar. Já divide sozinha.' },
             { type: 'fn', value: 'composicao', label: 'média c/ rec (', ajuda: 'média c/ rec ( média , REC ): sem recuperação fica a média; com REC vira (média + REC) ÷ 2.' },
             { type: 'fn', value: 'media_lancado', label: 'média (', ajuda: 'média ( provas | substituta | opcional ): média só do lançado. O | define o papel; ÷ automático.' },
+            { type: 'fn', value: 'media_ponderada', label: 'média ponderada (', ajuda: 'média ponderada ( PP , 3 , PU , 5 | CH ): pesos nas bases; CH cobre a 1ª ausente (mesmo peso). Sem cobertura → pendente.' },
             { type: 'fn', value: 'se', label: 'se (', ajuda: 'se ( condição , se_verdadeiro , se_falso ): condição = coluna (lançou?), PJ = verdadeiro/falso, PP > 7 ou PP > PU — depois escolhe qual conta usar.' }
         ];
     }
@@ -2402,6 +2404,7 @@ $boletimWizardSteps = [
             substituta: 'nota substituta ( bases… , CH ): média das bases; CH cobre a 1ª prova que faltar. Já divide sozinha.',
             composicao: 'média c/ rec ( média , REC ): sem recuperação fica a média; com REC vira (média + REC) ÷ 2.',
             media_lancado: 'média ( provas | substituta | opcional ): média só do lançado. O | define o papel; ÷ automático.',
+            media_ponderada: 'média ponderada ( PP , 3 , PU , 5 | CH ): pesos nas bases; CH cobre a 1ª ausente (mesmo peso). Sem cobertura → pendente.',
             se: 'se ( condição , se_verdadeiro , se_falso ): coluna sozinha (lançou?), = verdadeiro/falso, > < >= <= número ou outra coluna.',
             if: 'se ( condição , se_verdadeiro , se_falso ): coluna sozinha (lançou?), = verdadeiro/falso, > < >= <= número ou outra coluna.'
         };
@@ -2479,6 +2482,7 @@ $boletimWizardSteps = [
                 else if (fn === 'chamada' || fn === 'substituta') parts.push('chamada(');
                 else if (fn === 'composicao') parts.push('composicao(');
                 else if (fn === 'media_lancado') parts.push('media_lancado(');
+                else if (fn === 'media_ponderada') parts.push('media_ponderada(');
                 else if (fn === 'se' || fn === 'if') parts.push('se(');
                 else parts.push('max(');
             } else if (t.type === 'peca') parts.push(t.value);
@@ -2486,7 +2490,7 @@ $boletimWizardSteps = [
             else parts.push(t.value);
         });
         var exp = parts.join(' ').replace(/\( /g, '(').replace(/ \)/g, ')').replace(/ ,/g, ',').replace(/ \|/g, '|').replace(/\| /g, '|');
-        return exp.replace(/\b(max|min|chamada|substituta|composicao|media_lancado|se|if)\(\s+/g, '$1(').replace(/\bif\(/ig, 'se(').trim();
+        return exp.replace(/\b(max|min|chamada|substituta|composicao|media_lancado|media_ponderada|se|if)\(\s+/g, '$1(').replace(/\bif\(/ig, 'se(').trim();
     }
 
     function envolverSomaAntesDeDivisao(tokens) {
@@ -3045,7 +3049,7 @@ $boletimWizardSteps = [
         if (!estado || !tok) return;
         if (tok.type === 'peca') garantirPecaNaFormula(tok.value);
         if (!Array.isArray(estado.formula_tokens)) estado.formula_tokens = [];
-        if (estado.formula_tokens.length >= 80) return;
+        if (estado.formula_tokens.length >= 500) return;
         if (typeof at === 'number' && at >= 0 && at < estado.formula_tokens.length) {
             estado.formula_tokens.splice(at, 0, tok);
         } else {
@@ -3393,6 +3397,8 @@ $boletimWizardSteps = [
         // Rótulos do editor → nomes canônicos do motor.
         s = s.replace(/\bnota\s+substituta\b/g, 'chamada');
         s = s.replace(/\bmedia\s*c\s*\/\s*rec\b/g, 'composicao');
+        s = s.replace(/\bmedia\s+ponderada(?:\s+substituta)?\b/g, 'media_ponderada');
+        s = s.replace(/\bmedia_ponderada_substituta\b/g, 'media_ponderada');
         s = s.replace(/\bmedia\s+lancado\b/g, 'media_lancado');
         s = s.replace(/\bmedia\s*\(/g, 'media_lancado(');
         // Mantém | (grupos provas|substituta|opcional) e operadores de comparação.
@@ -3516,7 +3522,7 @@ $boletimWizardSteps = [
                 continue;
             }
             var rest = t.slice(i);
-            var fn = rest.match(/^(menor|maior|min|max|chamada|substituta|composicao|media_lancado|se|if)(?![a-z0-9_])/);
+            var fn = rest.match(/^(menor|maior|min|max|chamada|substituta|composicao|media_ponderada|media_lancado|se|if)(?![a-z0-9_])/);
             if (fn) {
                 var qual = fn[1];
                 var posFn = i + qual.length;
@@ -3528,6 +3534,7 @@ $boletimWizardSteps = [
                 if (qual === 'menor' || qual === 'min') fnVal = 'min';
                 else if (qual === 'chamada' || qual === 'substituta') fnVal = 'chamada';
                 else if (qual === 'composicao') fnVal = 'composicao';
+                else if (qual === 'media_ponderada') fnVal = 'media_ponderada';
                 else if (qual === 'media_lancado') fnVal = 'media_lancado';
                 else if (qual === 'se' || qual === 'if') fnVal = 'se';
                 flat.push({ k: 'fn', v: fnVal });
@@ -3576,9 +3583,11 @@ $boletimWizardSteps = [
                         ? 'nota substituta ('
                         : (item.v === 'composicao'
                             ? 'média c/ rec ('
-                            : (item.v === 'media_lancado'
-                                ? 'média ('
-                                : (item.v === 'se' || item.v === 'if' ? 'se (' : 'maior ('))));
+                            : (item.v === 'media_ponderada'
+                                ? 'média ponderada ('
+                                : (item.v === 'media_lancado'
+                                    ? 'média ('
+                                    : (item.v === 'se' || item.v === 'if' ? 'se (' : 'maior (')))));
                 toks.push({ type: 'fn', value: item.v === 'if' ? 'se' : item.v, label: labFn });
             }
             else if (item.k === 'num') toks.push({ type: 'num', value: item.v, label: item.v });
@@ -3594,7 +3603,8 @@ $boletimWizardSteps = [
                 toks.push({ type: 'op', value: item.v, label: lab });
             }
         });
-        if (toks.length > 80) return { ok: false, erro: 'A fórmula ficou longa demais.', tokens: [] };
+        // Árvore ponderada (CH/PJ/PE) passa de 80; teto folgado para não cortar.
+        if (toks.length > 500) return { ok: false, erro: 'A fórmula ficou longa demais.', tokens: [] };
         return { ok: true, erro: '', tokens: toks, temColuna: true };
     }
 
@@ -3620,7 +3630,7 @@ $boletimWizardSteps = [
             } else if (ultimaColuna) {
                 destino = ultimaColuna;
             }
-            if (!/(?:menor|maior|min|max|se|if|chamada|substituta|composicao|media_lancado|media)\s*\(|[+\-*/÷×|]|[()]|[<>=!]|(?:verdadeiro|falso|true|false|sim|nao)/i.test(expr)) return;
+            if (!/(?:menor|maior|min|max|se|if|chamada|substituta|composicao|media_ponderada|media_lancado|media)\s*\(|[+\-*/÷×|]|[()]|[<>=!]|(?:verdadeiro|falso|true|false|sim|nao)/i.test(expr)) return;
             if (!/[a-zA-ZÀ-ÿ]/.test(expr)) return;
             lista.push({ destino: destino, expr: expr.replace(/[."']+$/g, '').trim() });
         });
@@ -3661,6 +3671,7 @@ $boletimWizardSteps = [
             if (!t) return;
             if (t.type === 'fn' && (t.value === 'se' || t.value === 'if')) n += 40;
             if (t.type === 'fn' && t.value === 'media_lancado') n += 20;
+            if (t.type === 'fn' && t.value === 'media_ponderada') n += 25;
             if (t.type === 'op' && t.value === '|') n += 10;
             if (t.type === 'op' && t.value === '+') n += 5;
             n += 1;
@@ -6626,6 +6637,92 @@ $boletimWizardSteps = [
         return { provas: provas, subst: subst, extras: extras };
     }
 
+    /** Expande media_ponderada(base, peso… | subst). Pendente → null. */
+    function expandirMediaPonderadaJs(src, notas) {
+        var out = String(src || '');
+        var guard = 0;
+        while (/\bmedia_ponderada\s*\(/i.test(out) && guard++ < 40) {
+            var m = out.match(/\bmedia_ponderada\s*\(/i);
+            if (!m) break;
+            var startFn = m.index;
+            var openParen = startFn + m[0].length - 1;
+            var bloco = extrairConteudoParenJs(out, openParen);
+            if (!bloco) return null;
+            var conteudo = bloco.conteudo;
+            var subst = null;
+            var paresRaw = conteudo;
+            var depth = 0;
+            var pipePos = -1;
+            var i;
+            for (i = 0; i < conteudo.length; i++) {
+                var ch = conteudo.charAt(i);
+                if (ch === '(') depth++;
+                else if (ch === ')') depth--;
+                else if (ch === '|' && depth === 0) { pipePos = i; break; }
+            }
+            if (pipePos >= 0) {
+                paresRaw = conteudo.slice(0, pipePos).trim();
+                var substRaw = conteudo.slice(pipePos + 1).trim();
+                if (substRaw && /^[A-Za-z_][A-Za-z0-9_]*$/.test(substRaw)) subst = substRaw;
+                else if (substRaw) return null;
+            }
+            var tokens = [];
+            depth = 0;
+            var inicio = 0;
+            for (i = 0; i < paresRaw.length; i++) {
+                var c2 = paresRaw.charAt(i);
+                if (c2 === '(') depth++;
+                else if (c2 === ')') depth--;
+                else if (c2 === ',' && depth === 0) {
+                    tokens.push(paresRaw.slice(inicio, i).trim());
+                    inicio = i + 1;
+                }
+            }
+            tokens.push(paresRaw.slice(inicio).trim());
+            tokens = tokens.filter(function (t) { return t !== ''; });
+            var bases = [];
+            var ti = 0;
+            while (ti < tokens.length) {
+                var cod = tokens[ti];
+                if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(cod)) return null;
+                if (ti + 1 < tokens.length && /^-?\d+(?:[.,]\d+)?$/.test(tokens[ti + 1])) {
+                    var peso = Number(String(tokens[ti + 1]).replace(',', '.'));
+                    if (!(peso > 0)) return null;
+                    bases.push({ cod: cod, peso: peso });
+                    ti += 2;
+                    continue;
+                }
+                if (subst == null && ti === tokens.length - 1) {
+                    subst = cod;
+                    break;
+                }
+                return null;
+            }
+            if (!bases.length) return null;
+            var usouSubst = false;
+            var termos = [];
+            var somaPesos = 0;
+            var bi;
+            for (bi = 0; bi < bases.length; bi++) {
+                var b = bases[bi];
+                if (notaFormulaGrupo(notas, b.cod) != null) {
+                    termos.push('((' + b.cod + ')*(' + b.peso + '))');
+                    somaPesos += b.peso;
+                } else if (!usouSubst && subst && notaFormulaGrupo(notas, subst) != null) {
+                    termos.push('((' + subst + ')*(' + b.peso + '))');
+                    somaPesos += b.peso;
+                    usouSubst = true;
+                } else {
+                    return null;
+                }
+            }
+            if (!termos.length || !(somaPesos > 0)) return null;
+            var media = '((' + termos.join('+') + ')/(' + somaPesos + '))';
+            out = out.slice(0, startFn) + media + out.slice(bloco.close + 1);
+        }
+        return out;
+    }
+
     /** Expande chamada/substituta(bases…, subst) → média das bases (1ª ausente recebe a subst). */
     function expandirChamadaJs(src, notas) {
         var out = String(src || '');
@@ -6855,10 +6952,16 @@ $boletimWizardSteps = [
         var src = String(exp || '').trim();
         if (!src) return null;
         src = src.replace(/\bsubstituta\s*\(/ig, 'chamada(');
+        src = src.replace(/\bmedia_ponderada_substituta\s*\(/ig, 'media_ponderada(');
+        src = src.replace(/\bm[eé]dia\s+ponderada(?:\s+substituta)?\s*\(/ig, 'media_ponderada(');
         src = src.replace(/\bmedia_presentes\s*\(/ig, 'media_lancado(');
         src = src.replace(/\bif\s*\(/ig, 'se(');
         if (/\bse\s*\(/i.test(src)) {
             src = expandirSeJs(src, notas);
+            if (src == null) return null;
+        }
+        if (/\bmedia_ponderada\s*\(/i.test(src)) {
+            src = expandirMediaPonderadaJs(src, notas);
             if (src == null) return null;
         }
         if (/\bmedia_lancado\s*\(/i.test(src)) {
@@ -6875,12 +6978,12 @@ $boletimWizardSteps = [
         }
         src = src.replace(/[A-Za-z_][A-Za-z0-9_]*/g, function (nome) {
             var baixo = nome.toLowerCase();
-            if (baixo === 'max' || baixo === 'min' || baixo === 'chamada' || baixo === 'substituta' || baixo === 'composicao' || baixo === 'media_lancado' || baixo === 'se' || baixo === 'if') return baixo;
+            if (baixo === 'max' || baixo === 'min' || baixo === 'chamada' || baixo === 'substituta' || baixo === 'composicao' || baixo === 'media_lancado' || baixo === 'media_ponderada' || baixo === 'se' || baixo === 'if') return baixo;
             var v = notaFormulaGrupo(notas, nome);
             if (v == null || !isFinite(v)) return '0';
             return String(v);
         });
-        if (!/^[\d\s+\-*/().,]+$/.test(src.replace(/\b(?:max|min|chamada|substituta|composicao|media_lancado|se|if)\b/g, ''))) return null;
+        if (!/^[\d\s+\-*/().,]+$/.test(src.replace(/\b(?:max|min|chamada|substituta|composicao|media_lancado|media_ponderada|se|if)\b/g, ''))) return null;
         src = src.replace(/\bmax\b/g, 'Math.max').replace(/\bmin\b/g, 'Math.min');
         try {
             var n = Function('"use strict"; return (' + src + ');')();
@@ -6894,14 +6997,14 @@ $boletimWizardSteps = [
     function formulaGrupoFaltouPecaObrigatoria(codigo, exp, notas) {
         var cod = String(codigo || '').toLowerCase();
         var src = String(exp || '');
-        var temChamada = /\b(?:chamada|substituta|media_lancado)\s*\(/i.test(src);
+        var temChamada = /\b(?:chamada|substituta|media_lancado|media_ponderada)\s*\(/i.test(src);
         var refs = src.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || [];
         var i;
         var algumaPeca = false;
         for (i = 0; i < refs.length; i++) {
             var ref = String(refs[i] || '');
             var baixo = ref.toLowerCase();
-            if (baixo === 'max' || baixo === 'min' || baixo === 'chamada' || baixo === 'substituta' || baixo === 'composicao' || baixo === 'media_lancado' || baixo === 'se' || baixo === 'if') {
+            if (baixo === 'max' || baixo === 'min' || baixo === 'chamada' || baixo === 'substituta' || baixo === 'composicao' || baixo === 'media_lancado' || baixo === 'media_ponderada' || baixo === 'se' || baixo === 'if') {
                 continue;
             }
             var tem = notaFormulaGrupo(notas, ref) != null;
@@ -11240,7 +11343,7 @@ $boletimWizardSteps = [
                 html += '• 2º = fórmula se a condição for <strong>verdadeira</strong><br>';
                 html += '• 3º = fórmula se for <strong>falsa</strong><br>';
                 html += '• Ex.: <code class="bg-amber-50 px-1 rounded">se ( PJ = verdadeiro , média ( PP , PU | CH | PJ ) , média ( PP , PU | CH ) ) + PE</code> · <code class="bg-amber-50 px-1 rounded">se ( PP &gt; 7 , PP , PU )</code></p>';
-                html += '<p><strong>Média com peso</strong> — use × e ÷: <code class="bg-amber-50 px-1 rounded">((PP × 2) + PU) ÷ 3</code> (PP vale o dobro). Sempre divida pela soma dos pesos.</p>';
+                html += '<p><strong>Média ponderada</strong> — chip <code class="bg-amber-50 px-1 rounded">média ponderada (</code>: <code class="bg-amber-50 px-1 rounded">média ponderada ( PP , 3 , PU , 5 | CH )</code>. CH cobre a 1ª ausente com o mesmo peso; sem cobertura a coluna fica pendente. À mão: <code class="bg-amber-50 px-1 rounded">((PP × 2) + PU) ÷ 3</code>.</p>';
                 html += '<p><strong>maior (</strong> / <strong>menor (</strong> — maior ou menor valor entre as colunas listadas.</p>';
                 html += '<p class="text-amber-900/70">Manual completo: <code class="bg-amber-50 px-1 rounded">especificacoes/manual-formulas-boletim.md</code></p>';
                 html += '</div></details>';

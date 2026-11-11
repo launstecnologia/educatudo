@@ -2506,14 +2506,17 @@ class BoletimAssistenteWizard
     private function tokensDaExpressao(string $expr): array
     {
         $expr = trim($expr);
+        $expr = str_replace(['×', '÷', '−', '–', '—'], ['*', '/', '-', '-', '-'], $expr);
+        $expr = preg_replace('/\bmedia_ponderada_substituta\b/i', 'media_ponderada', $expr) ?? $expr;
+        $expr = preg_replace('/\bm[eé]dia\s+ponderada(?:\s+substituta)?\b/iu', 'media_ponderada', $expr) ?? $expr;
         $regexTokens = '/(?:>=|<=|!=|<>|==)'
             . '|\b(?:verdadeiro|falso|true|false|sim|nao|não)\b'
-            . '|\b(?:max|min|chamada|substituta|composicao|media_lancado|se|if)\b'
+            . '|\b(?:maior|menor|max|min|chamada|substituta|composicao|media_ponderada|media_lancado|se|if)\b'
             . '|\d+(?:\.\d+)?'
             . '|[A-Za-z_][A-Za-z0-9_]*'
             . '|[+\-*\/(),|]'
             . '|(?<![=!<>])=(?!=)'
-            . '|[<>]/';
+            . '|[<>]/u';
         if ($expr === '' || !preg_match_all($regexTokens, $expr, $achados)) {
             return [];
         }
@@ -2539,26 +2542,30 @@ class BoletimAssistenteWizard
         $n = count($partes);
         for ($i = 0; $i < $n; $i++) {
             $p = (string) $partes[$i];
-            $baixo = strtolower($p);
-            if (in_array($baixo, ['max', 'min', 'chamada', 'substituta', 'composicao', 'media_lancado', 'se', 'if'], true) && (($partes[$i + 1] ?? '') === '(')) {
-                $fnVal = ($baixo === 'min')
+            $baixo = mb_strtolower($p, 'UTF-8');
+            if (in_array($baixo, ['maior', 'menor', 'max', 'min', 'chamada', 'substituta', 'composicao', 'media_ponderada', 'media_lancado', 'se', 'if'], true) && (($partes[$i + 1] ?? '') === '(')) {
+                $fnVal = ($baixo === 'min' || $baixo === 'menor')
                     ? 'min'
                     : (($baixo === 'chamada' || $baixo === 'substituta')
                         ? 'chamada'
                         : ($baixo === 'composicao'
                             ? 'composicao'
-                            : ($baixo === 'media_lancado'
-                                ? 'media_lancado'
-                                : (($baixo === 'se' || $baixo === 'if') ? 'se' : 'max'))));
+                            : ($baixo === 'media_ponderada'
+                                ? 'media_ponderada'
+                                : ($baixo === 'media_lancado'
+                                    ? 'media_lancado'
+                                    : (($baixo === 'se' || $baixo === 'if') ? 'se' : 'max')))));
                 $fnLabel = $fnVal === 'min'
                     ? 'menor ('
                     : ($fnVal === 'chamada'
                         ? 'nota substituta ('
                         : ($fnVal === 'composicao'
                             ? 'média c/ rec ('
-                            : ($fnVal === 'media_lancado'
-                                ? 'média ('
-                                : ($fnVal === 'se' ? 'se (' : 'maior ('))));
+                            : ($fnVal === 'media_ponderada'
+                                ? 'média ponderada ('
+                                : ($fnVal === 'media_lancado'
+                                    ? 'média ('
+                                    : ($fnVal === 'se' ? 'se (' : 'maior (')))));
                 $tokens[] = [
                     'type' => 'fn',
                     'value' => $fnVal,
@@ -2611,7 +2618,7 @@ class BoletimAssistenteWizard
                     'label' => $labelPeca ?? $p,
                 ];
             }
-            if (count($tokens) >= 80) {
+            if (count($tokens) >= 500) {
                 break;
             }
         }
@@ -6083,7 +6090,10 @@ class BoletimAssistenteWizard
                 if ($value === 'if') {
                     $value = 'se';
                 }
-                if (!in_array($value, ['max', 'min', 'chamada', 'composicao', 'media_lancado', 'se'], true)) {
+                if ($value === 'media_ponderada_substituta') {
+                    $value = 'media_ponderada';
+                }
+                if (!in_array($value, ['max', 'min', 'chamada', 'composicao', 'media_ponderada', 'media_lancado', 'se'], true)) {
                     continue;
                 }
                 $out[] = [
@@ -6095,12 +6105,14 @@ class BoletimAssistenteWizard
                             ? 'nota substituta ('
                             : ($value === 'composicao'
                                 ? 'média c/ rec ('
-                                : ($value === 'media_lancado'
-                                    ? 'média ('
-                                    : ($value === 'se' ? 'se (' : 'maior (')))),
+                                : ($value === 'media_ponderada'
+                                    ? 'média ponderada ('
+                                    : ($value === 'media_lancado'
+                                        ? 'média ('
+                                        : ($value === 'se' ? 'se (' : 'maior ('))))),
                 ];
             }
-            if (count($out) >= 80) {
+            if (count($out) >= 500) {
                 break;
             }
         }
@@ -6367,7 +6379,10 @@ class BoletimAssistenteWizard
                 if ($v === 'if') {
                     $v = 'se';
                 }
-                if (!in_array($v, ['max', 'min', 'chamada', 'composicao', 'media_lancado', 'se'], true)) {
+                if ($v === 'media_ponderada_substituta') {
+                    $v = 'media_ponderada';
+                }
+                if (!in_array($v, ['max', 'min', 'chamada', 'composicao', 'media_ponderada', 'media_lancado', 'se'], true)) {
                     return '';
                 }
                 $parts[] = $v . '(';
@@ -6424,7 +6439,7 @@ class BoletimAssistenteWizard
         }
         $exp = trim(preg_replace('/\s+/', ' ', implode(' ', $parts)) ?? '');
         $exp = str_replace(['( ', ' )', ' ,', ' |'], ['(', ')', ',', '|'], $exp);
-        $exp = preg_replace('/\b(max|min|chamada|substituta|composicao|media_lancado|se|if)\(\s+/', '$1(', $exp) ?? $exp;
+        $exp = preg_replace('/\b(max|min|chamada|substituta|composicao|media_ponderada|media_lancado|se|if)\(\s+/', '$1(', $exp) ?? $exp;
         $exp = preg_replace('/\bsubstituta\s*\(/i', 'chamada(', $exp) ?? $exp;
         $exp = preg_replace('/\bif\s*\(/i', 'se(', $exp) ?? $exp;
         $exp = trim($exp);
@@ -6432,7 +6447,7 @@ class BoletimAssistenteWizard
         if ($exp === '' || !(bool) preg_match('/^[a-z0-9_+\-*\/(),|.<>=!\s]+$/i', $exp)) {
             return '';
         }
-        if ((str_contains($exp, 'max(') || str_contains($exp, 'min(') || str_contains($exp, 'chamada(') || str_contains($exp, 'composicao(') || str_contains($exp, 'se(')) && !str_contains($exp, ',')) {
+        if ((str_contains($exp, 'max(') || str_contains($exp, 'min(') || str_contains($exp, 'chamada(') || str_contains($exp, 'composicao(') || str_contains($exp, 'media_ponderada(') || str_contains($exp, 'se(')) && !str_contains($exp, ',')) {
             return '';
         }
         return $this->envolverSomaAntesDeDivisaoNaExpressao($exp);
@@ -10525,7 +10540,7 @@ class BoletimAssistenteWizard
             }
             $faltam = [];
             foreach ($achados[0] as $tok) {
-                if (in_array($tok, ['max', 'min', 'chamada', 'substituta', 'composicao', 'media_lancado', 'se', 'if'], true) || isset($faltam[$tok])) {
+                if (in_array($tok, ['max', 'min', 'chamada', 'substituta', 'composicao', 'media_ponderada', 'media_lancado', 'se', 'if'], true) || isset($faltam[$tok])) {
                     continue;
                 }
                 if ($this->tokenApontaParaColunaViva($tok, $codigos)) {
@@ -12126,7 +12141,7 @@ class BoletimAssistenteWizard
             return false;
         }
         foreach ($achados[0] as $cod) {
-            if (in_array($cod, ['max', 'min', 'chamada', 'substituta', 'composicao', 'media_lancado', 'se', 'if'], true)) {
+            if (in_array($cod, ['max', 'min', 'chamada', 'substituta', 'composicao', 'media_ponderada', 'media_lancado', 'se', 'if'], true)) {
                 continue;
             }
             if (!isset($notas[$cod]) || !is_numeric($notas[$cod])) {
@@ -12172,6 +12187,14 @@ class BoletimAssistenteWizard
             try {
                 $expr = (new \App\Modulos\Fechamento\Services\ResultadoAcademicoService())
                     ->expandirSeParaPreview($expr, $temNotaPrev, $valorNotaPrev);
+            } catch (\Throwable $e) {
+                return null;
+            }
+        }
+        if (preg_match('/\bmedia_ponderada(?:_substituta)?\s*\(/i', $expr) || preg_match('/\bm[eé]dia\s+ponderada/iu', $expr)) {
+            try {
+                $expr = (new \App\Modulos\Fechamento\Services\ResultadoAcademicoService())
+                    ->expandirMediaPonderadaParaPreview($expr, $temNotaPrev);
             } catch (\Throwable $e) {
                 return null;
             }

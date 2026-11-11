@@ -60,8 +60,21 @@ class BoletimConsultaAssistenteService
         if ($this->pedidoEhMediaComEnac($mensagem)) {
             return ['success' => true, 'mensagem' => $this->textoMediaComEnac()];
         }
+        if ($this->pedidoEhMediaPonderada($mensagem)) {
+            return ['success' => true, 'mensagem' => $this->textoMediaPonderadaComChEPj($mensagem, $wizardEstado)];
+        }
         if ($this->pedidoEhMediaComChEPj($mensagem)) {
             return ['success' => true, 'mensagem' => $this->textoMediaComChEPj($mensagem, $wizardEstado)];
+        }
+        // Follow-up curto ("Se tiver PJ…") sozinho não tem PP/PU/CH — junta só o pedido anterior.
+        $contextoFormula = $this->contextoPedidoFormula($mensagem, $historico);
+        if ($contextoFormula !== $mensagem) {
+            if ($this->pedidoEhMediaPonderada($contextoFormula)) {
+                return ['success' => true, 'mensagem' => $this->textoMediaPonderadaComChEPj($contextoFormula, $wizardEstado)];
+            }
+            if ($this->pedidoEhMediaComChEPj($contextoFormula)) {
+                return ['success' => true, 'mensagem' => $this->textoMediaComChEPj($contextoFormula, $wizardEstado)];
+            }
         }
         $metrica = $this->textoExplicacaoMetricaFormula($mensagem);
         if ($metrica !== null) {
@@ -431,6 +444,46 @@ class BoletimConsultaAssistenteService
     }
 
     /**
+     * Só para follow-up curto de fórmula: junta o último pedido completo do user.
+     * Não usa histórico em pergunta qualquer (evita reaplicar o template).
+     *
+     * @param list<array{role?:string,content?:string}> $historico
+     */
+    private function contextoPedidoFormula(string $mensagem, array $historico = []): string
+    {
+        $t = $this->normalizarTexto($mensagem);
+        $pareceRefino = mb_strlen(trim($mensagem)) <= 180
+            && preg_match(
+                '/se tiver|caso tenha|divid\w*\s+por\s*[23]|\/\s*[23]|add\b|adicionar|somar|\+\s*pe|opcional|substitut|corrija|ainda|faltou|inclua|monte/u',
+                $t
+            ) === 1;
+        if (!$pareceRefino) {
+            return $mensagem;
+        }
+
+        $anterior = '';
+        foreach (array_reverse($historico) as $msg) {
+            if (($msg['role'] ?? '') !== 'user') {
+                continue;
+            }
+            $c = trim((string) ($msg['content'] ?? ''));
+            if ($c === '' || $c === $mensagem || mb_strlen($c) < 20) {
+                continue;
+            }
+            if (preg_match('/\b(pp|pu|pj|ch|pe|peso|m[eé]dia|divid|substitut|f[oó]rmula|formula)\b/ui', $c) !== 1) {
+                continue;
+            }
+            $anterior = mb_substr($c, 0, 1500);
+            break;
+        }
+        if ($anterior === '') {
+            return $mensagem;
+        }
+
+        return trim($anterior . "\n" . $mensagem);
+    }
+
+    /**
      * (Média Bim + ENAC) ÷ 2, e só usa esse resultado se for maior que a Média Bim.
      */
     private function pedidoEhMediaComEnac(string $mensagem): bool
@@ -528,11 +581,317 @@ class BoletimConsultaAssistenteService
         if (str_contains($t, 'enac')) {
             return false;
         }
+        // Peso / teto condicional → NÃO cair no template "provas|substituta|opcional".
+        if ($this->pedidoEhMediaPonderada($mensagem) || $this->pedidoTemTetoCondicional($mensagem)) {
+            return false;
+        }
+        // Modelo 3 / bônus ponderado — mas "÷2 / ÷3 + PJ opcional" pode ter setas de validação.
+        if (preg_match('/b[oô]nus|ponderad|teto|efetiva|n[aã]o\s*(passou|corrigiu|implement)/u', $t) === 1) {
+            return false;
+        }
         $temPpPu = preg_match('/\bpp\b|\bpu\b/u', $t) === 1;
         $temSubst = preg_match('/\bch\b|2a.?chamada|2ª.?chamada|segunda.?chamada|substitut/u', $t) === 1;
         $pedeMontar = preg_match('/m[eé]dia|divid|\/\s*2|\/\s*3|por 2|por 3|÷|monta|formula|f[oó]rmula|calcular|se tiver|se lan[cç]/u', $t) === 1;
-        // PP/PU + CH (mínimo). PJ/PE podem vir na mesma frase; a resposta cobre os dois casos.
+
         return $pedeMontar && $temPpPu && $temSubst;
+    }
+
+    /** Média com pesos diferentes e/ou redistribuição (siglas do evento, não só PP/PU). */
+    private function pedidoEhMediaPonderada(string $mensagem): bool
+    {
+        $t = $this->normalizarTexto($mensagem);
+        if (str_contains($t, 'enac')) {
+            return false;
+        }
+        if ($this->pedidoTemTetoCondicional($mensagem)) {
+            return true;
+        }
+        // "Não use pesos/pontos" ≠ pedido de média ponderada.
+        if (preg_match('/\b(?:n[aã]o\s+use|n[aã]o\s+utilizar|sem|nem)\b[^.\n]{0,48}\b(?:pesos?|pontos?\s+de\s+peso)\b/u', $t) === 1) {
+            return false;
+        }
+        // ÷2 / ÷3 sem indicação de peso → média simples (PJ opcional).
+        if (preg_match('/divid\w*\s+por\s*[23]|\/\s*[23]|÷\s*[23]|\(\s*[a-z]{1,8}\s*\+\s*[a-z]{1,8}\s*\)\s*÷\s*2/u', $t) === 1
+            && !$this->mensagemTemIndicacaoPeso($mensagem)
+        ) {
+            return false;
+        }
+
+        return $this->mensagemTemIndicacaoPeso($mensagem)
+            || preg_match('/\d\s*\+\s*\d\s*\+\s*\d/u', $t) === 1;
+    }
+
+    /**
+     * Usuário pode dizer "peso 3", "vale 3", "vale 3 pontos", "PP 3 pontos".
+     * Não confundir com bônus: "PE até 0,5 ponto".
+     */
+    private function mensagemTemIndicacaoPeso(string $mensagem): bool
+    {
+        $t = $this->normalizarTexto($mensagem);
+        // Tira "até/máximo X ponto(s)" (teto de bônus, não peso da prova).
+        $t = preg_replace('/\b(?:at[eé]|m[aá]ximo|maximo|m[aá]x\.?)\s*\d+(?:[.,]\d+)?\s*pontos?\b/u', ' ', $t) ?? $t;
+
+        return preg_match(
+            '/ponderad|redistribu|proporcion|\bpesos?\b|peso\s*\d'
+            . '|vale\s+\d+(?:[.,]\d+)?(?:\s*pontos?)?'
+            . '|\b\d+(?:[.,]\d+)?\s*pontos?\b/u',
+            $t
+        ) === 1;
+    }
+
+    /** Modelo 3: teto 6 se a prova (PU efetiva / CH) < 5. */
+    private function pedidoTemTetoCondicional(string $mensagem): bool
+    {
+        return preg_match(
+            '/teto\s*(condicional|de\s*6)|ultrapassar\s*6|n[aã]o poder[aá] ultrapassar\s*6'
+            . '|menor que\s*5(?:[.,]0)?\b|inferior a\s*5(?:[.,]0)?\b|abaixo de\s*5(?:[.,]0)?\b|<\s*5(?:[.,]0)?\b'
+            . '|nota efetiva\s*(?:da\s*|de\s*)?(?:pu|prova)|pu efetiva|quando.{0,40}\bpu\b.{0,40}\b6\b'
+            . '|limit\w* (?:a )?6.{0,40}\bpu\b|\bpu\b.{0,40}limit\w* (?:a )?6/ui',
+            $mensagem
+        ) === 1;
+    }
+
+    /**
+     * Teto 6 se a prova-alvo (ou CH no lugar dela) < limiar; senão teto 10.
+     * se(PROVA, se(PROVA<L,…), se(CH<L,…)) — CH só entra na comparação quando a prova está ausente
+     * (aí a substituta cobre essa prova se a anterior já tinha nota).
+     */
+    private function envolverTetoCondicionalProva(
+        string $nucleo,
+        string $prova,
+        string $subst,
+        string $limiar,
+        string $tetoBaixo,
+        string $tetoAlto
+    ): string {
+        $ramoProva = "se ( {$prova} < {$limiar} , menor ( {$tetoBaixo} , {$nucleo} ) , menor ( {$tetoAlto} , {$nucleo} ) )";
+        $ramoSubst = "se ( {$subst} < {$limiar} , menor ( {$tetoBaixo} , {$nucleo} ) , menor ( {$tetoAlto} , {$nucleo} ) )";
+
+        return "se ( {$prova} , {$ramoProva} , {$ramoSubst} )";
+    }
+
+    /**
+     * Siglas/títulos curtos do evento para usar na fórmula (não códigos internos).
+     *
+     * @param array<string,mixed>|null $estado
+     * @return list<string>
+     */
+    private function siglasDoEventoParaFormula(?array $estado): array
+    {
+        $out = [];
+        $nomes = is_array($estado['nomes_blocos'] ?? null) ? $estado['nomes_blocos'] : [];
+        foreach ($nomes as $cod => $rotulo) {
+            $cod = strtolower(trim((string) $cod));
+            $rotulo = trim((string) $rotulo);
+            if ($rotulo === '' || $cod === '') {
+                continue;
+            }
+            if (preg_match('/^(media_|resultado|_semanal|s[1-8]$)/', $cod) === 1) {
+                continue;
+            }
+            if (!$this->rotuloPareceSiglaFormula($rotulo)) {
+                continue;
+            }
+            $out[$rotulo] = true;
+        }
+        foreach ((array) ($estado['colunas_ordem'] ?? []) as $cod) {
+            $cod = strtolower(trim((string) $cod));
+            if ($cod === '' || preg_match('/^(media_|resultado|_semanal)/', $cod) === 1) {
+                continue;
+            }
+            $rotulo = trim((string) ($nomes[$cod] ?? ''));
+            if ($rotulo !== '' && $this->rotuloPareceSiglaFormula($rotulo)) {
+                $out[$rotulo] = true;
+            }
+        }
+
+        return array_keys($out);
+    }
+
+    /** Sigla de peça/evento (PP, AV1…) — não título de período nem palavra comum. */
+    private function rotuloPareceSiglaFormula(string $rotulo): bool
+    {
+        $r = trim($rotulo);
+        if ($r === '' || mb_strlen($r) > 12 || preg_match('/\s/u', $r) === 1) {
+            return false;
+        }
+        if (preg_match('/^(e|ou|de|da|do|das|dos|a|o|as|os|um|uma|com|sem|ate|até|max|máx|para|por)$/iu', $r) === 1) {
+            return false;
+        }
+        if (preg_match('/bimestre|semestre|unidade|m[eé]dia|resultado|faltas|jornada|aluno|prova\s/iu', $r) === 1) {
+            return false;
+        }
+
+        return preg_match('/^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9_]{0,11}$/u', $r) === 1;
+    }
+
+    /**
+     * Pares [sigla, peso] — só siglas do evento (nunca "e", "bimestre", etc.).
+     *
+     * @param list<string> $siglas
+     * @param list<string> $excluir
+     * @return list<array{0:string,1:float}>
+     */
+    private function extrairBasesComPeso(string $mensagem, array $siglas, array $excluir = []): array
+    {
+        $excl = [];
+        foreach ($excluir as $e) {
+            $excl[mb_strtolower(trim((string) $e))] = true;
+        }
+        // Com evento aberto: SOMENTE as siglas do quadro. Sem evento: só tokens que parecem sigla.
+        $candidatas = $siglas;
+        if ($candidatas === []) {
+            if (preg_match_all(
+                '/\b([A-Za-z][A-Za-z0-9_]{0,11})\b[^0-9]{0,24}(?:peso\s*|vale\s*|(?:tem|com|de)\s+)?(\d+(?:[.,]\d+)?)(?:\s*pontos?)?/ui',
+                $mensagem,
+                $mm,
+                PREG_SET_ORDER
+            )) {
+                foreach ($mm as $m) {
+                    $cand = (string) $m[1];
+                    if ($this->rotuloPareceSiglaFormula($cand)) {
+                        $candidatas[] = $cand;
+                    }
+                }
+            }
+        }
+        $candidatas = array_values(array_unique(array_filter(array_map('trim', $candidatas))));
+        usort($candidatas, static fn ($a, $b) => mb_strlen($b) <=> mb_strlen($a));
+
+        $bases = [];
+        $usadas = [];
+        foreach ($candidatas as $sigla) {
+            $baixo = mb_strtolower($sigla);
+            if ($sigla === '' || isset($usadas[$baixo]) || isset($excl[$baixo])) {
+                continue;
+            }
+            if (!$this->rotuloPareceSiglaFormula($sigla)) {
+                continue;
+            }
+            $peso = $this->extrairPesoDaSiglaNaMensagem($mensagem, $sigla);
+            if ($peso === null || $peso <= 0) {
+                continue;
+            }
+            $bases[] = [$sigla, $peso];
+            $usadas[$baixo] = true;
+        }
+
+        return $bases;
+    }
+
+    /** Aceita "peso 3", "vale 3", "vale 3 pontos", "PP 3 pontos". */
+    private function extrairPesoDaSiglaNaMensagem(string $mensagem, string $sigla): ?float
+    {
+        $q = preg_quote($sigla, '/');
+        $padroes = [
+            '/(?<![A-Za-z0-9_])' . $q . '(?![A-Za-z0-9_])[^0-9]{0,20}peso\s*(\d+(?:[.,]\d+)?)/ui',
+            '/\bpeso\s*(\d+(?:[.,]\d+)?)\s*(?:para\s+|do\s+|de\s+|da\s+)?' . $q . '(?![A-Za-z0-9_])/ui',
+            '/(?<![A-Za-z0-9_])' . $q . '(?![A-Za-z0-9_])[^0-9]{0,28}vale\s*(\d+(?:[.,]\d+)?)(?:\s*pontos?)?/ui',
+            '/(?<![A-Za-z0-9_])' . $q . '(?![A-Za-z0-9_])[^0-9]{0,28}(?:tem|com|de)\s*(\d+(?:[.,]\d+)?)\s*pontos?\b/ui',
+            '/(?<![A-Za-z0-9_])' . $q . '(?![A-Za-z0-9_])\s*[,:\-–]?\s*(\d+(?:[.,]\d+)?)\s*pontos?\b/ui',
+        ];
+        foreach ($padroes as $re) {
+            if (preg_match($re, $mensagem, $m) === 1) {
+                return (float) str_replace(',', '.', $m[1]);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Escolhe uma sigla do evento (ou citada) para um papel: substituta, bônus, ponto extra.
+     *
+     * @param list<string> $siglas
+     * @param list<string> $excluir já usadas (case-insensitive)
+     */
+    private function escolherSiglaPorPapel(
+        string $mensagem,
+        array $siglas,
+        string $papel,
+        array $excluir = []
+    ): ?string {
+        $excl = [];
+        foreach ($excluir as $e) {
+            $excl[mb_strtolower(trim((string) $e))] = true;
+        }
+
+        $papelRe = match ($papel) {
+            'substituta' => 'substitut(?:a|o)?|2a\.?\s*chamada|2ª\.?\s*chamada|segunda\s*chamada',
+            'bonus' => 'b[oô]nus|bonus',
+            'ponto_extra' => 'ponto\s*extra|\bpe\b.{0,24}(?:at[eé]|m[aá]ximo|maximo|no m[aá]ximo)',
+            default => '',
+        };
+
+        // Palavra-chave do papel → sigla mais próxima (antes ou depois), máx. 28 chars.
+        if ($papelRe !== '' && preg_match_all('/(?:' . $papelRe . ')/uis', $mensagem, $mm, PREG_OFFSET_CAPTURE)) {
+            foreach ($mm[0] as $hit) {
+                $pos = (int) $hit[1];
+                $lenHit = strlen((string) $hit[0]);
+                $antes = substr($mensagem, max(0, $pos - 28), min(28, $pos));
+                $depois = substr($mensagem, $pos + $lenHit, 28);
+                $vizinha = $this->siglaMaisProximaNoTrecho($antes, $siglas, $excl, true)
+                    ?? $this->siglaMaisProximaNoTrecho($depois, $siglas, $excl, false);
+                if ($vizinha !== null) {
+                    return $vizinha;
+                }
+            }
+        }
+
+        // Fallback: sigla típica do papel no evento / citada.
+        $fallback = match ($papel) {
+            'substituta' => ['CH', '2CH', 'CH2', 'SUB', '2A'],
+            'bonus' => ['PJ', 'PROJ', 'PROJETO'],
+            'ponto_extra' => ['PE', 'PEX', 'EXTRA'],
+            default => [],
+        };
+        foreach ($fallback as $cand) {
+            $baixo = mb_strtolower($cand);
+            if (isset($excl[$baixo])) {
+                continue;
+            }
+            foreach ($siglas as $sigla) {
+                if (mb_strtolower($sigla) === $baixo) {
+                    return $sigla;
+                }
+            }
+            if (preg_match('/\b' . preg_quote($cand, '/') . '\b/ui', $mensagem) === 1) {
+                return $cand;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<string> $siglas
+     * @param array<string,bool> $excl
+     */
+    private function siglaMaisProximaNoTrecho(string $trecho, array $siglas, array $excl, bool $pegarUltima): ?string
+    {
+        $achados = [];
+        foreach ($siglas as $sigla) {
+            $baixo = mb_strtolower($sigla);
+            if ($sigla === '' || isset($excl[$baixo])) {
+                continue;
+            }
+            $q = preg_quote($sigla, '/');
+            if (preg_match_all('/(?<![A-Za-z0-9_])' . $q . '(?![A-Za-z0-9_])/ui', $trecho, $mm, PREG_OFFSET_CAPTURE)) {
+                foreach ($mm[0] as $m) {
+                    $achados[] = ['sigla' => $sigla, 'pos' => (int) $m[1]];
+                }
+            }
+        }
+        if ($achados === []) {
+            return null;
+        }
+        usort($achados, static function (array $a, array $b) use ($pegarUltima): int {
+            return $pegarUltima ? ($a['pos'] <=> $b['pos']) : ($b['pos'] <=> $a['pos']);
+        });
+
+        return $pegarUltima
+            ? (string) $achados[count($achados) - 1]['sigla']
+            : (string) $achados[0]['sigla'];
     }
 
     /**
@@ -597,32 +956,391 @@ class BoletimConsultaAssistenteService
     private function textoMediaComChEPj(string $mensagem = '', ?array $estado = null): string
     {
         $col = $this->nomeColunaAlvoFormula($mensagem, $estado);
+        $siglas = $this->siglasDoEventoParaFormula($estado);
         $t = $this->normalizarTexto($mensagem);
-        $querPj = preg_match('/\bpj\b|projeto|opcional|se tiver|se lan[cç]/u', $t) === 1;
-        $querPe = preg_match('/\bpe\b|soma fora|\+\s*pe/u', $t) === 1;
 
-        // Uma única linha "Coluna =" para o auto-montar não sobrescrever com a variante curta.
-        if ($querPj || $querPe) {
-            $formula = "{$col} = se ( PJ , média ( PP , PU | CH | PJ ) , média ( PP , PU | CH ) )";
-            if ($querPe || !$querPj) {
-                // Pedido com PE, ou PJ sem PE explícito mas padrão SM: PE fora.
-                $formula .= ' + PE';
-            }
-            if ($querPe && !$querPj) {
-                $formula = "{$col} = média ( PP , PU | CH ) + PE";
-            }
+        // Papéis ANTES das provas — senão PJ/CH/PE entram no array_slice(0,2) e a PU some.
+        $subst = $this->escolherSiglaPorPapel($mensagem, $siglas, 'substituta');
+        $opcional = $this->escolherSiglaPorPapel(
+            $mensagem,
+            $siglas,
+            'bonus',
+            $subst ? [$subst] : []
+        );
+        $extra = $this->escolherSiglaPorPapel(
+            $mensagem,
+            $siglas,
+            'ponto_extra',
+            array_merge($subst ? [$subst] : [], $opcional ? [$opcional] : [])
+        );
 
-            return "Entendi: PP e PU na média; CH cobre a prova que faltar"
-                . ($querPj ? '; se tiver PJ, entra na média (÷3)' : '')
-                . ($querPe || str_contains($formula, '+ PE') ? '; PE soma fora' : '')
-                . ".\n\n"
-                . $formula . "\n\n"
-                . "Montei para a coluna {$col} (cálculo aberto). O | só vale dentro de média ( … ).";
+        // "se tiver PJ / divide por 3 / entra na média" sem a palavra "bônus".
+        if ($opcional === null) {
+            foreach (['PJ', 'PROJ', 'PROJETO'] as $cand) {
+                $q = preg_quote($cand, '/');
+                if (preg_match('/\b' . $q . '\b/ui', $mensagem) !== 1) {
+                    continue;
+                }
+                if (preg_match(
+                    '/(?:se tiver|caso tenha|se lan[cç]|add|adicionar|somar|entra).{0,40}\b' . $q . '\b'
+                    . '|\b' . $q . '\b.{0,40}(?:divid|\/\s*3|por 3|somar|entra|opcional)/ui',
+                    $mensagem
+                ) === 1) {
+                    $opcional = $this->siglaDoEventoOuCitada($cand, $siglas);
+                    break;
+                }
+            }
         }
 
-        return "Entendi: PP e PU na média; CH cobre a prova que faltar.\n\n"
-            . "{$col} = média ( PP , PU | CH )\n\n"
-            . "Montei para a coluna {$col}. Se quiser Projeto e PE, diga que tem PJ e + PE.";
+        $excluirProvas = array_values(array_filter([$subst, $opcional, $extra]));
+        $provas = $this->extrairProvasMediaSimples($mensagem, $siglas, $excluirProvas);
+
+        $querOpcional = $opcional !== null || preg_match(
+            '/\bopcional|projeto|se tiver\s+(nota\s+)?(no\s+|em\s+)?pj|se lan[cç].{0,20}pj|divid\w*\s+por\s*3|\/\s*3|add\s+o?\s*pj/u',
+            $t
+        ) === 1;
+        $querExtra = $extra !== null || preg_match('/ponto\s*extra|\bpe\b|soma fora|soma o pe/u', $t) === 1;
+
+        if ($querOpcional && $opcional === null) {
+            $opcional = $this->escolherSiglaPorPapel($mensagem, $siglas, 'bonus', $excluirProvas)
+                ?? $this->siglaDoEventoOuCitada('PJ', $siglas);
+        }
+        if ($querExtra && $extra === null) {
+            $extra = $this->escolherSiglaPorPapel($mensagem, $siglas, 'ponto_extra', array_merge($excluirProvas, $opcional ? [$opcional] : []))
+                ?? $this->siglaDoEventoOuCitada('PE', $siglas);
+        }
+
+        if (count($provas) < 2 || $subst === null) {
+            $lista = $siglas !== [] ? implode(', ', $siglas) : '(nenhuma sigla no evento ainda)';
+
+            return "As siglas mudam por evento — não assumo PP/PU/CH.\n\n"
+                . "Colunas deste evento: {$lista}.\n"
+                . "Me diga: quais 2 provas entram na média, qual é a substituta"
+                . ($querOpcional ? ', qual é o opcional' : '')
+                . ($querExtra ? ' e qual é o ponto extra' : '')
+                . '.';
+        }
+
+        $a = $provas[0];
+        $b = $provas[1];
+        if ($querOpcional && $opcional !== null) {
+            $formula = "{$col} = se ( {$opcional} , média ( {$a} , {$b} | {$subst} | {$opcional} ) , média ( {$a} , {$b} | {$subst} ) )";
+            if ($querExtra && $extra !== null) {
+                $formula .= " + {$extra}";
+            }
+        } elseif ($querExtra && $extra !== null) {
+            $formula = "{$col} = média ( {$a} , {$b} | {$subst} ) + {$extra}";
+        } else {
+            $formula = "{$col} = média ( {$a} , {$b} | {$subst} )";
+        }
+
+        return "Entendi (siglas deste evento): {$a} e {$b} na média; {$subst} substituta"
+            . ($opcional !== null && $querOpcional ? "; {$opcional} opcional (÷3 se lançar)" : '')
+            . ($extra !== null && $querExtra ? "; {$extra} fora" : '')
+            . ".\n\n{$formula}\n\n"
+            . "Montei para a coluna {$col}. O | só vale dentro de média ( … ).";
+    }
+
+    /**
+     * Duas provas da média simples (ex.: PP e PU), sem misturar substituta/opcional/PE.
+     *
+     * @param list<string> $siglas
+     * @param list<string> $excluir
+     * @return list<string>
+     */
+    private function extrairProvasMediaSimples(string $mensagem, array $siglas, array $excluir = []): array
+    {
+        $excl = [];
+        foreach ($excluir as $e) {
+            $excl[mb_strtolower(trim((string) $e))] = true;
+        }
+
+        $provas = [];
+        foreach ($this->extrairBasesComPeso($mensagem, $siglas, $excluir) as [$sig]) {
+            $provas[] = $sig;
+        }
+
+        // "PP + PU" / "PP e PU" na frase — ordem do pedido.
+        if (count($provas) < 2
+            && preg_match_all('/\b([A-Za-z][A-Za-z0-9_]{0,11})\b/u', $mensagem, $mm)
+        ) {
+            foreach ($mm[1] as $tok) {
+                $baixo = mb_strtolower($tok);
+                if (isset($excl[$baixo]) || !$this->rotuloPareceSiglaFormula($tok)) {
+                    continue;
+                }
+                if ($siglas !== []) {
+                    $hit = false;
+                    foreach ($siglas as $s) {
+                        if (mb_strtolower($s) === $baixo) {
+                            $tok = $s;
+                            $hit = true;
+                            break;
+                        }
+                    }
+                    if (!$hit) {
+                        continue;
+                    }
+                }
+                if (!in_array($tok, $provas, true)) {
+                    $provas[] = $tok;
+                }
+                if (count($provas) >= 2) {
+                    break;
+                }
+            }
+        }
+
+        if (count($provas) < 2) {
+            foreach (['PP', 'PU', 'P1', 'P2', 'AV1', 'AV2'] as $cand) {
+                if (preg_match('/\b' . preg_quote($cand, '/') . '\b/ui', $mensagem) !== 1) {
+                    continue;
+                }
+                $sig = $this->siglaDoEventoOuCitada($cand, $siglas);
+                if ($sig === null) {
+                    continue;
+                }
+                $baixo = mb_strtolower($sig);
+                if (isset($excl[$baixo]) || in_array($sig, $provas, true)) {
+                    continue;
+                }
+                $provas[] = $sig;
+                if (count($provas) >= 2) {
+                    break;
+                }
+            }
+        }
+
+        return array_slice($provas, 0, 2);
+    }
+
+    /**
+     * @param list<string> $siglas
+     */
+    private function siglaDoEventoOuCitada(string $cand, array $siglas): ?string
+    {
+        foreach ($siglas as $sigla) {
+            if (mb_strtolower($sigla) === mb_strtolower($cand)) {
+                return $sigla;
+            }
+        }
+
+        return $siglas === [] ? $cand : null;
+    }
+
+    /**
+     * Média ponderada com siglas do evento (não fixa PP/PU/PJ/CH/PE).
+     *
+     * @param array<string,mixed>|null $estado
+     */
+    private function textoMediaPonderadaComChEPj(string $mensagem = '', ?array $estado = null): string
+    {
+        $col = $this->nomeColunaAlvoFormula($mensagem, $estado);
+        $t = $this->normalizarTexto($mensagem);
+        $fmt = static function (float $n): string {
+            return abs($n - round($n)) < 0.0001 ? (string) (int) round($n) : rtrim(rtrim(number_format($n, 2, '.', ''), '0'), '.');
+        };
+
+        $siglas = $this->siglasDoEventoParaFormula($estado);
+        // Papéis primeiro — para não virar "peso" por número solto na frase.
+        $subst = $this->escolherSiglaPorPapel($mensagem, $siglas, 'substituta');
+        $bonus = $this->escolherSiglaPorPapel($mensagem, $siglas, 'bonus', $subst ? [$subst] : []);
+        $extra = $this->escolherSiglaPorPapel($mensagem, $siglas, 'ponto_extra', array_merge($subst ? [$subst] : [], $bonus ? [$bonus] : []));
+        $excluirBases = array_values(array_filter([$subst, $bonus, $extra]));
+        $bases = $this->extrairBasesComPeso($mensagem, $siglas, $excluirBases);
+
+        if (count($bases) < 2) {
+            $lista = $siglas !== [] ? implode(', ', $siglas) : '(cadastre as colunas no evento — USAR NO CÁLCULO)';
+
+            return "Não fechei a média ponderada: preciso de pelo menos 2 colunas com peso, usando as siglas DESTE evento.\n\n"
+                . "Siglas disponíveis: {$lista}.\n"
+                . "Ex.: \"AV1 peso 4, AV2 peso 6, 2CH substituta, PROJ bônus ÷ 10, EXTRA até 0,5\".";
+        }
+
+        $bases = array_slice($bases, 0, 4);
+
+        if ($subst === null) {
+            $lista = $siglas !== [] ? implode(', ', $siglas) : '(nenhuma)';
+
+            return "Faltou a coluna substituta (2ª chamada). Neste evento: {$lista}. Qual sigla cobre a 1ª prova ausente?";
+        }
+
+        $paresTxt = [];
+        $somaSem = 0.0;
+        foreach ($bases as [$sig, $peso]) {
+            $paresTxt[] = $sig . ' , ' . $fmt($peso);
+            $somaSem += $peso;
+        }
+        $wSomaSem = $fmt($somaSem);
+        $base = 'média ponderada ( ' . implode(' , ', $paresTxt) . ' | ' . $subst . ' )';
+
+        $peMax = 1.0;
+        $alvoPe = $extra !== null ? $extra : 'pe';
+        $qPe = preg_quote($alvoPe, '/');
+        if (preg_match(
+            '/\b(?:' . $qPe . '|pe|ponto\s*extra)\b[^0-9]{0,40}(?:at[eé]|m[aá]ximo|maximo|limitad[oa]\s+a?|menor\s*\(?\s*)\s*(\d+(?:[.,]\d+)?)/ui',
+            $mensagem,
+            $mPe
+        ) === 1) {
+            $peMax = (float) str_replace(',', '.', $mPe[1]);
+        } elseif (preg_match(
+            '/\b(?:at[eé]|m[aá]ximo|maximo|limitad[oa]\s+a)\s*(\d+(?:[.,]\d+)?)\s*(?:ponto)?[^.\n]{0,24}\b(?:' . $qPe . '|pe|ponto\s*extra)\b/ui',
+            $mensagem,
+            $mPe2
+        ) === 1) {
+            $peMax = (float) str_replace(',', '.', $mPe2[1]);
+        }
+        if ($peMax <= 0) {
+            $peMax = 1.0;
+        }
+        $wPe = $fmt($peMax);
+        $termoPe = $extra !== null
+            ? "se ( {$extra} , menor ( {$wPe} , {$extra} ) , 0 )"
+            : null;
+
+        $bonusEhBonus = $bonus !== null && (
+            preg_match('/\b(b[oô]nus|bonus)\b/u', $t) === 1
+            || preg_match('/\b' . preg_quote($bonus, '/') . '\s*[÷\/]\s*\d+/ui', $mensagem) === 1
+            || preg_match('/\b' . preg_quote($bonus, '/') . '\b[^.\n]{0,40}\b(fora da m[eé]dia|n[aã]o entra)/ui', $mensagem) === 1
+        );
+        $bonusTemPeso = false;
+        $wBonus = 2.0;
+        if ($bonus !== null && !$bonusEhBonus) {
+            $q = preg_quote($bonus, '/');
+            if (preg_match('/\b' . $q . '\b[^0-9]{0,16}peso\s*(\d+(?:[.,]\d+)?)|\bpeso\s*(\d+(?:[.,]\d+)?)\s*(?:para\s+|do\s+|de\s+)?' . $q . '\b/ui', $mensagem, $mB) === 1) {
+                $bonusTemPeso = true;
+                $bruto = trim((string) (($mB[1] ?? '') !== '' ? $mB[1] : ($mB[2] ?? '')));
+                if ($bruto !== '') {
+                    $wBonus = (float) str_replace(',', '.', $bruto);
+                }
+            } elseif (preg_match('/\bredistribu/ui', $mensagem) === 1) {
+                $bonusTemPeso = true;
+            }
+        }
+
+        $descBases = implode(', ', array_map(static fn ($p) => $p[0] . ' peso ' . $fmt($p[1]), $bases));
+        $querTetoCond = $this->pedidoTemTetoCondicional($mensagem);
+
+        // Prova cujo valor efetivo (ou CH no lugar) dispara teto baixo — em geral a 2ª base (PU).
+        $provaTeto = null;
+        foreach ($bases as [$sig]) {
+            if (preg_match('/nota\s*efetiva\s*(?:da\s*|de\s*)?' . preg_quote($sig, '/') . '/ui', $mensagem) === 1
+                || preg_match('/\b' . preg_quote($sig, '/') . '\b.{0,48}(?:menor que\s*5|inferior a\s*5|abaixo de\s*5|<\s*5|teto\s*de\s*6|ultrapassar\s*6)/uis', $mensagem) === 1
+            ) {
+                $provaTeto = $sig;
+                break;
+            }
+        }
+        if ($provaTeto === null) {
+            foreach ($bases as [$sig]) {
+                if (preg_match('/^pu$/i', $sig) === 1) {
+                    $provaTeto = $sig;
+                    break;
+                }
+            }
+        }
+        if ($provaTeto === null && count($bases) >= 2) {
+            $provaTeto = $bases[count($bases) - 1][0];
+        }
+
+        // Defaults Modelo 3. Não usar o 0,5 do PE como limiar/teto.
+        $limiar = 5.0;
+        $tetoBaixo = 6.0;
+        $tetoAlto = 10.0;
+        if (preg_match(
+            '/(?:nota efetiva|efetiva(?:\s+da)?\s*' . ($provaTeto !== null ? preg_quote($provaTeto, '/') : 'pu')
+            . '|\b' . ($provaTeto !== null ? preg_quote($provaTeto, '/') : 'pu') . '\b).{0,72}'
+            . '(?:menor que|inferior a|abaixo de|<\s*)(\d+(?:[.,]\d+)?)/uis',
+            $mensagem,
+            $mLim
+        ) === 1
+            || preg_match('/(?:menor que|inferior a|abaixo de)\s*(5(?:[.,]0)?)\b/ui', $mensagem, $mLim) === 1
+        ) {
+            $limiar = (float) str_replace(',', '.', $mLim[1]);
+        }
+        if (preg_match(
+            '/(?:ultrapassar|teto\s*(?:condicional\s*)?(?:de\s*)?|n[aã]o poder[aá] ultrapassar)\s*(6(?:[.,]0)?)\b/ui',
+            $mensagem,
+            $mTb
+        ) === 1
+            || preg_match('/\b(6(?:[.,]0)?)\b.{0,28}(?:mesmo após|após os b[oô]nus|depois dos b[oô]nus)/uis', $mensagem, $mTb) === 1
+        ) {
+            $v = (float) str_replace(',', '.', $mTb[1]);
+            if ($v >= 5.0 && $v < 10.0) {
+                $tetoBaixo = $v;
+            }
+        }
+        $wLim = $fmt($limiar);
+        $wTetoB = $fmt($tetoBaixo);
+        $wTetoA = $fmt($tetoAlto);
+
+        $fechar = function (string $nucleo, string $extraDesc) use (
+            $col, $descBases, $subst, $extra, $wPe, $querTetoCond, $provaTeto, $wLim, $wTetoB, $wTetoA
+        ): string {
+            if ($querTetoCond && $provaTeto !== null) {
+                $formula = "{$col} = " . $this->envolverTetoCondicionalProva(
+                    $nucleo,
+                    $provaTeto,
+                    $subst,
+                    $wLim,
+                    $wTetoB,
+                    $wTetoA
+                );
+                $como = "se {$provaTeto} (ou {$subst} no lugar dela) < {$wLim} → teto {$wTetoB}; senão teto {$wTetoA}";
+
+                return "Entendi com as siglas deste evento: {$descBases}; substituta {$subst}; {$extraDesc}; {$como}; "
+                    . "prova obrigatória sem substituta deixa pendente.\n\n"
+                    . "{$formula}\n\n"
+                    . "Montei para a coluna {$col}.";
+            }
+            $formula = "{$col} = menor ( {$wTetoA} , {$nucleo} )";
+
+            return "Entendi com as siglas deste evento: {$descBases}; substituta {$subst}; {$extraDesc}; teto {$wTetoA}; "
+                . "prova sem substituta deixa pendente.\n\n"
+                . "{$formula}\n\n"
+                . "Montei para a coluna {$col}.";
+        };
+
+        if ($bonus !== null && $bonusEhBonus) {
+            $divBonus = 10.0;
+            if (preg_match('/\b' . preg_quote($bonus, '/') . '\s*[÷\/]\s*(\d+(?:[.,]\d+)?)/ui', $mensagem, $mDiv) === 1) {
+                $divBonus = (float) str_replace(',', '.', $mDiv[1]);
+            }
+            if ($divBonus <= 0) {
+                $divBonus = 10.0;
+            }
+            $wDiv = $fmt($divBonus);
+            $termoBonus = "se ( {$bonus} , {$bonus} ÷ {$wDiv} , 0 )";
+            $partes = [$base, $termoBonus];
+            if ($termoPe !== null) {
+                $partes[] = $termoPe;
+            }
+            $nucleo = implode(' + ', $partes);
+            $extraDesc = "{$bonus} é bônus ({$bonus} ÷ {$wDiv}, fora da média)"
+                . ($extra !== null ? "; {$extra} no máximo {$wPe}" : '');
+
+            return $fechar($nucleo, $extraDesc);
+        }
+
+        if ($bonus !== null && $bonusTemPeso) {
+            if ($wBonus <= 0) {
+                $wBonus = 2.0;
+            }
+            $wB = $fmt($wBonus);
+            $somaCom = $fmt($somaSem + $wBonus);
+            $comBonus = "( ( {$base} × {$wSomaSem} ) + ( {$bonus} × {$wB} ) ) ÷ {$somaCom}";
+            $nucleoMedia = "se ( {$bonus} , {$comBonus} , {$base} )";
+            $nucleo = $termoPe !== null ? "{$nucleoMedia} + {$termoPe}" : $nucleoMedia;
+            $extraDesc = "{$bonus} peso {$wB} na média; sem {$bonus} divide por {$wSomaSem}"
+                . ($extra !== null ? "; {$extra} no máximo {$wPe}" : '');
+
+            return $fechar($nucleo, $extraDesc);
+        }
+
+        $nucleo = $termoPe !== null ? "{$base} + {$termoPe}" : $base;
+        $extraDesc = $extra !== null ? "{$extra} no máximo {$wPe}" : 'sem bônus extra';
+
+        return $fechar($nucleo, $extraDesc);
     }
 
     /**
@@ -851,8 +1569,22 @@ Recuperação teto 7 sem cortar a média: maior ( Média Bim , menor ( 7 , Recup
 
 Exemplos de intenção (troque MU pelo título aberto):
   · "PP+PU/2, CH substitui, se PJ ÷3, +PE" → MU = se ( PJ , média ( PP , PU | CH | PJ ) , média ( PP , PU | CH ) ) + PE
+  · Siglas (PP, PU, PJ, CH, PE, AV1…) mudam por evento. SEMPRE use as siglas de "Siglas usáveis na fórmula" / USAR NO CÁLCULO. Nunca invente PP se o evento tem outro nome.
+  · Papéis: prova+peso, substituta, bônus (soma fora), ponto extra — não o nome da sigla.
+  · "peso 3", "vale 3", "vale 3 pontos" ou "PP 3 pontos" = mesmo peso. "PE até 0,5 ponto" é teto de bônus, NÃO peso.
+  · "AV1 peso 3, AV2 peso 5, PROJ peso 2; redistribui; 2CH; EXTRA até 1; máx 10" →
+    MU = menor ( 10 , se ( PROJ , ( ( média ponderada ( AV1 , 3 , AV2 , 5 | 2CH ) × 8 ) + ( PROJ × 2 ) ) ÷ 10 , média ponderada ( AV1 , 3 , AV2 , 5 | 2CH ) ) + se ( EXTRA , menor ( 1 , EXTRA ) , 0 ) )
+  · "AV1 peso 4, AV2 peso 6; PROJ bônus ÷10; EXTRA até 0,5; 2CH; máx 10" →
+    MU = menor ( 10 , média ponderada ( AV1 , 4 , AV2 , 6 | 2CH ) + se ( PROJ , PROJ ÷ 10 , 0 ) + se ( EXTRA , menor ( 0.5 , EXTRA ) , 0 ) )
+  · Teto condicional (ex.: se PU efetiva < 5 → MU máx 6; senão máx 10; CH no lugar da PU):
+    NÚCLEO = média ponderada ( PP , 3 , PU , 7 | CH ) + se ( PJ , PJ ÷ 10 , 0 ) + se ( PE , menor ( 0.5 , PE ) , 0 )
+    MU = se ( PU , se ( PU < 5 , menor ( 6 , NÚCLEO ) , menor ( 10 , NÚCLEO ) ) , se ( CH < 5 , menor ( 6 , NÚCLEO ) , menor ( 10 , NÚCLEO ) ) )
+    (repita NÚCLEO por extenso; não invente função PU_EFETIVA)
   · "se tiver PF soma com MA, senão fica MA" → MU = se ( PF , MA + PF , MA )
-  · "monta a média pra mim" sem detalhe → pergunte as colunas/regras
+  · sem detalhe → pergunte quais siglas do evento entram e o papel de cada uma
+  NUNCA responda média simples ÷3 quando pediram pesos. NUNCA transforme bônus em peso. NUNCA assuma PP/PU/PJ/CH/PE se não forem as siglas deste evento.
+  NUNCA troque média ponderada + bônus pelo template "média ( provas | substituta | opcional ) + PE" se o pedido tinha pesos ou teto condicional.
+  Se faltar recurso do motor para uma regra, diga a limitação e NÃO monte fórmula incompleta nem sobrescreva a anterior.
 
 - Jornada: pelo bimestre cadastrado na jornada.
 - "1º A"/"1a" = turma, não bimestre.
@@ -922,6 +1654,10 @@ PROMPT;
         }
         $linhas[] = 'Peças: ' . ($pecas !== [] ? implode(', ', $pecas) : '(nenhuma)');
         $linhas[] = 'Títulos das colunas: ' . ($titulos !== [] ? implode(', ', $titulos) : '(Média Bim, Resultado Final e os nomes padrão)');
+        $siglasEvt = $this->siglasDoEventoParaFormula($estado);
+        $linhas[] = 'Siglas usáveis na fórmula (evento atual): '
+            . ($siglasEvt !== [] ? implode(', ', $siglasEvt) : '(ainda sem siglas — use as de USAR NO CÁLCULO)');
+        $linhas[] = 'IMPORTANTE: PP/PU/PJ/CH/PE são só exemplos; neste evento use as siglas listadas acima.';
         $linhas[] = 'Fórmulas: ' . ($formulas !== [] ? implode(' | ', $formulas) : '(nenhuma salva no rascunho)');
         $colAberta = $this->nomeColunaAlvoFormula('', $estado);
         $codAberto = strtolower(trim((string) ($estado['bloco_calc'] ?? '')));

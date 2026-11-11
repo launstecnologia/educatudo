@@ -565,6 +565,10 @@ class ResultadoAcademicoService
      *   2) substituta (ex.: CH, 2ª chamada, qualquer nome)
      *   3) opcionais (ex.: Projeto) — só se lançado; substituta nunca cobre
      * PE fora (+ PE). Sem | = média simples do que tiver nota.
+     * media_ponderada(base, peso, base, peso… | substituta) = média ponderada;
+     *   a substituta cobre só a 1ª base ausente (herda o peso dela).
+     *   Base obrigatória ausente sem substituta → pendente (não calcula).
+     *   Zero lançado participa. Uma substituta não cobre duas bases.
      * se()/if() aceita condição em 3 formas:
      *   - se(PJ, A, B) → existência da nota em PJ
      *   - se(PJ = verdadeiro|true|sim|1, A, B) e falso|false|nao|não|0
@@ -628,7 +632,13 @@ class ResultadoAcademicoService
         };
 
         $expr = preg_replace('/(?<=\d),(?=\d)/', '.', $formula) ?? $formula;
+        // Operadores tipográficos do editor → ASCII do avaliador.
+        $expr = str_replace(['×', '÷', '−', '–', '—'], ['*', '/', '-', '-', '-'], $expr);
         // Alias legível no editor → nome canônico da função.
+        $expr = preg_replace('/\bmenor\s*\(/iu', 'min(', $expr) ?? $expr;
+        $expr = preg_replace('/\bmaior\s*\(/iu', 'max(', $expr) ?? $expr;
+        $expr = preg_replace('/\bmedia_ponderada_substituta\s*\(/i', 'media_ponderada(', $expr) ?? $expr;
+        $expr = preg_replace('/\bm[eé]dia\s+ponderada(?:\s+substituta)?\s*\(/iu', 'media_ponderada(', $expr) ?? $expr;
         $expr = preg_replace('/\bsubstituta\s*\(/i', 'chamada(', $expr) ?? $expr;
         // Alias antigo da função (renomeada para media_lancado).
         $expr = preg_replace('/\bmedia_presentes\s*\(/i', 'media_lancado(', $expr) ?? $expr;
@@ -670,17 +680,23 @@ class ResultadoAcademicoService
         try {
             // se() primeiro: descarta o ramo não usado (evita erro em média sem notas).
             $expr = $this->expandirFuncoesSe((string) $expr, $temNota, $valorNota);
+            $expr = $this->expandirFuncoesMediaPonderada((string) $expr, $temNota);
             $expr = $this->expandirFuncoesMediaLancado((string) $expr, $temNota);
             $expr = $this->expandirFuncoesChamada((string) $expr, $temNota);
             $expr = $this->expandirFuncoesComposicao((string) $expr, $temNota);
         } catch (\Throwable $e) {
-            return ['ok' => false, 'erro' => 'Erro na fórmula final: ' . $e->getMessage()];
+            $msg = $e->getMessage();
+            if (str_starts_with($msg, 'PENDENTE:')) {
+                return ['ok' => false, 'erro' => trim(substr($msg, strlen('PENDENTE:'))), 'pendente' => true];
+            }
+
+            return ['ok' => false, 'erro' => 'Erro na fórmula final: ' . $msg];
         }
 
         $expr = preg_replace_callback('/\b[a-zA-Z_][a-zA-Z0-9_]*\b/', function ($m) use ($valoresPorCodigo, $valoresPorCodigoInsensitive, $valoresPorCodigoNormalized, $normKey) {
             $token = $m[0];
             $tl = strtolower($token);
-            if ($tl === 'max' || $tl === 'min' || $tl === 'chamada' || $tl === 'substituta' || $tl === 'composicao' || $tl === 'media_lancado' || $tl === 'se' || $tl === 'if') {
+            if ($tl === 'max' || $tl === 'min' || $tl === 'chamada' || $tl === 'substituta' || $tl === 'composicao' || $tl === 'media_lancado' || $tl === 'media_ponderada' || $tl === 'se' || $tl === 'if') {
                 return $token;
             }
             if (array_key_exists($token, $valoresPorCodigo) && is_numeric($valoresPorCodigo[$token])) {
@@ -704,6 +720,179 @@ class ResultadoAcademicoService
         } catch (\Throwable $e) {
             return ['ok' => false, 'erro' => 'Erro na fórmula final: ' . $e->getMessage()];
         }
+    }
+
+    /**
+     * Expõe media_ponderada para prévia do assistente de boletim.
+     *
+     * @param callable(string):bool $temNota
+     */
+    public function expandirMediaPonderadaParaPreview(string $expr, callable $temNota): string
+    {
+        $expr = preg_replace('/\bmedia_ponderada_substituta\s*\(/i', 'media_ponderada(', $expr) ?? $expr;
+        $expr = preg_replace('/\bm[eé]dia\s+ponderada(?:\s+substituta)?\s*\(/iu', 'media_ponderada(', $expr) ?? $expr;
+
+        return $this->expandirFuncoesMediaPonderada($expr, $temNota);
+    }
+
+    /**
+     * media_ponderada(base, peso, base, peso… | substituta)
+     * ou media_ponderada(base, peso, base, peso…, substituta):
+     * média ponderada; substituta cobre só a 1ª base ausente (herda o peso).
+     * Base obrigatória ausente sem cobertura → pendente.
+     *
+     * @param callable(string):bool $temNota
+     */
+    private function expandirFuncoesMediaPonderada(string $expr, callable $temNota): string
+    {
+        $guard = 0;
+        while (preg_match('/\bmedia_ponderada\s*\(/i', $expr)) {
+            if (++$guard > 80) {
+                throw new \RuntimeException('Limite de aninhamento em media_ponderada.');
+            }
+            if (!preg_match('/\bmedia_ponderada\s*\(/i', $expr, $m, PREG_OFFSET_CAPTURE)) {
+                break;
+            }
+            $startFn = (int) $m[0][1];
+            $openParen = $startFn + strlen($m[0][0]) - 1;
+            $closePos = $this->indiceFechaParen($expr, $openParen);
+            $conteudo = substr($expr, $openParen + 1, $closePos - $openParen - 1);
+            [$bases, $substituta] = $this->parseArgsMediaPonderada($conteudo);
+            if ($bases === []) {
+                throw new \RuntimeException('média ponderada: informe pares coluna, peso (ex.: PP, 3, PU, 5 | CH).');
+            }
+
+            $usouSubst = false;
+            $termos = [];
+            $somaPesos = 0.0;
+            foreach ($bases as [$cod, $peso]) {
+                $pesoFmt = abs($peso - round($peso)) < 0.0001
+                    ? (string) (int) round($peso)
+                    : rtrim(rtrim(number_format($peso, 4, '.', ''), '0'), '.');
+                if ($temNota($cod)) {
+                    $termos[] = '((' . $cod . ')*(' . $pesoFmt . '))';
+                    $somaPesos += $peso;
+                    continue;
+                }
+                if (!$usouSubst && $substituta !== null && $substituta !== '' && $temNota($substituta)) {
+                    $termos[] = '((' . $substituta . ')*(' . $pesoFmt . '))';
+                    $somaPesos += $peso;
+                    $usouSubst = true;
+                    continue;
+                }
+                throw new \RuntimeException(
+                    'PENDENTE: média ponderada — falta nota obrigatória em ' . $cod
+                    . ($substituta ? ' (sem substituta cobrindo)' : '')
+                );
+            }
+            if ($termos === [] || $somaPesos <= 0) {
+                throw new \RuntimeException('PENDENTE: média ponderada — nenhuma base com nota.');
+            }
+            $somaFmt = abs($somaPesos - round($somaPesos)) < 0.0001
+                ? (string) (int) round($somaPesos)
+                : rtrim(rtrim(number_format($somaPesos, 4, '.', ''), '0'), '.');
+            $media = '((' . implode('+', $termos) . ')/(' . $somaFmt . '))';
+            $expr = substr($expr, 0, $startFn) . $media . substr($expr, $closePos + 1);
+        }
+
+        return $expr;
+    }
+
+    /**
+     * @return array{0: list<array{0:string,1:float}>, 1: ?string}
+     */
+    private function parseArgsMediaPonderada(string $conteudo): array
+    {
+        $conteudo = trim($conteudo);
+        $substituta = null;
+        $paresRaw = $conteudo;
+        $depth = 0;
+        $pipePos = null;
+        $n = strlen($conteudo);
+        for ($i = 0; $i < $n; $i++) {
+            $c = $conteudo[$i];
+            if ($c === '(') {
+                $depth++;
+            } elseif ($c === ')') {
+                $depth--;
+            } elseif ($c === '|' && $depth === 0) {
+                $pipePos = $i;
+                break;
+            }
+        }
+        if ($pipePos !== null) {
+            $paresRaw = trim(substr($conteudo, 0, $pipePos));
+            $substRaw = trim(substr($conteudo, $pipePos + 1));
+            if ($substRaw !== '' && preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $substRaw)) {
+                $substituta = $substRaw;
+            } elseif ($substRaw !== '') {
+                throw new \RuntimeException('média ponderada: a substituta após | deve ser uma coluna.');
+            }
+        }
+
+        $tokens = [];
+        $depth = 0;
+        $inicio = 0;
+        $len = strlen($paresRaw);
+        for ($i = 0; $i < $len; $i++) {
+            $c = $paresRaw[$i];
+            if ($c === '(') {
+                $depth++;
+            } elseif ($c === ')') {
+                $depth--;
+            } elseif ($c === ',' && $depth === 0) {
+                $tokens[] = trim(substr($paresRaw, $inicio, $i - $inicio));
+                $inicio = $i + 1;
+            }
+        }
+        $tokens[] = trim(substr($paresRaw, $inicio));
+        $tokens = array_values(array_filter($tokens, static fn ($t) => $t !== ''));
+
+        $bases = [];
+        $i = 0;
+        $nt = count($tokens);
+        while ($i < $nt) {
+            $cod = $tokens[$i];
+            if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $cod)) {
+                throw new \RuntimeException('média ponderada: coluna inválida "' . $cod . '".');
+            }
+            if ($i + 1 < $nt && preg_match('/^-?\d+(?:[.,]\d+)?$/', $tokens[$i + 1])) {
+                $peso = (float) str_replace(',', '.', $tokens[$i + 1]);
+                if ($peso <= 0) {
+                    throw new \RuntimeException('média ponderada: peso de ' . $cod . ' deve ser > 0.');
+                }
+                $bases[] = [$cod, $peso];
+                $i += 2;
+                continue;
+            }
+            // Último identificador sem peso = substituta (forma sem |).
+            if ($substituta === null && $i === $nt - 1) {
+                $substituta = $cod;
+                break;
+            }
+            throw new \RuntimeException('média ponderada: falta o peso após ' . $cod . '.');
+        }
+
+        return [$bases, $substituta];
+    }
+
+    private function indiceFechaParen(string $expr, int $openParenIdx): int
+    {
+        $n = strlen($expr);
+        $depth = 1;
+        for ($i = $openParenIdx + 1; $i < $n; $i++) {
+            $c = $expr[$i];
+            if ($c === '(') {
+                $depth++;
+            } elseif ($c === ')') {
+                $depth--;
+                if ($depth === 0) {
+                    return $i;
+                }
+            }
+        }
+
+        throw new \RuntimeException('Função com parênteses incompletos.');
     }
 
     /**

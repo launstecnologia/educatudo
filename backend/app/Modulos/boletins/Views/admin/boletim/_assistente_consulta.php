@@ -202,12 +202,20 @@ $bwConsultaAvatar = htmlspecialchars(URL . '/static/images/avatar-assistente-doc
     function anexarBotaoFormula(el, texto) {
         if (typeof window.boletimWizardLerFormulaTexto !== 'function') return;
         var lido = null;
-        try { lido = window.boletimWizardLerFormulaTexto(texto); } catch (e) { return; }
-        if (!lido || !lido.formulas || !lido.formulas.length) return;
-        var nomes = [];
-        lido.formulas.forEach(function (f) { if (f && f.nome && nomes.indexOf(f.nome) < 0) nomes.push(f.nome); });
+        try { lido = window.boletimWizardLerFormulaTexto(texto); } catch (e) { lido = null; }
         var aviso = document.createElement('p');
         aviso.className = 'mt-1 text-xs text-slate-500';
+        if (!lido || !lido.formulas || !lido.formulas.length) {
+            // Tinha cara de fórmula, mas o parser recusou (sigla inválida etc.) — não fica em silêncio.
+            if (/(?:média|media|menor|maior|se\s*\(|ponderada)/i.test(String(texto || ''))) {
+                aviso.className = 'mt-1 text-xs text-red-700';
+                aviso.textContent = (lido && lido.erro) || 'Não consegui montar essa fórmula nas colunas do evento. Peça de novo com as siglas de USAR NO CÁLCULO.';
+                el.appendChild(aviso);
+            }
+            return;
+        }
+        var nomes = [];
+        lido.formulas.forEach(function (f) { if (f && f.nome && nomes.indexOf(f.nome) < 0) nomes.push(f.nome); });
 
         function aplicarAgora(btn) {
             if (typeof window.boletimWizardAplicarFormulaTexto !== 'function') return null;
@@ -227,7 +235,7 @@ $bwConsultaAvatar = htmlspecialchars(URL . '/static/images/avatar-assistente-doc
             return r;
         }
 
-        // Igual ao assistente de documentos: se o cálculo já está aberto, monta na tela na hora.
+        // Se o cálculo amarelo já está aberto, monta na tela na hora.
         var calcAberto = typeof window.boletimWizardCalculoAberto === 'function' && window.boletimWizardCalculoAberto();
         if (calcAberto) {
             var auto = aplicarAgora(null);
@@ -235,13 +243,17 @@ $bwConsultaAvatar = htmlspecialchars(URL . '/static/images/avatar-assistente-doc
                 el.appendChild(aviso);
                 return;
             }
+            if (auto && auto.erro) {
+                aviso.className = 'mt-1 text-xs text-red-700';
+                aviso.textContent = auto.erro;
+            }
         }
 
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'mt-2 inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-60';
         btn.textContent = nomes.length > 1 ? 'Utilizar fórmulas' : 'Utilizar fórmula';
-        if (nomes.length) aviso.textContent = 'Entra em ' + nomes.join(', ') + '.';
+        if (nomes.length && !aviso.textContent) aviso.textContent = 'Entra em ' + nomes.join(', ') + '.';
         btn.addEventListener('click', function () { aplicarAgora(btn); });
         el.appendChild(btn);
         el.appendChild(aviso);

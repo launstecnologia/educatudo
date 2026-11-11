@@ -23,6 +23,7 @@ A fórmula define **como a coluna é calculada**. As colunas usadas na conta (PP
 | Nota substituta | `nota substituta (` | `nota substituta (PP, PU, CH)` |
 | Média com recuperação | `média c/ rec (` | `média c/ rec ((MS1 + MS2) ÷ 2, REC)` |
 | Média só do lançado | `média (` + grupos `\|` | `média ( PP , PU \| CH \| PJ ) + PE` |
+| Média ponderada + CH | `média ponderada (` | `média ponderada ( PP , 3 , PU , 5 \| CH )` |
 | Condição (Excel SE) | `se (` | `se ( PJ , A , B )` · `se ( PJ = verdadeiro , A , B )` · `se ( PP > 7 , A , B )` |
 
 Regras gerais:
@@ -30,7 +31,7 @@ Regras gerais:
 1. **Média simples** = soma das notas **entre parênteses**, depois **÷ quantidade**.  
    Ex.: `(Prova + Trabalho + Participação) ÷ 3`
 2. A plataforma **corrige sozinha** o caso `a + b + c ÷ 3` (vira `(a + b + c) ÷ 3`). Mesmo assim, prefira escrever com parênteses.
-3. Nota **ausente** (traço) **não vira 0** nas funções `nota substituta`, `média c/ rec`, `média (` com grupos e `se (`. Na conta aritmética pura (`+ − × ÷`), ausente entra como 0.
+3. Nota **ausente** (traço) **não vira 0** nas funções `nota substituta`, `média ponderada`, `média c/ rec`, `média (` com grupos e `se (`. Na conta aritmética pura (`+ − × ÷`), ausente entra como 0. Sem cobertura da substituta, `média ponderada` deixa a coluna **pendente**.
 4. **Valor máximo** da coluna corta o resultado (ex.: escala 10). Em “Resultado Final × 2”, coloque valor máximo **20**.
 5. Siglas na tela (PP, PU…) são rótulos; no cálculo usam o código do período (`b1_pp`, `b1_pu`…).
 
@@ -185,10 +186,21 @@ Igual à pronta da seção 2.3, montada à mão:
 `nota substituta (base1, base2, …, substituta)`
 
 - Último argumento = **substituta**.
-- Demais = **bases** da média.
+- Demais = **bases** da média (**pesos iguais**).
 - Substituta preenche **somente a primeira base ausente**.
 
-### 3.3 `média c/ rec (`
+### 3.3 `média ponderada (`
+
+Para pesos diferentes + CH:
+
+`média ponderada ( PP , 3 , PU , 5 | CH )`
+
+- Pares **coluna, peso**; após `|` a **substituta** (ou o último argumento sem peso).
+- CH cobre só a **1ª** base ausente e **herda o peso** dela.
+- Zero lançado **conta**. Base obrigatória ausente sem CH → **pendente** (não fecha a coluna).
+- Com PJ opcional: `se ( PJ , ( ( média ponderada ( … ) × 8 ) + ( PJ × 2 ) ) ÷ 10 , média ponderada ( … ) ) + menor ( 1 , PE )`, envelopado em `menor ( 10 , … )` se quiser teto.
+
+### 3.4 `média c/ rec (`
 
 Igual à pronta da seção 2.4:
 
@@ -196,9 +208,9 @@ Igual à pronta da seção 2.4:
 
 ---
 
-## 4. Média com peso (ponderada)
+## 4. Média com peso (ponderada) — à mão
 
-Não existe botão “peso”. Use **×** (multiplicar) e **÷** (dividir pela soma dos pesos).
+Prefira `média ponderada (` (seção 3.3) quando houver CH. À mão: use **×** e **÷** pela soma dos pesos.
 
 ### Regra
 
