@@ -230,7 +230,13 @@ class ProvasAlunoAssistenteService
     {
         switch ($tool) {
             case 'buscar_alunos':
+                $ra = trim((string) ($args['ra'] ?? $args['aluno_ra'] ?? ''));
                 $termo = trim((string) ($args['termo'] ?? $args['nome'] ?? ''));
+                if ($ra !== '') {
+                    $termo = 'ra ' . $ra;
+                } elseif ($termo !== '' && ($extraido = $this->consulta->extrairCodigoRa($termo)) !== null) {
+                    $termo = 'ra ' . $extraido;
+                }
                 $turma = trim((string) ($args['turma'] ?? $args['turma_nome'] ?? ''));
                 $alunos = $this->consulta->buscarAlunos(
                     $termo,
@@ -717,15 +723,17 @@ Regras importantes:
 2) Se citar turma (ex.: "2 Ano B", "2ªB"), SEMPRE passe args.turma / turma_nome (separado do nome).
 3) NUNCA peça confirmação antes de consultar. Chame a tool primeiro. Se houver 1 aluno, use-o; se houver vários, mostre candidatos.
 4) termo/aluno_nome = só o nome (ex.: "Maria Clara"), NUNCA junte turma no nome ("Maria Clara do 2 Ano B" está errado).
-5) Pedido sobre ALUNO + provas → resumo_provas_aluno ou listar_provas_aluno (última prova = listar e pegar a mais recente).
-6) Pedido sobre ALUNO + jornadas → resumo_jornadas_aluno.
-7) Pedido sobre TURMA sem professor → saude_turma / resumo_provas_turma.
-8) Pedido sobre BLOCO → buscar_blocos / resultados_bloco.
-9) Pedido sobre PROFESSOR → resumo_provas_professor / saude_turmas_professor / resumo_jornadas_professor.
-10) Boletim/faltas → boletim_aluno / faltas_aluno.
-11) Detalhe de questão → detalhar_prova_aluno com somente_erros=true.
-12) Resposta final: texto CURTO (2–4 linhas). A UI monta tabelas.
-13) Se a tool devolver candidatos/aviso, liste-os e peça escolha — não diga "não encontrei" se houver candidatos.
+5) Se o usuário informar RA/matrícula (ex.: "RA 24254"), passe args.ra só com os dígitos ("24254"). Não misture "ra", "ano" ou turma no mesmo campo.
+6) Ano letivo (ex.: 2024) vai em args.ano_letivo / args.ano, nunca dentro de aluno_nome ou ra.
+7) Pedido sobre ALUNO + provas → resumo_provas_aluno ou listar_provas_aluno (última prova = listar e pegar a mais recente).
+8) Pedido sobre ALUNO + jornadas → resumo_jornadas_aluno.
+9) Pedido sobre TURMA sem professor → saude_turma / resumo_provas_turma.
+10) Pedido sobre BLOCO → buscar_blocos / resultados_bloco.
+11) Pedido sobre PROFESSOR → resumo_provas_professor / saude_turmas_professor / resumo_jornadas_professor.
+12) Boletim/faltas → boletim_aluno / faltas_aluno.
+13) Detalhe de questão → detalhar_prova_aluno com somente_erros=true.
+14) Resposta final: texto CURTO (2–4 linhas). A UI monta tabelas.
+15) Se a tool devolver candidatos/aviso, liste-os e peça escolha — não diga "não encontrei" se houver candidatos.
 
 Para obter dados, emita EXATAMENTE:
 <<<CONSULTA>>>
@@ -733,7 +741,7 @@ Para obter dados, emita EXATAMENTE:
 <<<FIM>>>
 
 Tools — alunos/provas:
-1) buscar_alunos — {"termo":"Maria","turma":"2 Ano B"}
+1) buscar_alunos — {"termo":"Maria","turma":"2 Ano B"} ou {"ra":"24254"}
 2) listar_materias / 3) listar_tipos_avaliacao
 4) listar_provas_aluno / 5) detalhar_prova_aluno / 6) resumo_provas_aluno
 
@@ -750,8 +758,8 @@ Tools — turma / bloco / boletim / faltas:
 20) resumo_provas_turma — {"turma_nome":"2 Ano B"} — totais acertos/erros por matéria
 21) buscar_blocos — {"titulo":"Simulado"} ou {"turma_nome":"2ªB"}
 22) resultados_bloco — {"bloco_id":10} ou {"titulo":"Simulado 1"}
-23) boletim_aluno — {"aluno_id":123} ou {"aluno_nome":"Maria","turma":"2ªB"}
-24) faltas_aluno — {"aluno_id":123} — frequência no período/ano
+23) boletim_aluno — {"ra":"24254","ano_letivo":2024} ou {"aluno_id":123} ou {"aluno_nome":"Maria","turma":"2ªB"}
+24) faltas_aluno — {"ra":"24254"} ou {"aluno_id":123} — frequência no período/ano
 
 Tipos de avaliação (provas) desta escola:
 PROMPT

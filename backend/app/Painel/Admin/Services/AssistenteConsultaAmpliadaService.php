@@ -373,6 +373,14 @@ class AssistenteConsultaAmpliadaService
             $exibirEm !== '' ? $exibirEm : null
         );
 
+        $anoFiltro = (int) ($filtros['ano_letivo'] ?? $filtros['ano'] ?? 0);
+        if ($anoFiltro > 0 && is_array($eventos)) {
+            $eventos = array_values(array_filter(
+                $eventos,
+                static fn($ev): bool => (int) ($ev['ano_letivo'] ?? 0) === $anoFiltro
+            ));
+        }
+
         $slim = [];
         $totalEventos = count($eventos ?: []);
         foreach (array_slice($eventos ?: [], 0, 12) as $ev) {
@@ -521,14 +529,21 @@ class AssistenteConsultaAmpliadaService
             }
             return ['ok' => true, 'aluno' => $a];
         }
-        $nome = trim((string) ($filtros['aluno_nome'] ?? $filtros['nome'] ?? ''));
+
         $turma = trim((string) ($filtros['turma_nome'] ?? $filtros['turma'] ?? ''));
-        if ($nome === '') {
-            return ['ok' => false, 'error' => 'Informe aluno_id ou aluno_nome.'];
+        $ra = trim((string) ($filtros['ra'] ?? $filtros['aluno_ra'] ?? ''));
+        $nome = trim((string) ($filtros['aluno_nome'] ?? $filtros['nome'] ?? $filtros['termo'] ?? ''));
+        if ($ra === '' && $nome !== '') {
+            $ra = (string) ($this->alunos->extrairCodigoRa($nome) ?? '');
         }
-        $lista = $this->alunos->buscarAlunos($nome, 15, $turma !== '' ? $turma : null);
+        if ($ra === '' && $nome === '') {
+            return ['ok' => false, 'error' => 'Informe aluno_id, ra ou aluno_nome.'];
+        }
+
+        $termoBusca = $ra !== '' ? ('ra ' . $ra) : $nome;
+        $lista = $this->alunos->buscarAlunos($termoBusca, 15, $turma !== '' ? $turma : null);
         if ($lista === []) {
-            return ['ok' => false, 'error' => 'Nenhum aluno encontrado.'];
+            return ['ok' => false, 'error' => $ra !== '' ? ('Nenhum aluno encontrado com RA ' . $ra . '.') : 'Nenhum aluno encontrado.'];
         }
         if (count($lista) > 1) {
             return [

@@ -32,9 +32,41 @@ class ProvasAlunoConsultaService
             return [];
         }
         $limit = max(1, min($limit, 50));
+        $temTurma = $turma !== null && trim($turma) !== '';
+
+        // RA/matrícula explícita ("24254", "RA 24254", "aluna ra 24254, ano 2024").
+        $ra = $this->extrairCodigoRa($termo);
+        if ($ra !== null) {
+            $limiteSql = $temTurma ? min(120, max(40, $limit * 6)) : $limit;
+            $rows = $this->db->fetchAll(
+                "SELECT a.id, a.nome, a.ra, a.turma_id, t.nome AS turma_nome
+                 FROM alunos a
+                 LEFT JOIN turmas t ON t.id = a.turma_id
+                 WHERE a.ativo = 1
+                   AND (
+                        a.ra = :ra_eq
+                        OR a.codigo_aluno = :cod_eq
+                        OR a.ra LIKE :ra_like
+                        OR a.codigo_aluno LIKE :cod_like
+                   )
+                 ORDER BY (a.ra = :ra_ord) DESC, (a.codigo_aluno = :cod_ord) DESC, a.nome ASC
+                 LIMIT {$limiteSql}",
+                [
+                    'ra_eq' => $ra,
+                    'cod_eq' => $ra,
+                    'ra_like' => '%' . $ra . '%',
+                    'cod_like' => '%' . $ra . '%',
+                    'ra_ord' => $ra,
+                    'cod_ord' => $ra,
+                ]
+            ) ?: [];
+
+            return $this->mapearAlunosBusca($rows, $limit, $temTurma ? (string) $turma : null);
+        }
+
         $tokensNome = $this->tokensBuscaNome($termo);
         if ($tokensNome === []) {
-            // Fallback: termo inteiro (RA / código curto)
+            // Fallback: termo inteiro (código curto sem dígitos suficientes)
             $tokensNome = [mb_strtolower($termo)];
         }
 
@@ -52,7 +84,6 @@ class ProvasAlunoConsultaService
         $whereSql = implode(' AND ', $where);
 
         // Folga para filtrar turma em PHP (nomes variam: 2ªB, 2ª B do Ensino Médio…).
-        $temTurma = $turma !== null && trim($turma) !== '';
         $limiteSql = $temTurma ? min(120, max(40, $limit * 6)) : min(80, max($limit, count($tokensNome) * 25));
 
         $rows = $this->db->fetchAll(
@@ -65,6 +96,37 @@ class ProvasAlunoConsultaService
             $params
         ) ?: [];
 
+        return $this->mapearAlunosBusca($rows, $limit, $temTurma ? (string) $turma : null);
+    }
+
+    /**
+     * Extrai RA/matrícula numérica do termo do usuário.
+     * Evita misturar "ano 2024" na busca quando o RA está explícito.
+     */
+    public function extrairCodigoRa(string $termo): ?string
+    {
+        $t = trim($termo);
+        if ($t === '') {
+            return null;
+        }
+        if (preg_match('/^\d{3,12}$/', $t) === 1) {
+            return $t;
+        }
+        if (preg_match('/\bra\b\s*[:\-#]?\s*(\d{3,12})\b/iu', $t, $m) === 1) {
+            return $m[1];
+        }
+        if (preg_match('/\b(?:codigo|código|matricula)\b\s*[:\-#]?\s*(\d{3,12})\b/iu', $t, $m) === 1) {
+            return $m[1];
+        }
+        return null;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $rows
+     * @return list<array{id:int,nome:string,ra:?string,turma_id:?int,turma_nome:?string}>
+     */
+    private function mapearAlunosBusca(array $rows, int $limit, ?string $turma): array
+    {
         $out = [];
         foreach ($rows as $r) {
             $id = (int) ($r['id'] ?? 0);
@@ -78,7 +140,7 @@ class ProvasAlunoConsultaService
                 'turma_id' => isset($r['turma_id']) ? (int) $r['turma_id'] : null,
                 'turma_nome' => isset($r['turma_nome']) ? trim((string) $r['turma_nome']) : null,
             ];
-            if ($temTurma && !$this->turmaCasa($item['turma_nome'], (string) $turma)) {
+            if ($turma !== null && $turma !== '' && !$this->turmaCasa($item['turma_nome'], $turma)) {
                 continue;
             }
             $out[] = $item;
