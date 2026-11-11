@@ -420,10 +420,60 @@
     return out;
   }
 
+  var camposBordaQuadro = [
+    ['divisoria-espessura', 'Espessura da divisória (px)', 3],
+    ['divisoria-cor', 'Cor da divisória', '#475569'],
+    ['grade-espessura', 'Espessura da grade (px)', 1],
+    ['grade-cor', 'Cor da grade', '#9ca3af']
+  ];
+
+  function valorBordaQuadro(campo, valor) {
+    if (campo.endsWith('-cor')) return /^#[0-9a-f]{6}$/i.test(valor) ? valor : '';
+    if (valor == null || String(valor).trim() === '') return '';
+    var n = Number(valor);
+    return Number.isFinite(n) ? String(Math.max(0, Math.min(8, Math.round(n * 4) / 4))) : '';
+  }
+
+  function atributosBordasQuadro(el) {
+    var bordas = (el.props || {}).bordasQuadro;
+    if (!bordas) return '';
+    var chaves = [];
+    var css = '';
+    camposBordaQuadro.forEach(function (campo) {
+      var chave = campo[0];
+      var valor = valorBordaQuadro(chave, bordas[chave]);
+      if (valor === '') return;
+      chaves.push(chave);
+      css += '--doc-' + chave + ':' + valor + (chave.endsWith('-cor') ? '' : 'px') + ';';
+    });
+    return chaves.length ? ' data-doc-bordas-quadro="' + chaves.join(' ') + '" style="' + css + '"' : '';
+  }
+
+  function painelBordasQuadro(bordas) {
+    bordas = bordas || {};
+    var html = '<div class="edoc-sec-label">BORDAS DA TABELA</div>'
+      + '<p class="edoc-hint">A divisória separa os grupos de colunas. Use 0 para retirar o destaque.</p>';
+    camposBordaQuadro.forEach(function (campo, i) {
+      var chave = campo[0];
+      var cor = chave.endsWith('-cor');
+      var valor = valorBordaQuadro(chave, bordas[chave]);
+      if (i % 2 === 0) html += '<div class="edoc-prop-row">';
+      html += '<div><label for="edoc-borda-' + chave + '">' + campo[1] + '</label>'
+        + '<input id="edoc-borda-' + chave + '" data-borda-quadro="' + chave + '" value="' + (valor || campo[2]) + '"'
+        + (cor ? ' type="color"' : ' type="number" min="0" max="8" step="0.25"') + '></div>';
+      if (i % 2 === 1) html += '</div>';
+    });
+    if (Object.keys(bordas).length) {
+      html += '<button type="button" id="edoc-bordas-quadro-restaurar" class="edoc-btn">Restaurar bordas padrão</button>';
+    }
+    return html;
+  }
+
   function garantirHtmlBoletimPadrao(el) {
     if (!el) return;
     el.props = el.props || {};
     el.style = el.style || {};
+    delete el.props.boletimPersonalizado;
     if (!el.style.fontSize) el.style.fontSize = 7.5;
     var chave = chaveQuadroDoElemento(el);
     el.props.html = '<div class="quadro-notas-wrap doc-quadro-fit" style="'
@@ -440,7 +490,7 @@
   function boletimHtmlSoDinamico(html) {
     var h = String(html || '').trim();
     if (!h) return true;
-    if (h.indexOf('{{boletim_celula_') >= 0) return false;
+    if (/\{\{\s*boletim_celula_/i.test(h)) return false;
     return /\{\{\s*(?:quadro_notas_html|boletim_html|quadro_notas_b[1-4]_html)\s*\}\}/i.test(h);
   }
 
@@ -2386,7 +2436,7 @@
         var sel = state.selected && state.selected.id === el.id;
         html += '<div class="edoc-el' + (sel ? ' is-selected' : '')
           + ((el.type === 'imagem') ? ' edoc-el-stretch' : '')
-          + '" data-id="' + el.id + '" data-kind="element" data-type="' + el.type + '">';
+          + '" data-id="' + el.id + '" data-kind="element" data-type="' + el.type + '"' + atributosBordasQuadro(el) + '>';
         html += '<div class="edoc-el-toolbar">'
           + '<button type="button" data-act="move" title="Mover"><i class="fa-solid fa-up-down-left-right"></i></button>'
           + '<button type="button" data-act="dup" title="Duplicar"><i class="fa-solid fa-copy"></i></button>'
@@ -4223,6 +4273,13 @@
     return String(p.html != null && p.html !== '' ? p.html : (p.text || ''));
   }
 
+  function htmlCompletoDoBoletim(el) {
+    var fonte = htmlFonteElemento(el);
+    var modelo = C.modeloBoletimHtml || '';
+    if (!modelo || !/\{\{\s*boletim_html\s*\}\}/i.test(fonte)) return '';
+    return fonte.replace(/\{\{\s*boletim_html\s*\}\}/gi, function () { return modelo; });
+  }
+
   function tituloEditorHtml(el) {
     if (!el) return 'Editar HTML';
     if (elementoEhBoletim(el)) return 'Editar HTML do boletim';
@@ -4268,9 +4325,13 @@
     busca.dispatchEvent(new Event('input'));
     if (titulo) titulo.textContent = tituloEditorHtml(target);
     if (desc) {
-      desc.textContent = elementoEhBoletim(target) || target.type === 'demonstrativo_notas' || target.type === 'tabela_notas'
-        ? 'Os campos entre {{...}} são preenchidos para cada aluno. Edite a estrutura e os estilos à vontade.'
-        : 'Edite o HTML do bloco selecionado. Variáveis {{campo}} entram automaticamente na emissão.';
+      if (target.type === 'boletim' && /\{\{\s*boletim_celula_layout_/i.test(fonte)) {
+        desc.textContent = 'Ao aplicar, os cabeçalhos e as disciplinas deste quadro ficam no modelo. Os campos entre {{...}} recebem as notas de cada aluno.';
+      } else {
+        desc.textContent = elementoEhBoletim(target)
+          ? 'Os campos entre {{...}} são preenchidos para cada aluno. Edite a estrutura e os estilos à vontade.'
+          : 'Edite o HTML do bloco selecionado. Variáveis {{campo}} entram automaticamente na emissão.';
+      }
     }
     fecharInfoFolha();
     if (!stage.open) stage.showModal();
@@ -4479,6 +4540,13 @@
         var el = caminho.element;
         el.props = el.props || {};
         el.props.html = codigo.value;
+        if (el.type === 'boletim') {
+          if (/<table\b/i.test(codigo.value) && !boletimHtmlSoDinamico(codigo.value)) {
+            el.props.boletimPersonalizado = true;
+          } else {
+            delete el.props.boletimPersonalizado;
+          }
+        }
         delete el.props.text;
         fecharHtmlExpandido();
         pushHist();
@@ -4510,7 +4578,7 @@
         return;
       }
       if (btn.id === 'edoc-html-expand' || btn.id === 'edoc-editar-html') {
-        abrirHtmlExpandido(alvo);
+        abrirHtmlExpandido(alvo, alvo.type === 'boletim' ? htmlCompletoDoBoletim(alvo) || undefined : undefined);
       }
     });
   }
@@ -4546,8 +4614,11 @@
         p = el.props || {};
       }
       var soDin = boletimHtmlSoDinamico(p.html);
+      html += painelBordasQuadro(p.bordasQuadro);
       html += soDin
-        ? '<p class="edoc-hint">Este bloco ainda usa <code>{{quadro_notas_html}}</code>. Na prévia, escolha regra de aprovação, curso/série e aluno para carregar a tabela.</p>'
+        ? '<p class="edoc-hint">' + (el.type === 'boletim' && C.modeloBoletimHtml
+          ? 'Abra Editar em HTML para alterar os rótulos e a estrutura da tabela.'
+          : 'Escolha regra de aprovação, curso/série e aluno na prévia para carregar a tabela completa.') + '</p>'
         : '<p class="edoc-hint">Os campos <code>{{boletim_celula_…}}</code> recebem as notas de cada aluno.</p>';
       html += '<div class="edoc-prop-row" style="margin-bottom:6px;">'
         + '<button type="button" class="edoc-btn" id="edoc-boletim-html-dinamico" title="Wrapper com variável dinâmica">HTML dinâmico</button>'
@@ -4616,7 +4687,7 @@
       + box4('m', st.margin) + '</div>';
     html += '<div class="edoc-sec-label">PREENCHIMENTO</div><div class="edoc-box4">'
       + box4('p', st.padding) + '</div>';
-    html += '<div class="edoc-sec-label">BORDA</div>'
+    html += '<div class="edoc-sec-label">' + (elementoEhBoletim(el) ? 'BORDA DO BLOCO' : 'BORDA') + '</div>'
       + '<select data-f="borderStyle"><option value="none">Nenhuma</option><option value="solid">Sólida</option><option value="dashed">Tracejada</option><option value="dotted">Pontilhada</option></select>'
       + '<div class="edoc-prop-row"><div><label>Espessura</label>' + inp('borderWidth', st.borderWidth || 1, 'type="number"') + '</div>'
       + '<div><label>Cor</label>' + inp('borderColor', st.borderColor || '#e5e7eb', 'type="color"') + '</div></div>';
@@ -4771,6 +4842,26 @@
       }
     }
     if (kind === 'element' && elementoEhBoletim(target)) {
+      $all('[data-borda-quadro]', box).forEach(function (campo) {
+        campo.addEventListener('change', function () {
+          var chave = campo.dataset.bordaQuadro;
+          var bordas = target.props.bordasQuadro || {};
+          var valor = valorBordaQuadro(chave, campo.value);
+          if (valor !== '') bordas[chave] = valor;
+          else delete bordas[chave];
+          target.props.bordasQuadro = bordas;
+          pushHist();
+          render();
+        });
+      });
+      var restaurarBordas = $('#edoc-bordas-quadro-restaurar', box);
+      if (restaurarBordas) {
+        restaurarBordas.addEventListener('click', function () {
+          delete target.props.bordasQuadro;
+          pushHist();
+          render();
+        });
+      }
       var btnDin = $('#edoc-boletim-html-dinamico', box);
       var btnPrev = $('#edoc-boletim-html-previa', box);
       if (btnDin) {
@@ -4785,8 +4876,17 @@
       if (btnPrev) {
         btnPrev.addEventListener('click', function () {
           var existente = String((target.props || {}).html || '');
-          if (existente.indexOf('{{boletim_celula_') >= 0) {
+          if (target.props.boletimPersonalizado || /\{\{\s*boletim_celula_/i.test(existente)) {
             abrirHtmlExpandido(target);
+            return;
+          }
+          if (target.type === 'boletim') {
+            var htmlCompleto = htmlCompletoDoBoletim(target);
+            if (htmlCompleto) abrirHtmlExpandido(target, htmlCompleto);
+            else {
+              abrirCardBoletim(true);
+              setStatus('Escolha a regra, o curso/série e o aluno para carregar o HTML do boletim.');
+            }
             return;
           }
           var modelo = String(C.modeloQuadroHtml || '');
@@ -5175,6 +5275,7 @@
     el.props = el.props || {};
     el.props.bimestre = 0;
     var html = String(el.props.html || '');
+    if (el.props.boletimPersonalizado || /\{\{\s*boletim_celula_layout_/i.test(html)) return false;
     var soBoletimToken = boletimHtmlSoDinamico(html) && /\{\{\s*boletim_html\s*\}\}/i.test(html)
       && !/\{\{\s*quadro_notas(?:_b[1-4])?_html\s*\}\}/i.test(html);
     if (soBoletimToken) return false;
@@ -5813,6 +5914,7 @@
         C.varsPreview = { quadro_notas_html: '', boletim_html: '' };
         if (logoMantidaVazia) C.varsPreview.logo_html = logoMantidaVazia;
         C.modeloQuadroHtml = '';
+        C.modeloBoletimHtml = '';
         state.demo = !!(real && real.checked);
         render();
       }
@@ -5828,6 +5930,7 @@
           C.varsPreview.logo_html = logoAntesDemo;
         }
         C.modeloQuadroHtml = data.modelo_quadro_html || '';
+        C.modeloBoletimHtml = data.modelo_boletim_html || '';
         if (data.html_quadro) {
           C.varsPreview.quadro_notas_html = data.html_quadro;
           garantirPaisagemBoletim();
@@ -5911,6 +6014,7 @@
     }
     function carregar() {
       var n = ++req;
+      C.modeloBoletimHtml = '';
       var rid = regraSelecionadaId();
       var did = demonstrativoSelecionadoId();
       var lid = layoutBoletimSelecionadoId();

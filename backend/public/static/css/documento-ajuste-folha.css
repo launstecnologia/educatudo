@@ -51,3 +51,41 @@
 .edoc-foto-aluno > span {
   padding-top: 0 !important;
 }
+[data-doc-bordas-quadro~="grade-espessura"] th,
+[data-doc-bordas-quadro~="grade-espessura"] td {
+  border-top-width: var(--doc-grade-espessura) !important;
+  border-bottom-width: var(--doc-grade-espessura) !important;
+  border-left-width: var(--doc-grade-espessura) !important;
+  border-top-style: solid !important;
+  border-bottom-style: solid !important;
+  border-left-style: solid !important;
+}
+[data-doc-bordas-quadro~="grade-espessura"] th,
+[data-doc-bordas-quadro~="grade-espessura"] td,
+[data-doc-bordas-quadro~="divisoria-espessura"] th,
+[data-doc-bordas-quadro~="divisoria-espessura"] td {
+  border-right-width: 0 !important;
+}
+[data-doc-bordas-quadro~="grade-espessura"] th:last-child,
+[data-doc-bordas-quadro~="grade-espessura"] td:last-child,
+[data-doc-bordas-quadro~="divisoria-espessura"] th:last-child,
+[data-doc-bordas-quadro~="divisoria-espessura"] td:last-child {
+  border-right-width: var(--doc-grade-espessura, 1px) !important;
+  border-right-style: solid !important;
+}
+[data-doc-bordas-quadro~="grade-cor"] th,
+[data-doc-bordas-quadro~="grade-cor"] td {
+  border-top-color: var(--doc-grade-cor) !important;
+  border-right-color: var(--doc-grade-cor) !important;
+  border-bottom-color: var(--doc-grade-cor) !important;
+  border-left-color: var(--doc-grade-cor) !important;
+}
+[data-doc-bordas-quadro~="grade-espessura"] .boletim-quadro-grupo-sep,
+[data-doc-bordas-quadro~="divisoria-espessura"] .boletim-quadro-grupo-sep {
+  border-left-width: var(--doc-divisoria-espessura, 3px) !important;
+  border-left-style: solid !important;
+}
+[data-doc-bordas-quadro~="grade-cor"] .boletim-quadro-grupo-sep,
+[data-doc-bordas-quadro~="divisoria-cor"] .boletim-quadro-grupo-sep {
+  border-left-color: var(--doc-divisoria-cor, #475569) !important;
+}

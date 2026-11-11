@@ -208,7 +208,9 @@ class DemonstracaoDocumentoService
         $out['linhas'] = $linhas;
         $editavel = QuadroBoletimEditavelService::expor((string) ($vars['quadro_notas_html'] ?? ''));
         $out['modelo_quadro_html'] = $editavel['celulas'] > 0 ? $editavel['html'] : '';
-        $vars = array_replace($vars, $editavel['variaveis']);
+        $boletimEditavel = QuadroBoletimEditavelService::expor($htmlBoletim, true);
+        $out['modelo_boletim_html'] = $boletimEditavel['celulas'] > 0 ? $boletimEditavel['html'] : '';
+        $vars = array_replace($vars, $editavel['variaveis'], $boletimEditavel['variaveis']);
         $out['vars'] = $this->variaveisTexto($vars);
         $academico = CamposAcademicosDocumentoService::doQuadro((string) ($vars['quadro_notas_html'] ?? ''));
         if ($academico['componentes'] !== []) {

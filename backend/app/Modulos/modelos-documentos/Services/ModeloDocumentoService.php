@@ -2762,7 +2762,8 @@ class ModeloDocumentoService
             $css .= "\n" . $this->cssFolhaImpressa($estruturaVisual, $rodapeNoFim);
         }
 
-        if (str_contains($htmlAll, 'edoc-ajuste-folha') || str_contains($htmlAll, 'edoc-foto-aluno')) {
+        if (str_contains($htmlAll, 'edoc-ajuste-folha') || str_contains($htmlAll, 'edoc-foto-aluno')
+            || str_contains($htmlAll, 'data-doc-bordas-quadro')) {
             $css .= "\n" . DocumentoRenderer::cssAjusteFolha();
         }
 
@@ -3806,8 +3807,11 @@ HTML;
             $academico = CamposAcademicosDocumentoService::doQuadro((string) ($vars['quadro_notas_html'] ?? ''));
             $vars = array_replace($vars, $academico['vars']);
         }
-        if (preg_match('/\{\{\s*boletim_celula_/i', $html) === 1) {
+        if (preg_match('/\{\{\s*boletim_celula_t/i', $html) === 1) {
             $vars = array_replace($vars, QuadroBoletimEditavelService::variaveis((string) ($vars['quadro_notas_html'] ?? '')));
+        }
+        if (preg_match('/\{\{\s*boletim_celula_layout_/i', $html) === 1) {
+            $vars = array_replace($vars, QuadroBoletimEditavelService::variaveis((string) ($vars['boletim_html'] ?? ''), true));
         }
 
         // 0) Blocos condicionais {{#se:campo}}...{{/se:campo}} e atalho {{#se_resp2}}...{{/se_resp2}}

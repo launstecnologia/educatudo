@@ -40,6 +40,26 @@ class DocumentoRenderer
         return $html;
     }
 
+    private function aplicarBordasQuadro(string $html, mixed $bordas): string
+    {
+        if (!is_array($bordas)) {
+            return $html;
+        }
+        $chaves = [];
+        $css = '';
+        foreach (['divisoria-espessura', 'divisoria-cor', 'grade-espessura', 'grade-cor'] as $chave) {
+            $valor = $bordas[$chave] ?? null;
+            if (str_ends_with($chave, '-espessura') && is_numeric($valor) && is_finite((float) $valor)) {
+                $valor = round(max(0, min(8, (float) $valor)) * 4) / 4 . 'px';
+            } elseif (!str_ends_with($chave, '-cor') || !is_string($valor) || !preg_match('/^#[a-f0-9]{6}$/iD', $valor)) {
+                continue;
+            }
+            $chaves[] = $chave;
+            $css .= '--doc-' . $chave . ':' . $valor . ';';
+        }
+        return $chaves === [] ? $html : '<div data-doc-bordas-quadro="' . implode(' ', $chaves) . '" style="' . $css . '">' . $html . '</div>';
+    }
+
     /**
      * @param array<string,mixed> $secao
      */
@@ -223,7 +243,7 @@ class DocumentoRenderer
                 $html
             );
         }
-        return $html;
+        return $this->aplicarBordasQuadro($html, $props['bordasQuadro'] ?? null);
     }
 
     /**

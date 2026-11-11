@@ -380,25 +380,68 @@ test('redimensiona foto dinâmica e centraliza apenas a assinatura em um bloco c
   await expect(page.getByText('Assinatura do Diretor', { exact: false })).toHaveCSS('text-align', 'center');
 });
 
-test('expõe tabela inteira com campos dinâmicos sem aplicar até confirmar', async ({ page }) => {
-  await selecionarHtmlBoletim(page, '<div>{{boletim_html}}</div>');
-  await page.getByRole('button', { name: 'Expor tabela completa', exact: true }).click();
+test('edita os rótulos e as bordas do boletim sem salvar as notas do aluno', async ({ page }) => {
+  const quadro = '<style>.boletim-quadro-grupo-sep{border-left:3px solid #334155!important}</style>'
+    + '<table class="boletim-quadro-tabela"><thead><tr><th rowspan="2">MATÉRIAS</th><th class="boletim-quadro-grupo-sep" colspan="2">1 SEMESTRE</th></tr>'
+    + '<tr><th class="boletim-quadro-grupo-sep">REC 1º</th><th>MS</th></tr></thead>'
+    + '<tbody><tr data-boletim-materia="17"><td>Matemática</td><td class="boletim-quadro-grupo-sep" data-boletim-coluna="s1_rec">7,5</td><td>8,0</td></tr></tbody></table>';
+  const fixture = path.join(__dirname, 'fixtures/editor-documento.php');
+  const editavel = JSON.parse(execFileSync('php', [fixture, '--boletim-editavel'], { cwd: raiz, encoding: 'utf8', input: quadro }));
+  await page.route('**/demonstracao?*', route => route.fulfill({ json: {
+    ok: true, vars: editavel.variaveis, html_boletim: quadro, modelo_boletim_html: editavel.html,
+    modelo_quadro_html: '<table><tr><th>Demonstrativo</th></tr></table>',
+  } }));
+  await selecionarHtmlBoletim(page, '<div class="quadro-notas-wrap">{{boletim_html}}</div>');
+  const real = page.getByLabel('Mostrar dados reais na folha');
+  await real.evaluate((input: HTMLInputElement) => {
+    input.checked = true;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  const folha = page.locator('#edoc-paper');
+  const celula = folha.getByText('7,5', { exact: true });
+  await expect(celula).toBeVisible();
+  await page.getByLabel('Espessura da divisória (px)').fill('1');
+  await page.getByLabel('Espessura da divisória (px)').press('Tab');
+  await expect(celula).toHaveCSS('--doc-divisoria-espessura', '1px');
+  await page.getByLabel('Espessura da grade (px)').fill('2');
+  await page.getByLabel('Espessura da grade (px)').press('Tab');
+  await expect(celula).toHaveCSS('--doc-grade-espessura', '2px');
+  await expect(celula).toHaveCSS('--doc-divisoria-espessura', '1px');
+
+  await page.getByRole('button', { name: 'Editar em HTML' }).click();
   const campo = page.getByLabel('Código HTML', { exact: true });
-  await expect(campo).toHaveValue(/<thead>/);
-  await expect(campo).toHaveValue(/<tbody>/);
-  await expect(campo).toHaveValue(/\{\{boletim_celula_t1_m17_b1_pp\}\}/);
+  await expect(campo).toHaveValue(/<th[^>]*>1 SEMESTRE<\/th>/);
+  await expect(campo).toHaveValue(/REC 1º/);
+  await expect(campo).toHaveValue(/\{\{boletim_celula_layout_t1_m17_s1_rec\}\}/);
+  const painel = page.getByRole('dialog', { name: 'Editar HTML do boletim' });
+  const busca = painel.getByRole('searchbox', { name: 'Pesquisar no HTML' });
+  for (const rotulo of ['1 SEMESTRE', 'REC 1º']) {
+    await busca.fill(rotulo);
+    await expect(painel.getByRole('status')).toHaveText('1 de 1');
+  }
   expect(await campo.inputValue()).not.toContain('>7,5<');
   await page.getByRole('button', { name: 'Voltar à folha', exact: true }).click();
   await expect(page.locator('#edoc-boletim-html')).toHaveValue(/\{\{boletim_html\}\}/);
   await page.getByRole('button', { name: 'Expor tabela completa', exact: true }).click();
-  await campo.fill((await campo.inputValue()).replace('Matemática', 'Matemática do TI'));
+  await campo.fill((await campo.inputValue()).replace('REC 1º', 'Recuperação 1º'));
   await page.getByRole('button', { name: 'Aplicar na folha', exact: true }).click();
-  await expect(page.locator('#edoc-paper')).toContainText('Matemática do TI');
-  await expect(page.locator('#edoc-paper')).toContainText('7,5');
-  await expect(page.locator('#edoc-paper')).not.toContainText('{{boletim_celula_');
+  await expect(folha).toContainText('Recuperação 1º');
+  await expect(celula).toBeVisible();
   await page.locator('#edoc-save').click();
   await expect(page.locator('#edoc-status')).toHaveText('Salvo automaticamente');
-  expect(ultimoSalvo.estrutura.body.sections[0].columns[0].elements[0].props.html).toContain('{{boletim_celula_t1_m17_b1_pp}}');
+  const salvo = ultimoSalvo.estrutura;
+  expect(salvo.body.sections[0].columns[0].elements[0].props.html).toContain('{{boletim_celula_layout_t1_m17_s1_rec}}');
+  await page.reload();
+  await expect(folha).toContainText('Recuperação 1º');
+
+  const impressao = execFileSync('php', [fixture, '--impressao-ajustada'], {
+    cwd: raiz, encoding: 'utf8', input: JSON.stringify({ ...salvo, _boletim_teste: quadro.replace('7,5', '9,0') }),
+  });
+  await page.setContent(impressao);
+  await expect(page.getByText('Recuperação 1º', { exact: true })).toBeVisible();
+  const notaImpressa = page.getByText('9,0', { exact: true });
+  await expect(notaImpressa).toHaveCSS('border-left-width', '1px');
+  await expect(notaImpressa).toHaveCSS('border-bottom-width', '2px');
 });
 
 test('cadastro organiza os campos individuais e a busca encontra foto e responsáveis', async ({ page }) => {

@@ -8,6 +8,7 @@ require BASE_PATH . '/vendor/autoload.php';
 use App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService;
 use App\Modulos\ModelosDocumentos\Services\AssistenteDocumentoService;
 use App\Modulos\ModelosDocumentos\Services\ReprodutorLayoutDocumentoService;
+use App\Modulos\ModelosDocumentos\Services\QuadroBoletimEditavelService;
 
 $imagemTeste = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aF9sAAAAASUVORK5CYII=';
 $fotoTeste = '<img src="' . $imagemTeste . '" alt="Foto do aluno" style="width:25mm;height:30mm;">';
@@ -22,6 +23,11 @@ if (in_array('--reproducao', $argv, true)) {
     exit;
 }
 
+if (in_array('--boletim-editavel', $argv, true)) {
+    echo json_encode(QuadroBoletimEditavelService::expor(file_get_contents('php://stdin'), true), JSON_THROW_ON_ERROR);
+    exit;
+}
+
 if (in_array('--impressao-ajustada', $argv, true)) {
     $estrutura = json_decode(file_get_contents('php://stdin'), true, 512, JSON_THROW_ON_ERROR);
     $servico = new class extends ModeloDocumentoService {
@@ -30,7 +36,10 @@ if (in_array('--impressao-ajustada', $argv, true)) {
     };
     echo $servico->renderHtml(
         ['codigo' => 'teste_ajuste', 'estrutura_json' => json_encode($estrutura)],
-        ['assinante_nome' => 'Direção', 'assinante_cargo' => 'Direção', 'logo_html' => '<span></span>', 'aluno_foto_html' => $fotoTeste],
+        [
+            'assinante_nome' => 'Direção', 'assinante_cargo' => 'Direção', 'logo_html' => '<span></span>',
+            'aluno_foto_html' => $fotoTeste, 'boletim_html' => $estrutura['_boletim_teste'] ?? '',
+        ],
         'simples'
     );
     exit;

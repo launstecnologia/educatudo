@@ -1,5 +1,7 @@
 # Tasks — backlog atual
 
+- [x] Editor de documentos: abrir o HTML do próprio boletim com cabeçalhos pesquisáveis e notas dinâmicas, além de ajustar a espessura e a cor da grade e das divisórias no modelo. — 2026-11-11
+
 - [x] Editor de documentos: ajustar a largura da foto do aluno na folha e no PDF, alinhar as linhas selecionadas e exibir a logo cadastrada no rascunho do assistente. Validado no Chromium e no Dompdf. — 2026-11-11
 
 - [x] Editor de documentos: abrir as ações Editar em HTML e Expor tabela completa no mesmo painel lateral, com busca literal, contador e navegação entre ocorrências. Validado no Chromium.

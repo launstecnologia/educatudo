@@ -12,7 +12,7 @@ class QuadroBoletimEditavelService
     public const PREFIXO = 'boletim_celula_';
 
     /** @return array{html:string,variaveis:array<string,string>,celulas:int} */
-    public static function expor(string $html): array
+    public static function expor(string $html, bool $layoutBoletim = false): array
     {
         $vazio = ['html' => '', 'variaveis' => [], 'celulas' => 0];
         if (stripos($html, '<table') === false) {
@@ -33,6 +33,7 @@ class QuadroBoletimEditavelService
         $xpath = new DOMXPath($doc);
         $variaveis = [];
         $numeroTabela = 0;
+        $prefixo = self::PREFIXO . ($layoutBoletim ? 'layout_' : '');
         foreach ($xpath->query('.//table[not(ancestor::table)]', $raiz) as $tabela) {
             $numeroTabela++;
             $cabecalhos = self::cabecalhos($xpath, $tabela);
@@ -52,7 +53,7 @@ class QuadroBoletimEditavelService
                     $celula = $celulas->item($i);
                     $codigo = trim($celula->getAttribute('data-boletim-coluna'));
                     $codigo = $codigo !== '' ? self::chave($codigo) : ($cabecalhos[$coluna] ?? ('coluna_' . $coluna));
-                    $chave = self::PREFIXO . 't' . $numeroTabela . '_' . $materia . $sufixo . '_' . $codigo;
+                    $chave = $prefixo . 't' . $numeroTabela . '_' . $materia . $sufixo . '_' . $codigo;
                     $texto = trim(preg_replace('/\s+/u', ' ', $celula->textContent) ?? '');
                     $variaveis[$chave] = htmlspecialchars($texto !== '' ? $texto : '—', ENT_QUOTES, 'UTF-8');
                     $alvo = $xpath->query('.//span[contains(concat(" ", normalize-space(@class), " "), " boletim-cell-valor ")]', $celula)->item(0) ?? $celula;
@@ -72,9 +73,9 @@ class QuadroBoletimEditavelService
     }
 
     /** @return array<string,string> */
-    public static function variaveis(string $html): array
+    public static function variaveis(string $html, bool $layoutBoletim = false): array
     {
-        return self::expor($html)['variaveis'];
+        return self::expor($html, $layoutBoletim)['variaveis'];
     }
 
     /** @return array<int,string> */
