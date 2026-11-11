@@ -423,19 +423,23 @@
     el.props = el.props || {};
     el.style = el.style || {};
     if (!el.style.fontSize) el.style.fontSize = 7.5;
+    var chave = chaveQuadroDoElemento(el);
     el.props.html = '<div class="quadro-notas-wrap doc-quadro-fit" style="'
-      + cssCaixaBoletim(el.style) + '">{{quadro_notas_html}}</div>';
+      + cssCaixaBoletim(el.style) + '">{{' + chave + '}}</div>';
   }
 
   function chaveEhQuadroNotas(chave) {
-    return String(chave || '').trim() === 'quadro_notas_html';
+    chave = String(chave || '').trim();
+    return chave === 'quadro_notas_html'
+      || chave === 'boletim_html'
+      || /^quadro_notas_b[1-4]_html$/.test(chave);
   }
 
   function boletimHtmlSoDinamico(html) {
     var h = String(html || '').trim();
     if (!h) return true;
     if (h.indexOf('{{boletim_celula_') >= 0) return false;
-    return /\{\{\s*quadro_notas_html\s*\}\}/i.test(h);
+    return /\{\{\s*(?:quadro_notas_html|boletim_html|quadro_notas_b[1-4]_html)\s*\}\}/i.test(h);
   }
 
   /** Texto/HTML com só {{quadro_notas_html}} vira bloco Demonstrativo (não Boletim). */
@@ -457,9 +461,11 @@
     return true;
   }
 
-  /** Troca o wrapper dinâmico pela tabela editável (células {{boletim_celula_*}}). */
+  /** Troca o wrapper dinâmico pela tabela editável (células {{boletim_celula_*}}).
+   *  Só para Demonstrativo — nunca transforma o bloco Boletim no quadro de notas. */
   function garantirHtmlBoletimEditavel(el) {
     if (!el) return false;
+    if (el.type === 'boletim') return false;
     el.props = el.props || {};
     el.style = el.style || {};
     if (!boletimHtmlSoDinamico(el.props.html)) return false;
@@ -523,7 +529,7 @@
 
   function htmlBoletimDaPrevia() {
     var bag = varsDaFolha() || {};
-    return String(bag.quadro_notas_html || '').trim();
+    return String(bag.boletim_html || '').trim();
   }
 
   function atualizarCanvasBoletim(el) {
@@ -2113,8 +2119,19 @@
     if (t === 'quebra_pagina') return '<div style="border-top:2px dashed #f59e0b;margin:12px 0;color:#b45309;font-size:10px;text-align:center">Quebra de página</div>';
     if (t === 'qrcode') return '<div class="edoc-logo-slot">QR</div>';
     if (t === 'boletim' || t === 'demonstrativo_notas' || t === 'tabela_notas') {
-      var liveQuadro = String((varsDaFolha() || {}).quadro_notas_html || '').trim();
+      var bag = varsDaFolha() || {};
+      var bim = parseInt(p.bimestre || 0, 10) || 0;
+      var chaveLive = t === 'boletim'
+        ? 'boletim_html'
+        : (bim > 0 ? ('quadro_notas_b' + bim + '_html') : 'quadro_notas_html');
+      var liveQuadro = String(bag[chaveLive] || '').trim();
       var htmlBol = String((p.html || '')).trim();
+      // Legado: bloco Boletim com {{quadro_notas_html}} — força boletim_html.
+      if (t === 'boletim' && htmlBol && /\{\{\s*quadro_notas_html\s*\}\}/i.test(htmlBol)) {
+        htmlBol = htmlBol.replace(/\{\{\s*quadro_notas_html\s*\}\}/gi, '{{boletim_html}}');
+        el.props = el.props || {};
+        el.props.html = htmlBol;
+      }
       // O HTML do modelo define o layout; os campos recebem os dados do aluno.
       if (!htmlBol && (state.demo || state.preview) && liveQuadro) {
         return '<div class="edoc-quadro-notas edoc-el-body" style="' + st + '">'
@@ -2132,7 +2149,7 @@
           + '<span class="edoc-ph">Escolha a regra, o curso/série e o aluno na prévia</span></div>';
       }
       return htmlBlocoHtml(
-        'quadro_notas_html',
+        chaveLive,
         st,
         'edoc-quadro-notas',
         (t === 'boletim' || t === 'demonstrativo_notas') ? 'Escolha regra, curso/série e aluno na prévia' : ''
@@ -3379,9 +3396,16 @@
     if (tipo === 'imagem') el.props = { width: 180, align: 'center', vAlign: 'middle' };
     if (tipo === 'espacador') el.props = { height: 16 };
     if (tipo === 'assinaturas') el.props = { quantidade: 2 };
-    if (tipo === 'boletim' || tipo === 'demonstrativo_notas' || tipo === 'tabela_notas') {
+    if (tipo === 'boletim') {
       el.style = { fontSize: 7.5 };
       el.props = {
+        html: '<div class="quadro-notas-wrap doc-quadro-fit" style="font-size:7.5pt;width:100%;max-width:100%;">{{boletim_html}}</div>'
+      };
+    }
+    if (tipo === 'demonstrativo_notas' || tipo === 'tabela_notas') {
+      el.style = { fontSize: 7.5 };
+      el.props = {
+        bimestre: 0,
         html: '<div class="quadro-notas-wrap doc-quadro-fit" style="font-size:7.5pt;width:100%;max-width:100%;">{{quadro_notas_html}}</div>'
       };
     }
@@ -3569,8 +3593,17 @@
     if (chaveEhQuadroNotas(chave)) {
       var pathBol = findPath(colId);
       if (!pathBol || !pathBol.column) return;
-      var bol = defaultElement('demonstrativo_notas');
-      garantirHtmlBoletimEditavel(bol);
+      var bol;
+      if (chave === 'boletim_html') {
+        bol = defaultElement('boletim');
+      } else {
+        bol = defaultElement('demonstrativo_notas');
+        var mBim = String(chave).match(/^quadro_notas_b([1-4])_html$/);
+        bol.props = bol.props || {};
+        bol.props.bimestre = mBim ? parseInt(mBim[1], 10) : 0;
+        bol.props.html = '<div class="quadro-notas-wrap doc-quadro-fit" style="font-size:7.5pt;width:100%;max-width:100%;">{{' + chave + '}}</div>';
+        garantirHtmlBoletimEditavel(bol);
+      }
       pathBol.column.elements = pathBol.column.elements || [];
       pathBol.column.elements.push(bol);
       state.selected = { id: bol.id, kind: 'element' };
@@ -3578,9 +3611,9 @@
       if (!skipHist) pushHist();
       render();
       abrirCardBoletim(true);
-      setStatus(boletimHtmlSoDinamico((bol.props || {}).html)
-        ? 'Demonstrativo na folha. Escolha regra, curso/série e aluno na prévia.'
-        : 'Demonstrativo na folha — edite o HTML ao lado.');
+      setStatus(bol.type === 'boletim'
+        ? 'Boletim na folha. Escolha regra, curso/série e aluno na prévia.'
+        : 'Demonstrativo na folha. Escolha regra, curso/série e aluno na prévia.');
       return;
     }
     var path = findPath(colId);
@@ -4721,7 +4754,17 @@
     if (!el) return false;
     if (el.type === 'boletim' || el.type === 'demonstrativo_notas' || el.type === 'tabela_notas') return true;
     var raw = String((el.props || {}).html || (el.props || {}).text || '');
-    return raw.indexOf('quadro_notas_html') >= 0 || raw.indexOf('{{boletim_celula_') >= 0;
+    return raw.indexOf('quadro_notas_html') >= 0
+      || raw.indexOf('boletim_html') >= 0
+      || raw.indexOf('{{boletim_celula_') >= 0;
+  }
+
+  function chaveQuadroDoElemento(el) {
+    if (!el) return 'quadro_notas_html';
+    if (el.type === 'boletim') return 'boletim_html';
+    var bim = parseInt((el.props && el.props.bimestre) || 0, 10) || 0;
+    if (bim > 0) return 'quadro_notas_b' + bim + '_html';
+    return 'quadro_notas_html';
   }
 
   function acharElementoBoletim() {
@@ -4755,8 +4798,8 @@
       state.selected = { id: existente.id, kind: 'element' };
       return existente;
     }
-    var colId = colunaAlvo() || garantirColunaCorpo();
-    return insertElement(colId, 'boletim') || null;
+    // Não auto-insere: Boletim e cada bimestre do Demonstrativo entram só por clique/arraste.
+    return null;
   }
 
   function abrirCardBoletim(focar) {
@@ -4876,6 +4919,65 @@
     function pintarRegras(lista) {
       if (lista) demoPacote.regras = lista;
       pintarOpcoesFonte(fonteRegra, demoPacote.regras || [], regraSelecionadaId(), 'Selecione a regra de aprovação');
+    }
+    function inserirDemonstrativoPeriodo(bimestre, rotulo) {
+      bimestre = parseInt(bimestre, 10) || 0;
+      var colId = garantirColunaCorpo();
+      var path = findPath(colId);
+      if (!path || !path.column) return;
+      var el = defaultElement('demonstrativo_notas');
+      el.props = el.props || {};
+      el.props.bimestre = bimestre;
+      var chave = bimestre > 0 ? ('quadro_notas_b' + bimestre + '_html') : 'quadro_notas_html';
+      el.props.html = '<div class="quadro-notas-wrap doc-quadro-fit" style="font-size:7.5pt;width:100%;max-width:100%;">{{' + chave + '}}</div>';
+      path.column.elements = path.column.elements || [];
+      path.column.elements.push(el);
+      state.selected = { id: el.id, kind: 'element' };
+      garantirPaisagemBoletim();
+      pushHist();
+      render();
+      abrirCardBoletim(true);
+      setStatus((rotulo || 'Demonstrativo') + ' na folha — escolha regra, curso/série e aluno na prévia');
+    }
+    function pintarPeriodosDemonstrativo(lista) {
+      var boxPeriodos = $('#edoc-periodos-chips');
+      var contagem = $('#edoc-periodos-count');
+      var hint = $('#edoc-periodos-hint');
+      if (!boxPeriodos) return;
+      lista = lista || [];
+      if (!lista.length) {
+        boxPeriodos.innerHTML = '';
+        if (contagem) contagem.textContent = '0';
+        if (hint) {
+          hint.hidden = false;
+          hint.textContent = 'Escolha a regra de aprovação na prévia para listar 1º, 2º bimestre…';
+        }
+        return;
+      }
+      if (hint) hint.hidden = true;
+      var html = '';
+      html += '<button type="button" class="edoc-var-chip" data-demo-bimestre="0" title="Todos os períodos da regra">'
+        + '<span class="edoc-var-nome">Todos os períodos</span>'
+        + '<span class="edoc-var-token">{{quadro_notas_html}}</span></button>';
+      lista.forEach(function (p) {
+        var n = Number(p.n || 0);
+        if (n <= 0) return;
+        var rotulo = p.rotulo || (n + 'º Bimestre');
+        var chave = p.chave || ('quadro_notas_b' + n + '_html');
+        html += '<button type="button" class="edoc-var-chip" draggable="true" data-demo-bimestre="' + n + '" data-demo-rotulo="' + esc(rotulo) + '" data-drag-var="' + esc(chave) + '" title="Arraste para a folha: ' + esc(rotulo) + '">'
+          + '<span class="edoc-var-nome">' + esc(rotulo) + '</span>'
+          + '<span class="edoc-var-token">{{' + esc(chave) + '}}</span></button>';
+      });
+      boxPeriodos.innerHTML = html;
+      if (contagem) contagem.textContent = String(lista.length);
+      $all('[data-demo-bimestre]', boxPeriodos).forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          inserirDemonstrativoPeriodo(btn.getAttribute('data-demo-bimestre'), btn.getAttribute('data-demo-rotulo') || btn.textContent);
+        });
+        if (btn.getAttribute('draggable') === 'true') {
+          ligarArrasteVariavel(btn);
+        }
+      });
     }
     function pintarDemonstrativos(lista) {
       var atual = demonstrativoSelecionadoId();
@@ -5186,7 +5288,26 @@
         carregar();
         return;
       }
+      if (Array.isArray(data.turmas)) {
+        demoPacote.turmas = data.turmas;
+        var anoRegra = (data.regra && parseInt(data.regra.ano_letivo, 10)) || 0;
+        if (anoRegra > 0 && anoSel) {
+          anoSel.value = String(anoRegra);
+        }
+        pintarAnos(demoPacote.turmas);
+        var turmaAntes = turma.value;
+        pintarTurmas(demoPacote.turmas);
+        if (turmaAntes && !turma.value) {
+          aluno.value = '';
+          pintarAlunos([]);
+        } else if (!turma.value && demoPacote.turmas.length === 1) {
+          turma.value = String(demoPacote.turmas[0].id);
+          carregar();
+          return;
+        }
+      }
       pintarRegras(data.regras_aprovacao || []);
+      pintarPeriodosDemonstrativo(data.periodos_demonstrativo || []);
       pintarDemonstrativos(data.demonstrativos || data.boletins || []);
       pintarLayoutsBoletim(data.layouts_boletim || []);
       if (data.demonstrativo_id) {
@@ -5212,9 +5333,10 @@
       }
       if (Array.isArray(data.periodos) && data.periodos.length) demoPacote.periodos = data.periodos;
       demoPacote.html_quadro = data.html_quadro || '';
+      demoPacote.html_boletim = data.html_boletim || '';
       pintarComponentes(data.componentes || []);
       if (!data.vars && data.resumo) {
-        C.varsPreview = { quadro_notas_html: '' };
+        C.varsPreview = { quadro_notas_html: '', boletim_html: '' };
         C.modeloQuadroHtml = '';
         state.demo = !!(real && real.checked);
         render();
@@ -5227,19 +5349,38 @@
           C.varsPreview.quadro_notas_html = data.html_quadro;
           garantirPaisagemBoletim();
         }
-        var bolEdit = acharElementoBoletim();
-        if (bolEdit && garantirHtmlBoletimEditavel(bolEdit)) {
-          state.dirty = true;
-          scheduleSave();
+        if (data.html_boletim) {
+          C.varsPreview.boletim_html = data.html_boletim;
+        } else {
+          C.varsPreview.boletim_html = C.varsPreview.boletim_html || '';
+        }
+        if (data.html_por_bimestre && typeof data.html_por_bimestre === 'object') {
+          Object.keys(data.html_por_bimestre).forEach(function (n) {
+            C.varsPreview['quadro_notas_b' + n + '_html'] = data.html_por_bimestre[n] || '';
+          });
+        }
+        // Só edita células do Demonstrativo — nunca sobrescreve o bloco Boletim.
+        var rolesDemo = ['header', 'body', 'footer'];
+        for (var rd = 0; rd < rolesDemo.length; rd++) {
+          var secsDemo = (areaOf(rolesDemo[rd]).sections || []);
+          for (var id = 0; id < secsDemo.length; id++) {
+            var colsDemo = secsDemo[id].columns || [];
+            for (var jd = 0; jd < colsDemo.length; jd++) {
+              (colsDemo[jd].elements || []).forEach(function (elDemo) {
+                if (elDemo && (elDemo.type === 'demonstrativo_notas' || elDemo.type === 'tabela_notas')
+                  && garantirHtmlBoletimEditavel(elDemo)) {
+                  state.dirty = true;
+                  scheduleSave();
+                }
+              });
+            }
+          }
         }
         registrarDemoSel(capturarDemoSel());
         atualizarLinkPdf();
         state.demo = !!(real && real.checked);
-        if (boletimSelecionadoId() > 0) {
-          garantirBlocoBoletimNaFolha();
-        }
         if (status) {
-          if (boletimSelecionadoId() && data.html_quadro) {
+          if (boletimSelecionadoId() && (data.html_boletim || data.html_quadro)) {
             status.textContent = data.resumo || 'Quadro na folha. Troque a aluna para atualizar a prévia.';
           } else if (boletimSelecionadoId()) {
             status.textContent = data.resumo || 'Fonte escolhida. Se o quadro não aparecer, confira o assistente do modelo.';
@@ -5316,9 +5457,6 @@
       carregar();
     });
     aluno.addEventListener('change', function () {
-      if (regraSelecionadaId() > 0 || boletimSelecionadoId() > 0) {
-        garantirBlocoBoletimNaFolha();
-      }
       carregar();
     });
     if (fonteRegra) {
@@ -5328,9 +5466,9 @@
       fonteRegra.addEventListener('change', function () {
         gravarFonteRegra(fonteRegra.value);
         abrirCardBoletim(false);
-        if (regraSelecionadaId() > 0) {
-          garantirBlocoBoletimNaFolha();
-        }
+        // Troca de regra: limpa turma fora da vigência; chips de bimestre vêm no pacote.
+        aluno.value = '';
+        pintarAlunos([]);
         carregar();
       });
     }

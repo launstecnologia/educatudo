@@ -157,7 +157,12 @@ class ModeloDocumentoService
         'rodape_unidades' => 'Linha de unidades/contato do rodapé',
         'assinante_nome' => 'Nome de quem assina (layout padrão)',
         'assinante_cargo' => 'Cargo de quem assina (Direção, Coordenação…)',
-        'quadro_notas_html' => 'Demonstrativo de Notas (HTML)',
+        'quadro_notas_html' => 'Demonstrativo de Notas — todos os períodos (HTML)',
+        'boletim_html' => 'Boletim (HTML)',
+        'quadro_notas_b1_html' => 'Demonstrativo — 1º período (HTML)',
+        'quadro_notas_b2_html' => 'Demonstrativo — 2º período (HTML)',
+        'quadro_notas_b3_html' => 'Demonstrativo — 3º período (HTML)',
+        'quadro_notas_b4_html' => 'Demonstrativo — 4º período (HTML)',
         'componentes_serie_html' => 'Componentes curriculares da série (HTML)',
         'identidade_html' => 'Tabela de identidade do aluno (HTML)',
         'trajetoria_html' => 'Trajetória escolar por ano (HTML)',
@@ -626,7 +631,6 @@ class ModeloDocumentoService
                 $item('dados_responsavel', 'Dados do responsável', 'fa-user'),
                 $item('dados_turma', 'Dados da turma', 'fa-users'),
                 $item('boletim', 'Boletim', 'fa-table-list', 'Boletim vinculado à regra de aprovação. Na prévia: regra, curso/série e aluno.'),
-                $item('demonstrativo_notas', 'Demonstrativo de Notas', 'fa-table-cells', 'Todos os bimestres/semestres da regra. Na prévia: regra, curso/série e aluno.'),
                 $item('frequencia', 'Frequência', 'fa-chart-pie'),
                 $item('observacoes', 'Observações', 'fa-comment'),
                 $item('assinaturas', 'Assinaturas', 'fa-signature'),
@@ -2193,7 +2197,7 @@ class ModeloDocumentoService
 
     /**
      * Usa na emissão o mesmo quadro vinculado no editor.
-     * Preferência: regra de aprovação → demonstrativo → layout de boletim.
+     * Regra de aprovação resolve Demonstrativo e Boletim; cada bloco usa a própria variável.
      */
     public function aplicarFonteBoletimDoModelo(array $modelo, array $vars, int $alunoId, int $turmaId, int $anoLetivo = 0): array
     {
@@ -2202,35 +2206,33 @@ class ModeloDocumentoService
         $jsonEst = json_encode($estrutura);
         $temBlocoBoletim = is_string($jsonEst) && preg_match('/"type"\s*:\s*"boletim"/', $jsonEst) === 1;
         $temBlocoDemonstrativo = is_string($jsonEst)
-            && preg_match('/"type"\s*:\s*"demonstrativo_notas"/', $jsonEst) === 1;
-        $fonteTipo = 'auto';
-        $fonteId = 0;
-        if ($temBlocoBoletim && !$temBlocoDemonstrativo) {
-            $fonteTipo = 'layout';
-            $fonteId = (int) ($estrutura['fonte_boletim_id'] ?? 0);
-        } elseif ($temBlocoDemonstrativo && !$temBlocoBoletim) {
-            $fonteTipo = 'demonstrativo';
-            $fonteId = (int) ($estrutura['fonte_demonstrativo_id'] ?? 0);
-        } else {
-            $fonteId = (int) ($estrutura['fonte_demonstrativo_id'] ?? 0);
-            if ($fonteId > 0) {
-                $fonteTipo = 'demonstrativo';
-            } else {
-                $fonteId = (int) ($estrutura['fonte_boletim_id'] ?? 0);
-                if ($fonteId > 0) {
-                    $fonteTipo = 'layout';
-                }
-            }
-        }
-        if ($fonteId <= 0 && $regraId <= 0) {
+            && preg_match('/"type"\s*:\s*"(?:demonstrativo_notas|tabela_notas)"/', $jsonEst) === 1;
+        $fonteDemoId = (int) ($estrutura['fonte_demonstrativo_id'] ?? 0);
+        $fonteLayoutId = (int) ($estrutura['fonte_boletim_id'] ?? 0);
+        if ($fonteDemoId <= 0 && $fonteLayoutId <= 0 && $regraId <= 0) {
             return $vars;
         }
         if ($alunoId <= 0 || $turmaId <= 0) {
             throw new \RuntimeException('Aluno e turma são necessários para emitir o boletim vinculado ao documento.');
         }
         $demonstracao = new DemonstracaoDocumentoService($this->db);
-        if ($regraId > 0 && $fonteTipo === 'auto') {
+        // Com regra, o pacote já carrega demonstrativo + layout; senão usa o ID explícito.
+        $fonteTipo = 'auto';
+        $fonteId = 0;
+        if ($regraId > 0) {
             $fonteTipo = $temBlocoBoletim && !$temBlocoDemonstrativo ? 'layout' : 'demonstrativo';
+        } elseif ($temBlocoBoletim && !$temBlocoDemonstrativo) {
+            $fonteTipo = 'layout';
+            $fonteId = $fonteLayoutId;
+        } elseif ($temBlocoDemonstrativo && !$temBlocoBoletim) {
+            $fonteTipo = 'demonstrativo';
+            $fonteId = $fonteDemoId;
+        } elseif ($fonteDemoId > 0) {
+            $fonteTipo = 'demonstrativo';
+            $fonteId = $fonteDemoId;
+        } elseif ($fonteLayoutId > 0) {
+            $fonteTipo = 'layout';
+            $fonteId = $fonteLayoutId;
         }
         if ($fonteId > 0) {
             $anoFonte = $demonstracao->anoDoLayoutOuBoletim($fonteId, $fonteTipo);
@@ -2239,11 +2241,40 @@ class ModeloDocumentoService
             }
         }
         $pacote = $demonstracao->pacote($turmaId, $alunoId, '1127a', $fonteId, $fonteTipo, $regraId);
-        $quadro = trim((string) ($pacote['html_quadro'] ?? ''));
-        if ($quadro === '') {
+        $varsPacote = is_array($pacote['vars'] ?? null) ? $pacote['vars'] : [];
+        foreach ($varsPacote as $chave => $valor) {
+            if (!is_string($chave) || !is_string($valor) || $valor === '') {
+                continue;
+            }
+            if ($chave === 'quadro_notas_html'
+                || $chave === 'boletim_html'
+                || preg_match('/^quadro_notas_b[1-4]_html$/', $chave) === 1
+            ) {
+                $vars[$chave] = $valor;
+            }
+        }
+        $htmlBoletim = trim((string) ($pacote['html_boletim'] ?? $vars['boletim_html'] ?? ''));
+        $htmlQuadro = trim((string) ($pacote['html_quadro'] ?? $vars['quadro_notas_html'] ?? ''));
+        if ($htmlBoletim !== '') {
+            $vars['boletim_html'] = $htmlBoletim;
+        }
+        if ($htmlQuadro !== '') {
+            $vars['quadro_notas_html'] = $htmlQuadro;
+        }
+        $htmlPorBimestre = is_array($pacote['html_por_bimestre'] ?? null) ? $pacote['html_por_bimestre'] : [];
+        foreach ($htmlPorBimestre as $n => $htmlBim) {
+            $n = (int) $n;
+            if ($n < 1 || $n > 4 || !is_string($htmlBim) || trim($htmlBim) === '') {
+                continue;
+            }
+            $vars['quadro_notas_b' . $n . '_html'] = $htmlBim;
+        }
+        if ($temBlocoBoletim && $htmlBoletim === '') {
             throw new \RuntimeException((string) ($pacote['resumo'] ?? 'O boletim vinculado não possui quadro para este aluno.'));
         }
-        $vars['quadro_notas_html'] = $quadro;
+        if ($temBlocoDemonstrativo && $htmlQuadro === '' && $htmlPorBimestre === []) {
+            throw new \RuntimeException((string) ($pacote['resumo'] ?? 'O demonstrativo vinculado não possui quadro para este aluno.'));
+        }
         return $vars;
     }
 
@@ -3710,6 +3741,11 @@ HTML;
             'logo_html' => '',
             'aluno_foto_html' => '<span style="display:inline-block;width:25mm;height:30mm;border:1px solid #ccc;text-align:center;padding-top:10mm;box-sizing:border-box;">Foto do aluno</span>',
             'quadro_notas_html' => self::htmlQuadroNotasAmostra(),
+            'boletim_html' => self::htmlQuadroNotasAmostra(),
+            'quadro_notas_b1_html' => self::htmlQuadroNotasAmostra(),
+            'quadro_notas_b2_html' => self::htmlQuadroNotasAmostra(),
+            'quadro_notas_b3_html' => self::htmlQuadroNotasAmostra(),
+            'quadro_notas_b4_html' => self::htmlQuadroNotasAmostra(),
             'identidade_html' => '<table class="dados"><tr><td class="label">Nome</td><td>Maria Eduarda Silva</td></tr><tr><td class="label">CPF</td><td>123.456.789-00</td></tr></table>',
             'trajetoria_html' => '<table class="dados"><tr><td>2024</td><td>8º Ano</td><td>EMEF Exemplo</td><td>externo</td><td>Aprovado</td></tr></table>',
             'documentos_html' => '<table class="dados"><tr><td>Certidão de nascimento</td><td>entregue</td></tr></table>',

@@ -52,15 +52,18 @@ $renderCampos('Contrato e valores', $grupos['contrato']['chaves'] ?? [], 'fa-fil
 </details>
 <details class="edoc-tool-group" data-edoc-palette-group>
 <summary><span>Acadêmico</span><small>Boletim, eventos, médias, faltas e histórico</small></summary>
-<p class="edoc-hint">Use a mesma regra de aprovação na prévia. Boletim e Demonstrativo de Notas são blocos diferentes.</p>
+<p class="edoc-hint">Na prévia, escolha a regra de aprovação (ela já vincula ano, série, Demonstrativo e Boletim). Depois arraste cada bimestre do Demonstrativo — ou o Boletim, que é outro bloco.</p>
 <div class="edoc-var-stack">
 <?php $renderElementos(array_values(array_filter($catalogo['dados'] ?? [], static fn ($i) => ($i['tipo'] ?? '') === 'boletim'))); ?>
-<button type="button" class="edoc-item" draggable="true" data-drag-type="demonstrativo_notas" aria-label="Demonstrativo de Notas" title="Todos os bimestres/semestres configurados na regra. Escolha regra, curso/série e aluno na prévia.">
-<i class="fa-solid fa-table-list" aria-hidden="true"></i>
-<span class="edoc-item-text"><strong>Demonstrativo de Notas</strong><small>Todos os bimestres e semestres da regra</small></span>
-<i class="fa-solid fa-plus edoc-item-add" aria-hidden="true"></i>
-</button>
-<?php $renderCampos('Campos do Demonstrativo (HTML)', ['quadro_notas_html'], 'fa-code'); ?>
+<details class="edoc-var-drop edoc-var-group-side" id="edoc-periodos-demo" open>
+<summary>
+<span class="edoc-var-ico" aria-hidden="true"><i class="fa-solid fa-table-cells"></i></span>
+<span class="edoc-var-titulo">Demonstrativo de Notas</span>
+<span class="edoc-var-count" id="edoc-periodos-count">0</span>
+</summary>
+<p class="edoc-hint" id="edoc-periodos-hint">Escolha a regra de aprovação na prévia para listar 1º Bimestre, 2º Bimestre… (iguais aos cards da regra).</p>
+<div class="edoc-var-chips" id="edoc-periodos-chips"></div>
+</details>
 <div class="edoc-demo" id="edoc-demo">
 <div class="edoc-demo-head">
 <strong>Disciplinas e eventos</strong>

@@ -21,7 +21,9 @@ final class CamposDocumentoEditorTest extends TestCase
         $this->assertNotContains('aluno_filiacao', $grupos['academico']['chaves']);
         $this->assertNotContains('aluno_naturalidade', $grupos['academico']['chaves']);
         $this->assertNotContains('aluno_nacionalidade', $grupos['academico']['chaves']);
-        $this->assertSame('Demonstrativo de Notas (HTML)', ModeloDocumentoService::PLACEHOLDERS['quadro_notas_html']);
+        $this->assertSame('Demonstrativo de Notas — todos os períodos (HTML)', ModeloDocumentoService::PLACEHOLDERS['quadro_notas_html']);
+        $this->assertArrayHasKey('boletim_html', ModeloDocumentoService::PLACEHOLDERS);
+        $this->assertArrayHasKey('quadro_notas_b1_html', ModeloDocumentoService::PLACEHOLDERS);
         $this->assertContains('quadro_notas_html', $grupos['academico']['chaves']);
     }
 

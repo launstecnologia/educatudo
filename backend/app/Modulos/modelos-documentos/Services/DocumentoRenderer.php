@@ -182,7 +182,8 @@ class DocumentoRenderer
                 'Série' => '{{serie}}',
                 'Ano' => '{{ano_letivo}}',
             ], $css),
-            'boletim', 'demonstrativo_notas', 'tabela_notas' => $this->blocoBoletim($props, $css),
+            'boletim' => $this->blocoBoletim($props, $css, 'boletim'),
+            'demonstrativo_notas', 'tabela_notas' => $this->blocoBoletim($props, $css, 'demonstrativo_notas'),
             'tabela_coletiva' => $this->blocoHtmlLivre(
                 '<div class="tabela-coletiva-wrap">{{tabela_html}}</div>',
                 $css
@@ -427,11 +428,15 @@ class DocumentoRenderer
      *
      * @param array<string,mixed> $props
      */
-    private function blocoBoletim(array $props, string $css): string
+    private function blocoBoletim(array $props, string $css, string $tipo = 'boletim'): string
     {
         $html = trim((string) ($props['html'] ?? ''));
         if ($html === '') {
-            $html = '<div class="quadro-notas-wrap">{{quadro_notas_html}}</div>';
+            $bim = (int) ($props['bimestre'] ?? 0);
+            $chave = $tipo === 'boletim'
+                ? 'boletim_html'
+                : ($bim >= 1 && $bim <= 4 ? ('quadro_notas_b' . $bim . '_html') : 'quadro_notas_html');
+            $html = '<div class="quadro-notas-wrap">{{' . $chave . '}}</div>';
         }
         // Protege os blocos CSS para não virarem texto no PDF ao sanitizar o HTML.
         $estilos = [];
