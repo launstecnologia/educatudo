@@ -2122,7 +2122,7 @@
       var fonteBol = parseInt((state.estrutura && state.estrutura.fonte_boletim_id) || 0, 10) || 0;
       if (t === 'boletim' && fonteBol <= 0) {
         return '<div class="edoc-quadro-notas edoc-el-body" style="' + st + '">'
-          + '<span class="edoc-ph">Escolha o boletim e a aluna no card ao lado para ver o layout</span></div>';
+          + '<span class="edoc-ph">Escolha o demonstrativo e a aluna no card ao lado para ver o quadro</span></div>';
       }
       return htmlBlocoHtml(
         'quadro_notas_html',
@@ -4317,7 +4317,7 @@
           }
           var modelo = String(C.modeloQuadroHtml || '');
           if (!modelo || modelo.indexOf('{{boletim_celula_') < 0) {
-            setStatus('Escolha o boletim e um aluno com notas para expor a tabela completa.');
+            setStatus('Escolha o demonstrativo e um aluno com notas para expor a tabela completa.');
             abrirCardBoletim(true);
             return;
           }
@@ -4726,7 +4726,7 @@
     card.hidden = false;
     var status = $('#edoc-demo-status');
     if (status && !status.textContent) {
-      status.textContent = 'Escolha o boletim e a aluna para ver o layout na folha.';
+      status.textContent = 'Escolha o demonstrativo e a aluna para ver o quadro na folha.';
     }
     if (focar) {
       card.open = true;
@@ -4779,7 +4779,7 @@
     function pintarBoletins(lista) {
       if (!fonteBoletim) return;
       var atual = boletimSelecionadoId();
-      var html = '<option value="">Selecione o boletim construído</option>';
+      var html = '<option value="">Selecione o demonstrativo de notas</option>';
       (lista || []).forEach(function (b) {
         var id = Number(b.id || 0);
         if (!id) return;
@@ -4969,21 +4969,44 @@
       lista.forEach(function (c) {
         var nome = c.nome || '';
         var sigla = mapa[c.slug] || c.sigla || '';
+        var eventos = Array.isArray(c.eventos) ? c.eventos : [];
         html += '<div class="edoc-disc">';
         html += '<button type="button" class="edoc-disc-nome" draggable="true" data-drag-texto="' + esc(nome) + '" title="Arraste o nome para a folha">' + esc(nome) + '</button>';
         html += '<label class="edoc-disc-sigla">Sigla <input type="text" maxlength="12" data-sigla="' + esc(c.slug) + '" data-nome="' + esc(nome) + '" value="' + esc(sigla) + '"></label>';
         html += '<div class="edoc-disc-chips">';
         html += '<button type="button" data-drag-texto="' + esc(nome) + '">Nome</button>';
         html += '<button type="button" data-drag-texto="' + esc(sigla) + '" data-sigla-drag="' + esc(c.slug) + '">Sigla</button>';
-        pers.forEach(function (p, i) {
-          var nota = (c.notas && c.notas[i]) || ('nota_' + c.slug + '_' + p.n);
-          var falta = (c.faltas && c.faltas[i]) || ('falta_' + c.slug + '_' + p.n);
-          html += '<button type="button" data-drag-var="' + esc(nota) + '" title="Nota de ' + esc(p.rotulo || '') + '">' + esc(String(p.n)) + 'º</button>';
-          html += '<button type="button" data-drag-var="' + esc(falta) + '" title="Falta de ' + esc(p.rotulo || '') + '">F' + esc(String(p.n)) + '</button>';
-        });
-        html += '<button type="button" data-drag-var="' + esc(c.media || ('media_final_' + c.slug)) + '">Média final do boletim</button>';
-        html += '<button type="button" data-drag-var="' + esc('media_anual_' + c.slug) + '">Média anual</button>';
-        (c.eventos || []).forEach(function (evento) { html += '<button type="button" data-drag-var="' + esc(evento.chave) + '" title="' + esc(evento.rotulo) + '">' + esc(evento.rotulo) + '</button>'; });
+        if (eventos.length) {
+          var grupos = [];
+          var porGrupo = {};
+          eventos.forEach(function (evento) {
+            var grupo = String((evento && evento.grupo) || 'Campos').trim() || 'Campos';
+            if (!porGrupo[grupo]) {
+              porGrupo[grupo] = [];
+              grupos.push(grupo);
+            }
+            porGrupo[grupo].push(evento);
+          });
+          grupos.forEach(function (grupo) {
+            html += '<div class="edoc-disc-grupo">';
+            html += '<span class="edoc-disc-grupo-titulo">' + esc(grupo) + '</span>';
+            html += '<div class="edoc-disc-grupo-chips">';
+            porGrupo[grupo].forEach(function (evento) {
+              var rotulo = String((evento && evento.rotulo) || evento.codigo || 'Campo');
+              html += '<button type="button" data-drag-var="' + esc(evento.chave) + '" title="' + esc(grupo + ' · ' + rotulo) + '">' + esc(rotulo) + '</button>';
+            });
+            html += '</div></div>';
+          });
+        } else {
+          pers.forEach(function (p, i) {
+            var nota = (c.notas && c.notas[i]) || ('nota_' + c.slug + '_' + p.n);
+            var falta = (c.faltas && c.faltas[i]) || ('falta_' + c.slug + '_' + p.n);
+            html += '<button type="button" data-drag-var="' + esc(nota) + '" title="Nota de ' + esc(p.rotulo || '') + '">' + esc(String(p.n)) + 'º</button>';
+            html += '<button type="button" data-drag-var="' + esc(falta) + '" title="Falta de ' + esc(p.rotulo || '') + '">F' + esc(String(p.n)) + '</button>';
+          });
+          html += '<button type="button" data-drag-var="' + esc(c.media || ('media_final_' + c.slug)) + '">MF</button>';
+          html += '<button type="button" data-drag-var="' + esc('media_anual_' + c.slug) + '">MA</button>';
+        }
         html += '</div></div>';
       });
       comps.innerHTML = html;

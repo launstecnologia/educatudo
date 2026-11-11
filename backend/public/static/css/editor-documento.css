@@ -482,7 +482,10 @@ body.edoc-body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 0 10px 10px;
+  padding: 12px 10px 12px;
+}
+.edoc-tool-group > .edoc-var-stack:first-child {
+  padding-top: 12px;
 }
 .edoc-var-drop {
   border: 1px solid #e2e8f0;
@@ -850,22 +853,50 @@ td.edoc-celula-sel, th.edoc-celula-sel {
   background: #d7dde5;
 }
 .edoc-chk { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 10px; }
+.edoc-var-stack > .edoc-demo,
+.edoc-var-stack > .edoc-element-list,
+.edoc-var-stack > .edoc-var-drop {
+  width: 100%;
+  box-sizing: border-box;
+}
+.edoc-var-stack > .edoc-element-list {
+  padding: 0;
+}
 .edoc-demo {
-  margin: 4px 0 12px;
+  margin: 0;
   padding: 10px;
   border: 1px solid #dbe3ee;
   border-radius: 10px;
   background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.edoc-demo-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.edoc-demo-head strong {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.edoc-demo-head p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #64748b;
 }
 .edoc-demo h4 {
-  margin: 0 0 4px;
+  margin: 0;
   font-size: 12px;
   font-weight: 700;
   color: #0f172a;
 }
 .edoc-demo label {
   display: block;
-  margin: 8px 0 3px;
+  margin: 0;
   font-size: 11px;
   color: #64748b;
 }
@@ -883,7 +914,7 @@ td.edoc-celula-sel, th.edoc-celula-sel {
   display: flex !important;
   align-items: center;
   gap: 6px;
-  margin-top: 8px;
+  margin: 0 !important;
   font-size: 12px;
   color: #334155;
 }
@@ -894,10 +925,30 @@ td.edoc-celula-sel, th.edoc-celula-sel {
   background: #eff6ff;
 }
 .edoc-boletim-card h4 { color: #1e3a8a; }
-.edoc-atalhos { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
-.edoc-atalhos .edoc-btn { font-size: 11px; padding: 4px 8px; }
-.edoc-demo .edoc-var-drop { margin-top: 8px; background: #fff; }
-.edoc-demo-resultados { margin-top: 8px; }
+.edoc-atalhos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  align-items: stretch;
+}
+.edoc-atalhos .edoc-btn {
+  flex: 1 1 calc(50% - 6px);
+  min-width: 0;
+  justify-content: center;
+  font-size: 11px;
+  padding: 6px 8px;
+}
+.edoc-demo .edoc-var-drop {
+  margin: 0;
+  background: #fff;
+}
+.edoc-demo .edoc-hint {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+.edoc-demo-resultados { margin-top: 0; }
 .edoc-disc {
   border: 1px solid #e5e7eb;
   border-radius: 8px;
@@ -939,8 +990,31 @@ td.edoc-celula-sel, th.edoc-celula-sel {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  align-items: flex-start;
 }
-.edoc-disc-chips button, .edoc-demo-resultados button {
+.edoc-disc-grupo {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px dashed #e2e8f0;
+}
+.edoc-disc-grupo:first-of-type { margin-top: 2px; }
+.edoc-disc-grupo-titulo {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.edoc-disc-grupo-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.edoc-disc-chips button, .edoc-demo-resultados button, .edoc-disc-grupo-chips button {
   border: 1px solid #e5e7eb;
   background: #f8fafc;
   color: #334155;
@@ -949,7 +1023,7 @@ td.edoc-celula-sel, th.edoc-celula-sel {
   font-size: 10px;
   cursor: grab;
 }
-.edoc-disc-chips button:hover, .edoc-demo-resultados button:hover {
+.edoc-disc-chips button:hover, .edoc-demo-resultados button:hover, .edoc-disc-grupo-chips button:hover {
   border-color: var(--color-primary, #2563eb);
   background: #eff6ff;
 }

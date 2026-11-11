@@ -92,9 +92,9 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                 </div>
                 <details class="edoc-demo edoc-boletim-card" id="edoc-boletim-card" hidden>
                     <summary>Conferir com dados de aluno</summary>
-                    <p class="edoc-hint">Escolha o boletim, a turma e o aluno para conferir o resultado.</p>
-                    <label for="edoc-fonte-boletim">Boletim</label>
-                    <select id="edoc-fonte-boletim"><option value="">Carregando boletins…</option></select>
+                    <p class="edoc-hint">Escolha o Demonstrativo de notas (mesmos modelos de Acadêmico), a turma e o aluno.</p>
+                    <label for="edoc-fonte-boletim">Demonstrativo de notas</label>
+                    <select id="edoc-fonte-boletim"><option value="">Carregando demonstrativos…</option></select>
                     <label for="edoc-demo-turma">Turma / série</label>
                     <select id="edoc-demo-turma"><option value="">Carregando turmas…</option></select>
                     <label for="edoc-demo-aluno">Aluno(a) da prévia</label>
@@ -103,7 +103,7 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                         <input type="checkbox" id="edoc-demo-real" checked>
                         Mostrar dados reais na folha
                     </label>
-                    <p class="edoc-hint" id="edoc-demo-status">Escolha o boletim e a aluna — o layout aparece na folha.</p>
+                    <p class="edoc-hint" id="edoc-demo-status">Escolha o demonstrativo e a aluna — o quadro aparece na folha.</p>
                 </details>
                 <label class="edoc-busca-label" for="edoc-element-search">O que você quer adicionar?</label>
                 <input type="search" id="edoc-element-search" class="edoc-var-search" placeholder="Buscar título, imagem, boletim…" autocomplete="off">
@@ -148,7 +148,7 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                     'dados_aluno' => ['Aluno', 'Nome, RA e dados do estudante'],
                     'dados_responsavel' => ['Responsável', 'Dados do responsável pelo aluno'],
                     'dados_turma' => ['Turma', 'Série, curso e turma do aluno'],
-                    'boletim' => ['Boletim', 'Demonstrativo de notas com todos os bimestres, recuperações e prova final'],
+                    'boletim' => ['Boletim', 'Quadro do Demonstrativo de notas (bimestres, recuperações e prova final)'],
                     'frequencia' => ['Frequência', 'Resumo de presença do aluno'],
                     'observacoes' => ['Observações', 'Informações adicionais do documento'],
                     'assinaturas' => ['Assinaturas', 'Espaço para os responsáveis assinarem'],

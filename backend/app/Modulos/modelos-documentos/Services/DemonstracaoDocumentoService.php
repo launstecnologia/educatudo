@@ -146,7 +146,7 @@ class DemonstracaoDocumentoService
     }
 
     /**
-     * Mesmos Modelos de Boletim da tela Acadêmico → Boletim (boletim_layouts).
+     * Mesmos Modelos de Demonstrativo de Notas de Acadêmico → Demonstrativo (`boletins`).
      * Prioriza o ano da turma, mas lista todos para o select não ficar vazio.
      *
      * @return list<array{id:int,nome:string,rotulo:string,ano_letivo:?int,finalidade:string}>
@@ -155,19 +155,12 @@ class DemonstracaoDocumentoService
     {
         $rows = [];
         try {
-            if (class_exists(\App\Modulos\EventosAvaliativos\Models\BoletimLayout::class)) {
-                $layout = new \App\Modulos\EventosAvaliativos\Models\BoletimLayout();
-                $anoFiltro = ($anoLetivo !== null && $anoLetivo > 0) ? $anoLetivo : 0;
-                $rows = $layout->listar($anoFiltro) ?: [];
-                // Se filtrou por ano e veio vazio, lista todos (como a tela Boletim com "Todos").
-                if ($rows === [] && $anoFiltro > 0) {
-                    $rows = $layout->listar(0) ?: [];
-                }
+            if (class_exists(\App\Modulos\Boletins\Services\BoletimCadastroService::class)) {
+                $rows = (new \App\Modulos\Boletins\Services\BoletimCadastroService())->listarParaEventoNotas() ?: [];
             }
         } catch (\Throwable $e) {
             $rows = [];
         }
-        // Fallback legado: cadastro em boletins (não é o menu Boletim).
         if ($rows === [] && $this->tabelaExiste('boletins')) {
             $sql = 'SELECT id, nome, ano_letivo, finalidade
                     FROM boletins
@@ -179,7 +172,22 @@ class DemonstracaoDocumentoService
             try {
                 $rows = $this->db->fetchAll($sql) ?: [];
             } catch (\Throwable $e) {
-                return [];
+                $rows = [];
+            }
+        }
+        // Tenant legado sem cadastro de Demonstrativo: lista layouts de impressão.
+        if ($rows === []) {
+            try {
+                if (class_exists(\App\Modulos\EventosAvaliativos\Models\BoletimLayout::class)) {
+                    $layout = new \App\Modulos\EventosAvaliativos\Models\BoletimLayout();
+                    $anoFiltro = ($anoLetivo !== null && $anoLetivo > 0) ? $anoLetivo : 0;
+                    $rows = $layout->listar($anoFiltro) ?: [];
+                    if ($rows === [] && $anoFiltro > 0) {
+                        $rows = $layout->listar(0) ?: [];
+                    }
+                }
+            } catch (\Throwable $e) {
+                $rows = [];
             }
         }
 
@@ -244,42 +252,43 @@ class DemonstracaoDocumentoService
 
         $html = '';
 
-        // Preferência: quadro montado em Acadêmico → Boletim → Montar quadro (layout_boletim_id).
+        // 1) Modelo de Demonstrativo de Notas (cadastro em /admin/boletins) → quadro de impressão do boletim.
         try {
-            if (class_exists(\App\Modulos\Boletins\Services\BoletimVisaoImpressaoService::class)
-                && class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)
-            ) {
-                $regraLayout = (new \App\Modulos\Boletins\Services\BoletimVisaoImpressaoService())
-                    ->encontrarRegraDoLayout($boletimId);
-                if ($regraLayout > 0) {
-                    $candidato = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
-                        ->htmlQuadroPorRegraImpressao($alunoId, $regraLayout);
-                    $candidato = is_string($candidato) ? trim($candidato) : '';
-                    if ($candidato !== '') {
-                        $html = $candidato;
-                    }
+            if (class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)) {
+                $candidato = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
+                    ->htmlQuadroPorBoletim($alunoId, $boletimId);
+                $candidato = is_string($candidato) ? trim($candidato) : '';
+                if ($candidato !== '') {
+                    $html = $candidato;
                 }
             }
         } catch (\Throwable $e) {
-            error_log('DemonstracaoDocumento quadro layout boletim: ' . $e->getMessage());
+            error_log('DemonstracaoDocumento quadro demonstrativo: ' . $e->getMessage());
         }
 
+        // 2) Compat: se o id ainda for de layout de impressão (boletim_layouts).
         if ($html === '') {
             try {
-                if (class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)) {
-                    $candidato = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
-                        ->htmlQuadroPorBoletim($alunoId, $boletimId);
-                    $candidato = is_string($candidato) ? trim($candidato) : '';
-                    if ($candidato !== '') {
-                        $html = $candidato;
+                if (class_exists(\App\Modulos\Boletins\Services\BoletimVisaoImpressaoService::class)
+                    && class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)
+                ) {
+                    $regraLayout = (new \App\Modulos\Boletins\Services\BoletimVisaoImpressaoService())
+                        ->encontrarRegraDoLayout($boletimId);
+                    if ($regraLayout > 0) {
+                        $candidato = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
+                            ->htmlQuadroPorRegraImpressao($alunoId, $regraLayout);
+                        $candidato = is_string($candidato) ? trim($candidato) : '';
+                        if ($candidato !== '') {
+                            $html = $candidato;
+                        }
                     }
                 }
             } catch (\Throwable $e) {
-                error_log('DemonstracaoDocumento quadro boletim: ' . $e->getMessage());
+                error_log('DemonstracaoDocumento quadro layout boletim: ' . $e->getMessage());
             }
         }
 
-        // Fallback Santa Maria (PP/PU/CH…) e demais quadros gerados do ano.
+        // 3) Demonstrativo Santa Maria (todos os bimestres / recuperações / prova final).
         if ($html === '') {
             try {
                 $ano = $this->anoDoLayoutOuBoletim($boletimId);
@@ -332,21 +341,23 @@ class DemonstracaoDocumentoService
         if ($id <= 0) {
             return 0;
         }
+        // Preferência: modelo de Demonstrativo de Notas (cadastro em boletins).
+        $ano = $this->anoDoBoletim($id);
+        if ($ano > 0) {
+            return $ano;
+        }
         if ($this->tabelaExiste('boletim_layouts')) {
             try {
                 $row = $this->db->fetch(
                     'SELECT ano_letivo FROM boletim_layouts WHERE id = :id LIMIT 1',
                     ['id' => $id]
                 );
-                $ano = is_array($row) ? (int) ($row['ano_letivo'] ?? 0) : 0;
-                if ($ano > 0) {
-                    return $ano;
-                }
+                return is_array($row) ? (int) ($row['ano_letivo'] ?? 0) : 0;
             } catch (\Throwable $e) {
-                // continua no fallback
+                return 0;
             }
         }
-        return $this->anoDoBoletim($id);
+        return 0;
     }
 
     private function anoDoBoletim(int $boletimId): int

@@ -35,6 +35,45 @@ final class CamposDocumentoEditorTest extends TestCase
         $this->assertCount(5, $out['componentes'][0]['eventos']);
     }
 
+    public function testCamposDoQuadroUsamNomeEGrupoDoCabecalho(): void
+    {
+        $html = '<table><thead><tr>'
+            . '<th rowspan="2">Componente</th>'
+            . '<th colspan="3">I BIMESTRE</th>'
+            . '<th colspan="2">RESULTADO FINAL</th>'
+            . '</tr><tr><th>PP</th><th>MU</th><th>FAL</th><th>MA</th><th>MF</th></tr></thead>'
+            . '<tbody><tr><td>Arte</td>'
+            . '<td data-boletim-coluna="b1_pp">8,0</td>'
+            . '<td data-boletim-coluna="b1_mu">7,5</td>'
+            . '<td data-boletim-coluna="b1_fal">1</td>'
+            . '<td data-boletim-coluna="ma">7,8</td>'
+            . '<td data-boletim-coluna="mf">8,1</td>'
+            . '</tr></tbody></table>';
+        $out = CamposAcademicosDocumentoService::doQuadro($html);
+        $eventos = $out['componentes'][0]['eventos'];
+        $this->assertSame(['I BIMESTRE', 'RESULTADO FINAL'], $out['grupos']);
+        $this->assertSame('PP', $eventos[0]['rotulo']);
+        $this->assertSame('I BIMESTRE', $eventos[0]['grupo']);
+        $this->assertSame('MU', $eventos[1]['rotulo']);
+        $this->assertSame('MA', $eventos[3]['rotulo']);
+        $this->assertSame('RESULTADO FINAL', $eventos[3]['grupo']);
+        $this->assertSame('MF', $eventos[4]['rotulo']);
+        $this->assertSame('8,1', $out['vars']['media_final_arte']);
+        $this->assertSame('7,8', $out['vars']['media_anual_arte']);
+    }
+
+    public function testCodigoRepetidoEmOutroBimestreNaoSobrescreveEvento(): void
+    {
+        $html = '<table><thead><tr><th rowspan="2">Comp</th><th colspan="1">I BIMESTRE</th><th colspan="1">II BIMESTRE</th></tr><tr><th>PP</th><th>PP</th></tr></thead>'
+            . '<tbody><tr><td>Matemática</td><td data-boletim-coluna="pp">4,0</td><td data-boletim-coluna="pp">9,0</td></tr></tbody></table>';
+        $out = CamposAcademicosDocumentoService::doQuadro($html);
+        $this->assertSame('4,0', $out['vars']['evento_matematica_pp']);
+        $this->assertSame('9,0', $out['vars']['evento_matematica_ii_bimestre_pp']);
+        $this->assertSame('PP', $out['componentes'][0]['eventos'][0]['rotulo']);
+        $this->assertSame('PP', $out['componentes'][0]['eventos'][1]['rotulo']);
+        $this->assertSame('II BIMESTRE', $out['componentes'][0]['eventos'][1]['grupo']);
+    }
+
     public function testPdfUsaMediaOficialMesmoRecebendoMediaGenerica(): void
     {
         $svc = (new ReflectionClass(ModeloDocumentoService::class))->newInstanceWithoutConstructor();

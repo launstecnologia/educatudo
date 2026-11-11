@@ -52,16 +52,21 @@ $renderCampos('Contrato e valores', $grupos['contrato']['chaves'] ?? [], 'fa-fil
 </details>
 <details class="edoc-tool-group" data-edoc-palette-group>
 <summary><span>Acadêmico</span><small>Boletim, eventos, médias, faltas e histórico</small></summary>
-<p class="edoc-hint">Use o Boletim para o demonstrativo completo (1º ao 4º bimestre, recuperações e prova final).</p>
-<?php $renderElementos(array_values(array_filter($catalogo['dados'] ?? [], static fn ($i) => ($i['tipo'] ?? '') === 'boletim'))); ?>
+<p class="edoc-hint">Use o Boletim/Quadro com o Demonstrativo de notas de Acadêmico (ex.: Aprovação Santa Maria — todos os bimestres, recuperações e prova final).</p>
 <div class="edoc-var-stack">
+<?php $renderElementos(array_values(array_filter($catalogo['dados'] ?? [], static fn ($i) => ($i['tipo'] ?? '') === 'boletim'))); ?>
 <?php $renderCampos('Quadro / Demonstrativo de notas', ['quadro_notas_html'], 'fa-table-list'); ?>
-</div>
 <div class="edoc-demo" id="edoc-demo">
-<h4>Disciplinas e eventos</h4>
-<p class="edoc-hint">Escolha turma, aluno e boletim na demonstração. Depois insira cada nota, falta ou média final.</p>
+<div class="edoc-demo-head">
+<strong>Disciplinas e eventos</strong>
+<p>Escolha turma, aluno e boletim na demonstração. Depois insira cada nota, falta ou média final.</p>
+</div>
 <label class="edoc-demo-check" for="edoc-demo-sigla"><input type="checkbox" id="edoc-demo-sigla"> Sigla no lugar do nome</label>
-<div class="edoc-atalhos"><button type="button" class="edoc-btn" data-atalho="glossario">Glossário</button><button type="button" class="edoc-btn" data-atalho="componentes">Disciplinas</button><button type="button" class="edoc-btn" data-atalho="serie">Série e turma</button></div>
+<div class="edoc-atalhos">
+<button type="button" class="edoc-btn" data-atalho="glossario">Glossário</button>
+<button type="button" class="edoc-btn" data-atalho="componentes">Disciplinas</button>
+<button type="button" class="edoc-btn" data-atalho="serie">Série e turma</button>
+</div>
 <details class="edoc-var-drop" id="edoc-demo-comps-drop" hidden>
 <summary>
 <span class="edoc-var-ico" aria-hidden="true"><i class="fa-solid fa-book-open"></i></span>
@@ -71,7 +76,6 @@ $renderCampos('Contrato e valores', $grupos['contrato']['chaves'] ?? [], 'fa-fil
 <div class="edoc-var-chips" id="edoc-demo-comps"></div>
 </details>
 </div>
-<div class="edoc-var-stack">
 <?php
 $chavesAcademicoRestante = array_values(array_filter(
     $grupos['academico']['chaves'] ?? [],
@@ -92,8 +96,8 @@ $renderCampos('Frequência, histórico e totais', $chavesAcademicoRestante, 'fa-
 <summary><span>Documento</span><small>Emissão, numeração, observações e assinaturas</small></summary>
 <div class="edoc-var-stack">
 <?php $renderCampos('Dados do documento', $grupos['documento']['chaves'] ?? [], 'fa-file-lines'); ?>
-</div>
 <?php $renderElementos(array_values(array_filter($catalogo['dados'] ?? [], static fn ($i) => in_array($i['tipo'], ['observacoes', 'assinaturas'], true)))); ?>
+</div>
 </details>
 <details class="edoc-tool-group" data-edoc-palette-group>
 <summary><span>Autorização e campos da emissão</span><small>Informações digitadas ao gerar o documento</small></summary>

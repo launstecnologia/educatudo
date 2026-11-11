@@ -625,7 +625,7 @@ class ModeloDocumentoService
                 $item('dados_aluno', 'Dados do aluno', 'fa-user-graduate'),
                 $item('dados_responsavel', 'Dados do responsável', 'fa-user'),
                 $item('dados_turma', 'Dados da turma', 'fa-users'),
-                $item('boletim', 'Boletim', 'fa-table-list', 'Demonstrativo com todos os bimestres, recuperações e prova final. Escolha o boletim e a aluna no card.'),
+                $item('boletim', 'Boletim', 'fa-table-list', 'Quadro do Demonstrativo de notas (todos os bimestres, recuperações e prova final). Escolha o modelo e a aluna no card.'),
                 $item('frequencia', 'Frequência', 'fa-chart-pie'),
                 $item('observacoes', 'Observações', 'fa-comment'),
                 $item('assinaturas', 'Assinaturas', 'fa-signature'),
