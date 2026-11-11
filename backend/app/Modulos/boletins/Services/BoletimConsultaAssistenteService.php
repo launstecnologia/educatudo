@@ -63,6 +63,10 @@ class BoletimConsultaAssistenteService
         if ($this->pedidoEhMediaComChEPj($mensagem)) {
             return ['success' => true, 'mensagem' => $this->textoMediaComChEPj($mensagem, $wizardEstado)];
         }
+        $metrica = $this->textoExplicacaoMetricaFormula($mensagem);
+        if ($metrica !== null) {
+            return ['success' => true, 'mensagem' => $metrica];
+        }
         if ($this->parecePerguntaJornadaDeMateria($mensagem)) {
             $textoJornada = $this->textoJornadaNasMaterias($mensagem, $wizardEstado);
             if ($textoJornada !== null) {
@@ -458,6 +462,64 @@ class BoletimConsultaAssistenteService
     }
 
     /**
+     * Explica métricas do motor (|, papéis, se, substituta…) sem inventar.
+     */
+    private function textoExplicacaoMetricaFormula(string $mensagem): ?string
+    {
+        $t = $this->normalizarTexto($mensagem);
+        $pergunta = preg_match('/\b(pq|porque|por que|o que|como|explica|significa|serve|ordem|depois|antes|papel)\b/u', $t) === 1
+            || str_contains($t, '?');
+
+        if (
+            $pergunta
+            && (
+                preg_match('/\bpj\b.*\bch\b|\bch\b.*\bpj\b|depois do ch|antes do ch|pj \| ch|ch \| pj/u', $t) === 1
+                || (str_contains($t, '|') && preg_match('/\b(media|média|grupo|papel|pipe)\b/u', $t) === 1)
+                || preg_match('/\b(grupos?|papeis|papéis)\b.*\b(media|média|\|)\b|\b(media|média)\b.*\b(grupos?|\|)\b/u', $t) === 1
+            )
+        ) {
+            return "O | dentro de média ( ) separa PAPÉIS pela posição — não pelo nome da coluna:\n\n"
+                . "média ( provas | substituta | opcional )\n"
+                . "1º PP, PU = provas (a CH pode cobrir a 1ª que faltar)\n"
+                . "2º CH = substituta (1 coluna)\n"
+                . "3º PJ = opcional (só se tiver lançamento; a CH nunca cobre o PJ)\n\n"
+                . "Por isso o PJ fica depois do CH: opcional é o 3º grupo. "
+                . "Quem decide se tem PJ é o se ( PJ , … , … ) de fora — não a ordem dentro da média. "
+                . "PE soma fora: + PE.";
+        }
+
+        if ($pergunta && preg_match('/\bse\s*\(|\bse\b.*(verdadeiro|falso|condi|lan[cç]|existe)/u', $t) === 1) {
+            return "se ( condição , conta_se_sim , conta_se_não ) funciona como o SE do Excel:\n\n"
+                . "• PJ ou PJ = verdadeiro → tem nota em PJ\n"
+                . "• PJ = falso → não tem\n"
+                . "• PP > 7 (ou >= < <= = !=) → compara a nota\n"
+                . "• PP > PU → compara duas colunas (se faltar nota em alguma, a condição é falsa)\n\n"
+                . "Ex.: se ( PJ , média ( PP , PU | CH | PJ ) , média ( PP , PU | CH ) ) + PE";
+        }
+
+        if ($pergunta && preg_match('/nota substituta|chamada\s*\(|2a.?chamada|segunda.?chamada|substitut/u', $t) === 1
+            && !preg_match('/\bpj\b|projeto|opcional/u', $t)) {
+            return "nota substituta ( PP , PU , CH ) = média das bases; a CH cobre só a 1ª base que faltar. "
+                . "Se PP e PU existem, CH é ignorada. Já divide sozinha — não coloque ÷ 2 de novo. "
+                . "PE, se entrar, some fora: + PE.\n\n"
+                . "Parecido: média ( PP , PU | CH ) — aí o | marca CH como substituta.";
+        }
+
+        if ($pergunta && preg_match('/media c\/ rec|média c\/ rec|composicao|recupera/u', $t) === 1
+            && !preg_match('/\benac\b/u', $t)) {
+            return "média c/ rec ( média , REC ): sem recuperação fica só a média; com REC vira (média + REC) ÷ 2.";
+        }
+
+        if ($pergunta && preg_match('/\b(maior|menor)\s*\(|maior entre|menor entre/u', $t) === 1) {
+            return "maior ( A , B ) fica com o maior valor; menor ( A , B ) com o menor. "
+                . "Para ENAC só subir a média: Resultado Final = maior ( Média Bim , ENAC ). "
+                . "O atalho “Maior entre as duas primeiras” pega só as duas primeiras peças da lista — não use para Média Bim × ENAC.";
+        }
+
+        return null;
+    }
+
+    /**
      * PP/PU com CH substituta, Projeto opcional e PE fora — linguagem natural da coordenação.
      */
     private function pedidoEhMediaComChEPj(string $mensagem): bool
@@ -754,32 +816,47 @@ Como conversar (obrigatório):
 - Se o usuário responder a sua pergunta, continue a conversa e feche a fórmula.
 - Prefira os nomes das colunas que já existem no evento aberto (veja o JSON abaixo). Se o usuário citar um código que não existe no evento, pergunte qual coluna usar.
 
-Manual desta tela (não invente botão ou regra fora disto):
-- Peça = tipo de nota (Prova Semanal, Avaliação Bimestral, ENAC, Jornada do aluno…). O título do evento não define o tipo.
-- Prova Semanal mostra os eventos daquele tipo no bimestre marcado. Semanas S1–S8: \Bloco A ímpares, Bloco B pares.
-- Média = soma entre parênteses ÷ quantidade. Ex.: (Prova Semanal + Avaliação Bimestral + Jornada) ÷ 3.
-- Quando sugerir um cálculo, escreva uma linha exatamente assim: \Nome da coluna = expressão. Use menor(), maior(), se(), média(), nota substituta(), média c/ rec(), parênteses, +, −, ×, ÷ e | . Use o título da coluna como está na tela (Média Bim, MU, MS 2º, Recuperação, ENAC, Resultado Final ou o título que o evento já tem).
-- Ao sugerir fórmula, o nome à esquerda do = é o título da coluna amarela ABERTA (veja "Cálculo amarelo aberto agora" no evento). Se estiver MU, escreva MU = … . Nunca invente MS 2º, Média Bim ou outro título se a aberta for outra.
-- Interprete o pedido em português coloquial e traduza para a função certa. Exemplos de intenção (troque MU pelo título aberto):
-  · "PP + PU / 2, CH substitui qualquer um, se tiver PJ divide por 3, + PE" →
-    MU = se ( PJ , média ( PP , PU | CH | PJ ) , média ( PP , PU | CH ) ) + PE
-  · "média só do que lançou, CH no lugar da prova que faltar, Projeto só se existir" → mesma linha com o título aberto
-  · "nota substituta de PP e PU" → média ( PP , PU | CH ) ou nota substituta ( PP , PU , CH )
-  · "monta a média pra mim" (sem detalhe) → pergunte quais colunas e regras antes de escrever a fórmula
-- média ( provas | substituta | opcional ) = MÉDIA só do lançado. O | define o PAPEL (não o nome): 1º provas, 2º substituta (1 coluna), 3º opcionais. A substituta cobre só a 1ª prova que faltar; nunca cobre o opcional. PE sempre fora: + PE.
-- se ( condição , conta_se_sim , conta_se_não ) = SE do Excel. Condição pode ser:
-  · coluna sozinha ou coluna = verdadeiro / = falso (existe nota ou não). Ex.: se ( PJ , … , … ) ou se ( PJ = verdadeiro , … , … )
-  · comparação: > < >= <= = != entre coluna e número, ou entre duas colunas. Ex.: se ( PP > 7 , … , … )
-  · Com Projeto opcional: se ( PJ , média ( PP , PU | CH | PJ ) , média ( PP , PU | CH ) ) + PE
-- O usuário pode montar por blocos, pela conversa aqui, ou escrevendo a condição — os três caminhos usam a mesma fórmula. Se faltar detalhe, pergunte.
-- NUNCA escreva contas erradas como ( PP + PU + CH | CH ) ÷ 3 ou ( PP + PU | CH ) ÷ 2 com | misturado em +÷. O | só existe DENTRO de média ( … ). Nunca some CH como se fosse uma prova a mais.
-- Se a recuperação só entra quando for maior que a média, e a recuperação não pode passar de 7: \Resultado Final = maior(Média Bim, menor(7, Recuperação)). Sem recuperação, o resultado continua a Média Bim, mesmo acima de 7. Não use menor(7, maior(Média Bim, Recuperação)): isso limita a média também.
-- Para ficar com a média e só trocar se o ENAC for maior: \Resultado Final = maior(Média Bim, ENAC). Não use "Maior entre as duas primeiras".
-- Se a conta for (Média Bim + ENAC) ÷ 2 e esse resultado só entra quando for maior que a Média Bim: \Resultado Final = maior((Média Bim + ENAC) ÷ 2, Média Bim). Explique com um exemplo numérico, sem fórmula técnica.
-- Jornada entra pelo bimestre cadastrado na jornada.
-- "1º A", "1a" ou "do 1a" é a turma, não o bimestre. Só use bimestre se a frase disser a palavra bimestre.
-- Se a coluna Jornada do aluno do boletim tiver número, não diga que o aluno não tem jornada. Informe esse número. A jornada pode estar cadastrada com outro nome de matéria e mesmo assim aparecer na linha do boletim.
-- Sem aluno na prévia, os números são exemplo. Com aluno, são as notas lançadas.
+Manual canônico das fórmulas (OBRIGATÓRIO — não invente outra lógica):
+- Peça = tipo de nota (Prova Semanal, Avaliação Bimestral, ENAC, Jornada…). O título do evento não define o tipo.
+- Prova Semanal: eventos daquele tipo no bimestre marcado. S1–S8: Bloco A ímpares, Bloco B pares.
+- Conta aritmética: + − × ÷ e ( ). Média simples = (soma) ÷ quantidade. Ausente vira 0 só na conta pura +−×÷.
+- Funções: maior ( ), menor ( ), nota substituta ( ), média c/ rec ( ), média ( ), se ( ).
+- Ao sugerir fórmula: uma linha \Título = expressão. O título é a coluna amarela ABERTA (veja o evento abaixo). Nunca invente MS 2º se a aberta for MU.
+- Três caminhos iguais: chips, conversa aqui, ou digitar a condição — a nota final é a mesma.
+
+PAPÉIS DO | DENTRO DE média ( ) — responda SEMPRE assim quando perguntarem a ordem:
+  média ( provas | substituta | opcional )
+  1º grupo = provas (ex.: PP, PU) — a substituta pode cobrir a 1ª que faltar
+  2º grupo = substituta (ex.: CH) — 1 coluna
+  3º grupo = opcional (ex.: PJ/Projeto) — só se houver lançamento; a substituta NUNCA cobre o opcional
+  O nome da coluna não muda o papel: muda a POSIÇÃO após o |. Por isso PJ fica DEPOIS do CH: opcional é o 3º grupo, CH é o 2º.
+  ERRADO dizer que “PJ vem depois do CH porque avalia a situação do aluno antes da média”. Isso é falso.
+  Quem decide “tem PJ?” é o se ( ) de FORA, não a ordem dentro da média.
+  PE sempre FORA: + PE. O | só existe DENTRO de média ( ). Nunca (PP+PU+CH|CH)÷3.
+
+se ( condição , conta_se_sim , conta_se_não ):
+  · PJ ou PJ = verdadeiro → tem nota em PJ
+  · PJ = falso → não tem
+  · PP > 7 / >= / < / <= / = / != → compara valor; se faltar nota, condição falsa
+  · PP > PU → compara duas colunas
+  Ex. Projeto: se ( PJ , média ( PP , PU | CH | PJ ) , média ( PP , PU | CH ) ) + PE
+  (igual a se ( PJ = verdadeiro , … ))
+
+nota substituta ( bases… , CH ): média das bases; CH cobre só a 1ª base ausente; já divide sozinha.
+média c/ rec ( média , REC ): sem REC fica a média; com REC → (média+REC)÷2.
+maior ( A , B ): maior valor. menor ( A , B ): menor.
+ENAC só sobe a média: Resultado Final = maior ( Média Bim , ENAC ).
+(Média Bim + ENAC)÷2 só se melhorar: maior ( ( Média Bim + ENAC ) ÷ 2 , Média Bim ).
+Recuperação teto 7 sem cortar a média: maior ( Média Bim , menor ( 7 , Recuperação ) ).
+
+Exemplos de intenção (troque MU pelo título aberto):
+  · "PP+PU/2, CH substitui, se PJ ÷3, +PE" → MU = se ( PJ , média ( PP , PU | CH | PJ ) , média ( PP , PU | CH ) ) + PE
+  · "se tiver PF soma com MA, senão fica MA" → MU = se ( PF , MA + PF , MA )
+  · "monta a média pra mim" sem detalhe → pergunte as colunas/regras
+
+- Jornada: pelo bimestre cadastrado na jornada.
+- "1º A"/"1a" = turma, não bimestre.
+- Sem aluno na prévia = exemplo; com aluno = notas reais.
 
 Número de nota, quantidade de jornada ou lançamento SÓ pode vir de uma consulta. Se não consultou, não chute.
 
