@@ -84,12 +84,13 @@ test('o chat explica variáveis e deixa revisar o HTML de uma proposta', async (
   const proposta = JSON.parse(execFileSync('php', [fixture, '--assistente'], {
     encoding: 'utf8', cwd: raiz, input: JSON.stringify({
       mensagem: 'Preparei uma autorização com o nome do aluno.',
-      html: '<h1>Autorização de passeio</h1><p>Aluno: {{aluno_nome}}</p><script>alert(1)</script>',
+      html: '<h1>Autorização de passeio</h1><p>Aluno: {{aluno_nome}}</p><p>Local: {{aut_local}}</p><p>Data: {{cv_data_evento}}</p><script>alert(1)</script>',
     }),
   }));
   const pedidos: { role: string; content: string }[][] = [];
   let consultasDaProposta = 0;
   let propostaConcluida = false;
+  let salvo: any;
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());
     if (url.hostname !== 'editor.localhost') return route.abort();
@@ -118,6 +119,10 @@ test('o chat explica variáveis e deixa revisar o HTML de uma proposta', async (
     }
     if (url.pathname.endsWith('/ai-job/4/status')) {
       return route.fulfill({ json: { status: 'failed', error: 'Não foi possível gerar a revisão.' } });
+    }
+    if (url.pathname.endsWith('/estrutura')) {
+      salvo = route.request().postDataJSON();
+      return route.fulfill({ json: { ok: true, id: 21 } });
     }
     return route.fulfill({ json: { ok: true, turmas: [], boletins: [] } });
   });
@@ -150,6 +155,8 @@ test('o chat explica variáveis e deixa revisar o HTML de uma proposta', async (
   propostaConcluida = true;
   await expect(revisar).toBeVisible();
   await expect(page.frameLocator('#edoc-assistente-previa').getByText('Autorização de passeio')).toBeVisible();
+  await expect(page.frameLocator('#edoc-assistente-previa').getByText('Preencher na emissão · Local')).toBeVisible();
+  await expect(page.frameLocator('#edoc-assistente-previa').getByText('Unidade I')).toHaveCount(0);
   expect(consultasDaProposta).toBeGreaterThanOrEqual(3);
   expect(pedidos).toHaveLength(3);
   expect(pedidos[2].map(mensagem => mensagem.role)).toEqual(['user', 'assistant', 'user', 'assistant', 'user']);
@@ -163,6 +170,7 @@ test('o chat explica variáveis e deixa revisar o HTML de uma proposta', async (
   const codigo = dialogo.getByLabel('HTML gerado');
   const original = await codigo.inputValue();
   expect(original).toContain('{{aluno_nome}}');
+  expect(original).toContain('{{cv_aut_local}}');
   expect(original).not.toContain('<script');
   await dialogo.getByRole('button', { name: 'Descartar' }).click();
   await expect(folha).not.toContainText('Autorização de passeio');
@@ -171,6 +179,11 @@ test('o chat explica variáveis e deixa revisar o HTML de uma proposta', async (
   await expect(page.frameLocator('#edoc-ia-previa').getByText('Autorização de visita')).toBeVisible();
   await dialogo.getByRole('button', { name: 'Inserir na folha' }).click();
   await expect(folha).toContainText('Autorização de visita');
+  await expect.poll(() => salvo?.estrutura?.campos_variaveis).toEqual([
+    { chave: 'cv_aut_local', rotulo: 'Local', mascara: 'texto', obrigatorio: true },
+    { chave: 'cv_data_evento', rotulo: 'Data do evento (autorização)', mascara: 'data', obrigatorio: true },
+  ]);
+  expect(JSON.stringify(salvo.estrutura.body)).toContain('{{cv_aut_local}}');
 
   await campo.fill('Mude o título da proposta.');
   await enviar.click();
@@ -229,7 +242,8 @@ test('sem IA, o chat consulta variáveis e monta uma autorização guiada', asyn
   await page.getByRole('button', { name: 'Revisar layout' }).click();
   const dialogo = page.getByRole('dialog', { name: 'Proposta de layout' });
   const codigo = await dialogo.getByLabel('HTML gerado').inputValue();
-  expect(codigo).toContain('{{aut_hora_retorno}}');
+  expect(codigo).toContain('{{cv_aut_hora_retorno}}');
+  expect(codigo).toContain('{{cv_aut_finalidade}}');
   expect(codigo).toContain('{{resp_nome}}');
   await dialogo.getByRole('button', { name: 'Inserir na folha' }).click();
   await expect(folha).toContainText('Museu de Ciências');

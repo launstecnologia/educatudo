@@ -689,10 +689,12 @@
     return C.varsAmostra || C.varsPreview || {};
   }
 
-  function ph(html) {
+  function ph(html, camposEmissao) {
     if (!html) return '';
     var bag = varsDaFolha();
     var out = String(html).replace(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi, function (_, k) {
+      var campoEmissao = camposEmissao && camposEmissao.get(k.toLowerCase());
+      if (campoEmissao) return '<span class="edoc-campo-emissao">Preencher na emissão · ' + esc(campoEmissao.rotulo) + '</span>';
       if (bag && Object.prototype.hasOwnProperty.call(bag, k) && String(bag[k]) !== '') {
         return String(bag[k]);
       }
@@ -6130,7 +6132,7 @@
     serie.addEventListener('change', gravar);
   }
 
-  function aplicarEstruturaIa(estrutura) {
+  function aplicarEstruturaIa(estrutura, camposEmissao) {
     persistirEdicaoSeHouver();
     var nova = normalizarEstrutura(estrutura);
     var temConteudo = ['header', 'body', 'footer'].some(function (area) {
@@ -6150,6 +6152,7 @@
       nova.fonte_boletim_id = state.estrutura.fonte_boletim_id;
       state.estrutura = nova;
     }
+    if (camposEmissao) state.estrutura.campos_variaveis = camposEmissao;
     state.selected = null;
     pushHist();
     render();
@@ -6199,14 +6202,35 @@
     }).join('\n');
   }
 
-  function previaDaProposta(html) {
-    return '<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src data:; style-src \'unsafe-inline\'">'
-      + '<style>body{font:11pt Arial,sans-serif;color:#222;margin:12px}table{border-collapse:collapse;max-width:100%}td,th{vertical-align:middle}p{margin:0 0 8px}.edoc-vert{writing-mode:vertical-rl;transform:rotate(180deg)}.edoc-faixa{background:#d1d5db}</style>'
-      + '<style>' + (C.cssAjusteFolha || '') + '</style>'
-      + '<main class="edoc-ajuste-folha">' + limparHtmlReproducao(ph(html)) + '</main>';
+  function prepararCamposDaProposta(html) {
+    var catalogo = new Map();
+    $all('[data-emissao-preset]').forEach(function (botao) {
+      var campo = JSON.parse(botao.dataset.emissaoPreset);
+      catalogo.set(campo.chave.slice(3), campo);
+      catalogo.set(campo.chave, campo);
+    });
+    (state.estrutura.campos_variaveis || []).forEach(function (campo) { catalogo.set(campo.chave, campo); });
+    var usados = new Map();
+    var htmlComCampos = html.replace(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi, function (token, chave) {
+      var campo = catalogo.get(chave.toLowerCase());
+      if (!campo) return token;
+      campo = catalogo.get(campo.chave);
+      usados.set(campo.chave, campo);
+      return tokenDaChave(campo.chave);
+    });
+    return { html: htmlComCampos, campos: usados };
   }
 
-  function abrirRevisaoIa(estrutura, titulo) {
+  function previaDaProposta(html, comCamposEmissao) {
+    var proposta = comCamposEmissao ? prepararCamposDaProposta(html) : { html: html };
+    return '<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src data:; style-src \'unsafe-inline\'">'
+      + '<style>body{font:11pt Arial,sans-serif;color:#222;margin:12px}table{border-collapse:collapse;max-width:100%}td,th{vertical-align:middle}p{margin:0 0 8px}.edoc-vert{writing-mode:vertical-rl;transform:rotate(180deg)}.edoc-faixa{background:#d1d5db}</style>'
+      + '<style>.edoc-campo-emissao{display:inline-block;color:#563884;background:#f1ebfa;border-radius:4px;padding:2px 5px;font:600 9pt Arial,sans-serif}</style>'
+      + '<style>' + (C.cssAjusteFolha || '') + '</style>'
+      + '<main class="edoc-ajuste-folha">' + limparHtmlReproducao(ph(proposta.html, proposta.campos)) + '</main>';
+  }
+
+  function abrirRevisaoIa(estrutura, titulo, comCamposEmissao) {
     var dialogo = $('#edoc-ia-revisao');
     $('#edoc-ia-revisao-titulo').textContent = titulo;
     var codigo = $('#edoc-ia-html');
@@ -6215,15 +6239,18 @@
     var elementos = elementosDaProposta(estrutura);
     var editavel = elementos.length === 1 && elementos[0].type === 'html';
     codigo.readOnly = !editavel;
-    codigo.value = indentarHtmlDocumento(htmlDaProposta(elementos));
+    var html = htmlDaProposta(elementos);
+    if (editavel && comCamposEmissao) html = prepararCamposDaProposta(html).html;
+    codigo.value = indentarHtmlDocumento(html);
     aviso.hidden = true;
     function atualizar() {
-      previa.srcdoc = previaDaProposta(codigo.value);
+      previa.srcdoc = previaDaProposta(codigo.value, comCamposEmissao);
     }
     codigo.oninput = atualizar;
     $('#edoc-ia-revisao-cancelar').onclick = function () { dialogo.close(); };
     $('#edoc-ia-revisao-form').onsubmit = function (e) {
       e.preventDefault();
+      var camposEmissao;
       if (editavel) {
         var limpo = limparHtmlReproducao(codigo.value).trim();
         if (!limpo) {
@@ -6231,10 +6258,22 @@
           aviso.hidden = false;
           return;
         }
+        if (comCamposEmissao) {
+          var proposta = prepararCamposDaProposta(limpo);
+          camposEmissao = (state.estrutura.campos_variaveis || []).concat(
+            Array.from(proposta.campos.values()).filter(function (campo) { return !campoVariavelPorChave(campo.chave); })
+          );
+          if (camposEmissao.length > 24) {
+            aviso.textContent = 'O modelo aceita até 24 campos da emissão. Remova campos antes de inserir o rascunho.';
+            aviso.hidden = false;
+            return;
+          }
+          limpo = proposta.html;
+        }
         elementos[0].props.html = limpo;
       }
       dialogo.close();
-      aplicarEstruturaIa(estrutura);
+      aplicarEstruturaIa(estrutura, camposEmissao);
     };
     dialogo.onclose = function () { previa.removeAttribute('srcdoc'); };
     atualizar();
@@ -6412,8 +6451,10 @@
     elemento.props.html = '<p style="text-align:center"><strong>{{escola_nome}}</strong></p>'
       + '<h1 style="text-align:center;font-size:15pt">Autorização de passeio escolar</h1>'
       + '<p>Eu, <strong>{{resp_nome}}</strong>, responsável por <strong>{{aluno_nome}}</strong>, da turma <strong>{{turma_nome}}</strong>, '
-      + 'autorizo sua participação no passeio escolar descrito abaixo.</p>'
+      + 'autorizo sua participação no passeio escolar promovido pela escola, conforme a programação abaixo.</p>'
+      + '<p>A atividade tem como finalidade {{cv_aut_finalidade}} e integra a proposta pedagógica da turma.</p>'
       + detalhes
+      + '<p>Declaro estar ciente de que o aluno deverá seguir as orientações da equipe escolar durante a atividade.</p>'
       + '<p style="margin-top:20pt">Data da assinatura: ____/____/________</p>'
       + '<p style="margin-top:28pt">________________________________________</p>'
       + '<p>Assinatura do responsável</p>';
@@ -6497,12 +6538,12 @@
     }
     function exibirRascunho(estrutura) {
       estruturaRascunho = estrutura;
-      $('#edoc-assistente-previa').srcdoc = previaDaProposta(htmlDaProposta(elementosDaProposta(estrutura)));
+      $('#edoc-assistente-previa').srcdoc = previaDaProposta(htmlDaProposta(elementosDaProposta(estrutura)), true);
       rascunho.hidden = false;
       painel.classList.toggle('com-rascunho', !trabalho.hidden);
     }
     $('#edoc-assistente-revisar').addEventListener('click', function () {
-      abrirRevisaoIa(clone(estruturaRascunho), 'Proposta de layout');
+      abrirRevisaoIa(clone(estruturaRascunho), 'Proposta de layout', true);
     });
     function exibirMensagem(papel, texto, estrutura) {
       var linha = document.createElement('div');

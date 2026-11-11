@@ -146,7 +146,7 @@ class AssistenteDocumentoService
             $catalogo[] = '{{' . $chave . '}} — ' . $rotulo;
         }
         $camposEmissao = array_map(
-            static fn (array $campo): string => '{{' . substr($campo['chave'], 3) . '}}',
+            static fn (array $campo): string => '{{' . $campo['chave'] . '}} — ' . $campo['rotulo'],
             ModeloDocumentoService::camposAutorizacao()
         );
 
@@ -161,6 +161,9 @@ Se não houver variável no catálogo, oriente a criar um Campo da emissão no e
 Quando o pedido de criação estiver aberto e faltar informação que muda o documento, faça até três perguntas objetivas na mesma resposta e deixe html vazio.
 Para uma autorização de passeio, pergunte apenas pelo que falta entre local, data e horários de saída e retorno. Ofereça a opção de deixar esses dados para preencher na emissão.
 Quando a pessoa responder ou pedir para seguir com campos da emissão, monte o documento completo. Não repita perguntas respondidas e não peça dados pessoais que já existem como variáveis.
+Quando pedirem um modelo reutilizável, campos dinâmicos ou preenchimento na emissão, use os tokens cv_ do catálogo para cada dado da atividade. Não substitua esses tokens por exemplos, datas sugeridas ou linhas em branco.
+Em uma autorização de passeio com dados da atividade para preencher na emissão, inclua {{cv_aut_local}}, {{cv_data_evento}}, {{cv_aut_hora_saida}}, {{cv_aut_hora_retorno}} e {{cv_aut_finalidade}}. Use {{escola_nome}}, {{resp_nome}}, {{aluno_nome}} e {{turma_nome}} para os dados de cadastro.
+Redija uma autorização pronta para uso. Identifique a escola, o responsável e o aluno, explique o objetivo pedagógico usando a finalidade informada ou seu campo da emissão, destaque os dados da atividade e inclua data e espaço para assinatura. Evite inventar logística, obrigações ou consentimentos além do pedido.
 Para criar ou revisar um documento, preencha html com o fragmento editável completo e escolha retrato ou paisagem.
 Use títulos, parágrafos, tabelas, mesclas e estilos inline simples. Use larguras proporcionais e deixe o conteúdo caber na largura útil da folha.
 Use apenas variáveis do catálogo para dados automáticos e mantenha os campos da emissão que o pedido exigir.
@@ -169,7 +172,7 @@ Não invente nomes, notas, dados cadastrais, variáveis, imagens externas, scrip
 Ao revisar, considere o HTML da última proposta desta conversa, se houver, e devolva o documento inteiro.
 Explique que a pessoa pode revisar e editar a proposta antes de inserir na folha.
 PROMPT
-            . "\n\nCampos de autorização e comparecimento preenchidos na emissão: " . implode(', ', $camposEmissao)
+            . "\n\nCampos de autorização e comparecimento preenchidos na emissão:\n" . implode("\n", $camposEmissao)
             . "\n\nVariáveis do editor:\n" . implode("\n", $catalogo);
     }
 

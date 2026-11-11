@@ -50,7 +50,9 @@ $assistente_disponivel = true;
 $assistente_ia_disponivel = !in_array('--sem-ia-chat', $argv, true);
 $placeholders = ModeloDocumentoService::PLACEHOLDERS;
 $grupos_placeholders = ModeloDocumentoService::gruposPlaceholders();
+$mascaras_campo = ModeloDocumentoService::MASCARAS_CAMPO;
 $vars_preview = ['aluno_nome' => 'Aluno de demonstração', 'quadro_notas_html' => '<table><thead><tr><th>Matéria</th><th>Nota</th></tr></thead><tbody><tr data-boletim-materia="17"><td>Matemática</td><td data-boletim-coluna="b1_pp">7,5</td></tr></tbody></table>'];
+$vars_preview['aut_local'] = 'Unidade I';
 $vars_preview = array_merge($vars_preview, \App\Modulos\ModelosDocumentos\Services\QuadroBoletimEditavelService::variaveis($vars_preview['quadro_notas_html']));
 // A identidade visual da escola depende do banco; o restante da view é o arquivo de produção.
 $view = file_get_contents(BASE_PATH . '/app/Modulos/modelos-documentos/Views/admin/editor.php');
