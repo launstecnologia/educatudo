@@ -4136,39 +4136,189 @@
 
   var alvoHtmlExpandido = null;
 
+  function elementoPermiteHtml(el) {
+    if (!el) return false;
+    if (tabelaDoElemento(el) || elementoEhBoletim(el)) return true;
+    return ['titulo', 'texto', 'texto_rico', 'html', 'demonstrativo_notas', 'tabela_notas', 'frequencia', 'historico', 'resultado_final'].indexOf(el.type) >= 0;
+  }
+
+  function htmlFonteElemento(el) {
+    if (!el) return '';
+    var p = el.props || {};
+    return String(p.html != null && p.html !== '' ? p.html : (p.text || ''));
+  }
+
+  function tituloEditorHtml(el) {
+    if (!el) return 'Editar HTML';
+    if (elementoEhBoletim(el)) return 'Editar HTML do boletim';
+    if (tabelaDoElemento(el)) return 'Editar HTML da tabela';
+    if (el.type === 'demonstrativo_notas' || el.type === 'tabela_notas') return 'Editar HTML do demonstrativo';
+    return 'Editar HTML — ' + labelTipo(el.type);
+  }
+
+  function fecharHtmlExpandido() {
+    var stage = $('#edoc-html-stage');
+    var centro = document.querySelector('.edoc-center');
+    if (stage) stage.hidden = true;
+    if (centro) centro.classList.remove('is-html-editing');
+    alvoHtmlExpandido = null;
+  }
+
   function abrirHtmlExpandido(target, codigoInicial) {
+    if (!target || !elementoPermiteHtml(target)) return;
     persistirEdicaoSeHouver();
+    var stage = $('#edoc-html-stage');
+    var codigo = $('#edoc-html-code');
+    var titulo = $('#edoc-html-title');
+    var desc = $('#edoc-html-desc');
+    var centro = document.querySelector('.edoc-center');
+    if (!stage || !codigo) return;
     alvoHtmlExpandido = target.id;
-    $('#edoc-html-code').value = indentarHtmlDocumento(codigoInicial != null ? codigoInicial : ((target.props || {}).html || ''));
-    $('#edoc-html-dialog').showModal();
-    $('#edoc-html-code').focus();
-    $('#edoc-html-code').setSelectionRange(0, 0);
+    var fonte = codigoInicial != null ? codigoInicial : htmlFonteElemento(target);
+    codigo.value = indentarHtmlDocumento(fonte);
+    if (titulo) titulo.textContent = tituloEditorHtml(target);
+    if (desc) {
+      desc.textContent = elementoEhBoletim(target) || target.type === 'demonstrativo_notas' || target.type === 'tabela_notas'
+        ? 'Os campos entre {{...}} são preenchidos para cada aluno. Edite a estrutura e os estilos à vontade.'
+        : 'Edite o HTML do bloco selecionado. Variáveis {{campo}} entram automaticamente na emissão.';
+    }
+    stage.hidden = false;
+    if (centro) centro.classList.add('is-html-editing');
+    fecharInfoFolha();
+    codigo.focus();
+    codigo.setSelectionRange(0, 0);
+  }
+
+  function mmParaPx(mm) {
+    return Math.round((Number(mm) || 0) * 96 / 25.4);
+  }
+
+  function fmtMm(n) {
+    return (Math.round((Number(n) || 0) * 10) / 10).toFixed(1).replace('.', ',');
+  }
+
+  function fmtCm(n) {
+    return (Math.round((Number(n) || 0)) / 10).toFixed(1).replace('.', ',');
+  }
+
+  function dimensoesPapel(size, landscape) {
+    var a5 = String(size || 'A4').toUpperCase() === 'A5';
+    var w = a5 ? (landscape ? 210 : 148) : (landscape ? 297 : 210);
+    var h = a5 ? (landscape ? 148 : 210) : (landscape ? 210 : 297);
+    return { w: w, h: h };
+  }
+
+  function htmlLinhaMedida(rotulo, w, h, utilW, utilH) {
+    return '<dt>' + rotulo + '</dt><dd>'
+      + '<strong>Folha:</strong> ' + fmtMm(w) + ' × ' + fmtMm(h) + ' mm'
+      + ' · ' + fmtCm(w) + ' × ' + fmtCm(h) + ' cm'
+      + ' · ' + mmParaPx(w) + ' × ' + mmParaPx(h) + ' px<br>'
+      + '<strong>Área útil:</strong> ' + fmtMm(utilW) + ' × ' + fmtMm(utilH) + ' mm'
+      + ' · ' + fmtCm(utilW) + ' × ' + fmtCm(utilH) + ' cm'
+      + ' · ' + mmParaPx(utilW) + ' × ' + mmParaPx(utilH) + ' px'
+      + '</dd>';
+  }
+
+  function htmlInfoFolha() {
+    var page = (state.estrutura && state.estrutura.page) || {};
+    var size = String(page.size || 'A4').toUpperCase();
+    var m = page.margin || {};
+    var mt = Number(m.top != null ? m.top : 15);
+    var mr = Number(m.right != null ? m.right : 15);
+    var mb = Number(m.bottom != null ? m.bottom : 15);
+    var ml = Number(m.left != null ? m.left : 15);
+    var port = dimensoesPapel(size, false);
+    var land = dimensoesPapel(size, true);
+    var utilPortW = Math.max(0, port.w - ml - mr);
+    var utilPortH = Math.max(0, port.h - mt - mb);
+    var utilLandW = Math.max(0, land.w - ml - mr);
+    var utilLandH = Math.max(0, land.h - mt - mb);
+    var atual = (page.orientation || 'portrait') === 'landscape' ? 'paisagem' : 'retrato';
+    return '<h3>Medidas da folha (' + size + ')</h3>'
+      + '<p>Referência para o PDF de impressão. Pixels em 96 dpi CSS (mesmo padrão da prévia).</p>'
+      + '<dl>'
+      + htmlLinhaMedida('Vertical (retrato)' + (atual === 'retrato' ? ' — atual' : ''), port.w, port.h, utilPortW, utilPortH)
+      + htmlLinhaMedida('Horizontal (paisagem)' + (atual === 'paisagem' ? ' — atual' : ''), land.w, land.h, utilLandW, utilLandH)
+      + '</dl>'
+      + '<p class="edoc-folha-info-note">Margens atuais: topo ' + fmtMm(mt) + ' · direita ' + fmtMm(mr)
+      + ' · baixo ' + fmtMm(mb) + ' · esquerda ' + fmtMm(ml) + ' mm. A área útil é o espaço disponível para o conteúdo.</p>';
+  }
+
+  function fecharInfoFolha() {
+    var pop = $('#edoc-folha-info-pop');
+    var btn = $('#edoc-folha-info');
+    if (pop) pop.hidden = true;
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  }
+
+  function abrirInfoFolha() {
+    var pop = $('#edoc-folha-info-pop');
+    var btn = $('#edoc-folha-info');
+    if (!pop || !btn) return;
+    pop.innerHTML = htmlInfoFolha();
+    pop.hidden = false;
+    btn.setAttribute('aria-expanded', 'true');
+  }
+
+  function bindInfoFolha() {
+    var btn = $('#edoc-folha-info');
+    var pop = $('#edoc-folha-info-pop');
+    if (!btn || !pop || btn._edocInfo) return;
+    btn._edocInfo = true;
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (pop.hidden) abrirInfoFolha();
+      else fecharInfoFolha();
+    });
+    document.addEventListener('click', function (e) {
+      if (!pop.hidden && !pop.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
+        fecharInfoFolha();
+      }
+    });
   }
 
   function bindHtmlExpandido() {
-    var dialogo = $('#edoc-html-dialog');
+    var stage = $('#edoc-html-stage');
     var codigo = $('#edoc-html-code');
-    if (!dialogo || !codigo) return;
-    $('#edoc-html-cancel').addEventListener('click', function () { dialogo.close(); });
+    if (!stage || !codigo || stage._edocHtmlBound) return;
+    stage._edocHtmlBound = true;
+    $('#edoc-html-cancel').addEventListener('click', function () { fecharHtmlExpandido(); });
     $('#edoc-html-indent').addEventListener('click', function () {
       codigo.value = indentarHtmlDocumento(codigo.value);
       codigo.focus();
     });
     codigo.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        fecharHtmlExpandido();
+        return;
+      }
       if (e.key !== 'Tab' || e.shiftKey) return;
       e.preventDefault();
       var inicio = codigo.selectionStart;
       codigo.setRangeText('  ', inicio, codigo.selectionEnd, 'end');
     });
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape' || stage.hidden) return;
+      if (document.activeElement === codigo) return;
+      fecharHtmlExpandido();
+    });
     $('#edoc-html-form').addEventListener('submit', function (e) {
       e.preventDefault();
       var caminho = findPath(alvoHtmlExpandido);
-      var campo = $('#edoc-boletim-html');
-      if (!caminho || !caminho.element || !campo) return;
-      campo.value = codigo.value;
-      dialogo.close();
-      applyField('element', caminho.element, campo);
-      setStatus('HTML aplicado. Use Ver resultado para conferir o PDF.');
+      if (!caminho || !caminho.element) {
+        fecharHtmlExpandido();
+        return;
+      }
+      var el = caminho.element;
+      el.props = el.props || {};
+      el.props.html = codigo.value;
+      delete el.props.text;
+      fecharHtmlExpandido();
+      pushHist();
+      render();
+      setStatus('HTML aplicado na folha. Use Ver resultado para conferir o PDF.');
     });
   }
 
@@ -4191,7 +4341,10 @@
       html += '<div class="edoc-rte-wrap">'
         + '<div class="edoc-rte" contenteditable="true" role="textbox" aria-label="Conteúdo do texto" aria-multiline="true" spellcheck="true"></div>'
         + '</div>';
-      html += '<button type="button" class="edoc-btn" id="edoc-insert-var" style="margin-top:6px">{ } Variáveis</button>';
+      html += '<div class="edoc-prop-row" style="margin-top:6px;gap:6px;">'
+        + '<button type="button" class="edoc-btn" id="edoc-insert-var">{ } Variáveis</button>'
+        + '<button type="button" class="edoc-btn" id="edoc-editar-html" title="Abre o editor HTML no centro da tela"><i class="fa-solid fa-code" aria-hidden="true"></i> Editar em HTML</button>'
+        + '</div>';
     }
     if (elementoEhBoletim(el)) {
       abrirCardBoletim(false);
@@ -4202,15 +4355,20 @@
       var soDin = boletimHtmlSoDinamico(p.html);
       html += soDin
         ? '<p class="edoc-hint">Este bloco ainda usa <code>{{quadro_notas_html}}</code>. Na prévia, escolha regra de aprovação, curso/série e aluno para carregar a tabela.</p>'
-        : '<p class="edoc-hint">Edite o HTML ao lado (ou em <strong>Expandir editor</strong>). Os campos <code>{{boletim_celula_…}}</code> recebem as notas de cada aluno.</p>';
+        : '<p class="edoc-hint">Edite o HTML no centro da tela. Os campos <code>{{boletim_celula_…}}</code> recebem as notas de cada aluno.</p>';
       html += '<div class="edoc-prop-row" style="margin-bottom:6px;">'
         + '<button type="button" class="edoc-btn" id="edoc-boletim-html-dinamico" title="Wrapper com variável dinâmica">HTML dinâmico</button>'
         + '<button type="button" class="edoc-btn" id="edoc-boletim-html-previa" title="Editar a estrutura completa com notas dinâmicas">Expor tabela completa</button>'
         + '</div>';
       html += '<div class="edoc-html-label"><label for="edoc-boletim-html">HTML do boletim</label>'
-        + '<button type="button" class="edoc-btn" id="edoc-html-expand"><i class="fa-solid fa-expand" aria-hidden="true"></i> Expandir editor</button></div>';
+        + '<button type="button" class="edoc-btn" id="edoc-html-expand" title="Abre o editor HTML no centro da tela"><i class="fa-solid fa-code" aria-hidden="true"></i> Editar em HTML</button></div>';
       html += '<textarea data-f="html" id="edoc-boletim-html" class="edoc-html-src" rows="14" spellcheck="false">'
         + esc(indentarHtmlDocumento(p.html || '')) + '</textarea>';
+    }
+    if (elementoPermiteHtml(el) && !elementoEhBoletim(el)
+      && el.type !== 'titulo' && el.type !== 'texto' && el.type !== 'texto_rico' && el.type !== 'html') {
+      html += '<button type="button" class="edoc-btn" id="edoc-editar-html" style="margin:8px 0;width:100%" title="Abre o editor HTML no centro da tela">'
+        + '<i class="fa-solid fa-code" aria-hidden="true"></i> Editar em HTML</button>';
     }
     if (el.type === 'titulo') {
       html += '<label>Nível</label><select data-f="tag"><option value="h1">Título</option><option value="h2">Subtítulo</option><option value="h3">Seção</option></select>';
@@ -4406,6 +4564,10 @@
           });
         });
       }
+    }
+    if (kind === 'element') {
+      var btnHtml = $('#edoc-editar-html', box);
+      if (btnHtml) btnHtml.addEventListener('click', function () { abrirHtmlExpandido(target); });
     }
     if (kind === 'element' && elementoEhBoletim(target)) {
       var expandir = $('#edoc-html-expand', box);
@@ -5670,6 +5832,7 @@
   var arquivoPreviaPdf = null;
 
   function alternarResultadoPdf(ativo) {
+    if (ativo) fecharHtmlExpandido();
     state.preview = ativo;
     document.body.classList.toggle('edoc-result-mode', ativo);
     $('#edoc-pdf-preview').hidden = !ativo;
@@ -6101,6 +6264,7 @@
     bindBuscaElementos();
     bindCriadorTabela();
     bindHtmlExpandido();
+    bindInfoFolha();
     bindVarSearch();
     bindCamposVariaveis();
     bindDemonstracao();

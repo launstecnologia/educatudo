@@ -191,6 +191,12 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                 <span id="edoc-zoom-label" style="font-size:12px;min-width:48px;text-align:center">90%</span>
                 <button type="button" class="edoc-btn edoc-btn-icon" id="edoc-zoom-in"><i class="fa-solid fa-plus"></i></button>
                 <button type="button" class="edoc-btn" id="edoc-zoom-fit">Ajustar à tela</button>
+                <span class="edoc-folha-info-wrap">
+                    <button type="button" class="edoc-btn edoc-btn-icon" id="edoc-folha-info" aria-expanded="false" aria-controls="edoc-folha-info-pop" title="Medidas da folha para impressão">
+                        <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                    </button>
+                    <div class="edoc-folha-info-pop" id="edoc-folha-info-pop" role="dialog" aria-label="Medidas da folha" hidden></div>
+                </span>
                 <span class="edoc-canvas-hint">Edite na folha. Use Ver resultado para conferir as margens e as páginas da impressão.</span>
                 <span class="edoc-canvas-hint" id="edoc-folha-aviso"></span>
                 <?php if (!empty($layout_sugerido)): ?>
@@ -215,6 +221,24 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                     <div id="edoc-paper" class="edoc-paper"></div>
                 </div>
             </div>
+            <section class="edoc-html-stage" id="edoc-html-stage" aria-label="Editor HTML" hidden>
+                <form id="edoc-html-form" class="edoc-html-stage-form">
+                    <header>
+                        <div>
+                            <h2 id="edoc-html-title">Editar HTML</h2>
+                            <p id="edoc-html-desc">Os campos entre {{...}} são preenchidos para cada aluno. Edite a estrutura e os estilos à vontade.</p>
+                        </div>
+                        <div class="edoc-html-stage-actions">
+                            <button type="button" class="edoc-btn" id="edoc-html-indent">Indentar código</button>
+                            <button type="button" class="edoc-btn" id="edoc-html-cancel">Voltar à folha</button>
+                            <button type="submit" class="edoc-btn edoc-btn-primary">Aplicar na folha</button>
+                        </div>
+                    </header>
+                    <label class="edoc-sr-only" for="edoc-html-code">Código HTML</label>
+                    <textarea id="edoc-html-code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea>
+                    <footer><span>As alterações entram na folha ao clicar em Aplicar. Esc volta sem salvar.</span></footer>
+                </form>
+            </section>
         </main>
 
         <aside class="edoc-right">
@@ -327,15 +351,6 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
         <p id="edoc-table-description" aria-live="polite"></p>
         <p class="edoc-hint">A tabela ocupa a largura da coluna escolhida. Você poderá adicionar linhas e colunas depois.</p>
         <div class="edoc-table-dialog-actions"><button type="button" class="edoc-btn" id="edoc-table-cancel">Cancelar</button><button type="submit" class="edoc-btn edoc-btn-primary">Inserir tabela</button></div>
-    </form>
-</dialog>
-
-<dialog class="edoc-html-dialog" id="edoc-html-dialog" aria-labelledby="edoc-html-title">
-    <form id="edoc-html-form">
-        <header><div><h2 id="edoc-html-title">Editar HTML do boletim</h2><p>Os campos entre {{...}} são preenchidos para cada aluno. Edite a estrutura e os estilos à vontade.</p></div><button type="button" class="edoc-btn" id="edoc-html-indent">Indentar código</button></header>
-        <label class="edoc-sr-only" for="edoc-html-code">Código HTML do boletim</label>
-        <textarea id="edoc-html-code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea>
-        <footer><span>As alterações entram na folha ao clicar em Aplicar.</span><div><button type="button" class="edoc-btn" id="edoc-html-cancel">Cancelar</button><button type="submit" class="edoc-btn edoc-btn-primary">Aplicar alterações</button></div></footer>
     </form>
 </dialog>
 
