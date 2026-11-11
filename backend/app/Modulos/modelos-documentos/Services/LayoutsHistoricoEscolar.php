@@ -23,6 +23,13 @@ class LayoutsHistoricoEscolar
         ];
 
         return [
+            'historico_sao_paulo' => $item(
+                'Histórico escolar — São Paulo',
+                'resultado_historico_sao_paulo',
+                'Modelo editável no formato do histórico escolar do Ensino Médio de São Paulo (uma página).',
+                'Uma página: cabeçalho da rede, base nacional, parte diversificada, trajetória, observações e certificado.',
+                1
+            ),
             'historico_parana' => $item(
                 'Histórico escolar — Paraná',
                 'resultado_historico_parana',
@@ -57,6 +64,7 @@ class LayoutsHistoricoEscolar
             return null;
         }
         $html = match ($chave) {
+            'historico_sao_paulo' => self::htmlSaoPaulo(),
             'historico_parana' => self::htmlParana(),
             'historico_espirito_santo' => self::htmlEspiritoSantoFrente(),
             'historico_em_branco' => self::htmlEmBranco(),
@@ -95,6 +103,171 @@ class LayoutsHistoricoEscolar
         $sec['columns'][0]['elements'][] = ModeloDocumentoService::elementoEstrutura('html', ['html' => $html]);
 
         return $sec;
+    }
+
+    private static function htmlSaoPaulo(): string
+    {
+        $c = self::cols([4.5, 4.5, 13, 9, 24, 15, 15, 15]);
+        $n = static fn (string $t): string => self::td($t, 1, 1, 'edoc-centro');
+        $vazio = self::tdHtml('&nbsp;', 1, 1, 'edoc-centro');
+        $comp = static fn (string $t, int $rs = 1): string => self::td($t, 2, $rs);
+        $linhas = [];
+
+        $linhas[] = self::tr(
+            self::tdHtml('{{logo_html}}', 3, 8, 'edoc-logo')
+            . self::td('GOVERNO DO ESTADO DE SÃO PAULO', 5, 1, 'edoc-centro edoc-negrito'),
+            '4.8mm'
+        );
+        $linhas[] = self::tr(self::td('SECRETARIA DE ESTADO DA EDUCAÇÃO', 5, 1, 'edoc-centro edoc-negrito'), '4.4mm');
+        $linhas[] = self::tr(self::td('DIRETORIA DE ENSINO', 5, 1, 'edoc-centro edoc-negrito'), '4.4mm');
+        $linhas[] = self::tr(self::td('{{escola_nome}}', 5, 1, 'edoc-centro edoc-negrito'), '4.8mm');
+        $linhas[] = self::tr(self::td('Ato legal de criação: {{escola_docs}}', 5), '4.4mm');
+        $linhas[] = self::tr(self::td('Endereço: {{escola_endereco}}', 5), '4.4mm');
+        $linhas[] = self::tr(
+            self::td('Bairro: {{escola_bairro}}  Município: {{escola_municipio}}  CEP: {{escola_cep}}', 5),
+            '4.4mm'
+        );
+        $linhas[] = self::tr(
+            self::td('Telefone: {{escola_telefone}}  Endereço eletrônico: {{escola_email}}', 5),
+            '4.4mm'
+        );
+
+        $linhas[] = self::tr(self::td('HISTÓRICO ESCOLAR - ENSINO MÉDIO', 8, 1, 'edoc-titulo'), '6.5mm');
+        $linhas[] = self::tr(
+            self::td('Nome do Aluno: {{aluno_nome}}', 5)
+            . self::td('RG/RNM: {{aluno_rg}}', 2)
+            . self::td('RA: {{aluno_ra}}', 1),
+            '5.6mm'
+        );
+        $linhas[] = self::tr(
+            self::td('Nascimento:', 2)
+            . self::td('Município: {{aluno_naturalidade}}', 3)
+            . self::td('Estado: {{aluno_uf}}', 2)
+            . self::td('País: {{aluno_nacionalidade}}', 1),
+            '5.6mm'
+        );
+        $linhas[] = self::tr(self::td('Data: {{aluno_data_nasc}}', 8), '5.6mm');
+
+        $linhas[] = self::tr(
+            self::td('Fundamento Legal: Lei Federal 9394/96', 1, 27, 'edoc-vert')
+            . self::td('BASE NACIONAL COMUM', 1, 13, 'edoc-vert')
+            . self::td('ÁREAS DE CONHECIMENTO', 1, 2, 'edoc-centro edoc-negrito')
+            . self::td('COMPONENTES CURRICULARES', 2, 2, 'edoc-centro edoc-negrito')
+            . self::td('Ano', 1, 1, 'edoc-centro edoc-negrito')
+            . self::td('Ano', 1, 1, 'edoc-centro edoc-negrito')
+            . self::td('Ano', 1, 1, 'edoc-centro edoc-negrito'),
+            '5mm'
+        );
+        $linhas[] = self::tr(
+            self::td('1ª Série', 1, 1, 'edoc-centro edoc-negrito')
+            . self::td('2ª Série', 1, 1, 'edoc-centro edoc-negrito')
+            . self::td('3ª Série', 1, 1, 'edoc-centro edoc-negrito'),
+            '5mm'
+        );
+
+        $grupos = [
+            ['Linguagens', 3, ['Língua Portuguesa e Literatura', 'Arte', 'Educação Física']],
+            ['Matemática', 1, ['Matemática']],
+            ['Ciência da Natureza', 3, ['Biologia', 'Física', 'Química']],
+            ['Ciências Humanas', 4, ['História', 'Geografia', 'Filosofia', 'Sociologia']],
+        ];
+        foreach ($grupos as [$area, $rs, $disciplinas]) {
+            $primeira = true;
+            foreach ($disciplinas as $disc) {
+                $miolo = '';
+                if ($primeira) {
+                    $miolo .= self::td($area, 1, $rs, 'edoc-centro edoc-negrito');
+                    $primeira = false;
+                }
+                $linhas[] = self::tr($miolo . $comp($disc) . $vazio . $vazio . $vazio, '5.2mm');
+            }
+        }
+
+        $linhas[] = self::tr(
+            self::td('Total de Aulas da Base Nacional Comum', 4, 1, 'edoc-negrito') . $vazio . $vazio . $vazio,
+            '5.2mm'
+        );
+        $linhas[] = self::tr(
+            self::td('PARTE DIVERSIFICADA', 1, 5, 'edoc-vert')
+            . self::td('Língua Estrangeira Moderna', 1, 2, 'edoc-centro')
+            . $comp('Inglês') . $vazio . $vazio . $vazio,
+            '5.2mm'
+        );
+        $linhas[] = self::tr($comp('Espanhol') . $vazio . $vazio . $vazio, '5.2mm');
+        $linhas[] = self::tr(self::tdHtml('&nbsp;', 3) . $vazio . $vazio . $vazio, '5.2mm');
+        $linhas[] = self::tr(self::tdHtml('&nbsp;', 3) . $vazio . $vazio . $vazio, '5.2mm');
+        $linhas[] = self::tr(self::tdHtml('&nbsp;', 3) . $vazio . $vazio . $vazio, '5.2mm');
+        $linhas[] = self::tr(
+            self::td('Total de Aulas da Parte Diversificada', 4, 1, 'edoc-negrito') . $vazio . $vazio . $vazio,
+            '5.2mm'
+        );
+        $linhas[] = self::tr(
+            self::td('Total de Aulas Anual do Curso (Aulas)', 4, 1, 'edoc-negrito')
+            . $n('0') . $n('0') . $n('0'),
+            '5.2mm'
+        );
+        $linhas[] = self::tr(
+            self::td('Total de Carga Horária Anual do Curso (Horas)', 4, 1, 'edoc-negrito')
+            . $n('0') . $n('0') . $n('0'),
+            '5.2mm'
+        );
+
+        $linhas[] = self::tr(
+            self::tdHtml('&nbsp;')
+            . self::td('Série', 1, 1, 'edoc-centro edoc-negrito')
+            . self::td('Ano', 1, 1, 'edoc-centro edoc-negrito')
+            . self::td('Estabelecimento de Ensino', 2, 1, 'edoc-centro edoc-negrito')
+            . self::td('Município', 1, 1, 'edoc-centro edoc-negrito')
+            . self::td('UF', 1, 1, 'edoc-centro edoc-negrito'),
+            '5.2mm'
+        );
+        $linhas[] = self::tr(
+            self::td('Ensino Fundamental', 1, 1, 'edoc-vert')
+            . self::td('8ª Série / 9º Ano', 1, 1, 'edoc-centro')
+            . $vazio
+            . self::tdHtml('&nbsp;', 2)
+            . $vazio
+            . $vazio,
+            '7.5mm'
+        );
+        $series = ['1ª Série', '2ª Série', '3ª Série'];
+        foreach ($series as $i => $serie) {
+            $miolo = $i === 0 ? self::td('Ensino Médio', 1, 3, 'edoc-vert') : '';
+            $linhas[] = self::tr(
+                $miolo
+                . self::td($serie, 1, 1, 'edoc-centro')
+                . $vazio
+                . self::tdHtml('&nbsp;', 2)
+                . $vazio
+                . $vazio,
+                '6.8mm'
+            );
+        }
+
+        $linhas[] = self::tr(
+            self::td(
+                'Escala de Avaliação: “A partir de 2007 - Escala numérica de notas de 0 (zero) a 10 (dez) com patamar indicativo de desempenho escolar satisfatório, a nota igual ou superior a 05 (cinco) nos termos da Resolução SE - 61, de 24/9/2007.”',
+                8
+            ),
+            '8.5mm'
+        );
+        $linhas[] = self::tr(self::td('OBSERVAÇÕES:', 8), '12mm');
+        $linhas[] = self::tr(self::td('CERTIFICADO', 8, 1, 'edoc-titulo'), '5.5mm');
+        $linhas[] = self::tr(
+            self::td(
+                'O Diretor da {{escola_nome}}, CERTIFICA, nos termos do Art. 24, Inciso VII, da Lei Federal 9394/96, '
+                . 'que o aluno {{aluno_nome}}, R.A. {{aluno_ra}}, RG/RNM {{aluno_rg}}, '
+                . 'concluiu a {{serie}} do Ensino Médio, no ano de {{ano_letivo}}.',
+                8
+            ),
+            '11mm'
+        );
+        $linhas[] = self::tr(
+            self::td('Número de publicação de concluinte (Resolução SE 61/2019):', 8),
+            '5.5mm'
+        );
+
+        return self::tabela($c, implode('', $linhas));
     }
 
     private static function htmlParana(): string
