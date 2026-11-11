@@ -8,11 +8,25 @@ $renderElementos = static function (array $itens) use ($esc, $ajudasElementos): 
 <button type="button" class="edoc-item" draggable="true" data-drag-type="<?= $esc($tipo) ?>" aria-label="<?= $esc($rotulo) ?>" title="<?= $esc($ajuda) ?>"><i class="fa-solid <?= $esc($it['icone'] ?? 'fa-cube') ?>" aria-hidden="true"></i><span class="edoc-item-text"><strong><?= $esc($rotulo) ?></strong><small><?= $esc($ajuda) ?></small></span><i class="fa-solid fa-plus edoc-item-add" aria-hidden="true"></i></button>
 <?php endforeach; ?></div>
 <?php };
-$renderCampos = static function (string $titulo, array $chaves) use ($esc, $placeholders, $rotuloVar): void { ?>
-<details class="edoc-var-drop edoc-var-group-side"><summary><?= $esc($titulo) ?></summary><div class="edoc-var-chips">
-<?php foreach ($chaves as $ch): if (!isset($placeholders[$ch])) continue; ?>
+$renderCampos = static function (string $titulo, array $chaves, string $icone = 'fa-folder') use ($esc, $placeholders, $rotuloVar): void {
+    $visiveis = array_values(array_filter($chaves, static fn ($ch) => isset($placeholders[$ch])));
+    if ($visiveis === []) {
+        return;
+    }
+    $qtd = count($visiveis);
+    ?>
+<details class="edoc-var-drop edoc-var-group-side">
+<summary>
+<span class="edoc-var-ico" aria-hidden="true"><i class="fa-solid <?= $esc($icone) ?>"></i></span>
+<span class="edoc-var-titulo"><?= $esc($titulo) ?></span>
+<span class="edoc-var-count"><?= (int) $qtd ?></span>
+</summary>
+<div class="edoc-var-chips">
+<?php foreach ($visiveis as $ch): ?>
 <button type="button" class="edoc-var-chip" draggable="true" data-drag-var="<?= $esc($ch) ?>" data-var-nome="<?= $esc($placeholders[$ch]) ?>" title="<?= $esc($placeholders[$ch]) ?>"><span class="edoc-var-nome"><?= $esc($placeholders[$ch]) ?></span><span class="edoc-var-token"><?= $esc($rotuloVar($ch)) ?></span></button>
-<?php endforeach; ?></div></details>
+<?php endforeach; ?>
+</div>
+</details>
 <?php };
 ?>
 <details class="edoc-tool-group" data-edoc-palette-group open>
@@ -23,34 +37,62 @@ $renderCampos = static function (string $titulo, array $chaves) use ($esc, $plac
 <details class="edoc-tool-group" data-edoc-palette-group>
 <summary><span>Cadastro</span><small>Aluno, pais e responsáveis, escola e matrícula</small></summary>
 <p class="edoc-hint">Escolha cada informação e clique ou arraste para montar o documento.</p>
+<div class="edoc-var-stack">
 <?php
-$renderCampos('Aluno', $grupos['aluno']['chaves'] ?? []);
-$renderCampos('Pais e responsáveis', $grupos['responsavel']['chaves'] ?? []);
-$renderCampos('Escola', $grupos['escola']['chaves'] ?? []);
-$renderCampos('Turma', ['turma_nome', 'turma_frase', 'turno', 'numero_chamada']);
-$renderCampos('Série', ['serie', 'organizacao', 'proxima_serie']);
-$renderCampos('Curso', ['curso_nome', 'etapa']);
-$renderCampos('Matrícula', ['matricula_numero', 'ano_letivo', 'situacao_matricula', 'data_entrada', 'data_saida', 'tipo_matricula']);
-$renderCampos('Contrato e valores', $grupos['contrato']['chaves'] ?? []);
+$renderCampos('Aluno', $grupos['aluno']['chaves'] ?? [], 'fa-user-graduate');
+$renderCampos('Pais e responsáveis', $grupos['responsavel']['chaves'] ?? [], 'fa-users');
+$renderCampos('Escola', $grupos['escola']['chaves'] ?? [], 'fa-building-columns');
+$renderCampos('Turma', ['turma_nome', 'turma_frase', 'turno', 'numero_chamada'], 'fa-chalkboard-user');
+$renderCampos('Série', ['serie', 'organizacao', 'proxima_serie'], 'fa-layer-group');
+$renderCampos('Curso', ['curso_nome', 'etapa'], 'fa-graduation-cap');
+$renderCampos('Matrícula', ['matricula_numero', 'ano_letivo', 'situacao_matricula', 'data_entrada', 'data_saida', 'tipo_matricula'], 'fa-id-card');
+$renderCampos('Contrato e valores', $grupos['contrato']['chaves'] ?? [], 'fa-file-invoice-dollar');
 ?>
+</div>
 </details>
 <details class="edoc-tool-group" data-edoc-palette-group>
 <summary><span>Acadêmico</span><small>Boletim, eventos, médias, faltas e histórico</small></summary>
-<?php $renderCampos('Resultados e frequência', $grupos['academico']['chaves'] ?? []); ?>
+<p class="edoc-hint">Use o Boletim para o demonstrativo completo (1º ao 4º bimestre, recuperações e prova final).</p>
+<?php $renderElementos(array_values(array_filter($catalogo['dados'] ?? [], static fn ($i) => ($i['tipo'] ?? '') === 'boletim'))); ?>
+<div class="edoc-var-stack">
+<?php $renderCampos('Quadro / Demonstrativo de notas', ['quadro_notas_html'], 'fa-table-list'); ?>
+</div>
 <div class="edoc-demo" id="edoc-demo">
 <h4>Disciplinas e eventos</h4>
 <p class="edoc-hint">Escolha turma, aluno e boletim na demonstração. Depois insira cada nota, falta ou média final.</p>
 <label class="edoc-demo-check" for="edoc-demo-sigla"><input type="checkbox" id="edoc-demo-sigla"> Sigla no lugar do nome</label>
 <div class="edoc-atalhos"><button type="button" class="edoc-btn" data-atalho="glossario">Glossário</button><button type="button" class="edoc-btn" data-atalho="componentes">Disciplinas</button><button type="button" class="edoc-btn" data-atalho="serie">Série e turma</button></div>
-<details class="edoc-var-drop" id="edoc-demo-comps-drop" hidden><summary>Disciplinas, notas e médias <span class="edoc-var-count" id="edoc-demo-comps-count"></span></summary><div class="edoc-var-chips" id="edoc-demo-comps"></div></details>
-</div>
-<details class="edoc-var-drop"><summary>Quadros prontos</summary>
-<?php $renderElementos(array_merge(array_values(array_filter($catalogo['dados'] ?? [], static fn ($i) => in_array($i['tipo'], ['boletim', 'frequencia'], true))), $catalogo['tabelas'] ?? [])); ?>
+<details class="edoc-var-drop" id="edoc-demo-comps-drop" hidden>
+<summary>
+<span class="edoc-var-ico" aria-hidden="true"><i class="fa-solid fa-book-open"></i></span>
+<span class="edoc-var-titulo">Disciplinas, notas e médias</span>
+<span class="edoc-var-count" id="edoc-demo-comps-count"></span>
+</summary>
+<div class="edoc-var-chips" id="edoc-demo-comps"></div>
 </details>
+</div>
+<div class="edoc-var-stack">
+<?php
+$chavesAcademicoRestante = array_values(array_filter(
+    $grupos['academico']['chaves'] ?? [],
+    static fn ($ch) => $ch !== 'quadro_notas_html'
+));
+$renderCampos('Frequência, histórico e totais', $chavesAcademicoRestante, 'fa-chart-pie');
+?>
+<details class="edoc-var-drop">
+<summary>
+<span class="edoc-var-ico" aria-hidden="true"><i class="fa-solid fa-table"></i></span>
+<span class="edoc-var-titulo">Outros quadros</span>
+</summary>
+<?php $renderElementos(array_merge(array_values(array_filter($catalogo['dados'] ?? [], static fn ($i) => ($i['tipo'] ?? '') === 'frequencia')), $catalogo['tabelas'] ?? [])); ?>
+</details>
+</div>
 </details>
 <details class="edoc-tool-group" data-edoc-palette-group>
 <summary><span>Documento</span><small>Emissão, numeração, observações e assinaturas</small></summary>
-<?php $renderCampos('Dados do documento', $grupos['documento']['chaves'] ?? []); ?>
+<div class="edoc-var-stack">
+<?php $renderCampos('Dados do documento', $grupos['documento']['chaves'] ?? [], 'fa-file-lines'); ?>
+</div>
 <?php $renderElementos(array_values(array_filter($catalogo['dados'] ?? [], static fn ($i) => in_array($i['tipo'], ['observacoes', 'assinaturas'], true)))); ?>
 </details>
 <details class="edoc-tool-group" data-edoc-palette-group>

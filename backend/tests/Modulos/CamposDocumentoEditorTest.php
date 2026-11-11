@@ -11,6 +11,19 @@ final class CamposDocumentoEditorTest extends TestCase
         return '<table><tbody><tr><td>Matemática</td><td data-boletim-coluna="b1_pp">4,0</td><td data-boletim-coluna="b1_mu">5,0</td><td data-boletim-coluna="b1_fal">0</td><td data-boletim-coluna="ma">5,5</td><td data-boletim-coluna="mf">6,7</td></tr></tbody></table>';
     }
 
+    public function testFiliacaoNaturalidadeENacionalidadeFicamNoCadastroNaoNoAcademico(): void
+    {
+        $grupos = ModeloDocumentoService::gruposPlaceholders();
+        $this->assertContains('aluno_filiacao', $grupos['aluno']['chaves']);
+        $this->assertContains('aluno_naturalidade', $grupos['aluno']['chaves']);
+        $this->assertContains('aluno_nacionalidade', $grupos['aluno']['chaves']);
+        $this->assertNotContains('aluno_filiacao', $grupos['academico']['chaves']);
+        $this->assertNotContains('aluno_naturalidade', $grupos['academico']['chaves']);
+        $this->assertNotContains('aluno_nacionalidade', $grupos['academico']['chaves']);
+        $this->assertSame('Quadro / Demonstrativo de notas (HTML)', ModeloDocumentoService::PLACEHOLDERS['quadro_notas_html']);
+        $this->assertContains('quadro_notas_html', $grupos['academico']['chaves']);
+    }
+
     public function testMediaFinalEhDoBoletimSemRecalculoEFaltaZeroEhPreservada(): void
     {
         $out = CamposAcademicosDocumentoService::doQuadro($this->quadro());

@@ -423,6 +423,51 @@
       + cssCaixaBoletim(el.style) + '">{{quadro_notas_html}}</div>';
   }
 
+  function chaveEhQuadroNotas(chave) {
+    return String(chave || '').trim() === 'quadro_notas_html';
+  }
+
+  function boletimHtmlSoDinamico(html) {
+    var h = String(html || '').trim();
+    if (!h) return true;
+    if (h.indexOf('{{boletim_celula_') >= 0) return false;
+    return /\{\{\s*quadro_notas_html\s*\}\}/i.test(h);
+  }
+
+  /** Texto/HTML com só {{quadro_notas_html}} vira bloco Boletim (com editor HTML). */
+  function promoverParaBoletimSeQuadro(el) {
+    if (!el || el.type === 'boletim' || el.type === 'tabela_notas') return false;
+    var raw = String((el.props || {}).html || (el.props || {}).text || '').trim();
+    if (!/\{\{\s*quadro_notas_html\s*\}\}/i.test(raw)) return false;
+    var resto = raw.replace(/\{\{\s*quadro_notas_html\s*\}\}/gi, '').replace(/<[^>]+>/g, '').trim();
+    if (resto !== '') return false;
+    el.type = 'boletim';
+    el.props = el.props || {};
+    delete el.props.text;
+    if (!String(el.props.html || '').trim() || !/quadro_notas_html/i.test(el.props.html)) {
+      garantirHtmlBoletimPadrao(el);
+    }
+    el.style = el.style || {};
+    if (!el.style.fontSize) el.style.fontSize = 7.5;
+    garantirPaisagemBoletim();
+    return true;
+  }
+
+  /** Troca o wrapper dinâmico pela tabela editável (células {{boletim_celula_*}}). */
+  function garantirHtmlBoletimEditavel(el) {
+    if (!el) return false;
+    el.props = el.props || {};
+    el.style = el.style || {};
+    if (!boletimHtmlSoDinamico(el.props.html)) return false;
+    var modelo = String(C.modeloQuadroHtml || '').trim();
+    if (!modelo || modelo.indexOf('{{boletim_celula_') < 0) return false;
+    if (!el.style.fontSize) el.style.fontSize = 7.5;
+    el.props.html = '<div class="quadro-notas-wrap doc-quadro-fit" style="'
+      + cssCaixaBoletim(el.style) + '">' + modelo + '</div>';
+    sincronizarHtmlBoletimComEstilo(el);
+    return true;
+  }
+
   /** Espelha margem/tamanho do painel dentro do HTML do boletim. */
   function sincronizarHtmlBoletimComEstilo(el) {
     if (!el || !elementoEhBoletim(el)) return;
@@ -3481,6 +3526,23 @@
   }
 
   function insertVariavel(colId, chave, skipHist) {
+    if (chaveEhQuadroNotas(chave)) {
+      var pathBol = findPath(colId);
+      if (!pathBol || !pathBol.column) return;
+      var bol = defaultElement('boletim');
+      garantirHtmlBoletimEditavel(bol);
+      pathBol.column.elements = pathBol.column.elements || [];
+      pathBol.column.elements.push(bol);
+      state.selected = { id: bol.id, kind: 'element' };
+      garantirPaisagemBoletim();
+      if (!skipHist) pushHist();
+      render();
+      abrirCardBoletim(true);
+      setStatus(boletimHtmlSoDinamico((bol.props || {}).html)
+        ? 'Boletim na folha. Escolha aluno na demonstração para editar o HTML completo.'
+        : 'Boletim na folha — edite o HTML ao lado.');
+      return;
+    }
     var path = findPath(colId);
     if (!path || !path.column) return;
     var el = defaultElement('texto');
@@ -3493,6 +3555,25 @@
   }
 
   function insertVariavelIntoSelection(chave) {
+    if (chaveEhQuadroNotas(chave)) {
+      var selBol = state.selected ? findPath(state.selected.id) : null;
+      if (selBol && selBol.element && elementoEhBoletim(selBol.element)) {
+        if (boletimHtmlSoDinamico((selBol.element.props || {}).html)) {
+          if (!garantirHtmlBoletimEditavel(selBol.element)) garantirHtmlBoletimPadrao(selBol.element);
+        }
+        pushHist();
+        render();
+        setStatus('HTML do boletim disponível nas propriedades.');
+        return;
+      }
+      var colBol = (selBol && selBol.column) ? selBol.column.id : primeiraColuna();
+      if (!colBol) {
+        addSection('body', [100]);
+        colBol = areaOf('body').sections.slice(-1)[0].columns[0].id;
+      }
+      insertVariavel(colBol, chave);
+      return;
+    }
     var selecionado = state.selected && findPath(state.selected.id);
     if (selecionado && tabelaDoElemento(selecionado.element)) {
       var corpo = corpoVivoDoElemento(selecionado.element);
@@ -3747,6 +3828,13 @@
       return;
     }
     if (sel.element) {
+      var mudouBol = promoverParaBoletimSeQuadro(sel.element);
+      if (elementoEhBoletim(sel.element) && garantirHtmlBoletimEditavel(sel.element)) mudouBol = true;
+      if (mudouBol) {
+        pushHist();
+        render();
+        return;
+      }
       box.innerHTML = propsElement(sel.element, sel.column);
       bindProps(box, 'element', sel.element, sel.column);
       return;
@@ -3992,13 +4080,16 @@
         + '</div>';
       html += '<button type="button" class="edoc-btn" id="edoc-insert-var" style="margin-top:6px">{ } Variáveis</button>';
     }
-    if (el.type === 'boletim' || el.type === 'tabela_notas') {
+    if (elementoEhBoletim(el)) {
       abrirCardBoletim(false);
       if (!String((p.html || '')).trim()) {
         garantirHtmlBoletimPadrao(el);
         p = el.props || {};
       }
-      html += '<p class="edoc-hint">Edite o quadro automático ou use <strong>Expor tabela completa</strong> para personalizar todas as linhas e células. Os campos entre <code>{{...}}</code> recebem as notas de cada aluno.</p>';
+      var soDin = boletimHtmlSoDinamico(p.html);
+      html += soDin
+        ? '<p class="edoc-hint">Este bloco ainda usa <code>{{quadro_notas_html}}</code>. Escolha turma/aluno/boletim na demonstração para carregar a tabela completa e editar o HTML.</p>'
+        : '<p class="edoc-hint">Edite o HTML do demonstrativo ao lado (ou em <strong>Expandir editor</strong>). Os campos <code>{{boletim_celula_…}}</code> recebem as notas de cada aluno.</p>';
       html += '<div class="edoc-prop-row" style="margin-bottom:6px;">'
         + '<button type="button" class="edoc-btn" id="edoc-boletim-html-dinamico" title="Wrapper com variável dinâmica">HTML dinâmico</button>'
         + '<button type="button" class="edoc-btn" id="edoc-boletim-html-previa" title="Editar a estrutura completa com notas dinâmicas">Expor tabela completa</button>'
@@ -4586,10 +4677,8 @@
   function elementoEhBoletim(el) {
     if (!el) return false;
     if (el.type === 'boletim' || el.type === 'tabela_notas') return true;
-    if (el.type === 'html') {
-      return String((el.props || {}).html || '').indexOf('quadro_notas_html') >= 0;
-    }
-    return false;
+    var raw = String((el.props || {}).html || (el.props || {}).text || '');
+    return raw.indexOf('quadro_notas_html') >= 0 || raw.indexOf('{{boletim_celula_') >= 0;
   }
 
   function acharElementoBoletim() {
@@ -4949,6 +5038,11 @@
         if (data.html_quadro) {
           C.varsPreview.quadro_notas_html = data.html_quadro;
           garantirPaisagemBoletim();
+        }
+        var bolEdit = acharElementoBoletim();
+        if (bolEdit && garantirHtmlBoletimEditavel(bolEdit)) {
+          state.dirty = true;
+          scheduleSave();
         }
         registrarDemoSel({
           turmaId: turma.value,
