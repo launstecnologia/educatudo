@@ -552,12 +552,24 @@ class ResultadoAcademicoService
     }
 
     /**
-     * Avalia fórmula com códigos de bloco, max(), min(), chamada()/substituta() e composicao().
+     * Avalia fórmula com códigos de bloco, max(), min(), chamada()/substituta(),
+     * composicao(), media_lancado() e se()/if() (estilo Excel).
      * Extraído do boletim para ser a fonte única.
      *
      * chamada(base1, base2, …, substituta) = média das bases, preenchendo
      * só a primeira base ausente com a substituta (ex.: CH no lugar de PP ou PU).
      * composicao(média, REC) = média se REC ausente; (média+REC)/2 se houver REC.
+     * media_lancado(provas | substituta | opcionais) = MÉDIA do lançado.
+     * Grupos separados por | (posição define o papel — o nome do evento não importa):
+     *   1) provas — substituta cobre a 1ª que faltar
+     *   2) substituta (ex.: CH, 2ª chamada, qualquer nome)
+     *   3) opcionais (ex.: Projeto) — só se lançado; substituta nunca cobre
+     * PE fora (+ PE). Sem | = média simples do que tiver nota.
+     * se()/if() aceita condição em 3 formas:
+     *   - se(PJ, A, B) → existência da nota em PJ
+     *   - se(PJ = verdadeiro|true|sim|1, A, B) e falso|false|nao|não|0
+     *   - se(PP > 7, A, B), se(PP >= PU, A, B), com operadores >= <= > < = == != <>
+     * Em comparações entre colunas, se alguma estiver sem nota a condição é falsa.
      *
      * @param array<string, float|int|string|null> $valoresPorCodigo
      * @return array{ok:bool,valor?:float,expressao?:string,erro?:string}
@@ -595,10 +607,33 @@ class ResultadoAcademicoService
                 && array_key_exists($tn, $valoresPorCodigoNormalized)
                 && is_numeric($valoresPorCodigoNormalized[$tn]);
         };
+        $valorNota = static function (string $cod) use ($valoresPorCodigo, $valoresPorCodigoInsensitive, $valoresPorCodigoNormalized, $normKey): ?float {
+            $cod = trim($cod);
+            if ($cod === '') {
+                return null;
+            }
+            if (array_key_exists($cod, $valoresPorCodigo) && is_numeric($valoresPorCodigo[$cod])) {
+                return (float) $valoresPorCodigo[$cod];
+            }
+            $tl = strtolower($cod);
+            if (array_key_exists($tl, $valoresPorCodigoInsensitive) && is_numeric($valoresPorCodigoInsensitive[$tl])) {
+                return (float) $valoresPorCodigoInsensitive[$tl];
+            }
+            $tn = $normKey($cod);
+            if ($tn !== '' && array_key_exists($tn, $valoresPorCodigoNormalized) && is_numeric($valoresPorCodigoNormalized[$tn])) {
+                return (float) $valoresPorCodigoNormalized[$tn];
+            }
+
+            return null;
+        };
 
         $expr = preg_replace('/(?<=\d),(?=\d)/', '.', $formula) ?? $formula;
         // Alias legível no editor → nome canônico da função.
         $expr = preg_replace('/\bsubstituta\s*\(/i', 'chamada(', $expr) ?? $expr;
+        // Alias antigo da função (renomeada para media_lancado).
+        $expr = preg_replace('/\bmedia_presentes\s*\(/i', 'media_lancado(', $expr) ?? $expr;
+        // Excel IF → se (português).
+        $expr = preg_replace('/\bif\s*\(/i', 'se(', $expr) ?? $expr;
 
         $codeKeys = array_keys($valoresPorCodigo);
         usort($codeKeys, static function ($a, $b) {
@@ -633,6 +668,9 @@ class ResultadoAcademicoService
         }
 
         try {
+            // se() primeiro: descarta o ramo não usado (evita erro em média sem notas).
+            $expr = $this->expandirFuncoesSe((string) $expr, $temNota, $valorNota);
+            $expr = $this->expandirFuncoesMediaLancado((string) $expr, $temNota);
             $expr = $this->expandirFuncoesChamada((string) $expr, $temNota);
             $expr = $this->expandirFuncoesComposicao((string) $expr, $temNota);
         } catch (\Throwable $e) {
@@ -642,7 +680,7 @@ class ResultadoAcademicoService
         $expr = preg_replace_callback('/\b[a-zA-Z_][a-zA-Z0-9_]*\b/', function ($m) use ($valoresPorCodigo, $valoresPorCodigoInsensitive, $valoresPorCodigoNormalized, $normKey) {
             $token = $m[0];
             $tl = strtolower($token);
-            if ($tl === 'max' || $tl === 'min' || $tl === 'chamada' || $tl === 'substituta' || $tl === 'composicao') {
+            if ($tl === 'max' || $tl === 'min' || $tl === 'chamada' || $tl === 'substituta' || $tl === 'composicao' || $tl === 'media_lancado' || $tl === 'se' || $tl === 'if') {
                 return $token;
             }
             if (array_key_exists($token, $valoresPorCodigo) && is_numeric($valoresPorCodigo[$token])) {
@@ -722,6 +760,313 @@ class ResultadoAcademicoService
         }
 
         return $expr;
+    }
+
+    /**
+     * Expõe a expansão de media_lancado para prévia do assistente de boletim.
+     *
+     * @param callable(string):bool $temNota
+     */
+    public function expandirMediaLancadoParaPreview(string $expr, callable $temNota): string
+    {
+        return $this->expandirFuncoesMediaLancado($expr, $temNota);
+    }
+
+    /**
+     * Expõe se()/if() para prévia do assistente de boletim.
+     *
+     * @param callable(string):bool $temNota
+     * @param (callable(string):?float)|null $valorNota Quando null, comparações numéricas/entre colunas resultam false.
+     */
+    public function expandirSeParaPreview(string $expr, callable $temNota, ?callable $valorNota = null): string
+    {
+        $expr = preg_replace('/\bif\s*\(/i', 'se(', $expr) ?? $expr;
+        $valorNota = $valorNota ?? static fn (string $cod): ?float => null;
+
+        return $this->expandirFuncoesSe($expr, $temNota, $valorNota);
+    }
+
+    /**
+     * se(condicao, se_verdadeiro, se_falso) — estilo Excel SE/IF.
+     * Condições aceitas:
+     *  - IDENT (existência de nota)
+     *  - IDENT [=|==|!=|<>] (true/verdadeiro/sim/1/false/falso/nao/não/0)
+     *  - IDENT [>=|<=|>|<|=|==|!=|<>] número
+     *  - IDENT [>=|<=|>|<|=|==|!=|<>] IDENT
+     * Se qualquer coluna da comparação estiver sem nota numérica, condição = false.
+     *
+     * @param callable(string):bool $temNota
+     * @param callable(string):?float $valorNota
+     */
+    private function expandirFuncoesSe(string $expr, callable $temNota, callable $valorNota): string
+    {
+        $guard = 0;
+        while (preg_match('/\b(?:se|if)\s*\(/i', $expr)) {
+            if (++$guard > 80) {
+                throw new \RuntimeException('Limite de aninhamento em se/if.');
+            }
+            if (!preg_match('/\b(?:se|if)\s*\(/i', $expr, $m, PREG_OFFSET_CAPTURE)) {
+                break;
+            }
+            $startFn = (int) $m[0][1];
+            $openParen = $startFn + strlen($m[0][0]) - 1;
+            [$args, $closePos] = $this->extrairArgumentosFuncao($expr, $openParen);
+            if (count($args) !== 3) {
+                throw new \RuntimeException('se() precisa de 3 argumentos: se(condição, se_verdadeiro, se_falso).');
+            }
+            $cond = trim((string) $args[0]);
+            $condicaoVerdadeira = $this->avaliarCondicaoSe($cond, $temNota, $valorNota);
+            $escolhido = $condicaoVerdadeira ? trim((string) $args[1]) : trim((string) $args[2]);
+            if ($escolhido === '') {
+                throw new \RuntimeException('se(): ramo escolhido está vazio.');
+            }
+            $expr = substr($expr, 0, $startFn) . '(' . $escolhido . ')' . substr($expr, $closePos + 1);
+        }
+
+        return $expr;
+    }
+
+    /**
+     * @param callable(string):bool $temNota
+     * @param callable(string):?float $valorNota
+     */
+    private function avaliarCondicaoSe(string $cond, callable $temNota, callable $valorNota): bool
+    {
+        $cond = trim($cond);
+        $cond = preg_replace('/\s+/', ' ', $cond) ?? $cond;
+        if ($cond === '') {
+            throw new \RuntimeException('se(): condição vazia no 1º argumento.');
+        }
+
+        if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $cond)) {
+            return $temNota($cond);
+        }
+
+        if (!preg_match('/^([A-Za-z_][A-Za-z0-9_]*)\s*(>=|<=|!=|<>|==|=|>|<)\s*(.+)$/u', $cond, $m)) {
+            throw new \RuntimeException('se(): condição inválida. Use IDENT, IDENT = verdadeiro/falso, número ou outra coluna.');
+        }
+
+        $colunaEsquerda = trim((string) $m[1]);
+        $operador = trim((string) $m[2]);
+        $rhs = trim((string) $m[3]);
+        if ($rhs === '') {
+            throw new \RuntimeException('se(): condição inválida. Lado direito da comparação está vazio.');
+        }
+
+        $rhsBooleano = $this->normalizarLiteralBooleanoSe($rhs);
+        if ($rhsBooleano !== null) {
+            if (!in_array($operador, ['=', '==', '!=', '<>'], true)) {
+                throw new \RuntimeException('se(): comparação com verdadeiro/falso aceita apenas =, ==, != ou <>.');
+            }
+            $tem = $temNota($colunaEsquerda);
+            if ($operador === '=' || $operador === '==') {
+                return $tem === $rhsBooleano;
+            }
+
+            return $tem !== $rhsBooleano;
+        }
+
+        if (preg_match('/^-?\d+(?:[.,]\d+)?$/', $rhs)) {
+            $valorEsquerda = $valorNota($colunaEsquerda);
+            if ($valorEsquerda === null) {
+                return false;
+            }
+            $valorDireita = (float) str_replace(',', '.', $rhs);
+
+            return $this->compararNumerosSe($valorEsquerda, $operador, $valorDireita);
+        }
+
+        if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $rhs)) {
+            $valorEsquerda = $valorNota($colunaEsquerda);
+            $valorDireita = $valorNota($rhs);
+            if ($valorEsquerda === null || $valorDireita === null) {
+                return false;
+            }
+
+            return $this->compararNumerosSe($valorEsquerda, $operador, $valorDireita);
+        }
+
+        throw new \RuntimeException('se(): valor de comparação inválido. Use verdadeiro/falso, número ou código de coluna.');
+    }
+
+    private function normalizarLiteralBooleanoSe(string $valor): ?bool
+    {
+        $v = strtolower(trim($valor));
+        if (in_array($v, ['true', 'verdadeiro', 'sim', '1'], true)) {
+            return true;
+        }
+        if (in_array($v, ['false', 'falso', 'nao', 'não', '0'], true)) {
+            return false;
+        }
+
+        return null;
+    }
+
+    private function compararNumerosSe(float $esquerda, string $operador, float $direita): bool
+    {
+        $eps = 0.000001;
+        if ($operador === '=' || $operador === '==') {
+            return abs($esquerda - $direita) <= $eps;
+        }
+        if ($operador === '!=' || $operador === '<>') {
+            return abs($esquerda - $direita) > $eps;
+        }
+        if ($operador === '>') {
+            return $esquerda > $direita;
+        }
+        if ($operador === '<') {
+            return $esquerda < $direita;
+        }
+        if ($operador === '>=') {
+            return $esquerda > $direita || abs($esquerda - $direita) <= $eps;
+        }
+        if ($operador === '<=') {
+            return $esquerda < $direita || abs($esquerda - $direita) <= $eps;
+        }
+
+        throw new \RuntimeException('se(): operador inválido na condição.');
+    }
+
+    /**
+     * media_lancado(provas | substituta | opcionais):
+     * Papel vem da posição após | — não do nome/código do evento.
+     * 1) provas: substituta cobre a 1ª que faltar
+     * 2) substituta: 0 ou 1 coluna
+     * 3) opcionais: só se lançado; substituta nunca cobre
+     * Sem | = média simples das colunas com nota.
+     *
+     * @param callable(string):bool $temNota
+     */
+    private function expandirFuncoesMediaLancado(string $expr, callable $temNota): string
+    {
+        $guard = 0;
+        while (preg_match('/\bmedia_lancado\s*\(/i', $expr)) {
+            if (++$guard > 80) {
+                throw new \RuntimeException('Limite de aninhamento em media_lancado.');
+            }
+            if (!preg_match('/\bmedia_lancado\s*\(/i', $expr, $m, PREG_OFFSET_CAPTURE)) {
+                break;
+            }
+            $startFn = (int) $m[0][1];
+            $openParen = $startFn + strlen($m[0][0]) - 1;
+            [$conteudo, $closePos] = $this->extrairConteudoFuncao($expr, $openParen);
+            [$provas, $subst, $extras] = $this->gruposMediaLancado($conteudo);
+
+            if ($provas === [] && $extras === []) {
+                throw new \RuntimeException('media_lancado precisa de ao menos 1 coluna de prova ou opcional.');
+            }
+
+            $termos = [];
+            $usouSubst = false;
+            foreach ($provas as $prova) {
+                if ($temNota($prova)) {
+                    $termos[] = '(' . $prova . ')';
+                } elseif ($subst !== null && !$usouSubst && $temNota($subst)) {
+                    $termos[] = '(' . $subst . ')';
+                    $usouSubst = true;
+                }
+            }
+            foreach ($extras as $extra) {
+                if ($temNota($extra)) {
+                    $termos[] = '(' . $extra . ')';
+                }
+            }
+
+            if ($termos === []) {
+                throw new \RuntimeException('média só do lançado sem notas lançadas.');
+            }
+            $n = count($termos);
+            $media = $n === 1
+                ? $termos[0]
+                : '((' . implode('+', $termos) . ')/' . $n . ')';
+            $expr = substr($expr, 0, $startFn) . $media . substr($expr, $closePos + 1);
+        }
+
+        return $expr;
+    }
+
+    /**
+     * @return array{0: string, 1: int} conteúdo entre parênteses e índice do ')'
+     */
+    private function extrairConteudoFuncao(string $expr, int $openParenIdx): array
+    {
+        $n = strlen($expr);
+        $i = $openParenIdx + 1;
+        $depth = 1;
+        for (; $i < $n; $i++) {
+            $c = $expr[$i];
+            if ($c === '(') {
+                $depth++;
+            } elseif ($c === ')') {
+                $depth--;
+                if ($depth === 0) {
+                    return [substr($expr, $openParenIdx + 1, $i - $openParenIdx - 1), $i];
+                }
+            }
+        }
+
+        throw new \RuntimeException('Função com parênteses incompletos.');
+    }
+
+    /**
+     * Parte media_lancado em [provas, substituta|null, opcionais] pela posição do |.
+     *
+     * @return array{0: list<string>, 1: ?string, 2: list<string>}
+     */
+    private function gruposMediaLancado(string $conteudo): array
+    {
+        $gruposBrutos = [];
+        $n = strlen($conteudo);
+        $depth = 0;
+        $inicio = 0;
+        for ($i = 0; $i < $n; $i++) {
+            $c = $conteudo[$i];
+            if ($c === '(') {
+                $depth++;
+            } elseif ($c === ')') {
+                $depth--;
+            } elseif ($c === '|' && $depth === 0) {
+                $gruposBrutos[] = substr($conteudo, $inicio, $i - $inicio);
+                $inicio = $i + 1;
+            }
+        }
+        $gruposBrutos[] = substr($conteudo, $inicio);
+
+        $codigosDoGrupo = function (string $grupo): array {
+            $out = [];
+            foreach (explode(',', $grupo) as $argBruto) {
+                $arg = trim($argBruto);
+                if ($arg === '') {
+                    continue;
+                }
+                if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $arg)) {
+                    throw new \RuntimeException('media_lancado aceita só códigos de coluna (ex.: PP, PU | CH | PJ).');
+                }
+                $out[] = $arg;
+            }
+
+            return $out;
+        };
+
+        $provas = $codigosDoGrupo($gruposBrutos[0] ?? '');
+        $subst = null;
+        $extras = [];
+        if (count($gruposBrutos) >= 2) {
+            $doMeio = $codigosDoGrupo($gruposBrutos[1]);
+            if (count($doMeio) > 1) {
+                throw new \RuntimeException('media_lancado: o 2º grupo (substituta) aceita só 1 coluna.');
+            }
+            $subst = $doMeio[0] ?? null;
+        }
+        if (count($gruposBrutos) >= 3) {
+            for ($g = 2; $g < count($gruposBrutos); $g++) {
+                foreach ($codigosDoGrupo($gruposBrutos[$g]) as $cod) {
+                    $extras[] = $cod;
+                }
+            }
+        }
+
+        return [$provas, $subst, $extras];
     }
 
     /**

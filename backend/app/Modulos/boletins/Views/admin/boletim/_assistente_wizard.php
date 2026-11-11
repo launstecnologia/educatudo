@@ -165,6 +165,7 @@ $boletimWizardSteps = [
 .bw-chip-op { background: #f8fafc; border-color: #cbd5e1; color: #0f172a; font-weight: 700; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; min-width: 2rem; justify-content: center; }
 .bw-chip-fn { background: #fef3c7; border-color: #fcd34d; color: #92400e; font-weight: 600; }
 .bw-chip-num { background: #ecfdf5; border-color: #a7f3d0; color: #047857; font-weight: 600; }
+.bw-chip-lit { background: #f5f3ff; border-color: #c4b5fd; color: #5b21b6; font-weight: 600; font-size: 12px; }
 .bw-palette .bw-chip { cursor: pointer; }
 .bw-palette-grupos { display: flex; flex-direction: column; gap: 0.55rem; }
 .bw-palette-grupo { border: 1px solid #e2e8f0; border-radius: 0.65rem; background: #fff; padding: 0.4rem 0.55rem 0.5rem; }
@@ -2317,11 +2318,17 @@ $boletimWizardSteps = [
             if (tok.value === 'min') return 'menor (';
             if (tok.value === 'chamada' || tok.value === 'substituta') return 'nota substituta (';
             if (tok.value === 'composicao') return 'média c/ rec (';
+            if (tok.value === 'media_lancado') return 'média (';
+            if (tok.value === 'se' || tok.value === 'if') return 'se (';
             return 'maior (';
         }
+        if (tok.type === 'lit') return tok.label || tok.value;
         if (tok.type === 'op' && tok.value === '*') return '×';
         if (tok.type === 'op' && tok.value === '/') return '÷';
         if (tok.type === 'op' && tok.value === '-') return '−';
+        if (tok.type === 'op' && tok.value === '>=') return '≥';
+        if (tok.type === 'op' && tok.value === '<=') return '≤';
+        if (tok.type === 'op' && (tok.value === '!=' || tok.value === '<>')) return '≠';
         if (tok.type === 'peca') {
             var doSub = tituloSubeventoDaColuna(tok.value);
             if (doSub) return doSub;
@@ -2343,18 +2350,62 @@ $boletimWizardSteps = [
 
     function operadoresFormula() {
         return [
-            { type: 'op', value: '+', label: '+' },
-            { type: 'op', value: '-', label: '−' },
-            { type: 'op', value: '*', label: '×' },
-            { type: 'op', value: '/', label: '÷' },
-            { type: 'op', value: '(', label: '(' },
-            { type: 'op', value: ')', label: ')' },
-            { type: 'op', value: ',', label: ',' },
-            { type: 'fn', value: 'max', label: 'maior (' },
-            { type: 'fn', value: 'min', label: 'menor (' },
-            { type: 'fn', value: 'chamada', label: 'nota substituta (' },
-            { type: 'fn', value: 'composicao', label: 'média c/ rec (' }
+            { type: 'op', value: '+', label: '+', ajuda: 'Soma: junta notas ou valores (ex.: média + PE).' },
+            { type: 'op', value: '-', label: '−', ajuda: 'Subtração: tira um valor do outro.' },
+            { type: 'op', value: '*', label: '×', ajuda: 'Multiplicação: peso da nota (ex.: PP × 2).' },
+            { type: 'op', value: '/', label: '÷', ajuda: 'Divisão: divide pela quantidade ou pelos pesos (ex.: ÷ 3).' },
+            { type: 'op', value: '(', label: '(', ajuda: 'Abre um grupo. Use com ) para definir a ordem da conta.' },
+            { type: 'op', value: ')', label: ')', ajuda: 'Fecha o grupo aberto com (.' },
+            { type: 'op', value: ',', label: ',', ajuda: 'Separador de itens dentro de funções (maior, média, se…).' },
+            { type: 'op', value: '|', label: '|', ajuda: 'Só dentro de média ( ): separa papéis — provas | substituta | opcional. Não misture com +÷.' },
+            { type: 'op', value: '>', label: '>', ajuda: 'Maior que — use no 1º argumento de se ( ex.: PP > 7 ).' },
+            { type: 'op', value: '<', label: '<', ajuda: 'Menor que — use no 1º argumento de se ( ex.: PP < PU ).' },
+            { type: 'op', value: '>=', label: '≥', ajuda: 'Maior ou igual — condição em se ( ex.: PP >= 7 ).' },
+            { type: 'op', value: '<=', label: '≤', ajuda: 'Menor ou igual — condição em se ( ex.: PP <= PU ).' },
+            { type: 'op', value: '=', label: '=', ajuda: 'Igual — condição em se ( ex.: PJ = verdadeiro ou PP = PU ).' },
+            { type: 'op', value: '!=', label: '≠', ajuda: 'Diferente — condição em se ( ex.: PJ != verdadeiro ). Aceita também <> no texto.' },
+            { type: 'lit', value: 'verdadeiro', label: 'verdadeiro', ajuda: 'Literal: coluna lançada. Use após = no 1º argumento de se ( ex.: PJ = verdadeiro ).' },
+            { type: 'lit', value: 'falso', label: 'falso', ajuda: 'Literal: coluna em branco. Use após = no 1º argumento de se ( ex.: PJ = falso ).' },
+            { type: 'fn', value: 'max', label: 'maior (', ajuda: 'maior ( A , B , … ): fica o maior valor entre as colunas.' },
+            { type: 'fn', value: 'min', label: 'menor (', ajuda: 'menor ( A , B , … ): fica o menor valor entre as colunas.' },
+            { type: 'fn', value: 'chamada', label: 'nota substituta (', ajuda: 'nota substituta ( bases… , CH ): média das bases; CH cobre a 1ª prova que faltar. Já divide sozinha.' },
+            { type: 'fn', value: 'composicao', label: 'média c/ rec (', ajuda: 'média c/ rec ( média , REC ): sem recuperação fica a média; com REC vira (média + REC) ÷ 2.' },
+            { type: 'fn', value: 'media_lancado', label: 'média (', ajuda: 'média ( provas | substituta | opcional ): média só do lançado. O | define o papel; ÷ automático.' },
+            { type: 'fn', value: 'se', label: 'se (', ajuda: 'se ( condição , se_verdadeiro , se_falso ): condição = coluna (lançou?), PJ = verdadeiro/falso, PP > 7 ou PP > PU — depois escolhe qual conta usar.' }
         ];
+    }
+
+    function ajudaTokenFormula(tok) {
+        if (!tok) return '';
+        if (tok.ajuda) return String(tok.ajuda);
+        var mapa = {
+            '+': 'Soma: junta notas ou valores (ex.: média + PE).',
+            '-': 'Subtração: tira um valor do outro.',
+            '*': 'Multiplicação: peso da nota (ex.: PP × 2).',
+            '/': 'Divisão: divide pela quantidade ou pelos pesos (ex.: ÷ 3).',
+            '(': 'Abre um grupo. Use com ) para definir a ordem da conta.',
+            ')': 'Fecha o grupo aberto com (.',
+            ',': 'Separador de itens dentro de funções (maior, média, se…).',
+            '|': 'Só dentro de média ( ): separa papéis — provas | substituta | opcional. Não misture com +÷.',
+            '>': 'Maior que — no 1º argumento de se ( ex.: PP > 7 ).',
+            '<': 'Menor que — no 1º argumento de se ( ex.: PP < PU ).',
+            '>=': 'Maior ou igual — condição em se ( ex.: PP >= 7 ).',
+            '<=': 'Menor ou igual — condição em se ( ex.: PP <= PU ).',
+            '=': 'Igual — condição em se ( ex.: PJ = verdadeiro ou PP = PU ).',
+            '!=': 'Diferente — condição em se ( ex.: PJ != verdadeiro ). Também aceita <> no texto.',
+            '<>': 'Diferente — condição em se ( ex.: PJ <> verdadeiro ).',
+            verdadeiro: 'Literal: coluna lançada. Use após = no 1º argumento de se ( ex.: PJ = verdadeiro ).',
+            falso: 'Literal: coluna em branco. Use após = no 1º argumento de se ( ex.: PJ = falso ).',
+            max: 'maior ( A , B , … ): fica o maior valor entre as colunas.',
+            min: 'menor ( A , B , … ): fica o menor valor entre as colunas.',
+            chamada: 'nota substituta ( bases… , CH ): média das bases; CH cobre a 1ª prova que faltar. Já divide sozinha.',
+            substituta: 'nota substituta ( bases… , CH ): média das bases; CH cobre a 1ª prova que faltar. Já divide sozinha.',
+            composicao: 'média c/ rec ( média , REC ): sem recuperação fica a média; com REC vira (média + REC) ÷ 2.',
+            media_lancado: 'média ( provas | substituta | opcional ): média só do lançado. O | define o papel; ÷ automático.',
+            se: 'se ( condição , se_verdadeiro , se_falso ): coluna sozinha (lançou?), = verdadeiro/falso, > < >= <= número ou outra coluna.',
+            if: 'se ( condição , se_verdadeiro , se_falso ): coluna sozinha (lançou?), = verdadeiro/falso, > < >= <= número ou outra coluna.'
+        };
+        return mapa[String(tok.value || '')] || '';
     }
 
     function codigosColunaFormula() {
@@ -2427,12 +2478,15 @@ $boletimWizardSteps = [
                 if (fn === 'min') parts.push('min(');
                 else if (fn === 'chamada' || fn === 'substituta') parts.push('chamada(');
                 else if (fn === 'composicao') parts.push('composicao(');
+                else if (fn === 'media_lancado') parts.push('media_lancado(');
+                else if (fn === 'se' || fn === 'if') parts.push('se(');
                 else parts.push('max(');
             } else if (t.type === 'peca') parts.push(t.value);
+            else if (t.type === 'lit') parts.push(t.value);
             else parts.push(t.value);
         });
-        var exp = parts.join(' ').replace(/\( /g, '(').replace(/ \)/g, ')').replace(/ ,/g, ',');
-        return exp.replace(/\b(max|min|chamada|substituta|composicao)\(\s+/g, '$1(').trim();
+        var exp = parts.join(' ').replace(/\( /g, '(').replace(/ \)/g, ')').replace(/ ,/g, ',').replace(/ \|/g, '|').replace(/\| /g, '|');
+        return exp.replace(/\b(max|min|chamada|substituta|composicao|media_lancado|se|if)\(\s+/g, '$1(').replace(/\bif\(/ig, 'se(').trim();
     }
 
     function envolverSomaAntesDeDivisao(tokens) {
@@ -2613,6 +2667,226 @@ $boletimWizardSteps = [
         return toks;
     }
 
+    /** media_lancado(provas | substituta | opcionais) + PE — papel pela posição do |, não pelo nome. */
+    function tokensMediaPreenchidas() {
+        var cols = [];
+        function pushCol(c) {
+            c = String(c || '').toLowerCase();
+            if (!c || c === '_semanal') return;
+            if (ehCodigoBlocoCalc(c)) return;
+            if (cols.indexOf(c) < 0) cols.push(c);
+        }
+        (estado && estado.colunas_ordem || []).forEach(pushCol);
+        if (cols.length < 2) {
+            (((rascunhoAtual || {}).componentes) || []).forEach(function (comp) {
+                pushCol(comp && comp.codigo);
+            });
+        }
+        if (cols.length < 2) {
+            ((estado && estado.pecas) || []).forEach(pushCol);
+        }
+        if (cols.length < 1) return tokensMediaDasPecas();
+
+        var porSuf = {};
+        cols.forEach(function (c) {
+            var s = sufixoColunaSm(c);
+            if (s && !porSuf[s]) porSuf[s] = c;
+        });
+        // Sugestão inicial (só atalho): sufixos comuns. O motor usa a posição após | — qualquer nome vale.
+        var provas = [];
+        var subst = porSuf.ch || '';
+        var extras = [];
+        cols.forEach(function (c) {
+            var s = sufixoColunaSm(c);
+            var leaf = folhaCodigoFormulaJs(c);
+            if (s === 'pe' || s === 'fal' || s === 'mu') return;
+            if (subst && c === subst) return;
+            if (s === 'ch' || codigoMediaLancadoEhChamadaJs(c)) {
+                if (!subst) subst = c;
+                return;
+            }
+            if (codigoMediaLancadoEhProjetoJs(c) || leaf === 'pj' || leaf === 'ph' || /projeto/.test(leaf)) {
+                if (extras.indexOf(c) < 0) extras.push(c);
+                return;
+            }
+            if (codigoMediaLancadoEhPontoOuFaltaJs(c)) return;
+            if (provas.indexOf(c) < 0) provas.push(c);
+        });
+        provas.sort(function (a, b) {
+            function peso(c) {
+                var s = sufixoColunaSm(c);
+                if (s === 'pp') return 1;
+                if (s === 'pu') return 2;
+                return 10;
+            }
+            return peso(a) - peso(b) || String(a).localeCompare(String(b));
+        });
+        if (!provas.length && !extras.length) {
+            provas = cols.filter(function (c) {
+                var s = sufixoColunaSm(c);
+                return s !== 'pe' && s !== 'fal' && s !== 'mu' && c !== subst;
+            });
+        }
+        if (!provas.length && !extras.length) return tokensMediaDasPecas();
+
+        function pushPecaTok(toks, cod) {
+            toks.push({ type: 'peca', value: cod, label: tituloColuna(cod) || pecaLabel(cod) || cod });
+        }
+        function pushLista(toks, lista) {
+            lista.forEach(function (cod, idx) {
+                if (idx > 0) toks.push({ type: 'op', value: ',', label: ',' });
+                pushPecaTok(toks, cod);
+            });
+        }
+
+        var toks = [{ type: 'fn', value: 'media_lancado', label: 'média (' }];
+        pushLista(toks, provas);
+        // Sempre monta os 3 grupos quando há substituta ou opcional — nome da peça irrelevante.
+        if (subst || extras.length) {
+            toks.push({ type: 'op', value: '|', label: '|' });
+            if (subst) pushPecaTok(toks, subst);
+            toks.push({ type: 'op', value: '|', label: '|' });
+            pushLista(toks, extras);
+        }
+        toks.push({ type: 'op', value: ')', label: ')' });
+        if (porSuf.pe) {
+            toks.push({ type: 'op', value: '+', label: '+' });
+            pushPecaTok(toks, porSuf.pe);
+        }
+        return toks;
+    }
+
+    /** Texto em português: grupos pela posição do | (não pelo nome). */
+    function leituraMediaLancado(tokens) {
+        tokens = Array.isArray(tokens) ? tokens : [];
+        var i;
+        var dentro = false;
+        var grupo = 0;
+        var provas = [];
+        var subst = '';
+        var extras = [];
+        var pe = '';
+        for (i = 0; i < tokens.length; i++) {
+            var t = tokens[i] || {};
+            if (t.type === 'fn' && String(t.value || '') === 'media_lancado') {
+                dentro = true;
+                grupo = 0;
+                continue;
+            }
+            if (dentro && t.type === 'op' && t.value === ')') {
+                dentro = false;
+                continue;
+            }
+            if (dentro && t.type === 'op' && t.value === '|') {
+                grupo += 1;
+                continue;
+            }
+            if (dentro && t.type === 'peca') {
+                var cod = String(t.value || '');
+                var lab = String(t.label || tituloColuna(cod) || cod);
+                if (grupo === 0) provas.push(lab);
+                else if (grupo === 1 && !subst) subst = lab;
+                else if (grupo >= 2) extras.push(lab);
+                continue;
+            }
+            if (!dentro && t.type === 'op' && t.value === '+' && tokens[i + 1] && tokens[i + 1].type === 'peca') {
+                pe = String(tokens[i + 1].label || tituloColuna(tokens[i + 1].value) || tokens[i + 1].value);
+            }
+        }
+        if (!provas.length && !extras.length) return '';
+        var partes = [];
+        if (provas.length) {
+            var blocoProva = 'Provas (' + provas.join(' + ') + ')';
+            if (subst) {
+                partes.push(blocoProva + ' — ' + subst + ' só substitui prova (nunca o opcional)');
+            } else {
+                partes.push(blocoProva);
+            }
+        } else if (subst) {
+            partes.push(subst + ' só entra no lugar de prova');
+        }
+        if (extras.length) {
+            partes.push('Opcional (' + extras.join(', ') + ') à parte: só se houver lançamento');
+        }
+        partes.push('÷ pela quantidade que entrou');
+        if (pe) partes.push('+ ' + pe);
+        return 'Como se lê: ' + partes.join(' · ') + ' · (papéis pelo |, não pelo nome do evento)';
+    }
+
+    /**
+     * Excel SE: se(opcional, conta_com, conta_sem) + PE.
+     * Ex.: se(PJ; média(PP,PU|CH|PJ); média(PP,PU|CH)) + PE
+     */
+    function tokensSeLancou() {
+        var base = tokensMediaPreenchidas();
+        if (!base || !base.length) return tokensMediaDasPecas();
+
+        // Descobre opcional (3º grupo) e PE de fora.
+        var i;
+        var dentro = false;
+        var grupo = 0;
+        var provas = [];
+        var subst = '';
+        var extras = [];
+        var peTok = null;
+        for (i = 0; i < base.length; i++) {
+            var t = base[i] || {};
+            if (t.type === 'fn' && t.value === 'media_lancado') { dentro = true; grupo = 0; continue; }
+            if (dentro && t.type === 'op' && t.value === ')') { dentro = false; continue; }
+            if (dentro && t.type === 'op' && t.value === '|') { grupo += 1; continue; }
+            if (dentro && t.type === 'peca') {
+                if (grupo === 0) provas.push(t);
+                else if (grupo === 1 && !subst) subst = t;
+                else if (grupo >= 2) extras.push(t);
+                continue;
+            }
+            if (!dentro && t.type === 'op' && t.value === '+' && base[i + 1] && base[i + 1].type === 'peca') {
+                peTok = base[i + 1];
+            }
+        }
+        if (!extras.length || !provas.length) {
+            // Sem opcional detectado: cai na média por grupos; use o chip "se (" para montar à mão.
+            return base;
+        }
+
+        function pushPeca(toks, peca) {
+            toks.push({ type: 'peca', value: peca.value, label: peca.label || peca.value });
+        }
+        function pushMedia(toks, comExtra) {
+            toks.push({ type: 'fn', value: 'media_lancado', label: 'média (' });
+            provas.forEach(function (p, idx) {
+                if (idx > 0) toks.push({ type: 'op', value: ',', label: ',' });
+                pushPeca(toks, p);
+            });
+            if (subst || comExtra) {
+                toks.push({ type: 'op', value: '|', label: '|' });
+                if (subst) pushPeca(toks, subst);
+                toks.push({ type: 'op', value: '|', label: '|' });
+                if (comExtra) {
+                    extras.forEach(function (p, idx) {
+                        if (idx > 0) toks.push({ type: 'op', value: ',', label: ',' });
+                        pushPeca(toks, p);
+                    });
+                }
+            }
+            toks.push({ type: 'op', value: ')', label: ')' });
+        }
+
+        var cond = extras[0];
+        var toks = [{ type: 'fn', value: 'se', label: 'se (' }];
+        pushPeca(toks, cond);
+        toks.push({ type: 'op', value: ',', label: ',' });
+        pushMedia(toks, true);
+        toks.push({ type: 'op', value: ',', label: ',' });
+        pushMedia(toks, false);
+        toks.push({ type: 'op', value: ')', label: ')' });
+        if (peTok) {
+            toks.push({ type: 'op', value: '+', label: '+' });
+            pushPeca(toks, peTok);
+        }
+        return toks;
+    }
+
     /**
      * Modelo genérico: composicao((média1+média2)÷2, recuperação).
      * Sem recuperação → só a média; com recuperação → (média+rec)÷2.
@@ -2700,7 +2974,10 @@ $boletimWizardSteps = [
             : labelToken(tok);
         var completo = tok && (tok.label || tok.value) ? String(tok.label || tok.value) : '';
         var dica = '';
-        if (tok && tok.type === 'peca' && ehCodigoBlocoCalc(tok.value)) {
+        var ajudaOp = (tok && (tok.type === 'op' || tok.type === 'fn' || tok.type === 'lit')) ? ajudaTokenFormula(tok) : '';
+        if (ajudaOp) {
+            dica = ' title="' + esc(ajudaOp) + '"';
+        } else if (tok && tok.type === 'peca' && ehCodigoBlocoCalc(tok.value)) {
             dica = ' title="' + esc('Bloco de cálculo: ' + (completo || tok.value)) + '"';
         } else if (tok && tok.type === 'peca' && mostrado !== completo) {
             dica = ' title="' + esc(completo) + '"';
@@ -2738,17 +3015,22 @@ $boletimWizardSteps = [
         if (!estado) return;
         estado.formula_custom = compilarTokensPreview(estado.formula_tokens || []);
         var el = document.getElementById('bw-formula-preview');
-        if (!el) return;
-        el.textContent = '';
-        var midPrev = Number(estado.materia_calc || 0);
-        var expr = formulaTextoLegivel(estado.formula_tokens) || estado.formula_custom || 'Monte os blocos acima.';
-        if (midPrev > 0) {
-            var prefix = document.createElement('span');
-            prefix.className = 'font-sans font-semibold text-indigo-800 mr-1';
-            prefix.textContent = materiaNome(midPrev) + ':';
-            el.appendChild(prefix);
+        if (el) {
+            el.textContent = '';
+            var midPrev = Number(estado.materia_calc || 0);
+            var expr = formulaTextoLegivel(estado.formula_tokens) || estado.formula_custom || 'Monte os blocos acima.';
+            if (midPrev > 0) {
+                var prefix = document.createElement('span');
+                prefix.className = 'font-sans font-semibold text-indigo-800 mr-1';
+                prefix.textContent = materiaNome(midPrev) + ':';
+                el.appendChild(prefix);
+            }
+            el.appendChild(document.createTextNode(expr));
         }
-        el.appendChild(document.createTextNode(expr));
+        var elLei = document.getElementById('bw-formula-leitura');
+        if (elLei) {
+            elLei.textContent = leituraMediaLancado(estado.formula_tokens || []) || '';
+        }
     }
 
     function tokenFromEl(el) {
@@ -3107,7 +3389,14 @@ $boletimWizardSteps = [
         var s = String(src || '').toLocaleLowerCase('pt-BR');
         if (s.normalize) s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         s = s.replace(/÷/g, '/').replace(/×/g, '*').replace(/[−–—]/g, '-');
-        s = s.replace(/[^a-z0-9+\-*/(),.\s_]/g, ' ');
+        s = s.replace(/≥/g, '>=').replace(/≤/g, '<=').replace(/≠/g, '!=');
+        // Rótulos do editor → nomes canônicos do motor.
+        s = s.replace(/\bnota\s+substituta\b/g, 'chamada');
+        s = s.replace(/\bmedia\s*c\s*\/\s*rec\b/g, 'composicao');
+        s = s.replace(/\bmedia\s+lancado\b/g, 'media_lancado');
+        s = s.replace(/\bmedia\s*\(/g, 'media_lancado(');
+        // Mantém | (grupos provas|substituta|opcional) e operadores de comparação.
+        s = s.replace(/[^a-z0-9+\-*/(),|.<>=!\s_]/g, ' ');
         return s.replace(/\s+/g, ' ').trim();
     }
 
@@ -3192,9 +3481,29 @@ $boletimWizardSteps = [
         while (i < t.length) {
             if (t.charAt(i) === ' ') { i++; continue; }
             var ch = t.charAt(i);
-            if ('+-*/(),'.indexOf(ch) >= 0) {
+            var restI = t.slice(i);
+            var opMulti = restI.match(/^(>=|<=|!=|<>|==)/);
+            if (opMulti) {
+                flat.push({ k: 'op', v: opMulti[1] === '<>' ? '!=' : opMulti[1] });
+                i += opMulti[1].length;
+                continue;
+            }
+            if (ch === '=' || ch === '>' || ch === '<') {
                 flat.push({ k: 'op', v: ch });
                 i++;
+                continue;
+            }
+            if ('+-*/(),|'.indexOf(ch) >= 0) {
+                flat.push({ k: 'op', v: ch });
+                i++;
+                continue;
+            }
+            var litM = restI.match(/^(verdadeiro|falso|true|false|sim|nao)(?![a-z0-9_])/);
+            if (litM) {
+                var pal = litM[1];
+                var canonLit = (pal === 'falso' || pal === 'false' || pal === 'nao') ? 'falso' : 'verdadeiro';
+                flat.push({ k: 'lit', v: canonLit, label: canonLit });
+                i += pal.length;
                 continue;
             }
             if (/[0-9]/.test(ch)) {
@@ -3207,7 +3516,7 @@ $boletimWizardSteps = [
                 continue;
             }
             var rest = t.slice(i);
-            var fn = rest.match(/^(menor|maior|min|max|chamada|substituta|composicao)(?![a-z0-9_])/);
+            var fn = rest.match(/^(menor|maior|min|max|chamada|substituta|composicao|media_lancado|se|if)(?![a-z0-9_])/);
             if (fn) {
                 var qual = fn[1];
                 var posFn = i + qual.length;
@@ -3219,6 +3528,8 @@ $boletimWizardSteps = [
                 if (qual === 'menor' || qual === 'min') fnVal = 'min';
                 else if (qual === 'chamada' || qual === 'substituta') fnVal = 'chamada';
                 else if (qual === 'composicao') fnVal = 'composicao';
+                else if (qual === 'media_lancado') fnVal = 'media_lancado';
+                else if (qual === 'se' || qual === 'if') fnVal = 'se';
                 flat.push({ k: 'fn', v: fnVal });
                 i = posFn + 1;
                 continue;
@@ -3263,13 +3574,23 @@ $boletimWizardSteps = [
                     ? 'menor ('
                     : (item.v === 'chamada' || item.v === 'substituta'
                         ? 'nota substituta ('
-                        : (item.v === 'composicao' ? 'média c/ rec (' : 'maior ('));
-                toks.push({ type: 'fn', value: item.v, label: labFn });
+                        : (item.v === 'composicao'
+                            ? 'média c/ rec ('
+                            : (item.v === 'media_lancado'
+                                ? 'média ('
+                                : (item.v === 'se' || item.v === 'if' ? 'se (' : 'maior ('))));
+                toks.push({ type: 'fn', value: item.v === 'if' ? 'se' : item.v, label: labFn });
             }
             else if (item.k === 'num') toks.push({ type: 'num', value: item.v, label: item.v });
+            else if (item.k === 'lit') toks.push({ type: 'lit', value: item.v, label: item.label || item.v });
             else if (item.k === 'peca') toks.push({ type: 'peca', value: item.v, label: item.label || nomeBlocoCalc(item.v) });
             else if (item.k === 'op') {
-                var lab = item.v === '/' ? '÷' : (item.v === '*' ? '×' : (item.v === '-' ? '−' : item.v));
+                var lab = item.v === '/' ? '÷'
+                    : (item.v === '*' ? '×'
+                        : (item.v === '-' ? '−'
+                            : (item.v === '>=' ? '≥'
+                                : (item.v === '<=' ? '≤'
+                                    : ((item.v === '!=' || item.v === '<>') ? '≠' : item.v)))));
                 toks.push({ type: 'op', value: item.v, label: lab });
             }
         });
@@ -3299,7 +3620,7 @@ $boletimWizardSteps = [
             } else if (ultimaColuna) {
                 destino = ultimaColuna;
             }
-            if (!/(?:menor|maior|min|max)\s*\(|[+\-*/÷×]|[()]/.test(expr)) return;
+            if (!/(?:menor|maior|min|max|se|if|chamada|substituta|composicao|media_lancado|media)\s*\(|[+\-*/÷×|]|[()]|[<>=!]|(?:verdadeiro|falso|true|false|sim|nao)/i.test(expr)) return;
             if (!/[a-zA-ZÀ-ÿ]/.test(expr)) return;
             lista.push({ destino: destino, expr: expr.replace(/[."']+$/g, '').trim() });
         });
@@ -3321,11 +3642,30 @@ $boletimWizardSteps = [
         });
         var comDestino = formulas.filter(function (f) { return !!f.destino; });
         if (comDestino.length) formulas = comDestino;
-        else if (formulas.length > 1) {
-            formulas.sort(function (a, b) { return b.tokens.length - a.tokens.length; });
+        // Várias linhas "Coluna =": fica a mais completa (ex.: se+média+PE vence média curta).
+        if (formulas.length > 1) {
+            formulas.sort(function (a, b) {
+                var sa = scoreFormulaTokens(a.tokens);
+                var sb = scoreFormulaTokens(b.tokens);
+                if (sb !== sa) return sb - sa;
+                return (b.tokens.length || 0) - (a.tokens.length || 0);
+            });
             formulas = [formulas[0]];
         }
         return { formulas: formulas, erro: formulas.length ? '' : (erro || 'Não achei uma fórmula para usar.') };
+    }
+
+    function scoreFormulaTokens(tokens) {
+        var n = 0;
+        (tokens || []).forEach(function (t) {
+            if (!t) return;
+            if (t.type === 'fn' && (t.value === 'se' || t.value === 'if')) n += 40;
+            if (t.type === 'fn' && t.value === 'media_lancado') n += 20;
+            if (t.type === 'op' && t.value === '|') n += 10;
+            if (t.type === 'op' && t.value === '+') n += 5;
+            n += 1;
+        });
+        return n;
     }
 
     function colunaAceitaFormula(codigo) {
@@ -3369,6 +3709,14 @@ $boletimWizardSteps = [
         return extrairFormulasDoTexto(texto);
     };
 
+    /** Cálculo amarelo aberto no canvas (pode montar a fórmula na hora). */
+    window.boletimWizardCalculoAberto = function () {
+        if (!estado || !estado.bloco_calc || ehDemonstrativoNotas()) return false;
+        var ed = document.getElementById('bw-formula-editor');
+        if (ed && ed.classList.contains('hidden')) return false;
+        return colunaAceitaFormula(estado.bloco_calc);
+    };
+
     window.boletimWizardAplicarFormulaTexto = function (texto) {
         if (!estado) return { ok: false, erro: 'Abra o evento de notas para usar a fórmula.', nomes: [] };
         var lido = extrairFormulasDoTexto(texto);
@@ -3379,22 +3727,31 @@ $boletimWizardSteps = [
         if (!estado.formulas_blocos || typeof estado.formulas_blocos !== 'object' || Array.isArray(estado.formulas_blocos)) {
             estado.formulas_blocos = {};
         }
-        lido.formulas.forEach(function (f) {
-            var codigo = f.destino || (estado.bloco_calc || '');
-            if (!colunaAceitaFormula(codigo) || !f.tokens || !f.tokens.length) return;
-            if ((estado.blocos_calc || []).indexOf(codigo) < 0 && codigo !== 'media_sem') {
-                if (!Array.isArray(estado.blocos_calc)) estado.blocos_calc = [];
-                estado.blocos_calc.push(codigo);
-            }
-            estado.formulas_blocos[codigo] = f.tokens.slice();
-            ultima = codigo;
-            tokensUltima = f.tokens;
-            nomes.push(nomeBlocoCalc(codigo));
-        });
-        if (!nomes.length || !aplicarFormulaNoBloco(ultima, tokensUltima)) {
-            return { ok: false, erro: 'Abra a coluna amarela (Resultado Final, Média Bim…) e use a fórmula de novo.', nomes: [] };
+        // Preferência: se o cálculo já está aberto, monta NELA a melhor fórmula (uma só).
+        var aberto = window.boletimWizardCalculoAberto() ? String(estado.bloco_calc || '') : '';
+        var escolhida = lido.formulas[0];
+        if (lido.formulas.length > 1) {
+            lido.formulas.sort(function (a, b) {
+                return scoreFormulaTokens(b.tokens) - scoreFormulaTokens(a.tokens);
+            });
+            escolhida = lido.formulas[0];
         }
-        return { ok: true, erro: '', nomes: nomes };
+        var codigo = aberto || (escolhida && escolhida.destino) || (estado.bloco_calc || '');
+        if (!colunaAceitaFormula(codigo) || !escolhida || !escolhida.tokens || !escolhida.tokens.length) {
+            return { ok: false, erro: 'Abra a coluna amarela (MU, Resultado Final…) e use a fórmula de novo.', nomes: [] };
+        }
+        if ((estado.blocos_calc || []).indexOf(codigo) < 0 && codigo !== 'media_sem') {
+            if (!Array.isArray(estado.blocos_calc)) estado.blocos_calc = [];
+            estado.blocos_calc.push(codigo);
+        }
+        estado.formulas_blocos[codigo] = escolhida.tokens.slice();
+        ultima = codigo;
+        tokensUltima = escolhida.tokens;
+        nomes.push(nomeBlocoCalc(codigo));
+        if (!aplicarFormulaNoBloco(ultima, tokensUltima)) {
+            return { ok: false, erro: 'Abra a coluna amarela (MU, Resultado Final…) e use a fórmula de novo.', nomes: [] };
+        }
+        return { ok: true, erro: '', nomes: nomes, montou_aberto: !!aberto };
     };
 
     function codigoBlocoReservado(cod) {
@@ -4598,6 +4955,16 @@ $boletimWizardSteps = [
             }
             if (e.target.closest('#bw-formula-substituta')) {
                 estado.formula_tokens = tokensMediaComSubstituta();
+                afterFormulaChange();
+                return;
+            }
+            if (e.target.closest('#bw-formula-media-lancado')) {
+                estado.formula_tokens = tokensMediaPreenchidas();
+                afterFormulaChange();
+                return;
+            }
+            if (e.target.closest('#bw-formula-se-lancou')) {
+                estado.formula_tokens = tokensSeLancou();
                 afterFormulaChange();
                 return;
             }
@@ -6201,6 +6568,64 @@ $boletimWizardSteps = [
         return null;
     }
 
+    /** Conteúdo bruto entre ( e ) — para media_lancado com grupos |. */
+    function extrairConteudoFuncaoJs(src, openIdx) {
+        var n = src.length;
+        var i = openIdx + 1;
+        var depth = 1;
+        for (; i < n; i++) {
+            var c = src.charAt(i);
+            if (c === '(') depth++;
+            else if (c === ')') {
+                depth--;
+                if (depth === 0) {
+                    return { conteudo: src.slice(openIdx + 1, i), close: i };
+                }
+            }
+        }
+        return null;
+    }
+
+    function gruposMediaLancadoJs(conteudo) {
+        var gruposBrutos = [];
+        var depth = 0;
+        var inicio = 0;
+        var i;
+        var raw = String(conteudo || '');
+        for (i = 0; i < raw.length; i++) {
+            var c = raw.charAt(i);
+            if (c === '(') depth++;
+            else if (c === ')') depth--;
+            else if (c === '|' && depth === 0) {
+                gruposBrutos.push(raw.slice(inicio, i));
+                inicio = i + 1;
+            }
+        }
+        gruposBrutos.push(raw.slice(inicio));
+
+        function codigosDoGrupo(grupo) {
+            return String(grupo || '').split(',').map(function (s) { return String(s || '').trim(); }).filter(function (arg) {
+                return arg !== '' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(arg);
+            });
+        }
+
+        var provas = codigosDoGrupo(gruposBrutos[0] || '');
+        var subst = null;
+        var extras = [];
+        if (gruposBrutos.length >= 2) {
+            var meio = codigosDoGrupo(gruposBrutos[1]);
+            if (meio.length > 1) return null;
+            subst = meio[0] || null;
+        }
+        if (gruposBrutos.length >= 3) {
+            var g;
+            for (g = 2; g < gruposBrutos.length; g++) {
+                extras = extras.concat(codigosDoGrupo(gruposBrutos[g]));
+            }
+        }
+        return { provas: provas, subst: subst, extras: extras };
+    }
+
     /** Expande chamada/substituta(bases…, subst) → média das bases (1ª ausente recebe a subst). */
     function expandirChamadaJs(src, notas) {
         var out = String(src || '');
@@ -6262,10 +6687,184 @@ $boletimWizardSteps = [
         return out;
     }
 
+    function folhaCodigoFormulaJs(cod) {
+        var raw = String(cod || '').toLowerCase().trim();
+        var m = raw.match(/^b[1-4]_(.+)$/);
+        if (m) raw = m[1];
+        m = raw.match(/^s[12]_(.+)$/);
+        if (m) raw = m[1];
+        return raw;
+    }
+
+    function folhaMediaLancadoJs(cod) {
+        var raw = String(cod || '').toLowerCase().trim();
+        var m = raw.match(/^b[1-4]_(.+)$/);
+        if (m) raw = m[1];
+        m = raw.match(/^s[12]_(.+)$/);
+        if (m) raw = m[1];
+        return raw;
+    }
+
+    function codigoMediaLancadoEhChamadaJs(cod) {
+        var leaf = folhaMediaLancadoJs(cod);
+        return leaf === 'ch' || leaf === 'segunda_chamada' || leaf === '2a_chamada'
+            || leaf.indexOf('segunda_chamada') >= 0 || /_ch$/.test(leaf);
+    }
+
+    function codigoMediaLancadoEhProjetoJs(cod) {
+        var leaf = folhaMediaLancadoJs(cod);
+        return leaf === 'pj' || leaf === 'projeto' || leaf === 'ph' || leaf.indexOf('projeto') >= 0;
+    }
+
+    function codigoMediaLancadoEhPontoOuFaltaJs(cod) {
+        var leaf = folhaMediaLancadoJs(cod);
+        return leaf === 'pe' || leaf === 'ponto' || leaf === 'ponto_extra' || leaf === 'pontos'
+            || leaf === 'fal' || leaf === 'falta' || leaf === 'faltas'
+            || leaf.indexOf('ponto') >= 0 || leaf.indexOf('falt') >= 0;
+    }
+
+    function temNotaFormulaJs(notas, codigo) {
+        var v = notaDaLinhaPreview(notas, codigo);
+        return v != null && String(v).trim() !== '';
+    }
+
+    function normalizarLiteralBooleanoSeJs(valor) {
+        var v = String(valor || '').toLowerCase().trim();
+        if (v === 'true' || v === 'verdadeiro' || v === 'sim' || v === '1') return true;
+        if (v === 'false' || v === 'falso' || v === 'nao' || v === 'não' || v === '0') return false;
+        return null;
+    }
+
+    function compararNumerosSeJs(esquerda, operador, direita) {
+        var eps = 0.000001;
+        if (operador === '=' || operador === '==') return Math.abs(esquerda - direita) <= eps;
+        if (operador === '!=' || operador === '<>') return Math.abs(esquerda - direita) > eps;
+        if (operador === '>') return esquerda > direita;
+        if (operador === '<') return esquerda < direita;
+        if (operador === '>=') return esquerda > direita || Math.abs(esquerda - direita) <= eps;
+        if (operador === '<=') return esquerda < direita || Math.abs(esquerda - direita) <= eps;
+        return null;
+    }
+
+    /** @return {{ok:boolean,valor?:boolean}|{ok:false}} */
+    function avaliarCondicaoSeJs(cond, notas) {
+        cond = String(cond || '').trim().replace(/\s+/g, ' ');
+        if (!cond) return { ok: false };
+        if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(cond)) {
+            return { ok: true, valor: temNotaFormulaJs(notas, cond) };
+        }
+        var m = cond.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*(>=|<=|!=|<>|==|=|>|<)\s*(.+)$/);
+        if (!m) return { ok: false };
+        var colEsq = m[1];
+        var op = m[2];
+        var rhs = String(m[3] || '').trim();
+        if (!rhs) return { ok: false };
+        var rhsBool = normalizarLiteralBooleanoSeJs(rhs);
+        if (rhsBool !== null) {
+            if (['=', '==', '!=', '<>'].indexOf(op) < 0) return { ok: false };
+            var tem = temNotaFormulaJs(notas, colEsq);
+            if (op === '=' || op === '==') return { ok: true, valor: tem === rhsBool };
+            return { ok: true, valor: tem !== rhsBool };
+        }
+        if (/^-?\d+(?:[.,]\d+)?$/.test(rhs)) {
+            var vEsq = notaFormulaGrupo(notas, colEsq);
+            if (vEsq == null) return { ok: true, valor: false };
+            var vDir = parseFloat(rhs.replace(',', '.'));
+            var cmp = compararNumerosSeJs(vEsq, op, vDir);
+            if (cmp === null) return { ok: false };
+            return { ok: true, valor: cmp };
+        }
+        if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(rhs)) {
+            var vEsq2 = notaFormulaGrupo(notas, colEsq);
+            var vDir2 = notaFormulaGrupo(notas, rhs);
+            if (vEsq2 == null || vDir2 == null) return { ok: true, valor: false };
+            var cmp2 = compararNumerosSeJs(vEsq2, op, vDir2);
+            if (cmp2 === null) return { ok: false };
+            return { ok: true, valor: cmp2 };
+        }
+        return { ok: false };
+    }
+
+    /** Expande se(condição, se_verdadeiro, se_falso) — mesma semântica do motor PHP (existência, booleanos, comparações). */
+    function expandirSeJs(src, notas) {
+        var out = String(src || '');
+        var guard = 0;
+        out = out.replace(/\bif\s*\(/ig, 'se(');
+        while (/\bse\s*\(/i.test(out) && guard++ < 40) {
+            var m = out.match(/\bse\s*\(/i);
+            if (!m) break;
+            var startFn = m.index;
+            var openParen = startFn + m[0].length - 1;
+            var parsed = extrairArgsFuncaoJs(out, openParen);
+            if (!parsed || parsed.args.length !== 3) return null;
+            var cond = String(parsed.args[0] || '').trim();
+            var aval = avaliarCondicaoSeJs(cond, notas);
+            if (!aval.ok) return null;
+            var escolhido = aval.valor
+                ? String(parsed.args[1] || '').trim()
+                : String(parsed.args[2] || '').trim();
+            if (!escolhido) return null;
+            out = out.slice(0, startFn) + '(' + escolhido + ')' + out.slice(parsed.close + 1);
+        }
+        return out;
+    }
+
+    /** Expande media_lancado(provas | subst | opcionais): papel pela posição do |, não pelo nome. */
+    function expandirMediaLancadoJs(src, notas) {
+        var out = String(src || '');
+        var guard = 0;
+        while (/\bmedia_lancado\s*\(/i.test(out) && guard++ < 40) {
+            var m = out.match(/\bmedia_lancado\s*\(/i);
+            if (!m) break;
+            var startFn = m.index;
+            var openParen = startFn + m[0].length - 1;
+            var parsed = extrairConteudoFuncaoJs(out, openParen);
+            if (!parsed) return null;
+            var grupos = gruposMediaLancadoJs(parsed.conteudo);
+            if (!grupos) return null;
+            var provas = grupos.provas || [];
+            var subst = grupos.subst;
+            var extras = grupos.extras || [];
+            if (!provas.length && !extras.length) return null;
+            // Se algum token inválido apareceu no conteúdo (não só códigos/|/,:), falha.
+            var limpo = String(parsed.conteudo || '').replace(/[A-Za-z_][A-Za-z0-9_]*|[|,()\s]/g, '');
+            if (limpo !== '') return null;
+            var termos = [];
+            var usouSubst = false;
+            provas.forEach(function (prova) {
+                if (notaFormulaGrupo(notas, prova) != null) {
+                    termos.push('(' + prova + ')');
+                } else if (subst && !usouSubst && notaFormulaGrupo(notas, subst) != null) {
+                    termos.push('(' + subst + ')');
+                    usouSubst = true;
+                }
+            });
+            extras.forEach(function (extra) {
+                if (notaFormulaGrupo(notas, extra) != null) termos.push('(' + extra + ')');
+            });
+            if (!termos.length) return null;
+            var media = termos.length === 1
+                ? termos[0]
+                : '((' + termos.join('+') + ')/' + termos.length + ')';
+            out = out.slice(0, startFn) + media + out.slice(parsed.close + 1);
+        }
+        return out;
+    }
+
     function avaliarExpressaoGrupo(exp, notas) {
         var src = String(exp || '').trim();
         if (!src) return null;
         src = src.replace(/\bsubstituta\s*\(/ig, 'chamada(');
+        src = src.replace(/\bmedia_presentes\s*\(/ig, 'media_lancado(');
+        src = src.replace(/\bif\s*\(/ig, 'se(');
+        if (/\bse\s*\(/i.test(src)) {
+            src = expandirSeJs(src, notas);
+            if (src == null) return null;
+        }
+        if (/\bmedia_lancado\s*\(/i.test(src)) {
+            src = expandirMediaLancadoJs(src, notas);
+            if (src == null) return null;
+        }
         if (/\bchamada\s*\(/i.test(src)) {
             src = expandirChamadaJs(src, notas);
             if (src == null) return null;
@@ -6276,12 +6875,12 @@ $boletimWizardSteps = [
         }
         src = src.replace(/[A-Za-z_][A-Za-z0-9_]*/g, function (nome) {
             var baixo = nome.toLowerCase();
-            if (baixo === 'max' || baixo === 'min' || baixo === 'chamada' || baixo === 'substituta' || baixo === 'composicao') return baixo;
+            if (baixo === 'max' || baixo === 'min' || baixo === 'chamada' || baixo === 'substituta' || baixo === 'composicao' || baixo === 'media_lancado' || baixo === 'se' || baixo === 'if') return baixo;
             var v = notaFormulaGrupo(notas, nome);
             if (v == null || !isFinite(v)) return '0';
             return String(v);
         });
-        if (!/^[\d\s+\-*/().,]+$/.test(src.replace(/\b(?:max|min|chamada|substituta|composicao)\b/g, ''))) return null;
+        if (!/^[\d\s+\-*/().,]+$/.test(src.replace(/\b(?:max|min|chamada|substituta|composicao|media_lancado|se|if)\b/g, ''))) return null;
         src = src.replace(/\bmax\b/g, 'Math.max').replace(/\bmin\b/g, 'Math.min');
         try {
             var n = Function('"use strict"; return (' + src + ');')();
@@ -6295,14 +6894,14 @@ $boletimWizardSteps = [
     function formulaGrupoFaltouPecaObrigatoria(codigo, exp, notas) {
         var cod = String(codigo || '').toLowerCase();
         var src = String(exp || '');
-        var temChamada = /\b(?:chamada|substituta)\s*\(/i.test(src);
+        var temChamada = /\b(?:chamada|substituta|media_lancado)\s*\(/i.test(src);
         var refs = src.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || [];
         var i;
         var algumaPeca = false;
         for (i = 0; i < refs.length; i++) {
             var ref = String(refs[i] || '');
             var baixo = ref.toLowerCase();
-            if (baixo === 'max' || baixo === 'min' || baixo === 'chamada' || baixo === 'substituta' || baixo === 'composicao') {
+            if (baixo === 'max' || baixo === 'min' || baixo === 'chamada' || baixo === 'substituta' || baixo === 'composicao' || baixo === 'media_lancado' || baixo === 'se' || baixo === 'if') {
                 continue;
             }
             var tem = notaFormulaGrupo(notas, ref) != null;
@@ -10608,18 +11207,21 @@ $boletimWizardSteps = [
                 html += '<p id="bw-formula-canvas-label" class="text-[11px] font-semibold text-amber-950 uppercase tracking-wide mb-1.5">Fórmula desta coluna</p>';
                 html += '<div id="bw-formula-canvas" class="bw-canvas">' + htmlCanvasTokens() + '</div>';
                 html += '<p id="bw-formula-preview" class="mt-2 text-sm font-mono text-slate-800 break-all">' + esc(compilarTokensPreview(estado.formula_tokens || []) || 'Clique nas siglas à esquerda.') + '</p>';
+                html += '<p id="bw-formula-leitura" class="mt-1 text-xs text-sky-900">' + esc(leituraMediaLancado(estado.formula_tokens || []) || '') + '</p>';
                 html += '<p class="text-[11px] font-semibold text-amber-950 uppercase tracking-wide mt-3 mb-1.5">Sinais</p>';
                 html += '<div class="bw-palette flex flex-wrap gap-2 items-center">';
                 operadoresFormula().forEach(function (op) { html += chipHtml(op, -1, true); });
-                html += '<label class="inline-flex items-center gap-1.5 text-xs text-amber-950/80 ml-1">Número';
-                html += '<input id="bw-formula-num" type="text" inputmode="decimal" class="h-8 w-16 border border-amber-200 rounded-md px-2 text-sm bg-white" placeholder="2">';
-                html += '<button type="button" id="bw-formula-num-add" class="h-8 px-2 text-xs rounded-md border border-amber-300 text-amber-950 bg-white hover:bg-amber-50">Inserir</button></label></div>';
+                html += '<label class="inline-flex items-center gap-1.5 text-xs text-amber-950/80 ml-1" title="Insere um número na fórmula (peso, divisor, teto…).">Número';
+                html += '<input id="bw-formula-num" type="text" inputmode="decimal" class="h-8 w-16 border border-amber-200 rounded-md px-2 text-sm bg-white" placeholder="2" title="Digite o número e clique em Inserir (ex.: 2 ou 3).">';
+                html += '<button type="button" id="bw-formula-num-add" class="h-8 px-2 text-xs rounded-md border border-amber-300 text-amber-950 bg-white hover:bg-amber-50" title="Coloca o número na fórmula.">Inserir</button></label></div>';
                 html += '<div class="mt-2 flex flex-wrap gap-2">';
-                html += '<button type="button" id="bw-formula-media" class="px-2.5 py-1.5 text-xs rounded-lg border border-indigo-200 text-indigo-700 bg-white hover:bg-indigo-50">Média das peças</button>';
-                html += '<button type="button" id="bw-formula-max" class="px-2.5 py-1.5 text-xs rounded-lg border border-amber-300 text-amber-900 bg-white hover:bg-amber-100">Maior entre as duas primeiras</button>';
+                html += '<button type="button" id="bw-formula-media" class="px-2.5 py-1.5 text-xs rounded-lg border border-indigo-200 text-indigo-700 bg-white hover:bg-indigo-50" title="Monta (peça1 + peça2 + …) ÷ quantidade. Todas com o mesmo peso.">Média das peças</button>';
+                html += '<button type="button" id="bw-formula-max" class="px-2.5 py-1.5 text-xs rounded-lg border border-amber-300 text-amber-900 bg-white hover:bg-amber-100" title="Fica a maior nota entre as duas primeiras peças da lista. Para Média Bim × ENAC, monte maior ( à mão.">Maior entre as duas primeiras</button>';
                 html += '<button type="button" id="bw-formula-substituta" class="px-2.5 py-1.5 text-xs rounded-lg border border-emerald-200 text-emerald-800 bg-white hover:bg-emerald-50" title="Média das notas principais; a substituta entra no lugar da primeira nota ausente">Média com nota substituta</button>';
                 html += '<button type="button" id="bw-formula-composicao" class="px-2.5 py-1.5 text-xs rounded-lg border border-violet-200 text-violet-800 bg-white hover:bg-violet-50" title="Sem recuperação: fica a média. Com recuperação: (média + recuperação) ÷ 2">Média com recuperação</button>';
-                html += '<button type="button" id="bw-formula-limpar" class="px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 text-gray-600 bg-white hover:bg-gray-50">Limpar</button></div>';
+                html += '<button type="button" id="bw-formula-media-lancado" class="px-2.5 py-1.5 text-xs rounded-lg border border-sky-200 text-sky-900 bg-white hover:bg-sky-50" title="média ( provas | substituta | opcionais ) + PE — o | define o papel; o nome do evento pode ser qualquer um">Provas | substituta | opcional  + PE</button>';
+                html += '<button type="button" id="bw-formula-se-lancou" class="px-2.5 py-1.5 text-xs rounded-lg border border-rose-200 text-rose-900 bg-white hover:bg-rose-50" title="Como no Excel: SE(lançou opcional; conta A; conta B)">Se lançou (condição A / B)</button>';
+                html += '<button type="button" id="bw-formula-limpar" class="px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 text-gray-600 bg-white hover:bg-gray-50" title="Apaga todos os blocos da fórmula desta coluna.">Limpar</button></div>';
                 html += '<details class="mt-2 rounded-lg border border-amber-200/80 bg-white/70 px-2.5 py-2">';
                 html += '<summary class="text-[11px] font-semibold text-amber-950 cursor-pointer select-none">Manual rápido das fórmulas</summary>';
                 html += '<div class="mt-2 space-y-1.5 text-[11px] text-amber-950/80 leading-snug">';
@@ -10627,6 +11229,17 @@ $boletimWizardSteps = [
                 html += '<p><strong>Maior entre as duas primeiras</strong> — fica a maior nota entre as duas primeiras peças.</p>';
                 html += '<p><strong>Média com nota substituta</strong> — média das bases; a substituta (ex.: CH) entra só no lugar da 1ª ausente. Já divide sozinha: não coloque <code class="bg-amber-50 px-1 rounded">÷ 2</code> de novo. Na MU do Santa Maria, some o PE depois: <code class="bg-amber-50 px-1 rounded">nota substituta (PP, PU, CH) + PE</code>.</p>';
                 html += '<p><strong>Média com recuperação</strong> — sem REC fica a média; com REC vira (média + REC) ÷ 2.</p>';
+                html += '<p><strong>Provas | substituta | opcional + PE</strong> — o <code class="bg-amber-50 px-1 rounded">|</code> separa os papéis (o <em>nome</em> do evento pode ser qualquer um):<br>';
+                html += '• <strong>1º grupo (provas):</strong> o que a substituta pode cobrir<br>';
+                html += '• <strong>2º grupo (substituta):</strong> CH, 2ª chamada, etc. — cobre a 1ª prova que faltar<br>';
+                html += '• <strong>3º grupo (opcional):</strong> Projeto etc. — só se houver lançamento; a substituta <strong>nunca</strong> cobre este grupo<br>';
+                html += '• Ex.: <code class="bg-amber-50 px-1 rounded">média ( PP , PU | 2a_chamada | Projeto ) + PE</code> · ÷ automático</p>';
+                html += '<p><strong>Se (condição A / B)</strong> — igual ao <em>SE</em> do Excel:<br>';
+                html += '<code class="bg-amber-50 px-1 rounded">se ( condição , conta_se_verdadeiro , conta_se_falso )</code><br>';
+                html += '• <strong>1º — condição:</strong> só a sigla (lançou?), <code class="bg-amber-50 px-1 rounded">PJ = verdadeiro</code> / <code class="bg-amber-50 px-1 rounded">falso</code>, <code class="bg-amber-50 px-1 rounded">PP &gt; 7</code> ou <code class="bg-amber-50 px-1 rounded">PP &gt; PU</code> (use os chips de comparação)<br>';
+                html += '• 2º = fórmula se a condição for <strong>verdadeira</strong><br>';
+                html += '• 3º = fórmula se for <strong>falsa</strong><br>';
+                html += '• Ex.: <code class="bg-amber-50 px-1 rounded">se ( PJ = verdadeiro , média ( PP , PU | CH | PJ ) , média ( PP , PU | CH ) ) + PE</code> · <code class="bg-amber-50 px-1 rounded">se ( PP &gt; 7 , PP , PU )</code></p>';
                 html += '<p><strong>Média com peso</strong> — use × e ÷: <code class="bg-amber-50 px-1 rounded">((PP × 2) + PU) ÷ 3</code> (PP vale o dobro). Sempre divida pela soma dos pesos.</p>';
                 html += '<p><strong>maior (</strong> / <strong>menor (</strong> — maior ou menor valor entre as colunas listadas.</p>';
                 html += '<p class="text-amber-900/70">Manual completo: <code class="bg-amber-50 px-1 rounded">especificacoes/manual-formulas-boletim.md</code></p>';

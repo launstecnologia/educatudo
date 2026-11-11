@@ -9368,11 +9368,11 @@ class BoletimConfigController extends BaseController
                 $ehMuBimestre = (bool) preg_match('/^b[1-4]_mu$/i', (string) $item['codigo']);
                 $ehMsSemestre = (bool) preg_match('/^s[12]_ms$/i', (string) $item['codigo']);
                 $ehMaAnual = strtolower(trim((string) $item['codigo'])) === 'ma';
-                $exprTemChamada = (bool) preg_match('/\b(chamada|substituta)\s*\(/i', (string) $item['expr']);
+                $exprTemChamada = (bool) preg_match('/\b(chamada|substituta|media_lancado)\s*\(/i', (string) $item['expr']);
                 foreach ($refs as $ref) {
                     $notaRef = $this->notaOpcionalGrupoPorCodigo($notas, (string) $ref);
                     $codRef = strtolower(trim((string) $ref));
-                    // MU sem PP/PU = traço (exceto nota substituta, que cobre a 1ª ausente).
+                    // MU sem PP/PU = traço (exceto nota substituta / média só do lançado, que cobrem ausência).
                     if ($ehMuBimestre && !$exprTemChamada && $notaRef === null && preg_match('/_(pp|pu)$/', $codRef)) {
                         $faltouMu = true;
                         break;
@@ -11426,7 +11426,7 @@ class BoletimConfigController extends BaseController
         if (preg_match_all('/\b[a-zA-Z_][a-zA-Z0-9_]*\b/', $expr, $m)) {
             foreach ($m[0] as $token) {
                 $tl = strtolower((string) $token);
-                if (in_array($tl, ['max', 'min', 'chamada', 'substituta', 'composicao'], true)) {
+                if (in_array($tl, ['max', 'min', 'chamada', 'substituta', 'composicao', 'media_lancado', 'se', 'if'], true)) {
                     continue;
                 }
                 $out[(string) $token] = true;
@@ -11801,7 +11801,7 @@ class BoletimConfigController extends BaseController
         $ehMsSemestre = (bool) preg_match('/^s[12]_ms$/i', (string) $codigoProprio);
         $ehMaAnual = strtolower(trim((string) $codigoProprio)) === 'ma';
         $exprTemChamada = (bool) preg_match(
-            '/\b(chamada|substituta)\s*\(/i',
+            '/\b(chamada|substituta|media_lancado)\s*\(/i',
             implode(' ', array_map('strval', $exprs))
         );
         foreach (array_keys($unionMids) as $mid) {
@@ -11811,7 +11811,7 @@ class BoletimConfigController extends BaseController
                 $notaRef = $this->notaNaMatrizPorApelido($matrizPorCodigo, (string) $rc, (int) $mid);
                 $codRef = strtolower(trim((string) $rc));
                 // Manual SM: MU = ((PP+PU)/2)+PE — PE/CH ausente = 0; sem PP ou PU = traço.
-                // Com nota substituta(…), CH pode cobrir a 1ª base ausente — não corta o mid.
+                // Com nota substituta / média só do lançado, ausência de PP/PU não corta o mid.
                 if ($ehMuBimestre && !$exprTemChamada && $notaRef === null && preg_match('/_(pp|pu)$/', $codRef)) {
                     $faltouMu = true;
                     break;

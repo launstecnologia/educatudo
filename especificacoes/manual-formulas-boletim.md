@@ -22,13 +22,15 @@ A fórmula define **como a coluna é calculada**. As colunas usadas na conta (PP
 | Menor valor | `menor (` | `menor (PP, PU)` |
 | Nota substituta | `nota substituta (` | `nota substituta (PP, PU, CH)` |
 | Média com recuperação | `média c/ rec (` | `média c/ rec ((MS1 + MS2) ÷ 2, REC)` |
+| Média só do lançado | `média (` + grupos `\|` | `média ( PP , PU \| CH \| PJ ) + PE` |
+| Condição (Excel SE) | `se (` | `se ( PJ , A , B )` · `se ( PJ = verdadeiro , A , B )` · `se ( PP > 7 , A , B )` |
 
 Regras gerais:
 
 1. **Média simples** = soma das notas **entre parênteses**, depois **÷ quantidade**.  
    Ex.: `(Prova + Trabalho + Participação) ÷ 3`
 2. A plataforma **corrige sozinha** o caso `a + b + c ÷ 3` (vira `(a + b + c) ÷ 3`). Mesmo assim, prefira escrever com parênteses.
-3. Nota **ausente** (traço) **não vira 0** nas funções `nota substituta` e `média c/ rec`. Na conta aritmética pura (`+ − × ÷`), ausente entra como 0.
+3. Nota **ausente** (traço) **não vira 0** nas funções `nota substituta`, `média c/ rec`, `média (` com grupos e `se (`. Na conta aritmética pura (`+ − × ÷`), ausente entra como 0.
 4. **Valor máximo** da coluna corta o resultado (ex.: escala 10). Em “Resultado Final × 2”, coloque valor máximo **20**.
 5. Siglas na tela (PP, PU…) são rótulos; no cálculo usam o código do período (`b1_pp`, `b1_pu`…).
 
@@ -118,7 +120,50 @@ Monte a pronta “Média com nota substituta” e **acrescente** `+` e **PE**.
 
 ---
 
-### 2.5 Limpar
+### 2.5 Provas | substituta | opcional + PE
+
+**O que faz:** média estilo Excel `MÉDIA` (só entra o que foi lançado). O `|` separa **papéis** — o nome do evento pode ser qualquer um.
+
+**Formato:** `média ( provas | substituta | opcionais ) + PE`
+
+| Grupo | Papel |
+|---|---|
+| 1º | Provas — a substituta cobre a **1ª** que faltar |
+| 2º | Substituta (CH, 2ª chamada…) — **1 coluna** |
+| 3º | Opcional (Projeto…) — só se houver lançamento; substituta **não** cobre |
+
+---
+
+### 2.6 Se lançou (condição A / B)
+
+**O que faz:** igual ao `SE` do Excel: escolhe **uma** das duas contas conforme a condição.
+
+**Formatos da condição:**
+
+| Condição | Significado |
+|---|---|
+| `PJ` ou `PJ = verdadeiro` | Tem nota em PJ |
+| `PJ = falso` | Não tem nota em PJ |
+| `PP > 7` / `>=` / `<` / `<=` / `=` / `!=` | Compara a nota com um número |
+| `PP > PU` | Compara duas colunas (se faltar nota em alguma, a condição é falsa) |
+
+**Formato:** `se ( condição , conta_se_sim , conta_se_não )`
+
+Dá para montar pelos **chips**, pelo **assistente** ou digitando a condição — a nota final é a mesma.
+
+**Exemplo (Projeto opcional):**
+
+`se ( PJ , média ( PP , PU | CH | PJ ) , média ( PP , PU | CH ) ) + PE`
+
+(igual a `se ( PJ = verdadeiro , … )`)
+
+- Com PJ lançado → média ÷ 3 (com PJ)
+- Sem PJ → média ÷ 2
+- O nome da coluna de decisão pode ser qualquer um (`PJ`, `Projeto_X`, …)
+
+---
+
+### 2.7 Limpar
 
 Apaga todos os chips da fórmula desta coluna (não apaga o título nem o valor máximo).
 

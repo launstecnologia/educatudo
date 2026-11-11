@@ -10,6 +10,8 @@ namespace App\Modulos\Boletins\Services;
 
 use App\Controllers\Admin\BoletimConfigController;
 use App\Core\CreditosModuleRegistry;
+use App\Modulos\Jornadas\Services\JornadasAlunoConsultaService;
+use App\Modulos\Provas\Services\ProvasAlunoConsultaService;
 
 class BoletimConsultaAssistenteService
 {
@@ -58,6 +60,9 @@ class BoletimConsultaAssistenteService
         if ($this->pedidoEhMediaComEnac($mensagem)) {
             return ['success' => true, 'mensagem' => $this->textoMediaComEnac()];
         }
+        if ($this->pedidoEhMediaComChEPj($mensagem)) {
+            return ['success' => true, 'mensagem' => $this->textoMediaComChEPj($mensagem, $wizardEstado)];
+        }
         if ($this->parecePerguntaJornadaDeMateria($mensagem)) {
             $textoJornada = $this->textoJornadaNasMaterias($mensagem, $wizardEstado);
             if ($textoJornada !== null) {
@@ -75,8 +80,9 @@ class BoletimConsultaAssistenteService
             return ['success' => true, 'mensagem' => $this->textoDiagnostico($mensagem, $wizardEstado)];
         }
 
-        if (!$this->parecePerguntaDeDado($mensagem)) {
-            $guia = $this->responderGuia($mensagem);
+        // Pedido de fórmula/conversa de montagem vai para a IA (entende e pergunta se faltar algo).
+        if (!$this->parecePerguntaDeDado($mensagem) && !$this->parecePedidoDeFormula($mensagem)) {
+            $guia = $this->responderGuia($mensagem, $wizardEstado);
             if ($guia !== null) {
                 return ['success' => true, 'mensagem' => $guia];
             }
@@ -145,16 +151,31 @@ class BoletimConsultaAssistenteService
         }
 
         if ($textoFinal === null || $textoFinal === '') {
-            $textoFinal = 'Consultei o sistema, mas não fechou uma resposta. Diga o nome do aluno e a matéria.';
+            if ($this->parecePerguntaDeDado($mensagem) && !$this->parecePedidoDeFormula($mensagem)) {
+                $textoFinal = 'Consultei o sistema, mas não fechou uma resposta. Diga o nome do aluno e a matéria.';
+            } elseif ($this->parecePedidoDeFormula($mensagem)) {
+                $textoFinal = 'Não fechei a fórmula. Me diga quais colunas entram, se tem substituta (CH), se tem Projeto/opcional e se PE soma fora.';
+            } else {
+                $textoFinal = 'Não entendi bem. Pode repetir com mais detalhe?';
+            }
         }
 
-        return ['success' => true, 'mensagem' => $textoFinal];
+        return ['success' => true, 'mensagem' => $this->corrigirFormulaPipeErrada($textoFinal)];
     }
 
     private function parecePerguntaDeDado(string $mensagem): bool
     {
         return (bool) preg_match(
             '/\b(nota|notas|jornada|jornadas|quantas|quanto|quais|lançamento|lancamento|aluno|aluna|fez|tirou|acertou|bimestral|semanal|enac|avalia[cç][aã]o|mat[eé]ria|professor|no caso|na verdade|quero saber)\b/ui',
+            $mensagem
+        );
+    }
+
+    /** Conversa livre para montar/entender fórmula — não usar texto fixo do guia. */
+    private function parecePedidoDeFormula(string $mensagem): bool
+    {
+        return (bool) preg_match(
+            '/\b(f[oó]rmula|formula|m[eé]dia|calcular|calcula|monta|montar|monte|divid|substitut|opcional|projeto|\bpp\b|\bpu\b|\bch\b|\bpj\b|\bpe\b|se\s+lan[cç]|se\s*\(|media_lancado|conta|express[aã]o|resultado final|m[eé]dia bim)\b/ui',
             $mensagem
         );
     }
@@ -365,31 +386,24 @@ class BoletimConsultaAssistenteService
         return ['ok' => true, 'texto' => $texto, 'vazias' => $vazias, 'preenchidas' => $preenchidas];
     }
 
-    private function responderGuia(string $mensagem): ?string
+    /**
+     * @param array<string,mixed>|null $wizardEstado
+     */
+    private function responderGuia(string $mensagem, ?array $wizardEstado = null): ?string
     {
         if ($this->pedidoEhMediaComEnac($mensagem)) {
             return $this->textoMediaComEnac();
         }
         $t = mb_strtolower($mensagem);
-        if (preg_match('/enac|substitu|maior\s*\(/u', $t)) {
-            return "Para o Resultado Final ficar com a média e só trocar quando o ENAC for maior:\n\n"
-                . "1. Abra a coluna Resultado Final.\n"
-                . "2. Limpe a fórmula.\n"
-                . "3. Monte: maior (  Média Bim  ,  ENAC  )\n"
-                . "4. Salvar bloco.\n\n"
-                . "Exemplo: média 7 e ENAC 9 vira 9. Média 8 e ENAC 6 continua 8. Não use o botão Maior entre as duas primeiras — ele pega os dois primeiros tipos da lista, não a Média Bim com o ENAC.";
+        if ($this->pedidoEhMediaComChEPj($mensagem)) {
+            return $this->textoMediaComChEPj($mensagem, $wizardEstado);
         }
-        if (preg_match('/semanal|s1|semana/u', $t) && !preg_match('/\b(aluno|aluna|nota|tirou|fez|lançamento|lancamento)\b/u', $t)) {
+        if (preg_match('/semanal|s1|semana/u', $t) && !preg_match('/\b(aluno|aluna|nota|tirou|fez|lançamento|lancamento|f[oó]rmula|formula|m[eé]dia)\b/u', $t)) {
             return "A Prova Semanal lista os eventos do tipo de nota Prova Semanal no bimestre marcado na peça. O título do evento (Avaliação Semanal) não define o tipo.\n\n"
                 . "No passo das peças, marque Prova Semanal e o bimestre. Cada evento entra com a data, o bloco e a semana (S1, S2…). Bloco A fica nas semanas ímpares e Bloco B nas pares.\n\n"
                 . "Se faltar evento, confira em Lançamento de Notas se o tipo é Prova Semanal e se o bimestre é o mesmo da peça.";
         }
-        if (preg_match('/m[eé]dia|calcular|f[oó]rmula|formula|dividir/u', $t)) {
-            return "A média desta tela é a soma das peças entre parênteses, dividida pela quantidade.\n\n"
-                . "Exemplo: ( Prova Semanal + Avaliação Bimestral + Jornada do aluno ) ÷ 3\n\n"
-                . "Monte na coluna amarela (Média Bim): clique nas peças, no +, nos parênteses e no ÷. Depois Salvar bloco. A ordem das colunas se arrasta pelo ⋮⋮. A coluna calculada precisa estar depois das peças que ela usa.";
-        }
-        if (preg_match('/jornada/u', $t)) {
+        if (preg_match('/\bjornada\b/u', $t) && !preg_match('/f[oó]rmula|formula|m[eé]dia|monta/u', $t)) {
             return "A Jornada do aluno entra como peça. Marque o bimestre dela. O sistema usa as jornadas ativas daquele bimestre, não só as mais novas.\n\n"
                 . "Se a peça mostrar zero, a jornada está sem o campo Bimestre preenchido no cadastro.";
         }
@@ -401,12 +415,12 @@ class BoletimConsultaAssistenteService
             return "Sem aluno, a tabela de baixo é um exemplo. Com um aluno escolhido, a tabela passa a usar as notas lançadas dele neste evento.\n\n"
                 . "A faixa verde confirma que são notas reais. Se não houver lançamento no período, a tela avisa em vez de inventar número.";
         }
-        if (preg_match('/como|criar|montar|boletim|evento de nota/u', $t)) {
+        if (preg_match('/\b(como criar|como funciona|o que (e|é) (este|esse) evento|passos do boletim)\b/u', $t)) {
             return "Nesta tela o evento de notas se monta em etapas:\n\n"
                 . "1. Identidade: nome, ano e para quem vale.\n"
                 . "2. Peças: marque os tipos de nota e o bimestre de cada uma.\n"
                 . "3. Exibir: arraste a ordem das colunas e monte a fórmula de cada bloco amarelo. Salvar bloco, depois Salvar e continuar.\n\n"
-                . "A média é (peças) ÷ quantidade. Para o ENAC só substituir quando for maior, use maior ( Média Bim , ENAC ).";
+                . "Para montar uma fórmula, descreva a regra em português aqui no assistente.";
         }
 
         return null;
@@ -441,6 +455,152 @@ class BoletimConsultaAssistenteService
             . "2. Monte: maior ( ( Média Bim + ENAC ) ÷ 2 , Média Bim )\n"
             . "3. Salvar bloco.\n\n"
             . "Não use o botão Maior entre as duas primeiras.";
+    }
+
+    /**
+     * PP/PU com CH substituta, Projeto opcional e PE fora — linguagem natural da coordenação.
+     */
+    private function pedidoEhMediaComChEPj(string $mensagem): bool
+    {
+        $t = $this->normalizarTexto($mensagem);
+        if (str_contains($t, 'enac')) {
+            return false;
+        }
+        $temPpPu = preg_match('/\bpp\b|\bpu\b/u', $t) === 1;
+        $temSubst = preg_match('/\bch\b|2a.?chamada|2ª.?chamada|segunda.?chamada|substitut/u', $t) === 1;
+        $pedeMontar = preg_match('/m[eé]dia|divid|\/\s*2|\/\s*3|por 2|por 3|÷|monta|formula|f[oó]rmula|calcular|se tiver|se lan[cç]/u', $t) === 1;
+        // PP/PU + CH (mínimo). PJ/PE podem vir na mesma frase; a resposta cobre os dois casos.
+        return $pedeMontar && $temPpPu && $temSubst;
+    }
+
+    /**
+     * Título da coluna amarela aberta (ex.: MU). Não confunde com peças (PP/PU/PJ/CH/PE).
+     *
+     * @param array<string,mixed>|null $estado
+     */
+    private function nomeColunaAlvoFormula(string $mensagem = '', ?array $estado = null): string
+    {
+        $nomes = is_array($estado['nomes_blocos'] ?? null) ? $estado['nomes_blocos'] : [];
+        $pecasCurta = ['pp', 'pu', 'pj', 'ch', 'pe', 'fal', 'mu', 'ms', 'enac', 'rec'];
+
+        // 1) Prioridade: cálculo amarelo aberto (é nele que a fórmula sobe).
+        $cod = strtolower(trim((string) ($estado['bloco_calc'] ?? '')));
+        if ($cod !== '') {
+            $rotuloAberto = trim((string) ($nomes[$cod] ?? ''));
+            if ($rotuloAberto !== '') {
+                return $rotuloAberto;
+            }
+            $padrao = [
+                'media_bim' => 'Média Bim',
+                'media_final' => 'Resultado Final',
+                's1_mu' => 'MU',
+                's2_ms' => 'MS 2º',
+                's1_ms' => 'MS 1º',
+            ];
+            if (isset($padrao[$cod])) {
+                return $padrao[$cod];
+            }
+            if (preg_match('/_mu$/', $cod) === 1) {
+                return 'MU';
+            }
+            if (preg_match('/_ms$/', $cod) === 1) {
+                return 'MS';
+            }
+        }
+
+        // 2) Só se a mensagem citar um título de BLOCO (não peça PP/PJ…).
+        $msg = trim($mensagem);
+        if ($msg !== '' && $nomes !== []) {
+            foreach ($nomes as $rotulo) {
+                $rotulo = trim((string) $rotulo);
+                if ($rotulo === '') {
+                    continue;
+                }
+                $baixo = mb_strtolower($rotulo);
+                if (in_array($baixo, $pecasCurta, true)) {
+                    continue;
+                }
+                if (preg_match('/\b' . preg_quote($rotulo, '/') . '\b/ui', $msg) === 1) {
+                    return $rotulo;
+                }
+            }
+        }
+
+        return 'esta coluna';
+    }
+
+    /**
+     * @param array<string,mixed>|null $estado
+     */
+    private function textoMediaComChEPj(string $mensagem = '', ?array $estado = null): string
+    {
+        $col = $this->nomeColunaAlvoFormula($mensagem, $estado);
+        $t = $this->normalizarTexto($mensagem);
+        $querPj = preg_match('/\bpj\b|projeto|opcional|se tiver|se lan[cç]/u', $t) === 1;
+        $querPe = preg_match('/\bpe\b|soma fora|\+\s*pe/u', $t) === 1;
+
+        // Uma única linha "Coluna =" para o auto-montar não sobrescrever com a variante curta.
+        if ($querPj || $querPe) {
+            $formula = "{$col} = se ( PJ , média ( PP , PU | CH | PJ ) , média ( PP , PU | CH ) )";
+            if ($querPe || !$querPj) {
+                // Pedido com PE, ou PJ sem PE explícito mas padrão SM: PE fora.
+                $formula .= ' + PE';
+            }
+            if ($querPe && !$querPj) {
+                $formula = "{$col} = média ( PP , PU | CH ) + PE";
+            }
+
+            return "Entendi: PP e PU na média; CH cobre a prova que faltar"
+                . ($querPj ? '; se tiver PJ, entra na média (÷3)' : '')
+                . ($querPe || str_contains($formula, '+ PE') ? '; PE soma fora' : '')
+                . ".\n\n"
+                . $formula . "\n\n"
+                . "Montei para a coluna {$col} (cálculo aberto). O | só vale dentro de média ( … ).";
+        }
+
+        return "Entendi: PP e PU na média; CH cobre a prova que faltar.\n\n"
+            . "{$col} = média ( PP , PU | CH )\n\n"
+            . "Montei para a coluna {$col}. Se quiser Projeto e PE, diga que tem PJ e + PE.";
+    }
+
+    /**
+     * Se a IA misturou | com +÷ fora de média(), remove a linha inválida e pede esclarecimento
+     * (não inventa template PP/PU/CH).
+     */
+    private function corrigirFormulaPipeErrada(string $texto): string
+    {
+        if (!str_contains($texto, '|')) {
+            return $texto;
+        }
+        $linhas = preg_split("/\r\n|\n|\r/", $texto) ?: [$texto];
+        $mudou = false;
+        $restantes = [];
+        foreach ($linhas as $linha) {
+            if (!preg_match('/=\s*.*\|/u', $linha)) {
+                $restantes[] = $linha;
+                continue;
+            }
+            if (preg_match('/m[eé]dia\s*\(/ui', $linha) && !preg_match('/\([^)]*[+\-×*][^)]*\|[^)]*\)\s*[÷\/]/u', $linha)) {
+                $restantes[] = $linha;
+                continue;
+            }
+            $pipeForaMedia = preg_match('/\([^)]*[+\-×*][^)]*\|[^)]*\)\s*[÷\/]/u', $linha) === 1
+                || (preg_match('/[+\-×*]\s*[A-Za-zÁ-ú0-9_.ºª]+\s*\|/u', $linha) === 1
+                    && !preg_match('/m[eé]dia\s*\(/ui', $linha));
+            if (!$pipeForaMedia) {
+                $restantes[] = $linha;
+                continue;
+            }
+            $mudou = true;
+        }
+        if (!$mudou) {
+            return $texto;
+        }
+        $limpo = trim(implode("\n", $restantes));
+        $aviso = "O | só vale dentro de média ( … ), não misturado com +÷. "
+            . "Me diga de novo: quais colunas são provas, qual é a substituta e se tem opcional (Projeto) ou PE fora.";
+
+        return $limpo !== '' ? $limpo . "\n\n" . $aviso : $aviso;
     }
 
     /**
@@ -585,13 +745,34 @@ PROMPT;
         $resumo = $this->resumoEvento($wizardEstado);
 
         return <<<PROMPT
-Você é o assistente da tela Evento de Notas do EducaTudo. Responda em português, curto e direto. Sem LaTeX, sem markdown, sem crase e sem bloco de código. Use os nomes da tela: Média Bim, ENAC, Resultado Final.
+Você é o assistente da tela Evento de Notas do EducaTudo. Conversa em português, curto e direto. Sem LaTeX, sem markdown, sem crase e sem bloco de código. Use os nomes da tela: Média Bim, ENAC, Resultado Final e os títulos das colunas do evento aberto.
+
+Como conversar (obrigatório):
+- Entenda o pedido em linguagem natural, mesmo informal, incompleto ou em várias mensagens. Use o histórico.
+- Se a intenção estiver clara, responda e, se for fórmula, entregue a linha pronta.
+- Se NÃO entender ou faltar informação, NÃO invente. Pergunte 1 a 3 perguntas objetivas para entender melhor (ex.: quais colunas entram na média? tem nota substituta/CH? tem Projeto/opcional? PE soma fora? em qual coluna amarela montar?).
+- Se o usuário responder a sua pergunta, continue a conversa e feche a fórmula.
+- Prefira os nomes das colunas que já existem no evento aberto (veja o JSON abaixo). Se o usuário citar um código que não existe no evento, pergunte qual coluna usar.
 
 Manual desta tela (não invente botão ou regra fora disto):
 - Peça = tipo de nota (Prova Semanal, Avaliação Bimestral, ENAC, Jornada do aluno…). O título do evento não define o tipo.
 - Prova Semanal mostra os eventos daquele tipo no bimestre marcado. Semanas S1–S8: \Bloco A ímpares, Bloco B pares.
 - Média = soma entre parênteses ÷ quantidade. Ex.: (Prova Semanal + Avaliação Bimestral + Jornada) ÷ 3.
-- Quando sugerir um cálculo, escreva uma linha exatamente assim: \Nome da coluna = expressão. Use menor(), maior(), parênteses, +, −, × e ÷. Use o título da coluna como está na tela (Média Bim, Recuperação, ENAC, Resultado Final ou o título que o evento já tem).
+- Quando sugerir um cálculo, escreva uma linha exatamente assim: \Nome da coluna = expressão. Use menor(), maior(), se(), média(), nota substituta(), média c/ rec(), parênteses, +, −, ×, ÷ e | . Use o título da coluna como está na tela (Média Bim, MU, MS 2º, Recuperação, ENAC, Resultado Final ou o título que o evento já tem).
+- Ao sugerir fórmula, o nome à esquerda do = é o título da coluna amarela ABERTA (veja "Cálculo amarelo aberto agora" no evento). Se estiver MU, escreva MU = … . Nunca invente MS 2º, Média Bim ou outro título se a aberta for outra.
+- Interprete o pedido em português coloquial e traduza para a função certa. Exemplos de intenção (troque MU pelo título aberto):
+  · "PP + PU / 2, CH substitui qualquer um, se tiver PJ divide por 3, + PE" →
+    MU = se ( PJ , média ( PP , PU | CH | PJ ) , média ( PP , PU | CH ) ) + PE
+  · "média só do que lançou, CH no lugar da prova que faltar, Projeto só se existir" → mesma linha com o título aberto
+  · "nota substituta de PP e PU" → média ( PP , PU | CH ) ou nota substituta ( PP , PU , CH )
+  · "monta a média pra mim" (sem detalhe) → pergunte quais colunas e regras antes de escrever a fórmula
+- média ( provas | substituta | opcional ) = MÉDIA só do lançado. O | define o PAPEL (não o nome): 1º provas, 2º substituta (1 coluna), 3º opcionais. A substituta cobre só a 1ª prova que faltar; nunca cobre o opcional. PE sempre fora: + PE.
+- se ( condição , conta_se_sim , conta_se_não ) = SE do Excel. Condição pode ser:
+  · coluna sozinha ou coluna = verdadeiro / = falso (existe nota ou não). Ex.: se ( PJ , … , … ) ou se ( PJ = verdadeiro , … , … )
+  · comparação: > < >= <= = != entre coluna e número, ou entre duas colunas. Ex.: se ( PP > 7 , … , … )
+  · Com Projeto opcional: se ( PJ , média ( PP , PU | CH | PJ ) , média ( PP , PU | CH ) ) + PE
+- O usuário pode montar por blocos, pela conversa aqui, ou escrevendo a condição — os três caminhos usam a mesma fórmula. Se faltar detalhe, pergunte.
+- NUNCA escreva contas erradas como ( PP + PU + CH | CH ) ÷ 3 ou ( PP + PU | CH ) ÷ 2 com | misturado em +÷. O | só existe DENTRO de média ( … ). Nunca some CH como se fosse uma prova a mais.
 - Se a recuperação só entra quando for maior que a média, e a recuperação não pode passar de 7: \Resultado Final = maior(Média Bim, menor(7, Recuperação)). Sem recuperação, o resultado continua a Média Bim, mesmo acima de 7. Não use menor(7, maior(Média Bim, Recuperação)): isso limita a média também.
 - Para ficar com a média e só trocar se o ENAC for maior: \Resultado Final = maior(Média Bim, ENAC). Não use "Maior entre as duas primeiras".
 - Se a conta for (Média Bim + ENAC) ÷ 2 e esse resultado só entra quando for maior que a Média Bim: \Resultado Final = maior((Média Bim + ENAC) ÷ 2, Média Bim). Explique com um exemplo numérico, sem fórmula técnica.
@@ -665,6 +846,14 @@ PROMPT;
         $linhas[] = 'Peças: ' . ($pecas !== [] ? implode(', ', $pecas) : '(nenhuma)');
         $linhas[] = 'Títulos das colunas: ' . ($titulos !== [] ? implode(', ', $titulos) : '(Média Bim, Resultado Final e os nomes padrão)');
         $linhas[] = 'Fórmulas: ' . ($formulas !== [] ? implode(' | ', $formulas) : '(nenhuma salva no rascunho)');
+        $colAberta = $this->nomeColunaAlvoFormula('', $estado);
+        $codAberto = strtolower(trim((string) ($estado['bloco_calc'] ?? '')));
+        if ($codAberto !== '') {
+            $linhas[] = 'Cálculo amarelo aberto agora: ' . $colAberta . ' (código ' . $codAberto . '). '
+                . 'Quando sugerir fórmula, use EXATAMENTE este título na linha Coluna = expressão — nunca invente MS 2º ou outro nome se a aberta for outra.';
+        } else {
+            $linhas[] = 'Nenhum cálculo amarelo aberto. Se sugerir fórmula, pergunte em qual coluna montar, ou use o título que o usuário citar.';
+        }
         if ($alunoPreview > 0) {
             $linhas[] = 'Aluno selecionado na prévia: id ' . $alunoPreview . ' (pode usar aluno_id direto).';
         }
@@ -1596,8 +1785,8 @@ PROMPT;
     {
         $texto = mb_strtolower(trim($texto));
         $texto = str_replace(
-            ['á', 'à', 'â', 'ã', 'é', 'ê', 'í', 'ó', 'ô', 'õ', 'ú', 'ç'],
-            ['a', 'a', 'a', 'a', 'e', 'e', 'i', 'o', 'o', 'o', 'u', 'c'],
+            ['á', 'à', 'â', 'ã', 'é', 'ê', 'í', 'ó', 'ô', 'õ', 'ú', 'ç', 'ª', 'º'],
+            ['a', 'a', 'a', 'a', 'e', 'e', 'i', 'o', 'o', 'o', 'u', 'c', 'a', 'o'],
             $texto
         );
 

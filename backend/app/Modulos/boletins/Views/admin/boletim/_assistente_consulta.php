@@ -4,10 +4,28 @@
  * Variáveis: $csrfToken, $boletimAssistenteDisponivel
  */
 $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
+$bwConsultaAvatar = htmlspecialchars(URL . '/static/images/avatar-assistente-documentos.webp', ENT_QUOTES, 'UTF-8');
 ?>
 <style>
 #bw-consulta-panel:not(.hidden) {
     display: flex;
+}
+#bw-consulta-toggle {
+    padding: 3px;
+    background: #6366f1;
+}
+#bw-consulta-toggle img,
+#bw-consulta-barra img,
+.bw-consulta-avatar {
+    display: block;
+    border-radius: 9999px;
+    object-fit: cover;
+}
+#bw-consulta-identidade {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-width: 0;
 }
 #bw-consulta-panel {
     position: relative;
@@ -21,13 +39,8 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
     overflow: hidden;
 }
 #bw-consulta-panel .bw-consulta-cabeca,
-#bw-consulta-panel .bw-consulta-atalhos,
 #bw-consulta-form {
     flex: 0 0 auto;
-}
-#bw-consulta-panel .bw-consulta-atalhos {
-    max-height: 6rem;
-    overflow-y: auto;
 }
 #bw-consulta-msgs {
     flex: 1 1 auto;
@@ -71,9 +84,12 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
                 <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-width="1.5" d="M5 3H3v2M3 9v4h4M9 13h4"/></svg>
             </button>
             <div class="bw-consulta-cabeca px-4 py-3 pl-6 border-b border-slate-100 bg-slate-50 flex items-start justify-between gap-3">
-                <div>
-                    <h3 class="text-sm font-semibold text-slate-900">Assistente do evento de notas</h3>
-                    <p class="text-xs text-slate-500">Pergunte, ou cole um print para conferir o que está errado ou não marcado.</p>
+                <div id="bw-consulta-identidade">
+                    <img class="bw-consulta-avatar" src="<?= $bwConsultaAvatar ?>" width="40" height="40" alt="">
+                    <div class="min-w-0">
+                        <h3 class="text-sm font-semibold text-slate-900">Assistente do evento de notas</h3>
+                        <p class="text-xs text-slate-500">Pergunte, ou cole um print para conferir o que está errado ou não marcado.</p>
+                    </div>
                 </div>
                 <div class="flex items-center gap-0.5 shrink-0">
                     <button type="button" id="bw-consulta-minimizar" class="text-slate-400 hover:text-slate-700 p-1" aria-label="Minimizar" title="Minimizar">
@@ -86,16 +102,8 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
             </div>
             <div id="bw-consulta-msgs" class="flex-1 overflow-y-auto p-3 space-y-2 text-sm bg-white">
                 <div class="bg-indigo-50 border border-indigo-100 text-slate-700 rounded-lg px-3 py-2">
-                    Pergunte como montar a média, peça um dado real, ou cole um print (Ctrl+V). O print é comparado com o que está marcado neste evento.
+                    Descreva a regra em português (ex.: PP e PU na média, CH substitui, se tiver Projeto divide por 3, + PE). Se eu não entender, eu pergunto. Também dá para pedir um dado do aluno ou colar um print (Ctrl+V).
                 </div>
-            </div>
-            <div class="bw-consulta-atalhos px-3 pt-2 pb-2 flex flex-wrap gap-1.5 border-t border-slate-100 bg-white max-h-24 overflow-y-auto">
-                <button type="button" class="bw-consulta-atalho px-2.5 py-1 text-xs rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50" data-pergunta="Como ficar com a média e só trocar se o ENAC for maior?">ENAC maior que a média</button>
-                <button type="button" class="bw-consulta-atalho px-2.5 py-1 text-xs rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50" data-pergunta="Como calcular a média das peças?">Como calcular a média</button>
-                <button type="button" class="bw-consulta-atalho px-2.5 py-1 text-xs rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50" data-pergunta="Quantas jornadas a Alice Cardoso Mariano fez no 1º bimestre?">Jornadas de um aluno</button>
-                <button type="button" class="bw-consulta-atalho px-2.5 py-1 text-xs rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50" data-pergunta="Qual a nota da avaliação bimestral de Matemática da Alice Cardoso Mariano?">Nota bimestral</button>
-                <button type="button" class="bw-consulta-atalho px-2.5 py-1 text-xs rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50" data-pergunta="Por que a jornada está vazia?">Por que está vazio</button>
-                <button type="button" class="bw-consulta-atalho px-2.5 py-1 text-xs rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50" data-pergunta="O que falta antes de salvar?">O que falta</button>
             </div>
             <form id="bw-consulta-form" class="p-3 flex flex-col gap-2 bg-slate-50">
                 <div id="bw-consulta-print" class="hidden items-center gap-2 rounded-lg border border-indigo-100 bg-white px-2 py-1.5">
@@ -109,16 +117,16 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
                 </div>
             </form>
         </div>
-        <button type="button" id="bw-consulta-barra" class="hidden inline-flex items-center gap-2 max-w-[min(100vw-2rem,20rem)] pl-3 pr-2 py-2 rounded-full shadow-lg bg-indigo-600 text-white hover:bg-indigo-700" aria-label="Restaurar assistente" title="Clique para abrir de novo">
-            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+        <button type="button" id="bw-consulta-barra" class="hidden inline-flex items-center gap-2 max-w-[min(100vw-2rem,20rem)] pl-1.5 pr-2 py-1.5 rounded-full shadow-lg bg-indigo-600 text-white hover:bg-indigo-700" aria-label="Restaurar assistente" title="Clique para abrir de novo">
+            <img src="<?= $bwConsultaAvatar ?>" width="32" height="32" alt="">
             <span class="text-sm font-medium truncate">Assistente</span>
             <span id="bw-consulta-barra-badge" class="hidden min-w-[1.25rem] h-5 px-1.5 rounded-full bg-white text-indigo-700 text-xs font-semibold leading-5 text-center">0</span>
             <span class="shrink-0 text-indigo-100 pl-1" aria-hidden="true">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
             </span>
         </button>
-        <button type="button" id="bw-consulta-toggle" class="inline-flex items-center justify-center w-14 h-14 rounded-full shadow-lg bg-indigo-600 text-white hover:bg-indigo-700" aria-label="Abrir assistente" title="Perguntar sobre boletim e notas">
-            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+        <button type="button" id="bw-consulta-toggle" class="inline-flex items-center justify-center w-14 h-14 rounded-full shadow-lg hover:opacity-95" aria-label="Abrir assistente" title="Perguntar sobre boletim e notas">
+            <img src="<?= $bwConsultaAvatar ?>" width="56" height="56" alt="Tudinha">
         </button>
     </div>
 </div>
@@ -198,27 +206,43 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
         if (!lido || !lido.formulas || !lido.formulas.length) return;
         var nomes = [];
         lido.formulas.forEach(function (f) { if (f && f.nome && nomes.indexOf(f.nome) < 0) nomes.push(f.nome); });
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'mt-2 inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-60';
-        btn.textContent = nomes.length > 1 ? 'Utilizar fórmulas' : 'Utilizar fórmula';
         var aviso = document.createElement('p');
         aviso.className = 'mt-1 text-xs text-slate-500';
-        if (nomes.length) aviso.textContent = 'Entra em ' + nomes.join(', ') + '.';
-        btn.addEventListener('click', function () {
-            if (typeof window.boletimWizardAplicarFormulaTexto !== 'function') return;
+
+        function aplicarAgora(btn) {
+            if (typeof window.boletimWizardAplicarFormulaTexto !== 'function') return null;
             var r = null;
             try { r = window.boletimWizardAplicarFormulaTexto(texto); } catch (e) { r = null; }
             if (r && r.ok) {
-                btn.disabled = true;
-                btn.textContent = 'Fórmula no cálculo';
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = 'Fórmula no cálculo';
+                }
                 aviso.className = 'mt-1 text-xs font-medium text-emerald-700';
-                aviso.textContent = 'Aplicada em ' + ((r.nomes && r.nomes.length) ? r.nomes.join(', ') : (nomes.join(', ') || 'a coluna aberta')) + '.';
+                aviso.textContent = 'Montada em ' + ((r.nomes && r.nomes.length) ? r.nomes.join(', ') : (nomes.join(', ') || 'a coluna aberta')) + '.';
             } else {
                 aviso.className = 'mt-1 text-xs text-red-700';
                 aviso.textContent = (r && r.erro) || 'Não deu para montar essa fórmula.';
             }
-        });
+            return r;
+        }
+
+        // Igual ao assistente de documentos: se o cálculo já está aberto, monta na tela na hora.
+        var calcAberto = typeof window.boletimWizardCalculoAberto === 'function' && window.boletimWizardCalculoAberto();
+        if (calcAberto) {
+            var auto = aplicarAgora(null);
+            if (auto && auto.ok) {
+                el.appendChild(aviso);
+                return;
+            }
+        }
+
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'mt-2 inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-60';
+        btn.textContent = nomes.length > 1 ? 'Utilizar fórmulas' : 'Utilizar fórmula';
+        if (nomes.length) aviso.textContent = 'Entra em ' + nomes.join(', ') + '.';
+        btn.addEventListener('click', function () { aplicarAgora(btn); });
         el.appendChild(btn);
         el.appendChild(aviso);
     }
@@ -379,11 +403,5 @@ $boletimAssistenteDisponivel = !empty($boletimAssistenteDisponivel);
             document.addEventListener('pointerup', soltar);
         });
     })();
-    root.querySelectorAll('.bw-consulta-atalho').forEach(function (b) {
-        b.addEventListener('click', function () {
-            abrir(false);
-            enviar(b.getAttribute('data-pergunta') || '');
-        });
-    });
 })();
 </script>
