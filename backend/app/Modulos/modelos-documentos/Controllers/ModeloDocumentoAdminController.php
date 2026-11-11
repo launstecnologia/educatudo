@@ -245,6 +245,7 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
      */
     public function reproduzirImagem(): void
     {
+        $creditoModulo = 'modelo_documento_reproduzir_imagem';
         if (!class_exists('AdminPermissionMatrix')) {
         }
         $user = $this->auth->getUser() ?: [];
@@ -257,6 +258,10 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
         }
         if (!$this->validateCsrf((string) ($_POST['_token'] ?? $_POST['csrf_token'] ?? ''))) {
             $this->json(['success' => false, 'error' => 'Sessão expirada.'], 403);
+            return;
+        }
+        if (!\App\Core\CreditosModuleRegistry::acaoIaDisponivel($creditoModulo)) {
+            $this->json(['success' => false, 'error' => 'Reproduzir de imagem indisponível. Ative TudiCoins para esta escola no Master.'], 403);
             return;
         }
 
@@ -287,6 +292,9 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
             return;
         }
 
+        $path = null;
+        $creditosRef = 'modelo_doc_ia:' . bin2hex(random_bytes(10));
+        $debitou = false;
         try {
             $slug = defined('TENANT_SLUG') ? preg_replace('/[^a-z0-9_-]/i', '', (string) TENANT_SLUG) : 'tenant';
             if (!is_string($slug) || $slug === '') {
@@ -302,12 +310,21 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
             }
             @chmod($path, 0600);
 
+            $creditos = new \App\Services\CreditosService();
+            if (!$creditos->podeConsumir('escola', \App\Core\CreditosModuleRegistry::ESCOLA_CARTEIRA_USER_ID, $creditoModulo)) {
+                throw new \RuntimeException('TudiCoins insuficientes na carteira da escola.');
+            }
+            $creditos->consumirEscola($creditoModulo, $creditosRef);
+            $debitou = true;
+
             $jobId = \App\Services\AIJobService::enqueue('modelo_documento_reproduzir_imagem', [
                 'arquivo' => [
                     'path' => $path,
                     'mime' => $mime,
                     'slug' => $slug,
                 ],
+                'credits_ref' => $creditosRef,
+                'credits_modulo' => $creditoModulo,
             ], (int) ($user['id'] ?? 0), 'admin');
 
             $this->json([
@@ -316,18 +333,27 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
                 'message' => 'Imagem enviada. A IA está montando o layout.',
             ]);
         } catch (\Throwable $e) {
-            if (isset($path) && is_file($path)) {
+            if ($debitou) {
+                try {
+                    (new \App\Services\CreditosService())->estornarPorReferencia($creditoModulo, $creditosRef);
+                } catch (\Throwable $estornoErro) {
+                    error_log('Reproduzir modelo por imagem estorno: ' . $estornoErro->getMessage());
+                }
+            }
+            if (is_string($path) && is_file($path)) {
                 @unlink($path);
             }
             error_log('Reproduzir modelo por imagem: ' . $e->getMessage());
             $avisos = [
                 'Não foi possível preparar o envio da imagem.',
                 'Não foi possível salvar a imagem para processamento.',
+                'TudiCoins insuficientes na carteira da escola.',
             ];
             $aviso = in_array($e->getMessage(), $avisos, true)
                 ? $e->getMessage()
                 : 'Não foi possível enviar a imagem.';
-            $this->json(['success' => false, 'error' => $aviso], 500);
+            $status = str_contains($e->getMessage(), 'TudiCoins') ? 402 : 500;
+            $this->json(['success' => false, 'error' => $aviso], $status);
         }
     }
 
@@ -690,16 +716,20 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
         $layoutSugerido = ModeloDocumentoService::estruturaSugeridaParaCodigo(
             (string) ($modelo['codigo'] ?? '')
         );
+        $logoHtml = '';
         $logoPreview = '';
         try {
-            $logoPreview = $this->service->logoHtmlInstitucional(null, $this->config);
-            if (preg_match('/src="([^"]+)"/', $logoPreview, $m)) {
+            $logoHtml = $this->service->logoHtmlInstitucional(null, $this->config);
+            if (preg_match('/src="([^"]+)"/', $logoHtml, $m)) {
                 $logoPreview = html_entity_decode($m[1], ENT_QUOTES, 'UTF-8');
-            } else {
-                $logoPreview = '';
             }
         } catch (\Throwable $e) {
+            $logoHtml = '';
             $logoPreview = '';
+        }
+        $varsPreview = ModeloDocumentoService::varsExemplo();
+        if ($logoHtml !== '') {
+            $varsPreview['logo_html'] = $logoHtml;
         }
         $this->view('admin/modelos-documentos/editor', [
             'title' => ($modelo ? 'Editar' : 'Novo') . ' modelo — EducaTudo',
@@ -711,10 +741,10 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
             'categoria' => $categoria,
             'csrf_token' => $this->generateCsrfToken(),
             'codigo_sistema' => $modelo ? ModeloDocumentoService::isCodigoSistema((string) ($modelo['codigo'] ?? '')) : false,
-            'vars_preview' => ModeloDocumentoService::varsExemplo(),
+            'vars_preview' => $varsPreview,
             'logo_preview' => $logoPreview,
             'layout_sugerido' => $layoutSugerido,
-            'ia_disponivel' => true,
+            'ia_disponivel' => \App\Core\CreditosModuleRegistry::acaoIaDisponivel('modelo_documento_reproduzir_imagem'),
             'assistente_disponivel' => AssistenteDocumentoService::podeUsar($this->db, $this->auth->getUser() ?: []),
             'assistente_ia_disponivel' => AssistenteDocumentoService::iaDisponivel(),
             'cursos_emissao' => $this->service->listarCursosParaEmissao(),

@@ -235,6 +235,13 @@ class CreditosModuleRegistry
             'feature_modules' => ['boletim'],
             'pagador' => 'escola',
         ],
+        'modelo_documento_reproduzir_imagem' => [
+            'label' => 'Documento — reproduzir layout por imagem',
+            'grupo' => 'Documentos',
+            'escopo_ui' => 'acao',
+            'feature_modules' => [],
+            'pagador' => 'escola',
+        ],
         'modelo_documento_assistente' => [
             'label' => 'Documento — mensagem ao assistente',
             'grupo' => 'Documentos',

@@ -153,23 +153,36 @@ class AssistenteDocumentoService
         return <<<'PROMPT'
 Você é o assistente do editor de modelos de documentos escolares do EducaTudo.
 Ajude em português do Brasil com variáveis, campos preenchidos na emissão e montagem de layouts.
-Responda com um único objeto JSON válido, sem Markdown, no formato abaixo. Escreva o campo mensagem primeiro, seguido de html e orientacao.
-{"mensagem":"Resposta curta em texto simples","html":"","orientacao":"retrato"}.
+Responda com um único objeto JSON válido, sem Markdown. Escreva o campo mensagem primeiro.
+Formato:
+{"mensagem":"Resposta curta","cabecalho":"","corpo":"","rodape":"","orientacao":"retrato"}
+
+A folha do editor tem três áreas. Sempre separe o HTML nelas:
+- cabecalho: topo da página (logo {{logo_html}}, brasão, identificação institucional no alto). Repete nas páginas.
+- corpo: miolo (título, textos, tabelas do aluno, conteúdo principal).
+- rodape: baixo da página (dados da escola, CNPJ, endereço, telefone, e-mail, linhas de assinatura pedidas no rodapé).
+
+Regras de área (obrigatórias):
+- Se pedirem logo no topo/cabeçalho, coloque {{logo_html}} em cabecalho.
+- Se pedirem dados da instituição/escola, CNPJ, endereço ou nome da escola no rodapé, coloque esses dados em rodape — nunca no corpo.
+- Assinatura no final do texto principal pode ficar no corpo; se pedirem assinatura no rodapé, use rodape.
+- Não deixe cabecalho/rodape vazios quando o pedido mencionar topo ou rodapé.
+- O campo legado "html" só se for um bloco único sem separação. Prefira cabecalho/corpo/rodape.
+
 Fale de forma direta e natural. Quando o tipo de autorização estiver ambíguo, pergunte o que precisa ser autorizado antes de sugerir um modelo.
-Em dúvidas, deixe html vazio. Cite as variáveis exatas do catálogo, com chaves duplas.
+Em dúvidas, deixe cabecalho, corpo e rodape vazios. Cite as variáveis exatas do catálogo, com chaves duplas.
 Se não houver variável no catálogo, oriente a criar um Campo da emissão no editor ou a inserir texto.
-Quando o pedido de criação estiver aberto e faltar informação que muda o documento, faça até três perguntas objetivas na mesma resposta e deixe html vazio.
+Quando o pedido de criação estiver aberto e faltar informação que muda o documento, faça até três perguntas objetivas na mesma resposta e deixe as áreas vazias.
 Para uma autorização de passeio, pergunte apenas pelo que falta entre local, data e horários de saída e retorno. Ofereça a opção de deixar esses dados para preencher na emissão.
 Quando a pessoa responder ou pedir para seguir com campos da emissão, monte o documento completo. Não repita perguntas respondidas e não peça dados pessoais que já existem como variáveis.
 Quando pedirem um modelo reutilizável, campos dinâmicos ou preenchimento na emissão, use os tokens cv_ do catálogo para cada dado da atividade. Não substitua esses tokens por exemplos, datas sugeridas ou linhas em branco.
 Em uma autorização de passeio com dados da atividade para preencher na emissão, inclua {{cv_aut_local}}, {{cv_data_evento}}, {{cv_aut_hora_saida}}, {{cv_aut_hora_retorno}} e {{cv_aut_finalidade}}. Use {{escola_nome}}, {{resp_nome}}, {{aluno_nome}} e {{turma_nome}} para os dados de cadastro.
 Redija uma autorização pronta para uso. Identifique a escola, o responsável e o aluno, explique o objetivo pedagógico usando a finalidade informada ou seu campo da emissão, destaque os dados da atividade e inclua data e espaço para assinatura. Evite inventar logística, obrigações ou consentimentos além do pedido.
-Para criar ou revisar um documento, preencha html com o fragmento editável completo e escolha retrato ou paisagem.
 Use títulos, parágrafos, tabelas, mesclas e estilos inline simples. Use larguras proporcionais e deixe o conteúdo caber na largura útil da folha.
 Use apenas variáveis do catálogo para dados automáticos e mantenha os campos da emissão que o pedido exigir.
-Use {{logo_html}} ou {{aluno_foto_html}} diretamente no conteúdo para logo ou foto, quando solicitados.
+Use {{logo_html}} ou {{aluno_foto_html}} diretamente no HTML da área pedida.
 Não invente nomes, notas, dados cadastrais, variáveis, imagens externas, scripts, formulários ou links.
-Ao revisar, considere o HTML da última proposta desta conversa, se houver, e devolva o documento inteiro.
+Ao revisar, considere a última proposta desta conversa e devolva o documento inteiro nas três áreas.
 Explique que a pessoa pode revisar e editar a proposta antes de inserir na folha.
 PROMPT
             . "\n\nCampos de autorização e comparecimento preenchidos na emissão:\n" . implode("\n", $camposEmissao)
@@ -181,18 +194,68 @@ PROMPT
         $resposta = preg_replace('/\A\s*```(?:json)?\s*|\s*```\s*\z/i', '', trim($resposta));
         $dados = json_decode($resposta, true);
         $mensagem = $dados['mensagem'] ?? null;
-        $html = $dados['html'] ?? '';
-        if (!is_string($mensagem) || trim($mensagem) === '' || !is_string($html)) {
+        if (!is_string($mensagem) || trim($mensagem) === '') {
             throw new \UnexpectedValueException('Resposta inválida do assistente.');
         }
 
-        $estrutura = null;
-        if (trim($html) !== '') {
-            $estrutura = ReprodutorLayoutDocumentoService::estruturaDaResposta(json_encode([
-                'html' => $html,
-                'orientacao' => ($dados['orientacao'] ?? '') === 'paisagem' ? 'paisagem' : 'retrato',
-            ], JSON_THROW_ON_ERROR));
+        $cabecalho = self::htmlArea($dados['cabecalho'] ?? $dados['header'] ?? '');
+        $corpo = self::htmlArea($dados['corpo'] ?? $dados['body'] ?? '');
+        $rodape = self::htmlArea($dados['rodape'] ?? $dados['footer'] ?? '');
+        $htmlLegado = self::htmlArea($dados['html'] ?? '');
+        if ($corpo === '' && $htmlLegado !== '') {
+            $corpo = $htmlLegado;
         }
+
+        $estrutura = null;
+        if ($cabecalho !== '' || $corpo !== '' || $rodape !== '') {
+            $estrutura = self::estruturaPorAreas(
+                $cabecalho,
+                $corpo,
+                $rodape,
+                ($dados['orientacao'] ?? '') === 'paisagem' ? 'paisagem' : 'retrato'
+            );
+        }
+
         return ['mensagem' => mb_substr(trim($mensagem), 0, 4000), 'estrutura' => $estrutura];
+    }
+
+    private static function htmlArea(mixed $valor): string
+    {
+        return is_string($valor) ? trim($valor) : '';
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private static function estruturaPorAreas(string $cabecalho, string $corpo, string $rodape, string $orientacao): array
+    {
+        $base = ModeloDocumentoService::estruturaVazia('a4', $orientacao, 12);
+        $base['header']['sections'] = self::secoesDaArea($cabecalho, 'header');
+        $base['body']['sections'] = self::secoesDaArea($corpo, 'body');
+        $base['footer']['sections'] = self::secoesDaArea($rodape, 'footer');
+        if ($base['body']['sections'] === [] && $base['header']['sections'] === [] && $base['footer']['sections'] === []) {
+            throw new \UnexpectedValueException('A proposta do assistente veio sem conteúdo.');
+        }
+
+        return $base;
+    }
+
+    /**
+     * @return list<array<string,mixed>>
+     */
+    private static function secoesDaArea(string $html, string $area): array
+    {
+        $limpo = trim(ReprodutorLayoutDocumentoService::limparHtmlReproduzido($html));
+        if ($limpo === '') {
+            return [];
+        }
+        $sec = ModeloDocumentoService::secaoPadrao([100], $area);
+        $sec['columns'][0]['elements'][] = ModeloDocumentoService::elementoEstrutura(
+            'html',
+            ['html' => $limpo],
+            ['fontSize' => $area === 'footer' ? 8 : 11]
+        );
+
+        return [$sec];
     }
 }

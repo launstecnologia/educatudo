@@ -109,7 +109,7 @@ TXT;
         return $base;
     }
 
-    private static function limparHtmlReproduzido(string $html): string
+    public static function limparHtmlReproduzido(string $html): string
     {
         $html = preg_replace('#<(?:head|style)\b[^>]*>.*?</(?:head|style)>#is', '', $html) ?? $html;
         $html = self::semPosicao(DocumentoRenderer::htmlPermitido($html));

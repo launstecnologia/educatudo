@@ -689,6 +689,18 @@
     return C.varsAmostra || C.varsPreview || {};
   }
 
+  function htmlLogoPreview() {
+    if (C.varsPreview && String(C.varsPreview.logo_html || '').trim() !== '') {
+      return String(C.varsPreview.logo_html);
+    }
+    if (C.varsAmostra && String(C.varsAmostra.logo_html || '').trim() !== '') {
+      return String(C.varsAmostra.logo_html);
+    }
+    var src = String(C.logoPreview || '').trim();
+    if (!src) return '';
+    return '<img src="' + src.replace(/"/g, '') + '" alt="Logo" style="max-height:64px;max-width:160px;width:auto;height:auto;object-fit:contain;">';
+  }
+
   function ph(html, camposEmissao) {
     if (!html) return '';
     var bag = varsDaFolha();
@@ -702,6 +714,10 @@
       }
       if (bag && Object.prototype.hasOwnProperty.call(bag, k) && String(bag[k]) !== '') {
         return String(bag[k]);
+      }
+      if (k.toLowerCase() === 'logo_html') {
+        var logo = htmlLogoPreview();
+        if (logo) return logo;
       }
       if (k.indexOf('boletim_celula_') === 0) return '—';
       return '<span class="edoc-ph">{{' + k + '}}</span>';
@@ -5744,7 +5760,9 @@
       demoPacote.html_boletim = data.html_boletim || '';
       pintarComponentes(data.componentes || []);
       if (!data.vars && data.resumo) {
+        var logoMantidaVazia = htmlLogoPreview();
         C.varsPreview = { quadro_notas_html: '', boletim_html: '' };
+        if (logoMantidaVazia) C.varsPreview.logo_html = logoMantidaVazia;
         C.modeloQuadroHtml = '';
         state.demo = !!(real && real.checked);
         render();
@@ -5755,7 +5773,11 @@
           state.dirty = true;
           scheduleSave();
         }
+        var logoAntesDemo = htmlLogoPreview();
         C.varsPreview = data.vars;
+        if (!String(C.varsPreview.logo_html || '').trim() && logoAntesDemo) {
+          C.varsPreview.logo_html = logoAntesDemo;
+        }
         C.modeloQuadroHtml = data.modelo_quadro_html || '';
         if (data.html_quadro) {
           C.varsPreview.quadro_notas_html = data.html_quadro;
@@ -6173,17 +6195,30 @@
     serie.addEventListener('change', gravar);
   }
 
+  function areaTemElementos(area) {
+    return (area.sections || []).some(function (secao) {
+      return (secao.columns || []).some(function (coluna) {
+        return (coluna.elements || []).length > 0;
+      });
+    });
+  }
+
   function aplicarEstruturaIa(estrutura, camposEmissao) {
     persistirEdicaoSeHouver();
     var nova = normalizarEstrutura(estrutura);
     var temConteudo = ['header', 'body', 'footer'].some(function (area) {
-      return (state.estrutura[area].sections || []).some(function (secao) {
-        return secao.columns.some(function (coluna) { return coluna.elements.length > 0; });
-      });
+      return areaTemElementos(state.estrutura[area] || {});
     });
     if (temConteudo) {
       ['header', 'body', 'footer'].forEach(function (area) {
-        state.estrutura[area].sections = state.estrutura[area].sections.concat(nova[area].sections);
+        var secoesNovas = (nova[area] && nova[area].sections) || [];
+        if (!secoesNovas.length) return;
+        // Se a área da folha está vazia, substitui pelo conteúdo da proposta (ex.: rodapé).
+        if (!areaTemElementos(state.estrutura[area] || {})) {
+          state.estrutura[area].sections = secoesNovas;
+          return;
+        }
+        state.estrutura[area].sections = state.estrutura[area].sections.concat(secoesNovas);
       });
     } else {
       nova.page.ocultarCabecalho = state.estrutura.page.ocultarCabecalho;
@@ -6197,7 +6232,7 @@
     state.selected = null;
     pushHist();
     render();
-    setStatus('HTML inserido na folha. Use Ver resultado para conferir a impressão.');
+    setStatus('Conteúdo inserido no cabeçalho, corpo e rodapé. Use Ver resultado para conferir.');
   }
 
   function limparHtmlReproducao(html) {
@@ -6236,11 +6271,37 @@
     });
   }
 
-  function htmlDaProposta(elementos) {
+  function htmlElementosProposta(elementos) {
     return elementos.map(function (el) {
       var props = el.props || {};
       return props.html || '<p>' + esc(props.text || '') + '</p>';
     }).join('\n');
+  }
+
+  function htmlDaProposta(elementosOuEstrutura) {
+    if (elementosOuEstrutura && (elementosOuEstrutura.header || elementosOuEstrutura.body || elementosOuEstrutura.footer)) {
+      var partes = [];
+      [
+        ['header', 'CABEÇALHO'],
+        ['body', 'CORPO'],
+        ['footer', 'RODAPÉ']
+      ].forEach(function (item) {
+        var area = item[0];
+        var rotulo = item[1];
+        var els = secoesDe(elementosOuEstrutura[area]).flatMap(function (secao) {
+          return (secao.columns || []).flatMap(function (coluna) { return coluna.elements || []; });
+        });
+        if (!els.length) return;
+        partes.push(
+          '<div class="edoc-proposta-area" data-area="' + area + '">'
+          + '<div class="edoc-proposta-area-label">' + rotulo + '</div>'
+          + htmlElementosProposta(els)
+          + '</div>'
+        );
+      });
+      return partes.join('\n') || htmlElementosProposta(elementosDaProposta(elementosOuEstrutura));
+    }
+    return htmlElementosProposta(elementosOuEstrutura || []);
   }
 
   function prepararCamposDaProposta(html) {
@@ -6267,6 +6328,7 @@
     return '<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src data:; style-src \'unsafe-inline\'">'
       + '<style>body{font:11pt Arial,sans-serif;color:#222;margin:12px}table{border-collapse:collapse;max-width:100%}td,th{vertical-align:middle}p{margin:0 0 8px}.edoc-vert{writing-mode:vertical-rl;transform:rotate(180deg)}.edoc-faixa{background:#d1d5db}</style>'
       + '<style>.edoc-campo-emissao{display:inline-block;color:#563884;background:#f1ebfa;border-radius:4px;padding:2px 5px;font:600 9pt Arial,sans-serif}</style>'
+      + '<style>.edoc-proposta-area{margin:0 0 14px;padding:0 0 10px;border-bottom:1px dashed #cbd5e1}.edoc-proposta-area:last-child{border-bottom:0;margin-bottom:0;padding-bottom:0}.edoc-proposta-area-label{font:700 9px/1.2 Arial,sans-serif;letter-spacing:.08em;color:#94a3b8;margin:0 0 8px}</style>'
       + '<style>' + (C.cssAjusteFolha || '') + '</style>'
       + '<main class="edoc-ajuste-folha">' + limparHtmlReproducao(ph(proposta.html, proposta.campos)) + '</main>';
   }
@@ -6579,7 +6641,7 @@
     }
     function exibirRascunho(estrutura) {
       estruturaRascunho = estrutura;
-      $('#edoc-assistente-previa').srcdoc = previaDaProposta(htmlDaProposta(elementosDaProposta(estrutura)), true);
+      $('#edoc-assistente-previa').srcdoc = previaDaProposta(htmlDaProposta(estrutura), true);
       rascunho.hidden = false;
       painel.classList.toggle('com-rascunho', !trabalho.hidden);
     }
@@ -6706,7 +6768,7 @@
           avisar('Ainda aguardando a resposta. Você pode continuar editando a folha.');
         });
         var estrutura = resultado.estrutura;
-        var proposta = estrutura && estrutura.body.sections[0].columns[0].elements[0].props.html;
+        var proposta = estrutura ? htmlDaProposta(estrutura) : '';
         historico = ultimas.concat(mensagem, { role: 'assistant', content: resultado.mensagem, html: proposta });
         atualizarResposta(resultado.mensagem);
         if (estrutura) exibirRascunho(estrutura);
