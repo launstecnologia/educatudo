@@ -283,7 +283,7 @@ Uma aba por disciplina. A primeira já vem selecionada. A nota é de 0 a 10, sal
 |---|---|
 | Filtros | Abre série, turma, ordenação e quantidade por página. |
 | Histórico | Abre o que já foi alterado naquela nota. |
-| Importar planilha | Abre o painel de CSV ou Excel. |
+| Importar planilha | Abre o painel de CSV, Excel ou Word. |
 | Desbloquear edição | Pede a senha de acesso. Nota já salva fica bloqueada até desbloquear. |
 | Salvar notas | Grava o que foi digitado. |
 | Voltar | Sai do lançamento. |
@@ -307,7 +307,7 @@ Importar planilha:
 | Campo ou botão | Para que serve |
 |---|---|
 | Baixar modelo preenchido com os alunos | Baixa a planilha já com código, disciplina e turma. A coluna nota vem vazia para preencher. |
-| Arquivo | O CSV ou Excel (.xlsx). Colunas obrigatórias: codigo, disciplina, nota. O código é o código do aluno ou o RA. Célula vazia é ignorada. Código ou disciplina que não existem são pulados. |
+| Arquivo | CSV, Excel (.xlsx) ou Word (.docx). Colunas: codigo (ou nome/aluno), disciplina e nota. O código é o código do aluno ou o RA. No Word, uma tabela com nome e nota também serve. Célula vazia ou marcador TR é ignorada. Código/nome ou disciplina que não existem são pulados. |
 | Substituir notas já lançadas | Só vale depois de desbloquear a edição com a senha. Sem isso, a nota que já está na tela permanece. |
 | Importar | Lê o arquivo e grava. |
 | Fechar | Fecha o painel. |

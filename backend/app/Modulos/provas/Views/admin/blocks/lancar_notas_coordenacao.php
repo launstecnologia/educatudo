@@ -27,6 +27,7 @@ $csrfToken = $csrf_token ?? '';
 $flash = $flash ?? [];
 $notaUnicaTodasMaterias = !empty($bloco['nota_unica_todas_materias']);
 $mostrarProfessor = !empty($mostrar_professor);
+$enacColagHabilitado = !empty($enac_colag_habilitado);
 $mostrarMateria = !$notaUnicaTodasMaterias && $materiaIdFiltro <= 0;
 $colunasTabela = 6 + ($mostrarMateria ? 1 : 0) + ($mostrarProfessor ? 1 : 0);
 $blocoId = (int) ($bloco['id'] ?? 0);
@@ -92,6 +93,13 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
             <i class="fa-solid fa-file-import" aria-hidden="true"></i>
             Importar planilha
         </button>
+        <?php if ($enacColagHabilitado): ?>
+        <button type="button" onclick="openImportarEnacDrawer()"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-sky-200 bg-sky-50 text-sky-900 text-sm font-medium hover:bg-sky-100">
+            <i class="fa-solid fa-calculator" aria-hidden="true"></i>
+            Importar ENAC
+        </button>
+        <?php endif; ?>
         <?php if (!$edicaoDesbloqueada): ?>
         <button type="button" id="btnDesbloquearEdicao" onclick="abrirModalSenha()"
                 class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-amber-300 bg-amber-50 text-amber-900 text-sm font-semibold hover:bg-amber-100">
@@ -350,8 +358,9 @@ if ($tipoFlash === 'error') {
         <input type="hidden" name="ordenar" value="<?= htmlspecialchars($ordenarFiltro) ?>">
         <input type="hidden" name="por_pagina" value="<?= (int) $porPagina ?>">
         <p class="text-sm text-gray-600">
-            A planilha precisa das colunas <strong>codigo</strong>, <strong>disciplina</strong> e <strong>nota</strong>.
-            O código é o código do aluno ou o RA. Aceita CSV e Excel (.xlsx).
+            Use as colunas <strong>codigo</strong> (ou <strong>nome/aluno</strong>), <strong>disciplina</strong> e <strong>nota</strong>.
+            O código é o código do aluno ou o RA. Em Word, a tabela com nome e nota também serve.
+            Aceita CSV, Excel (.xlsx) e Word (.docx).
         </p>
         <a href="<?= URL ?>/admin/provas/blocos/<?= $blocoId ?>/modelo-notas-planilha"
            class="inline-flex items-center gap-2 text-sm font-medium text-indigo-700 hover:text-indigo-900">
@@ -360,7 +369,7 @@ if ($tipoFlash === 'error') {
         </a>
         <div>
             <label for="planilha" class="block text-sm font-medium text-gray-700 mb-1">Arquivo</label>
-            <input type="file" id="planilha" name="planilha" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required
+            <input type="file" id="planilha" name="planilha" accept=".csv,.xlsx,.docx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required
                    class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-gray-100 file:text-gray-700">
         </div>
         <label class="flex items-start gap-2 text-sm text-gray-700">
@@ -374,6 +383,55 @@ if ($tipoFlash === 'error') {
         </div>
     </form>
 </aside>
+
+<?php if ($enacColagHabilitado): ?>
+<!-- Offcanvas importar ENAC (Colag) -->
+<div id="importarEnacDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeImportarEnacDrawer()"></div>
+<aside id="importarEnacDrawer"
+       class="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-2xl transform translate-x-full transition-transform duration-200 ease-out flex flex-col"
+       aria-hidden="true">
+    <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-900">Importar ENAC</h3>
+        <button type="button" onclick="closeImportarEnacDrawer()" class="text-gray-400 hover:text-gray-600" aria-label="Fechar">
+            <i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i>
+        </button>
+    </div>
+    <form method="post" enctype="multipart/form-data"
+          action="<?= URL ?>/admin/provas/blocos/<?= $blocoId ?>/importar-enac-colag"
+          class="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+        <input type="hidden" name="_token" value="<?= htmlspecialchars((string) $csrfToken) ?>">
+        <input type="hidden" name="materia_id" value="<?= $materiaIdFiltro ?>">
+        <input type="hidden" name="professor_id" value="<?= $professorIdFiltro ?>">
+        <input type="hidden" name="turma_id" value="<?= $turmaIdFiltro ?>">
+        <input type="hidden" name="serie_id" value="<?= $serieIdFiltro ?>">
+        <input type="hidden" name="ordenar" value="<?= htmlspecialchars($ordenarFiltro) ?>">
+        <input type="hidden" name="por_pagina" value="<?= (int) $porPagina ?>">
+        <p class="text-sm text-gray-600">
+            Envie o Excel do ENAC com as colunas <strong>NOME</strong> e <strong>TOTAL</strong>.
+            O sistema converte a pontuação em nota pela tabela de descarte 30%
+            (54+ → 10,0 … 20–23 → 4,5; abaixo de 20 → 4,0) e lança no evento.
+            Linhas com FALTOU ou TR são ignoradas.
+            <?php if (!$notaUnicaTodasMaterias): ?>
+            Se o evento tiver várias disciplinas, mantenha a disciplina filtrada na tela antes de importar.
+            <?php endif; ?>
+        </p>
+        <div>
+            <label for="planilha_enac" class="block text-sm font-medium text-gray-700 mb-1">Arquivo ENAC</label>
+            <input type="file" id="planilha_enac" name="planilha" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required
+                   class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-gray-100 file:text-gray-700">
+        </div>
+        <label class="flex items-start gap-2 text-sm text-gray-700">
+            <input type="checkbox" name="substituir" value="1" class="mt-1">
+            <span>Substituir notas já lançadas. Isso só vale depois de desbloquear a edição com a senha.</span>
+        </label>
+        <div class="pt-2">
+            <button type="submit" class="btn-primary-custom w-full px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90">
+                Converter e importar
+            </button>
+        </div>
+    </form>
+</aside>
+<?php endif; ?>
 
 <!-- Offcanvas filtros -->
 <div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
@@ -554,6 +612,24 @@ if ($tipoFlash === 'error') {
     window.closeImportarDrawer = function () {
         document.getElementById('importarDrawerBackdrop').classList.add('hidden');
         var d = document.getElementById('importarDrawer');
+        d.classList.add('translate-x-full');
+        d.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    };
+    window.openImportarEnacDrawer = function () {
+        var backdrop = document.getElementById('importarEnacDrawerBackdrop');
+        var d = document.getElementById('importarEnacDrawer');
+        if (!backdrop || !d) return;
+        backdrop.classList.remove('hidden');
+        d.classList.remove('translate-x-full');
+        d.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+    };
+    window.closeImportarEnacDrawer = function () {
+        var backdrop = document.getElementById('importarEnacDrawerBackdrop');
+        var d = document.getElementById('importarEnacDrawer');
+        if (!backdrop || !d) return;
+        backdrop.classList.add('hidden');
         d.classList.add('translate-x-full');
         d.setAttribute('aria-hidden', 'true');
         document.body.style.overflow = '';

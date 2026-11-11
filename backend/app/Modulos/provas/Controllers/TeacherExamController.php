@@ -18,6 +18,7 @@ use App\Models\Exams\ExamBlockManualGrade;
 use App\Modulos\EducaInclui\Services\MascaraResolver;
 use App\Core\PeriodoLetivo;
 use App\Models\Exams\TeacherExam;
+use App\Modulos\EnacColag\Services\ImportacaoEnacPlanilhaService;
 use App\Modulos\Provas\Services\ImportacaoNotasPlanilha;
 use App\Modulos\Provas\Services\ModificarNotaProvaOnlineService;
 
@@ -2278,7 +2279,7 @@ class TeacherExamController extends BaseController
     }
 
     /**
-     * Importa notas a partir de CSV ou Excel (código, disciplina, nota).
+     * Importa notas a partir de CSV, Excel ou Word (código ou nome, disciplina, nota).
      */
     public function importarNotasPlanilha($blocoId): void
     {
@@ -2306,92 +2307,15 @@ class TeacherExamController extends BaseController
 
         $notaUnica = !empty($bloco['nota_unica_todas_materias']);
         $cruzamento = $servico->cruzar($linhasArquivo, $this->alunosPorComboLancamento($bloco, 0), $notaUnica);
-        $notasModel = new ExamBlockManualGrade();
-        if (!$notasModel->tableExists()) {
-            $this->setFlashMessage('Tabela de notas ainda não existe. Execute a migração SQL no banco.', 'error');
-            $this->redirect($urlVolta);
+        $resultado = $this->aplicarCruzamentoImportacaoNotas(
+            $blocoId,
+            $cruzamento,
+            !empty($_POST['substituir']),
+            $urlVolta,
+            'planilha'
+        );
+        if ($resultado === null) {
             return;
-        }
-
-        $substituir = !empty($_POST['substituir']);
-        $index = $this->indexarNotasLancadasBloco($notasModel->fetchTodasNotasBlocoAdmin($blocoId));
-        $aplicar = [];
-        $preservadas = 0;
-        $alteraExistente = false;
-        foreach ($cruzamento['aplicar'] as $item) {
-            $pid = (int) $item['professor_id'];
-            $mid = (int) $item['materia_id'];
-            $tid = (int) $item['turma_id'];
-            $aid = (int) $item['aluno_id'];
-            $ant = $this->buscarNotaLancadaIndex($index, $pid, $mid, $tid, $aid, false);
-            $notaAnt = null;
-            if ($ant !== null && isset($ant['nota']) && $ant['nota'] !== null && $ant['nota'] !== '') {
-                $notaAnt = (float) $ant['nota'];
-            }
-            $notaNova = (float) $item['nota'];
-            if ($notaAnt !== null && abs($notaAnt - $notaNova) <= 0.0001) {
-                continue;
-            }
-            if ($notaAnt !== null && !$substituir) {
-                $preservadas++;
-                continue;
-            }
-            if ($notaAnt !== null) {
-                $alteraExistente = true;
-            }
-            $aplicar[] = [
-                'professor_id' => $pid,
-                'materia_id' => $mid,
-                'turma_id' => $tid,
-                'aluno_id' => $aid,
-                'nota' => $notaNova,
-                'observacao' => trim((string) ($ant['observacao'] ?? '')),
-            ];
-        }
-
-        if ($alteraExistente && !$this->sessaoDesbloqueioLancamentoValida($blocoId)) {
-            $this->setFlashMessage('Para substituir notas já lançadas, desbloqueie a edição com sua senha e importe de novo.', 'error');
-            $this->redirect($urlVolta);
-            return;
-        }
-
-        $usuarioId = (int) (($this->authManager->getUser()['id'] ?? 0));
-        if ($aplicar !== []) {
-            $grupos = [];
-            foreach ($aplicar as $item) {
-                $chave = $item['professor_id'] . '_' . $item['materia_id'];
-                $grupos[$chave][] = [
-                    'turma_id' => $item['turma_id'],
-                    'aluno_id' => $item['aluno_id'],
-                    'nota' => $item['nota'],
-                    'observacao' => $item['observacao'],
-                ];
-            }
-            $this->db->beginTransaction();
-            try {
-                foreach ($grupos as $chave => $linhasGrupo) {
-                    $partes = explode('_', (string) $chave, 2);
-                    $notasModel->upsertLinhas(
-                        $blocoId,
-                        (int) ($partes[0] ?? 0),
-                        (int) ($partes[1] ?? 0),
-                        $linhasGrupo,
-                        $usuarioId
-                    );
-                }
-                $this->db->commit();
-            } catch (\Throwable $e) {
-                if ($this->db->inTransaction()) {
-                    $this->db->rollback();
-                }
-                error_log('importarNotasPlanilha: ' . $e->getMessage());
-                $this->setFlashMessage(
-                    str_contains($e->getMessage(), 'homologado') ? $e->getMessage() : 'Não foi possível importar as notas. Nenhuma alteração foi concluída.',
-                    'error'
-                );
-                $this->redirect($urlVolta);
-                return;
-            }
         }
 
         $erros = $cruzamento['erros'];
@@ -2400,9 +2324,9 @@ class TeacherExamController extends BaseController
             $resto = count($erros) - 8;
             $erros = array_slice($erros, 0, 8);
         }
-        $partesMsg = [count($aplicar) . ' nota(s) importada(s)'];
-        if ($preservadas > 0) {
-            $partesMsg[] = $preservadas . ' nota(s) já lançada(s) foram mantidas';
+        $partesMsg = [(int) $resultado['aplicadas'] . ' nota(s) importada(s)'];
+        if ((int) $resultado['preservadas'] > 0) {
+            $partesMsg[] = (int) $resultado['preservadas'] . ' nota(s) já lançada(s) foram mantidas';
         }
         if ((int) $cruzamento['ignoradas'] > 0) {
             $partesMsg[] = (int) $cruzamento['ignoradas'] . ' linha(s) sem nota foram ignoradas';
@@ -2414,8 +2338,112 @@ class TeacherExamController extends BaseController
                 $mensagem .= ' E mais ' . $resto . ' aviso(s).';
             }
         }
-        $tipo = $aplicar !== [] ? 'success' : 'warning';
-        $this->setFlashMessage($mensagem, $tipo);
+        $this->setFlashMessage($mensagem, ((int) $resultado['aplicadas'] > 0) ? 'success' : 'warning');
+        $this->redirect($urlVolta);
+    }
+
+    /**
+     * Importa planilha ENAC (Colag): TOTAL → nota pela tabela de descarte 30% e lança no evento.
+     * Entrada HTTP fica no módulo enac-colag; a lógica de elegíveis/upsert permanece aqui.
+     */
+    public function importarEnacColag($blocoId): void
+    {
+        $blocoId = (int) $blocoId;
+        if (!\App\Core\FeatureGate::isModuleEnabled('enac_colag')) {
+            $this->setFlashMessage('O módulo ENAC Colag não está habilitado nesta escola.', 'error');
+            $this->redirect('/admin/provas');
+            return;
+        }
+        $bloco = $this->exigirEventoLancamentoCoordenacao($blocoId);
+        if ($bloco === null) {
+            return;
+        }
+        $filtros = $this->filtrosLancamentoNotasCoordenacao($_POST);
+        $urlVolta = $this->urlLancamentoNotasCoordenacao($blocoId, $filtros);
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Token inválido. Recarregue a página.', 'error');
+            $this->redirect($urlVolta);
+            return;
+        }
+
+        $servico = new ImportacaoEnacPlanilhaService();
+        try {
+            $lido = $servico->lerArquivo(is_array($_FILES['planilha'] ?? null) ? $_FILES['planilha'] : []);
+        } catch (\RuntimeException $e) {
+            $this->setFlashMessage($e->getMessage(), 'error');
+            $this->redirect($urlVolta);
+            return;
+        }
+
+        $notaUnica = !empty($bloco['nota_unica_todas_materias']);
+        $materiaFiltro = 0;
+        if (!$notaUnica) {
+            $materiaFiltro = (int) ($filtros['materia_id'] ?? 0);
+            if ($materiaFiltro <= 0) {
+                $this->setFlashMessage(
+                    'Selecione a disciplina na tela de lançamento antes de importar o ENAC.',
+                    'error'
+                );
+                $this->redirect($urlVolta);
+                return;
+            }
+        }
+        if (($lido['linhas'] ?? []) === []) {
+            $errosLidos = is_array($lido['erros'] ?? null) ? $lido['erros'] : [];
+            $this->setFlashMessage(
+                'Nenhuma pontuação ENAC válida para lançar.'
+                . ($errosLidos !== [] ? ' ' . implode(' ', array_slice($errosLidos, 0, 5)) : ''),
+                'warning'
+            );
+            $this->redirect($urlVolta);
+            return;
+        }
+
+        $cruzamento = $servico->cruzar(
+            $lido['linhas'],
+            $this->alunosPorComboLancamento($bloco, $materiaFiltro),
+            $notaUnica
+        );
+        $cruzamento['erros'] = array_merge(
+            is_array($lido['erros'] ?? null) ? $lido['erros'] : [],
+            $cruzamento['erros']
+        );
+        $resultado = $this->aplicarCruzamentoImportacaoNotas(
+            $blocoId,
+            $cruzamento,
+            !empty($_POST['substituir']),
+            $urlVolta,
+            'ENAC'
+        );
+        if ($resultado === null) {
+            return;
+        }
+
+        $partesMsg = [(int) $resultado['aplicadas'] . ' nota(s) ENAC importada(s)'];
+        if ((int) $resultado['preservadas'] > 0) {
+            $partesMsg[] = (int) $resultado['preservadas'] . ' nota(s) já lançada(s) foram mantidas';
+        }
+        $ignoradas = (int) $cruzamento['ignoradas'] + (int) ($lido['ignoradas'] ?? 0);
+        if ($ignoradas > 0) {
+            $partesMsg[] = $ignoradas . ' linha(s) ignoradas (FALTOU/TR/vazio)';
+        }
+        if ((int) ($lido['abaixo_de_20'] ?? 0) > 0) {
+            $partesMsg[] = (int) $lido['abaixo_de_20'] . ' nota(s) com total abaixo de 20 (lançadas como 4,0)';
+        }
+        $mensagem = implode('. ', $partesMsg) . '.';
+        $erros = $cruzamento['erros'];
+        $resto = 0;
+        if (count($erros) > 8) {
+            $resto = count($erros) - 8;
+            $erros = array_slice($erros, 0, 8);
+        }
+        if ($erros !== []) {
+            $mensagem .= ' ' . implode(' ', $erros);
+            if ($resto > 0) {
+                $mensagem .= ' E mais ' . $resto . ' aviso(s).';
+            }
+        }
+        $this->setFlashMessage($mensagem, ((int) $resultado['aplicadas'] > 0) ? 'success' : 'warning');
         $this->redirect($urlVolta);
     }
 
@@ -2620,6 +2648,7 @@ class TeacherExamController extends BaseController
             'historico_alteracoes' => $historico,
             'edicao_desbloqueada' => $edicaoDesbloqueada,
             'mostrar_professor' => !$notaUnicaTodasMaterias && count($professoresDaAba) > 1,
+            'enac_colag_habilitado' => \App\Core\FeatureGate::isModuleEnabled('enac_colag'),
             'csrf_token' => $this->generateCsrfToken(),
             'flash' => $this->getFlashMessage(),
             'current_page' => 'provas_blocos',
@@ -3178,6 +3207,114 @@ class TeacherExamController extends BaseController
         asort($materias, SORT_NATURAL | SORT_FLAG_CASE);
 
         return $materias;
+    }
+
+    /**
+     * Aplica o resultado de cruzamento de importação (planilha genérica ou ENAC).
+     *
+     * @param array{aplicar:list<array<string,mixed>>,erros:list<string>,ignoradas:int} $cruzamento
+     * @return array{aplicadas:int,preservadas:int}|null null se já redirecionou com erro
+     */
+    private function aplicarCruzamentoImportacaoNotas(
+        int $blocoId,
+        array $cruzamento,
+        bool $substituir,
+        string $urlVolta,
+        string $origemLog
+    ): ?array {
+        $notasModel = new ExamBlockManualGrade();
+        if (!$notasModel->tableExists()) {
+            $this->setFlashMessage('Tabela de notas ainda não existe. Execute a migração SQL no banco.', 'error');
+            $this->redirect($urlVolta);
+            return null;
+        }
+
+        $index = $this->indexarNotasLancadasBloco($notasModel->fetchTodasNotasBlocoAdmin($blocoId));
+        $aplicar = [];
+        $preservadas = 0;
+        $alteraExistente = false;
+        foreach ($cruzamento['aplicar'] as $item) {
+            $pid = (int) $item['professor_id'];
+            $mid = (int) $item['materia_id'];
+            $tid = (int) $item['turma_id'];
+            $aid = (int) $item['aluno_id'];
+            $ant = $this->buscarNotaLancadaIndex($index, $pid, $mid, $tid, $aid, false);
+            $notaAnt = null;
+            if ($ant !== null && isset($ant['nota']) && $ant['nota'] !== null && $ant['nota'] !== '') {
+                $notaAnt = (float) $ant['nota'];
+            }
+            $notaNova = (float) $item['nota'];
+            if ($notaAnt !== null && abs($notaAnt - $notaNova) <= 0.0001) {
+                continue;
+            }
+            if ($notaAnt !== null && !$substituir) {
+                $preservadas++;
+                continue;
+            }
+            if ($notaAnt !== null) {
+                $alteraExistente = true;
+            }
+            $aplicar[] = [
+                'professor_id' => $pid,
+                'materia_id' => $mid,
+                'turma_id' => $tid,
+                'aluno_id' => $aid,
+                'nota' => $notaNova,
+                'observacao' => trim((string) ($ant['observacao'] ?? '')),
+            ];
+        }
+
+        if ($alteraExistente && !$this->sessaoDesbloqueioLancamentoValida($blocoId)) {
+            $this->setFlashMessage('Para substituir notas já lançadas, desbloqueie a edição com sua senha e importe de novo.', 'error');
+            $this->redirect($urlVolta);
+            return null;
+        }
+
+        $usuarioId = (int) (($this->authManager->getUser()['id'] ?? 0));
+        if ($aplicar !== []) {
+            $grupos = [];
+            foreach ($aplicar as $item) {
+                $chave = $item['professor_id'] . '_' . $item['materia_id'];
+                $grupos[$chave][] = [
+                    'turma_id' => $item['turma_id'],
+                    'aluno_id' => $item['aluno_id'],
+                    'nota' => $item['nota'],
+                    'observacao' => $item['observacao'],
+                ];
+            }
+            $this->db->beginTransaction();
+            try {
+                foreach ($grupos as $chave => $linhasGrupo) {
+                    $partes = explode('_', (string) $chave, 2);
+                    $notasModel->upsertLinhas(
+                        $blocoId,
+                        (int) ($partes[0] ?? 0),
+                        (int) ($partes[1] ?? 0),
+                        $linhasGrupo,
+                        $usuarioId
+                    );
+                }
+                $this->db->commit();
+            } catch (\Throwable $e) {
+                if ($this->db->inTransaction()) {
+                    $this->db->rollback();
+                }
+                error_log('importarNotas(' . $origemLog . '): ' . $e->getMessage());
+                $this->setFlashMessage(
+                    str_contains($e->getMessage(), 'homologado')
+                        ? $e->getMessage()
+                        : 'Não foi possível importar as notas. Nenhuma alteração foi concluída.',
+                    'error'
+                );
+                $this->redirect($urlVolta);
+                return null;
+            }
+        }
+
+        return [
+            'aplicadas' => count($aplicar),
+            'preservadas' => $preservadas,
+        ];
     }
 
     /**

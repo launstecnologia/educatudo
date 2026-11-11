@@ -2,18 +2,21 @@
 
 namespace App\Modulos\Provas\Services;
 
+use App\Helpers\AlunoLancamentoNotaHelper;
+
 /**
- * Lê uma planilha de notas (CSV ou Excel) com código do aluno, disciplina e nota
- * e cruza com os alunos já convocados no evento.
+ * Lê planilha/documento de notas (CSV, Excel ou Word) e cruza com os alunos
+ * já convocados no evento. Aceita código/RA ou nome do aluno.
  */
 class ImportacaoNotasPlanilha
 {
     private const MAX_BYTES = 2000000;
+    private const MAX_XML_BYTES = 10000000;
     private const MAX_LINHAS = 8000;
 
     /**
      * @param array<string,mixed> $arquivo
-     * @return list<array{linha:int,codigo:string,disciplina:string,nota:string}>
+     * @return list<array{linha:int,codigo:string,nome:string,disciplina:string,nota:string}>
      */
     public function lerArquivo(array $arquivo): array
     {
@@ -34,27 +37,41 @@ class ImportacaoNotasPlanilha
             throw new \RuntimeException('A planilha precisa ter até 2 MB.');
         }
         $ext = strtolower(pathinfo($nome, PATHINFO_EXTENSION));
-        if (!in_array($ext, ['csv', 'xlsx'], true)) {
-            throw new \RuntimeException('Use um arquivo .csv ou .xlsx. No Excel, salve como CSV ou como pasta de trabalho do Excel.');
+        if (!in_array($ext, ['csv', 'xlsx', 'docx'], true)) {
+            throw new \RuntimeException('Use um arquivo .csv, .xlsx ou .docx (Word).');
         }
         $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($tmp);
         $mime = is_string($mime) ? $mime : '';
         $mimesCsv = ['text/plain', 'text/csv', 'application/csv', 'text/x-csv', 'application/vnd.ms-excel', 'application/octet-stream'];
         $mimesXlsx = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/zip', 'application/octet-stream'];
+        $mimesDocx = [
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/zip',
+            'application/octet-stream',
+        ];
         if ($ext === 'csv' && !in_array($mime, $mimesCsv, true)) {
             throw new \RuntimeException('O arquivo não parece um CSV.');
         }
         if ($ext === 'xlsx' && !in_array($mime, $mimesXlsx, true)) {
             throw new \RuntimeException('O arquivo não parece uma planilha do Excel.');
         }
+        if ($ext === 'docx' && !in_array($mime, $mimesDocx, true)) {
+            throw new \RuntimeException('O arquivo não parece um documento do Word.');
+        }
 
-        $tabela = $ext === 'xlsx' ? $this->lerXlsx($tmp) : $this->lerCsv($tmp);
+        if ($ext === 'xlsx') {
+            $tabela = $this->lerXlsx($tmp);
+        } elseif ($ext === 'docx') {
+            $tabela = $this->lerDocx($tmp);
+        } else {
+            $tabela = $this->lerCsv($tmp);
+        }
 
         return $this->tabelaParaLinhas($tabela);
     }
 
     /**
-     * @param list<array{linha:int,codigo:string,disciplina:string,nota:string}> $linhas
+     * @param list<array{linha:int,codigo:string,nome:string,disciplina:string,nota:string}> $linhas
      * @param list<array<string,mixed>> $elegiveis
      * @return array{aplicar:list<array<string,mixed>>,erros:list<string>,ignoradas:int}
      */
@@ -62,7 +79,9 @@ class ImportacaoNotasPlanilha
     {
         $porAluno = [];
         $porCodigo = [];
-        $ambiguos = [];
+        $ambiguosCodigo = [];
+        $porNome = [];
+        $ambiguosNome = [];
         $materiasPorNorma = [];
         foreach ($elegiveis as $row) {
             if (!is_array($row)) {
@@ -79,9 +98,17 @@ class ImportacaoNotasPlanilha
                     continue;
                 }
                 if (isset($porCodigo[$cod]) && $porCodigo[$cod] !== $aid) {
-                    $ambiguos[$cod] = true;
+                    $ambiguosCodigo[$cod] = true;
                 } else {
                     $porCodigo[$cod] = $aid;
+                }
+            }
+            $nomeNorma = $this->normalizarNomeAluno((string) ($row['aluno_nome'] ?? ''));
+            if ($nomeNorma !== '') {
+                if (isset($porNome[$nomeNorma]) && $porNome[$nomeNorma] !== $aid) {
+                    $ambiguosNome[$nomeNorma] = true;
+                } else {
+                    $porNome[$nomeNorma] = $aid;
                 }
             }
             $norma = $this->normalizarTexto((string) ($row['materia_nome'] ?? ''));
@@ -96,16 +123,17 @@ class ImportacaoNotasPlanilha
         foreach ($linhas as $linha) {
             $n = (int) ($linha['linha'] ?? 0);
             $cod = $this->normalizarCodigo((string) ($linha['codigo'] ?? ''));
+            $nomeLinha = $this->normalizarNomeAluno((string) ($linha['nome'] ?? ''));
             $notaBruta = trim(str_replace(',', '.', (string) ($linha['nota'] ?? '')));
             $disciplinaBruta = trim((string) ($linha['disciplina'] ?? ''));
-            if ($cod === '' && $notaBruta === '' && $disciplinaBruta === '') {
+            if ($cod === '' && $nomeLinha === '' && $notaBruta === '' && $disciplinaBruta === '') {
                 continue;
             }
-            if ($cod === '') {
-                $erros[] = 'Linha ' . $n . ': informe o código do aluno.';
+            if ($cod === '' && $nomeLinha === '') {
+                $erros[] = 'Linha ' . $n . ': informe o código ou o nome do aluno.';
                 continue;
             }
-            if ($notaBruta === '') {
+            if ($notaBruta === '' || $this->notaVaziaOuMarcador($notaBruta)) {
                 $ignoradas++;
                 continue;
             }
@@ -118,16 +146,32 @@ class ImportacaoNotasPlanilha
                 $erros[] = 'Linha ' . $n . ': a nota deve estar entre 0 e 10.';
                 continue;
             }
-            if (!isset($porCodigo[$cod]) || isset($ambiguos[$cod])) {
-                $erros[] = isset($ambiguos[$cod])
-                    ? 'Linha ' . $n . ': o código ' . $this->recortar((string) ($linha['codigo'] ?? '')) . ' aparece em mais de um aluno.'
-                    : 'Linha ' . $n . ': o código ' . $this->recortar((string) ($linha['codigo'] ?? '')) . ' não está neste evento.';
-                continue;
+
+            $aid = 0;
+            if ($cod !== '') {
+                if (!isset($porCodigo[$cod]) || isset($ambiguosCodigo[$cod])) {
+                    $erros[] = isset($ambiguosCodigo[$cod])
+                        ? 'Linha ' . $n . ': o código ' . $this->recortar((string) ($linha['codigo'] ?? '')) . ' aparece em mais de um aluno.'
+                        : 'Linha ' . $n . ': o código ' . $this->recortar((string) ($linha['codigo'] ?? '')) . ' não está neste evento.';
+                    continue;
+                }
+                $aid = $porCodigo[$cod];
+            } else {
+                if (!isset($porNome[$nomeLinha]) || isset($ambiguosNome[$nomeLinha])) {
+                    $erros[] = isset($ambiguosNome[$nomeLinha])
+                        ? 'Linha ' . $n . ': o nome ' . $this->recortar((string) ($linha['nome'] ?? '')) . ' aparece em mais de um aluno neste evento.'
+                        : 'Linha ' . $n . ': o nome ' . $this->recortar((string) ($linha['nome'] ?? '')) . ' não está neste evento.';
+                    continue;
+                }
+                $aid = $porNome[$nomeLinha];
             }
-            $aid = $porCodigo[$cod];
+
             $candidatos = $porAluno[$aid] ?? [];
             if (!$notaUnica) {
                 $disciplina = $this->normalizarTexto($disciplinaBruta);
+                if ($disciplina === '' && count($materiasPorNorma) === 1) {
+                    $disciplina = (string) array_key_first($materiasPorNorma);
+                }
                 if ($disciplina === '') {
                     $erros[] = 'Linha ' . $n . ': informe a disciplina.';
                     continue;
@@ -229,8 +273,9 @@ class ImportacaoNotasPlanilha
         if ($zip->open($caminho) !== true) {
             throw new \RuntimeException('Não foi possível abrir a planilha.');
         }
-        $compartilhadas = $this->textosCompartilhados($zip->getFromName('xl/sharedStrings.xml') ?: '');
-        $aba = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $this->exigirEntradaZipSegura($zip, 'xl/worksheets/sheet1.xml');
+        $compartilhadas = $this->textosCompartilhados($this->lerEntradaZip($zip, 'xl/sharedStrings.xml') ?: '');
+        $aba = $this->lerEntradaZip($zip, 'xl/worksheets/sheet1.xml');
         $zip->close();
         if (!is_string($aba) || $aba === '') {
             throw new \RuntimeException('A planilha não tem uma primeira aba.');
@@ -300,6 +345,107 @@ class ImportacaoNotasPlanilha
     }
 
     /**
+     * Lê a(s) tabela(s) do Word (.docx) — formato OOXML.
+     *
+     * @return list<list<string>>
+     */
+    private function lerDocx(string $caminho): array
+    {
+        if (!class_exists(\ZipArchive::class)) {
+            throw new \RuntimeException('Este servidor não abre Word. Salve a tabela como CSV ou Excel.');
+        }
+        $zip = new \ZipArchive();
+        if ($zip->open($caminho) !== true) {
+            throw new \RuntimeException('Não foi possível abrir o documento Word.');
+        }
+        $this->exigirEntradaZipSegura($zip, 'word/document.xml');
+        $xml = $this->lerEntradaZip($zip, 'word/document.xml');
+        $zip->close();
+        if (!is_string($xml) || $xml === '') {
+            throw new \RuntimeException('O Word não tem conteúdo legível.');
+        }
+
+        $dom = new \DOMDocument();
+        $anterior = libxml_use_internal_errors(true);
+        $carregou = $dom->loadXML($xml, LIBXML_NONET);
+        libxml_clear_errors();
+        libxml_use_internal_errors($anterior);
+        if ($carregou !== true) {
+            throw new \RuntimeException('Não foi possível ler o documento Word.');
+        }
+
+        $xp = new \DOMXPath($dom);
+        $xp->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
+        // Só tabelas do corpo (evita tabela aninhada / cabeçalho).
+        $tabelasXml = $xp->query('/w:document/w:body/w:tbl');
+        if ($tabelasXml === false || $tabelasXml->length === 0) {
+            $tabelasXml = $xp->query('//w:body/w:tbl');
+        }
+        if ($tabelasXml === false || $tabelasXml->length === 0) {
+            throw new \RuntimeException('O Word precisa ter uma tabela com as notas (código ou nome, e nota).');
+        }
+
+        $tabela = [];
+        $cabecalhoNorma = null;
+        foreach ($tabelasXml as $tbl) {
+            if (!$tbl instanceof \DOMElement) {
+                continue;
+            }
+            $linhasXml = $xp->query('./w:tr', $tbl);
+            if ($linhasXml === false) {
+                continue;
+            }
+            $primeiraDaTabela = true;
+            foreach ($linhasXml as $tr) {
+                if (!$tr instanceof \DOMElement) {
+                    continue;
+                }
+                if (count($tabela) >= self::MAX_LINHAS + 1) {
+                    throw new \RuntimeException('A planilha passa de ' . self::MAX_LINHAS . ' linhas.');
+                }
+                $row = [];
+                foreach ($xp->query('./w:tc', $tr) ?: [] as $tc) {
+                    if (!$tc instanceof \DOMElement) {
+                        continue;
+                    }
+                    $paragrafos = [];
+                    foreach ($xp->query('./w:p', $tc) ?: [] as $p) {
+                        if (!$p instanceof \DOMElement) {
+                            continue;
+                        }
+                        $textos = [];
+                        foreach ($xp->query('.//w:t', $p) ?: [] as $t) {
+                            $textos[] = (string) ($t->textContent ?? '');
+                        }
+                        $paragrafo = trim(implode('', $textos));
+                        if ($paragrafo !== '') {
+                            $paragrafos[] = $paragrafo;
+                        }
+                    }
+                    $row[] = trim(preg_replace('/\s+/u', ' ', implode(' ', $paragrafos)) ?? '');
+                }
+                if ($primeiraDaTabela) {
+                    $primeiraDaTabela = false;
+                    $normaLinha = $this->normalizarTexto(implode('|', $row));
+                    if ($cabecalhoNorma === null) {
+                        $cabecalhoNorma = $normaLinha;
+                    } elseif ($normaLinha === $cabecalhoNorma) {
+                        // Cabeçalho repetido em outra tabela do mesmo arquivo.
+                        continue;
+                    }
+                }
+                $tabela[] = $row;
+            }
+        }
+
+        if ($tabela === []) {
+            throw new \RuntimeException('A tabela do Word está vazia.');
+        }
+
+        return $tabela;
+    }
+
+    /**
      * @return list<string>
      */
     private function textosCompartilhados(string $xml): array
@@ -341,7 +487,7 @@ class ImportacaoNotasPlanilha
 
     /**
      * @param list<list<string>> $tabela
-     * @return list<array{linha:int,codigo:string,disciplina:string,nota:string}>
+     * @return list<array{linha:int,codigo:string,nome:string,disciplina:string,nota:string}>
      */
     private function tabelaParaLinhas(array $tabela): array
     {
@@ -362,7 +508,7 @@ class ImportacaoNotasPlanilha
         if ($mapa !== null) {
             $inicio = 1;
         } else {
-            $mapa = ['codigo' => 0, 'disciplina' => 1, 'nota' => 2];
+            $mapa = ['codigo' => 0, 'nome' => -1, 'disciplina' => 1, 'nota' => 2];
         }
         $saida = [];
         for ($i = $inicio; $i < count($tabela); $i++) {
@@ -373,6 +519,7 @@ class ImportacaoNotasPlanilha
             $saida[] = [
                 'linha' => $i + 1,
                 'codigo' => trim((string) ($row[$mapa['codigo']] ?? '')),
+                'nome' => trim((string) ($row[$mapa['nome']] ?? '')),
                 'disciplina' => trim((string) ($row[$mapa['disciplina']] ?? '')),
                 'nota' => trim((string) ($row[$mapa['nota']] ?? '')),
             ];
@@ -386,16 +533,18 @@ class ImportacaoNotasPlanilha
 
     /**
      * @param list<string> $cabecalho
-     * @return array{codigo:int,disciplina:int,nota:int}|null
+     * @return array{codigo:int,nome:int,disciplina:int,nota:int}|null
      */
     private function mapaColunas(array $cabecalho): ?array
     {
         $aliases = [
             'codigo' => ['codigo', 'codigo do aluno', 'codigo_aluno', 'cod', 'ra', 'matricula'],
+            'nome' => ['nome', 'aluno', 'nome do aluno', 'nome aluno', 'estudante', 'nome completo'],
             'disciplina' => ['disciplina', 'materia', 'componente', 'componente curricular'],
-            'nota' => ['nota', 'nota final', 'valor'],
+            'nota' => ['nota', 'nota final', 'valor', 'nota da prova bimestral', 'nota bimestral', 'nota da prova'],
         ];
         $achou = [];
+        $candidatasNota = [];
         foreach ($cabecalho as $i => $celula) {
             $norma = $this->normalizarTexto((string) $celula);
             foreach ($aliases as $chave => $opcoes) {
@@ -406,9 +555,26 @@ class ImportacaoNotasPlanilha
                     $achou[$chave] = (int) $i;
                 }
             }
+            if (str_starts_with($norma, 'nota')) {
+                $candidatasNota[] = (int) $i;
+            }
         }
-        if (!isset($achou['codigo'], $achou['nota'])) {
+        if (!isset($achou['nota'])) {
+            $candidatasNota = array_values(array_unique($candidatasNota));
+            if (count($candidatasNota) === 1) {
+                $achou['nota'] = $candidatasNota[0];
+            } else {
+                return null;
+            }
+        }
+        if (!isset($achou['codigo']) && !isset($achou['nome'])) {
             return null;
+        }
+        if (!isset($achou['codigo'])) {
+            $achou['codigo'] = -1;
+        }
+        if (!isset($achou['nome'])) {
+            $achou['nome'] = -1;
         }
         if (!isset($achou['disciplina'])) {
             $achou['disciplina'] = -1;
@@ -416,9 +582,48 @@ class ImportacaoNotasPlanilha
 
         return [
             'codigo' => $achou['codigo'],
+            'nome' => $achou['nome'],
             'disciplina' => $achou['disciplina'],
             'nota' => $achou['nota'],
         ];
+    }
+
+    private function notaVaziaOuMarcador(string $nota): bool
+    {
+        $norma = $this->normalizarTexto($nota);
+        return in_array($norma, ['tr', 'transferido', 'transferida', '-', 'n/a', 'na', 's/n', 'sn'], true);
+    }
+
+    private function exigirEntradaZipSegura(\ZipArchive $zip, string $caminho): void
+    {
+        $stat = $zip->statName($caminho);
+        if (!is_array($stat)) {
+            return;
+        }
+        $tamanho = (int) ($stat['size'] ?? 0);
+        if ($tamanho > self::MAX_XML_BYTES) {
+            throw new \RuntimeException('O arquivo interno da planilha é grande demais para importar.');
+        }
+    }
+
+    private function lerEntradaZip(\ZipArchive $zip, string $caminho): string
+    {
+        $stat = $zip->statName($caminho);
+        if (is_array($stat)) {
+            $tamanho = (int) ($stat['size'] ?? 0);
+            if ($tamanho > self::MAX_XML_BYTES) {
+                throw new \RuntimeException('O arquivo interno da planilha é grande demais para importar.');
+            }
+        }
+        $conteudo = $zip->getFromName($caminho);
+        if (!is_string($conteudo)) {
+            return '';
+        }
+        if (strlen($conteudo) > self::MAX_XML_BYTES) {
+            throw new \RuntimeException('O arquivo interno da planilha é grande demais para importar.');
+        }
+
+        return $conteudo;
     }
 
     private function normalizarCodigo(string $codigo): string
@@ -431,6 +636,15 @@ class ImportacaoNotasPlanilha
         $codigo = preg_replace('/\s+/', '', $codigo) ?? $codigo;
 
         return $codigo;
+    }
+
+    private function normalizarNomeAluno(string $nome): string
+    {
+        $nome = AlunoLancamentoNotaHelper::normalizarNome($nome);
+        // Remove prefixo "TR " que a tela usa para transferido.
+        $nome = preg_replace('/^TR\s+/u', '', $nome) ?? $nome;
+
+        return trim($nome);
     }
 
     private function normalizarTexto(string $texto): string
