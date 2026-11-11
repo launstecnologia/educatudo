@@ -630,7 +630,7 @@ class ModeloDocumentoService
                 $item('dados_aluno', 'Dados do aluno', 'fa-user-graduate'),
                 $item('dados_responsavel', 'Dados do responsável', 'fa-user'),
                 $item('dados_turma', 'Dados da turma', 'fa-users'),
-                $item('boletim', 'Boletim', 'fa-table-list', 'Boletim vinculado à regra de aprovação. Na prévia: regra, curso/série e aluno.'),
+                $item('boletim', 'Boletim', 'fa-table-list', 'Layout criado em Acadêmico → Boletim. Na prévia: regra, curso/série e aluno.'),
                 $item('frequencia', 'Frequência', 'fa-chart-pie'),
                 $item('observacoes', 'Observações', 'fa-comment'),
                 $item('assinaturas', 'Assinaturas', 'fa-signature'),

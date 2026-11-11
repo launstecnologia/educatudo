@@ -52,29 +52,28 @@ $renderCampos('Contrato e valores', $grupos['contrato']['chaves'] ?? [], 'fa-fil
 </details>
 <details class="edoc-tool-group" data-edoc-palette-group>
 <summary><span>Acadêmico</span><small>Boletim, eventos, médias, faltas e histórico</small></summary>
-<p class="edoc-hint">Na prévia, escolha a regra de aprovação (ela já vincula ano, série, Demonstrativo e Boletim). Depois arraste cada bimestre do Demonstrativo — ou o Boletim, que é outro bloco.</p>
+<p class="edoc-hint">Na prévia, escolha a regra de aprovação. Clique em Demonstrativo e selecione o bimestre; Boletim é o layout criado em Acadêmico → Boletim.</p>
 <div class="edoc-var-stack">
 <?php $renderElementos(array_values(array_filter($catalogo['dados'] ?? [], static fn ($i) => ($i['tipo'] ?? '') === 'boletim'))); ?>
-<details class="edoc-var-drop edoc-var-group-side" id="edoc-periodos-demo" open>
-<summary>
-<span class="edoc-var-ico" aria-hidden="true"><i class="fa-solid fa-table-cells"></i></span>
-<span class="edoc-var-titulo">Demonstrativo de Notas</span>
-<span class="edoc-var-count" id="edoc-periodos-count">0</span>
-</summary>
-<p class="edoc-hint" id="edoc-periodos-hint">Escolha a regra de aprovação na prévia para listar 1º Bimestre, 2º Bimestre… (iguais aos cards da regra).</p>
-<div class="edoc-var-chips" id="edoc-periodos-chips"></div>
-</details>
+<div class="edoc-element-list edoc-demo-picker-wrap">
+<div class="edoc-demo-picker" id="edoc-demo-picker">
+<button type="button" class="edoc-item" id="edoc-demo-abrir" aria-haspopup="listbox" aria-expanded="false" aria-controls="edoc-demo-menu" title="Escolha o bimestre/semestre para inserir na folha">
+<i class="fa-solid fa-table-cells" aria-hidden="true"></i>
+<span class="edoc-item-text"><strong>Demonstrativo de Notas</strong><small>Clique para escolher 1º, 2º bimestre…</small></span>
+<i class="fa-solid fa-chevron-down edoc-item-add" aria-hidden="true"></i>
+</button>
+<div class="edoc-demo-menu" id="edoc-demo-menu" role="listbox" hidden>
+<p class="edoc-hint" id="edoc-periodos-hint">Escolha a regra de aprovação na prévia para listar os bimestres.</p>
+<div class="edoc-demo-menu-list" id="edoc-periodos-chips"></div>
+</div>
+</div>
+</div>
 <div class="edoc-demo" id="edoc-demo">
 <div class="edoc-demo-head">
-<strong>Disciplinas e eventos</strong>
-<p>Na prévia, escolha regra de aprovação, curso/série e aluno. Depois insira cada nota, falta ou média.</p>
+<strong>Disciplinas, notas e médias</strong>
+<p>Na prévia, escolha regra, curso/série e aluno. Depois abra a lista e arraste cada campo para a folha.</p>
 </div>
 <label class="edoc-demo-check" for="edoc-demo-sigla"><input type="checkbox" id="edoc-demo-sigla"> Sigla no lugar do nome</label>
-<div class="edoc-atalhos">
-<button type="button" class="edoc-btn" data-atalho="glossario">Glossário</button>
-<button type="button" class="edoc-btn" data-atalho="componentes">Disciplinas</button>
-<button type="button" class="edoc-btn" data-atalho="serie">Série e turma</button>
-</div>
 <details class="edoc-var-drop" id="edoc-demo-comps-drop" hidden>
 <summary>
 <span class="edoc-var-ico" aria-hidden="true"><i class="fa-solid fa-book-open"></i></span>

@@ -3399,6 +3399,7 @@
     if (tipo === 'boletim') {
       el.style = { fontSize: 7.5 };
       el.props = {
+        bimestre: 0,
         html: '<div class="quadro-notas-wrap doc-quadro-fit" style="font-size:7.5pt;width:100%;max-width:100%;">{{boletim_html}}</div>'
       };
     }
@@ -3701,6 +3702,9 @@
     if (tipo === 'boletim' || tipo === 'demonstrativo_notas') {
       garantirPaisagemBoletim();
     }
+    if (tipo === 'boletim') {
+      restaurarPlaceholderBoletim(el);
+    }
     if (!skipHist) pushHist();
     render();
     if (tipo === 'demonstrativo_notas') {
@@ -3708,7 +3712,10 @@
       setStatus('Demonstrativo na folha — escolha regra, curso/série e aluno na prévia');
     } else if (tipo === 'boletim') {
       abrirCardBoletim(true);
-      setStatus('Boletim na folha — escolha regra, curso/série e aluno na prévia');
+      setStatus('Boletim na folha — usa o layout criado em Acadêmico → Boletim (não o Demonstrativo).');
+      try {
+        if (typeof window.__edocRecarregarDemo === 'function') window.__edocRecarregarDemo();
+      } catch (eRecarrega) {}
     }
     if (tipo === 'tabela') {
       var node = paper && paper.querySelector('.edoc-el[data-id="' + el.id + '"]');
@@ -4767,6 +4774,33 @@
     return 'quadro_notas_html';
   }
 
+  /** Garante que blocos Boletim usem só {{boletim_html}} (nunca quadro/demonstrativo). */
+  function restaurarPlaceholderBoletim(el) {
+    if (!el || el.type !== 'boletim') return false;
+    el.props = el.props || {};
+    el.props.bimestre = 0;
+    var html = String(el.props.html || '');
+    var soBoletimToken = boletimHtmlSoDinamico(html) && /\{\{\s*boletim_html\s*\}\}/i.test(html)
+      && !/\{\{\s*quadro_notas(?:_b[1-4])?_html\s*\}\}/i.test(html);
+    if (soBoletimToken) return false;
+    garantirHtmlBoletimPadrao(el);
+    return true;
+  }
+
+  function restaurarTodosPlaceholdersBoletim() {
+    var mudou = false;
+    ['header', 'body', 'footer'].forEach(function (role) {
+      (areaOf(role).sections || []).forEach(function (sec) {
+        (sec.columns || []).forEach(function (col) {
+          (col.elements || []).forEach(function (el) {
+            if (restaurarPlaceholderBoletim(el)) mudou = true;
+          });
+        });
+      });
+    });
+    return mudou;
+  }
+
   function acharElementoBoletim() {
     var roles = ['header', 'body', 'footer'];
     for (var r = 0; r < roles.length; r++) {
@@ -4939,44 +4973,88 @@
       abrirCardBoletim(true);
       setStatus((rotulo || 'Demonstrativo') + ' na folha — escolha regra, curso/série e aluno na prévia');
     }
+    function fecharMenuDemonstrativo() {
+      var picker = $('#edoc-demo-picker');
+      var menu = $('#edoc-demo-menu');
+      var btn = $('#edoc-demo-abrir');
+      if (menu) menu.hidden = true;
+      if (picker) picker.classList.remove('is-open');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+    }
+    function abrirMenuDemonstrativo() {
+      var picker = $('#edoc-demo-picker');
+      var menu = $('#edoc-demo-menu');
+      var btn = $('#edoc-demo-abrir');
+      if (!menu || !btn) return;
+      menu.hidden = false;
+      if (picker) picker.classList.add('is-open');
+      btn.setAttribute('aria-expanded', 'true');
+    }
     function pintarPeriodosDemonstrativo(lista) {
       var boxPeriodos = $('#edoc-periodos-chips');
-      var contagem = $('#edoc-periodos-count');
       var hint = $('#edoc-periodos-hint');
+      var btnAbrir = $('#edoc-demo-abrir');
       if (!boxPeriodos) return;
       lista = lista || [];
+      demoPacote.periodos_demonstrativo = lista;
       if (!lista.length) {
         boxPeriodos.innerHTML = '';
-        if (contagem) contagem.textContent = '0';
         if (hint) {
           hint.hidden = false;
           hint.textContent = 'Escolha a regra de aprovação na prévia para listar 1º, 2º bimestre…';
         }
+        if (btnAbrir) {
+          var smallVazio = btnAbrir.querySelector('small');
+          if (smallVazio) smallVazio.textContent = 'Escolha a regra na prévia e clique aqui';
+        }
         return;
       }
       if (hint) hint.hidden = true;
+      if (btnAbrir) {
+        var smallOk = btnAbrir.querySelector('small');
+        if (smallOk) smallOk.textContent = lista.length + ' períodos — clique para escolher';
+      }
       var html = '';
-      html += '<button type="button" class="edoc-var-chip" data-demo-bimestre="0" title="Todos os períodos da regra">'
-        + '<span class="edoc-var-nome">Todos os períodos</span>'
-        + '<span class="edoc-var-token">{{quadro_notas_html}}</span></button>';
       lista.forEach(function (p) {
         var n = Number(p.n || 0);
         if (n <= 0) return;
         var rotulo = p.rotulo || (n + 'º Bimestre');
         var chave = p.chave || ('quadro_notas_b' + n + '_html');
-        html += '<button type="button" class="edoc-var-chip" draggable="true" data-demo-bimestre="' + n + '" data-demo-rotulo="' + esc(rotulo) + '" data-drag-var="' + esc(chave) + '" title="Arraste para a folha: ' + esc(rotulo) + '">'
-          + '<span class="edoc-var-nome">' + esc(rotulo) + '</span>'
-          + '<span class="edoc-var-token">{{' + esc(chave) + '}}</span></button>';
+        html += '<button type="button" class="edoc-demo-opcao" role="option" data-demo-bimestre="' + n + '" data-demo-rotulo="' + esc(rotulo) + '" title="Inserir ' + esc(rotulo) + ' na folha">'
+          + '<strong>' + esc(rotulo) + '</strong>'
+          + '<small>{{' + esc(chave) + '}}</small></button>';
       });
       boxPeriodos.innerHTML = html;
-      if (contagem) contagem.textContent = String(lista.length);
       $all('[data-demo-bimestre]', boxPeriodos).forEach(function (btn) {
         btn.addEventListener('click', function () {
           inserirDemonstrativoPeriodo(btn.getAttribute('data-demo-bimestre'), btn.getAttribute('data-demo-rotulo') || btn.textContent);
+          fecharMenuDemonstrativo();
         });
-        if (btn.getAttribute('draggable') === 'true') {
-          ligarArrasteVariavel(btn);
+      });
+    }
+    function ligarSeletorDemonstrativo() {
+      var btnAbrir = $('#edoc-demo-abrir');
+      var menu = $('#edoc-demo-menu');
+      var picker = $('#edoc-demo-picker');
+      if (!btnAbrir || !menu || btnAbrir._edocDemoPicker) return;
+      btnAbrir._edocDemoPicker = true;
+      btnAbrir.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (menu.hidden) {
+          if (!(demoPacote.periodos_demonstrativo || []).length) {
+            abrirCardBoletim(true);
+            setStatus('Escolha a regra de aprovação na prévia para listar os bimestres.');
+          }
+          abrirMenuDemonstrativo();
+        } else {
+          fecharMenuDemonstrativo();
         }
+      });
+      document.addEventListener('click', function (e) {
+        if (!picker) return;
+        if (picker.contains(e.target)) return;
+        fecharMenuDemonstrativo();
       });
     }
     function pintarDemonstrativos(lista) {
@@ -5343,16 +5421,20 @@
       }
       if (data.vars) {
         persistirEdicaoSeHouver();
+        if (restaurarTodosPlaceholdersBoletim()) {
+          state.dirty = true;
+          scheduleSave();
+        }
         C.varsPreview = data.vars;
         C.modeloQuadroHtml = data.modelo_quadro_html || '';
         if (data.html_quadro) {
           C.varsPreview.quadro_notas_html = data.html_quadro;
           garantirPaisagemBoletim();
         }
-        if (data.html_boletim) {
-          C.varsPreview.boletim_html = data.html_boletim;
-        } else {
-          C.varsPreview.boletim_html = C.varsPreview.boletim_html || '';
+        // Boletim = layout criado; nunca herda o quadro do Demonstrativo.
+        C.varsPreview.boletim_html = data.html_boletim || '';
+        if (!C.varsPreview.boletim_html && data.html_quadro) {
+          // Mantém vazio de propósito — o bloco Boletim não deve mostrar Demonstrativo.
         }
         if (data.html_por_bimestre && typeof data.html_por_bimestre === 'object') {
           Object.keys(data.html_por_bimestre).forEach(function (n) {
@@ -5400,7 +5482,24 @@
     }
     function tipoFonteDoBloco() {
       var el = state.selected ? findPath(state.selected.id) : null;
-      var alvo = (el && el.element && elementoEhBoletim(el.element)) ? el.element : acharElementoBoletim();
+      var alvo = (el && el.element && elementoEhBoletim(el.element)) ? el.element : null;
+      if (!alvo) {
+        // Prefere Boletim se existir na folha — evita prévia cair no Demonstrativo.
+        var roles = ['header', 'body', 'footer'];
+        for (var r = 0; r < roles.length; r++) {
+          var secs = (areaOf(roles[r]).sections || []);
+          for (var i = 0; i < secs.length; i++) {
+            var cols = secs[i].columns || [];
+            for (var j = 0; j < cols.length; j++) {
+              var els = cols[j].elements || [];
+              for (var k = 0; k < els.length; k++) {
+                if (els[k] && els[k].type === 'boletim') return 'layout';
+              }
+            }
+          }
+        }
+        alvo = acharElementoBoletim();
+      }
       if (alvo && alvo.type === 'boletim') return 'layout';
       if (alvo && alvo.type === 'demonstrativo_notas') return 'demonstrativo';
       return 'demonstrativo';
@@ -5490,24 +5589,8 @@
         render();
       });
     }
-    if (box) {
-      box.addEventListener('click', function (e) {
-        var atalho = e.target.closest('[data-atalho]');
-        if (!atalho) return;
-        var qual = atalho.getAttribute('data-atalho');
-        if (qual === 'serie') {
-          inserirBlocoHtml('<p>Série: {{serie}}<br>Turma: {{turma_nome}}<br>Curso: {{curso_nome}}<br>Ano letivo: {{ano_letivo}}</p>');
-          return;
-        }
-        if (qual === 'componentes') {
-          inserirPersonalizado(htmlListaEditavel(), 'Lista na folha. Troque o nome pela sigla direto na célula.');
-          return;
-        }
-        if (qual === 'glossario') {
-          inserirPersonalizado(htmlGlossario(), 'Glossário na folha. Edite a sigla e o nome como quiser.');
-        }
-      });
-    }
+    ligarSeletorDemonstrativo();
+    window.__edocRecarregarDemo = carregar;
     carregar();
   }
 
@@ -5525,10 +5608,12 @@
       if (busca && !abertos) abertos = $all('details', $('#pane-elementos')).map(function (g) { return { node: g, open: g.open }; });
       grupos.forEach(function (grupo) {
         var encontrados = 0;
-        $all('[data-drag-type], [data-drag-layout], [data-drag-var], [data-emissao-preset]', grupo).forEach(function (item) {
-          var texto = item.textContent + ' ' + (item.getAttribute('title') || '') + ' ' + (item.getAttribute('data-drag-type') || '') + ' ' + (item.getAttribute('data-drag-var') || '') + ' ' + (item.getAttribute('data-var-nome') || '');
+        $all('[data-drag-type], [data-drag-layout], [data-drag-var], [data-emissao-preset], #edoc-demo-abrir', grupo).forEach(function (item) {
+          var texto = item.textContent + ' ' + (item.getAttribute('title') || '') + ' ' + (item.getAttribute('data-drag-type') || '') + ' ' + (item.getAttribute('data-drag-var') || '') + ' ' + (item.getAttribute('data-var-nome') || '') + ' demonstrativo bimestre';
           item.hidden = !!busca && normalizarBusca(texto).indexOf(busca) < 0;
           if (!item.hidden) encontrados++;
+          var wrap = item.closest('.edoc-demo-picker-wrap');
+          if (wrap) wrap.hidden = !!item.hidden;
         });
         grupo.hidden = encontrados === 0;
         if (busca && encontrados) {

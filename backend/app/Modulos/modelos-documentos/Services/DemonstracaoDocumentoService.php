@@ -154,7 +154,8 @@ class DemonstracaoDocumentoService
             $layoutId = $boletimId;
         }
 
-        // Demonstrativo: um HTML por bimestre + quadro completo do ano.
+        // Demonstrativo: um HTML por bimestre (igual detalhe do aluno) + quadro empilhado do ano.
+        // Nunca usa a visão de impressão do menu Boletim.
         $htmlPorBimestre = [];
         if ($demoId > 0 || $regraAcademicaId > 0) {
             foreach ($periodosDemo as $periodo) {
@@ -169,26 +170,17 @@ class DemonstracaoDocumentoService
             }
         }
         $quadroDemo = '';
-        if ($demoId > 0) {
-            $quadroDemo = $this->htmlQuadroDoBoletim($alunoId, $demoId, 'demonstrativo');
-        } elseif ($regraAcademicaId > 0 && $ano > 0) {
-            try {
-                $quadroSm = (new QuadroBoletimSantaMariaService($this->db))->montarHtml($alunoId, $ano);
-                if ((int) ($quadroSm['linhas'] ?? 0) > 0) {
-                    $quadroDemo = $this->envolverQuadroCompacto(trim((string) ($quadroSm['html'] ?? '')));
-                }
-            } catch (\Throwable $e) {
-                error_log('DemonstracaoDocumento quadro por regra/ano: ' . $e->getMessage());
-            }
-        }
-        if ($quadroDemo === '' && $htmlPorBimestre !== []) {
+        if ($htmlPorBimestre !== []) {
             $quadroDemo = $this->envolverQuadroCompacto(implode('', array_filter($htmlPorBimestre)));
         }
+        if ($quadroDemo === '' && ($demoId > 0 || $regraAcademicaId > 0) && $ano > 0) {
+            $quadroDemo = $this->htmlQuadroDemonstrativoAno($alunoId, $demoId, $ano);
+        }
 
-        // Boletim: layout de impressão (nunca o demonstrativo de um bimestre).
+        // Boletim: só a visão de impressão criada em Acadêmico → Boletim.
         $htmlBoletim = '';
         if ($layoutId > 0) {
-            $htmlBoletim = $this->htmlQuadroDoBoletim($alunoId, $layoutId, 'layout');
+            $htmlBoletim = $this->htmlQuadroDoLayoutBoletim($alunoId, $layoutId);
         }
 
         if ($boletimId > 0) {
@@ -644,7 +636,43 @@ class DemonstracaoDocumentoService
     }
 
     /**
+     * Visão de impressão do Boletim criado em Acadêmico → Boletim (boletim_layouts).
+     * Nunca resolve Demonstrativo / exibir_em=notas.
+     */
+    private function htmlQuadroDoLayoutBoletim(int $alunoId, int $layoutId): string
+    {
+        if ($alunoId <= 0 || $layoutId <= 0) {
+            return '';
+        }
+        try {
+            if (!class_exists(\App\Modulos\Boletins\Services\BoletimVisaoImpressaoService::class)
+                || !class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)
+            ) {
+                return '';
+            }
+            $regraLayout = (new \App\Modulos\Boletins\Services\BoletimVisaoImpressaoService())
+                ->encontrarRegraDoLayout($layoutId);
+            if ($regraLayout <= 0) {
+                // Garante a regra de impressão se o layout ainda não tiver uma.
+                $garantida = (new \App\Modulos\Boletins\Services\BoletimVisaoImpressaoService())
+                    ->garantirRegraDoLayout($layoutId);
+                $regraLayout = (int) ($garantida['regra_id'] ?? 0);
+            }
+            if ($regraLayout <= 0) {
+                return '';
+            }
+            $candidato = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
+                ->htmlQuadroPorRegraImpressao($alunoId, $regraLayout);
+            return $this->envolverQuadroCompacto(is_string($candidato) ? trim($candidato) : '');
+        } catch (\Throwable $e) {
+            error_log('DemonstracaoDocumento quadro layout boletim: ' . $e->getMessage());
+            return '';
+        }
+    }
+
+    /**
      * @param 'auto'|'demonstrativo'|'layout' $fonteTipo
+     * @deprecated Preferir htmlQuadroDoLayoutBoletim / htmlQuadroDemonstrativoAno.
      */
     private function htmlQuadroDoBoletim(int $alunoId, int $boletimId, string $fonteTipo = 'auto'): string
     {
@@ -652,76 +680,52 @@ class DemonstracaoDocumentoService
             return '';
         }
         $fonteTipo = $this->normalizarFonteTipo($fonteTipo);
-        $html = '';
-
-        $tentarDemonstrativo = static function () use ($alunoId, $boletimId): string {
-            try {
-                if (!class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)) {
-                    return '';
-                }
-                $candidato = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
-                    ->htmlQuadroPorBoletim($alunoId, $boletimId);
-                return is_string($candidato) ? trim($candidato) : '';
-            } catch (\Throwable $e) {
-                error_log('DemonstracaoDocumento quadro demonstrativo: ' . $e->getMessage());
-                return '';
-            }
-        };
-
-        $tentarLayout = static function () use ($alunoId, $boletimId): string {
-            try {
-                if (!class_exists(\App\Modulos\Boletins\Services\BoletimVisaoImpressaoService::class)
-                    || !class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)
-                ) {
-                    return '';
-                }
-                $regraLayout = (new \App\Modulos\Boletins\Services\BoletimVisaoImpressaoService())
-                    ->encontrarRegraDoLayout($boletimId);
-                if ($regraLayout <= 0) {
-                    return '';
-                }
-                $candidato = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
-                    ->htmlQuadroPorRegraImpressao($alunoId, $regraLayout);
-                return is_string($candidato) ? trim($candidato) : '';
-            } catch (\Throwable $e) {
-                error_log('DemonstracaoDocumento quadro layout boletim: ' . $e->getMessage());
-                return '';
-            }
-        };
-
-        // Demonstrativo de Notas: sempre o quadro do ano (todos bimestres/semestres configurados).
-        if ($fonteTipo === 'demonstrativo') {
-            $htmlSm = $this->htmlQuadroSantaMariaAno($alunoId, $boletimId, $fonteTipo);
-            if ($htmlSm !== '') {
-                return $this->envolverQuadroCompacto($htmlSm);
-            }
-            $html = $tentarDemonstrativo();
-            return $this->envolverQuadroCompacto($html);
-        }
-
         if ($fonteTipo === 'layout') {
-            $html = $tentarLayout();
-        } else {
-            // auto (legado): tenta demonstrativo (boletins) e depois layout.
-            $html = $tentarDemonstrativo();
-            if ($html === '') {
-                $html = $tentarLayout();
-            }
+            return $this->htmlQuadroDoLayoutBoletim($alunoId, $boletimId);
         }
+        $ano = $this->anoDoLayoutOuBoletim($boletimId, $fonteTipo === 'auto' ? 'demonstrativo' : $fonteTipo);
+        return $this->htmlQuadroDemonstrativoAno($alunoId, $boletimId, $ano);
+    }
 
-        // Só no path auto/demonstrativo: se veio 1 bimestre, sobe para o quadro do ano.
-        // Layout de Boletim permanece como montado no assistente.
-        if ($fonteTipo !== 'layout') {
-            $precisaAno = $html === '' || $this->quadroTemApenasUmBimestre($html);
-            if ($precisaAno) {
-                $htmlSm = $this->htmlQuadroSantaMariaAno($alunoId, $boletimId, $fonteTipo);
-                if ($htmlSm !== '') {
-                    $html = $htmlSm;
+    /**
+     * Quadro anual do Demonstrativo (bimestres empilhados ou grade Santa Maria).
+     * Não usa a visão de impressão do Boletim.
+     */
+    private function htmlQuadroDemonstrativoAno(int $alunoId, int $demonstrativoId, int $ano): string
+    {
+        if ($alunoId <= 0) {
+            return '';
+        }
+        if ($demonstrativoId > 0) {
+            $porBimestre = [];
+            for ($n = 1; $n <= 4; $n++) {
+                $htmlBim = $this->htmlQuadroDoBimestre($alunoId, $demonstrativoId, $n);
+                if ($htmlBim !== '') {
+                    $porBimestre[$n] = $htmlBim;
                 }
             }
+            if ($porBimestre !== []) {
+                return $this->envolverQuadroCompacto(implode('', $porBimestre));
+            }
         }
-
-        return $this->envolverQuadroCompacto($html);
+        if ($ano <= 0 && $demonstrativoId > 0) {
+            $ano = $this->anoDoBoletim($demonstrativoId);
+        }
+        if ($ano <= 0) {
+            return '';
+        }
+        try {
+            $quadro = (new QuadroBoletimSantaMariaService($this->db))->montarHtml($alunoId, $ano);
+            $html = trim((string) ($quadro['html'] ?? ''));
+            // Aceita HTML mesmo quando o contador de linhas vem zerado.
+            if ($html === '' || stripos($html, '<table') === false) {
+                return '';
+            }
+            return $this->envolverQuadroCompacto($html);
+        } catch (\Throwable $e) {
+            error_log('DemonstracaoDocumento quadro Demonstrativo ano: ' . $e->getMessage());
+            return '';
+        }
     }
 
     /**
@@ -729,20 +733,8 @@ class DemonstracaoDocumentoService
      */
     private function htmlQuadroSantaMariaAno(int $alunoId, int $boletimId, string $fonteTipo): string
     {
-        try {
-            $ano = $this->anoDoLayoutOuBoletim($boletimId, $fonteTipo);
-            if ($ano <= 0) {
-                return '';
-            }
-            $quadro = (new QuadroBoletimSantaMariaService($this->db))->montarHtml($alunoId, $ano);
-            if ((int) ($quadro['linhas'] ?? 0) <= 0) {
-                return '';
-            }
-            return trim((string) ($quadro['html'] ?? ''));
-        } catch (\Throwable $e) {
-            error_log('DemonstracaoDocumento quadro Santa Maria: ' . $e->getMessage());
-            return '';
-        }
+        $ano = $this->anoDoLayoutOuBoletim($boletimId, $fonteTipo);
+        return $this->htmlQuadroDemonstrativoAno($alunoId, 0, $ano);
     }
 
     /**
