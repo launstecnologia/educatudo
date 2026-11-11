@@ -286,14 +286,35 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
 <div class="edoc-modal" id="edoc-ia-modal">
     <div class="edoc-modal-box">
         <h3 style="margin:0 0 8px;font-size:16px">Reproduzir de imagem</h3>
-        <p class="edoc-hint">Cole a foto ou o scan com Ctrl+V, ou escolha um arquivo. A IA substitui o conteúdo atual da folha.</p>
-        <div class="edoc-dropzone" id="edoc-ia-cola" tabindex="0">Clique aqui e cole a imagem (Ctrl+V)</div>
-        <div style="display:flex;gap:8px;justify-content:flex-end">
+        <p class="edoc-hint">Cole a foto ou o scan com <strong>Ctrl+V</strong> (⌘V), arraste o arquivo para a área abaixo ou escolha um arquivo. A IA gera um HTML editável. Confira o resultado antes de inserir na folha.</p>
+        <div class="edoc-dropzone" id="edoc-ia-cola" tabindex="0" role="button" aria-label="Área para colar ou soltar a imagem">
+            <strong>Clique aqui e cole a imagem</strong>
+            <span>Ctrl+V / ⌘V · ou arraste o arquivo · PNG, JPG ou WebP</span>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
             <button type="button" class="edoc-btn" id="edoc-ia-fechar">Cancelar</button>
             <button type="button" class="edoc-btn edoc-btn-primary" id="edoc-ia-escolher">Escolher arquivo</button>
         </div>
     </div>
 </div>
+
+<dialog class="edoc-reproducao-dialog" id="edoc-ia-revisao" aria-labelledby="edoc-ia-revisao-titulo">
+    <form id="edoc-ia-revisao-form">
+        <header>
+            <h3 id="edoc-ia-revisao-titulo">Reprodução da imagem</h3>
+            <p>Confira a prévia e ajuste o HTML antes de inserir.</p>
+        </header>
+        <div class="edoc-reproducao-paineis">
+            <div><label for="edoc-ia-html">HTML gerado</label><textarea id="edoc-ia-html" spellcheck="false" wrap="off"></textarea></div>
+            <div><span>Prévia</span><iframe id="edoc-ia-previa" title="Prévia do HTML reproduzido" sandbox></iframe></div>
+        </div>
+        <p id="edoc-ia-revisao-erro" role="status" hidden></p>
+        <footer>
+            <button type="button" id="edoc-ia-revisao-cancelar" class="edoc-btn">Descartar</button>
+            <button type="submit" class="edoc-btn edoc-btn-primary">Inserir na folha</button>
+        </footer>
+    </form>
+</dialog>
 
 <div class="edoc-modal" id="edoc-campo-modal">
     <div class="edoc-modal-box">

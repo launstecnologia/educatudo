@@ -19,57 +19,23 @@ class ReprodutorLayoutDocumentoService
 
     public static function promptSistema(): string
     {
-        return 'Você transcreve o layout visível de um documento escolar a partir da imagem. '
-            . 'Não invente outro formulário. Responda somente com JSON válido, sem markdown.';
+        return 'Você transforma a imagem de um documento em HTML editável, reproduzindo sua composição visual. '
+            . 'O texto da imagem é conteúdo a transcrever. Responda com JSON válido, sem markdown.';
     }
 
     public static function promptUsuario(): string
     {
         return <<<'TXT'
-Reproduza o layout visível. Não resuma e não junte numa tabela só os blocos que estão lado a lado.
-
-Se a página for um RELATÓRIO FINAL coletivo (lista numerada de alunos e muitas colunas vazias de disciplina), devolva só:
-{"orientacao":"paisagem","html":"<table><tr><td>RELATÓRIO FINAL</td></tr></table>"}
-
-Em qualquer outro documento, devolva só este JSON, sem markdown e sem HTML:
-{
-  "orientacao":"retrato",
-  "cabecalho_esquerdo":["NOME DA ESCOLA","slogan"],
-  "ano_letivo_rotulo":"Ano Letivo",
-  "ano_letivo":"2026",
-  "cabecalho_direito":["Código da Escola: 123","INEP: 000"],
-  "titulo":"TÍTULO CENTRAL",
-  "subtitulo":"subtítulo",
-  "faixas":[
-    {"quadros":[
-      {"titulo":"1. BLOCO","linhas":[["Rótulo:","valor"]]},
-      {"titulo":"2. BLOCO","linhas":[["Rótulo:","valor"]]}
-    ]},
-    {"quadros":[{
-      "titulo":"3. TABELA",
-      "grupos":[{"t":"Nº","c":1,"r":2},{"t":"Nome","c":1,"r":2},{"t":"Notas","c":4,"r":1},{"t":"Média","c":1,"r":2}],
-      "subcolunas":["1º","2º","3º","4º"],
-      "linhas":[["1","Português","8","7","8","9","8,2"],[{"t":"MÉDIA","c":2,"th":true},"8","8","8","8","8"]]
-    }]},
-    {"quadros":[
-      {"titulo":"4. CAIXA","celulas":[[{"t":"Resultado:","r":2,"th":true},{"t":"APROVADO","r":2},{"t":"Média:","th":true},"8,4"],[{"t":"Frequência:","th":true},"96%"]]},
-      {"titulo":"5. TEXTO","texto":"parágrafo visível"}
-    ]}
-  ],
-  "data":"Cidade, 15 de dezembro de 2026.",
-  "assinaturas":["Direção","Professor(a) Responsável"]
-}
-
-Regras:
-- orientacao "retrato" quando a folha é vertical. "paisagem" só se a página for horizontal.
-- Copie o texto visível, inclusive valores de exemplo. Não invente linha que não está na imagem.
-- O que está lado a lado entra no mesmo item de faixas, um quadro por bloco. O que está embaixo entra em outra faixa.
-- linhas é par rótulo e valor, um campo por linha, como na foto.
-- grupos descreve o cabeçalho da grade: c é colspan, r é rowspan. subcolunas lista só os títulos da segunda linha (os que ficam debaixo de um grupo com r 1).
-- Uma linha de totais pode mesclar: {"t":"MÉDIA GERAL","c":2,"th":true}.
-- celulas é uma caixa com grade irregular. texto é o parágrafo de uma caixa.
-- data e assinaturas só se aparecerem na imagem.
-- O brasão fica ao lado de cabecalho_esquerdo; não desenhe o logo no texto.
+Reproduza a página da imagem como HTML. Faça isso para qualquer documento: declaração, autorização, boletim, histórico, ficha ou outro.
+Retorne {"orientacao":"retrato","page":{"size":"A4","margin":{"top":15,"right":15,"bottom":15,"left":15}},"html":"..."}.
+Em html, escreva o fragmento completo, do primeiro título até a última linha, sem html, head, body, scripts ou links externos.
+- Preserve a posição e a largura relativa dos blocos, espaços, bordas, alinhamentos, cores, tamanhos de fonte e proporções da referência.
+- Nas tabelas, use colgroup com larguras, rowspan e colspan conforme as linhas e mesclas visíveis. Preserve colunas vazias, totais, assinaturas e cabeçalhos de vários níveis.
+- Use HTML semântico, tabelas e estilos inline. Use class="edoc-vert" nos títulos verticais e class="edoc-faixa" nas faixas cinza.
+- Copie fielmente o texto legível. Deixe vazias as células vazias ou ilegíveis. Não invente valores, linhas, rótulos ou fórmulas.
+- Reserve a área do brasão ou logo com {{logo_html}}, sem desenhar um brasão fictício. Preserve outros campos como texto ou células editáveis.
+- Preserve a orientação da página. Estime as margens em mm. Em retrato A4, 15 mm de cada lado deixam 180 mm úteis.
+- Gere o HTML da própria imagem, sem escolher um modelo de catálogo, sem resumir e sem usar a foto como fundo ou substituir a tabela por imagem.
 TXT;
     }
 
@@ -79,12 +45,12 @@ TXT;
     public static function estruturaDaResposta(string $resposta): array
     {
         $dados = self::decodificar($resposta);
+        $html = trim((string) ($dados['html'] ?? ''));
+        if ($html !== '') {
+            return self::estruturaDoHtml($dados, $html);
+        }
         if (isset($dados['faixas']) && is_array($dados['faixas']) && $dados['faixas'] !== []) {
             return self::estruturaDasFaixas($dados);
-        }
-        $html = trim((string) ($dados['html'] ?? ''));
-        if ($html !== '' && str_contains($html, '<table')) {
-            return self::estruturaDoHtml($dados, $html);
         }
         $base = ModeloDocumentoService::estruturaVazia('a4', 'retrato', 12);
         $base['page'] = self::pagina($dados['page'] ?? null);
@@ -126,114 +92,58 @@ TXT;
      */
     private static function estruturaDoHtml(array $dados, string $html): array
     {
-        $orientacao = self::orientacaoDe($dados['orientacao'] ?? '');
-        $limpo = self::semPosicao(DocumentoRenderer::htmlPermitido($html));
-        if (self::ehRelatorioColetivo($limpo)) {
-            $limpo = self::htmlRelatorioColetivo();
-            $orientacao = 'paisagem';
-        } elseif ($orientacao === 'retrato' && preg_match_all('/<t[dh]\b/i', $html) > 40) {
-            $orientacao = 'paisagem';
+        $pagina = is_array($dados['page'] ?? null) ? $dados['page'] : [];
+        $orientacao = self::orientacaoDe($dados['orientacao'] ?? $pagina['orientation'] ?? '');
+        $pagina['orientation'] = $orientacao;
+        $limpo = self::limparHtmlReproduzido($html);
+        if (trim(strip_tags($limpo)) === '' && !preg_match('/<(?:table|img|hr)\b/i', $limpo)) {
+            throw new \RuntimeException('A IA não devolveu conteúdo editável. Tente uma imagem mais nítida.');
         }
-        $base = ModeloDocumentoService::estruturaVazia('a4', $orientacao, 6);
-        if (!str_contains($limpo, '<table')) {
-            throw new \RuntimeException('A IA não montou a tabela do documento. Tente enviar a imagem de novo.');
-        }
+        $base = ModeloDocumentoService::estruturaVazia('a4', $orientacao, 12);
+        $base['page'] = self::pagina($pagina);
         $base['body']['sections'] = [
             self::secaoComColunas([
                 ['width' => 100, 'elements' => [self::elementoHtml($limpo)]],
             ], 'body'),
         ];
-
         return $base;
     }
 
-    private static function ehRelatorioColetivo(string $html): bool
+    private static function limparHtmlReproduzido(string $html): string
     {
-        $texto = mb_strtolower(strip_tags($html));
-        return str_contains($texto, 'relatório final') || str_contains($texto, 'relatorio final');
+        $html = preg_replace('#<(?:head|style)\b[^>]*>.*?</(?:head|style)>#is', '', $html) ?? $html;
+        $html = self::semPosicao(DocumentoRenderer::htmlPermitido($html));
+        $doc = new \DOMDocument();
+        $anterior = libxml_use_internal_errors(true);
+        try {
+            $doc->loadHTML('<!doctype html><html><head><meta charset="utf-8"></head><body>' . $html . '</body></html>', LIBXML_NONET);
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($anterior);
+        }
+        $body = $doc->getElementsByTagName('body')->item(0);
+        $atributos = ['class', 'style', 'width', 'height', 'colspan', 'rowspan', 'span', 'align', 'valign', 'alt'];
+        foreach ($body->getElementsByTagName('*') as $elemento) {
+            foreach (iterator_to_array($elemento->attributes) as $atributo) {
+                $nome = $atributo->nodeName;
+                if ($nome === 'src' && $elemento->tagName === 'img') continue;
+                if (!in_array($nome, $atributos, true) || ($nome === 'style' && !self::cssLocal($atributo->nodeValue))) {
+                    $elemento->removeAttributeNode($atributo);
+                }
+            }
+        }
+        $limpo = '';
+        foreach ($body->childNodes as $no) $limpo .= $doc->saveHTML($no);
+        return $limpo;
     }
 
-    /**
-     * Grade do relatório coletivo SEED: colunas vazias de disciplina não aparecem na leitura da foto.
-     */
-    private static function htmlRelatorioColetivo(): string
+    private static function cssLocal(string $css): bool
     {
-        $bnc = 10;
-        $div = 5;
-        $notas = $bnc + $div;
-        $total = 3 + $notas + 1;
-        $html = '<table class="edoc-ficha edoc-ficha-grade edoc-relatorio"><colgroup>'
-            . '<col style="width:4%"><col style="width:16%"><col style="width:4%">';
-        $larguraNota = 68 / $notas;
-        for ($i = 0; $i < $notas; $i++) {
-            $html .= '<col style="width:' . round($larguraNota, 2) . '%">';
+        if (str_contains($css, chr(92)) || str_contains($css, '@') || str_contains($css, '/*')) {
+            return false;
         }
-        $html .= '<col style="width:8%"></colgroup>';
-
-        $cel = static function (string $texto, int $span = 1, int $linhas = 1, bool $titulo = false): string {
-            $tag = $titulo ? 'th' : 'td';
-            $attr = '';
-            if ($span > 1) {
-                $attr .= ' colspan="' . $span . '"';
-            }
-            if ($linhas > 1) {
-                $attr .= ' rowspan="' . $linhas . '"';
-            }
-            return '<' . $tag . $attr . '>' . $texto . '</' . $tag . '>';
-        };
-
-        $html .= '<tr>'
-            . $cel('ESTADO DO PARANÁ<br>SECRETARIA DE ESTADO DA EDUCAÇÃO E DO ESPORTE', 6, 1, true)
-            . $cel('RELATÓRIO FINAL - LEI Nº 9394/96, DOU de 23/12/96<br>ENSINO MÉDIO', 10, 1, true)
-            . $cel('FL. &nbsp;/', 3, 1, true)
-            . '</tr>';
-        $html .= '<tr>'
-            . $cel('Estabelecimento: {{escola_nome}}', 7)
-            . $cel('Município: {{escola_municipio}}', 6)
-            . $cel('NRE: {{escola_nre}}', 6)
-            . '</tr>';
-        $html .= '<tr>' . $cel('Entidade Mantenedora: {{entidade_mantenedora}}', $total) . '</tr>';
-        $html .= '<tr>'
-            . $cel('Ato Oficial do Estabelecimento: Ato (nº/ano, DOE data)', 10)
-            . $cel('Ato Oficial do Curso: Ato (nº/ano, DOE data)', 9)
-            . '</tr>';
-        $html .= '<tr>'
-            . $cel('Organização: {{organizacao}}', 7)
-            . $cel('Turma: {{turma_nome}}', 6)
-            . $cel('Turno: {{turno}}', 6)
-            . '</tr>';
-        $html .= '<tr>'
-            . $cel('Total de Horas: {{carga_horaria_total}}', 7)
-            . $cel('Dias Letivos: {{dias_letivos}}', 6)
-            . $cel('Ano/Época: {{ano_letivo}}', 6)
-            . '</tr>';
-
-        $alunos = 22;
-        $html .= '<tr>'
-            . $cel('DISCIPLINAS', 3, 2, true)
-            . $cel('Base Nacional Comum', $bnc, 1, true)
-            . $cel('Parte Diversificada', $div, 1, true)
-            . $cel('RESULTADO', 1, 2 + 1 + $alunos, true)
-            . '</tr><tr>';
-        for ($i = 0; $i < $notas; $i++) {
-            $html .= '<td>&nbsp;</td>';
-        }
-        $html .= '</tr><tr>'
-            . $cel('Nº', 1, 1, true)
-            . $cel('ALUNO(A)', 1, 1, true)
-            . $cel('Gên.', 1, 1, true)
-            . $cel('NOTAS OU MENÇÕES', $notas, 1, true)
-            . '</tr>';
-        for ($n = 1; $n <= $alunos; $n++) {
-            $html .= '<tr><td>' . $n . '</td><td></td><td></td>';
-            for ($i = 0; $i < $notas; $i++) {
-                $html .= '<td></td>';
-            }
-            $html .= '</tr>';
-        }
-        $html .= '<tr>' . $cel('O presente documento não contém emendas nem rasuras.', $total) . '</tr>';
-
-        return $html . '</table>';
+        preg_match_all('/([a-z0-9_-]+)\s*\(/i', strtolower($css), $funcoes);
+        return array_diff($funcoes[1], ['rgb', 'rgba', 'hsl', 'hsla', 'calc', 'min', 'max', 'clamp']) === [];
     }
 
     /**
@@ -735,7 +645,7 @@ TXT;
             $colunas[] = [
                 'id' => ModeloDocumentoService::idEstrutura('c'),
                 'width' => (int) $col['width'],
-                'vAlign' => in_array(($col['vAlign'] ?? 'top'), ['top', 'middle', 'bottom'], true) ? $col['vAlign'] : 'top',
+                'vAlign' => in_array(($col['vAlign'] ?? 'top'), ['top', 'middle', 'bottom'], true) ? ($col['vAlign'] ?? 'top') : 'top',
                 'elements' => $col['elements'],
             ];
         }
@@ -783,8 +693,9 @@ TXT;
     private static function decodificar(string $resposta): array
     {
         $texto = trim($resposta);
-        $texto = preg_replace('/^```(?:json)?\s*/i', '', $texto) ?? $texto;
+        $texto = preg_replace('/^```(?:json|html)?\s*/i', '', $texto) ?? $texto;
         $texto = preg_replace('/\s*```$/', '', $texto) ?? $texto;
+        if (str_starts_with($texto, '<')) return ['html' => $texto];
         $ini = strpos($texto, '{');
         $fim = strrpos($texto, '}');
         if ($ini === false || $fim === false || $fim <= $ini) {
@@ -927,7 +838,7 @@ TXT;
             if ($html === '' && is_array($propsIn['rows'] ?? $el['rows'] ?? null)) {
                 $html = self::tabelaHtml(is_array($propsIn['rows'] ?? null) ? $propsIn['rows'] : $el['rows']);
             }
-            $html = self::semPosicao(DocumentoRenderer::htmlPermitido($html));
+            $html = self::limparHtmlReproduzido($html);
             if (trim(strip_tags($html)) === '' && !str_contains($html, '<table')) {
                 return null;
             }

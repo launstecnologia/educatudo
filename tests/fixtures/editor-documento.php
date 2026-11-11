@@ -7,6 +7,11 @@ require BASE_PATH . '/vendor/autoload.php';
 
 use App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService;
 
+if (in_array('--reproducao', $argv, true)) {
+    echo json_encode(\App\Modulos\ModelosDocumentos\Services\ReprodutorLayoutDocumentoService::estruturaDaResposta(file_get_contents('php://stdin')), JSON_THROW_ON_ERROR);
+    exit;
+}
+
 if (in_array('--pdf', $argv, true)) {
     $pdf = new \Dompdf\Dompdf();
     $pdf->loadHtml('<h1>Documento de teste</h1><p>Resultado da impressão.</p>');
@@ -20,6 +25,7 @@ $estrutura = ModeloDocumentoService::estruturaVazia('a4', 'paisagem', 8);
 $estrutura['body']['sections'] = [ModeloDocumentoService::secaoPadrao([100])];
 $catalogo = ModeloDocumentoService::catalogoElementosEditor();
 $csrf_token = 'csrf-teste-local';
+$ia_disponivel = true;
 $placeholders = ModeloDocumentoService::PLACEHOLDERS;
 $grupos_placeholders = ModeloDocumentoService::gruposPlaceholders();
 $vars_preview = ['aluno_nome' => 'Aluno de demonstração', 'quadro_notas_html' => '<table><thead><tr><th>Matéria</th><th>Nota</th></tr></thead><tbody><tr data-boletim-materia="17"><td>Matemática</td><td data-boletim-coluna="b1_pp">7,5</td></tr></tbody></table>'];

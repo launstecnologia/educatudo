@@ -454,6 +454,24 @@ body.edoc-body {
   color: #9ca3af; font-size: 12px; display: flex; align-items: center; justify-content: center;
   margin: 0 0 12px; background: #f8fafc;
 }
+#edoc-ia-cola {
+  min-height: 120px;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 14px;
+  text-align: center;
+  cursor: pointer;
+  color: #64748b;
+  outline: none;
+}
+#edoc-ia-cola strong { display: block; font-size: 13px; color: #334155; }
+#edoc-ia-cola span { display: block; font-size: 11px; color: #94a3b8; }
+#edoc-ia-cola:focus,
+#edoc-ia-cola.is-drag {
+  border-color: var(--color-primary, #2563eb);
+  background: #eff6ff;
+  color: #1e40af;
+}
 .edoc-tree { font-size: 12px; }
 .edoc-tree-item { padding: 4px 6px; border-radius: 6px; cursor: pointer; display: flex; gap: 6px; align-items: center; }
 .edoc-tree-item:hover { background: #f3f4f6; }
@@ -1265,3 +1283,33 @@ td.edoc-celula-sel, th.edoc-celula-sel {
   color: #94a3b8;
 }
 .edoc-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+.edoc-reproducao-dialog {
+  width: min(1320px, 95vw);
+  max-height: 94vh;
+  padding: 18px;
+  border: 1px solid #dbe2ec;
+  border-radius: 12px;
+  color: #1e293b;
+  background: #fff;
+}
+.edoc-reproducao-dialog::backdrop { background: rgba(15, 23, 42, .5); }
+.edoc-reproducao-dialog header h3 { margin: 0; font-size: 18px; }
+.edoc-reproducao-dialog header p { margin: 4px 0 14px; color: #475569; font-size: 13px; }
+.edoc-reproducao-paineis { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 14px; }
+.edoc-reproducao-paineis label, .edoc-reproducao-paineis span { display: block; margin-bottom: 6px; font-weight: 600; }
+.edoc-reproducao-paineis textarea, .edoc-reproducao-paineis iframe { box-sizing: border-box; width: 100%; height: 63vh; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; }
+.edoc-reproducao-paineis textarea { resize: vertical; padding: 10px; font: 12px/1.5 monospace; }
+.edoc-reproducao-dialog footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+@media (max-width: 740px) {
+  .edoc-reproducao-paineis { grid-template-columns: minmax(0, 1fr); }
+  .edoc-reproducao-paineis textarea, .edoc-reproducao-paineis iframe { height: 32vh; }
+}
+
+.edoc-paper td.edoc-vert,
+.edoc-paper th.edoc-vert {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  text-align: center;
+}
+.edoc-paper .edoc-faixa { background-color: #d1d5db; }
