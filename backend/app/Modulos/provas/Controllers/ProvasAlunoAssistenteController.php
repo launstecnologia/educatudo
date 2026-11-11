@@ -39,9 +39,14 @@ class ProvasAlunoAssistenteController extends BaseController
     {
         $user = $this->auth->getUser();
         $userId = (int) ($user['id'] ?? 0);
-        $disponivel = CreditosModuleRegistry::acaoIaDisponivel(ProvasAlunoAssistenteService::MODULO_CREDITOS);
+        $disponivel = CreditosModuleRegistry::acaoIaDisponivel(ProvasAlunoAssistenteService::MODULO_CREDITOS)
+            || ProvasAlunoAssistenteService::LIBERAR_SEM_TUDICOINS;
         $historicoDisponivel = $this->historico->tabelasProntas();
         $conversas = $historicoDisponivel ? $this->historico->listarConversas($userId) : [];
+        $avatarUrl = \App\Core\LayoutHelper::getIaAvatarUrl();
+        if ($avatarUrl === '') {
+            $avatarUrl = URL . '/static/images/avatar-assistente-documentos.webp';
+        }
 
         $this->viewWithLayout('admin', 'admin/assistente/index', [
             'title' => 'Assistente - EducaTudo',
@@ -52,6 +57,8 @@ class ProvasAlunoAssistenteController extends BaseController
             'assistente_disponivel' => $disponivel,
             'historico_disponivel' => $historicoDisponivel,
             'conversas_iniciais' => $conversas,
+            'assistente_avatar_url' => $avatarUrl,
+            'assistente_nome' => \App\Core\LayoutHelper::getIaName(),
         ]);
     }
 
@@ -165,7 +172,10 @@ class ProvasAlunoAssistenteController extends BaseController
             @flush();
         };
 
-        if (!CreditosModuleRegistry::acaoIaDisponivel(ProvasAlunoAssistenteService::MODULO_CREDITOS)) {
+        if (
+            !CreditosModuleRegistry::acaoIaDisponivel(ProvasAlunoAssistenteService::MODULO_CREDITOS)
+            && !ProvasAlunoAssistenteService::LIBERAR_SEM_TUDICOINS
+        ) {
             $emit('error', [
                 'error' => 'Assistente indisponível. Ative TudiCoins para esta escola no Master e inclua o item provas_aluno_assistente_mensagem no catálogo de custos.',
             ]);
@@ -317,12 +327,16 @@ class ProvasAlunoAssistenteController extends BaseController
 
     private function assertIaDisponivel(): void
     {
-        if (!CreditosModuleRegistry::acaoIaDisponivel(ProvasAlunoAssistenteService::MODULO_CREDITOS)) {
-            $this->json([
-                'success' => false,
-                'error' => 'Assistente indisponível. Ative TudiCoins para esta escola no Master.',
-            ], 403);
+        if (
+            CreditosModuleRegistry::acaoIaDisponivel(ProvasAlunoAssistenteService::MODULO_CREDITOS)
+            || ProvasAlunoAssistenteService::LIBERAR_SEM_TUDICOINS
+        ) {
+            return;
         }
+        $this->json([
+            'success' => false,
+            'error' => 'Assistente indisponível. Ative TudiCoins para esta escola no Master.',
+        ], 403);
     }
 
     private function usuarioPodeUsar(?array $user): bool

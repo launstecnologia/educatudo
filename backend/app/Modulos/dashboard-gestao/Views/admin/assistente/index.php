@@ -4,11 +4,19 @@ $disponivel = !empty($assistente_disponivel);
 $historicoDisponivel = !empty($historico_disponivel);
 $conversasIniciais = is_array($conversas_iniciais ?? null) ? $conversas_iniciais : [];
 $urlBase = URL . '/admin/assistente';
+$assistenteAvatar = htmlspecialchars(
+    (string) ($assistente_avatar_url ?? (URL . '/static/images/avatar-assistente-documentos.webp')),
+    ENT_QUOTES,
+    'UTF-8'
+);
+$assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT_QUOTES, 'UTF-8');
 ?>
 <div class="space-y-3"
      id="assistente-root"
      data-disponivel="<?= $disponivel ? '1' : '0' ?>"
      data-historico="<?= $historicoDisponivel ? '1' : '0' ?>"
+     data-avatar="<?= $assistenteAvatar ?>"
+     data-nome="<?= $assistenteNome ?>"
      data-url-stream="<?= htmlspecialchars($urlBase . '/mensagem-stream', ENT_QUOTES, 'UTF-8') ?>"
      data-url-listar="<?= htmlspecialchars($urlBase . '/conversas', ENT_QUOTES, 'UTF-8') ?>"
      data-url-obter="<?= htmlspecialchars($urlBase . '/conversa', ENT_QUOTES, 'UTF-8') ?>"
@@ -19,11 +27,15 @@ $urlBase = URL . '/admin/assistente';
      data-conversas="<?= htmlspecialchars(json_encode($conversasIniciais, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>">
 
         <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900">Assistente</h1>
-            <p class="text-sm text-gray-600 mt-1">
-                Consulte aluno (provas/jornadas/boletim/faltas), turma (saúde), bloco de prova ou professor.
-            </p>
+        <div class="flex items-center gap-3 min-w-0">
+            <img src="<?= $assistenteAvatar ?>" width="56" height="56" alt="<?= $assistenteNome ?>"
+                 class="w-14 h-14 rounded-full shadow-md object-cover shrink-0 bg-white">
+            <div class="min-w-0">
+                <h1 class="text-2xl font-bold text-gray-900"><?= $assistenteNome ?></h1>
+                <p class="text-sm text-gray-600 mt-1">
+                    Consulte aluno (provas/jornadas/boletim/faltas), turma (saúde), bloco de prova ou professor.
+                </p>
+            </div>
         </div>
         <a href="<?= URL ?>/admin/doc-sistema/tool"
            class="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 shrink-0">
@@ -63,10 +75,14 @@ $urlBase = URL . '/admin/assistente';
 
         <!-- Chat -->
         <section class="flex-1 min-w-0 flex flex-col">
-            <div class="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between gap-2 bg-white">
-                <div class="min-w-0">
-                    <p id="assistente-titulo-ativo" class="text-sm font-semibold text-gray-900 truncate">Nova conversa</p>
-                    <p id="assistente-subtitulo-ativo" class="text-xs text-gray-500 truncate"></p>
+            <div class="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between gap-2 bg-slate-50">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <img src="<?= $assistenteAvatar ?>" width="40" height="40" alt=""
+                         class="w-10 h-10 rounded-full object-cover shrink-0 bg-white shadow-sm">
+                    <div class="min-w-0">
+                        <p id="assistente-titulo-ativo" class="text-sm font-semibold text-gray-900 truncate">Nova conversa</p>
+                        <p id="assistente-subtitulo-ativo" class="text-xs text-gray-500 truncate"></p>
+                    </div>
                 </div>
                 <div class="flex items-center gap-1 shrink-0">
                     <button type="button" id="assistente-btn-mobile-hist"
@@ -77,16 +93,20 @@ $urlBase = URL . '/admin/assistente';
             </div>
 
             <div id="assistente-mensagens" class="flex-1 overflow-y-auto p-4 space-y-3 text-sm bg-slate-50/40">
-                <div class="bg-indigo-50 border border-indigo-100 text-indigo-900 rounded-xl px-4 py-3 space-y-1.5" id="assistente-welcome">
-                    <p class="font-medium">Como começar</p>
-                <ul class="list-disc list-inside text-indigo-800/90 space-y-0.5">
-                    <li>“Como andam as provas da Maria Clara no 2º Ano B?”</li>
-                    <li>“Como está a saúde da turma 2ªB?”</li>
-                    <li>“Resultados do bloco Simulado 1 — quem precisa de atenção?”</li>
-                    <li>“Boletim e faltas da Maria Clara.”</li>
-                    <li>“Como estão as jornadas do professor Ana?”</li>
-                    <li>Use <strong>Novo chat</strong> para separar contextos.</li>
-                </ul>
+                <div class="flex items-start gap-2.5" id="assistente-welcome">
+                    <img src="<?= $assistenteAvatar ?>" width="36" height="36" alt="<?= $assistenteNome ?>"
+                         class="w-9 h-9 rounded-full object-cover shrink-0 bg-white shadow-sm mt-0.5">
+                    <div class="bg-indigo-50 border border-indigo-100 text-indigo-900 rounded-xl px-4 py-3 space-y-1.5 min-w-0">
+                        <p class="font-medium">Como começar</p>
+                        <ul class="list-disc list-inside text-indigo-800/90 space-y-0.5">
+                            <li>“Como andam as provas da Maria Clara no 2º Ano B?”</li>
+                            <li>“Como está a saúde da turma 2ªB?”</li>
+                            <li>“Resultados do bloco Simulado 1 — quem precisa de atenção?”</li>
+                            <li>“Boletim e faltas da Maria Clara.”</li>
+                            <li>“Como estão as jornadas do professor Ana?”</li>
+                            <li>Use <strong>Novo chat</strong> para separar contextos.</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
 
@@ -147,7 +167,15 @@ $urlBase = URL . '/admin/assistente';
 
     var disponivel = root.getAttribute('data-disponivel') === '1';
     var historicoOn = root.getAttribute('data-historico') === '1';
+    var avatarUrl = root.getAttribute('data-avatar') || '';
+    var assistenteNome = root.getAttribute('data-nome') || 'Tudinha';
     var csrf = root.getAttribute('data-csrf');
+
+    function avatarHtml(sizeClass) {
+        if (!avatarUrl) return '';
+        return '<img src="' + esc(avatarUrl) + '" width="36" height="36" alt="' + esc(assistenteNome)
+            + '" class="' + (sizeClass || 'w-9 h-9') + ' rounded-full object-cover shrink-0 bg-white shadow-sm mt-0.5">';
+    }
     var urls = {
         stream: root.getAttribute('data-url-stream'),
         listar: root.getAttribute('data-url-listar'),
@@ -251,14 +279,15 @@ $urlBase = URL . '/admin/assistente';
     function limparMensagens(keepWelcome) {
         msgs.innerHTML = '';
         if (keepWelcome) {
-            msgs.innerHTML = document.getElementById('assistente-welcome')
-                ? '' : '';
             var welcome = document.createElement('div');
-            welcome.className = 'bg-indigo-50 border border-indigo-100 text-indigo-900 rounded-xl px-4 py-3 space-y-1.5';
-            welcome.innerHTML = '<p class="font-medium">Como começar</p><ul class="list-disc list-inside text-indigo-800/90 space-y-0.5">'
+            welcome.className = 'flex items-start gap-2.5';
+            welcome.id = 'assistente-welcome';
+            welcome.innerHTML = avatarHtml()
+                + '<div class="bg-indigo-50 border border-indigo-100 text-indigo-900 rounded-xl px-4 py-3 space-y-1.5 min-w-0">'
+                + '<p class="font-medium">Como começar</p><ul class="list-disc list-inside text-indigo-800/90 space-y-0.5">'
                 + '<li>“Como andam as provas da Maria Clara no 2º Ano B?”</li>'
                 + '<li>“Quero ver as jornadas desse aluno.”</li>'
-                + '<li>Use <strong>Novo chat</strong> para separar contextos (um aluno por conversa).</li></ul>';
+                + '<li>Use <strong>Novo chat</strong> para separar contextos (um aluno por conversa).</li></ul></div>';
             msgs.appendChild(welcome);
         }
     }
@@ -272,9 +301,21 @@ $urlBase = URL . '/admin/assistente';
     }
 
     function appendAssistantShell() {
+        var row = document.createElement('div');
+        row.className = 'flex items-start gap-2.5 mr-4';
+        if (avatarUrl) {
+            var img = document.createElement('img');
+            img.src = avatarUrl;
+            img.width = 36;
+            img.height = 36;
+            img.alt = assistenteNome;
+            img.className = 'w-9 h-9 rounded-full object-cover shrink-0 bg-white shadow-sm mt-0.5';
+            row.appendChild(img);
+        }
         var wrap = document.createElement('div');
-        wrap.className = 'mr-4 bg-white border border-gray-200 text-gray-800 rounded-xl px-3 py-3 shadow-sm space-y-3';
-        msgs.appendChild(wrap);
+        wrap.className = 'bg-white border border-gray-200 text-gray-800 rounded-xl px-3 py-3 shadow-sm space-y-3 min-w-0 flex-1';
+        row.appendChild(wrap);
+        msgs.appendChild(row);
         msgs.scrollTop = msgs.scrollHeight;
         return wrap;
     }
@@ -1182,8 +1223,10 @@ $urlBase = URL . '/admin/assistente';
     function mostrarStatus(texto) {
         removerCarregando();
         loadingEl = document.createElement('div');
-        loadingEl.className = 'mr-4 text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 inline-flex items-center gap-2';
-        loadingEl.innerHTML = '<span class="assistente-dot"></span><span class="assistente-dot"></span><span class="assistente-dot"></span><span></span>';
+        loadingEl.className = 'flex items-start gap-2.5 mr-4';
+        loadingEl.innerHTML = avatarHtml()
+            + '<div class="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 inline-flex items-center gap-2">'
+            + '<span class="assistente-dot"></span><span class="assistente-dot"></span><span class="assistente-dot"></span><span></span></div>';
         loadingEl.querySelector('span:last-child').textContent = texto || 'Pensando…';
         msgs.appendChild(loadingEl);
         msgs.scrollTop = msgs.scrollHeight;

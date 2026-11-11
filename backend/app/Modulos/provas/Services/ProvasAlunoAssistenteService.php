@@ -14,6 +14,8 @@ use App\Painel\Admin\Services\AssistenteConsultaAmpliadaService;
 class ProvasAlunoAssistenteService
 {
     public const MODULO_CREDITOS = 'provas_aluno_assistente_mensagem';
+    /** Liberação temporária: permite usar o Assistente sem TudiCoins ligado na escola. */
+    public const LIBERAR_SEM_TUDICOINS = true;
     public const DELIMITADOR_INICIO = '<<<CONSULTA>>>';
     public const DELIMITADOR_FIM = '<<<FIM>>>';
     private const MAX_RODADAS = 6;
@@ -992,6 +994,9 @@ PROMPT
         }
         $creditos = new \App\Services\CreditosService();
         if (!$creditos->isCreditosHabilitado()) {
+            if (self::LIBERAR_SEM_TUDICOINS) {
+                return;
+            }
             throw new \Exception('TudiCoins desabilitado para esta escola. Ações com IA não estão disponíveis.');
         }
         if (!$creditos->podeConsumir(
@@ -1010,6 +1015,9 @@ PROMPT
         }
         $creditos = new \App\Services\CreditosService();
         if (!$creditos->isCreditosHabilitado()) {
+            if (self::LIBERAR_SEM_TUDICOINS) {
+                return;
+            }
             throw new \Exception('TudiCoins desabilitado para esta escola. Ações com IA não estão disponíveis.');
         }
         $creditos->consumirEscola(self::MODULO_CREDITOS, 'provas_aluno_assistente');
