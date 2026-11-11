@@ -102,7 +102,7 @@ $bwConsultaAvatar = htmlspecialchars(URL . '/static/images/avatar-assistente-doc
             </div>
             <div id="bw-consulta-msgs" class="flex-1 overflow-y-auto p-3 space-y-2 text-sm bg-white">
                 <div class="bg-indigo-50 border border-indigo-100 text-slate-700 rounded-lg px-3 py-2">
-                    Descreva a regra em português (ex.: PP e PU na média, CH substitui, se tiver Projeto divide por 3, + PE). Se eu não entender, eu pergunto. Também dá para pedir um dado do aluno ou colar um print (Ctrl+V).
+                    Precisa de ajuda pra montar boletim?
                 </div>
             </div>
             <form id="bw-consulta-form" class="p-3 flex flex-col gap-2 bg-slate-50">
