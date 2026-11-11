@@ -50,4 +50,44 @@ final class EmissaoDocumentoPdfTest extends TestCase
         $this->assertStringContainsString('break-after:page', $out);
         $this->assertSame($html, $juntar->invoke($svc, [$html]));
     }
+
+    public function testDompdfPosicionaRodapeNaMargemInferiorDaFolha(): void
+    {
+        $modelos = new class extends ModeloDocumentoService {
+            public function __construct() {}
+            public function aplicarLayoutPadraoNoModelo(array $modelo): array { return $modelo; }
+        };
+        $estrutura = ModeloDocumentoService::estruturaVazia('a5', 'paisagem');
+        $estrutura['page']['margin']['bottom'] = 18;
+        $estrutura['page']['rodapeNoFim'] = true;
+        foreach (['body' => 'Declaração', 'footer' => 'Contato da escola'] as $area => $texto) {
+            $secao = ModeloDocumentoService::secaoPadrao([100], $area);
+            $secao['columns'][0]['elements'][] = ['type' => 'texto', 'props' => ['text' => $texto]];
+            $estrutura[$area]['sections'] = [$secao];
+        }
+        $modelo = ['codigo' => 'teste_rodape', 'estrutura_json' => json_encode($estrutura)];
+        $html = $modelos->renderHtml($modelo, [
+            'logo_html' => '<span></span>',
+            'assinante_nome' => 'Direção',
+            'assinante_cargo' => 'Direção',
+        ]);
+        $posicoes = [];
+        $pdf = new \Dompdf\Dompdf();
+        $pdf->loadHtml($html);
+        $pdf->setCallbacks([[
+            'event' => 'begin_frame',
+            'f' => static function ($quadro, $canvas) use (&$posicoes): void {
+                $no = $quadro->get_node();
+                if ($no instanceof \DOMElement && $no->hasAttribute('data-doc-rodape-fim')) {
+                    $posicoes[] = $canvas->get_height() - $quadro->get_position('y') - $quadro->get_margin_height();
+                }
+            },
+        ]]);
+        $modelos->aplicarPapelDompdf($pdf, $modelo);
+        $pdf->render();
+
+        $this->assertSame(1, $pdf->getCanvas()->get_page_count());
+        $this->assertCount(1, $posicoes);
+        $this->assertEqualsWithDelta(18 * 72 / 25.4, $posicoes[0], 0.1);
+    }
 }

@@ -555,6 +555,7 @@ class ResultadoFinalAdminController extends AdminBaseController
             $dompdf = new \Dompdf\Dompdf($options);
             $dompdf->loadHtml($html, 'UTF-8');
             $dompdf->setPaper($paper, $orientation);
+            \App\Modulos\ModelosDocumentos\Services\GeradorPdfFolhaService::configurarRodapeDompdf($dompdf);
             $dompdf->render();
             $bin = $dompdf->output();
             $this->arquivarPdfAluno($alunoId, $titulo, $filename, $bin);

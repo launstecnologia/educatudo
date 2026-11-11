@@ -2757,8 +2757,9 @@ class ModeloDocumentoService
         if ($temFolhaSeed || $temGradeCompacta || $temGradeLivre) {
             $css .= "\n" . $this->cssGradeSolta();
         }
+        $rodapeNoFim = $estruturaVisual !== null && $rodape !== '' && !empty($estruturaVisual['page']['rodapeNoFim']);
         if ($estruturaVisual !== null) {
-            $css .= "\n" . $this->cssFolhaImpressa($estruturaVisual);
+            $css .= "\n" . $this->cssFolhaImpressa($estruturaVisual, $rodapeNoFim);
         }
 
         if (str_contains($htmlAll, 'edoc-ajuste-folha') || str_contains($htmlAll, 'edoc-foto-aluno')) {
@@ -2810,12 +2811,11 @@ class ModeloDocumentoService
         }
 
         $fundoHtml = $this->htmlFundoImpresso(is_array($estruturaVisual) ? $estruturaVisual : null);
-        $rodapeNoFim = is_array($estruturaVisual) && empty($estruturaVisual['page']['ocultarRodape']) && !empty($estruturaVisual['page']['rodapeNoFim']);
         $classeBody = $estruturaVisual !== null
             ? ' class="folha-impressa' . ($rodapeNoFim ? ' rodape-no-fim' : '') . '"'
             : '';
         if ($rodapeNoFim) {
-            $rodape = '<div class="doc-rodape-fim">' . $rodape . '</div>';
+            $rodape = '<div class="doc-rodape-fim" data-doc-rodape-fim="1">' . $rodape . '</div>';
         }
 
         return <<<HTML
@@ -2896,6 +2896,9 @@ HTML;
             }
         }
         $dompdf->setPaper($this->papelDompdf($modelo), $this->orientacaoDompdf($modelo));
+        if ($dompdf instanceof \Dompdf\Dompdf) {
+            GeradorPdfFolhaService::configurarRodapeDompdf($dompdf);
+        }
     }
 
     public function normalizarFormatoPapel(string $formato): string
@@ -4166,7 +4169,7 @@ CSS;
      *
      * @param array<string,mixed> $estrutura
      */
-    private function cssFolhaImpressa(array $estrutura): string
+    private function cssFolhaImpressa(array $estrutura, bool $rodapeNoFim): string
     {
         $page = is_array($estrutura['page'] ?? null) ? $estrutura['page'] : [];
         $m = is_array($page['margin'] ?? null) ? $page['margin'] : [];
@@ -4177,10 +4180,12 @@ CSS;
         [$largura, $altura] = $this->medidasPaginaMm($estrutura);
 
         $mioloAltura = number_format(max(20, $altura - (float) $top - (float) $bottom), 1, '.', '');
+        // No Dompdf, a margem de html substitui a margem de @page.
+        $resetHtml = $rodapeNoFim ? '' : 'html { margin: 0; padding: 0; background: #fff; }';
 
         return <<<CSS
   @page { size: {$largura}mm {$altura}mm; margin: {$top}mm {$right}mm {$bottom}mm {$left}mm; }
-  html, body.folha-impressa { margin: 0; padding: 0; background: #fff; }
+  {$resetHtml}
   body.folha-impressa, body.folha-impressa * {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
@@ -4188,16 +4193,20 @@ CSS;
   body.folha-impressa {
     margin: 0;
     padding: 0;
+    background: #fff;
     font-family: "DejaVu Sans", Arial, Helvetica, sans-serif;
     font-size: 11pt;
     color: #222;
   }
-  body.folha-impressa.rodape-no-fim {
-    display: flex;
-    flex-direction: column;
-    min-height: {$mioloAltura}mm;
+  @supports (display: flex) {
+    body.folha-impressa.rodape-no-fim {
+      display: flex;
+      flex-direction: column;
+      min-height: {$mioloAltura}mm;
+    }
+    body.folha-impressa.rodape-no-fim .doc-rodape-fim { margin-top: auto; }
   }
-  body.folha-impressa.rodape-no-fim .doc-rodape-fim { margin-top: auto; }
+  .doc-rodape-fim { page-break-inside: avoid; break-inside: avoid; }
   body.folha-impressa table.doc-linha { margin: 0 0 8px !important; }
   body.folha-impressa table.doc-linha > tbody > tr > td {
     box-sizing: border-box;

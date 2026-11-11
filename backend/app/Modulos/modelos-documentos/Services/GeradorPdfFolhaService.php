@@ -2,12 +2,51 @@
 
 namespace App\Modulos\ModelosDocumentos\Services;
 
+use Dompdf\Dompdf;
+use Dompdf\FrameDecorator\AbstractFrameDecorator;
+
 /**
  * Imprime a ficha oficial com o Chrome, o mesmo motor da tela.
  * Sem o binário, o chamador segue no Dompdf.
  */
 class GeradorPdfFolhaService
 {
+    public static function configurarRodapeDompdf(Dompdf $dompdf): void
+    {
+        $xpath = new \DOMXPath($dompdf->getDom());
+        if (!$xpath->evaluate('boolean(//div[@data-doc-rodape-fim])')) {
+            return;
+        }
+
+        $callbacks = [];
+        foreach ($dompdf->getCallbacks() as $evento => $funcoes) {
+            foreach ($funcoes as $funcao) {
+                $callbacks[] = ['event' => $evento, 'f' => $funcao];
+            }
+        }
+        $callbacks[] = [
+            'event' => 'begin_page_render',
+            'f' => static function (AbstractFrameDecorator $pagina): void {
+                $raiz = $pagina->get_root();
+                $altura = $raiz->get_containing_block('h');
+                $estilo = $raiz->get_style();
+                $fimDaPagina = $altura - (float) $estilo->length_in_pt($estilo->margin_bottom, $altura);
+                foreach ($pagina->get_subtree() as $quadro) {
+                    $no = $quadro->get_node();
+                    if (!$no instanceof \DOMElement || !$no->hasAttribute('data-doc-rodape-fim') || $quadro->is_split) {
+                        continue;
+                    }
+                    // A paginação já reservou o espaço do rodapé no fluxo. Mova só se houver espaço abaixo dele.
+                    $deslocamento = $fimDaPagina - $quadro->get_position('y') - $quadro->get_margin_height();
+                    if ($deslocamento > 0) {
+                        $quadro->move(0, $deslocamento);
+                    }
+                }
+            },
+        ];
+        $dompdf->setCallbacks($callbacks);
+    }
+
     public function gerarSeFolhaOficial(string $html): ?string
     {
         if (!str_contains($html, 'seed-folha') && !str_contains($html, 'doc-linha')) {

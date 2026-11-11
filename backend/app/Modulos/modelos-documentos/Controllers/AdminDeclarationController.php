@@ -256,6 +256,7 @@ class AdminDeclarationController extends AdminBaseController
             $dompdf = new \Dompdf\Dompdf($options);
             $dompdf->loadHtml($html, 'UTF-8');
             $dompdf->setPaper($paper, $orientation);
+            \App\Modulos\ModelosDocumentos\Services\GeradorPdfFolhaService::configurarRodapeDompdf($dompdf);
             $dompdf->render();
 
             while (ob_get_level() > 0) {
