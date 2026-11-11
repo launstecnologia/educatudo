@@ -33,7 +33,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             <div class="min-w-0">
                 <h1 class="text-2xl font-bold text-gray-900"><?= $assistenteNome ?></h1>
                 <p class="text-sm text-gray-600 mt-1">
-                    Consulte aluno (provas/jornadas/boletim/faltas), turma (saúde), bloco de prova ou professor.
+                    Consulte aluno (provas/jornadas/boletim/faltas/ocorrências), turma (saúde), bloco de prova ou professor.
                 </p>
             </div>
         </div>
@@ -102,7 +102,9 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                             <li>“Como andam as provas da Maria Clara no 2º Ano B?”</li>
                             <li>“Como está a saúde da turma 2ªB?”</li>
                             <li>“Resultados do bloco Simulado 1 — quem precisa de atenção?”</li>
-                            <li>“Boletim e faltas da Maria Clara.”</li>
+                            <li>“Boletim do RA 24254 em 2024.”</li>
+                            <li>“Notas do 1º bimestre / MU do 2º bimestre do RA 24254.”</li>
+                            <li>“Tem ocorrência do aluno RA 24254?”</li>
                             <li>“Como estão as jornadas do professor Ana?”</li>
                             <li>Use <strong>Novo chat</strong> para separar contextos.</li>
                         </ul>
@@ -1138,51 +1140,173 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             renderOpcoes(container, painel.opcoes);
         }
 
-        if (painel.tipo === 'boletim_aluno') {
-            var evs = painel.eventos || [];
-            if (!evs.length) {
-                var vazioB = document.createElement('p');
-                vazioB.className = 'text-sm text-gray-600';
-                vazioB.textContent = 'Nenhum boletim gerado visível para coordenação.';
-                container.appendChild(vazioB);
+        function fmtNota(v) {
+            if (v == null || v === '') return '—';
+            if (typeof v === 'object') v = v.valor != null ? v.valor : null;
+            if (v == null || v === '') return '—';
+            if (typeof v === 'number') {
+                return (Math.round(v * 10) / 10).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
             }
-            evs.forEach(function (ev) {
-                var boxEv = document.createElement('div');
-                boxEv.className = 'overflow-x-auto border border-gray-200 rounded-lg mb-2';
-                var tituloEv = (ev.regra_nome || 'Boletim')
-                    + (ev.bimestre ? ' · ' + ev.bimestre + 'º bim' : '')
-                    + (ev.ano_letivo ? ' · ' + ev.ano_letivo : '');
-                var cols = ev.colunas || [];
-                var hev = '<div class="px-3 py-2 text-xs font-semibold uppercase text-slate-600 bg-slate-50 border-b">' + esc(tituloEv) + '</div>'
-                    + '<table class="min-w-full text-sm"><thead><tr class="text-xs text-slate-500 text-left">'
-                    + '<th class="px-3 py-2">Matéria</th>';
-                cols.forEach(function (c) {
-                    hev += '<th class="px-3 py-2">' + esc(c.label || c.nome || c.chave || '—') + '</th>';
+            return String(v);
+        }
+
+        function renderQuadroNotas(containerEl, quadro, tituloQuadro) {
+            if (!quadro || !quadro.colunas || !quadro.colunas.length) {
+                var vazioQ = document.createElement('p');
+                vazioQ.className = 'text-sm text-gray-600';
+                vazioQ.textContent = 'Sem colunas de notas para exibir.';
+                containerEl.appendChild(vazioQ);
+                return;
+            }
+            var box = document.createElement('div');
+            box.className = 'overflow-x-auto border border-gray-200 rounded-lg';
+            var cols = quadro.colunas || [];
+            var grupos = quadro.grupos || [];
+            var html = '';
+            if (tituloQuadro) {
+                html += '<div class="px-3 py-2 text-xs font-semibold uppercase text-slate-600 bg-slate-50 border-b">' + esc(tituloQuadro) + '</div>';
+            }
+            html += '<table class="min-w-full text-xs sm:text-sm"><thead>';
+            if (grupos.length) {
+                html += '<tr class="bg-slate-600 text-white text-[10px] uppercase">';
+                html += '<th class="px-2 py-1.5 text-left sticky left-0 bg-slate-600 z-10">Matérias</th>';
+                grupos.forEach(function (g) {
+                    html += '<th class="px-1 py-1.5 text-center" colspan="' + (g.colspan || 1) + '">' + esc(g.titulo || '') + '</th>';
                 });
-                hev += '</tr></thead><tbody>';
-                (ev.linhas || []).forEach(function (linha) {
-                    hev += '<tr class="border-t"><td class="px-3 py-2 font-medium">' + esc(linha.materia || '—') + '</td>';
-                    var notas = linha.notas || {};
-                    if (Array.isArray(notas)) {
-                        notas.forEach(function (n) {
-                            hev += '<td class="px-3 py-2">' + esc(n.valor != null ? n.valor : (n != null ? n : '—')) + '</td>';
-                        });
-                    } else if (cols.length) {
-                        cols.forEach(function (c) {
-                            var key = c.chave || c.key || c.id || c.nome;
-                            var val = key != null ? notas[key] : null;
-                            if (val && typeof val === 'object') val = val.valor != null ? val.valor : '—';
-                            hev += '<td class="px-3 py-2">' + esc(val != null ? val : '—') + '</td>';
-                        });
-                    } else {
-                        hev += '<td class="px-3 py-2" colspan="4">' + esc(JSON.stringify(notas)) + '</td>';
-                    }
-                    hev += '</tr>';
-                });
-                hev += '</tbody></table>';
-                boxEv.innerHTML = hev;
-                container.appendChild(boxEv);
+                html += '</tr>';
+            }
+            html += '<tr class="bg-slate-100 text-[10px] uppercase text-slate-600"><th class="px-2 py-1.5 text-left sticky left-0 bg-slate-100 z-10">Componente</th>';
+            cols.forEach(function (c) {
+                html += '<th class="px-1.5 py-1.5 text-center whitespace-nowrap">' + esc(c.nome || c.codigo || '—') + '</th>';
             });
+            html += '</tr></thead><tbody>';
+            (quadro.linhas || []).forEach(function (linha) {
+                html += '<tr class="border-t"><td class="px-2 py-1.5 font-medium text-gray-900 whitespace-nowrap sticky left-0 bg-white z-10">'
+                    + esc(linha.materia || '—') + '</td>';
+                var notas = linha.notas || {};
+                cols.forEach(function (c) {
+                    var key = c.codigo || c.chave || c.key;
+                    html += '<td class="px-1.5 py-1.5 text-center tabular-nums">' + esc(fmtNota(key != null ? notas[key] : null)) + '</td>';
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            box.innerHTML = html;
+            containerEl.appendChild(box);
+        }
+
+        if (painel.tipo === 'boletim_aluno') {
+            if (painel.aviso) {
+                var avB = document.createElement('p');
+                avB.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+                avB.textContent = painel.aviso;
+                container.appendChild(avB);
+            }
+            if (painel.formato === 'quadro_anual' && painel.quadro) {
+                var tituloQ = 'Boletim'
+                    + (painel.ano_letivo ? ' · ' + painel.ano_letivo : '')
+                    + (painel.regra && painel.regra.nome ? ' · ' + painel.regra.nome : '');
+                renderQuadroNotas(container, painel.quadro, tituloQ);
+            } else {
+                var evs = painel.eventos || [];
+                if (!evs.length) {
+                    var vazioB = document.createElement('p');
+                    vazioB.className = 'text-sm text-gray-600';
+                    vazioB.textContent = 'Nenhum boletim encontrado para exibir.';
+                    container.appendChild(vazioB);
+                }
+                evs.forEach(function (ev) {
+                    var tituloEv = (ev.regra_nome || 'Boletim')
+                        + (ev.bimestre ? ' · ' + ev.bimestre + 'º bim' : '')
+                        + (ev.ano_letivo ? ' · ' + ev.ano_letivo : '');
+                    renderQuadroNotas(container, { colunas: ev.colunas || [], linhas: (ev.linhas || []).map(function (l) {
+                        return { materia: l.materia, notas: l.notas || {} };
+                    }) }, tituloEv);
+                });
+            }
+            renderOpcoes(container, painel.opcoes);
+        }
+
+        if (painel.tipo === 'candidatos_eventos') {
+            if (painel.aviso) {
+                var avE = document.createElement('p');
+                avE.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+                avE.textContent = painel.aviso;
+                container.appendChild(avE);
+            }
+            var listE = document.createElement('div');
+            listE.className = 'flex flex-wrap gap-2';
+            (painel.candidatos || []).forEach(function (ev) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'pa-chip';
+                b.textContent = (ev.nome || ('Evento #' + ev.id))
+                    + (ev.bimestre ? ' · bim ' + ev.bimestre : '');
+                b.addEventListener('click', function () {
+                    if (enviando) return;
+                    input.value = 'Usar evento_id ' + ev.id + (ev.nome ? (' (' + ev.nome + ')') : '');
+                    form.dispatchEvent(new Event('submit', { cancelable: true }));
+                });
+                listE.appendChild(b);
+            });
+            container.appendChild(listE);
+        }
+
+        if (painel.tipo === 'notas_evento_aluno') {
+            if (painel.aviso) {
+                var avNe = document.createElement('p');
+                avNe.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+                avNe.textContent = painel.aviso;
+                container.appendChild(avNe);
+            }
+            var tituloEvn = (painel.evento && painel.evento.nome ? painel.evento.nome : 'Evento')
+                + (painel.ano_letivo ? ' · ' + painel.ano_letivo : '')
+                + (painel.coluna ? ' · coluna ' + painel.coluna : '');
+            renderQuadroNotas(container, painel.quadro || {}, tituloEvn);
+            renderOpcoes(container, painel.opcoes);
+        }
+
+        if (painel.tipo === 'ocorrencias_aluno') {
+            var listaOco = painel.ocorrencias || [];
+            if (painel.aviso) {
+                var avO = document.createElement('p');
+                avO.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+                avO.textContent = painel.aviso;
+                container.appendChild(avO);
+            }
+            if (!listaOco.length && !painel.aviso) {
+                var vazioO = document.createElement('p');
+                vazioO.className = 'text-sm text-gray-600';
+                vazioO.textContent = 'Nenhuma ocorrência encontrada.';
+                container.appendChild(vazioO);
+            }
+            if (listaOco.length) {
+                var boxO = document.createElement('div');
+                boxO.className = 'overflow-x-auto border border-gray-200 rounded-lg';
+                var ho = '<table class="min-w-full text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-600"><tr>'
+                    + '<th class="px-3 py-2 text-left">Data</th>'
+                    + '<th class="px-3 py-2 text-left">Título</th>'
+                    + '<th class="px-3 py-2 text-left">Gravidade</th>'
+                    + '<th class="px-3 py-2 text-left">Status</th>'
+                    + '<th class="px-3 py-2 text-left">Categoria</th></tr></thead><tbody>';
+                listaOco.forEach(function (o) {
+                    ho += '<tr class="border-t align-top">'
+                        + '<td class="px-3 py-2 whitespace-nowrap">' + esc(o.data || '—') + '</td>'
+                        + '<td class="px-3 py-2"><div class="font-medium text-gray-900">' + esc(o.titulo || '—') + '</div>'
+                        + (o.detalhe ? '<div class="text-xs text-gray-500 mt-0.5">' + esc(o.detalhe) + '</div>' : '')
+                        + '</td>'
+                        + '<td class="px-3 py-2">' + esc(o.gravidade_label || o.gravidade || '—') + '</td>'
+                        + '<td class="px-3 py-2">' + esc(o.status_label || o.status || '—') + '</td>'
+                        + '<td class="px-3 py-2">' + esc(o.categoria || '—') + '</td></tr>';
+                });
+                ho += '</tbody></table>';
+                if (painel.total && painel.total > listaOco.length) {
+                    ho += '<div class="px-3 py-2 text-xs text-slate-500 border-t bg-slate-50">Mostrando '
+                        + listaOco.length + ' de ' + painel.total + '</div>';
+                }
+                boxO.innerHTML = ho;
+                container.appendChild(boxO);
+            }
             renderOpcoes(container, painel.opcoes);
         }
 

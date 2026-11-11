@@ -3,7 +3,7 @@
 namespace App\Painel\Admin\Services;
 /**
  * Consultas extras do Assistente: turma, bloco de prova, jornadas do professor,
- * boletim e faltas do aluno (somente leitura).
+ * boletim, faltas e ocorrências do aluno (somente leitura).
  */
 
 
@@ -13,6 +13,7 @@ use App\Modulos\Provas\Services\ProvasAlunoConsultaService;
 use App\Modulos\Provas\Services\ProvasProfessorConsultaService;
 use App\Modulos\Jornadas\Services\JornadasRelatorioService;
 use App\Modulos\Presenca\Services\FrequencyService;
+use App\Modulos\Ocorrencias\Models\Ocorrencia;
 
 use App\Models\System\BoletimConfig;
 use App\Core\Database;
@@ -350,8 +351,10 @@ class AssistenteConsultaAmpliadaService
     }
 
     /**
+     * Boletim anual do aluno (quadro PP/PU/CH/PE/MU…), como na tela Boletim.
+     *
      * @param array<string,mixed> $filtros
-     * @return array{ok:bool,aluno?:array,eventos?:list,error?:string,candidatos?:list}
+     * @return array{ok:bool,aluno?:array,formato?:string,quadro?:array,eventos?:list,error?:string,candidatos?:list}
      */
     public function boletimAluno(array $filtros): array
     {
@@ -360,21 +363,34 @@ class AssistenteConsultaAmpliadaService
             return $aluno;
         }
         $alunoId = (int) $aluno['aluno']['id'];
-        $exibirEm = trim((string) ($filtros['exibir_em'] ?? ''));
-        if ($exibirEm !== '' && !in_array($exibirEm, ['boletim', 'notas'], true)) {
-            $exibirEm = '';
+        $anoFiltro = (int) ($filtros['ano_letivo'] ?? $filtros['ano'] ?? 0);
+        if ($anoFiltro <= 0) {
+            $anoAtual = $this->anoLetivoAtual();
+            $anoFiltro = $anoAtual['ano'] ?? (int) date('Y');
         }
 
+        $quadro = $this->montarQuadroBoletimAluno($alunoId, $anoFiltro, (int) ($filtros['regra_id'] ?? 0));
+        if (!empty($quadro['ok'])) {
+            return [
+                'ok' => true,
+                'formato' => 'quadro_anual',
+                'aluno' => $aluno['aluno'],
+                'ano_letivo' => $anoFiltro,
+                'regra' => $quadro['regra'] ?? null,
+                'quadro' => [
+                    'colunas' => $quadro['colunas'] ?? [],
+                    'grupos' => $quadro['grupos'] ?? [],
+                    'linhas' => $quadro['linhas'] ?? [],
+                ],
+                'aviso' => $quadro['aviso'] ?? null,
+            ];
+        }
+
+        // Fallback: eventos já gerados (demonstrativos/snapshots).
         $boletim = new BoletimConfig();
         $boletim->ensureSchema();
-        $eventos = $boletim->getGeneratedBoletinsByAluno(
-            $alunoId,
-            'coordenacao',
-            $exibirEm !== '' ? $exibirEm : null
-        );
-
-        $anoFiltro = (int) ($filtros['ano_letivo'] ?? $filtros['ano'] ?? 0);
-        if ($anoFiltro > 0 && is_array($eventos)) {
+        $eventos = $boletim->getGeneratedBoletinsByAluno($alunoId, 'coordenacao', null) ?: [];
+        if ($anoFiltro > 0) {
             $eventos = array_values(array_filter(
                 $eventos,
                 static fn($ev): bool => (int) ($ev['ano_letivo'] ?? 0) === $anoFiltro
@@ -382,8 +398,7 @@ class AssistenteConsultaAmpliadaService
         }
 
         $slim = [];
-        $totalEventos = count($eventos ?: []);
-        foreach (array_slice($eventos ?: [], 0, 12) as $ev) {
+        foreach (array_slice($eventos, 0, 12) as $ev) {
             $linhas = [];
             foreach (array_slice($ev['linhas'] ?? [], 0, 40) as $linha) {
                 $linhas[] = [
@@ -402,11 +417,185 @@ class AssistenteConsultaAmpliadaService
             ];
         }
 
+        if ($slim === []) {
+            return [
+                'ok' => false,
+                'error' => $quadro['error'] ?? ('Não encontrei boletim montado para ' . $anoFiltro . '.'),
+                'aluno' => $aluno['aluno'],
+            ];
+        }
+
         return [
             'ok' => true,
+            'formato' => 'eventos',
             'aluno' => $aluno['aluno'],
+            'ano_letivo' => $anoFiltro,
             'eventos' => $slim,
-            'total_eventos' => $totalEventos,
+            'total_eventos' => count($slim),
+        ];
+    }
+
+    /**
+     * Notas de um evento avaliativo / demonstrativo (ex.: 1º bimestre, PP/MU).
+     *
+     * @param array<string,mixed> $filtros
+     * @return array{ok:bool,aluno?:array,evento?:array,quadro?:array,error?:string,candidatos?:list}
+     */
+    public function notasEventoAluno(array $filtros): array
+    {
+        $aluno = $this->resolverAluno($filtros);
+        if (empty($aluno['ok'])) {
+            return $aluno;
+        }
+        $alunoId = (int) $aluno['aluno']['id'];
+        $anoFiltro = (int) ($filtros['ano_letivo'] ?? $filtros['ano'] ?? 0);
+        if ($anoFiltro <= 0) {
+            $anoAtual = $this->anoLetivoAtual();
+            $anoFiltro = $anoAtual['ano'] ?? (int) date('Y');
+        }
+        $bimestre = (int) ($filtros['bimestre'] ?? $filtros['periodo'] ?? 0);
+        $regraId = (int) ($filtros['regra_id'] ?? $filtros['evento_id'] ?? 0);
+        $eventoNome = trim((string) ($filtros['evento_nome'] ?? $filtros['nome'] ?? ''));
+        $coluna = strtoupper(trim((string) ($filtros['coluna'] ?? $filtros['campo'] ?? '')));
+
+        $boletim = new BoletimConfig();
+        $boletim->ensureSchema();
+        $regra = null;
+        if ($regraId > 0) {
+            $regra = $boletim->getRuleById($regraId);
+            if (is_array($regra) && (int) ($regra['ano_letivo'] ?? 0) !== $anoFiltro) {
+                return [
+                    'ok' => false,
+                    'error' => 'O evento #' . $regraId . ' não pertence ao ano letivo ' . $anoFiltro . '.',
+                    'aluno' => $aluno['aluno'],
+                ];
+            }
+        }
+        if (!is_array($regra) || empty($regra['componentes'])) {
+            $resolvido = $this->resolverRegraEventoNotas($anoFiltro, $bimestre, $eventoNome);
+            if (!empty($resolvido['ambiguidade'])) {
+                return [
+                    'ok' => false,
+                    'aviso' => 'Há mais de um evento. Escolha um:',
+                    'candidatos_eventos' => $resolvido['candidatos_eventos'] ?? [],
+                    'aluno' => $aluno['aluno'],
+                ];
+            }
+            $regra = $resolvido['regra'] ?? null;
+        }
+        if (!is_array($regra) || empty($regra['componentes'])) {
+            $cands = $this->listarEventosNotasAno($anoFiltro, $bimestre);
+            if (count($cands) === 1) {
+                $unica = $boletim->getRuleById((int) $cands[0]['id']);
+                if (is_array($unica) && !empty($unica['componentes'])) {
+                    $regra = $unica;
+                }
+            } elseif (count($cands) > 1) {
+                return [
+                    'ok' => false,
+                    'aviso' => 'Há mais de um evento. Escolha um:',
+                    'candidatos_eventos' => $cands,
+                    'aluno' => $aluno['aluno'],
+                ];
+            }
+            if (!is_array($regra) || empty($regra['componentes'])) {
+                return [
+                    'ok' => false,
+                    'error' => 'Evento avaliativo não encontrado para o filtro informado.',
+                    'aluno' => $aluno['aluno'],
+                ];
+            }
+        }
+
+        $matriz = $this->simularMatrizRegraAluno($regra, $alunoId, $anoFiltro);
+        if ($matriz === null) {
+            return ['ok' => false, 'error' => 'Não foi possível calcular as notas deste evento.', 'aluno' => $aluno['aluno']];
+        }
+
+        $colunas = $matriz['colunas'];
+        $linhas = $matriz['linhas'];
+        if ($coluna !== '') {
+            $codigos = [];
+            foreach ($colunas as $c) {
+                $nomeCol = strtoupper(trim((string) ($c['nome'] ?? $c['label'] ?? '')));
+                $codCol = strtoupper(trim((string) ($c['codigo'] ?? $c['chave'] ?? '')));
+                $codOrig = (string) ($c['codigo'] ?? $c['chave'] ?? '');
+                $match = $nomeCol === $coluna
+                    || $codCol === $coluna
+                    || str_ends_with($codCol, '_' . $coluna)
+                    || str_starts_with($codCol, $coluna . '_');
+                if ($match) {
+                    $codigos[] = $codOrig;
+                }
+            }
+            $codigos = array_values(array_filter($codigos));
+            if ($codigos === []) {
+                // MU/MS/MA etc. costumam existir só no quadro anual — tenta extrair dali.
+                $doQuadro = $this->extrairColunaQuadroAnual($alunoId, $anoFiltro, $bimestre, $coluna);
+                if (!empty($doQuadro['ok'])) {
+                    return [
+                        'ok' => true,
+                        'formato' => 'coluna_quadro',
+                        'aluno' => $aluno['aluno'],
+                        'ano_letivo' => $anoFiltro,
+                        'evento' => [
+                            'id' => (int) ($regra['id'] ?? 0),
+                            'nome' => trim((string) ($regra['nome'] ?? 'Boletim')),
+                            'bimestre' => $bimestre > 0 ? $bimestre : ($regra['bimestre'] ?? null),
+                        ],
+                        'coluna' => $coluna,
+                        'quadro' => $doQuadro['quadro'],
+                        'aviso' => 'Coluna "' . $coluna . '" veio do quadro do boletim (não está no demonstrativo do evento).',
+                    ];
+                }
+                return [
+                    'ok' => false,
+                    'error' => 'Coluna "' . $coluna . '" não encontrada neste evento. Colunas: '
+                        . implode(', ', array_map(
+                            static fn($c): string => (string) ($c['nome'] ?? $c['codigo'] ?? ''),
+                            $matriz['colunas']
+                        )),
+                    'aluno' => $aluno['aluno'],
+                    'evento' => [
+                        'id' => (int) ($regra['id'] ?? 0),
+                        'nome' => trim((string) ($regra['nome'] ?? '')),
+                    ],
+                ];
+            }
+            $colunas = array_values(array_filter(
+                $colunas,
+                static fn($c): bool => in_array((string) ($c['codigo'] ?? $c['chave'] ?? ''), $codigos, true)
+            ));
+            foreach ($linhas as &$linha) {
+                $notas = is_array($linha['notas'] ?? null) ? $linha['notas'] : [];
+                $filtradas = [];
+                foreach ($codigos as $cod) {
+                    if (array_key_exists($cod, $notas)) {
+                        $filtradas[$cod] = $notas[$cod];
+                    }
+                }
+                $linha['notas'] = $filtradas;
+            }
+            unset($linha);
+        }
+
+        return [
+            'ok' => true,
+            'formato' => 'evento',
+            'aluno' => $aluno['aluno'],
+            'ano_letivo' => $anoFiltro,
+            'evento' => [
+                'id' => (int) ($regra['id'] ?? 0),
+                'nome' => trim((string) ($regra['nome'] ?? '')),
+                'bimestre' => $regra['bimestre'] ?? null,
+                'exibir_em' => $regra['exibir_em'] ?? null,
+            ],
+            'coluna' => $coluna !== '' ? $coluna : null,
+            'quadro' => [
+                'colunas' => $colunas,
+                'grupos' => $this->agruparCabecalhosColunas($colunas),
+                'linhas' => $linhas,
+            ],
         ];
     }
 
@@ -474,6 +663,474 @@ class AssistenteConsultaAmpliadaService
             'turma_percentual' => $turmaPct,
             'aviso' => $meu === null ? 'Sem lançamentos de frequência no período.' : null,
         ];
+    }
+
+    /**
+     * Ocorrências disciplinares/comportamentais do aluno (não confundir com faltas).
+     *
+     * @param array<string,mixed> $filtros
+     * @return array{ok:bool,aluno?:array,ocorrencias?:list,total?:int,error?:string,candidatos?:list,aviso?:string}
+     */
+    public function ocorrenciasAluno(array $filtros): array
+    {
+        $aluno = $this->resolverAluno($filtros);
+        if (empty($aluno['ok'])) {
+            return $aluno;
+        }
+        $a = $aluno['aluno'];
+        $alunoId = (int) $a['id'];
+
+        $filtrosLista = ['aluno_id' => $alunoId];
+        $status = trim((string) ($filtros['status'] ?? ''));
+        if ($status !== '' && isset(Ocorrencia::STATUS[$status])) {
+            $filtrosLista['status'] = $status;
+        }
+
+        $inicio = $this->normalizarData($filtros['data_inicio'] ?? null);
+        $fim = $this->normalizarData($filtros['data_fim'] ?? null);
+        $anoFiltro = (int) ($filtros['ano_letivo'] ?? $filtros['ano'] ?? 0);
+        if ($anoFiltro > 0 && ($inicio === null || $fim === null)) {
+            $inicio = $inicio ?? ($anoFiltro . '-01-01');
+            $fim = $fim ?? ($anoFiltro . '-12-31');
+        }
+        if ($inicio !== null) {
+            $filtrosLista['data_inicio'] = $inicio;
+        }
+        if ($fim !== null) {
+            $filtrosLista['data_fim'] = $fim;
+        }
+
+        try {
+            $model = new Ocorrencia();
+            $rows = $model->listar($filtrosLista, 40, 0);
+            $total = $model->contar($filtrosLista);
+        } catch (\Throwable $e) {
+            error_log('AssistenteConsultaAmpliada ocorrenciasAluno: ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'Não foi possível consultar as ocorrências.'];
+        }
+
+        $slim = [];
+        foreach ($rows as $row) {
+            $data = (string) ($row['data_ocorrencia'] ?? '');
+            if (preg_match('/^(\d{4}-\d{2}-\d{2})/', $data, $m)) {
+                $data = $m[1];
+            }
+            $nivel = (string) ($row['nivel_gravidade'] ?? '');
+            $statusRow = (string) ($row['status'] ?? '');
+            $slim[] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'data' => $data,
+                'titulo' => trim((string) ($row['titulo'] ?? '')),
+                'detalhe' => mb_substr(trim((string) ($row['detalhe'] ?? '')), 0, 400),
+                'gravidade' => $nivel,
+                'gravidade_label' => Ocorrencia::GRAVIDADES[$nivel] ?? $nivel,
+                'status' => $statusRow,
+                'status_label' => Ocorrencia::STATUS[$statusRow] ?? $statusRow,
+                'categoria' => trim((string) ($row['categoria_nome'] ?? '')),
+                'turma_nome' => trim((string) ($row['turma_nome'] ?? '')),
+                'materia_nome' => trim((string) ($row['materia_nome'] ?? '')),
+                'local' => trim((string) ($row['local'] ?? '')),
+                'enviar_pais' => !empty($row['enviar_pais']),
+                'criado_por' => trim((string) ($row['criado_por_nome'] ?? '')),
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'aluno' => $a,
+            'periodo' => [
+                'inicio' => $inicio,
+                'fim' => $fim,
+                'ano_letivo' => $anoFiltro > 0 ? $anoFiltro : null,
+            ],
+            'ocorrencias' => $slim,
+            'total' => $total,
+            'aviso' => $total === 0 ? 'Nenhuma ocorrência registrada para este aluno no filtro informado.' : null,
+        ];
+    }
+
+    /**
+     * @return array{ok:bool,colunas?:list,grupos?:list,linhas?:list,regra?:array,error?:string,aviso?:string}
+     */
+    private function montarQuadroBoletimAluno(int $alunoId, int $anoLetivo, int $regraIdPreferida = 0): array
+    {
+        $boletim = new BoletimConfig();
+        $boletim->ensureSchema();
+        $regra = null;
+        if ($regraIdPreferida > 0) {
+            $regra = $boletim->getRuleById($regraIdPreferida);
+            if (is_array($regra) && (int) ($regra['ano_letivo'] ?? 0) !== $anoLetivo) {
+                return [
+                    'ok' => false,
+                    'error' => 'A regra #' . $regraIdPreferida . ' não pertence ao ano letivo ' . $anoLetivo . '.',
+                ];
+            }
+        }
+        if (!is_array($regra) || empty($regra['componentes'])) {
+            $regra = $this->resolverRegraQuadroBoletim($anoLetivo);
+        }
+        if (!is_array($regra) || empty($regra['componentes'])) {
+            return ['ok' => false, 'error' => 'Nenhuma regra de boletim/impressão encontrada para ' . $anoLetivo . '.'];
+        }
+
+        $matriz = $this->simularMatrizRegraAluno($regra, $alunoId, $anoLetivo);
+        if ($matriz === null || empty($matriz['colunas']) || empty($matriz['linhas'])) {
+            return ['ok' => false, 'error' => 'Não foi possível montar o quadro do boletim.'];
+        }
+
+        return [
+            'ok' => true,
+            'regra' => [
+                'id' => (int) ($regra['id'] ?? 0),
+                'nome' => trim((string) ($regra['nome'] ?? '')),
+            ],
+            'colunas' => $matriz['colunas'],
+            'grupos' => $this->agruparCabecalhosColunas($matriz['colunas']),
+            'linhas' => $matriz['linhas'],
+        ];
+    }
+
+    /**
+     * Prefere regra de impressão/quadro anual (muitas colunas) do ano.
+     *
+     * @return array<string,mixed>|null
+     */
+    private function resolverRegraQuadroBoletim(int $anoLetivo): ?array
+    {
+        if ($anoLetivo < 2000) {
+            return null;
+        }
+        $boletim = new BoletimConfig();
+        $rows = $this->db->fetchAll(
+            "SELECT id, nome, codigo
+             FROM boletim_regras
+             WHERE ativo = 1
+               AND ano_letivo = :ano
+               AND (exibir_em = 'boletim' OR exibir_em IS NULL OR exibir_em = '')
+             ORDER BY id DESC
+             LIMIT 40",
+            ['ano' => $anoLetivo]
+        ) ?: [];
+
+        $melhor = null;
+        $melhorScore = -1;
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $regra = $boletim->getRuleById($id);
+            if (!is_array($regra)) {
+                continue;
+            }
+            $comps = is_array($regra['componentes'] ?? null) ? $regra['componentes'] : [];
+            $n = count($comps);
+            if ($n < 8) {
+                continue;
+            }
+            $blob = mb_strtolower(
+                trim((string) ($row['codigo'] ?? '')) . ' ' . trim((string) ($row['nome'] ?? '')),
+                'UTF-8'
+            );
+            $score = $n;
+            if (str_contains($blob, 'impress') || str_contains($blob, 'print') || str_contains($blob, 'quadro')) {
+                $score += 100;
+            }
+            if ((string) ($regra['exibir_em'] ?? '') === 'boletim') {
+                $score += 40;
+            }
+            if ($score > $melhorScore) {
+                $melhorScore = $score;
+                $melhor = $regra;
+            }
+        }
+        return $melhor;
+    }
+
+    /**
+     * @return array{regra?:?array,ambiguidade?:bool,candidatos_eventos?:list}
+     */
+    private function resolverRegraEventoNotas(int $anoLetivo, int $bimestre, string $eventoNome): array
+    {
+        $boletim = new BoletimConfig();
+        $params = ['ano' => $anoLetivo];
+        $sql = "SELECT id, nome, bimestre, exibir_em, codigo
+                FROM boletim_regras
+                WHERE ativo = 1
+                  AND ano_letivo = :ano
+                  AND (exibir_em = 'notas' OR exibir_em = 'demonstrativo' OR exibir_em IS NULL OR exibir_em = '')";
+        if ($bimestre > 0) {
+            $sql .= ' AND bimestre = :bim';
+            $params['bim'] = $bimestre;
+        }
+        if ($eventoNome !== '') {
+            $sql .= ' AND nome LIKE :nome';
+            $params['nome'] = '%' . $eventoNome . '%';
+        }
+        $sql .= " ORDER BY
+                    CASE WHEN exibir_em = 'notas' THEN 0 WHEN exibir_em = 'demonstrativo' THEN 1 ELSE 2 END,
+                    id DESC
+                 LIMIT 20";
+        $rows = $this->db->fetchAll($sql, $params) ?: [];
+        $candidatos = [];
+        foreach ($rows as $row) {
+            $regra = $boletim->getRuleById((int) ($row['id'] ?? 0));
+            if (!is_array($regra) || empty($regra['componentes'])) {
+                continue;
+            }
+            $candidatos[] = $regra;
+        }
+        if ($candidatos === []) {
+            return ['regra' => null];
+        }
+        if (count($candidatos) === 1) {
+            return ['regra' => $candidatos[0]];
+        }
+        // Preferência clara: se só um tem exibir_em=notas e o resto não, usa esse.
+        $soNotas = array_values(array_filter(
+            $candidatos,
+            static fn(array $r): bool => in_array((string) ($r['exibir_em'] ?? ''), ['notas', 'demonstrativo'], true)
+        ));
+        if (count($soNotas) === 1) {
+            return ['regra' => $soNotas[0]];
+        }
+        $lista = [];
+        foreach (($soNotas !== [] ? $soNotas : $candidatos) as $r) {
+            $lista[] = [
+                'id' => (int) ($r['id'] ?? 0),
+                'nome' => trim((string) ($r['nome'] ?? '')),
+                'bimestre' => isset($r['bimestre']) ? (int) $r['bimestre'] : null,
+                'exibir_em' => isset($r['exibir_em']) ? (string) $r['exibir_em'] : null,
+            ];
+        }
+        return [
+            'ambiguidade' => true,
+            'candidatos_eventos' => $lista,
+        ];
+    }
+
+    /**
+     * @return list<array{id:int,nome:string,bimestre:?int,exibir_em:?string}>
+     */
+    private function listarEventosNotasAno(int $anoLetivo, int $bimestre = 0): array
+    {
+        $params = ['ano' => $anoLetivo];
+        $sql = "SELECT id, nome, bimestre, exibir_em
+                FROM boletim_regras
+                WHERE ativo = 1
+                  AND ano_letivo = :ano
+                  AND (exibir_em = 'notas' OR exibir_em = 'demonstrativo' OR exibir_em IS NULL OR exibir_em = '')";
+        if ($bimestre > 0) {
+            $sql .= ' AND bimestre = :bim';
+            $params['bim'] = $bimestre;
+        }
+        $sql .= " ORDER BY bimestre ASC, nome ASC LIMIT 30";
+        $rows = $this->db->fetchAll($sql, $params) ?: [];
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = [
+                'id' => (int) ($r['id'] ?? 0),
+                'nome' => trim((string) ($r['nome'] ?? '')),
+                'bimestre' => isset($r['bimestre']) ? (int) $r['bimestre'] : null,
+                'exibir_em' => isset($r['exibir_em']) ? (string) $r['exibir_em'] : null,
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * @param array<string,mixed> $regra
+     * @return array{colunas:list,linhas:list}|null
+     */
+    private function simularMatrizRegraAluno(array $regra, int $alunoId, int $anoLetivo): ?array
+    {
+        $ini = $this->normalizarData($regra['default_data_inicio'] ?? null);
+        $fim = $this->normalizarData($regra['default_data_fim'] ?? null);
+        if ($ini === null || $fim === null) {
+            $ini = $ini ?? sprintf('%04d-01-01', $anoLetivo);
+            $fim = $fim ?? sprintf('%04d-12-31', $anoLetivo);
+        }
+        if ($ini > $fim) {
+            [$ini, $fim] = [$fim, $ini];
+        }
+        try {
+            $motor = new \App\Modulos\Boletins\Controllers\BoletimConfigController(true);
+            $sim = $motor->simularRegraAluno(
+                $regra,
+                $alunoId,
+                'RANGE:' . $ini . ':' . $fim,
+                $ini,
+                $fim,
+                [],
+                true,
+                false
+            );
+            if (!is_array($sim)) {
+                return null;
+            }
+            $matriz = is_array($sim['matriz_materias'] ?? null) ? $sim['matriz_materias'] : [];
+            $colunasRaw = is_array($matriz['colunas'] ?? null) ? $matriz['colunas'] : [];
+            $linhasRaw = is_array($matriz['linhas'] ?? null) ? $matriz['linhas'] : [];
+            if ($colunasRaw === [] || $linhasRaw === []) {
+                return null;
+            }
+
+            $colunas = [];
+            foreach ($colunasRaw as $c) {
+                if (!is_array($c)) {
+                    continue;
+                }
+                $codigo = trim((string) ($c['codigo'] ?? $c['chave'] ?? $c['key'] ?? ''));
+                if ($codigo === '') {
+                    continue;
+                }
+                $colunas[] = [
+                    'codigo' => $codigo,
+                    'nome' => trim((string) ($c['nome'] ?? $c['label'] ?? $codigo)),
+                    'cabecalho' => trim((string) ($c['linha_cabecalho'] ?? '')),
+                    'layout_group' => trim((string) ($c['layout_group'] ?? '')),
+                ];
+            }
+
+            $linhas = [];
+            foreach ($linhasRaw as $linha) {
+                if (!is_array($linha)) {
+                    continue;
+                }
+                $notas = is_array($linha['notas'] ?? null) ? $linha['notas'] : [];
+                $linhas[] = [
+                    'materia_id' => (int) ($linha['materia_id'] ?? 0),
+                    'materia' => trim((string) ($linha['materia_nome'] ?? '')),
+                    'notas' => $notas,
+                ];
+            }
+
+            return ['colunas' => $colunas, 'linhas' => $linhas];
+        } catch (\Throwable $e) {
+            error_log('AssistenteConsultaAmpliada simularMatriz: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Extrai uma coluna (ex.: MU) do quadro anual, opcionalmente restrita ao bimestre.
+     *
+     * @return array{ok:bool,quadro?:array,error?:string}
+     */
+    private function extrairColunaQuadroAnual(int $alunoId, int $anoLetivo, int $bimestre, string $coluna): array
+    {
+        $quadro = $this->montarQuadroBoletimAluno($alunoId, $anoLetivo);
+        if (empty($quadro['ok'])) {
+            return ['ok' => false, 'error' => $quadro['error'] ?? 'Quadro anual indisponível.'];
+        }
+        $coluna = strtoupper(trim($coluna));
+        $prefix = $bimestre > 0 ? ('b' . $bimestre . '_') : '';
+        $colunas = [];
+        foreach ($quadro['colunas'] as $c) {
+            $nome = strtoupper(trim((string) ($c['nome'] ?? '')));
+            $cod = strtoupper(trim((string) ($c['codigo'] ?? '')));
+            $grupo = strtolower(trim((string) ($c['layout_group'] ?? '')));
+            $doBim = $bimestre <= 0
+                || $grupo === ('b' . $bimestre)
+                || ($prefix !== '' && str_starts_with(strtolower($cod), $prefix));
+            if (!$doBim) {
+                continue;
+            }
+            if ($nome === $coluna || $cod === $coluna || str_ends_with($cod, '_' . $coluna)) {
+                $colunas[] = $c;
+            }
+        }
+        if ($colunas === []) {
+            return ['ok' => false, 'error' => 'Coluna não encontrada no quadro anual.'];
+        }
+        $codigos = array_map(static fn($c): string => (string) ($c['codigo'] ?? ''), $colunas);
+        $linhas = [];
+        foreach ($quadro['linhas'] as $linha) {
+            $notas = is_array($linha['notas'] ?? null) ? $linha['notas'] : [];
+            $filtradas = [];
+            foreach ($codigos as $cod) {
+                if ($cod !== '' && array_key_exists($cod, $notas)) {
+                    $filtradas[$cod] = $notas[$cod];
+                }
+            }
+            $linhas[] = [
+                'materia_id' => (int) ($linha['materia_id'] ?? 0),
+                'materia' => (string) ($linha['materia'] ?? ''),
+                'notas' => $filtradas,
+            ];
+        }
+        return [
+            'ok' => true,
+            'quadro' => [
+                'colunas' => $colunas,
+                'grupos' => $this->agruparCabecalhosColunas($colunas),
+                'linhas' => $linhas,
+            ],
+        ];
+    }
+
+    /**
+     * @param list<array<string,mixed>> $colunas
+     * @return list<array{titulo:string,colspan:int}>
+     */
+    private function agruparCabecalhosColunas(array $colunas): array
+    {
+        $mapaGrupo = [
+            'b1' => 'I BIMESTRE',
+            'b2' => 'II BIMESTRE',
+            'b3' => 'III BIMESTRE',
+            'b4' => 'IV BIMESTRE',
+            's1' => '1º SEMESTRE',
+            's2' => '2º SEMESTRE',
+            'sem1' => '1º SEMESTRE',
+            'sem2' => '2º SEMESTRE',
+            'final' => 'RESULTADO FINAL',
+            'rf' => 'RESULTADO FINAL',
+            'faltas' => 'FALTAS',
+        ];
+
+        $grupos = [];
+        $atualKey = null;
+        $atualTitulo = null;
+        $span = 0;
+        foreach ($colunas as $c) {
+            $layout = strtolower(trim((string) ($c['layout_group'] ?? '')));
+            $cab = trim((string) ($c['cabecalho'] ?? ''));
+            $key = $layout !== '' ? $layout : ('cab:' . ($cab !== '' ? $cab : '_'));
+            $titulo = $cab;
+            if ($titulo === '' && $layout !== '' && isset($mapaGrupo[$layout])) {
+                $titulo = $mapaGrupo[$layout];
+            }
+            if ($titulo === '') {
+                $titulo = $layout !== '' ? strtoupper($layout) : ' ';
+            }
+
+            if ($atualKey === null) {
+                $atualKey = $key;
+                $atualTitulo = $titulo;
+                $span = 1;
+                continue;
+            }
+            if ($key === $atualKey) {
+                $span++;
+                // Prefere título não vazio / mais descritivo dentro do mesmo grupo.
+                if (($atualTitulo === ' ' || $atualTitulo === strtoupper($layout)) && $titulo !== ' ') {
+                    $atualTitulo = $titulo;
+                }
+                if ($cab !== '' && isset($mapaGrupo[$layout]) === false) {
+                    $atualTitulo = $cab;
+                }
+                continue;
+            }
+            $grupos[] = ['titulo' => $atualTitulo ?? ' ', 'colspan' => $span];
+            $atualKey = $key;
+            $atualTitulo = $titulo;
+            $span = 1;
+        }
+        if ($atualKey !== null) {
+            $grupos[] = ['titulo' => $atualTitulo ?? ' ', 'colspan' => $span];
+        }
+        return $grupos;
     }
 
     /**

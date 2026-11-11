@@ -350,8 +350,14 @@ class ProvasAlunoAssistenteService
             case 'boletim_aluno':
                 return $this->ampliada->boletimAluno($args);
 
+            case 'notas_evento_aluno':
+                return $this->ampliada->notasEventoAluno($args);
+
             case 'faltas_aluno':
                 return $this->ampliada->faltasAluno($args);
+
+            case 'ocorrencias_aluno':
+                return $this->ampliada->ocorrenciasAluno($args);
 
             default:
                 return ['ok' => false, 'error' => 'Tool desconhecida: ' . $tool];
@@ -677,13 +683,42 @@ class ProvasAlunoAssistenteService
         if ($tool === 'boletim_aluno' && !empty($resultado['ok'])) {
             return [
                 'tipo' => 'boletim_aluno',
+                'formato' => $resultado['formato'] ?? 'eventos',
                 'aluno' => $resultado['aluno'] ?? null,
+                'ano_letivo' => $resultado['ano_letivo'] ?? null,
+                'regra' => $resultado['regra'] ?? null,
+                'quadro' => $resultado['quadro'] ?? null,
                 'eventos' => $resultado['eventos'] ?? [],
                 'total_eventos' => (int) ($resultado['total_eventos'] ?? 0),
+                'aviso' => $resultado['aviso'] ?? null,
                 'opcoes' => [
+                    'Notas do 1º bimestre',
+                    'Ver ocorrências deste aluno',
                     'Ver faltas deste aluno',
-                    'Consolidado de provas',
-                    'Jornadas deste aluno',
+                ],
+            ];
+        }
+        if ($tool === 'notas_evento_aluno' && !empty($resultado['candidatos_eventos'])) {
+            return [
+                'tipo' => 'candidatos_eventos',
+                'aluno' => $resultado['aluno'] ?? null,
+                'aviso' => $resultado['aviso'] ?? 'Escolha o evento:',
+                'candidatos' => $resultado['candidatos_eventos'],
+            ];
+        }
+        if ($tool === 'notas_evento_aluno' && !empty($resultado['ok'])) {
+            return [
+                'tipo' => 'notas_evento_aluno',
+                'aluno' => $resultado['aluno'] ?? null,
+                'ano_letivo' => $resultado['ano_letivo'] ?? null,
+                'evento' => $resultado['evento'] ?? null,
+                'coluna' => $resultado['coluna'] ?? null,
+                'quadro' => $resultado['quadro'] ?? null,
+                'aviso' => $resultado['aviso'] ?? null,
+                'opcoes' => [
+                    'Ver boletim completo',
+                    'Só a coluna MU',
+                    'Ver faltas deste aluno',
                 ],
             ];
         }
@@ -696,9 +731,24 @@ class ProvasAlunoAssistenteService
                 'turma_percentual' => $resultado['turma_percentual'] ?? null,
                 'aviso' => $resultado['aviso'] ?? null,
                 'opcoes' => [
+                    'Ver ocorrências deste aluno',
                     'Ver boletim deste aluno',
                     'Saúde da turma',
-                    'Consolidado de provas',
+                ],
+            ];
+        }
+        if ($tool === 'ocorrencias_aluno' && !empty($resultado['ok'])) {
+            return [
+                'tipo' => 'ocorrencias_aluno',
+                'aluno' => $resultado['aluno'] ?? null,
+                'periodo' => $resultado['periodo'] ?? null,
+                'ocorrencias' => $resultado['ocorrencias'] ?? [],
+                'total' => (int) ($resultado['total'] ?? 0),
+                'aviso' => $resultado['aviso'] ?? null,
+                'opcoes' => [
+                    'Ver faltas deste aluno',
+                    'Ver boletim deste aluno',
+                    'Só ocorrências abertas',
                 ],
             ];
         }
@@ -716,7 +766,7 @@ class ProvasAlunoAssistenteService
         return <<<PROMPT
 Você é o Assistente da EducaTudo (coordenação/direção).
 
-Objetivo: consultar ALUNOS (provas/jornadas/boletim/faltas), TURMAS (saúde e provas), BLOCOS de prova, e PROFESSORES (provas e jornadas).
+Objetivo: consultar ALUNOS (provas/jornadas/boletim/faltas/ocorrências), TURMAS (saúde e provas), BLOCOS de prova, e PROFESSORES (provas e jornadas).
 
 Regras importantes:
 1) Nunca invente notas, datas, progresso, enunciados, alunos ou professores — só dados das consultas.
@@ -730,10 +780,13 @@ Regras importantes:
 9) Pedido sobre TURMA sem professor → saude_turma / resumo_provas_turma.
 10) Pedido sobre BLOCO → buscar_blocos / resultados_bloco.
 11) Pedido sobre PROFESSOR → resumo_provas_professor / saude_turmas_professor / resumo_jornadas_professor.
-12) Boletim/faltas → boletim_aluno / faltas_aluno.
-13) Detalhe de questão → detalhar_prova_aluno com somente_erros=true.
-14) Resposta final: texto CURTO (2–4 linhas). A UI monta tabelas.
-15) Se a tool devolver candidatos/aviso, liste-os e peça escolha — não diga "não encontrei" se houver candidatos.
+12) Pedido de BOLETIM / médias e faltas por bimestre / quadro anual → boletim_aluno (formato quadro PP/PU/CH/PE/MU).
+13) Pedido de NOTAS DE EVENTO / demonstrativo / "PP do 1º bimestre" / "MU do 2º" → notas_evento_aluno (passe bimestre e/ou coluna).
+14) Frequência/presença/faltas → faltas_aluno.
+15) Ocorrência/incidente/disciplina/comportamento → ocorrencias_aluno. NUNCA use faltas_aluno para ocorrência.
+16) Detalhe de questão → detalhar_prova_aluno com somente_erros=true.
+17) Resposta final: texto CURTO (2–4 linhas). A UI monta tabelas.
+18) Se a tool devolver candidatos/aviso, liste-os e peça escolha — não diga "não encontrei" se houver candidatos.
 
 Para obter dados, emita EXATAMENTE:
 <<<CONSULTA>>>
@@ -753,13 +806,15 @@ Tools — professor:
 14) resumo_provas_professor / 15) detalhar_prova_professor / 16) ranking_erros_prova_professor
 17) saude_turmas_professor / 18) resumo_jornadas_professor — {"professor_nome":"Ana","turma_nome":"2ªB"}
 
-Tools — turma / bloco / boletim / faltas:
+Tools — turma / bloco / boletim / faltas / ocorrências:
 19) saude_turma — {"turma_nome":"2 Ano B"} — KPIs crítico/atenção
 20) resumo_provas_turma — {"turma_nome":"2 Ano B"} — totais acertos/erros por matéria
 21) buscar_blocos — {"titulo":"Simulado"} ou {"turma_nome":"2ªB"}
 22) resultados_bloco — {"bloco_id":10} ou {"titulo":"Simulado 1"}
-23) boletim_aluno — {"ra":"24254","ano_letivo":2024} ou {"aluno_id":123} ou {"aluno_nome":"Maria","turma":"2ªB"}
-24) faltas_aluno — {"ra":"24254"} ou {"aluno_id":123} — frequência no período/ano
+23) boletim_aluno — {"ra":"24254","ano_letivo":2024} — quadro anual (PP/PU/CH/PE/MU por bimestre)
+24) notas_evento_aluno — {"ra":"24254","ano_letivo":2024,"bimestre":1} ou {"coluna":"MU","bimestre":2} — notas de um evento/demonstrativo
+25) faltas_aluno — {"ra":"24254"} ou {"aluno_id":123} — frequência/presença (NÃO é ocorrência)
+26) ocorrencias_aluno — {"ra":"24254","ano_letivo":2024} ou {"aluno_id":123,"status":"aberta"} — incidentes disciplinares
 
 Tipos de avaliação (provas) desta escola:
 PROMPT
@@ -971,9 +1026,13 @@ PROMPT
             case 'resumo_jornadas_professor':
                 return 'Montando jornadas do professor…';
             case 'boletim_aluno':
-                return 'Consultando boletim…';
+                return 'Montando boletim…';
+            case 'notas_evento_aluno':
+                return 'Consultando notas do evento…';
             case 'faltas_aluno':
                 return 'Consultando frequência…';
+            case 'ocorrencias_aluno':
+                return 'Consultando ocorrências…';
             case 'listar_materias':
             case 'listar_materias_jornadas':
                 return 'Listando matérias…';
