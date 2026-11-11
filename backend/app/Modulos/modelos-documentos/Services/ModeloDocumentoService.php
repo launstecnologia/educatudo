@@ -2703,6 +2703,7 @@ class ModeloDocumentoService
         if ($usarVisual) {
             $estruturaVisual = $this->estruturaDoModelo($modelo);
             $partes = $this->htmlDaEstrutura($estruturaVisual, $vars);
+            $partes = $this->recuperarCamposPasseioNaEmissao($partes, $estruturaVisual['campos_variaveis'] ?? [], $vars);
             $htmlBrutoCab = $partes['cabecalho'];
             $htmlBrutoCorpo = $partes['corpo'];
             if (is_array($estruturaVisual['grade'] ?? null)) {
@@ -3838,6 +3839,43 @@ HTML;
         );
 
         return $html;
+    }
+
+    /**
+     * Versões anteriores do editor podiam salvar o rótulo visível no lugar
+     * do token. Recupera apenas os pares rótulo/valor conhecidos do passeio.
+     */
+    private function recuperarCamposPasseioNaEmissao(array $partes, array $campos, array $vars): array
+    {
+        $rotulos = [
+            'cv_aut_finalidade' => 'Finalidade(?: do passeio)?',
+            'cv_aut_local' => 'Local(?: do passeio)?',
+            'cv_data_evento' => 'Data(?: do evento| do passeio)?',
+            'cv_aut_hora_saida' => '(?:(?:Hora|Horário)(?: de)? )?Saída',
+            'cv_aut_hora_retorno' => '(?:(?:Hora|Horário)(?: de)? )?Retorno',
+        ];
+        $html = implode('', $partes);
+        foreach ($campos as $campo) {
+            $chave = $campo['chave'];
+            if (!isset($rotulos[$chave]) || !array_key_exists($chave, $vars)) {
+                continue;
+            }
+            $alias = substr($chave, 3);
+            if (preg_match('/\{\{\s*(?:cv_)?' . preg_quote($alias, '/') . '\s*\}\}/i', $html)) {
+                continue;
+            }
+            $rotuloSalvo = preg_quote(htmlspecialchars($campo['rotulo'], ENT_QUOTES, 'UTF-8'), '~');
+            $espaco = '(?:\s|&nbsp;)*';
+            $padrao = '~(<(p|td|th|div)\b[^>]*>' . $espaco
+                . '(?:<(?:strong|b)\b[^>]*>' . $espaco . ')?' . $rotulos[$chave]
+                . $espaco . ':' . $espaco . '(?:</(?:strong|b)>' . $espaco . ')?)'
+                . $rotuloSalvo . '(?=' . $espaco . '</\2>)~iu';
+            foreach ($partes as &$parte) {
+                $parte = preg_replace($padrao, '$1{{' . $chave . '}}', $parte) ?? $parte;
+            }
+            unset($parte);
+        }
+        return $partes;
     }
 
     /**

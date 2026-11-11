@@ -1,5 +1,7 @@
 # Tasks — backlog atual
 
+- [x] Editor de documentos: abrir as ações Editar em HTML e Expor tabela completa no mesmo painel lateral, com busca literal, contador e navegação entre ocorrências. Validado no Chromium.
+
 - [x] Chat de documentos: perguntar pelos dados do passeio, montar autorização com campos da emissão e mostrar o rascunho ao lado da conversa. Fluxo guiado local para escolas sem TudiCoins. Validado com 3 testes no Chromium, 8 testes PHP e revisão de código.
 
 - [x] Assistente no editor de documentos: reunir Chat e Reproduzir de imagem, responder sobre as variáveis e gerar HTML editável para revisão. Ação `modelo_documento_assistente` configurável nas tabelas de custo do Master. Validado com 8 testes PHP, 2 testes Chromium com IA simulada e revisão PHP. — 2026-11-11

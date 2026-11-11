@@ -124,6 +124,43 @@ final class CamposDocumentoEditorTest extends TestCase
         $this->assertSame('Museu &amp; Escola', $svc->aplicarPlaceholders('{{aut_local}}', $vars));
     }
 
+    public function testAutorizacaoSalvaComRotulosImprimeOsValoresDaEmissao(): void
+    {
+        $svc = new class extends ModeloDocumentoService {
+            public function __construct() {}
+            public function aplicarLayoutPadraoNoModelo(array $modelo): array { return $modelo; }
+        };
+        $valores = [
+            'cv_aut_finalidade' => 'Visita pedagógica',
+            'cv_aut_local' => 'Museu & Escola',
+            'cv_data_evento' => '2026-11-13',
+            'cv_aut_hora_saida' => '08:45',
+            'cv_aut_hora_retorno' => '14:30',
+        ];
+        $estrutura = ModeloDocumentoService::estruturaVazia();
+        $estrutura['campos_variaveis'] = array_values(array_filter(
+            ModeloDocumentoService::camposAutorizacao(),
+            static fn (array $campo): bool => isset($valores[$campo['chave']])
+        ));
+        $corpo = '<p><strong>Finalidade do passeio:</strong> Finalidade</p>'
+            . '<table><tr><td><strong>Local:</strong> Local</td><td><strong>Data:</strong> Data do evento (autorização)</td></tr>'
+            . '<tr><td><strong>Hora de saída:</strong> Hora saída</td><td><strong>Hora de retorno:</strong> {{cv_aut_hora_retorno}}</td></tr></table>'
+            . '<p>A finalidade consta no planejamento.</p>';
+        $estrutura['body']['sections'][0]['columns'][0]['elements'][] = ModeloDocumentoService::elementoEstrutura('html', ['html' => $corpo]);
+        $modelo = ['codigo' => 'autorizacao_personalizada', 'estrutura_json' => json_encode($estrutura)];
+        $vars = $svc->mesclarCamposVariaveis([
+            'assinante_nome' => 'Direção',
+            'assinante_cargo' => 'Direção',
+            'logo_html' => '<span></span>',
+        ], $svc->camposDoModelo($modelo), $valores);
+        $html = $svc->renderHtml($modelo, $vars);
+
+        foreach (['Visita pedagógica', 'Museu &amp; Escola', '13/11/2026', '08:45', '14:30', 'A finalidade consta no planejamento.'] as $trecho) {
+            self::assertStringContainsString($trecho, $html);
+        }
+        self::assertStringNotContainsString('Local:</strong> Local', $html);
+    }
+
     public function testCatalogoDaSecretariaExibeCampoDoHtmlLegado(): void
     {
         $db = $this->getMockBuilder(\App\Core\Database::class)->disableOriginalConstructor()->onlyMethods(['fetchAll'])->getMock();

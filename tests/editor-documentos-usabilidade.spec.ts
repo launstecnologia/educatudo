@@ -212,36 +212,42 @@ async function selecionarHtmlBoletim(page: Page, codigo: string) {
   ultimoSalvo = { estrutura };
   await page.reload();
   await page.locator('.edoc-el[data-type="boletim"]').click();
-  await expect(page.getByRole('button', { name: 'Expandir editor' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Editar em HTML' })).toBeVisible();
 }
 
-const codigoBoletim = '<style type="text/css">.exemplo{color:red;--imagem:url("data:image/svg+xml;a;b");content:"a;b{}";}</style><div class="quadro-notas-wrap"><p class="inline"><span>Nome</span><strong>Aluno</strong></p><div>{{quadro_notas_html}}</div></div>';
+const codigoBoletim = '<style type="text/css">.exemplo{color:red;--imagem:url("data:image/svg+xml;a;b");content:"a;b{}";}</style><div class="quadro-notas-wrap"><p class="inline"><span>Nome</span><strong>Aluno</strong></p><div>{{boletim_html}}</div></div>';
 
 test('HTML abre expandido e indentado sem mudar textos inline, CSS ou variáveis', async ({ page }) => {
   await selecionarHtmlBoletim(page, codigoBoletim);
   await expect(page.locator('#edoc-boletim-html')).toHaveValue(/\n  \.exemplo \{\n    color:red;/);
-  await page.getByRole('button', { name: 'Expandir editor' }).click();
+  await page.getByRole('button', { name: 'Editar em HTML' }).click();
   const dialogo = page.getByRole('dialog', { name: 'Editar HTML do boletim' });
   await expect(dialogo).toBeVisible();
-  const campo = page.getByLabel('Código HTML do boletim', { exact: true });
+  const campo = page.getByLabel('Código HTML', { exact: true });
   const formatado = await campo.inputValue();
   expect(formatado).toContain('<style type="text/css">\n');
   expect(formatado).toContain('content:"a;b{}";');
   expect(formatado).toContain('url("data:image/svg+xml;a;b")');
   expect(formatado).toContain('<span>Nome</span><strong>Aluno</strong>');
-  expect(formatado).toContain('    {{quadro_notas_html}}');
+  expect(formatado).toContain('    {{boletim_html}}');
   await page.getByRole('button', { name: 'Indentar código', exact: true }).click();
   await expect(campo).toHaveValue(formatado);
   const dimensao = await dialogo.boundingBox();
-  expect(dimensao!.width).toBeGreaterThan(900);
+  expect(dimensao!.width).toBeGreaterThan(600);
+  expect(Math.round(dimensao!.x + dimensao!.width)).toBe(page.viewportSize()!.width);
+  await expect(page.locator('#edoc-paper')).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('html-expandido.png'), fullPage: true });
+  await campo.press('Escape');
+  await page.getByRole('button', { name: 'Ver resultado', exact: true }).click();
+  await expect(page.locator('#edoc-pdf-frame')).toBeVisible();
+  await expect(page.locator('#edoc-paper')).not.toBeVisible();
 });
 
 test('cancelar HTML expandido descarta rascunho e não altera o documento', async ({ page }) => {
   await selecionarHtmlBoletim(page, codigoBoletim);
-  await page.getByRole('button', { name: 'Expandir editor' }).click();
-  await page.getByLabel('Código HTML do boletim', { exact: true }).fill('<p>Não aplicar</p>');
-  await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await page.getByRole('button', { name: 'Editar em HTML' }).click();
+  await page.getByLabel('Código HTML', { exact: true }).fill('<p>Não aplicar</p>');
+  await page.getByRole('button', { name: 'Voltar à folha', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Editar HTML do boletim' })).not.toBeVisible();
   await page.locator('#edoc-save').click();
   await expect(page.locator('#edoc-status')).toHaveText('Salvo automaticamente');
@@ -250,56 +256,86 @@ test('cancelar HTML expandido descarta rascunho e não altera o documento', asyn
 
 test('aplicar HTML expandido atualiza a folha e persiste o código editado', async ({ page }) => {
   await selecionarHtmlBoletim(page, codigoBoletim);
-  await page.getByRole('button', { name: 'Expandir editor' }).click();
-  const campo = page.getByLabel('Código HTML do boletim', { exact: true });
-  await campo.fill('<div class="quadro-notas-wrap"><p>Observação editada</p>{{quadro_notas_html}}</div>');
+  await page.getByRole('button', { name: 'Editar em HTML' }).click();
+  const campo = page.getByLabel('Código HTML', { exact: true });
+  await campo.fill('<div class="quadro-notas-wrap"><p>Observação editada</p>{{boletim_html}}</div>');
   await page.getByRole('button', { name: 'Indentar código', exact: true }).click();
-  await page.getByRole('button', { name: 'Aplicar alterações', exact: true }).click();
+  await page.getByRole('button', { name: 'Aplicar na folha', exact: true }).click();
   await expect(page.locator('#edoc-paper')).toContainText('Observação editada');
   await page.locator('#edoc-save').click();
   await expect(page.locator('#edoc-status')).toHaveText('Salvo automaticamente');
   const salvo = ultimoSalvo.estrutura.body.sections[0].columns[0].elements[0].props.html;
   expect(salvo).toContain('Observação editada');
-  expect(salvo).toContain('{{quadro_notas_html}}');
+  expect(salvo).toContain('{{boletim_html}}');
   await page.reload();
   await expect(page.locator('#edoc-paper')).toContainText('Observação editada');
 });
 
 
-for (const codigo of ['<span>Nome</span><strong>Aluno</strong>', 'Texto &lt;b&gt;literal&lt;/b&gt;<div>{{quadro_notas_html}}</div>']) {
+for (const codigo of ['<span>Nome</span><strong>Aluno</strong>', 'Texto &lt;b&gt;literal&lt;/b&gt;<div>{{boletim_html}}</div>']) {
   test('formatar e aplicar preserva fragmento raiz: ' + codigo.slice(0, 25), async ({ page }) => {
     await selecionarHtmlBoletim(page, codigo);
-    await page.getByRole('button', { name: 'Expandir editor' }).click();
-    await expect(page.getByLabel('Código HTML do boletim', { exact: true })).toHaveValue(codigo);
+    await page.getByRole('button', { name: 'Editar em HTML' }).click();
+    await expect(page.getByLabel('Código HTML', { exact: true })).toHaveValue(codigo);
     await page.getByRole('button', { name: 'Indentar código', exact: true }).click();
-    await page.getByRole('button', { name: 'Aplicar alterações', exact: true }).click();
+    await page.getByRole('button', { name: 'Aplicar na folha', exact: true }).click();
     await page.locator('#edoc-save').click();
     await expect(page.locator('#edoc-status')).toHaveText('Salvo automaticamente');
     expect(ultimoSalvo.estrutura.body.sections[0].columns[0].elements[0].props.html).toBe(codigo);
   });
 }
 
-test('expandir logo depois de editar o campo lateral funciona no primeiro clique', async ({ page }) => {
-  await selecionarHtmlBoletim(page, codigoBoletim);
-  await page.locator('#edoc-boletim-html').fill('<div><p>Editado na lateral</p>{{quadro_notas_html}}</div>');
-  await page.getByRole('button', { name: 'Expandir editor' }).click();
-  await expect(page.getByRole('dialog', { name: 'Editar HTML do boletim' })).toBeVisible();
-  await expect(page.getByLabel('Código HTML do boletim', { exact: true })).toHaveValue(/Editado na lateral/);
+test('busca no painel lateral localiza variáveis e mantém o código intacto', async ({ page }) => {
+  await selecionarHtmlBoletim(page, '<p>{{boletim_html}}</p>' + '<p>Uma linha</p>'.repeat(60) + '<p>{{BOLETIM_HTML}}</p>');
+  await page.getByRole('button', { name: 'Editar em HTML' }).click();
+  const painel = page.getByRole('dialog', { name: 'Editar HTML do boletim' });
+  const campo = painel.getByLabel('Código HTML', { exact: true });
+  const fonte = await campo.inputValue();
+  const busca = painel.getByRole('searchbox', { name: 'Pesquisar no HTML' });
+  await campo.press('Control+f');
+  await expect(busca).toBeFocused();
+  await busca.fill('{{boletim_html}}');
+  await expect(painel.getByRole('status')).toHaveText('1 de 2');
+  await busca.press('Enter');
+  await expect(painel.getByRole('status')).toHaveText('2 de 2');
+  expect(await campo.evaluate((el: HTMLTextAreaElement) => el.value.slice(el.selectionStart, el.selectionEnd))).toBe('{{BOLETIM_HTML}}');
+  expect(await campo.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+  await painel.getByRole('button', { name: 'Próxima ocorrência' }).click();
+  await expect(painel.getByRole('status')).toHaveText('1 de 2');
+  await busca.fill('inexistente');
+  await expect(painel.getByRole('status')).toHaveText('Nenhuma ocorrência');
+  await expect(painel.getByRole('button', { name: 'Ocorrência anterior' })).toBeDisabled();
+  await expect(campo).toHaveValue(fonte);
+  await busca.press('Escape');
+  await expect(painel).not.toBeVisible();
+});
+
+test('Editar em HTML usa o mesmo painel para um bloco de texto', async ({ page }) => {
+  const estrutura = await page.evaluate(() => (window as any).EDOC.estrutura);
+  estrutura.body.sections[0].columns[0].elements = [{ id: 'texto_html_teste', type: 'texto', props: { text: 'Texto da autorização' }, style: {} }];
+  ultimoSalvo = { estrutura };
+  await page.reload();
+  await page.getByText('Texto da autorização', { exact: true }).click();
+  await page.getByRole('button', { name: 'Editar em HTML' }).click();
+  const painel = page.locator('#edoc-html-stage');
+  await expect(painel).toBeVisible();
+  await expect(painel.getByRole('searchbox', { name: 'Pesquisar no HTML' })).toBeVisible();
+  await expect(painel.getByLabel('Código HTML', { exact: true })).toHaveValue('Texto da autorização');
 });
 
 test('expõe tabela inteira com campos dinâmicos sem aplicar até confirmar', async ({ page }) => {
-  await selecionarHtmlBoletim(page, '<div>{{quadro_notas_html}}</div>');
+  await selecionarHtmlBoletim(page, '<div>{{boletim_html}}</div>');
   await page.getByRole('button', { name: 'Expor tabela completa', exact: true }).click();
-  const campo = page.getByLabel('Código HTML do boletim', { exact: true });
+  const campo = page.getByLabel('Código HTML', { exact: true });
   await expect(campo).toHaveValue(/<thead>/);
   await expect(campo).toHaveValue(/<tbody>/);
   await expect(campo).toHaveValue(/\{\{boletim_celula_t1_m17_b1_pp\}\}/);
   expect(await campo.inputValue()).not.toContain('>7,5<');
-  await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
-  await expect(page.locator('#edoc-boletim-html')).toHaveValue(/\{\{quadro_notas_html\}\}/);
+  await page.getByRole('button', { name: 'Voltar à folha', exact: true }).click();
+  await expect(page.locator('#edoc-boletim-html')).toHaveValue(/\{\{boletim_html\}\}/);
   await page.getByRole('button', { name: 'Expor tabela completa', exact: true }).click();
   await campo.fill((await campo.inputValue()).replace('Matemática', 'Matemática do TI'));
-  await page.getByRole('button', { name: 'Aplicar alterações', exact: true }).click();
+  await page.getByRole('button', { name: 'Aplicar na folha', exact: true }).click();
   await expect(page.locator('#edoc-paper')).toContainText('Matemática do TI');
   await expect(page.locator('#edoc-paper')).toContainText('7,5');
   await expect(page.locator('#edoc-paper')).not.toContainText('{{boletim_celula_');

@@ -218,7 +218,7 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                     <div id="edoc-paper" class="edoc-paper"></div>
                 </div>
             </div>
-            <section class="edoc-html-stage" id="edoc-html-stage" aria-label="Editor HTML" hidden>
+            <dialog class="edoc-html-stage" id="edoc-html-stage" aria-labelledby="edoc-html-title" aria-describedby="edoc-html-desc">
                 <form id="edoc-html-form" class="edoc-html-stage-form">
                     <header>
                         <div>
@@ -231,11 +231,17 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                             <button type="submit" class="edoc-btn edoc-btn-primary">Aplicar na folha</button>
                         </div>
                     </header>
+                    <div class="edoc-html-busca" role="search" aria-label="Pesquisa no código HTML">
+                        <input type="search" id="edoc-html-busca" aria-label="Pesquisar no HTML" placeholder="Pesquisar no HTML" autocomplete="off" spellcheck="false">
+                        <span id="edoc-html-busca-status" role="status"></span>
+                        <button type="button" class="edoc-btn edoc-btn-icon" id="edoc-html-anterior" aria-label="Ocorrência anterior" title="Ocorrência anterior" disabled>↑</button>
+                        <button type="button" class="edoc-btn edoc-btn-icon" id="edoc-html-proximo" aria-label="Próxima ocorrência" title="Próxima ocorrência" disabled>↓</button>
+                    </div>
                     <label class="edoc-sr-only" for="edoc-html-code">Código HTML</label>
-                    <textarea id="edoc-html-code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea>
+                    <textarea id="edoc-html-code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off" autofocus></textarea>
                     <footer><span>As alterações entram na folha ao clicar em Aplicar. Esc volta sem salvar.</span></footer>
                 </form>
-            </section>
+            </dialog>
         </main>
 
         <aside class="edoc-right">

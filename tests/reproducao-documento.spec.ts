@@ -84,7 +84,7 @@ test('o chat explica variáveis e deixa revisar o HTML de uma proposta', async (
   const proposta = JSON.parse(execFileSync('php', [fixture, '--assistente'], {
     encoding: 'utf8', cwd: raiz, input: JSON.stringify({
       mensagem: 'Preparei uma autorização com o nome do aluno.',
-      html: '<h1>Autorização de passeio</h1><p>Aluno: {{aluno_nome}}</p><p>Local: {{aut_local}}</p><p>Data: {{cv_data_evento}}</p><script>alert(1)</script>',
+      html: '<h1>Autorização de passeio</h1><p>Aluno: {{aluno_nome}}</p><table><tr><td>Local: {{aut_local}}</td><td>Data: {{cv_data_evento}}</td></tr></table><script>alert(1)</script>',
     }),
   }));
   const pedidos: { role: string; content: string }[][] = [];
@@ -184,6 +184,17 @@ test('o chat explica variáveis e deixa revisar o HTML de uma proposta', async (
     { chave: 'cv_data_evento', rotulo: 'Data do evento (autorização)', mascara: 'data', obrigatorio: true },
   ]);
   expect(JSON.stringify(salvo.estrutura.body)).toContain('{{cv_aut_local}}');
+
+  await page.getByRole('button', { name: 'Fechar assistente' }).click();
+  const celulaLocal = folha.getByRole('cell', { name: 'Local: Local' });
+  await celulaLocal.click();
+  await page.keyboard.press('Home');
+  await page.keyboard.insertText('Passeio — ');
+  await expect.poll(() => JSON.stringify(salvo?.estrutura?.body)).toContain('Passeio — ');
+  expect(JSON.stringify(salvo.estrutura.body)).toContain('{{cv_aut_local}}');
+  expect(JSON.stringify(salvo.estrutura.body)).toContain('{{cv_data_evento}}');
+  await assistente.click();
+  await chat.click();
 
   await campo.fill('Mude o título da proposta.');
   await enviar.click();

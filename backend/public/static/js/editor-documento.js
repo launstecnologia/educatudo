@@ -695,12 +695,15 @@
     var out = String(html).replace(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi, function (_, k) {
       var campoEmissao = camposEmissao && camposEmissao.get(k.toLowerCase());
       if (campoEmissao) return '<span class="edoc-campo-emissao">Preencher na emissão · ' + esc(campoEmissao.rotulo) + '</span>';
+      var campo = campoVariavelPorChave(k);
+      if (campo) {
+        return '<span class="edoc-ph" data-edoc-variavel="' + campo.chave + '" contenteditable="false">'
+          + esc(campo.rotulo) + '</span>';
+      }
       if (bag && Object.prototype.hasOwnProperty.call(bag, k) && String(bag[k]) !== '') {
         return String(bag[k]);
       }
       if (k.indexOf('boletim_celula_') === 0) return '—';
-      var campo = campoVariavelPorChave(k);
-      if (campo) return '<span class="edoc-ph">' + esc(campo.rotulo) + '</span>';
       return '<span class="edoc-ph">{{' + k + '}}</span>';
     });
     return out;
@@ -761,7 +764,9 @@
     if (!node) return '';
     var clone = node.cloneNode(true);
     $all('.edoc-ph', clone).forEach(function (s) {
-      s.replaceWith(document.createTextNode(s.textContent || ''));
+      var chave = s.dataset.edocVariavel;
+      var texto = /^cv_[a-z0-9_]{1,40}$/.test(chave || '') ? tokenDaChave(chave) : s.textContent;
+      s.replaceWith(document.createTextNode(texto || ''));
     });
     $all('.edoc-col-marcada, .edoc-celula-sel, .edoc-celula-drop', clone).forEach(function (n) {
       n.classList.remove('edoc-col-marcada', 'edoc-celula-sel', 'edoc-celula-drop');
@@ -787,6 +792,8 @@
     $all('[data-edoc-token]', body).forEach(function (cel) {
       var chave = String(cel.getAttribute('data-edoc-token') || '');
       var texto = (cel.textContent || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+      var marcador = cel.querySelector('[data-edoc-variavel]');
+      if (marcador && marcador.dataset.edocVariavel === chave && texto === marcador.textContent) return;
       var token = '{{' + chave + '}}';
       var resolvido = '';
       if (bag && Object.prototype.hasOwnProperty.call(bag, chave)) {
@@ -4170,40 +4177,9 @@
     return 'Editar HTML — ' + labelTipo(el.type);
   }
 
-  function garantirPainelHtml() {
-    var stage = $('#edoc-html-stage');
-    if (stage) return stage;
-    var centro = document.querySelector('.edoc-center');
-    if (!centro) return null;
-    stage = document.createElement('section');
-    stage.id = 'edoc-html-stage';
-    stage.className = 'edoc-html-stage';
-    stage.setAttribute('aria-label', 'Editor HTML');
-    stage.hidden = true;
-    stage.innerHTML = '<form id="edoc-html-form" class="edoc-html-stage-form">'
-      + '<header><div><h2 id="edoc-html-title">Editar HTML</h2>'
-      + '<p id="edoc-html-desc">Edite o HTML do bloco selecionado.</p></div>'
-      + '<div class="edoc-html-stage-actions">'
-      + '<button type="button" class="edoc-btn" id="edoc-html-indent">Indentar código</button>'
-      + '<button type="button" class="edoc-btn" id="edoc-html-cancel">Voltar à folha</button>'
-      + '<button type="submit" class="edoc-btn edoc-btn-primary">Aplicar na folha</button>'
-      + '</div></header>'
-      + '<label class="edoc-sr-only" for="edoc-html-code">Código HTML</label>'
-      + '<textarea id="edoc-html-code" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea>'
-      + '<footer><span>As alterações entram na folha ao clicar em Aplicar. Esc volta sem salvar.</span></footer>'
-      + '</form>';
-    centro.appendChild(stage);
-    return stage;
-  }
-
   function fecharHtmlExpandido() {
     var stage = $('#edoc-html-stage');
-    var centro = document.querySelector('.edoc-center');
-    if (stage) {
-      stage.hidden = true;
-      stage.setAttribute('hidden', '');
-    }
-    if (centro) centro.classList.remove('is-html-editing');
+    if (stage && stage.open) stage.close();
     alvoHtmlExpandido = null;
   }
 
@@ -4217,12 +4193,11 @@
       return;
     }
     try { persistirEdicaoSeHouver(); } catch (ePersist) {}
-    var stage = garantirPainelHtml();
+    var stage = $('#edoc-html-stage');
     bindHtmlExpandido();
     var codigo = $('#edoc-html-code');
     var titulo = $('#edoc-html-title');
     var desc = $('#edoc-html-desc');
-    var centro = document.querySelector('.edoc-center');
     if (!stage || !codigo) {
       setStatus('Não foi possível abrir o editor HTML. Recarregue a página.');
       return;
@@ -4234,21 +4209,21 @@
     } catch (eIndent) {
       codigo.value = String(fonte || '');
     }
+    var busca = $('#edoc-html-busca');
+    busca.value = '';
+    busca.dispatchEvent(new Event('input'));
     if (titulo) titulo.textContent = tituloEditorHtml(target);
     if (desc) {
       desc.textContent = elementoEhBoletim(target) || target.type === 'demonstrativo_notas' || target.type === 'tabela_notas'
         ? 'Os campos entre {{...}} são preenchidos para cada aluno. Edite a estrutura e os estilos à vontade.'
         : 'Edite o HTML do bloco selecionado. Variáveis {{campo}} entram automaticamente na emissão.';
     }
-    stage.removeAttribute('hidden');
-    stage.hidden = false;
-    if (centro) centro.classList.add('is-html-editing');
     fecharInfoFolha();
-    window.setTimeout(function () {
-      codigo.focus();
-      try { codigo.setSelectionRange(0, 0); } catch (eSel) {}
-    }, 0);
-    setStatus('Editor HTML aberto no centro da tela.');
+    if (!stage.open) stage.showModal();
+    codigo.focus();
+    codigo.setSelectionRange(0, 0);
+    codigo.scrollTop = codigo.scrollLeft = 0;
+    setStatus('Editor HTML aberto no painel lateral.');
   }
 
   function mmParaPx(mm) {
@@ -4340,11 +4315,77 @@
     });
   }
 
+  function bindBuscaHtml(stage, codigo) {
+    var busca = $('#edoc-html-busca', stage);
+    var status = $('#edoc-html-busca-status', stage);
+    var anterior = $('#edoc-html-anterior', stage);
+    var proximo = $('#edoc-html-proximo', stage);
+    var medidor = document.createElement('canvas').getContext('2d');
+    var ocorrencias = [];
+    var atual = -1;
+
+    function atualizarStatus() {
+      var total = ocorrencias.length;
+      anterior.disabled = proximo.disabled = total === 0;
+      if (!busca.value) status.textContent = '';
+      else if (!total) status.textContent = 'Nenhuma ocorrência';
+      else if (atual >= 0) status.textContent = (atual + 1) + ' de ' + total;
+      else status.textContent = total + (total === 1 ? ' ocorrência' : ' ocorrências');
+    }
+
+    function selecionar(indice, focarCodigo) {
+      if (!ocorrencias.length) return;
+      atual = (indice + ocorrencias.length) % ocorrencias.length;
+      var resultado = ocorrencias[atual];
+      if (focarCodigo) codigo.focus({ preventScroll: true });
+      codigo.setSelectionRange(resultado.index, resultado.index + resultado[0].length);
+      var antes = codigo.value.slice(0, resultado.index);
+      var linhas = antes.split('\n');
+      var estilo = getComputedStyle(codigo);
+      var alturaLinha = parseFloat(estilo.lineHeight);
+      codigo.scrollTop = (linhas.length - 1) * alturaLinha - codigo.clientHeight / 2;
+      if (medidor) {
+        medidor.font = estilo.fontSize + ' ' + estilo.fontFamily;
+        var linha = linhas[linhas.length - 1].replace(/\t/g, '  ');
+        codigo.scrollLeft = medidor.measureText(linha).width - codigo.clientWidth / 2;
+      }
+      atualizarStatus();
+    }
+
+    function atualizarResultados(selecionarPrimeiro) {
+      var termo = busca.value.replace(/[.*+?^{}$()|[\]\\]/g, '\\$&');
+      ocorrencias = termo ? Array.from(codigo.value.matchAll(new RegExp(termo, 'gi'))) : [];
+      atual = -1;
+      if (selecionarPrimeiro && ocorrencias.length) selecionar(0, false);
+      else atualizarStatus();
+    }
+
+    function navegar(direcao) {
+      selecionar(atual < 0 && direcao < 0 ? ocorrencias.length - 1 : atual + direcao, true);
+    }
+
+    busca.addEventListener('input', function () { atualizarResultados(true); });
+    codigo.addEventListener('input', function () { atualizarResultados(false); });
+    anterior.addEventListener('click', function () { navegar(-1); });
+    proximo.addEventListener('click', function () { navegar(1); });
+    stage.addEventListener('keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        busca.focus();
+        busca.select();
+      } else if (e.key === 'F3' || (e.target === busca && e.key === 'Enter' && !e.isComposing)) {
+        e.preventDefault();
+        navegar(e.shiftKey ? -1 : 1);
+      }
+    });
+  }
+
   function bindHtmlExpandido() {
-    var stage = garantirPainelHtml();
+    var stage = $('#edoc-html-stage');
     var codigo = $('#edoc-html-code');
     if (!stage || !codigo || stage._edocHtmlBound) return;
     stage._edocHtmlBound = true;
+    bindBuscaHtml(stage, codigo);
     var btnCancel = $('#edoc-html-cancel');
     var btnIndent = $('#edoc-html-indent');
     var form = $('#edoc-html-form');
@@ -4352,23 +4393,24 @@
     if (btnIndent) {
       btnIndent.addEventListener('click', function () {
         try { codigo.value = indentarHtmlDocumento(codigo.value); } catch (eIndent) {}
+        codigo.dispatchEvent(new Event('input'));
         codigo.focus();
       });
     }
     codigo.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        fecharHtmlExpandido();
-        return;
-      }
       if (e.key !== 'Tab' || e.shiftKey) return;
       e.preventDefault();
       var inicio = codigo.selectionStart;
       codigo.setRangeText('  ', inicio, codigo.selectionEnd, 'end');
+      codigo.dispatchEvent(new Event('input'));
     });
-    document.addEventListener('keydown', function (e) {
-      if (e.key !== 'Escape' || stage.hidden) return;
-      if (document.activeElement === codigo) return;
+    stage.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape' || e.isComposing) return;
+      e.preventDefault();
+      fecharHtmlExpandido();
+    });
+    stage.addEventListener('cancel', function (e) {
+      e.preventDefault();
       fecharHtmlExpandido();
     });
     if (form) {
@@ -4439,7 +4481,7 @@
         + '</div>';
       html += '<div class="edoc-prop-row" style="margin-top:6px;gap:6px;">'
         + '<button type="button" class="edoc-btn" id="edoc-insert-var">{ } Variáveis</button>'
-        + '<button type="button" class="edoc-btn" id="edoc-editar-html" title="Abre o editor HTML no centro da tela"><i class="fa-solid fa-code" aria-hidden="true"></i> Editar em HTML</button>'
+        + '<button type="button" class="edoc-btn" id="edoc-editar-html" title="Abre o editor HTML no painel lateral"><i class="fa-solid fa-code" aria-hidden="true"></i> Editar em HTML</button>'
         + '</div>';
     }
     if (elementoEhBoletim(el)) {
@@ -4451,19 +4493,19 @@
       var soDin = boletimHtmlSoDinamico(p.html);
       html += soDin
         ? '<p class="edoc-hint">Este bloco ainda usa <code>{{quadro_notas_html}}</code>. Na prévia, escolha regra de aprovação, curso/série e aluno para carregar a tabela.</p>'
-        : '<p class="edoc-hint">Edite o HTML no centro da tela. Os campos <code>{{boletim_celula_…}}</code> recebem as notas de cada aluno.</p>';
+        : '<p class="edoc-hint">Os campos <code>{{boletim_celula_…}}</code> recebem as notas de cada aluno.</p>';
       html += '<div class="edoc-prop-row" style="margin-bottom:6px;">'
         + '<button type="button" class="edoc-btn" id="edoc-boletim-html-dinamico" title="Wrapper com variável dinâmica">HTML dinâmico</button>'
         + '<button type="button" class="edoc-btn" id="edoc-boletim-html-previa" title="Editar a estrutura completa com notas dinâmicas">Expor tabela completa</button>'
         + '</div>';
       html += '<div class="edoc-html-label"><label for="edoc-boletim-html">HTML do boletim</label>'
-        + '<button type="button" class="edoc-btn" id="edoc-html-expand" title="Abre o editor HTML no centro da tela"><i class="fa-solid fa-code" aria-hidden="true"></i> Editar em HTML</button></div>';
-      html += '<textarea data-f="html" id="edoc-boletim-html" class="edoc-html-src" rows="14" spellcheck="false">'
+        + '<button type="button" class="edoc-btn" id="edoc-html-expand" title="Abre o editor HTML no painel lateral"><i class="fa-solid fa-code" aria-hidden="true"></i> Editar em HTML</button></div>';
+      html += '<textarea id="edoc-boletim-html" class="edoc-html-src" rows="6" spellcheck="false" readonly>'
         + esc(indentarHtmlDocumento(p.html || '')) + '</textarea>';
     }
     if (elementoPermiteHtml(el) && !elementoEhBoletim(el)
       && el.type !== 'titulo' && el.type !== 'texto' && el.type !== 'texto_rico' && el.type !== 'html') {
-      html += '<button type="button" class="edoc-btn" id="edoc-editar-html" style="margin:8px 0;width:100%" title="Abre o editor HTML no centro da tela">'
+      html += '<button type="button" class="edoc-btn" id="edoc-editar-html" style="margin:8px 0;width:100%" title="Abre o editor HTML no painel lateral">'
         + '<i class="fa-solid fa-code" aria-hidden="true"></i> Editar em HTML</button>';
     }
     if (el.type === 'titulo') {
@@ -4600,9 +4642,7 @@
     ligarRodapeNoFim(box);
     $all('[data-f]', box).forEach(function (f) {
       f.addEventListener('change', function () {
-        // Não recriar o botão Expandir entre o blur do HTML e seu clique.
-        if (f.id === 'edoc-boletim-html') { applyField(kind, target, f, true); pushHist(); }
-        else applyField(kind, target, f);
+        applyField(kind, target, f);
       });
       if (f.tagName === 'TEXTAREA' || f.type === 'text' || f.type === 'number') {
         f.addEventListener('input', function () { applyField(kind, target, f, true); });
