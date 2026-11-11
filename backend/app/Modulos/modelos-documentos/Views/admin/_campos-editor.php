@@ -52,14 +52,14 @@ $renderCampos('Contrato e valores', $grupos['contrato']['chaves'] ?? [], 'fa-fil
 </details>
 <details class="edoc-tool-group" data-edoc-palette-group>
 <summary><span>Acadêmico</span><small>Boletim, eventos, médias, faltas e histórico</small></summary>
-<p class="edoc-hint">Use o Boletim/Quadro com o Demonstrativo de notas de Acadêmico (ex.: Aprovação Santa Maria — todos os bimestres, recuperações e prova final).</p>
+<p class="edoc-hint">Boletim = modelos criados em Acadêmico → Boletim. Demonstrativo de Notas = modelos criados em Acadêmico → Demonstrativo de notas.</p>
 <div class="edoc-var-stack">
 <?php $renderElementos(array_values(array_filter($catalogo['dados'] ?? [], static fn ($i) => ($i['tipo'] ?? '') === 'boletim'))); ?>
-<?php $renderCampos('Quadro / Demonstrativo de notas', ['quadro_notas_html'], 'fa-table-list'); ?>
+<?php $renderCampos('Demonstrativo de Notas', ['quadro_notas_html'], 'fa-table-list'); ?>
 <div class="edoc-demo" id="edoc-demo">
 <div class="edoc-demo-head">
 <strong>Disciplinas e eventos</strong>
-<p>Escolha turma, aluno e boletim na demonstração. Depois insira cada nota, falta ou média final.</p>
+<p>Na prévia, escolha regra de aprovação, ano, turma/série e aluno. Depois insira cada nota, falta ou média.</p>
 </div>
 <label class="edoc-demo-check" for="edoc-demo-sigla"><input type="checkbox" id="edoc-demo-sigla"> Sigla no lugar do nome</label>
 <div class="edoc-atalhos">

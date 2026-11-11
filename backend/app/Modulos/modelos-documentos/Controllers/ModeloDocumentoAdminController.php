@@ -162,10 +162,27 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
         }
         $turmaId = max(0, (int) ($_GET['turma_id'] ?? 0));
         $alunoId = max(0, (int) ($_GET['aluno_id'] ?? 0));
+        $demonstrativoId = max(0, (int) ($_GET['demonstrativo_id'] ?? 0));
+        $layoutBoletimId = max(0, (int) ($_GET['layout_boletim_id'] ?? 0));
+        // Compat: boletim_id antigo = Demonstrativo de Notas (cadastro em boletins).
         $boletimId = max(0, (int) ($_GET['boletim_id'] ?? 0));
+        $fonteTipo = 'auto';
+        $fonteQuadro = 0;
+        if ($demonstrativoId > 0) {
+            $fonteQuadro = $demonstrativoId;
+            $fonteTipo = 'demonstrativo';
+        } elseif ($layoutBoletimId > 0) {
+            $fonteQuadro = $layoutBoletimId;
+            $fonteTipo = 'layout';
+        } elseif ($boletimId > 0) {
+            $fonteQuadro = $boletimId;
+            $fonteTipo = 'auto';
+        }
         $chave = (string) ($_GET['chave'] ?? '1127');
         try {
-            $pacote = (new DemonstracaoDocumentoService($this->db))->pacote($turmaId, $alunoId, $chave, $boletimId);
+            $pacote = (new DemonstracaoDocumentoService($this->db))->pacote($turmaId, $alunoId, $chave, $fonteQuadro, $fonteTipo);
+            $pacote['demonstrativo_id'] = $demonstrativoId > 0 ? $demonstrativoId : null;
+            $pacote['layout_boletim_id'] = $layoutBoletimId > 0 ? $layoutBoletimId : null;
             unset($pacote['linhas']);
             $this->json($pacote);
         } catch (\Throwable $e) {
@@ -339,12 +356,30 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
             $decodedEst = json_decode((string) $modelo['estrutura_json'], true);
             $estruturaModelo = is_array($decodedEst) ? $decodedEst : [];
         }
-        $boletimId = max(0, (int) ($_GET['boletim_id'] ?? ($estruturaModelo['fonte_boletim_id'] ?? 0)));
+        $demonstrativoId = max(0, (int) ($_GET['demonstrativo_id'] ?? ($estruturaModelo['fonte_demonstrativo_id'] ?? 0)));
+        $layoutBoletimId = max(0, (int) ($_GET['layout_boletim_id'] ?? 0));
+        $boletimIdGet = max(0, (int) ($_GET['boletim_id'] ?? 0));
+        $fonteTipo = 'auto';
+        $boletimId = 0;
+        if ($demonstrativoId > 0) {
+            $boletimId = $demonstrativoId;
+            $fonteTipo = 'demonstrativo';
+        } elseif ($layoutBoletimId > 0) {
+            $boletimId = $layoutBoletimId;
+            $fonteTipo = 'layout';
+        } elseif ($boletimIdGet > 0) {
+            $boletimId = $boletimIdGet;
+            $fonteTipo = 'auto';
+        } elseif ((int) ($estruturaModelo['fonte_boletim_id'] ?? 0) > 0) {
+            $boletimId = (int) $estruturaModelo['fonte_boletim_id'];
+            // Sem GET tipado: campo novo = layout de Boletim (igual à emissão).
+            $fonteTipo = 'layout';
+        }
         if ($turmaId > 0 && $alunoId > 0) {
             try {
                 $demo = new \App\Modulos\ModelosDocumentos\Services\DemonstracaoDocumentoService($this->db);
                 $chaveGrade = $demo::chaveGradeDoCodigo((string) ($modelo['codigo'] ?? ''));
-                $pacote = $demo->pacote($turmaId, $alunoId, $chaveGrade, $boletimId);
+                $pacote = $demo->pacote($turmaId, $alunoId, $chaveGrade, $boletimId, $fonteTipo);
                 if (is_array($pacote['vars'] ?? null)) {
                     foreach ($pacote['vars'] as $chave => $valor) {
                         if (is_string($chave) && is_string($valor) && $valor !== '') {

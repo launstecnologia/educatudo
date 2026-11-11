@@ -157,7 +157,7 @@ class ModeloDocumentoService
         'rodape_unidades' => 'Linha de unidades/contato do rodapé',
         'assinante_nome' => 'Nome de quem assina (layout padrão)',
         'assinante_cargo' => 'Cargo de quem assina (Direção, Coordenação…)',
-        'quadro_notas_html' => 'Quadro / Demonstrativo de notas (HTML)',
+        'quadro_notas_html' => 'Demonstrativo de Notas (HTML)',
         'componentes_serie_html' => 'Componentes curriculares da série (HTML)',
         'identidade_html' => 'Tabela de identidade do aluno (HTML)',
         'trajetoria_html' => 'Trajetória escolar por ano (HTML)',
@@ -625,7 +625,7 @@ class ModeloDocumentoService
                 $item('dados_aluno', 'Dados do aluno', 'fa-user-graduate'),
                 $item('dados_responsavel', 'Dados do responsável', 'fa-user'),
                 $item('dados_turma', 'Dados da turma', 'fa-users'),
-                $item('boletim', 'Boletim', 'fa-table-list', 'Quadro do Demonstrativo de notas (todos os bimestres, recuperações e prova final). Escolha o modelo e a aluna no card.'),
+                $item('boletim', 'Boletim', 'fa-table-list', 'Boletim que você criou em Acadêmico → Boletim. Na prévia: regra, ano, turma/série e aluno.'),
                 $item('frequencia', 'Frequência', 'fa-chart-pie'),
                 $item('observacoes', 'Observações', 'fa-comment'),
                 $item('assinaturas', 'Assinaturas', 'fa-signature'),
@@ -1595,6 +1595,10 @@ class ModeloDocumentoService
         if ($fonteBoletimId > 0) {
             $base['fonte_boletim_id'] = $fonteBoletimId;
         }
+        $fonteDemonstrativoId = (int) ($estrutura['fonte_demonstrativo_id'] ?? 0);
+        if ($fonteDemonstrativoId > 0) {
+            $base['fonte_demonstrativo_id'] = $fonteDemonstrativoId;
+        }
         return $this->estruturaSemLogoDuplicado($base);
     }
 
@@ -2182,11 +2186,23 @@ class ModeloDocumentoService
         return $out;
     }
 
-    /** Usa na emissão o mesmo boletim-fonte vinculado no editor do documento. */
+    /**
+     * Usa na emissão o mesmo quadro vinculado no editor.
+     * Preferência: fonte_demonstrativo_id (Acadêmico → Demonstrativo) e depois fonte_boletim_id (layout de Boletim).
+     */
     public function aplicarFonteBoletimDoModelo(array $modelo, array $vars, int $alunoId, int $turmaId, int $anoLetivo = 0): array
     {
         $estrutura = $this->estruturaDoModelo($modelo);
-        $fonteId = (int) ($estrutura['fonte_boletim_id'] ?? 0);
+        $fonteTipo = 'auto';
+        $fonteId = (int) ($estrutura['fonte_demonstrativo_id'] ?? 0);
+        if ($fonteId > 0) {
+            $fonteTipo = 'demonstrativo';
+        } else {
+            $fonteId = (int) ($estrutura['fonte_boletim_id'] ?? 0);
+            if ($fonteId > 0) {
+                $fonteTipo = 'layout';
+            }
+        }
         if ($fonteId <= 0) {
             return $vars;
         }
@@ -2194,11 +2210,11 @@ class ModeloDocumentoService
             throw new \RuntimeException('Aluno e turma são necessários para emitir o boletim vinculado ao documento.');
         }
         $demonstracao = new DemonstracaoDocumentoService($this->db);
-        $anoFonte = $demonstracao->anoDoLayoutOuBoletim($fonteId);
+        $anoFonte = $demonstracao->anoDoLayoutOuBoletim($fonteId, $fonteTipo);
         if ($anoLetivo > 0 && $anoFonte > 0 && $anoLetivo !== $anoFonte) {
             throw new \RuntimeException('O boletim vinculado é de ' . $anoFonte . ', mas a ficha emitida é de ' . $anoLetivo . '. Selecione um modelo com boletim do mesmo ano letivo.');
         }
-        $pacote = $demonstracao->pacote($turmaId, $alunoId, '1127a', $fonteId);
+        $pacote = $demonstracao->pacote($turmaId, $alunoId, '1127a', $fonteId, $fonteTipo);
         $quadro = trim((string) ($pacote['html_quadro'] ?? ''));
         if ($quadro === '') {
             throw new \RuntimeException((string) ($pacote['resumo'] ?? 'O boletim vinculado não possui quadro para este aluno.'));
@@ -2231,6 +2247,7 @@ class ModeloDocumentoService
             return false;
         }
         if (self::emissaoValida($estrutura['emissao'] ?? null) !== null
+            || (int) ($estrutura['fonte_demonstrativo_id'] ?? 0) > 0
             || (int) ($estrutura['fonte_boletim_id'] ?? 0) > 0) {
             return true;
         }

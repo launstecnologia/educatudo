@@ -35,24 +35,33 @@ class DemonstracaoDocumentoService
     }
 
     /**
+     * @param 'auto'|'demonstrativo'|'layout' $fonteTipo
      * @return array<string, mixed>
      */
-    public function pacote(int $turmaId, int $alunoId, string $chave, int $boletimId = 0): array
+    public function pacote(int $turmaId, int $alunoId, string $chave, int $boletimId = 0, string $fonteTipo = 'auto'): array
     {
         $chave = $this->chaveGrade($chave);
+        $fonteTipo = $this->normalizarFonteTipo($fonteTipo);
         $turmas = $this->listarTurmas();
         $alunos = $turmaId > 0 ? $this->listarAlunos($turmaId) : [];
-        $anoLista = 0;
+        // Sempre lista todos os modelos criados; o ano da turma só prioriza a ordenação.
+        $anoPrioridade = 0;
         if ($turmaId > 0) {
             $turmaLista = $this->turmaPorId($turmaId);
-            $anoLista = is_array($turmaLista) ? (int) ($turmaLista['ano_letivo'] ?? 0) : 0;
+            $anoPrioridade = is_array($turmaLista) ? (int) ($turmaLista['ano_letivo'] ?? 0) : 0;
         }
+        $demonstrativos = $this->listarDemonstrativosAtivos($anoPrioridade > 0 ? $anoPrioridade : null);
+        $layouts = $this->listarLayoutsBoletimAtivos($anoPrioridade > 0 ? $anoPrioridade : null);
         $out = [
             'ok' => true,
             'turmas' => $turmas,
             'alunos' => $alunos,
-            'boletins' => $this->listarBoletinsAtivos($anoLista > 0 ? $anoLista : null),
+            'demonstrativos' => $demonstrativos,
+            'layouts_boletim' => $layouts,
+            // Compat com o editor antigo (select único).
+            'boletins' => $demonstrativos,
             'boletim_id' => $boletimId > 0 ? $boletimId : null,
+            'fonte_tipo' => $fonteTipo,
             'html_quadro' => '',
             'componentes' => [],
             'periodos' => $this->periodosPublicos($chave),
@@ -72,10 +81,14 @@ class DemonstracaoDocumentoService
         if ($ano <= 0) {
             $ano = (int) ($turma['ano_letivo'] ?? 0);
         }
-        if ($ano > 0) {
-            $out['boletins'] = $this->listarBoletinsAtivos($ano);
+        if ($ano > 0 && $ano !== $anoPrioridade) {
+            $demonstrativos = $this->listarDemonstrativosAtivos($ano);
+            $layouts = $this->listarLayoutsBoletimAtivos($ano);
+            $out['demonstrativos'] = $demonstrativos;
+            $out['layouts_boletim'] = $layouts;
+            $out['boletins'] = $demonstrativos;
         }
-        $anoFonte = $boletimId > 0 ? $this->anoDoLayoutOuBoletim($boletimId) : 0;
+        $anoFonte = $boletimId > 0 ? $this->anoDoLayoutOuBoletim($boletimId, $fonteTipo) : 0;
         if ($anoFonte > 0 && $ano > 0 && $anoFonte !== $ano) {
             $out['resumo'] = 'O boletim vinculado é de ' . $anoFonte . ', mas o aluno selecionado é de ' . $ano . '. Escolha um boletim do mesmo ano letivo.';
             return $out;
@@ -90,7 +103,7 @@ class DemonstracaoDocumentoService
         $vars = GradeSoltaService::completar($this->gradeDaDemonstracao($chave, $atalhos), $vars);
         unset($vars['_grade_fonte']);
         $vars['componentes_serie_html'] = $this->htmlComponentes($linhas);
-        $quadroBoletim = $boletimId > 0 ? $this->htmlQuadroDoBoletim($alunoId, $boletimId) : '';
+        $quadroBoletim = $boletimId > 0 ? $this->htmlQuadroDoBoletim($alunoId, $boletimId, $fonteTipo) : '';
         if ($boletimId > 0) {
             $out['boletim_id'] = $boletimId;
             if ($quadroBoletim !== '') {
@@ -100,7 +113,7 @@ class DemonstracaoDocumentoService
             } else {
                 $vars['quadro_notas_html'] = '';
                 $out['html_quadro'] = '';
-                $anoBoletim = $this->anoDoLayoutOuBoletim($boletimId);
+                $anoBoletim = $this->anoDoLayoutOuBoletim($boletimId, $fonteTipo);
                 $regraDbg = 0;
                 try {
                     if (class_exists(\App\Modulos\Boletins\Services\BoletimVisaoImpressaoService::class)) {
@@ -146,12 +159,11 @@ class DemonstracaoDocumentoService
     }
 
     /**
-     * Mesmos Modelos de Demonstrativo de Notas de Acadêmico → Demonstrativo (`boletins`).
-     * Prioriza o ano da turma, mas lista todos para o select não ficar vazio.
+     * Modelos de Demonstrativo de Notas (Acadêmico → Demonstrativo).
      *
-     * @return list<array{id:int,nome:string,rotulo:string,ano_letivo:?int,finalidade:string}>
+     * @return list<array{id:int,nome:string,rotulo:string,ano_letivo:?int,finalidade:string,regra_nome?:string}>
      */
-    public function listarBoletinsAtivos(?int $anoLetivo = null): array
+    public function listarDemonstrativosAtivos(?int $anoLetivo = null): array
     {
         $rows = [];
         try {
@@ -175,22 +187,42 @@ class DemonstracaoDocumentoService
                 $rows = [];
             }
         }
-        // Tenant legado sem cadastro de Demonstrativo: lista layouts de impressão.
-        if ($rows === []) {
-            try {
-                if (class_exists(\App\Modulos\EventosAvaliativos\Models\BoletimLayout::class)) {
-                    $layout = new \App\Modulos\EventosAvaliativos\Models\BoletimLayout();
-                    $anoFiltro = ($anoLetivo !== null && $anoLetivo > 0) ? $anoLetivo : 0;
-                    $rows = $layout->listar($anoFiltro) ?: [];
-                    if ($rows === [] && $anoFiltro > 0) {
-                        $rows = $layout->listar(0) ?: [];
-                    }
-                }
-            } catch (\Throwable $e) {
-                $rows = [];
+
+        return $this->normalizarOpcoesFonte($rows, $anoLetivo, true);
+    }
+
+    /**
+     * Modelos de Boletim criados (Acadêmico → Boletim / boletim_layouts).
+     *
+     * @return list<array{id:int,nome:string,rotulo:string,ano_letivo:?int,finalidade:string,regra_nome?:string}>
+     */
+    public function listarLayoutsBoletimAtivos(?int $anoLetivo = null): array
+    {
+        $rows = [];
+        try {
+            if (class_exists(\App\Modulos\EventosAvaliativos\Models\BoletimLayout::class)) {
+                // Sempre todos os boletins criados; $anoLetivo só prioriza a ordenação.
+                $rows = (new \App\Modulos\EventosAvaliativos\Models\BoletimLayout())->listar(0) ?: [];
             }
+        } catch (\Throwable $e) {
+            $rows = [];
         }
 
+        return $this->normalizarOpcoesFonte($rows, $anoLetivo, true);
+    }
+
+    /** @deprecated Use listarDemonstrativosAtivos() */
+    public function listarBoletinsAtivos(?int $anoLetivo = null): array
+    {
+        return $this->listarDemonstrativosAtivos($anoLetivo);
+    }
+
+    /**
+     * @param list<array<string,mixed>> $rows
+     * @return list<array{id:int,nome:string,rotulo:string,ano_letivo:?int,finalidade:string,regra_nome:string}>
+     */
+    private function normalizarOpcoesFonte(array $rows, ?int $anoLetivo, bool $priorizarRegra): array
+    {
         $out = [];
         foreach ($rows as $row) {
             if (!is_array($row)) {
@@ -208,7 +240,11 @@ class DemonstracaoDocumentoService
                 ? (int) $row['ano_letivo']
                 : null;
             $finalidade = (string) ($row['finalidade'] ?? 'oficial');
-            $rotulo = $nome;
+            $regraNome = trim((string) ($row['regra_nome'] ?? $row['regra_academica_nome'] ?? ''));
+            $rotulo = $priorizarRegra && $regraNome !== '' ? $regraNome : $nome;
+            if ($priorizarRegra && $regraNome !== '' && strcasecmp($regraNome, $nome) !== 0) {
+                $rotulo = $regraNome . ' · ' . $nome;
+            }
             if ($ano !== null && $ano > 0) {
                 $rotulo .= ' · ' . $ano;
             }
@@ -221,6 +257,7 @@ class DemonstracaoDocumentoService
                 'rotulo' => $rotulo,
                 'ano_letivo' => $ano,
                 'finalidade' => $finalidade,
+                'regra_nome' => $regraNome,
                 '_prio' => ($anoLetivo !== null && $anoLetivo > 0 && $ano === $anoLetivo) ? 0 : 1,
             ];
         }
@@ -234,7 +271,7 @@ class DemonstracaoDocumentoService
             if ($anoA !== $anoB) {
                 return $anoB <=> $anoA;
             }
-            return strcmp((string) ($a['nome'] ?? ''), (string) ($b['nome'] ?? ''));
+            return strcmp((string) ($a['rotulo'] ?? ''), (string) ($b['rotulo'] ?? ''));
         });
         foreach ($out as &$item) {
             unset($item['_prio']);
@@ -244,54 +281,68 @@ class DemonstracaoDocumentoService
         return $out;
     }
 
-    private function htmlQuadroDoBoletim(int $alunoId, int $boletimId): string
+    /**
+     * @param 'auto'|'demonstrativo'|'layout' $fonteTipo
+     */
+    private function htmlQuadroDoBoletim(int $alunoId, int $boletimId, string $fonteTipo = 'auto'): string
     {
         if ($alunoId <= 0 || $boletimId <= 0) {
             return '';
         }
-
+        $fonteTipo = $this->normalizarFonteTipo($fonteTipo);
         $html = '';
 
-        // 1) Modelo de Demonstrativo de Notas (cadastro em /admin/boletins) → quadro de impressão do boletim.
-        try {
-            if (class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)) {
+        $tentarDemonstrativo = static function () use ($alunoId, $boletimId): string {
+            try {
+                if (!class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)) {
+                    return '';
+                }
                 $candidato = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
                     ->htmlQuadroPorBoletim($alunoId, $boletimId);
-                $candidato = is_string($candidato) ? trim($candidato) : '';
-                if ($candidato !== '') {
-                    $html = $candidato;
-                }
+                return is_string($candidato) ? trim($candidato) : '';
+            } catch (\Throwable $e) {
+                error_log('DemonstracaoDocumento quadro demonstrativo: ' . $e->getMessage());
+                return '';
             }
-        } catch (\Throwable $e) {
-            error_log('DemonstracaoDocumento quadro demonstrativo: ' . $e->getMessage());
-        }
+        };
 
-        // 2) Compat: se o id ainda for de layout de impressão (boletim_layouts).
-        if ($html === '') {
+        $tentarLayout = static function () use ($alunoId, $boletimId): string {
             try {
-                if (class_exists(\App\Modulos\Boletins\Services\BoletimVisaoImpressaoService::class)
-                    && class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)
+                if (!class_exists(\App\Modulos\Boletins\Services\BoletimVisaoImpressaoService::class)
+                    || !class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)
                 ) {
-                    $regraLayout = (new \App\Modulos\Boletins\Services\BoletimVisaoImpressaoService())
-                        ->encontrarRegraDoLayout($boletimId);
-                    if ($regraLayout > 0) {
-                        $candidato = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
-                            ->htmlQuadroPorRegraImpressao($alunoId, $regraLayout);
-                        $candidato = is_string($candidato) ? trim($candidato) : '';
-                        if ($candidato !== '') {
-                            $html = $candidato;
-                        }
-                    }
+                    return '';
                 }
+                $regraLayout = (new \App\Modulos\Boletins\Services\BoletimVisaoImpressaoService())
+                    ->encontrarRegraDoLayout($boletimId);
+                if ($regraLayout <= 0) {
+                    return '';
+                }
+                $candidato = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
+                    ->htmlQuadroPorRegraImpressao($alunoId, $regraLayout);
+                return is_string($candidato) ? trim($candidato) : '';
             } catch (\Throwable $e) {
                 error_log('DemonstracaoDocumento quadro layout boletim: ' . $e->getMessage());
+                return '';
+            }
+        };
+
+        if ($fonteTipo === 'layout') {
+            $html = $tentarLayout();
+        } elseif ($fonteTipo === 'demonstrativo') {
+            $html = $tentarDemonstrativo();
+        } else {
+            // auto (legado): tenta demonstrativo (boletins) e depois layout.
+            $html = $tentarDemonstrativo();
+            if ($html === '') {
+                $html = $tentarLayout();
             }
         }
 
-        // 3) Demonstrativo Santa Maria (todos os bimestres / recuperações / prova final).
+        // Fallback Santa Maria (todos os bimestres / recuperações / prova final).
         if ($html === '') {
             try {
-                $ano = $this->anoDoLayoutOuBoletim($boletimId);
+                $ano = $this->anoDoLayoutOuBoletim($boletimId, $fonteTipo);
                 if ($ano > 0) {
                     $quadro = (new QuadroBoletimSantaMariaService($this->db))->montarHtml($alunoId, $ano);
                     $htmlSm = trim((string) ($quadro['html'] ?? ''));
@@ -305,6 +356,13 @@ class DemonstracaoDocumentoService
         }
 
         return $this->envolverQuadroCompacto($html);
+    }
+
+    /** @return 'auto'|'demonstrativo'|'layout' */
+    private function normalizarFonteTipo(string $fonteTipo): string
+    {
+        $fonteTipo = strtolower(trim($fonteTipo));
+        return in_array($fonteTipo, ['demonstrativo', 'layout'], true) ? $fonteTipo : 'auto';
     }
 
     /**
@@ -336,28 +394,43 @@ class DemonstracaoDocumentoService
         return $css . '<div class="doc-quadro-fit">' . $html . '</div>';
     }
 
-    public function anoDoLayoutOuBoletim(int $id): int
+    /**
+     * @param 'auto'|'demonstrativo'|'layout' $fonteTipo
+     */
+    public function anoDoLayoutOuBoletim(int $id, string $fonteTipo = 'auto'): int
     {
         if ($id <= 0) {
             return 0;
         }
-        // Preferência: modelo de Demonstrativo de Notas (cadastro em boletins).
+        $fonteTipo = $this->normalizarFonteTipo($fonteTipo);
+        if ($fonteTipo === 'layout') {
+            return $this->anoDoLayout($id);
+        }
+        if ($fonteTipo === 'demonstrativo') {
+            return $this->anoDoBoletim($id);
+        }
+        // auto (legado): preferência demonstrativo (boletins), depois layout.
         $ano = $this->anoDoBoletim($id);
         if ($ano > 0) {
             return $ano;
         }
-        if ($this->tabelaExiste('boletim_layouts')) {
-            try {
-                $row = $this->db->fetch(
-                    'SELECT ano_letivo FROM boletim_layouts WHERE id = :id LIMIT 1',
-                    ['id' => $id]
-                );
-                return is_array($row) ? (int) ($row['ano_letivo'] ?? 0) : 0;
-            } catch (\Throwable $e) {
-                return 0;
-            }
+        return $this->anoDoLayout($id);
+    }
+
+    private function anoDoLayout(int $layoutId): int
+    {
+        if ($layoutId <= 0 || !$this->tabelaExiste('boletim_layouts')) {
+            return 0;
         }
-        return 0;
+        try {
+            $row = $this->db->fetch(
+                'SELECT ano_letivo FROM boletim_layouts WHERE id = :id LIMIT 1',
+                ['id' => $layoutId]
+            );
+            return is_array($row) ? (int) ($row['ano_letivo'] ?? 0) : 0;
+        } catch (\Throwable $e) {
+            return 0;
+        }
     }
 
     private function anoDoBoletim(int $boletimId): int

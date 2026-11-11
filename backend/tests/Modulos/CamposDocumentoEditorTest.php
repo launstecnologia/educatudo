@@ -20,7 +20,7 @@ final class CamposDocumentoEditorTest extends TestCase
         $this->assertNotContains('aluno_filiacao', $grupos['academico']['chaves']);
         $this->assertNotContains('aluno_naturalidade', $grupos['academico']['chaves']);
         $this->assertNotContains('aluno_nacionalidade', $grupos['academico']['chaves']);
-        $this->assertSame('Quadro / Demonstrativo de notas (HTML)', ModeloDocumentoService::PLACEHOLDERS['quadro_notas_html']);
+        $this->assertSame('Demonstrativo de Notas (HTML)', ModeloDocumentoService::PLACEHOLDERS['quadro_notas_html']);
         $this->assertContains('quadro_notas_html', $grupos['academico']['chaves']);
     }
 

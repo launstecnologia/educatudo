@@ -45,6 +45,8 @@
     if (campos.length) out.campos_variaveis = campos;
     var fonteBoletimId = parseInt(e.fonte_boletim_id, 10) || 0;
     if (fonteBoletimId > 0) out.fonte_boletim_id = fonteBoletimId;
+    var fonteDemonstrativoId = parseInt(e.fonte_demonstrativo_id, 10) || 0;
+    if (fonteDemonstrativoId > 0) out.fonte_demonstrativo_id = fonteDemonstrativoId;
     return stripLogoDuplicado(out);
   }
 
@@ -2516,13 +2518,28 @@
   function capturarDemoSel() {
     var turma = $('#edoc-demo-turma');
     var aluno = $('#edoc-demo-aluno');
+    var fonteDemo = $('#edoc-fonte-demonstrativo');
     var fonteBol = $('#edoc-fonte-boletim');
     var tid = turma && turma.value ? String(turma.value) : '';
     var aid = aluno && aluno.value ? String(aluno.value) : '';
-    var bid = fonteBol && fonteBol.value
+    var did = fonteDemo && fonteDemo.value
+      ? (parseInt(fonteDemo.value, 10) || 0)
+      : (parseInt((state.estrutura && state.estrutura.fonte_demonstrativo_id) || 0, 10) || 0);
+    var lid = fonteBol && fonteBol.value
       ? (parseInt(fonteBol.value, 10) || 0)
       : (parseInt((state.estrutura && state.estrutura.fonte_boletim_id) || 0, 10) || 0);
-    return { turmaId: tid, alunoId: aid, boletimId: bid };
+    // Compat: modelos antigos só tinham fonte_boletim_id apontando ao demonstrativo.
+    if (did <= 0 && lid > 0 && !(fonteBol && fonteBol.querySelector('option[value="' + lid + '"]'))) {
+      did = lid;
+      lid = 0;
+    }
+    return {
+      turmaId: tid,
+      alunoId: aid,
+      demonstrativoId: did,
+      layoutBoletimId: lid,
+      boletimId: did > 0 ? did : lid
+    };
   }
 
   function registrarDemoSel(sel) {
@@ -2530,6 +2547,8 @@
     state.demoSel = {
       turmaId: String(sel.turmaId),
       alunoId: String(sel.alunoId),
+      demonstrativoId: parseInt(sel.demonstrativoId, 10) || 0,
+      layoutBoletimId: parseInt(sel.layoutBoletimId, 10) || 0,
       boletimId: parseInt(sel.boletimId, 10) || 0
     };
   }
@@ -2540,12 +2559,21 @@
     sel = sel || state.demoSel || capturarDemoSel();
     var tid = sel.turmaId || '';
     var aid = sel.alunoId || '';
+    var did = parseInt(sel.demonstrativoId, 10) || 0;
+    var lid = parseInt(sel.layoutBoletimId, 10) || 0;
     var bid = parseInt(sel.boletimId, 10) || 0;
     if (!tid || !aid) return url;
     url += (url.indexOf('?') >= 0 ? '&' : '?')
       + 'turma_id=' + encodeURIComponent(tid)
       + '&aluno_id=' + encodeURIComponent(aid);
-    if (bid > 0) {
+    if (did > 0) {
+      url += '&demonstrativo_id=' + encodeURIComponent(String(did));
+      url += '&boletim_id=' + encodeURIComponent(String(did));
+    } else if (lid > 0) {
+      url += '&layout_boletim_id=' + encodeURIComponent(String(lid));
+      url += '&boletim_id=' + encodeURIComponent(String(lid));
+    } else if (bid > 0) {
+      // Compat: id antigo sem tipo explícito.
       url += '&boletim_id=' + encodeURIComponent(String(bid));
     }
     return url;
@@ -3539,8 +3567,8 @@
       render();
       abrirCardBoletim(true);
       setStatus(boletimHtmlSoDinamico((bol.props || {}).html)
-        ? 'Boletim na folha. Escolha aluno na demonstração para editar o HTML completo.'
-        : 'Boletim na folha — edite o HTML ao lado.');
+        ? 'Demonstrativo na folha. Escolha regra, ano, turma/série e aluno na prévia.'
+        : 'Demonstrativo na folha — edite o HTML ao lado.');
       return;
     }
     var path = findPath(colId);
@@ -3632,7 +3660,7 @@
     render();
     if (tipo === 'boletim') {
       abrirCardBoletim(true);
-      setStatus('Boletim na folha (paisagem) — escolha o boletim e a aluna no card');
+      setStatus('Boletim na folha — escolha o boletim criado, ano, turma/série e aluno na prévia');
     }
     if (tipo === 'tabela') {
       var node = paper && paper.querySelector('.edoc-el[data-id="' + el.id + '"]');
@@ -4088,8 +4116,8 @@
       }
       var soDin = boletimHtmlSoDinamico(p.html);
       html += soDin
-        ? '<p class="edoc-hint">Este bloco ainda usa <code>{{quadro_notas_html}}</code>. Escolha turma/aluno/boletim na demonstração para carregar a tabela completa e editar o HTML.</p>'
-        : '<p class="edoc-hint">Edite o HTML do demonstrativo ao lado (ou em <strong>Expandir editor</strong>). Os campos <code>{{boletim_celula_…}}</code> recebem as notas de cada aluno.</p>';
+        ? '<p class="edoc-hint">Este bloco ainda usa <code>{{quadro_notas_html}}</code>. Na prévia, escolha Demonstrativo de Notas (ou Boletim), ano, turma/série e aluno para carregar a tabela.</p>'
+        : '<p class="edoc-hint">Edite o HTML do Demonstrativo de Notas ao lado (ou em <strong>Expandir editor</strong>). Os campos <code>{{boletim_celula_…}}</code> recebem as notas de cada aluno.</p>';
       html += '<div class="edoc-prop-row" style="margin-bottom:6px;">'
         + '<button type="button" class="edoc-btn" id="edoc-boletim-html-dinamico" title="Wrapper com variável dinâmica">HTML dinâmico</button>'
         + '<button type="button" class="edoc-btn" id="edoc-boletim-html-previa" title="Editar a estrutura completa com notas dinâmicas">Expor tabela completa</button>'
@@ -4730,7 +4758,7 @@
     }
     if (focar) {
       card.open = true;
-      var fonte = $('#edoc-fonte-boletim');
+      var fonte = $('#edoc-fonte-demonstrativo') || $('#edoc-fonte-boletim');
       if (fonte) {
         try { fonte.focus(); } catch (e) {}
       }
@@ -4744,7 +4772,7 @@
     var sel = state.selected ? findPath(state.selected.id) : null;
     if ((sel && sel.element && elementoEhBoletim(sel.element))
       || estruturaTemBlocoBoletim()
-      || (state.estrutura && state.estrutura.fonte_boletim_id)) {
+      || (state.estrutura && (state.estrutura.fonte_boletim_id || state.estrutura.fonte_demonstrativo_id))) {
       card.hidden = false;
     }
   }
@@ -4754,20 +4782,40 @@
     var card = $('#edoc-boletim-card');
     var turma = $('#edoc-demo-turma');
     var aluno = $('#edoc-demo-aluno');
+    var anoSel = $('#edoc-demo-ano');
+    var fonteDemonstrativo = $('#edoc-fonte-demonstrativo');
     var fonteBoletim = $('#edoc-fonte-boletim');
     var real = $('#edoc-demo-real');
     var status = $('#edoc-demo-status');
     var comps = $('#edoc-demo-comps');
     if (!turma || !aluno || !C.demoUrl) return;
-    if (estruturaTemBlocoBoletim() || (state.estrutura && state.estrutura.fonte_boletim_id)) {
+    if (estruturaTemBlocoBoletim()
+      || (state.estrutura && (state.estrutura.fonte_boletim_id || state.estrutura.fonte_demonstrativo_id))) {
       abrirCardBoletim(false);
     }
     var req = 0;
-    var demoPacote = { componentes: [], periodos: [], html_quadro: '' };
-    function boletimSelecionadoId() {
+    var demoPacote = { componentes: [], periodos: [], html_quadro: '', turmas: [] };
+    function demonstrativoSelecionadoId() {
+      var doSelect = fonteDemonstrativo ? (parseInt(fonteDemonstrativo.value || '0', 10) || 0) : 0;
+      if (doSelect > 0) return doSelect;
+      return parseInt((state.estrutura && state.estrutura.fonte_demonstrativo_id) || 0, 10) || 0;
+    }
+    function layoutBoletimSelecionadoId() {
       var doSelect = fonteBoletim ? (parseInt(fonteBoletim.value || '0', 10) || 0) : 0;
       if (doSelect > 0) return doSelect;
       return parseInt((state.estrutura && state.estrutura.fonte_boletim_id) || 0, 10) || 0;
+    }
+    function boletimSelecionadoId() {
+      var did = demonstrativoSelecionadoId();
+      if (did > 0) return did;
+      return layoutBoletimSelecionadoId();
+    }
+    function gravarFonteDemonstrativo(id) {
+      id = parseInt(id, 10) || 0;
+      if (id > 0) state.estrutura.fonte_demonstrativo_id = id;
+      else delete state.estrutura.fonte_demonstrativo_id;
+      state.dirty = true;
+      scheduleSave();
     }
     function gravarFonteBoletim(id) {
       id = parseInt(id, 10) || 0;
@@ -4776,18 +4824,69 @@
       state.dirty = true;
       scheduleSave();
     }
-    function pintarBoletins(lista) {
-      if (!fonteBoletim) return;
-      var atual = boletimSelecionadoId();
-      var html = '<option value="">Selecione o demonstrativo de notas</option>';
+    function pintarOpcoesFonte(select, lista, atual, vazio) {
+      if (!select) return;
+      var html = '<option value="">' + esc(vazio || 'Selecione…') + '</option>';
       (lista || []).forEach(function (b) {
         var id = Number(b.id || 0);
         if (!id) return;
-        var rotulo = b.rotulo || b.nome || ('Boletim #' + id);
+        var rotulo = b.rotulo || b.nome || ('#' + id);
         html += '<option value="' + id + '"' + (id === atual ? ' selected' : '') + '>' + esc(rotulo) + '</option>';
       });
-      fonteBoletim.innerHTML = html;
-      if (atual > 0) fonteBoletim.value = String(atual);
+      select.innerHTML = html;
+      if (atual > 0) select.value = String(atual);
+    }
+    function idExisteNaLista(lista, id) {
+      id = parseInt(id, 10) || 0;
+      if (id <= 0) return false;
+      return (lista || []).some(function (b) { return Number(b.id || 0) === id; });
+    }
+    function pintarDemonstrativos(lista) {
+      var atual = demonstrativoSelecionadoId();
+      // Se o id antigo de fonte_boletim for na verdade um demonstrativo, usa aqui.
+      if (atual <= 0 && state.estrutura && state.estrutura.fonte_boletim_id) {
+        var legado = parseInt(state.estrutura.fonte_boletim_id, 10) || 0;
+        if (idExisteNaLista(lista, legado)) {
+          atual = legado;
+          state.estrutura.fonte_demonstrativo_id = legado;
+        }
+      }
+      pintarOpcoesFonte(fonteDemonstrativo, lista, atual, 'Selecione o demonstrativo de notas');
+    }
+    function pintarLayoutsBoletim(lista) {
+      var atual = layoutBoletimSelecionadoId();
+      // Só mantém no select de Boletim se o id existir em boletim_layouts.
+      if (atual > 0 && !idExisteNaLista(lista, atual)) {
+        atual = 0;
+        if (state.estrutura && state.estrutura.fonte_boletim_id && !state.estrutura.fonte_demonstrativo_id) {
+          // Fonte antiga era demonstrativo — limpa o select de layout.
+          delete state.estrutura.fonte_boletim_id;
+        } else if (state.estrutura && state.estrutura.fonte_demonstrativo_id
+          && Number(state.estrutura.fonte_boletim_id) === Number(state.estrutura.fonte_demonstrativo_id)) {
+          delete state.estrutura.fonte_boletim_id;
+        }
+      }
+      pintarOpcoesFonte(fonteBoletim, lista, atual, 'Selecione o boletim criado');
+    }
+    function pintarAnos(turmasLista) {
+      if (!anoSel) return;
+      var anos = {};
+      (turmasLista || []).forEach(function (t) {
+        var ano = Number(t.ano_letivo || 0);
+        if (ano > 0) anos[ano] = true;
+      });
+      var lista = Object.keys(anos).map(Number).sort(function (a, b) { return b - a; });
+      var atual = anoSel.value || '';
+      var html = '<option value="">Todos</option>';
+      lista.forEach(function (ano) {
+        html += '<option value="' + ano + '"' + (String(ano) === String(atual) ? ' selected' : '') + '>' + ano + '</option>';
+      });
+      anoSel.innerHTML = html;
+      if (atual) anoSel.value = String(atual);
+    }
+    function pintarBoletins(lista) {
+      // Compat: se a API antiga só mandar boletins, usa como demonstrativos.
+      pintarDemonstrativos(lista);
     }
     function mapaGlossario() {
       var mapa = {};
@@ -4904,13 +5003,21 @@
       setStatus(aviso);
     }
     function pintarTurmas(lista) {
+      if (lista) demoPacote.turmas = lista;
+      var anoFiltro = anoSel && anoSel.value ? parseInt(anoSel.value, 10) || 0 : 0;
       var atual = turma.value;
-      var html = '<option value="">Selecione a turma</option>';
-      (lista || []).forEach(function (t) {
-        html += '<option value="' + parseInt(t.id, 10) + '">' + esc(t.rotulo || t.nome || '') + '</option>';
+      var html = '<option value="">Selecione a turma / série</option>';
+      (demoPacote.turmas || []).forEach(function (t) {
+        var anoT = Number(t.ano_letivo || 0);
+        if (anoFiltro > 0 && anoT > 0 && anoT !== anoFiltro) return;
+        html += '<option value="' + parseInt(t.id, 10) + '" data-ano="' + anoT + '">' + esc(t.rotulo || t.nome || '') + '</option>';
       });
       turma.innerHTML = html;
       if (atual) turma.value = atual;
+      if (atual && !turma.value) {
+        aluno.value = '';
+        pintarAlunos([]);
+      }
     }
     function pintarAlunos(lista) {
       var atual = aluno.value;
@@ -5030,10 +5137,12 @@
         return;
       }
       if (!turma.dataset.pronto) {
-        pintarTurmas(data.turmas || []);
+        demoPacote.turmas = data.turmas || [];
+        pintarAnos(demoPacote.turmas);
+        pintarTurmas(demoPacote.turmas);
         turma.dataset.pronto = '1';
-        if (!turma.value && data.turmas && data.turmas.length) {
-          turma.value = String(data.turmas[0].id);
+        if (!turma.value && demoPacote.turmas.length) {
+          turma.value = String(demoPacote.turmas[0].id);
           carregar();
           return;
         }
@@ -5044,7 +5153,8 @@
         carregar();
         return;
       }
-      pintarBoletins(data.boletins || []);
+      pintarDemonstrativos(data.demonstrativos || data.boletins || []);
+      pintarLayoutsBoletim(data.layouts_boletim || []);
       if (Array.isArray(data.periodos) && data.periodos.length) demoPacote.periodos = data.periodos;
       demoPacote.html_quadro = data.html_quadro || '';
       pintarComponentes(data.componentes || []);
@@ -5067,11 +5177,7 @@
           state.dirty = true;
           scheduleSave();
         }
-        registrarDemoSel({
-          turmaId: turma.value,
-          alunoId: aluno.value,
-          boletimId: boletimSelecionadoId()
-        });
+        registrarDemoSel(capturarDemoSel());
         atualizarLinkPdf();
         state.demo = !!(real && real.checked);
         if (boletimSelecionadoId() > 0) {
@@ -5079,9 +5185,9 @@
         }
         if (status) {
           if (boletimSelecionadoId() && data.html_quadro) {
-            status.textContent = data.resumo || 'Layout do boletim na folha. Troque a aluna para atualizar a prévia.';
+            status.textContent = data.resumo || 'Quadro na folha. Troque a aluna para atualizar a prévia.';
           } else if (boletimSelecionadoId()) {
-            status.textContent = data.resumo || 'Boletim escolhido. Se o layout não aparecer, monte o quadro no assistente desse boletim.';
+            status.textContent = data.resumo || 'Fonte escolhida. Se o quadro não aparecer, confira o assistente do modelo.';
           } else {
             status.textContent = data.resumo || 'Dados reais na folha.';
           }
@@ -5098,10 +5204,16 @@
     }
     function carregar() {
       var n = ++req;
+      var did = demonstrativoSelecionadoId();
+      var lid = layoutBoletimSelecionadoId();
+      // Uma fonte por vez: demonstrativo tem prioridade se ambos estiverem setados.
+      if (did > 0) lid = 0;
       var url = C.demoUrl
         + '?turma_id=' + encodeURIComponent(turma.value || '0')
         + '&aluno_id=' + encodeURIComponent(aluno.value || '0')
-        + '&boletim_id=' + encodeURIComponent(String(boletimSelecionadoId()))
+        + '&demonstrativo_id=' + encodeURIComponent(String(did))
+        + '&layout_boletim_id=' + encodeURIComponent(String(lid))
+        + '&boletim_id=' + encodeURIComponent(String(did > 0 ? did : lid))
         + '&chave=' + encodeURIComponent(chaveGrade());
       fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
         .then(function (r) { return r.json(); })
@@ -5113,6 +5225,15 @@
           if (n !== req) return;
           if (status) status.textContent = 'Não foi possível carregar a demonstração.';
         });
+    }
+    if (anoSel) {
+      anoSel.addEventListener('change', function () {
+        aluno.value = '';
+        pintarAlunos([]);
+        pintarComponentes([]);
+        pintarTurmas();
+        carregar();
+      });
     }
     turma.addEventListener('change', function () {
       aluno.value = '';
@@ -5126,12 +5247,36 @@
       }
       carregar();
     });
+    if (fonteDemonstrativo) {
+      if (state.estrutura && state.estrutura.fonte_demonstrativo_id) {
+        fonteDemonstrativo.value = String(state.estrutura.fonte_demonstrativo_id);
+      } else if (state.estrutura && state.estrutura.fonte_boletim_id) {
+        // Migração suave: valor antigo pode ser demonstrativo (cadastro em boletins).
+        fonteDemonstrativo.value = String(state.estrutura.fonte_boletim_id);
+      }
+      fonteDemonstrativo.addEventListener('change', function () {
+        gravarFonteDemonstrativo(fonteDemonstrativo.value);
+        if (fonteDemonstrativo.value && fonteBoletim) {
+          fonteBoletim.value = '';
+          gravarFonteBoletim(0);
+        }
+        abrirCardBoletim(false);
+        if (boletimSelecionadoId() > 0) {
+          garantirBlocoBoletimNaFolha();
+        }
+        carregar();
+      });
+    }
     if (fonteBoletim) {
       if (state.estrutura && state.estrutura.fonte_boletim_id) {
         fonteBoletim.value = String(state.estrutura.fonte_boletim_id);
       }
       fonteBoletim.addEventListener('change', function () {
         gravarFonteBoletim(fonteBoletim.value);
+        if (fonteBoletim.value && fonteDemonstrativo) {
+          fonteDemonstrativo.value = '';
+          gravarFonteDemonstrativo(0);
+        }
         abrirCardBoletim(false);
         if (boletimSelecionadoId() > 0) {
           garantirBlocoBoletimNaFolha();
