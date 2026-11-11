@@ -157,7 +157,10 @@ if (!class_exists('PeriodoLetivo')) {
                                 $queryPeriodo['regra_id'] = $periodoRegraId;
                             }
                             $urlPeriodo = URL . '/admin/boletim-configuracao/assistente?' . http_build_query($queryPeriodo);
-                            $sufixoAcao = $periodoRegraId > 0 ? ' — Configurar notas' : ' — Criar configuração';
+                            // No Demonstrativo de Notas: só o nome do período (sem "Criar configuração" / "Configurar notas").
+                            $sufixoAcao = !empty($modeloEvento)
+                                ? ''
+                                : ($periodoRegraId > 0 ? ' — Configurar notas' : ' — Criar configuração');
                             ?>
                             <a href="<?= htmlspecialchars($urlPeriodo, ENT_QUOTES, 'UTF-8') ?>"
                                class="flex items-start gap-2 mx-1 px-2 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-50 focus:bg-gray-50 focus:outline-none<?= $classeSoDev ?>"
