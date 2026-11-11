@@ -462,10 +462,11 @@
   }
 
   /** Troca o wrapper dinâmico pela tabela editável (células {{boletim_celula_*}}).
-   *  Só para Demonstrativo — nunca transforma o bloco Boletim no quadro de notas. */
+   *  Não usa em Boletim nem em Demonstrativo por bimestre — cada um tem HTML próprio. */
   function garantirHtmlBoletimEditavel(el) {
     if (!el) return false;
     if (el.type === 'boletim') return false;
+    if (el.type === 'demonstrativo_notas' || el.type === 'tabela_notas') return false;
     el.props = el.props || {};
     el.style = el.style || {};
     if (!boletimHtmlSoDinamico(el.props.html)) return false;
@@ -475,6 +476,20 @@
     el.props.html = '<div class="quadro-notas-wrap doc-quadro-fit" style="'
       + cssCaixaBoletim(el.style) + '">' + modelo + '</div>';
     sincronizarHtmlBoletimComEstilo(el);
+    return true;
+  }
+
+  /** Bloco Demonstrativo sempre aponta para o token do período (nunca HTML de Boletim). */
+  function restaurarPlaceholderDemonstrativo(el) {
+    if (!el || (el.type !== 'demonstrativo_notas' && el.type !== 'tabela_notas')) return false;
+    el.props = el.props || {};
+    var bim = parseInt(el.props.bimestre || 0, 10) || 0;
+    var chave = bim >= 1 && bim <= 4 ? ('quadro_notas_b' + bim + '_html') : 'quadro_notas_html';
+    var html = String(el.props.html || '');
+    var tokenOk = boletimHtmlSoDinamico(html) && html.indexOf('{{' + chave + '}}') >= 0
+      && html.indexOf('{{boletim_html}}') < 0;
+    if (tokenOk) return false;
+    el.props.html = '<div class="quadro-notas-wrap doc-quadro-fit" style="font-size:7.5pt;width:100%;max-width:100%;">{{' + chave + '}}</div>';
     return true;
   }
 
@@ -2132,6 +2147,11 @@
         el.props = el.props || {};
         el.props.html = htmlBol;
       }
+      // Demonstrativo por bimestre: na prévia usa o HTML real do período (PP/PU/CH/PE).
+      if ((t === 'demonstrativo_notas' || t === 'tabela_notas') && (state.demo || state.preview) && liveQuadro) {
+        return '<div class="edoc-quadro-notas edoc-el-body" style="' + st + '">'
+          + sanitizeHtml(liveQuadro) + '</div>';
+      }
       // O HTML do modelo define o layout; os campos recebem os dados do aluno.
       if (!htmlBol && (state.demo || state.preview) && liveQuadro) {
         return '<div class="edoc-quadro-notas edoc-el-body" style="' + st + '">'
@@ -3603,7 +3623,6 @@
         bol.props = bol.props || {};
         bol.props.bimestre = mBim ? parseInt(mBim[1], 10) : 0;
         bol.props.html = '<div class="quadro-notas-wrap doc-quadro-fit" style="font-size:7.5pt;width:100%;max-width:100%;">{{' + chave + '}}</div>';
-        garantirHtmlBoletimEditavel(bol);
       }
       pathBol.column.elements = pathBol.column.elements || [];
       pathBol.column.elements.push(bol);
@@ -4971,7 +4990,10 @@
       pushHist();
       render();
       abrirCardBoletim(true);
-      setStatus((rotulo || 'Demonstrativo') + ' na folha — escolha regra, curso/série e aluno na prévia');
+      setStatus((rotulo || 'Demonstrativo') + ' na folha — quadro PP/PU/CH/PE do período (não é o Boletim).');
+      try {
+        if (typeof window.__edocRecarregarDemo === 'function') window.__edocRecarregarDemo();
+      } catch (eRecarregaDemo) {}
     }
     function fecharMenuDemonstrativo() {
       var picker = $('#edoc-demo-picker');
@@ -5433,15 +5455,12 @@
         }
         // Boletim = layout criado; nunca herda o quadro do Demonstrativo.
         C.varsPreview.boletim_html = data.html_boletim || '';
-        if (!C.varsPreview.boletim_html && data.html_quadro) {
-          // Mantém vazio de propósito — o bloco Boletim não deve mostrar Demonstrativo.
-        }
         if (data.html_por_bimestre && typeof data.html_por_bimestre === 'object') {
           Object.keys(data.html_por_bimestre).forEach(function (n) {
             C.varsPreview['quadro_notas_b' + n + '_html'] = data.html_por_bimestre[n] || '';
           });
         }
-        // Só edita células do Demonstrativo — nunca sobrescreve o bloco Boletim.
+        // Demonstrativo: restaura token do bimestre (não materializa o Boletim no bloco).
         var rolesDemo = ['header', 'body', 'footer'];
         for (var rd = 0; rd < rolesDemo.length; rd++) {
           var secsDemo = (areaOf(rolesDemo[rd]).sections || []);
@@ -5449,8 +5468,7 @@
             var colsDemo = secsDemo[id].columns || [];
             for (var jd = 0; jd < colsDemo.length; jd++) {
               (colsDemo[jd].elements || []).forEach(function (elDemo) {
-                if (elDemo && (elDemo.type === 'demonstrativo_notas' || elDemo.type === 'tabela_notas')
-                  && garantirHtmlBoletimEditavel(elDemo)) {
+                if (elDemo && restaurarPlaceholderDemonstrativo(elDemo)) {
                   state.dirty = true;
                   scheduleSave();
                 }
