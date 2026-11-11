@@ -8,6 +8,8 @@ namespace App\Modulos\Provas\Services;
 
 
 use App\Core\CreditosModuleRegistry;
+use App\Modulos\Jornadas\Services\JornadasAlunoConsultaService;
+use App\Painel\Admin\Services\AssistenteConsultaAmpliadaService;
 
 class ProvasAlunoAssistenteService
 {
