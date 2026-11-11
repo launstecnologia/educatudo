@@ -174,6 +174,49 @@ final class CamposDocumentoEditorTest extends TestCase
         $this->assertSame('cv_aut_local', $svc->catalogo()[0]['campos'][0]['chave']);
     }
 
+    public function testSecretariaExibeCamposDeAutorizacaoUsadosNoModeloSemDefinicoesSalvas(): void
+    {
+        $estrutura = ModeloDocumentoService::estruturaVazia();
+        $estrutura['body']['sections'][0]['columns'][0]['elements'][] = ModeloDocumentoService::elementoEstrutura('html', [
+            'html' => '<table><tr><td>{{cv_aut_local}}</td><td>{{ CV_DATA_EVENTO }}</td>'
+                . '<td>{{cv_aut_hora_saida}}</td><td>{{cv_aut_hora_retorno}}</td></tr></table><p>{{cv_aut_finalidade}}</p>',
+        ]);
+        $modelo = ['id' => 40, 'nome' => 'Autorização de passeio', 'codigo' => 'modelo_passeio', 'estrutura_json' => json_encode($estrutura)];
+        $db = $this->getMockBuilder(\App\Core\Database::class)->disableOriginalConstructor()->onlyMethods(['fetchAll'])->getMock();
+        $db->method('fetchAll')->willReturn([$modelo]);
+        $modelos = $this->getMockBuilder(ModeloDocumentoService::class)->disableOriginalConstructor()->onlyMethods(['schemaReady'])->getMock();
+        $modelos->method('schemaReady')->willReturn(true);
+        $ref = new ReflectionClass(\App\Modulos\ModelosDocumentos\Services\ArquivoEmissaoDocumentoService::class);
+        $svc = $ref->newInstanceWithoutConstructor();
+        $ref->getProperty('db')->setValue($svc, $db);
+        $ref->getProperty('modelos')->setValue($svc, $modelos);
+
+        $campos_variaveis = $svc->catalogo()[0]['campos'];
+        self::assertSame([
+            'cv_data_evento' => 'data',
+            'cv_aut_local' => 'texto',
+            'cv_aut_hora_saida' => 'hora',
+            'cv_aut_hora_retorno' => 'hora',
+            'cv_aut_finalidade' => 'texto',
+        ], array_column($campos_variaveis, 'mascara', 'chave'));
+        ob_start();
+        require dirname(__DIR__, 2) . '/app/Views/admin/_partials/campos_variaveis_documento.php';
+        $formulario = ob_get_clean();
+        foreach ($campos_variaveis as $campo) {
+            self::assertStringContainsString('name="c[' . $campo['chave'] . ']"', $formulario);
+        }
+        $valores = [
+            'cv_aut_local' => 'Museu & Escola',
+            'cv_data_evento' => '2026-11-13',
+            'cv_aut_hora_saida' => '08:45',
+            'cv_aut_hora_retorno' => '14:30',
+            'cv_aut_finalidade' => 'Visita pedagógica',
+        ];
+        $vars = $modelos->mesclarCamposVariaveis([], $campos_variaveis, $valores);
+        $html = $modelos->aplicarPlaceholders($estrutura['body']['sections'][0]['columns'][0]['elements'][0]['props']['html'], $vars);
+        self::assertSame('<table><tr><td>Museu &amp; Escola</td><td>13/11/2026</td><td>08:45</td><td>14:30</td></tr></table><p>Visita pedagógica</p>', $html);
+    }
+
     public function testCadastroDeCursoESerieUsaTurmaDaMatricula(): void
     {
         $db = $this->getMockBuilder(\App\Core\Database::class)->disableOriginalConstructor()->onlyMethods(['fetch'])->getMock();

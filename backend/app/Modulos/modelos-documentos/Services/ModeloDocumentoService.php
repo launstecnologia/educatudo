@@ -1977,12 +1977,15 @@ class ModeloDocumentoService
         $est = $this->estruturaDoModelo($modelo);
         $campos = self::camposVariaveisValidos($est['campos_variaveis'] ?? null);
         $existentes = array_column($campos, 'chave');
-        $html = (json_encode($est) ?: '') . (string) ($modelo['corpo_html'] ?? '') . (string) ($modelo['cabecalho_html'] ?? '') . (string) ($modelo['rodape_html'] ?? '');
+        $conteudo = array_intersect_key($est, ['header' => true, 'body' => true, 'footer' => true]);
+        $html = (json_encode($conteudo) ?: '') . (string) ($modelo['corpo_html'] ?? '')
+            . (string) ($modelo['cabecalho_html'] ?? '') . (string) ($modelo['rodape_html'] ?? '');
+        preg_match_all('/\{\{\s*([a-z0-9_]+)\s*\}\}/i', $html, $tokens);
+        $usados = array_fill_keys(array_map('strtolower', $tokens[1]), true);
         foreach (self::camposAutorizacao() as $campo) {
-            $alias = substr($campo['chave'], 3);
-            if (preg_match('/\{\{\s*' . preg_quote($alias, '/') . '\s*\}\}/', $html) && !in_array($campo['chave'], $existentes, true)) {
+            $chave = $campo['chave'];
+            if ((isset($usados[$chave]) || isset($usados[substr($chave, 3)])) && !in_array($chave, $existentes, true)) {
                 $campos[] = $campo;
-                $existentes[] = $campo['chave'];
             }
         }
         return self::camposVariaveisValidos($campos);
@@ -1993,16 +1996,16 @@ class ModeloDocumentoService
      */
     public function listarModelosComCampos(): array
     {
-        if (!$this->schemaReady() || !$this->temColuna('estrutura_json')) {
+        if (!$this->schemaReady()) {
             return [];
         }
         try {
+            $estrutura = $this->temColuna('estrutura_json') ? ', estrutura_json' : '';
             $rows = $this->db->fetchAll(
-                'SELECT id, nome, codigo, estrutura_json
+                'SELECT id, nome, codigo, cabecalho_html, corpo_html, rodape_html' . $estrutura . '
                  FROM secretaria_modelos_documentos
-                 WHERE ativo = 1 AND estrutura_json LIKE :marca
-                 ORDER BY nome ASC',
-                ['marca' => '%"campos_variaveis"%']
+                 WHERE ativo = 1
+                 ORDER BY nome ASC'
             ) ?: [];
         } catch (\Throwable $e) {
             return [];
@@ -2012,8 +2015,7 @@ class ModeloDocumentoService
             if (!is_array($row)) {
                 continue;
             }
-            $est = json_decode((string) ($row['estrutura_json'] ?? ''), true);
-            $campos = self::camposVariaveisValidos(is_array($est) ? ($est['campos_variaveis'] ?? null) : null);
+            $campos = $this->camposDoModelo($row);
             if ($campos === []) {
                 continue;
             }
