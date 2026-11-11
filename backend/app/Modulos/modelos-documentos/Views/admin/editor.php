@@ -225,6 +225,9 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                             <h2 id="edoc-html-title">Editar HTML</h2>
                             <p id="edoc-html-desc">Os campos entre {{...}} são preenchidos para cada aluno. Edite a estrutura e os estilos à vontade.</p>
                         </div>
+                        <button type="button" class="edoc-btn edoc-btn-icon edoc-html-fechar" id="edoc-html-close" aria-label="Fechar editor HTML" title="Fechar editor HTML">
+                            <span aria-hidden="true">×</span>
+                        </button>
                         <div class="edoc-html-stage-actions">
                             <button type="button" class="edoc-btn" id="edoc-html-indent">Indentar código</button>
                             <button type="button" class="edoc-btn" id="edoc-html-cancel">Voltar à folha</button>

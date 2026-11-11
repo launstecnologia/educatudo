@@ -243,11 +243,11 @@ test('HTML abre expandido e indentado sem mudar textos inline, CSS ou variáveis
   await expect(page.locator('#edoc-paper')).not.toBeVisible();
 });
 
-test('cancelar HTML expandido descarta rascunho e não altera o documento', async ({ page }) => {
+test('fechar o editor HTML pelo botão descarta o rascunho', async ({ page }) => {
   await selecionarHtmlBoletim(page, codigoBoletim);
   await page.getByRole('button', { name: 'Editar em HTML' }).click();
   await page.getByLabel('Código HTML', { exact: true }).fill('<p>Não aplicar</p>');
-  await page.getByRole('button', { name: 'Voltar à folha', exact: true }).click();
+  await page.getByRole('button', { name: 'Fechar editor HTML', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Editar HTML do boletim' })).not.toBeVisible();
   await page.locator('#edoc-save').click();
   await expect(page.locator('#edoc-status')).toHaveText('Salvo automaticamente');

@@ -4386,10 +4386,11 @@
     if (!stage || !codigo || stage._edocHtmlBound) return;
     stage._edocHtmlBound = true;
     bindBuscaHtml(stage, codigo);
-    var btnCancel = $('#edoc-html-cancel');
     var btnIndent = $('#edoc-html-indent');
     var form = $('#edoc-html-form');
-    if (btnCancel) btnCancel.addEventListener('click', function () { fecharHtmlExpandido(); });
+    $all('#edoc-html-cancel, #edoc-html-close', stage).forEach(function (botao) {
+      botao.addEventListener('click', fecharHtmlExpandido);
+    });
     if (btnIndent) {
       btnIndent.addEventListener('click', function () {
         try { codigo.value = indentarHtmlDocumento(codigo.value); } catch (eIndent) {}
