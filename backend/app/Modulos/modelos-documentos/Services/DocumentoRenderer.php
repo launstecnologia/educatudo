@@ -182,7 +182,7 @@ class DocumentoRenderer
                 'Série' => '{{serie}}',
                 'Ano' => '{{ano_letivo}}',
             ], $css),
-            'boletim', 'tabela_notas' => $this->blocoBoletim($props, $css),
+            'boletim', 'demonstrativo_notas', 'tabela_notas' => $this->blocoBoletim($props, $css),
             'tabela_coletiva' => $this->blocoHtmlLivre(
                 '<div class="tabela-coletiva-wrap">{{tabela_html}}</div>',
                 $css

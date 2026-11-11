@@ -1,6 +1,7 @@
 <?php
 
 use App\Modulos\ModelosDocumentos\Services\CamposAcademicosDocumentoService;
+use App\Modulos\ModelosDocumentos\Services\DemonstracaoDocumentoService;
 use App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService;
 use PHPUnit\Framework\TestCase;
 
@@ -179,5 +180,21 @@ final class CamposDocumentoEditorTest extends TestCase
         $this->assertSame('', $svc->fotoAlunoHtml(['foto_url' => 'https://exemplo.com/foto.jpg'], $config));
         $this->assertSame('', $svc->fotoAlunoHtml(['foto_url' => '/media/serve?type=avatars&key=..%2Ffoto.jpg'], $config));
         $this->assertSame('', $svc->fotoAlunoHtml([], $config));
+    }
+
+    public function testDetectaQuadroDeUmBimestreVersusDois(): void
+    {
+        $svc = (new ReflectionClass(DemonstracaoDocumentoService::class))->newInstanceWithoutConstructor();
+        $metodo = (new ReflectionClass(DemonstracaoDocumentoService::class))->getMethod('quadroTemApenasUmBimestre');
+
+        $soUm = '<table><thead><tr><th>MATÉRIAS</th><th>PP</th><th>PU</th><th>CH</th><th>PE</th><th>FAL</th></tr></thead></table>';
+        $dois = '<table><thead><tr><th>I BIMESTRE</th><th colspan="6">II BIMESTRE</th></tr>'
+            . '<tr><th>PP</th><th>PU</th><th>PP</th><th>PU</th></tr></thead></table>';
+        $doisCodigo = '<td data-boletim-coluna="b1_pp">4</td><td data-boletim-coluna="b2_pp">7</td>';
+
+        $this->assertTrue($metodo->invoke($svc, $soUm));
+        $this->assertTrue($metodo->invoke($svc, ''));
+        $this->assertFalse($metodo->invoke($svc, $dois));
+        $this->assertFalse($metodo->invoke($svc, $doisCodigo));
     }
 }

@@ -92,22 +92,22 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                 </div>
                 <details class="edoc-demo edoc-boletim-card" id="edoc-boletim-card" hidden>
                     <summary>Conferir com dados de aluno</summary>
-                    <p class="edoc-hint">Escolha a regra de aprovação (Demonstrativo de Notas ou Boletim), o ano, a turma/série e o aluno para a prévia.</p>
-                    <label for="edoc-fonte-demonstrativo">Demonstrativo de Notas</label>
-                    <select id="edoc-fonte-demonstrativo"><option value="">Carregando demonstrativos…</option></select>
-                    <label for="edoc-fonte-boletim">Boletim</label>
-                    <select id="edoc-fonte-boletim"><option value="">Carregando boletins…</option></select>
-                    <label for="edoc-demo-ano">Ano letivo</label>
-                    <select id="edoc-demo-ano"><option value="">Todos</option></select>
-                    <label for="edoc-demo-turma">Turma / série</label>
+                    <p class="edoc-hint">A regra de aprovação já vincula o Demonstrativo de Notas e o Boletim. Escolha regra, curso/série e o aluno.</p>
+                    <label for="edoc-fonte-regra">Regra de aprovação</label>
+                    <select id="edoc-fonte-regra"><option value="">Carregando regras…</option></select>
+                    <label for="edoc-demo-turma">Curso / série</label>
                     <select id="edoc-demo-turma"><option value="">Carregando turmas…</option></select>
-                    <label for="edoc-demo-aluno">Aluno(a) da prévia</label>
-                    <select id="edoc-demo-aluno"><option value="">Escolha a turma</option></select>
+                    <label for="edoc-demo-aluno">Nome do aluno(a)</label>
+                    <select id="edoc-demo-aluno"><option value="">Escolha o curso/série</option></select>
                     <label class="edoc-demo-check" for="edoc-demo-real">
                         <input type="checkbox" id="edoc-demo-real" checked>
                         Mostrar dados reais na folha
                     </label>
-                    <p class="edoc-hint" id="edoc-demo-status">Escolha regra, ano, turma e aluno para ver na folha.</p>
+                    <p class="edoc-hint" id="edoc-demo-status">Escolha regra, curso/série e aluno para ver na folha.</p>
+                    <?php /* Compat JS legado (ocultos). */ ?>
+                    <select id="edoc-demo-ano" hidden aria-hidden="true"><option value="">Todos</option></select>
+                    <select id="edoc-fonte-demonstrativo" hidden aria-hidden="true"><option value=""></option></select>
+                    <select id="edoc-fonte-boletim" hidden aria-hidden="true"><option value=""></option></select>
                 </details>
                 <label class="edoc-busca-label" for="edoc-element-search">O que você quer adicionar?</label>
                 <input type="search" id="edoc-element-search" class="edoc-var-search" placeholder="Buscar título, imagem, boletim…" autocomplete="off">
@@ -152,7 +152,8 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                     'dados_aluno' => ['Aluno', 'Nome, RA e dados do estudante'],
                     'dados_responsavel' => ['Responsável', 'Dados do responsável pelo aluno'],
                     'dados_turma' => ['Turma', 'Série, curso e turma do aluno'],
-                    'boletim' => ['Boletim', 'Boletim que você criou em Acadêmico → Boletim. Escolha o modelo e o aluno na prévia.'],
+                    'boletim' => ['Boletim', 'Quadro do boletim vinculado à regra de aprovação. Na prévia: regra, curso/série e aluno.'],
+                    'demonstrativo_notas' => ['Demonstrativo de Notas', 'Todos os bimestres/semestres que você configurou. Na prévia: regra, curso/série e aluno.'],
                     'frequencia' => ['Frequência', 'Resumo de presença do aluno'],
                     'observacoes' => ['Observações', 'Informações adicionais do documento'],
                     'assinaturas' => ['Assinaturas', 'Espaço para os responsáveis assinarem'],

@@ -38,8 +38,14 @@ class DemonstracaoDocumentoService
      * @param 'auto'|'demonstrativo'|'layout' $fonteTipo
      * @return array<string, mixed>
      */
-    public function pacote(int $turmaId, int $alunoId, string $chave, int $boletimId = 0, string $fonteTipo = 'auto'): array
-    {
+    public function pacote(
+        int $turmaId,
+        int $alunoId,
+        string $chave,
+        int $boletimId = 0,
+        string $fonteTipo = 'auto',
+        int $regraAcademicaId = 0
+    ): array {
         $chave = $this->chaveGrade($chave);
         $fonteTipo = $this->normalizarFonteTipo($fonteTipo);
         $turmas = $this->listarTurmas();
@@ -50,17 +56,39 @@ class DemonstracaoDocumentoService
             $turmaLista = $this->turmaPorId($turmaId);
             $anoPrioridade = is_array($turmaLista) ? (int) ($turmaLista['ano_letivo'] ?? 0) : 0;
         }
+        $regras = $this->listarRegrasAprovacaoAtivas($anoPrioridade > 0 ? $anoPrioridade : null);
+        $fontesRegra = $regraAcademicaId > 0 ? $this->resolverFontesDaRegra($regraAcademicaId) : [
+            'demonstrativo_id' => 0,
+            'layout_boletim_id' => 0,
+        ];
+        if ($regraAcademicaId > 0 && $boletimId <= 0) {
+            if ($fonteTipo === 'layout') {
+                $boletimId = $fontesRegra['layout_boletim_id'];
+            } elseif ($fonteTipo === 'demonstrativo') {
+                $boletimId = $fontesRegra['demonstrativo_id'];
+            } elseif ($fontesRegra['demonstrativo_id'] > 0) {
+                $boletimId = $fontesRegra['demonstrativo_id'];
+                $fonteTipo = 'demonstrativo';
+            } elseif ($fontesRegra['layout_boletim_id'] > 0) {
+                $boletimId = $fontesRegra['layout_boletim_id'];
+                $fonteTipo = 'layout';
+            }
+        }
         $demonstrativos = $this->listarDemonstrativosAtivos($anoPrioridade > 0 ? $anoPrioridade : null);
         $layouts = $this->listarLayoutsBoletimAtivos($anoPrioridade > 0 ? $anoPrioridade : null);
         $out = [
             'ok' => true,
             'turmas' => $turmas,
             'alunos' => $alunos,
+            'regras_aprovacao' => $regras,
             'demonstrativos' => $demonstrativos,
             'layouts_boletim' => $layouts,
             // Compat com o editor antigo (select único).
             'boletins' => $demonstrativos,
             'boletim_id' => $boletimId > 0 ? $boletimId : null,
+            'regra_academica_id' => $regraAcademicaId > 0 ? $regraAcademicaId : null,
+            'demonstrativo_id' => $fontesRegra['demonstrativo_id'] > 0 ? $fontesRegra['demonstrativo_id'] : null,
+            'layout_boletim_id' => $fontesRegra['layout_boletim_id'] > 0 ? $fontesRegra['layout_boletim_id'] : null,
             'fonte_tipo' => $fonteTipo,
             'html_quadro' => '',
             'componentes' => [],
@@ -82,8 +110,10 @@ class DemonstracaoDocumentoService
             $ano = (int) ($turma['ano_letivo'] ?? 0);
         }
         if ($ano > 0 && $ano !== $anoPrioridade) {
+            $regras = $this->listarRegrasAprovacaoAtivas($ano);
             $demonstrativos = $this->listarDemonstrativosAtivos($ano);
             $layouts = $this->listarLayoutsBoletimAtivos($ano);
+            $out['regras_aprovacao'] = $regras;
             $out['demonstrativos'] = $demonstrativos;
             $out['layouts_boletim'] = $layouts;
             $out['boletins'] = $demonstrativos;
@@ -103,9 +133,24 @@ class DemonstracaoDocumentoService
         $vars = GradeSoltaService::completar($this->gradeDaDemonstracao($chave, $atalhos), $vars);
         unset($vars['_grade_fonte']);
         $vars['componentes_serie_html'] = $this->htmlComponentes($linhas);
-        $quadroBoletim = $boletimId > 0 ? $this->htmlQuadroDoBoletim($alunoId, $boletimId, $fonteTipo) : '';
+        $quadroBoletim = '';
         if ($boletimId > 0) {
-            $out['boletim_id'] = $boletimId;
+            $quadroBoletim = $this->htmlQuadroDoBoletim($alunoId, $boletimId, $fonteTipo);
+        } elseif ($regraAcademicaId > 0 && $ano > 0) {
+            // Regra sem cadastro resolvido: ainda assim monta todos os bimestres/semestres do ano.
+            try {
+                $quadroSm = (new QuadroBoletimSantaMariaService($this->db))->montarHtml($alunoId, $ano);
+                if ((int) ($quadroSm['linhas'] ?? 0) > 0) {
+                    $quadroBoletim = $this->envolverQuadroCompacto(trim((string) ($quadroSm['html'] ?? '')));
+                }
+            } catch (\Throwable $e) {
+                error_log('DemonstracaoDocumento quadro por regra/ano: ' . $e->getMessage());
+            }
+        }
+        if ($boletimId > 0 || $regraAcademicaId > 0) {
+            if ($boletimId > 0) {
+                $out['boletim_id'] = $boletimId;
+            }
             if ($quadroBoletim !== '') {
                 // Só o quadro montado no assistente (PP/PU/CH…), nunca a grade genérica Nota/Falta.
                 $vars['quadro_notas_html'] = $quadroBoletim;
@@ -113,27 +158,31 @@ class DemonstracaoDocumentoService
             } else {
                 $vars['quadro_notas_html'] = '';
                 $out['html_quadro'] = '';
-                $anoBoletim = $this->anoDoLayoutOuBoletim($boletimId, $fonteTipo);
-                $regraDbg = 0;
-                try {
-                    if (class_exists(\App\Modulos\Boletins\Services\BoletimVisaoImpressaoService::class)) {
-                        $regraDbg = (new \App\Modulos\Boletins\Services\BoletimVisaoImpressaoService())
-                            ->encontrarRegraDoLayout($boletimId);
-                    }
-                    if ($regraDbg <= 0 && class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)) {
-                        $regraDbg = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
-                            ->resolverRegraImpressaoDoBoletim($boletimId);
-                    }
-                } catch (\Throwable $e) {
+                if ($boletimId > 0) {
+                    $anoBoletim = $this->anoDoLayoutOuBoletim($boletimId, $fonteTipo);
                     $regraDbg = 0;
-                }
-                $out['debug_regra_impressao'] = $regraDbg > 0 ? $regraDbg : null;
-                if ($anoBoletim > 0 && $ano > 0 && $anoBoletim !== $ano) {
-                    $out['resumo'] = 'Boletim vinculado (ano ' . $anoBoletim . '). Escolha uma aluna de ' . $anoBoletim . ' para ver a prévia do quadro.';
-                } elseif ($regraDbg > 0) {
-                    $out['resumo'] = 'Boletim vinculado (regra #' . $regraDbg . '), mas o quadro veio vazio para esta aluna. Confira notas/demonstrativo no assistente.';
+                    try {
+                        if (class_exists(\App\Modulos\Boletins\Services\BoletimVisaoImpressaoService::class)) {
+                            $regraDbg = (new \App\Modulos\Boletins\Services\BoletimVisaoImpressaoService())
+                                ->encontrarRegraDoLayout($boletimId);
+                        }
+                        if ($regraDbg <= 0 && class_exists(\App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService::class)) {
+                            $regraDbg = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
+                                ->resolverRegraImpressaoDoBoletim($boletimId);
+                        }
+                    } catch (\Throwable $e) {
+                        $regraDbg = 0;
+                    }
+                    $out['debug_regra_impressao'] = $regraDbg > 0 ? $regraDbg : null;
+                    if ($anoBoletim > 0 && $ano > 0 && $anoBoletim !== $ano) {
+                        $out['resumo'] = 'Boletim vinculado (ano ' . $anoBoletim . '). Escolha uma aluna de ' . $anoBoletim . ' para ver a prévia do quadro.';
+                    } elseif ($regraDbg > 0) {
+                        $out['resumo'] = 'Boletim vinculado (regra #' . $regraDbg . '), mas o quadro veio vazio para esta aluna. Confira notas/demonstrativo no assistente.';
+                    } else {
+                        $out['resumo'] = 'Boletim vinculado sem regra de impressão. Abra o assistente desse boletim, monte o quadro e conclua.';
+                    }
                 } else {
-                    $out['resumo'] = 'Boletim vinculado sem regra de impressão. Abra o assistente desse boletim, monte o quadro e conclua.';
+                    $out['resumo'] = 'Regra escolhida, mas não há notas dos bimestres para esta aluna neste ano.';
                 }
             }
         } else {
@@ -155,6 +204,104 @@ class DemonstracaoDocumentoService
         if (($out['resumo'] ?? '') === '') {
             $out['resumo'] = trim((string) ($aluno['nome_exibir'] ?? '')) . ' · ' . $this->rotuloTurma($turma);
         }
+        return $out;
+    }
+
+    /**
+     * Regras de aprovação (já vinculam Demonstrativo e Boletim).
+     *
+     * @return list<array{id:int,nome:string,rotulo:string,ano_letivo:?int}>
+     */
+    public function listarRegrasAprovacaoAtivas(?int $anoLetivo = null): array
+    {
+        $rows = [];
+        try {
+            if (class_exists(\App\Modulos\Boletins\Services\BoletimCadastroService::class)) {
+                $rows = (new \App\Modulos\Boletins\Services\BoletimCadastroService())
+                    ->listarRegrasAcademicas($anoLetivo) ?: [];
+            }
+        } catch (\Throwable $e) {
+            $rows = [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $id = (int) ($row['id'] ?? 0);
+            $nome = trim((string) ($row['nome'] ?? ''));
+            if ($id <= 0 || $nome === '') {
+                continue;
+            }
+            $ano = isset($row['ano_letivo']) && $row['ano_letivo'] !== null && $row['ano_letivo'] !== ''
+                ? (int) $row['ano_letivo']
+                : null;
+            $rotulo = $nome;
+            if ($ano !== null && $ano > 0) {
+                $rotulo .= ' · ' . $ano;
+            }
+            $out[] = [
+                'id' => $id,
+                'nome' => $nome,
+                'rotulo' => $rotulo,
+                'ano_letivo' => $ano,
+            ];
+        }
+        usort($out, static function (array $a, array $b) use ($anoLetivo): int {
+            $prioA = ($anoLetivo !== null && $anoLetivo > 0 && (int) ($a['ano_letivo'] ?? 0) === $anoLetivo) ? 0 : 1;
+            $prioB = ($anoLetivo !== null && $anoLetivo > 0 && (int) ($b['ano_letivo'] ?? 0) === $anoLetivo) ? 0 : 1;
+            if ($prioA !== $prioB) {
+                return $prioA <=> $prioB;
+            }
+            $anoA = (int) ($a['ano_letivo'] ?? 0);
+            $anoB = (int) ($b['ano_letivo'] ?? 0);
+            if ($anoA !== $anoB) {
+                return $anoB <=> $anoA;
+            }
+            return strcmp((string) ($a['rotulo'] ?? ''), (string) ($b['rotulo'] ?? ''));
+        });
+
+        return $out;
+    }
+
+    /**
+     * @return array{demonstrativo_id:int,layout_boletim_id:int}
+     */
+    public function resolverFontesDaRegra(int $regraAcademicaId): array
+    {
+        $out = ['demonstrativo_id' => 0, 'layout_boletim_id' => 0];
+        if ($regraAcademicaId <= 0) {
+            return $out;
+        }
+        if ($this->tabelaExiste('boletins') && $this->temColuna('boletins', 'regra_academica_id')) {
+            try {
+                $sql = 'SELECT id FROM boletins
+                        WHERE ativo = 1 AND regra_academica_id = :rid';
+                if ($this->temColuna('boletins', 'excluido_em')) {
+                    $sql .= ' AND excluido_em IS NULL';
+                }
+                $sql .= ' ORDER BY ano_letivo DESC, id DESC LIMIT 1';
+                $row = $this->db->fetch($sql, ['rid' => $regraAcademicaId]);
+                $out['demonstrativo_id'] = is_array($row) ? (int) ($row['id'] ?? 0) : 0;
+            } catch (\Throwable $e) {
+                $out['demonstrativo_id'] = 0;
+            }
+        }
+        if ($this->tabelaExiste('boletim_layouts') && $this->temColuna('boletim_layouts', 'regra_academica_id')) {
+            try {
+                $row = $this->db->fetch(
+                    'SELECT id FROM boletim_layouts
+                     WHERE ativo = 1 AND regra_academica_id = :rid
+                     ORDER BY ano_letivo DESC, id DESC
+                     LIMIT 1',
+                    ['rid' => $regraAcademicaId]
+                );
+                $out['layout_boletim_id'] = is_array($row) ? (int) ($row['id'] ?? 0) : 0;
+            } catch (\Throwable $e) {
+                $out['layout_boletim_id'] = 0;
+            }
+        }
+
         return $out;
     }
 
@@ -327,10 +474,18 @@ class DemonstracaoDocumentoService
             }
         };
 
+        // Demonstrativo de Notas: sempre o quadro do ano (todos bimestres/semestres configurados).
+        if ($fonteTipo === 'demonstrativo') {
+            $htmlSm = $this->htmlQuadroSantaMariaAno($alunoId, $boletimId, $fonteTipo);
+            if ($htmlSm !== '') {
+                return $this->envolverQuadroCompacto($htmlSm);
+            }
+            $html = $tentarDemonstrativo();
+            return $this->envolverQuadroCompacto($html);
+        }
+
         if ($fonteTipo === 'layout') {
             $html = $tentarLayout();
-        } elseif ($fonteTipo === 'demonstrativo') {
-            $html = $tentarDemonstrativo();
         } else {
             // auto (legado): tenta demonstrativo (boletins) e depois layout.
             $html = $tentarDemonstrativo();
@@ -339,23 +494,72 @@ class DemonstracaoDocumentoService
             }
         }
 
-        // Fallback Santa Maria (todos os bimestres / recuperações / prova final).
-        if ($html === '') {
-            try {
-                $ano = $this->anoDoLayoutOuBoletim($boletimId, $fonteTipo);
-                if ($ano > 0) {
-                    $quadro = (new QuadroBoletimSantaMariaService($this->db))->montarHtml($alunoId, $ano);
-                    $htmlSm = trim((string) ($quadro['html'] ?? ''));
-                    if ((int) ($quadro['linhas'] ?? 0) > 0 && $htmlSm !== '') {
-                        $html = $htmlSm;
-                    }
+        // Só no path auto/demonstrativo: se veio 1 bimestre, sobe para o quadro do ano.
+        // Layout de Boletim permanece como montado no assistente.
+        if ($fonteTipo !== 'layout') {
+            $precisaAno = $html === '' || $this->quadroTemApenasUmBimestre($html);
+            if ($precisaAno) {
+                $htmlSm = $this->htmlQuadroSantaMariaAno($alunoId, $boletimId, $fonteTipo);
+                if ($htmlSm !== '') {
+                    $html = $htmlSm;
                 }
-            } catch (\Throwable $e) {
-                error_log('DemonstracaoDocumento quadro Santa Maria: ' . $e->getMessage());
             }
         }
 
         return $this->envolverQuadroCompacto($html);
+    }
+
+    /**
+     * Quadro do ano com I/II/III/IV bimestre (notas lançadas nos demonstrativos).
+     */
+    private function htmlQuadroSantaMariaAno(int $alunoId, int $boletimId, string $fonteTipo): string
+    {
+        try {
+            $ano = $this->anoDoLayoutOuBoletim($boletimId, $fonteTipo);
+            if ($ano <= 0) {
+                return '';
+            }
+            $quadro = (new QuadroBoletimSantaMariaService($this->db))->montarHtml($alunoId, $ano);
+            if ((int) ($quadro['linhas'] ?? 0) <= 0) {
+                return '';
+            }
+            return trim((string) ($quadro['html'] ?? ''));
+        } catch (\Throwable $e) {
+            error_log('DemonstracaoDocumento quadro Santa Maria: ' . $e->getMessage());
+            return '';
+        }
+    }
+
+    /**
+     * Detecta quadro de um único período (ex.: só PP/PU/CH/PE/FAL), sem II bimestre.
+     */
+    private function quadroTemApenasUmBimestre(string $html): bool
+    {
+        $html = trim($html);
+        if ($html === '') {
+            return true;
+        }
+        $h = mb_strtolower($html);
+        if (str_contains($h, 'ii bimestre')
+            || str_contains($h, '2º bimestre')
+            || str_contains($h, '2° bimestre')
+            || str_contains($h, '2o bimestre')
+            || str_contains($h, '2º bim')
+            || str_contains($h, 'bim 2')
+            || str_contains($h, 'b2_pp')
+            || str_contains($h, 'b2_pu')
+            || str_contains($h, 'data-boletim-coluna="b2_')
+            || str_contains($h, 'data-boletim-coluna="b3_')
+            || str_contains($h, 'data-boletim-coluna="b4_')
+        ) {
+            return false;
+        }
+
+        // Só PP/PU (ou b1_*) sem marcador de outro bimestre.
+        return (bool) preg_match('/\b(?:pp|b1_pp)\b/u', $h)
+            || str_contains($h, 'data-boletim-coluna="b1_')
+            || str_contains($h, 'i bimestre')
+            || str_contains($h, '1º bimestre');
     }
 
     /** @return 'auto'|'demonstrativo'|'layout' */

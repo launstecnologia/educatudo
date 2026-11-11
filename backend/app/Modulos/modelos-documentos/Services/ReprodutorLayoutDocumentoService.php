@@ -12,7 +12,7 @@ class ReprodutorLayoutDocumentoService
     private const TIPOS = [
         'titulo', 'texto', 'texto_rico', 'html', 'logo',
         'dados_escola', 'dados_aluno', 'dados_responsavel', 'dados_turma',
-        'boletim', 'tabela_notas', 'tabela_aluno', 'tabela_frequencia', 'tabela_coletiva',
+        'boletim', 'demonstrativo_notas', 'tabela_notas', 'tabela_aluno', 'tabela_frequencia', 'tabela_coletiva',
         'frequencia', 'observacoes', 'assinaturas', 'historico', 'resultado_final',
         'linha', 'espacador', 'pagina', 'quebra_pagina',
     ];

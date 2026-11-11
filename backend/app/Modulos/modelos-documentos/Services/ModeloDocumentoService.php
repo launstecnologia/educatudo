@@ -625,7 +625,8 @@ class ModeloDocumentoService
                 $item('dados_aluno', 'Dados do aluno', 'fa-user-graduate'),
                 $item('dados_responsavel', 'Dados do responsável', 'fa-user'),
                 $item('dados_turma', 'Dados da turma', 'fa-users'),
-                $item('boletim', 'Boletim', 'fa-table-list', 'Boletim que você criou em Acadêmico → Boletim. Na prévia: regra, ano, turma/série e aluno.'),
+                $item('boletim', 'Boletim', 'fa-table-list', 'Boletim vinculado à regra de aprovação. Na prévia: regra, curso/série e aluno.'),
+                $item('demonstrativo_notas', 'Demonstrativo de Notas', 'fa-table-cells', 'Todos os bimestres/semestres da regra. Na prévia: regra, curso/série e aluno.'),
                 $item('frequencia', 'Frequência', 'fa-chart-pie'),
                 $item('observacoes', 'Observações', 'fa-comment'),
                 $item('assinaturas', 'Assinaturas', 'fa-signature'),
@@ -1599,6 +1600,10 @@ class ModeloDocumentoService
         if ($fonteDemonstrativoId > 0) {
             $base['fonte_demonstrativo_id'] = $fonteDemonstrativoId;
         }
+        $fonteRegraId = (int) ($estrutura['fonte_regra_academica_id'] ?? 0);
+        if ($fonteRegraId > 0) {
+            $base['fonte_regra_academica_id'] = $fonteRegraId;
+        }
         return $this->estruturaSemLogoDuplicado($base);
     }
 
@@ -2188,33 +2193,52 @@ class ModeloDocumentoService
 
     /**
      * Usa na emissão o mesmo quadro vinculado no editor.
-     * Preferência: fonte_demonstrativo_id (Acadêmico → Demonstrativo) e depois fonte_boletim_id (layout de Boletim).
+     * Preferência: regra de aprovação → demonstrativo → layout de boletim.
      */
     public function aplicarFonteBoletimDoModelo(array $modelo, array $vars, int $alunoId, int $turmaId, int $anoLetivo = 0): array
     {
         $estrutura = $this->estruturaDoModelo($modelo);
+        $regraId = (int) ($estrutura['fonte_regra_academica_id'] ?? 0);
+        $jsonEst = json_encode($estrutura);
+        $temBlocoBoletim = is_string($jsonEst) && preg_match('/"type"\s*:\s*"boletim"/', $jsonEst) === 1;
+        $temBlocoDemonstrativo = is_string($jsonEst)
+            && preg_match('/"type"\s*:\s*"demonstrativo_notas"/', $jsonEst) === 1;
         $fonteTipo = 'auto';
-        $fonteId = (int) ($estrutura['fonte_demonstrativo_id'] ?? 0);
-        if ($fonteId > 0) {
-            $fonteTipo = 'demonstrativo';
-        } else {
+        $fonteId = 0;
+        if ($temBlocoBoletim && !$temBlocoDemonstrativo) {
+            $fonteTipo = 'layout';
             $fonteId = (int) ($estrutura['fonte_boletim_id'] ?? 0);
+        } elseif ($temBlocoDemonstrativo && !$temBlocoBoletim) {
+            $fonteTipo = 'demonstrativo';
+            $fonteId = (int) ($estrutura['fonte_demonstrativo_id'] ?? 0);
+        } else {
+            $fonteId = (int) ($estrutura['fonte_demonstrativo_id'] ?? 0);
             if ($fonteId > 0) {
-                $fonteTipo = 'layout';
+                $fonteTipo = 'demonstrativo';
+            } else {
+                $fonteId = (int) ($estrutura['fonte_boletim_id'] ?? 0);
+                if ($fonteId > 0) {
+                    $fonteTipo = 'layout';
+                }
             }
         }
-        if ($fonteId <= 0) {
+        if ($fonteId <= 0 && $regraId <= 0) {
             return $vars;
         }
         if ($alunoId <= 0 || $turmaId <= 0) {
             throw new \RuntimeException('Aluno e turma são necessários para emitir o boletim vinculado ao documento.');
         }
         $demonstracao = new DemonstracaoDocumentoService($this->db);
-        $anoFonte = $demonstracao->anoDoLayoutOuBoletim($fonteId, $fonteTipo);
-        if ($anoLetivo > 0 && $anoFonte > 0 && $anoLetivo !== $anoFonte) {
-            throw new \RuntimeException('O boletim vinculado é de ' . $anoFonte . ', mas a ficha emitida é de ' . $anoLetivo . '. Selecione um modelo com boletim do mesmo ano letivo.');
+        if ($regraId > 0 && $fonteTipo === 'auto') {
+            $fonteTipo = $temBlocoBoletim && !$temBlocoDemonstrativo ? 'layout' : 'demonstrativo';
         }
-        $pacote = $demonstracao->pacote($turmaId, $alunoId, '1127a', $fonteId, $fonteTipo);
+        if ($fonteId > 0) {
+            $anoFonte = $demonstracao->anoDoLayoutOuBoletim($fonteId, $fonteTipo);
+            if ($anoLetivo > 0 && $anoFonte > 0 && $anoLetivo !== $anoFonte) {
+                throw new \RuntimeException('O boletim vinculado é de ' . $anoFonte . ', mas a ficha emitida é de ' . $anoLetivo . '. Selecione um modelo com boletim do mesmo ano letivo.');
+            }
+        }
+        $pacote = $demonstracao->pacote($turmaId, $alunoId, '1127a', $fonteId, $fonteTipo, $regraId);
         $quadro = trim((string) ($pacote['html_quadro'] ?? ''));
         if ($quadro === '') {
             throw new \RuntimeException((string) ($pacote['resumo'] ?? 'O boletim vinculado não possui quadro para este aluno.'));
@@ -2247,6 +2271,7 @@ class ModeloDocumentoService
             return false;
         }
         if (self::emissaoValida($estrutura['emissao'] ?? null) !== null
+            || (int) ($estrutura['fonte_regra_academica_id'] ?? 0) > 0
             || (int) ($estrutura['fonte_demonstrativo_id'] ?? 0) > 0
             || (int) ($estrutura['fonte_boletim_id'] ?? 0) > 0) {
             return true;
@@ -2273,7 +2298,7 @@ class ModeloDocumentoService
         }
         $json = json_encode($estrutura);
         return str_contains((string) ($modelo['codigo'] ?? ''), 'boletim')
-            || (is_string($json) && preg_match('/"type"\s*:\s*"(?:boletim|tabela_notas)"/', $json) === 1);
+            || (is_string($json) && preg_match('/"type"\s*:\s*"(?:boletim|demonstrativo_notas|tabela_notas)"/', $json) === 1);
     }
 
     public function codigoParaEmissao(string $tipo, int $cursoId, int $serieId): ?string

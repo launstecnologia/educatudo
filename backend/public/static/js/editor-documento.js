@@ -47,6 +47,8 @@
     if (fonteBoletimId > 0) out.fonte_boletim_id = fonteBoletimId;
     var fonteDemonstrativoId = parseInt(e.fonte_demonstrativo_id, 10) || 0;
     if (fonteDemonstrativoId > 0) out.fonte_demonstrativo_id = fonteDemonstrativoId;
+    var fonteRegraId = parseInt(e.fonte_regra_academica_id, 10) || 0;
+    if (fonteRegraId > 0) out.fonte_regra_academica_id = fonteRegraId;
     return stripLogoDuplicado(out);
   }
 
@@ -436,14 +438,14 @@
     return /\{\{\s*quadro_notas_html\s*\}\}/i.test(h);
   }
 
-  /** Texto/HTML com só {{quadro_notas_html}} vira bloco Boletim (com editor HTML). */
+  /** Texto/HTML com só {{quadro_notas_html}} vira bloco Demonstrativo (não Boletim). */
   function promoverParaBoletimSeQuadro(el) {
-    if (!el || el.type === 'boletim' || el.type === 'tabela_notas') return false;
+    if (!el || el.type === 'boletim' || el.type === 'demonstrativo_notas' || el.type === 'tabela_notas') return false;
     var raw = String((el.props || {}).html || (el.props || {}).text || '').trim();
     if (!/\{\{\s*quadro_notas_html\s*\}\}/i.test(raw)) return false;
     var resto = raw.replace(/\{\{\s*quadro_notas_html\s*\}\}/gi, '').replace(/<[^>]+>/g, '').trim();
     if (resto !== '') return false;
-    el.type = 'boletim';
+    el.type = 'demonstrativo_notas';
     el.props = el.props || {};
     delete el.props.text;
     if (!String(el.props.html || '').trim() || !/quadro_notas_html/i.test(el.props.html)) {
@@ -642,7 +644,8 @@
       dados_escola: 'Escola', dados_aluno: 'Aluno', dados_responsavel: 'Responsável', dados_turma: 'Turma',
       frequencia: 'Frequência', observacoes: 'Observações', assinaturas: 'Assinaturas',
       tabela_aluno: 'Tabela aluno', tabela_notas: 'Notas', tabela_frequencia: 'Freq. tabela',
-      boletim: 'Boletim', historico: 'Histórico', resultado_final: 'Resultado', qrcode: 'QR Code'
+      boletim: 'Boletim', demonstrativo_notas: 'Demonstrativo de Notas',
+      historico: 'Histórico', resultado_final: 'Resultado', qrcode: 'QR Code'
     };
     return map[t] || t;
   }
@@ -2109,7 +2112,7 @@
     if (t === 'pagina') return '<p style="' + st + 'text-align:center">Página ' + ph('{{pagina}}') + ' de ' + ph('{{total_paginas}}') + '</p>';
     if (t === 'quebra_pagina') return '<div style="border-top:2px dashed #f59e0b;margin:12px 0;color:#b45309;font-size:10px;text-align:center">Quebra de página</div>';
     if (t === 'qrcode') return '<div class="edoc-logo-slot">QR</div>';
-    if (t === 'boletim' || t === 'tabela_notas') {
+    if (t === 'boletim' || t === 'demonstrativo_notas' || t === 'tabela_notas') {
       var liveQuadro = String((varsDaFolha() || {}).quadro_notas_html || '').trim();
       var htmlBol = String((p.html || '')).trim();
       // O HTML do modelo define o layout; os campos recebem os dados do aluno.
@@ -2121,16 +2124,18 @@
         return '<div class="edoc-quadro-notas edoc-el-body" style="' + st + '">'
           + sanitizeHtml(ph(htmlBol)) + '</div>';
       }
+      var temRegra = parseInt((state.estrutura && state.estrutura.fonte_regra_academica_id) || 0, 10) || 0;
       var fonteBol = parseInt((state.estrutura && state.estrutura.fonte_boletim_id) || 0, 10) || 0;
-      if (t === 'boletim' && fonteBol <= 0) {
+      var fonteDemo = parseInt((state.estrutura && state.estrutura.fonte_demonstrativo_id) || 0, 10) || 0;
+      if ((t === 'boletim' || t === 'demonstrativo_notas') && temRegra <= 0 && fonteBol <= 0 && fonteDemo <= 0) {
         return '<div class="edoc-quadro-notas edoc-el-body" style="' + st + '">'
-          + '<span class="edoc-ph">Escolha o demonstrativo e a aluna no card ao lado para ver o quadro</span></div>';
+          + '<span class="edoc-ph">Escolha a regra, o curso/série e o aluno na prévia</span></div>';
       }
       return htmlBlocoHtml(
         'quadro_notas_html',
         st,
         'edoc-quadro-notas',
-        t === 'boletim' ? 'Escolha a aluna no card ao lado para ver o layout' : ''
+        (t === 'boletim' || t === 'demonstrativo_notas') ? 'Escolha regra, curso/série e aluno na prévia' : ''
       );
     }
     if (t === 'tabela_coletiva') {
@@ -2518,24 +2523,24 @@
   function capturarDemoSel() {
     var turma = $('#edoc-demo-turma');
     var aluno = $('#edoc-demo-aluno');
+    var fonteRegra = $('#edoc-fonte-regra');
     var fonteDemo = $('#edoc-fonte-demonstrativo');
     var fonteBol = $('#edoc-fonte-boletim');
     var tid = turma && turma.value ? String(turma.value) : '';
     var aid = aluno && aluno.value ? String(aluno.value) : '';
+    var rid = fonteRegra && fonteRegra.value
+      ? (parseInt(fonteRegra.value, 10) || 0)
+      : (parseInt((state.estrutura && state.estrutura.fonte_regra_academica_id) || 0, 10) || 0);
     var did = fonteDemo && fonteDemo.value
       ? (parseInt(fonteDemo.value, 10) || 0)
       : (parseInt((state.estrutura && state.estrutura.fonte_demonstrativo_id) || 0, 10) || 0);
     var lid = fonteBol && fonteBol.value
       ? (parseInt(fonteBol.value, 10) || 0)
       : (parseInt((state.estrutura && state.estrutura.fonte_boletim_id) || 0, 10) || 0);
-    // Compat: modelos antigos só tinham fonte_boletim_id apontando ao demonstrativo.
-    if (did <= 0 && lid > 0 && !(fonteBol && fonteBol.querySelector('option[value="' + lid + '"]'))) {
-      did = lid;
-      lid = 0;
-    }
     return {
       turmaId: tid,
       alunoId: aid,
+      regraId: rid,
       demonstrativoId: did,
       layoutBoletimId: lid,
       boletimId: did > 0 ? did : lid
@@ -2547,6 +2552,7 @@
     state.demoSel = {
       turmaId: String(sel.turmaId),
       alunoId: String(sel.alunoId),
+      regraId: parseInt(sel.regraId, 10) || 0,
       demonstrativoId: parseInt(sel.demonstrativoId, 10) || 0,
       layoutBoletimId: parseInt(sel.layoutBoletimId, 10) || 0,
       boletimId: parseInt(sel.boletimId, 10) || 0
@@ -2559,6 +2565,7 @@
     sel = sel || state.demoSel || capturarDemoSel();
     var tid = sel.turmaId || '';
     var aid = sel.alunoId || '';
+    var rid = parseInt(sel.regraId, 10) || 0;
     var did = parseInt(sel.demonstrativoId, 10) || 0;
     var lid = parseInt(sel.layoutBoletimId, 10) || 0;
     var bid = parseInt(sel.boletimId, 10) || 0;
@@ -2566,6 +2573,12 @@
     url += (url.indexOf('?') >= 0 ? '&' : '?')
       + 'turma_id=' + encodeURIComponent(tid)
       + '&aluno_id=' + encodeURIComponent(aid);
+    if (rid > 0) {
+      url += '&regra_academica_id=' + encodeURIComponent(String(rid));
+    }
+    var elPrev = acharElementoBoletim();
+    var fonteTipoPrev = (elPrev && elPrev.type === 'boletim') ? 'layout' : 'demonstrativo';
+    url += '&fonte_tipo=' + encodeURIComponent(fonteTipoPrev);
     if (did > 0) {
       url += '&demonstrativo_id=' + encodeURIComponent(String(did));
       url += '&boletim_id=' + encodeURIComponent(String(did));
@@ -2573,7 +2586,6 @@
       url += '&layout_boletim_id=' + encodeURIComponent(String(lid));
       url += '&boletim_id=' + encodeURIComponent(String(lid));
     } else if (bid > 0) {
-      // Compat: id antigo sem tipo explícito.
       url += '&boletim_id=' + encodeURIComponent(String(bid));
     }
     return url;
@@ -3367,7 +3379,7 @@
     if (tipo === 'imagem') el.props = { width: 180, align: 'center', vAlign: 'middle' };
     if (tipo === 'espacador') el.props = { height: 16 };
     if (tipo === 'assinaturas') el.props = { quantidade: 2 };
-    if (tipo === 'boletim' || tipo === 'tabela_notas') {
+    if (tipo === 'boletim' || tipo === 'demonstrativo_notas' || tipo === 'tabela_notas') {
       el.style = { fontSize: 7.5 };
       el.props = {
         html: '<div class="quadro-notas-wrap doc-quadro-fit" style="font-size:7.5pt;width:100%;max-width:100%;">{{quadro_notas_html}}</div>'
@@ -3557,7 +3569,7 @@
     if (chaveEhQuadroNotas(chave)) {
       var pathBol = findPath(colId);
       if (!pathBol || !pathBol.column) return;
-      var bol = defaultElement('boletim');
+      var bol = defaultElement('demonstrativo_notas');
       garantirHtmlBoletimEditavel(bol);
       pathBol.column.elements = pathBol.column.elements || [];
       pathBol.column.elements.push(bol);
@@ -3567,7 +3579,7 @@
       render();
       abrirCardBoletim(true);
       setStatus(boletimHtmlSoDinamico((bol.props || {}).html)
-        ? 'Demonstrativo na folha. Escolha regra, ano, turma/série e aluno na prévia.'
+        ? 'Demonstrativo na folha. Escolha regra, curso/série e aluno na prévia.'
         : 'Demonstrativo na folha — edite o HTML ao lado.');
       return;
     }
@@ -3653,14 +3665,17 @@
     path.column.elements = path.column.elements || [];
     path.column.elements.push(el);
     state.selected = { id: el.id, kind: 'element' };
-    if (tipo === 'boletim') {
+    if (tipo === 'boletim' || tipo === 'demonstrativo_notas') {
       garantirPaisagemBoletim();
     }
     if (!skipHist) pushHist();
     render();
-    if (tipo === 'boletim') {
+    if (tipo === 'demonstrativo_notas') {
       abrirCardBoletim(true);
-      setStatus('Boletim na folha — escolha o boletim criado, ano, turma/série e aluno na prévia');
+      setStatus('Demonstrativo na folha — escolha regra, curso/série e aluno na prévia');
+    } else if (tipo === 'boletim') {
+      abrirCardBoletim(true);
+      setStatus('Boletim na folha — escolha regra, curso/série e aluno na prévia');
     }
     if (tipo === 'tabela') {
       var node = paper && paper.querySelector('.edoc-el[data-id="' + el.id + '"]');
@@ -4116,8 +4131,8 @@
       }
       var soDin = boletimHtmlSoDinamico(p.html);
       html += soDin
-        ? '<p class="edoc-hint">Este bloco ainda usa <code>{{quadro_notas_html}}</code>. Na prévia, escolha Demonstrativo de Notas (ou Boletim), ano, turma/série e aluno para carregar a tabela.</p>'
-        : '<p class="edoc-hint">Edite o HTML do Demonstrativo de Notas ao lado (ou em <strong>Expandir editor</strong>). Os campos <code>{{boletim_celula_…}}</code> recebem as notas de cada aluno.</p>';
+        ? '<p class="edoc-hint">Este bloco ainda usa <code>{{quadro_notas_html}}</code>. Na prévia, escolha regra de aprovação, curso/série e aluno para carregar a tabela.</p>'
+        : '<p class="edoc-hint">Edite o HTML ao lado (ou em <strong>Expandir editor</strong>). Os campos <code>{{boletim_celula_…}}</code> recebem as notas de cada aluno.</p>';
       html += '<div class="edoc-prop-row" style="margin-bottom:6px;">'
         + '<button type="button" class="edoc-btn" id="edoc-boletim-html-dinamico" title="Wrapper com variável dinâmica">HTML dinâmico</button>'
         + '<button type="button" class="edoc-btn" id="edoc-boletim-html-previa" title="Editar a estrutura completa com notas dinâmicas">Expor tabela completa</button>'
@@ -4164,7 +4179,7 @@
         ]) + '</div>';
     }
     if (el.type !== 'logo' && el.type !== 'imagem') {
-      var minPt = (el.type === 'boletim' || el.type === 'tabela_notas') ? '4' : '8';
+      var minPt = (el.type === 'boletim' || el.type === 'demonstrativo_notas' || el.type === 'tabela_notas') ? '4' : '8';
       html += '<div class="edoc-sec-label">TIPOGRAFIA</div><div class="edoc-prop-row">'
         + '<div><label>Tamanho (pt)</label>' + inp('fontSize', st.fontSize || '', 'type="number" min="' + minPt + '" max="72" step="0.5"') + '</div>'
         + '<div><label>Peso do bloco</label><select data-f="fontWeight"><option value="">Normal</option><option value="bold">Negrito</option></select></div></div>'
@@ -4704,7 +4719,7 @@
 
   function elementoEhBoletim(el) {
     if (!el) return false;
-    if (el.type === 'boletim' || el.type === 'tabela_notas') return true;
+    if (el.type === 'boletim' || el.type === 'demonstrativo_notas' || el.type === 'tabela_notas') return true;
     var raw = String((el.props || {}).html || (el.props || {}).text || '');
     return raw.indexOf('quadro_notas_html') >= 0 || raw.indexOf('{{boletim_celula_') >= 0;
   }
@@ -4758,7 +4773,7 @@
     }
     if (focar) {
       card.open = true;
-      var fonte = $('#edoc-fonte-demonstrativo') || $('#edoc-fonte-boletim');
+      var fonte = $('#edoc-fonte-regra') || $('#edoc-fonte-demonstrativo') || $('#edoc-fonte-boletim');
       if (fonte) {
         try { fonte.focus(); } catch (e) {}
       }
@@ -4772,7 +4787,9 @@
     var sel = state.selected ? findPath(state.selected.id) : null;
     if ((sel && sel.element && elementoEhBoletim(sel.element))
       || estruturaTemBlocoBoletim()
-      || (state.estrutura && (state.estrutura.fonte_boletim_id || state.estrutura.fonte_demonstrativo_id))) {
+      || (state.estrutura && (state.estrutura.fonte_boletim_id
+        || state.estrutura.fonte_demonstrativo_id
+        || state.estrutura.fonte_regra_academica_id))) {
       card.hidden = false;
     }
   }
@@ -4783,6 +4800,7 @@
     var turma = $('#edoc-demo-turma');
     var aluno = $('#edoc-demo-aluno');
     var anoSel = $('#edoc-demo-ano');
+    var fonteRegra = $('#edoc-fonte-regra');
     var fonteDemonstrativo = $('#edoc-fonte-demonstrativo');
     var fonteBoletim = $('#edoc-fonte-boletim');
     var real = $('#edoc-demo-real');
@@ -4790,11 +4808,18 @@
     var comps = $('#edoc-demo-comps');
     if (!turma || !aluno || !C.demoUrl) return;
     if (estruturaTemBlocoBoletim()
-      || (state.estrutura && (state.estrutura.fonte_boletim_id || state.estrutura.fonte_demonstrativo_id))) {
+      || (state.estrutura && (state.estrutura.fonte_boletim_id
+        || state.estrutura.fonte_demonstrativo_id
+        || state.estrutura.fonte_regra_academica_id))) {
       abrirCardBoletim(false);
     }
     var req = 0;
-    var demoPacote = { componentes: [], periodos: [], html_quadro: '', turmas: [] };
+    var demoPacote = { componentes: [], periodos: [], html_quadro: '', turmas: [], regras: [] };
+    function regraSelecionadaId() {
+      var doSelect = fonteRegra ? (parseInt(fonteRegra.value || '0', 10) || 0) : 0;
+      if (doSelect > 0) return doSelect;
+      return parseInt((state.estrutura && state.estrutura.fonte_regra_academica_id) || 0, 10) || 0;
+    }
     function demonstrativoSelecionadoId() {
       var doSelect = fonteDemonstrativo ? (parseInt(fonteDemonstrativo.value || '0', 10) || 0) : 0;
       if (doSelect > 0) return doSelect;
@@ -4809,6 +4834,13 @@
       var did = demonstrativoSelecionadoId();
       if (did > 0) return did;
       return layoutBoletimSelecionadoId();
+    }
+    function gravarFonteRegra(id) {
+      id = parseInt(id, 10) || 0;
+      if (id > 0) state.estrutura.fonte_regra_academica_id = id;
+      else delete state.estrutura.fonte_regra_academica_id;
+      state.dirty = true;
+      scheduleSave();
     }
     function gravarFonteDemonstrativo(id) {
       id = parseInt(id, 10) || 0;
@@ -4841,9 +4873,12 @@
       if (id <= 0) return false;
       return (lista || []).some(function (b) { return Number(b.id || 0) === id; });
     }
+    function pintarRegras(lista) {
+      if (lista) demoPacote.regras = lista;
+      pintarOpcoesFonte(fonteRegra, demoPacote.regras || [], regraSelecionadaId(), 'Selecione a regra de aprovação');
+    }
     function pintarDemonstrativos(lista) {
       var atual = demonstrativoSelecionadoId();
-      // Se o id antigo de fonte_boletim for na verdade um demonstrativo, usa aqui.
       if (atual <= 0 && state.estrutura && state.estrutura.fonte_boletim_id) {
         var legado = parseInt(state.estrutura.fonte_boletim_id, 10) || 0;
         if (idExisteNaLista(lista, legado)) {
@@ -4855,11 +4890,9 @@
     }
     function pintarLayoutsBoletim(lista) {
       var atual = layoutBoletimSelecionadoId();
-      // Só mantém no select de Boletim se o id existir em boletim_layouts.
       if (atual > 0 && !idExisteNaLista(lista, atual)) {
         atual = 0;
         if (state.estrutura && state.estrutura.fonte_boletim_id && !state.estrutura.fonte_demonstrativo_id) {
-          // Fonte antiga era demonstrativo — limpa o select de layout.
           delete state.estrutura.fonte_boletim_id;
         } else if (state.estrutura && state.estrutura.fonte_demonstrativo_id
           && Number(state.estrutura.fonte_boletim_id) === Number(state.estrutura.fonte_demonstrativo_id)) {
@@ -5153,8 +5186,30 @@
         carregar();
         return;
       }
+      pintarRegras(data.regras_aprovacao || []);
       pintarDemonstrativos(data.demonstrativos || data.boletins || []);
       pintarLayoutsBoletim(data.layouts_boletim || []);
+      if (data.demonstrativo_id) {
+        var didResolvido = parseInt(data.demonstrativo_id, 10) || 0;
+        if (didResolvido > 0) {
+          state.estrutura.fonte_demonstrativo_id = didResolvido;
+          if (fonteDemonstrativo) fonteDemonstrativo.value = String(didResolvido);
+        }
+      }
+      if (data.layout_boletim_id) {
+        var lidResolvido = parseInt(data.layout_boletim_id, 10) || 0;
+        if (lidResolvido > 0) {
+          state.estrutura.fonte_boletim_id = lidResolvido;
+          if (fonteBoletim) fonteBoletim.value = String(lidResolvido);
+        }
+      }
+      if (data.regra_academica_id) {
+        var ridResolvido = parseInt(data.regra_academica_id, 10) || 0;
+        if (ridResolvido > 0) {
+          state.estrutura.fonte_regra_academica_id = ridResolvido;
+          if (fonteRegra) fonteRegra.value = String(ridResolvido);
+        }
+      }
       if (Array.isArray(data.periodos) && data.periodos.length) demoPacote.periodos = data.periodos;
       demoPacote.html_quadro = data.html_quadro || '';
       pintarComponentes(data.componentes || []);
@@ -5202,15 +5257,34 @@
         else status.textContent = 'Nenhuma turma ativa encontrada.';
       }
     }
+    function tipoFonteDoBloco() {
+      var el = state.selected ? findPath(state.selected.id) : null;
+      var alvo = (el && el.element && elementoEhBoletim(el.element)) ? el.element : acharElementoBoletim();
+      if (alvo && alvo.type === 'boletim') return 'layout';
+      if (alvo && alvo.type === 'demonstrativo_notas') return 'demonstrativo';
+      return 'demonstrativo';
+    }
     function carregar() {
       var n = ++req;
+      var rid = regraSelecionadaId();
       var did = demonstrativoSelecionadoId();
       var lid = layoutBoletimSelecionadoId();
-      // Uma fonte por vez: demonstrativo tem prioridade se ambos estiverem setados.
-      if (did > 0) lid = 0;
+      var fonteTipo = tipoFonteDoBloco();
+      // Com regra, o backend resolve o vínculo; o tipo do bloco define Demonstrativo vs Boletim.
+      if (rid > 0) {
+        did = 0;
+        lid = 0;
+      } else if (did > 0) {
+        lid = 0;
+        fonteTipo = 'demonstrativo';
+      } else if (lid > 0) {
+        fonteTipo = 'layout';
+      }
       var url = C.demoUrl
         + '?turma_id=' + encodeURIComponent(turma.value || '0')
         + '&aluno_id=' + encodeURIComponent(aluno.value || '0')
+        + '&regra_academica_id=' + encodeURIComponent(String(rid))
+        + '&fonte_tipo=' + encodeURIComponent(fonteTipo)
         + '&demonstrativo_id=' + encodeURIComponent(String(did))
         + '&layout_boletim_id=' + encodeURIComponent(String(lid))
         + '&boletim_id=' + encodeURIComponent(String(did > 0 ? did : lid))
@@ -5242,47 +5316,35 @@
       carregar();
     });
     aluno.addEventListener('change', function () {
-      if (boletimSelecionadoId() > 0) {
+      if (regraSelecionadaId() > 0 || boletimSelecionadoId() > 0) {
         garantirBlocoBoletimNaFolha();
       }
       carregar();
     });
-    if (fonteDemonstrativo) {
-      if (state.estrutura && state.estrutura.fonte_demonstrativo_id) {
-        fonteDemonstrativo.value = String(state.estrutura.fonte_demonstrativo_id);
-      } else if (state.estrutura && state.estrutura.fonte_boletim_id) {
-        // Migração suave: valor antigo pode ser demonstrativo (cadastro em boletins).
-        fonteDemonstrativo.value = String(state.estrutura.fonte_boletim_id);
+    if (fonteRegra) {
+      if (state.estrutura && state.estrutura.fonte_regra_academica_id) {
+        fonteRegra.value = String(state.estrutura.fonte_regra_academica_id);
       }
-      fonteDemonstrativo.addEventListener('change', function () {
-        gravarFonteDemonstrativo(fonteDemonstrativo.value);
-        if (fonteDemonstrativo.value && fonteBoletim) {
-          fonteBoletim.value = '';
-          gravarFonteBoletim(0);
-        }
+      fonteRegra.addEventListener('change', function () {
+        gravarFonteRegra(fonteRegra.value);
         abrirCardBoletim(false);
-        if (boletimSelecionadoId() > 0) {
+        if (regraSelecionadaId() > 0) {
           garantirBlocoBoletimNaFolha();
         }
         carregar();
       });
     }
+    if (fonteDemonstrativo) {
+      if (state.estrutura && state.estrutura.fonte_demonstrativo_id) {
+        fonteDemonstrativo.value = String(state.estrutura.fonte_demonstrativo_id);
+      } else if (state.estrutura && state.estrutura.fonte_boletim_id) {
+        fonteDemonstrativo.value = String(state.estrutura.fonte_boletim_id);
+      }
+    }
     if (fonteBoletim) {
       if (state.estrutura && state.estrutura.fonte_boletim_id) {
         fonteBoletim.value = String(state.estrutura.fonte_boletim_id);
       }
-      fonteBoletim.addEventListener('change', function () {
-        gravarFonteBoletim(fonteBoletim.value);
-        if (fonteBoletim.value && fonteDemonstrativo) {
-          fonteDemonstrativo.value = '';
-          gravarFonteDemonstrativo(0);
-        }
-        abrirCardBoletim(false);
-        if (boletimSelecionadoId() > 0) {
-          garantirBlocoBoletimNaFolha();
-        }
-        carregar();
-      });
     }
     if (real) {
       real.addEventListener('change', function () {
