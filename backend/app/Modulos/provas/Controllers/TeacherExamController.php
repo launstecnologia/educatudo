@@ -2298,7 +2298,7 @@ class TeacherExamController extends BaseController
 
         $servico = new ImportacaoNotasPlanilha();
         try {
-            $linhasArquivo = $servico->lerArquivo(is_array($_FILES['planilha'] ?? null) ? $_FILES['planilha'] : []);
+            $linhasArquivo = $servico->lerArquivos(is_array($_FILES['planilha'] ?? null) ? $_FILES['planilha'] : []);
         } catch (\RuntimeException $e) {
             $this->setFlashMessage($e->getMessage(), 'error');
             $this->redirect($urlVolta);
@@ -2324,7 +2324,11 @@ class TeacherExamController extends BaseController
             $resto = count($erros) - 8;
             $erros = array_slice($erros, 0, 8);
         }
+        $qtdArquivos = count(ImportacaoNotasPlanilha::separarUploads(is_array($_FILES['planilha'] ?? null) ? $_FILES['planilha'] : []));
         $partesMsg = [(int) $resultado['aplicadas'] . ' nota(s) importada(s)'];
+        if ($qtdArquivos > 1) {
+            $partesMsg[] = $qtdArquivos . ' arquivo(s)';
+        }
         if ((int) $resultado['preservadas'] > 0) {
             $partesMsg[] = (int) $resultado['preservadas'] . ' nota(s) já lançada(s) foram mantidas';
         }
@@ -2368,7 +2372,7 @@ class TeacherExamController extends BaseController
 
         $servico = new ImportacaoEnacPlanilhaService();
         try {
-            $lido = $servico->lerArquivo(is_array($_FILES['planilha'] ?? null) ? $_FILES['planilha'] : []);
+            $lido = $servico->lerArquivos(is_array($_FILES['planilha'] ?? null) ? $_FILES['planilha'] : []);
         } catch (\RuntimeException $e) {
             $this->setFlashMessage($e->getMessage(), 'error');
             $this->redirect($urlVolta);
@@ -2420,6 +2424,9 @@ class TeacherExamController extends BaseController
         }
 
         $partesMsg = [(int) $resultado['aplicadas'] . ' nota(s) ENAC importada(s)'];
+        if ((int) ($lido['arquivos'] ?? 0) > 1) {
+            $partesMsg[] = (int) $lido['arquivos'] . ' arquivo(s)';
+        }
         if ((int) $resultado['preservadas'] > 0) {
             $partesMsg[] = (int) $resultado['preservadas'] . ' nota(s) já lançada(s) foram mantidas';
         }

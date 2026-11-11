@@ -13,12 +13,70 @@ class ImportacaoEnacPlanilhaService
     private const MAX_BYTES = 2000000;
     private const MAX_XML_BYTES = 10000000;
     private const MAX_LINHAS = 8000;
+    private const MAX_ARQUIVOS = 30;
 
     private ConversaoNotaEnacService $conversao;
 
     public function __construct(?ConversaoNotaEnacService $conversao = null)
     {
         $this->conversao = $conversao ?? new ConversaoNotaEnacService();
+    }
+
+    /**
+     * Lê um ou vários Excels ENAC e junta as linhas.
+     *
+     * @param array<string,mixed> $filesCampo campo $_FILES['planilha']
+     * @return array{
+     *   linhas: list<array{linha:int,codigo:string,nome:string,disciplina:string,nota:string,arquivo?:string}>,
+     *   abaixo_de_20:int,
+     *   ignoradas:int,
+     *   erros: list<string>,
+     *   arquivos:int
+     * }
+     */
+    public function lerArquivos(array $filesCampo): array
+    {
+        $lista = ImportacaoNotasPlanilha::separarUploads($filesCampo);
+        if ($lista === []) {
+            throw new \RuntimeException('Selecione ao menos um arquivo ENAC para importar.');
+        }
+        if (count($lista) > self::MAX_ARQUIVOS) {
+            throw new \RuntimeException('Envie no máximo ' . self::MAX_ARQUIVOS . ' arquivos por vez.');
+        }
+
+        $linhas = [];
+        $abaixo = 0;
+        $ignoradas = 0;
+        $erros = [];
+        foreach ($lista as $arquivo) {
+            $nomeArq = basename((string) ($arquivo['name'] ?? 'arquivo'));
+            try {
+                $lido = $this->lerArquivo($arquivo);
+            } catch (\RuntimeException $e) {
+                $erros[] = $nomeArq . ': ' . $e->getMessage();
+                continue;
+            }
+            $abaixo += (int) ($lido['abaixo_de_20'] ?? 0);
+            $ignoradas += (int) ($lido['ignoradas'] ?? 0);
+            foreach (($lido['erros'] ?? []) as $erro) {
+                $erros[] = $nomeArq . ' ' . (string) $erro;
+            }
+            foreach (($lido['linhas'] ?? []) as $linha) {
+                $linha['arquivo'] = $nomeArq;
+                $linhas[] = $linha;
+            }
+        }
+        if ($linhas === [] && $erros === []) {
+            throw new \RuntimeException('A planilha ENAC não tem linhas com pontuação para lançar.');
+        }
+
+        return [
+            'linhas' => $linhas,
+            'abaixo_de_20' => $abaixo,
+            'ignoradas' => $ignoradas,
+            'erros' => $erros,
+            'arquivos' => count($lista),
+        ];
     }
 
     /**
