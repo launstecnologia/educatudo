@@ -59,7 +59,7 @@ $renderCampos('Contrato e valores', $grupos['contrato']['chaves'] ?? [], 'fa-fil
 <div class="edoc-demo-picker" id="edoc-demo-picker">
 <button type="button" class="edoc-item" id="edoc-demo-abrir" aria-haspopup="listbox" aria-expanded="false" aria-controls="edoc-demo-menu" title="Escolha o bimestre/semestre para inserir na folha">
 <i class="fa-solid fa-table-cells" aria-hidden="true"></i>
-<span class="edoc-item-text"><strong>Demonstrativo de Notas</strong><small>Clique para escolher 1º, 2º bimestre…</small></span>
+<span class="edoc-item-text"><strong>Demonstrativo de Notas</strong><small>Períodos configurados no Demonstrativo</small></span>
 <i class="fa-solid fa-chevron-down edoc-item-add" aria-hidden="true"></i>
 </button>
 <div class="edoc-demo-menu" id="edoc-demo-menu" role="listbox" hidden>
@@ -69,11 +69,7 @@ $renderCampos('Contrato e valores', $grupos['contrato']['chaves'] ?? [], 'fa-fil
 </div>
 </div>
 <div class="edoc-demo" id="edoc-demo">
-<div class="edoc-demo-head">
-<strong>Disciplinas, notas e médias</strong>
-<p>Na prévia, escolha regra, curso/série e aluno. Depois abra a lista e arraste cada campo para a folha.</p>
-</div>
-<label class="edoc-demo-check" for="edoc-demo-sigla"><input type="checkbox" id="edoc-demo-sigla"> Sigla no lugar do nome</label>
+<input type="checkbox" id="edoc-demo-sigla" hidden aria-hidden="true">
 <details class="edoc-var-drop" id="edoc-demo-comps-drop" hidden>
 <summary>
 <span class="edoc-var-ico" aria-hidden="true"><i class="fa-solid fa-book-open"></i></span>

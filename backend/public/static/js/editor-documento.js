@@ -479,12 +479,21 @@
     return true;
   }
 
+  function chaveDemonstrativoPeriodo(bimestre, chaveProp) {
+    var chave = String(chaveProp || '').trim();
+    if (chave) return chave;
+    var bim = parseInt(bimestre || 0, 10) || 0;
+    if (bim >= 1 && bim <= 4) return 'quadro_notas_b' + bim + '_html';
+    if (bim > 0) return 'quadro_notas_p' + bim + '_html';
+    return 'quadro_notas_html';
+  }
+
   /** Bloco Demonstrativo sempre aponta para o token do período (nunca HTML de Boletim). */
   function restaurarPlaceholderDemonstrativo(el) {
     if (!el || (el.type !== 'demonstrativo_notas' && el.type !== 'tabela_notas')) return false;
     el.props = el.props || {};
-    var bim = parseInt(el.props.bimestre || 0, 10) || 0;
-    var chave = bim >= 1 && bim <= 4 ? ('quadro_notas_b' + bim + '_html') : 'quadro_notas_html';
+    var chave = chaveDemonstrativoPeriodo(el.props.bimestre, el.props.chave);
+    el.props.chave = chave;
     var html = String(el.props.html || '');
     var tokenOk = boletimHtmlSoDinamico(html) && html.indexOf('{{' + chave + '}}') >= 0
       && html.indexOf('{{boletim_html}}') < 0;
@@ -2138,7 +2147,9 @@
       var bim = parseInt(p.bimestre || 0, 10) || 0;
       var chaveLive = t === 'boletim'
         ? 'boletim_html'
-        : (bim > 0 ? ('quadro_notas_b' + bim + '_html') : 'quadro_notas_html');
+        : (String(p.chave || '').trim()
+          || (bim >= 1 && bim <= 4 ? ('quadro_notas_b' + bim + '_html')
+            : (bim > 0 ? ('quadro_notas_p' + bim + '_html') : 'quadro_notas_html')));
       var liveQuadro = String(bag[chaveLive] || '').trim();
       var htmlBol = String((p.html || '')).trim();
       // Legado: bloco Boletim com {{quadro_notas_html}} — força boletim_html.
@@ -4973,15 +4984,16 @@
       if (lista) demoPacote.regras = lista;
       pintarOpcoesFonte(fonteRegra, demoPacote.regras || [], regraSelecionadaId(), 'Selecione a regra de aprovação');
     }
-    function inserirDemonstrativoPeriodo(bimestre, rotulo) {
+    function inserirDemonstrativoPeriodo(bimestre, rotulo, chave) {
       bimestre = parseInt(bimestre, 10) || 0;
+      chave = chaveDemonstrativoPeriodo(bimestre, chave);
       var colId = garantirColunaCorpo();
       var path = findPath(colId);
       if (!path || !path.column) return;
       var el = defaultElement('demonstrativo_notas');
       el.props = el.props || {};
       el.props.bimestre = bimestre;
-      var chave = bimestre > 0 ? ('quadro_notas_b' + bimestre + '_html') : 'quadro_notas_html';
+      el.props.chave = chave;
       el.props.html = '<div class="quadro-notas-wrap doc-quadro-fit" style="font-size:7.5pt;width:100%;max-width:100%;">{{' + chave + '}}</div>';
       path.column.elements = path.column.elements || [];
       path.column.elements.push(el);
@@ -4990,7 +5002,7 @@
       pushHist();
       render();
       abrirCardBoletim(true);
-      setStatus((rotulo || 'Demonstrativo') + ' na folha — quadro PP/PU/CH/PE do período (não é o Boletim).');
+      setStatus((rotulo || 'Demonstrativo') + ' na folha — quadro do período configurado no Demonstrativo.');
       try {
         if (typeof window.__edocRecarregarDemo === 'function') window.__edocRecarregarDemo();
       } catch (eRecarregaDemo) {}
@@ -5034,22 +5046,26 @@
       if (hint) hint.hidden = true;
       if (btnAbrir) {
         var smallOk = btnAbrir.querySelector('small');
-        if (smallOk) smallOk.textContent = lista.length + ' períodos — clique para escolher';
+        if (smallOk) smallOk.textContent = lista.length + ' período(s) configurado(s) — clique para escolher';
       }
       var html = '';
       lista.forEach(function (p) {
         var n = Number(p.n || 0);
         if (n <= 0) return;
-        var rotulo = p.rotulo || (n + 'º Bimestre');
-        var chave = p.chave || ('quadro_notas_b' + n + '_html');
-        html += '<button type="button" class="edoc-demo-opcao" role="option" data-demo-bimestre="' + n + '" data-demo-rotulo="' + esc(rotulo) + '" title="Inserir ' + esc(rotulo) + ' na folha">'
+        var rotulo = p.rotulo || (n + 'º período');
+        var chave = chaveDemonstrativoPeriodo(n, p.chave);
+        html += '<button type="button" class="edoc-demo-opcao" role="option" data-demo-bimestre="' + n + '" data-demo-chave="' + esc(chave) + '" data-demo-rotulo="' + esc(rotulo) + '" title="Inserir ' + esc(rotulo) + ' na folha">'
           + '<strong>' + esc(rotulo) + '</strong>'
           + '<small>{{' + esc(chave) + '}}</small></button>';
       });
       boxPeriodos.innerHTML = html;
       $all('[data-demo-bimestre]', boxPeriodos).forEach(function (btn) {
         btn.addEventListener('click', function () {
-          inserirDemonstrativoPeriodo(btn.getAttribute('data-demo-bimestre'), btn.getAttribute('data-demo-rotulo') || btn.textContent);
+          inserirDemonstrativoPeriodo(
+            btn.getAttribute('data-demo-bimestre'),
+            btn.getAttribute('data-demo-rotulo') || btn.textContent,
+            btn.getAttribute('data-demo-chave')
+          );
           fecharMenuDemonstrativo();
         });
       });
@@ -5457,7 +5473,15 @@
         C.varsPreview.boletim_html = data.html_boletim || '';
         if (data.html_por_bimestre && typeof data.html_por_bimestre === 'object') {
           Object.keys(data.html_por_bimestre).forEach(function (n) {
-            C.varsPreview['quadro_notas_b' + n + '_html'] = data.html_por_bimestre[n] || '';
+            var codigo = parseInt(n, 10) || 0;
+            var chavePeriodo = chaveDemonstrativoPeriodo(codigo, '');
+            (data.periodos_demonstrativo || []).forEach(function (p) {
+              if (Number(p.n || 0) === codigo && p.chave) chavePeriodo = p.chave;
+            });
+            C.varsPreview[chavePeriodo] = data.html_por_bimestre[n] || '';
+            if (codigo >= 1 && codigo <= 4) {
+              C.varsPreview['quadro_notas_b' + codigo + '_html'] = data.html_por_bimestre[n] || '';
+            }
           });
         }
         // Demonstrativo: restaura token do bimestre (não materializa o Boletim no bloco).

@@ -358,61 +358,106 @@ class DemonstracaoDocumentoService
      * @param array{ano_letivo?:int,series_ids?:list<int>} $detalheRegra
      * @return list<array{n:int,rotulo:string,chave:string,regra_notas_id:?int}>
      */
+    /**
+     * Mesmos períodos do menu "Períodos" do Demonstrativo de Notas (só os já configurados).
+     *
+     * @return list<array{n:int,rotulo:string,chave:string,regra_notas_id:?int}>
+     */
     public function periodosDemonstrativoDaRegra(array $detalheRegra, int $demonstrativoId = 0): array
     {
         $ano = (int) ($detalheRegra['ano_letivo'] ?? 0);
-        if ($ano <= 0) {
+        if ($ano <= 0 && $demonstrativoId <= 0) {
             return [];
         }
-        /** @var array<int, string> $rotulos */
-        $rotulos = [];
-        try {
-            if (class_exists(\App\Core\PeriodoLetivo::class)) {
-                $info = \App\Core\PeriodoLetivo::doAno($ano);
-                $brutos = is_array($info['rotulos'] ?? null) ? $info['rotulos'] : [];
-                foreach ($brutos as $num => $lab) {
-                    $n = (int) $num;
-                    if ($n >= 1 && $n <= 4) {
-                        $rotulos[$n] = trim((string) $lab);
-                    }
+        $eventos = [];
+        if ($demonstrativoId > 0) {
+            try {
+                if (class_exists(\App\Models\System\BoletimConfig::class)) {
+                    $cfg = new \App\Models\System\BoletimConfig();
+                    $cfg->ensureSchema();
+                    $eventos = $cfg->listarEventosNotasDoBoletim($demonstrativoId) ?: [];
                 }
+            } catch (\Throwable $e) {
+                $eventos = [];
+            }
+        }
+        $item = [
+            'ano_letivo' => $ano > 0 ? $ano : (int) date('Y'),
+            'regra_academica_id' => (int) ($detalheRegra['id'] ?? 0),
+        ];
+        $menu = [];
+        try {
+            if (class_exists(\App\Modulos\Boletins\Services\BoletimCadastroService::class)) {
+                $menu = (new \App\Modulos\Boletins\Services\BoletimCadastroService())
+                    ->periodosDoMenuNotas($item, $eventos) ?: [];
             }
         } catch (\Throwable $e) {
-            $rotulos = [];
+            $menu = [];
         }
-        $mapaRegraNotas = $this->mapaRegraNotasPorBimestre($demonstrativoId, $ano);
-        // Mesmos períodos dos cards da regra / detalhe do aluno (PeriodoLetivo do ano).
-        $nums = array_keys($rotulos);
-        if ($nums === []) {
-            $nums = array_keys($mapaRegraNotas);
-        }
-        if ($nums === []) {
-            $nums = [1, 2, 3, 4];
-        }
-        $nums = array_values(array_unique(array_map('intval', $nums)));
-        sort($nums);
         $out = [];
-        foreach ($nums as $n) {
-            if ($n < 1 || $n > 4) {
+        $vistos = [];
+        foreach ($menu as $periodo) {
+            if (!is_array($periodo)) {
                 continue;
             }
-            $rotulo = trim((string) ($rotulos[$n] ?? ''));
+            $codigo = (int) ($periodo['bimestre'] ?? 0);
+            $regraId = (int) ($periodo['regra_id'] ?? 0);
+            // Só períodos já configurados no Demonstrativo (mesma regra do "Configurar notas").
+            if ($codigo <= 0 || $regraId <= 0 || isset($vistos[$codigo])) {
+                continue;
+            }
+            $vistos[$codigo] = true;
+            $rotulo = trim((string) ($periodo['rotulo'] ?? ''));
             if ($rotulo === '') {
-                $rotulo = $n . 'º Bimestre';
+                $rotulo = $codigo . 'º período';
             }
             $out[] = [
-                'n' => $n,
+                'n' => $codigo,
                 'rotulo' => $rotulo,
-                'chave' => 'quadro_notas_b' . $n . '_html',
-                'regra_notas_id' => $mapaRegraNotas[$n] ?? null,
+                'chave' => $this->chaveQuadroPeriodo($codigo),
+                'regra_notas_id' => $regraId,
+            ];
+        }
+        if ($out !== []) {
+            return $out;
+        }
+        // Fallback: eventos de notas ligados ao demonstrativo.
+        foreach ($eventos as $evento) {
+            if (!is_array($evento)) {
+                continue;
+            }
+            $codigo = (int) ($evento['bimestre'] ?? 0);
+            $regraId = (int) ($evento['id'] ?? 0);
+            if ($codigo <= 0 || $regraId <= 0 || isset($vistos[$codigo])) {
+                continue;
+            }
+            $vistos[$codigo] = true;
+            $rotulo = trim((string) ($evento['nome'] ?? ''));
+            if ($rotulo === '') {
+                $rotulo = $codigo . 'º período';
+            }
+            $out[] = [
+                'n' => $codigo,
+                'rotulo' => $rotulo,
+                'chave' => $this->chaveQuadroPeriodo($codigo),
+                'regra_notas_id' => $regraId,
             ];
         }
 
         return $out;
     }
 
+    private function chaveQuadroPeriodo(int $codigo): string
+    {
+        if ($codigo >= 1 && $codigo <= 4) {
+            return 'quadro_notas_b' . $codigo . '_html';
+        }
+
+        return 'quadro_notas_p' . $codigo . '_html';
+    }
+
     /**
-     * @return array<int, int> bimestre => boletim_regras.id
+     * @return array<int, int> codigo periodo => boletim_regras.id
      */
     private function mapaRegraNotasPorBimestre(int $demonstrativoId, int $ano): array
     {
@@ -424,7 +469,8 @@ class DemonstracaoDocumentoService
                 FROM boletim_regras
                 WHERE ativo = 1
                   AND exibir_em = 'notas'
-                  AND bimestre BETWEEN 1 AND 4";
+                  AND bimestre IS NOT NULL
+                  AND bimestre > 0";
         if ($demonstrativoId > 0 && $this->temColuna('boletim_regras', 'boletim_id')) {
             $sql .= ' AND boletim_id = :bid';
             $params['bid'] = $demonstrativoId;
@@ -444,7 +490,7 @@ class DemonstracaoDocumentoService
         foreach ($rows as $row) {
             $bim = (int) ($row['bimestre'] ?? 0);
             $id = (int) ($row['id'] ?? 0);
-            if ($bim >= 1 && $bim <= 4 && $id > 0 && !isset($out[$bim])) {
+            if ($bim > 0 && $id > 0 && !isset($out[$bim])) {
                 $out[$bim] = $id;
             }
         }
@@ -454,7 +500,7 @@ class DemonstracaoDocumentoService
 
     public function htmlQuadroDoBimestre(int $alunoId, int $demonstrativoId, int $bimestre): string
     {
-        if ($alunoId <= 0 || $demonstrativoId <= 0 || $bimestre < 1 || $bimestre > 4) {
+        if ($alunoId <= 0 || $demonstrativoId <= 0 || $bimestre <= 0) {
             return '';
         }
         $ano = $this->anoDoBoletim($demonstrativoId);
@@ -697,11 +743,13 @@ class DemonstracaoDocumentoService
             return '';
         }
         if ($demonstrativoId > 0) {
+            $anoDemo = $ano > 0 ? $ano : $this->anoDoBoletim($demonstrativoId);
+            $mapa = $this->mapaRegraNotasPorBimestre($demonstrativoId, $anoDemo);
             $porBimestre = [];
-            for ($n = 1; $n <= 4; $n++) {
-                $htmlBim = $this->htmlQuadroDoBimestre($alunoId, $demonstrativoId, $n);
+            foreach (array_keys($mapa) as $n) {
+                $htmlBim = $this->htmlQuadroDoBimestre($alunoId, $demonstrativoId, (int) $n);
                 if ($htmlBim !== '') {
-                    $porBimestre[$n] = $htmlBim;
+                    $porBimestre[(int) $n] = $htmlBim;
                 }
             }
             if ($porBimestre !== []) {
