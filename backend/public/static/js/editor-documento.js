@@ -6384,6 +6384,31 @@
     }
   }
 
+  function consultarVariaveisAssistente(texto) {
+    function palavras(valor) {
+      return valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().match(/[a-z0-9]+/g) || [];
+    }
+    var termos = Array.from(new Set(palavras(texto))).filter(function (termo) {
+      return termo.length > 1 && !/^(ao|as|da|de|do|em|na|no|os|ou|um)$/.test(termo);
+    });
+    var campos = new Map();
+    $all('#pane-elementos [data-drag-var][data-var-nome]').forEach(function (botao) {
+      var chave = botao.dataset.dragVar;
+      var rotulo = botao.dataset.varNome;
+      var termosCampo = new Set(palavras(chave + ' ' + rotulo));
+      var pontos = termos.filter(function (termo) { return termosCampo.has(termo); }).length;
+      if (texto.toLowerCase().includes('{{' + chave + '}}') || texto.trim().toLowerCase() === chave) pontos += 100;
+      if (pontos > 0) campos.set(chave, { chave: chave, rotulo: rotulo, pontos: pontos });
+    });
+    var resultados = Array.from(campos.values()).sort(function (a, b) { return b.pontos - a.pontos; });
+    if (!resultados.length) {
+      return 'Não encontrei essa variável. Tente buscar pelo nome do campo, como “foto do aluno” ou “CNPJ da escola”.';
+    }
+    return resultados.filter(function (campo) { return campo.pontos === resultados[0].pontos; }).slice(0, 4).map(function (campo) {
+      return campo.rotulo + ' — ' + tokenDaChave(campo.chave);
+    }).join('\n');
+  }
+
   function bindAssistenteDocumento() {
     var abrir = $('#edoc-assistente-abrir');
     if (!abrir) return;
@@ -6410,7 +6435,7 @@
     if (imagem) imagem.addEventListener('click', function () { alternarPainel(false, false); });
 
     var conversa = $('#edoc-assistente-conversa');
-    if (!chat || !conversa || !C.assistenteUrl) return;
+    if (!chat || !conversa) return;
     var form = $('#edoc-assistente-form');
     var campo = $('#edoc-assistente-mensagem');
     var enviar = form.querySelector('button[type="submit"]');
@@ -6468,6 +6493,14 @@
       e.preventDefault();
       var texto = campo.value.trim();
       if (!texto || enviar.disabled) return;
+      campo.value = '';
+      campo.focus();
+      exemplos.hidden = true;
+      var balao = exibirMensagem('user', texto);
+      if (!C.assistenteUrl) {
+        exibirMensagem('assistant', consultarVariaveisAssistente(texto));
+        return;
+      }
       var mensagem = { role: 'user', content: texto };
       var dados = new FormData();
       var ultimas = historico.slice(-10);
@@ -6480,10 +6513,6 @@
       }).concat(mensagem)));
 
       enviar.disabled = true;
-      campo.value = '';
-      campo.focus();
-      exemplos.hidden = true;
-      var balao = exibirMensagem('user', texto);
       avisar('Preparando resposta…');
       try {
         var resposta = await fetch(C.assistenteUrl, { method: 'POST', body: dados });

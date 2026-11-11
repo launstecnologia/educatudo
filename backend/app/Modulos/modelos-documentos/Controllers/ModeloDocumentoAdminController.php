@@ -715,8 +715,8 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
             'logo_preview' => $logoPreview,
             'layout_sugerido' => $layoutSugerido,
             'ia_disponivel' => true,
-            'assistente_disponivel' => \App\Core\CreditosModuleRegistry::acaoIaDisponivel(AssistenteDocumentoService::ACAO)
-                && AssistenteDocumentoService::podeUsar($this->db, $this->auth->getUser() ?: []),
+            'assistente_disponivel' => AssistenteDocumentoService::podeUsar($this->db, $this->auth->getUser() ?: []),
+            'assistente_ia_disponivel' => \App\Core\CreditosModuleRegistry::acaoIaDisponivel(AssistenteDocumentoService::ACAO),
             'cursos_emissao' => $this->service->listarCursosParaEmissao(),
             'series_emissao' => $this->service->listarSeriesParaEmissao(),
             'mascaras_campo' => ModeloDocumentoService::MASCARAS_CAMPO,

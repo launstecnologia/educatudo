@@ -289,7 +289,7 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
             <?php if (!empty($assistente_disponivel)): ?>
             <button type="button" class="edoc-btn" id="edoc-assistente-chat">
                 <i class="fa-solid fa-comments" aria-hidden="true"></i>
-                <span><strong>Chat</strong><small>Pergunte sobre variáveis ou peça um layout.</small></span>
+                <span><strong>Chat</strong><small><?= !empty($assistente_ia_disponivel) ? 'Pergunte sobre variáveis ou peça um layout.' : 'Consulte as variáveis do editor.' ?></small></span>
             </button>
             <?php endif; ?>
             <?php if (!empty($ia_disponivel)): ?>
@@ -305,9 +305,14 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                 <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Opções do assistente
             </button>
             <div id="edoc-assistente-mensagens" class="edoc-assistente-mensagens" role="log" aria-label="Conversa do assistente" tabindex="0">
+                <?php if (empty($assistente_ia_disponivel)): ?>
+                <p class="edoc-hint">Você pode consultar as variáveis aqui. Para criar layouts pelo chat, a escola precisa ter TudiCoins ativo.</p>
+                <?php endif; ?>
                 <div id="edoc-assistente-exemplos" class="edoc-assistente-exemplos">
                     <button type="button" class="edoc-btn">Qual variável insere a foto do aluno?</button>
+                    <?php if (!empty($assistente_ia_disponivel)): ?>
                     <button type="button" class="edoc-btn">Monte uma autorização de passeio.</button>
+                    <?php endif; ?>
                 </div>
             </div>
             <form id="edoc-assistente-form">
@@ -441,7 +446,7 @@ window.EDOC = {
   catalogo: <?= json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
   layoutSugerido: <?= json_encode($layout_sugerido ?? null, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
   iaUrl: <?= json_encode(!empty($ia_disponivel) ? (URL . '/admin/modelos-documentos/reproduzir-imagem') : '', JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
-  assistenteUrl: <?= json_encode(!empty($assistente_disponivel) ? (URL . '/admin/modelos-documentos/assistente') : '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
+  assistenteUrl: <?= json_encode(!empty($assistente_disponivel) && !empty($assistente_ia_disponivel) ? (URL . '/admin/modelos-documentos/assistente') : '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
   series: <?= json_encode($series_emissao ?? [], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
   demoUrl: <?= json_encode(URL . '/admin/modelos-documentos/demonstracao', JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
   mascaras: <?= json_encode($mascaras_campo ?? [], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>

@@ -47,6 +47,7 @@ $catalogo = ModeloDocumentoService::catalogoElementosEditor();
 $csrf_token = 'csrf-teste-local';
 $ia_disponivel = true;
 $assistente_disponivel = true;
+$assistente_ia_disponivel = !in_array('--sem-ia-chat', $argv, true);
 $placeholders = ModeloDocumentoService::PLACEHOLDERS;
 $grupos_placeholders = ModeloDocumentoService::gruposPlaceholders();
 $vars_preview = ['aluno_nome' => 'Aluno de demonstração', 'quadro_notas_html' => '<table><thead><tr><th>Matéria</th><th>Nota</th></tr></thead><tbody><tr data-boletim-materia="17"><td>Matemática</td><td data-boletim-coluna="b1_pp">7,5</td></tr></tbody></table>'];

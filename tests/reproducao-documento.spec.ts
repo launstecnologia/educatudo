@@ -162,3 +162,29 @@ test('o chat explica variáveis e deixa revisar o HTML de uma proposta', async (
   await chat.click();
   await expect(revisar).toBeVisible();
 });
+
+test('o chat aparece e consulta variáveis com a IA desativada', async ({ page }) => {
+  const html = execFileSync('php', [fixture, '--sem-ia-chat'], { encoding: 'utf8', cwd: raiz });
+  let pedidosIa = 0;
+  await page.route('**/*', route => {
+    const url = new URL(route.request().url());
+    if (url.hostname !== 'editor.localhost') return route.abort();
+    if (url.pathname.startsWith('/static/')) return route.fulfill({ path: path.join(raiz, 'backend/public', url.pathname) });
+    if (url.pathname.endsWith('/editor')) return route.fulfill({ contentType: 'text/html', body: html });
+    if (url.pathname.endsWith('/assistente')) pedidosIa++;
+    return route.fulfill({ json: { ok: true, turmas: [], boletins: [] } });
+  });
+  await page.goto('http://editor.localhost/admin/modelos-documentos/21/editor');
+  await page.getByRole('button', { name: 'Abrir assistente de documentos' }).click();
+  await expect(page.getByRole('button', { name: 'Reproduzir de imagem' })).toBeVisible();
+  await page.getByRole('button', { name: /^Chat/ }).click();
+  const conversa = page.getByRole('log', { name: 'Conversa do assistente' });
+  await expect(conversa).toContainText('a escola precisa ter TudiCoins ativo');
+  await page.getByRole('button', { name: 'Qual variável insere a foto do aluno?' }).click();
+  await page.getByRole('button', { name: 'Enviar', exact: true }).click();
+  await expect(conversa).toContainText('Foto do aluno — {{aluno_foto_html}}');
+  await page.getByLabel('Sua mensagem').fill('Qual variável insere o RA do aluno?');
+  await page.getByRole('button', { name: 'Enviar', exact: true }).click();
+  await expect(conversa).toContainText('RA do aluno — {{aluno_ra}}');
+  expect(pedidosIa).toBe(0);
+});
