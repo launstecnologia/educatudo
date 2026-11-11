@@ -2,6 +2,8 @@
 
 namespace App\Painel\Admin\Controllers;
 
+use App\Core\AuthManager;
+use App\Modulos\ModelosDocumentos\Services\AssistenteDocumentoService;
 use App\Services\AIJobService;
 
 /**
@@ -35,6 +37,13 @@ class AIJobController
             $job = AIJobService::getJob($jobId);
             if (!$job) {
                 $this->jsonResponse(['id' => $jobId, 'error' => 'Job não encontrado', 'status' => 'not_found']);
+                return;
+            }
+
+            if ($job['job_type'] === AssistenteDocumentoService::ACAO
+                && !AssistenteDocumentoService::podeConsultar($db, (new AuthManager())->getUser() ?: [], $job)) {
+                http_response_code(403);
+                $this->jsonResponse(['error' => 'Acesso negado', 'status' => 'forbidden']);
                 return;
             }
 

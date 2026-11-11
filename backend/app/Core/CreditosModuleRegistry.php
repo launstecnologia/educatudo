@@ -235,6 +235,13 @@ class CreditosModuleRegistry
             'feature_modules' => ['boletim'],
             'pagador' => 'escola',
         ],
+        'modelo_documento_assistente' => [
+            'label' => 'Documento — mensagem ao assistente',
+            'grupo' => 'Documentos',
+            'escopo_ui' => 'acao',
+            'feature_modules' => [],
+            'pagador' => 'escola',
+        ],
         'provas_aluno_assistente_mensagem' => [
             'label' => 'Assistente de provas do aluno (IA)',
             'grupo' => 'Avaliações',

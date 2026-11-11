@@ -6184,8 +6184,9 @@
     return modelo.innerHTML;
   }
 
-  function abrirRevisaoImagem(estrutura) {
+  function abrirRevisaoIa(estrutura, titulo) {
     var dialogo = $('#edoc-ia-revisao');
+    $('#edoc-ia-revisao-titulo').textContent = titulo;
     var codigo = $('#edoc-ia-html');
     var previa = $('#edoc-ia-previa');
     var aviso = $('#edoc-ia-revisao-erro');
@@ -6250,7 +6251,7 @@
             return;
           }
           marcarReproducaoIa(false);
-          abrirRevisaoImagem(est);
+          abrirRevisaoIa(est, 'Reprodução da imagem');
           return;
         }
         if (data.status === 'failed' || data.status === 'error' || data.status === 'not_found') {
@@ -6323,8 +6324,15 @@
     var escolher = $('#edoc-ia-escolher');
     if (escolher) escolher.addEventListener('click', function () { input.click(); });
     var fecharBtn = $('#edoc-ia-fechar');
-    if (fecharBtn) fecharBtn.addEventListener('click', fechar);
-    modal.addEventListener('click', function (e) { if (e.target === modal) fechar(); });
+    function cancelar() {
+      fechar();
+      $('#edoc-assistente-abrir').focus();
+    }
+    if (fecharBtn) fecharBtn.addEventListener('click', cancelar);
+    modal.addEventListener('click', function (e) { if (e.target === modal) cancelar(); });
+    modal.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') cancelar();
+    });
     input.addEventListener('change', function () {
       var file = input.files && input.files[0];
       input.value = '';
@@ -6359,6 +6367,147 @@
     }, true);
   }
 
+  async function esperarRespostaAssistente(jobId, avisarDemora) {
+    for (var tentativa = 0; ; tentativa++) {
+      var resposta = await fetch(C.urlBase + '/admin/ai-job/' + encodeURIComponent(jobId) + '/status')
+        .catch(function () { return null; });
+      if (resposta && resposta.redirected) throw new Error('Sessão expirada. Recarregue o editor.');
+      if (resposta && resposta.status < 500) {
+        var job = await resposta.json().catch(function () { return null; });
+        if (job && job.status === 'done' && job.result && job.result.mensagem) return job.result;
+        if (!resposta.ok || (job && ['done', 'failed', 'error', 'not_found', 'cancelled'].includes(job.status))) {
+          throw new Error((job && job.error) || 'Não foi possível obter a resposta do assistente.');
+        }
+      }
+      if (tentativa === 30) avisarDemora();
+      await new Promise(function (resolver) { setTimeout(resolver, tentativa < 30 ? 2000 : 8000); });
+    }
+  }
+
+  function bindAssistenteDocumento() {
+    var abrir = $('#edoc-assistente-abrir');
+    if (!abrir) return;
+    var painel = $('#edoc-assistente-painel');
+    var opcoes = $('#edoc-assistente-opcoes');
+    var chat = $('#edoc-assistente-chat');
+    var imagem = $('#edoc-ia');
+    function alternarPainel(visivel, devolverFoco) {
+      painel.hidden = !visivel;
+      abrir.setAttribute('aria-expanded', String(visivel));
+      if (visivel) {
+        if (conversa) conversa.hidden = true;
+        opcoes.hidden = false;
+        (chat || imagem).focus();
+      } else if (devolverFoco) {
+        abrir.focus();
+      }
+    }
+    abrir.addEventListener('click', function () { alternarPainel(painel.hidden, true); });
+    $('#edoc-assistente-fechar').addEventListener('click', function () { alternarPainel(false, true); });
+    painel.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') alternarPainel(false, true);
+    });
+    if (imagem) imagem.addEventListener('click', function () { alternarPainel(false, false); });
+
+    var conversa = $('#edoc-assistente-conversa');
+    if (!chat || !conversa || !C.assistenteUrl) return;
+    var form = $('#edoc-assistente-form');
+    var campo = $('#edoc-assistente-mensagem');
+    var enviar = form.querySelector('button[type="submit"]');
+    var mensagens = $('#edoc-assistente-mensagens');
+    var exemplos = $('#edoc-assistente-exemplos');
+    var status = $('#edoc-assistente-status');
+    var historico = [];
+
+    function avisar(texto, erro) {
+      status.textContent = texto;
+      status.dataset.erro = String(!!erro);
+      status.hidden = !texto;
+    }
+    function exibirMensagem(papel, texto, estrutura) {
+      var balao = document.createElement('div');
+      balao.className = 'edoc-assistente-balao';
+      balao.dataset.papel = papel;
+      var autor = document.createElement('strong');
+      autor.textContent = papel === 'user' ? 'Você' : 'Assistente';
+      var conteudo = document.createElement('p');
+      conteudo.textContent = texto;
+      balao.append(autor, conteudo);
+      if (estrutura) {
+        var revisar = document.createElement('button');
+        revisar.type = 'button';
+        revisar.className = 'edoc-btn';
+        revisar.textContent = 'Revisar layout';
+        revisar.addEventListener('click', function () {
+          abrirRevisaoIa(JSON.parse(JSON.stringify(estrutura)), 'Proposta de layout');
+        });
+        balao.appendChild(revisar);
+      }
+      mensagens.appendChild(balao);
+      mensagens.scrollTop = mensagens.scrollHeight;
+      return balao;
+    }
+    chat.addEventListener('click', function () {
+      opcoes.hidden = true;
+      conversa.hidden = false;
+      mensagens.scrollTop = mensagens.scrollHeight;
+      campo.focus();
+    });
+    $('#edoc-assistente-voltar').addEventListener('click', function () {
+      conversa.hidden = true;
+      opcoes.hidden = false;
+      chat.focus();
+    });
+    exemplos.querySelectorAll('button').forEach(function (botao) {
+      botao.addEventListener('click', function () {
+        campo.value = botao.textContent;
+        campo.focus();
+      });
+    });
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var texto = campo.value.trim();
+      if (!texto || enviar.disabled) return;
+      var mensagem = { role: 'user', content: texto };
+      var dados = new FormData();
+      var ultimas = historico.slice(-10);
+      var ultimaProposta = ultimas.slice().reverse().find(function (item) { return item.html; });
+      dados.append('_token', C.csrf);
+      dados.append('mensagens', JSON.stringify(ultimas.map(function (item) {
+        var content = item.content;
+        if (item === ultimaProposta) content += '\n\nHTML da proposta anterior:\n' + item.html;
+        return { role: item.role, content: content };
+      }).concat(mensagem)));
+
+      enviar.disabled = true;
+      campo.value = '';
+      campo.focus();
+      exemplos.hidden = true;
+      var balao = exibirMensagem('user', texto);
+      avisar('Preparando resposta…');
+      try {
+        var resposta = await fetch(C.assistenteUrl, { method: 'POST', body: dados });
+        var pedido = await resposta.json();
+        if (!resposta.ok || !pedido.job_id) throw new Error(pedido.error || 'Não foi possível enviar a mensagem.');
+        var resultado = await esperarRespostaAssistente(pedido.job_id, function () {
+          avisar('Ainda aguardando a resposta. Você pode continuar editando a folha.');
+        });
+        var estrutura = resultado.estrutura;
+        var proposta = estrutura && estrutura.body.sections[0].columns[0].elements[0].props.html;
+        historico = ultimas.concat(mensagem, { role: 'assistant', content: resultado.mensagem, html: proposta });
+        exibirMensagem('assistant', resultado.mensagem, estrutura);
+        avisar('');
+      } catch (erro) {
+        balao.remove();
+        if (!campo.value.trim()) campo.value = texto;
+        exemplos.hidden = historico.length > 0;
+        avisar(erro instanceof SyntaxError ? 'Não foi possível ler a resposta do assistente.' : erro.message, true);
+      } finally {
+        enviar.disabled = false;
+      }
+    });
+  }
+
   function bindChrome() {
     function onClick(sel, fn) {
       var el = $(sel);
@@ -6372,6 +6521,7 @@
     onClick('#edoc-layout-sugerido', aplicarLayoutSugerido);
     window.addEventListener('resize', function () { if (state.ajustarZoom && !state.preview) render(); });
     bindReproduzirImagem();
+    bindAssistenteDocumento();
     onClick('#edoc-preview-mode', function () { alternarResultadoPdf(!state.preview); });
     onClick('#edoc-pdf-refresh', carregarResultadoPdf);
     onClick('#edoc-save', save);

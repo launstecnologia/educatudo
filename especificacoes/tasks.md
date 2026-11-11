@@ -1,5 +1,7 @@
 # Tasks — backlog atual
 
+- [x] Assistente no editor de documentos: reunir Chat e Reproduzir de imagem, responder sobre as variáveis e gerar HTML editável para revisão. Ação `modelo_documento_assistente` configurável nas tabelas de custo do Master. Validado com 8 testes PHP, 2 testes Chromium com IA simulada e revisão PHP. — 2026-11-11
+
 - [x] Layout de documentos: ajustar HTML à largura útil da folha no editor e na impressão e permitir ocultar cabeçalho e rodapé pelas propriedades da página. Validado no navegador, PDF A5 e 5 testes PHP. — 2026-11-11
 
 - [x] Reproduzir de imagem no editor: gerar HTML fiel à referência de qualquer documento, preservar mesclas, proporções e orientação e revisar HTML e prévia antes da inserção. Validado com o HTML de referência, 4 testes PHP e 1 teste de navegador com retorno de IA simulado. — 2026-11-11

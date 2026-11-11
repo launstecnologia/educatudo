@@ -25,7 +25,9 @@ test('reprodução revisa o HTML editável antes de inserir na folha', async ({ 
     return route.fulfill({ json: { ok: true, turmas: [], boletins: [] } });
   });
   await page.goto('http://editor.localhost/admin/modelos-documentos/21/editor');
+  const assistente = page.getByRole('button', { name: 'Abrir assistente de documentos' });
   const reproduzir = page.getByRole('button', { name: 'Reproduzir de imagem' });
+  await assistente.click();
   await reproduzir.click();
   await page.locator('#edoc-ia-cola').evaluate((zona, dados) => {
     const clipboardData = new DataTransfer();
@@ -45,6 +47,7 @@ test('reprodução revisa o HTML editável antes de inserir na folha', async ({ 
   if (!await texto.isVisible()) await texto.locator('xpath=ancestor::details[1]/summary').click();
   await texto.click();
   await expect(page.locator('#edoc-paper .edoc-el[data-type="texto"]')).toHaveCount(1);
+  await assistente.click();
   await reproduzir.click();
   await page.locator('#edoc-ia-file').setInputFiles(imagem);
   const codigo = dialogo.getByLabel('HTML gerado');
@@ -74,4 +77,88 @@ test('reprodução revisa o HTML editável antes de inserir na folha', async ({ 
   const impressao = execFileSync('php', [fixture, '--impressao-ajustada'], { encoding: 'utf8', cwd: raiz, input: JSON.stringify(salvo.estrutura) });
   await page.setContent(impressao);
   await page.pdf({ path: test.info().outputPath('folha-ajustada.pdf'), preferCSSPageSize: true });
+});
+
+test('o chat explica variáveis e deixa revisar o HTML de uma proposta', async ({ page }) => {
+  const html = execFileSync('php', [fixture], { encoding: 'utf8', cwd: raiz });
+  const proposta = JSON.parse(execFileSync('php', [fixture, '--assistente'], {
+    encoding: 'utf8', cwd: raiz, input: JSON.stringify({
+      mensagem: 'Preparei uma autorização com o nome do aluno.',
+      html: '<h1>Autorização de passeio</h1><p>Aluno: {{aluno_nome}}</p><script>alert(1)</script>',
+    }),
+  }));
+  const pedidos: { role: string; content: string }[][] = [];
+  let consultasDaProposta = 0;
+  await page.route('**/*', async route => {
+    const url = new URL(route.request().url());
+    if (url.hostname !== 'editor.localhost') return route.abort();
+    if (url.pathname.startsWith('/static/')) return route.fulfill({ path: path.join(raiz, 'backend/public', url.pathname) });
+    if (url.pathname.endsWith('/editor')) return route.fulfill({ contentType: 'text/html', body: html });
+    if (url.pathname.endsWith('/assistente')) {
+      const corpo = await new Response(route.request().postDataBuffer(), {
+        headers: { 'content-type': route.request().headers()['content-type'] },
+      }).formData();
+      expect(corpo.get('_token')).toBe('csrf-teste-local');
+      pedidos.push(JSON.parse(String(corpo.get('mensagens'))));
+      return route.fulfill({ json: { success: true, job_id: pedidos.length } });
+    }
+    if (url.pathname.endsWith('/ai-job/1/status')) {
+      return route.fulfill({ json: { status: 'done', result: { mensagem: 'Use {{aluno_foto_html}}.' } } });
+    }
+    if (url.pathname.endsWith('/ai-job/2/status')) {
+      if (++consultasDaProposta === 1) return route.fulfill({ status: 503 });
+      return route.fulfill({ json: { status: 'done', result: proposta } });
+    }
+    if (url.pathname.endsWith('/ai-job/3/status')) {
+      return route.fulfill({ json: { status: 'failed', error: 'Não foi possível gerar a revisão.' } });
+    }
+    return route.fulfill({ json: { ok: true, turmas: [], boletins: [] } });
+  });
+  await page.goto('http://editor.localhost/admin/modelos-documentos/21/editor');
+  const assistente = page.getByRole('button', { name: 'Abrir assistente de documentos' });
+  await assistente.click();
+  await expect(page.getByRole('button', { name: 'Reproduzir de imagem' })).toBeVisible();
+  const chat = page.getByRole('button', { name: /^Chat/ });
+  await chat.click();
+  const campo = page.getByLabel('Sua mensagem');
+  const enviar = page.getByRole('button', { name: 'Enviar', exact: true });
+  await page.getByRole('button', { name: 'Qual variável insere a foto do aluno?' }).click();
+  await enviar.click();
+  await expect(page.getByText('Use {{aluno_foto_html}}.')).toBeVisible();
+  await campo.fill('Monte uma autorização de passeio.');
+  await enviar.click();
+  const revisar = page.getByRole('button', { name: 'Revisar layout' });
+  await expect(revisar).toBeVisible();
+  expect(consultasDaProposta).toBe(2);
+  expect(pedidos).toHaveLength(2);
+  expect(pedidos[1].map(mensagem => mensagem.role)).toEqual(['user', 'assistant', 'user']);
+
+  const folha = page.locator('#edoc-paper');
+  await revisar.click();
+  const dialogo = page.getByRole('dialog', { name: 'Proposta de layout' });
+  await expect(dialogo).toBeVisible();
+  await expect(folha).not.toContainText('Autorização de passeio');
+  const codigo = dialogo.getByLabel('HTML gerado');
+  const original = await codigo.inputValue();
+  expect(original).toContain('{{aluno_nome}}');
+  expect(original).not.toContain('<script');
+  await dialogo.getByRole('button', { name: 'Descartar' }).click();
+  await expect(folha).not.toContainText('Autorização de passeio');
+  await revisar.click();
+  await codigo.fill(original.replace('Autorização de passeio', 'Autorização de visita'));
+  await expect(page.frameLocator('#edoc-ia-previa').getByText('Autorização de visita')).toBeVisible();
+  await dialogo.getByRole('button', { name: 'Inserir na folha' }).click();
+  await expect(folha).toContainText('Autorização de visita');
+
+  await campo.fill('Mude o título da proposta.');
+  await enviar.click();
+  await expect(page.getByText('Não foi possível gerar a revisão.')).toBeVisible();
+  await expect(campo).toHaveValue('Mude o título da proposta.');
+  expect(pedidos[2][3].content).toContain('<h1>Autorização de passeio</h1>');
+  await campo.press('Escape');
+  await expect(assistente).toBeFocused();
+  await expect(assistente).toHaveAttribute('aria-expanded', 'false');
+  await assistente.click();
+  await chat.click();
+  await expect(revisar).toBeVisible();
 });

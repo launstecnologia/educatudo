@@ -6,6 +6,7 @@ namespace App\Modulos\ModelosDocumentos\Controllers;
  */
 
 
+use App\Modulos\ModelosDocumentos\Services\AssistenteDocumentoService;
 use App\Modulos\ModelosDocumentos\Services\DemonstracaoDocumentoService;
 use App\Modulos\ModelosDocumentos\Services\EmissaoCampoVariavelService;
 use App\Modulos\ModelosDocumentos\Services\ImportadorModeloPlanilhaService;
@@ -205,6 +206,37 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
         } catch (\Throwable $e) {
             error_log('ModeloDocumento demonstracao: ' . $e->getMessage());
             $this->json(['ok' => false, 'error' => 'Não foi possível carregar os dados da demonstração.'], 400);
+        }
+    }
+
+    public function assistente(): void
+    {
+        $usuario = $this->auth->getUser() ?: [];
+        if (!AssistenteDocumentoService::podeUsar($this->db, $usuario)) {
+            $this->json(['success' => false, 'error' => 'Sem permissão para esta ação.'], 403);
+            return;
+        }
+        if (!$this->validateCsrf((string) ($_POST['_token'] ?? ''))) {
+            $this->json(['success' => false, 'error' => 'Sessão expirada. Recarregue o editor.'], 403);
+            return;
+        }
+        if (!\App\Core\CreditosModuleRegistry::acaoIaDisponivel(AssistenteDocumentoService::ACAO)) {
+            $this->json(['success' => false, 'error' => 'Chat indisponível. Ative TudiCoins para esta escola no Master.'], 403);
+            return;
+        }
+
+        try {
+            $mensagens = AssistenteDocumentoService::mensagensDoPedido($_POST['mensagens'] ?? null);
+            $jobId = AssistenteDocumentoService::enfileirar($mensagens, (int) $usuario['id']);
+            $this->json(['success' => true, 'job_id' => $jobId]);
+        } catch (\InvalidArgumentException $e) {
+            $this->json(['success' => false, 'error' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            $saldoInsuficiente = str_starts_with($e->getMessage(), 'TudiCoins insuficientes');
+            error_log('Assistente de documentos: ' . $e->getMessage());
+            $this->json(['success' => false, 'error' => $saldoInsuficiente
+                ? 'TudiCoins insuficientes na carteira da escola.'
+                : 'Não foi possível enviar a mensagem.'], $saldoInsuficiente ? 402 : 500);
         }
     }
 
@@ -683,6 +715,8 @@ class ModeloDocumentoAdminController extends \App\Controllers\Admin\AdminBaseCon
             'logo_preview' => $logoPreview,
             'layout_sugerido' => $layoutSugerido,
             'ia_disponivel' => true,
+            'assistente_disponivel' => \App\Core\CreditosModuleRegistry::acaoIaDisponivel(AssistenteDocumentoService::ACAO)
+                && AssistenteDocumentoService::podeUsar($this->db, $this->auth->getUser() ?: []),
             'cursos_emissao' => $this->service->listarCursosParaEmissao(),
             'series_emissao' => $this->service->listarSeriesParaEmissao(),
             'mascaras_campo' => ModeloDocumentoService::MASCARAS_CAMPO,

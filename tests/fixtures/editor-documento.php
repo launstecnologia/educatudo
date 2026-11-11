@@ -6,6 +6,12 @@ define('URL', 'http://editor.localhost');
 require BASE_PATH . '/vendor/autoload.php';
 
 use App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService;
+use App\Modulos\ModelosDocumentos\Services\AssistenteDocumentoService;
+
+if (in_array('--assistente', $argv, true)) {
+    echo json_encode(AssistenteDocumentoService::interpretarResposta(file_get_contents('php://stdin')), JSON_THROW_ON_ERROR);
+    exit;
+}
 
 if (in_array('--reproducao', $argv, true)) {
     echo json_encode(\App\Modulos\ModelosDocumentos\Services\ReprodutorLayoutDocumentoService::estruturaDaResposta(file_get_contents('php://stdin')), JSON_THROW_ON_ERROR);
@@ -40,6 +46,7 @@ $estrutura['body']['sections'] = [ModeloDocumentoService::secaoPadrao([100])];
 $catalogo = ModeloDocumentoService::catalogoElementosEditor();
 $csrf_token = 'csrf-teste-local';
 $ia_disponivel = true;
+$assistente_disponivel = true;
 $placeholders = ModeloDocumentoService::PLACEHOLDERS;
 $grupos_placeholders = ModeloDocumentoService::gruposPlaceholders();
 $vars_preview = ['aluno_nome' => 'Aluno de demonstração', 'quadro_notas_html' => '<table><thead><tr><th>Matéria</th><th>Nota</th></tr></thead><tbody><tr data-boletim-materia="17"><td>Matemática</td><td data-boletim-coluna="b1_pp">7,5</td></tr></tbody></table>'];

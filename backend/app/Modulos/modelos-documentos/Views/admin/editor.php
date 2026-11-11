@@ -71,10 +71,6 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
         </label>
         <button type="button" class="edoc-btn edoc-btn-icon" id="edoc-undo" title="Desfazer"><i class="fa-solid fa-rotate-left"></i></button>
         <button type="button" class="edoc-btn edoc-btn-icon" id="edoc-redo" title="Refazer"><i class="fa-solid fa-rotate-right"></i></button>
-        <?php if (!empty($ia_disponivel)): ?>
-        <button type="button" class="edoc-btn" id="edoc-ia" title="A IA monta o layout a partir de uma foto ou scan. Você pode colar a imagem."><i class="fa-solid fa-wand-magic-sparkles"></i> Reproduzir de imagem</button>
-        <input type="file" id="edoc-ia-file" accept="image/png,image/jpeg,image/webp" hidden>
-        <?php endif; ?>
         <button type="button" class="edoc-btn" id="edoc-preview-mode"><i class="fa-solid fa-eye"></i> Ver resultado</button>
         <a class="edoc-btn" id="edoc-pdf" href="<?= $esc($previewUrl ?: '#') ?>" target="_blank" rel="noopener">Abrir PDF</a>
         <button type="button" class="edoc-btn edoc-btn-primary" id="edoc-save"><i class="fa-solid fa-floppy-disk"></i> Salvar modelo</button>
@@ -245,14 +241,10 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
         <aside class="edoc-right">
             <div class="edoc-tabs">
                 <button type="button" class="active" data-tab="pane-props">PROPRIEDADES</button>
-                <button type="button" data-tab="pane-estilo">ESTILO</button>
                 <button type="button" data-tab="pane-avancado">AVANÇADO</button>
             </div>
             <div class="edoc-pane edoc-prop" id="pane-props">
                 <div id="edoc-props"></div>
-            </div>
-            <div class="edoc-pane edoc-prop" id="pane-estilo" style="display:none">
-                <p class="edoc-hint">Margem, preenchimento, borda e posição da imagem ficam em <strong>Propriedades</strong> ao selecionar o elemento na folha.</p>
             </div>
             <div class="edoc-pane edoc-prop" id="pane-avancado" style="display:none">
                 <div class="edoc-sec-label">USO NA EMISSÃO</div>
@@ -284,6 +276,62 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
     </div>
 </div>
 
+<?php if (!empty($assistente_disponivel) || !empty($ia_disponivel)): ?>
+<section class="edoc-assistente" aria-label="Assistente de documentos">
+    <div class="edoc-assistente-painel" id="edoc-assistente-painel" hidden>
+        <header>
+            <h2>Assistente de documentos</h2>
+            <button type="button" class="edoc-btn edoc-btn-icon" id="edoc-assistente-fechar" aria-label="Fechar assistente">
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+        </header>
+        <div id="edoc-assistente-opcoes" class="edoc-assistente-opcoes">
+            <?php if (!empty($assistente_disponivel)): ?>
+            <button type="button" class="edoc-btn" id="edoc-assistente-chat">
+                <i class="fa-solid fa-comments" aria-hidden="true"></i>
+                <span><strong>Chat</strong><small>Pergunte sobre variáveis ou peça um layout.</small></span>
+            </button>
+            <?php endif; ?>
+            <?php if (!empty($ia_disponivel)): ?>
+            <button type="button" class="edoc-btn" id="edoc-ia">
+                <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                <span><strong>Reproduzir de imagem</strong><small>Gere HTML a partir de uma foto ou captura de tela.</small></span>
+            </button>
+            <?php endif; ?>
+        </div>
+        <?php if (!empty($assistente_disponivel)): ?>
+        <div id="edoc-assistente-conversa" class="edoc-assistente-conversa" hidden>
+            <button type="button" class="edoc-btn" id="edoc-assistente-voltar">
+                <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Opções do assistente
+            </button>
+            <div id="edoc-assistente-mensagens" class="edoc-assistente-mensagens" role="log" aria-label="Conversa do assistente" tabindex="0">
+                <div id="edoc-assistente-exemplos" class="edoc-assistente-exemplos">
+                    <button type="button" class="edoc-btn">Qual variável insere a foto do aluno?</button>
+                    <button type="button" class="edoc-btn">Monte uma autorização de passeio.</button>
+                </div>
+            </div>
+            <form id="edoc-assistente-form">
+                <p id="edoc-assistente-status" role="status" hidden></p>
+                <label for="edoc-assistente-mensagem">Sua mensagem</label>
+                <div>
+                    <textarea id="edoc-assistente-mensagem" rows="2" maxlength="2500" required></textarea>
+                    <button type="submit" class="edoc-btn edoc-btn-primary">Enviar</button>
+                </div>
+            </form>
+        </div>
+        <?php endif; ?>
+    </div>
+    <button type="button" class="edoc-btn edoc-btn-primary edoc-assistente-abrir" id="edoc-assistente-abrir"
+            aria-label="Abrir assistente de documentos" title="Assistente de documentos"
+            aria-expanded="false" aria-controls="edoc-assistente-painel">
+        <i class="fa-solid fa-comment-dots" aria-hidden="true"></i>
+        <span>Assistente</span>
+    </button>
+</section>
+<?php endif; ?>
+
+<?php if (!empty($ia_disponivel)): ?>
+<input type="file" id="edoc-ia-file" accept="image/png,image/jpeg,image/webp" hidden>
 <div class="edoc-modal" id="edoc-ia-modal">
     <div class="edoc-modal-box">
         <h3 style="margin:0 0 8px;font-size:16px">Reproduzir de imagem</h3>
@@ -298,6 +346,7 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
         </div>
     </div>
 </div>
+<?php endif; ?>
 
 <dialog class="edoc-reproducao-dialog" id="edoc-ia-revisao" aria-labelledby="edoc-ia-revisao-titulo">
     <form id="edoc-ia-revisao-form">
@@ -307,7 +356,7 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
         </header>
         <div class="edoc-reproducao-paineis">
             <div><label for="edoc-ia-html">HTML gerado</label><textarea id="edoc-ia-html" spellcheck="false" wrap="off"></textarea></div>
-            <div><span>Prévia</span><iframe id="edoc-ia-previa" title="Prévia do HTML reproduzido" sandbox></iframe></div>
+            <div><span>Prévia</span><iframe id="edoc-ia-previa" title="Prévia do HTML gerado" sandbox></iframe></div>
         </div>
         <p id="edoc-ia-revisao-erro" role="status" hidden></p>
         <footer>
@@ -392,6 +441,7 @@ window.EDOC = {
   catalogo: <?= json_encode($catalogo, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
   layoutSugerido: <?= json_encode($layout_sugerido ?? null, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
   iaUrl: <?= json_encode(!empty($ia_disponivel) ? (URL . '/admin/modelos-documentos/reproduzir-imagem') : '', JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
+  assistenteUrl: <?= json_encode(!empty($assistente_disponivel) ? (URL . '/admin/modelos-documentos/assistente') : '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
   series: <?= json_encode($series_emissao ?? [], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
   demoUrl: <?= json_encode(URL . '/admin/modelos-documentos/demonstracao', JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
   mascaras: <?= json_encode($mascaras_campo ?? [], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>

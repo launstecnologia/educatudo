@@ -21,6 +21,7 @@ $router->post('/admin/modelos-documentos/layout', 'Modulos/modelos-documentos/Mo
 $router->get('/admin/modelos-documentos/editor', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@editor');
 $router->get('/admin/modelos-documentos/demonstracao', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@demonstracao');
 $router->post('/admin/modelos-documentos/reproduzir-imagem', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@reproduzirImagem');
+$router->post('/admin/modelos-documentos/assistente', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@assistente');
 $router->post('/admin/modelos-documentos/estrutura', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@salvarEstruturaNovo');
 $router->get('/admin/modelos-documentos/create', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@create');
 $router->post('/admin/modelos-documentos', 'Modulos/modelos-documentos/ModeloDocumentoAdminController@store');
