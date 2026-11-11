@@ -1,5 +1,7 @@
 # Tasks — backlog atual
 
+- [x] Layout de documentos: ajustar HTML à largura útil da folha no editor e na impressão e permitir ocultar cabeçalho e rodapé pelas propriedades da página. Validado no navegador, PDF A5 e 5 testes PHP. — 2026-11-11
+
 - [x] Reproduzir de imagem no editor: gerar HTML fiel à referência de qualquer documento, preservar mesclas, proporções e orientação e revisar HTML e prévia antes da inserção. Validado com o HTML de referência, 4 testes PHP e 1 teste de navegador com retorno de IA simulado. — 2026-11-11
 
 - [ ] Editor de documentos: organizar campos por Cadastro (aluno, responsáveis, escola, turma, série, curso e matrícula), Acadêmico e Documento; incluir foto do aluno; autorização como campos da emissão; notas/eventos e resultado final do boletim. Plano: catálogo e menu → valores reais e emissão → testes e revisão PHP. — 2026-11-10

@@ -19,9 +19,9 @@ class DocumentoRenderer
     {
         $this->vars = $vars;
         return [
-            'cabecalho' => $this->renderizarArea($estrutura['header']['sections'] ?? []),
+            'cabecalho' => empty($estrutura['page']['ocultarCabecalho']) ? $this->renderizarArea($estrutura['header']['sections'] ?? []) : '',
             'corpo' => $this->renderizarArea($estrutura['body']['sections'] ?? []),
-            'rodape' => $this->renderizarArea($estrutura['footer']['sections'] ?? []),
+            'rodape' => empty($estrutura['page']['ocultarRodape']) ? $this->renderizarArea($estrutura['footer']['sections'] ?? []) : '',
         ];
     }
 
@@ -139,7 +139,7 @@ class DocumentoRenderer
         $html = match ($tipo) {
             'titulo' => $this->blocoTitulo($props, $css),
             'texto', 'texto_rico' => $this->blocoTexto($props, $css),
-            'html' => $this->blocoHtmlLivre($this->blocoHtml($props), $css),
+            'html' => $this->blocoHtmlLivre($this->blocoHtml($props), $css, 'edoc-ajuste-folha'),
             'logo' => $this->blocoLogo($props, $css),
             'imagem' => $this->blocoImagem($props, $css),
             'linha' => '<hr style="border:none;border-top:1px solid #d1d5db;margin:8px 0;">',
@@ -233,6 +233,12 @@ class DocumentoRenderer
             }
         }
         return $out;
+    }
+
+    public static function cssAjusteFolha(): string
+    {
+        $arquivo = dirname(__DIR__, 4) . '/public/static/css/documento-ajuste-folha.css';
+        return (string) file_get_contents($arquivo);
     }
 
     public static function htmlPermitido(string $html): string
@@ -418,9 +424,10 @@ class DocumentoRenderer
             . $css . '">' . $rows . '</table>';
     }
 
-    private function blocoHtmlLivre(string $inner, string $css): string
+    private function blocoHtmlLivre(string $inner, string $css, string $classe = ''): string
     {
-        return '<div style="' . $css . '">' . $inner . '</div>';
+        $atributo = $classe !== '' ? ' class="' . $classe . '"' : '';
+        return '<div' . $atributo . ' style="' . $css . '">' . $inner . '</div>';
     }
 
     /**

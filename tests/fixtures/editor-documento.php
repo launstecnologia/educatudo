@@ -12,6 +12,20 @@ if (in_array('--reproducao', $argv, true)) {
     exit;
 }
 
+if (in_array('--impressao-ajustada', $argv, true)) {
+    $estrutura = json_decode(file_get_contents('php://stdin'), true, 512, JSON_THROW_ON_ERROR);
+    $servico = new class extends ModeloDocumentoService {
+        public function __construct() {}
+        public function aplicarLayoutPadraoNoModelo(array $modelo): array { return $modelo; }
+    };
+    echo $servico->renderHtml(
+        ['codigo' => 'teste_ajuste', 'estrutura_json' => json_encode($estrutura)],
+        ['assinante_nome' => 'Direção', 'assinante_cargo' => 'Direção', 'logo_html' => '<span></span>'],
+        'simples'
+    );
+    exit;
+}
+
 if (in_array('--pdf', $argv, true)) {
     $pdf = new \Dompdf\Dompdf();
     $pdf->loadHtml('<h1>Documento de teste</h1><p>Resultado da impressão.</p>');

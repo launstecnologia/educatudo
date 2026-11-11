@@ -124,6 +124,9 @@ TXT;
         $body = $doc->getElementsByTagName('body')->item(0);
         $atributos = ['class', 'style', 'width', 'height', 'colspan', 'rowspan', 'span', 'align', 'valign', 'alt'];
         foreach ($body->getElementsByTagName('*') as $elemento) {
+            if ($elemento->tagName === 'table') {
+                $elemento->setAttribute('class', trim($elemento->getAttribute('class') . ' edoc-tabela-reproduzida'));
+            }
             foreach (iterator_to_array($elemento->attributes) as $atributo) {
                 $nome = $atributo->nodeName;
                 if ($nome === 'src' && $elemento->tagName === 'img') continue;

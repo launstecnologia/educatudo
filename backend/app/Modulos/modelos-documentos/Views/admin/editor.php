@@ -51,6 +51,7 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
     <title><?= $esc($nome) ?> — Editor de documentos</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
     <link rel="stylesheet" href="<?= URL ?>/static/css/editor-documento.css?v=<?= $esc($vCss) ?>">
+    <style><?= \App\Modulos\ModelosDocumentos\Services\DocumentoRenderer::cssAjusteFolha() ?></style>
     <link rel="stylesheet" href="<?= URL ?>/static/css/folha-oficial.css?v=<?= $esc($vFolha) ?>">
     <style><?= \App\Core\LayoutHelper::generateCustomCSS() ?></style>
     <?php include BASE_PATH . '/app/Views/layouts/components/form_control_safari.php'; ?>
@@ -377,6 +378,7 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
 
 <script>
 window.EDOC = {
+  cssAjusteFolha: <?= json_encode(\App\Modulos\ModelosDocumentos\Services\DocumentoRenderer::cssAjusteFolha(), JSON_HEX_TAG) ?>,
   csrf: <?= json_encode((string) ($csrf_token ?? ''), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
   urlBase: <?= json_encode((string) URL, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,
   saveUrl: <?= json_encode($saveUrl, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>,

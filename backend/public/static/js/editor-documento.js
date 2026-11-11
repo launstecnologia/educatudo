@@ -27,7 +27,9 @@
           bottom: margin.bottom != null ? margin.bottom : 15,
           left: margin.left != null ? margin.left : 15
         },
-        rodapeNoFim: page.rodapeNoFim === true
+        rodapeNoFim: page.rodapeNoFim === true,
+        ocultarCabecalho: page.ocultarCabecalho === true,
+        ocultarRodape: page.ocultarRodape === true
       },
       header: { repeat: header.repeat !== false, sections: secoesDe(header) },
       body: { sections: secoesDe(body) },
@@ -2119,7 +2121,7 @@
       }
       return '<div class="edoc-el-body" style="' + st + '">' + htmlTextoInterno(el, 'Texto') + '</div>';
     }
-    if (t === 'html') return '<div class="edoc-html-raw edoc-el-body" style="' + st + '">' + htmlTextoInterno(el) + '</div>';
+    if (t === 'html') return '<div class="edoc-html-raw edoc-el-body edoc-ajuste-folha" style="' + st + '">' + htmlTextoInterno(el) + '</div>';
     if (t === 'logo') {
       var w = p.width || 120;
       var img = (C.logoPreview || '');
@@ -2536,6 +2538,7 @@
 
     var html = '';
     [['header', 'Cabeçalho'], ['body', 'Corpo'], ['footer', 'Rodapé']].forEach(function (pair) {
+      if (areaOculta(pair[0])) return;
       var secs = areaOf(pair[0]).sections || [];
       if (fiel && !secs.length) return;
       var areaClass = 'edoc-area' + (pair[0] === 'footer' ? ' edoc-area-footer' : '');
@@ -3891,6 +3894,11 @@
     addSection(role, widths);
   }
 
+  function areaOculta(area) {
+    var pagina = state.estrutura.page || {};
+    return (area === 'header' && pagina.ocultarCabecalho) || (area === 'footer' && pagina.ocultarRodape);
+  }
+
   function renderTree() {
     var box = $('#edoc-tree');
     var pane = $('#pane-estrutura');
@@ -3901,6 +3909,7 @@
     }
     var html = '';
     [['header', 'Cabeçalho'], ['body', 'Corpo'], ['footer', 'Rodapé']].forEach(function (pair) {
+      if (areaOculta(pair[0])) return;
       html += '<div style="font-size:10px;font-weight:700;color:#9ca3af;margin:8px 0 4px">' + pair[1] + '</div>';
       (areaOf(pair[0]).sections || []).forEach(function (s, si) {
         html += node('Seção ' + (si + 1), s.id, 'section', '<i class="fa-regular fa-square"></i>');
@@ -3980,6 +3989,9 @@
       + '<div><label>Direita</label>' + inp('mr', m.right != null ? m.right : 15, 'type="number" min="0" max="40" step="0.1"') + '</div>'
       + '<div><label>Baixo</label>' + inp('mb', m.bottom != null ? m.bottom : 15, 'type="number" min="0" max="40" step="0.1"') + '</div>'
       + '<div><label>Esquerda</label>' + inp('ml', m.left != null ? m.left : 15, 'type="number" min="0" max="40" step="0.1"') + '</div></div>'
+      + '<div class="edoc-sec-label">CABEÇALHO E RODAPÉ</div>'
+      + '<label class="edoc-chk"><input type="checkbox" data-ocultar-area="ocultarCabecalho"' + (p.ocultarCabecalho ? ' checked' : '') + '> Ocultar cabeçalho</label>'
+      + '<label class="edoc-chk"><input type="checkbox" data-ocultar-area="ocultarRodape"' + (p.ocultarRodape ? ' checked' : '') + '> Ocultar rodapé</label>'
       + '<div class="edoc-sec-label">IMAGEM DE REFERÊNCIA</div>'
       + '<p class="edoc-hint">Fundo da folha para copiar o layout da escola. A impressão só inclui a imagem se você marcar abaixo.</p>'
       + '<input type="file" id="edoc-fundo" accept="image/png,image/jpeg,image/webp,image/gif">'
@@ -4530,6 +4542,13 @@
   function bindProps(box, kind, target, coluna) {
     if (kind === 'page') {
       var p = state.estrutura.page;
+      $all('[data-ocultar-area]', box).forEach(function (campo) {
+        campo.addEventListener('change', function () {
+          p[campo.getAttribute('data-ocultar-area')] = campo.checked;
+          pushHist();
+          render();
+        });
+      });
       var size = box.querySelector('[data-f="size"]');
       var ori = box.querySelector('[data-f="orientation"]');
       if (size) { size.value = p.size || 'A4'; size.onchange = function () { p.size = size.value; pushHist(); render(); }; }
@@ -6124,6 +6143,8 @@
         state.estrutura[area].sections = state.estrutura[area].sections.concat(nova[area].sections);
       });
     } else {
+      nova.page.ocultarCabecalho = state.estrutura.page.ocultarCabecalho;
+      nova.page.ocultarRodape = state.estrutura.page.ocultarRodape;
       nova.campos_variaveis = state.estrutura.campos_variaveis;
       nova.emissao = state.estrutura.emissao;
       nova.fonte_boletim_id = state.estrutura.fonte_boletim_id;
@@ -6157,6 +6178,7 @@
         var cssSeguro = !/[@\\]|\/\*/.test(css) && funcoes.every(function (nome) { return /^(rgb|rgba|hsl|hsla|calc|min|max|clamp)$/.test(nome); });
         if (!atributos.test(attr.name) || !cssSeguro) el.removeAttribute(attr.name);
       });
+      if (el.tagName === 'TABLE') el.classList.add('edoc-tabela-reproduzida');
       ['position', 'inset', 'top', 'left', 'right', 'bottom', 'z-index'].forEach(function (nome) { el.style.removeProperty(nome); });
     });
     return modelo.innerHTML;
@@ -6186,7 +6208,8 @@
     function atualizar() {
       previa.srcdoc = '<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src data:; style-src \'unsafe-inline\'">'
         + '<style>body{font:11pt Arial,sans-serif;color:#222;margin:12px}table{border-collapse:collapse;max-width:100%}td,th{vertical-align:middle}p{margin:0 0 8px}.edoc-vert{writing-mode:vertical-rl;transform:rotate(180deg)}.edoc-faixa{background:#d1d5db}</style>'
-        + limparHtmlReproducao(ph(codigo.value));
+        + '<style>' + (C.cssAjusteFolha || '') + '</style>'
+        + '<main class="edoc-ajuste-folha">' + limparHtmlReproducao(ph(codigo.value)) + '</main>';
     }
     codigo.oninput = atualizar;
     $('#edoc-ia-revisao-cancelar').onclick = function () { dialogo.close(); };

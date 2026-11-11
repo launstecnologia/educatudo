@@ -1,0 +1,40 @@
+/* A largura da coluna limita o HTML inserido, inclusive em A5 e na impressão. */
+.edoc-ajuste-folha {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+.edoc-ajuste-folha table.edoc-tabela-reproduzida:not(.edoc-tabela-editavel),
+.edoc-ajuste-folha table:not(.edoc-tabela-editavel):not(.seed-folha):not(.edoc-grade-livre) {
+  box-sizing: border-box;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  table-layout: fixed !important;
+}
+.edoc-ajuste-folha table.edoc-tabela-reproduzida:not(.edoc-tabela-editavel) col:not([style*="%"]):not([width$="%"]),
+.edoc-ajuste-folha table:not(.edoc-tabela-editavel):not(.seed-folha):not(.edoc-grade-livre) col:not([style*="%"]):not([width$="%"]),
+.edoc-ajuste-folha table.edoc-tabela-reproduzida:not(.edoc-tabela-editavel) th:not([style*="%"]):not([width$="%"]),
+.edoc-ajuste-folha table:not(.edoc-tabela-editavel):not(.seed-folha):not(.edoc-grade-livre) th:not([style*="%"]):not([width$="%"]),
+.edoc-ajuste-folha table.edoc-tabela-reproduzida:not(.edoc-tabela-editavel) td:not([style*="%"]):not([width$="%"]),
+.edoc-ajuste-folha table:not(.edoc-tabela-editavel):not(.seed-folha):not(.edoc-grade-livre) td:not([style*="%"]):not([width$="%"]) {
+  width: auto !important;
+}
+.edoc-ajuste-folha table.edoc-tabela-reproduzida:not(.edoc-tabela-editavel) th,
+.edoc-ajuste-folha table:not(.edoc-tabela-editavel):not(.seed-folha):not(.edoc-grade-livre) th,
+.edoc-ajuste-folha table.edoc-tabela-reproduzida:not(.edoc-tabela-editavel) td,
+.edoc-ajuste-folha table:not(.edoc-tabela-editavel):not(.seed-folha):not(.edoc-grade-livre) td {
+  box-sizing: border-box;
+  min-width: 0 !important;
+  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal !important;
+}
+.edoc-ajuste-folha img {
+  max-width: 100% !important;
+  height: auto;
+}

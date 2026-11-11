@@ -2760,6 +2760,10 @@ class ModeloDocumentoService
             $css .= "\n" . $this->cssFolhaImpressa($estruturaVisual);
         }
 
+        if (str_contains($htmlAll, 'edoc-ajuste-folha')) {
+            $css .= "\n" . DocumentoRenderer::cssAjusteFolha();
+        }
+
         $imgCabHtml = '';
         $imgRodHtml = '';
         $srcCab = $this->resolverImagemSrc((string) ($modelo['imagem_cabecalho'] ?? ''), $config);
@@ -2805,7 +2809,7 @@ class ModeloDocumentoService
         }
 
         $fundoHtml = $this->htmlFundoImpresso(is_array($estruturaVisual) ? $estruturaVisual : null);
-        $rodapeNoFim = is_array($estruturaVisual) && !empty($estruturaVisual['page']['rodapeNoFim']);
+        $rodapeNoFim = is_array($estruturaVisual) && empty($estruturaVisual['page']['ocultarRodape']) && !empty($estruturaVisual['page']['rodapeNoFim']);
         $classeBody = $estruturaVisual !== null
             ? ' class="folha-impressa' . ($rodapeNoFim ? ' rodape-no-fim' : '') . '"'
             : '';
@@ -4324,6 +4328,8 @@ CSS;
             $page['imprimirFundo'] = !empty($page['imprimirFundo']);
         }
         $page['rodapeNoFim'] = !empty($page['rodapeNoFim']);
+        $page['ocultarCabecalho'] = !empty($page['ocultarCabecalho']);
+        $page['ocultarRodape'] = !empty($page['ocultarRodape']);
 
         return $page;
     }

@@ -42,6 +42,26 @@ final class ReproducaoImagemDocumentoTest extends TestCase
         $this->assertSame('<p>Parte 1</p>', $elementos[0]['props']['html']);
     }
 
+    public function testImpressaoOmiteAreasOcultasEPermiteReativar(): void
+    {
+        $estrutura = ReprodutorLayoutDocumentoService::estruturaDaResposta('<p>Conteúdo completo</p>');
+        foreach (['header' => 'Cabeçalho de teste', 'footer' => 'Rodapé de teste'] as $area => $texto) {
+            $secao = \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService::secaoPadrao([100], $area);
+            $secao['columns'][0]['elements'][] = ['type' => 'texto', 'props' => ['text' => $texto]];
+            $estrutura[$area]['sections'] = [$secao];
+        }
+        $renderer = new \App\Modulos\ModelosDocumentos\Services\DocumentoRenderer();
+        $estrutura['page']['ocultarCabecalho'] = $estrutura['page']['ocultarRodape'] = true;
+        $oculto = $renderer->renderizarPartes($estrutura, []);
+        $this->assertSame('', $oculto['cabecalho']);
+        $this->assertSame('', $oculto['rodape']);
+        $this->assertStringContainsString('edoc-ajuste-folha', $oculto['corpo']);
+        $estrutura['page']['ocultarCabecalho'] = $estrutura['page']['ocultarRodape'] = false;
+        $visivel = $renderer->renderizarPartes($estrutura, []);
+        $this->assertStringContainsString('Cabeçalho de teste', $visivel['cabecalho']);
+        $this->assertStringContainsString('Rodapé de teste', $visivel['rodape']);
+    }
+
     public function testRespostaSomenteComCodigoDeCatalogoNaoTrocaLayout(): void
     {
         $this->expectException(RuntimeException::class);
