@@ -854,10 +854,20 @@ td.edoc-celula-sel, th.edoc-celula-sel {
 }
 .edoc-chk { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 10px; }
 .edoc-var-stack > .edoc-demo,
+.edoc-var-stack > #edoc-demo,
 .edoc-var-stack > .edoc-element-list,
 .edoc-var-stack > .edoc-var-drop {
   width: 100%;
   box-sizing: border-box;
+}
+.edoc-var-stack > #edoc-demo {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.edoc-var-stack > #edoc-demo > .edoc-var-drop {
+  width: 100%;
 }
 .edoc-var-stack > .edoc-element-list {
   padding: 0;

@@ -68,7 +68,7 @@ $renderCampos('Contrato e valores', $grupos['contrato']['chaves'] ?? [], 'fa-fil
 </div>
 </div>
 </div>
-<div class="edoc-demo" id="edoc-demo">
+<div id="edoc-demo">
 <input type="checkbox" id="edoc-demo-sigla" hidden aria-hidden="true">
 <details class="edoc-var-drop" id="edoc-demo-comps-drop" hidden>
 <summary>
