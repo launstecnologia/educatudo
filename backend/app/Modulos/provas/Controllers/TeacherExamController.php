@@ -2289,7 +2289,15 @@ class TeacherExamController extends BaseController
             return;
         }
         $filtros = $this->filtrosLancamentoNotasCoordenacao($_POST);
-        $urlVolta = $this->urlLancamentoNotasCoordenacao($blocoId, $filtros);
+        // Após importar, mostra todas as turmas/séries — o filtro antigo escondia quem entrou de outro arquivo.
+        $urlVolta = $this->urlLancamentoNotasCoordenacao($blocoId, [
+            'materia_id' => (int) ($filtros['materia_id'] ?? 0),
+            'professor_id' => (int) ($filtros['professor_id'] ?? 0),
+            'turma_id' => 0,
+            'serie_id' => 0,
+            'ordenar' => (string) ($filtros['ordenar'] ?? 'nome'),
+            'por_pagina' => (int) ($filtros['por_pagina'] ?? 40),
+        ]);
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
             $this->setFlashMessage('Token inválido. Recarregue a página.', 'error');
             $this->redirect($urlVolta);
@@ -2318,31 +2326,10 @@ class TeacherExamController extends BaseController
             return;
         }
 
-        $erros = $cruzamento['erros'];
-        $resto = 0;
-        if (count($erros) > 8) {
-            $resto = count($erros) - 8;
-            $erros = array_slice($erros, 0, 8);
-        }
-        $qtdArquivos = count(ImportacaoNotasPlanilha::separarUploads(is_array($_FILES['planilha'] ?? null) ? $_FILES['planilha'] : []));
-        $partesMsg = [(int) $resultado['aplicadas'] . ' nota(s) importada(s)'];
-        if ($qtdArquivos > 1) {
-            $partesMsg[] = $qtdArquivos . ' arquivo(s)';
-        }
-        if ((int) $resultado['preservadas'] > 0) {
-            $partesMsg[] = (int) $resultado['preservadas'] . ' nota(s) já lançada(s) foram mantidas';
-        }
-        if ((int) $cruzamento['ignoradas'] > 0) {
-            $partesMsg[] = (int) $cruzamento['ignoradas'] . ' linha(s) sem nota foram ignoradas';
-        }
-        $mensagem = implode('. ', $partesMsg) . '.';
-        if ($erros !== []) {
-            $mensagem .= ' ' . implode(' ', $erros);
-            if ($resto > 0) {
-                $mensagem .= ' E mais ' . $resto . ' aviso(s).';
-            }
-        }
-        $this->setFlashMessage($mensagem, ((int) $resultado['aplicadas'] > 0) ? 'success' : 'warning');
+        $this->setFlashMessage(
+            $this->montarMensagemImportacaoNotas($resultado, $cruzamento, 'planilha', count(ImportacaoNotasPlanilha::separarUploads(is_array($_FILES['planilha'] ?? null) ? $_FILES['planilha'] : []))),
+            $this->tipoFlashImportacaoNotas($resultado, $cruzamento)
+        );
         $this->redirect($urlVolta);
     }
 
@@ -2363,7 +2350,15 @@ class TeacherExamController extends BaseController
             return;
         }
         $filtros = $this->filtrosLancamentoNotasCoordenacao($_POST);
-        $urlVolta = $this->urlLancamentoNotasCoordenacao($blocoId, $filtros);
+        // Após importar, abre sem filtro de série/turma — senão parece que a outra série “não entrou”.
+        $urlVolta = $this->urlLancamentoNotasCoordenacao($blocoId, [
+            'materia_id' => (int) ($filtros['materia_id'] ?? 0),
+            'professor_id' => (int) ($filtros['professor_id'] ?? 0),
+            'turma_id' => 0,
+            'serie_id' => 0,
+            'ordenar' => (string) ($filtros['ordenar'] ?? 'nome'),
+            'por_pagina' => (int) ($filtros['por_pagina'] ?? 40),
+        ]);
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
             $this->setFlashMessage('Token inválido. Recarregue a página.', 'error');
             $this->redirect($urlVolta);
@@ -2412,6 +2407,7 @@ class TeacherExamController extends BaseController
             is_array($lido['erros'] ?? null) ? $lido['erros'] : [],
             $cruzamento['erros']
         );
+        $cruzamento['ignoradas'] = (int) ($cruzamento['ignoradas'] ?? 0) + (int) ($lido['ignoradas'] ?? 0);
         $resultado = $this->aplicarCruzamentoImportacaoNotas(
             $blocoId,
             $cruzamento,
@@ -2423,34 +2419,16 @@ class TeacherExamController extends BaseController
             return;
         }
 
-        $partesMsg = [(int) $resultado['aplicadas'] . ' nota(s) ENAC importada(s)'];
-        if ((int) ($lido['arquivos'] ?? 0) > 1) {
-            $partesMsg[] = (int) $lido['arquivos'] . ' arquivo(s)';
-        }
-        if ((int) $resultado['preservadas'] > 0) {
-            $partesMsg[] = (int) $resultado['preservadas'] . ' nota(s) já lançada(s) foram mantidas';
-        }
-        $ignoradas = (int) $cruzamento['ignoradas'] + (int) ($lido['ignoradas'] ?? 0);
-        if ($ignoradas > 0) {
-            $partesMsg[] = $ignoradas . ' linha(s) ignoradas (FALTOU/TR/vazio)';
-        }
+        $mensagem = $this->montarMensagemImportacaoNotas(
+            $resultado,
+            $cruzamento,
+            'ENAC',
+            (int) ($lido['arquivos'] ?? 0)
+        );
         if ((int) ($lido['abaixo_de_20'] ?? 0) > 0) {
-            $partesMsg[] = (int) $lido['abaixo_de_20'] . ' nota(s) com total abaixo de 20 (lançadas como 4,0)';
+            $mensagem .= ' ' . (int) $lido['abaixo_de_20'] . ' nota(s) com total abaixo de 20 (lançadas como 4,0).';
         }
-        $mensagem = implode('. ', $partesMsg) . '.';
-        $erros = $cruzamento['erros'];
-        $resto = 0;
-        if (count($erros) > 8) {
-            $resto = count($erros) - 8;
-            $erros = array_slice($erros, 0, 8);
-        }
-        if ($erros !== []) {
-            $mensagem .= ' ' . implode(' ', $erros);
-            if ($resto > 0) {
-                $mensagem .= ' E mais ' . $resto . ' aviso(s).';
-            }
-        }
-        $this->setFlashMessage($mensagem, ((int) $resultado['aplicadas'] > 0) ? 'success' : 'warning');
+        $this->setFlashMessage($mensagem, $this->tipoFlashImportacaoNotas($resultado, $cruzamento));
         $this->redirect($urlVolta);
     }
 
@@ -3214,6 +3192,80 @@ class TeacherExamController extends BaseController
         asort($materias, SORT_NATURAL | SORT_FLAG_CASE);
 
         return $materias;
+    }
+
+    /**
+     * @param array{aplicadas:int,preservadas:int} $resultado
+     * @param array<string,mixed> $cruzamento
+     */
+    private function montarMensagemImportacaoNotas(
+        array $resultado,
+        array $cruzamento,
+        string $rotulo,
+        int $qtdArquivos
+    ): string {
+        $partes = [(int) $resultado['aplicadas'] . ' nota(s) ' . ($rotulo === 'ENAC' ? 'ENAC ' : '') . 'importada(s)'];
+        if ($qtdArquivos > 1) {
+            $partes[] = $qtdArquivos . ' arquivo(s) lido(s)';
+        }
+        if ((int) $resultado['preservadas'] > 0) {
+            $partes[] = (int) $resultado['preservadas'] . ' nota(s) já lançada(s) foram mantidas';
+        }
+        if ((int) ($cruzamento['ignoradas'] ?? 0) > 0) {
+            $partes[] = (int) $cruzamento['ignoradas'] . ' linha(s) ignoradas';
+        }
+        if ((int) ($cruzamento['nao_encontrados'] ?? 0) > 0) {
+            $partes[] = (int) $cruzamento['nao_encontrados'] . ' aluno(s) do arquivo não estão neste evento';
+        }
+        $arquivosErro = is_array($cruzamento['arquivos_erro'] ?? null) ? $cruzamento['arquivos_erro'] : [];
+        if ($arquivosErro !== []) {
+            $det = [];
+            foreach ($arquivosErro as $nomeArq => $qtd) {
+                $det[] = $this->recortarFlashTexto((string) $nomeArq) . ' (' . (int) $qtd . ' pendência(s))';
+            }
+            $partes[] = 'Arquivos com pendência: ' . implode(', ', array_slice($det, 0, 5));
+        }
+        $mensagem = implode('. ', $partes) . '.';
+        $erros = is_array($cruzamento['erros'] ?? null) ? $cruzamento['erros'] : [];
+        if ($erros !== []) {
+            $resto = 0;
+            if (count($erros) > 6) {
+                $resto = count($erros) - 6;
+                $erros = array_slice($erros, 0, 6);
+            }
+            $mensagem .= ' ' . implode(' ', $erros);
+            if ($resto > 0) {
+                $mensagem .= ' E mais ' . $resto . ' aviso(s).';
+            }
+        }
+
+        return $mensagem;
+    }
+
+    /**
+     * @param array{aplicadas:int,preservadas?:int} $resultado
+     * @param array<string,mixed> $cruzamento
+     */
+    private function tipoFlashImportacaoNotas(array $resultado, array $cruzamento): string
+    {
+        $temErro = !empty($cruzamento['erros'])
+            || (int) ($cruzamento['nao_encontrados'] ?? 0) > 0
+            || !empty($cruzamento['arquivos_erro']);
+        if ((int) $resultado['aplicadas'] > 0 && $temErro) {
+            return 'warning';
+        }
+
+        return ((int) $resultado['aplicadas'] > 0) ? 'success' : 'warning';
+    }
+
+    private function recortarFlashTexto(string $texto): string
+    {
+        $texto = trim($texto);
+        if (mb_strlen($texto) > 40) {
+            return mb_substr($texto, 0, 40) . '…';
+        }
+
+        return $texto;
     }
 
     /**

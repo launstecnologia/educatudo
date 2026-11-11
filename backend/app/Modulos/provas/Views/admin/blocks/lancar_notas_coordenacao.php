@@ -412,7 +412,9 @@ if ($tipoFlash === 'error') {
             O sistema converte a pontuação em nota pela tabela de descarte 30%
             (54+ → 10,0 … 20–23 → 4,5; abaixo de 20 → 4,0) e lança no evento.
             Linhas com FALTOU ou TR são ignoradas.
-            Dá para selecionar <strong>vários Excels</strong> de uma vez (uma turma por arquivo).
+            Dá para selecionar <strong>vários Excels</strong> de uma vez (uma turma/série por arquivo).
+            Depois do envio a tela mostra todas as séries — tire o filtro de série/turma para conferir.
+            Só entram alunos que já estão neste evento.
             <?php if (!$notaUnicaTodasMaterias): ?>
             Se o evento tiver várias disciplinas, mantenha a disciplina filtrada na tela antes de importar.
             <?php endif; ?>

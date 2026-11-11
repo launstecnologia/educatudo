@@ -140,9 +140,16 @@ class ImportacaoNotasPlanilha
     }
 
     /**
-     * @param list<array{linha:int,codigo:string,nome:string,disciplina:string,nota:string}> $linhas
+     * @param list<array{linha:int,codigo:string,nome:string,disciplina:string,nota:string,arquivo?:string}> $linhas
      * @param list<array<string,mixed>> $elegiveis
-     * @return array{aplicar:list<array<string,mixed>>,erros:list<string>,ignoradas:int}
+     * @return array{
+     *   aplicar:list<array<string,mixed>>,
+     *   erros:list<string>,
+     *   ignoradas:int,
+     *   nao_encontrados:int,
+     *   arquivos_ok:array<string,int>,
+     *   arquivos_erro:array<string,int>
+     * }
      */
     public function cruzar(array $linhas, array $elegiveis, bool $notaUnica): array
     {
@@ -188,10 +195,17 @@ class ImportacaoNotasPlanilha
 
         $erros = [];
         $ignoradas = 0;
+        $naoEncontrados = 0;
+        $arquivosOk = [];
+        $arquivosErro = [];
         $vistos = [];
         foreach ($linhas as $linha) {
             $n = (int) ($linha['linha'] ?? 0);
             $rotulo = $this->rotuloLinha($linha);
+            $arquivoChave = trim((string) ($linha['arquivo'] ?? ''));
+            if ($arquivoChave === '') {
+                $arquivoChave = '(sem arquivo)';
+            }
             $cod = $this->normalizarCodigo((string) ($linha['codigo'] ?? ''));
             $nomeLinha = $this->normalizarNomeAluno((string) ($linha['nome'] ?? ''));
             $notaBruta = trim(str_replace(',', '.', (string) ($linha['nota'] ?? '')));
@@ -201,6 +215,7 @@ class ImportacaoNotasPlanilha
             }
             if ($cod === '' && $nomeLinha === '') {
                 $erros[] = $rotulo . ': informe o código ou o nome do aluno.';
+                $arquivosErro[$arquivoChave] = ($arquivosErro[$arquivoChave] ?? 0) + 1;
                 continue;
             }
             if ($notaBruta === '' || $this->notaVaziaOuMarcador($notaBruta)) {
@@ -209,11 +224,13 @@ class ImportacaoNotasPlanilha
             }
             if (!is_numeric($notaBruta)) {
                 $erros[] = $rotulo . ': nota inválida.';
+                $arquivosErro[$arquivoChave] = ($arquivosErro[$arquivoChave] ?? 0) + 1;
                 continue;
             }
             $nota = round((float) $notaBruta, 2);
             if ($nota < 0 || $nota > 10) {
                 $erros[] = $rotulo . ': a nota deve estar entre 0 e 10.';
+                $arquivosErro[$arquivoChave] = ($arquivosErro[$arquivoChave] ?? 0) + 1;
                 continue;
             }
 
@@ -223,6 +240,10 @@ class ImportacaoNotasPlanilha
                     $erros[] = isset($ambiguosCodigo[$cod])
                         ? $rotulo . ': o código ' . $this->recortar((string) ($linha['codigo'] ?? '')) . ' aparece em mais de um aluno.'
                         : $rotulo . ': o código ' . $this->recortar((string) ($linha['codigo'] ?? '')) . ' não está neste evento.';
+                    if (!isset($ambiguosCodigo[$cod])) {
+                        $naoEncontrados++;
+                    }
+                    $arquivosErro[$arquivoChave] = ($arquivosErro[$arquivoChave] ?? 0) + 1;
                     continue;
                 }
                 $aid = $porCodigo[$cod];
@@ -231,6 +252,10 @@ class ImportacaoNotasPlanilha
                     $erros[] = isset($ambiguosNome[$nomeLinha])
                         ? $rotulo . ': o nome ' . $this->recortar((string) ($linha['nome'] ?? '')) . ' aparece em mais de um aluno neste evento.'
                         : $rotulo . ': o nome ' . $this->recortar((string) ($linha['nome'] ?? '')) . ' não está neste evento.';
+                    if (!isset($ambiguosNome[$nomeLinha])) {
+                        $naoEncontrados++;
+                    }
+                    $arquivosErro[$arquivoChave] = ($arquivosErro[$arquivoChave] ?? 0) + 1;
                     continue;
                 }
                 $aid = $porNome[$nomeLinha];
@@ -244,10 +269,12 @@ class ImportacaoNotasPlanilha
                 }
                 if ($disciplina === '') {
                     $erros[] = $rotulo . ': informe a disciplina.';
+                    $arquivosErro[$arquivoChave] = ($arquivosErro[$arquivoChave] ?? 0) + 1;
                     continue;
                 }
                 if (!isset($materiasPorNorma[$disciplina])) {
                     $erros[] = $rotulo . ': a disciplina não faz parte deste evento.';
+                    $arquivosErro[$arquivoChave] = ($arquivosErro[$arquivoChave] ?? 0) + 1;
                     continue;
                 }
                 $candidatos = array_values(array_filter(
@@ -267,6 +294,7 @@ class ImportacaoNotasPlanilha
                 $erros[] = $candidatos === []
                     ? $rotulo . ': este aluno não está nessa disciplina no evento.'
                     : $rotulo . ': aluno transferido, a nota não foi lançada.';
+                $arquivosErro[$arquivoChave] = ($arquivosErro[$arquivoChave] ?? 0) + 1;
                 continue;
             }
             foreach ($ativos as $row) {
@@ -283,12 +311,16 @@ class ImportacaoNotasPlanilha
                     'linha' => $n,
                 ];
             }
+            $arquivosOk[$arquivoChave] = ($arquivosOk[$arquivoChave] ?? 0) + 1;
         }
 
         return [
             'aplicar' => array_values($vistos),
             'erros' => $erros,
             'ignoradas' => $ignoradas,
+            'nao_encontrados' => $naoEncontrados,
+            'arquivos_ok' => $arquivosOk,
+            'arquivos_erro' => $arquivosErro,
         ];
     }
 
