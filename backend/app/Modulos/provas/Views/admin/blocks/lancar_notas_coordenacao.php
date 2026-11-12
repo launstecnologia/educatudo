@@ -43,6 +43,28 @@ $escalaMaxRotulo = (string) (int) $escalaMax;
 $urlVoltarLista = \App\Modulos\EventosAvaliativos\Services\RetornoListaProva::endereco($blocoId);
 $actionFiltro = URL . '/admin/provas/blocos/' . $blocoId . '/lancar-notas-coordenacao';
 $urlDesbloquear = URL . '/admin/provas/blocos/' . $blocoId . '/lancar-notas-coordenacao/desbloquear';
+$modEventosAvaliativos = \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos');
+$nomeEventoTrilha = trim((string) ($bloco['titulo'] ?? 'Evento'));
+$eventoAvaliativoId = (int) ($bloco['evento_avaliativo_id'] ?? 0);
+if ($modEventosAvaliativos && $eventoAvaliativoId > 0) {
+    try {
+        $eventoPai = (new \App\Modulos\EventosAvaliativos\Models\EventoAvaliativo())->findById($eventoAvaliativoId);
+        $nomePai = trim((string) ($eventoPai['nome'] ?? ''));
+        if ($nomePai !== '') {
+            $nomeEventoTrilha = $nomePai;
+        }
+    } catch (\Throwable $e) {
+        // Mantém o título do bloco.
+    }
+}
+if ($modEventosAvaliativos) {
+    $trilhaItens = \App\Helpers\TrilhaAdmin::montar('', $nomeEventoTrilha, [
+        ['rotulo' => 'Acadêmico', 'url' => '/admin/academico'],
+        ['rotulo' => 'Eventos Avaliativos', 'url' => '/admin/eventos-avaliativos'],
+        ['rotulo' => 'Chaveamento', 'url' => $urlVoltarLista],
+        ['rotulo' => $nomeEventoTrilha],
+    ]);
+}
 
 $filtrosAtivos = [];
 if (!$notaUnicaTodasMaterias && $professorIdFiltro > 0) {
@@ -80,6 +102,12 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
     return $qs !== '' ? $actionFiltro . '?' . $qs : $actionFiltro;
 };
 ?>
+
+<?php if (!empty($trilhaItens) && is_array($trilhaItens) && !\App\Helpers\TrilhaAdmin::jaRenderizada() && count($trilhaItens) >= 2): ?>
+<div class="mb-4">
+    <?php include \App\Core\ViewPaths::layoutComponent('trilha.php'); ?>
+</div>
+<?php endif; ?>
 
 <div class="mb-6 flex flex-wrap justify-between items-start gap-4">
     <div>
