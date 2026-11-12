@@ -419,9 +419,10 @@ $boletimWizardSteps = [
 .bw-preview-table td { border: 1px solid #d1d5db; padding: 3px 5px; }
 .bw-preview-table td.mat { text-align: left; font-weight: 600; color: #111827; white-space: nowrap; }
 .bw-preview-table tr:nth-child(even) td { background: #f3f4f6; }
-.bw-preview-table.boletim th { background: var(--sidebar-bg-color, #1e3a5f); color: var(--sidebar-text-color, #fff); border-color: color-mix(in srgb, var(--sidebar-bg-color, #1e3a5f) 75%, #000); text-transform: uppercase; letter-spacing: .02em; }
-.bw-preview-table.boletim th.sub { background: color-mix(in srgb, var(--sidebar-bg-color, #1e3a5f) 18%, #fff); color: var(--sidebar-bg-color, #1e3a5f); text-transform: none; font-weight: 700; }
-.bw-preview-table.boletim th.mat { text-transform: none; letter-spacing: 0; }
+/* Padrão do quadro boletim: título do período cinza escuro; nomes dos eventos cinza claro. */
+.bw-preview-table.boletim th { background: #64748b; color: #fff; border-color: #475569; text-transform: uppercase; letter-spacing: .02em; }
+.bw-preview-table.boletim th.sub { background: #e2e8f0; color: #334155; border-color: #cbd5e1; text-transform: none; font-weight: 700; }
+.bw-preview-table.boletim th.mat { background: #64748b; color: #fff; text-transform: none; letter-spacing: 0; }
 .bw-preview-table.boletim tr:nth-child(even) td { background: #f8fafc; }
 .bw-preview-table.boletim td.ok { color: #047857; font-weight: 700; }
 .bw-preview-table.boletim td.nok { color: #b91c1c; font-weight: 700; }
@@ -429,10 +430,13 @@ $boletimWizardSteps = [
 .bw-preview-table.boletim th.grupo-sep,
 .bw-preview-table.boletim th.sub.grupo-sep,
 .bw-preview-table.boletim td.grupo-sep {
-    border-left: 3px solid color-mix(in srgb, var(--sidebar-bg-color, #1e3a5f) 55%, #64748b);
+    border-left: 3px solid #94a3b8;
 }
 .bw-preview-table.boletim th.grupo-sep {
-    border-left-color: color-mix(in srgb, var(--sidebar-bg-color, #1e3a5f) 40%, #fff);
+    border-left-color: #94a3b8;
+}
+.bw-preview-table.boletim th.sub.grupo-sep {
+    border-left-color: #cbd5e1;
 }
 .bw-builder { display: grid; grid-template-columns: minmax(14rem, 17rem) minmax(0, 1fr); gap: 0.75rem; align-items: stretch; }
 @media (max-width: 900px) { .bw-builder { grid-template-columns: 1fr; } }
@@ -4355,8 +4359,10 @@ $boletimWizardSteps = [
     }
 
     function anexarEventoAoComponenteFormula(codigo, ev) {
-        if (!ev) return;
+        if (!ev || !codigo) return;
         var id = Number(ev.id || 0);
+        var low = String(codigo).toLowerCase();
+        var tipo = Number(ev.tipo_avaliacao_id || 0);
         var blocos = [];
         ((ev.subeventos) || []).forEach(function (sub) {
             var sid = Number(sub && sub.id || 0);
@@ -4365,18 +4371,23 @@ $boletimWizardSteps = [
         [rascunhoAtual, estado && estado.rascunho_preservado].forEach(function (r) {
             if (!r || !Array.isArray(r.componentes)) return;
             r.componentes.forEach(function (c) {
-                if (!c || String(c.codigo || '') !== String(codigo)) return;
-                if (!c.config || typeof c.config !== 'object') c.config = {};
+                if (!c) return;
+                if (String(c.codigo || '').toLowerCase() !== low) return;
+                if (!c.config || typeof c.config !== 'object' || Array.isArray(c.config)) c.config = {};
                 if (id > 0) {
                     c.config.evento_avaliativo_id = id;
                     c.evento_avaliativo_id = id;
+                    // Sem isso a prévia trata a coluna como vazia e a fórmula vira 0,00.
+                    if (c.source_type === 'nenhuma' || !c.source_type) {
+                        c.source_type = 'provas_sistema';
+                    }
+                }
+                if (tipo > 0) {
+                    c.config.tipo_avaliacao_id = tipo;
                 }
                 if (blocos.length) {
                     c.blocos_ids = blocos.slice();
                     c.config.blocos_ids = blocos.slice();
-                    if (c.source_type === 'nenhuma' || !c.source_type) {
-                        c.source_type = 'provas_sistema';
-                    }
                 }
             });
         });
@@ -4740,14 +4751,26 @@ $boletimWizardSteps = [
 
     function garantirComponenteManualNoRascunho(codigo, nome) {
         codigo = String(codigo || '');
-        if (!codigo) return;
-        [rascunhoAtual, estado && estado.rascunho_preservado].forEach(function (r) {
+        if (!codigo || !estado) return;
+        // Sem rascunho ainda (só MU/Nota no quadro): cria casca pra o chip do evento não virar fantasma.
+        if (!estado.rascunho_preservado || typeof estado.rascunho_preservado !== 'object') {
+            estado.rascunho_preservado = { componentes: [] };
+        }
+        if (!Array.isArray(estado.rascunho_preservado.componentes)) {
+            estado.rascunho_preservado.componentes = [];
+        }
+        if (!rascunhoAtual) rascunhoAtual = estado.rascunho_preservado;
+        var low = codigo.toLowerCase();
+        [rascunhoAtual, estado.rascunho_preservado].forEach(function (r) {
             if (!r) return;
             if (!Array.isArray(r.componentes)) r.componentes = [];
             var achou = false;
             r.componentes.forEach(function (c) {
-                if (!c || String(c.codigo || '') !== codigo) return;
+                if (!c) return;
+                var cLow = String(c.codigo || '').toLowerCase();
+                if (cLow !== low && String(c.codigo || '') !== codigo) return;
                 achou = true;
+                c.codigo = c.codigo || codigo;
                 c.nome = nome || c.nome || codigo;
                 c.source_type = c.source_type || 'nenhuma';
             });
@@ -4763,6 +4786,32 @@ $boletimWizardSteps = [
                     config: {}
                 });
             }
+        });
+    }
+
+    /** Reancora chips do layout manual que sumiram do rascunho (ex.: REC após só ter Nota/MU). */
+    function garantirComponentesDasColunasManuais() {
+        if (!estado || !quadroManualDoZero()) return;
+        var codigos = {};
+        (estado.colunas_ordem || []).forEach(function (cod) {
+            var low = String(cod || '').toLowerCase();
+            if (low) codigos[low] = String(cod);
+        });
+        (estado.linhas_layout || []).forEach(function (lin) {
+            (lin && lin.colunas || []).forEach(function (cod) {
+                var low = String(cod || '').toLowerCase();
+                if (low) codigos[low] = String(cod);
+            });
+        });
+        Object.keys(codigos).forEach(function (low) {
+            if (ehCodigoBlocoCalc(low)) return;
+            if (estado.formulas_blocos && (estado.formulas_blocos[low] || estado.formulas_blocos[codigos[low]])) return;
+            var nome = (estado.nomes_blocos && (estado.nomes_blocos[codigos[low]] || estado.nomes_blocos[low]))
+                || tituloColuna(codigos[low])
+                || codigos[low];
+            garantirComponenteManualNoRascunho(codigos[low], nome);
+            var evHeal = encontrarEventoPorCodigoColuna(codigos[low]);
+            if (evHeal) anexarEventoAoComponenteFormula(codigos[low], evHeal);
         });
     }
 
@@ -8041,7 +8090,9 @@ $boletimWizardSteps = [
                 || (estado.blocos_calc || []).indexOf(low) >= 0
                 || !!(estado.formulas_blocos && (estado.formulas_blocos[codigo] || estado.formulas_blocos[low]));
             // No Montar quadro não reinsere EVA/SEV fantasma da ordem antiga.
-            if (soVivos && !vivos[low] && !ehCalc) return;
+            // Quadro manual: o que o admin colocou em colunas_ordem/linhas_layout aparece
+            // mesmo se o rascunho ainda só tiver o bloco Nota/MU (senão REC some e fica "já neste título").
+            if (!manualDoZero && soVivos && !vivos[low] && !ehCalc) return;
             vistos[codigo] = true;
             cols.push({
                 codigo: codigo,
@@ -8173,8 +8224,12 @@ $boletimWizardSteps = [
         var idsNum = estado.eventos_avaliativos_ids.map(Number);
         if (idsNum.indexOf(id) < 0) estado.eventos_avaliativos_ids.push(id);
         if (colunaEventoJaNoQuadro(ev)) {
+            var codJa = codigoColunaExistenteDoEvento(ev);
+            if (codJa) {
+                garantirComponenteManualNoRascunho(codJa, String(siglaDoEvento(ev) || '').toUpperCase() || codJa);
+                anexarEventoAoComponenteFormula(codJa, ev);
+            }
             if (opcoes.linhaId || opcoes.nomeCab) {
-                var codJa = codigoColunaExistenteDoEvento(ev);
                 if (codJa) {
                     moverCodigoParaCabecalho(codJa, opcoes.nomeCab || '', opcoes.linhaId || '');
                     if (!silencioso) {
@@ -8188,6 +8243,7 @@ $boletimWizardSteps = [
             if (!silencioso) {
                 avisoLinha = { tipo: 'ok', texto: 'Essa coluna já está no quadro (só a sigla). Arraste para um título do período se quiser.' };
                 renderRevisarDinamico();
+                if (codJa) agendarMontar();
             }
             return false;
         }
@@ -8220,6 +8276,7 @@ $boletimWizardSteps = [
         if (!estado.nomes_blocos[codigo]) estado.nomes_blocos[codigo] = titulo;
         // Garante chip imediato no quadro mesmo com rascunho já carregado (evita filtro de fantasma).
         garantirComponenteManualNoRascunho(codigo, titulo);
+        anexarEventoAoComponenteFormula(codigo, ev);
         if (opcoes.linhaId || opcoes.nomeCab) {
             moverCodigoParaCabecalho(codigo, opcoes.nomeCab || '', opcoes.linhaId || '');
         }
@@ -8563,6 +8620,7 @@ $boletimWizardSteps = [
     function htmlColunasOrdem(pv) {
         zerarQuadroColunasSeAutomatico();
         removerMuAutomaticaDoEstado();
+        garantirComponentesDasColunasManuais();
         var cols = ordenarColunasLista(mesclarColunasExtrasDoEstado((pv && pv.colunas) || []));
 
         var html = '<div class="bw-builder">';

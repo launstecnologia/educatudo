@@ -3599,9 +3599,9 @@ class BoletimAssistenteWizard
                 $sigla = strtolower(preg_replace('/[^a-z0-9_]+/i', '', (string) ($ev['sigla'] ?? '')) ?? '');
                 $bim = (int) ($ev['bimestre'] ?? 0);
                 $slotRec = '';
-                if ($bim === 81 || $bim === 61 || $bim === 62) {
+                if ($bim === 81) {
                     $slotRec = 's1_rec';
-                } elseif ($bim === 82 || $bim === 63 || $bim === 64) {
+                } elseif ($bim === 82) {
                     $slotRec = 's2_rec';
                 } elseif ($bim === 90 || $sigla === 'pf') {
                     $slotRec = 'pf';
@@ -3699,6 +3699,7 @@ class BoletimAssistenteWizard
      */
     private function componentesDeEventosAvaliativosMarcados(array $estado, array &$vistos, array &$erros): array
     {
+        $placeholdersPorCodigo = $this->codigosPlaceholderSemEvento($estado);
         $ids = $this->idsEventosAvaliativos($estado);
         if ($ids === []) {
             return [];
@@ -3759,9 +3760,9 @@ class BoletimAssistenteWizard
 
             // REC/PF do print Santa Maria: encaixa no slot mesmo se o placeholder
             // (source_type=nenhuma) já estiver em $vistos — a mesclagem substitui.
-            if ($ehRec && ($bim === 81 || $bim === 61 || $bim === 62)) {
+            if ($ehRec && $bim === 81) {
                 $codigoBase = 's1_rec';
-            } elseif ($ehRec && ($bim === 82 || $bim === 63 || $bim === 64)) {
+            } elseif ($ehRec && $bim === 82) {
                 $codigoBase = 's2_rec';
             } elseif ($ehRec && ($bim === 90 || $sigla === 'pf')) {
                 $codigoBase = 'pf';
@@ -3811,7 +3812,12 @@ class BoletimAssistenteWizard
                     $ehSlotBimestre = false;
                     $ehSlotRecPf = false;
                 }
-                if (isset($vistos[$codigoBase]) && !$ehSlotBimestre && !$ehSlotRecPf) {
+                if (
+                    isset($vistos[$codigoBase])
+                    && !$ehSlotBimestre
+                    && !$ehSlotRecPf
+                    && empty($placeholdersPorCodigo[$codigoBase])
+                ) {
                     continue;
                 }
                 $vistos[$codigoBase] = true;
@@ -4088,70 +4094,60 @@ class BoletimAssistenteWizard
             if ($quadroLivre && $tituloExtra !== '' && isset($siglasJa[strtoupper($tituloExtra)])) {
                 $slotsDistintos = in_array($codExtra, ['s1_rec', 's2_rec', 'pf', 'rec', 'recuperacao'], true)
                     || (bool) preg_match('/^b[1-4]_/', $codExtra);
-                if (!$slotsDistintos) {
+                if (
+                    !$slotsDistintos
+                    && !$this->existePlaceholderCompativelParaExtra($componentes, $codExtra, $tituloExtra)
+                ) {
                     continue;
                 }
             }
 
             $substituido = false;
             $ehSlotBimestre = (bool) preg_match('/^b[1-4]_(pp|pu|ch|pe|fal)$/', $codExtra);
-            if (in_array($codExtra, ['s1_rec', 's2_rec', 'pf', 'rec', 'recuperacao'], true) || $ehSlotBimestre) {
-                foreach ($componentes as $i => $c) {
-                    if (!is_array($c)) {
-                        continue;
-                    }
-                    $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
-                    $grpExtra = strtolower(trim((string) (($extra['config']['layout_group'] ?? '') ?: '')));
-                    // rec genérico → só o semestre do layout_group (evita REC 2º cair em s1_rec).
-                    $recParaSlot = false;
-                    if (in_array($codExtra, ['rec', 'recuperacao'], true) && in_array($cod, ['s1_rec', 's2_rec'], true)) {
-                        if ($grpExtra === 's1' || $grpExtra === 's2') {
-                            $recParaSlot = ($cod === ($grpExtra === 's2' ? 's2_rec' : 's1_rec'));
-                        } elseif ($grpExtra === '') {
-                            $recParaSlot = true;
-                        }
-                    }
-                    $pfParaSlot = $codExtra === 'pf' && $cod === 'pf';
-                    if ($cod !== $codExtra && !$recParaSlot && !$pfParaSlot) {
-                        continue;
-                    }
-                    $srcAtual = strtolower(trim((string) ($c['source_type'] ?? '')));
-                    if ($srcAtual !== '' && $srcAtual !== 'nenhuma') {
-                        // Slot bimestre já ligado a Demonstrativo: não sobrescreve.
-                        // REC/PF: sobrescreve se ainda não tem evento_avaliativo_id (legado).
-                        $cfgAtual = is_array($c['config'] ?? null) ? $c['config'] : [];
-                        if ($cfgAtual === [] && is_string($c['config_json'] ?? null) && trim((string) $c['config_json']) !== '') {
-                            $tmpCfg = json_decode((string) $c['config_json'], true);
-                            $cfgAtual = is_array($tmpCfg) ? $tmpCfg : [];
-                        }
-                        $evAtual = (int) ($cfgAtual['evento_avaliativo_id'] ?? 0);
-                        $ehSlotRecPfExistente = in_array($cod, ['s1_rec', 's2_rec', 'pf', 'rec', 'recuperacao'], true);
-                        if (!$ehSlotRecPfExistente || $evAtual > 0) {
-                            continue;
-                        }
-                    }
-                    $componentes[$i] = $extra;
-                    if (in_array($codExtra, ['rec', 'recuperacao'], true)) {
-                        $componentes[$i]['codigo'] = $cod;
-                        $cfg = is_array($extra['config'] ?? null) ? $extra['config'] : [];
-                        $cfg['layout_group'] = $cod === 's2_rec' ? 's2' : 's1';                        $componentes[$i]['config'] = $cfg;
-                        $codExtra = $cod;
-                    } elseif ($ehSlotBimestre) {
-                        $componentes[$i]['codigo'] = $codExtra;
-                        $cfg = is_array($extra['config'] ?? null) ? $extra['config'] : [];
-                        if (preg_match('/^(b[1-4])_/', $codExtra, $mGrp)) {
-                            $cfg['layout_group'] = $mGrp[1];
-                        }
-                        if (str_ends_with($codExtra, '_fal')) {
-                            $cfg['layout_type'] = 'faltas';
-                        } else {
-                            $cfg['layout_type'] = $cfg['layout_type'] ?? 'media';
-                        }
-                        $componentes[$i]['config'] = $cfg;
-                    }
-                    $substituido = true;
-                    break;
+            $apenasSlots = in_array($codExtra, ['s1_rec', 's2_rec', 'pf', 'rec', 'recuperacao'], true) || $ehSlotBimestre;
+            foreach ($componentes as $i => $c) {
+                if (!is_array($c)) {
+                    continue;
                 }
+                $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+                $grpExtra = strtolower(trim((string) (($extra['config']['layout_group'] ?? '') ?: '')));
+                // rec genérico → só com layout_group s1/s2 (81/82). Ciclo 61–63 não cai em s1_rec.
+                $recParaSlot = false;
+                if (in_array($codExtra, ['rec', 'recuperacao'], true) && in_array($cod, ['s1_rec', 's2_rec'], true)) {
+                    if ($grpExtra === 's1' || $grpExtra === 's2') {
+                        $recParaSlot = ($cod === ($grpExtra === 's2' ? 's2_rec' : 's1_rec'));
+                    }
+                }
+                $pfParaSlot = $codExtra === 'pf' && $cod === 'pf';
+                $codigoCompativel = $cod === $codExtra || ($apenasSlots && ($recParaSlot || $pfParaSlot));
+                if (!$codigoCompativel) {
+                    continue;
+                }
+                if (!$this->componentePodeReceberEvento($c)) {
+                    continue;
+                }
+                $componentes[$i] = $extra;
+                if (in_array($codExtra, ['rec', 'recuperacao'], true)) {
+                    $componentes[$i]['codigo'] = $cod;
+                    $cfg = is_array($extra['config'] ?? null) ? $extra['config'] : [];
+                    $cfg['layout_group'] = $cod === 's2_rec' ? 's2' : 's1';
+                    $componentes[$i]['config'] = $cfg;
+                    $codExtra = $cod;
+                } elseif ($ehSlotBimestre) {
+                    $componentes[$i]['codigo'] = $codExtra;
+                    $cfg = is_array($extra['config'] ?? null) ? $extra['config'] : [];
+                    if (preg_match('/^(b[1-4])_/', $codExtra, $mGrp)) {
+                        $cfg['layout_group'] = $mGrp[1];
+                    }
+                    if (str_ends_with($codExtra, '_fal')) {
+                        $cfg['layout_type'] = 'faltas';
+                    } else {
+                        $cfg['layout_type'] = $cfg['layout_type'] ?? 'media';
+                    }
+                    $componentes[$i]['config'] = $cfg;
+                }
+                $substituido = true;
+                break;
             }
             if (!$substituido) {
                 // Slot já preenchido (ex.: evento_boletim do Demonstrativo): NÃO duplica.
@@ -4184,6 +4180,82 @@ class BoletimAssistenteWizard
         }
 
         return $componentes;
+    }
+
+    /**
+     * @param array<string,mixed> $estado
+     * @return array<string,true>
+     */
+    private function codigosPlaceholderSemEvento(array $estado): array
+    {
+        $out = [];
+        $componentes = is_array($estado['rascunho_preservado']['componentes'] ?? null)
+            ? $estado['rascunho_preservado']['componentes']
+            : [];
+        foreach ($componentes as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if ($cod === '') {
+                continue;
+            }
+            if ($this->componentePodeReceberEvento($c)) {
+                $out[$cod] = true;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string,mixed> $componente
+     */
+    private function componentePodeReceberEvento(array $componente): bool
+    {
+        $srcAtual = strtolower(trim((string) ($componente['source_type'] ?? '')));
+        $cod = strtolower(trim((string) ($componente['codigo'] ?? '')));
+        $cfgAtual = is_array($componente['config'] ?? null) ? $componente['config'] : [];
+        if ($cfgAtual === [] && is_string($componente['config_json'] ?? null) && trim((string) $componente['config_json']) !== '') {
+            $tmpCfg = json_decode((string) $componente['config_json'], true);
+            $cfgAtual = is_array($tmpCfg) ? $tmpCfg : [];
+        }
+        $evAtual = (int) ($cfgAtual['evento_avaliativo_id'] ?? $componente['evento_avaliativo_id'] ?? 0);
+
+        // Placeholder do Montar quadro (PO/FAZ/TESTEAZ…): pode receber o evento real.
+        if ($srcAtual === '' || $srcAtual === 'nenhuma') {
+            return true;
+        }
+        // Não sobrescreve Demonstrativo/evento_boletim já ligado.
+        // Exceção: slot REC/PF legado com source preenchido mas sem evento_avaliativo_id.
+        $ehSlotRecPf = in_array($cod, ['s1_rec', 's2_rec', 'pf', 'rec', 'recuperacao'], true);
+
+        return $ehSlotRecPf && $evAtual <= 0;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $componentes
+     */
+    private function existePlaceholderCompativelParaExtra(array $componentes, string $codExtra, string $tituloExtra): bool
+    {
+        $siglaExtra = strtoupper(trim($tituloExtra));
+        foreach ($componentes as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if ($cod === '') {
+                continue;
+            }
+            $sigla = strtoupper(trim($this->siglaTituloColuna($cod, (string) ($c['nome'] ?? ''))));
+            $mesmoCodigo = $codExtra !== '' && $cod === $codExtra;
+            $mesmaSigla = $siglaExtra !== '' && $sigla !== '' && $sigla === $siglaExtra;
+            if (($mesmoCodigo || $mesmaSigla) && $this->componentePodeReceberEvento($c)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
