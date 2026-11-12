@@ -283,6 +283,74 @@ class MatrizCurricular
     }
 
     /**
+     * Matérias avaliáveis (recebem nota) das matrizes das séries.
+     * Expande área-pai da matriz para os filhos avaliáveis.
+     *
+     * @param list<int|string> $seriesIds
+     * @return list<array{id:int,nome:string}>
+     */
+    public function materiasAvaliaveisPorSeries(array $seriesIds): array
+    {
+        $avaliaveis = [];
+        try {
+            foreach ((new ComponenteCurricular())->getAvaliaveis(true) as $materia) {
+                if (!is_array($materia)) {
+                    continue;
+                }
+                $id = (int) ($materia['id'] ?? 0);
+                if ($id <= 0) {
+                    continue;
+                }
+                $avaliaveis[$id] = trim((string) ($materia['nome'] ?? ''));
+            }
+        } catch (\Throwable $e) {
+            return [];
+        }
+        if ($avaliaveis === []) {
+            return [];
+        }
+
+        $filhosPorPai = [];
+        try {
+            $filhosPorPai = (new ComponenteCurricular())->mapaFilhosPorPai();
+        } catch (\Throwable $e) {
+            $filhosPorPai = [];
+        }
+
+        $porId = [];
+        foreach ($this->materiasOficiaisPorSeries($seriesIds) as $oficial) {
+            $id = (int) ($oficial['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            if (isset($avaliaveis[$id])) {
+                $porId[$id] = [
+                    'id' => $id,
+                    'nome' => $avaliaveis[$id] !== '' ? $avaliaveis[$id] : (string) ($oficial['nome'] ?? ''),
+                ];
+                continue;
+            }
+            foreach ($filhosPorPai[$id] ?? [] as $filho) {
+                $fid = (int) ($filho['id'] ?? 0);
+                if ($fid <= 0 || !isset($avaliaveis[$fid])) {
+                    continue;
+                }
+                $porId[$fid] = [
+                    'id' => $fid,
+                    'nome' => $avaliaveis[$fid] !== '' ? $avaliaveis[$fid] : (string) ($filho['nome'] ?? ''),
+                ];
+            }
+        }
+
+        $saida = array_values($porId);
+        usort($saida, static function (array $a, array $b): int {
+            return strcmp($a['nome'], $b['nome']);
+        });
+
+        return $saida;
+    }
+
+    /**
      * @param list<array<string,mixed>> $componentes
      * @return list<array<string,mixed>>
      */

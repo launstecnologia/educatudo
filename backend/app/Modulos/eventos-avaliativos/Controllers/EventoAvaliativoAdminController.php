@@ -200,7 +200,11 @@ class EventoAvaliativoAdminController extends AdminBaseController
             $periodoNum = 1;
         }
         $catalogo = $this->service->catalogoFormulario($ano);
-        $escalaPadrao = number_format($this->service->escalaMaximaPadrao($ano, $regraId), 2, '.', '');
+        try {
+            $escalaPadrao = number_format($this->service->escalaMaximaPadrao($ano, $regraId), 2, '.', '');
+        } catch (\Throwable $e) {
+            $escalaPadrao = '10.00';
+        }
         $flash = $this->getFlashMessage();
         $this->viewWithLayout('admin', 'admin/eventos-avaliativos/form', $this->dados([
             'flash_status' => ($flash['type'] ?? '') === 'error' ? 'error' : (($flash['message'] ?? '') !== '' ? 'success' : ''),
@@ -271,7 +275,7 @@ class EventoAvaliativoAdminController extends AdminBaseController
             }
         }
         $materias = (new \App\Dominio\Escola\Models\MatrizCurricular())
-            ->materiasOficiaisPorSeries(array_values($series));
+            ->materiasAvaliaveisPorSeries(array_values($series));
         $this->json([
             'ok' => true,
             'materias' => $materias,
@@ -283,16 +287,24 @@ class EventoAvaliativoAdminController extends AdminBaseController
         if (!$this->permitido('cadastrar') || !$this->exigirSchema()) {
             return;
         }
+        $voltarCriar = '/admin/eventos-avaliativos/criar?ano=' . (int) ($_POST['ano_letivo'] ?? 0) . '&periodo=' . (int) ($_POST['bimestre'] ?? 0);
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
             $this->setFlashMessage('Token inválido. Tente novamente.', 'error');
-            $this->redirect('/admin/eventos-avaliativos/criar?ano=' . (int) ($_POST['ano_letivo'] ?? 0) . '&periodo=' . (int) ($_POST['bimestre'] ?? 0));
+            $this->redirect($voltarCriar);
             return;
         }
         $user = $this->auth->getUser() ?? [];
-        $res = $this->service->criar($_POST, (int) ($user['id'] ?? 0));
+        try {
+            $res = $this->service->criar($_POST, (int) ($user['id'] ?? 0));
+        } catch (\Throwable $e) {
+            error_log('EventoAvaliativoAdminController::salvar: ' . $e->getMessage());
+            $this->setFlashMessage('Não foi possível criar o evento. Confira professores, matérias e datas.', 'error');
+            $this->redirect($voltarCriar);
+            return;
+        }
         if (empty($res['success'])) {
             $this->setFlashMessage((string) ($res['error'] ?? 'Não foi possível criar o evento.'), 'error');
-            $this->redirect('/admin/eventos-avaliativos/criar?ano=' . (int) ($_POST['ano_letivo'] ?? 0) . '&periodo=' . (int) ($_POST['bimestre'] ?? 0));
+            $this->redirect($voltarCriar);
             return;
         }
         $agruparRes = $this->salvarAgruparDoPost($_POST);

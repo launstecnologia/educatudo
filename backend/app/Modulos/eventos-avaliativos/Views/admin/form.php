@@ -2509,11 +2509,19 @@ foreach ($familiasTituloJs as $paiTitulo => $cfgTitulo) {
                 if (!data || !data.ok || !Array.isArray(data.materias) || !data.materias.length) return;
                 var agora = lerPares(box);
                 if (!paresSemMateria(agora)) return;
+                var idsCatalogo = {};
+                (catalogo.materias || []).forEach(function (m) {
+                    if (m && m.id) idsCatalogo[String(m.id)] = true;
+                });
+                var materiasOk = data.materias.filter(function (mat) {
+                    return mat && idsCatalogo[String(mat.id)];
+                });
+                if (!materiasOk.length) return;
                 fecharDisciplina();
                 var listaPares = box.querySelector('.js-pares');
                 if (listaPares) listaPares.innerHTML = '';
                 box.setAttribute('data-par', '0');
-                data.materias.forEach(function (mat) {
+                materiasOk.forEach(function (mat) {
                     adicionarPar(box, {
                         materia_id: mat.id,
                         professor_id: '',

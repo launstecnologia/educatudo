@@ -109,8 +109,12 @@ class EventoAvaliativoService
         }
 
         $regraId = (int) ($post['regra'] ?? $post['regra_id'] ?? 0);
-        if (!isset($post['escala_max']) || trim((string) $post['escala_max']) === '') {
-            $post['escala_max'] = number_format($this->escalaMaximaPadrao($ano, $regraId), 2, '.', '');
+        try {
+            if (!isset($post['escala_max']) || trim((string) $post['escala_max']) === '') {
+                $post['escala_max'] = number_format($this->escalaMaximaPadrao($ano, $regraId), 2, '.', '');
+            }
+        } catch (Throwable $e) {
+            $post['escala_max'] = '10.00';
         }
 
         $config = $this->normalizarConfig($post);
@@ -1086,6 +1090,9 @@ class EventoAvaliativoService
         } catch (Throwable $e) {
             return 6.0;
         }
+        if (!is_array($row)) {
+            return 6.0;
+        }
         $media = $row['media_minima'] ?? null;
         if (!is_numeric($media)) {
             return 6.0;
@@ -1110,13 +1117,16 @@ class EventoAvaliativoService
                     ['ano' => $ano]
                 );
             }
+            if (!is_array($row)) {
+                return 10.0;
+            }
+            $escala = (string) ($row['escala'] ?? '10');
+            $max = EscalaNota::maximo($escala);
+
+            return $max !== null ? (float) $max : 10.0;
         } catch (Throwable $e) {
             return 10.0;
         }
-        $escala = (string) ($row['escala'] ?? '10');
-        $max = EscalaNota::maximo($escala);
-
-        return $max !== null ? (float) $max : 10.0;
     }
 
     /**
