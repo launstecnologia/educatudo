@@ -4329,9 +4329,32 @@ $boletimWizardSteps = [
         garantirColunaFormulaSemQuadro(key);
     }
 
+    /** Tira a coluna do quadro visual (ordem/título), sem apagar o componente da fórmula. */
+    function retirarColunaDoQuadroVisual(codigo) {
+        codigo = String(codigo || '');
+        if (!codigo || !estado) return;
+        var low = codigo.toLowerCase();
+        ocultarColuna(codigo);
+        estado.colunas_ordem = (estado.colunas_ordem || []).filter(function (c) {
+            return String(c || '').toLowerCase() !== low;
+        });
+        if (Array.isArray(estado.linhas_layout)) {
+            estado.linhas_layout = estado.linhas_layout.map(function (lin) {
+                if (!lin) return lin;
+                lin.colunas = (lin.colunas || []).filter(function (c) {
+                    return String(c || '').toLowerCase() !== low;
+                });
+                return lin;
+            }).filter(function (lin) { return lin && String(lin.nome || '').trim(); });
+        }
+        if (colunasMarcadas && colunasMarcadas[codigo]) delete colunasMarcadas[codigo];
+        if (colunasMarcadas && colunasMarcadas[low]) delete colunasMarcadas[low];
+    }
+
     /**
-     * Garante evento/coluna na fórmula sem obrigar chip no quadro.
-     * Fica oculta na impressão, mas com componente + evento no cálculo.
+     * Garante evento na fórmula SEM chip no quadro.
+     * Soma/média usam a nota lançada; a coluna não aparece no boletim.
+     * Quer ver a coluna? Use o catálogo à esquerda (Adicionar / arrastar).
      */
     function garantirColunaFormulaSemQuadro(codigo) {
         codigo = String(codigo || '');
@@ -4353,9 +4376,7 @@ $boletimWizardSteps = [
         if (!estado.nomes_blocos[codigo]) estado.nomes_blocos[codigo] = nome;
         garantirComponenteManualNoRascunho(codigo, nome);
         anexarEventoAoComponenteFormula(codigo, ev);
-        if (!colunaEventoJaVisivelNoQuadro(codigo)) {
-            ocultarColuna(codigo);
-        }
+        retirarColunaDoQuadroVisual(codigo);
     }
 
     function colunaEventoJaVisivelNoQuadro(codigo) {
@@ -4414,6 +4435,11 @@ $boletimWizardSteps = [
                 }
                 if (tipo > 0) {
                     c.config.tipo_avaliacao_id = tipo;
+                }
+                // Escala da regra (10/100): senão a prévia corta 60 → 10.
+                var escPad = (typeof escalaPadraoRegra === 'function') ? escalaPadraoRegra() : 10;
+                if (escPad >= 0.01 && (c.escala_max == null || Number(c.escala_max) === 10 && escPad !== 10)) {
+                    c.escala_max = escPad;
                 }
                 if (blocos.length) {
                     c.blocos_ids = blocos.slice();
@@ -4812,7 +4838,7 @@ $boletimWizardSteps = [
                     source_type: 'nenhuma',
                     calc_type: 'media',
                     peso: 1,
-                    escala_max: 10,
+                    escala_max: (typeof escalaPadraoRegra === 'function' ? escalaPadraoRegra() : 10),
                     obrigatorio: 0,
                     config: {}
                 });
@@ -5144,6 +5170,16 @@ $boletimWizardSteps = [
         // Evento/nota: some do quadro do boletim, mas permanece na fórmula.
         if (!ehCalc) {
             estado.quadro_chips_manuais = 1;
+            // Reforça vínculo p/ a média continuar mesmo sem o chip.
+            garantirColunaFormulaSemQuadro(codigo);
+            // Se algum bloco de cálculo já cita esta coluna, garante de novo.
+            Object.keys(estado.formulas_blocos || {}).forEach(function (codBloco) {
+                (estado.formulas_blocos[codBloco] || []).forEach(function (t) {
+                    if (t && t.type === 'peca' && String(t.value || '').toLowerCase() === low) {
+                        garantirColunaFormulaSemQuadro(t.value);
+                    }
+                });
+            });
             aplicarOrdemNoPreview(previewAtual);
             renderRevisarDinamico();
             agendarMontar();
@@ -11672,8 +11708,8 @@ $boletimWizardSteps = [
             } else {
                 html += '<p class="text-sm text-gray-700">Como o boletim <strong>aparece</strong></p>';
                 html += '<p class="text-xs text-gray-500 mt-1">' + (ehVisaoImpressaoEditavel()
-                    ? 'À esquerda: catálogo por bimestre (clique adiciona a sigla). À direita: arraste chips para títulos do período e use <strong>Bloco de cálculo</strong> para média com nome livre (ex. MU). Clique em <strong>Confirmar</strong> quando o período estiver pronto.'
-                    : 'Catálogo à esquerda adiciona a sigla. Monte títulos do período e blocos de cálculo à direita. Ao terminar, clique em <strong>Salvar bloco</strong> e depois em <strong>Salvar e continuar</strong>.') + '</p>';
+                    ? 'No <strong>Bloco de cálculo</strong>, monte a média com as siglas da paleta — elas <strong>não precisam</strong> ficar como coluna no quadro. O catálogo à esquerda só entra se você quiser <em>mostrar</em> a coluna. Confirme o título do período quando estiver pronto.'
+                    : 'No bloco de cálculo, use as siglas na fórmula sem obrigar chip no quadro. Catálogo à esquerda = coluna visível. Salve o bloco e continue.') + '</p>';
                 html += '<div class="mt-3">' + htmlEscopoPecasSelecionadas() + '</div>';
                 html += '<div id="bw-colunas-wrap" class="mt-3"></div>';
                 html += '<div id="bw-formula-editor" class="' + (estado.bloco_calc ? '' : 'hidden') + ' mt-4 rounded-xl border border-amber-200 bg-amber-50/40 p-3">';
@@ -11707,7 +11743,7 @@ $boletimWizardSteps = [
                 html += '<div class="bw-formula-topo">';
                 html += '<div class="bw-formula-pecas-col">';
                 html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-0.5">Usar no cálculo</p>';
-                html += '<p class="text-[11px] text-slate-500 mb-2">Clique na coluna para inserir. Filtre pelo período nas abas.</p>';
+                html += '<p class="text-[11px] text-slate-500 mb-2">Clique na sigla para somar na fórmula — <strong>não precisa</strong> aparecer como coluna no quadro. Filtre pelo período nas abas.</p>';
                 html += '<div id="bw-formula-pecas-pal" class="bw-palette"></div>';
                 html += '</div>';
                 html += '<div class="bw-formula-ferramentas">';
@@ -12886,16 +12922,11 @@ $boletimWizardSteps = [
                 var blocosRemotos = Array.isArray(estado.blocos_calc) ? estado.blocos_calc.slice() : [];
                 blocosCalcLocal.forEach(function (cod) {
                     cod = String(cod || '');
-                    if (!cod || blocosRemotos.indexOf(cod) >= 0 || colunaOculta(cod)) return;
+                    if (!cod || blocosRemotos.indexOf(cod) >= 0) return;
                     blocosRemotos.push(cod);
                 });
-                blocosRemotos = blocosRemotos.filter(function (cod) { return !colunaOculta(cod); });
+                // Coluna oculta = só some da grade; bloco de cálculo e fórmula ficam.
                 estado.blocos_calc = blocosRemotos;
-                if (estado.formulas_blocos && typeof estado.formulas_blocos === 'object') {
-                    Object.keys(estado.formulas_blocos).forEach(function (cod) {
-                        if (colunaOculta(cod)) delete estado.formulas_blocos[cod];
-                    });
-                }
                 var ordemRemota = Array.isArray(estado.colunas_ordem) ? estado.colunas_ordem : [];
                 // Quadro do zero: não importa colunas remotas que o admin não adicionou.
                 if (!(cabecalhosManuaisLocal || (estado.quadro_livre || estado.origem === 'quadro-impressao'))) {

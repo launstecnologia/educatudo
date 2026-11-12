@@ -3764,6 +3764,7 @@ class BoletimAssistenteWizard
     private function componentesDeEventosAvaliativosMarcados(array $estado, array &$vistos, array &$erros): array
     {
         $placeholdersPorCodigo = $this->codigosPlaceholderSemEvento($estado);
+        $escalaMaxPadrao = $this->normalizarEscalaMaxima($estado['escala_max_padrao'] ?? null, 10.0);
         $ids = $this->idsEventosAvaliativos($estado);
         if ($ids === []) {
             return [];
@@ -3893,6 +3894,7 @@ class BoletimAssistenteWizard
                         ? $tipo
                         : (int) (($subsMarcados[0]['tipo_avaliacao_id'] ?? $subs[0]['tipo_avaliacao_id'] ?? 0)),
                     'evento_avaliativo_id' => $id,
+                    'escala_max' => $escalaMaxPadrao,
                     'papel_wizard' => 'exibe',
                     'layout_type' => $ehRec ? 'rec' : 'media',
                 ];
@@ -3939,6 +3941,7 @@ class BoletimAssistenteWizard
                     'tipo_avaliacao_id' => (int) ($sub['tipo_avaliacao_id'] ?? $tipo),
                     'evento_avaliativo_id' => $id,
                     'subevento_avaliativo' => 1,
+                    'escala_max' => $escalaMaxPadrao,
                     'papel_wizard' => 'exibe',
                     'layout_type' => $ehRec ? 'rec' : 'media',
                 ];
@@ -5683,8 +5686,16 @@ class BoletimAssistenteWizard
      */
     private function componenteBoletim(string $codigo, string $nome, string $source, array $config): array
     {
-        $ehFaltas = $source === 'faltas_evento'
-            || strtolower((string) ($config['layout_type'] ?? '')) === 'faltas';
+        $ehFaltas = $this->componenteEhFaltas([
+            'codigo' => $codigo,
+            'nome' => $nome,
+            'source_type' => $source,
+            'layout_type' => (string) ($config['layout_type'] ?? ''),
+            'config' => $config,
+        ]);
+        $escalaMax = $ehFaltas
+            ? 999.0
+            : $this->normalizarEscalaMaxima($config['escala_max'] ?? ($config['escala_max_padrao'] ?? null), 10.0);
 
         return [
             'codigo' => $codigo,
@@ -5696,10 +5707,32 @@ class BoletimAssistenteWizard
             'blocos_ids' => [],
             'materias_ids' => [],
             'usar_percentual' => 0,
-            'escala_max' => $ehFaltas ? 999 : 10,
+            'escala_max' => $escalaMax,
             'obrigatorio' => 0,
             'config' => $config,
         ];
+    }
+
+    /**
+     * @param array<string,mixed> $componente
+     */
+    private function componenteEhFaltas(array $componente): bool
+    {
+        $source = strtolower(trim((string) ($componente['source_type'] ?? '')));
+        if ($source === 'faltas_evento') {
+            return true;
+        }
+        $config = is_array($componente['config'] ?? null) ? $componente['config'] : [];
+        $layoutType = strtolower(trim((string) ($config['layout_type'] ?? ($componente['layout_type'] ?? ''))));
+        if ($layoutType === 'faltas') {
+            return true;
+        }
+        $codigo = strtolower(trim((string) ($componente['codigo'] ?? '')));
+        if ((bool) preg_match('/(^|_)fal(tas)?$/', $codigo)) {
+            return true;
+        }
+
+        return strtoupper($this->siglaTituloColuna($codigo, (string) ($componente['nome'] ?? ''))) === 'FAL';
     }
 
     /**
@@ -7129,6 +7162,16 @@ class BoletimAssistenteWizard
             }
         }
 
+        $escalaMax = $this->escalaDoBloco($estado, (string) ($base['codigo'] ?? $peca));
+        if ($this->componenteEhFaltas([
+            'codigo' => (string) ($base['codigo'] ?? $peca),
+            'nome' => (string) ($base['nome'] ?? ''),
+            'source_type' => (string) ($base['source_type'] ?? ''),
+            'config' => $config,
+        ])) {
+            $escalaMax = 999.0;
+        }
+
         return [
             'codigo' => $base['codigo'],
             'nome' => $base['nome'],
@@ -7141,7 +7184,7 @@ class BoletimAssistenteWizard
             'materia_unica' => $materiaUnica,
             'materia_unica_modo' => $this->normalizarMateriaUnicaModo($estado['materia_unica_modo'] ?? ($opts['materia_unica_modo'] ?? 'soma')),
             'usar_percentual' => $usarPerc,
-            'escala_max' => 10,
+            'escala_max' => $escalaMax,
             'obrigatorio' => 0,
             'tipo_avaliacao_id' => $tipoId > 0 ? $tipoId : null,
             'tipo_avaliacao_nome' => $tipoNome !== '' ? $tipoNome : null,
@@ -8262,9 +8305,7 @@ class BoletimAssistenteWizard
     private function aplicarEscalasBlocos(array $rascunho, array $estado): array
     {
         $escalas = is_array($estado['escalas_blocos'] ?? null) ? $estado['escalas_blocos'] : [];
-        if ($escalas === []) {
-            return $rascunho;
-        }
+        $escalaMaxPadrao = $this->normalizarEscalaMaxima($estado['escala_max_padrao'] ?? null, 10.0);
         $comps = is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : [];
         foreach ($comps as &$c) {
             if (!is_array($c)) {
@@ -8274,10 +8315,17 @@ class BoletimAssistenteWizard
             if ($cod === '' || (bool) preg_match('/^s[1-8]$/', $cod)) {
                 continue;
             }
-            if (!isset($escalas[$cod])) {
+            if (isset($escalas[$cod])) {
+                $c['escala_max'] = $this->escalaDoBloco($estado, $cod);
                 continue;
             }
-            $c['escala_max'] = $this->escalaDoBloco($estado, $cod);
+            $source = strtolower(trim((string) ($c['source_type'] ?? '')));
+            $ehFaltas = $this->componenteEhFaltas($c);
+            if ($source === 'provas_sistema' || ($ehFaltas && $source !== 'faltas_evento')) {
+                if ($escalaMaxPadrao > 0.0) {
+                    $c['escala_max'] = $escalaMaxPadrao;
+                }
+            }
         }
         unset($c);
         $rascunho['componentes'] = $comps;

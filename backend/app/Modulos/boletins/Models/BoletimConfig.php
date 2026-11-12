@@ -4546,7 +4546,7 @@ class BoletimConfig
                         LIMIT 1
                     ) AS professor_materia_nome,
                     CONCAT(COALESCE(pb.titulo, 'Bloco'), ' (pauta)') AS titulo,
-                    10 AS valor_total,
+                    NULL AS valor_total,
                     0 AS total_questoes,
                     0 AS acertos
                 FROM provas_blocos_notas_lancadas n
@@ -4633,7 +4633,7 @@ class BoletimConfig
                     n.materia_id AS professor_materia_id,
                     m.nome AS professor_materia_nome,
                     CONCAT(COALESCE(pb.titulo, 'Bloco'), ' (pauta)') AS titulo,
-                    10 AS valor_total,
+                    NULL AS valor_total,
                     0 AS total_questoes,
                     0 AS acertos
                 FROM provas_blocos_notas_lancadas n
