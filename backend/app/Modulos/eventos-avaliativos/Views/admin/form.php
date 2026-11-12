@@ -2522,9 +2522,10 @@ foreach ($familiasTituloJs as $paiTitulo => $cfgTitulo) {
                 if (listaPares) listaPares.innerHTML = '';
                 box.setAttribute('data-par', '0');
                 materiasOk.forEach(function (mat) {
+                    var profsDaMat = professoresDaDisciplina(mat.id);
                     adicionarPar(box, {
                         materia_id: mat.id,
-                        professor_id: '',
+                        professor_id: (profsDaMat && profsDaMat.length) ? profsDaMat[0].id : '',
                         turmas: turmasIds
                     }, false);
                 });

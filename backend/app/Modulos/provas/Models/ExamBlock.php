@@ -53,6 +53,47 @@ class ExamBlock
         return $this->columnExistsCache[$column];
     }
 
+    /**
+     * Indica se provas_blocos_professores.professor_id aceita NULL (migration 2026_09_28).
+     * Em caso de falha na consulta, assume que aceita (não bloqueia o fluxo).
+     */
+    private function professorIdAceitaNulo(): bool
+    {
+        static $cache = null;
+        if ($cache !== null) {
+            return $cache;
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT IS_NULLABLE
+                 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'provas_blocos_professores'
+                   AND COLUMN_NAME = 'professor_id'
+                 LIMIT 1"
+            );
+            if (!is_array($row) || !isset($row['IS_NULLABLE'])) {
+                $cache = true;
+            } else {
+                $cache = strtoupper((string) $row['IS_NULLABLE']) === 'YES';
+            }
+        } catch (\Throwable $e) {
+            error_log('ExamBlock::professorIdAceitaNulo: ' . $e->getMessage());
+            $cache = true;
+        }
+        return $cache;
+    }
+
+    private function exigirProfessorNoPar(?int $professorId): void
+    {
+        if ($professorId === null && !$this->professorIdAceitaNulo()) {
+            throw new \RuntimeException(
+                'Selecione o professor de cada matéria. O banco desta escola ainda exige professor '
+                . '(rode a migration 2026_09_28 no painel Master para permitir professor opcional).'
+            );
+        }
+    }
+
     private function hasTable(string $table): bool
     {
         if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
@@ -1036,6 +1077,7 @@ class ExamBlock
                     if (isset($professorMateriaInseridos[$chaveProfessorMateria])) {
                         $blocoProfessorId = $professorMateriaInseridos[$chaveProfessorMateria];
                     } else {
+                        $this->exigirProfessorNoPar($professorIdInsert);
                         $blocoProfessorId = $this->db->insert(
                             "INSERT INTO provas_blocos_professores (bloco_id, professor_id, materia_id, quantidade_questoes) 
                              VALUES (:bloco_id, :professor_id, :materia_id, :quantidade_questoes)",
@@ -1098,7 +1140,7 @@ class ExamBlock
             $this->db->commit();
             return $blocoId;
             
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->db->rollback();
             throw $e;
         }
@@ -1242,6 +1284,7 @@ class ExamBlock
                 $turmasDoBloco = isset($data['turmas']) && is_array($data['turmas']) ? $data['turmas'] : [];
                 foreach ($data['professores'] as $professorData) {
                     $qtdQuestoes = $this->resolverQuantidadeQuestoes($professorData, $data);
+                    $this->exigirProfessorNoPar(!empty($professorData['professor_id']) ? (int) $professorData['professor_id'] : null);
                     // Insere relacionamento bloco-professor-matéria
                     $blocoProfessorId = $this->db->insert(
                         "INSERT INTO provas_blocos_professores (bloco_id, professor_id, materia_id, quantidade_questoes) 

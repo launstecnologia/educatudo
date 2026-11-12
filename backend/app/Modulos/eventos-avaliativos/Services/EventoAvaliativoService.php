@@ -91,6 +91,67 @@ class EventoAvaliativoService
             return ['success' => false, 'error' => 'Rode a migration 2026_10_26_eventos_avaliativos.sql no painel Master.'];
         }
 
+        try {
+            return $this->criarEvento($post, $criadoPor);
+        } catch (Throwable $e) {
+            $this->logarFalhaCriar($e);
+            return ['success' => false, 'error' => $this->mensagemErroCriar($e)];
+        }
+    }
+
+    private function logarFalhaCriar(Throwable $e): void
+    {
+        error_log(sprintf(
+            'EventoAvaliativoService::criar: %s: %s em %s:%d | %s',
+            get_class($e),
+            $e->getMessage(),
+            $e->getFile(),
+            $e->getLine(),
+            $e->getTraceAsString()
+        ));
+    }
+
+    /**
+     * Traduz exceções (SQL ou de negócio) em mensagem clara para o admin.
+     */
+    private function mensagemErroCriar(Throwable $e): string
+    {
+        $msg = $e->getMessage();
+        $min = mb_strtolower($msg);
+
+        if (str_contains($min, 'professor_id') && (str_contains($min, 'null') || str_contains($min, 'cannot be'))) {
+            return 'Selecione o professor de cada matéria. O banco desta escola ainda exige professor '
+                . '(rode a migration 2026_09_28 no painel Master para permitir professor opcional).';
+        }
+        if (str_contains($min, 'duplicate') || str_contains($min, 'uk_provas_tipos')) {
+            return 'Já existe um tipo/evento com este nome. Use outro nome ou edite o existente.';
+        }
+        if (str_contains($min, 'unknown column')) {
+            $coluna = '';
+            if (preg_match("/unknown column '([^']+)'/i", $msg, $m)) {
+                $coluna = ' (' . $m[1] . ')';
+            }
+            return 'O banco desta escola está desatualizado: falta uma coluna' . $coluna
+                . '. Rode as migrations pendentes no painel Master (ex.: 2026_09_28, 2026_10_26, 2026_10_28).';
+        }
+        if (
+            str_contains($msg, 'calendário')
+            || str_contains($msg, 'recuperação')
+            || str_contains($msg, 'migration')
+            || str_contains($msg, 'Selecione o professor')
+        ) {
+            return $msg;
+        }
+
+        return 'Não foi possível criar o evento. Confira professores, matérias e datas.';
+    }
+
+    /**
+     * @param array<string,mixed> $post
+     * @return array{success:bool,id?:int,error?:string}
+     */
+    private function criarEvento(array $post, int $criadoPor): array
+    {
         $nome = trim((string) ($post['nome'] ?? ''));
         if ($nome === '') {
             return ['success' => false, 'error' => 'Informe o nome do evento.'];
@@ -278,8 +339,7 @@ class EventoAvaliativoService
                 throw new \RuntimeException((string) $alunosRec['error']);
             }
         } catch (Throwable $e) {
-            error_log('EventoAvaliativoService::criar: ' . $e->getMessage());
-            $mensagemCalendario = $e->getMessage();
+            $this->logarFalhaCriar($e);
             $this->desfazerBlocos($blocosCriados, $criadoPor);
             if ($eventoId > 0) {
                 $this->model->marcarExcluido($eventoId);
@@ -291,10 +351,7 @@ class EventoAvaliativoService
             if ($tipoId > 0) {
                 $this->desfazerTipo($tipos, $tipoId);
             }
-            $erroCriar = str_contains($mensagemCalendario, 'calendário') || str_contains($mensagemCalendario, 'recuperação') || str_contains($mensagemCalendario, 'migration')
-                ? $mensagemCalendario
-                : 'Não foi possível criar o evento. Confira professores, matérias e datas.';
-            return ['success' => false, 'error' => $erroCriar];
+            return ['success' => false, 'error' => $this->mensagemErroCriar($e)];
         }
 
         return ['success' => true, 'id' => $eventoId];
@@ -1106,6 +1163,14 @@ class EventoAvaliativoService
     public function escalaMaximaPadrao(int $ano, int $regraId = 0): float
     {
         try {
+            $coluna = $this->db->fetch(
+                'SELECT 1 AS ok FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c LIMIT 1',
+                ['t' => 'regras_academicas', 'c' => 'escala']
+            );
+            if (empty($coluna['ok'])) {
+                return 10.0;
+            }
             if ($regraId > 0) {
                 $row = $this->db->fetch(
                     'SELECT escala FROM regras_academicas WHERE id = :id LIMIT 1',

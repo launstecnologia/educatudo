@@ -199,11 +199,24 @@ class EventoAvaliativoAdminController extends AdminBaseController
         if (!$recuperacao->codigoAceito($ano, $periodoNum, $regraId) && !PeriodoLetivo::numeroValido($ano, $periodoNum)) {
             $periodoNum = 1;
         }
-        $catalogo = $this->service->catalogoFormulario($ano);
+        try {
+            $catalogo = $this->service->catalogoFormulario($ano);
+        } catch (\Throwable $e) {
+            error_log('EventoAvaliativoAdminController::criar catalogoFormulario: ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
+            $this->setFlashMessage('Não foi possível carregar professores, matérias e turmas. Tente novamente.', 'error');
+            $this->redirect($this->urlListaEvento($ano, $periodoNum, $regraId));
+            return;
+        }
         try {
             $escalaPadrao = number_format($this->service->escalaMaximaPadrao($ano, $regraId), 2, '.', '');
         } catch (\Throwable $e) {
             $escalaPadrao = '10.00';
+        }
+        try {
+            $periodosExtra = $recuperacao->opcoesFormulario($ano, $periodoNum, $regraId);
+        } catch (\Throwable $e) {
+            error_log('EventoAvaliativoAdminController::criar opcoesFormulario: ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
+            $periodosExtra = [];
         }
         $flash = $this->getFlashMessage();
         $this->viewWithLayout('admin', 'admin/eventos-avaliativos/form', $this->dados([
@@ -219,7 +232,7 @@ class EventoAvaliativoAdminController extends AdminBaseController
             'bimestre_selecionado' => $periodoNum,
             'regra_id' => $regraId,
             'escala_max_padrao' => $escalaPadrao,
-            'periodos_extra' => $recuperacao->opcoesFormulario($ano, $periodoNum, $regraId),
+            'periodos_extra' => $periodosExtra,
             'criterios' => TipoNotaRegraService::CRITERIOS,
             'registros' => TipoNotaRegraService::REGISTROS,
             'criterios_professores' => TipoNotaRegraService::CRITERIOS_PROFESSORES,
@@ -297,7 +310,14 @@ class EventoAvaliativoAdminController extends AdminBaseController
         try {
             $res = $this->service->criar($_POST, (int) ($user['id'] ?? 0));
         } catch (\Throwable $e) {
-            error_log('EventoAvaliativoAdminController::salvar: ' . $e->getMessage());
+            error_log(sprintf(
+                'EventoAvaliativoAdminController::salvar: %s: %s em %s:%d | %s',
+                get_class($e),
+                $e->getMessage(),
+                $e->getFile(),
+                $e->getLine(),
+                $e->getTraceAsString()
+            ));
             $this->setFlashMessage('Não foi possível criar o evento. Confira professores, matérias e datas.', 'error');
             $this->redirect($voltarCriar);
             return;
