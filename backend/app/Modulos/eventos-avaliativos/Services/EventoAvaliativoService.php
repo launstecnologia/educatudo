@@ -150,14 +150,45 @@ class EventoAvaliativoService
             return [' AND t.serie_id IN (' . implode(', ', $marcadores) . ')', $params];
         }
         if ($cursoId > 0) {
+            if ($this->turmasTemColuna('curso_novo_id')) {
+                return [
+                    ' AND (t.serie_id IN (SELECT id FROM serie WHERE curso_id = :escopo_curso_serie)'
+                    . ' OR t.curso_novo_id = :escopo_curso_turma)',
+                    ['escopo_curso_serie' => $cursoId, 'escopo_curso_turma' => $cursoId],
+                ];
+            }
+
             return [
-                ' AND (t.serie_id IN (SELECT id FROM serie WHERE curso_id = :escopo_curso_serie)'
-                . ' OR t.curso_novo_id = :escopo_curso_turma)',
-                ['escopo_curso_serie' => $cursoId, 'escopo_curso_turma' => $cursoId],
+                ' AND t.serie_id IN (SELECT id FROM serie WHERE curso_id = :escopo_curso_serie)',
+                ['escopo_curso_serie' => $cursoId],
             ];
         }
 
         return ['', []];
+    }
+
+    /**
+     * Confere (com cache por requisição) se a coluna existe em `turmas` neste tenant.
+     */
+    private function turmasTemColuna(string $coluna): bool
+    {
+        static $cache = [];
+        if (array_key_exists($coluna, $cache)) {
+            return $cache[$coluna];
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT 1 AS ok FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c LIMIT 1',
+                ['t' => 'turmas', 'c' => $coluna]
+            );
+            $cache[$coluna] = !empty($row['ok']);
+        } catch (Throwable $e) {
+            error_log('EventoAvaliativoService::turmasTemColuna: ' . $e->getMessage());
+            $cache[$coluna] = false;
+        }
+
+        return $cache[$coluna];
     }
 
     /**
@@ -222,8 +253,14 @@ class EventoAvaliativoService
 
     private function logarFalhaCriar(Throwable $e): void
     {
+        $this->logarFalha($e, 'criar');
+    }
+
+    private function logarFalha(Throwable $e, string $operacao): void
+    {
         error_log(sprintf(
-            'EventoAvaliativoService::criar: %s: %s em %s:%d | %s',
+            'EventoAvaliativoService::%s: %s: %s em %s:%d | %s',
+            $operacao,
             get_class($e),
             $e->getMessage(),
             $e->getFile(),
@@ -236,6 +273,11 @@ class EventoAvaliativoService
      * Traduz exceções (SQL ou de negócio) em mensagem clara para o admin.
      */
     private function mensagemErroCriar(Throwable $e): string
+    {
+        return $this->mensagemErro($e, 'Não foi possível criar o evento. Confira professores, matérias e datas.');
+    }
+
+    private function mensagemErro(Throwable $e, string $padrao): string
     {
         $msg = $e->getMessage();
         $min = mb_strtolower($msg);
@@ -264,7 +306,7 @@ class EventoAvaliativoService
             return $msg;
         }
 
-        return 'Não foi possível criar o evento. Confira professores, matérias e datas.';
+        return $padrao;
     }
 
     /**
@@ -820,6 +862,23 @@ class EventoAvaliativoService
      */
     public function atualizar(int $id, array $post, int $usuarioId): array
     {
+        try {
+            return $this->atualizarEvento($id, $post, $usuarioId);
+        } catch (Throwable $e) {
+            $this->logarFalha($e, 'atualizar');
+            return ['success' => false, 'error' => $this->mensagemErro(
+                $e,
+                'Não foi possível salvar o evento. Confira professores, matérias e datas.'
+            )];
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $post
+     * @return array{success:bool,error?:string}
+     */
+    private function atualizarEvento(int $id, array $post, int $usuarioId): array
+    {
         $evento = $this->model->findById($id);
         if ($evento === null) {
             return ['success' => false, 'error' => 'Evento não encontrado.'];
@@ -1066,9 +1125,16 @@ class EventoAvaliativoService
                 $blocos->delete($blocoId, $usuarioId);
             }
         } catch (Throwable $e) {
-            error_log('EventoAvaliativoService::atualizar: ' . $e->getMessage());
-            $this->desfazerBlocos($criados, $usuarioId);
-            return ['success' => false, 'error' => 'Não foi possível salvar o evento. Confira professores, matérias e datas.'];
+            $this->logarFalha($e, 'atualizar');
+            try {
+                $this->desfazerBlocos($criados, $usuarioId);
+            } catch (Throwable $e2) {
+                error_log('EventoAvaliativoService::atualizar (desfazer): ' . $e2->getMessage());
+            }
+            return ['success' => false, 'error' => $this->mensagemErro(
+                $e,
+                'Não foi possível salvar o evento. Confira professores, matérias e datas.'
+            )];
         }
 
         $gravado = $this->gravarCalendario($id, $calendario);

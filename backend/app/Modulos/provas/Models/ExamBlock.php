@@ -1387,7 +1387,7 @@ class ExamBlock
             $this->db->commit();
             return true;
             
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->db->rollback();
             throw $e;
         }

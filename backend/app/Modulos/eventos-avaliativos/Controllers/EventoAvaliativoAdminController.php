@@ -394,10 +394,18 @@ class EventoAvaliativoAdminController extends AdminBaseController
             return;
         }
         $id = (int) $id;
-        $evento = $this->service->model()->findById($id);
-        $voltar = $evento === null
-            ? '/admin/eventos-avaliativos'
-            : '/admin/eventos-avaliativos/' . $id . '/editar';
+        $voltar = '/admin/eventos-avaliativos/' . $id . '/editar';
+        try {
+            $evento = $this->service->model()->findById($id);
+        } catch (\Throwable $e) {
+            $this->logarFalhaAtualizar($e);
+            $this->setFlashMessage('Não foi possível carregar o evento. Tente novamente.', 'error');
+            $this->redirect('/admin/eventos-avaliativos');
+            return;
+        }
+        if ($evento === null) {
+            $voltar = '/admin/eventos-avaliativos';
+        }
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
             $this->setFlashMessage('Token inválido. Tente novamente.', 'error');
             $this->redirect($voltar);
@@ -409,7 +417,14 @@ class EventoAvaliativoAdminController extends AdminBaseController
             return;
         }
         $user = $this->auth->getUser() ?? [];
-        $res = $this->service->atualizar($id, $_POST, (int) ($user['id'] ?? 0));
+        try {
+            $res = $this->service->atualizar($id, $_POST, (int) ($user['id'] ?? 0));
+        } catch (\Throwable $e) {
+            $this->logarFalhaAtualizar($e);
+            $this->setFlashMessage('Não foi possível salvar o evento. Confira professores, matérias e datas.', 'error');
+            $this->redirect($voltar);
+            return;
+        }
         if (empty($res['success'])) {
             $this->setFlashMessage((string) ($res['error'] ?? 'Não foi possível salvar o evento.'), 'error');
             $this->redirect($voltar);
@@ -428,6 +443,18 @@ class EventoAvaliativoAdminController extends AdminBaseController
             (int) ($evento['ano_letivo'] ?? 0),
             (int) ($_POST['bimestre'] ?? ($evento['bimestre'] ?? 0)),
             (int) ($_POST['regra'] ?? 0)
+        ));
+    }
+
+    private function logarFalhaAtualizar(\Throwable $e): void
+    {
+        error_log(sprintf(
+            'EventoAvaliativoAdminController::atualizar: %s: %s em %s:%d | %s',
+            get_class($e),
+            $e->getMessage(),
+            $e->getFile(),
+            $e->getLine(),
+            $e->getTraceAsString()
         ));
     }
 
