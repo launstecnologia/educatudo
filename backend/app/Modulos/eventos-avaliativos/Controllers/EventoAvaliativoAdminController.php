@@ -304,6 +304,9 @@ class EventoAvaliativoAdminController extends AdminBaseController
             'ok' => true,
             'media' => $res['media'],
             'escala_max' => $res['escala_max'] ?? null,
+            'media_ciclo_configurada' => !empty($res['media_ciclo_configurada']),
+            'media_ciclo_pendente' => !empty($res['media_ciclo_pendente']),
+            'media_ciclo_codigo' => $res['media_ciclo_codigo'] ?? null,
             'tabela' => $this->service->model()->colunaMateriaPronta(),
             'alunos' => $res['alunos'],
         ]);

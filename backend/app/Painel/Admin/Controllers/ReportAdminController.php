@@ -2021,7 +2021,9 @@ class ReportAdminController extends AdminBaseController
             if ($cols === [] || $linhas === []) {
                 return '';
             }
-            $decimalPlaces = ((int) ($regra['decimal_places'] ?? 2) === 1) ? 1 : 2;
+            $decimalPlaces = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
+                $regra['decimal_places'] ?? 2
+            );
             if (!class_exists('BoletimQuadroLayoutHelper', false)) {
             }
             $edicaoSimulacao = null;

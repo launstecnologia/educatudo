@@ -11,6 +11,7 @@ use App\Modulos\GruposRegrasNotas\Services\GrupoRegrasNotasService;
 use App\Modulos\Provas\Models\ExamBlock;
 use App\Modulos\Provas\Models\ExamBlockManualGrade;
 use App\Modulos\Provas\Models\ExamEvaluationType;
+use App\Modulos\Boletins\Services\MediaCicloRecuperacaoService;
 use App\Modulos\RegrasAcademicas\Models\RecuperacaoConfig;
 use App\Modulos\RegrasAcademicas\Models\RegraAcademica;
 use App\Modulos\RegrasAcademicas\Services\EscalaNota;
@@ -1414,10 +1415,17 @@ class EventoAvaliativoService
     }
 
     /**
-     * Alunos das turmas, com a menor nota do período de origem e se está abaixo da média.
+     * Alunos das turmas, com a média do ciclo (se flagada no boletim) ou a menor nota do período.
      *
      * @param list<int> $turmaIds
-     * @return array{media:float,escala_max?:float,alunos:list<array{id:int,nome:string,turma_id:int,turma:string,nota:?float,abaixo:bool}>}|array{error:string}
+     * @return array{
+     *   media:float,
+     *   escala_max?:float,
+     *   media_ciclo_configurada?:bool,
+     *   media_ciclo_pendente?:bool,
+     *   media_ciclo_codigo?:?string,
+     *   alunos:list<array{id:int,nome:string,turma_id:int,turma:string,nota:?float,abaixo:bool}>
+     * }|array{error:string}
      */
     public function candidatosRecuperacao(int $ano, int $codigoPeriodo, array $turmaIds, int $regraId = 0): array
     {
@@ -1430,6 +1438,9 @@ class EventoAvaliativoService
         $media = $this->mediaMinima($ano, $regraId);
         $escalaMax = $this->escalaMaximaPadrao($ano, $regraId);
         $periodos = $this->periodosDaRecuperacao($codigoPeriodo);
+        $svcMediaCiclo = new MediaCicloRecuperacaoService();
+        $mediaCiclo = $svcMediaCiclo->resolverNotas($ano, $codigoPeriodo, $turmaIds);
+        $usarMediaCiclo = !empty($mediaCiclo['configurada']);
         try {
             $rows = [];
             if ($this->tabelaExisteSimples('notas_tipo_finais')) {
@@ -1442,16 +1453,25 @@ class EventoAvaliativoService
             error_log('EventoAvaliativoService::candidatosRecuperacao: ' . $e->getMessage());
             return ['error' => 'Não foi possível listar os alunos desta recuperação.'];
         }
-        $fatores = $this->fatoresAjusteEscalaPorMateria($rows, $escalaMax);
+        $fatores = $usarMediaCiclo ? [] : $this->fatoresAjusteEscalaPorMateria($rows, $escalaMax);
         $alunos = [];
+        $vistos = [];
         foreach ($rows as $row) {
-            $nota = $row['menor_nota'] ?? null;
             $materiaId = (int) ($row['materia_id'] ?? 0);
-            $fator = $fatores[$materiaId] ?? 1.0;
-            $notaNum = $nota === null || $nota === '' ? null : round((float) $nota * $fator, 2);
+            $alunoId = (int) ($row['id'] ?? 0);
+            $notaNum = null;
+            if ($usarMediaCiclo) {
+                $notaNum = $svcMediaCiclo->notaAlunoMateria($mediaCiclo, $alunoId, $materiaId);
+            } else {
+                $nota = $row['menor_nota'] ?? null;
+                $fator = $fatores[$materiaId] ?? 1.0;
+                $notaNum = $nota === null || $nota === '' ? null : round((float) $nota * $fator, 2);
+            }
             $turmaId = (int) ($row['turma_lista_id'] ?? $row['turma_id'] ?? 0);
+            $chave = $alunoId . '|' . $materiaId;
+            $vistos[$chave] = true;
             $alunos[] = [
-                'id' => (int) ($row['id'] ?? 0),
+                'id' => $alunoId,
                 'nome' => (string) ($row['nome'] ?? ''),
                 'turma_id' => $turmaId,
                 'turma' => (string) ($row['turma_nome'] ?? ''),
@@ -1461,7 +1481,168 @@ class EventoAvaliativoService
                 'abaixo' => $notaNum !== null && $notaNum < $media,
             ];
         }
-        return ['media' => $media, 'alunos' => $alunos, 'escala_max' => $escalaMax];
+        if ($usarMediaCiclo) {
+            $alunos = array_merge(
+                $alunos,
+                $this->linhasExtrasMediaCiclo($mediaCiclo, $vistos, $media, $turmaIds)
+            );
+        }
+        return [
+            'media' => $media,
+            'alunos' => $alunos,
+            'escala_max' => $escalaMax,
+            'media_ciclo_configurada' => $usarMediaCiclo,
+            'media_ciclo_pendente' => $usarMediaCiclo && !empty($mediaCiclo['pendente']),
+            'media_ciclo_codigo' => $usarMediaCiclo ? ($mediaCiclo['codigo'] ?? null) : null,
+        ];
+    }
+
+    /**
+     * Pares aluno×matéria presentes na média do ciclo e ausentes das notas do período.
+     *
+     * @param array{notas?:array<string,float>} $mediaCiclo
+     * @param array<string,bool> $vistos
+     * @param list<int> $turmaIds
+     * @return list<array{id:int,nome:string,turma_id:int,turma:string,materia_id:int,materia:string,nota:?float,abaixo:bool}>
+     */
+    private function linhasExtrasMediaCiclo(array $mediaCiclo, array $vistos, float $media, array $turmaIds): array
+    {
+        $mapa = is_array($mediaCiclo['notas'] ?? null) ? $mediaCiclo['notas'] : [];
+        $faltantes = [];
+        $alunoIds = [];
+        $materiaIds = [];
+        foreach ($mapa as $chave => $nota) {
+            if (isset($vistos[$chave]) || !is_numeric($nota)) {
+                continue;
+            }
+            $partes = explode('|', (string) $chave, 2);
+            $alunoId = (int) ($partes[0] ?? 0);
+            $materiaId = (int) ($partes[1] ?? 0);
+            if ($alunoId <= 0 || $materiaId <= 0) {
+                continue;
+            }
+            $faltantes[$chave] = (float) $nota;
+            $alunoIds[$alunoId] = true;
+            $materiaIds[$materiaId] = true;
+        }
+        if ($faltantes === []) {
+            return [];
+        }
+
+        $nomesAluno = $this->mapaNomesAlunosTurmas(array_keys($alunoIds), $turmaIds);
+        $nomesMateria = $this->mapaNomesMaterias(array_keys($materiaIds));
+        $out = [];
+        foreach ($faltantes as $chave => $notaNum) {
+            $partes = explode('|', $chave, 2);
+            $alunoId = (int) $partes[0];
+            $materiaId = (int) $partes[1];
+            $info = $nomesAluno[$alunoId] ?? null;
+            if ($info === null) {
+                continue;
+            }
+            $notaArred = round($notaNum, 2);
+            $out[] = [
+                'id' => $alunoId,
+                'nome' => (string) ($info['nome'] ?? ''),
+                'turma_id' => (int) ($info['turma_id'] ?? 0),
+                'turma' => (string) ($info['turma'] ?? ''),
+                'materia_id' => $materiaId,
+                'materia' => (string) ($nomesMateria[$materiaId] ?? ''),
+                'nota' => $notaArred,
+                'abaixo' => $notaArred < $media,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<int> $alunoIds
+     * @param list<int> $turmaIds
+     * @return array<int,array{nome:string,turma_id:int,turma:string}>
+     */
+    private function mapaNomesAlunosTurmas(array $alunoIds, array $turmaIds): array
+    {
+        $alunoIds = array_values(array_unique(array_filter(array_map('intval', $alunoIds))));
+        $turmaIds = array_values(array_unique(array_filter(array_map('intval', $turmaIds))));
+        if ($alunoIds === [] || $turmaIds === []) {
+            return [];
+        }
+        $params = [];
+        $phAluno = [];
+        foreach ($alunoIds as $i => $id) {
+            $k = 'a' . $i;
+            $phAluno[] = ':' . $k;
+            $params[$k] = $id;
+        }
+        $phTurma = [];
+        foreach ($turmaIds as $i => $id) {
+            $k = 't' . $i;
+            $phTurma[] = ':' . $k;
+            $params[$k] = $id;
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                'SELECT a.id, a.nome, t.id AS turma_id, t.nome AS turma_nome
+                   FROM alunos a
+                   INNER JOIN turmas t ON t.id = a.turma_id
+                  WHERE a.id IN (' . implode(', ', $phAluno) . ')
+                    AND a.turma_id IN (' . implode(', ', $phTurma) . ')',
+                $params
+            ) ?: [];
+        } catch (Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $out[$id] = [
+                'nome' => (string) ($row['nome'] ?? ''),
+                'turma_id' => (int) ($row['turma_id'] ?? 0),
+                'turma' => (string) ($row['turma_nome'] ?? ''),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<int> $materiaIds
+     * @return array<int,string>
+     */
+    private function mapaNomesMaterias(array $materiaIds): array
+    {
+        $materiaIds = array_values(array_unique(array_filter(array_map('intval', $materiaIds))));
+        if ($materiaIds === []) {
+            return [];
+        }
+        $params = [];
+        $ph = [];
+        foreach ($materiaIds as $i => $id) {
+            $k = 'm' . $i;
+            $ph[] = ':' . $k;
+            $params[$k] = $id;
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                'SELECT id, nome FROM materias WHERE id IN (' . implode(', ', $ph) . ')',
+                $params
+            ) ?: [];
+        } catch (Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $out[$id] = (string) ($row['nome'] ?? '');
+            }
+        }
+
+        return $out;
     }
 
     /**

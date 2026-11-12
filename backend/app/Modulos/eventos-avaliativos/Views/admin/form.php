@@ -320,6 +320,12 @@ foreach ($familiasTituloJs as $paiTitulo => $cfgTitulo) {
                             Puxar alunos abaixo da média
                         </button>
                     </div>
+                    <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                        Você pode criar o evento agora. O vínculo automático de quem ficou abaixo da média depende das notas
+                        já lançadas (e da <strong>Média do Ciclo</strong> no boletim, se o bloco de cálculo estiver flagado).
+                        Se a média ainda não estiver disponível, salve o evento e volte depois para marcar os alunos.
+                    </div>
+                    <p id="recuperacao-aviso-media" class="hidden mt-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-950"></p>
                     <input type="hidden" name="definir_alunos_recuperacao" id="definir-alunos-recuperacao" value="<?= $alunosRecuperacaoMarcados !== [] ? '1' : '0' ?>">
                     <p id="recuperacao-resumo" class="mt-3 text-xs text-gray-500">Marque as turmas para listar os alunos.</p>
                     <div id="recuperacao-lista" class="mt-4"></div>
@@ -2927,6 +2933,7 @@ foreach ($familiasTituloJs as $paiTitulo => $cfgTitulo) {
     if (!painel) return;
     var lista = document.getElementById('recuperacao-lista');
     var resumo = document.getElementById('recuperacao-resumo');
+    var avisoMedia = document.getElementById('recuperacao-aviso-media');
     var botao = document.getElementById('btn-puxar-abaixo');
     var definir = document.getElementById('definir-alunos-recuperacao');
     var marcados = {};
@@ -2938,6 +2945,29 @@ foreach ($familiasTituloJs as $paiTitulo => $cfgTitulo) {
     var media = 6;
     var pedido = 0;
     var tabelaPronta = true;
+    var mediaCicloPendente = false;
+
+    function atualizarAvisoMedia(dados) {
+        if (!avisoMedia) return;
+        var cfg = !!(dados && dados.media_ciclo_configurada);
+        var pend = !!(dados && dados.media_ciclo_pendente);
+        mediaCicloPendente = cfg && pend;
+        if (!cfg) {
+            avisoMedia.classList.add('hidden');
+            avisoMedia.textContent = '';
+            return;
+        }
+        if (pend) {
+            avisoMedia.textContent = 'A média do ciclo ainda não está disponível. Lance as notas das peças da fórmula e flague o bloco no boletim; depois use “Puxar alunos abaixo da média”. O evento pode ser salvo agora.';
+            avisoMedia.classList.remove('hidden');
+            return;
+        }
+        var cod = String((dados && dados.media_ciclo_codigo) || '').trim();
+        avisoMedia.textContent = 'Usando a Média do Ciclo do boletim'
+            + (cod ? (' (“' + cod + '”)') : '')
+            + ' para indicar quem ficou abaixo.';
+        avisoMedia.classList.remove('hidden');
+    }
 
     function turmasMarcadas() {
         var ids = [];
@@ -3090,9 +3120,13 @@ foreach ($familiasTituloJs as $paiTitulo => $cfgTitulo) {
         if (definir && achou) definir.value = '1';
         desenhar();
         if (!achou) {
-            resumo.textContent = alunos.length
-                ? 'Nenhum aluno ficou abaixo da média. Você ainda pode marcar quem quiser fazer a prova.'
-                : 'Marque as turmas para listar os alunos.';
+            if (mediaCicloPendente) {
+                resumo.textContent = 'A média do ciclo ainda não está disponível para marcar automaticamente. Você ainda pode marcar quem quiser fazer a prova.';
+            } else {
+                resumo.textContent = alunos.length
+                    ? 'Nenhum aluno ficou abaixo da média. Você ainda pode marcar quem quiser fazer a prova.'
+                    : 'Marque as turmas para listar os alunos.';
+            }
         }
     }
 
@@ -3124,6 +3158,7 @@ foreach ($familiasTituloJs as $paiTitulo => $cfgTitulo) {
                 }
                 media = Number(dados.media) || 6;
                 tabelaPronta = dados.tabela !== false;
+                atualizarAvisoMedia(dados);
                 alunos = (dados.alunos || []).map(function (aluno) {
                     return {
                         id: parseInt(aluno.id, 10) || 0,
@@ -3138,7 +3173,9 @@ foreach ($familiasTituloJs as $paiTitulo => $cfgTitulo) {
                 });
                 if (!alunos.length) {
                     lista.innerHTML = '';
-                    resumo.textContent = 'Nenhuma nota do período nessas turmas para separar por matéria.';
+                    resumo.textContent = mediaCicloPendente
+                        ? 'A média do ciclo ainda não está disponível. Lance as notas e volte para vincular os alunos.'
+                        : 'Nenhuma nota do período nessas turmas para separar por matéria.';
                     return;
                 }
                 if (puxar) puxarAbaixo();

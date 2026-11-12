@@ -340,7 +340,7 @@ class BoletimGeradosExportacao
             if (!empty($col['faltas']) || !empty($col['inteiro'])) {
                 return number_format((float) round((float) $nv), 0, ',', '');
             }
-            $casas = $casas === 1 ? 1 : 2;
+            $casas = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($casas);
             return number_format((float) $nv, $casas, ',', '');
         }
         return trim((string) $nv);

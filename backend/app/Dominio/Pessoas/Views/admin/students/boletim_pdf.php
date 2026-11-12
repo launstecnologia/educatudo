@@ -273,7 +273,9 @@ $buildGroupedBoletimHeader = static function (array $cols): array {
             <?php
             $cols = is_array($ev['colunas'] ?? null) ? $ev['colunas'] : [];
             $linhas = is_array($ev['linhas'] ?? null) ? $ev['linhas'] : [];
-            $decimalPlaces = ((int) ($ev['decimal_places'] ?? 2) === 1) ? 1 : 2;
+            $decimalPlaces = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
+                $ev['decimal_places'] ?? 2
+            );
             if ($cols === [] || $linhas === []) {
                 continue;
             }

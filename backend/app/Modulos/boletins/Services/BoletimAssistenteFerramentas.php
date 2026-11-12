@@ -1917,7 +1917,7 @@ class BoletimAssistenteFerramentas
             'materias_ids' => $this->decodeIdsJson($regra['materias_ids'] ?? null),
             'series_ids' => $this->decodeIdsJson($regra['series_ids'] ?? null),
             'round_mode' => (string) ($regra['round_mode'] ?? 'none'),
-            'decimal_places' => ((int) ($regra['decimal_places'] ?? 2) === 1) ? 1 : 2,
+            'decimal_places' => \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($regra['decimal_places'] ?? 2),
             'nota_minima_aprovacao' => isset($regra['nota_minima_aprovacao']) ? (float) $regra['nota_minima_aprovacao'] : null,
             // Sem extras_json o assistente perde REC/PF/eventos_avaliativos_ids ao reabrir.
             'extras_json' => is_string($regra['extras_json'] ?? null)

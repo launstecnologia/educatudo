@@ -93,7 +93,7 @@ $fmtResumo = static function ($valor, string $chave, int $dec): string {
         $colunasR = is_array($resumo['colunas'] ?? null) ? $resumo['colunas'] : \App\Helpers\BoletimQuadroLayoutHelper::chavesResumoNotas();
         $rotulosR = is_array($resumo['rotulos'] ?? null) ? $resumo['rotulos'] : \App\Helpers\BoletimQuadroLayoutHelper::rotulosResumoNotas();
         $linhasR = is_array($resumo['linhas'] ?? null) ? $resumo['linhas'] : [];
-        $decR = ((int) ($resumo['decimal_places'] ?? 2) === 1) ? 1 : 2;
+        $decR = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($resumo['decimal_places'] ?? 2);
         $tituloR = trim((string) ($resumo['titulo'] ?? 'Notas'));
         $subR = trim((string) ($resumo['subtitulo'] ?? ''));
         ?>

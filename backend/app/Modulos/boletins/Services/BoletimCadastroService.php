@@ -283,6 +283,7 @@ class BoletimCadastroService
                 'escala_max' => (float) ($criterios['escala_max'] ?? 10.0),
                 'round_mode' => $criterios['round_mode'],
                 'decimal_places' => $criterios['decimal_places'],
+                'escopo_arredondamento' => $criterios['escopo_arredondamento'],
             ];
         }
         return $out;

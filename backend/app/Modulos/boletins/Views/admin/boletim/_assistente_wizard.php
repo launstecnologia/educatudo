@@ -2163,6 +2163,7 @@ $boletimWizardSteps = [
                 : 10,
             round_mode: 'none',
             decimal_places: 2,
+            escopo_arredondamento: 'medias',
             pecas: [],
             pecas_opcoes: {},
             materia_unica: 0,
@@ -2175,6 +2176,7 @@ $boletimWizardSteps = [
             formulas_materias_blocos: {},
             nomes_blocos: {},
             escalas_blocos: {},
+            media_ciclo_blocos: {},
             nomes_limpos: {},
             bloco_calc: '',
             materia_calc: 0,
@@ -2270,6 +2272,9 @@ $boletimWizardSteps = [
         if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
         if (!estado.escalas_blocos || typeof estado.escalas_blocos !== 'object' || Array.isArray(estado.escalas_blocos)) {
             estado.escalas_blocos = {};
+        }
+        if (!estado.media_ciclo_blocos || typeof estado.media_ciclo_blocos !== 'object' || Array.isArray(estado.media_ciclo_blocos)) {
+            estado.media_ciclo_blocos = {};
         }
         if (!Array.isArray(estado.blocos_calc)) estado.blocos_calc = [];
         if (estado.bloco_calc == null) estado.bloco_calc = '';
@@ -4101,7 +4106,7 @@ $boletimWizardSteps = [
         function ehMuAuto(cod) { return /^b[1-4]_mu$/i.test(String(cod || '')); }
         estado.blocos_calc = (estado.blocos_calc || []).filter(function (c) { return !ehMuAuto(c); });
         estado.colunas_ordem = (estado.colunas_ordem || []).filter(function (c) { return !ehMuAuto(c); });
-        ['formulas_blocos', 'nomes_blocos', 'escalas_blocos', 'formulas_materias_blocos'].forEach(function (chave) {
+        ['formulas_blocos', 'nomes_blocos', 'escalas_blocos', 'media_ciclo_blocos', 'formulas_materias_blocos'].forEach(function (chave) {
             if (!estado[chave] || typeof estado[chave] !== 'object') return;
             Object.keys(estado[chave]).forEach(function (cod) {
                 if (ehMuAuto(cod)) delete estado[chave][cod];
@@ -4162,6 +4167,8 @@ $boletimWizardSteps = [
         }
         var inpEsc = document.getElementById('bw-formula-bloco-escala-input');
         if (inpEsc) inpEsc.value = String(escalaBlocoCalc(codigo));
+        var inpCiclo = document.getElementById('bw-formula-media-ciclo');
+        if (inpCiclo) inpCiclo.checked = blocoEhMediaCiclo(codigo);
         renderFormulaCanvas();
         var lista = document.getElementById('bw-colunas-lista');
         if (lista) {
@@ -5028,6 +5035,27 @@ $boletimWizardSteps = [
         return !!fecharFormulaAposSalvar;
     }
 
+    function blocoEhMediaCiclo(codigo) {
+        codigo = String(codigo || '');
+        if (!codigo || !estado || !estado.media_ciclo_blocos) return false;
+        return !!estado.media_ciclo_blocos[codigo] || !!estado.media_ciclo_blocos[codigo.toLowerCase()];
+    }
+
+    function flushMediaCicloAberta() {
+        if (!estado || !estado.bloco_calc) return;
+        if (!estado.media_ciclo_blocos || typeof estado.media_ciclo_blocos !== 'object') {
+            estado.media_ciclo_blocos = {};
+        }
+        var el = document.getElementById('bw-formula-media-ciclo');
+        var low = String(estado.bloco_calc).toLowerCase();
+        Object.keys(estado.media_ciclo_blocos).forEach(function (k) {
+            if (String(k).toLowerCase() === low) delete estado.media_ciclo_blocos[k];
+        });
+        if (el && el.checked) {
+            estado.media_ciclo_blocos[estado.bloco_calc] = 1;
+        }
+    }
+
     function salvarBlocoCalc() {
         if (!estado || !estado.bloco_calc) {
             var edVazio = document.getElementById('bw-formula-editor');
@@ -5041,6 +5069,7 @@ $boletimWizardSteps = [
         if (!Array.isArray(estado.colunas_ordem)) estado.colunas_ordem = [];
         aplicarTituloBloco(estado.bloco_calc, nome);
         flushEscalaAberta();
+        flushMediaCicloAberta();
         var codigoSalvo = estado.bloco_calc;
         if (codigoSalvo) mostrarColuna(codigoSalvo);
         if (codigoSalvo && estado.blocos_calc.indexOf(codigoSalvo) < 0) {
@@ -5213,6 +5242,11 @@ $boletimWizardSteps = [
                 if (String(k).toLowerCase() === low) delete estado.escalas_blocos[k];
             });
         }
+        if (estado.media_ciclo_blocos) {
+            Object.keys(estado.media_ciclo_blocos).forEach(function (k) {
+                if (String(k).toLowerCase() === low) delete estado.media_ciclo_blocos[k];
+            });
+        }
         if (String(estado.bloco_calc || '').toLowerCase() === low) {
             estado.bloco_calc = '';
             estado.materia_calc = 0;
@@ -5273,6 +5307,7 @@ $boletimWizardSteps = [
         estado.formulas_materias_blocos = {};
         estado.nomes_blocos = {};
         estado.escalas_blocos = {};
+        estado.media_ciclo_blocos = {};
         estado.colunas_ordem = [];
         estado.linhas_layout = [];
         estado.cabecalhos_manuais = 1;
@@ -5503,13 +5538,21 @@ $boletimWizardSteps = [
         });
     }
 
+    /** Casas da regra de aprovação: 0, 1 ou 2 (0 = Nenhuma). Ausente → 2. */
+    function normalizarCasasDecimais(v) {
+        if (v === null || v === undefined || v === '') return 2;
+        var n = Number(v);
+        if (n === 0 || n === 1) return n;
+        return 2;
+    }
+
     function casasDoBoletimVinculado() {
         var bolId = estado && Number(estado.boletim_id);
         if (!(bolId > 0) || !catalogo || !Array.isArray(catalogo.boletins)) return null;
         for (var i = 0; i < catalogo.boletins.length; i++) {
             var b = catalogo.boletins[i];
             if (Number(b.id) === bolId && b.decimal_places != null && b.decimal_places !== '') {
-                return Number(b.decimal_places) === 1 ? 1 : 2;
+                return normalizarCasasDecimais(b.decimal_places);
             }
         }
         return null;
@@ -5521,7 +5564,7 @@ $boletimWizardSteps = [
             if (estado) estado.decimal_places = doBoletim;
             return doBoletim;
         }
-        return (estado && Number(estado.decimal_places) === 1) ? 1 : 2;
+        return normalizarCasasDecimais(estado && estado.decimal_places);
     }
 
     function fmtPreviewNota(v) {
@@ -5553,15 +5596,19 @@ $boletimWizardSteps = [
     function roundPreviewValor(v) {
         var n = Number(v);
         if (!isFinite(n)) return v;
-        if (!estado || estado.round_mode !== 'half') {
-            var fatorCasas = Math.pow(10, casasDecimaisPreview());
-            return Math.round(n * fatorCasas) / fatorCasas;
+        var casas = casasDecimaisPreview();
+        if (estado && estado.round_mode === 'half') {
+            var base = Math.floor(n);
+            var dec = n - base;
+            if (dec < 0.25) n = base;
+            else if (dec < 0.75) n = base + 0.5;
+            else n = base + 1;
+            // Com “Nenhuma” casa, a faixa .50 vira inteiro (ex.: 57,5 → 58).
+            if (casas === 0) return Math.round(n);
+            return n;
         }
-        var base = Math.floor(n);
-        var dec = n - base;
-        if (dec < 0.25) return base;
-        if (dec < 0.75) return base + 0.5;
-        return base + 1;
+        var fatorCasas = Math.pow(10, casas);
+        return Math.round(n * fatorCasas) / fatorCasas;
     }
 
     function arredondamentoGrupoAtual() {
@@ -9577,6 +9624,12 @@ $boletimWizardSteps = [
             } else if (estado.escalas_blocos[novoCod] == null) {
                 estado.escalas_blocos[novoCod] = escalaPadraoRegra();
             }
+            if (!estado.media_ciclo_blocos || typeof estado.media_ciclo_blocos !== 'object') {
+                estado.media_ciclo_blocos = {};
+            }
+            if (blocoEhMediaCiclo(cod)) {
+                estado.media_ciclo_blocos[novoCod] = 1;
+            }
             if (estado.blocos_calc.indexOf(novoCod) < 0) estado.blocos_calc.push(novoCod);
             mostrarColuna(novoCod);
             garantirComponenteManualNoRascunho(novoCod, estado.nomes_blocos[novoCod]);
@@ -10671,10 +10724,10 @@ $boletimWizardSteps = [
         var roundEl = document.querySelector('[name="round_mode"]');
         if (roundEl && r.round_mode) roundEl.value = r.round_mode;
         if (r.decimal_places != null) {
-            estado.decimal_places = Number(r.decimal_places) === 1 ? 1 : 2;
+            estado.decimal_places = normalizarCasasDecimais(r.decimal_places);
         }
         var decEl = document.querySelector('[name="decimal_places"]');
-        if (decEl && estado.decimal_places) {
+        if (decEl && estado.decimal_places != null && estado.decimal_places !== '') {
             decEl.value = String(estado.decimal_places);
         }
         var exibirEl = document.querySelector('[name="exibir_em"]');
@@ -11236,7 +11289,8 @@ $boletimWizardSteps = [
             estado.nota_minima_origem = bol.minima_origem === 'regra' ? 'regra' : 'padrao';
             estado.nota_minima_regra_nome = estado.nota_minima_origem === 'regra' ? (bol.regra_nome || '') : '';
             estado.round_mode = bol.round_mode || 'none';
-            estado.decimal_places = Number(bol.decimal_places) === 1 ? 1 : 2;
+            estado.decimal_places = normalizarCasasDecimais(bol.decimal_places);
+            estado.escopo_arredondamento = bol.escopo_arredondamento === 'todas' ? 'todas' : 'medias';
             if (bol.escala_max != null && Number(bol.escala_max) >= 0.01) {
                 estado.escala_max_padrao = Number(bol.escala_max);
             } else if (catalogo && catalogo.escala_max_padrao != null) {
@@ -11256,7 +11310,8 @@ $boletimWizardSteps = [
             rascunhoAtual.nota_minima_regra_nome = estado.nota_minima_regra_nome;
             rascunhoAtual.boletim_id = estado.boletim_id;
             rascunhoAtual.round_mode = estado.round_mode || 'none';
-            rascunhoAtual.decimal_places = Number(estado.decimal_places) === 1 ? 1 : 2;
+            rascunhoAtual.decimal_places = normalizarCasasDecimais(estado.decimal_places);
+            rascunhoAtual.escopo_arredondamento = estado.escopo_arredondamento === 'todas' ? 'todas' : 'medias';
         }
         var roundEl = document.querySelector('[name="round_mode"]');
         if (roundEl && estado.round_mode) roundEl.value = estado.round_mode;
@@ -11741,6 +11796,9 @@ $boletimWizardSteps = [
                     html += '<button type="button" class="bw-escala-atalho h-8 px-2 text-xs rounded-md border border-amber-200 text-amber-900 hover:bg-amber-100" data-escala="' + v + '">' + v + '</button>';
                 });
                 html += '</div>';
+                html += '<label class="inline-flex items-center gap-1.5 h-10 px-2 rounded-lg border border-amber-200 bg-white text-xs text-amber-950 cursor-pointer select-none" title="Usa esta coluna para marcar quem ficou abaixo da média na recuperação">'
+                    + '<input type="checkbox" id="bw-formula-media-ciclo" class="rounded border-amber-300 text-amber-600"'
+                    + (blocoEhMediaCiclo(estado.bloco_calc || '') ? ' checked' : '') + '> Média do Ciclo</label>';
                 html += '<div class="flex flex-col items-end gap-1">';
                 html += '<button type="button" id="bw-formula-salvar" class="h-10 px-4 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700">Salvar bloco</button>';
                 html += '<label class="inline-flex items-center gap-1.5 text-[11px] text-amber-950/80 cursor-pointer select-none">'
@@ -11751,7 +11809,8 @@ $boletimWizardSteps = [
                 html += '</div>';
                 html += '<p class="text-[11px] text-amber-900/80 mb-2">Valor máximo vem da <strong>Regra de Aprovação</strong> (escala '
                     + esc(String(escalaPadraoRegra()))
-                    + '). Corta o resultado da fórmula — em <strong>Resultado Final × 2</strong>, use o dobro.</p>';
+                    + '). Corta o resultado da fórmula — em <strong>Resultado Final × 2</strong>, use o dobro. '
+                    + '<strong>Média do Ciclo</strong> alimenta a convocação da recuperação.</p>';
                 html += '<p id="bw-formula-bloco-titulo" class="text-sm font-semibold text-amber-950">Cálculo de <span id="bw-formula-bloco-nome">' + esc(nomeBlocoCalc(estado.bloco_calc || 'média')) + '</span></p>';
                 html += '<p id="bw-formula-bloco-ajuda" class="text-xs text-amber-900/80 mt-0.5 mb-2">A média é a soma entre parênteses, depois ÷ quantidade. Ex.: (Prova + Trabalho + Participação) ÷ 3.</p>';
                 html += '<div class="bw-formula-workspace mt-1">';
@@ -12753,10 +12812,15 @@ $boletimWizardSteps = [
         aplicarNomesNoRascunho(estado && estado.rascunho_preservado);
         aplicarMateriaUnicaNasPecas();
         zerarFormulasDemonstrativoNotas();
-        if (estado.bloco_calc && !ehDemonstrativoNotas()) gravarTokensBlocoAberto();
+        if (estado.bloco_calc && !ehDemonstrativoNotas()) {
+            gravarTokensBlocoAberto();
+            flushEscalaAberta();
+            flushMediaCicloAberta();
+        }
         var versaoEnvio = formulaVersao;
         var nomesLocal = JSON.parse(JSON.stringify(estado.nomes_blocos || {}));
         var escalasLocal = JSON.parse(JSON.stringify(estado.escalas_blocos || {}));
+        var mediaCicloLocal = JSON.parse(JSON.stringify(estado.media_ciclo_blocos || {}));
         var formulaLocal = JSON.parse(JSON.stringify(estado.formulas_blocos || {}));
         var excecoesLocal = JSON.parse(JSON.stringify(estado.formulas_materias_blocos || {}));
         var tokensLocal = (estado.formula_tokens || []).slice();
@@ -12823,6 +12887,19 @@ $boletimWizardSteps = [
                     escalasAgora[cod] = Math.min(999, Math.round(escR * 100) / 100);
                 });
                 remoto.escalas_blocos = escalasAgora;
+                var cicloAgora = {};
+                var fonteCiclo = (estado && estado.media_ciclo_blocos && typeof estado.media_ciclo_blocos === 'object' && !Array.isArray(estado.media_ciclo_blocos))
+                    ? estado.media_ciclo_blocos
+                    : (mediaCicloLocal || {});
+                Object.keys(fonteCiclo).forEach(function (cod) {
+                    if (!cod || !fonteCiclo[cod]) return;
+                    cicloAgora[cod] = 1;
+                });
+                Object.keys(remoto.media_ciclo_blocos || {}).forEach(function (cod) {
+                    if (cicloAgora[cod]) return;
+                    if ((remoto.media_ciclo_blocos || {})[cod]) cicloAgora[cod] = 1;
+                });
+                remoto.media_ciclo_blocos = cicloAgora;
                 var limposAgora = {};
                 var fonteLimpos = (estado && estado.nomes_limpos && typeof estado.nomes_limpos === 'object' && !Array.isArray(estado.nomes_limpos))
                     ? estado.nomes_limpos : {};
@@ -13203,7 +13280,7 @@ $boletimWizardSteps = [
             add('default_data_inicio', r.default_data_inicio || '');
             add('default_data_fim', r.default_data_fim || '');
             add('round_mode', r.round_mode || 'none');
-            add('decimal_places', (Number(r.decimal_places) === 1 ? 1 : 2));
+            add('decimal_places', normalizarCasasDecimais(r.decimal_places));
             var infoMin = minimaExibida();
             r.nota_minima_aprovacao = infoMin.valor;
             r.nota_minima_origem = infoMin.origem;

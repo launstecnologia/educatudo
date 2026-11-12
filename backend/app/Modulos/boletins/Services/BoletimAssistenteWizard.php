@@ -580,6 +580,7 @@ class BoletimAssistenteWizard
                 'escala_max' => $bol['escala_max'] ?? null,
                 'round_mode' => $bol['round_mode'] ?? 'none',
                 'decimal_places' => $bol['decimal_places'] ?? 2,
+                'escopo_arredondamento' => (($bol['escopo_arredondamento'] ?? '') === 'todas') ? 'todas' : 'medias',
                 'minima_origem' => (($bol['minima_origem'] ?? '') === 'regra') ? 'regra' : 'padrao',
                 'regra_nome' => (string) ($bol['regra_nome'] ?? ''),
                 'regra' => (($bol['minima_origem'] ?? '') === 'regra') ? ['nome' => (string) ($bol['regra_nome'] ?? '')] : null,
@@ -612,6 +613,8 @@ class BoletimAssistenteWizard
         $estado['decimal_places'] = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
             $criterios['decimal_places'] ?? 2
         );
+        $escopoBol = strtolower(trim((string) ($criterios['escopo_arredondamento'] ?? 'medias')));
+        $estado['escopo_arredondamento'] = $escopoBol === 'todas' ? 'todas' : 'medias';
         $estado['nota_minima_aprovacao'] = (float) ($criterios['nota_minima_aprovacao'] ?? 6);
         $estado['nota_minima_origem'] = 'regra';
         $estado['nota_minima_regra_nome'] = (string) ($criterios['regra_nome'] ?? '');
@@ -789,6 +792,7 @@ class BoletimAssistenteWizard
             'nota_minima_regra_nome' => '',
             'round_mode' => 'none',
             'decimal_places' => 2,
+            'escopo_arredondamento' => 'medias',
             'pecas' => [],
             'pecas_opcoes' => $this->pecasOpcoesPadrao([]),
             'eventos_ids' => [],
@@ -805,6 +809,7 @@ class BoletimAssistenteWizard
             'formulas_materias_blocos' => [],
             'nomes_blocos' => [],
             'escalas_blocos' => [],
+            'media_ciclo_blocos' => [],
             'bloco_calc' => '',
             'materia_calc' => 0,
             'blocos_calc' => [],
@@ -902,7 +907,7 @@ class BoletimAssistenteWizard
                 $estado['round_mode'] = (string) $estadoFormulario['round_mode'];
             }
             if (isset($estadoFormulario['decimal_places']) && $estadoFormulario['decimal_places'] !== '') {
-                $estado['decimal_places'] = ((int) $estadoFormulario['decimal_places'] === 1) ? 1 : 2;
+                $estado['decimal_places'] = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($estadoFormulario['decimal_places']);
             }
             $estado['series_ids'] = array_values(array_map('intval', (array) ($estadoFormulario['series_ids'] ?? [])));
             $estado['turmas_ids'] = array_values(array_map('intval', (array) ($estadoFormulario['turmas_ids'] ?? [])));
@@ -967,7 +972,7 @@ class BoletimAssistenteWizard
                     'materias_ids' => $estado['materias_ids'],
                     'series_ids' => $estado['series_ids'],
                     'round_mode' => $estado['round_mode'],
-                    'decimal_places' => ((int) ($estado['decimal_places'] ?? 2) === 1) ? 1 : 2,
+                    'decimal_places' => \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($estado['decimal_places'] ?? 2),
                     'nota_minima_aprovacao' => $estado['nota_minima_aprovacao'],
                     'componentes' => $comps,
                 ];
@@ -1269,7 +1274,7 @@ class BoletimAssistenteWizard
             $rascunho['boletim_id'] = (int) ($estado['boletim_id'] ?? $rascunho['boletim_id'] ?? 0);
             $rascunho['grupo_regras_notas_id'] = (int) ($estado['grupo_regras_notas_id'] ?? $rascunho['grupo_regras_notas_id'] ?? 0);
             $rascunho['round_mode'] = (string) ($estado['round_mode'] ?? $rascunho['round_mode'] ?? 'none');
-            $rascunho['decimal_places'] = ((int) ($estado['decimal_places'] ?? $rascunho['decimal_places'] ?? 2) === 1) ? 1 : 2;
+            $rascunho['decimal_places'] = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($estado['decimal_places'] ?? $rascunho['decimal_places'] ?? 2);
             $rascunho['nota_minima_aprovacao'] = $estado['nota_minima_aprovacao'] ?? $rascunho['nota_minima_aprovacao'] ?? 6;
             $rascunho['nota_minima_origem'] = (string) ($estado['nota_minima_origem'] ?? $rascunho['nota_minima_origem'] ?? 'padrao');
             $rascunho['nota_minima_regra_nome'] = (string) ($estado['nota_minima_regra_nome'] ?? $rascunho['nota_minima_regra_nome'] ?? '');
@@ -2232,6 +2237,7 @@ class BoletimAssistenteWizard
         $merged['formulas_materias_blocos'] = $this->normalizarFormulasMateriasBlocos($merged['formulas_materias_blocos'] ?? []);
         $merged['nomes_blocos'] = $this->normalizarNomesBlocos($merged['nomes_blocos'] ?? []);
         $merged['escalas_blocos'] = $this->normalizarEscalasBlocos($merged['escalas_blocos'] ?? []);
+        $merged['media_ciclo_blocos'] = $this->normalizarMediaCicloBlocos($merged['media_ciclo_blocos'] ?? []);
         $merged['nomes_limpos'] = $this->normalizarNomesLimpos($merged['nomes_limpos'] ?? []);
         $merged['blocos_calc'] = $this->normalizarColunasOrdem($merged['blocos_calc'] ?? []);
         $merged['bloco_calc'] = strtolower(trim((string) ($merged['bloco_calc'] ?? '')));
@@ -2420,6 +2426,7 @@ class BoletimAssistenteWizard
         }
         $this->reidratarNomesDosComponentes($merged);
         $this->reidratarEscalasDosComponentes($merged);
+        $this->reidratarMediaCicloDosComponentes($merged);
         $this->reidratarFormulasDosComponentes($merged);
         return $merged;
     }
@@ -2496,6 +2503,33 @@ class BoletimAssistenteWizard
                 continue;
             }
             $estado['escalas_blocos'][$cod] = min(999.0, $escala);
+        }
+    }
+
+    /**
+     * Flag “Média do Ciclo” gravada no componente volta para o editor.
+     *
+     * @param array<string,mixed> $estado
+     */
+    private function reidratarMediaCicloDosComponentes(array &$estado): void
+    {
+        if (!is_array($estado['media_ciclo_blocos'] ?? null)) {
+            $estado['media_ciclo_blocos'] = [];
+        }
+        $rascunho = is_array($estado['rascunho_preservado'] ?? null) ? $estado['rascunho_preservado'] : [];
+        $comps = is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : [];
+        foreach ($comps as $c) {
+            if (!is_array($c) || (string) ($c['source_type'] ?? '') !== 'calculado') {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if ($cod === '' || isset($estado['media_ciclo_blocos'][$cod])) {
+                continue;
+            }
+            $cfg = is_array($c['config'] ?? null) ? $c['config'] : [];
+            if (!empty($cfg['media_ciclo'])) {
+                $estado['media_ciclo_blocos'][$cod] = 1;
+            }
         }
     }
 
@@ -3049,7 +3083,7 @@ class BoletimAssistenteWizard
             'materias_ids' => $estado['materias_ids'] !== [] ? $estado['materias_ids'] : ($regra['materias_ids'] ?? []),
             'series_ids' => $estado['series_ids'] !== [] ? $estado['series_ids'] : ($regra['series_ids'] ?? []),
             'round_mode' => (string) ($estado['round_mode'] ?? $regra['round_mode'] ?? 'none'),
-            'decimal_places' => ((int) ($estado['decimal_places'] ?? $regra['decimal_places'] ?? 2) === 1) ? 1 : 2,
+            'decimal_places' => \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($estado['decimal_places'] ?? $regra['decimal_places'] ?? 2),
             'nota_minima_aprovacao' => $this->minimaDaClonagem($estado, $regra['nota_minima_aprovacao'] ?? null),
             'nota_minima_origem' => $this->origemDaClonagem($estado, $regra['nota_minima_aprovacao'] ?? null),
             'nota_minima_regra_nome' => $this->origemDaClonagem($estado, $regra['nota_minima_aprovacao'] ?? null) === 'regra'
@@ -3122,7 +3156,7 @@ class BoletimAssistenteWizard
             'materias_ids' => $estado['materias_ids'],
             'series_ids' => $estado['series_ids'],
             'round_mode' => (string) ($estado['round_mode'] ?? 'none'),
-            'decimal_places' => ((int) ($estado['decimal_places'] ?? 2) === 1) ? 1 : 2,
+            'decimal_places' => \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($estado['decimal_places'] ?? 2),
             'nota_minima_aprovacao' => (float) ($estado['nota_minima_aprovacao'] ?? 6),
             'nota_minima_origem' => (string) ($estado['nota_minima_origem'] ?? 'padrao'),
             'nota_minima_regra_nome' => (string) ($estado['nota_minima_regra_nome'] ?? ''),
@@ -4825,7 +4859,7 @@ class BoletimAssistenteWizard
             'materias_ids' => $estado['materias_ids'] ?? [],
             'series_ids' => $estado['series_ids'] ?? [],
             'round_mode' => (string) ($estado['round_mode'] ?? 'none'),
-            'decimal_places' => ((int) ($estado['decimal_places'] ?? 2) === 1) ? 1 : 2,
+            'decimal_places' => \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($estado['decimal_places'] ?? 2),
             'nota_minima_aprovacao' => (float) ($estado['nota_minima_aprovacao'] ?? 6),
             'nota_minima_origem' => (string) ($estado['nota_minima_origem'] ?? 'padrao'),
             'nota_minima_regra_nome' => (string) ($estado['nota_minima_regra_nome'] ?? ''),
@@ -5377,7 +5411,7 @@ class BoletimAssistenteWizard
                 static fn ($cod) => !preg_match('/^b[1-4]_mu$/i', (string) $cod)
             ));
         }
-        foreach (['formulas_blocos', 'nomes_blocos', 'escalas_blocos', 'formulas_materias_blocos'] as $chave) {
+        foreach (['formulas_blocos', 'nomes_blocos', 'escalas_blocos', 'media_ciclo_blocos', 'formulas_materias_blocos'] as $chave) {
             if (!is_array($estado[$chave] ?? null)) {
                 continue;
             }
@@ -6079,7 +6113,7 @@ class BoletimAssistenteWizard
             'materias_ids' => $estado['materias_ids'] ?? [],
             'series_ids' => $estado['series_ids'] ?? [],
             'round_mode' => (string) ($estado['round_mode'] ?? 'none'),
-            'decimal_places' => ((int) ($estado['decimal_places'] ?? 2) === 1) ? 1 : 2,
+            'decimal_places' => \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($estado['decimal_places'] ?? 2),
             'nota_minima_aprovacao' => (float) ($estado['nota_minima_aprovacao'] ?? 6),
             'nota_minima_origem' => (string) ($estado['nota_minima_origem'] ?? 'padrao'),
             'nota_minima_regra_nome' => (string) ($estado['nota_minima_regra_nome'] ?? ''),
@@ -6315,7 +6349,7 @@ class BoletimAssistenteWizard
             'materias_ids' => $estado['materias_ids'] ?? [],
             'series_ids' => $estado['series_ids'] ?? [],
             'round_mode' => (string) ($estado['round_mode'] ?? 'none'),
-            'decimal_places' => ((int) ($estado['decimal_places'] ?? 2) === 1) ? 1 : 2,
+            'decimal_places' => \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($estado['decimal_places'] ?? 2),
             'nota_minima_aprovacao' => (float) ($estado['nota_minima_aprovacao'] ?? 6),
             'nota_minima_origem' => (string) ($estado['nota_minima_origem'] ?? 'padrao'),
             'nota_minima_regra_nome' => (string) ($estado['nota_minima_regra_nome'] ?? ''),
@@ -6594,6 +6628,46 @@ class BoletimAssistenteWizard
             }
         }
         return $out;
+    }
+
+    /**
+     * @param mixed $raw
+     * @return array<string,int>
+     */
+    private function normalizarMediaCicloBlocos($raw): array
+    {
+        $out = [];
+        if (!is_array($raw)) {
+            return $out;
+        }
+        foreach ($raw as $codigo => $flag) {
+            $codigo = strtolower(trim((string) $codigo));
+            if ($codigo === '' || !(bool) preg_match('/^[a-z][a-z0-9_]{0,40}$/', $codigo)) {
+                continue;
+            }
+            if (!empty($flag)) {
+                $out[$codigo] = 1;
+            }
+            if (count($out) >= 40) {
+                break;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string,mixed> $estado
+     */
+    private function blocoEhMediaCiclo(array $estado, string $codigo): bool
+    {
+        $codigo = strtolower(trim($codigo));
+        if ($codigo === '') {
+            return false;
+        }
+        $mapa = is_array($estado['media_ciclo_blocos'] ?? null) ? $estado['media_ciclo_blocos'] : [];
+
+        return !empty($mapa[$codigo]);
     }
 
     /**
@@ -7807,7 +7881,7 @@ class BoletimAssistenteWizard
             'default_data_inicio' => (string) ($estado['data_inicio'] ?? ''),
             'default_data_fim' => (string) ($estado['data_fim'] ?? ''),
             'round_mode' => (string) ($estado['round_mode'] ?? 'none'),
-            'decimal_places' => ((int) ($estado['decimal_places'] ?? 2) === 1) ? 1 : 2,
+            'decimal_places' => \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($estado['decimal_places'] ?? 2),
             'nota_minima_aprovacao' => $estado['nota_minima_aprovacao'] ?? 6,
             'nota_minima_origem' => (string) ($estado['nota_minima_origem'] ?? 'padrao'),
             'nota_minima_regra_nome' => (string) ($estado['nota_minima_regra_nome'] ?? ''),
@@ -8207,10 +8281,16 @@ class BoletimAssistenteWizard
             }
             $escalaAlvo = $this->escalaDoBloco($estado, $codigoAlvo);
             $grupoLayout = $this->layoutGroupDaColunaNoEstado($codigoAlvo, $estado);
+            $ehMediaCiclo = $this->blocoEhMediaCiclo($estado, $codigoAlvo);
             if ($idxExistente !== null) {
                 $c = $comps[$idxExistente];
                 $c['config'] = is_array($c['config'] ?? null) ? $c['config'] : [];
                 $c['config']['expressao'] = $exp;
+                if ($ehMediaCiclo) {
+                    $c['config']['media_ciclo'] = 1;
+                } else {
+                    unset($c['config']['media_ciclo']);
+                }
                 if ($ehQuadro) {
                     $grupoAtual = strtolower(trim((string) ($c['config']['layout_group'] ?? '')));
                     if ($grupoAtual === '' || $grupoAtual === 'quadro_comum') {
@@ -8223,6 +8303,9 @@ class BoletimAssistenteWizard
                 $comps[$idxExistente] = $c;
             } else {
                 $bloco = $this->blocoCalculado($codigoAlvo, $nome, $exp, $escalaAlvo);
+                if ($ehMediaCiclo) {
+                    $bloco['config']['media_ciclo'] = 1;
+                }
                 if ($ehQuadro) {
                     $bloco['config']['layout_group'] = $grupoLayout;
                     $bloco['config']['layout_type'] = 'media';
@@ -12467,20 +12550,26 @@ class BoletimAssistenteWizard
 
     private function roundPreviewFicticio(float $valor, string $roundMode, int $casas = 2): float
     {
+        $casas = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($casas);
         if ($roundMode !== 'half') {
-            return round($valor, $casas === 1 ? 1 : 2);
+            return round($valor, $casas);
         }
 
         $base = floor($valor);
         $dec = $valor - $base;
         if ($dec < 0.25) {
-            return (float) $base;
+            $valor = (float) $base;
+        } elseif ($dec < 0.75) {
+            $valor = $base + 0.5;
+        } else {
+            $valor = $base + 1.0;
         }
-        if ($dec < 0.75) {
-            return $base + 0.5;
+        // Regra “Nenhuma” casa: .50 vira inteiro após a faixa.
+        if ($casas === 0) {
+            return (float) round($valor);
         }
 
-        return $base + 1.0;
+        return round($valor, min(1, $casas));
     }
 
     /**

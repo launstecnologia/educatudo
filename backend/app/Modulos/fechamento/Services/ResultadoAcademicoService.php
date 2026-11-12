@@ -533,22 +533,30 @@ class ResultadoAcademicoService
         }
         $v = (float) $value;
         $mode = $this->normalizeRoundMode($mode);
+        $casas = \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais($this->casasArredondamento);
         if ($mode === 'places') {
             // Ex.: (8,0 + 7,9)/2 = 7,95 com 1 casa → 8,0
-            return round($v, $this->casasArredondamento);
+            return round($v, $casas);
         }
         if ($mode !== 'half') {
-            return round($v, 2);
+            // Convencional: se a regra pede 0/1 casa, respeita; senão mantém 2.
+            return round($v, $casas === 2 ? 2 : $casas);
         }
         $base = floor($v);
         $dec = $v - $base;
         if ($dec < 0.25) {
-            return round($base, 2);
+            $v = (float) $base;
+        } elseif ($dec < 0.75) {
+            $v = $base + 0.5;
+        } else {
+            $v = $base + 1.0;
         }
-        if ($dec < 0.75) {
-            return round($base + 0.5, 2);
+        // “Nenhuma” casa: faixa .50 vira inteiro (ex.: 57,5 → 58).
+        if ($casas === 0) {
+            return (float) round($v);
         }
-        return round($base + 1.0, 2);
+
+        return round($v, min(1, $casas));
     }
 
     /**
