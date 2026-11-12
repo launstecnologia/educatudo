@@ -173,32 +173,198 @@ $boletimWizardSteps = [
 .bw-palette-grupo-titulo { font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #64748b; margin-bottom: 0.35rem; }
 .bw-palette-grupo.calc .bw-palette-grupo-titulo { color: #92400e; }
 .bw-palette-grupo-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
-/* Editor de fórmula: peças à esquerda, montagem fixa à direita */
+.bw-formula-cats { display: flex; flex-direction: column; gap: 0.7rem; }
+.bw-formula-cat { padding: 0; border: none; background: transparent; }
+.bw-formula-cat + .bw-formula-cat {
+    padding-top: 0.65rem;
+    border-top: 1px solid #f1f5f9;
+}
+.bw-formula-cat-head {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.4rem;
+}
+.bw-formula-cat-titulo {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+.bw-formula-cat-info {
+    appearance: none;
+    width: 1.15rem;
+    height: 1.15rem;
+    border-radius: 999px;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 800;
+    font-style: italic;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+}
+.bw-formula-cat-info:hover,
+.bw-formula-cat-info[aria-expanded="true"] {
+    background: #f59e0b;
+    color: #fff;
+    border-color: #d97706;
+}
+.bw-formula-cat-ajuda { display: none !important; }
+.bw-formula-cat-corpo { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+.bw-formula-ajuda-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(15, 23, 42, 0.45);
+}
+.bw-formula-ajuda-modal.is-open { display: flex; }
+.bw-formula-ajuda-dialog {
+    width: min(28rem, 100%);
+    max-height: min(80vh, 32rem);
+    overflow: auto;
+    background: #fff;
+    border-radius: 0.9rem;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.22);
+    padding: 0.9rem 1rem 1rem;
+}
+.bw-formula-ajuda-dialog-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.55rem;
+}
+.bw-formula-ajuda-dialog-titulo {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.3;
+}
+.bw-formula-ajuda-dialog-fechar {
+    appearance: none;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 999px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.bw-formula-ajuda-dialog-fechar:hover { background: #fee2e2; border-color: #fecaca; color: #991b1b; }
+.bw-formula-ajuda-dialog-corpo {
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: #334155;
+}
+.bw-formula-ajuda-dialog-corpo p + p { margin-top: 0.45rem; }
+.bw-formula-ajuda-dialog-corpo code {
+    background: #f1f5f9;
+    border-radius: 0.25rem;
+    padding: 0.05rem 0.3rem;
+    font-size: 0.75rem;
+}
+/* Editor: colunas iguais → atalhos → canvas em destaque */
 .bw-formula-workspace {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+.bw-formula-topo {
     display: grid;
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-    gap: 0.85rem;
-    align-items: start;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+    align-items: stretch;
 }
 @media (max-width: 900px) {
-    .bw-formula-workspace { grid-template-columns: 1fr; }
-    .bw-formula-montagem { order: -1; position: static !important; top: auto !important; }
+    .bw-formula-topo { grid-template-columns: 1fr; }
 }
 .bw-formula-pecas-col,
-.bw-formula-montagem {
+.bw-formula-ferramentas {
     border: 1px solid #e2e8f0;
     border-radius: 0.85rem;
     background: #fff;
-    padding: 0.7rem 0.75rem 0.85rem;
+    padding: 0.7rem 0.75rem;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 16.5rem;
 }
+.bw-formula-pecas-col .bw-palette {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+.bw-formula-ferramentas .bw-formula-cats {
+    flex: 1 1 auto;
+}
+.bw-formula-atalhos {
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    background: #fff;
+    padding: 0.55rem 0.7rem 0.6rem;
+}
+.bw-formula-atalhos .bw-formula-cat-titulo { color: #64748b; }
 .bw-formula-montagem {
-    position: sticky;
-    top: 0.5rem;
-    border-color: #fcd34d;
+    width: 100%;
+    border: 2px solid #f59e0b;
+    border-radius: 0.95rem;
+    background: linear-gradient(180deg, #fffbeb 0%, #fff 48%);
+    box-shadow: 0 6px 18px rgba(245, 158, 11, 0.12);
+    padding: 0.85rem 0.9rem 0.95rem;
+}
+.bw-formula-montagem .bw-canvas {
+    min-height: 132px;
+    background: #fff;
+    border-color: #fdba74;
+}
+.bw-formula-montagem #bw-formula-canvas-label {
+    color: #9a3412;
+    font-size: 12px;
+}
+.bw-formula-manual {
+    margin: 0;
+    border: none;
+    background: transparent;
+    padding: 0;
+}
+.bw-formula-manual > summary {
+    list-style: none;
+    cursor: pointer;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+.bw-formula-manual > summary::-webkit-details-marker { display: none; }
+.bw-formula-manual > summary::before { content: '▸'; font-size: 10px; }
+.bw-formula-manual[open] > summary::before { content: '▾'; }
+.bw-formula-manual > summary:hover { color: #92400e; }
+.bw-formula-manual-corpo {
+    margin-top: 0.45rem;
+    padding: 0.55rem 0.65rem;
+    border-radius: 0.6rem;
+    border: 1px solid #fde68a;
     background: #fffbeb;
-    box-shadow: 0 2px 10px rgba(245, 158, 11, 0.08);
-    z-index: 2;
+    color: #7c2d12;
+    font-size: 11px;
+    line-height: 1.4;
 }
 .bw-palette-shell { display: flex; flex-direction: column; gap: 0.55rem; }
 .bw-palette-tabs {
@@ -2350,61 +2516,148 @@ $boletimWizardSteps = [
     }
 
     function operadoresFormula() {
+        return operadoresSinaisFormula().concat(operadoresFuncoesFormula());
+    }
+
+    function operadoresSinaisFormula() {
         return [
-            { type: 'op', value: '+', label: '+', ajuda: 'Soma: junta notas ou valores (ex.: média + PE).' },
+            { type: 'op', value: '+', label: '+', ajuda: 'Soma: junta notas ou valores (ex.: média + PontoExtra).' },
             { type: 'op', value: '-', label: '−', ajuda: 'Subtração: tira um valor do outro.' },
-            { type: 'op', value: '*', label: '×', ajuda: 'Multiplicação: peso da nota (ex.: PP × 2).' },
+            { type: 'op', value: '*', label: '×', ajuda: 'Multiplicação: peso da nota (ex.: ProvaParcial × 2).' },
             { type: 'op', value: '/', label: '÷', ajuda: 'Divisão: divide pela quantidade ou pelos pesos (ex.: ÷ 3).' },
             { type: 'op', value: '(', label: '(', ajuda: 'Abre um grupo. Use com ) para definir a ordem da conta.' },
             { type: 'op', value: ')', label: ')', ajuda: 'Fecha o grupo aberto com (.' },
             { type: 'op', value: ',', label: ',', ajuda: 'Separador de itens dentro de funções (maior, média, se…).' },
             { type: 'op', value: '|', label: '|', ajuda: 'Só dentro de média ( ): separa papéis — provas | substituta | opcional. Não misture com +÷.' },
-            { type: 'op', value: '>', label: '>', ajuda: 'Maior que — use no 1º argumento de se ( ex.: PP > 7 ).' },
-            { type: 'op', value: '<', label: '<', ajuda: 'Menor que — use no 1º argumento de se ( ex.: PP < PU ).' },
-            { type: 'op', value: '>=', label: '≥', ajuda: 'Maior ou igual — condição em se ( ex.: PP >= 7 ).' },
-            { type: 'op', value: '<=', label: '≤', ajuda: 'Menor ou igual — condição em se ( ex.: PP <= PU ).' },
-            { type: 'op', value: '=', label: '=', ajuda: 'Igual — condição em se ( ex.: PJ = verdadeiro ou PP = PU ).' },
-            { type: 'op', value: '!=', label: '≠', ajuda: 'Diferente — condição em se ( ex.: PJ != verdadeiro ). Aceita também <> no texto.' },
-            { type: 'lit', value: 'verdadeiro', label: 'verdadeiro', ajuda: 'Literal: coluna lançada. Use após = no 1º argumento de se ( ex.: PJ = verdadeiro ).' },
-            { type: 'lit', value: 'falso', label: 'falso', ajuda: 'Literal: coluna em branco. Use após = no 1º argumento de se ( ex.: PJ = falso ).' },
+            { type: 'op', value: '>', label: '>', ajuda: 'Maior que — use no 1º argumento de se ( ex.: ProvaParcial > 7 ).' },
+            { type: 'op', value: '<', label: '<', ajuda: 'Menor que — use no 1º argumento de se ( ex.: ProvaParcial < ProvaBimestral ).' },
+            { type: 'op', value: '>=', label: '≥', ajuda: 'Maior ou igual — condição em se ( ex.: ProvaParcial >= 7 ).' },
+            { type: 'op', value: '<=', label: '≤', ajuda: 'Menor ou igual — condição em se ( ex.: ProvaParcial <= ProvaBimestral ).' },
+            { type: 'op', value: '=', label: '=', ajuda: 'Igual — condição em se ( ex.: Trabalho = verdadeiro ou ProvaParcial = ProvaBimestral ).' },
+            { type: 'op', value: '!=', label: '≠', ajuda: 'Diferente — condição em se ( ex.: Trabalho != verdadeiro ). Aceita também <> no texto.' },
+            { type: 'lit', value: 'verdadeiro', label: 'verdadeiro', ajuda: 'Literal: coluna lançada. Use após = no 1º argumento de se ( ex.: Trabalho = verdadeiro ).' },
+            { type: 'lit', value: 'falso', label: 'falso', ajuda: 'Literal: coluna em branco. Use após = no 1º argumento de se ( ex.: Trabalho = falso ).' }
+        ];
+    }
+
+    function operadoresFuncoesFormula() {
+        return [
             { type: 'fn', value: 'max', label: 'maior (', ajuda: 'maior ( A , B , … ): fica o maior valor entre as colunas.' },
             { type: 'fn', value: 'min', label: 'menor (', ajuda: 'menor ( A , B , … ): fica o menor valor entre as colunas.' },
-            { type: 'fn', value: 'chamada', label: 'nota substituta (', ajuda: 'nota substituta ( bases… , CH ): média das bases; CH cobre a 1ª prova que faltar. Já divide sozinha.' },
-            { type: 'fn', value: 'composicao', label: 'média c/ rec (', ajuda: 'média c/ rec ( média , REC ): sem recuperação fica a média; com REC vira (média + REC) ÷ 2.' },
-            { type: 'fn', value: 'media_lancado', label: 'média (', ajuda: 'média ( provas | substituta | opcional ): média só do lançado. O | define o papel; ÷ automático.' },
-            { type: 'fn', value: 'media_ponderada', label: 'média ponderada (', ajuda: 'média ponderada ( PP , 3 , PU , 5 | CH ): pesos nas bases; CH cobre a 1ª ausente (mesmo peso). Sem cobertura → pendente.' },
-            { type: 'fn', value: 'se', label: 'se (', ajuda: 'se ( condição , se_verdadeiro , se_falso ): condição = coluna (lançou?), PJ = verdadeiro/falso, PP > 7 ou PP > PU — depois escolhe qual conta usar.' }
+            { type: 'fn', value: 'chamada', label: 'nota substituta (', ajuda: 'nota substituta ( ProvaParcial , ProvaBimestral , 2aChamada ): média das bases; a 2ª chamada cobre a 1ª prova que faltar. Já divide sozinha.' },
+            { type: 'fn', value: 'composicao', label: 'média c/ rec (', ajuda: 'média c/ rec ( média , Recuperacao ): sem recuperação fica a média; com recuperação vira (média + Recuperacao) ÷ 2.' },
+            { type: 'fn', value: 'media_lancado', label: 'média (', ajuda: 'média ( provas | substituta | opcional ): média só do lançado. O | define o papel; ÷ automático. Ex.: média ( ProvaParcial , ProvaBimestral | 2aChamada | Trabalho ).' },
+            { type: 'fn', value: 'media_ponderada', label: 'média ponderada (', ajuda: 'média ponderada ( ProvaParcial , 3 , ProvaBimestral , 5 | 2aChamada ): pesos nas bases; a 2ª chamada cobre a 1ª ausente (mesmo peso). Sem cobertura → pendente.' },
+            { type: 'fn', value: 'se', label: 'se (', ajuda: 'se ( condição , se_verdadeiro , se_falso ): coluna (lançou?), Trabalho = verdadeiro/falso, ProvaParcial > 7 ou ProvaParcial > ProvaBimestral — depois escolhe qual conta usar.' }
         ];
+    }
+
+    /** Bloco de categoria (Sinais / Funções / Fórmulas prontas) com ícone i → modal. */
+    function htmlCategoriaFerramentaFormula(idCat, titulo, textoAjuda, corpoHtml) {
+        var id = String(idCat || '');
+        var ajudaId = 'bw-formula-cat-ajuda-' + id;
+        var html = '<div class="bw-formula-cat" data-cat="' + esc(id) + '">';
+        html += '<div class="bw-formula-cat-head">';
+        html += '<span class="bw-formula-cat-titulo">' + esc(titulo) + '</span>';
+        html += '<button type="button" class="bw-formula-cat-info" data-ajuda="' + esc(ajudaId) + '" data-titulo="' + esc(titulo) + '" title="O que é esta categoria?">i</button>';
+        html += '</div>';
+        html += '<div id="' + esc(ajudaId) + '" class="bw-formula-cat-ajuda" hidden>' + textoAjuda + '</div>';
+        html += '<div class="bw-formula-cat-corpo">' + corpoHtml + '</div>';
+        html += '</div>';
+        return html;
+    }
+
+    function garantirModalAjudaFormula() {
+        var modal = document.getElementById('bw-formula-ajuda-modal');
+        if (modal) return modal;
+        modal = document.createElement('div');
+        modal.id = 'bw-formula-ajuda-modal';
+        modal.className = 'bw-formula-ajuda-modal';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-hidden', 'true');
+        modal.setAttribute('aria-labelledby', 'bw-formula-ajuda-titulo');
+        modal.innerHTML = ''
+            + '<div class="bw-formula-ajuda-dialog" role="document">'
+            + '<div class="bw-formula-ajuda-dialog-head">'
+            + '<p id="bw-formula-ajuda-titulo" class="bw-formula-ajuda-dialog-titulo"></p>'
+            + '<button type="button" class="bw-formula-ajuda-dialog-fechar" id="bw-formula-ajuda-fechar" aria-label="Fechar" title="Fechar">×</button>'
+            + '</div>'
+            + '<div id="bw-formula-ajuda-corpo" class="bw-formula-ajuda-dialog-corpo"></div>'
+            + '</div>';
+        document.body.appendChild(modal);
+        modal.addEventListener('click', function (ev) {
+            if (ev.target === modal || ev.target.closest('#bw-formula-ajuda-fechar')) {
+                fecharModalAjudaFormula();
+            }
+        });
+        if (!window.__bwFormulaAjudaEsc) {
+            window.__bwFormulaAjudaEsc = true;
+            document.addEventListener('keydown', function (ev) {
+                if (ev.key !== 'Escape') return;
+                var aberto = document.getElementById('bw-formula-ajuda-modal');
+                if (aberto && aberto.classList.contains('is-open')) {
+                    fecharModalAjudaFormula();
+                }
+            });
+        }
+        return modal;
+    }
+
+    function fecharModalAjudaFormula() {
+        var modal = document.getElementById('bw-formula-ajuda-modal');
+        if (!modal) return;
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        document.querySelectorAll('.bw-formula-cat-info[aria-expanded="true"]').forEach(function (btn) {
+            btn.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    function abrirModalAjudaFormula(titulo, htmlCorpo, btnOrigem) {
+        var modal = garantirModalAjudaFormula();
+        var titEl = document.getElementById('bw-formula-ajuda-titulo');
+        var corpoEl = document.getElementById('bw-formula-ajuda-corpo');
+        if (titEl) titEl.textContent = String(titulo || 'Ajuda');
+        if (corpoEl) corpoEl.innerHTML = htmlCorpo || '';
+        document.querySelectorAll('.bw-formula-cat-info[aria-expanded="true"]').forEach(function (btn) {
+            btn.setAttribute('aria-expanded', 'false');
+        });
+        if (btnOrigem) btnOrigem.setAttribute('aria-expanded', 'true');
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        var fechar = document.getElementById('bw-formula-ajuda-fechar');
+        if (fechar) fechar.focus();
     }
 
     function ajudaTokenFormula(tok) {
         if (!tok) return '';
         if (tok.ajuda) return String(tok.ajuda);
         var mapa = {
-            '+': 'Soma: junta notas ou valores (ex.: média + PE).',
+            '+': 'Soma: junta notas ou valores (ex.: média + PontoExtra).',
             '-': 'Subtração: tira um valor do outro.',
-            '*': 'Multiplicação: peso da nota (ex.: PP × 2).',
+            '*': 'Multiplicação: peso da nota (ex.: ProvaParcial × 2).',
             '/': 'Divisão: divide pela quantidade ou pelos pesos (ex.: ÷ 3).',
             '(': 'Abre um grupo. Use com ) para definir a ordem da conta.',
             ')': 'Fecha o grupo aberto com (.',
             ',': 'Separador de itens dentro de funções (maior, média, se…).',
             '|': 'Só dentro de média ( ): separa papéis — provas | substituta | opcional. Não misture com +÷.',
-            '>': 'Maior que — no 1º argumento de se ( ex.: PP > 7 ).',
-            '<': 'Menor que — no 1º argumento de se ( ex.: PP < PU ).',
-            '>=': 'Maior ou igual — condição em se ( ex.: PP >= 7 ).',
-            '<=': 'Menor ou igual — condição em se ( ex.: PP <= PU ).',
-            '=': 'Igual — condição em se ( ex.: PJ = verdadeiro ou PP = PU ).',
-            '!=': 'Diferente — condição em se ( ex.: PJ != verdadeiro ). Também aceita <> no texto.',
-            '<>': 'Diferente — condição em se ( ex.: PJ <> verdadeiro ).',
-            verdadeiro: 'Literal: coluna lançada. Use após = no 1º argumento de se ( ex.: PJ = verdadeiro ).',
-            falso: 'Literal: coluna em branco. Use após = no 1º argumento de se ( ex.: PJ = falso ).',
+            '>': 'Maior que — no 1º argumento de se ( ex.: ProvaParcial > 7 ).',
+            '<': 'Menor que — no 1º argumento de se ( ex.: ProvaParcial < ProvaBimestral ).',
+            '>=': 'Maior ou igual — condição em se ( ex.: ProvaParcial >= 7 ).',
+            '<=': 'Menor ou igual — condição em se ( ex.: ProvaParcial <= ProvaBimestral ).',
+            '=': 'Igual — condição em se ( ex.: Trabalho = verdadeiro ou ProvaParcial = ProvaBimestral ).',
+            '!=': 'Diferente — condição em se ( ex.: Trabalho != verdadeiro ). Também aceita <> no texto.',
+            '<>': 'Diferente — condição em se ( ex.: Trabalho <> verdadeiro ).',
+            verdadeiro: 'Literal: coluna lançada. Use após = no 1º argumento de se ( ex.: Trabalho = verdadeiro ).',
+            falso: 'Literal: coluna em branco. Use após = no 1º argumento de se ( ex.: Trabalho = falso ).',
             max: 'maior ( A , B , … ): fica o maior valor entre as colunas.',
             min: 'menor ( A , B , … ): fica o menor valor entre as colunas.',
-            chamada: 'nota substituta ( bases… , CH ): média das bases; CH cobre a 1ª prova que faltar. Já divide sozinha.',
-            substituta: 'nota substituta ( bases… , CH ): média das bases; CH cobre a 1ª prova que faltar. Já divide sozinha.',
-            composicao: 'média c/ rec ( média , REC ): sem recuperação fica a média; com REC vira (média + REC) ÷ 2.',
-            media_lancado: 'média ( provas | substituta | opcional ): média só do lançado. O | define o papel; ÷ automático.',
-            media_ponderada: 'média ponderada ( PP , 3 , PU , 5 | CH ): pesos nas bases; CH cobre a 1ª ausente (mesmo peso). Sem cobertura → pendente.',
+            chamada: 'nota substituta ( ProvaParcial , ProvaBimestral , 2aChamada ): média das bases; a 2ª chamada cobre a 1ª prova que faltar. Já divide sozinha.',
+            substituta: 'nota substituta ( ProvaParcial , ProvaBimestral , 2aChamada ): média das bases; a 2ª chamada cobre a 1ª prova que faltar. Já divide sozinha.',
+            composicao: 'média c/ rec ( média , Recuperacao ): sem recuperação fica a média; com recuperação vira (média + Recuperacao) ÷ 2.',
+            media_lancado: 'média ( provas | substituta | opcional ): média só do lançado. O | define o papel; ÷ automático. Ex.: média ( ProvaParcial , ProvaBimestral | 2aChamada | Trabalho ).',
+            media_ponderada: 'média ponderada ( ProvaParcial , 3 , ProvaBimestral , 5 | 2aChamada ): pesos nas bases; a 2ª chamada cobre a 1ª ausente (mesmo peso). Sem cobertura → pendente.',
             se: 'se ( condição , se_verdadeiro , se_falso ): coluna sozinha (lançou?), = verdadeiro/falso, > < >= <= número ou outra coluna.',
             if: 'se ( condição , se_verdadeiro , se_falso ): coluna sozinha (lançou?), = verdadeiro/falso, > < >= <= número ou outra coluna.'
         };
@@ -3002,7 +3255,7 @@ $boletimWizardSteps = [
             if (midPh > 0) {
                 return '<p class="bw-canvas-ph">Fórmula só de ' + esc(materiaNome(midPh)) + '. Clique ou arraste as peças que esta matéria tem.</p>';
             }
-            return '<p class="bw-canvas-ph">Clique nas siglas à esquerda (ou nos sinais). Ex.: PP , PU , CH ) + PE</p>';
+            return '<p class="bw-canvas-ph">Clique nas colunas e nos sinais acima. Use as colunas do seu evento (ex.: Prova Parcial, Prova Bimestral, Trabalho).</p>';
         }
         var html = '';
         toks.forEach(function (t, i) { html += chipHtml(t, i, false); });
@@ -3269,17 +3522,22 @@ $boletimWizardSteps = [
             estado.nomes_blocos['eva' + id] = sig;
             estado.nomes_blocos['eva_' + id] = sig;
             var bim = Number(ev.bimestre || 0);
-            if (bim >= 1 && bim <= 4 && codSigla) {
+            var anoEv = Number(ev.ano_letivo || (estado && estado.ano_letivo) || 0);
+            if (periodoNumeroValido(bim, anoEv) && codSigla) {
                 var leaf = codSigla === 'faltas' ? 'fal' : codSigla;
                 if (['pp', 'pu', 'ch', 'pe', 'fal'].indexOf(leaf) >= 0) {
                     estado.nomes_blocos['b' + bim + '_' + leaf] = sig;
                 }
             }
-            if (bim === 81 || bim === 61 || bim === 62) {
+            if (bim === 81) {
                 estado.nomes_blocos.s1_rec = (sig === 'REC') ? 'REC 1º' : sig;
             }
-            if (bim === 82 || bim === 63 || bim === 64) {
+            if (bim === 82) {
                 estado.nomes_blocos.s2_rec = (sig === 'REC') ? 'REC 2º' : sig;
+            }
+            if (bim >= 61 && bim < 80) {
+                var codRec = codSigla || ('rec' + (bim - 60));
+                estado.nomes_blocos[codRec] = sig || ('REC ' + (bim - 60) + 'º');
             }
             if (bim === 90 || sig === 'PF') {
                 estado.nomes_blocos.pf = 'PF';
@@ -4198,20 +4456,46 @@ $boletimWizardSteps = [
     function rotuloCicloPalette(chave) {
         if (chave.indexOf('p-') === 0) {
             var n = Number(chave.slice(2)) || 0;
-            return rotuloPeriodoNumero(n) || (n + 'º período');
+            return rotuloPeriodoNumero(n) || (n + 'º ' + rotuloCampoPeriodo());
         }
-        if (chave === 's1') return '1º semestre';
-        if (chave === 's2') return '2º semestre';
-        if (chave === 'final') return 'Recuperação Final';
+        if (chave.indexOf('rec-bim-') === 0) {
+            var nRec = Number(chave.slice(8)) || 0;
+            return 'Recuperação · ' + (periodoNumeroValido(nRec) ? rotuloPeriodoNumero(nRec) : (nRec + 'º ' + rotuloCampoPeriodo()));
+        }
+        if (chave.indexOf('rec-sem-') === 0) {
+            var nPar = Number(chave.slice(8)) || 0;
+            return rotuloRecuperacaoPar(nPar);
+        }
+        if (chave === 'rec-ano' || chave === 'final') return 'Recuperação Final';
+        if (chave === 's1') return anoEhSemestre() ? '1º semestre' : ('1º ' + rotuloCampoPeriodo().toLocaleLowerCase('pt-BR'));
+        if (chave === 's2') return anoEhSemestre() ? '2º semestre' : ('2º ' + rotuloCampoPeriodo().toLocaleLowerCase('pt-BR'));
         return 'Geral / outros';
+    }
+
+    function anoEhSemestre(ano) {
+        return String((periodoInfo(ano).tipo || '')).toLowerCase() === 'semestre';
+    }
+
+    function rotuloRecuperacaoPar(par, ano) {
+        par = Number(par) || 0;
+        if (anoEhSemestre(ano)) {
+            return 'Recuperação · ' + par + 'º semestre';
+        }
+        var ini = ((par - 1) * 2) + 1;
+        var fim = Math.min(maxPeriodo(ano), ini + 1);
+        if (ini < 1) return 'Recuperação';
+        if (fim <= ini) return 'Recuperação · ' + rotuloPeriodoNumero(ini, ano);
+        return 'Recuperação · ' + rotuloPeriodoNumero(ini, ano) + ' e ' + rotuloPeriodoNumero(fim, ano);
     }
 
     function ordemCicloPalette(chave) {
         if (chave === 'calc') return -10;
         if (chave.indexOf('p-') === 0) return Number(chave.slice(2)) || 0;
+        if (chave.indexOf('rec-bim-') === 0) return 1000 + (Number(chave.slice(8)) || 0);
+        if (chave.indexOf('rec-sem-') === 0) return 2000 + (Number(chave.slice(8)) || 0);
         if (chave === 's1') return 100;
         if (chave === 's2') return 101;
-        if (chave === 'final') return 200;
+        if (chave === 'rec-ano' || chave === 'final') return 3000;
         return 900;
     }
 
@@ -4310,6 +4594,18 @@ $boletimWizardSteps = [
             add(cod, nomeBlocoCalc(cod) || tituloColuna(cod), 'calc');
         });
 
+        // 2) Eventos marcados no passo Eventos (fallback: todos do ano).
+        // Antes das demais fontes, para o período real (trimestre/bimestre) ganhar do
+        // legado Santa Maria (s1_rec → "semestre").
+        var vistosEvtPalette = {};
+        (eventosCatalogoBuilder() || []).forEach(function (ev) {
+            var cod = codigoColunaDoEventoJs(ev, vistosEvtPalette);
+            if (!cod) return;
+            vistosEvtPalette[String(cod).toLowerCase()] = true;
+            var label = String(siglaDoEvento(ev) || '').trim() || String(ev.nome || cod).trim();
+            add(cod, label, chavePeriodoItem(ev));
+        });
+
         (estado.pecas || []).forEach(function (k) {
             if (!k || ehCodigoBlocoCalc(k)) return;
             add(k, pecaLabel(k));
@@ -4348,15 +4644,6 @@ $boletimWizardSteps = [
                 calc: true,
                 chave: chaveDup
             });
-        });
-
-        // Todos os eventos do ano — mesmo sem chip no quadro (só entram no cálculo).
-        (eventosAvaliativosDoAnoQuadro() || []).forEach(function (ev) {
-            var cod = codigoPreferidoEvento(ev);
-            if (!cod) cod = codigoColunaDoEventoJs(ev, {});
-            if (!cod) return;
-            var label = String(siglaDoEvento(ev) || '').trim() || String(ev.nome || cod).trim();
-            add(cod, label);
         });
 
         if (!itens.length) {
@@ -4952,6 +5239,15 @@ $boletimWizardSteps = [
             var rmEx = e.target.closest('.bw-excecao-remover');
             if (rmEx) {
                 removerExcecaoMateria(rmEx.getAttribute('data-mid'));
+                return;
+            }
+            var infoCat = e.target.closest('.bw-formula-cat-info');
+            if (infoCat && bodyEl.contains(infoCat)) {
+                e.preventDefault();
+                var ajudaId = String(infoCat.getAttribute('data-ajuda') || '');
+                var painel = ajudaId ? document.getElementById(ajudaId) : null;
+                var tituloCat = String(infoCat.getAttribute('data-titulo') || 'Ajuda');
+                abrirModalAjudaFormula(tituloCat, painel ? painel.innerHTML : '', infoCat);
                 return;
             }
             if (e.target.closest('#bw-formula-media')) {
@@ -7793,11 +8089,18 @@ $boletimWizardSteps = [
         var sigla = String(ev.sigla || '').toLowerCase().replace(/[^a-z0-9_]+/g, '');
         var bim = Number(ev.bimestre || 0);
         var id = Number(ev.id || 0);
-        if (bim >= 1 && bim <= 4 && ['pp', 'pu', 'ch', 'pe', 'fal', 'faltas'].indexOf(sigla) >= 0) {
+        var anoEv = Number(ev.ano_letivo || (estado && estado.ano_letivo) || 0);
+        if (periodoNumeroValido(bim, anoEv) && ['pp', 'pu', 'ch', 'pe', 'fal', 'faltas'].indexOf(sigla) >= 0) {
             return 'b' + bim + '_' + (sigla === 'faltas' ? 'fal' : sigla);
         }
-        if (bim === 81 || bim === 61 || bim === 62) return 's1_rec';
-        if (bim === 82 || bim === 63 || bim === 64) return 's2_rec';
+        // Semestral / par (81/82): códigos Santa Maria. Ciclo (61–63) NÃO cai aqui —
+        // senão trimestre vira abas de "semestre" e várias RECs viram um chip só.
+        if (bim === 81) return 's1_rec';
+        if (bim === 82) return 's2_rec';
+        if (bim >= 61 && bim < 80) {
+            if (sigla) return sigla;
+            return 'rec' + (bim - 60);
+        }
         // Recuperação final / Prova Final (ano).
         if (bim === 90 || sigla === 'pf' || sigla === 'prova_final' || sigla === 'provafinal') return 'pf';
         if (sigla) return sigla;
@@ -8191,8 +8494,9 @@ $boletimWizardSteps = [
         var eventos = eventosCatalogoBuilder();
         var html = '<aside class="bw-catalogo" aria-label="Catálogo de eventos">';
         html += '<div class="bw-catalogo-topo">';
-        html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Eventos por bimestre</p>';
-        html += '<p class="text-[11px] text-slate-500 mt-0.5">Clique em <strong>Abrir</strong> no bimestre. Depois selecione um título no quadro e use <strong>Adicionar todos</strong>.</p>';
+        var campoPeriodo = String(rotuloCampoPeriodo() || 'período').toLocaleLowerCase('pt-BR');
+        html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Eventos por ' + esc(campoPeriodo) + '</p>';
+        html += '<p class="text-[11px] text-slate-500 mt-0.5">Clique em <strong>Abrir</strong> no ' + esc(campoPeriodo) + '. Depois selecione um título no quadro e use <strong>Adicionar todos</strong>.</p>';
         html += '</div><div class="bw-catalogo-corpo">';
         if (!eventos.length) {
             html += '<p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">Nenhum evento neste ano. Marque no passo anterior ou cadastre Eventos Avaliativos.</p>';
@@ -8344,8 +8648,8 @@ $boletimWizardSteps = [
         rotulo = rotuloSemestreColuna(c.codigo, rotulo);
         var dica = '';
         var codLow = String(c.codigo || '').toLowerCase();
-        if (codLow === 's1_rec' || codLow === 's1_ms') dica = '1º semestre';
-        if (codLow === 's2_rec' || codLow === 's2_ms') dica = '2º semestre';
+        if (codLow === 's1_rec' || codLow === 's1_ms') dica = anoEhSemestre() ? '1º semestre' : ('1º ' + rotuloCampoPeriodo().toLocaleLowerCase('pt-BR'));
+        if (codLow === 's2_rec' || codLow === 's2_ms') dica = anoEhSemestre() ? '2º semestre' : ('2º ' + rotuloCampoPeriodo().toLocaleLowerCase('pt-BR'));
         if (ehCalc) dica = 'Clique para editar a fórmula · arraste pelo ⋮⋮';
         var html = '<span class="' + cls + '" data-codigo="' + esc(c.codigo) + '" data-tipo="' + esc(ehCalc ? 'calculado' : (c.tipo || '')) + '"'
             + (dica ? ' title="' + esc(dica) + '"' : '') + '>';
@@ -10447,7 +10751,7 @@ $boletimWizardSteps = [
             var nBim = bim - 60;
             return 'Recuperação · ' + (periodoNumeroValido(nBim, ano) ? rotuloPeriodoNumero(nBim, ano) : (nBim + 'º ' + rotuloCampoPeriodo(ano)));
         }
-        if (bim >= 80 && bim <= 82) return 'Recuperação · ' + (bim - 80) + 'º semestre';
+        if (bim >= 80 && bim <= 82) return rotuloRecuperacaoPar(bim - 80, ano);
         if (bim === 90) return 'Recuperação Final';
         if (periodoNumeroValido(bim, ano)) return rotuloPeriodoNumero(bim, ano);
         if (bim > 0) return 'Período ' + bim;
@@ -11301,53 +11605,74 @@ $boletimWizardSteps = [
                 html += '<p id="bw-formula-bloco-titulo" class="text-sm font-semibold text-amber-950">Cálculo de <span id="bw-formula-bloco-nome">' + esc(nomeBlocoCalc(estado.bloco_calc || 'média')) + '</span></p>';
                 html += '<p id="bw-formula-bloco-ajuda" class="text-xs text-amber-900/80 mt-0.5 mb-2">A média é a soma entre parênteses, depois ÷ quantidade. Ex.: (Prova + Trabalho + Participação) ÷ 3.</p>';
                 html += '<div class="bw-formula-workspace mt-1">';
+                html += '<div class="bw-formula-topo">';
                 html += '<div class="bw-formula-pecas-col">';
-                html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-1">Usar no cálculo</p>';
-                html += '<p class="text-[11px] text-slate-500 mb-2"><strong>Clique</strong> na sigla para inserir (não precisa arrastar). Filtre pelo período nas abas. Eventos sem chip no quadro também aparecem aqui.</p>';
+                html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-0.5">Usar no cálculo</p>';
+                html += '<p class="text-[11px] text-slate-500 mb-2">Clique na coluna para inserir. Filtre pelo período nas abas.</p>';
                 html += '<div id="bw-formula-pecas-pal" class="bw-palette"></div>';
                 html += '</div>';
+                html += '<div class="bw-formula-ferramentas">';
+                html += '<div class="bw-formula-cats">';
+                var corpoSinais = '';
+                operadoresSinaisFormula().forEach(function (op) { corpoSinais += chipHtml(op, -1, true); });
+                corpoSinais += '<label class="inline-flex items-center gap-1.5 text-xs text-slate-600" title="Insere um número na fórmula (peso, divisor, teto…).">Número';
+                corpoSinais += '<input id="bw-formula-num" type="text" inputmode="decimal" class="h-8 w-16 border border-slate-200 rounded-md px-2 text-sm bg-white" placeholder="2" title="Digite o número e clique em Inserir (ex.: 2 ou 3).">';
+                corpoSinais += '<button type="button" id="bw-formula-num-add" class="h-8 px-2 text-xs rounded-md border border-slate-300 text-slate-700 bg-white hover:bg-slate-50" title="Coloca o número na fórmula.">Inserir</button></label>';
+                html += htmlCategoriaFerramentaFormula(
+                    'sinais',
+                    'Sinais',
+                    '<p><strong>Peças básicas</strong> da conta: + − × ÷, parênteses, vírgula, comparações e verdadeiro/falso.</p>'
+                        + '<p class="mt-1">Use para montar a fórmula à mão. O <code>|</code> só vale <strong>dentro</strong> de <code>média ( )</code> (papéis: provas | substituta | opcional).</p>'
+                        + '<p class="mt-1">Sempre use as <strong>colunas deste evento</strong> (ex.: Prova Parcial, Prova Bimestral, Trabalho).</p>',
+                    corpoSinais
+                );
+                var corpoFuncoes = '';
+                operadoresFuncoesFormula().forEach(function (fn) { corpoFuncoes += chipHtml(fn, -1, true); });
+                html += htmlCategoriaFerramentaFormula(
+                    'funcoes',
+                    'Funções',
+                    '<p><strong>Cálculos com regra própria</strong> — não são só aritmética.</p>'
+                        + '<p class="mt-1"><code>média (</code> e <code>média ponderada (</code> já tratam substituta e divisão. '
+                        + '<code>se (</code> escolhe a conta A ou B. '
+                        + '<code>maior (</code> / <code>menor (</code> pegam o extremo.</p>'
+                        + '<p class="mt-1">Ex.: <code>média ponderada ( ProvaParcial , 3 , ProvaBimestral , 7 | 2aChamada )</code>.</p>',
+                    corpoFuncoes
+                );
+                html += '</div></div></div>'; // cats · ferramentas · topo
+                var corpoProntas = '';
+                corpoProntas += '<button type="button" id="bw-formula-media" class="px-2.5 py-1.5 text-xs rounded-lg border border-indigo-200 text-indigo-700 bg-white hover:bg-indigo-50" title="Monta (peça1 + peça2 + …) ÷ quantidade. Todas com o mesmo peso.">Média das peças</button>';
+                corpoProntas += '<button type="button" id="bw-formula-max" class="px-2.5 py-1.5 text-xs rounded-lg border border-amber-300 text-amber-900 bg-white hover:bg-amber-100" title="Fica a maior nota entre as duas primeiras peças da lista. Para Média Bim × ENAC, monte maior ( à mão.">Maior entre as duas primeiras</button>';
+                corpoProntas += '<button type="button" id="bw-formula-substituta" class="px-2.5 py-1.5 text-xs rounded-lg border border-emerald-200 text-emerald-800 bg-white hover:bg-emerald-50" title="Média das notas principais; a substituta entra no lugar da primeira nota ausente">Média com nota substituta</button>';
+                corpoProntas += '<button type="button" id="bw-formula-composicao" class="px-2.5 py-1.5 text-xs rounded-lg border border-violet-200 text-violet-800 bg-white hover:bg-violet-50" title="Sem recuperação: fica a média. Com recuperação: (média + recuperação) ÷ 2">Média com recuperação</button>';
+                corpoProntas += '<button type="button" id="bw-formula-media-lancado" class="px-2.5 py-1.5 text-xs rounded-lg border border-sky-200 text-sky-900 bg-white hover:bg-sky-50" title="média ( provas | substituta | opcionais ) + ponto extra — o | define o papel; use as colunas do seu evento">Provas | substituta | opcional + ponto extra</button>';
+                corpoProntas += '<button type="button" id="bw-formula-se-lancou" class="px-2.5 py-1.5 text-xs rounded-lg border border-rose-200 text-rose-900 bg-white hover:bg-rose-50" title="Como no Excel: SE(lançou opcional; conta A; conta B)">Se lançou (condição A / B)</button>';
+                corpoProntas += '<button type="button" id="bw-formula-limpar" class="px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 text-gray-600 bg-white hover:bg-gray-50" title="Apaga todos os blocos da fórmula desta coluna.">Limpar</button>';
+                html += '<div class="bw-formula-atalhos">';
+                html += htmlCategoriaFerramentaFormula(
+                    'prontas',
+                    'Fórmulas prontas',
+                    '<p><strong>Atalhos</strong> que montam de uma vez um padrão comum.</p>'
+                        + '<p class="mt-1">O resultado é a mesma linguagem das funções e sinais — só mais rápido. <strong>Limpar</strong> apaga a fórmula desta coluna.</p>',
+                    corpoProntas
+                );
+                html += '</div>';
                 html += '<div class="bw-formula-montagem">';
-                html += '<p id="bw-formula-canvas-label" class="text-[11px] font-semibold text-amber-950 uppercase tracking-wide mb-1.5">Fórmula desta coluna</p>';
+                html += '<div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">';
+                html += '<p id="bw-formula-canvas-label" class="text-[11px] font-semibold uppercase tracking-wide mb-0">Fórmula desta coluna</p>';
+                html += '<details class="bw-formula-manual">';
+                html += '<summary>Manual rápido</summary>';
+                html += '<div class="bw-formula-manual-corpo space-y-1.5">';
+                html += '<p>Exemplos genéricos — no seu evento use as colunas cadastradas (Prova Parcial, Prova Bimestral, Trabalho…).</p>';
+                html += '<p><strong>Média das peças</strong> — (nota1 + nota2 + …) ÷ quantidade.</p>';
+                html += '<p><strong>Média com nota substituta</strong> — a 2ª chamada cobre a 1ª prova ausente. Ex.: <code>nota substituta ( ProvaParcial , ProvaBimestral , 2aChamada ) + PontoExtra</code>.</p>';
+                html += '<p><strong>Provas | substituta | opcional</strong> — papéis pelo <code>|</code>. Ex.: <code>média ( ProvaParcial , ProvaBimestral | 2aChamada | Trabalho ) + PontoExtra</code>.</p>';
+                html += '<p><strong>Média ponderada</strong> — <code>média ponderada ( ProvaParcial , 3 , ProvaBimestral , 5 | 2aChamada )</code>.</p>';
+                html += '<p><strong>Se</strong> — <code>se ( Trabalho , conta_com , conta_sem )</code>.</p>';
+                html += '</div></details></div>';
                 html += '<div id="bw-formula-canvas" class="bw-canvas">' + htmlCanvasTokens() + '</div>';
-                html += '<p id="bw-formula-preview" class="mt-2 text-sm font-mono text-slate-800 break-all">' + esc(compilarTokensPreview(estado.formula_tokens || []) || 'Clique nas siglas à esquerda.') + '</p>';
+                html += '<p id="bw-formula-preview" class="mt-2 text-sm font-mono text-slate-800 break-all">' + esc(compilarTokensPreview(estado.formula_tokens || []) || 'Monte a fórmula com as colunas e os sinais acima.') + '</p>';
                 html += '<p id="bw-formula-leitura" class="mt-1 text-xs text-sky-900">' + esc(leituraMediaLancado(estado.formula_tokens || []) || '') + '</p>';
-                html += '<p class="text-[11px] font-semibold text-amber-950 uppercase tracking-wide mt-3 mb-1.5">Sinais</p>';
-                html += '<div class="bw-palette flex flex-wrap gap-2 items-center">';
-                operadoresFormula().forEach(function (op) { html += chipHtml(op, -1, true); });
-                html += '<label class="inline-flex items-center gap-1.5 text-xs text-amber-950/80 ml-1" title="Insere um número na fórmula (peso, divisor, teto…).">Número';
-                html += '<input id="bw-formula-num" type="text" inputmode="decimal" class="h-8 w-16 border border-amber-200 rounded-md px-2 text-sm bg-white" placeholder="2" title="Digite o número e clique em Inserir (ex.: 2 ou 3).">';
-                html += '<button type="button" id="bw-formula-num-add" class="h-8 px-2 text-xs rounded-md border border-amber-300 text-amber-950 bg-white hover:bg-amber-50" title="Coloca o número na fórmula.">Inserir</button></label></div>';
-                html += '<div class="mt-2 flex flex-wrap gap-2">';
-                html += '<button type="button" id="bw-formula-media" class="px-2.5 py-1.5 text-xs rounded-lg border border-indigo-200 text-indigo-700 bg-white hover:bg-indigo-50" title="Monta (peça1 + peça2 + …) ÷ quantidade. Todas com o mesmo peso.">Média das peças</button>';
-                html += '<button type="button" id="bw-formula-max" class="px-2.5 py-1.5 text-xs rounded-lg border border-amber-300 text-amber-900 bg-white hover:bg-amber-100" title="Fica a maior nota entre as duas primeiras peças da lista. Para Média Bim × ENAC, monte maior ( à mão.">Maior entre as duas primeiras</button>';
-                html += '<button type="button" id="bw-formula-substituta" class="px-2.5 py-1.5 text-xs rounded-lg border border-emerald-200 text-emerald-800 bg-white hover:bg-emerald-50" title="Média das notas principais; a substituta entra no lugar da primeira nota ausente">Média com nota substituta</button>';
-                html += '<button type="button" id="bw-formula-composicao" class="px-2.5 py-1.5 text-xs rounded-lg border border-violet-200 text-violet-800 bg-white hover:bg-violet-50" title="Sem recuperação: fica a média. Com recuperação: (média + recuperação) ÷ 2">Média com recuperação</button>';
-                html += '<button type="button" id="bw-formula-media-lancado" class="px-2.5 py-1.5 text-xs rounded-lg border border-sky-200 text-sky-900 bg-white hover:bg-sky-50" title="média ( provas | substituta | opcionais ) + PE — o | define o papel; o nome do evento pode ser qualquer um">Provas | substituta | opcional  + PE</button>';
-                html += '<button type="button" id="bw-formula-se-lancou" class="px-2.5 py-1.5 text-xs rounded-lg border border-rose-200 text-rose-900 bg-white hover:bg-rose-50" title="Como no Excel: SE(lançou opcional; conta A; conta B)">Se lançou (condição A / B)</button>';
-                html += '<button type="button" id="bw-formula-limpar" class="px-2.5 py-1.5 text-xs rounded-lg border border-gray-300 text-gray-600 bg-white hover:bg-gray-50" title="Apaga todos os blocos da fórmula desta coluna.">Limpar</button></div>';
-                html += '<details class="mt-2 rounded-lg border border-amber-200/80 bg-white/70 px-2.5 py-2">';
-                html += '<summary class="text-[11px] font-semibold text-amber-950 cursor-pointer select-none">Manual rápido das fórmulas</summary>';
-                html += '<div class="mt-2 space-y-1.5 text-[11px] text-amber-950/80 leading-snug">';
-                html += '<p><strong>Média das peças</strong> — (nota1 + nota2 + …) ÷ quantidade. Todas com o mesmo peso.</p>';
-                html += '<p><strong>Maior entre as duas primeiras</strong> — fica a maior nota entre as duas primeiras peças.</p>';
-                html += '<p><strong>Média com nota substituta</strong> — média das bases; a substituta (ex.: CH) entra só no lugar da 1ª ausente. Já divide sozinha: não coloque <code class="bg-amber-50 px-1 rounded">÷ 2</code> de novo. Na MU do Santa Maria, some o PE depois: <code class="bg-amber-50 px-1 rounded">nota substituta (PP, PU, CH) + PE</code>.</p>';
-                html += '<p><strong>Média com recuperação</strong> — sem REC fica a média; com REC vira (média + REC) ÷ 2.</p>';
-                html += '<p><strong>Provas | substituta | opcional + PE</strong> — o <code class="bg-amber-50 px-1 rounded">|</code> separa os papéis (o <em>nome</em> do evento pode ser qualquer um):<br>';
-                html += '• <strong>1º grupo (provas):</strong> o que a substituta pode cobrir<br>';
-                html += '• <strong>2º grupo (substituta):</strong> CH, 2ª chamada, etc. — cobre a 1ª prova que faltar<br>';
-                html += '• <strong>3º grupo (opcional):</strong> Projeto etc. — só se houver lançamento; a substituta <strong>nunca</strong> cobre este grupo<br>';
-                html += '• Ex.: <code class="bg-amber-50 px-1 rounded">média ( PP , PU | 2a_chamada | Projeto ) + PE</code> · ÷ automático</p>';
-                html += '<p><strong>Se (condição A / B)</strong> — igual ao <em>SE</em> do Excel:<br>';
-                html += '<code class="bg-amber-50 px-1 rounded">se ( condição , conta_se_verdadeiro , conta_se_falso )</code><br>';
-                html += '• <strong>1º — condição:</strong> só a sigla (lançou?), <code class="bg-amber-50 px-1 rounded">PJ = verdadeiro</code> / <code class="bg-amber-50 px-1 rounded">falso</code>, <code class="bg-amber-50 px-1 rounded">PP &gt; 7</code> ou <code class="bg-amber-50 px-1 rounded">PP &gt; PU</code> (use os chips de comparação)<br>';
-                html += '• 2º = fórmula se a condição for <strong>verdadeira</strong><br>';
-                html += '• 3º = fórmula se for <strong>falsa</strong><br>';
-                html += '• Ex.: <code class="bg-amber-50 px-1 rounded">se ( PJ = verdadeiro , média ( PP , PU | CH | PJ ) , média ( PP , PU | CH ) ) + PE</code> · <code class="bg-amber-50 px-1 rounded">se ( PP &gt; 7 , PP , PU )</code></p>';
-                html += '<p><strong>Média ponderada</strong> — chip <code class="bg-amber-50 px-1 rounded">média ponderada (</code>: <code class="bg-amber-50 px-1 rounded">média ponderada ( PP , 3 , PU , 5 | CH )</code>. CH cobre a 1ª ausente com o mesmo peso; sem cobertura a coluna fica pendente. À mão: <code class="bg-amber-50 px-1 rounded">((PP × 2) + PU) ÷ 3</code>.</p>';
-                html += '<p><strong>maior (</strong> / <strong>menor (</strong> — maior ou menor valor entre as colunas listadas.</p>';
-                html += '<p class="text-amber-900/70">Manual completo: <code class="bg-amber-50 px-1 rounded">especificacoes/manual-formulas-boletim.md</code></p>';
-                html += '</div></details>';
-                html += '</div></div>';
+                html += '</div></div>'; // montagem · workspace
                 html += '<div class="mt-4 pt-3 border-t border-amber-200/80">';
                 html += '<p class="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-1">Exceção só nesta matéria</p>';
                 html += '<p class="text-xs text-gray-500 mb-2">Se uma matéria não tem um tipo de prova (ex.: sem semanal), some só o que ela tem — a fórmula geral continua nas outras.</p>';
