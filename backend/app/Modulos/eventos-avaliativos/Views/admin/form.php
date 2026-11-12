@@ -316,16 +316,20 @@ foreach ($familiasTituloJs as $paiTitulo => $cfgTitulo) {
                             <p class="text-sm font-medium text-gray-900">Quem faz a recuperação</p>
                             <p class="mt-0.5 text-xs text-gray-500">Cada matéria fica separada. A linha vermelha é só a matéria em que o aluno ficou abaixo. Nas outras, marque só quem quiser subir a nota.</p>
                         </div>
-                        <button type="button" id="btn-puxar-abaixo" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                        <button type="button" id="btn-puxar-abaixo" class="hidden inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
                             Puxar alunos abaixo da média
                         </button>
                     </div>
-                    <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-                        Você pode criar o evento agora. O vínculo automático de quem ficou abaixo da média depende das notas
-                        já lançadas (e da <strong>Média do Ciclo</strong> no boletim, se o bloco de cálculo estiver flagado).
-                        Se a média ainda não estiver disponível, salve o evento e volte depois para marcar os alunos.
+                    <div id="recuperacao-aviso-media"
+                         class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-relaxed text-amber-950 sm:text-base">
+                        <p class="font-semibold text-base sm:text-lg text-amber-950">
+                            Os alunos em recuperação só serão definidos após a definição da métrica na sessão Boletim.
+                        </p>
+                        <p class="mt-1.5 text-sm text-amber-900/90">
+                            Marque a <strong>Média do Ciclo</strong> no bloco de cálculo do boletim e lance as notas.
+                            Você pode salvar este evento agora e voltar depois para marcar quem faz a prova.
+                        </p>
                     </div>
-                    <p id="recuperacao-aviso-media" class="hidden mt-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-950"></p>
                     <input type="hidden" name="definir_alunos_recuperacao" id="definir-alunos-recuperacao" value="<?= $alunosRecuperacaoMarcados !== [] ? '1' : '0' ?>">
                     <p id="recuperacao-resumo" class="mt-3 text-xs text-gray-500">Marque as turmas para listar os alunos.</p>
                     <div id="recuperacao-lista" class="mt-4"></div>
@@ -2946,27 +2950,48 @@ foreach ($familiasTituloJs as $paiTitulo => $cfgTitulo) {
     var pedido = 0;
     var tabelaPronta = true;
     var mediaCicloPendente = false;
+    var mediaCicloPronta = false;
+
+    function mediaDisponivelParaLista() {
+        return mediaCicloPronta;
+    }
 
     function atualizarAvisoMedia(dados) {
         if (!avisoMedia) return;
         var cfg = !!(dados && dados.media_ciclo_configurada);
         var pend = !!(dados && dados.media_ciclo_pendente);
-        mediaCicloPendente = cfg && pend;
-        if (!cfg) {
-            avisoMedia.classList.add('hidden');
-            avisoMedia.textContent = '';
-            return;
+        mediaCicloPendente = !cfg || pend;
+        mediaCicloPronta = cfg && !pend;
+        if (botao) {
+            botao.classList.toggle('hidden', !mediaCicloPronta);
+            botao.disabled = !mediaCicloPronta;
         }
-        if (pend) {
-            avisoMedia.textContent = 'A média do ciclo ainda não está disponível. Lance as notas das peças da fórmula e flague o bloco no boletim; depois use “Puxar alunos abaixo da média”. O evento pode ser salvo agora.';
+        if (!mediaCicloPronta) {
+            avisoMedia.className = 'mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-relaxed text-amber-950 sm:text-base';
+            avisoMedia.innerHTML = '<p class="font-semibold text-base sm:text-lg text-amber-950">'
+                + 'Os alunos em recuperação só serão definidos após a definição da métrica na sessão Boletim.'
+                + '</p>'
+                + '<p class="mt-1.5 text-sm text-amber-900/90">'
+                + 'Marque a <strong>Média do Ciclo</strong> no bloco de cálculo do boletim e lance as notas. '
+                + 'Você pode salvar este evento agora e voltar depois para marcar quem faz a prova.'
+                + '</p>';
             avisoMedia.classList.remove('hidden');
             return;
         }
         var cod = String((dados && dados.media_ciclo_codigo) || '').trim();
-        avisoMedia.textContent = 'Usando a Média do Ciclo do boletim'
+        avisoMedia.className = 'mt-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950';
+        avisoMedia.textContent = 'Pronto: usando a Média do Ciclo do boletim'
             + (cod ? (' (“' + cod + '”)') : '')
             + ' para indicar quem ficou abaixo.';
         avisoMedia.classList.remove('hidden');
+    }
+
+    function limparListaAguardandoMedia() {
+        alunos = [];
+        lista.innerHTML = '';
+        if (resumo) {
+            resumo.textContent = 'Aguardando a métrica na sessão Boletim para listar os alunos.';
+        }
     }
 
     function turmasMarcadas() {
@@ -3159,6 +3184,11 @@ foreach ($familiasTituloJs as $paiTitulo => $cfgTitulo) {
                 media = Number(dados.media) || 6;
                 tabelaPronta = dados.tabela !== false;
                 atualizarAvisoMedia(dados);
+                // Notas e lista só quando a Média do Ciclo do boletim estiver disponível.
+                if (!mediaDisponivelParaLista()) {
+                    limparListaAguardandoMedia();
+                    return;
+                }
                 alunos = (dados.alunos || []).map(function (aluno) {
                     return {
                         id: parseInt(aluno.id, 10) || 0,
@@ -3173,9 +3203,7 @@ foreach ($familiasTituloJs as $paiTitulo => $cfgTitulo) {
                 });
                 if (!alunos.length) {
                     lista.innerHTML = '';
-                    resumo.textContent = mediaCicloPendente
-                        ? 'A média do ciclo ainda não está disponível. Lance as notas e volte para vincular os alunos.'
-                        : 'Nenhuma nota do período nessas turmas para separar por matéria.';
+                    resumo.textContent = 'Nenhuma nota do período nessas turmas para separar por matéria.';
                     return;
                 }
                 if (puxar) puxarAbaixo();

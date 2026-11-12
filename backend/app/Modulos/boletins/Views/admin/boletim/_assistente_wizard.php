@@ -11782,35 +11782,45 @@ $boletimWizardSteps = [
                     : 'No bloco de cálculo, use as siglas na fórmula sem obrigar chip no quadro. Catálogo à esquerda = coluna visível. Salve o bloco e continue.') + '</p>';
                 html += '<div class="mt-3">' + htmlEscopoPecasSelecionadas() + '</div>';
                 html += '<div id="bw-colunas-wrap" class="mt-3"></div>';
-                html += '<div id="bw-formula-editor" class="' + (estado.bloco_calc ? '' : 'hidden') + ' mt-4 rounded-xl border border-amber-200 bg-amber-50/40 p-3">';
+                html += '<div id="bw-formula-editor" class="' + (estado.bloco_calc ? '' : 'hidden') + ' mt-4 rounded-xl border border-amber-200 bg-amber-50/40 p-4">';
                 html += '<div id="bw-excecao-banner" class="hidden mb-3 rounded-xl border-2 border-indigo-400 bg-indigo-600 text-white px-3 py-2.5"></div>';
-                html += '<div class="flex flex-wrap items-end justify-between gap-2 mb-2">';
-                html += '<label class="flex-1 min-w-[12rem]"><span class="text-xs font-medium text-amber-950">Título da coluna</span>';
+                html += '<div class="flex flex-col gap-3 mb-3">';
+                // Linha 1: título + escala + salvar
+                html += '<div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">';
+                html += '<div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] gap-3 flex-1 min-w-0">';
+                html += '<label class="min-w-0"><span class="text-xs font-medium text-amber-950">Título da coluna</span>';
                 html += '<input id="bw-formula-bloco-nome-input" type="text" maxlength="60" class="mt-1 w-full h-10 border border-amber-200 rounded-lg px-3 text-sm bg-white" value="' + esc(nomeBlocoCalc(estado.bloco_calc || '')) + '" placeholder="Ex.: Média Bim">';
                 html += '</label>';
-                html += '<label class="w-36"><span class="text-xs font-medium text-amber-950">Valor máximo</span>';
-                html += '<input id="bw-formula-bloco-escala-input" type="number" min="0.01" max="999" step="0.01" class="mt-1 w-full h-10 border border-amber-200 rounded-lg px-3 text-sm bg-white" value="' + esc(String(escalaBlocoCalc(estado.bloco_calc || ''))) + '" title="Teto da coluna. Em Resultado Final × 2 use 20.">';
-                html += '</label>';
-                html += '<div class="flex flex-wrap gap-1 pb-0.5">';
+                html += '<div class="sm:w-56">';
+                html += '<span class="text-xs font-medium text-amber-950">Valor máximo</span>';
+                html += '<div class="mt-1 flex items-center gap-1.5">';
+                html += '<input id="bw-formula-bloco-escala-input" type="number" min="0.01" max="999" step="0.01" class="h-10 w-full min-w-0 border border-amber-200 rounded-lg px-3 text-sm bg-white" value="' + esc(String(escalaBlocoCalc(estado.bloco_calc || ''))) + '" title="Teto da coluna. Em Resultado Final × 2 use 20.">';
                 [10, 20, 100].forEach(function (v) {
-                    html += '<button type="button" class="bw-escala-atalho h-8 px-2 text-xs rounded-md border border-amber-200 text-amber-900 hover:bg-amber-100" data-escala="' + v + '">' + v + '</button>';
+                    html += '<button type="button" class="bw-escala-atalho shrink-0 h-10 min-w-[2.5rem] px-2 text-xs rounded-lg border border-amber-200 text-amber-900 bg-white hover:bg-amber-100" data-escala="' + v + '">' + v + '</button>';
                 });
                 html += '</div>';
-                html += '<label class="inline-flex items-center gap-1.5 h-10 px-2 rounded-lg border border-amber-200 bg-white text-xs text-amber-950 cursor-pointer select-none" title="Usa esta coluna para marcar quem ficou abaixo da média na recuperação">'
-                    + '<input type="checkbox" id="bw-formula-media-ciclo" class="rounded border-amber-300 text-amber-600"'
-                    + (blocoEhMediaCiclo(estado.bloco_calc || '') ? ' checked' : '') + '> Média do Ciclo</label>';
-                html += '<div class="flex flex-col items-end gap-1">';
-                html += '<button type="button" id="bw-formula-salvar" class="h-10 px-4 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700">Salvar bloco</button>';
+                html += '<p class="mt-1 text-[11px] text-amber-900/70">Da <strong>Regra de Aprovação</strong> (escala '
+                    + esc(String(escalaPadraoRegra()))
+                    + '). Em Resultado Final × 2, use o dobro.</p>';
+                html += '</div>';
+                html += '</div>';
+                html += '<div class="flex flex-col items-stretch sm:items-end gap-1.5 shrink-0">';
+                html += '<button type="button" id="bw-formula-salvar" class="h-10 px-5 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700">Salvar bloco</button>';
                 html += '<label class="inline-flex items-center gap-1.5 text-[11px] text-amber-950/80 cursor-pointer select-none">'
                     + '<input type="checkbox" id="bw-formula-fechar-apos" class="rounded border-amber-300 text-amber-600"'
                     + (fecharFormulaAposSalvar ? ' checked' : '') + '> Fechar ao salvar</label>';
                 html += '<p id="bw-formula-salva" class="hidden text-sm font-semibold text-emerald-700">Salvo.</p>';
                 html += '</div>';
                 html += '</div>';
-                html += '<p class="text-[11px] text-amber-900/80 mb-2">Valor máximo vem da <strong>Regra de Aprovação</strong> (escala '
-                    + esc(String(escalaPadraoRegra()))
-                    + '). Corta o resultado da fórmula — em <strong>Resultado Final × 2</strong>, use o dobro. '
-                    + '<strong>Média do Ciclo</strong> alimenta a convocação da recuperação.</p>';
+                // Linha 2: flag Média do Ciclo em destaque
+                html += '<label class="flex items-start gap-3 rounded-xl border border-amber-300 bg-white px-3.5 py-3 cursor-pointer hover:bg-amber-50/60 select-none" title="Usa esta coluna para marcar quem ficou abaixo da média na recuperação">';
+                html += '<input type="checkbox" id="bw-formula-media-ciclo" class="mt-0.5 rounded border-amber-300 text-amber-600"'
+                    + (blocoEhMediaCiclo(estado.bloco_calc || '') ? ' checked' : '') + '>';
+                html += '<span class="min-w-0">';
+                html += '<span class="block text-sm font-semibold text-amber-950">Média do Ciclo</span>';
+                html += '<span class="block text-xs text-amber-900/80 mt-0.5">Marque se esta coluna for a média que define quem entra na recuperação.</span>';
+                html += '</span></label>';
+                html += '</div>';
                 html += '<p id="bw-formula-bloco-titulo" class="text-sm font-semibold text-amber-950">Cálculo de <span id="bw-formula-bloco-nome">' + esc(nomeBlocoCalc(estado.bloco_calc || 'média')) + '</span></p>';
                 html += '<p id="bw-formula-bloco-ajuda" class="text-xs text-amber-900/80 mt-0.5 mb-2">A média é a soma entre parênteses, depois ÷ quantidade. Ex.: (Prova + Trabalho + Participação) ÷ 3.</p>';
                 html += '<div class="bw-formula-workspace mt-1">';
