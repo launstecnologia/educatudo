@@ -2523,10 +2523,16 @@ class BoletimAssistenteWizard
                 continue;
             }
             $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
-            if ($cod === '' || isset($estado['media_ciclo_blocos'][$cod])) {
+            if ($cod === '' || !empty($estado['media_ciclo_blocos'][$cod])) {
                 continue;
             }
             $cfg = is_array($c['config'] ?? null) ? $c['config'] : [];
+            if ($cfg === [] && is_string($c['config_json'] ?? null) && trim((string) $c['config_json']) !== '') {
+                $decoded = json_decode((string) $c['config_json'], true);
+                if (is_array($decoded)) {
+                    $cfg = $decoded;
+                }
+            }
             if (!empty($cfg['media_ciclo'])) {
                 $estado['media_ciclo_blocos'][$cod] = 1;
             }
@@ -6666,8 +6672,16 @@ class BoletimAssistenteWizard
             return false;
         }
         $mapa = is_array($estado['media_ciclo_blocos'] ?? null) ? $estado['media_ciclo_blocos'] : [];
+        if (!empty($mapa[$codigo])) {
+            return true;
+        }
+        foreach ($mapa as $cod => $flag) {
+            if (!empty($flag) && strtolower(trim((string) $cod)) === $codigo) {
+                return true;
+            }
+        }
 
-        return !empty($mapa[$codigo]);
+        return false;
     }
 
     /**
@@ -8391,6 +8405,19 @@ class BoletimAssistenteWizard
                 }
             }
             $nome = mb_strtoupper(trim((string) ($lin['nome'] ?? '')), 'UTF-8');
+            // Semestre / “a cada dois ciclos” (antes do bimestre: “1º” sozinho viraria b1).
+            if (preg_match('/SEMESTRE|SEMESTRAL|\bPAR\b|ETAPA/', $nome)) {
+                if (preg_match('/\b2[ºO]?\b|SEGUNDO|\bII\b/', $nome) && !preg_match('/\bIII\b/', $nome)) {
+                    return 's2';
+                }
+                if (preg_match('/\b1[ºO]?\b|PRIMEIRO|\bI\b/', $nome)) {
+                    return 's1';
+                }
+            }
+            // Rec / média final do ano.
+            if (preg_match('/\bFINAL\b|RESULTADO\s+FINAL|M[ÉE]DIA\s+FINAL|\bMF\b|\bMA\b/', $nome)) {
+                return 'final';
+            }
             if (preg_match('/\bIV\b|4[ºO]|QUARTO/', $nome)) {
                 return 'b4';
             }

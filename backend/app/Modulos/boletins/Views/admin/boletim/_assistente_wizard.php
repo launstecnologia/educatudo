@@ -5056,8 +5056,29 @@ $boletimWizardSteps = [
             if (String(k).toLowerCase() === low) delete estado.media_ciclo_blocos[k];
         });
         if (el && el.checked) {
-            estado.media_ciclo_blocos[estado.bloco_calc] = 1;
+            estado.media_ciclo_blocos[low] = 1;
         }
+    }
+
+    /** Período do título em que o bloco está (para explicar qual REC usa a flag). */
+    function rotuloPeriodoMediaCiclo(codigo) {
+        codigo = String(codigo || '').toLowerCase();
+        if (!codigo || !estado) return '';
+        var linhas = estado.linhas_layout || [];
+        for (var i = 0; i < linhas.length; i++) {
+            var lin = linhas[i];
+            if (!lin) continue;
+            var cols = lin.colunas || [];
+            var achou = cols.some(function (c) { return String(c || '').toLowerCase() === codigo; });
+            if (!achou) continue;
+            var nome = String(lin.nome || '').trim();
+            if (nome) return nome;
+        }
+        if (/^b1_/.test(codigo) || /1[ºo]/i.test(codigo)) return '1º período';
+        if (/^b2_/.test(codigo)) return '2º período';
+        if (/^b3_/.test(codigo)) return '3º período';
+        if (/^b4_/.test(codigo)) return '4º período';
+        return '';
     }
 
     function salvarBlocoCalc() {
@@ -11817,12 +11838,21 @@ $boletimWizardSteps = [
                 html += '</div>';
                 html += '</div>';
                 // Linha 2: flag Média do Ciclo em destaque
+                var periodoCiclo = rotuloPeriodoMediaCiclo(estado.bloco_calc || '');
                 html += '<label class="flex items-start gap-3 rounded-xl border border-amber-300 bg-white px-3.5 py-3 cursor-pointer hover:bg-amber-50/60 select-none" title="Usa esta coluna para marcar quem ficou abaixo da média na recuperação">';
                 html += '<input type="checkbox" id="bw-formula-media-ciclo" class="mt-0.5 rounded border-amber-300 text-amber-600"'
                     + (blocoEhMediaCiclo(estado.bloco_calc || '') ? ' checked' : '') + '>';
                 html += '<span class="min-w-0">';
                 html += '<span class="block text-sm font-semibold text-amber-950">Média do Ciclo</span>';
-                html += '<span class="block text-xs text-amber-900/80 mt-0.5">Marque se esta coluna for a média que define quem entra na recuperação.</span>';
+                html += '<span class="block text-xs text-amber-900/80 mt-0.5">Marque se esta coluna for a média que define quem entra na recuperação'
+                    + (periodoCiclo
+                        ? (' de <strong>' + esc(periodoCiclo) + '</strong>.')
+                        : '.')
+                    + ' O vínculo é pelo título em que o bloco está:'
+                    + ' <strong>1º Trimestre/Bimestre</strong> → REC desse ciclo;'
+                    + ' <strong>1º Semestre</strong> (média dos 2 bimestres) → REC “a cada dois ciclos”;'
+                    + ' <strong>Resultado Final / Média Final</strong> → Rec Final.'
+                    + '</span>';
                 html += '</span></label>';
                 html += '</div>';
                 html += '<p id="bw-formula-bloco-titulo" class="text-sm font-semibold text-amber-950">Cálculo de <span id="bw-formula-bloco-nome">' + esc(nomeBlocoCalc(estado.bloco_calc || 'média')) + '</span></p>';

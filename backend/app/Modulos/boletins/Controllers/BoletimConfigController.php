@@ -12822,11 +12822,16 @@ class BoletimConfigController extends BaseController
                 $payload['agregar_nq'] = $agregarNqSave;
             }
             $tracoMin = false;
+            $mediaCiclo = false;
             if (isset($componente['config']) && is_array($componente['config'])) {
                 $tracoMin = !empty($componente['config']['traco_abaixo_minimo']);
+                $mediaCiclo = !empty($componente['config']['media_ciclo']);
             }
             if ($tracoMin) {
                 $payload['traco_abaixo_minimo'] = true;
+            }
+            if ($mediaCiclo) {
+                $payload['media_ciclo'] = 1;
             }
             if ($groupLine !== null) {
                 $payload['group_line'] = $groupLine;

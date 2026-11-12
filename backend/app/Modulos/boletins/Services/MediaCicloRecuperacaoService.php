@@ -254,12 +254,19 @@ class MediaCicloRecuperacaoService
         }
         foreach ($candidatos as $c) {
             $cfg = $this->configDoComponente($c);
-            $g = strtolower(trim((string) ($cfg['layout_group'] ?? $c['layout_group'] ?? '')));
+            $g = $this->layoutGroupDoConfig($cfg, $c);
             if ($g === $grupo) {
                 return $c;
             }
             $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
-            if ($grupo === 'final' && in_array($cod, ['media_final', 'mf', 'ma'], true)) {
+            if ($grupo === 'final' && (
+                in_array($cod, ['media_final', 'mf', 'ma', 'nota_final', 'resultado_final'], true)
+                || str_starts_with($cod, 'final_')
+                || str_contains($cod, 'media_final')
+            )) {
+                return $c;
+            }
+            if (($grupo === 's1' || $grupo === 's2') && str_starts_with($cod, $grupo . '_')) {
                 return $c;
             }
             if (preg_match('/^b([1-4])/', $grupo, $m) && str_starts_with($cod, 'b' . $m[1] . '_')) {
@@ -270,7 +277,7 @@ class MediaCicloRecuperacaoService
         // Quadro livre: bloco flagado sem grupo (ou quadro_comum).
         foreach ($candidatos as $c) {
             $cfg = $this->configDoComponente($c);
-            $g = strtolower(trim((string) ($cfg['layout_group'] ?? '')));
+            $g = $this->layoutGroupDoConfig($cfg, $c);
             if ($g === '' || $g === 'quadro_comum') {
                 return $c;
             }
@@ -613,16 +620,33 @@ class MediaCicloRecuperacaoService
      */
     private function configDoComponente(array $componente): array
     {
-        if (is_array($componente['config'] ?? null)) {
-            return $componente['config'];
-        }
+        $cfg = is_array($componente['config'] ?? null) ? $componente['config'] : [];
         $raw = trim((string) ($componente['config_json'] ?? ''));
-        if ($raw === '') {
-            return [];
+        if ($raw !== '') {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                $cfg = $cfg === [] ? $decoded : array_replace($decoded, $cfg);
+            }
         }
-        $decoded = json_decode($raw, true);
 
-        return is_array($decoded) ? $decoded : [];
+        return $cfg;
+    }
+
+    /**
+     * @param array<string,mixed> $cfg
+     * @param array<string,mixed> $componente
+     */
+    private function layoutGroupDoConfig(array $cfg, array $componente): string
+    {
+        $layout = is_array($cfg['layout'] ?? null) ? $cfg['layout'] : [];
+        $g = strtolower(trim((string) (
+            $cfg['layout_group']
+            ?? $layout['group']
+            ?? $componente['layout_group']
+            ?? ''
+        )));
+
+        return $g;
     }
 
     private function colunaExiste(string $tabela, string $coluna): bool
