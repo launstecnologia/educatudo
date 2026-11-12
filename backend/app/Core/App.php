@@ -138,7 +138,13 @@ class App
             if (!empty($_POST)) {
                 $postData = $_POST;
                 // Remover dados sensíveis
-                unset($postData['password'], $postData['senha'], $postData['_token']);
+                unset(
+                    $postData['password'],
+                    $postData['senha'],
+                    $postData['senha_confirmacao'],
+                    $postData['confirmacao_senha'],
+                    $postData['_token']
+                );
                 $context['post_data'] = $postData;
             }
             // Incluir causa real quando for exceção encadeada (ex.: falha de conexão com o banco)

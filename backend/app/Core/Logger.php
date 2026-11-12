@@ -465,10 +465,12 @@ class Logger
      */
     private static function mascararContexto(array $contexto): array
     {
-        $sensiveis = ['token', '_token', 'access_token', 'refresh_token', 'password', 'senha', 'senha_hash', 'password_hash', 'csrf', 'csrf_token', 'authorization', 'api_key', 'secret', 'secret_key'];
+        $sensiveis = ['token', '_token', 'access_token', 'refresh_token', 'password', 'senha', 'senha_hash', 'password_hash', 'senha_confirmacao', 'confirmacao_senha', 'csrf', 'csrf_token', 'authorization', 'api_key', 'secret', 'secret_key'];
         foreach ($contexto as $chave => $valor) {
             $nome = strtolower((string) $chave);
-            if (in_array($nome, $sensiveis, true)) {
+            if (in_array($nome, $sensiveis, true)
+                || str_contains($nome, 'senha')
+                || str_contains($nome, 'password')) {
                 $contexto[$chave] = '***';
                 continue;
             }
@@ -499,7 +501,7 @@ class Logger
         }
         $query = [];
         parse_str($partes[1], $query);
-        $sensiveis = ['token', '_token', 'access_token', 'refresh_token', 'password', 'senha', 'senha_hash', 'password_hash', 'csrf', 'csrf_token', 'authorization', 'api_key', 'secret', 'secret_key'];
+        $sensiveis = ['token', '_token', 'access_token', 'refresh_token', 'password', 'senha', 'senha_hash', 'password_hash', 'senha_confirmacao', 'confirmacao_senha', 'csrf', 'csrf_token', 'authorization', 'api_key', 'secret', 'secret_key'];
         $pares = [];
         foreach ($query as $chave => $valor) {
             $nome = strtolower((string) $chave);
@@ -572,6 +574,8 @@ class Logger
             'senha',
             'senha_hash',
             'password_hash',
+            'senha_confirmacao',
+            'confirmacao_senha',
             'token',
             '_token',
             'csrf_token',
@@ -586,10 +590,12 @@ class Logger
         $filtered = [];
         
         foreach ($data as $key => $value) {
-            $keyLower = strtolower($key);
+            $keyLower = strtolower((string) $key);
             
-            // Se for campo sensível, ocultar
-            if (in_array($keyLower, $sensitiveFields)) {
+            // Se for campo sensível, ocultar (inclui nomes como senha_confirmacao)
+            if (in_array($keyLower, $sensitiveFields, true)
+                || str_contains($keyLower, 'senha')
+                || str_contains($keyLower, 'password')) {
                 $filtered[$key] = '[REDACTED]';
             } elseif (is_array($value)) {
                 // Recursivamente filtrar arrays aninhados

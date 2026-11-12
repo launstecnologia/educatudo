@@ -525,16 +525,71 @@ class EventoAvaliativoService
     }
 
     /**
-     * @return array{success:bool,error?:string}
+     * Resumo dos vínculos do evento para a confirmação de exclusão (sem dados de aluno).
+     *
+     * @return array{ok:bool,possui_vinculos?:bool,exige_confirmacao_forte?:bool,vinculos?:array<string,int>,resumo?:list<string>,error?:string}
      */
-    public function excluir(int $id, int $usuarioId): array
+    public function consultarVinculos(int $id): array
+    {
+        $id = (int) $id;
+        if ($id <= 0 || $this->model->findById($id) === null) {
+            return ['ok' => false, 'error' => 'Evento não encontrado.'];
+        }
+        $vinculos = $this->model->contarVinculos($id);
+        $resumo = [];
+        if ($vinculos['notas_lancadas'] > 0) {
+            $resumo[] = $vinculos['notas_lancadas'] . ($vinculos['notas_lancadas'] === 1 ? ' nota lançada' : ' notas lançadas');
+        }
+        if ($vinculos['subeventos'] > 0) {
+            $resumo[] = $vinculos['subeventos'] . ($vinculos['subeventos'] === 1 ? ' subevento (data)' : ' subeventos (datas)');
+        }
+        if ($vinculos['provas'] > 0) {
+            $resumo[] = $vinculos['provas'] . ($vinculos['provas'] === 1 ? ' prova vinculada' : ' provas vinculadas');
+        }
+        if ($vinculos['calendario'] > 0) {
+            $resumo[] = $vinculos['calendario'] . ($vinculos['calendario'] === 1 ? ' compromisso no calendário' : ' compromissos no calendário');
+        }
+        if ($vinculos['alunos_recuperacao'] > 0) {
+            $resumo[] = $vinculos['alunos_recuperacao'] . ($vinculos['alunos_recuperacao'] === 1 ? ' aluno convocado' : ' alunos convocados');
+        }
+
+        return [
+            'ok' => true,
+            'possui_vinculos' => $resumo !== [],
+            // Subevento sozinho não exige EXCLUIR+senha (todo evento tem data).
+            'exige_confirmacao_forte' => (
+                ($vinculos['notas_lancadas'] ?? 0) > 0
+                || ($vinculos['alunos_recuperacao'] ?? 0) > 0
+                || ($vinculos['calendario'] ?? 0) > 0
+                || ($vinculos['provas'] ?? 0) > 0
+            ),
+            'vinculos' => $vinculos,
+            'resumo' => $resumo,
+        ];
+    }
+
+    /**
+     * Soft-delete. Com nota lançada exige $forcar (confirmação validada no Controller).
+     * Não apaga as notas: só some o evento das listagens.
+     *
+     * @return array{success:bool,error?:string,precisa_confirmacao?:bool,vinculos?:array<string,int>}
+     */
+    public function excluir(int $id, int $usuarioId, bool $forcar = false): array
     {
         $evento = $this->model->findById($id);
         if ($evento === null) {
             return ['success' => false, 'error' => 'Evento não encontrado.'];
         }
-        if ($this->model->temNotaLancada($id)) {
-            return ['success' => false, 'error' => 'Este evento já tem nota lançada. Não é possível excluir.'];
+        if (!$forcar) {
+            $consulta = $this->consultarVinculos($id);
+            if (!empty($consulta['exige_confirmacao_forte'])) {
+                return [
+                    'success' => false,
+                    'precisa_confirmacao' => true,
+                    'error' => 'Este evento tem vínculos (notas, calendário ou convocações). Confirme a exclusão digitando EXCLUIR e sua senha.',
+                    'vinculos' => $consulta['vinculos'] ?? $this->model->contarVinculos($id),
+                ];
+            }
         }
 
         return $this->apagarEvento($evento, $usuarioId);
@@ -605,6 +660,7 @@ class EventoAvaliativoService
                 $this->desfazerQuadro($grupoId);
             }
             $this->retirarDoCalendario($id);
+            $this->model->limparAlunos($id);
         } catch (Throwable $e) {
             error_log('EventoAvaliativoService::apagarEvento: ' . $e->getMessage());
             return ['success' => false, 'error' => 'Não foi possível excluir o evento.'];

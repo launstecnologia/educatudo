@@ -27,6 +27,7 @@ $router->post('/admin/eventos-avaliativos/duplicar', 'Modulos/eventos-avaliativo
 $router->post('/admin/eventos-avaliativos/{id}/publicar', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@publicar');
 $router->get('/admin/eventos-avaliativos/{id}/editar', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@editar');
 $router->post('/admin/eventos-avaliativos/{id}', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@atualizar');
+$router->get('/admin/eventos-avaliativos/{id}/vinculos', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@vinculos');
 $router->get('/admin/eventos-avaliativos/{id}', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@detalhe');
 $router->post('/admin/eventos-avaliativos/{id}/subeventos/{blocoId}/excluir', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@excluirSubevento');
 $router->post('/admin/eventos-avaliativos/{id}/excluir', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@excluir');

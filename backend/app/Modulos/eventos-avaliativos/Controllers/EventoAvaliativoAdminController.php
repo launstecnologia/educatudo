@@ -482,6 +482,27 @@ class EventoAvaliativoAdminController extends AdminBaseController
         ));
     }
 
+    /**
+     * JSON: contagens de vínculos do evento (sem dados de aluno), para a confirmação de exclusão.
+     */
+    public function vinculos($id): void
+    {
+        if (!$this->permitido('excluir', true) && !$this->permitido('visualizar', true)) {
+            $this->json(['ok' => false, 'erro' => 'Sem permissão.'], 403);
+            return;
+        }
+        if (!$this->service->model()->tabelasProntas()) {
+            $this->json(['ok' => false, 'erro' => 'Módulo ainda não está pronto nesta escola.'], 422);
+            return;
+        }
+        $res = $this->service->consultarVinculos((int) $id);
+        if (empty($res['ok'])) {
+            $this->json(['ok' => false, 'erro' => (string) ($res['error'] ?? 'Evento não encontrado.')], 404);
+            return;
+        }
+        $this->json($res);
+    }
+
     public function excluir($id): void
     {
         if (!$this->permitido('excluir') || !$this->exigirSchema()) {
@@ -498,13 +519,34 @@ class EventoAvaliativoAdminController extends AdminBaseController
             return;
         }
         $user = $this->auth->getUser() ?? [];
-        $res = $this->service->excluir($id, (int) ($user['id'] ?? 0));
+        $forcar = false;
+        $pediuConfirmacao = !empty($_POST['forcar_exclusao']) || array_key_exists('confirmacao_texto', $_POST);
+        if ($pediuConfirmacao) {
+            $texto = (string) ($_POST['confirmacao_texto'] ?? '');
+            if ($texto !== 'EXCLUIR') {
+                unset($_POST['senha_confirmacao']);
+                $this->setFlashMessage('Digite EXCLUIR (em maiúsculas) para confirmar a exclusão.', 'error');
+                $this->redirect($voltar);
+                return;
+            }
+            $senha = (string) ($_POST['senha_confirmacao'] ?? '');
+            unset($_POST['senha_confirmacao']);
+            if ($senha === '' || !$this->senhaConfereUsuarioLogado($senha)) {
+                $this->setFlashMessage($senha === '' ? 'Informe sua senha para confirmar a exclusão.' : 'Senha incorreta.', 'error');
+                $this->redirect($voltar);
+                return;
+            }
+            $forcar = true;
+        } else {
+            unset($_POST['senha_confirmacao']);
+        }
+        $res = $this->service->excluir($id, (int) ($user['id'] ?? 0), $forcar);
         if (empty($res['success'])) {
             $this->setFlashMessage((string) ($res['error'] ?? 'Não foi possível excluir.'), 'error');
             $this->redirect($voltar);
             return;
         }
-        $this->setFlashMessage('Evento excluído.', 'success');
+        $this->setFlashMessage('Evento desativado. Ele não aparece mais na lista; notas e histórico foram preservados.', 'success');
         $this->redirect($voltar);
     }
 
@@ -1261,6 +1303,28 @@ class EventoAvaliativoAdminController extends AdminBaseController
         $this->setFlashMessage('Rode a migration 2026_10_26_eventos_avaliativos.sql no painel Master.', 'error');
         $this->redirect('/admin/eventos-avaliativos');
         return false;
+    }
+
+    private function senhaConfereUsuarioLogado(string $senha): bool
+    {
+        $senha = trim($senha);
+        if ($senha === '') {
+            return false;
+        }
+        $user = $this->auth->getUser();
+        $uid = (int) ($user['id'] ?? 0);
+        if ($uid <= 0) {
+            return false;
+        }
+        $row = $this->db->fetch(
+            'SELECT senha_hash FROM usuarios WHERE id = :id LIMIT 1',
+            ['id' => $uid]
+        );
+        if (!$row || empty($row['senha_hash'])) {
+            return false;
+        }
+
+        return password_verify($senha, (string) $row['senha_hash']);
     }
 
     private function permitido(string $acao, bool $apenasConsulta = false): bool

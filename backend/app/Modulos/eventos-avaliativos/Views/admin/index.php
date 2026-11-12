@@ -207,9 +207,10 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
             </form>
             <?php endif; ?>
             <?php if ($podeExcluir): ?>
-            <form method="POST" action="<?= URL ?>/admin/eventos-avaliativos/<?= $eventoId ?>/excluir" onsubmit="return confirm('Excluir este evento avaliativo?');">
+            <form method="POST" action="<?= URL ?>/admin/eventos-avaliativos/<?= $eventoId ?>/excluir"
+                  data-excluir-evento data-evento-id="<?= $eventoId ?>" data-evento-nome="<?= htmlspecialchars($nomeEvento, ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>">
-                <button type="submit" class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50">
+                <button type="button" data-excluir-evento-abrir class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50">
                     <i class="fa-solid fa-trash-can w-4 text-center text-red-400"></i> Excluir
                 </button>
             </form>
@@ -319,6 +320,193 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
     <?php endforeach; ?>
 </div>
 <p id="eventos-vazio-busca" class="hidden rounded-xl border border-gray-200 bg-white px-6 py-10 text-center text-sm text-gray-500">Nenhum evento com esse nome, referência ou sigla.</p>
+<?php endif; ?>
+
+<?php if ($podeExcluir): ?>
+<!-- Modal: excluir evento avaliativo -->
+<div id="modalExcluirEvento" class="hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="modalExcluirEventoTitulo">
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="fixed inset-0 bg-black/50" data-excluir-fechar></div>
+        <div class="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 id="modalExcluirEventoTitulo" class="mb-2 text-lg font-semibold text-gray-900">Excluir evento</h3>
+            <p id="modalExcluirEventoNome" class="mb-3 hidden text-sm font-medium text-gray-800"></p>
+
+            <!-- Exclusão simples -->
+            <div id="excluirEventoSimples" class="hidden">
+                <p class="mb-4 text-sm text-gray-600">Excluir este evento? Ele deixa de aparecer na lista.</p>
+            </div>
+
+            <!-- Exclusão com vínculos (confirmação forte) -->
+            <div id="excluirEventoForte" class="hidden">
+                <div class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                    <p class="flex items-start gap-2 font-semibold">
+                        <i class="fa-solid fa-triangle-exclamation mt-0.5" aria-hidden="true"></i>
+                        <span>Este evento possui vínculos.</span>
+                    </p>
+                    <ul id="excluirEventoResumo" class="mt-2 list-inside list-disc space-y-0.5"></ul>
+                </div>
+                <p class="mb-4 text-sm text-gray-600">O evento some da lista (fica desabilitado), mas as notas e o histórico não são apagados.</p>
+                <label for="excluirEventoTexto" class="mb-1 block text-sm font-medium text-gray-700">Digite <span class="font-bold">EXCLUIR</span> (em maiúsculas)</label>
+                <input type="text" id="excluirEventoTexto" autocomplete="off" placeholder="EXCLUIR"
+                       class="mb-4 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                <label for="excluirEventoSenha" class="mb-1 block text-sm font-medium text-gray-700">Senha de acesso</label>
+                <input type="password" id="excluirEventoSenha" autocomplete="current-password" placeholder="Sua senha"
+                       class="mb-4 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            </div>
+
+            <p id="excluirEventoErro" class="mb-3 hidden text-sm text-red-600"></p>
+
+            <div class="flex justify-end gap-2">
+                <button type="button" data-excluir-fechar class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Cancelar</button>
+                <button type="button" id="excluirEventoConfirmar" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var modal = document.getElementById('modalExcluirEvento');
+    if (!modal) return;
+    var elNome = document.getElementById('modalExcluirEventoNome');
+    var elSimples = document.getElementById('excluirEventoSimples');
+    var elForte = document.getElementById('excluirEventoForte');
+    var elResumo = document.getElementById('excluirEventoResumo');
+    var elTexto = document.getElementById('excluirEventoTexto');
+    var elSenha = document.getElementById('excluirEventoSenha');
+    var elErro = document.getElementById('excluirEventoErro');
+    var btnConfirmar = document.getElementById('excluirEventoConfirmar');
+    var formAtual = null;
+    var modoForte = false;
+    var urlBase = <?= json_encode(URL . '/admin/eventos-avaliativos/', JSON_UNESCAPED_SLASHES) ?>;
+
+    function mostrarErro(msg) {
+        elErro.textContent = msg || '';
+        elErro.classList.toggle('hidden', !msg);
+    }
+
+    function fechar() {
+        modal.classList.add('hidden');
+        formAtual = null;
+        elTexto.value = '';
+        elSenha.value = '';
+        mostrarErro('');
+    }
+
+    function abrir(forte, resumo, nome) {
+        modoForte = forte;
+        elNome.textContent = nome || '';
+        elNome.classList.toggle('hidden', !nome);
+        elSimples.classList.toggle('hidden', forte);
+        elForte.classList.toggle('hidden', !forte);
+        elResumo.innerHTML = '';
+        (resumo || []).forEach(function (item) {
+            var li = document.createElement('li');
+            li.textContent = String(item);
+            elResumo.appendChild(li);
+        });
+        elTexto.value = '';
+        elSenha.value = '';
+        mostrarErro('');
+        btnConfirmar.textContent = forte ? 'Excluir mesmo assim' : 'Excluir';
+        btnConfirmar.disabled = false;
+        modal.classList.remove('hidden');
+        if (forte) elTexto.focus(); else btnConfirmar.focus();
+    }
+
+    function campoOculto(form, nome, valor) {
+        var el = form.querySelector('input[type="hidden"][name="' + nome + '"]');
+        if (!el) {
+            el = document.createElement('input');
+            el.type = 'hidden';
+            el.name = nome;
+            form.appendChild(el);
+        }
+        el.value = valor;
+    }
+
+    function removerCampo(form, nome) {
+        var el = form.querySelector('input[type="hidden"][name="' + nome + '"]');
+        if (el) el.remove();
+    }
+
+    document.addEventListener('click', function (e) {
+        var abrirBtn = e.target.closest('[data-excluir-evento-abrir]');
+        if (!abrirBtn) return;
+        var form = abrirBtn.closest('form[data-excluir-evento]');
+        if (!form) return;
+        e.preventDefault();
+        if (abrirBtn.getAttribute('data-carregando') === '1') return;
+        abrirBtn.setAttribute('data-carregando', '1');
+        abrirBtn.disabled = true;
+
+        var id = form.getAttribute('data-evento-id');
+        var nome = form.getAttribute('data-evento-nome') || '';
+        fetch(urlBase + encodeURIComponent(id) + '/vinculos', {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' }
+        }).then(function (r) {
+            return r.json().catch(function () { return null; }).then(function (dados) {
+                return { http: r.ok, dados: dados };
+            });
+        }).then(function (res) {
+            var d = res.dados;
+            if (!res.http || !d || d.ok !== true) {
+                alert((d && d.mensagem) || (d && d.erro) || 'Não foi possível verificar os vínculos do evento. Tente novamente.');
+                return;
+            }
+            formAtual = form;
+            abrir(!!d.exige_confirmacao_forte, Array.isArray(d.resumo) ? d.resumo : [], nome);
+        }).catch(function () {
+            alert('Erro de conexão ao verificar os vínculos do evento.');
+        }).then(function () {
+            abrirBtn.removeAttribute('data-carregando');
+            abrirBtn.disabled = false;
+        });
+    });
+
+    modal.addEventListener('click', function (e) {
+        if (e.target.closest('[data-excluir-fechar]')) fechar();
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !modal.classList.contains('hidden')) fechar();
+    });
+
+    function confirmar() {
+        if (!formAtual) return;
+        if (modoForte) {
+            if (elTexto.value !== 'EXCLUIR') {
+                mostrarErro('Digite EXCLUIR em maiúsculas para confirmar.');
+                elTexto.focus();
+                return;
+            }
+            if (elSenha.value === '') {
+                mostrarErro('Informe sua senha de acesso.');
+                elSenha.focus();
+                return;
+            }
+            campoOculto(formAtual, 'forcar_exclusao', '1');
+            campoOculto(formAtual, 'confirmacao_texto', elTexto.value);
+            campoOculto(formAtual, 'senha_confirmacao', elSenha.value);
+        } else {
+            removerCampo(formAtual, 'forcar_exclusao');
+            removerCampo(formAtual, 'confirmacao_texto');
+            removerCampo(formAtual, 'senha_confirmacao');
+        }
+        btnConfirmar.disabled = true;
+        formAtual.submit();
+    }
+
+    btnConfirmar.addEventListener('click', confirmar);
+    [elTexto, elSenha].forEach(function (el) {
+        el.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); confirmar(); }
+        });
+    });
+})();
+</script>
 <?php endif; ?>
 
 <script>

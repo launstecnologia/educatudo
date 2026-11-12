@@ -413,6 +413,96 @@ class EventoAvaliativo
         }
     }
 
+    /**
+     * Contagens de vínculos do evento, sem dados de aluno.
+     *
+     * @return array{subeventos:int,notas_lancadas:int,provas:int,calendario:int,alunos_recuperacao:int}
+     */
+    public function contarVinculos(int $eventoId): array
+    {
+        $saida = [
+            'subeventos' => 0,
+            'notas_lancadas' => 0,
+            'provas' => 0,
+            'calendario' => 0,
+            'alunos_recuperacao' => 0,
+        ];
+        $eventoId = (int) $eventoId;
+        if ($eventoId <= 0) {
+            return $saida;
+        }
+
+        try {
+            $row = $this->db->fetch(
+                'SELECT COUNT(*) AS total
+                   FROM provas_blocos
+                  WHERE evento_avaliativo_id = :id AND deleted_at IS NULL',
+                ['id' => $eventoId]
+            );
+            $saida['subeventos'] = (int) ($row['total'] ?? 0);
+        } catch (\Throwable $e) {
+            $saida['subeventos'] = 0;
+        }
+
+        if ($this->tabelaExiste('provas_blocos_notas_lancadas')) {
+            try {
+                $row = $this->db->fetch(
+                    'SELECT COUNT(*) AS total
+                       FROM provas_blocos_notas_lancadas n
+                       INNER JOIN provas_blocos pb ON pb.id = n.bloco_id
+                      WHERE pb.evento_avaliativo_id = :id
+                        AND n.nota IS NOT NULL',
+                    ['id' => $eventoId]
+                );
+                $saida['notas_lancadas'] = (int) ($row['total'] ?? 0);
+            } catch (\Throwable $e) {
+                $saida['notas_lancadas'] = 0;
+            }
+        }
+
+        try {
+            $coluna = $this->db->fetch("SHOW COLUMNS FROM calendario_letivo_eventos LIKE 'evento_avaliativo_id'");
+            if (!empty($coluna)) {
+                $row = $this->db->fetch(
+                    'SELECT COUNT(*) AS total FROM calendario_letivo_eventos WHERE evento_avaliativo_id = :id',
+                    ['id' => $eventoId]
+                );
+                $saida['calendario'] = (int) ($row['total'] ?? 0);
+            }
+        } catch (\Throwable $e) {
+            $saida['calendario'] = 0;
+        }
+
+        if ($this->tabelaAlunosPronta()) {
+            try {
+                $row = $this->db->fetch(
+                    'SELECT COUNT(DISTINCT aluno_id) AS total FROM eventos_avaliativos_alunos WHERE evento_id = :id',
+                    ['id' => $eventoId]
+                );
+                $saida['alunos_recuperacao'] = (int) ($row['total'] ?? 0);
+            } catch (\Throwable $e) {
+                $saida['alunos_recuperacao'] = 0;
+            }
+        }
+
+        // Provas vinculadas ao bloco não têm tabela de ligação estável: fica 0.
+        return $saida;
+    }
+
+    private function tabelaExiste(string $tabela): bool
+    {
+        try {
+            $row = $this->db->fetch(
+                'SELECT 1 AS ok FROM information_schema.TABLES
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t LIMIT 1',
+                ['t' => $tabela]
+            );
+            return !empty($row['ok']);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     public function tabelaAlunosPronta(): bool
     {
         try {
