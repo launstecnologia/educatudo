@@ -151,8 +151,10 @@ class ImportacaoNotasPlanilha
      *   arquivos_erro:array<string,int>
      * }
      */
-    public function cruzar(array $linhas, array $elegiveis, bool $notaUnica): array
+    public function cruzar(array $linhas, array $elegiveis, bool $notaUnica, float $escalaMax = 10.0): array
     {
+        $max = $escalaMax > 0 ? min(100.0, $escalaMax) : 10.0;
+        $maxRotulo = (string) (int) $max;
         $porAluno = [];
         $porCodigo = [];
         $ambiguosCodigo = [];
@@ -228,8 +230,8 @@ class ImportacaoNotasPlanilha
                 continue;
             }
             $nota = round((float) $notaBruta, 2);
-            if ($nota < 0 || $nota > 10) {
-                $erros[] = $rotulo . ': a nota deve estar entre 0 e 10.';
+            if ($nota < 0 || $nota > $max) {
+                $erros[] = $rotulo . ': a nota deve estar entre 0 e ' . $maxRotulo . '.';
                 $arquivosErro[$arquivoChave] = ($arquivosErro[$arquivoChave] ?? 0) + 1;
                 continue;
             }

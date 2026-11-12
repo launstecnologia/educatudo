@@ -6,6 +6,14 @@ $notas_map = $notas_map ?? [];
 $csrf_token = $csrf_token ?? '';
 $materiaId = (int) ($materia['id'] ?? $_GET['materia_id'] ?? 0);
 $eventoId = (int) ($evento['id'] ?? 0);
+$escalaMax = (float) ($escala_max ?? 10);
+if ($escalaMax <= 0) {
+    $escalaMax = 10.0;
+}
+if ($escalaMax > 100) {
+    $escalaMax = 100.0;
+}
+$escalaMaxRotulo = (string) (int) $escalaMax;
 $ajaxUrl = URL . '/professor/provas/evento-lancar-notas/' . $eventoId . '/ajax';
 ?>
 <div class="mb-6">
@@ -15,7 +23,7 @@ $ajaxUrl = URL . '/professor/provas/evento-lancar-notas/' . $eventoId . '/ajax';
 <div class="mb-8">
     <h1 class="text-3xl font-bold text-gray-900">Lançamento de notas</h1>
     <p class="text-gray-600 mt-2"><?= htmlspecialchars((string) ($evento['titulo'] ?? '')) ?> · <?= htmlspecialchars((string) ($materia['nome'] ?? '')) ?></p>
-    <p class="text-sm text-gray-500 mt-1">Informe a nota de cada aluno (0 a 10). Deixe em branco para não lançar ainda. Use vírgula ou ponto para decimais. A nota é salva automaticamente ao sair do campo.</p>
+    <p class="text-sm text-gray-500 mt-1">Informe a nota de cada aluno (0 a <?= htmlspecialchars($escalaMaxRotulo, ENT_QUOTES, 'UTF-8') ?>). Deixe em branco para não lançar ainda. Use vírgula ou ponto para decimais. A nota é salva automaticamente ao sair do campo.</p>
     <?php if (!empty($evento['nota_unica_todas_materias'])): ?>
     <div class="mt-3 px-3 py-2 rounded-lg bg-violet-100 border border-violet-200 text-violet-900 text-sm">
         Configuração ativa: mesma nota para todas as matérias. Ao salvar, a nota deste aluno será replicada para as outras matérias do evento.
@@ -51,7 +59,7 @@ $ajaxUrl = URL . '/professor/provas/evento-lancar-notas/' . $eventoId . '/ajax';
                     <thead class="bg-gray-50">
                         <tr>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Aluno</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-40">Nota (0–10)</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-40">Nota (0–<?= htmlspecialchars($escalaMaxRotulo, ENT_QUOTES, 'UTF-8') ?>)</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
@@ -161,12 +169,17 @@ $ajaxUrl = URL . '/professor/provas/evento-lancar-notas/' . $eventoId . '/ajax';
         msg.classList.add(tipo === 'error' ? 'text-red-600' : (tipo === 'ok' ? 'text-emerald-600' : 'text-slate-500'));
     }
 
+    var escalaMax = <?= json_encode($escalaMax, JSON_UNESCAPED_UNICODE) ?>;
+    var escalaMaxRotulo = <?= json_encode($escalaMaxRotulo, JSON_UNESCAPED_UNICODE) ?>;
+
     function validarLocal(valor) {
         var v = normalizarValor(valor);
         if (v === '') return { ok: true, valor: '' };
         if (!/^-?\d+(\.\d+)?$/.test(v)) return { ok: false, message: 'Nota inválida.' };
         var n = parseFloat(v);
-        if (isNaN(n) || n < 0 || n > 10) return { ok: false, message: 'Notas devem estar entre 0 e 10.' };
+        if (isNaN(n) || n < 0 || n > escalaMax) {
+            return { ok: false, message: 'Notas devem estar entre 0 e ' + escalaMaxRotulo + '.' };
+        }
         return { ok: true, valor: v };
     }
 

@@ -131,9 +131,9 @@ class ImportacaoEnacPlanilhaService
      * @param list<array<string,mixed>> $elegiveis
      * @return array{aplicar:list<array<string,mixed>>,erros:list<string>,ignoradas:int}
      */
-    public function cruzar(array $linhas, array $elegiveis, bool $notaUnica): array
+    public function cruzar(array $linhas, array $elegiveis, bool $notaUnica, float $escalaMax = 10.0): array
     {
-        return (new ImportacaoNotasPlanilha())->cruzar($linhas, $elegiveis, $notaUnica);
+        return (new ImportacaoNotasPlanilha())->cruzar($linhas, $elegiveis, $notaUnica, $escalaMax);
     }
 
     /**

@@ -840,6 +840,9 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
         [(int) $val($item, 'serie_id', 0)]
     )))), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     var seriesModo = seriesMarcadas.length ? 'algumas' : 'todas';
+    var seriesMateriasSyncPronto = false;
+    var seriesMateriasFetchSeq = 0;
+    var urlMateriasPorSeries = <?= json_encode(URL . '/admin/regras-academicas/materias-por-series', JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     var cursoSel = document.getElementById('regra-curso');
     var serieCampo = document.getElementById('regra-serie-campo');
     var serieBotao = document.getElementById('regra-serie-botao');
@@ -851,6 +854,38 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
         return seriesCatalogo.filter(function (serie) {
             return serie.id && (!curso || String(serie.curso_id) === String(curso));
         });
+    }
+    function seriesIdsParaMatriz() {
+        if (seriesModo === 'nenhuma') return [];
+        if (seriesModo === 'todas') {
+            return seriesVisiveis().map(function (serie) { return serie.id; });
+        }
+        return seriesMarcadas.slice();
+    }
+    function marcarMateriasDaMatriz(ids) {
+        var mapa = {};
+        (ids || []).forEach(function (id) { mapa[String(id)] = true; });
+        document.querySelectorAll('input[name="materias_ids[]"]').forEach(function (el) {
+            el.checked = !!mapa[String(el.value)];
+        });
+    }
+    function aplicarMateriasDaSerie() {
+        if (!seriesMateriasSyncPronto) return;
+        if (!document.querySelector('input[name="materias_ids[]"]')) return;
+        var ids = seriesIdsParaMatriz();
+        if (!ids.length) {
+            marcarMateriasDaMatriz([]);
+            return;
+        }
+        var seq = ++seriesMateriasFetchSeq;
+        fetch(urlMateriasPorSeries + '?series=' + encodeURIComponent(ids.join(',')))
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (seq !== seriesMateriasFetchSeq) return;
+                if (!data || !data.ok || !Array.isArray(data.materias)) return;
+                marcarMateriasDaMatriz(data.materias.map(function (m) { return m.id; }));
+            })
+            .catch(function () {});
     }
     function painelAberto() {
         return seriePainel && !seriePainel.classList.contains('hidden');
@@ -952,6 +987,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             });
         });
         if (aberto) abrirPainelSeries(true);
+        aplicarMateriasDaSerie();
     }
     if (serieBotao) {
         serieBotao.addEventListener('click', function () {
@@ -980,5 +1016,6 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
         });
     }
     desenharSeries();
+    seriesMateriasSyncPronto = true;
 })();
 </script>

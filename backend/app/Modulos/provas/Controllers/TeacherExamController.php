@@ -19,6 +19,7 @@ use App\Modulos\EducaInclui\Services\MascaraResolver;
 use App\Core\PeriodoLetivo;
 use App\Models\Exams\TeacherExam;
 use App\Modulos\EnacColag\Services\ImportacaoEnacPlanilhaService;
+use App\Modulos\Provas\Models\ExamEvaluationType;
 use App\Modulos\Provas\Services\ImportacaoNotasPlanilha;
 use App\Modulos\Provas\Services\ModificarNotaProvaOnlineService;
 
@@ -2314,7 +2315,12 @@ class TeacherExamController extends BaseController
         }
 
         $notaUnica = !empty($bloco['nota_unica_todas_materias']);
-        $cruzamento = $servico->cruzar($linhasArquivo, $this->alunosPorComboLancamento($bloco, 0), $notaUnica);
+        $cruzamento = $servico->cruzar(
+            $linhasArquivo,
+            $this->alunosPorComboLancamento($bloco, 0),
+            $notaUnica,
+            $this->escalaMaximaDoBloco($bloco)
+        );
         $resultado = $this->aplicarCruzamentoImportacaoNotas(
             $blocoId,
             $cruzamento,
@@ -2401,7 +2407,8 @@ class TeacherExamController extends BaseController
         $cruzamento = $servico->cruzar(
             $lido['linhas'],
             $this->alunosPorComboLancamento($bloco, $materiaFiltro),
-            $notaUnica
+            $notaUnica,
+            $this->escalaMaximaDoBloco($bloco)
         );
         $cruzamento['erros'] = array_merge(
             is_array($lido['erros'] ?? null) ? $lido['erros'] : [],
@@ -2611,6 +2618,7 @@ class TeacherExamController extends BaseController
         foreach ($combos as $combo) {
             $professoresDaAba[(int) ($combo['professor_id'] ?? 0)] = true;
         }
+        $escalaMax = $this->escalaMaximaDoBloco($bloco);
 
         $this->viewWithLayout('admin', 'admin/exams/blocks/lancar_notas_coordenacao', [
             'title' => 'Lançar notas (coordenação) — ' . ($bloco['titulo'] ?? 'Evento'),
@@ -2634,6 +2642,7 @@ class TeacherExamController extends BaseController
             'edicao_desbloqueada' => $edicaoDesbloqueada,
             'mostrar_professor' => !$notaUnicaTodasMaterias && count($professoresDaAba) > 1,
             'enac_colag_habilitado' => \App\Core\FeatureGate::isModuleEnabled('enac_colag'),
+            'escala_max' => $escalaMax,
             'csrf_token' => $this->generateCsrfToken(),
             'flash' => $this->getFlashMessage(),
             'current_page' => 'provas_blocos',
@@ -2671,6 +2680,8 @@ class TeacherExamController extends BaseController
         }
 
         $notaUnicaTodasMaterias = !empty($bloco['nota_unica_todas_materias']);
+        $escalaMax = $this->escalaMaximaDoBloco($bloco);
+        $escalaMaxRotulo = (string) (int) $escalaMax;
         $filtros = $this->filtrosLancamentoNotasCoordenacao($_POST);
         $materiaIdFiltro = $notaUnicaTodasMaterias ? 0 : $filtros['materia_id'];
         $professorIdFiltro = $notaUnicaTodasMaterias ? 0 : (int) ($filtros['professor_id'] ?? 0);
@@ -2825,8 +2836,8 @@ class TeacherExamController extends BaseController
                             return;
                         }
                         $nf = (float) $valorStr;
-                        if ($nf < 0 || $nf > 10) {
-                            $this->setFlashMessage('Notas devem estar entre 0 e 10.', 'error');
+                        if ($nf < 0 || $nf > $escalaMax) {
+                            $this->setFlashMessage('Notas devem estar entre 0 e ' . $escalaMaxRotulo . '.', 'error');
                             $this->redirect($urlVolta);
                             return;
                         }
@@ -2904,8 +2915,8 @@ class TeacherExamController extends BaseController
                         return;
                     }
                     $nf = (float) $valorStr;
-                    if ($nf < 0 || $nf > 10) {
-                        $this->setFlashMessage('Notas devem estar entre 0 e 10.', 'error');
+                    if ($nf < 0 || $nf > $escalaMax) {
+                        $this->setFlashMessage('Notas devem estar entre 0 e ' . $escalaMaxRotulo . '.', 'error');
                         $this->redirect($urlVolta);
                         return;
                     }
@@ -4411,6 +4422,27 @@ class TeacherExamController extends BaseController
             'message' => $resultado['mensagem'],
         ];
         $this->json(['success' => true, 'message' => $resultado['mensagem']]);
+    }
+
+    /**
+     * Teto da nota lançada conforme escala_max do tipo do bloco/evento.
+     */
+    private function escalaMaximaDoBloco(array $bloco): float
+    {
+        $tipoId = (int) ($bloco['tipo_avaliacao_id'] ?? 0);
+        if ($tipoId <= 0) {
+            return 10.0;
+        }
+        $tipo = (new ExamEvaluationType())->findById($tipoId);
+        $max = (float) ($tipo['escala_max'] ?? 10);
+        if ($max <= 0) {
+            return 10.0;
+        }
+        if ($max > 100) {
+            return 100.0;
+        }
+
+        return $max;
     }
 }
 

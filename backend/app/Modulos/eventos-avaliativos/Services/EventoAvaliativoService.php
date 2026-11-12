@@ -11,6 +11,7 @@ use App\Modulos\GruposRegrasNotas\Services\GrupoRegrasNotasService;
 use App\Modulos\Provas\Models\ExamBlock;
 use App\Modulos\Provas\Models\ExamEvaluationType;
 use App\Modulos\RegrasAcademicas\Models\RecuperacaoConfig;
+use App\Modulos\RegrasAcademicas\Services\EscalaNota;
 use App\Modulos\RegrasAcademicas\Services\TipoNotaRegraService;
 use Throwable;
 
@@ -105,6 +106,11 @@ class EventoAvaliativoService
         }
         if (!$this->periodoAceito($ano, $bimestre)) {
             return ['success' => false, 'error' => PeriodoLetivo::mensagemNumeroInvalido($ano)];
+        }
+
+        $regraId = (int) ($post['regra'] ?? $post['regra_id'] ?? 0);
+        if (!isset($post['escala_max']) || trim((string) $post['escala_max']) === '') {
+            $post['escala_max'] = number_format($this->escalaMaximaPadrao($ano, $regraId), 2, '.', '');
         }
 
         $config = $this->normalizarConfig($post);
@@ -1085,6 +1091,32 @@ class EventoAvaliativoService
             return 6.0;
         }
         return (float) $media;
+    }
+
+    /**
+     * Teto numérico padrão (10 ou 100) conforme a escala da regra de aprovação.
+     */
+    public function escalaMaximaPadrao(int $ano, int $regraId = 0): float
+    {
+        try {
+            if ($regraId > 0) {
+                $row = $this->db->fetch(
+                    'SELECT escala FROM regras_academicas WHERE id = :id LIMIT 1',
+                    ['id' => $regraId]
+                );
+            } else {
+                $row = $this->db->fetch(
+                    'SELECT escala FROM regras_academicas WHERE ano_letivo = :ano ORDER BY id ASC LIMIT 1',
+                    ['ano' => $ano]
+                );
+            }
+        } catch (Throwable $e) {
+            return 10.0;
+        }
+        $escala = (string) ($row['escala'] ?? '10');
+        $max = EscalaNota::maximo($escala);
+
+        return $max !== null ? (float) $max : 10.0;
     }
 
     /**

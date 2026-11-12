@@ -11,6 +11,7 @@ $router->post('/admin/regras-academicas/recuperacao', 'Modulos/regras-academicas
 $router->get('/admin/regras-academicas/recuperacao/{id}/dados', 'Modulos/regras-academicas/RecuperacaoAdminController@dados');
 $router->post('/admin/regras-academicas/recuperacao/{id}/excluir', 'Modulos/regras-academicas/RecuperacaoAdminController@excluir');
 $router->post('/admin/regras-academicas/recuperacao/{id}', 'Modulos/regras-academicas/RecuperacaoAdminController@atualizar');
+$router->get('/admin/regras-academicas/materias-por-series', 'Modulos/regras-academicas/RegraAcademicaAdminController@materiasPorSeries');
 $router->get('/admin/regras-academicas', 'Modulos/regras-academicas/RegraAcademicaAdminController@index');
 $router->get('/admin/regras-academicas/nova', 'Modulos/regras-academicas/RegraAcademicaAdminController@nova');
 $router->post('/admin/regras-academicas', 'Modulos/regras-academicas/RegraAcademicaAdminController@salvar');

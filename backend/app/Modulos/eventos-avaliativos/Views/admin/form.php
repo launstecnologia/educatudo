@@ -43,7 +43,8 @@ $cfgEdicao = (string) ($edicao['configuracao_nota'] ?? 'professor_por_questao');
 $modoEdicao = (string) ($edicao['modo_offline'] ?? 'lancamento_direto');
 $criterioEdicao = (string) ($edicao['criterio_fechamento'] ?? 'ultima');
 $criterioProfEdicao = (string) ($edicao['criterio_professores'] ?? 'nenhum');
-$escalaEdicao = (string) ($edicao['escala_max'] ?? '10.00');
+$escalaPadrao = (string) ($escala_max_padrao ?? '10.00');
+$escalaEdicao = (string) ($edicao['escala_max'] ?? $escalaPadrao);
 $prazoEdicao = (string) ($edicao['prazo'] ?? '');
 $registroEdicao = (string) ($edicao['registro_evento'] ?? '');
 $turmasMarcadas = [];
@@ -2031,6 +2032,7 @@ foreach ($familiasTituloJs as $paiTitulo => $cfgTitulo) {
             if (card.querySelector('.js-par-campos')) pintarResumoPar(card);
         });
         atualizarAgendas();
+        aplicarDisciplinasDaMatriz();
     }
     function nomesDoPar(par, materias, materiaIds, professores) {
         var mat = (catalogo.materias || []).filter(function (m) { return String(m.id) === String(par.materia_id); })[0];
@@ -2137,7 +2139,8 @@ foreach ($familiasTituloJs as $paiTitulo => $cfgTitulo) {
         });
         var incluirMedia = (document.getElementById('incluir_media') || {}).value === '1' && subs.length > 1;
         var criterio = (document.getElementById('criterio_fechamento') || {}).value || 'ultima';
-        var escala = parseFloat(document.getElementById('escala_max').value) || 10;
+        var escalaPadraoJs = <?= json_encode((float) $escalaPadrao, JSON_UNESCAPED_UNICODE) ?>;
+        var escala = parseFloat(document.getElementById('escala_max').value) || escalaPadraoJs || 10;
         var pares = lerPares(document.getElementById('pares-padrao')).filter(function (par) {
             return par.materia_id || par.professor_id;
         });
@@ -2477,6 +2480,50 @@ foreach ($familiasTituloJs as $paiTitulo => $cfgTitulo) {
     }
 
     var disciplinasAutoChave = '';
+    var disciplinasMatrizFetchSeq = 0;
+    var urlMateriasPorSeriesEvento = <?= json_encode(URL . '/admin/eventos-avaliativos/materias-por-series', JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    function seriesDasTurmasEvento() {
+        var mapa = {};
+        turmasEvento().forEach(function (turma) {
+            var sid = parseInt(turma.serie_id || 0, 10) || 0;
+            if (sid > 0) mapa[sid] = sid;
+        });
+        return Object.keys(mapa).map(function (id) { return parseInt(id, 10); });
+    }
+    function paresSemMateria(pares) {
+        return !pares.length || pares.every(function (par) { return !par.materia_id; });
+    }
+    function aplicarDisciplinasDaMatriz() {
+        var box = document.getElementById('pares-padrao');
+        if (!box) return;
+        var atuais = lerPares(box);
+        if (!paresSemMateria(atuais)) return;
+        var series = seriesDasTurmasEvento();
+        if (!series.length) return;
+        var seq = ++disciplinasMatrizFetchSeq;
+        var turmasIds = turmasEvento().map(function (t) { return String(t.id); });
+        fetch(urlMateriasPorSeriesEvento + '?series=' + encodeURIComponent(series.join(',')))
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (seq !== disciplinasMatrizFetchSeq) return;
+                if (!data || !data.ok || !Array.isArray(data.materias) || !data.materias.length) return;
+                var agora = lerPares(box);
+                if (!paresSemMateria(agora)) return;
+                fecharDisciplina();
+                var listaPares = box.querySelector('.js-pares');
+                if (listaPares) listaPares.innerHTML = '';
+                box.setAttribute('data-par', '0');
+                data.materias.forEach(function (mat) {
+                    adicionarPar(box, {
+                        materia_id: mat.id,
+                        professor_id: '',
+                        turmas: turmasIds
+                    }, false);
+                });
+                disciplinasAutoChave = chaveDisciplinas(lerPares(box));
+            })
+            .catch(function () {});
+    }
     function chaveDisciplinas(pares) {
         return (pares || []).map(function (par) {
             var turmas = (par.turmas || []).map(String).slice().sort();

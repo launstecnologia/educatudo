@@ -225,6 +225,64 @@ class MatrizCurricular
     }
 
     /**
+     * União das matérias oficiais das matrizes ativas das séries informadas.
+     *
+     * @param list<int|string> $seriesIds
+     * @return list<array{id:int,nome:string}>
+     */
+    public function materiasOficiaisPorSeries(array $seriesIds): array
+    {
+        $series = [];
+        foreach ($seriesIds as $serieId) {
+            $id = (int) $serieId;
+            if ($id > 0) {
+                $series[$id] = $id;
+            }
+        }
+        if ($series === []) {
+            return [];
+        }
+
+        $porId = [];
+        foreach ($series as $serieId) {
+            $matrizes = $this->getAll(['serie_id' => $serieId, 'ativo' => 1]) ?: [];
+            foreach ($matrizes as $matriz) {
+                if (!is_array($matriz)) {
+                    continue;
+                }
+                $matrizId = (int) ($matriz['id'] ?? 0);
+                if ($matrizId <= 0) {
+                    continue;
+                }
+                foreach ($this->getComponentesOficiais($matrizId) as $componente) {
+                    if (!is_array($componente)) {
+                        continue;
+                    }
+                    $materiaId = (int) ($componente['materia_id'] ?? 0);
+                    if ($materiaId <= 0) {
+                        continue;
+                    }
+                    $nome = trim((string) ($componente['materia_nome'] ?? ''));
+                    if ($nome === '') {
+                        continue;
+                    }
+                    $porId[$materiaId] = [
+                        'id' => $materiaId,
+                        'nome' => $nome,
+                    ];
+                }
+            }
+        }
+
+        $saida = array_values($porId);
+        usort($saida, static function (array $a, array $b): int {
+            return strcmp($a['nome'], $b['nome']);
+        });
+
+        return $saida;
+    }
+
+    /**
      * @param list<array<string,mixed>> $componentes
      * @return list<array<string,mixed>>
      */

@@ -70,6 +70,35 @@ class RegraAcademicaAdminController extends \App\Controllers\Admin\AdminBaseCont
         $this->renderFormulario(null);
     }
 
+    /**
+     * JSON: matérias oficiais da matriz curricular das séries informadas.
+     */
+    public function materiasPorSeries(): void
+    {
+        $user = $this->auth->getUser();
+        $permissions = \App\Core\AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user ?? []);
+        $pode = \App\Core\AdminPermissionMatrix::can($permissions, 'regras_academicas', 'visualizar')
+            || \App\Core\AdminPermissionMatrix::can($permissions, 'regras_academicas', 'cadastrar')
+            || \App\Core\AdminPermissionMatrix::can($permissions, 'regras_academicas', 'alterar');
+        if (!$pode) {
+            $this->json(['ok' => false, 'erro' => 'Sem permissão.'], 403);
+            return;
+        }
+        $series = [];
+        foreach (explode(',', (string) ($_GET['series'] ?? '')) as $parte) {
+            $id = (int) $parte;
+            if ($id > 0) {
+                $series[$id] = $id;
+            }
+        }
+        $materias = (new \App\Dominio\Escola\Models\MatrizCurricular())
+            ->materiasOficiaisPorSeries(array_values($series));
+        $this->json([
+            'ok' => true,
+            'materias' => $materias,
+        ]);
+    }
+
     public function editar($id): void
     {
         if (!$this->enforceAdminPermissionKey('regras_academicas', 'alterar', false)) {

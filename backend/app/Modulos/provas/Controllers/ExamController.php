@@ -20,6 +20,7 @@ use App\Core\Database;
 use App\Models\Exams\Exam;
 use App\Models\Exams\ExamBlock;
 use App\Models\Exams\ExamBlockManualGrade;
+use App\Modulos\Provas\Models\ExamEvaluationType;
 use App\Core\LayoutHelper;
 use App\Models\Education\LessonPlan;
 use App\Core\Logger;
@@ -1309,6 +1310,7 @@ class ExamController extends BaseController
         $notasModel = new ExamBlockManualGrade();
         $notasMap = $notasModel->fetchMap((int) $evento_id, (int) $professor['id'], $materiaId);
         $materia = $this->subjectModel->findById($materiaId);
+        $escalaMax = $this->escalaMaximaDoBloco($evento);
 
         $this->viewWithLayout('professor', 'teacher/exams/evento_lancar_notas', [
             'title' => 'Lançar notas — ' . ($evento['titulo'] ?? 'Evento'),
@@ -1320,6 +1322,7 @@ class ExamController extends BaseController
             'materia' => $materia,
             'turmas_com_alunos' => array_values($porTurma),
             'notas_map' => $notasMap,
+            'escala_max' => $escalaMax,
         ]);
     }
 
@@ -1471,12 +1474,34 @@ class ExamController extends BaseController
     }
 
     /**
-     * Interpreta nota 0–10 (vírgula/ponto) ou vazio = sem lançamento.
+     * Teto da nota lançada conforme escala_max do tipo do bloco/evento.
+     */
+    private function escalaMaximaDoBloco(array $bloco): float
+    {
+        $tipoId = (int) ($bloco['tipo_avaliacao_id'] ?? 0);
+        if ($tipoId <= 0) {
+            return 10.0;
+        }
+        $tipo = (new ExamEvaluationType())->findById($tipoId);
+        $max = (float) ($tipo['escala_max'] ?? 10);
+        if ($max <= 0) {
+            return 10.0;
+        }
+        if ($max > 100) {
+            return 100.0;
+        }
+
+        return $max;
+    }
+
+    /**
+     * Interpreta nota 0–escala (vírgula/ponto) ou vazio = sem lançamento.
      *
      * @return array{ok:true,nota:?float}|array{ok:false,message:string}
      */
-    private function parseNotaLancamento(string $valorRaw): array
+    private function parseNotaLancamento(string $valorRaw, float $escalaMax = 10.0): array
     {
+        $max = $escalaMax > 0 ? min(100.0, $escalaMax) : 10.0;
         $valorStr = trim(str_replace(',', '.', $valorRaw));
         if ($valorStr === '') {
             return ['ok' => true, 'nota' => null];
@@ -1485,8 +1510,8 @@ class ExamController extends BaseController
             return ['ok' => false, 'message' => 'Nota inválida.'];
         }
         $nf = (float) $valorStr;
-        if ($nf < 0 || $nf > 10) {
-            return ['ok' => false, 'message' => 'Notas devem estar entre 0 e 10.'];
+        if ($nf < 0 || $nf > $max) {
+            return ['ok' => false, 'message' => 'Notas devem estar entre 0 e ' . (int) $max . '.'];
         }
         return ['ok' => true, 'nota' => round($nf, 2)];
     }
@@ -1513,7 +1538,8 @@ class ExamController extends BaseController
             $this->json(['success' => false, 'message' => 'Aluno não permitido neste lançamento.'], 403);
             return;
         }
-        $parsed = $this->parseNotaLancamento((string) ($_POST['nota'] ?? ''));
+        $escalaMax = $this->escalaMaximaDoBloco($ctx['evento'] ?? []);
+        $parsed = $this->parseNotaLancamento((string) ($_POST['nota'] ?? ''), $escalaMax);
         if (empty($parsed['ok'])) {
             $this->json(['success' => false, 'message' => (string) $parsed['message']], 400);
             return;
@@ -1587,6 +1613,7 @@ class ExamController extends BaseController
         $professor = $ctx['professor'];
         $evento = $ctx['evento'];
         $alunosPermitidos = $ctx['alunos_permitidos'];
+        $escalaMax = $this->escalaMaximaDoBloco($evento);
         $notasPost = $_POST['notas'] ?? [];
         $obsPost = $_POST['observacoes'] ?? [];
         if (!is_array($notasPost)) {
@@ -1604,7 +1631,7 @@ class ExamController extends BaseController
             if (isset($obsPost[$turmaId][$alunoId])) {
                 $obs = substr((string) $obsPost[$turmaId][$alunoId], 0, 500);
             }
-            $parsed = $this->parseNotaLancamento(is_string($valorRaw) ? $valorRaw : '');
+            $parsed = $this->parseNotaLancamento(is_string($valorRaw) ? $valorRaw : '', $escalaMax);
             if (empty($parsed['ok'])) {
                 $this->setFlashMessage(
                     $parsed['message'] === 'Nota inválida.'

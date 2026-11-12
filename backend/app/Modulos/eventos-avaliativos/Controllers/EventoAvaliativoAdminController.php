@@ -200,6 +200,7 @@ class EventoAvaliativoAdminController extends AdminBaseController
             $periodoNum = 1;
         }
         $catalogo = $this->service->catalogoFormulario($ano);
+        $escalaPadrao = number_format($this->service->escalaMaximaPadrao($ano, $regraId), 2, '.', '');
         $flash = $this->getFlashMessage();
         $this->viewWithLayout('admin', 'admin/eventos-avaliativos/form', $this->dados([
             'flash_status' => ($flash['type'] ?? '') === 'error' ? 'error' : (($flash['message'] ?? '') !== '' ? 'success' : ''),
@@ -213,6 +214,7 @@ class EventoAvaliativoAdminController extends AdminBaseController
             'anos' => $this->anosDoCadastro(),
             'bimestre_selecionado' => $periodoNum,
             'regra_id' => $regraId,
+            'escala_max_padrao' => $escalaPadrao,
             'periodos_extra' => $recuperacao->opcoesFormulario($ano, $periodoNum, $regraId),
             'criterios' => TipoNotaRegraService::CRITERIOS,
             'registros' => TipoNotaRegraService::REGISTROS,
@@ -249,6 +251,30 @@ class EventoAvaliativoAdminController extends AdminBaseController
             'media' => $res['media'],
             'tabela' => $this->service->model()->colunaMateriaPronta(),
             'alunos' => $res['alunos'],
+        ]);
+    }
+
+    /**
+     * JSON: matérias oficiais da matriz curricular das séries informadas.
+     */
+    public function materiasPorSeries(): void
+    {
+        if (!$this->permitido('cadastrar', true) && !$this->permitido('alterar', true) && !$this->permitido('visualizar', true)) {
+            $this->json(['ok' => false, 'erro' => 'Sem permissão.'], 403);
+            return;
+        }
+        $series = [];
+        foreach (explode(',', (string) ($_GET['series'] ?? '')) as $parte) {
+            $id = (int) $parte;
+            if ($id > 0) {
+                $series[$id] = $id;
+            }
+        }
+        $materias = (new \App\Dominio\Escola\Models\MatrizCurricular())
+            ->materiasOficiaisPorSeries(array_values($series));
+        $this->json([
+            'ok' => true,
+            'materias' => $materias,
         ]);
     }
 

@@ -31,6 +31,14 @@ $enacColagHabilitado = !empty($enac_colag_habilitado);
 $mostrarMateria = !$notaUnicaTodasMaterias && $materiaIdFiltro <= 0;
 $colunasTabela = 6 + ($mostrarMateria ? 1 : 0) + ($mostrarProfessor ? 1 : 0);
 $blocoId = (int) ($bloco['id'] ?? 0);
+$escalaMax = (float) ($escala_max ?? 10);
+if ($escalaMax <= 0) {
+    $escalaMax = 10.0;
+}
+if ($escalaMax > 100) {
+    $escalaMax = 100.0;
+}
+$escalaMaxRotulo = (string) (int) $escalaMax;
 \App\Modulos\EventosAvaliativos\Services\RetornoListaProva::registrar($blocoId);
 $actionFiltro = URL . '/admin/provas/blocos/' . $blocoId . '/lancar-notas-coordenacao';
 $urlDesbloquear = URL . '/admin/provas/blocos/' . $blocoId . '/lancar-notas-coordenacao/desbloquear';
@@ -142,6 +150,7 @@ if ($tipoFlash === 'error') {
 </div>
 
 <p class="text-xs text-gray-500 mb-4">
+    Notas de 0 a <?= htmlspecialchars($escalaMaxRotulo, ENT_QUOTES, 'UTF-8') ?>.
     Notas novas podem ser lançadas normalmente. Notas já salvas ficam bloqueadas até você confirmar com a senha de acesso.
     A planilha usa o código do aluno, a disciplina e a nota.
     <?php if ($notaUnicaTodasMaterias): ?>

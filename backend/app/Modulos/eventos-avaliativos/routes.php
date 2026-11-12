@@ -21,6 +21,7 @@ $router->get('/admin/eventos-avaliativos/boletim/{id}', 'Modulos/eventos-avaliat
 $router->post('/admin/eventos-avaliativos/boletim/{id}', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@salvarBoletim');
 $router->get('/admin/eventos-avaliativos/criar', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@criar');
 $router->get('/admin/eventos-avaliativos/alunos-recuperacao', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@alunosRecuperacao');
+$router->get('/admin/eventos-avaliativos/materias-por-series', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@materiasPorSeries');
 $router->post('/admin/eventos-avaliativos', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@salvar');
 $router->post('/admin/eventos-avaliativos/duplicar', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@duplicar');
 $router->post('/admin/eventos-avaliativos/{id}/publicar', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@publicar');
