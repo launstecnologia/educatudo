@@ -1024,6 +1024,10 @@ class ExamBlock
                 $semana = isset($data['semana']) ? (int) $data['semana'] : 0;
                 $params['semana'] = ($semana >= 1 && $semana <= 20) ? $semana : null;
             }
+            if ($this->hasProvasBlocosColumn('ordem') && array_key_exists('ordem', $data)) {
+                $columns[] = 'ordem';
+                $params['ordem'] = max(0, (int) $data['ordem']);
+            }
             if ($this->hasProvasBlocosColumn('grupo_regras_notas_id')) {
                 $columns[] = 'grupo_regras_notas_id';
                 $params['grupo_regras_notas_id'] = !empty($data['grupo_regras_notas_id']) ? (int) $data['grupo_regras_notas_id'] : null;
@@ -1220,6 +1224,10 @@ class ExamBlock
                 $setParts[] = 'semana = :semana';
                 $semana = isset($data['semana']) ? (int) $data['semana'] : 0;
                 $params['semana'] = ($semana >= 1 && $semana <= 20) ? $semana : null;
+            }
+            if ($this->hasProvasBlocosColumn('ordem') && array_key_exists('ordem', $data)) {
+                $setParts[] = 'ordem = :ordem';
+                $params['ordem'] = max(0, (int) $data['ordem']);
             }
             if ($this->hasProvasBlocosColumn('grupo_regras_notas_id') && array_key_exists('grupo_regras_notas_id', $data)) {
                 $setParts[] = 'grupo_regras_notas_id = :grupo_regras_notas_id';

@@ -164,9 +164,29 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
         }
         $rotuloSub = $totalSub === 1 ? '1 Subevento' : $totalSub . ' Subeventos';
     ?>
-    <article data-evento-card data-busca="<?= htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') ?>"
+    <article id="evento-<?= $eventoId ?>" data-evento-card data-busca="<?= htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') ?>"
              class="overflow-hidden rounded-xl border bg-white shadow-sm <?= $rascunho ? 'border-amber-300' : 'border-gray-200' ?>">
         <div class="flex flex-wrap items-center gap-4 px-4 py-4 sm:px-5">
+            <?php if ($podeAlterar): ?>
+            <div class="flex shrink-0 flex-col gap-1">
+                <form method="POST" action="<?= URL ?>/admin/eventos-avaliativos/<?= $eventoId ?>/mover">
+                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="regra" value="<?= $regraId ?>">
+                    <input type="hidden" name="direcao" value="cima">
+                    <button type="submit" class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40" <?= $indiceEvento === 0 ? 'disabled' : '' ?> title="Mover evento para cima" aria-label="Mover evento para cima">
+                        <i class="fa-solid fa-chevron-up text-xs" aria-hidden="true"></i>
+                    </button>
+                </form>
+                <form method="POST" action="<?= URL ?>/admin/eventos-avaliativos/<?= $eventoId ?>/mover">
+                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="regra" value="<?= $regraId ?>">
+                    <input type="hidden" name="direcao" value="baixo">
+                    <button type="submit" class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40" <?= $indiceEvento >= count($itens) - 1 ? 'disabled' : '' ?> title="Mover evento para baixo" aria-label="Mover evento para baixo">
+                        <i class="fa-solid fa-chevron-down text-xs" aria-hidden="true"></i>
+                    </button>
+                </form>
+            </div>
+            <?php endif; ?>
             <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl <?= $tom['caixa'] ?>">
                 <i class="fa-solid fa-clipboard-list" aria-hidden="true"></i>
             </span>
@@ -233,6 +253,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Ordem</th>
                             <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Ref</th>
                             <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Nome do subevento</th>
                             <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Data</th>
@@ -265,6 +286,30 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                             }
                         ?>
                         <tr class="hover:bg-gray-50">
+                            <td class="whitespace-nowrap px-4 py-3">
+                                <?php if ($podeAlterar): ?>
+                                <div class="inline-flex items-center gap-1">
+                                    <form method="POST" action="<?= URL ?>/admin/eventos-avaliativos/<?= $eventoId ?>/subeventos/<?= $blocoId ?>/mover">
+                                        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+                                        <input type="hidden" name="regra" value="<?= $regraId ?>">
+                                        <input type="hidden" name="direcao" value="cima">
+                                        <button type="submit" class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40" <?= $indiceSub === 0 ? 'disabled' : '' ?> title="Mover subevento para cima" aria-label="Mover subevento para cima">
+                                            <i class="fa-solid fa-chevron-up text-[10px]" aria-hidden="true"></i>
+                                        </button>
+                                    </form>
+                                    <form method="POST" action="<?= URL ?>/admin/eventos-avaliativos/<?= $eventoId ?>/subeventos/<?= $blocoId ?>/mover">
+                                        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+                                        <input type="hidden" name="regra" value="<?= $regraId ?>">
+                                        <input type="hidden" name="direcao" value="baixo">
+                                        <button type="submit" class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40" <?= $indiceSub >= count($subeventos) - 1 ? 'disabled' : '' ?> title="Mover subevento para baixo" aria-label="Mover subevento para baixo">
+                                            <i class="fa-solid fa-chevron-down text-[10px]" aria-hidden="true"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                                <?php else: ?>
+                                <span class="text-sm text-gray-400">—</span>
+                                <?php endif; ?>
+                            </td>
                             <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500"><?= $eventoId ?>.<?= $indiceSub + 1 ?></td>
                             <td class="px-4 py-3 text-sm font-medium text-gray-900"><?= htmlspecialchars($tituloSub) ?></td>
                             <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700">

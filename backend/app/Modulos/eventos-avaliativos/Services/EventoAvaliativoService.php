@@ -33,6 +33,22 @@ class EventoAvaliativoService
         return $this->model;
     }
 
+    /**
+     * @return array{success:bool,error?:string}
+     */
+    public function reposicionarEvento(int $id, string $direcao): array
+    {
+        return $this->model->moverEvento($id, $direcao);
+    }
+
+    /**
+     * @return array{success:bool,error?:string}
+     */
+    public function reposicionarSubevento(int $eventoId, int $blocoId, string $direcao): array
+    {
+        return $this->model->moverSubevento($eventoId, $blocoId, $direcao);
+    }
+
     public function moduloAtivo(): bool
     {
         return \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos');
@@ -448,7 +464,7 @@ class EventoAvaliativoService
                 if ($marca === null) {
                     throw new \RuntimeException('Coluna do quadro não encontrada para ' . $sub['titulo'] . '.');
                 }
-                $blocoId = $blocos->create([
+                $dadosBloco = [
                     'titulo' => $sub['titulo'],
                     'descricao' => $tipoData['descricao'],
                     'ano_letivo' => $ano,
@@ -477,7 +493,11 @@ class EventoAvaliativoService
                         'tipo_id' => null,
                         'marca_id' => (int) $marca['id'],
                     ]],
-                ]);
+                ];
+                if ($this->model->temColunaOrdemBloco()) {
+                    $dadosBloco['ordem'] = $i + 1;
+                }
+                $blocoId = $blocos->create($dadosBloco);
                 $blocosCriados[] = (int) $blocoId;
                 $this->substituirAgendas((int) $blocoId, $sub['agendas'] ?? []);
             }
@@ -494,8 +514,8 @@ class EventoAvaliativoService
                 'sigla' => $sigla['valor'],
                 'rascunho' => !empty($post['rascunho']) ? 1 : 0,
             ]);
-            foreach ($blocosCriados as $blocoId) {
-                $this->model->vincularBloco($eventoId, $blocoId);
+            foreach ($blocosCriados as $indiceBloco => $blocoId) {
+                $this->model->vincularBloco($eventoId, $blocoId, $indiceBloco + 1);
             }
             $gravado = $this->gravarCalendario($eventoId, $calendario);
             if (isset($gravado['error'])) {
@@ -846,7 +866,7 @@ class EventoAvaliativoService
                     nota_unica_todas_materias
                FROM provas_blocos
               WHERE evento_avaliativo_id = :id AND deleted_at IS NULL
-              ORDER BY semana ASC, data_prova ASC, id ASC',
+              ORDER BY ' . $this->model->sqlOrdemBloco(),
             ['id' => $id]
         ) ?: [];
         $turmaRows = $this->db->fetchAll(
@@ -1149,7 +1169,7 @@ class EventoAvaliativoService
                     if ($tipoBloco <= 0) {
                         $tipoBloco = $tipoId;
                     }
-                    $blocos->update($blocoId, [
+                    $dadosUpdate = [
                         'titulo' => $sub['titulo'],
                         'descricao' => $atual['descricao'] ?? ($tipoData['descricao'] ?? null),
                         'data_prova' => $sub['data'],
@@ -1170,13 +1190,17 @@ class EventoAvaliativoService
                         'bimestre' => $bimestre,
                         'tipo_avaliacao_id' => $tipoBloco > 0 ? $tipoBloco : null,
                         'semana' => $semana,
-                    ]);
+                    ];
+                    if ($this->model->temColunaOrdemBloco()) {
+                        $dadosUpdate['ordem'] = $i + 1;
+                    }
+                    $blocos->update($blocoId, $dadosUpdate);
                     $this->renomearColunaQuadro((int) ($atual['grupo_regras_marca_id'] ?? 0), $sub['titulo']);
                     $this->substituirAgendas($blocoId, $sub['agendas'] ?? []);
                     continue;
                 }
 
-                $novoId = (int) $blocos->create([
+                $dadosNovo = [
                     'titulo' => $sub['titulo'],
                     'descricao' => $tipoData['descricao'] ?? null,
                     'ano_letivo' => $ano,
@@ -1199,12 +1223,16 @@ class EventoAvaliativoService
                     'visivel_no_portal_aluno' => $config['visivel_portal'],
                     'nota_unica_todas_materias' => $config['nota_unica'],
                     'grupo_regras_notas_id' => $grupoId > 0 ? $grupoId : null,
-                ]);
+                ];
+                if ($this->model->temColunaOrdemBloco()) {
+                    $dadosNovo['ordem'] = $i + 1;
+                }
+                $novoId = (int) $blocos->create($dadosNovo);
                 if ($novoId <= 0) {
                     throw new \RuntimeException('Não foi possível incluir a data ' . $sub['titulo'] . '.');
                 }
                 $criados[] = $novoId;
-                $this->model->vincularBloco($id, $novoId);
+                $this->model->vincularBloco($id, $novoId, $i + 1);
                 $this->substituirAgendas($novoId, $sub['agendas'] ?? []);
             }
 
@@ -1734,7 +1762,7 @@ class EventoAvaliativoService
                    INNER JOIN provas_blocos pb ON pb.evento_avaliativo_id = e.id AND pb.deleted_at IS NULL
                    INNER JOIN provas_blocos_turmas pbt ON pbt.bloco_id = pb.id AND pbt.turma_id = :turma
                   WHERE e.deleted_at IS NULL AND e.liberar_nota_aluno = 1' . $this->sqlSemRascunho('e') . '
-                  ORDER BY e.ano_letivo DESC, e.bimestre ASC, e.id ASC, pb.semana ASC, pb.data_prova ASC, pb.id ASC',
+                  ORDER BY e.ano_letivo DESC, e.bimestre ASC, ' . $this->model->sqlOrdemEvento('e') . ', ' . $this->model->sqlOrdemBloco('pb'),
                 ['turma' => $turmaId]
             ) ?: [];
             foreach ($rows as $row) {

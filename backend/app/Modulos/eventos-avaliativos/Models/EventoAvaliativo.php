@@ -62,11 +62,12 @@ class EventoAvaliativo
             'SELECT e.*,
                     (SELECT COUNT(*) FROM provas_blocos pb
                       WHERE pb.evento_avaliativo_id = e.id AND pb.deleted_at IS NULL) AS total_subeventos,
-                    (SELECT MIN(pb2.id) FROM provas_blocos pb2
-                      WHERE pb2.evento_avaliativo_id = e.id AND pb2.deleted_at IS NULL) AS primeiro_bloco_id,
+                    (SELECT pb2.id FROM provas_blocos pb2
+                      WHERE pb2.evento_avaliativo_id = e.id AND pb2.deleted_at IS NULL
+                      ORDER BY ' . $this->sqlOrdemBloco('pb2') . ' LIMIT 1) AS primeiro_bloco_id,
                     (SELECT pb3.formato_evento FROM provas_blocos pb3
                       WHERE pb3.evento_avaliativo_id = e.id AND pb3.deleted_at IS NULL
-                      ORDER BY pb3.id ASC LIMIT 1) AS primeiro_formato,
+                      ORDER BY ' . $this->sqlOrdemBloco('pb3') . ' LIMIT 1) AS primeiro_formato,
                     (SELECT GROUP_CONCAT(DISTINCT t.nome ORDER BY t.nome SEPARATOR \', \')
                        FROM provas_blocos pb4
                        INNER JOIN provas_blocos_turmas pbt ON pbt.bloco_id = pb4.id
@@ -74,7 +75,7 @@ class EventoAvaliativo
                       WHERE pb4.evento_avaliativo_id = e.id AND pb4.deleted_at IS NULL) AS turmas_nomes
                FROM eventos_avaliativos e
               WHERE ' . $where . '
-              ORDER BY e.nome ASC, e.id DESC',
+              ORDER BY ' . $this->sqlOrdemEvento('e'),
             $params
         ) ?: [];
         if ($eventos === []) {
@@ -122,7 +123,7 @@ class EventoAvaliativo
                FROM provas_blocos pb
               WHERE pb.deleted_at IS NULL
                 AND pb.evento_avaliativo_id IN (' . implode(', ', $placeholders) . ')
-              ORDER BY pb.semana ASC, pb.data_prova ASC, pb.id ASC',
+              ORDER BY ' . $this->sqlOrdemBloco('pb'),
             $params
         ) ?: [];
         $porEvento = [];
@@ -180,7 +181,7 @@ class EventoAvaliativo
             'SELECT id, titulo, data_prova, status, semana, formato_evento
                FROM provas_blocos
               WHERE evento_avaliativo_id = :id AND deleted_at IS NULL
-              ORDER BY semana ASC, data_prova ASC, id ASC',
+              ORDER BY ' . $this->sqlOrdemBloco(),
             ['id' => $eventoId]
         ) ?: [];
     }
@@ -291,6 +292,13 @@ class EventoAvaliativo
             $valores .= ', :rascunho';
             $params['rascunho'] = !empty($dados['rascunho']) ? 1 : 0;
         }
+        if ($this->temColunaOrdem()) {
+            $colunas .= ', ordem';
+            $valores .= ', :ordem';
+            $params['ordem'] = isset($dados['ordem'])
+                ? max(1, (int) $dados['ordem'])
+                : $this->proximaOrdemEvento((int) $dados['ano_letivo'], (int) $dados['bimestre']);
+        }
         return (int) $this->db->insert(
             'INSERT INTO eventos_avaliativos (' . $colunas . ') VALUES (' . $valores . ')',
             $params
@@ -378,13 +386,21 @@ class EventoAvaliativo
         }
     }
 
-    public function vincularBloco(int $eventoId, int $blocoId): void
+    public function vincularBloco(int $eventoId, int $blocoId, ?int $ordem = null): void
     {
+        $extra = '';
+        $params = ['evento_id' => $eventoId, 'bloco_id' => $blocoId];
+        if ($this->temColunaOrdemBloco()) {
+            $extra = ', ordem = :ordem';
+            $params['ordem'] = $ordem !== null && $ordem > 0
+                ? $ordem
+                : $this->proximaOrdemBloco($eventoId);
+        }
         $this->db->query(
             'UPDATE provas_blocos
-                SET evento_avaliativo_id = :evento_id
+                SET evento_avaliativo_id = :evento_id' . $extra . '
               WHERE id = :bloco_id AND deleted_at IS NULL',
-            ['evento_id' => $eventoId, 'bloco_id' => $blocoId]
+            $params
         );
     }
 
@@ -645,5 +661,200 @@ class EventoAvaliativo
               WHERE id = :id AND deleted_at IS NULL',
             ['id' => $id]
         );
+    }
+
+    public function temColunaOrdem(): bool
+    {
+        return $this->temColuna('ordem');
+    }
+
+    public function temColunaOrdemBloco(): bool
+    {
+        try {
+            $row = $this->db->fetch(
+                'SELECT 1 AS ok FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c LIMIT 1',
+                ['t' => 'provas_blocos', 'c' => 'ordem']
+            );
+            return !empty($row['ok']);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    public function sqlOrdemEvento(string $alias = 'e'): string
+    {
+        $pref = $alias !== '' ? $alias . '.' : '';
+        if ($this->temColunaOrdem()) {
+            return $pref . 'ordem ASC, ' . $pref . 'id ASC';
+        }
+        return $pref . 'nome ASC, ' . $pref . 'id DESC';
+    }
+
+    public function sqlOrdemBloco(string $alias = ''): string
+    {
+        $pref = $alias !== '' ? $alias . '.' : '';
+        if ($this->temColunaOrdemBloco()) {
+            return $pref . 'ordem ASC, ' . $pref . 'semana ASC, ' . $pref . 'data_prova ASC, ' . $pref . 'id ASC';
+        }
+        return $pref . 'semana ASC, ' . $pref . 'data_prova ASC, ' . $pref . 'id ASC';
+    }
+
+    public function proximaOrdemEvento(int $ano, int $bimestre): int
+    {
+        if (!$this->temColunaOrdem() || $ano <= 0 || $bimestre <= 0) {
+            return 1;
+        }
+        $row = $this->db->fetch(
+            'SELECT COALESCE(MAX(ordem), 0) + 1 AS proxima
+               FROM eventos_avaliativos
+              WHERE deleted_at IS NULL AND ano_letivo = :ano AND bimestre = :bimestre',
+            ['ano' => $ano, 'bimestre' => $bimestre]
+        );
+        return max(1, (int) ($row['proxima'] ?? 1));
+    }
+
+    public function proximaOrdemBloco(int $eventoId): int
+    {
+        if (!$this->temColunaOrdemBloco() || $eventoId <= 0) {
+            return 1;
+        }
+        $row = $this->db->fetch(
+            'SELECT COALESCE(MAX(ordem), 0) + 1 AS proxima
+               FROM provas_blocos
+              WHERE deleted_at IS NULL AND evento_avaliativo_id = :id',
+            ['id' => $eventoId]
+        );
+        return max(1, (int) ($row['proxima'] ?? 1));
+    }
+
+    /**
+     * @return array{success:bool,error?:string}
+     */
+    public function moverEvento(int $id, string $direcao): array
+    {
+        if (!$this->temColunaOrdem()) {
+            return ['success' => false, 'error' => 'Rode a migration de ordem dos eventos avaliativos.'];
+        }
+        $evento = $this->findById($id);
+        if ($evento === null) {
+            return ['success' => false, 'error' => 'Evento não encontrado.'];
+        }
+        $ano = (int) ($evento['ano_letivo'] ?? 0);
+        $bimestre = (int) ($evento['bimestre'] ?? 0);
+        $lista = $this->db->fetchAll(
+            'SELECT id, ordem
+               FROM eventos_avaliativos
+              WHERE deleted_at IS NULL AND ano_letivo = :ano AND bimestre = :bimestre
+              ORDER BY ordem ASC, id ASC',
+            ['ano' => $ano, 'bimestre' => $bimestre]
+        ) ?: [];
+        return $this->trocarOrdemNaLista($lista, $id, $direcao, 'eventos_avaliativos');
+    }
+
+    /**
+     * @return array{success:bool,error?:string}
+     */
+    public function moverSubevento(int $eventoId, int $blocoId, string $direcao): array
+    {
+        if (!$this->temColunaOrdemBloco()) {
+            return ['success' => false, 'error' => 'Rode a migration de ordem dos eventos avaliativos.'];
+        }
+        if ($this->findById($eventoId) === null) {
+            return ['success' => false, 'error' => 'Evento não encontrado.'];
+        }
+        if ($this->buscarSubevento($eventoId, $blocoId) === null) {
+            return ['success' => false, 'error' => 'Subevento não encontrado.'];
+        }
+        $lista = $this->db->fetchAll(
+            'SELECT id, ordem
+               FROM provas_blocos
+              WHERE deleted_at IS NULL AND evento_avaliativo_id = :evento
+              ORDER BY ' . $this->sqlOrdemBloco(),
+            ['evento' => $eventoId]
+        ) ?: [];
+        return $this->trocarOrdemNaLista($lista, $blocoId, $direcao, 'provas_blocos');
+    }
+
+    /**
+     * @param list<array<string,mixed>> $lista
+     * @return array{success:bool,error?:string}
+     */
+    private function trocarOrdemNaLista(array $lista, int $id, string $direcao, string $tabela): array
+    {
+        $direcao = strtolower(trim($direcao));
+        if ($direcao !== 'cima' && $direcao !== 'baixo') {
+            return ['success' => false, 'error' => 'Direção inválida.'];
+        }
+        $indice = -1;
+        foreach ($lista as $i => $item) {
+            if ((int) ($item['id'] ?? 0) === $id) {
+                $indice = $i;
+                break;
+            }
+        }
+        if ($indice < 0) {
+            return ['success' => false, 'error' => 'Item não encontrado na lista.'];
+        }
+        $vizinho = $direcao === 'cima' ? $indice - 1 : $indice + 1;
+        if ($vizinho < 0 || $vizinho >= count($lista)) {
+            return ['success' => true];
+        }
+
+        $tabelasOk = ['eventos_avaliativos' => true, 'provas_blocos' => true];
+        if (!isset($tabelasOk[$tabela])) {
+            return ['success' => false, 'error' => 'Não foi possível reposicionar.'];
+        }
+
+        $a = $lista[$indice];
+        $b = $lista[$vizinho];
+        $idA = (int) ($a['id'] ?? 0);
+        $idB = (int) ($b['id'] ?? 0);
+        $ordemA = (int) ($a['ordem'] ?? 0);
+        $ordemB = (int) ($b['ordem'] ?? 0);
+        if ($idA <= 0 || $idB <= 0) {
+            return ['success' => false, 'error' => 'Não foi possível reposicionar.'];
+        }
+
+        try {
+            $this->db->beginTransaction();
+            // Se empatam na ordem, renumera a lista inteira e troca as posições.
+            if ($ordemA === $ordemB || $ordemA <= 0 || $ordemB <= 0) {
+                $ids = [];
+                foreach ($lista as $item) {
+                    $ids[] = (int) ($item['id'] ?? 0);
+                }
+                $tmp = $ids[$indice];
+                $ids[$indice] = $ids[$vizinho];
+                $ids[$vizinho] = $tmp;
+                foreach ($ids as $pos => $itemId) {
+                    if ($itemId <= 0) {
+                        continue;
+                    }
+                    $this->db->query(
+                        'UPDATE `' . $tabela . '` SET ordem = :ordem WHERE id = :id',
+                        ['ordem' => $pos + 1, 'id' => $itemId]
+                    );
+                }
+                $this->db->commit();
+                return ['success' => true];
+            }
+
+            $this->db->query(
+                'UPDATE `' . $tabela . '` SET ordem = :ordem WHERE id = :id',
+                ['ordem' => $ordemB, 'id' => $idA]
+            );
+            $this->db->query(
+                'UPDATE `' . $tabela . '` SET ordem = :ordem WHERE id = :id',
+                ['ordem' => $ordemA, 'id' => $idB]
+            );
+            $this->db->commit();
+            return ['success' => true];
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollback();
+            }
+            return ['success' => false, 'error' => 'Não foi possível reposicionar.'];
+        }
     }
 }

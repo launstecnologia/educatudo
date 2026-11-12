@@ -585,18 +585,22 @@ class BoletimAssistenteFerramentas
                FROM eventos_avaliativos e
                ' . $joinTipo . '
               WHERE e.deleted_at IS NULL AND e.ativo = 1' . ($this->temColuna('eventos_avaliativos', 'rascunho') ? ' AND e.rascunho = 0' : '') . '
-              ORDER BY e.ano_letivo DESC, e.bimestre ASC, e.nome ASC, e.id ASC
+              ORDER BY e.ano_letivo DESC, e.bimestre ASC, '
+            . ($this->temColuna('eventos_avaliativos', 'ordem') ? 'e.ordem ASC, e.id ASC' : 'e.nome ASC, e.id ASC') . '
               LIMIT 400'
         ) ?: [];
         $selectTipoBloco = $this->temColuna('provas_blocos', 'tipo_avaliacao_id')
             ? 'pb.tipo_avaliacao_id'
             : 'NULL AS tipo_avaliacao_id';
+        $ordemBlocos = $this->temColuna('provas_blocos', 'ordem')
+            ? 'pb.ordem ASC, pb.semana ASC, pb.data_prova ASC, pb.id ASC'
+            : 'pb.semana ASC, pb.data_prova ASC, pb.id ASC';
         $blocos = $this->db->fetchAll(
             'SELECT pb.id, pb.evento_avaliativo_id, pb.titulo, pb.data_prova, pb.semana, ' . $selectTipoBloco . '
                FROM provas_blocos pb
                INNER JOIN eventos_avaliativos e ON e.id = pb.evento_avaliativo_id
               WHERE e.deleted_at IS NULL AND e.ativo = 1 AND pb.deleted_at IS NULL' . ($this->temColuna('eventos_avaliativos', 'rascunho') ? ' AND e.rascunho = 0' : '') . '
-              ORDER BY pb.semana ASC, pb.data_prova ASC, pb.id ASC'
+              ORDER BY ' . $ordemBlocos
         ) ?: [];
         $porEvento = [];
         foreach ($blocos as $bloco) {

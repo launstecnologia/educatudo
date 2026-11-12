@@ -29,5 +29,7 @@ $router->get('/admin/eventos-avaliativos/{id}/editar', 'Modulos/eventos-avaliati
 $router->post('/admin/eventos-avaliativos/{id}', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@atualizar');
 $router->get('/admin/eventos-avaliativos/{id}/vinculos', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@vinculos');
 $router->get('/admin/eventos-avaliativos/{id}', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@detalhe');
+$router->post('/admin/eventos-avaliativos/{id}/subeventos/{blocoId}/mover', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@moverSubevento');
 $router->post('/admin/eventos-avaliativos/{id}/subeventos/{blocoId}/excluir', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@excluirSubevento');
+$router->post('/admin/eventos-avaliativos/{id}/mover', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@mover');
 $router->post('/admin/eventos-avaliativos/{id}/excluir', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@excluir');

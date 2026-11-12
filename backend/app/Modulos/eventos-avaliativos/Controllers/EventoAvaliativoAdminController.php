@@ -503,6 +503,59 @@ class EventoAvaliativoAdminController extends AdminBaseController
         $this->json($res);
     }
 
+    public function mover($id): void
+    {
+        if (!$this->permitido('alterar') || !$this->exigirSchema()) {
+            return;
+        }
+        $id = (int) $id;
+        $evento = $this->service->model()->findById($id);
+        $voltar = $evento === null
+            ? '/admin/eventos-avaliativos'
+            : $this->urlListaEvento(
+                (int) ($evento['ano_letivo'] ?? 0),
+                (int) ($evento['bimestre'] ?? 0),
+                (int) ($_POST['regra'] ?? 0)
+            );
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Token inválido. Tente novamente.', 'error');
+            $this->redirect($voltar);
+            return;
+        }
+        $res = $this->service->reposicionarEvento($id, (string) ($_POST['direcao'] ?? ''));
+        if (empty($res['success'])) {
+            $this->setFlashMessage((string) ($res['error'] ?? 'Não foi possível reposicionar o evento.'), 'error');
+        }
+        $this->redirect($voltar . '#evento-' . $id);
+    }
+
+    public function moverSubevento($id, $blocoId): void
+    {
+        if (!$this->permitido('alterar') || !$this->exigirSchema()) {
+            return;
+        }
+        $id = (int) $id;
+        $blocoId = (int) $blocoId;
+        $evento = $this->service->model()->findById($id);
+        $voltar = $evento === null
+            ? '/admin/eventos-avaliativos'
+            : $this->urlListaEvento(
+                (int) ($evento['ano_letivo'] ?? 0),
+                (int) ($evento['bimestre'] ?? 0),
+                (int) ($_POST['regra'] ?? 0)
+            );
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Token inválido. Tente novamente.', 'error');
+            $this->redirect($voltar);
+            return;
+        }
+        $res = $this->service->reposicionarSubevento($id, $blocoId, (string) ($_POST['direcao'] ?? ''));
+        if (empty($res['success'])) {
+            $this->setFlashMessage((string) ($res['error'] ?? 'Não foi possível reposicionar o subevento.'), 'error');
+        }
+        $this->redirect($voltar . '#evento-' . $id);
+    }
+
     public function excluir($id): void
     {
         if (!$this->permitido('excluir') || !$this->exigirSchema()) {
