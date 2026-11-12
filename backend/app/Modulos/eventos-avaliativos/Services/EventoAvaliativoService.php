@@ -1372,7 +1372,7 @@ class EventoAvaliativoService
      * Alunos das turmas, com a menor nota do período de origem e se está abaixo da média.
      *
      * @param list<int> $turmaIds
-     * @return array{media:float,alunos:list<array{id:int,nome:string,turma_id:int,turma:string,nota:?float,abaixo:bool}>}|array{error:string}
+     * @return array{media:float,escala_max?:float,alunos:list<array{id:int,nome:string,turma_id:int,turma:string,nota:?float,abaixo:bool}>}|array{error:string}
      */
     public function candidatosRecuperacao(int $ano, int $codigoPeriodo, array $turmaIds, int $regraId = 0): array
     {
@@ -1383,6 +1383,7 @@ class EventoAvaliativoService
             return ['media' => 6.0, 'alunos' => []];
         }
         $media = $this->mediaMinima($ano, $regraId);
+        $escalaMax = $this->escalaMaximaPadrao($ano, $regraId);
         $periodos = $this->periodosDaRecuperacao($codigoPeriodo);
         try {
             $rows = [];
@@ -1396,10 +1397,11 @@ class EventoAvaliativoService
             error_log('EventoAvaliativoService::candidatosRecuperacao: ' . $e->getMessage());
             return ['error' => 'Não foi possível listar os alunos desta recuperação.'];
         }
+        $fator = $this->fatorAjusteEscalaCandidatos($rows, $escalaMax);
         $alunos = [];
         foreach ($rows as $row) {
             $nota = $row['menor_nota'] ?? null;
-            $notaNum = $nota === null || $nota === '' ? null : round((float) $nota, 2);
+            $notaNum = $nota === null || $nota === '' ? null : round((float) $nota * $fator, 2);
             $turmaId = (int) ($row['turma_lista_id'] ?? $row['turma_id'] ?? 0);
             $alunos[] = [
                 'id' => (int) ($row['id'] ?? 0),
@@ -1412,7 +1414,36 @@ class EventoAvaliativoService
                 'abaixo' => $notaNum !== null && $notaNum < $media,
             ];
         }
-        return ['media' => $media, 'alunos' => $alunos];
+        return ['media' => $media, 'alunos' => $alunos, 'escala_max' => $escalaMax];
+    }
+
+    /**
+     * Quando a regra está em 0–100 e as notas do período ainda estão em 0–10
+     * (tipo/evento antigo), multiplica por 10 para comparar com a média mínima.
+     *
+     * @param list<array<string,mixed>> $rows
+     */
+    private function fatorAjusteEscalaCandidatos(array $rows, float $escalaMax): float
+    {
+        if ($escalaMax < 100.0 || $rows === []) {
+            return 1.0;
+        }
+        $maxNota = null;
+        foreach ($rows as $row) {
+            $bruta = $row['menor_nota'] ?? null;
+            if ($bruta === null || $bruta === '') {
+                continue;
+            }
+            $valor = (float) $bruta;
+            if ($maxNota === null || $valor > $maxNota) {
+                $maxNota = $valor;
+            }
+        }
+        if ($maxNota === null || $maxNota > 10.0 + 0.001) {
+            return 1.0;
+        }
+
+        return 10.0;
     }
 
     /**

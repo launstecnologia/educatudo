@@ -302,6 +302,7 @@ class EventoAvaliativoAdminController extends AdminBaseController
         $this->json([
             'ok' => true,
             'media' => $res['media'],
+            'escala_max' => $res['escala_max'] ?? null,
             'tabela' => $this->service->model()->colunaMateriaPronta(),
             'alunos' => $res['alunos'],
         ]);
