@@ -4365,7 +4365,157 @@ class BoletimAssistenteWizard
     }
 
     /**
-     * Montar do zero: mantém só colunas que o admin adicionou (ou blocos de cálculo).
+     * Siglas citadas nas fórmulas (PO, FAZ…) — entram no cálculo mesmo sem chip no quadro.
+     *
+     * @param array<string,mixed> $estado
+     * @return array<string,true>
+     */
+    private function codigosCitadosNasFormulas(array $estado): array
+    {
+        $out = [];
+        $listas = [];
+        foreach ((array) ($estado['formulas_blocos'] ?? []) as $toks) {
+            if (is_array($toks)) {
+                $listas[] = $toks;
+            }
+        }
+        if (is_array($estado['formula_tokens'] ?? null)) {
+            $listas[] = $estado['formula_tokens'];
+        }
+        foreach ((array) ($estado['formulas_materias_blocos'] ?? []) as $porMateria) {
+            if (!is_array($porMateria)) {
+                continue;
+            }
+            foreach ($porMateria as $toks) {
+                if (is_array($toks)) {
+                    $listas[] = $toks;
+                }
+            }
+        }
+        foreach ($listas as $toks) {
+            foreach ($toks as $t) {
+                if (!is_array($t) || (string) ($t['type'] ?? '') !== 'peca') {
+                    continue;
+                }
+                $cod = strtolower(trim((string) ($t['value'] ?? '')));
+                if ($cod === '' || !(bool) preg_match('/^[a-z_][a-z0-9_]{0,40}$/', $cod)) {
+                    continue;
+                }
+                if ($cod === '_semanal' || $cod === 'media_sem') {
+                    continue;
+                }
+                $out[$cod] = true;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Colunas do quadro + peças da fórmula + ocultas (fonte do cálculo sem coluna visível).
+     *
+     * @param array<string,mixed> $estado
+     * @return array<string,true>
+     */
+    private function codigosPermitidosNoRascunhoManual(array $estado): array
+    {
+        $out = $this->codigosExplicitosDoQuadro($estado);
+        foreach ($this->codigosCitadosNasFormulas($estado) as $cod => $_) {
+            $out[$cod] = true;
+        }
+        foreach ($this->normalizarColunasOcultas($estado['colunas_ocultas'] ?? []) as $cod) {
+            $out[$cod] = true;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Peça só na fórmula: marca como oculta para não voltar ao quadro visual.
+     *
+     * @param array<string,mixed> $estado
+     */
+    private function sincronizarOcultasDasFormulas(array &$estado): void
+    {
+        $visiveis = [];
+        foreach ((array) ($estado['colunas_ordem'] ?? []) as $cod) {
+            $cod = strtolower(trim((string) $cod));
+            if ($cod !== '') {
+                $visiveis[$cod] = true;
+            }
+        }
+        foreach ($this->normalizarLinhasLayout($estado['linhas_layout'] ?? []) as $lin) {
+            foreach ((array) ($lin['colunas'] ?? []) as $cod) {
+                $cod = strtolower(trim((string) $cod));
+                if ($cod !== '') {
+                    $visiveis[$cod] = true;
+                }
+            }
+        }
+        $ocultas = $this->normalizarColunasOcultas($estado['colunas_ocultas'] ?? []);
+        $set = array_fill_keys($ocultas, true);
+        foreach (array_keys($this->codigosCitadosNasFormulas($estado)) as $cod) {
+            if (isset($visiveis[$cod]) || isset($set[$cod])) {
+                continue;
+            }
+            $ocultas[] = $cod;
+            $set[$cod] = true;
+        }
+        $estado['colunas_ocultas'] = $ocultas;
+    }
+
+    /**
+     * Garante IDs dos eventos cujas siglas aparecem na fórmula (mesmo sem chip no board).
+     *
+     * @param array<string,mixed> $estado
+     */
+    private function garantirEventosDasFormulasNoEstado(array &$estado): void
+    {
+        $citados = $this->codigosCitadosNasFormulas($estado);
+        if ($citados === []) {
+            return;
+        }
+        $ids = $this->idsEventosAvaliativos($estado);
+        $ja = array_fill_keys($ids, true);
+        try {
+            $catalogo = $this->ferramentas->listarEventosAvaliativosParaBoletim();
+        } catch (\Throwable $e) {
+            return;
+        }
+        $ano = (int) ($estado['ano_letivo'] ?? 0);
+        $vistos = [];
+        foreach ($catalogo as $ev) {
+            if (!is_array($ev)) {
+                continue;
+            }
+            $id = (int) ($ev['id'] ?? 0);
+            if ($id <= 0 || isset($ja[$id])) {
+                continue;
+            }
+            if ($ano > 0 && (int) ($ev['ano_letivo'] ?? 0) > 0 && (int) $ev['ano_letivo'] !== $ano) {
+                continue;
+            }
+            $codPref = strtolower($this->codigoColunaEventoAvaliativo($ev, $vistos));
+            $sigla = strtolower(preg_replace('/[^a-z0-9_]+/i', '', (string) ($ev['sigla'] ?? '')) ?? '');
+            $bate = ($codPref !== '' && isset($citados[$codPref]))
+                || ($sigla !== '' && isset($citados[$sigla]));
+            if (!$bate) {
+                continue;
+            }
+            $ids[] = $id;
+            $ja[$id] = true;
+            if ($codPref !== '') {
+                $vistos[$codPref] = true;
+            }
+        }
+        $estado['eventos_avaliativos_ids'] = array_values(array_unique(array_filter(
+            array_map('intval', $ids),
+            static fn (int $id): bool => $id > 0
+        )));
+    }
+
+    /**
+     * Montar do zero: mantém colunas do quadro + peças citadas na fórmula (mesmo ocultas).
      *
      * @param list<array<string,mixed>> $componentes
      * @param array<string,mixed> $estado
@@ -4373,7 +4523,7 @@ class BoletimAssistenteWizard
      */
     private function filtrarComponentesParaQuadroManual(array $componentes, array $estado): array
     {
-        $permitidos = $this->codigosExplicitosDoQuadro($estado);
+        $permitidos = $this->codigosPermitidosNoRascunhoManual($estado);
         if ($permitidos === []) {
             return [];
         }
@@ -4502,6 +4652,12 @@ class BoletimAssistenteWizard
         // Quadro "do zero": só entra no board o que o admin clicou (colunas_ordem / linhas).
         if ($quadroLivre) {
             $estado['cabecalhos_manuais'] = 1;
+        }
+
+        // Quadro livre: fórmula com PO/FAZ… sem chip ancora o evento e mantém a peça no cálculo.
+        if ($quadroLivre) {
+            $this->garantirEventosDasFormulasNoEstado($estado);
+            $this->sincronizarOcultasDasFormulas($estado);
         }
 
         $componentes = $this->mesclarEventosAvaliativosNosComponentes($componentes, $estado, $erros);
