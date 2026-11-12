@@ -746,9 +746,37 @@ class EventoAvaliativoService
     }
 
     /**
+     * Escala exibida na edição: valor gravado no tipo, ou o da regra quando o tipo
+     * ficou no padrão 10 (create antigo não persistia escala_max).
+     *
+     * @param array<string,mixed> $tipo
+     */
+    private function escalaParaEdicao(array $tipo, int $ano, int $regraId): string
+    {
+        $padrao = $this->escalaMaximaPadrao($ano, $regraId);
+        if (!array_key_exists('escala_max', $tipo) || $tipo['escala_max'] === null || $tipo['escala_max'] === '') {
+            return number_format($padrao, 2, '.', '');
+        }
+        $bruta = $tipo['escala_max'];
+        if (is_string($bruta)) {
+            $bruta = str_replace(',', '.', trim($bruta));
+        }
+        if (!is_numeric($bruta)) {
+            return number_format($padrao, 2, '.', '');
+        }
+        $salva = round((float) $bruta, 2);
+        // Create antigo gravava o DEFAULT 10 mesmo com a regra em 100.
+        if (abs($salva - 10.0) < 0.001 && abs($padrao - 10.0) > 0.001) {
+            return number_format($padrao, 2, '.', '');
+        }
+
+        return number_format($salva, 2, '.', '');
+    }
+
+    /**
      * @return array<string,mixed>|null
      */
-    public function dadosParaEdicao(int $id): ?array
+    public function dadosParaEdicao(int $id, int $regraId = 0): ?array
     {
         $evento = $this->model->findById($id);
         if ($evento === null) {
@@ -824,10 +852,7 @@ class EventoAvaliativoService
             ];
         }
 
-        $escala = $tipo['escala_max'] ?? '10.00';
-        if (is_numeric($escala)) {
-            $escala = number_format((float) $escala, 2, '.', '');
-        }
+        $escala = $this->escalaParaEdicao($tipo, (int) ($evento['ano_letivo'] ?? 0), $regraId);
 
         return [
             'id' => (int) $evento['id'],
@@ -844,7 +869,7 @@ class EventoAvaliativoService
             'modo_offline' => count($subeventos) > 1 ? 'eventos' : 'lancamento_direto',
             'registro_evento' => (string) ($tipo['registro_evento'] ?? 'nota'),
             'criterio_fechamento' => (string) ($tipo['criterio_fechamento'] ?? 'ultima'),
-            'escala_max' => (string) $escala,
+            'escala_max' => $escala,
             'criterio_professores' => (string) ($tipo['criterio_professores_mesmo_componente'] ?? 'nenhum'),
             'hora_inicio' => $this->horaCurta($primeiro['hora_inicio'] ?? ''),
             'hora_fim' => $this->horaCurta($primeiro['hora_fim'] ?? ''),
@@ -927,6 +952,15 @@ class EventoAvaliativoService
         }
 
         $regraId = (int) ($post['regra'] ?? $post['regra_id'] ?? 0);
+        try {
+            if (!isset($post['escala_max']) || trim((string) $post['escala_max']) === '') {
+                $post['escala_max'] = number_format($this->escalaMaximaPadrao($ano, $regraId), 2, '.', '');
+            }
+        } catch (Throwable $e) {
+            if (!isset($post['escala_max']) || trim((string) $post['escala_max']) === '') {
+                $post['escala_max'] = '10.00';
+            }
+        }
         $catalogo = $this->catalogoFormulario($ano, $regraId);
         $foraDoEscopo = $this->turmasForaDoEscopo($turmaIds, $catalogo['turmas'], $this->turmasDoEvento($id));
         if ($foraDoEscopo !== []) {

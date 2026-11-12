@@ -348,14 +348,14 @@ class EventoAvaliativoAdminController extends AdminBaseController
         if (!$this->permitido('alterar') || !$this->exigirSchema()) {
             return;
         }
-        $edicao = $this->service->dadosParaEdicao((int) $id);
+        $regraId = (int) ($_GET['regra'] ?? 0);
+        $edicao = $this->service->dadosParaEdicao((int) $id, $regraId);
         if ($edicao === null) {
             $this->setFlashMessage('Evento não encontrado.', 'error');
             $this->redirect('/admin/eventos-avaliativos');
             return;
         }
         $ano = (int) ($edicao['ano_letivo'] ?? date('Y'));
-        $regraId = (int) ($_GET['regra'] ?? 0);
         $catalogo = $this->service->catalogoFormulario($ano, $regraId, (array) ($edicao['turmas'] ?? []));
         $materiasEvento = [];
         foreach ((array) ($edicao['pares'] ?? []) as $par) {
@@ -363,6 +363,11 @@ class EventoAvaliativoAdminController extends AdminBaseController
             if ($mid > 0) {
                 $materiasEvento[$mid] = $mid;
             }
+        }
+        try {
+            $escalaPadrao = number_format($this->service->escalaMaximaPadrao($ano, $regraId), 2, '.', '');
+        } catch (\Throwable $e) {
+            $escalaPadrao = '10.00';
         }
         $flash = $this->getFlashMessage();
         $this->viewWithLayout('admin', 'admin/eventos-avaliativos/form', $this->dados([
@@ -378,6 +383,7 @@ class EventoAvaliativoAdminController extends AdminBaseController
             'anos' => $this->anosDoCadastro($ano, true),
             'bimestre_selecionado' => (int) ($edicao['bimestre'] ?? 0),
             'regra_id' => $regraId,
+            'escala_max_padrao' => $escalaPadrao,
             'periodos_extra' => (new RecuperacaoConfig())->opcoesFormulario($ano, (int) ($edicao['bimestre'] ?? 0), $regraId),
             'criterios' => TipoNotaRegraService::CRITERIOS,
             'registros' => TipoNotaRegraService::REGISTROS,

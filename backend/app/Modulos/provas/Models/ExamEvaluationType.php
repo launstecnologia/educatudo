@@ -196,6 +196,9 @@ class ExamEvaluationType
 
     private function sanitizarEscala($valor): float
     {
+        if (is_string($valor)) {
+            $valor = str_replace(',', '.', trim($valor));
+        }
         $n = is_numeric($valor) ? (float) $valor : 10.0;
         if ($n <= 0) {
             $n = 10.0;
@@ -204,6 +207,28 @@ class ExamEvaluationType
             $n = 100.0;
         }
         return round($n, 2);
+    }
+
+    public function temColunaEscalaMax(): bool
+    {
+        static $cache = null;
+        if ($cache !== null) {
+            return $cache;
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT 1 AS ok
+                 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'provas_tipos_avaliacao'
+                   AND COLUMN_NAME = 'escala_max'
+                 LIMIT 1"
+            );
+            $cache = !empty($row);
+        } catch (\Exception $e) {
+            $cache = false;
+        }
+        return $cache;
     }
 
     public function create(array $data): int
@@ -229,6 +254,10 @@ class ExamEvaluationType
                 $cols .= ', criterio_professores_mesmo_componente';
                 $vals .= ', :criterio_professores_mesmo_componente';
             }
+        } elseif ($this->temColunaEscalaMax()) {
+            $params['escala_max'] = $this->sanitizarEscala($data['escala_max'] ?? 10);
+            $cols .= ', escala_max';
+            $vals .= ', :escala_max';
         }
         return (int) $this->db->insert(
             "INSERT INTO provas_tipos_avaliacao ({$cols}) VALUES ({$vals})",
@@ -261,6 +290,9 @@ class ExamEvaluationType
             if ($this->temColunaCriterioProfessores()) {
                 $set .= ', criterio_professores_mesmo_componente = :criterio_professores_mesmo_componente';
             }
+        } elseif ($this->temColunaEscalaMax() && array_key_exists('escala_max', $data)) {
+            $set .= ', escala_max = :escala_max';
+            $params['escala_max'] = $this->sanitizarEscala($data['escala_max']);
         }
         return (bool) $this->db->query(
             "UPDATE provas_tipos_avaliacao

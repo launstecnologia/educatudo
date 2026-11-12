@@ -106,7 +106,11 @@ class TipoNotaRegraService
         $origem = $this->normalizarOrigem($origemRaw);
         $registro = $this->normalizarRegistro($post['registro_evento'] ?? 'nota');
         $criterio = $this->normalizarCriterio($post['criterio_fechamento'] ?? 'ultima');
-        $escala = isset($post['escala_max']) ? (float) $post['escala_max'] : 10.0;
+        $escalaBruta = $post['escala_max'] ?? 10.0;
+        if (is_string($escalaBruta)) {
+            $escalaBruta = str_replace(',', '.', trim($escalaBruta));
+        }
+        $escala = is_numeric($escalaBruta) ? (float) $escalaBruta : 10.0;
         if ($escala <= 0) {
             $escala = 10.0;
         }
