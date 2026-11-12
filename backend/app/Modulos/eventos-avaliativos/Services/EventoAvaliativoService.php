@@ -1388,19 +1388,21 @@ class EventoAvaliativoService
         try {
             $rows = [];
             if ($this->tabelaExisteSimples('notas_tipo_finais')) {
-                $rows = $this->linhasCandidatosRecuperacao($ano, $turmaIds, $periodos, false);
+                $rows = $this->linhasCandidatosRecuperacao($ano, $turmaIds, $periodos, false, $escalaMax);
             }
             if ($rows === [] && $this->tabelaExisteSimples('provas_blocos_notas_lancadas')) {
-                $rows = $this->linhasCandidatosRecuperacao($ano, $turmaIds, $periodos, true);
+                $rows = $this->linhasCandidatosRecuperacao($ano, $turmaIds, $periodos, true, $escalaMax);
             }
         } catch (Throwable $e) {
             error_log('EventoAvaliativoService::candidatosRecuperacao: ' . $e->getMessage());
             return ['error' => 'Não foi possível listar os alunos desta recuperação.'];
         }
-        $fator = $this->fatorAjusteEscalaCandidatos($rows, $escalaMax);
+        $fatores = $this->fatoresAjusteEscalaPorMateria($rows, $escalaMax);
         $alunos = [];
         foreach ($rows as $row) {
             $nota = $row['menor_nota'] ?? null;
+            $materiaId = (int) ($row['materia_id'] ?? 0);
+            $fator = $fatores[$materiaId] ?? 1.0;
             $notaNum = $nota === null || $nota === '' ? null : round((float) $nota * $fator, 2);
             $turmaId = (int) ($row['turma_lista_id'] ?? $row['turma_id'] ?? 0);
             $alunos[] = [
@@ -1408,7 +1410,7 @@ class EventoAvaliativoService
                 'nome' => (string) ($row['nome'] ?? ''),
                 'turma_id' => $turmaId,
                 'turma' => (string) ($row['turma_nome'] ?? ''),
-                'materia_id' => (int) ($row['materia_id'] ?? 0),
+                'materia_id' => $materiaId,
                 'materia' => (string) ($row['materia_nome'] ?? ''),
                 'nota' => $notaNum,
                 'abaixo' => $notaNum !== null && $notaNum < $media,
@@ -1418,32 +1420,39 @@ class EventoAvaliativoService
     }
 
     /**
-     * Quando a regra está em 0–100 e as notas do período ainda estão em 0–10
-     * (tipo/evento antigo), multiplica por 10 para comparar com a média mínima.
+     * Por matéria: se a regra é 0–100 e aquela matéria só tem notas ≤ 10
+     * (lançamento antigo), multiplica por 10. Assim uma matéria já em 0–100
+     * não impede a conversão das demais.
      *
      * @param list<array<string,mixed>> $rows
+     * @return array<int,float> materia_id => fator
      */
-    private function fatorAjusteEscalaCandidatos(array $rows, float $escalaMax): float
+    private function fatoresAjusteEscalaPorMateria(array $rows, float $escalaMax): array
     {
         if ($escalaMax < 100.0 || $rows === []) {
-            return 1.0;
+            return [];
         }
-        $maxNota = null;
+        $maxPorMateria = [];
         foreach ($rows as $row) {
+            $materiaId = (int) ($row['materia_id'] ?? 0);
+            if ($materiaId <= 0) {
+                continue;
+            }
             $bruta = $row['menor_nota'] ?? null;
             if ($bruta === null || $bruta === '') {
                 continue;
             }
             $valor = (float) $bruta;
-            if ($maxNota === null || $valor > $maxNota) {
-                $maxNota = $valor;
+            if (!isset($maxPorMateria[$materiaId]) || $valor > $maxPorMateria[$materiaId]) {
+                $maxPorMateria[$materiaId] = $valor;
             }
         }
-        if ($maxNota === null || $maxNota > 10.0 + 0.001) {
-            return 1.0;
+        $fatores = [];
+        foreach ($maxPorMateria as $materiaId => $maxNota) {
+            $fatores[$materiaId] = ($maxNota <= 10.0 + 0.001) ? 10.0 : 1.0;
         }
 
-        return 10.0;
+        return $fatores;
     }
 
     /**
@@ -1451,8 +1460,13 @@ class EventoAvaliativoService
      * @param list<int> $periodos
      * @return list<array<string,mixed>>
      */
-    private function linhasCandidatosRecuperacao(int $ano, array $turmaIds, array $periodos, bool $usarNotasLancadas): array
-    {
+    private function linhasCandidatosRecuperacao(
+        int $ano,
+        array $turmaIds,
+        array $periodos,
+        bool $usarNotasLancadas,
+        float $escalaRegra = 10.0
+    ): array {
         $params = ['ano' => $ano, 'ano_mat' => $ano];
         $turmasPh = [];
         $turmasMateria = [];
@@ -1522,6 +1536,20 @@ class EventoAvaliativoService
                          AND (a1.status IS NULL OR a1.status IN (\'ACTIVE\', \'PENDING\'))';
         }
 
+        $converterEscala = $escalaRegra >= 100.0 && $this->colunaEscalaMaxTipoExiste();
+        $exprNotaFinal = $converterEscala
+            ? 'CASE WHEN COALESCE(pta.escala_max, 10) <= 10.001 THEN n.nota_final * 10 ELSE n.nota_final END'
+            : 'n.nota_final';
+        $exprNotaLancada = $converterEscala
+            ? 'CASE WHEN COALESCE(pta.escala_max, 10) <= 10.001 THEN n.nota * 10 ELSE n.nota END'
+            : 'n.nota';
+        $joinTipoFinal = $converterEscala
+            ? ' LEFT JOIN provas_tipos_avaliacao pta ON pta.id = n.tipo_avaliacao_id AND pta.deleted_at IS NULL'
+            : '';
+        $joinTipoBloco = $converterEscala
+            ? ' LEFT JOIN provas_tipos_avaliacao pta ON pta.id = pb.tipo_avaliacao_id AND pta.deleted_at IS NULL'
+            : '';
+
         if ($usarNotasLancadas) {
             $sqlMaterias = 'SELECT DISTINCT n2.materia_id
                               FROM provas_blocos_notas_lancadas n2
@@ -1531,9 +1559,10 @@ class EventoAvaliativoService
                                AND n2.materia_id > 0
                                AND n2.nota IS NOT NULL' . $filtroPeriodoMaterias;
             $joinNota = 'LEFT JOIN (
-                            SELECT n.aluno_id, n.materia_id, n.turma_id, MIN(n.nota) AS menor_nota
+                            SELECT n.aluno_id, n.materia_id, n.turma_id, MIN(' . $exprNotaLancada . ') AS menor_nota
                               FROM provas_blocos_notas_lancadas n
-                              INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.deleted_at IS NULL
+                              INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.deleted_at IS NULL'
+                              . $joinTipoBloco . '
                              WHERE pb.ano_letivo = :ano
                                AND n.turma_id IN (' . $inTurmasNota . ')
                                AND n.nota IS NOT NULL' . $filtroPeriodoNotas . '
@@ -1548,8 +1577,9 @@ class EventoAvaliativoService
                                AND n2.turma_id IN (' . $inTurmasMat . ')
                                AND n2.materia_id > 0' . $filtroPeriodoMaterias;
             $joinNota = 'LEFT JOIN (
-                            SELECT n.aluno_id, n.materia_id, n.turma_id, MIN(n.nota_final) AS menor_nota
-                              FROM notas_tipo_finais n
+                            SELECT n.aluno_id, n.materia_id, n.turma_id, MIN(' . $exprNotaFinal . ') AS menor_nota
+                              FROM notas_tipo_finais n'
+                              . $joinTipoFinal . '
                              WHERE n.ano_letivo = :ano
                                AND n.turma_id IN (' . $inTurmasNota . ')' . $filtroPeriodoNotas . '
                              GROUP BY n.aluno_id, n.materia_id, n.turma_id
@@ -1582,6 +1612,27 @@ class EventoAvaliativoService
         } catch (Throwable $e) {
             return false;
         }
+    }
+
+    private function colunaEscalaMaxTipoExiste(): bool
+    {
+        static $cache = null;
+        if ($cache !== null) {
+            return $cache;
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT 1 AS ok FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA = DATABASE()
+                    AND TABLE_NAME = :t AND COLUMN_NAME = :c LIMIT 1',
+                ['t' => 'provas_tipos_avaliacao', 'c' => 'escala_max']
+            );
+            $cache = !empty($row['ok']);
+        } catch (Throwable $e) {
+            $cache = false;
+        }
+
+        return $cache;
     }
 
     /**
