@@ -285,12 +285,21 @@ $ajaxUrl = URL . '/professor/provas/evento-lancar-notas/' . $eventoId . '/ajax';
     }
 
     document.querySelectorAll('input[data-nota-autosave="1"]').forEach(function (input) {
+        input.addEventListener('input', function () {
+            clearTimeout(input._notaDebounce);
+            setCampoEstado(input, 'saving', 'Na fila…');
+            input._notaDebounce = setTimeout(function () {
+                salvarCelula(input);
+            }, 550);
+        });
         input.addEventListener('blur', function () {
+            clearTimeout(input._notaDebounce);
             salvarCelula(input);
         });
         input.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
+                clearTimeout(input._notaDebounce);
                 input.blur();
             }
         });

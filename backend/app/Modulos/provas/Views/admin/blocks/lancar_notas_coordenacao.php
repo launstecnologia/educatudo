@@ -169,6 +169,8 @@ if ($tipoFlash === 'error') {
     <input type="hidden" name="por_pagina" value="<?= (int) $porPagina ?>">
     <input type="hidden" name="senha_confirmacao" id="senhaConfirmacaoHidden" value="">
 
+    <div id="status-autosave-notas" class="hidden px-4 py-2 rounded-lg text-sm border" role="status" aria-live="polite"></div>
+
     <div class="bg-white rounded-xl shadow-lg overflow-hidden">
         <?php if (!$notaUnicaTodasMaterias && count($materiasFiltro) > 0): ?>
         <div class="flex flex-wrap border-b border-gray-200 px-2" role="tablist">
@@ -268,7 +270,13 @@ if ($tipoFlash === 'error') {
                                                class="js-nota-input w-full px-2 py-1.5 border border-gray-300 rounded-lg <?= $somenteLeitura ? 'bg-gray-100 text-gray-600' : '' ?>"
                                                placeholder="—"
                                                autocomplete="off"
+                                               data-nota-autosave="1"
+                                               data-professor-id="<?= $pid ?>"
+                                               data-materia-id="<?= $mid ?>"
+                                               data-turma-id="<?= $tid ?>"
+                                               data-aluno-id="<?= $aid ?>"
                                                data-original="<?= htmlspecialchars($notaStr) ?>"
+                                               data-valor-salvo="<?= htmlspecialchars($notaStr) ?>"
                                                <?= $somenteLeitura ? 'readonly' : '' ?>>
                                         <?php if ($bloqueada): ?>
                                         <button type="button" class="shrink-0 text-amber-600" title="Bloqueada — use Desbloquear edição" onclick="abrirModalSenha()" aria-label="Desbloquear">
@@ -277,6 +285,7 @@ if ($tipoFlash === 'error') {
                                         <?php endif; ?>
                                         <?php endif; ?>
                                     </div>
+                                    <p class="nota-autosave-msg mt-1 text-xs hidden"></p>
                                 </td>
                                 <td class="px-4 py-3">
                                     <?php if ($transferido): ?>
@@ -294,7 +303,13 @@ if ($tipoFlash === 'error') {
                                            class="js-obs-input w-full px-2 py-1.5 border border-gray-300 rounded-lg <?= $somenteLeitura ? 'bg-gray-100 text-gray-600' : '' ?>"
                                            maxlength="500"
                                            placeholder="Opcional"
+                                           data-obs-autosave="1"
+                                           data-professor-id="<?= $pid ?>"
+                                           data-materia-id="<?= $mid ?>"
+                                           data-turma-id="<?= $tid ?>"
+                                           data-aluno-id="<?= $aid ?>"
                                            data-original="<?= htmlspecialchars((string) ($ln['observacao'] ?? '')) ?>"
+                                           data-valor-salvo="<?= htmlspecialchars((string) ($ln['observacao'] ?? '')) ?>"
                                            <?= $somenteLeitura ? 'readonly' : '' ?>>
                                     <?php endif; ?>
                                 </td>
@@ -333,13 +348,16 @@ if ($tipoFlash === 'error') {
     <?php endif; ?>
 
     <?php if (!empty($linhas)): ?>
-    <div class="flex gap-3">
+    <div class="flex flex-wrap items-center gap-3">
+        <p class="text-sm text-gray-500">
+            As notas entram na fila e salvam sozinhas ao digitar. O botão abaixo é opcional.
+        </p>
         <button type="submit" class="btn-primary-custom inline-flex items-center px-6 py-3 rounded-lg font-semibold hover:opacity-90">
-            Salvar notas
+            Salvar tudo agora
         </button>
         <a href="<?= URL ?>/admin/provas/blocos/<?= $blocoId ?>/gerenciar"
            class="inline-flex items-center px-6 py-3 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50">
-            Cancelar
+            Voltar
         </a>
     </div>
     <?php endif; ?>
@@ -587,6 +605,286 @@ if ($tipoFlash === 'error') {
     var edicaoLiberada = <?= $edicaoDesbloqueada ? 'true' : 'false' ?>;
     var urlDesbloquear = <?= json_encode($urlDesbloquear, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     var csrfToken = <?= json_encode((string) $csrfToken, JSON_UNESCAPED_UNICODE) ?>;
+    var ajaxUrl = <?= json_encode(URL . '/admin/provas/blocos/' . $blocoId . '/lancar-notas-coordenacao/ajax', JSON_UNESCAPED_SLASHES) ?>;
+    var escalaMax = <?= json_encode($escalaMax) ?>;
+    var escalaMaxRotulo = <?= json_encode($escalaMaxRotulo, JSON_UNESCAPED_UNICODE) ?>;
+    var statusEl = document.getElementById('status-autosave-notas');
+    var statusTimer = null;
+    var fila = [];
+    var filaMap = Object.create(null);
+    var emAndamento = 0;
+    var maxParalelo = 2;
+    var debounceMs = 550;
+    var pendenteAposDesbloqueio = null;
+
+    function normalizarValor(v) {
+        return String(v || '').trim().replace(',', '.');
+    }
+
+    function setStatus(tipo, texto) {
+        if (!statusEl) return;
+        clearTimeout(statusTimer);
+        statusEl.classList.remove('hidden', 'bg-slate-50', 'border-slate-200', 'text-slate-700', 'bg-emerald-50', 'border-emerald-200', 'text-emerald-800', 'bg-red-50', 'border-red-200', 'text-red-800');
+        if (tipo === 'saving') {
+            statusEl.classList.add('bg-slate-50', 'border-slate-200', 'text-slate-700');
+        } else if (tipo === 'ok') {
+            statusEl.classList.add('bg-emerald-50', 'border-emerald-200', 'text-emerald-800');
+            statusTimer = setTimeout(function () {
+                if (emAndamento === 0 && fila.length === 0) statusEl.classList.add('hidden');
+            }, 1600);
+        } else {
+            statusEl.classList.add('bg-red-50', 'border-red-200', 'text-red-800');
+        }
+        statusEl.textContent = texto;
+    }
+
+    function setCampoEstado(input, tipo, mensagem) {
+        if (!input) return;
+        var cell = input.closest('td');
+        var msg = cell ? cell.querySelector('.nota-autosave-msg') : null;
+        input.classList.remove('border-red-400', 'border-emerald-400', 'border-gray-300');
+        if (tipo === 'error') input.classList.add('border-red-400');
+        else if (tipo === 'ok') input.classList.add('border-emerald-400');
+        else input.classList.add('border-gray-300');
+        if (!msg) return;
+        if (!mensagem) {
+            msg.classList.add('hidden');
+            msg.textContent = '';
+            return;
+        }
+        msg.textContent = mensagem;
+        msg.classList.remove('hidden', 'text-red-600', 'text-emerald-600', 'text-slate-500');
+        msg.classList.add(tipo === 'error' ? 'text-red-600' : (tipo === 'ok' ? 'text-emerald-600' : 'text-slate-500'));
+    }
+
+    function chaveLinha(el) {
+        return [
+            el.getAttribute('data-professor-id') || '0',
+            el.getAttribute('data-materia-id') || '0',
+            el.getAttribute('data-turma-id') || '0',
+            el.getAttribute('data-aluno-id') || '0'
+        ].join(':');
+    }
+
+    function validarNota(valor) {
+        var v = normalizarValor(valor);
+        if (v === '') return { ok: true, valor: '' };
+        if (!/^-?\d+(\.\d+)?$/.test(v)) return { ok: false, message: 'Nota inválida.' };
+        var n = parseFloat(v);
+        if (isNaN(n) || n < 0 || n > escalaMax) {
+            return { ok: false, message: 'Notas devem estar entre 0 e ' + escalaMaxRotulo + '.' };
+        }
+        return { ok: true, valor: v };
+    }
+
+    function valoresEquivalentes(a, b) {
+        var na = normalizarValor(a);
+        var nb = normalizarValor(b);
+        if (na === nb) return true;
+        if (na === '' || nb === '') return false;
+        var fa = parseFloat(na);
+        var fb = parseFloat(nb);
+        return !isNaN(fa) && !isNaN(fb) && Math.abs(fa - fb) < 0.0001;
+    }
+
+    function paresDaLinha(el) {
+        var tr = el.closest('tr');
+        if (!tr) return { nota: null, obs: null };
+        return {
+            nota: tr.querySelector('.js-nota-input'),
+            obs: tr.querySelector('.js-obs-input')
+        };
+    }
+
+    function enfileirar(el, imediato) {
+        if (!el || el.readOnly || el.disabled) return;
+        var key = chaveLinha(el);
+        var pares = paresDaLinha(el);
+        var notaInput = pares.nota;
+        var obsInput = pares.obs;
+        if (!notaInput) return;
+
+        var local = validarNota(notaInput.value);
+        if (!local.ok) {
+            setCampoEstado(notaInput, 'error', local.message);
+            setStatus('error', local.message);
+            return;
+        }
+
+        var notaAtual = normalizarValor(notaInput.value);
+        var obsAtual = obsInput ? String(obsInput.value || '').trim() : '';
+        var notaSalva = normalizarValor(notaInput.getAttribute('data-valor-salvo') || '');
+        var obsSalva = obsInput ? String(obsInput.getAttribute('data-valor-salvo') || '').trim() : '';
+        if (valoresEquivalentes(notaAtual, notaSalva) && obsAtual === obsSalva) {
+            setCampoEstado(notaInput, 'idle', '');
+            return;
+        }
+
+        if (filaMap[key] && filaMap[key].timer) {
+            clearTimeout(filaMap[key].timer);
+        }
+
+        var item = {
+            key: key,
+            notaInput: notaInput,
+            obsInput: obsInput,
+            timer: null
+        };
+        filaMap[key] = item;
+
+        var agendar = function () {
+            if (fila.indexOf(item) === -1) fila.push(item);
+            setCampoEstado(notaInput, 'saving', 'Na fila…');
+            setStatus('saving', fila.length + emAndamento > 1
+                ? ('Salvando fila (' + (fila.length + emAndamento) + ')…')
+                : 'Salvando…');
+            processarFila();
+        };
+
+        if (imediato) {
+            agendar();
+            return;
+        }
+        setCampoEstado(notaInput, 'saving', 'Na fila…');
+        item.timer = setTimeout(agendar, debounceMs);
+    }
+
+    function processarFila() {
+        while (emAndamento < maxParalelo && fila.length > 0) {
+            var item = fila.shift();
+            if (!item || !item.notaInput) continue;
+            if (item.timer) {
+                clearTimeout(item.timer);
+                item.timer = null;
+            }
+            salvarItem(item);
+        }
+    }
+
+    function salvarItem(item) {
+        var notaInput = item.notaInput;
+        var obsInput = item.obsInput;
+        var key = item.key;
+        var local = validarNota(notaInput.value);
+        if (!local.ok) {
+            setCampoEstado(notaInput, 'error', local.message);
+            setStatus('error', local.message);
+            delete filaMap[key];
+            processarFila();
+            return;
+        }
+
+        var notaAtual = normalizarValor(notaInput.value);
+        var obsAtual = obsInput ? String(obsInput.value || '').trim() : '';
+        var notaSalva = normalizarValor(notaInput.getAttribute('data-valor-salvo') || '');
+        var obsSalva = obsInput ? String(obsInput.getAttribute('data-valor-salvo') || '').trim() : '';
+        if (valoresEquivalentes(notaAtual, notaSalva) && obsAtual === obsSalva) {
+            setCampoEstado(notaInput, 'idle', '');
+            delete filaMap[key];
+            processarFila();
+            return;
+        }
+
+        var versao = (parseInt(notaInput.getAttribute('data-save-version') || '0', 10) || 0) + 1;
+        notaInput.setAttribute('data-save-version', String(versao));
+        emAndamento += 1;
+        setCampoEstado(notaInput, 'saving', 'Salvando…');
+        setStatus('saving', (fila.length + emAndamento) > 1
+            ? ('Salvando fila (' + (fila.length + emAndamento) + ')…')
+            : 'Salvando…');
+
+        var fd = new FormData();
+        fd.append('_token', csrfToken);
+        fd.append('professor_id', notaInput.getAttribute('data-professor-id') || '');
+        fd.append('materia_id', notaInput.getAttribute('data-materia-id') || '');
+        fd.append('turma_id', notaInput.getAttribute('data-turma-id') || '');
+        fd.append('aluno_id', notaInput.getAttribute('data-aluno-id') || '');
+        fd.append('nota', String(notaInput.value || '').trim());
+        fd.append('observacao', obsInput ? String(obsInput.value || '').trim() : '');
+
+        fetch(ajaxUrl, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+            body: fd,
+            credentials: 'same-origin'
+        })
+        .then(function (r) {
+            return r.json().then(function (data) {
+                return { http: r.status, data: data || {} };
+            }).catch(function () {
+                return { http: r.status, data: { success: false, message: 'Resposta inválida do servidor.' } };
+            });
+        })
+        .then(function (res) {
+            if (String(notaInput.getAttribute('data-save-version') || '') !== String(versao)) {
+                return;
+            }
+            if (!res.data.success) {
+                if (res.data.precisa_desbloquear) {
+                    setCampoEstado(notaInput, 'error', 'Desbloqueie a edição');
+                    setStatus('error', res.data.message || 'Desbloqueie a edição com sua senha.');
+                    pendenteAposDesbloqueio = notaInput;
+                    abrirModalSenha();
+                    return;
+                }
+                var msg = res.data.message || 'Erro ao salvar.';
+                setCampoEstado(notaInput, 'error', msg);
+                setStatus('error', msg);
+                return;
+            }
+            var notaPersistida = (res.data.nota === null || typeof res.data.nota === 'undefined')
+                ? ''
+                : String(Number(res.data.nota).toFixed(2));
+            var obsPersistida = typeof res.data.observacao === 'string' ? res.data.observacao : obsAtual;
+            notaInput.setAttribute('data-valor-salvo', notaPersistida);
+            notaInput.setAttribute('data-original', notaPersistida);
+            if (notaPersistida !== '') notaInput.value = notaPersistida;
+            if (obsInput) {
+                obsInput.setAttribute('data-valor-salvo', obsPersistida);
+                obsInput.setAttribute('data-original', obsPersistida);
+            }
+            var tr = notaInput.closest('tr');
+            if (tr) tr.setAttribute('data-tem-nota', notaPersistida !== '' ? '1' : '0');
+            setCampoEstado(notaInput, 'ok', 'Salvo');
+            setStatus('ok', res.data.message || 'Nota salva.');
+            setTimeout(function () {
+                if (String(notaInput.getAttribute('data-save-version') || '') === String(versao)) {
+                    setCampoEstado(notaInput, 'idle', '');
+                }
+            }, 1000);
+        })
+        .catch(function () {
+            if (String(notaInput.getAttribute('data-save-version') || '') !== String(versao)) return;
+            setCampoEstado(notaInput, 'error', 'Erro de conexão ao salvar.');
+            setStatus('error', 'Erro de conexão ao salvar.');
+        })
+        .finally(function () {
+            emAndamento = Math.max(0, emAndamento - 1);
+            if (!filaMap[key] || filaMap[key] === item) {
+                delete filaMap[key];
+            }
+            if (emAndamento > 0 || fila.length > 0) {
+                setStatus('saving', 'Salvando fila (' + (fila.length + emAndamento) + ')…');
+            }
+            processarFila();
+        });
+    }
+
+    document.querySelectorAll('[data-nota-autosave="1"], [data-obs-autosave="1"]').forEach(function (input) {
+        input.addEventListener('input', function () {
+            enfileirar(input, false);
+        });
+        input.addEventListener('blur', function () {
+            enfileirar(input, true);
+        });
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                enfileirar(input, true);
+                input.blur();
+            }
+        });
+    });
 
     window.openFilterDrawer = function () {
         document.getElementById('filterDrawerBackdrop').classList.remove('hidden');
@@ -704,6 +1002,11 @@ if ($tipoFlash === 'error') {
             document.getElementById('senhaConfirmacaoHidden').value = '';
             liberarCamposBloqueados();
             fecharModalSenha();
+            if (pendenteAposDesbloqueio) {
+                var retentar = pendenteAposDesbloqueio;
+                pendenteAposDesbloqueio = null;
+                enfileirar(retentar, true);
+            }
         })
         .catch(function () {
             if (btn) { btn.disabled = false; btn.textContent = 'Desbloquear'; }
@@ -723,6 +1026,14 @@ if ($tipoFlash === 'error') {
     var form = document.getElementById('formLancamentoNotas');
     if (form) {
         form.addEventListener('submit', function (e) {
+            if (emAndamento > 0 || fila.length > 0) {
+                e.preventDefault();
+                setStatus('saving', 'Aguarde a fila de salvamento terminar…');
+                document.querySelectorAll('[data-nota-autosave="1"], [data-obs-autosave="1"]').forEach(function (el) {
+                    enfileirar(el, true);
+                });
+                return;
+            }
             if (edicaoLiberada) return;
             var mudouBloqueada = false;
             document.querySelectorAll('tr[data-tem-nota="1"]').forEach(function (tr) {

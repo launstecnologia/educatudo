@@ -2943,6 +2943,230 @@ class TeacherExamController extends BaseController
     }
 
     /**
+     * Autosave de uma célula (nota/observação) no lançamento da coordenação.
+     */
+    public function lancarNotasCoordenacaoSalvarAjax($blocoId)
+    {
+        $user = $this->authManager->getUser();
+        if (!in_array($user['tipo'] ?? '', ['admin', 'admin_escola'], true)) {
+            $this->json(['success' => false, 'message' => 'Sem permissão.'], 403);
+            return;
+        }
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->json(['success' => false, 'message' => 'Token inválido. Recarregue a página.'], 419);
+            return;
+        }
+
+        $blocoId = (int) $blocoId;
+        $bloco = $this->blocoModel->findById($blocoId);
+        if (!$bloco || (($bloco['formato_evento'] ?? '') !== 'lancamento_nota')) {
+            $this->json(['success' => false, 'message' => 'Evento inválido.'], 404);
+            return;
+        }
+        if (($bloco['configuracao_nota'] ?? '') !== 'coordenacao_calcula') {
+            $this->json(['success' => false, 'message' => 'Este evento está configurado para lançamento pelo professor.'], 422);
+            return;
+        }
+
+        $pid = (int) ($_POST['professor_id'] ?? 0);
+        $mid = (int) ($_POST['materia_id'] ?? 0);
+        $tid = (int) ($_POST['turma_id'] ?? 0);
+        $aid = (int) ($_POST['aluno_id'] ?? 0);
+        if ($pid < 0 || $mid <= 0 || $tid <= 0 || $aid <= 0) {
+            $this->json(['success' => false, 'message' => 'Dados incompletos para salvar a nota.'], 400);
+            return;
+        }
+
+        $notaUnicaTodasMaterias = !empty($bloco['nota_unica_todas_materias']);
+        $escalaMax = $this->escalaMaximaDoBloco($bloco);
+        $escalaMaxRotulo = (string) (int) $escalaMax;
+        $anoLetivo = (int) ($bloco['ano_letivo'] ?? 0);
+        $combos = $this->combosLancamentoNotaBloco($bloco, 0);
+        $comboOk = false;
+        foreach ($combos as $combo) {
+            if ((int) ($combo['professor_id'] ?? 0) !== $pid || (int) ($combo['materia_id'] ?? 0) !== $mid) {
+                continue;
+            }
+            $turmasCombo = array_map('intval', is_array($combo['turma_ids'] ?? null) ? $combo['turma_ids'] : []);
+            if (in_array($tid, $turmasCombo, true)) {
+                $comboOk = true;
+                break;
+            }
+        }
+        if (!$comboOk) {
+            $this->json(['success' => false, 'message' => 'Combinação de professor/matéria/turma inválida.'], 403);
+            return;
+        }
+
+        $alunos = $this->alunosAtivosPorTurmas([$tid], $anoLetivo, $blocoId, $mid);
+        $alunoOk = false;
+        foreach ($alunos as $al) {
+            if ((int) ($al['id'] ?? 0) === $aid) {
+                if (!empty($al['transferido'])) {
+                    $this->json(['success' => false, 'message' => 'Aluno transferido: nota não pode ser alterada.'], 422);
+                    return;
+                }
+                $alunoOk = true;
+                break;
+            }
+        }
+        if (!$alunoOk) {
+            $this->json(['success' => false, 'message' => 'Aluno não encontrado neste lançamento.'], 403);
+            return;
+        }
+
+        $valorRaw = (string) ($_POST['nota'] ?? '');
+        $obs = substr(trim((string) ($_POST['observacao'] ?? '')), 0, 500);
+        $valorStr = trim(str_replace(',', '.', $valorRaw));
+        $notaVal = null;
+        if ($valorStr !== '') {
+            if (!is_numeric($valorStr)) {
+                $this->json(['success' => false, 'message' => 'Nota inválida.'], 400);
+                return;
+            }
+            $nf = (float) $valorStr;
+            if ($nf < 0 || $nf > $escalaMax) {
+                $this->json(['success' => false, 'message' => 'Notas devem estar entre 0 e ' . $escalaMaxRotulo . '.'], 400);
+                return;
+            }
+            $notaVal = round($nf, 2);
+        }
+
+        $notasModel = new ExamBlockManualGrade();
+        if (!$notasModel->tableExists()) {
+            $this->json(['success' => false, 'message' => 'Tabela de notas ainda não existe. Execute a migração SQL no banco.'], 500);
+            return;
+        }
+
+        // Alvos efetivos: origem + (se nota única) combos em que o aluno está ativo.
+        $alvos = [[
+            'professor_id' => $pid,
+            'materia_id' => $mid,
+            'turma_id' => $tid,
+            'aluno_id' => $aid,
+        ]];
+        if ($notaUnicaTodasMaterias) {
+            foreach ($combos as $combo) {
+                $pidCombo = (int) ($combo['professor_id'] ?? 0);
+                $midCombo = (int) ($combo['materia_id'] ?? 0);
+                if ($midCombo <= 0) {
+                    continue;
+                }
+                $turmasCombo = array_values(array_filter(array_map(
+                    'intval',
+                    is_array($combo['turma_ids'] ?? null) ? $combo['turma_ids'] : []
+                )));
+                if ($turmasCombo === []) {
+                    continue;
+                }
+                $alunosCombo = $this->alunosAtivosPorTurmas($turmasCombo, $anoLetivo, $blocoId, $midCombo);
+                foreach ($alunosCombo as $alCombo) {
+                    if ((int) ($alCombo['id'] ?? 0) !== $aid || !empty($alCombo['transferido'])) {
+                        continue;
+                    }
+                    $tidCombo = (int) ($alCombo['turma_id'] ?? 0);
+                    if ($tidCombo <= 0) {
+                        continue;
+                    }
+                    $alvos[] = [
+                        'professor_id' => $pidCombo,
+                        'materia_id' => $midCombo,
+                        'turma_id' => $tidCombo,
+                        'aluno_id' => $aid,
+                    ];
+                }
+            }
+        }
+
+        $alvosUnicos = [];
+        foreach ($alvos as $alvo) {
+            $chaveAlvo = (int) $alvo['professor_id'] . ':' . (int) $alvo['materia_id'] . ':' . (int) $alvo['turma_id'] . ':' . (int) $alvo['aluno_id'];
+            $alvosUnicos[$chaveAlvo] = $alvo;
+        }
+        $alvos = array_values($alvosUnicos);
+
+        $existentes = $notasModel->fetchTodasNotasBlocoAdmin($blocoId);
+        $indexExistente = $this->indexarNotasLancadasBloco($existentes);
+        $precisaDesbloquear = false;
+        foreach ($alvos as $alvo) {
+            $antRaw = $this->buscarNotaLancadaIndex(
+                $indexExistente,
+                (int) $alvo['professor_id'],
+                (int) $alvo['materia_id'],
+                (int) $alvo['turma_id'],
+                (int) $alvo['aluno_id'],
+                false
+            );
+            if ($antRaw === null) {
+                continue;
+            }
+            $notaAnt = isset($antRaw['nota']) && $antRaw['nota'] !== null && $antRaw['nota'] !== ''
+                ? (float) $antRaw['nota']
+                : null;
+            if ($notaAnt === null) {
+                continue;
+            }
+            $obsAnt = trim((string) ($antRaw['observacao'] ?? ''));
+            $mudouNota = ($notaVal === null) || abs($notaAnt - $notaVal) > 0.0001;
+            $mudouObs = $obs !== $obsAnt;
+            if ($mudouNota || $mudouObs) {
+                $precisaDesbloquear = true;
+                break;
+            }
+        }
+        if ($precisaDesbloquear && !$this->sessaoDesbloqueioLancamentoValida($blocoId)) {
+            $this->json([
+                'success' => false,
+                'precisa_desbloquear' => true,
+                'message' => 'Para alterar notas já lançadas, desbloqueie a edição com sua senha.',
+            ], 423);
+            return;
+        }
+
+        $usuarioId = (int) ($user['id'] ?? 0);
+        try {
+            $porProfessorMateria = [];
+            foreach ($alvos as $alvo) {
+                $chavePm = (int) $alvo['professor_id'] . ':' . (int) $alvo['materia_id'];
+                if (!isset($porProfessorMateria[$chavePm])) {
+                    $porProfessorMateria[$chavePm] = [
+                        'professor_id' => (int) $alvo['professor_id'],
+                        'materia_id' => (int) $alvo['materia_id'],
+                        'linhas' => [],
+                    ];
+                }
+                $porProfessorMateria[$chavePm]['linhas'][] = [
+                    'turma_id' => (int) $alvo['turma_id'],
+                    'aluno_id' => (int) $alvo['aluno_id'],
+                    'nota' => $notaVal,
+                    'observacao' => $obs,
+                ];
+            }
+            foreach ($porProfessorMateria as $grupo) {
+                $notasModel->upsertLinhas(
+                    $blocoId,
+                    (int) $grupo['professor_id'],
+                    (int) $grupo['materia_id'],
+                    $grupo['linhas'],
+                    $usuarioId
+                );
+            }
+        } catch (\RuntimeException $e) {
+            $this->json(['success' => false, 'message' => $e->getMessage()], 409);
+            return;
+        }
+
+        $this->json([
+            'success' => true,
+            'message' => $notaUnicaTodasMaterias
+                ? 'Nota salva e replicada para todas as matérias.'
+                : 'Nota salva.',
+            'nota' => $notaVal,
+            'observacao' => $obs,
+        ]);
+    }
+
+    /**
      * Monta o relatório completo do evento de lançamento (com e sem nota),
      * incluindo transferidos e filtros da tela.
      *
