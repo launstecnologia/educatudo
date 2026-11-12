@@ -505,7 +505,17 @@ class EventoAvaliativoAdminController extends AdminBaseController
 
     public function mover($id): void
     {
-        if (!$this->permitido('alterar') || !$this->exigirSchema()) {
+        $ajax = $this->pedidoAjaxMover();
+        if ($ajax) {
+            if (!$this->permitido('alterar', true)) {
+                $this->json(['ok' => false, 'erro' => 'Sem permissão.'], 403);
+                return;
+            }
+            if (!$this->service->model()->tabelasProntas()) {
+                $this->json(['ok' => false, 'erro' => 'Módulo ainda não está pronto nesta escola.'], 422);
+                return;
+            }
+        } elseif (!$this->permitido('alterar') || !$this->exigirSchema()) {
             return;
         }
         $id = (int) $id;
@@ -518,11 +528,23 @@ class EventoAvaliativoAdminController extends AdminBaseController
                 (int) ($_POST['regra'] ?? 0)
             );
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            if ($ajax) {
+                $this->json(['ok' => false, 'erro' => 'Token inválido. Tente novamente.'], 419);
+                return;
+            }
             $this->setFlashMessage('Token inválido. Tente novamente.', 'error');
             $this->redirect($voltar);
             return;
         }
         $res = $this->service->reposicionarEvento($id, (string) ($_POST['direcao'] ?? ''));
+        if ($ajax) {
+            if (empty($res['success'])) {
+                $this->json(['ok' => false, 'erro' => (string) ($res['error'] ?? 'Não foi possível reposicionar o evento.')], 422);
+                return;
+            }
+            $this->json(['ok' => true]);
+            return;
+        }
         if (empty($res['success'])) {
             $this->setFlashMessage((string) ($res['error'] ?? 'Não foi possível reposicionar o evento.'), 'error');
         }
@@ -531,7 +553,17 @@ class EventoAvaliativoAdminController extends AdminBaseController
 
     public function moverSubevento($id, $blocoId): void
     {
-        if (!$this->permitido('alterar') || !$this->exigirSchema()) {
+        $ajax = $this->pedidoAjaxMover();
+        if ($ajax) {
+            if (!$this->permitido('alterar', true)) {
+                $this->json(['ok' => false, 'erro' => 'Sem permissão.'], 403);
+                return;
+            }
+            if (!$this->service->model()->tabelasProntas()) {
+                $this->json(['ok' => false, 'erro' => 'Módulo ainda não está pronto nesta escola.'], 422);
+                return;
+            }
+        } elseif (!$this->permitido('alterar') || !$this->exigirSchema()) {
             return;
         }
         $id = (int) $id;
@@ -545,15 +577,36 @@ class EventoAvaliativoAdminController extends AdminBaseController
                 (int) ($_POST['regra'] ?? 0)
             );
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            if ($ajax) {
+                $this->json(['ok' => false, 'erro' => 'Token inválido. Tente novamente.'], 419);
+                return;
+            }
             $this->setFlashMessage('Token inválido. Tente novamente.', 'error');
             $this->redirect($voltar);
             return;
         }
         $res = $this->service->reposicionarSubevento($id, $blocoId, (string) ($_POST['direcao'] ?? ''));
+        if ($ajax) {
+            if (empty($res['success'])) {
+                $this->json(['ok' => false, 'erro' => (string) ($res['error'] ?? 'Não foi possível reposicionar o subevento.')], 422);
+                return;
+            }
+            $this->json(['ok' => true]);
+            return;
+        }
         if (empty($res['success'])) {
             $this->setFlashMessage((string) ($res['error'] ?? 'Não foi possível reposicionar o subevento.'), 'error');
         }
         $this->redirect($voltar . '#evento-' . $id);
+    }
+
+    private function pedidoAjaxMover(): bool
+    {
+        if ($this->isAjaxRequest()) {
+            return true;
+        }
+        $accept = strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? ''));
+        return str_contains($accept, 'application/json');
     }
 
     public function excluir($id): void

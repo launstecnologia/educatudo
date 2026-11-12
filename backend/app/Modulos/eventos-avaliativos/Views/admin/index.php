@@ -168,23 +168,27 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
              class="overflow-hidden rounded-xl border bg-white shadow-sm <?= $rascunho ? 'border-amber-300' : 'border-gray-200' ?>">
         <div class="flex flex-wrap items-center gap-4 px-4 py-4 sm:px-5">
             <?php if ($podeAlterar): ?>
-            <div class="flex shrink-0 flex-col gap-1">
-                <form method="POST" action="<?= URL ?>/admin/eventos-avaliativos/<?= $eventoId ?>/mover">
-                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>">
-                    <input type="hidden" name="regra" value="<?= $regraId ?>">
-                    <input type="hidden" name="direcao" value="cima">
-                    <button type="submit" class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40" <?= $indiceEvento === 0 ? 'disabled' : '' ?> title="Mover evento para cima" aria-label="Mover evento para cima">
-                        <i class="fa-solid fa-chevron-up text-xs" aria-hidden="true"></i>
-                    </button>
-                </form>
-                <form method="POST" action="<?= URL ?>/admin/eventos-avaliativos/<?= $eventoId ?>/mover">
-                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>">
-                    <input type="hidden" name="regra" value="<?= $regraId ?>">
-                    <input type="hidden" name="direcao" value="baixo">
-                    <button type="submit" class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40" <?= $indiceEvento >= count($itens) - 1 ? 'disabled' : '' ?> title="Mover evento para baixo" aria-label="Mover evento para baixo">
-                        <i class="fa-solid fa-chevron-down text-xs" aria-hidden="true"></i>
-                    </button>
-                </form>
+            <div class="flex shrink-0 flex-col gap-1" data-mover-grupo="evento">
+                <button type="button"
+                        data-mover="evento"
+                        data-direcao="cima"
+                        data-url="<?= URL ?>/admin/eventos-avaliativos/<?= $eventoId ?>/mover"
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        <?= $indiceEvento === 0 ? 'disabled' : '' ?>
+                        title="Mover evento para cima"
+                        aria-label="Mover evento para cima">
+                    <i class="fa-solid fa-chevron-up text-xs" aria-hidden="true"></i>
+                </button>
+                <button type="button"
+                        data-mover="evento"
+                        data-direcao="baixo"
+                        data-url="<?= URL ?>/admin/eventos-avaliativos/<?= $eventoId ?>/mover"
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        <?= $indiceEvento >= count($itens) - 1 ? 'disabled' : '' ?>
+                        title="Mover evento para baixo"
+                        aria-label="Mover evento para baixo">
+                    <i class="fa-solid fa-chevron-down text-xs" aria-hidden="true"></i>
+                </button>
             </div>
             <?php endif; ?>
             <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl <?= $tom['caixa'] ?>">
@@ -288,29 +292,33 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                         <tr class="hover:bg-gray-50">
                             <td class="whitespace-nowrap px-4 py-3">
                                 <?php if ($podeAlterar): ?>
-                                <div class="inline-flex items-center gap-1">
-                                    <form method="POST" action="<?= URL ?>/admin/eventos-avaliativos/<?= $eventoId ?>/subeventos/<?= $blocoId ?>/mover">
-                                        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>">
-                                        <input type="hidden" name="regra" value="<?= $regraId ?>">
-                                        <input type="hidden" name="direcao" value="cima">
-                                        <button type="submit" class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40" <?= $indiceSub === 0 ? 'disabled' : '' ?> title="Mover subevento para cima" aria-label="Mover subevento para cima">
-                                            <i class="fa-solid fa-chevron-up text-[10px]" aria-hidden="true"></i>
-                                        </button>
-                                    </form>
-                                    <form method="POST" action="<?= URL ?>/admin/eventos-avaliativos/<?= $eventoId ?>/subeventos/<?= $blocoId ?>/mover">
-                                        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>">
-                                        <input type="hidden" name="regra" value="<?= $regraId ?>">
-                                        <input type="hidden" name="direcao" value="baixo">
-                                        <button type="submit" class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40" <?= $indiceSub >= count($subeventos) - 1 ? 'disabled' : '' ?> title="Mover subevento para baixo" aria-label="Mover subevento para baixo">
-                                            <i class="fa-solid fa-chevron-down text-[10px]" aria-hidden="true"></i>
-                                        </button>
-                                    </form>
+                                <div class="inline-flex items-center gap-1" data-mover-grupo="subevento">
+                                    <button type="button"
+                                            data-mover="subevento"
+                                            data-direcao="cima"
+                                            data-url="<?= URL ?>/admin/eventos-avaliativos/<?= $eventoId ?>/subeventos/<?= $blocoId ?>/mover"
+                                            class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                            <?= $indiceSub === 0 ? 'disabled' : '' ?>
+                                            title="Mover subevento para cima"
+                                            aria-label="Mover subevento para cima">
+                                        <i class="fa-solid fa-chevron-up text-[10px]" aria-hidden="true"></i>
+                                    </button>
+                                    <button type="button"
+                                            data-mover="subevento"
+                                            data-direcao="baixo"
+                                            data-url="<?= URL ?>/admin/eventos-avaliativos/<?= $eventoId ?>/subeventos/<?= $blocoId ?>/mover"
+                                            class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                            <?= $indiceSub >= count($subeventos) - 1 ? 'disabled' : '' ?>
+                                            title="Mover subevento para baixo"
+                                            aria-label="Mover subevento para baixo">
+                                        <i class="fa-solid fa-chevron-down text-[10px]" aria-hidden="true"></i>
+                                    </button>
                                 </div>
                                 <?php else: ?>
                                 <span class="text-sm text-gray-400">—</span>
                                 <?php endif; ?>
                             </td>
-                            <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500"><?= $eventoId ?>.<?= $indiceSub + 1 ?></td>
+                            <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500" data-sub-ref><?= $eventoId ?>.<?= $indiceSub + 1 ?></td>
                             <td class="px-4 py-3 text-sm font-medium text-gray-900"><?= htmlspecialchars($tituloSub) ?></td>
                             <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-700">
                                 <?php if ($dataSub !== ''): ?>
@@ -554,6 +562,10 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
 </script>
 <?php endif; ?>
 
+<?php if ($podeAlterar): ?>
+<div id="eventos-ordem-toast" class="pointer-events-none fixed bottom-4 right-4 z-50 hidden rounded-lg bg-slate-900 px-3 py-2 text-sm text-white shadow-lg" role="status" aria-live="polite"></div>
+<?php endif; ?>
+
 <script>
 (function () {
     var campo = document.getElementById('eventos-busca');
@@ -561,6 +573,12 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
     var contagem = document.getElementById('eventos-contagem');
     var vazio = document.getElementById('eventos-vazio-busca');
     if (!lista) return;
+
+    var csrf = <?= json_encode($csrf_token, JSON_UNESCAPED_UNICODE) ?>;
+    var regraId = <?= (int) $regraId ?>;
+    var salvando = false;
+    var toast = document.getElementById('eventos-ordem-toast');
+    var toastTimer = null;
 
     function cards() {
         return Array.prototype.slice.call(lista.querySelectorAll('[data-evento-card]'));
@@ -577,11 +595,136 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
         });
     }
 
+    function mostrarToast(msg, erro) {
+        if (!toast) return;
+        toast.textContent = msg;
+        toast.classList.toggle('bg-red-700', !!erro);
+        toast.classList.toggle('bg-slate-900', !erro);
+        toast.classList.remove('hidden');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { toast.classList.add('hidden'); }, erro ? 3500 : 1600);
+    }
+
+    function atualizarBotoesEvento() {
+        var itens = cards();
+        itens.forEach(function (card, i) {
+            var cima = card.querySelector('[data-mover="evento"][data-direcao="cima"]');
+            var baixo = card.querySelector('[data-mover="evento"][data-direcao="baixo"]');
+            if (cima) cima.disabled = i === 0;
+            if (baixo) baixo.disabled = i >= itens.length - 1;
+        });
+    }
+
+    function atualizarRefsSub(card) {
+        var eventoId = String(card.id || '').replace(/^evento-/, '');
+        var linhas = Array.prototype.slice.call(card.querySelectorAll('tbody tr'));
+        linhas.forEach(function (tr, i) {
+            var ref = tr.querySelector('[data-sub-ref]');
+            if (ref) ref.textContent = eventoId + '.' + (i + 1);
+            var cima = tr.querySelector('[data-mover="subevento"][data-direcao="cima"]');
+            var baixo = tr.querySelector('[data-mover="subevento"][data-direcao="baixo"]');
+            if (cima) cima.disabled = i === 0;
+            if (baixo) baixo.disabled = i >= linhas.length - 1;
+        });
+    }
+
+    function trocarNos(atual, vizinho, paraCima) {
+        var pai = atual.parentNode;
+        if (!pai || !vizinho) return false;
+        if (paraCima) {
+            pai.insertBefore(atual, vizinho);
+        } else {
+            pai.insertBefore(vizinho, atual);
+        }
+        return true;
+    }
+
+    function salvarOrdem(url, direcao) {
+        var body = new FormData();
+        body.append('_token', csrf);
+        body.append('regra', String(regraId));
+        body.append('direcao', direcao);
+        return fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            body: body,
+            credentials: 'same-origin'
+        }).then(function (resp) {
+            return resp.json().catch(function () { return {}; }).then(function (data) {
+                if (!resp.ok || !data || !data.ok) {
+                    throw new Error((data && data.erro) || 'Não foi possível salvar a ordem.');
+                }
+                return data;
+            });
+        });
+    }
+
     lista.addEventListener('click', function (evento) {
+        var botaoMover = evento.target.closest('[data-mover]');
+        if (botaoMover && lista.contains(botaoMover)) {
+            evento.preventDefault();
+            if (salvando || botaoMover.disabled) return;
+
+            var tipo = botaoMover.getAttribute('data-mover');
+            var direcao = botaoMover.getAttribute('data-direcao');
+            var url = botaoMover.getAttribute('data-url');
+            var paraCima = direcao === 'cima';
+            if (!url || (direcao !== 'cima' && direcao !== 'baixo')) return;
+
+            var atual = null;
+            var vizinho = null;
+            var card = null;
+
+            if (tipo === 'evento') {
+                atual = botaoMover.closest('[data-evento-card]');
+                if (!atual) return;
+                vizinho = paraCima ? atual.previousElementSibling : atual.nextElementSibling;
+                while (vizinho && !vizinho.hasAttribute('data-evento-card')) {
+                    vizinho = paraCima ? vizinho.previousElementSibling : vizinho.nextElementSibling;
+                }
+            } else {
+                atual = botaoMover.closest('tr');
+                card = botaoMover.closest('[data-evento-card]');
+                if (!atual || !card) return;
+                vizinho = paraCima ? atual.previousElementSibling : atual.nextElementSibling;
+            }
+
+            if (!atual || !vizinho) return;
+            if (!trocarNos(atual, vizinho, paraCima)) return;
+
+            if (tipo === 'evento') {
+                atualizarBotoesEvento();
+            } else {
+                atualizarRefsSub(card);
+            }
+
+            salvando = true;
+            lista.setAttribute('aria-busy', 'true');
+            salvarOrdem(url, direcao).then(function () {
+                mostrarToast('Ordem salva');
+            }).catch(function (err) {
+                // Desfaz a troca visual se o servidor falhar
+                trocarNos(atual, vizinho, !paraCima);
+                if (tipo === 'evento') {
+                    atualizarBotoesEvento();
+                } else if (card) {
+                    atualizarRefsSub(card);
+                }
+                mostrarToast(err && err.message ? err.message : 'Não foi possível salvar a ordem.', true);
+            }).finally(function () {
+                salvando = false;
+                lista.removeAttribute('aria-busy');
+            });
+            return;
+        }
+
         var botao = evento.target.closest('[data-evento-toggle]');
         if (!botao || !lista.contains(botao)) return;
-        var card = botao.closest('[data-evento-card]');
-        var corpo = card ? card.querySelector('[data-evento-corpo]') : null;
+        var cardToggle = botao.closest('[data-evento-card]');
+        var corpo = cardToggle ? cardToggle.querySelector('[data-evento-corpo]') : null;
         if (!corpo) return;
         var abrir = corpo.classList.contains('hidden');
         corpo.classList.toggle('hidden', !abrir);
