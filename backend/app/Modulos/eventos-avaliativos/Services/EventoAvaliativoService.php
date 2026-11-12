@@ -11,6 +11,7 @@ use App\Modulos\GruposRegrasNotas\Services\GrupoRegrasNotasService;
 use App\Modulos\Provas\Models\ExamBlock;
 use App\Modulos\Provas\Models\ExamEvaluationType;
 use App\Modulos\RegrasAcademicas\Models\RecuperacaoConfig;
+use App\Modulos\RegrasAcademicas\Models\RegraAcademica;
 use App\Modulos\RegrasAcademicas\Services\EscalaNota;
 use App\Modulos\RegrasAcademicas\Services\TipoNotaRegraService;
 use Throwable;
@@ -40,7 +41,7 @@ class EventoAvaliativoService
     /**
      * @return array{professores:list<array<string,mixed>>,materias:list<array<string,mixed>>,turmas:list<array<string,mixed>>,periodo:array<string,mixed>}
      */
-    public function catalogoFormulario(int $ano): array
+    public function catalogoFormulario(int $ano, int $regraId = 0, array $manterTurmaIds = []): array
     {
         $professores = $this->db->fetchAll(
             'SELECT id, nome, materias FROM professores WHERE ativo = 1 ORDER BY nome ASC'
@@ -65,12 +66,14 @@ class EventoAvaliativoService
             $materias[$i]['pai_id'] = $paiId;
             $materias[$i]['pai_nome'] = $paiId > 0 ? (string) ($nomesPai[$paiId] ?? '') : '';
         }
+        [$filtroEscopo, $paramsEscopo] = $this->filtroTurmasDaRegra($regraId, $manterTurmaIds);
         $turmas = $this->db->fetchAll(
             'SELECT t.id, t.nome, t.tipo_ensino, t.serie_id, COALESCE(NULLIF(s.nome, \'\'), NULLIF(t.serie, \'\')) AS serie
              FROM turmas t
              LEFT JOIN serie s ON s.id = t.serie_id
-             WHERE t.ativo = 1
-             ORDER BY t.nome ASC'
+             WHERE t.ativo = 1' . $filtroEscopo . '
+             ORDER BY t.nome ASC',
+            $paramsEscopo
         ) ?: [];
 
         return [
@@ -79,6 +82,124 @@ class EventoAvaliativoService
             'turmas' => $turmas,
             'periodo' => PeriodoLetivo::doAno($ano > 0 ? $ano : (int) date('Y')),
         ];
+    }
+
+    /**
+     * Restringe as turmas ao escopo (séries / curso) da regra de aprovação.
+     * Regra inexistente ou sem série e sem curso: sem restrição.
+     *
+     * Turmas em $manterTurmaIds (já vinculadas ao evento em edição) continuam listadas.
+     *
+     * @param list<int> $manterTurmaIds
+     * @return array{0:string,1:array<string,int>} fragmento SQL (começa com " AND ") e parâmetros nomeados
+     */
+    private function filtroTurmasDaRegra(int $regraId, array $manterTurmaIds = []): array
+    {
+        [$sql, $params] = $this->escopoTurmasDaRegra($regraId);
+        if ($sql === '') {
+            return ['', []];
+        }
+        $manter = [];
+        foreach ($manterTurmaIds as $i => $turmaId) {
+            $turmaId = (int) $turmaId;
+            if ($turmaId > 0) {
+                $chave = 'manter_turma_' . $i;
+                $manter[] = ':' . $chave;
+                $params[$chave] = $turmaId;
+            }
+        }
+        if ($manter !== []) {
+            $sql = ' AND (' . substr($sql, 5) . ' OR t.id IN (' . implode(', ', $manter) . '))';
+        }
+
+        return [$sql, $params];
+    }
+
+    /**
+     * @return array{0:string,1:array<string,int>}
+     */
+    private function escopoTurmasDaRegra(int $regraId): array
+    {
+        if ($regraId <= 0) {
+            return ['', []];
+        }
+        try {
+            $modelo = new RegraAcademica();
+            $regra = $modelo->findById($regraId);
+            if ($regra === null) {
+                return ['', []];
+            }
+            $series = $modelo->listarSeriesIds($regraId);
+            if ($series === [] && (int) ($regra['serie_id'] ?? 0) > 0) {
+                $series = [(int) $regra['serie_id']];
+            }
+            $cursoId = (int) ($regra['curso_id'] ?? 0);
+        } catch (Throwable $e) {
+            error_log('EventoAvaliativoService::escopoTurmasDaRegra: ' . $e->getMessage());
+            return ['', []];
+        }
+
+        if ($series !== []) {
+            $marcadores = [];
+            $params = [];
+            foreach (array_values($series) as $i => $serieId) {
+                $chave = 'escopo_serie_' . $i;
+                $marcadores[] = ':' . $chave;
+                $params[$chave] = (int) $serieId;
+            }
+            return [' AND t.serie_id IN (' . implode(', ', $marcadores) . ')', $params];
+        }
+        if ($cursoId > 0) {
+            return [
+                ' AND (t.serie_id IN (SELECT id FROM serie WHERE curso_id = :escopo_curso_serie)'
+                . ' OR t.curso_novo_id = :escopo_curso_turma)',
+                ['escopo_curso_serie' => $cursoId, 'escopo_curso_turma' => $cursoId],
+            ];
+        }
+
+        return ['', []];
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function turmasDoEvento(int $eventoId): array
+    {
+        $rows = $this->db->fetchAll(
+            'SELECT DISTINCT pbt.turma_id
+               FROM provas_blocos_turmas pbt
+               INNER JOIN provas_blocos pb ON pb.id = pbt.bloco_id
+              WHERE pb.evento_avaliativo_id = :id AND pb.deleted_at IS NULL',
+            ['id' => $eventoId]
+        ) ?: [];
+        $ids = [];
+        foreach ($rows as $row) {
+            $turmaId = (int) ($row['turma_id'] ?? 0);
+            if ($turmaId > 0) {
+                $ids[] = $turmaId;
+            }
+        }
+        return $ids;
+    }
+
+    /**
+     * Mantém só as turmas do catálogo; as já vinculadas ao evento (edição) continuam aceitas.
+     *
+     * @param list<int> $turmaIds
+     * @param list<array<string,mixed>> $turmasCatalogo
+     * @param list<int> $jaVinculadas
+     * @return list<int>
+     */
+    private function turmasForaDoEscopo(array $turmaIds, array $turmasCatalogo, array $jaVinculadas = []): array
+    {
+        $aceitas = [];
+        foreach ($turmasCatalogo as $turma) {
+            $aceitas[(int) ($turma['id'] ?? 0)] = true;
+        }
+        foreach ($jaVinculadas as $turmaId) {
+            $aceitas[(int) $turmaId] = true;
+        }
+        return array_values(array_filter($turmaIds, static fn (int $id): bool => !isset($aceitas[$id])));
     }
 
     /**
@@ -203,7 +324,11 @@ class EventoAvaliativoService
             return ['success' => false, 'error' => 'Selecione pelo menos uma turma.'];
         }
 
-        $catalogo = $this->catalogoFormulario($ano);
+        $catalogo = $this->catalogoFormulario($ano, $regraId);
+        $foraDoEscopo = $this->turmasForaDoEscopo($turmaIds, $catalogo['turmas'], []);
+        if ($foraDoEscopo !== []) {
+            return ['success' => false, 'error' => 'Há turmas selecionadas fora do escopo da regra de aprovação. Atualize a página e escolha apenas as turmas listadas.'];
+        }
         $professoresValidos = [];
         foreach ($catalogo['professores'] as $professor) {
             $professoresValidos[(int) ($professor['id'] ?? 0)] = true;
@@ -742,7 +867,12 @@ class EventoAvaliativoService
             return ['success' => false, 'error' => 'Selecione pelo menos uma turma.'];
         }
 
-        $catalogo = $this->catalogoFormulario($ano);
+        $regraId = (int) ($post['regra'] ?? $post['regra_id'] ?? 0);
+        $catalogo = $this->catalogoFormulario($ano, $regraId);
+        $foraDoEscopo = $this->turmasForaDoEscopo($turmaIds, $catalogo['turmas'], $this->turmasDoEvento($id));
+        if ($foraDoEscopo !== []) {
+            return ['success' => false, 'error' => 'Há turmas selecionadas fora do escopo da regra de aprovação. Atualize a página e escolha apenas as turmas listadas.'];
+        }
         $professoresValidos = [];
         foreach ($catalogo['professores'] as $professor) {
             $professoresValidos[(int) ($professor['id'] ?? 0)] = true;

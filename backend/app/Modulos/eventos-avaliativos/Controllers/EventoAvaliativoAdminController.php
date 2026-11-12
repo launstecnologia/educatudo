@@ -200,7 +200,7 @@ class EventoAvaliativoAdminController extends AdminBaseController
             $periodoNum = 1;
         }
         try {
-            $catalogo = $this->service->catalogoFormulario($ano);
+            $catalogo = $this->service->catalogoFormulario($ano, $regraId);
         } catch (\Throwable $e) {
             error_log('EventoAvaliativoAdminController::criar catalogoFormulario: ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
             $this->setFlashMessage('Não foi possível carregar professores, matérias e turmas. Tente novamente.', 'error');
@@ -356,7 +356,7 @@ class EventoAvaliativoAdminController extends AdminBaseController
         }
         $ano = (int) ($edicao['ano_letivo'] ?? date('Y'));
         $regraId = (int) ($_GET['regra'] ?? 0);
-        $catalogo = $this->service->catalogoFormulario($ano);
+        $catalogo = $this->service->catalogoFormulario($ano, $regraId, (array) ($edicao['turmas'] ?? []));
         $materiasEvento = [];
         foreach ((array) ($edicao['pares'] ?? []) as $par) {
             $mid = (int) ($par['materia_id'] ?? 0);
