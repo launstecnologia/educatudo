@@ -86,6 +86,9 @@ class ProvasAlunoAssistenteService
             return ['success' => false, 'error' => 'Mensagem muito longa (máx. 4000 caracteres).'];
         }
 
+        // Clique "Selecionar" no painel: nunca trate o id como RA; retome o pedido anterior.
+        $mensagemUsuario = $this->reescreverSelecaoAluno($mensagemUsuario, $historico);
+
         try {
             $this->assertCreditosDisponiveis();
         } catch (\Throwable $e) {
@@ -402,6 +405,12 @@ class ProvasAlunoAssistenteService
 
             case 'notas_evento_aluno':
                 return $this->ampliada->notasEventoAluno($args);
+
+            case 'nota_evento_sigla':
+                return $this->ampliada->notaEventoPorSigla($args);
+
+            case 'listar_eventos_avaliativos':
+                return $this->ampliada->listarEventosAvaliativos($args);
 
             case 'faltas_aluno':
                 return $this->ampliada->faltasAluno($args);
@@ -884,6 +893,42 @@ class ProvasAlunoAssistenteService
                 ],
             ];
         }
+        if ($tool === 'nota_evento_sigla' && !empty($resultado['candidatos_eventos_sigla'])) {
+            return [
+                'tipo' => 'candidatos_eventos_sigla',
+                'aluno' => $resultado['aluno'] ?? null,
+                'aviso' => $resultado['aviso'] ?? 'Escolha o evento pela sigla:',
+                'candidatos' => $resultado['candidatos_eventos_sigla'],
+            ];
+        }
+        if ($tool === 'nota_evento_sigla' && !empty($resultado['eventos_disponiveis']) && empty($resultado['ok'])) {
+            return [
+                'tipo' => 'eventos_avaliativos_disponiveis',
+                'aluno' => $resultado['aluno'] ?? null,
+                'aviso' => $resultado['error'] ?? 'Eventos avaliativos desta escola:',
+                'candidatos' => $resultado['eventos_disponiveis'],
+            ];
+        }
+        if ($tool === 'listar_eventos_avaliativos' && !empty($resultado['ok'])) {
+            return [
+                'tipo' => 'eventos_avaliativos_disponiveis',
+                'aviso' => 'Eventos avaliativos cadastrados nesta escola:',
+                'candidatos' => $resultado['eventos'] ?? [],
+                'ano_letivo' => $resultado['ano_letivo'] ?? null,
+            ];
+        }
+        if ($tool === 'nota_evento_sigla' && !empty($resultado['ok'])) {
+            return [
+                'tipo' => 'nota_evento_sigla',
+                'formato' => $resultado['formato'] ?? 'nota_unica',
+                'aluno' => $resultado['aluno'] ?? null,
+                'evento' => $resultado['evento'] ?? null,
+                'materia' => $resultado['materia'] ?? null,
+                'nota' => $resultado['nota'] ?? null,
+                'notas' => $resultado['notas'] ?? [],
+                'aviso' => $resultado['aviso'] ?? null,
+            ];
+        }
         if ($tool === 'notas_evento_aluno' && !empty($resultado['candidatos_eventos'])) {
             return [
                 'tipo' => 'candidatos_eventos',
@@ -949,6 +994,18 @@ class ProvasAlunoAssistenteService
             $tiposResumo[] = ['id' => $t['id'], 'nome' => $t['nome']];
         }
 
+        $eventosCat = $this->ampliada->listarEventosAvaliativos([]);
+        $eventosResumo = [];
+        foreach (array_slice($eventosCat['eventos'] ?? [], 0, 40) as $ev) {
+            $eventosResumo[] = [
+                'id' => (int) ($ev['id'] ?? 0),
+                'sigla' => (string) ($ev['sigla'] ?? ''),
+                'nome' => (string) ($ev['nome'] ?? ''),
+                'bimestre' => $ev['bimestre'] ?? null,
+                'ano_letivo' => $ev['ano_letivo'] ?? null,
+            ];
+        }
+
         return <<<PROMPT
 Você é o Assistente da EducaTudo (coordenação/direção).
 
@@ -959,7 +1016,7 @@ Regras importantes:
 2) Se citar turma (ex.: "2 Ano B", "2ªB"), SEMPRE passe args.turma / turma_nome (separado do nome).
 3) NUNCA peça confirmação antes de consultar. Chame a tool primeiro. Se houver 1 aluno, use-o; se houver vários, mostre candidatos.
 4) termo/aluno_nome = só o nome (ex.: "Maria Clara" = nome + sobrenome com LIKE %%token%%), NUNCA junte turma no nome ("Maria Clara do 2 Ano B" está errado).
-5) Se o usuário informar RA/matrícula (ex.: "RA 24254"), passe args.ra só com os dígitos ("24254"). Não misture "ra", "ano" ou turma no mesmo campo.
+5) Se o usuário informar RA/matrícula (ex.: "RA 24254"), passe args.ra só com os dígitos ("24254"). NUNCA use aluno_id como RA. Se a mensagem trouxer aluno_id=76, passe args.aluno_id=76 (inteiro) — não chame buscar_alunos de novo.
 6) Ano letivo (ex.: 2024) vai em args.ano_letivo / args.ano, nunca dentro de aluno_nome ou ra.
 7) Pedido sobre ALUNO + provas → resumo_provas_aluno ou listar_provas_aluno (última prova = listar e pegar a mais recente).
 8) Pedido sobre ALUNO + jornadas → resumo_jornadas_aluno.
@@ -970,13 +1027,14 @@ Regras importantes:
 13) Pedido de PERFIL 360 / visão geral de um aluno → perfil_aluno_360.
 14) Pedido de DIÁRIO atrasado / pendências de diário → diario_pendencias.
 15) Pedido de GRADE HORÁRIA / "qual aula hoje" → grade_horaria_consulta.
-16) Pedido de BOLETIM completo → boletim_aluno. Pedido de UMA NOTA de matéria (ex.: "nota de matemática da Júlia") → notas_evento_aluno com materia="Matemática" (e bimestre/coluna se souber); se precisar do quadro, use boletim_aluno e responda só a célula pedida.
-17) Pedido de NOTAS DE EVENTO / demonstrativo / "PP do 1º bimestre" / "MU do 2º" → notas_evento_aluno (passe bimestre e/ou coluna e/ou materia).
+16) Pedido de BOLETIM completo → boletim_aluno. Pedido de UMA NOTA de matéria no boletim (ex.: "nota de matemática da Júlia") → notas_evento_aluno com materia="Matemática" (e bimestre/coluna se souber).
+17) Pedido de nota de avaliação/prova por SIGLA ou NOME (ex.: "PB", "prova bimestral", "PO de matemática") → nota_evento_sigla. Compare SEMPRE com o catálogo de Eventos Avaliativos desta escola (abaixo): use a sigla cadastrada em args.sigla OU o nome cadastrado em args.evento_nome / args.termo. NUNCA invente o significado da sigla (não diga que PO = "Prova Objetiva" se isso não estiver no cadastro). Se não souber qual evento, chame listar_eventos_avaliativos. Coluna do boletim (PP/PU/MU) → notas_evento_aluno.
 18) Frequência/presença/faltas (consulta) → faltas_aluno.
 19) CONSULTA de ocorrência/incidente de ALUNO → ocorrencias_aluno. Ocorrências da TURMA → ocorrencias_turma. NUNCA use faltas_aluno para ocorrência.
 20) Detalhe de questão → detalhar_prova_aluno com somente_erros=true.
 21) RESPOSTA ASSERTIVA (obrigatório): responda EXATAMENTE o que foi pedido, em 1–2 frases, com o valor em destaque markdown (**10**). Exemplos:
-    - "qual a nota de matemática da Júlia Martiz do 2B?" → "**A nota de Matemática da Júlia Martiz (2ª B) é 10.**"
+    - "qual a nota de matemática da Júlia Martiz do 2B?" → "A nota de Matemática da Júlia Martiz (2ª B) é **10**."
+    - "nota da Aline na PB de matemática" → use a sigla/nome cadastrados; "A nota da PB de Matemática da Aline … é **8,5**."
     - "boletim do João" → "**Boletim do João Silva (1ª A) — 2026.** O quadro completo está abaixo; use o botão para baixar o PDF."
     - "quantas faltas tem a Ana?" → "**Ana Souza tem 4 faltas (frequência 92%).**"
     NÃO enrole, NÃO invente opções extras, NÃO diga "segue um resumo" se o pedido era um número/nota.
@@ -1017,18 +1075,22 @@ Tools — turma / bloco / diário / agenda / boletim / faltas / ocorrências:
 25) resultados_bloco — {"bloco_id":10} ou {"titulo":"Simulado 1"}
 26) perfil_aluno_360 — {"ra":"24254","ano_letivo":2024} — resumo geral do aluno
 27) boletim_aluno — {"ra":"24254","ano_letivo":2024} — quadro anual (PP/PU/CH/PE/MU por bimestre); a UI oferece PDF
-28) notas_evento_aluno — {"ra":"24254","materia":"Matemática","bimestre":2} ou {"coluna":"MU","bimestre":2} — nota/matéria/coluna específica
-29) faltas_aluno — {"ra":"24254","ano_letivo":2024} ou {"aluno_id":365} — frequência/presença (NÃO é ocorrência). Passe o mesmo ano_letivo da conversa.
-30) ocorrencias_aluno — {"ra":"24254","ano_letivo":2024} ou {"aluno_id":123,"status":"aberta"} — incidentes disciplinares
-31) ocorrencias_turma — {"turma_nome":"1A","status":"aberta"} ou {"turma_id":37} — incidentes da turma
+28) notas_evento_aluno — {"ra":"24254","materia":"Matemática","bimestre":2} ou {"coluna":"MU","bimestre":2} — nota/matéria/coluna do boletim/demonstrativo
+29) listar_eventos_avaliativos — {"ano_letivo":2026} ou {"termo":"bimestral"} — catálogo vivo (sigla+nome) desta escola
+30) nota_evento_sigla — {"aluno_id":76,"sigla":"PB","materia":"Matemática"} OU {"aluno_id":76,"evento_nome":"Prova Bimestral","materia":"Matemática"} OU {"termo":"prova bimestral","materia":"Matemática","aluno_id":76} — compara com Eventos Avaliativos cadastrados (sigla OU nome). Nunca invente sigla.
+31) faltas_aluno — {"ra":"24254","ano_letivo":2024} ou {"aluno_id":365} — frequência/presença (NÃO é ocorrência). Passe o mesmo ano_letivo da conversa.
+32) ocorrencias_aluno — {"ra":"24254","ano_letivo":2024} ou {"aluno_id":123,"status":"aberta"} — incidentes disciplinares
+33) ocorrencias_turma — {"turma_nome":"1A","status":"aberta"} ou {"turma_id":37} — incidentes da turma
 
 Tools — ações (só rascunho; o usuário confirma no botão):
-32) propor_criar_ocorrencia — {"alunos":["João Silva","Maria Souza"],"turma":"1A","titulo":"Conversa","detalhe":"...","nivel_gravidade":"leve","categoria_id":1,"enviar_pais":false} — N alunos ok; nome+sobrenome; push SÓ se o usuário pedir notificar pais (enviar_pais=true)
-33) propor_entrada_saida — {"aluno_nome":"João Silva","turma":"1A","tipo":"entrada","ocorrido_em":"2026-11-12 07:55"} ou tipo=saida
-34) propor_chamada_aula — {"aluno_nome":"João Silva","turma":"1A","situacao":"presente","data":"2026-11-12","materia":"Matemática"} ou {"diario_aula_id":10,"aluno_id":123,"situacao":"falta"}
+34) propor_criar_ocorrencia — {"alunos":["João Silva","Maria Souza"],"turma":"1A","titulo":"Conversa","detalhe":"...","nivel_gravidade":"leve","categoria_id":1,"enviar_pais":false} — N alunos ok; nome+sobrenome; push SÓ se o usuário pedir notificar pais (enviar_pais=true)
+35) propor_entrada_saida — {"aluno_nome":"João Silva","turma":"1A","tipo":"entrada","ocorrido_em":"2026-11-12 07:55"} ou tipo=saida
+36) propor_chamada_aula — {"aluno_nome":"João Silva","turma":"1A","situacao":"presente","data":"2026-11-12","materia":"Matemática"} ou {"diario_aula_id":10,"aluno_id":123,"situacao":"falta"}
 
-Tipos de avaliação (provas) desta escola:
+Eventos Avaliativos desta escola (fonte oficial — use só estes nomes/siglas):
 PROMPT
+            . json_encode($eventosResumo, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            . "\n\nTipos de avaliação (provas) desta escola:\n"
             . json_encode($tiposResumo, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
             . "\n\nQuando já tiver os dados, responda de forma ASSERTIVA e formatada (sem <<<CONSULTA>>>), destacando o valor pedido em **negrito**.";
     }
@@ -1180,6 +1242,209 @@ PROMPT
         ];
     }
 
+    /**
+     * @param list<array{role?:string,content?:string}> $historico
+     */
+    private function reescreverSelecaoAluno(string $mensagem, array $historico): string
+    {
+        if (preg_match('/^usar\s+evento(?:\s+avaliativo)?(?:\s+id)?\s+(\d+)\b/iu', $mensagem, $mEv) === 1) {
+            return $this->reescreverSelecaoEvento((int) $mEv[1], $mensagem, $historico);
+        }
+        if (preg_match('/^usar\s+aluno_id\s+(\d+)\b/iu', $mensagem, $m) !== 1) {
+            return $mensagem;
+        }
+        $alunoId = (int) $m[1];
+        $pedidoAnterior = $this->ultimoPedidoUsuario($historico, '/^usar\s+aluno_id\s+\d+/iu');
+        $evento = $this->extrairEventoAvaliativoDoTexto($pedidoAnterior !== '' ? $pedidoAnterior : $mensagem);
+        $materia = $this->extrairMateriaDaPergunta($pedidoAnterior !== '' ? $pedidoAnterior : $mensagem);
+
+        $parts = ['Aluno já escolhido: aluno_id=' . $alunoId . '.'];
+        $parts[] = 'NÃO chame buscar_alunos. NÃO use esse número como RA.';
+        if ($pedidoAnterior !== '') {
+            $parts[] = 'Retome o pedido original: «' . mb_substr($pedidoAnterior, 0, 400) . '».';
+        }
+        if ($evento !== null) {
+            $argsHint = [];
+            if (!empty($evento['sigla'])) {
+                $argsHint[] = 'sigla="' . $evento['sigla'] . '"';
+            }
+            if (!empty($evento['nome'])) {
+                $argsHint[] = 'evento_nome="' . $evento['nome'] . '"';
+            }
+            if (!empty($evento['id'])) {
+                $argsHint[] = 'evento_id=' . (int) $evento['id'];
+            }
+            $parts[] = 'Use nota_evento_sigla com ' . implode(', ', $argsHint)
+                . ($materia !== null ? ' e materia="' . $materia . '"' : '')
+                . ' e aluno_id=' . $alunoId . '. Responda com a nota, sem perguntar de novo.';
+        } elseif ($materia !== null) {
+            $parts[] = 'Consulte a nota de ' . $materia . ' com aluno_id=' . $alunoId . ' e responda direto.';
+        } else {
+            $parts[] = 'Continue a consulta pedida com aluno_id=' . $alunoId . ' imediatamente.';
+        }
+        return implode(' ', $parts);
+    }
+
+    /**
+     * @param list<array{role?:string,content?:string}> $historico
+     */
+    private function reescreverSelecaoEvento(int $eventoId, string $mensagem, array $historico): string
+    {
+        $pedidoAnterior = $this->ultimoPedidoUsuario(
+            $historico,
+            '/^usar\s+(?:aluno_id\s+\d+|evento(?:\s+avaliativo)?(?:\s+id)?\s+\d+)/iu'
+        );
+        $materia = $this->extrairMateriaDaPergunta($pedidoAnterior !== '' ? $pedidoAnterior : $mensagem);
+        $alunoId = 0;
+        if (preg_match('/aluno_id\s*=\s*(\d+)/i', $pedidoAnterior, $mA) === 1) {
+            $alunoId = (int) $mA[1];
+        } else {
+            foreach (array_reverse($historico) as $msg) {
+                $c = (string) ($msg['content'] ?? '');
+                if (preg_match('/aluno_id\s*=\s*(\d+)/i', $c, $mH) === 1) {
+                    $alunoId = (int) $mH[1];
+                    break;
+                }
+            }
+        }
+        $siglaMsg = '';
+        if (preg_match('/\bsigla\s+([A-Za-z0-9]{1,12})\b/u', $mensagem, $mS) === 1) {
+            $siglaMsg = strtoupper($mS[1]);
+        }
+
+        $parts = ['Evento avaliativo já escolhido: evento_id=' . $eventoId . '.'];
+        if ($siglaMsg !== '') {
+            $parts[] = 'sigla="' . $siglaMsg . '".';
+        }
+        if ($pedidoAnterior !== '') {
+            $parts[] = 'Retome o pedido original: «' . mb_substr($pedidoAnterior, 0, 400) . '».';
+        }
+        $parts[] = 'Use nota_evento_sigla com evento_id=' . $eventoId
+            . ($siglaMsg !== '' ? ' e sigla="' . $siglaMsg . '"' : '')
+            . ($materia !== null ? ' e materia="' . $materia . '"' : '')
+            . ($alunoId > 0 ? ' e aluno_id=' . $alunoId : '')
+            . '. Responda com a nota, sem perguntar de novo.';
+        return implode(' ', $parts);
+    }
+
+    /**
+     * @param list<array{role?:string,content?:string}> $historico
+     */
+    private function ultimoPedidoUsuario(array $historico, string $ignorarPadrao): string
+    {
+        foreach (array_reverse($historico) as $msg) {
+            if (($msg['role'] ?? '') !== 'user') {
+                continue;
+            }
+            $c = trim((string) ($msg['content'] ?? ''));
+            if ($c === '' || preg_match($ignorarPadrao, $c) === 1) {
+                continue;
+            }
+            return $c;
+        }
+        return '';
+    }
+
+    /**
+     * Compara o texto com Eventos Avaliativos cadastrados (sigla ou nome).
+     * Não usa lista fixa de siglas inventadas.
+     *
+     * @return array{id?:int,sigla?:string,nome?:string}|null
+     */
+    private function extrairEventoAvaliativoDoTexto(string $texto): ?array
+    {
+        $t = trim($texto);
+        if ($t === '') {
+            return null;
+        }
+
+        $catalogo = $this->ampliada->listarEventosAvaliativos([]);
+        $eventos = is_array($catalogo['eventos'] ?? null) ? $catalogo['eventos'] : [];
+        if ($eventos === []) {
+            return null;
+        }
+
+        $textoNorm = mb_strtolower($t, 'UTF-8');
+        $map = [
+            'á' => 'a', 'à' => 'a', 'â' => 'a', 'ã' => 'a',
+            'é' => 'e', 'ê' => 'e', 'í' => 'i',
+            'ó' => 'o', 'ô' => 'o', 'õ' => 'o',
+            'ú' => 'u', 'ü' => 'u', 'ç' => 'c',
+        ];
+        $textoNorm = strtr($textoNorm, $map);
+
+        $melhor = null;
+        $melhorScore = 0;
+        foreach ($eventos as $ev) {
+            $sigla = strtoupper(trim((string) ($ev['sigla'] ?? '')));
+            $nome = trim((string) ($ev['nome'] ?? ''));
+            $nomeNorm = strtr(mb_strtolower($nome, 'UTF-8'), $map);
+            $score = 0;
+
+            if ($sigla !== '' && preg_match('/\b' . preg_quote($sigla, '/') . '\b/iu', $t) === 1) {
+                $score = 100;
+            } elseif ($nomeNorm !== '' && $nomeNorm !== ' ' && str_contains($textoNorm, $nomeNorm)) {
+                $score = 90;
+            } elseif ($nomeNorm !== '') {
+                // tokens significativos do nome (ex.: "prova bimestral")
+                $tokens = array_values(array_filter(
+                    preg_split('/\s+/u', $nomeNorm) ?: [],
+                    static fn($tok) => mb_strlen($tok) >= 4
+                ));
+                if ($tokens !== []) {
+                    $achados = 0;
+                    foreach ($tokens as $tok) {
+                        if (str_contains($textoNorm, $tok)) {
+                            $achados++;
+                        }
+                    }
+                    if ($achados === count($tokens)) {
+                        $score = 80;
+                    } elseif ($achados > 0 && $achados >= (int) ceil(count($tokens) * 0.6)) {
+                        $score = 65;
+                    }
+                }
+            }
+
+            if ($score > $melhorScore) {
+                $melhorScore = $score;
+                $melhor = [
+                    'id' => (int) ($ev['id'] ?? 0),
+                    'sigla' => $sigla,
+                    'nome' => $nome,
+                ];
+            }
+        }
+
+        if ($melhor !== null && $melhorScore >= 65) {
+            return $melhor;
+        }
+
+        // Fallback: token curto no texto que bata exatamente com alguma sigla cadastrada.
+        if (preg_match_all('/\b([A-Za-z0-9]{1,12})\b/u', $t, $mm) === false) {
+            return null;
+        }
+        $siglasCadastro = [];
+        foreach ($eventos as $ev) {
+            $s = strtoupper(trim((string) ($ev['sigla'] ?? '')));
+            if ($s !== '') {
+                $siglasCadastro[$s] = $ev;
+            }
+        }
+        foreach ($mm[1] as $token) {
+            $up = strtoupper($token);
+            if (isset($siglasCadastro[$up])) {
+                $ev = $siglasCadastro[$up];
+                return [
+                    'id' => (int) ($ev['id'] ?? 0),
+                    'sigla' => $up,
+                    'nome' => trim((string) ($ev['nome'] ?? '')),
+                ];
+            }
+        }
+        return null;
+    }
+
     private function limparRespostaFinal(string $resposta): string
     {
         $resposta = preg_replace(
@@ -1230,6 +1495,42 @@ PROMPT
                 $txt .= ($faltas !== null ? ' (frequência **' . $perc . '%**)' : ' está com frequência **' . $perc . '%**');
             }
             return $txt . '.';
+        }
+
+        if ($tool === 'nota_evento_sigla') {
+            $sigla = strtoupper(trim((string) ($resultado['evento']['sigla'] ?? '')));
+            $nomeEv = trim((string) ($resultado['evento']['nome'] ?? $sigla));
+            $rotuloEv = $sigla !== '' ? $sigla : $nomeEv;
+            if (($resultado['formato'] ?? '') === 'nota_unica') {
+                $mat = trim((string) ($resultado['materia'] ?? ''));
+                $nota = $resultado['nota'] ?? null;
+                if ($nota === null || $nota === '') {
+                    return 'Não há nota lançada da ' . $rotuloEv
+                        . ($mat !== '' ? ' de ' . $mat : '')
+                        . ' para ' . $quem . '.';
+                }
+                return 'A nota da ' . $rotuloEv
+                    . ($mat !== '' ? ' de ' . $mat : '')
+                    . ' d' . $this->artigoDe($quem) . ' ' . $quem
+                    . ' é **' . $nota . '**.';
+            }
+            $linhas = is_array($resultado['notas'] ?? null) ? $resultado['notas'] : [];
+            if ($linhas === []) {
+                return 'Não há notas lançadas da ' . $rotuloEv . ' para ' . $quem . '.';
+            }
+            $partes = [];
+            foreach (array_slice($linhas, 0, 12) as $l) {
+                $m = trim((string) ($l['materia'] ?? ''));
+                $n = $l['nota'] ?? null;
+                if ($m === '' || $n === null || $n === '') {
+                    continue;
+                }
+                $partes[] = $m . ' **' . $n . '**';
+            }
+            if ($partes === []) {
+                return 'Não há notas lançadas da ' . $rotuloEv . ' para ' . $quem . '.';
+            }
+            return 'Notas da ' . $rotuloEv . ' d' . $this->artigoDe($quem) . ' ' . $quem . ': ' . implode('; ', $partes) . '.';
         }
 
         if (in_array($tool, ['boletim_aluno', 'notas_evento_aluno'], true)) {
@@ -1499,6 +1800,10 @@ PROMPT
                 return 'Montando boletim…';
             case 'notas_evento_aluno':
                 return 'Consultando notas do evento…';
+            case 'nota_evento_sigla':
+                return 'Consultando nota no evento avaliativo…';
+            case 'listar_eventos_avaliativos':
+                return 'Listando eventos avaliativos…';
             case 'faltas_aluno':
                 return 'Consultando frequência…';
             case 'ocorrencias_turma':

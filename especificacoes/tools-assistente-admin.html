@@ -358,6 +358,20 @@
       </div>
 
       <div class="card">
+        <h3><code>listar_eventos_avaliativos</code> / <code>nota_evento_sigla</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Nota por Evento Avaliativo (sigla ou nome do cadastro)</div>
+        <p>
+          Compara o que o usuário falou (sigla <em>ou</em> nome, ex.: “PB” / “prova bimestral”)
+          com o catálogo vivo de <code>eventos_avaliativos</code> desta escola — não usa lista fixa de siglas.
+          Lê a nota em <code>provas_blocos_notas_lancadas</code>. Se não achar, devolve os eventos disponíveis.
+        </p>
+        <ul>
+          <li>Exemplo natural: “Nota da Aline na PB de matemática” ou “nota da prova bimestral de matemática”</li>
+          <li>Resposta esperada: “A nota da PB de Matemática da Aline… é **8,5**.” (usando a sigla/nome cadastrados)</li>
+        </ul>
+      </div>
+
+      <div class="card">
         <h3><code>faltas_aluno</code></h3>
         <div class="meta"><span class="label">Consulta</span>Frequência e faltas do aluno</div>
         <p>Retorna aulas, presenças, faltas e percentual de frequência no período pedido.</p>

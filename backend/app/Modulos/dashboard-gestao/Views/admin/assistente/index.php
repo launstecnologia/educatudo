@@ -1546,6 +1546,69 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             container.appendChild(listE);
         }
 
+        if (painel.tipo === 'candidatos_eventos_sigla' || painel.tipo === 'eventos_avaliativos_disponiveis') {
+            if (painel.aviso) {
+                var avEs = document.createElement('p');
+                avEs.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+                avEs.textContent = painel.aviso;
+                container.appendChild(avEs);
+            }
+            var listEs = document.createElement('div');
+            listEs.className = 'flex flex-wrap gap-2';
+            (painel.candidatos || []).forEach(function (ev) {
+                var eid = ev.evento_id || ev.id;
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'pa-chip';
+                b.textContent = (ev.sigla ? (ev.sigla + ' · ') : '')
+                    + (ev.nome || ('Evento #' + eid))
+                    + (ev.ano_letivo ? ' · ' + ev.ano_letivo : '')
+                    + (ev.bimestre ? ' · bim ' + ev.bimestre : '');
+                b.addEventListener('click', function () {
+                    if (enviando) return;
+                    input.value = 'Usar evento avaliativo id ' + eid
+                        + (ev.sigla ? (' sigla ' + ev.sigla) : '')
+                        + (ev.nome ? (' (' + ev.nome + ')') : '');
+                    form.dispatchEvent(new Event('submit', { cancelable: true }));
+                });
+                listEs.appendChild(b);
+            });
+            container.appendChild(listEs);
+        }
+
+        if (painel.tipo === 'nota_evento_sigla') {
+            if (painel.aviso) {
+                var avNs = document.createElement('p');
+                avNs.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+                avNs.textContent = painel.aviso;
+                container.appendChild(avNs);
+            }
+            if (painel.formato === 'nota_unica') {
+                var boxN = document.createElement('div');
+                boxN.className = 'rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950';
+                var siglaN = (painel.evento && painel.evento.sigla) ? String(painel.evento.sigla) : '';
+                boxN.innerHTML = '<span class="font-semibold">' + esc(siglaN || (painel.evento && painel.evento.nome) || 'Evento') + '</span>'
+                    + (painel.materia ? ' · ' + esc(painel.materia) : '')
+                    + ' → <strong class="text-lg">' + esc(painel.nota != null ? String(painel.nota) : '—') + '</strong>';
+                container.appendChild(boxN);
+            } else if ((painel.notas || []).length) {
+                var boxL = document.createElement('div');
+                boxL.className = 'overflow-x-auto border border-gray-200 rounded-lg';
+                var hl = '<table class="min-w-full text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-600"><tr>'
+                    + '<th class="px-3 py-2 text-left">Matéria</th>'
+                    + '<th class="px-3 py-2 text-right">Nota</th>'
+                    + '<th class="px-3 py-2 text-left">Subevento</th></tr></thead><tbody>';
+                (painel.notas || []).forEach(function (n) {
+                    hl += '<tr class="border-t"><td class="px-3 py-2">' + esc(n.materia || '—')
+                        + '</td><td class="px-3 py-2 text-right font-semibold">' + esc(n.nota != null ? String(n.nota) : '—')
+                        + '</td><td class="px-3 py-2 text-gray-600">' + esc(n.bloco_titulo || '—') + '</td></tr>';
+                });
+                hl += '</tbody></table>';
+                boxL.innerHTML = hl;
+                container.appendChild(boxL);
+            }
+        }
+
         if (painel.tipo === 'notas_evento_aluno') {
             if (painel.aviso) {
                 var avNe = document.createElement('p');

@@ -28,6 +28,9 @@ class AssistenteConsultaAmpliadaService
     private $db;
     private ProvasAlunoConsultaService $alunos;
     private ProvasProfessorConsultaService $professores;
+    /** @var array<string,bool> */
+    private array $cacheColunasEventos = [];
+    private ?bool $cacheTabelaEventos = null;
 
     public function __construct(
         ?ProvasAlunoConsultaService $alunos = null,
@@ -621,6 +624,526 @@ class AssistenteConsultaAmpliadaService
                 'linhas' => $linhas,
             ],
         ];
+    }
+
+    /**
+     * Catálogo vivo dos eventos avaliativos desta escola (sigla + nome).
+     * Não é lista fixa — vem do cadastro em eventos_avaliativos.
+     *
+     * @param array<string,mixed> $filtros
+     * @return array{ok:bool,eventos:list<array<string,mixed>>,ano_letivo:?int}
+     */
+    public function listarEventosAvaliativos(array $filtros = []): array
+    {
+        $anoFiltro = (int) ($filtros['ano_letivo'] ?? $filtros['ano'] ?? 0);
+        $bimestre = (int) ($filtros['bimestre'] ?? $filtros['periodo'] ?? 0);
+        $termo = trim((string) ($filtros['termo'] ?? $filtros['busca'] ?? ''));
+
+        if (!$this->tabelaEventosAvaliativosExiste()) {
+            return ['ok' => false, 'error' => 'Módulo de eventos avaliativos indisponível neste tenant.', 'eventos' => [], 'ano_letivo' => null];
+        }
+
+        $temSigla = $this->colunaEventosAvaliativosExiste('sigla');
+        $params = [];
+        $where = ['e.deleted_at IS NULL'];
+        if ($this->colunaEventosAvaliativosExiste('rascunho')) {
+            $where[] = '(e.rascunho IS NULL OR e.rascunho = 0)';
+        }
+        if ($anoFiltro <= 0) {
+            $anoAtual = $this->anoLetivoAtual();
+            $anoFiltro = (int) ($anoAtual['ano'] ?? date('Y'));
+        }
+        if ($anoFiltro > 0) {
+            $where[] = 'e.ano_letivo = :ano';
+            $params['ano'] = $anoFiltro;
+        }
+        if ($bimestre > 0) {
+            $where[] = 'e.bimestre = :bim';
+            $params['bim'] = $bimestre;
+        }
+        if ($termo !== '') {
+            $termoUp = strtoupper(preg_replace('/\s+/u', '', $termo) ?? '');
+            if ($temSigla) {
+                $where[] = '(UPPER(TRIM(e.sigla)) = :termo_sigla OR e.nome LIKE :termo_nome OR UPPER(TRIM(e.sigla)) LIKE :termo_sigla_like)';
+                $params['termo_sigla'] = $termoUp;
+                $params['termo_sigla_like'] = '%' . $termoUp . '%';
+            } else {
+                $where[] = 'e.nome LIKE :termo_nome';
+            }
+            $params['termo_nome'] = '%' . $termo . '%';
+        }
+
+        $sql = 'SELECT e.id, e.nome, e.ano_letivo, e.bimestre'
+            . ($temSigla ? ', e.sigla' : ', NULL AS sigla')
+            . ' FROM eventos_avaliativos e WHERE ' . implode(' AND ', $where)
+            . ' ORDER BY e.bimestre ASC, e.nome ASC LIMIT 80';
+        $rows = $this->db->fetchAll($sql, $params) ?: [];
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = [
+                'id' => (int) ($r['id'] ?? 0),
+                'nome' => trim((string) ($r['nome'] ?? '')),
+                'sigla' => strtoupper(trim((string) ($r['sigla'] ?? ''))),
+                'ano_letivo' => isset($r['ano_letivo']) ? (int) $r['ano_letivo'] : null,
+                'bimestre' => isset($r['bimestre']) ? (int) $r['bimestre'] : null,
+            ];
+        }
+        return ['ok' => true, 'eventos' => $out, 'ano_letivo' => $anoFiltro > 0 ? $anoFiltro : null];
+    }
+
+    /**
+     * Nota lançada em Evento Avaliativo comparando SIGLA ou NOME cadastrados no sistema + matéria.
+     * Fonte: eventos_avaliativos → provas_blocos → provas_blocos_notas_lancadas.
+     *
+     * @param array<string,mixed> $filtros
+     * @return array<string,mixed>
+     */
+    public function notaEventoPorSigla(array $filtros): array
+    {
+        $sigla = strtoupper(trim((string) ($filtros['sigla'] ?? $filtros['evento_sigla'] ?? $filtros['codigo'] ?? '')));
+        $sigla = preg_replace('/\s+/u', '', $sigla) ?? '';
+        $eventoNome = trim((string) ($filtros['evento_nome'] ?? $filtros['evento'] ?? $filtros['nome_evento'] ?? ''));
+        $termo = trim((string) ($filtros['termo'] ?? $filtros['avaliacao'] ?? $filtros['prova'] ?? ''));
+        if ($sigla === '' && $eventoNome === '' && $termo !== '') {
+            $termoCompacto = strtoupper(preg_replace('/\s+/u', '', $termo) ?? '');
+            if (preg_match('/^[A-Z0-9]{1,12}$/', $termoCompacto) === 1) {
+                $sigla = $termoCompacto;
+            } else {
+                $eventoNome = $termo;
+            }
+        }
+        // Não repassa termo/prova ao resolverAluno (evita buscar aluno "prova bimestral").
+        $filtrosAluno = $filtros;
+        unset(
+            $filtrosAluno['termo'],
+            $filtrosAluno['avaliacao'],
+            $filtrosAluno['prova'],
+            $filtrosAluno['evento'],
+            $filtrosAluno['evento_nome'],
+            $filtrosAluno['nome_evento'],
+            $filtrosAluno['sigla'],
+            $filtrosAluno['evento_sigla'],
+            $filtrosAluno['codigo']
+        );
+
+        $aluno = $this->resolverAluno($filtrosAluno);
+        if (empty($aluno['ok'])) {
+            return $aluno;
+        }
+        $alunoId = (int) $aluno['aluno']['id'];
+        $turmaId = (int) ($aluno['aluno']['turma_id'] ?? 0);
+
+        $materiaFiltro = trim((string) ($filtros['materia'] ?? $filtros['materia_nome'] ?? $filtros['disciplina'] ?? ''));
+        $anoFiltro = (int) ($filtros['ano_letivo'] ?? $filtros['ano'] ?? 0);
+        $bimestre = (int) ($filtros['bimestre'] ?? $filtros['periodo'] ?? 0);
+        $eventoIdFiltro = (int) ($filtros['evento_id'] ?? $filtros['evento_avaliativo_id'] ?? 0);
+
+        if ($eventoIdFiltro <= 0 && $sigla === '' && $eventoNome === '') {
+            $catalogo = $this->listarEventosAvaliativos([
+                'ano_letivo' => $anoFiltro,
+                'bimestre' => $bimestre,
+            ]);
+            return [
+                'ok' => false,
+                'error' => 'Informe a sigla ou o nome do evento avaliativo cadastrado nesta escola.',
+                'aluno' => $aluno['aluno'],
+                'eventos_disponiveis' => $catalogo['eventos'] ?? [],
+            ];
+        }
+
+        if (!$this->tabelaEventosAvaliativosExiste()) {
+            return [
+                'ok' => false,
+                'error' => 'Módulo de eventos avaliativos indisponível neste tenant.',
+                'aluno' => $aluno['aluno'],
+            ];
+        }
+
+        $temSigla = $this->colunaEventosAvaliativosExiste('sigla');
+
+        $params = [];
+        $where = ['e.deleted_at IS NULL'];
+        if ($this->colunaEventosAvaliativosExiste('rascunho')) {
+            $where[] = '(e.rascunho IS NULL OR e.rascunho = 0)';
+        }
+        if ($anoFiltro > 0) {
+            $where[] = 'e.ano_letivo = :ano';
+            $params['ano'] = $anoFiltro;
+        }
+        if ($bimestre > 0) {
+            $where[] = 'e.bimestre = :bim';
+            $params['bim'] = $bimestre;
+        }
+        if ($eventoIdFiltro > 0) {
+            $where[] = 'e.id = :evento_id';
+            $params['evento_id'] = $eventoIdFiltro;
+        } else {
+            // Compara com o cadastro: sigla exata OU nome (exato / parcial).
+            $ors = [];
+            if ($sigla !== '' && $temSigla) {
+                $ors[] = 'UPPER(TRIM(e.sigla)) = :sigla';
+                $params['sigla'] = $sigla;
+            }
+            if ($sigla !== '') {
+                $ors[] = 'UPPER(TRIM(e.nome)) = :sigla_eq';
+                $ors[] = 'e.nome LIKE :sigla_like';
+                $params['sigla_eq'] = $sigla;
+                $params['sigla_like'] = '%' . $sigla . '%';
+            }
+            if ($eventoNome !== '') {
+                $ors[] = 'e.nome LIKE :evento_nome';
+                $params['evento_nome'] = '%' . $eventoNome . '%';
+                $nomeCompacto = strtoupper(preg_replace('/\s+/u', '', $eventoNome) ?? '');
+                if ($temSigla && $nomeCompacto !== '' && preg_match('/^[A-Z0-9]{1,12}$/', $nomeCompacto) === 1) {
+                    $ors[] = 'UPPER(TRIM(e.sigla)) = :nome_como_sigla';
+                    $params['nome_como_sigla'] = $nomeCompacto;
+                }
+            }
+            if ($ors !== []) {
+                $where[] = '(' . implode(' OR ', $ors) . ')';
+            }
+        }
+
+        $sqlEventos = 'SELECT e.id, e.nome, e.ano_letivo, e.bimestre'
+            . ($temSigla ? ', e.sigla' : ', NULL AS sigla')
+            . ' FROM eventos_avaliativos e WHERE ' . implode(' AND ', $where)
+            . ' ORDER BY e.ano_letivo DESC, e.id DESC LIMIT 20';
+        $eventos = $this->db->fetchAll($sqlEventos, $params) ?: [];
+
+        // Fallback: compara o termo falado com o catálogo vivo (sigla/nome) sem lista fixa.
+        if ($eventos === [] && $eventoIdFiltro <= 0) {
+            $eventos = $this->resolverEventosPorCatalogo(
+                $sigla !== '' ? $sigla : $eventoNome,
+                $anoFiltro,
+                $bimestre
+            );
+        }
+
+        if ($eventos === []) {
+            $catalogo = $this->listarEventosAvaliativos([
+                'ano_letivo' => $anoFiltro,
+                'bimestre' => $bimestre,
+            ]);
+            return [
+                'ok' => false,
+                'error' => 'Nenhum evento avaliativo cadastrado corresponde a'
+                    . ($sigla !== '' ? ' sigla "' . $sigla . '"' : '')
+                    . ($eventoNome !== '' ? ' nome "' . $eventoNome . '"' : '')
+                    . '. Confira as siglas/nomes disponíveis nesta escola.',
+                'aluno' => $aluno['aluno'],
+                'eventos_disponiveis' => $catalogo['eventos'] ?? [],
+            ];
+        }
+        if (count($eventos) > 1) {
+            // Se a sigla bateu em vários anos/bimestres, prefere o da turma do aluno quando possível.
+            $filtradosTurma = [];
+            if ($turmaId > 0) {
+                foreach ($eventos as $ev) {
+                    $temTurma = $this->db->fetch(
+                        'SELECT 1 AS ok
+                           FROM provas_blocos pb
+                           INNER JOIN provas_blocos_turmas pbt ON pbt.bloco_id = pb.id AND pbt.turma_id = :turma
+                          WHERE pb.evento_avaliativo_id = :ev AND pb.deleted_at IS NULL
+                          LIMIT 1',
+                        ['turma' => $turmaId, 'ev' => (int) $ev['id']]
+                    );
+                    if ($temTurma) {
+                        $filtradosTurma[] = $ev;
+                    }
+                }
+            }
+            $listaBase = $filtradosTurma !== [] ? $filtradosTurma : $eventos;
+            if (count($listaBase) > 1) {
+                $cands = [];
+                foreach ($listaBase as $ev) {
+                    $cands[] = [
+                        'evento_id' => (int) $ev['id'],
+                        'nome' => trim((string) ($ev['nome'] ?? '')),
+                        'sigla' => strtoupper(trim((string) ($ev['sigla'] ?? ''))),
+                        'ano_letivo' => isset($ev['ano_letivo']) ? (int) $ev['ano_letivo'] : null,
+                        'bimestre' => isset($ev['bimestre']) ? (int) $ev['bimestre'] : null,
+                    ];
+                }
+                return [
+                    'ok' => false,
+                    'aviso' => 'Há mais de um evento com essa sigla. Escolha um:',
+                    'candidatos_eventos_sigla' => $cands,
+                    'aluno' => $aluno['aluno'],
+                ];
+            }
+            $eventos = $listaBase;
+        }
+
+        $evento = $eventos[0];
+        $eventoId = (int) $evento['id'];
+
+        $paramsNota = ['aluno' => $alunoId, 'evento' => $eventoId];
+        $sqlNota = 'SELECT n.nota, n.materia_id, m.nome AS materia_nome,
+                           pb.id AS bloco_id, pb.titulo AS bloco_titulo, pb.data_prova,
+                           e.nome AS evento_nome, e.ano_letivo, e.bimestre'
+            . ($temSigla ? ', e.sigla' : ', NULL AS sigla')
+            . ' FROM provas_blocos_notas_lancadas n
+               INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.deleted_at IS NULL
+               INNER JOIN eventos_avaliativos e ON e.id = pb.evento_avaliativo_id AND e.id = :evento
+               LEFT JOIN materias m ON m.id = n.materia_id
+              WHERE n.aluno_id = :aluno AND n.nota IS NOT NULL';
+        if ($materiaFiltro !== '') {
+            $sqlNota .= ' AND m.nome LIKE :materia';
+            $paramsNota['materia'] = '%' . $materiaFiltro . '%';
+        }
+        $sqlNota .= ' ORDER BY pb.data_prova DESC, n.id DESC LIMIT 30';
+        $notas = $this->db->fetchAll($sqlNota, $paramsNota) ?: [];
+
+        if ($notas === [] && $materiaFiltro !== '') {
+            // Sem filtro de matéria para mostrar o que existe.
+            $todas = $this->db->fetchAll(
+                'SELECT n.nota, m.nome AS materia_nome
+                   FROM provas_blocos_notas_lancadas n
+                   INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.deleted_at IS NULL
+                   LEFT JOIN materias m ON m.id = n.materia_id
+                  WHERE n.aluno_id = :aluno AND pb.evento_avaliativo_id = :evento AND n.nota IS NOT NULL
+                  ORDER BY m.nome ASC LIMIT 40',
+                ['aluno' => $alunoId, 'evento' => $eventoId]
+            ) ?: [];
+            if ($todas === []) {
+                return [
+                    'ok' => false,
+                    'error' => 'Não há nota lançada da '
+                        . ($sigla !== '' ? $sigla : trim((string) $evento['nome']))
+                        . ' para este aluno'
+                        . ($materiaFiltro !== '' ? ' em ' . $materiaFiltro : '') . '.',
+                    'aluno' => $aluno['aluno'],
+                    'evento' => [
+                        'id' => $eventoId,
+                        'nome' => trim((string) ($evento['nome'] ?? '')),
+                        'sigla' => strtoupper(trim((string) ($evento['sigla'] ?? $sigla))),
+                    ],
+                ];
+            }
+            return [
+                'ok' => false,
+                'error' => 'Não achei "' . $materiaFiltro . '" neste evento. Matérias com nota:',
+                'aluno' => $aluno['aluno'],
+                'evento' => [
+                    'id' => $eventoId,
+                    'nome' => trim((string) ($evento['nome'] ?? '')),
+                    'sigla' => strtoupper(trim((string) ($evento['sigla'] ?? $sigla))),
+                ],
+                'materias_com_nota' => array_values(array_unique(array_filter(array_map(
+                    static fn($r) => trim((string) ($r['materia_nome'] ?? '')),
+                    $todas
+                )))),
+            ];
+        }
+
+        if ($notas === []) {
+            return [
+                'ok' => false,
+                'error' => 'Não há nota lançada da '
+                    . ($sigla !== '' ? $sigla : trim((string) $evento['nome']))
+                    . ' para este aluno.',
+                'aluno' => $aluno['aluno'],
+                'evento' => [
+                    'id' => $eventoId,
+                    'nome' => trim((string) ($evento['nome'] ?? '')),
+                    'sigla' => strtoupper(trim((string) ($evento['sigla'] ?? $sigla))),
+                ],
+            ];
+        }
+
+        // Uma matéria pedida: devolve a nota principal (mais recente).
+        if ($materiaFiltro !== '' && count($notas) >= 1) {
+            $n = $notas[0];
+            return [
+                'ok' => true,
+                'formato' => 'nota_unica',
+                'aluno' => $aluno['aluno'],
+                'evento' => [
+                    'id' => $eventoId,
+                    'nome' => trim((string) ($n['evento_nome'] ?? $evento['nome'] ?? '')),
+                    'sigla' => strtoupper(trim((string) ($n['sigla'] ?? $evento['sigla'] ?? $sigla))),
+                    'ano_letivo' => isset($n['ano_letivo']) ? (int) $n['ano_letivo'] : null,
+                    'bimestre' => isset($n['bimestre']) ? (int) $n['bimestre'] : null,
+                ],
+                'materia' => trim((string) ($n['materia_nome'] ?? $materiaFiltro)),
+                'nota' => $this->formatarNotaLancada($n['nota'] ?? null),
+                'bloco_id' => (int) ($n['bloco_id'] ?? 0),
+                'data_prova' => (string) ($n['data_prova'] ?? ''),
+            ];
+        }
+
+        $linhas = [];
+        foreach ($notas as $n) {
+            $mat = trim((string) ($n['materia_nome'] ?? 'Sem matéria'));
+            $linhas[] = [
+                'materia' => $mat,
+                'nota' => $this->formatarNotaLancada($n['nota'] ?? null),
+                'bloco_titulo' => trim((string) ($n['bloco_titulo'] ?? '')),
+                'data_prova' => (string) ($n['data_prova'] ?? ''),
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'formato' => 'lista_notas',
+            'aluno' => $aluno['aluno'],
+            'evento' => [
+                'id' => $eventoId,
+                'nome' => trim((string) ($evento['nome'] ?? '')),
+                'sigla' => strtoupper(trim((string) ($evento['sigla'] ?? $sigla))),
+                'ano_letivo' => isset($evento['ano_letivo']) ? (int) $evento['ano_letivo'] : null,
+                'bimestre' => isset($evento['bimestre']) ? (int) $evento['bimestre'] : null,
+            ],
+            'notas' => $linhas,
+        ];
+    }
+
+    /** @param mixed $nota */
+    private function formatarNotaLancada($nota): ?string
+    {
+        if ($nota === null || $nota === '') {
+            return null;
+        }
+        if (is_numeric($nota)) {
+            $n = (float) $nota;
+            return fmod($n, 1.0) === 0.0
+                ? (string) (int) $n
+                : rtrim(rtrim(number_format($n, 2, ',', ''), '0'), ',');
+        }
+        $s = trim((string) $nota);
+        return $s !== '' ? $s : null;
+    }
+
+    private function tabelaEventosAvaliativosExiste(): bool
+    {
+        if ($this->cacheTabelaEventos !== null) {
+            return $this->cacheTabelaEventos;
+        }
+        try {
+            $r = $this->db->fetchAll("SHOW TABLES LIKE 'eventos_avaliativos'");
+            $this->cacheTabelaEventos = !empty($r);
+        } catch (\Throwable $e) {
+            $this->cacheTabelaEventos = false;
+        }
+        return $this->cacheTabelaEventos;
+    }
+
+    private function colunaEventosAvaliativosExiste(string $coluna): bool
+    {
+        $coluna = trim($coluna);
+        if ($coluna === '') {
+            return false;
+        }
+        if (array_key_exists($coluna, $this->cacheColunasEventos)) {
+            return $this->cacheColunasEventos[$coluna];
+        }
+        if (!$this->tabelaEventosAvaliativosExiste()) {
+            $this->cacheColunasEventos[$coluna] = false;
+            return false;
+        }
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $coluna)) {
+            $this->cacheColunasEventos[$coluna] = false;
+            return false;
+        }
+        try {
+            $r = $this->db->fetchAll("SHOW COLUMNS FROM eventos_avaliativos LIKE '" . $coluna . "'");
+            $this->cacheColunasEventos[$coluna] = !empty($r);
+        } catch (\Throwable $e) {
+            $this->cacheColunasEventos[$coluna] = false;
+        }
+        return $this->cacheColunasEventos[$coluna];
+    }
+
+    /**
+     * Resolve eventos comparando o termo falado com sigla/nome cadastrados (fuzzy).
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function resolverEventosPorCatalogo(string $termo, int $anoFiltro, int $bimestre): array
+    {
+        $termo = trim($termo);
+        if ($termo === '') {
+            return [];
+        }
+        $catalogo = $this->listarEventosAvaliativos([
+            'ano_letivo' => $anoFiltro,
+            'bimestre' => $bimestre,
+        ]);
+        $lista = is_array($catalogo['eventos'] ?? null) ? $catalogo['eventos'] : [];
+        if ($lista === []) {
+            return [];
+        }
+
+        $termoNorm = $this->normalizarTermoEvento($termo);
+        $termoCompacto = strtoupper(preg_replace('/\s+/u', '', $termoNorm) ?? '');
+        $melhores = [];
+        $melhorScore = 0;
+
+        foreach ($lista as $ev) {
+            $sigla = strtoupper(trim((string) ($ev['sigla'] ?? '')));
+            $nome = trim((string) ($ev['nome'] ?? ''));
+            $nomeNorm = $this->normalizarTermoEvento($nome);
+            $nomeCompacto = strtoupper(preg_replace('/\s+/u', '', $nomeNorm) ?? '');
+            $score = 0;
+
+            if ($sigla !== '' && $sigla === $termoCompacto) {
+                $score = 100;
+            } elseif ($nomeCompacto !== '' && $nomeCompacto === $termoCompacto) {
+                $score = 95;
+            } elseif ($nomeNorm !== '' && $termoNorm !== '' && str_contains($nomeNorm, $termoNorm)) {
+                $score = 80;
+            } elseif ($nomeNorm !== '' && $termoNorm !== '' && str_contains($termoNorm, $nomeNorm)) {
+                $score = 75;
+            } elseif ($sigla !== '' && str_contains($termoCompacto, $sigla)) {
+                $score = 70;
+            }
+
+            if ($score <= 0) {
+                continue;
+            }
+            if ($score > $melhorScore) {
+                $melhorScore = $score;
+                $melhores = [$ev];
+            } elseif ($score === $melhorScore) {
+                $melhores[] = $ev;
+            }
+        }
+
+        if ($melhorScore < 70 || $melhores === []) {
+            return [];
+        }
+
+        // Reconsulta no formato SQL (id/nome/sigla/ano/bimestre).
+        $ids = array_values(array_unique(array_map(
+            static fn($e) => (int) ($e['id'] ?? 0),
+            $melhores
+        )));
+        $ids = array_values(array_filter($ids, static fn($id) => $id > 0));
+        if ($ids === []) {
+            return [];
+        }
+
+        $temSigla = $this->colunaEventosAvaliativosExiste('sigla');
+        $ph = [];
+        $params = [];
+        foreach ($ids as $i => $id) {
+            $k = 'id' . $i;
+            $ph[] = ':' . $k;
+            $params[$k] = $id;
+        }
+        $sql = 'SELECT e.id, e.nome, e.ano_letivo, e.bimestre'
+            . ($temSigla ? ', e.sigla' : ', NULL AS sigla')
+            . ' FROM eventos_avaliativos e WHERE e.id IN (' . implode(',', $ph) . ')'
+            . ' ORDER BY e.ano_letivo DESC, e.id DESC';
+        return $this->db->fetchAll($sql, $params) ?: [];
+    }
+
+    private function normalizarTermoEvento(string $texto): string
+    {
+        $t = mb_strtolower(trim($texto), 'UTF-8');
+        $t = $this->normalizarTextoBusca($t);
+        $t = preg_replace('/\s+/u', ' ', $t) ?? $t;
+        return trim($t);
     }
 
     /**
