@@ -1441,6 +1441,18 @@ class EventoAvaliativoService
         $svcMediaCiclo = new MediaCicloRecuperacaoService();
         $mediaCiclo = $svcMediaCiclo->resolverNotas($ano, $codigoPeriodo, $turmaIds);
         $usarMediaCiclo = !empty($mediaCiclo['configurada']);
+        $mediaCicloPendente = $usarMediaCiclo && !empty($mediaCiclo['pendente']);
+        // Sem flag / sem média calculável: evento pode ser salvo sem vincular alunos.
+        if (!$usarMediaCiclo || $mediaCicloPendente) {
+            return [
+                'media' => $media,
+                'alunos' => [],
+                'escala_max' => $escalaMax,
+                'media_ciclo_configurada' => $usarMediaCiclo,
+                'media_ciclo_pendente' => !$usarMediaCiclo || $mediaCicloPendente,
+                'media_ciclo_codigo' => $usarMediaCiclo ? ($mediaCiclo['codigo'] ?? null) : null,
+            ];
+        }
         try {
             $rows = [];
             if ($this->tabelaExisteSimples('notas_tipo_finais')) {
@@ -1453,20 +1465,12 @@ class EventoAvaliativoService
             error_log('EventoAvaliativoService::candidatosRecuperacao: ' . $e->getMessage());
             return ['error' => 'Não foi possível listar os alunos desta recuperação.'];
         }
-        $fatores = $usarMediaCiclo ? [] : $this->fatoresAjusteEscalaPorMateria($rows, $escalaMax);
         $alunos = [];
         $vistos = [];
         foreach ($rows as $row) {
             $materiaId = (int) ($row['materia_id'] ?? 0);
             $alunoId = (int) ($row['id'] ?? 0);
-            $notaNum = null;
-            if ($usarMediaCiclo) {
-                $notaNum = $svcMediaCiclo->notaAlunoMateria($mediaCiclo, $alunoId, $materiaId);
-            } else {
-                $nota = $row['menor_nota'] ?? null;
-                $fator = $fatores[$materiaId] ?? 1.0;
-                $notaNum = $nota === null || $nota === '' ? null : round((float) $nota * $fator, 2);
-            }
+            $notaNum = $svcMediaCiclo->notaAlunoMateria($mediaCiclo, $alunoId, $materiaId);
             $turmaId = (int) ($row['turma_lista_id'] ?? $row['turma_id'] ?? 0);
             $chave = $alunoId . '|' . $materiaId;
             $vistos[$chave] = true;
@@ -1481,19 +1485,17 @@ class EventoAvaliativoService
                 'abaixo' => $notaNum !== null && $notaNum < $media,
             ];
         }
-        if ($usarMediaCiclo) {
-            $alunos = array_merge(
-                $alunos,
-                $this->linhasExtrasMediaCiclo($mediaCiclo, $vistos, $media, $turmaIds)
-            );
-        }
+        $alunos = array_merge(
+            $alunos,
+            $this->linhasExtrasMediaCiclo($mediaCiclo, $vistos, $media, $turmaIds)
+        );
         return [
             'media' => $media,
             'alunos' => $alunos,
             'escala_max' => $escalaMax,
-            'media_ciclo_configurada' => $usarMediaCiclo,
-            'media_ciclo_pendente' => $usarMediaCiclo && !empty($mediaCiclo['pendente']),
-            'media_ciclo_codigo' => $usarMediaCiclo ? ($mediaCiclo['codigo'] ?? null) : null,
+            'media_ciclo_configurada' => true,
+            'media_ciclo_pendente' => false,
+            'media_ciclo_codigo' => $mediaCiclo['codigo'] ?? null,
         ];
     }
 

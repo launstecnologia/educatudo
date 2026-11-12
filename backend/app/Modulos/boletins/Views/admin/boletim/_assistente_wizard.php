@@ -4359,9 +4359,9 @@ $boletimWizardSteps = [
     }
 
     /**
-     * Garante evento na fórmula SEM chip no quadro.
-     * Soma/média usam a nota lançada; a coluna não aparece no boletim.
-     * Quer ver a coluna? Use o catálogo à esquerda (Adicionar / arrastar).
+     * Garante evento na fórmula (componente + vínculo).
+     * Se o chip já está no título/quadro, mantém — fórmula e período podem coexistir.
+     * Só oculta do quadro quando a peça entra só pelo cálculo (sem chip visual).
      */
     function garantirColunaFormulaSemQuadro(codigo) {
         codigo = String(codigo || '');
@@ -4383,7 +4383,11 @@ $boletimWizardSteps = [
         if (!estado.nomes_blocos[codigo]) estado.nomes_blocos[codigo] = nome;
         garantirComponenteManualNoRascunho(codigo, nome);
         anexarEventoAoComponenteFormula(codigo, ev);
-        retirarColunaDoQuadroVisual(codigo);
+        // Chip no período + uso na fórmula: os dois ao mesmo tempo.
+        // Só tira do quadro se ainda não estiver visível (peça só de cálculo).
+        if (!colunaEventoJaVisivelNoQuadro(codigo)) {
+            retirarColunaDoQuadroVisual(codigo);
+        }
     }
 
     function colunaEventoJaVisivelNoQuadro(codigo) {

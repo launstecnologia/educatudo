@@ -2988,9 +2988,15 @@ foreach ($familiasTituloJs as $paiTitulo => $cfgTitulo) {
 
     function limparListaAguardandoMedia() {
         alunos = [];
+        marcados = {};
         lista.innerHTML = '';
+        if (definir) definir.value = '0';
+        if (botao) {
+            botao.classList.add('hidden');
+            botao.disabled = true;
+        }
         if (resumo) {
-            resumo.textContent = 'Aguardando a métrica na sessão Boletim para listar os alunos.';
+            resumo.textContent = 'Aguardando a métrica na sessão Boletim para listar os alunos. Você pode salvar o evento sem vincular ninguém.';
         }
     }
 
