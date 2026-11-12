@@ -348,17 +348,19 @@ if ($tipoFlash === 'error') {
     <?php endif; ?>
 
     <?php if (!empty($linhas)): ?>
-    <div class="flex flex-wrap items-center gap-3">
+    <div class="space-y-3 pt-2">
+        <div class="flex flex-wrap items-center gap-3">
+            <button type="submit" class="btn-primary-custom inline-flex items-center px-6 py-3 rounded-lg font-semibold hover:opacity-90">
+                Salvar tudo agora
+            </button>
+            <a href="<?= URL ?>/admin/provas/blocos/<?= $blocoId ?>/gerenciar"
+               class="inline-flex items-center px-6 py-3 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50">
+                Voltar
+            </a>
+        </div>
         <p class="text-sm text-gray-500">
-            As notas entram na fila e salvam sozinhas ao digitar. O botão abaixo é opcional.
+            As notas entram na fila e salvam sozinhas ao digitar. O botão acima é opcional.
         </p>
-        <button type="submit" class="btn-primary-custom inline-flex items-center px-6 py-3 rounded-lg font-semibold hover:opacity-90">
-            Salvar tudo agora
-        </button>
-        <a href="<?= URL ?>/admin/provas/blocos/<?= $blocoId ?>/gerenciar"
-           class="inline-flex items-center px-6 py-3 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50">
-            Voltar
-        </a>
     </div>
     <?php endif; ?>
 </form>
