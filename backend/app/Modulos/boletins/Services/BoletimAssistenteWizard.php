@@ -4431,7 +4431,7 @@ class BoletimAssistenteWizard
     }
 
     /**
-     * Peça só na fórmula: marca como oculta para não voltar ao quadro visual.
+     * Peça só na fórmula: oculta no quadro. Se o admin colocou o chip de volta, tira da lista.
      *
      * @param array<string,mixed> $estado
      */
@@ -4452,7 +4452,14 @@ class BoletimAssistenteWizard
                 }
             }
         }
-        $ocultas = $this->normalizarColunasOcultas($estado['colunas_ocultas'] ?? []);
+        // Chip no quadro visual ganha da ocultação (ex.: REC recolocada no título).
+        $ocultas = [];
+        foreach ($this->normalizarColunasOcultas($estado['colunas_ocultas'] ?? []) as $cod) {
+            if (isset($visiveis[$cod])) {
+                continue;
+            }
+            $ocultas[] = $cod;
+        }
         $set = array_fill_keys($ocultas, true);
         foreach (array_keys($this->codigosCitadosNasFormulas($estado)) as $cod) {
             if (isset($visiveis[$cod]) || isset($set[$cod])) {

@@ -8241,6 +8241,7 @@ $boletimWizardSteps = [
         return id > 0 ? ('eva_' + id) : '';
     }
 
+    /** Só conta chip visível no quadro (ordem/título). Peça só na fórmula não conta. */
     function colunaEventoJaNoQuadro(ev) {
         if (!ev || !estado) return false;
         var pref = String(codigoPreferidoEvento(ev) || '').toLowerCase();
@@ -8248,10 +8249,10 @@ $boletimWizardSteps = [
         var ordem = {};
         function marcar(cod) {
             var low = String(cod || '').toLowerCase();
-            if (low) ordem[low] = true;
+            if (!low || colunaOculta(low)) return;
+            ordem[low] = true;
         }
         (estado.colunas_ordem || []).forEach(marcar);
-        (((rascunhoAtual || {}).componentes) || []).forEach(function (c) { marcar(c && c.codigo); });
         (estado.linhas_layout || []).forEach(function (lin) {
             (lin && lin.colunas || []).forEach(marcar);
         });
@@ -8281,6 +8282,21 @@ $boletimWizardSteps = [
         return pref || (id > 0 ? ('eva' + id) : '');
     }
 
+    /** Garante chip visível na ordem/título (tira de colunas_ocultas). */
+    function garantirChipVisivelNoQuadro(codigo) {
+        codigo = String(codigo || '');
+        if (!codigo || !estado) return;
+        mostrarColuna(codigo);
+        estado.quadro_chips_manuais = 1;
+        if (!Array.isArray(estado.colunas_ordem)) estado.colunas_ordem = [];
+        var low = codigo.toLowerCase();
+        if (!estado.colunas_ordem.some(function (c) {
+            return String(c || '').toLowerCase() === low;
+        })) {
+            estado.colunas_ordem.push(codigo);
+        }
+    }
+
     function adicionarColunaDoEvento(ev, opcoes) {
         if (!estado || !ev) return false;
         opcoes = opcoes || {};
@@ -8293,6 +8309,7 @@ $boletimWizardSteps = [
         if (colunaEventoJaNoQuadro(ev)) {
             var codJa = codigoColunaExistenteDoEvento(ev);
             if (codJa) {
+                garantirChipVisivelNoQuadro(codJa);
                 garantirComponenteManualNoRascunho(codJa, String(siglaDoEvento(ev) || '').toUpperCase() || codJa);
                 anexarEventoAoComponenteFormula(codJa, ev);
             }
@@ -8329,14 +8346,11 @@ $boletimWizardSteps = [
                 if (low) vistos[low] = true;
             });
         });
-        var codigo = codigoColunaDoEventoJs(ev, vistos);
+        // Se a sigla preferida está oculta (só na fórmula), reusa o código e reaparece no quadro.
+        var pref = String(codigoPreferidoEvento(ev) || '').toLowerCase();
+        var codigo = (pref && colunaOculta(pref)) ? pref : codigoColunaDoEventoJs(ev, vistos);
         if (!codigo) return false;
-        mostrarColuna(codigo);
-        estado.quadro_chips_manuais = 1;
-        if (!Array.isArray(estado.colunas_ordem)) estado.colunas_ordem = [];
-        if (estado.colunas_ordem.map(function (c) { return String(c || '').toLowerCase(); }).indexOf(codigo) < 0) {
-            estado.colunas_ordem.push(codigo);
-        }
+        garantirChipVisivelNoQuadro(codigo);
         if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
         var sigla = String(siglaDoEvento(ev) || '').toUpperCase();
         var titulo = sigla || String(ev.nome || codigo);
@@ -8378,10 +8392,10 @@ $boletimWizardSteps = [
         var ordem = {};
         function marcar(c) {
             var low = String(c || '').toLowerCase();
-            if (low) ordem[low] = true;
+            if (!low || colunaOculta(low)) return;
+            ordem[low] = true;
         }
         (estado.colunas_ordem || []).forEach(marcar);
-        (((rascunhoAtual || {}).componentes) || []).forEach(function (c) { marcar(c && c.codigo); });
         (estado.linhas_layout || []).forEach(function (lin) {
             (lin && lin.colunas || []).forEach(marcar);
         });
@@ -8426,6 +8440,7 @@ $boletimWizardSteps = [
         var codigo = 'b' + bim + '_fal';
         if (colunaFalJaNoQuadro(bim)) {
             if (opcoes.linhaId || opcoes.nomeCab) {
+                garantirChipVisivelNoQuadro(codigo);
                 moverCodigoParaCabecalho(codigo, opcoes.nomeCab || '', opcoes.linhaId || '');
                 if (!silencioso) {
                     avisoLinha = { tipo: 'ok', texto: 'Coluna FAL movida para o título do período.' };
@@ -12875,12 +12890,24 @@ $boletimWizardSteps = [
                 estado.linhas_layout = linhasLocais;
                 estado.titulos_periodo_ok = titulosOkLocal;
                 // Chips excluídos com X não podem voltar no remount do servidor.
+                // Chip recolocado no título (REC etc.) não pode ficar preso em ocultas remotas.
                 var ocultasRemotas = Array.isArray(estado.colunas_ocultas) ? estado.colunas_ocultas : [];
+                var visiveisQuadro = {};
+                (linhasLocais || []).forEach(function (lin) {
+                    (lin && lin.colunas || []).forEach(function (cod) {
+                        var low = String(cod || '').toLowerCase();
+                        if (low) visiveisQuadro[low] = true;
+                    });
+                });
+                (ordemLocal || []).forEach(function (cod) {
+                    var low = String(cod || '').toLowerCase();
+                    if (low) visiveisQuadro[low] = true;
+                });
                 var ocultasFundidas = [];
                 var vistoOculta = {};
                 ocultasLocal.concat(ocultasRemotas).forEach(function (cod) {
                     var low = String(cod || '').toLowerCase();
-                    if (!low || vistoOculta[low]) return;
+                    if (!low || vistoOculta[low] || visiveisQuadro[low]) return;
                     vistoOculta[low] = true;
                     ocultasFundidas.push(cod);
                 });
