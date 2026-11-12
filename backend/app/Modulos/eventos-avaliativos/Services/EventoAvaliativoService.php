@@ -1509,6 +1509,81 @@ class EventoAvaliativoService
     }
 
     /**
+     * Teto efetivo para lançamento: tipo do evento/bloco, com fallback da regra
+     * quando o tipo ficou no DEFAULT 10 (creates antigos). Opcionalmente corrige o tipo.
+     *
+     * @param array<string,mixed> $blocoOuEvento provas_blocos ou eventos_avaliativos
+     */
+    public function escalaMaximaDoBlocoOuEvento(array $blocoOuEvento, bool $corrigirTipo = true): float
+    {
+        $tipoId = (int) ($blocoOuEvento['tipo_avaliacao_id'] ?? 0);
+        $ano = (int) ($blocoOuEvento['ano_letivo'] ?? 0);
+        $eventoId = (int) ($blocoOuEvento['evento_avaliativo_id'] ?? 0);
+
+        if ($eventoId > 0) {
+            $evento = $this->model->findById($eventoId);
+            if (is_array($evento)) {
+                $tipoEvento = (int) ($evento['tipo_avaliacao_id'] ?? 0);
+                if ($tipoEvento > 0) {
+                    $tipoId = $tipoEvento;
+                }
+                $anoEvento = (int) ($evento['ano_letivo'] ?? 0);
+                if ($anoEvento > 0) {
+                    $ano = $anoEvento;
+                }
+            }
+        }
+
+        return $this->escalaMaximaEfetiva($tipoId, $ano, 0, $corrigirTipo);
+    }
+
+    /**
+     * Resolve escala do tipo + regra (mesma lógica da tela de edição).
+     */
+    public function escalaMaximaEfetiva(int $tipoId, int $ano, int $regraId = 0, bool $corrigirTipo = false): float
+    {
+        $padrao = $ano > 0 ? $this->escalaMaximaPadrao($ano, $regraId) : 10.0;
+        $max = $padrao;
+
+        if ($tipoId > 0) {
+            $tipo = (new ExamEvaluationType())->findById($tipoId);
+            if (is_array($tipo) && array_key_exists('escala_max', $tipo) && $tipo['escala_max'] !== null && $tipo['escala_max'] !== '') {
+                $bruta = $tipo['escala_max'];
+                if (is_string($bruta)) {
+                    $bruta = str_replace(',', '.', trim($bruta));
+                }
+                if (is_numeric($bruta)) {
+                    $salva = round((float) $bruta, 2);
+                    if ($salva > 0) {
+                        $max = $salva;
+                    }
+                }
+            }
+        }
+
+        // Create antigo gravava DEFAULT 10 mesmo com a regra em 100.
+        if (abs($max - 10.0) < 0.001 && abs($padrao - 10.0) > 0.001) {
+            $max = $padrao;
+            if ($corrigirTipo && $tipoId > 0) {
+                try {
+                    (new ExamEvaluationType())->definirEscalaMax($tipoId, $padrao);
+                } catch (Throwable $e) {
+                    // Não bloqueia o lançamento se a correção falhar.
+                }
+            }
+        }
+
+        if ($max <= 0) {
+            return 10.0;
+        }
+        if ($max > 100) {
+            return 100.0;
+        }
+
+        return $max;
+    }
+
+    /**
      * @return list<int>
      */
     private function periodosDaRecuperacao(int $codigo): array

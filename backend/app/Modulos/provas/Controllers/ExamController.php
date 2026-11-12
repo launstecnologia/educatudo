@@ -1474,24 +1474,30 @@ class ExamController extends BaseController
     }
 
     /**
-     * Teto da nota lançada conforme escala_max do tipo do bloco/evento.
+     * Teto da nota lançada conforme escala_max do tipo do bloco/evento
+     * (com fallback da regra quando o tipo ficou no DEFAULT 10).
      */
     private function escalaMaximaDoBloco(array $bloco): float
     {
-        $tipoId = (int) ($bloco['tipo_avaliacao_id'] ?? 0);
-        if ($tipoId <= 0) {
-            return 10.0;
-        }
-        $tipo = (new ExamEvaluationType())->findById($tipoId);
-        $max = (float) ($tipo['escala_max'] ?? 10);
-        if ($max <= 0) {
-            return 10.0;
-        }
-        if ($max > 100) {
-            return 100.0;
-        }
+        try {
+            return (new \App\Modulos\EventosAvaliativos\Services\EventoAvaliativoService())
+                ->escalaMaximaDoBlocoOuEvento($bloco, true);
+        } catch (\Throwable $e) {
+            $tipoId = (int) ($bloco['tipo_avaliacao_id'] ?? 0);
+            if ($tipoId <= 0) {
+                return 10.0;
+            }
+            $tipo = (new ExamEvaluationType())->findById($tipoId);
+            $max = (float) ($tipo['escala_max'] ?? 10);
+            if ($max <= 0) {
+                return 10.0;
+            }
+            if ($max > 100) {
+                return 100.0;
+            }
 
-        return $max;
+            return $max;
+        }
     }
 
     /**

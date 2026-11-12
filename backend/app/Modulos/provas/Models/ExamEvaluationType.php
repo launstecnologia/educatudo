@@ -231,6 +231,25 @@ class ExamEvaluationType
         return $cache;
     }
 
+    /**
+     * Atualiza só a escala máxima (sem mexer no restante do tipo).
+     */
+    public function definirEscalaMax(int $id, float $escala): bool
+    {
+        if ($id <= 0 || !$this->temColunaEscalaMax()) {
+            return false;
+        }
+        return (bool) $this->db->query(
+            'UPDATE provas_tipos_avaliacao
+                SET escala_max = :escala
+              WHERE id = :id AND deleted_at IS NULL',
+            [
+                'id' => $id,
+                'escala' => $this->sanitizarEscala($escala),
+            ]
+        );
+    }
+
     public function create(array $data): int
     {
         $params = [
