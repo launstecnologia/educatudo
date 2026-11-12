@@ -8217,7 +8217,11 @@ class BoletimAssistenteWizard
         $formulas = is_array($estado['formulas_blocos'] ?? null) ? $estado['formulas_blocos'] : [];
         $excecoes = is_array($estado['formulas_materias_blocos'] ?? null) ? $estado['formulas_materias_blocos'] : [];
         if ($formulas === [] && $excecoes === []) {
-            return $this->aplicarEscalasBlocos($this->aplicarNomesBlocos($rascunho, $estado), $estado);
+            // Ainda aplica Média do Ciclo / nomes / escalas (flag pode mudar sem reeditar a fórmula).
+            return $this->aplicarFlagsMediaCicloNosComponentes(
+                $this->aplicarEscalasBlocos($this->aplicarNomesBlocos($rascunho, $estado), $estado),
+                $estado
+            );
         }
 
         $comps = is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : [];
@@ -8295,16 +8299,10 @@ class BoletimAssistenteWizard
             }
             $escalaAlvo = $this->escalaDoBloco($estado, $codigoAlvo);
             $grupoLayout = $this->layoutGroupDaColunaNoEstado($codigoAlvo, $estado);
-            $ehMediaCiclo = $this->blocoEhMediaCiclo($estado, $codigoAlvo);
             if ($idxExistente !== null) {
                 $c = $comps[$idxExistente];
                 $c['config'] = is_array($c['config'] ?? null) ? $c['config'] : [];
                 $c['config']['expressao'] = $exp;
-                if ($ehMediaCiclo) {
-                    $c['config']['media_ciclo'] = 1;
-                } else {
-                    unset($c['config']['media_ciclo']);
-                }
                 if ($ehQuadro) {
                     $grupoAtual = strtolower(trim((string) ($c['config']['layout_group'] ?? '')));
                     if ($grupoAtual === '' || $grupoAtual === 'quadro_comum') {
@@ -8317,9 +8315,6 @@ class BoletimAssistenteWizard
                 $comps[$idxExistente] = $c;
             } else {
                 $bloco = $this->blocoCalculado($codigoAlvo, $nome, $exp, $escalaAlvo);
-                if ($ehMediaCiclo) {
-                    $bloco['config']['media_ciclo'] = 1;
-                }
                 if ($ehQuadro) {
                     $bloco['config']['layout_group'] = $grupoLayout;
                     $bloco['config']['layout_type'] = 'media';
@@ -8355,6 +8350,48 @@ class BoletimAssistenteWizard
         if ($linhas !== [] && is_array($rascunho['componentes'] ?? null)) {
             $rascunho['componentes'] = $this->aplicarLinhasLayoutNosComponentes($rascunho['componentes'], $linhas);
         }
+
+        return $this->aplicarFlagsMediaCicloNosComponentes($rascunho, $estado);
+    }
+
+    /**
+     * Grava config.media_ciclo (+ layout_group do título) a partir de estado.media_ciclo_blocos.
+     *
+     * @param array<string,mixed> $rascunho
+     * @param array<string,mixed> $estado
+     * @return array<string,mixed>
+     */
+    private function aplicarFlagsMediaCicloNosComponentes(array $rascunho, array $estado): array
+    {
+        $comps = is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : [];
+        if ($comps === []) {
+            return $rascunho;
+        }
+        foreach ($comps as $i => $c) {
+            if (!is_array($c) || (string) ($c['source_type'] ?? '') !== 'calculado') {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if ($cod === '') {
+                continue;
+            }
+            $cfg = is_array($c['config'] ?? null) ? $c['config'] : [];
+            if ($this->blocoEhMediaCiclo($estado, $cod)) {
+                $cfg['media_ciclo'] = 1;
+                $grupoAtual = strtolower(trim((string) ($cfg['layout_group'] ?? '')));
+                if ($grupoAtual === '' || $grupoAtual === 'quadro_comum') {
+                    $inferido = $this->layoutGroupDaColunaNoEstado($cod, $estado);
+                    if ($inferido !== '' && $inferido !== 'quadro_comum') {
+                        $cfg['layout_group'] = $inferido;
+                        $cfg['layout_type'] = $cfg['layout_type'] ?? 'media';
+                    }
+                }
+            } else {
+                unset($cfg['media_ciclo']);
+            }
+            $comps[$i]['config'] = $cfg;
+        }
+        $rascunho['componentes'] = $comps;
 
         return $rascunho;
     }
@@ -8514,7 +8551,10 @@ class BoletimAssistenteWizard
             $rascunho['linhas_layout'] = $linhas;
         }
 
-        return $this->aplicarEscalasBlocos($this->aplicarNomesBlocos($rascunho, $estado), $estado);
+        return $this->aplicarFlagsMediaCicloNosComponentes(
+            $this->aplicarEscalasBlocos($this->aplicarNomesBlocos($rascunho, $estado), $estado),
+            $estado
+        );
     }
 
     /**

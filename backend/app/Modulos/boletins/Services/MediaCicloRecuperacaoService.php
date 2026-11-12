@@ -29,7 +29,8 @@ class MediaCicloRecuperacaoService
      *   codigo:?string,
      *   expressao:?string,
      *   regra_id:int,
-     *   notas:array<string,float>
+     *   notas:array<string,float>,
+     *   motivo:string
      * }
      */
     public function resolverNotas(int $ano, int $codigoPeriodoRec, array $turmaIds): array
@@ -41,6 +42,7 @@ class MediaCicloRecuperacaoService
             'expressao' => null,
             'regra_id' => 0,
             'notas' => [],
+            'motivo' => 'sem_metrica',
         ];
         $turmaIds = array_values(array_unique(array_filter(array_map('intval', $turmaIds))));
         if ($ano < 2000 || $codigoPeriodoRec < RecuperacaoConfig::CODIGO_CICLO_BASE || $turmaIds === []) {
@@ -50,10 +52,13 @@ class MediaCicloRecuperacaoService
         $grupo = $this->layoutGroupDoPeriodoRec($codigoPeriodoRec);
         $regra = $this->resolverRegraBoletim($ano, $turmaIds);
         if ($regra === null) {
+            $vazio['motivo'] = 'sem_boletim';
             return $vazio;
         }
         $comp = $this->componenteMediaCiclo($regra, $grupo);
         if ($comp === null) {
+            $vazio['regra_id'] = (int) ($regra['id'] ?? 0);
+            $vazio['motivo'] = 'sem_metrica';
             return $vazio;
         }
 
@@ -68,6 +73,7 @@ class MediaCicloRecuperacaoService
                 'expressao' => null,
                 'regra_id' => (int) ($regra['id'] ?? 0),
                 'notas' => [],
+                'motivo' => 'sem_formula',
             ];
         }
 
@@ -84,6 +90,7 @@ class MediaCicloRecuperacaoService
             'expressao' => $expressao,
             'regra_id' => (int) ($regra['id'] ?? 0),
             'notas' => $notas,
+            'motivo' => $notas === [] ? 'aguardando_notas' : 'ok',
         ];
     }
 
@@ -283,6 +290,11 @@ class MediaCicloRecuperacaoService
             }
         }
 
+        // Um único bloco flagado no boletim: usa mesmo se o layout_group tiver se perdido no save.
+        if (count($candidatos) === 1) {
+            return $candidatos[0];
+        }
+
         // Sem match do período: não usa bloco de outro ciclo (evita MIN → média errada).
         return null;
     }
@@ -378,9 +390,12 @@ class MediaCicloRecuperacaoService
         if (!preg_match_all('/\b[a-z_][a-z0-9_]*\b/', $expressao, $m)) {
             return [];
         }
+        // Funções do editor / avaliador — não são colunas de nota.
         $reservados = [
-            'max', 'min', 'chamada', 'substituta', 'composicao', 'media_ponderada',
-            'media_lancado', 'se', 'if', 'verdadeiro', 'falso', 'true', 'false',
+            'max', 'min', 'maior', 'menor', 'chamada', 'substituta', 'composicao',
+            'media_ponderada', 'media_lancado', 'media_presentes', 'media',
+            'se', 'if', 'verdadeiro', 'falso', 'true', 'false', 'sim', 'nao',
+            'and', 'or', 'not', 'div', 'mod',
         ];
         $codigos = [];
         foreach ($m[0] as $tok) {
@@ -422,13 +437,18 @@ class MediaCicloRecuperacaoService
             }
         }
 
+        // Só peças com origem de nota (evento/tipo). Tokens de função/coluna calculada não bloqueiam.
+        $codigosPeca = array_values(array_unique(array_merge(array_keys($eventoIds), array_keys($tipoIds))));
+        if ($codigosPeca === []) {
+            return [];
+        }
+
         $pecas = $this->carregarNotasPecas($turmaIds, $periodos, $ano, $eventoIds, $tipoIds);
         if ($pecas === []) {
             return [];
         }
 
         $pares = [];
-        $codigosPeca = array_keys($codigos);
         foreach ($pecas as $chaveAlunoMat => $porCodigo) {
             [$alunoId, $materiaId] = array_map('intval', explode('|', $chaveAlunoMat, 2));
             if ($alunoId <= 0 || $materiaId <= 0) {

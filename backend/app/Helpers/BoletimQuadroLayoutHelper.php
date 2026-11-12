@@ -15,7 +15,8 @@ class BoletimQuadroLayoutHelper
     /** @return list<string> */
     public static function gruposPermitidos(): array
     {
-        return ['b1', 'b2', 'b3', 'b4', 'final', 'quadro_a', 'quadro_b', 'quadro_comum'];
+        // s1/s2 = média “a cada dois ciclos” (REC 81/82); sem isso o save apaga o layout_group.
+        return ['b1', 'b2', 'b3', 'b4', 's1', 's2', 'final', 'quadro_a', 'quadro_b', 'quadro_comum'];
     }
 
     public static function grupoLayoutEhValido(string $grupo): bool

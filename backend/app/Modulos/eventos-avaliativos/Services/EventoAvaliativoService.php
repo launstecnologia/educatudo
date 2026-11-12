@@ -1442,6 +1442,7 @@ class EventoAvaliativoService
         $mediaCiclo = $svcMediaCiclo->resolverNotas($ano, $codigoPeriodo, $turmaIds);
         $usarMediaCiclo = !empty($mediaCiclo['configurada']);
         $mediaCicloPendente = $usarMediaCiclo && !empty($mediaCiclo['pendente']);
+        $mediaCicloMotivo = (string) ($mediaCiclo['motivo'] ?? ($usarMediaCiclo ? 'ok' : 'sem_metrica'));
         // Sem flag / sem média calculável: evento pode ser salvo sem vincular alunos.
         if (!$usarMediaCiclo || $mediaCicloPendente) {
             return [
@@ -1449,8 +1450,9 @@ class EventoAvaliativoService
                 'alunos' => [],
                 'escala_max' => $escalaMax,
                 'media_ciclo_configurada' => $usarMediaCiclo,
-                'media_ciclo_pendente' => !$usarMediaCiclo || $mediaCicloPendente,
+                'media_ciclo_pendente' => $mediaCicloPendente,
                 'media_ciclo_codigo' => $usarMediaCiclo ? ($mediaCiclo['codigo'] ?? null) : null,
+                'media_ciclo_motivo' => $mediaCicloMotivo,
             ];
         }
         try {
@@ -1496,6 +1498,7 @@ class EventoAvaliativoService
             'media_ciclo_configurada' => true,
             'media_ciclo_pendente' => false,
             'media_ciclo_codigo' => $mediaCiclo['codigo'] ?? null,
+            'media_ciclo_motivo' => 'ok',
         ];
     }
 
