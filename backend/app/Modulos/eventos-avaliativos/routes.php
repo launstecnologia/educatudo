@@ -24,6 +24,7 @@ $router->get('/admin/eventos-avaliativos/alunos-recuperacao', 'Modulos/eventos-a
 $router->get('/admin/eventos-avaliativos/materias-por-series', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@materiasPorSeries');
 $router->post('/admin/eventos-avaliativos', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@salvar');
 $router->post('/admin/eventos-avaliativos/duplicar', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@duplicar');
+$router->post('/admin/eventos-avaliativos/duplicar-notas', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@duplicarNotas'); // TEMP DEV
 $router->post('/admin/eventos-avaliativos/{id}/publicar', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@publicar');
 $router->get('/admin/eventos-avaliativos/{id}/editar', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@editar');
 $router->post('/admin/eventos-avaliativos/{id}', 'Modulos/eventos-avaliativos/EventoAvaliativoAdminController@atualizar');

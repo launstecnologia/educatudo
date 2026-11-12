@@ -205,6 +205,39 @@ class ExamBlockManualGrade
     }
 
     /**
+     * Copia linhas de nota de um bloco para outro (ferramenta temporária de DEV).
+     * Não sobrescreve linhas já existentes no destino; não passa por upsertLinhas.
+     * Herda professor_id/materia_id/turma_id da origem (turma antiga se o aluno mudou).
+     */
+    public function copiarNotasDeBlocoParaBloco(int $origemBlocoId, int $destinoBlocoId): int
+    {
+        if (!$this->tableExists() || $origemBlocoId <= 0 || $destinoBlocoId <= 0 || $origemBlocoId === $destinoBlocoId) {
+            return 0;
+        }
+        $antes = (int) ($this->db->fetch(
+            'SELECT COUNT(*) AS total FROM provas_blocos_notas_lancadas WHERE bloco_id = :id',
+            ['id' => $destinoBlocoId]
+        )['total'] ?? 0);
+        $this->db->query(
+            'INSERT IGNORE INTO provas_blocos_notas_lancadas
+                (bloco_id, professor_id, materia_id, turma_id, aluno_id, nota, observacao)
+             SELECT :destino, o.professor_id, o.materia_id, o.turma_id, o.aluno_id, o.nota, o.observacao
+               FROM provas_blocos_notas_lancadas o
+              WHERE o.bloco_id = :origem',
+            [
+                'destino' => $destinoBlocoId,
+                'origem' => $origemBlocoId,
+            ]
+        );
+        $depois = (int) ($this->db->fetch(
+            'SELECT COUNT(*) AS total FROM provas_blocos_notas_lancadas WHERE bloco_id = :id',
+            ['id' => $destinoBlocoId]
+        )['total'] ?? 0);
+
+        return max(0, $depois - $antes);
+    }
+
+    /**
      * Todas as linhas de nota do bloco (relatório coordenação).
      *
      * @return list<array<string, mixed>>

@@ -162,6 +162,42 @@ class EventoAvaliativoAdminController extends AdminBaseController
         $this->redirect($volta);
     }
 
+    /** TEMP DEV: copiar notas do período anterior — remover depois. */
+    public function duplicarNotas(): void
+    {
+        $user = $this->auth->getUser() ?? [];
+        if (($user['perfil_admin'] ?? '') !== 'dev') {
+            http_response_code(403);
+            echo 'Acesso restrito ao perfil de desenvolvimento.';
+            return;
+        }
+        if (!$this->permitido('cadastrar') || !$this->exigirSchema()) {
+            return;
+        }
+        $ano = (int) ($_POST['ano'] ?? 0);
+        $periodo = (int) ($_POST['periodo'] ?? 0);
+        $regra = (int) ($_POST['regra'] ?? 0);
+        $volta = '/admin/eventos-avaliativos?ano=' . $ano . '&periodo=' . $periodo . ($regra > 0 ? '&regra=' . $regra : '');
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Token inválido. Tente novamente.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+        $res = $this->service->duplicarNotasDoPeriodoAnterior($ano, $periodo);
+        if (empty($res['success'])) {
+            $this->setFlashMessage((string) ($res['error'] ?? 'Não foi possível duplicar as notas.'), 'error');
+            $this->redirect($volta);
+            return;
+        }
+        $copiadas = (int) ($res['copiadas'] ?? 0);
+        $pares = (int) ($res['pares'] ?? 0);
+        $this->setFlashMessage(
+            '[DEV] ' . $copiadas . ' linha(s) de nota copiada(s) em ' . $pares . ' subevento(s).',
+            'success'
+        );
+        $this->redirect($volta);
+    }
+
     public function publicar($id): void
     {
         if (!$this->permitido('alterar') || !$this->exigirSchema()) {

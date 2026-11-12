@@ -13,6 +13,8 @@ $podeDuplicar = !empty($pode_duplicar);
 $rotuloAnterior = trim((string) ($rotulo_anterior ?? ''));
 $tipoRotulo = trim((string) ($tipo_rotulo ?? 'Avaliação'));
 $opcoesPeriodo = is_array($periodos_opcoes ?? null) ? $periodos_opcoes : [];
+$userView = is_array($user ?? null) ? $user : [];
+$ehDev = ($userView['perfil_admin'] ?? '') === 'dev';
 $urlPeriodos = URL . '/admin/eventos-avaliativos?ano=' . $ano . ($regraId > 0 ? '&regra=' . $regraId : '');
 $urlCriar = URL . '/admin/eventos-avaliativos/criar?ano=' . $ano . '&periodo=' . $periodoNum . ($regraId > 0 ? '&regra=' . $regraId : '');
 $urlLista = URL . '/admin/eventos-avaliativos';
@@ -90,6 +92,20 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
             <button type="submit" class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
                 <i class="fa-solid fa-copy mr-2 text-gray-500" aria-hidden="true"></i>
                 Duplicar de <?= htmlspecialchars($rotuloAnterior !== '' ? $rotuloAnterior : 'o período anterior', ENT_QUOTES, 'UTF-8') ?>
+            </button>
+        </form>
+        <?php endif; ?>
+        <?php if ($ehDev && $schemaPronto && $podeDuplicar): ?>
+        <form method="POST" action="<?= URL ?>/admin/eventos-avaliativos/duplicar-notas"
+              onsubmit="return confirm('DEV: copiar notas dos alunos do período anterior para os eventos de mesmo nome deste período?');">
+            <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+            <input type="hidden" name="ano" value="<?= $ano ?>">
+            <input type="hidden" name="periodo" value="<?= $periodoNum ?>">
+            <input type="hidden" name="regra" value="<?= $regraId ?>">
+            <button type="submit" title="Temporário — só perfil DEV"
+                    class="inline-flex items-center rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800 hover:bg-amber-100">
+                <i class="fa-solid fa-flask mr-2" aria-hidden="true"></i>
+                Notas (dev)
             </button>
         </form>
         <?php endif; ?>

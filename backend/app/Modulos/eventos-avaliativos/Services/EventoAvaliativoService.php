@@ -9,6 +9,7 @@ use App\Modulos\EventosAvaliativos\Models\EventoAvaliativo;
 use App\Modulos\GruposRegrasNotas\Models\GrupoRegrasNotas;
 use App\Modulos\GruposRegrasNotas\Services\GrupoRegrasNotasService;
 use App\Modulos\Provas\Models\ExamBlock;
+use App\Modulos\Provas\Models\ExamBlockManualGrade;
 use App\Modulos\Provas\Models\ExamEvaluationType;
 use App\Modulos\RegrasAcademicas\Models\RecuperacaoConfig;
 use App\Modulos\RegrasAcademicas\Models\RegraAcademica;
@@ -83,13 +84,27 @@ class EventoAvaliativoService
             $materias[$i]['pai_nome'] = $paiId > 0 ? (string) ($nomesPai[$paiId] ?? '') : '';
         }
         [$filtroEscopo, $paramsEscopo] = $this->filtroTurmasDaRegra($regraId, $manterTurmaIds);
+        $paramsTurmas = array_merge(['ano_turma' => $ano > 0 ? $ano : (int) date('Y')], $paramsEscopo);
+        $filtroAno = ' AND t.ano_letivo = :ano_turma';
+        $manterAno = [];
+        foreach ($manterTurmaIds as $i => $turmaId) {
+            $turmaId = (int) $turmaId;
+            if ($turmaId > 0) {
+                $chave = 'manter_ano_' . $i;
+                $manterAno[] = ':' . $chave;
+                $paramsTurmas[$chave] = $turmaId;
+            }
+        }
+        if ($manterAno !== []) {
+            $filtroAno = ' AND (t.ano_letivo = :ano_turma OR t.id IN (' . implode(', ', $manterAno) . '))';
+        }
         $turmas = $this->db->fetchAll(
             'SELECT t.id, t.nome, t.tipo_ensino, t.serie_id, COALESCE(NULLIF(s.nome, \'\'), NULLIF(t.serie, \'\')) AS serie
              FROM turmas t
              LEFT JOIN serie s ON s.id = t.serie_id
-             WHERE t.ativo = 1' . $filtroEscopo . '
+             WHERE t.ativo = 1' . $filtroAno . $filtroEscopo . '
              ORDER BY t.nome ASC',
-            $paramsEscopo
+            $paramsTurmas
         ) ?: [];
 
         return [
@@ -749,6 +764,89 @@ class EventoAvaliativoService
     }
 
     /**
+     * Ferramenta temporária de DEV: copia notas lançadas dos subeventos do período anterior
+     * para os eventos de mesmo nome no período atual (pareados por ordem / título).
+     *
+     * @return array{success:bool,copiadas?:int,pares?:int,error?:string}
+     */
+    public function duplicarNotasDoPeriodoAnterior(int $ano, int $periodo): array
+    {
+        if (!$this->model->tabelasProntas()) {
+            return ['success' => false, 'error' => 'Rode a migration 2026_10_26_eventos_avaliativos.sql no painel Master.'];
+        }
+        if ($periodo < 2 || !PeriodoLetivo::numeroValido($ano, $periodo) || !PeriodoLetivo::numeroValido($ano, $periodo - 1)) {
+            return ['success' => false, 'error' => 'A duplicação de notas começa no segundo período.'];
+        }
+
+        $origem = $this->model->listar($ano, $periodo - 1);
+        $destino = $this->model->listar($ano, $periodo);
+        if ($origem === [] || $destino === []) {
+            return ['success' => false, 'error' => 'Não há eventos nos dois períodos para parear notas.'];
+        }
+
+        $origemPorNome = [];
+        foreach ($origem as $evento) {
+            $chave = mb_strtolower(trim((string) ($evento['nome'] ?? '')));
+            if ($chave !== '' && !isset($origemPorNome[$chave])) {
+                $origemPorNome[$chave] = (int) ($evento['id'] ?? 0);
+            }
+        }
+
+        $notas = new ExamBlockManualGrade();
+        if (!$notas->tableExists()) {
+            return ['success' => false, 'error' => 'Tabela de notas lançadas não existe neste tenant.'];
+        }
+
+        $copiadas = 0;
+        $pares = 0;
+        foreach ($destino as $eventoDest) {
+            $chave = mb_strtolower(trim((string) ($eventoDest['nome'] ?? '')));
+            $origemId = (int) ($origemPorNome[$chave] ?? 0);
+            $destinoId = (int) ($eventoDest['id'] ?? 0);
+            if ($origemId <= 0 || $destinoId <= 0) {
+                continue;
+            }
+            $subsOrigem = $this->model->listarSubeventos($origemId);
+            $subsDestino = $this->model->listarSubeventos($destinoId);
+            if ($subsOrigem === [] || $subsDestino === []) {
+                continue;
+            }
+
+            $origemPorTitulo = [];
+            foreach ($subsOrigem as $i => $sub) {
+                $titulo = mb_strtolower(trim((string) ($sub['titulo'] ?? '')));
+                if ($titulo !== '' && !isset($origemPorTitulo[$titulo])) {
+                    $origemPorTitulo[$titulo] = (int) ($sub['id'] ?? 0);
+                }
+            }
+            $mesmoTamanho = count($subsOrigem) === count($subsDestino);
+
+            foreach ($subsDestino as $i => $subDest) {
+                $titulo = mb_strtolower(trim((string) ($subDest['titulo'] ?? '')));
+                $blocoOrigem = (int) ($origemPorTitulo[$titulo] ?? 0);
+                if ($blocoOrigem <= 0 && $mesmoTamanho) {
+                    $blocoOrigem = (int) ($subsOrigem[$i]['id'] ?? 0);
+                }
+                $blocoDestino = (int) ($subDest['id'] ?? 0);
+                if ($blocoOrigem <= 0 || $blocoDestino <= 0) {
+                    continue;
+                }
+                $n = $notas->copiarNotasDeBlocoParaBloco($blocoOrigem, $blocoDestino);
+                if ($n > 0) {
+                    $copiadas += $n;
+                    $pares++;
+                }
+            }
+        }
+
+        if ($copiadas === 0) {
+            return ['success' => false, 'error' => 'Nenhuma nota foi copiada. Confira se os eventos têm o mesmo nome e se o período anterior tem lançamentos.'];
+        }
+
+        return ['success' => true, 'copiadas' => $copiadas, 'pares' => $pares];
+    }
+
+    /**
      * @return array<string,mixed>|null
      */
     private function postParaDuplicar(int $eventoId, int $ano, int $periodo): ?array
@@ -1286,15 +1384,70 @@ class EventoAvaliativoService
         }
         $media = $this->mediaMinima($ano, $regraId);
         $periodos = $this->periodosDaRecuperacao($codigoPeriodo);
-        $params = ['ano' => $ano];
+        try {
+            $rows = [];
+            if ($this->tabelaExisteSimples('notas_tipo_finais')) {
+                $rows = $this->linhasCandidatosRecuperacao($ano, $turmaIds, $periodos, false);
+            }
+            if ($rows === [] && $this->tabelaExisteSimples('provas_blocos_notas_lancadas')) {
+                $rows = $this->linhasCandidatosRecuperacao($ano, $turmaIds, $periodos, true);
+            }
+        } catch (Throwable $e) {
+            error_log('EventoAvaliativoService::candidatosRecuperacao: ' . $e->getMessage());
+            return ['error' => 'Não foi possível listar os alunos desta recuperação.'];
+        }
+        $alunos = [];
+        foreach ($rows as $row) {
+            $nota = $row['menor_nota'] ?? null;
+            $notaNum = $nota === null || $nota === '' ? null : round((float) $nota, 2);
+            $turmaId = (int) ($row['turma_lista_id'] ?? $row['turma_id'] ?? 0);
+            $alunos[] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'nome' => (string) ($row['nome'] ?? ''),
+                'turma_id' => $turmaId,
+                'turma' => (string) ($row['turma_nome'] ?? ''),
+                'materia_id' => (int) ($row['materia_id'] ?? 0),
+                'materia' => (string) ($row['materia_nome'] ?? ''),
+                'nota' => $notaNum,
+                'abaixo' => $notaNum !== null && $notaNum < $media,
+            ];
+        }
+        return ['media' => $media, 'alunos' => $alunos];
+    }
+
+    /**
+     * @param list<int> $turmaIds
+     * @param list<int> $periodos
+     * @return list<array<string,mixed>>
+     */
+    private function linhasCandidatosRecuperacao(int $ano, array $turmaIds, array $periodos, bool $usarNotasLancadas): array
+    {
+        $params = ['ano' => $ano, 'ano_mat' => $ano];
         $turmasPh = [];
+        $turmasMateria = [];
+        $turmasNota = [];
+        $turmasAluno = [];
         foreach ($turmaIds as $i => $turmaId) {
             $chave = 't' . $i;
+            $chaveMat = 'mt' . $i;
+            $chaveNota = 'nt' . $i;
+            $chaveAluno = 'at' . $i;
             $turmasPh[] = ':' . $chave;
+            $turmasMateria[] = ':' . $chaveMat;
+            $turmasNota[] = ':' . $chaveNota;
+            $turmasAluno[] = ':' . $chaveAluno;
             $params[$chave] = $turmaId;
+            $params[$chaveMat] = $turmaId;
+            $params[$chaveNota] = $turmaId;
+            $params[$chaveAluno] = $turmaId;
         }
-        $filtroPeriodoNotas = '';
+        $inTurmas = implode(', ', $turmasPh);
+        $inTurmasMat = implode(', ', $turmasMateria);
+        $inTurmasNota = implode(', ', $turmasNota);
+        $inTurmasAluno = implode(', ', $turmasAluno);
+
         $filtroPeriodoMaterias = '';
+        $filtroPeriodoNotas = '';
         if ($periodos !== []) {
             $periodosNota = [];
             $periodosMateria = [];
@@ -1306,62 +1459,98 @@ class EventoAvaliativoService
                 $params[$chaveNota] = $periodo;
                 $params[$chaveMateria] = $periodo;
             }
-            $filtroPeriodoNotas = ' AND n.periodo IN (' . implode(', ', $periodosNota) . ')';
-            $filtroPeriodoMaterias = ' AND n2.periodo IN (' . implode(', ', $periodosMateria) . ')';
+            $inPeriodoNota = implode(', ', $periodosNota);
+            $inPeriodoMat = implode(', ', $periodosMateria);
+            if ($usarNotasLancadas) {
+                $filtroPeriodoMaterias = ' AND pb2.bimestre IN (' . $inPeriodoMat . ')';
+                $filtroPeriodoNotas = ' AND pb.bimestre IN (' . $inPeriodoNota . ')';
+            } else {
+                $filtroPeriodoMaterias = ' AND n2.periodo IN (' . $inPeriodoMat . ')';
+                $filtroPeriodoNotas = ' AND n.periodo IN (' . $inPeriodoNota . ')';
+            }
         }
-        $turmasMateria = [];
-        $params['ano_mat'] = $ano;
-        foreach ($turmaIds as $i => $turmaId) {
-            $chave = 'mt' . $i;
-            $turmasMateria[] = ':' . $chave;
-            $params[$chave] = $turmaId;
+
+        $temMatricula = $this->tabelaExisteSimples('matricula');
+        $sqlAlunos = 'SELECT a0.id AS aluno_id, a0.nome, tv.id AS turma_id, tv.nome AS turma_nome
+                        FROM alunos a0
+                        INNER JOIN turmas tv ON tv.id = a0.turma_id
+                       WHERE a0.turma_id IN (' . $inTurmasAluno . ')
+                         AND a0.ativo = 1
+                         AND (a0.status IS NULL OR a0.status IN (\'ACTIVE\', \'PENDING\'))';
+        if ($temMatricula) {
+            $sqlAlunos .= '
+                       UNION
+                      SELECT a1.id AS aluno_id, a1.nome, tm.id AS turma_id, tm.nome AS turma_nome
+                        FROM matricula m
+                        INNER JOIN alunos a1 ON a1.id = m.aluno_id
+                        INNER JOIN turmas tm ON tm.id = m.turma_id
+                       WHERE m.turma_id IN (' . $inTurmas . ')
+                         AND m.status = \'ativa\'
+                         AND m.data_saida IS NULL
+                         AND a1.ativo = 1
+                         AND (a1.status IS NULL OR a1.status IN (\'ACTIVE\', \'PENDING\'))';
+        }
+
+        if ($usarNotasLancadas) {
+            $sqlMaterias = 'SELECT DISTINCT n2.materia_id
+                              FROM provas_blocos_notas_lancadas n2
+                              INNER JOIN provas_blocos pb2 ON pb2.id = n2.bloco_id AND pb2.deleted_at IS NULL
+                             WHERE pb2.ano_letivo = :ano_mat
+                               AND n2.turma_id IN (' . $inTurmasMat . ')
+                               AND n2.materia_id > 0
+                               AND n2.nota IS NOT NULL' . $filtroPeriodoMaterias;
+            $joinNota = 'LEFT JOIN (
+                            SELECT n.aluno_id, n.materia_id, n.turma_id, MIN(n.nota) AS menor_nota
+                              FROM provas_blocos_notas_lancadas n
+                              INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.deleted_at IS NULL
+                             WHERE pb.ano_letivo = :ano
+                               AND n.turma_id IN (' . $inTurmasNota . ')
+                               AND n.nota IS NOT NULL' . $filtroPeriodoNotas . '
+                             GROUP BY n.aluno_id, n.materia_id, n.turma_id
+                         ) n ON n.aluno_id = aluno_turma.aluno_id
+                            AND n.materia_id = mat.id
+                            AND n.turma_id = aluno_turma.turma_id';
+        } else {
+            $sqlMaterias = 'SELECT DISTINCT n2.materia_id
+                              FROM notas_tipo_finais n2
+                             WHERE n2.ano_letivo = :ano_mat
+                               AND n2.turma_id IN (' . $inTurmasMat . ')
+                               AND n2.materia_id > 0' . $filtroPeriodoMaterias;
+            $joinNota = 'LEFT JOIN (
+                            SELECT n.aluno_id, n.materia_id, n.turma_id, MIN(n.nota_final) AS menor_nota
+                              FROM notas_tipo_finais n
+                             WHERE n.ano_letivo = :ano
+                               AND n.turma_id IN (' . $inTurmasNota . ')' . $filtroPeriodoNotas . '
+                             GROUP BY n.aluno_id, n.materia_id, n.turma_id
+                         ) n ON n.aluno_id = aluno_turma.aluno_id
+                            AND n.materia_id = mat.id
+                            AND n.turma_id = aluno_turma.turma_id';
+        }
+
+        $sql = 'SELECT aluno_turma.aluno_id AS id, aluno_turma.nome AS nome,
+                       aluno_turma.turma_id AS turma_lista_id, aluno_turma.turma_nome AS turma_nome,
+                       mat.id AS materia_id, mat.nome AS materia_nome, n.menor_nota
+                  FROM (' . $sqlAlunos . ') aluno_turma
+                  INNER JOIN (
+                        ' . $sqlMaterias . '
+                  ) materias_periodo ON 1 = 1
+                  INNER JOIN materias mat ON mat.id = materias_periodo.materia_id
+                  ' . $joinNota . '
+                 ORDER BY mat.nome ASC, aluno_turma.turma_nome ASC, aluno_turma.nome ASC';
+
+        return $this->db->fetchAll($sql, $params) ?: [];
+    }
+
+    private function tabelaExisteSimples(string $tabela): bool
+    {
+        if (!preg_match('/^[a-z0-9_]+$/i', $tabela)) {
+            return false;
         }
         try {
-            $rows = $this->db->fetchAll(
-                'SELECT a.id, a.nome, a.turma_id, t.nome AS turma_nome,
-                        mat.id AS materia_id, mat.nome AS materia_nome, MIN(n.nota_final) AS menor_nota
-                   FROM alunos a
-                   INNER JOIN turmas t ON t.id = a.turma_id
-                   INNER JOIN (
-                        SELECT DISTINCT n2.materia_id
-                          FROM notas_tipo_finais n2
-                         WHERE n2.ano_letivo = :ano_mat
-                           AND n2.turma_id IN (' . implode(', ', $turmasMateria) . ')
-                           AND n2.materia_id > 0' . $filtroPeriodoMaterias . '
-                   ) materias_periodo ON 1 = 1
-                   INNER JOIN materias mat ON mat.id = materias_periodo.materia_id
-                   LEFT JOIN notas_tipo_finais n
-                     ON n.aluno_id = a.id
-                    AND n.materia_id = mat.id
-                    AND n.ano_letivo = :ano
-                    AND n.turma_id = a.turma_id' . $filtroPeriodoNotas . '
-                  WHERE a.turma_id IN (' . implode(', ', $turmasPh) . ')
-                    AND a.ativo = 1
-                    AND a.status = \'ACTIVE\'
-                  GROUP BY a.id, a.nome, a.turma_id, t.nome, mat.id, mat.nome
-                  ORDER BY mat.nome ASC, t.nome ASC, a.nome ASC',
-                $params
-            );
+            return $this->db->fetch('SHOW TABLES LIKE \'' . $tabela . '\'') !== false;
         } catch (Throwable $e) {
-            error_log('EventoAvaliativoService::candidatosRecuperacao: ' . $e->getMessage());
-            return ['error' => 'Não foi possível listar os alunos desta recuperação.'];
+            return false;
         }
-        $alunos = [];
-        foreach ($rows ?: [] as $row) {
-            $nota = $row['menor_nota'];
-            $notaNum = $nota === null || $nota === '' ? null : round((float) $nota, 2);
-            $alunos[] = [
-                'id' => (int) ($row['id'] ?? 0),
-                'nome' => (string) ($row['nome'] ?? ''),
-                'turma_id' => (int) ($row['turma_id'] ?? 0),
-                'turma' => (string) ($row['turma_nome'] ?? ''),
-                'materia_id' => (int) ($row['materia_id'] ?? 0),
-                'materia' => (string) ($row['materia_nome'] ?? ''),
-                'nota' => $notaNum,
-                'abaixo' => $notaNum !== null && $notaNum < $media,
-            ];
-        }
-        return ['media' => $media, 'alunos' => $alunos];
     }
 
     /**
