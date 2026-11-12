@@ -2158,6 +2158,9 @@ $boletimWizardSteps = [
             nota_minima_aprovacao: 6,
             nota_minima_origem: 'padrao',
             nota_minima_regra_nome: '',
+            escala_max_padrao: (catalogo && catalogo.escala_max_padrao != null)
+                ? (Number(catalogo.escala_max_padrao) || 10)
+                : 10,
             round_mode: 'none',
             decimal_places: 2,
             pecas: [],
@@ -3612,11 +3615,31 @@ $boletimWizardSteps = [
         flushEscalaAberta();
     }
 
+    /** Escala numérica da regra de aprovação (Regras e Aprovação): 10 ou 100. */
+    function escalaPadraoRegra() {
+        var bol = (typeof boletimEscolhido === 'function') ? boletimEscolhido() : null;
+        var candidatos = [
+            bol && bol.escala_max,
+            estado && estado.escala_max_padrao,
+            catalogo && catalogo.escala_max_padrao,
+            10
+        ];
+        var i;
+        for (i = 0; i < candidatos.length; i++) {
+            var v = Number(candidatos[i]);
+            if (isFinite(v) && v >= 0.01) {
+                return Math.min(999, Math.round(v * 100) / 100);
+            }
+        }
+        return 10;
+    }
+
     function escalaBlocoCalc(codigo) {
         codigo = String(codigo || '');
-        if (!codigo || !estado || !estado.escalas_blocos) return 10;
+        var padrao = escalaPadraoRegra();
+        if (!codigo || !estado || !estado.escalas_blocos) return padrao;
         var v = Number(estado.escalas_blocos[codigo]);
-        if (!isFinite(v) || v < 0.01) return 10;
+        if (!isFinite(v) || v < 0.01) return padrao;
         return Math.min(999, Math.round(v * 100) / 100);
     }
 
@@ -3627,7 +3650,7 @@ $boletimWizardSteps = [
             estado.escalas_blocos = {};
         }
         var v = Number(escala);
-        if (!isFinite(v) || v < 0.01) v = 10;
+        if (!isFinite(v) || v < 0.01) v = escalaPadraoRegra();
         if (v > 999) v = 999;
         v = Math.round(v * 100) / 100;
         estado.escalas_blocos[codigo] = v;
@@ -4123,6 +4146,13 @@ $boletimWizardSteps = [
         if (ed) ed.classList.remove('hidden');
         var t = document.getElementById('bw-formula-bloco-nome');
         if (t) t.textContent = nomeBlocoCalc(codigo);
+        // Valor máximo: se ainda está no 10 padrão e a regra é outra (ex.: 100), alinha.
+        if (!estado.escalas_blocos || typeof estado.escalas_blocos !== 'object') estado.escalas_blocos = {};
+        var padraoEsc = escalaPadraoRegra();
+        var escAtual = estado.escalas_blocos[codigo];
+        if (escAtual == null || (Number(escAtual) === 10 && padraoEsc !== 10)) {
+            estado.escalas_blocos[codigo] = padraoEsc;
+        }
         var inp = document.getElementById('bw-formula-bloco-nome-input');
         if (inp) {
             inp.value = nomeBlocoCalc(codigo);
@@ -4388,6 +4418,7 @@ $boletimWizardSteps = [
                 if (blocos.length) {
                     c.blocos_ids = blocos.slice();
                     c.config.blocos_ids = blocos.slice();
+                    c.config.blocos_ids_manual = 1;
                 }
             });
         });
@@ -4845,7 +4876,7 @@ $boletimWizardSteps = [
                 : (codigo === 'media_final' ? 'Resultado Final' : 'Nova média');
         }
         if (!estado.escalas_blocos || typeof estado.escalas_blocos !== 'object') estado.escalas_blocos = {};
-        if (estado.escalas_blocos[codigo] == null) estado.escalas_blocos[codigo] = 10;
+        if (estado.escalas_blocos[codigo] == null) estado.escalas_blocos[codigo] = escalaPadraoRegra();
         estado.quadro_chips_manuais = 1;
         marcarEdicaoManual();
         previewAtual = null;
@@ -9493,7 +9524,7 @@ $boletimWizardSteps = [
             if (estado.escalas_blocos[cod] != null) {
                 estado.escalas_blocos[novoCod] = estado.escalas_blocos[cod];
             } else if (estado.escalas_blocos[novoCod] == null) {
-                estado.escalas_blocos[novoCod] = 10;
+                estado.escalas_blocos[novoCod] = escalaPadraoRegra();
             }
             if (estado.blocos_calc.indexOf(novoCod) < 0) estado.blocos_calc.push(novoCod);
             mostrarColuna(novoCod);
@@ -11155,10 +11186,18 @@ $boletimWizardSteps = [
             estado.nota_minima_regra_nome = estado.nota_minima_origem === 'regra' ? (bol.regra_nome || '') : '';
             estado.round_mode = bol.round_mode || 'none';
             estado.decimal_places = Number(bol.decimal_places) === 1 ? 1 : 2;
+            if (bol.escala_max != null && Number(bol.escala_max) >= 0.01) {
+                estado.escala_max_padrao = Number(bol.escala_max);
+            } else if (catalogo && catalogo.escala_max_padrao != null) {
+                estado.escala_max_padrao = Number(catalogo.escala_max_padrao) || 10;
+            }
         } else {
             estado.nota_minima_aprovacao = 6;
             estado.nota_minima_origem = 'padrao';
             estado.nota_minima_regra_nome = '';
+            if (catalogo && catalogo.escala_max_padrao != null) {
+                estado.escala_max_padrao = Number(catalogo.escala_max_padrao) || 10;
+            }
         }
         if (rascunhoAtual) {
             rascunhoAtual.nota_minima_aprovacao = estado.nota_minima_aprovacao;
@@ -11659,7 +11698,9 @@ $boletimWizardSteps = [
                 html += '<p id="bw-formula-salva" class="hidden text-sm font-semibold text-emerald-700">Salvo.</p>';
                 html += '</div>';
                 html += '</div>';
-                html += '<p class="text-[11px] text-amber-900/80 mb-2">Valor máximo corta o resultado da fórmula. Em <strong>Resultado Final × 2</strong>, use <strong>20</strong> (senão fica 10).</p>';
+                html += '<p class="text-[11px] text-amber-900/80 mb-2">Valor máximo vem da <strong>Regra de Aprovação</strong> (escala '
+                    + esc(String(escalaPadraoRegra()))
+                    + '). Corta o resultado da fórmula — em <strong>Resultado Final × 2</strong>, use o dobro.</p>';
                 html += '<p id="bw-formula-bloco-titulo" class="text-sm font-semibold text-amber-950">Cálculo de <span id="bw-formula-bloco-nome">' + esc(nomeBlocoCalc(estado.bloco_calc || 'média')) + '</span></p>';
                 html += '<p id="bw-formula-bloco-ajuda" class="text-xs text-amber-900/80 mt-0.5 mb-2">A média é a soma entre parênteses, depois ÷ quantidade. Ex.: (Prova + Trabalho + Participação) ÷ 3.</p>';
                 html += '<div class="bw-formula-workspace mt-1">';

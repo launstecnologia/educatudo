@@ -6,6 +6,7 @@ namespace App\Modulos\Boletins\Services;
 use App\Modulos\Boletins\Models\Boletim;
 use App\Modulos\RegrasAcademicas\Models\RecuperacaoConfig;
 use App\Modulos\RegrasAcademicas\Models\RegraAcademica;
+use App\Modulos\RegrasAcademicas\Services\EscalaNota;
 use App\Services\BoletimAssistenteWizard;
 use App\Models\System\BoletimConfig;
 use App\Core\Database;
@@ -232,7 +233,7 @@ class BoletimCadastroService
     }
 
     /**
-     * @return list<array{id:int,nome:string,finalidade:string,ano_letivo:?int}>
+     * @return list<array{id:int,nome:string,finalidade:string,ano_letivo:?int,escala_max:float}>
      */
     public function listarParaEventoNotas(): array
     {
@@ -279,6 +280,7 @@ class BoletimCadastroService
                 'regra_nome' => $regra !== null ? trim((string) ($regra['nome'] ?? '')) : '',
                 'minima_origem' => $regra !== null ? 'regra' : 'padrao',
                 'nota_minima_aprovacao' => $criterios['nota_minima_aprovacao'],
+                'escala_max' => (float) ($criterios['escala_max'] ?? 10.0),
                 'round_mode' => $criterios['round_mode'],
                 'decimal_places' => $criterios['decimal_places'],
             ];
@@ -491,7 +493,7 @@ class BoletimCadastroService
      * Mínima e arredondamento vêm da regra acadêmica vinculada (fallback 6 se não houver).
      *
      * @param array<string,mixed> $item
-     * @return array{nota_minima_aprovacao:float,round_mode:string,decimal_places:int,escopo_arredondamento:string,regra:?array,boletim_id?:int,minima_origem?:string,regra_nome?:string}
+     * @return array{nota_minima_aprovacao:float,escala_max:float,round_mode:string,decimal_places:int,escopo_arredondamento:string,regra:?array,boletim_id?:int,minima_origem?:string,regra_nome?:string}
      */
     public function criteriosDoBoletim(array $item): array
     {
@@ -508,8 +510,10 @@ class BoletimCadastroService
             $minima = isset($regra['media_minima']) && is_numeric($regra['media_minima'])
                 ? (float) $regra['media_minima']
                 : 6.0;
+            $escalaMax = EscalaNota::maximo((string) ($regra['escala'] ?? '10'));
             return [
                 'nota_minima_aprovacao' => $minima,
+                'escala_max' => $escalaMax !== null ? (float) $escalaMax : 10.0,
                 'round_mode' => $round,
                 'decimal_places' => \App\Modulos\RegrasAcademicas\Services\EscalaNota::casasDecimais(
                     $regra['decimal_places'] ?? 2
@@ -523,6 +527,7 @@ class BoletimCadastroService
         }
         return [
             'nota_minima_aprovacao' => 6.0,
+            'escala_max' => 10.0,
             'round_mode' => 'none',
             'decimal_places' => 2,
             'escopo_arredondamento' => 'medias',
@@ -538,7 +543,7 @@ class BoletimCadastroService
      * Quadro de impressão (sem modelo) também precisa dessas casas/arredondamento/mínima.
      *
      * @param list<int> $seriesIds
-     * @return array{nota_minima_aprovacao:float,round_mode:string,decimal_places:int,escopo_arredondamento:string,regra:?array,boletim_id:int,minima_origem:string,regra_nome:string}
+     * @return array{nota_minima_aprovacao:float,escala_max:float,round_mode:string,decimal_places:int,escopo_arredondamento:string,regra:?array,boletim_id:int,minima_origem:string,regra_nome:string}
      */
     public function criteriosEfetivosParaDocumento(
         ?int $boletimId = null,
@@ -548,6 +553,7 @@ class BoletimCadastroService
     ): array {
         $padrao = [
             'nota_minima_aprovacao' => 6.0,
+            'escala_max' => 10.0,
             'round_mode' => 'none',
             'decimal_places' => 2,
             'escopo_arredondamento' => 'medias',

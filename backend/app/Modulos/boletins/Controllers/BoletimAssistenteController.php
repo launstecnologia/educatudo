@@ -356,8 +356,9 @@ class BoletimAssistenteController extends BaseController
     }
 
     /**
-     * A fórmula em edição fica no rascunho. Provas, jornada e nota manual vêm do evento já salvo,
-     * para a prévia achar os mesmos lançamentos da tela de configuração.
+     * A fórmula em edição fica no rascunho. Provas/jornada já salvas alimentam a prévia,
+     * mas chips do assistente já amarrados (provas_sistema + evento/blocos) não voltam
+     * para o placeholder `nenhuma` do banco — senão a média zera com nota lançada.
      *
      * @param array<string,mixed> $rascunho
      * @param array<string,mixed> $estado
@@ -411,6 +412,53 @@ class BoletimAssistenteController extends BaseController
                         $blocosWizard[$bidWizard] = $bidWizard;
                     }
                 }
+                foreach ((array) ($cfgWizard['blocos_ids'] ?? []) as $bidWizardCfg) {
+                    $bidWizardCfg = (int) $bidWizardCfg;
+                    if ($bidWizardCfg > 0) {
+                        $blocosWizard[$bidWizardCfg] = $bidWizardCfg;
+                    }
+                }
+                $evWizard = (int) ($cfgWizard['evento_avaliativo_id'] ?? $comp['evento_avaliativo_id'] ?? 0);
+                // Chip do catálogo já amarrado no assistente (ainda não salvo): não pode
+                // ser trocado pelo placeholder nenhuma do banco — senão a prévia zera.
+                if (($origem === '' || $origem === 'nenhuma') && $evWizard > 0) {
+                    $origem = 'provas_sistema';
+                    $comp['source_type'] = 'provas_sistema';
+                }
+                $wizardTemFonteProva = ($origem === 'provas_sistema') && ($evWizard > 0 || $blocosWizard !== []);
+
+                $cfgSalvaPeek = is_array($salvaComp['config'] ?? null) ? $salvaComp['config'] : [];
+                if ($cfgSalvaPeek === [] && is_string($salvaComp['config_json'] ?? null) && trim((string) $salvaComp['config_json']) !== '') {
+                    $tmpPeek = json_decode((string) $salvaComp['config_json'], true);
+                    $cfgSalvaPeek = is_array($tmpPeek) ? $tmpPeek : [];
+                }
+                $evSalva = (int) ($cfgSalvaPeek['evento_avaliativo_id'] ?? $salvaComp['evento_avaliativo_id'] ?? 0);
+                $srcSalva = strtolower(trim((string) ($salvaComp['source_type'] ?? '')));
+                $salvaEhPlaceholder = ($srcSalva === '' || $srcSalva === 'nenhuma') && $evSalva <= 0;
+
+                if ($wizardTemFonteProva && $salvaEhPlaceholder) {
+                    if ((int) ($salvaComp['id'] ?? 0) > 0) {
+                        $comp['id'] = (int) $salvaComp['id'];
+                    }
+                    if ($nome !== '') {
+                        $comp['nome'] = $nome;
+                    }
+                    if ($evWizard > 0) {
+                        $comp['evento_avaliativo_id'] = $evWizard;
+                        $cfgWizard['evento_avaliativo_id'] = $evWizard;
+                    }
+                    if ($blocosWizard !== []) {
+                        $comp['blocos_ids'] = array_values($blocosWizard);
+                        $cfgWizard['blocos_ids'] = array_values($blocosWizard);
+                        $cfgWizard['blocos_ids_manual'] = 1;
+                    }
+                    $comp['source_type'] = 'provas_sistema';
+                    $comp['config'] = $cfgWizard;
+                    unset($comp['config_json']);
+                    $componentes[] = $comp;
+                    continue;
+                }
+
                 $comp = $salvaComp;
                 if ($nome !== '') {
                     $comp['nome'] = $nome;
@@ -429,13 +477,24 @@ class BoletimAssistenteController extends BaseController
                 if (is_array($grupoLinha) && !empty($grupoLinha['enabled'])) {
                     $cfgSalva['group_line'] = $grupoLinha;
                 }
-                if ($origem === 'provas_sistema' && $blocosWizard !== []) {
-                    $comp['blocos_ids'] = array_values($blocosWizard);
-                    if (!empty($cfgWizard['blocos_ids_manual'])) {
+                if ($origem === 'provas_sistema') {
+                    if ($evWizard > 0) {
+                        $comp['source_type'] = 'provas_sistema';
+                        $comp['evento_avaliativo_id'] = $evWizard;
+                        $cfgSalva['evento_avaliativo_id'] = $evWizard;
+                    }
+                    if ($blocosWizard !== []) {
+                        $comp['blocos_ids'] = array_values($blocosWizard);
+                        $cfgSalva['blocos_ids'] = array_values($blocosWizard);
+                        $cfgSalva['blocos_ids_manual'] = 1;
+                    } elseif (!empty($cfgWizard['blocos_ids_manual'])) {
                         $cfgSalva['blocos_ids_manual'] = 1;
                     }
                     if (!empty($cfgWizard['prova_bimestres']) && is_array($cfgWizard['prova_bimestres'])) {
                         $cfgSalva['prova_bimestres'] = $cfgWizard['prova_bimestres'];
+                    }
+                    if (!empty($cfgWizard['tipo_avaliacao_id'])) {
+                        $cfgSalva['tipo_avaliacao_id'] = (int) $cfgWizard['tipo_avaliacao_id'];
                     }
                 }
                 // Mantém opções da peça Jornada escolhidas no assistente (ainda não salvas).

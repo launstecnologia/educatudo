@@ -137,6 +137,9 @@ class BoletimAssistenteWizard
             error_log('BoletimAssistenteWizard catalogo faltas: ' . $e->getMessage());
         }
 
+        $anoLetivoAtivo = $this->ferramentas->anoLetivoAtivo();
+        $escalaMaxPadrao = $this->escalaMaxPadraoDoAno($anoLetivoAtivo);
+
         return [
             'passos' => self::PASSOS,
             'modelos' => $this->modelosParaCatalogo(),
@@ -161,7 +164,8 @@ class BoletimAssistenteWizard
                 : [],
             'pecas' => $this->pecasMeta($tipos),
             'papeis' => self::papeisMeta(),
-            'ano_letivo_ativo' => $this->ferramentas->anoLetivoAtivo(),
+            'ano_letivo_ativo' => $anoLetivoAtivo,
+            'escala_max_padrao' => $escalaMaxPadrao,
             'periodos_por_ano' => $this->catalogoPeriodos(),
         ];
     }
@@ -241,7 +245,7 @@ class BoletimAssistenteWizard
     }
 
     /**
-     * @return list<array{id:int,nome:string,finalidade:string,ano_letivo:?int}>
+     * @return list<array{id:int,nome:string,finalidade:string,ano_letivo:?int,escala_max:float}>
      */
     private function catalogoBoletins(): array
     {
@@ -251,11 +255,49 @@ class BoletimAssistenteWizard
         }
         require_once $path;
         try {
-            return (new \App\Modulos\Boletins\Services\BoletimCadastroService())->listarParaEventoNotas();
+            $boletins = (new \App\Modulos\Boletins\Services\BoletimCadastroService())->listarParaEventoNotas();
+            foreach ($boletins as &$boletim) {
+                if (!is_array($boletim)) {
+                    continue;
+                }
+                $boletim['escala_max'] = $this->normalizarEscalaMaxima($boletim['escala_max'] ?? null, 10.0);
+            }
+            unset($boletim);
+
+            return $boletins;
         } catch (\Throwable $e) {
             error_log('BoletimAssistenteWizard catalogo boletins: ' . $e->getMessage());
             return [];
         }
+    }
+
+    private function escalaMaxPadraoDoAno(int $ano): float
+    {
+        $ano = $ano > 0 ? $ano : $this->ferramentas->anoLetivoPadrao();
+        try {
+            $service = new \App\Modulos\EventosAvaliativos\Services\EventoAvaliativoService();
+            $escala = $service->escalaMaximaPadrao($ano, 0);
+
+            return $this->normalizarEscalaMaxima($escala, 10.0);
+        } catch (\Throwable $e) {
+            return 10.0;
+        }
+    }
+
+    /**
+     * @param mixed $valor
+     */
+    private function normalizarEscalaMaxima($valor, float $fallback = 10.0): float
+    {
+        $escala = is_numeric($valor) ? round((float) $valor, 2) : $fallback;
+        if ($escala < 0.01) {
+            $escala = $fallback;
+        }
+        if ($escala > 999.0) {
+            return 999.0;
+        }
+
+        return $escala;
     }
 
     /**
@@ -507,6 +549,10 @@ class BoletimAssistenteWizard
         // Modelo vinculado: preenche matérias/séries (também no demonstrativo).
         $bol = $id > 0 ? $this->buscarBoletimCatalogo($id) : null;
         if (is_array($bol)) {
+            $estado['escala_max_padrao'] = $this->normalizarEscalaMaxima(
+                $bol['escala_max'] ?? null,
+                $this->escalaMaxPadraoDoAno((int) ($estado['ano_letivo'] ?? 0))
+            );
             if (($estado['finalidade'] ?? '') !== 'complementar') {
                 $estado['finalidade'] = (($bol['finalidade'] ?? '') === 'complementar') ? 'complementar' : 'oficial';
             }
@@ -531,6 +577,7 @@ class BoletimAssistenteWizard
         if (is_array($bol)) {
             $criterios = [
                 'nota_minima_aprovacao' => $bol['nota_minima_aprovacao'] ?? 6,
+                'escala_max' => $bol['escala_max'] ?? null,
                 'round_mode' => $bol['round_mode'] ?? 'none',
                 'decimal_places' => $bol['decimal_places'] ?? 2,
                 'minima_origem' => (($bol['minima_origem'] ?? '') === 'regra') ? 'regra' : 'padrao',
@@ -550,6 +597,12 @@ class BoletimAssistenteWizard
                 error_log('aplicarEscopoDoBoletimCadastro criterios: ' . $e->getMessage());
                 $criterios = null;
             }
+        }
+        if (is_array($criterios)) {
+            $estado['escala_max_padrao'] = $this->normalizarEscalaMaxima(
+                $criterios['escala_max'] ?? null,
+                $this->escalaMaxPadraoDoAno((int) ($estado['ano_letivo'] ?? 0))
+            );
         }
         if (!is_array($criterios) || ($criterios['regra'] ?? null) === null) {
             return;
@@ -731,6 +784,7 @@ class BoletimAssistenteWizard
             'boletim_id' => 0,
             'grupo_regras_notas_id' => 0,
             'nota_minima_aprovacao' => 6.0,
+            'escala_max_padrao' => $this->escalaMaxPadraoDoAno($ano),
             'nota_minima_origem' => 'padrao',
             'nota_minima_regra_nome' => '',
             'round_mode' => 'none',
@@ -837,6 +891,12 @@ class BoletimAssistenteWizard
                 if ($regraIdAtual > 0) {
                     $estado['nota_minima_origem'] = '';
                 }
+            }
+            if (isset($estadoFormulario['escala_max_padrao']) && $estadoFormulario['escala_max_padrao'] !== '') {
+                $estado['escala_max_padrao'] = $this->normalizarEscalaMaxima(
+                    $estadoFormulario['escala_max_padrao'],
+                    (float) $estado['escala_max_padrao']
+                );
             }
             if (!empty($estadoFormulario['round_mode'])) {
                 $estado['round_mode'] = (string) $estadoFormulario['round_mode'];
@@ -2126,6 +2186,10 @@ class BoletimAssistenteWizard
         $merged['nota_minima_aprovacao'] = isset($merged['nota_minima_aprovacao']) && $merged['nota_minima_aprovacao'] !== ''
             ? (float) $merged['nota_minima_aprovacao']
             : 6.0;
+        $merged['escala_max_padrao'] = $this->normalizarEscalaMaxima(
+            $merged['escala_max_padrao'] ?? null,
+            $this->escalaMaxPadraoDoAno((int) ($merged['ano_letivo'] ?? 0))
+        );
         $merged['round_mode'] = in_array((string) ($merged['round_mode'] ?? ''), ['none', 'half', 'places'], true)
             ? (string) $merged['round_mode']
             : 'none';
@@ -6349,6 +6413,13 @@ class BoletimAssistenteWizard
                 return min(999.0, $v);
             }
         }
+        if (isset($estado['escala_max_padrao']) && $estado['escala_max_padrao'] !== '') {
+            $padraoEstado = round((float) $estado['escala_max_padrao'], 2);
+            if ($padraoEstado >= 0.01) {
+                return min(999.0, $padraoEstado);
+            }
+        }
+
         return 10.0;
     }
 
