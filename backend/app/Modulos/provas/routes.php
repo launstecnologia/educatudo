@@ -121,10 +121,12 @@ $router->post('/admin/assistente/conversas/excluir', 'Modulos/provas/ProvasAluno
 $router->post('/admin/assistente/mensagem', 'Modulos/provas/ProvasAlunoAssistenteController@mensagem');
 $router->post('/admin/assistente/mensagem-stream', 'Modulos/provas/ProvasAlunoAssistenteController@mensagemStream');
 $router->post('/admin/assistente/ferramenta', 'Modulos/provas/ProvasAlunoAssistenteController@ferramenta');
+$router->post('/admin/assistente/confirmar-proposta', 'Modulos/provas/ProvasAlunoAssistenteController@confirmarProposta');
 $router->get('/admin/assistente-provas', 'Modulos/provas/ProvasAlunoAssistenteController@index');
 $router->post('/admin/assistente-provas/mensagem', 'Modulos/provas/ProvasAlunoAssistenteController@mensagem');
 $router->post('/admin/assistente-provas/mensagem-stream', 'Modulos/provas/ProvasAlunoAssistenteController@mensagemStream');
 $router->post('/admin/assistente-provas/ferramenta', 'Modulos/provas/ProvasAlunoAssistenteController@ferramenta');
+$router->post('/admin/assistente-provas/confirmar-proposta', 'Modulos/provas/ProvasAlunoAssistenteController@confirmarProposta');
 $router->get('/admin/blocos-modelo', 'Modulos/provas/ExamBlockModelController@index');
 $router->get('/admin/blocos-modelo/criar', 'Modulos/provas/ExamBlockModelController@criar');
 $router->post('/admin/blocos-modelo', 'Modulos/provas/ExamBlockModelController@salvar');

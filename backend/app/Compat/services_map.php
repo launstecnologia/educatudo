@@ -18,6 +18,7 @@ return [
     'App\\Services\\AssessmentVersionGenerator' => ['App\\Modulos\\Provas\\Services\\AssessmentVersionGenerator', 'Modulos/provas/Services/AssessmentVersionGenerator.php'],
     'App\\Services\\AssistenteConsultaAmpliadaService' => ['App\\Painel\\Admin\\Services\\AssistenteConsultaAmpliadaService', 'Painel/Admin/Services/AssistenteConsultaAmpliadaService.php'],
     'App\\Services\\AssistenteHistoricoService' => ['App\\Painel\\Admin\\Services\\AssistenteHistoricoService', 'Painel/Admin/Services/AssistenteHistoricoService.php'],
+    'App\\Services\\AssistenteAcaoPropostaService' => ['App\\Painel\\Admin\\Services\\AssistenteAcaoPropostaService', 'Painel/Admin/Services/AssistenteAcaoPropostaService.php'],
     'App\\Services\\AulaOnlineGravacaoService' => ['App\\Modulos\\AulasOnline\\Services\\AulaOnlineGravacaoService', 'Modulos/aulas-online/Services/AulaOnlineGravacaoService.php'],
     'App\\Services\\AvaActivityService' => ['App\\Modulos\\Ava\\Services\\AvaActivityService', 'Modulos/ava/Services/AvaActivityService.php'],
     'App\\Services\\AvaAgendaService' => ['App\\Modulos\\Ava\\Services\\AvaAgendaService', 'Modulos/ava/Services/AvaAgendaService.php'],

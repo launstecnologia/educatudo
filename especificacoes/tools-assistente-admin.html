@@ -123,10 +123,11 @@
     </p>
 
     <div class="note">
-      <strong>Importante:</strong> todas as tools deste documento são de <strong>consulta</strong>.
-      Elas ajudam a enxergar dados da escola, dos alunos, das turmas, dos professores, do boletim,
-      da frequência, do diário e das ocorrências. Hoje o Assistente <strong>não grava</strong> nota,
-      presença, ocorrência, matrícula ou financeiro direto pelo chat.
+      <strong>Importante:</strong> as tools das seções 1 a 5 são de <strong>consulta</strong>.
+      A seção 5b cobre <strong>ações de escrita</strong> (ocorrência, entrada/saída, chamada): o Assistente só monta um
+      <strong>rascunho</strong>; nada grava até o usuário clicar em <strong>Confirmar proposta</strong>.
+      As do módulo EducaSync (seção 6) seguem regras próprias. O Assistente <strong>não</strong> lança nota,
+      nem altera matrícula ou financeiro pelo chat.
     </div>
 
     <h2>Como pensar o Assistente</h2>
@@ -335,19 +336,24 @@
         <div class="meta"><span class="label">Consulta</span>Boletim completo no formato quadro anual</div>
         <p>
           Monta o quadro de PP, PU, CH, PE, MU, faltas, semestres e resultado final no padrão do sistema.
+          A resposta do chat é assertiva e a UI oferece botão para <strong>baixar PDF</strong>.
         </p>
         <ul>
           <li>Exemplo natural: “Boletim do RA 24254 em 2024”</li>
+          <li>Resposta esperada: “Boletim da Júlia Martiz (2ª B) — 2026. …” + botão PDF</li>
         </ul>
       </div>
 
       <div class="card">
         <h3><code>notas_evento_aluno</code></h3>
-        <div class="meta"><span class="label">Consulta</span>Notas de um evento específico</div>
-        <p>Serve para demonstrativos ou para pedir uma coluna específica, como MU ou PP de um bimestre.</p>
+        <div class="meta"><span class="label">Consulta</span>Notas de um evento / matéria específica</div>
+        <p>
+          Serve para demonstrativos, coluna (MU/PP) ou matéria (“nota de Matemática”).
+          A resposta deve ser direta: “A nota de Matemática da Júlia Martiz (2ª B) é **10**.”
+        </p>
         <ul>
           <li>Exemplo natural: “MU do 2º bimestre do RA 24254”</li>
-          <li>Exemplo natural: “Notas do 1º bimestre da Ana Luiza”</li>
+          <li>Exemplo natural: “Traga a nota de matemática da Júlia Martiz do 2B”</li>
         </ul>
       </div>
 
@@ -377,7 +383,133 @@
       </div>
     </div>
 
-    <h2>6. Ferramentas de apoio invisíveis para o usuário</h2>
+    <h2>5b. Ações com confirmação (escrita)</h2>
+    <div class="note">
+      Endpoint de confirmação: <code>POST /admin/assistente/confirmar-proposta</code>
+      com <code>proposta_id</code>, <code>confirmar=1</code> e CSRF. Só o autor confirma, uma única vez.
+      Tabela de auditoria: <code>assistente_propostas</code>.
+    </div>
+    <div class="grid">
+      <div class="card">
+        <h3><code>propor_criar_ocorrencia</code></h3>
+        <div class="meta"><span class="label">Proposta</span>Cria ocorrência multi-aluno + push</div>
+        <p>
+          Aceita N alunos (sem limite de 2). Resolve por nome/sobrenome (<code>LIKE %token%</code>) + turma,
+          RA ou <code>aluno_id</code>. Ao confirmar: grava via <code>OcorrenciaService</code>.
+          Push FCM aos responsáveis só se <code>enviar_pais</code>/<code>notificar_push</code> for pedido
+          explicitamente (padrão: desligado). Texto do push é genérico; o detalhe fica no app.
+        </p>
+        <ul>
+          <li>Exemplo: “Cria ocorrência leve para João Silva e Maria Souza da 1A: conversa com a coordenação”</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><code>propor_entrada_saida</code></h3>
+        <div class="meta"><span class="label">Proposta</span>Portaria — entrada ou saída</div>
+        <p>
+          Registra evento em <code>presenca_eventos</code> (<code>origem=manual_secretaria</code>) e aplica no diário
+          pelo fluxo já existente da portaria.
+        </p>
+        <ul>
+          <li>Exemplo: “Registra entrada do João Silva da 1A às 07:55”</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><code>propor_chamada_aula</code></h3>
+        <div class="meta"><span class="label">Proposta</span>Chamada da aula no diário</div>
+        <p>
+          Marca <code>presente</code>/<code>falta</code>/<code>atraso</code>/<code>falta_justificada</code> em
+          <code>diario_frequencias</code> via <code>ClassDiaryService</code>. Se houver várias aulas no dia,
+          devolve candidatos com <code>diario_aula_id</code>.
+        </p>
+        <ul>
+          <li>Exemplo: “Marca presente o João Silva na aula de Matemática de hoje na 1A”</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>6. EducaSync (módulo de grade horária)</h2>
+    <div class="note">
+      <strong>Escopo:</strong> estas tools pertencem ao <strong>módulo EducaSync</strong> e funcionam só dentro de um
+      cenário aberto em <code>/admin/educasync/{id}</code> (seção “Assistente”). Elas <strong>não</strong> fazem parte do
+      assistente geral de provas/alunos das seções anteriores e não aparecem no chat geral.
+      Chave TudiCoins: <code>educasync_assistente_mensagem</code> (pagador = escola; sem TudiCoins o assistente não responde).<br>
+      <strong>Regras:</strong> nenhuma tool <strong>publica</strong> a grade, nenhuma <strong>gera</strong> a grade (o solver só roda
+      pelo botão “Gerar grade”) e nenhuma altera o cenário sozinha. Mudanças de restrição são sempre uma
+      <strong>proposta</strong>: o assistente grava um rascunho e o usuário precisa clicar em <strong>“Confirmar proposta”</strong>.
+      Cada mensagem fica auditada em <code>educasync_comandos_ia</code> (texto enviado, proposta e se foi confirmada).
+    </div>
+    <div class="grid">
+      <div class="card">
+        <h3><code>get_school_schedule_context</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Resumo do cenário</div>
+        <p>Horários por dia, demandas, professores/turmas/matérias envolvidos, pesos, versões e execuções recentes.</p>
+        <ul>
+          <li>Exemplo natural: “Como está o cenário?”</li>
+          <li>Dados pessoais mínimos: só ids e nomes necessários</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3><code>get_teacher_availability</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Horários livres e bloqueados do professor</div>
+        <p>Aceita <code>professor_id</code> ou <code>professor_nome</code>; se o nome for ambíguo, pede o id.</p>
+        <ul>
+          <li>Exemplo natural: “Quais horários a professora Ana tem livres?”</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3><code>analyze_schedule_conflicts</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Conflitos de uma versão ou do cenário</div>
+        <p>
+          Com <code>versao_id</code>: confere duplicidade de turma/professor no mesmo horário, professor em horário bloqueado
+          e demandas incompletas. Sem versão: valida o cenário e aponta conflitos óbvios (ex.: professor com mais aulas que horários livres).
+          Análise estática — não roda o solver.
+        </p>
+      </div>
+
+      <div class="card">
+        <h3><code>propose_constraint_changes</code></h3>
+        <div class="meta"><span class="label">Proposta</span>Rascunho tipado — exige confirmação</div>
+        <p>Não aplica nada: valida e grava o rascunho (<code>confirmado = 0</code>). Tipos aceitos:</p>
+        <ul>
+          <li><code>bloquear_professor_dia</code> — ao confirmar, bloqueia todos os horários do dia para o professor (aplicado)</li>
+          <li><code>minimizar_janelas</code> — ao confirmar, ajusta o peso de janelas do cenário (aplicado; vale para as próximas gerações)</li>
+          <li><code>evitar_disciplina_slot</code> — ao confirmar, grava uma preferência (soft) em <code>educasync_restricoes</code> (matéria + horário, com peso); vale para as próximas gerações (aplicado)</li>
+          <li><code>concentrar_disciplina</code> — ao confirmar, grava uma preferência (soft) em <code>educasync_restricoes</code> (matéria, turma opcional, com peso); vale para as próximas gerações (aplicado)</li>
+        </ul>
+        <p>Todos os quatro tipos são aplicados ao confirmar. Única trava: <code>bloquear_professor_dia</code> não é aplicado quando o cenário já tem versões geradas (disponibilidade travada, como na tela). As restrições soft são enviadas ao solver achatadas (<code>tipo</code>, <code>peso</code>, <code>materia_id</code>, …); o efeito na grade depende de o solver implementar cada tipo.</p>
+      </div>
+
+      <div class="card">
+        <h3><code>validate_constraint_changes</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Validação estrutural da proposta</div>
+        <p>Confere tipos conhecidos, se professor/matéria/turma/horário existem e se os pesos estão na faixa (0 a 1000). Sem argumentos, valida o rascunho da mensagem atual.</p>
+      </div>
+
+      <div class="card">
+        <h3><code>compare_schedule_versions</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Diferença entre duas versões</div>
+        <p>Argumentos <code>versao_a</code> e <code>versao_b</code>. Compara métricas numéricas e conta alocações iguais e diferentes, com exemplos.</p>
+      </div>
+
+      <div class="card">
+        <h3><code>explain_schedule_result</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Fatos do solver vs. sugestões genéricas</div>
+        <p>
+          Devolve separado: <strong>fatos</strong> (status, métricas, aulas alocadas, janelas por professor, execução) e
+          <strong>sugestões genéricas</strong> (não simuladas no solver).
+        </p>
+      </div>
+    </div>
+    <ul>
+      <li><strong>Gerar/simular grade:</strong> o assistente orienta a usar o botão “Gerar grade”; não há chamada síncrona ao solver.</li>
+      <li><strong>Confirmação:</strong> <code>POST /admin/educasync/{id}/assistente/confirmar-proposta</code> com <code>comando_ia_id</code> e <code>confirmar=1</code>; só o autor da mensagem confirma, uma única vez.</li>
+      <li><strong>Publicação:</strong> continua exclusiva da tela da versão, com confirmação própria.</li>
+    </ul>
+
+    <h2>7. Ferramentas de apoio invisíveis para o usuário</h2>
     <p>
       Além das tools “visíveis” no resultado, o Assistente usa estruturas de apoio para manter contexto
       dentro da conversa, como o aluno atual, o histórico recente e resumos estruturados dos painéis já mostrados.
@@ -390,11 +522,13 @@
       e cite a <strong>turma</strong> quando houver chance de ambiguidade. Isso melhora bastante a precisão.
     </div>
 
-    <h2>7. O que ainda não faz</h2>
+    <h2>8. O que ainda não faz</h2>
     <ul>
-      <li>Não cria ocorrência, não lança nota e não marca presença pelo chat.</li>
+      <li>Não lança nota pelo chat.</li>
       <li>Não altera matrícula, financeiro ou dados cadastrais sensíveis.</li>
-      <li>Não substitui as telas transacionais do admin; hoje ele é uma camada de consulta inteligente.</li>
+      <li>No EducaSync, não gera nem publica grade horária; só propõe restrições que o usuário confirma.</li>
+      <li>Ocorrência, entrada/saída e chamada existem como proposta — só gravam após o botão Confirmar.</li>
+      <li>Não substitui as telas transacionais do admin para fluxos complexos (anexos, fechamento de diário, etc.).</li>
     </ul>
 
     <div class="footer">

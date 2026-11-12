@@ -461,6 +461,7 @@ class AssistenteConsultaAmpliadaService
         $regraId = (int) ($filtros['regra_id'] ?? $filtros['evento_id'] ?? 0);
         $eventoNome = trim((string) ($filtros['evento_nome'] ?? $filtros['nome'] ?? ''));
         $coluna = strtoupper(trim((string) ($filtros['coluna'] ?? $filtros['campo'] ?? '')));
+        $materiaFiltro = trim((string) ($filtros['materia'] ?? $filtros['materia_nome'] ?? $filtros['disciplina'] ?? ''));
 
         $boletim = new BoletimConfig();
         $boletim->ensureSchema();
@@ -583,6 +584,24 @@ class AssistenteConsultaAmpliadaService
             unset($linha);
         }
 
+        if ($materiaFiltro !== '') {
+            $alvo = $this->normalizarTextoBusca($materiaFiltro);
+            $linhas = array_values(array_filter(
+                $linhas,
+                function (array $linha) use ($alvo): bool {
+                    $nome = $this->normalizarTextoBusca((string) ($linha['materia'] ?? $linha['materia_nome'] ?? ''));
+                    return $nome !== '' && ($nome === $alvo || str_contains($nome, $alvo) || str_contains($alvo, $nome));
+                }
+            ));
+            if ($linhas === []) {
+                return [
+                    'ok' => false,
+                    'error' => 'Matéria "' . $materiaFiltro . '" não encontrada neste evento para o aluno.',
+                    'aluno' => $aluno['aluno'],
+                ];
+            }
+        }
+
         return [
             'ok' => true,
             'formato' => 'evento',
@@ -595,6 +614,7 @@ class AssistenteConsultaAmpliadaService
                 'exibir_em' => $regra['exibir_em'] ?? null,
             ],
             'coluna' => $coluna !== '' ? $coluna : null,
+            'materia' => $materiaFiltro !== '' ? $materiaFiltro : null,
             'quadro' => [
                 'colunas' => $colunas,
                 'grupos' => $this->agruparCabecalhosColunas($colunas),
@@ -1909,6 +1929,20 @@ class AssistenteConsultaAmpliadaService
             return strcmp((string) ($a['professor_nome'] ?? ''), (string) ($b['professor_nome'] ?? ''));
         });
         return $out;
+    }
+
+    private function normalizarTextoBusca(string $texto): string
+    {
+        $texto = mb_strtolower(trim($texto));
+        $map = [
+            'á' => 'a', 'à' => 'a', 'â' => 'a', 'ã' => 'a',
+            'é' => 'e', 'ê' => 'e',
+            'í' => 'i',
+            'ó' => 'o', 'ô' => 'o', 'õ' => 'o',
+            'ú' => 'u', 'ü' => 'u',
+            'ç' => 'c',
+        ];
+        return strtr($texto, $map);
     }
 
     private function normalizarData($raw): ?string

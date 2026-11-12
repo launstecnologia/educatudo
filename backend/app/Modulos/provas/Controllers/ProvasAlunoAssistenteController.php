@@ -134,6 +134,8 @@ class ProvasAlunoAssistenteController extends BaseController
         $this->assertIaDisponivel();
 
         $payload = $this->lerPayloadMensagem();
+        $user = $this->auth->getUser();
+        $this->assistente->definirContextoAcao((int) ($user['id'] ?? 0), (int) ($payload['conversa_id'] ?? 0));
         $resultado = $this->assistente->processarMensagem(
             $payload['mensagem'],
             $payload['historico']
@@ -183,6 +185,8 @@ class ProvasAlunoAssistenteController extends BaseController
         }
 
         $payload = $this->lerPayloadMensagem();
+        $user = $this->auth->getUser();
+        $this->assistente->definirContextoAcao((int) ($user['id'] ?? 0), (int) ($payload['conversa_id'] ?? 0));
         $resultado = $this->assistente->processarMensagem(
             $payload['mensagem'],
             $payload['historico'],
@@ -229,6 +233,8 @@ class ProvasAlunoAssistenteController extends BaseController
             }
             $args[$k] = $v;
         }
+        $user = $this->auth->getUser();
+        $this->assistente->definirContextoAcao((int) ($user['id'] ?? 0), (int) ($_POST['conversa_id'] ?? 0));
         $resultado = $this->assistente->executarTool($tool, $args);
         $ok = !isset($resultado['ok']) || !empty($resultado['ok']);
         $this->json([
@@ -236,6 +242,32 @@ class ProvasAlunoAssistenteController extends BaseController
             'error' => $resultado['error'] ?? null,
             'data' => $resultado,
         ], $ok ? 200 : 400);
+    }
+
+    public function confirmarProposta(): void
+    {
+        if (!$this->verifyCsrfToken((string) ($_POST['_token'] ?? ''))) {
+            $this->json(['success' => false, 'error' => 'CSRF inválido. Recarregue a página.'], 419);
+        }
+
+        $confirmar = $_POST['confirmar'] ?? null;
+        if ($confirmar !== 1 && $confirmar !== '1' && $confirmar !== true) {
+            $this->json(['success' => false, 'error' => 'Confirmação explícita obrigatória (confirmar=1).'], 422);
+        }
+
+        $propostaId = (int) ($_POST['proposta_id'] ?? 0);
+        if ($propostaId <= 0) {
+            $this->json(['success' => false, 'error' => 'proposta_id obrigatório.'], 422);
+        }
+
+        $user = $this->auth->getUser() ?: [];
+        $usuarioId = (int) ($user['id'] ?? 0);
+        if ($usuarioId <= 0) {
+            $this->json(['success' => false, 'error' => 'Sessão inválida.'], 401);
+        }
+
+        $resultado = $this->assistente->acoes()->confirmar($propostaId, $usuarioId, $user);
+        $this->json($resultado, !empty($resultado['success']) ? 200 : 400);
     }
 
     /**

@@ -23,6 +23,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
      data-url-criar="<?= htmlspecialchars($urlBase . '/conversas/criar', ENT_QUOTES, 'UTF-8') ?>"
      data-url-renomear="<?= htmlspecialchars($urlBase . '/conversas/renomear', ENT_QUOTES, 'UTF-8') ?>"
      data-url-excluir="<?= htmlspecialchars($urlBase . '/conversas/excluir', ENT_QUOTES, 'UTF-8') ?>"
+     data-url-confirmar="<?= htmlspecialchars($urlBase . '/confirmar-proposta', ENT_QUOTES, 'UTF-8') ?>"
      data-csrf="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>"
      data-conversas="<?= htmlspecialchars(json_encode($conversasIniciais, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>">
 
@@ -33,14 +34,10 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             <div class="min-w-0">
                 <h1 class="text-2xl font-bold text-gray-900"><?= $assistenteNome ?></h1>
                 <p class="text-sm text-gray-600 mt-1">
-                    Consulte aluno (provas/jornadas/boletim/faltas/ocorrências), turma (saúde), bloco de prova ou professor.
+                    Consulte aluno/turma/professor e proponha ocorrência, entrada/saída ou chamada (com confirmação).
                 </p>
             </div>
         </div>
-        <a href="<?= URL ?>/admin/doc-sistema/tool"
-           class="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 shrink-0">
-            <i class="fa-solid fa-book text-xs"></i> Docs das tools
-        </a>
     </div>
 
     <?php if (!$disponivel): ?>
@@ -188,7 +185,8 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
         obter: root.getAttribute('data-url-obter'),
         criar: root.getAttribute('data-url-criar'),
         renomear: root.getAttribute('data-url-renomear'),
-        excluir: root.getAttribute('data-url-excluir')
+        excluir: root.getAttribute('data-url-excluir'),
+        confirmar: root.getAttribute('data-url-confirmar')
     };
 
     var conversas = [];
@@ -383,6 +381,111 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 });
             });
             container.appendChild(list);
+            return;
+        }
+
+        if (painel.tipo === 'candidatos_aulas') {
+            var avisoA = document.createElement('p');
+            avisoA.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+            avisoA.textContent = painel.aviso || 'Há mais de uma aula:';
+            container.appendChild(avisoA);
+            var listA = document.createElement('div');
+            listA.className = 'overflow-x-auto border border-gray-200 rounded-lg';
+            var htmlA = '<table class="min-w-full text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-600"><tr>'
+                + '<th class="px-3 py-2 text-left">Aula</th><th class="px-3 py-2 text-left">Matéria</th>'
+                + '<th class="px-3 py-2 text-left">Horário</th><th class="px-3 py-2"></th></tr></thead><tbody>';
+            (painel.candidatos_aulas || []).forEach(function (a) {
+                var askA = 'Usar diario_aula_id ' + a.diario_aula_id
+                    + ' (' + (a.materia_nome || '') + ' · ' + (a.data_aula || '') + ')';
+                htmlA += '<tr class="border-t"><td class="px-3 py-2 font-medium">#' + esc(a.diario_aula_id)
+                    + ' · ' + esc(a.turma_nome || '—')
+                    + '</td><td class="px-3 py-2">' + esc(a.materia_nome || '—')
+                    + '</td><td class="px-3 py-2">' + esc(a.horario || '—')
+                    + '</td><td class="px-3 py-2 text-right"><button type="button" class="pa-chip" data-ask="' + esc(askA) + '">Selecionar</button></td></tr>';
+            });
+            htmlA += '</tbody></table>';
+            listA.innerHTML = htmlA;
+            listA.querySelectorAll('[data-ask]').forEach(function (el) {
+                el.addEventListener('click', function () {
+                    input.value = el.getAttribute('data-ask');
+                    form.dispatchEvent(new Event('submit', { cancelable: true }));
+                });
+            });
+            container.appendChild(listA);
+            return;
+        }
+
+        if (painel.tipo === 'proposta') {
+            var box = document.createElement('div');
+            box.className = 'rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 space-y-3';
+            var tituloP = document.createElement('p');
+            tituloP.className = 'text-sm font-semibold text-indigo-900';
+            tituloP.textContent = 'Proposta pendente de confirmação';
+            box.appendChild(tituloP);
+            var resumoP = document.createElement('p');
+            resumoP.className = 'text-sm text-indigo-900';
+            resumoP.textContent = painel.resumo || 'Revise e confirme para aplicar.';
+            box.appendChild(resumoP);
+            if (painel.payload && painel.payload.detalhe) {
+                var detalheP = document.createElement('p');
+                detalheP.className = 'text-sm text-indigo-800 whitespace-pre-wrap border-t border-indigo-100 pt-2';
+                detalheP.textContent = 'Detalhe: ' + String(painel.payload.detalhe);
+                box.appendChild(detalheP);
+            }
+            if (painel.payload && Array.isArray(painel.payload.alunos) && painel.payload.alunos.length) {
+                var alunosP = document.createElement('p');
+                alunosP.className = 'text-xs text-indigo-700';
+                alunosP.textContent = 'Alunos: ' + painel.payload.alunos.map(function (a) {
+                    return (a && a.nome) ? a.nome : '';
+                }).filter(Boolean).join(', ');
+                box.appendChild(alunosP);
+            }
+            var situacaoP = document.createElement('p');
+            situacaoP.className = 'text-xs text-indigo-700';
+            situacaoP.textContent = painel.situacao || 'RASCUNHO';
+            box.appendChild(situacaoP);
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-60';
+            btn.textContent = 'Confirmar proposta';
+            btn.addEventListener('click', function () {
+                if (!window.confirm('Aplicar esta proposta agora? Esta ação grava no sistema.')) {
+                    return;
+                }
+                btn.disabled = true;
+                btn.textContent = 'Confirmando…';
+                var body = new URLSearchParams();
+                body.set('_token', csrf);
+                body.set('proposta_id', String(painel.proposta_id || 0));
+                body.set('confirmar', '1');
+                fetch(urls.confirmar, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: body,
+                    credentials: 'same-origin'
+                }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+                  .then(function (res) {
+                      var msg = document.createElement('p');
+                      msg.className = 'text-sm mt-2 ' + (res.ok && res.j.success ? 'text-emerald-700' : 'text-rose-700');
+                      msg.textContent = (res.j && (res.j.mensagem || res.j.error)) || (res.ok ? 'Aplicado.' : 'Falha ao confirmar.');
+                      box.appendChild(msg);
+                      if (res.ok && res.j.success) {
+                          btn.textContent = 'Confirmada';
+                      } else {
+                          btn.disabled = false;
+                          btn.textContent = 'Confirmar proposta';
+                      }
+                  }).catch(function () {
+                      btn.disabled = false;
+                      btn.textContent = 'Confirmar proposta';
+                      var err = document.createElement('p');
+                      err.className = 'text-sm mt-2 text-rose-700';
+                      err.textContent = 'Erro de rede ao confirmar.';
+                      box.appendChild(err);
+                  });
+            });
+            box.appendChild(btn);
+            container.appendChild(box);
             return;
         }
 
@@ -1369,6 +1472,29 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 avB.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
                 avB.textContent = painel.aviso;
                 container.appendChild(avB);
+            }
+            if (painel.pdf_url || painel.pdf_oficial_url) {
+                var pdfBar = document.createElement('div');
+                pdfBar.className = 'flex flex-wrap gap-2 mb-2';
+                if (painel.pdf_url) {
+                    var aPdf = document.createElement('a');
+                    aPdf.href = painel.pdf_url;
+                    aPdf.target = '_blank';
+                    aPdf.rel = 'noopener';
+                    aPdf.className = 'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700';
+                    aPdf.innerHTML = '<i class="fa-solid fa-file-pdf"></i> Baixar boletim (PDF)';
+                    pdfBar.appendChild(aPdf);
+                }
+                if (painel.pdf_oficial_url) {
+                    var aOf = document.createElement('a');
+                    aOf.href = painel.pdf_oficial_url;
+                    aOf.target = '_blank';
+                    aOf.rel = 'noopener';
+                    aOf.className = 'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-indigo-200 text-indigo-800 text-sm font-medium hover:bg-indigo-50';
+                    aOf.innerHTML = '<i class="fa-solid fa-stamp"></i> PDF oficial (fechamento)';
+                    pdfBar.appendChild(aOf);
+                }
+                container.appendChild(pdfBar);
             }
             if (painel.formato === 'quadro_anual' && painel.quadro) {
                 var tituloQ = 'Boletim'

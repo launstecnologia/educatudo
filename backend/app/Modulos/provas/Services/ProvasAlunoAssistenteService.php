@@ -9,6 +9,7 @@ namespace App\Modulos\Provas\Services;
 
 use App\Core\CreditosModuleRegistry;
 use App\Modulos\Jornadas\Services\JornadasAlunoConsultaService;
+use App\Painel\Admin\Services\AssistenteAcaoPropostaService;
 use App\Painel\Admin\Services\AssistenteConsultaAmpliadaService;
 
 class ProvasAlunoAssistenteService
@@ -24,23 +25,40 @@ class ProvasAlunoAssistenteService
     private JornadasAlunoConsultaService $jornadas;
     private ProvasProfessorConsultaService $professores;
     private AssistenteConsultaAmpliadaService $ampliada;
+    private AssistenteAcaoPropostaService $acoes;
     /** @var \App\Services\OpenAIService */
     private $openai;
+    private int $usuarioIdContexto = 0;
+    private int $conversaIdContexto = 0;
 
     public function __construct(
         ?ProvasAlunoConsultaService $consulta = null,
         ?JornadasAlunoConsultaService $jornadas = null,
         ?ProvasProfessorConsultaService $professores = null,
         ?AssistenteConsultaAmpliadaService $ampliada = null,
-        $openai = null
+        $openai = null,
+        ?AssistenteAcaoPropostaService $acoes = null
     ) {
         $this->consulta = $consulta ?? new ProvasAlunoConsultaService();
         $this->jornadas = $jornadas ?? new JornadasAlunoConsultaService($this->consulta);
         $this->professores = $professores ?? new ProvasProfessorConsultaService();
         $this->ampliada = $ampliada ?? new AssistenteConsultaAmpliadaService($this->consulta, $this->professores);
+        $this->acoes = $acoes ?? new AssistenteAcaoPropostaService(null, $this->consulta);
         $this->openai = $openai instanceof \App\Services\OpenAIService
             ? $openai
             : new \App\Services\OpenAIService();
+    }
+
+    /** Contexto do admin/conversa para gravar propostas de escrita. */
+    public function definirContextoAcao(int $usuarioId, int $conversaId = 0): void
+    {
+        $this->usuarioIdContexto = max(0, $usuarioId);
+        $this->conversaIdContexto = max(0, $conversaId);
+    }
+
+    public function acoes(): AssistenteAcaoPropostaService
+    {
+        return $this->acoes;
     }
 
     public function consulta(): ProvasAlunoConsultaService
@@ -124,9 +142,12 @@ class ProvasAlunoAssistenteService
                     'role' => 'user',
                     'content' => "Resultado da consulta ({$tool}):\n"
                         . json_encode($resultadoTool, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
-                        . "\n\nUse esses dados (não invente). Se precisar de outra consulta, emita <<<CONSULTA>>> de novo. "
+                        . "\n\nPedido original do usuário: «{$mensagemUsuario}»\n"
+                        . "Use esses dados (não invente). Se precisar de outra consulta, emita <<<CONSULTA>>> de novo. "
                         . 'Se o usuário pediu questões erradas/detalhe e você ainda NÃO chamou detalhar_prova_aluno (com prova_id do contexto e somente_erros=true), chame agora. '
-                        . 'Caso contrário, texto CURTO (2–4 linhas). A UI monta a tabela — não diga que não consegue se o resultado trouxe questoes[].',
+                        . 'Caso contrário, responda de forma ASSERTIVA: 1–2 frases respondendo EXATAMENTE o pedido, com o valor em **negrito**. '
+                        . 'Ex.: "A nota de Matemática da Júlia Martiz (2ª B) é **10**." '
+                        . 'A UI monta tabelas/PDF — não diga que não consegue se o resultado trouxe dados.',
                 ];
             }
         } catch (\Throwable $e) {
@@ -136,6 +157,11 @@ class ProvasAlunoAssistenteService
 
         if ($textoFinal === null) {
             $textoFinal = 'Consultei os dados. Escolha: provas semanais, bimestrais, um bimestre específico ou consolidado geral.';
+        }
+
+        $direta = $this->montarRespostaDireta($mensagemUsuario, $ultimaTool, $ultimoResultado);
+        if ($direta !== null) {
+            $textoFinal = $direta;
         }
 
         // Fallback: pedido de "qual errou" + última tool foi lista → detalha automaticamente.
@@ -199,6 +225,15 @@ class ProvasAlunoAssistenteService
             && !empty($ultimoResultado['candidatos_provas'])
         ) {
             $textoFinal = 'Encontrei mais de uma prova. Qual delas você quer detalhar?';
+        }
+
+        if (
+            in_array($ultimaTool, ['propor_criar_ocorrencia', 'propor_entrada_saida', 'propor_chamada_aula'], true)
+            && is_array($ultimoResultado)
+            && !empty($ultimoResultado['ok'])
+            && !empty($ultimoResultado['proposta_id'])
+        ) {
+            $textoFinal = 'Preparei uma proposta. Revise abaixo e confirme se estiver de acordo.';
         }
 
         try {
@@ -374,6 +409,27 @@ class ProvasAlunoAssistenteService
             case 'ocorrencias_aluno':
                 return $this->ampliada->ocorrenciasAluno($args);
 
+            case 'propor_criar_ocorrencia':
+                return $this->acoes->proporCriarOcorrencia(
+                    $args,
+                    $this->usuarioIdContexto,
+                    $this->conversaIdContexto
+                );
+
+            case 'propor_entrada_saida':
+                return $this->acoes->proporEntradaSaida(
+                    $args,
+                    $this->usuarioIdContexto,
+                    $this->conversaIdContexto
+                );
+
+            case 'propor_chamada_aula':
+                return $this->acoes->proporChamadaAula(
+                    $args,
+                    $this->usuarioIdContexto,
+                    $this->conversaIdContexto
+                );
+
             default:
                 return ['ok' => false, 'error' => 'Tool desconhecida: ' . $tool];
         }
@@ -387,6 +443,27 @@ class ProvasAlunoAssistenteService
     {
         if ($resultado === null || $tool === null) {
             return null;
+        }
+        if (
+            in_array($tool, ['propor_criar_ocorrencia', 'propor_entrada_saida', 'propor_chamada_aula'], true)
+            && !empty($resultado['ok'])
+            && !empty($resultado['proposta_id'])
+        ) {
+            return [
+                'tipo' => 'proposta',
+                'proposta_id' => (int) $resultado['proposta_id'],
+                'acao' => (string) ($resultado['tipo'] ?? ''),
+                'resumo' => (string) ($resultado['resumo'] ?? ''),
+                'situacao' => (string) ($resultado['situacao'] ?? 'RASCUNHO'),
+                'payload' => is_array($resultado['payload'] ?? null) ? $resultado['payload'] : [],
+            ];
+        }
+        if (!empty($resultado['candidatos_aulas']) && is_array($resultado['candidatos_aulas'])) {
+            return [
+                'tipo' => 'candidatos_aulas',
+                'aviso' => (string) ($resultado['aviso'] ?? 'Há mais de uma aula. Escolha uma:'),
+                'candidatos_aulas' => $resultado['candidatos_aulas'],
+            ];
         }
         if (!empty($resultado['candidatos']) && is_array($resultado['candidatos'])) {
             $primeiro = $resultado['candidatos'][0] ?? [];
@@ -779,6 +856,15 @@ class ProvasAlunoAssistenteService
             ];
         }
         if ($tool === 'boletim_aluno' && !empty($resultado['ok'])) {
+            $alunoId = (int) ($resultado['aluno']['id'] ?? 0);
+            $base = defined('URL') ? rtrim((string) URL, '/') : '';
+            $pdfUrl = $alunoId > 0 ? ($base . '/admin/students/' . $alunoId . '/boletim/pdf') : null;
+            $pdfOficial = $alunoId > 0
+                ? ($base . '/admin/resultados-finais/aluno/' . $alunoId . '/boletim/pdf'
+                    . (!empty($resultado['aluno']['turma_id'])
+                        ? ('?turma_id=' . (int) $resultado['aluno']['turma_id'])
+                        : ''))
+                : null;
             return [
                 'tipo' => 'boletim_aluno',
                 'formato' => $resultado['formato'] ?? 'eventos',
@@ -789,6 +875,8 @@ class ProvasAlunoAssistenteService
                 'eventos' => $resultado['eventos'] ?? [],
                 'total_eventos' => (int) ($resultado['total_eventos'] ?? 0),
                 'aviso' => $resultado['aviso'] ?? null,
+                'pdf_url' => $pdfUrl,
+                'pdf_oficial_url' => $pdfOficial,
                 'opcoes' => [
                     'Notas do 1º bimestre',
                     'Ver ocorrências deste aluno',
@@ -864,13 +952,13 @@ class ProvasAlunoAssistenteService
         return <<<PROMPT
 Você é o Assistente da EducaTudo (coordenação/direção).
 
-Objetivo: consultar ALUNOS (provas/jornadas/boletim/faltas/ocorrências/perfil 360), TURMAS (saúde, provas, ocorrências, grade), DIÁRIO, BLOCOS de prova, e PROFESSORES (provas, jornadas, grade).
+Objetivo: consultar ALUNOS (provas/jornadas/boletim/faltas/ocorrências/perfil 360), TURMAS (saúde, provas, ocorrências, grade), DIÁRIO, BLOCOS de prova, PROFESSORES, e propor AÇÕES DE ESCRITA (ocorrência, entrada/saída, chamada) que o usuário confirma no botão.
 
 Regras importantes:
-1) Nunca invente notas, datas, progresso, enunciados, alunos ou professores — só dados das consultas.
+1) Nunca invente notas, datas, progresso, enunciados, alunos ou professores — só dados das consultas/propostas.
 2) Se citar turma (ex.: "2 Ano B", "2ªB"), SEMPRE passe args.turma / turma_nome (separado do nome).
 3) NUNCA peça confirmação antes de consultar. Chame a tool primeiro. Se houver 1 aluno, use-o; se houver vários, mostre candidatos.
-4) termo/aluno_nome = só o nome (ex.: "Maria Clara"), NUNCA junte turma no nome ("Maria Clara do 2 Ano B" está errado).
+4) termo/aluno_nome = só o nome (ex.: "Maria Clara" = nome + sobrenome com LIKE %%token%%), NUNCA junte turma no nome ("Maria Clara do 2 Ano B" está errado).
 5) Se o usuário informar RA/matrícula (ex.: "RA 24254"), passe args.ra só com os dígitos ("24254"). Não misture "ra", "ano" ou turma no mesmo campo.
 6) Ano letivo (ex.: 2024) vai em args.ano_letivo / args.ano, nunca dentro de aluno_nome ou ra.
 7) Pedido sobre ALUNO + provas → resumo_provas_aluno ou listar_provas_aluno (última prova = listar e pegar a mais recente).
@@ -882,16 +970,24 @@ Regras importantes:
 13) Pedido de PERFIL 360 / visão geral de um aluno → perfil_aluno_360.
 14) Pedido de DIÁRIO atrasado / pendências de diário → diario_pendencias.
 15) Pedido de GRADE HORÁRIA / "qual aula hoje" → grade_horaria_consulta.
-16) Pedido de BOLETIM / médias e faltas por bimestre / quadro anual → boletim_aluno (formato quadro PP/PU/CH/PE/MU).
-17) Pedido de NOTAS DE EVENTO / demonstrativo / "PP do 1º bimestre" / "MU do 2º" → notas_evento_aluno (passe bimestre e/ou coluna).
-18) Frequência/presença/faltas → faltas_aluno.
-19) Ocorrência/incidente/disciplina/comportamento de ALUNO → ocorrencias_aluno. Ocorrências da TURMA → ocorrencias_turma. NUNCA use faltas_aluno para ocorrência.
+16) Pedido de BOLETIM completo → boletim_aluno. Pedido de UMA NOTA de matéria (ex.: "nota de matemática da Júlia") → notas_evento_aluno com materia="Matemática" (e bimestre/coluna se souber); se precisar do quadro, use boletim_aluno e responda só a célula pedida.
+17) Pedido de NOTAS DE EVENTO / demonstrativo / "PP do 1º bimestre" / "MU do 2º" → notas_evento_aluno (passe bimestre e/ou coluna e/ou materia).
+18) Frequência/presença/faltas (consulta) → faltas_aluno.
+19) CONSULTA de ocorrência/incidente de ALUNO → ocorrencias_aluno. Ocorrências da TURMA → ocorrencias_turma. NUNCA use faltas_aluno para ocorrência.
 20) Detalhe de questão → detalhar_prova_aluno com somente_erros=true.
-21) Resposta final: texto CURTO (2–4 linhas). A UI monta tabelas.
+21) RESPOSTA ASSERTIVA (obrigatório): responda EXATAMENTE o que foi pedido, em 1–2 frases, com o valor em destaque markdown (**10**). Exemplos:
+    - "qual a nota de matemática da Júlia Martiz do 2B?" → "**A nota de Matemática da Júlia Martiz (2ª B) é 10.**"
+    - "boletim do João" → "**Boletim do João Silva (1ª A) — 2026.** O quadro completo está abaixo; use o botão para baixar o PDF."
+    - "quantas faltas tem a Ana?" → "**Ana Souza tem 4 faltas (frequência 92%).**"
+    NÃO enrole, NÃO invente opções extras, NÃO diga "segue um resumo" se o pedido era um número/nota.
 22) Se a tool devolver candidatos/aviso, liste-os e peça escolha — não diga "não encontrei" se houver candidatos.
 23) NUNCA invente quantidade de faltas/ocorrências/notas. Sempre chame a tool adequada. Se frequencia=null ou aviso de sem lançamentos, diga isso — não chute um número.
 24) NUNCA escreva [contexto_estruturado], aluno_id=, prova_id= nem metadados internos na resposta ao usuário. Isso é só para a UI/histórico.
 25) Saude_academica é alerta cadastral/matrícula/chamada da escola; para rendimento de uma turma use saude_turma.
+26) CRIAR ocorrência / registrar incidente → propor_criar_ocorrencia (aceita vários alunos). NÃO diga que criou — diga que preparou a proposta e o usuário confirma no botão.
+27) Registrar ENTRADA ou SAÍDA (portaria) → propor_entrada_saida.
+28) Marcar PRESENTE/FALTA na CHAMADA de uma aula do diário → propor_chamada_aula.
+29) Em ações de escrita, se nome ficar ambíguo, devolva candidatos; nunca chute aluno_id.
 
 Para obter dados, emita EXATAMENTE:
 <<<CONSULTA>>>
@@ -920,16 +1016,21 @@ Tools — turma / bloco / diário / agenda / boletim / faltas / ocorrências:
 24) buscar_blocos — {"titulo":"Simulado"} ou {"turma_nome":"2ªB"}
 25) resultados_bloco — {"bloco_id":10} ou {"titulo":"Simulado 1"}
 26) perfil_aluno_360 — {"ra":"24254","ano_letivo":2024} — resumo geral do aluno
-27) boletim_aluno — {"ra":"24254","ano_letivo":2024} — quadro anual (PP/PU/CH/PE/MU por bimestre)
-28) notas_evento_aluno — {"ra":"24254","ano_letivo":2024,"bimestre":1} ou {"coluna":"MU","bimestre":2} — notas de um evento/demonstrativo
+27) boletim_aluno — {"ra":"24254","ano_letivo":2024} — quadro anual (PP/PU/CH/PE/MU por bimestre); a UI oferece PDF
+28) notas_evento_aluno — {"ra":"24254","materia":"Matemática","bimestre":2} ou {"coluna":"MU","bimestre":2} — nota/matéria/coluna específica
 29) faltas_aluno — {"ra":"24254","ano_letivo":2024} ou {"aluno_id":365} — frequência/presença (NÃO é ocorrência). Passe o mesmo ano_letivo da conversa.
 30) ocorrencias_aluno — {"ra":"24254","ano_letivo":2024} ou {"aluno_id":123,"status":"aberta"} — incidentes disciplinares
 31) ocorrencias_turma — {"turma_nome":"1A","status":"aberta"} ou {"turma_id":37} — incidentes da turma
 
+Tools — ações (só rascunho; o usuário confirma no botão):
+32) propor_criar_ocorrencia — {"alunos":["João Silva","Maria Souza"],"turma":"1A","titulo":"Conversa","detalhe":"...","nivel_gravidade":"leve","categoria_id":1,"enviar_pais":false} — N alunos ok; nome+sobrenome; push SÓ se o usuário pedir notificar pais (enviar_pais=true)
+33) propor_entrada_saida — {"aluno_nome":"João Silva","turma":"1A","tipo":"entrada","ocorrido_em":"2026-11-12 07:55"} ou tipo=saida
+34) propor_chamada_aula — {"aluno_nome":"João Silva","turma":"1A","situacao":"presente","data":"2026-11-12","materia":"Matemática"} ou {"diario_aula_id":10,"aluno_id":123,"situacao":"falta"}
+
 Tipos de avaliação (provas) desta escola:
 PROMPT
             . json_encode($tiposResumo, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
-            . "\n\nQuando já tiver os dados, responda em texto curto (sem <<<CONSULTA>>>).";
+            . "\n\nQuando já tiver os dados, responda de forma ASSERTIVA e formatada (sem <<<CONSULTA>>>), destacando o valor pedido em **negrito**.";
     }
 
     /**
@@ -1094,6 +1195,254 @@ PROMPT
         $resposta = preg_replace('/\[contexto_estruturado\][\s\S]*$/u', '', $resposta) ?? $resposta;
         $resposta = preg_replace('/^\s*aluno_id\s*=\s*\d+.*$/mu', '', $resposta) ?? $resposta;
         return trim($resposta);
+    }
+
+    /**
+     * Quando o pedido é pontual (nota de uma matéria, boletim, faltas), monta frase assertiva
+     * a partir do resultado da tool — independente do estilo da IA.
+     *
+     * @param array<string,mixed>|null $resultado
+     */
+    private function montarRespostaDireta(string $pergunta, ?string $tool, ?array $resultado): ?string
+    {
+        if ($tool === null || !is_array($resultado) || empty($resultado['ok'])) {
+            return null;
+        }
+        $aluno = is_array($resultado['aluno'] ?? null) ? $resultado['aluno'] : [];
+        $nomeAluno = trim((string) ($aluno['nome'] ?? ''));
+        $turma = trim((string) ($aluno['turma_nome'] ?? ''));
+        $quem = $nomeAluno !== ''
+            ? ($nomeAluno . ($turma !== '' ? ' (' . $turma . ')' : ''))
+            : 'o aluno';
+
+        if ($tool === 'faltas_aluno') {
+            $freq = is_array($resultado['frequencia'] ?? null) ? $resultado['frequencia'] : $resultado;
+            $faltas = $freq['faltas'] ?? $freq['total_faltas'] ?? $resultado['faltas'] ?? null;
+            $perc = $freq['percentual'] ?? $freq['frequencia_percentual'] ?? $resultado['percentual'] ?? null;
+            if ($faltas === null && $perc === null) {
+                return null;
+            }
+            $txt = $quem;
+            if ($faltas !== null) {
+                $txt .= ' tem **' . $faltas . '** falta' . ((int) $faltas === 1 ? '' : 's');
+            }
+            if ($perc !== null && $perc !== '') {
+                $txt .= ($faltas !== null ? ' (frequência **' . $perc . '%**)' : ' está com frequência **' . $perc . '%**');
+            }
+            return $txt . '.';
+        }
+
+        if (in_array($tool, ['boletim_aluno', 'notas_evento_aluno'], true)) {
+            $materiaPedido = $this->extrairMateriaDaPergunta($pergunta);
+            if ($materiaPedido === null && !empty($resultado['materia'])) {
+                $materiaPedido = trim((string) $resultado['materia']);
+            }
+            $quadro = is_array($resultado['quadro'] ?? null) ? $resultado['quadro'] : null;
+            if ($quadro === null && !empty($resultado['eventos'][0]) && is_array($resultado['eventos'][0])) {
+                $ev0 = $resultado['eventos'][0];
+                $quadro = [
+                    'colunas' => $ev0['colunas'] ?? [],
+                    'linhas' => array_map(static function ($l) {
+                        return [
+                            'materia' => $l['materia'] ?? ($l['materia_nome'] ?? ''),
+                            'notas' => $l['notas'] ?? [],
+                        ];
+                    }, (array) ($ev0['linhas'] ?? [])),
+                ];
+            }
+
+            if ($materiaPedido !== null && is_array($quadro)) {
+                $achado = $this->buscarNotaMateriaNoQuadro($quadro, $materiaPedido);
+                if ($achado !== null) {
+                    $rotuloMat = $achado['materia'] !== '' ? $achado['materia'] : $materiaPedido;
+                    if ($achado['valor'] === null || $achado['valor'] === '') {
+                        return 'Não há nota lançada de ' . $rotuloMat . ' para ' . $quem . '.';
+                    }
+                    return 'A nota de ' . $rotuloMat . ' d' . $this->artigoDe($quem) . ' ' . $quem
+                        . ' é **' . $achado['valor'] . '**.';
+                }
+            }
+
+            if ($tool === 'boletim_aluno' && $this->pedidoPareceBoletim($pergunta)) {
+                $ano = (string) ($resultado['ano_letivo'] ?? '');
+                return 'Boletim d' . $this->artigoDe($quem) . ' **' . $quem . '**'
+                    . ($ano !== '' ? ' — ' . $ano : '')
+                    . '. O quadro completo está abaixo; use o botão para baixar o PDF.';
+            }
+
+            if ($tool === 'notas_evento_aluno' && $materiaPedido === null) {
+                $evento = trim((string) ($resultado['evento']['nome'] ?? 'evento'));
+                $coluna = trim((string) ($resultado['coluna'] ?? ''));
+                return 'Notas d' . $this->artigoDe($quem) . ' **' . $quem . '** — ' . $evento
+                    . ($coluna !== '' ? ' (' . $coluna . ')' : '')
+                    . '. O quadro está abaixo.';
+            }
+        }
+
+        return null;
+    }
+
+    private function pedidoPareceBoletim(string $pergunta): bool
+    {
+        return (bool) preg_match('/\bboletim\b|\bquadro\s+de\s+notas\b/iu', $pergunta);
+    }
+
+    private function artigoDe(string $nomeComTurma): string
+    {
+        // "da Júlia" / "do João" — heurística simples pelo primeiro nome.
+        $primeiro = trim((string) preg_replace('/\s*\(.*$/', '', $nomeComTurma));
+        $primeiro = trim(explode(' ', $primeiro)[0] ?? '');
+        if ($primeiro === '') {
+            return 'e';
+        }
+        // Nomes terminados em a (exceto alguns) → da
+        if (preg_match('/a$/iu', $primeiro) && !preg_match('/^(Joshua|Josué|Tobias|Lucas|Nicolas|Matias)$/iu', $primeiro)) {
+            return 'a';
+        }
+        return 'o';
+    }
+
+    private function extrairMateriaDaPergunta(string $pergunta): ?string
+    {
+        $p = mb_strtolower($this->semAcento($pergunta));
+        // "nota de matemática", "em matemática", "matéria matemática"
+        if (preg_match(
+            '/\b(?:nota|media|média|desempenho|resultado)?\s*(?:de|em|da|do)?\s*(matematica|portugues|lingua portuguesa|ciencias|historia|geografia|ingles|educacao fisica|artes?|biologia|fisica|quimica|filosofia|sociologia|redacao)\b/u',
+            $p,
+            $m
+        )) {
+            return $this->rotuloMateriaCanonico($m[1]);
+        }
+        return null;
+    }
+
+    private function rotuloMateriaCanonico(string $slug): string
+    {
+        $mapa = [
+            'matematica' => 'Matemática',
+            'portugues' => 'Português',
+            'lingua portuguesa' => 'Língua Portuguesa',
+            'ciencias' => 'Ciências',
+            'historia' => 'História',
+            'geografia' => 'Geografia',
+            'ingles' => 'Inglês',
+            'educacao fisica' => 'Educação Física',
+            'arte' => 'Arte',
+            'artes' => 'Artes',
+            'biologia' => 'Biologia',
+            'fisica' => 'Física',
+            'quimica' => 'Química',
+            'filosofia' => 'Filosofia',
+            'sociologia' => 'Sociologia',
+            'redacao' => 'Redação',
+        ];
+        return $mapa[$slug] ?? mb_convert_case($slug, MB_CASE_TITLE, 'UTF-8');
+    }
+
+    /**
+     * @param array{colunas?:list,linhas?:list} $quadro
+     * @return array{materia:string,valor:string|null}|null
+     */
+    private function buscarNotaMateriaNoQuadro(array $quadro, string $materiaPedido): ?array
+    {
+        $alvo = $this->semAcento(mb_strtolower($materiaPedido));
+        $linhas = is_array($quadro['linhas'] ?? null) ? $quadro['linhas'] : [];
+        $melhor = null;
+        foreach ($linhas as $linha) {
+            $nome = trim((string) ($linha['materia'] ?? $linha['materia_nome'] ?? ''));
+            if ($nome === '') {
+                continue;
+            }
+            $norm = $this->semAcento(mb_strtolower($nome));
+            if ($norm !== $alvo && !str_contains($norm, $alvo) && !str_contains($alvo, $norm)) {
+                continue;
+            }
+            $notas = is_array($linha['notas'] ?? null) ? $linha['notas'] : [];
+            $valor = $this->escolherValorNota($notas, is_array($quadro['colunas'] ?? null) ? $quadro['colunas'] : []);
+            $melhor = ['materia' => $nome, 'valor' => $valor];
+            if ($norm === $alvo) {
+                break;
+            }
+        }
+        return $melhor;
+    }
+
+    /**
+     * @param array<string,mixed> $notas
+     * @param list<array<string,mixed>> $colunas
+     */
+    private function escolherValorNota(array $notas, array $colunas): ?string
+    {
+        if ($notas === []) {
+            return null;
+        }
+        // Preferência: MU / média / última coluna com valor.
+        $preferidas = ['MU', 'MEDIA', 'MÉDIA', 'MS', 'MA', 'RF', 'RESULTADO'];
+        foreach ($preferidas as $pref) {
+            foreach ($notas as $cod => $val) {
+                $c = strtoupper((string) $cod);
+                $nomeCol = '';
+                foreach ($colunas as $col) {
+                    if ((string) ($col['codigo'] ?? $col['chave'] ?? '') === (string) $cod) {
+                        $nomeCol = strtoupper((string) ($col['nome'] ?? ''));
+                        break;
+                    }
+                }
+                if ($c === $pref || str_ends_with($c, '_' . $pref) || $nomeCol === $pref) {
+                    $fmt = $this->formatarValorNota($val);
+                    if ($fmt !== null) {
+                        return $fmt;
+                    }
+                }
+            }
+        }
+        $ultimo = null;
+        foreach ($notas as $val) {
+            $fmt = $this->formatarValorNota($val);
+            if ($fmt !== null) {
+                $ultimo = $fmt;
+            }
+        }
+        return $ultimo;
+    }
+
+    /** @param mixed $val */
+    private function formatarValorNota($val): ?string
+    {
+        if ($val === null || $val === '') {
+            return null;
+        }
+        if (is_array($val)) {
+            $val = $val['valor'] ?? $val['nota'] ?? $val['exibicao'] ?? null;
+            if ($val === null || $val === '') {
+                return null;
+            }
+        }
+        if (is_float($val) || is_int($val)) {
+            $n = (float) $val;
+            return fmod($n, 1.0) === 0.0 ? (string) (int) $n : rtrim(rtrim(number_format($n, 2, ',', ''), '0'), ',');
+        }
+        $s = trim((string) $val);
+        return $s !== '' ? $s : null;
+    }
+
+    private function semAcento(string $texto): string
+    {
+        $map = [
+            'á' => 'a', 'à' => 'a', 'â' => 'a', 'ã' => 'a',
+            'é' => 'e', 'ê' => 'e',
+            'í' => 'i',
+            'ó' => 'o', 'ô' => 'o', 'õ' => 'o',
+            'ú' => 'u', 'ü' => 'u',
+            'ç' => 'c',
+            'Á' => 'A', 'À' => 'A', 'Â' => 'A', 'Ã' => 'A',
+            'É' => 'E', 'Ê' => 'E',
+            'Í' => 'I',
+            'Ó' => 'O', 'Ô' => 'O', 'Õ' => 'O',
+            'Ú' => 'U', 'Ü' => 'U',
+            'Ç' => 'C',
+        ];
+        return strtr($texto, $map);
     }
 
     /** @param array<string,mixed> $args */
