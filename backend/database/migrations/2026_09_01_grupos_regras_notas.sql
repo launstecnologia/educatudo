@@ -1,8 +1,13 @@
 -- Grupo de Regras de Notas: tipos (A/B, Humanas…) e marcas (S1, S2…) por escola.
 -- Tenant. Idempotente.
 -- Rollback: 2026_09_01_grupos_regras_notas_rollback.sql
+--
+-- Tabelas sem FK no CREATE (evita MySQL/MariaDB 1824 "Failed to open the referenced table"
+-- quando várias CREATE rodam na mesma sessão/transação). FKs entram depois via ALTER.
 
 SET @db := DATABASE();
+SET @fk_checks_antes := @@FOREIGN_KEY_CHECKS;
+SET FOREIGN_KEY_CHECKS = 0;
 
 CREATE TABLE IF NOT EXISTS `grupos_regras_notas` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -26,9 +31,7 @@ CREATE TABLE IF NOT EXISTS `grupos_regras_notas_tipos` (
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_grupos_regras_notas_tipos_codigo` (`grupo_id`, `codigo`),
-  KEY `idx_grupos_regras_notas_tipos_grupo` (`grupo_id`),
-  CONSTRAINT `fk_grn_tipos_grupo`
-    FOREIGN KEY (`grupo_id`) REFERENCES `grupos_regras_notas` (`id`) ON DELETE CASCADE
+  KEY `idx_grupos_regras_notas_tipos_grupo` (`grupo_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `grupos_regras_notas_marcas` (
@@ -43,30 +46,105 @@ CREATE TABLE IF NOT EXISTS `grupos_regras_notas_marcas` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_grupos_regras_notas_marcas_codigo` (`grupo_id`, `codigo`),
   UNIQUE KEY `uk_grupos_regras_notas_marcas_numero` (`grupo_id`, `numero`),
-  KEY `idx_grupos_regras_notas_marcas_grupo` (`grupo_id`),
-  CONSTRAINT `fk_grn_marcas_grupo`
-    FOREIGN KEY (`grupo_id`) REFERENCES `grupos_regras_notas` (`id`) ON DELETE CASCADE
+  KEY `idx_grupos_regras_notas_marcas_grupo` (`grupo_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `grupos_regras_notas_tipo_marcas` (
   `tipo_id` INT UNSIGNED NOT NULL,
   `marca_id` INT UNSIGNED NOT NULL,
   PRIMARY KEY (`tipo_id`, `marca_id`),
-  KEY `idx_grn_tipo_marcas_marca` (`marca_id`),
-  CONSTRAINT `fk_grn_tipo_marcas_tipo`
-    FOREIGN KEY (`tipo_id`) REFERENCES `grupos_regras_notas_tipos` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_grn_tipo_marcas_marca`
-    FOREIGN KEY (`marca_id`) REFERENCES `grupos_regras_notas_marcas` (`id`) ON DELETE CASCADE
+  KEY `idx_grn_tipo_marcas_marca` (`marca_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `grupos_regras_notas_tipo_materias` (
   `tipo_id` INT UNSIGNED NOT NULL,
   `materia_id` INT NOT NULL,
   PRIMARY KEY (`tipo_id`, `materia_id`),
-  KEY `idx_grn_tipo_materias_materia` (`materia_id`),
-  CONSTRAINT `fk_grn_tipo_materias_tipo`
-    FOREIGN KEY (`tipo_id`) REFERENCES `grupos_regras_notas_tipos` (`id`) ON DELETE CASCADE
+  KEY `idx_grn_tipo_materias_materia` (`materia_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+SET FOREIGN_KEY_CHECKS = @fk_checks_antes;
+
+-- FKs internas do módulo (só se a tabela pai existir e a constraint ainda não estiver lá)
+SET @fk := (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = @db AND CONSTRAINT_NAME = 'fk_grn_tipos_grupo'
+);
+SET @sql := IF(
+  @fk = 0 AND (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'grupos_regras_notas'
+  ) > 0,
+  "ALTER TABLE `grupos_regras_notas_tipos`
+     ADD CONSTRAINT `fk_grn_tipos_grupo`
+     FOREIGN KEY (`grupo_id`) REFERENCES `grupos_regras_notas` (`id`) ON DELETE CASCADE",
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @fk := (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = @db AND CONSTRAINT_NAME = 'fk_grn_marcas_grupo'
+);
+SET @sql := IF(
+  @fk = 0 AND (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'grupos_regras_notas'
+  ) > 0,
+  "ALTER TABLE `grupos_regras_notas_marcas`
+     ADD CONSTRAINT `fk_grn_marcas_grupo`
+     FOREIGN KEY (`grupo_id`) REFERENCES `grupos_regras_notas` (`id`) ON DELETE CASCADE",
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @fk := (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = @db AND CONSTRAINT_NAME = 'fk_grn_tipo_marcas_tipo'
+);
+SET @sql := IF(
+  @fk = 0 AND (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'grupos_regras_notas_tipos'
+  ) > 0,
+  "ALTER TABLE `grupos_regras_notas_tipo_marcas`
+     ADD CONSTRAINT `fk_grn_tipo_marcas_tipo`
+     FOREIGN KEY (`tipo_id`) REFERENCES `grupos_regras_notas_tipos` (`id`) ON DELETE CASCADE",
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @fk := (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = @db AND CONSTRAINT_NAME = 'fk_grn_tipo_marcas_marca'
+);
+SET @sql := IF(
+  @fk = 0 AND (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'grupos_regras_notas_marcas'
+  ) > 0,
+  "ALTER TABLE `grupos_regras_notas_tipo_marcas`
+     ADD CONSTRAINT `fk_grn_tipo_marcas_marca`
+     FOREIGN KEY (`marca_id`) REFERENCES `grupos_regras_notas_marcas` (`id`) ON DELETE CASCADE",
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @fk := (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = @db AND CONSTRAINT_NAME = 'fk_grn_tipo_materias_tipo'
+);
+SET @sql := IF(
+  @fk = 0 AND (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'grupos_regras_notas_tipos'
+  ) > 0,
+  "ALTER TABLE `grupos_regras_notas_tipo_materias`
+     ADD CONSTRAINT `fk_grn_tipo_materias_tipo`
+     FOREIGN KEY (`tipo_id`) REFERENCES `grupos_regras_notas_tipos` (`id`) ON DELETE CASCADE",
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- Evento de prova: vínculo opcional com o grupo (semana continua sendo o número da marca)
 SET @has_pb := (
