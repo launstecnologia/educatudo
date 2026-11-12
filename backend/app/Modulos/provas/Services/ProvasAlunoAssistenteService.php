@@ -347,6 +347,21 @@ class ProvasAlunoAssistenteService
             case 'resumo_jornadas_professor':
                 return $this->ampliada->resumoJornadasProfessor($args);
 
+            case 'saude_academica':
+                return $this->ampliada->saudeAcademica($args);
+
+            case 'perfil_aluno_360':
+                return $this->ampliada->perfilAluno360($args);
+
+            case 'diario_pendencias':
+                return $this->ampliada->diarioPendencias($args);
+
+            case 'grade_horaria_consulta':
+                return $this->ampliada->gradeHorariaConsulta($args);
+
+            case 'ocorrencias_turma':
+                return $this->ampliada->ocorrenciasTurma($args);
+
             case 'boletim_aluno':
                 return $this->ampliada->boletimAluno($args);
 
@@ -395,7 +410,7 @@ class ProvasAlunoAssistenteService
                     'candidatos' => $resultado['candidatos'],
                 ];
             }
-            if (in_array($tool, ['saude_turma', 'resumo_provas_turma'], true)) {
+            if (in_array($tool, ['saude_turma', 'resumo_provas_turma', 'saude_academica', 'diario_pendencias', 'grade_horaria_consulta', 'ocorrencias_turma'], true)) {
                 return [
                     'tipo' => 'candidatos_turmas',
                     'aviso' => (string) ($resultado['aviso'] ?? 'Há mais de uma turma. Escolha uma:'),
@@ -533,6 +548,7 @@ class ProvasAlunoAssistenteService
         if (
             in_array($tool, [
                 'listar_provas_professor', 'resumo_provas_professor', 'saude_turmas_professor', 'listar_turmas_professor',
+                'diario_pendencias', 'grade_horaria_consulta',
             ], true)
             && !empty($resultado['candidatos'])
             && is_array($resultado['candidatos'])
@@ -680,6 +696,88 @@ class ProvasAlunoAssistenteService
                 ],
             ];
         }
+        if ($tool === 'saude_academica' && !empty($resultado['ok'])) {
+            return [
+                'tipo' => 'saude_academica',
+                'ano_letivo' => $resultado['ano_letivo'] ?? null,
+                'turma' => $resultado['turma'] ?? null,
+                'natureza' => $resultado['natureza'] ?? null,
+                'kpis' => $resultado['kpis'] ?? [],
+                'alertas' => $resultado['alertas'] ?? [],
+                'total_alertas' => (int) ($resultado['total_alertas'] ?? 0),
+                'aviso' => $resultado['aviso'] ?? null,
+                'opcoes' => [
+                    'Só sem matrícula no ano',
+                    'Filtrar por turma',
+                    'Perfil 360 de um aluno',
+                ],
+            ];
+        }
+        if ($tool === 'perfil_aluno_360' && !empty($resultado['ok'])) {
+            return [
+                'tipo' => 'perfil_aluno_360',
+                'aluno' => $resultado['aluno'] ?? null,
+                'ano_letivo' => $resultado['ano_letivo'] ?? null,
+                'indicadores' => $resultado['indicadores'] ?? [],
+                'atividade' => $resultado['atividade'] ?? [],
+                'pendencias' => $resultado['pendencias'] ?? [],
+                'destaques' => $resultado['destaques'] ?? [],
+                'opcoes' => [
+                    'Ver boletim deste aluno',
+                    'Ver faltas deste aluno',
+                    'Ver ocorrências deste aluno',
+                ],
+            ];
+        }
+        if ($tool === 'diario_pendencias' && !empty($resultado['ok'])) {
+            return [
+                'tipo' => 'diario_pendencias',
+                'periodo' => $resultado['periodo'] ?? null,
+                'professor' => $resultado['professor'] ?? null,
+                'turma' => $resultado['turma'] ?? null,
+                'resumo' => $resultado['resumo'] ?? [],
+                'diarios' => $resultado['diarios'] ?? [],
+                'total' => (int) ($resultado['total'] ?? 0),
+                'aviso' => $resultado['aviso'] ?? null,
+                'opcoes' => [
+                    'Só em atraso',
+                    'Só atenção',
+                    'Filtrar por professor',
+                ],
+            ];
+        }
+        if ($tool === 'grade_horaria_consulta' && !empty($resultado['ok'])) {
+            return [
+                'tipo' => 'grade_horaria_consulta',
+                'data' => $resultado['data'] ?? null,
+                'dia_semana' => $resultado['dia_semana'] ?? null,
+                'dia_semana_label' => $resultado['dia_semana_label'] ?? null,
+                'escopo' => $resultado['escopo'] ?? null,
+                'aulas' => $resultado['aulas'] ?? [],
+                'aviso' => $resultado['aviso'] ?? null,
+                'opcoes' => [
+                    'Ver grade da turma hoje',
+                    'Ver grade do professor hoje',
+                    'Filtrar por período',
+                ],
+            ];
+        }
+        if ($tool === 'ocorrencias_turma' && !empty($resultado['ok'])) {
+            return [
+                'tipo' => 'ocorrencias_turma',
+                'turma' => $resultado['turma'] ?? null,
+                'filtros' => $resultado['filtros'] ?? [],
+                'total' => (int) ($resultado['total'] ?? 0),
+                'por_gravidade' => $resultado['por_gravidade'] ?? [],
+                'ocorrencias' => $resultado['ocorrencias'] ?? [],
+                'aviso' => $resultado['aviso'] ?? null,
+                'opcoes' => [
+                    'Só ocorrências abertas',
+                    'Só graves',
+                    'Ver perfil 360 de um aluno',
+                ],
+            ];
+        }
         if ($tool === 'boletim_aluno' && !empty($resultado['ok'])) {
             return [
                 'tipo' => 'boletim_aluno',
@@ -766,7 +864,7 @@ class ProvasAlunoAssistenteService
         return <<<PROMPT
 Você é o Assistente da EducaTudo (coordenação/direção).
 
-Objetivo: consultar ALUNOS (provas/jornadas/boletim/faltas/ocorrências), TURMAS (saúde e provas), BLOCOS de prova, e PROFESSORES (provas e jornadas).
+Objetivo: consultar ALUNOS (provas/jornadas/boletim/faltas/ocorrências/perfil 360), TURMAS (saúde, provas, ocorrências, grade), DIÁRIO, BLOCOS de prova, e PROFESSORES (provas, jornadas, grade).
 
 Regras importantes:
 1) Nunca invente notas, datas, progresso, enunciados, alunos ou professores — só dados das consultas.
@@ -780,13 +878,20 @@ Regras importantes:
 9) Pedido sobre TURMA sem professor → saude_turma / resumo_provas_turma.
 10) Pedido sobre BLOCO → buscar_blocos / resultados_bloco.
 11) Pedido sobre PROFESSOR → resumo_provas_professor / saude_turmas_professor / resumo_jornadas_professor.
-12) Pedido de BOLETIM / médias e faltas por bimestre / quadro anual → boletim_aluno (formato quadro PP/PU/CH/PE/MU).
-13) Pedido de NOTAS DE EVENTO / demonstrativo / "PP do 1º bimestre" / "MU do 2º" → notas_evento_aluno (passe bimestre e/ou coluna).
-14) Frequência/presença/faltas → faltas_aluno.
-15) Ocorrência/incidente/disciplina/comportamento → ocorrencias_aluno. NUNCA use faltas_aluno para ocorrência.
-16) Detalhe de questão → detalhar_prova_aluno com somente_erros=true.
-17) Resposta final: texto CURTO (2–4 linhas). A UI monta tabelas.
-18) Se a tool devolver candidatos/aviso, liste-os e peça escolha — não diga "não encontrei" se houver candidatos.
+12) Pedido de SAÚDE ACADÊMICA da escola / alunos com alerta cadastral → saude_academica.
+13) Pedido de PERFIL 360 / visão geral de um aluno → perfil_aluno_360.
+14) Pedido de DIÁRIO atrasado / pendências de diário → diario_pendencias.
+15) Pedido de GRADE HORÁRIA / "qual aula hoje" → grade_horaria_consulta.
+16) Pedido de BOLETIM / médias e faltas por bimestre / quadro anual → boletim_aluno (formato quadro PP/PU/CH/PE/MU).
+17) Pedido de NOTAS DE EVENTO / demonstrativo / "PP do 1º bimestre" / "MU do 2º" → notas_evento_aluno (passe bimestre e/ou coluna).
+18) Frequência/presença/faltas → faltas_aluno.
+19) Ocorrência/incidente/disciplina/comportamento de ALUNO → ocorrencias_aluno. Ocorrências da TURMA → ocorrencias_turma. NUNCA use faltas_aluno para ocorrência.
+20) Detalhe de questão → detalhar_prova_aluno com somente_erros=true.
+21) Resposta final: texto CURTO (2–4 linhas). A UI monta tabelas.
+22) Se a tool devolver candidatos/aviso, liste-os e peça escolha — não diga "não encontrei" se houver candidatos.
+23) NUNCA invente quantidade de faltas/ocorrências/notas. Sempre chame a tool adequada. Se frequencia=null ou aviso de sem lançamentos, diga isso — não chute um número.
+24) NUNCA escreva [contexto_estruturado], aluno_id=, prova_id= nem metadados internos na resposta ao usuário. Isso é só para a UI/histórico.
+25) Saude_academica é alerta cadastral/matrícula/chamada da escola; para rendimento de uma turma use saude_turma.
 
 Para obter dados, emita EXATAMENTE:
 <<<CONSULTA>>>
@@ -806,15 +911,20 @@ Tools — professor:
 14) resumo_provas_professor / 15) detalhar_prova_professor / 16) ranking_erros_prova_professor
 17) saude_turmas_professor / 18) resumo_jornadas_professor — {"professor_nome":"Ana","turma_nome":"2ªB"}
 
-Tools — turma / bloco / boletim / faltas / ocorrências:
+Tools — turma / bloco / diário / agenda / boletim / faltas / ocorrências:
 19) saude_turma — {"turma_nome":"2 Ano B"} — KPIs crítico/atenção
 20) resumo_provas_turma — {"turma_nome":"2 Ano B"} — totais acertos/erros por matéria
-21) buscar_blocos — {"titulo":"Simulado"} ou {"turma_nome":"2ªB"}
-22) resultados_bloco — {"bloco_id":10} ou {"titulo":"Simulado 1"}
-23) boletim_aluno — {"ra":"24254","ano_letivo":2024} — quadro anual (PP/PU/CH/PE/MU por bimestre)
-24) notas_evento_aluno — {"ra":"24254","ano_letivo":2024,"bimestre":1} ou {"coluna":"MU","bimestre":2} — notas de um evento/demonstrativo
-25) faltas_aluno — {"ra":"24254"} ou {"aluno_id":123} — frequência/presença (NÃO é ocorrência)
-26) ocorrencias_aluno — {"ra":"24254","ano_letivo":2024} ou {"aluno_id":123,"status":"aberta"} — incidentes disciplinares
+21) saude_academica — {"ano":2024} ou {"ano_letivo_id":4,"turma_nome":"1A"} — alertas cadastrais/matrícula
+22) diario_pendencias — {"turma_nome":"1A","situacao":"atraso"} ou {"professor_nome":"Ana"} — diários pendentes
+23) grade_horaria_consulta — {"turma_nome":"1A","data":"2026-11-12"} ou {"professor_nome":"Ana"} — aulas do dia
+24) buscar_blocos — {"titulo":"Simulado"} ou {"turma_nome":"2ªB"}
+25) resultados_bloco — {"bloco_id":10} ou {"titulo":"Simulado 1"}
+26) perfil_aluno_360 — {"ra":"24254","ano_letivo":2024} — resumo geral do aluno
+27) boletim_aluno — {"ra":"24254","ano_letivo":2024} — quadro anual (PP/PU/CH/PE/MU por bimestre)
+28) notas_evento_aluno — {"ra":"24254","ano_letivo":2024,"bimestre":1} ou {"coluna":"MU","bimestre":2} — notas de um evento/demonstrativo
+29) faltas_aluno — {"ra":"24254","ano_letivo":2024} ou {"aluno_id":365} — frequência/presença (NÃO é ocorrência). Passe o mesmo ano_letivo da conversa.
+30) ocorrencias_aluno — {"ra":"24254","ano_letivo":2024} ou {"aluno_id":123,"status":"aberta"} — incidentes disciplinares
+31) ocorrencias_turma — {"turma_nome":"1A","status":"aberta"} ou {"turma_id":37} — incidentes da turma
 
 Tipos de avaliação (provas) desta escola:
 PROMPT
@@ -980,6 +1090,9 @@ PROMPT
         if ($pos !== false) {
             $resposta = substr($resposta, 0, $pos);
         }
+        // Metadado interno do histórico — nunca mostrar ao usuário.
+        $resposta = preg_replace('/\[contexto_estruturado\][\s\S]*$/u', '', $resposta) ?? $resposta;
+        $resposta = preg_replace('/^\s*aluno_id\s*=\s*\d+.*$/mu', '', $resposta) ?? $resposta;
         return trim($resposta);
     }
 
@@ -1025,12 +1138,21 @@ PROMPT
                 return 'Consultando resultados do bloco…';
             case 'resumo_jornadas_professor':
                 return 'Montando jornadas do professor…';
+            case 'saude_academica':
+                return 'Analisando saúde acadêmica…';
+            case 'perfil_aluno_360':
+                return 'Montando perfil do aluno…';
+            case 'diario_pendencias':
+                return 'Consultando pendências do diário…';
+            case 'grade_horaria_consulta':
+                return 'Consultando grade horária…';
             case 'boletim_aluno':
                 return 'Montando boletim…';
             case 'notas_evento_aluno':
                 return 'Consultando notas do evento…';
             case 'faltas_aluno':
                 return 'Consultando frequência…';
+            case 'ocorrencias_turma':
             case 'ocorrencias_aluno':
                 return 'Consultando ocorrências…';
             case 'listar_materias':

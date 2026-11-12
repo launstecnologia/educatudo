@@ -101,6 +101,10 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                         <ul class="list-disc list-inside text-indigo-800/90 space-y-0.5">
                             <li>“Como andam as provas da Maria Clara no 2º Ano B?”</li>
                             <li>“Como está a saúde da turma 2ªB?”</li>
+                            <li>“Quem precisa de atenção na escola em 2024?”</li>
+                            <li>“Me dá um 360 da Ana Luiza.”</li>
+                            <li>“Quais diários estão em atraso?”</li>
+                            <li>“Qual aula a turma 1A tem hoje?”</li>
                             <li>“Resultados do bloco Simulado 1 — quem precisa de atenção?”</li>
                             <li>“Boletim do RA 24254 em 2024.”</li>
                             <li>“Notas do 1º bimestre / MU do 2º bimestre do RA 24254.”</li>
@@ -219,8 +223,14 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
         var x = Number(n);
         return isNaN(x) ? esc(n) : (Math.round(x * 100) / 100).toString().replace('.', ',');
     }
+    function limparTextoAssistente(text) {
+        var s = String(text || '');
+        s = s.replace(/\[contexto_estruturado\][\s\S]*$/i, '');
+        s = s.replace(/^\s*aluno_id\s*=\s*\d+.*$/gmi, '');
+        return s.trim();
+    }
     function simpleMarkdown(text) {
-        var t = esc(text || '');
+        var t = esc(limparTextoAssistente(text || ''));
         t = t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
         t = t.replace(/^### (.+)$/gm, '<p class="font-semibold mt-2">$1</p>');
         t = t.replace(/^- (.+)$/gm, '<li>$1</li>');
@@ -1030,6 +1040,164 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             renderOpcoes(container, painel.opcoes);
         }
 
+        if (painel.tipo === 'saude_academica') {
+            var kA = painel.kpis || {};
+            var cardsSA = document.createElement('div');
+            cardsSA.className = 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2';
+            function cardSA(label, val, cls) {
+                return '<div class="rounded-lg border border-gray-200 bg-slate-50 px-3 py-2">'
+                    + '<div class="text-[11px] uppercase tracking-wide text-slate-500">' + esc(label) + '</div>'
+                    + '<div class="text-lg font-semibold ' + (cls || 'text-gray-900') + '">' + esc(val) + '</div></div>';
+            }
+            cardsSA.innerHTML = cardSA('Total alertas', painel.total_alertas || kA.total || 0, 'text-rose-700')
+                + cardSA('Sem matrícula', kA.sem_matricula_ano || 0)
+                + cardSA('Divergente', kA.matricula_divergente || 0)
+                + cardSA('Sem chamada', kA.sem_chamada || 0)
+                + cardSA('Pendente sem turma', kA.pending_sem_turma || 0)
+                + cardSA('Curso extra', kA.extra_apenas_matricula || 0);
+            container.appendChild(cardsSA);
+            if (painel.aviso) {
+                var avSa = document.createElement('p');
+                avSa.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+                avSa.textContent = painel.aviso;
+                container.appendChild(avSa);
+            }
+            var alertasSA = painel.alertas || [];
+            var boxSA = document.createElement('div');
+            boxSA.className = 'overflow-x-auto border border-gray-200 rounded-lg';
+            var hsa = '<div class="px-3 py-2 text-xs font-semibold uppercase text-slate-600 bg-slate-50 border-b">Alertas cadastrais</div>'
+                + '<table class="min-w-full text-sm"><thead><tr class="text-xs text-slate-500 text-left">'
+                + '<th class="px-3 py-2">Aluno</th><th class="px-3 py-2">Turma</th><th class="px-3 py-2">Alerta</th><th class="px-3 py-2">Descrição</th></tr></thead><tbody>';
+            if (!alertasSA.length) {
+                hsa += '<tr><td colspan="4" class="px-3 py-4 text-center text-gray-500">Nenhum alerta encontrado.</td></tr>';
+            }
+            alertasSA.forEach(function (a) {
+                hsa += '<tr class="border-t align-top"><td class="px-3 py-2 font-medium">' + esc(a.nome || '—')
+                    + (a.ra ? '<div class="text-xs text-gray-500">RA ' + esc(a.ra) + '</div>' : '')
+                    + '</td><td class="px-3 py-2">' + esc(a.turma_nome || '—')
+                    + '</td><td class="px-3 py-2">' + esc(a.tipo_rotulo || a.tipo || '—')
+                    + '</td><td class="px-3 py-2">' + esc(a.descricao || '—') + '</td></tr>';
+            });
+            hsa += '</tbody></table>';
+            boxSA.innerHTML = hsa;
+            container.appendChild(boxSA);
+            renderOpcoes(container, painel.opcoes);
+        }
+
+        if (painel.tipo === 'perfil_aluno_360') {
+            var ind360 = painel.indicadores || {};
+            var atv360 = painel.atividade || {};
+            var pen360 = painel.pendencias || {};
+            var cards360 = document.createElement('div');
+            cards360.className = 'grid grid-cols-2 sm:grid-cols-4 gap-2';
+            function card360(label, val, cls) {
+                return '<div class="rounded-lg border border-gray-200 bg-slate-50 px-3 py-2">'
+                    + '<div class="text-[11px] uppercase tracking-wide text-slate-500">' + esc(label) + '</div>'
+                    + '<div class="text-lg font-semibold ' + (cls || 'text-gray-900') + '">' + esc(val) + '</div></div>';
+            }
+            cards360.innerHTML = card360('Provas %', ind360.provas_pct != null ? ind360.provas_pct + '%' : '—')
+                + card360('Frequência', ind360.frequencia_pct != null ? ind360.frequencia_pct + '%' : '—')
+                + card360('Jornadas %', ind360.jornadas_pct != null ? ind360.jornadas_pct + '%' : '—')
+                + card360('Ocorrências abertas', pen360.ocorrencias_abertas != null ? pen360.ocorrencias_abertas : 0, 'text-rose-700');
+            container.appendChild(cards360);
+
+            var meta360 = document.createElement('div');
+            meta360.className = 'grid grid-cols-1 sm:grid-cols-2 gap-2';
+            meta360.innerHTML = '<div class="rounded-lg border border-gray-200 bg-white px-3 py-2"><div class="text-xs uppercase text-slate-500">RA</div><div class="font-medium text-gray-900">' + esc((painel.aluno && painel.aluno.ra) || '—') + '</div></div>'
+                + '<div class="rounded-lg border border-gray-200 bg-white px-3 py-2"><div class="text-xs uppercase text-slate-500">Atividade</div><div class="font-medium text-gray-900">'
+                + esc((atv360.total_provas || 0) + ' provas · ' + (atv360.jornadas_concluidas || 0) + '/' + (atv360.total_jornadas || 0) + ' jornadas') + '</div></div>';
+            container.appendChild(meta360);
+
+            var destaques360 = painel.destaques || [];
+            if (destaques360.length) {
+                var box360 = document.createElement('div');
+                box360.className = 'rounded-lg border border-gray-200 bg-white px-4 py-3';
+                var html360 = '<div class="text-xs font-semibold uppercase text-slate-600 mb-2">Destaques</div><ul class="list-disc pl-5 space-y-1 text-sm text-gray-700">';
+                destaques360.forEach(function (d) {
+                    html360 += '<li>' + esc(d) + '</li>';
+                });
+                html360 += '</ul>';
+                box360.innerHTML = html360;
+                container.appendChild(box360);
+            }
+            renderOpcoes(container, painel.opcoes);
+        }
+
+        if (painel.tipo === 'diario_pendencias') {
+            var resD = painel.resumo || {};
+            var cardsD = document.createElement('div');
+            cardsD.className = 'grid grid-cols-2 sm:grid-cols-5 gap-2';
+            function cardD(label, val, cls) {
+                return '<div class="rounded-lg border border-gray-200 bg-slate-50 px-3 py-2">'
+                    + '<div class="text-[11px] uppercase tracking-wide text-slate-500">' + esc(label) + '</div>'
+                    + '<div class="text-lg font-semibold ' + (cls || 'text-gray-900') + '">' + esc(val) + '</div></div>';
+            }
+            cardsD.innerHTML = cardD('Em atraso', resD.atraso || 0, 'text-rose-700')
+                + cardD('Atenção', resD.atencao || 0, 'text-amber-700')
+                + cardD('Em dia', resD.em_dia || 0, 'text-emerald-700')
+                + cardD('Pendências', resD.pendentes_vencidas || 0)
+                + cardD('Cobertura', resD.cobertura_media != null ? resD.cobertura_media + '%' : '—');
+            container.appendChild(cardsD);
+            if (painel.aviso) {
+                var avD = document.createElement('p');
+                avD.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+                avD.textContent = painel.aviso;
+                container.appendChild(avD);
+            }
+            var diarios = painel.diarios || [];
+            var boxD = document.createElement('div');
+            boxD.className = 'overflow-x-auto border border-gray-200 rounded-lg';
+            var hd = '<div class="px-3 py-2 text-xs font-semibold uppercase text-slate-600 bg-slate-50 border-b">Pendências do diário</div>'
+                + '<table class="min-w-full text-sm"><thead><tr class="text-xs text-slate-500 text-left">'
+                + '<th class="px-3 py-2">Professor</th><th class="px-3 py-2">Turma</th><th class="px-3 py-2">Matéria</th><th class="px-3 py-2">Pendentes</th><th class="px-3 py-2">Cobertura</th><th class="px-3 py-2">Situação</th></tr></thead><tbody>';
+            if (!diarios.length) {
+                hd += '<tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">Nenhuma pendência encontrada.</td></tr>';
+            }
+            diarios.forEach(function (d) {
+                hd += '<tr class="border-t"><td class="px-3 py-2 font-medium">' + esc(d.professor_nome || '—')
+                    + '</td><td class="px-3 py-2">' + esc(d.turma_nome || '—')
+                    + '</td><td class="px-3 py-2">' + esc(d.materia_nome || '—')
+                    + '</td><td class="px-3 py-2">' + esc(d.pendentes_vencidas != null ? d.pendentes_vencidas : 0)
+                    + '</td><td class="px-3 py-2">' + esc(d.percentual != null ? d.percentual + '%' : '—')
+                    + '</td><td class="px-3 py-2">' + esc(d.situacao_label || d.situacao || '—') + '</td></tr>';
+            });
+            hd += '</tbody></table>';
+            boxD.innerHTML = hd;
+            container.appendChild(boxD);
+            renderOpcoes(container, painel.opcoes);
+        }
+
+        if (painel.tipo === 'grade_horaria_consulta') {
+            if (painel.aviso) {
+                var avG = document.createElement('p');
+                avG.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+                avG.textContent = painel.aviso;
+                container.appendChild(avG);
+            }
+            var boxG = document.createElement('div');
+            boxG.className = 'overflow-x-auto border border-gray-200 rounded-lg';
+            var tituloG = 'Agenda de ' + esc(painel.dia_semana_label || 'hoje')
+                + (painel.data ? ' · ' + esc(painel.data) : '');
+            var hg = '<div class="px-3 py-2 text-xs font-semibold uppercase text-slate-600 bg-slate-50 border-b">' + tituloG + '</div>'
+                + '<table class="min-w-full text-sm"><thead><tr class="text-xs text-slate-500 text-left">'
+                + '<th class="px-3 py-2">Horário</th><th class="px-3 py-2">Turma</th><th class="px-3 py-2">Professor</th><th class="px-3 py-2">Matéria</th><th class="px-3 py-2">Sala</th></tr></thead><tbody>';
+            var aulasG = painel.aulas || [];
+            if (!aulasG.length) {
+                hg += '<tr><td colspan="5" class="px-3 py-4 text-center text-gray-500">Nenhuma aula encontrada.</td></tr>';
+            }
+            aulasG.forEach(function (a) {
+                hg += '<tr class="border-t"><td class="px-3 py-2 whitespace-nowrap">' + esc((a.horario_de || '—') + ' - ' + (a.horario_ate || '—'))
+                    + '</td><td class="px-3 py-2">' + esc(a.turma_nome || '—')
+                    + '</td><td class="px-3 py-2">' + esc(a.professor_nome || '—')
+                    + '</td><td class="px-3 py-2">' + esc(a.materia_nome || '—')
+                    + '</td><td class="px-3 py-2">' + esc(a.sala_nome || '—') + '</td></tr>';
+            });
+            hg += '</tbody></table>';
+            boxG.innerHTML = hg;
+            container.appendChild(boxG);
+            renderOpcoes(container, painel.opcoes);
+        }
+
         if (painel.tipo === 'lista_blocos') {
             var boxLB = document.createElement('div');
             boxLB.className = 'overflow-x-auto border border-gray-200 rounded-lg';
@@ -1307,6 +1475,48 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 boxO.innerHTML = ho;
                 container.appendChild(boxO);
             }
+            renderOpcoes(container, painel.opcoes);
+        }
+
+        if (painel.tipo === 'ocorrencias_turma') {
+            var gravT = painel.por_gravidade || {};
+            var cardsOT = document.createElement('div');
+            cardsOT.className = 'grid grid-cols-2 sm:grid-cols-4 gap-2';
+            function cardOT(label, val, cls) {
+                return '<div class="rounded-lg border border-gray-200 bg-slate-50 px-3 py-2">'
+                    + '<div class="text-[11px] uppercase tracking-wide text-slate-500">' + esc(label) + '</div>'
+                    + '<div class="text-lg font-semibold ' + (cls || 'text-gray-900') + '">' + esc(val) + '</div></div>';
+            }
+            cardsOT.innerHTML = cardOT('Total', painel.total || 0)
+                + cardOT('Leves', gravT.leve || 0)
+                + cardOT('Moderadas', gravT.moderado || 0, 'text-amber-700')
+                + cardOT('Graves', gravT.grave || 0, 'text-rose-700');
+            container.appendChild(cardsOT);
+            if (painel.aviso) {
+                var avOt = document.createElement('p');
+                avOt.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+                avOt.textContent = painel.aviso;
+                container.appendChild(avOt);
+            }
+            var boxOT = document.createElement('div');
+            boxOT.className = 'overflow-x-auto border border-gray-200 rounded-lg';
+            var hot = '<div class="px-3 py-2 text-xs font-semibold uppercase text-slate-600 bg-slate-50 border-b">Ocorrências da turma</div>'
+                + '<table class="min-w-full text-sm"><thead><tr class="text-xs text-slate-500 text-left">'
+                + '<th class="px-3 py-2">Data</th><th class="px-3 py-2">Aluno(s)</th><th class="px-3 py-2">Título</th><th class="px-3 py-2">Gravidade</th><th class="px-3 py-2">Status</th></tr></thead><tbody>';
+            (painel.ocorrencias || []).forEach(function (o) {
+                hot += '<tr class="border-t align-top"><td class="px-3 py-2 whitespace-nowrap">' + esc(o.data || '—')
+                    + '</td><td class="px-3 py-2">' + esc(o.alunos_nomes || '—')
+                    + '</td><td class="px-3 py-2"><div class="font-medium text-gray-900">' + esc(o.titulo || '—') + '</div>'
+                    + (o.detalhe ? '<div class="text-xs text-gray-500 mt-0.5">' + esc(o.detalhe) + '</div>' : '')
+                    + '</td><td class="px-3 py-2">' + esc(o.gravidade_label || o.gravidade || '—')
+                    + '</td><td class="px-3 py-2">' + esc(o.status_label || o.status || '—') + '</td></tr>';
+            });
+            if (!(painel.ocorrencias || []).length) {
+                hot += '<tr><td colspan="5" class="px-3 py-4 text-center text-gray-500">Nenhuma ocorrência encontrada.</td></tr>';
+            }
+            hot += '</tbody></table>';
+            boxOT.innerHTML = hot;
+            container.appendChild(boxOT);
             renderOpcoes(container, painel.opcoes);
         }
 

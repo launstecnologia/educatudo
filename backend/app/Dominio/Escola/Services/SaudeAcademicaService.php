@@ -2,6 +2,7 @@
 
 namespace App\Dominio\Escola\Services;
 
+use App\Dominio\Pessoas\Services\AlunoTurmaResolver;
 
 class SaudeAcademicaService
 {

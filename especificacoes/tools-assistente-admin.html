@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Assistente Admin - Guia de Tools</title>
+  <style>
+    :root {
+      --ink: #1f2937;
+      --muted: #6b7280;
+      --line: #dbe4f0;
+      --soft: #f8fafc;
+      --brand: #4338ca;
+      --brand-soft: #eef2ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background: white;
+      line-height: 1.55;
+      font-size: 12px;
+    }
+    .page {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 36px 40px 56px;
+    }
+    h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
+    h1 {
+      font-size: 28px;
+      color: #111827;
+      margin-bottom: 10px;
+    }
+    h2 {
+      font-size: 20px;
+      color: var(--brand);
+      border-bottom: 2px solid var(--brand-soft);
+      padding-bottom: 6px;
+      margin-top: 28px;
+    }
+    h3 {
+      font-size: 15px;
+      margin-top: 18px;
+      color: #111827;
+    }
+    p { margin: 8px 0; }
+    .lead {
+      font-size: 13px;
+      color: #374151;
+    }
+    .note {
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--brand);
+      padding: 12px 14px;
+      border-radius: 8px;
+      margin: 16px 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 14px 0 8px;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px;
+      background: white;
+      break-inside: avoid;
+    }
+    .card h3 { margin-top: 0; }
+    .meta {
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 8px;
+    }
+    .label {
+      display: inline-block;
+      background: var(--brand-soft);
+      color: var(--brand);
+      border: 1px solid #c7d2fe;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: bold;
+      margin-right: 6px;
+    }
+    ul {
+      margin: 8px 0 0 18px;
+      padding: 0;
+    }
+    li { margin: 4px 0; }
+    code {
+      font-family: "Courier New", monospace;
+      font-size: 11px;
+      background: #f3f4f6;
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
+    .footer {
+      margin-top: 28px;
+      color: var(--muted);
+      font-size: 11px;
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+    }
+    @media print {
+      .page { padding: 22px 26px 30px; }
+      .grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>Assistente Admin do EducaTudo</h1>
+    <p class="lead">
+      Guia em linguagem natural das tools disponíveis hoje no chat da coordenação/direção.
+      A ideia deste material é explicar, de forma prática, o que cada tool faz, quando vale a pena usar
+      e como pedir isso em linguagem natural.
+    </p>
+
+    <div class="note">
+      <strong>Importante:</strong> todas as tools deste documento são de <strong>consulta</strong>.
+      Elas ajudam a enxergar dados da escola, dos alunos, das turmas, dos professores, do boletim,
+      da frequência, do diário e das ocorrências. Hoje o Assistente <strong>não grava</strong> nota,
+      presença, ocorrência, matrícula ou financeiro direto pelo chat.
+    </div>
+
+    <h2>Como pensar o Assistente</h2>
+    <p>
+      Em vez de decorar o nome técnico das tools, pense no tipo de pergunta que você faria para a coordenação:
+      “como está este aluno?”, “quem precisa de atenção?”, “qual aula tem agora?”, “tem ocorrência aberta?”.
+      O Assistente escolhe a tool adequada a partir desse pedido.
+    </p>
+    <p>
+      Se houver ambiguidade, como mais de uma turma “1A” ou mais de um professor com nome parecido, ele deve
+      devolver candidatos para você escolher, em vez de adivinhar.
+    </p>
+
+    <h2>1. Tools de Aluno e Provas</h2>
+    <div class="grid">
+      <div class="card">
+        <h3><code>buscar_alunos</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Localiza aluno por nome, RA e turma</div>
+        <p>Use quando você quer identificar corretamente um aluno antes de aprofundar a conversa.</p>
+        <ul>
+          <li>Exemplo natural: “Procura a Ana Luiza da 1A Santa Maria”</li>
+          <li>Exemplo natural: “Busca o RA 24254”</li>
+          <li>Retorno esperado: aluno único ou lista de candidatos</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3><code>resumo_provas_aluno</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Consolidado de desempenho em provas</div>
+        <p>Mostra visão geral de provas, acertos, erros e percentuais do aluno.</p>
+        <ul>
+          <li>Exemplo natural: “Como andam as provas da Ana Luiza?”</li>
+          <li>Exemplo natural: “Me dá um resumo das provas dele”</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3><code>listar_provas_aluno</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Lista detalhada das provas do aluno</div>
+        <p>Boa para ver quais provas existem e depois abrir uma específica.</p>
+        <ul>
+          <li>Exemplo natural: “Quais provas ela fez no 2º bimestre?”</li>
+          <li>Exemplo natural: “Me mostra as provas semanais dela”</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3><code>detalhar_prova_aluno</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Abre a prova e mostra questões</div>
+        <p>Serve para entrar no detalhe de uma prova, especialmente quando a coordenação quer entender erros.</p>
+        <ul>
+          <li>Exemplo natural: “Em quais questões ela errou?”</li>
+          <li>Exemplo natural: “Abre a última prova de matemática”</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3><code>listar_materias</code> e <code>listar_tipos_avaliacao</code></h3>
+        <div class="meta"><span class="label">Apoio</span>Catálogos de matéria e tipo</div>
+        <p>São tools de apoio para a IA entender filtros como matéria, prova semanal, bimestral etc.</p>
+      </div>
+
+      <div class="card">
+        <h3><code>perfil_aluno_360</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Visão geral resumida do aluno</div>
+        <p>
+          Junta desempenho em provas, frequência, jornadas e pendências relevantes em um único painel.
+          É a melhor porta de entrada quando você quer “entender o aluno inteiro”.
+        </p>
+        <ul>
+          <li>Exemplo natural: “Me dá um 360 da Ana Luiza”</li>
+          <li>Exemplo natural: “Quero uma visão geral do aluno RA 24254”</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>2. Tools de Jornadas</h2>
+    <div class="grid">
+      <div class="card">
+        <h3><code>resumo_jornadas_aluno</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Consolidado de jornadas do aluno</div>
+        <p>Mostra quantas jornadas existem, quantas foram concluídas e o percentual médio.</p>
+        <ul>
+          <li>Exemplo natural: “Como estão as jornadas da Ana Luiza?”</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3><code>listar_jornadas_aluno</code> e <code>detalhar_jornada_aluno</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Lista e abre uma jornada específica</div>
+        <p>Útil quando a coordenação quer sair do consolidado e olhar uma jornada concreta.</p>
+      </div>
+
+      <div class="card">
+        <h3><code>listar_materias_jornadas</code></h3>
+        <div class="meta"><span class="label">Apoio</span>Catálogo de matérias das jornadas</div>
+        <p>Ajuda a IA a filtrar corretamente por área, componente ou matéria.</p>
+      </div>
+    </div>
+
+    <h2>3. Tools de Professor</h2>
+    <div class="grid">
+      <div class="card">
+        <h3><code>buscar_professores</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Encontra o professor certo</div>
+        <p>Primeiro passo para qualquer pergunta sobre o professor.</p>
+      </div>
+
+      <div class="card">
+        <h3><code>listar_turmas_professor</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Quais turmas estão com esse professor</div>
+        <p>Ajuda a coordenação a contextualizar o trabalho do docente.</p>
+      </div>
+
+      <div class="card">
+        <h3><code>resumo_provas_professor</code> e <code>listar_provas_professor</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Desempenho de provas sob a ótica do professor</div>
+        <p>Boa para responder “como estão as provas desse professor?” ou “quais avaliações ele aplicou?”.</p>
+      </div>
+
+      <div class="card">
+        <h3><code>detalhar_prova_professor</code> e <code>ranking_erros_prova_professor</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Abre a prova e mostra gargalos</div>
+        <p>Serve para identificar conteúdo difícil, prova problemática ou turma com alto erro.</p>
+      </div>
+
+      <div class="card">
+        <h3><code>saude_turmas_professor</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Saúde das turmas ligadas ao professor</div>
+        <p>Mostra alunos em atenção ou situações críticas no escopo do docente.</p>
+      </div>
+
+      <div class="card">
+        <h3><code>resumo_jornadas_professor</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Jornadas do professor e alunos em atenção</div>
+        <p>Boa para coordenação pedagógica quando quer medir avanço e engajamento por professor.</p>
+      </div>
+    </div>
+
+    <h2>4. Tools de Turma, Saúde Escolar e Agenda</h2>
+    <div class="grid">
+      <div class="card">
+        <h3><code>saude_turma</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Saúde de aprendizagem da turma</div>
+        <p>
+          Mostra alunos em crítico, atenção, monitorar e saudável. É a tool certa para
+          “quem precisa de ajuda nesta turma?”.
+        </p>
+        <ul>
+          <li>Exemplo natural: “Como está a saúde da turma 2ªB?”</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3><code>resumo_provas_turma</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Consolidado de acertos e erros da turma</div>
+        <p>Responde bem a perguntas como “em quais matérias essa turma erra mais?”.</p>
+      </div>
+
+      <div class="card">
+        <h3><code>saude_academica</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Alertas cadastrais e de matrícula da escola</div>
+        <p>
+          Aqui a palavra “saúde” significa governança acadêmica: aluno sem matrícula do ano,
+          matrícula divergente, sem número de chamada, pendente sem turma etc.
+        </p>
+        <ul>
+          <li>Exemplo natural: “Quem precisa de atenção na escola em 2024?”</li>
+          <li>Exemplo natural: “Tem aluno sem matrícula no ano?”</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3><code>grade_horaria_consulta</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Agenda do dia por turma, professor ou aluno</div>
+        <p>
+          Excelente para perguntas operacionais do dia a dia, como “qual aula a turma tem agora?”,
+          “quem está com a 1A hoje?” ou “qual é a grade do professor X?”.
+        </p>
+      </div>
+
+      <div class="card">
+        <h3><code>diario_pendencias</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Pendências do diário de classe</div>
+        <p>
+          Mostra o que está em atraso, em atenção ou em dia no lançamento do diário.
+          É útil para secretaria e coordenação quando precisam agir rápido.
+        </p>
+        <ul>
+          <li>Exemplo natural: “Quais diários estão em atraso?”</li>
+          <li>Exemplo natural: “Quais pendências de diário do professor Ana?”</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>5. Tools de Blocos, Boletim, Frequência e Ocorrências</h2>
+    <div class="grid">
+      <div class="card">
+        <h3><code>buscar_blocos</code> e <code>resultados_bloco</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Busca blocos de prova e mostra resultados</div>
+        <p>Indicado para perguntas sobre simulados, blocos e desempenho agregado.</p>
+      </div>
+
+      <div class="card">
+        <h3><code>boletim_aluno</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Boletim completo no formato quadro anual</div>
+        <p>
+          Monta o quadro de PP, PU, CH, PE, MU, faltas, semestres e resultado final no padrão do sistema.
+        </p>
+        <ul>
+          <li>Exemplo natural: “Boletim do RA 24254 em 2024”</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3><code>notas_evento_aluno</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Notas de um evento específico</div>
+        <p>Serve para demonstrativos ou para pedir uma coluna específica, como MU ou PP de um bimestre.</p>
+        <ul>
+          <li>Exemplo natural: “MU do 2º bimestre do RA 24254”</li>
+          <li>Exemplo natural: “Notas do 1º bimestre da Ana Luiza”</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3><code>faltas_aluno</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Frequência e faltas do aluno</div>
+        <p>Retorna aulas, presenças, faltas e percentual de frequência no período pedido.</p>
+      </div>
+
+      <div class="card">
+        <h3><code>ocorrencias_aluno</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Ocorrências disciplinares/comportamentais do aluno</div>
+        <p>Mostra título, detalhe, gravidade, status e categoria.</p>
+      </div>
+
+      <div class="card">
+        <h3><code>ocorrencias_turma</code></h3>
+        <div class="meta"><span class="label">Consulta</span>Ocorrências da turma</div>
+        <p>
+          Pensada para a coordenação enxergar rapidamente se uma turma está concentrando problemas,
+          inclusive por gravidade e status.
+        </p>
+        <ul>
+          <li>Exemplo natural: “Quais ocorrências abertas da turma 1A?”</li>
+          <li>Exemplo natural: “Só as graves da turma 2ªB”</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>6. Ferramentas de apoio invisíveis para o usuário</h2>
+    <p>
+      Além das tools “visíveis” no resultado, o Assistente usa estruturas de apoio para manter contexto
+      dentro da conversa, como o aluno atual, o histórico recente e resumos estruturados dos painéis já mostrados.
+      Isso permite follow-ups como “e a falta como está?” ou “e o boletim dele?” sem repetir tudo.
+    </p>
+
+    <div class="note">
+      <strong>Boas práticas ao usar o chat:</strong>
+      peça o <strong>ano letivo</strong> quando fizer sentido, informe <strong>RA</strong> quando já souber,
+      e cite a <strong>turma</strong> quando houver chance de ambiguidade. Isso melhora bastante a precisão.
+    </div>
+
+    <h2>7. O que ainda não faz</h2>
+    <ul>
+      <li>Não cria ocorrência, não lança nota e não marca presença pelo chat.</li>
+      <li>Não altera matrícula, financeiro ou dados cadastrais sensíveis.</li>
+      <li>Não substitui as telas transacionais do admin; hoje ele é uma camada de consulta inteligente.</li>
+    </ul>
+
+    <div class="footer">
+      Material gerado para uso interno do EducaTudo. Documento de apoio do Assistente Admin, em linguagem natural,
+      para coordenação, direção e equipe pedagógica.
+    </div>
+  </div>
+</body>
+</html>

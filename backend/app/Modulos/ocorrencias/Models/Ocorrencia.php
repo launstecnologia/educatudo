@@ -466,6 +466,11 @@ class Ocorrencia
                 $where[] = "o.status = :status";
                 $params['status'] = $status;
             }
+            $gravidade = trim((string) ($filtros['gravidade'] ?? $filtros['nivel_gravidade'] ?? ''));
+            if ($gravidade !== '' && isset(self::GRAVIDADES[$gravidade])) {
+                $where[] = "o.nivel_gravidade = :nivel_gravidade";
+                $params['nivel_gravidade'] = $gravidade;
+            }
             $categoriaId = (int) ($filtros['categoria_id'] ?? 0);
             if ($categoriaId > 0) {
                 $where[] = "o.categoria_id = :categoria_id";

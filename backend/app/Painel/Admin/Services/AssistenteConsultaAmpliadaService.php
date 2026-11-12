@@ -8,12 +8,16 @@ namespace App\Painel\Admin\Services;
 
 
 use App\Services\SaudeAprendizagemService;
+use App\Dominio\Escola\Services\SaudeAcademicaService;
+use App\Dominio\Escola\Services\GradeHorariaLeitura;
 use App\Services\ExamBlockResultsDashboardService;
 use App\Modulos\Provas\Services\ProvasAlunoConsultaService;
 use App\Modulos\Provas\Services\ProvasProfessorConsultaService;
 use App\Modulos\Jornadas\Services\JornadasRelatorioService;
+use App\Modulos\Jornadas\Services\JornadasAlunoConsultaService;
 use App\Modulos\Presenca\Services\FrequencyService;
 use App\Modulos\Ocorrencias\Models\Ocorrencia;
+use App\Modulos\Diario\Models\ClassDiary;
 
 use App\Models\System\BoletimConfig;
 use App\Core\Database;
@@ -600,6 +604,441 @@ class AssistenteConsultaAmpliadaService
     }
 
     /**
+     * Saúde acadêmica/cadastral da escola (não confundir com saúde de aprendizagem da turma).
+     *
+     * @param array<string,mixed> $filtros
+     * @return array<string,mixed>
+     */
+    public function saudeAcademica(array $filtros): array
+    {
+        $ano = $this->resolverAnoLetivoFiltro($filtros);
+        if ($ano === null) {
+            return ['ok' => false, 'error' => 'Ano letivo não encontrado.'];
+        }
+
+        $turma = null;
+        $turmaId = 0;
+        if (!empty($filtros['turma_id']) || !empty($filtros['turma_nome']) || !empty($filtros['turma'])) {
+            $turma = $this->resolverTurma($filtros);
+            if (empty($turma['ok'])) {
+                return $turma;
+            }
+            $turmaId = (int) ($turma['turma']['id'] ?? 0);
+        }
+
+        $tipo = trim((string) ($filtros['tipo_alerta'] ?? $filtros['tipo'] ?? ''));
+        if ($tipo !== '' && !in_array($tipo, SaudeAcademicaService::TIPOS_ALERTA, true)) {
+            return ['ok' => false, 'error' => 'Tipo de alerta inválido para saúde acadêmica.'];
+        }
+
+        $limite = max(1, min(100, (int) ($filtros['limite'] ?? 30)));
+        $svc = new SaudeAcademicaService();
+        $kpis = $svc->calcularKpis((int) $ano['id']);
+        $rows = $svc->buscarAlertas((int) $ano['id'], $tipo !== '' ? $tipo : null, $turmaId);
+        if ($turmaId > 0) {
+            $kpis = array_fill_keys(SaudeAcademicaService::TIPOS_ALERTA, 0);
+            foreach ($rows as $row) {
+                $tipoRow = (string) ($row['tipo_alerta'] ?? '');
+                if (isset($kpis[$tipoRow])) {
+                    $kpis[$tipoRow]++;
+                }
+            }
+            $kpis['total'] = array_sum($kpis);
+        }
+
+        $alertas = [];
+        foreach (array_slice($rows, 0, $limite) as $r) {
+            $tipoRow = (string) ($r['tipo_alerta'] ?? '');
+            $alertas[] = [
+                'aluno_id' => (int) ($r['aluno_id'] ?? 0),
+                'nome' => trim((string) ($r['nome'] ?? '')),
+                'ra' => isset($r['ra']) && $r['ra'] !== '' ? trim((string) $r['ra']) : null,
+                'turma_nome' => trim((string) ($r['turma_nome'] ?? '')),
+                'tipo' => $tipoRow,
+                'tipo_rotulo' => $svc->rotuloTipoAlerta($tipoRow),
+                'descricao' => trim((string) ($r['descricao'] ?? '')),
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'natureza' => 'governanca_cadastral',
+            'ano_letivo' => $ano,
+            'turma' => $turma['turma'] ?? null,
+            'kpis' => $kpis,
+            'alertas' => $alertas,
+            'total_alertas' => count($rows),
+            'tipo_alerta' => $tipo !== '' ? $tipo : null,
+            'aviso' => $alertas === [] ? 'Nenhum alerta cadastral encontrado para este filtro.' : null,
+        ];
+    }
+
+    /**
+     * Visão 360 resumida do aluno para coordenação.
+     *
+     * @param array<string,mixed> $filtros
+     * @return array<string,mixed>
+     */
+    public function perfilAluno360(array $filtros): array
+    {
+        $aluno = $this->resolverAluno($filtros);
+        if (empty($aluno['ok'])) {
+            return $aluno;
+        }
+
+        $a = $aluno['aluno'];
+        $alunoId = (int) ($a['id'] ?? 0);
+        $ano = $this->resolverAnoLetivoFiltro($filtros);
+
+        $baseAluno = $this->db->fetch(
+            "SELECT a.id, a.nome, a.ra, a.turma_id, t.nome AS turma_nome
+             FROM alunos a
+             LEFT JOIN turmas t ON t.id = a.turma_id
+             WHERE a.id = :id
+             LIMIT 1",
+            ['id' => $alunoId]
+        ) ?: [];
+
+        $provas = $this->alunos->resumoProvasAluno(['aluno_id' => $alunoId]);
+        $jornadas = ['ok' => false];
+        try {
+            $jornadas = (new JornadasAlunoConsultaService($this->alunos))->resumoJornadasAluno(['aluno_id' => $alunoId]);
+        } catch (\Throwable $e) {
+            $jornadas = ['ok' => false, 'error' => 'Resumo de jornadas indisponível nesta base.'];
+        }
+        $faltas = $this->faltasAluno([
+            'aluno_id' => $alunoId,
+            'ano_letivo' => $ano['ano'] ?? null,
+            'ano_letivo_id' => $ano['id'] ?? null,
+        ]);
+        $ocorrencias = $this->ocorrenciasAluno([
+            'aluno_id' => $alunoId,
+            'status' => 'aberta',
+            'ano_letivo' => $ano['ano'] ?? null,
+        ]);
+
+        $indicadores = [
+            'provas_pct' => $provas['percentual_acerto'] ?? null,
+            'frequencia_pct' => $faltas['frequencia']['percentual'] ?? null,
+            'jornadas_pct' => $jornadas['percentual_medio'] ?? null,
+            'media_provas' => $provas['percentual_acerto'] ?? null,
+        ];
+        $atividade = [
+            'total_provas' => (int) ($provas['total_provas'] ?? 0),
+            'total_jornadas' => (int) ($jornadas['total_jornadas'] ?? 0),
+            'jornadas_concluidas' => (int) ($jornadas['concluidas'] ?? 0),
+            'jornadas_em_andamento' => (int) ($jornadas['em_andamento'] ?? 0),
+        ];
+        $pendencias = [
+            'ocorrencias_abertas' => (int) ($ocorrencias['total'] ?? 0),
+            'faltas' => isset($faltas['frequencia']['faltas']) ? (int) $faltas['frequencia']['faltas'] : null,
+            'sem_frequencia' => empty($faltas['frequencia']),
+        ];
+
+        $destaques = [];
+        if (($ocorrencias['total'] ?? 0) > 0) {
+            $destaques[] = (int) $ocorrencias['total'] . ' ocorrência(s) aberta(s).';
+        }
+        if (!empty($faltas['aviso'])) {
+            $destaques[] = (string) $faltas['aviso'];
+        } elseif (isset($faltas['frequencia']['faltas'])) {
+            $destaques[] = 'Faltas no período: ' . (int) $faltas['frequencia']['faltas'] . '.';
+        }
+        if (($provas['total_provas'] ?? 0) > 0 && isset($provas['percentual_acerto'])) {
+            $destaques[] = 'Acerto médio em provas: ' . $provas['percentual_acerto'] . '%.';
+        }
+        if (($jornadas['total_jornadas'] ?? 0) > 0) {
+            $destaques[] = 'Jornadas: ' . (int) ($jornadas['concluidas'] ?? 0) . ' concluída(s) de '
+                . (int) ($jornadas['total_jornadas'] ?? 0) . '.';
+        } elseif (!empty($jornadas['error'])) {
+            $destaques[] = (string) $jornadas['error'];
+        }
+
+        return [
+            'ok' => true,
+            'aluno' => [
+                'id' => $alunoId,
+                'nome' => trim((string) ($baseAluno['nome'] ?? $a['nome'] ?? '')),
+                'ra' => $baseAluno['ra'] ?? ($a['ra'] ?? null),
+                'turma_id' => isset($baseAluno['turma_id']) ? (int) $baseAluno['turma_id'] : ($a['turma_id'] ?? null),
+                'turma_nome' => trim((string) ($baseAluno['turma_nome'] ?? $a['turma_nome'] ?? '')),
+            ],
+            'ano_letivo' => $ano,
+            'indicadores' => $indicadores,
+            'atividade' => $atividade,
+            'pendencias' => $pendencias,
+            'destaques' => array_slice($destaques, 0, 6),
+        ];
+    }
+
+    /**
+     * Diário de classe: pendências por professor/turma/matéria.
+     *
+     * @param array<string,mixed> $filtros
+     * @return array<string,mixed>
+     */
+    public function diarioPendencias(array $filtros): array
+    {
+        $status = trim((string) ($filtros['situacao'] ?? $filtros['status'] ?? ''));
+        if ($status !== '' && !in_array($status, ['em_dia', 'atencao', 'atraso'], true)) {
+            return ['ok' => false, 'error' => 'Situação inválida para pendências do diário.'];
+        }
+
+        [$inicioBase, $fimBase] = $this->periodoFiltro($filtros);
+        $inicio = $this->normalizarData($filtros['data_inicio'] ?? $filtros['inicio'] ?? null) ?? $inicioBase ?? date('Y-m-d', strtotime('-45 days'));
+        $fim = $this->normalizarData($filtros['data_fim'] ?? $filtros['fim'] ?? null) ?? $fimBase ?? date('Y-m-d');
+        if ($inicio > $fim) {
+            [$inicio, $fim] = [$fim, $inicio];
+        }
+
+        $professor = null;
+        $professorId = 0;
+        if (!empty($filtros['professor_id']) || !empty($filtros['professor_nome']) || !empty($filtros['nome'])) {
+            $professor = $this->professores->resolverProfessor($filtros);
+            if (empty($professor['ok'])) {
+                return $professor;
+            }
+            $professorId = (int) ($professor['professor']['id'] ?? 0);
+        }
+
+        $turma = null;
+        $turmaId = 0;
+        if (!empty($filtros['turma_id']) || !empty($filtros['turma_nome']) || !empty($filtros['turma'])) {
+            $turma = $this->resolverTurma($filtros);
+            if (empty($turma['ok'])) {
+                return $turma;
+            }
+            $turmaId = (int) ($turma['turma']['id'] ?? 0);
+        }
+
+        $rows = $this->indicadoresDiarioPeriodoCompleto($inicio, $fim, $professorId);
+        if ($turmaId > 0) {
+            $rows = array_values(array_filter(
+                $rows,
+                static fn(array $r): bool => (int) ($r['turma_id'] ?? 0) === $turmaId
+            ));
+        }
+        if ($status !== '') {
+            $rows = array_values(array_filter(
+                $rows,
+                static fn(array $r): bool => (string) ($r['situacao'] ?? '') === $status
+            ));
+        }
+
+        usort($rows, static function (array $a, array $b): int {
+            $ordem = ['atraso' => 0, 'atencao' => 1, 'em_dia' => 2];
+            $sa = $ordem[(string) ($a['situacao'] ?? '')] ?? 3;
+            $sb = $ordem[(string) ($b['situacao'] ?? '')] ?? 3;
+            if ($sa !== $sb) {
+                return $sa <=> $sb;
+            }
+            $pa = (int) ($a['pendentes_vencidas'] ?? 0);
+            $pb = (int) ($b['pendentes_vencidas'] ?? 0);
+            if ($pa !== $pb) {
+                return $pb <=> $pa;
+            }
+            return strcmp((string) ($a['professor_nome'] ?? ''), (string) ($b['professor_nome'] ?? ''));
+        });
+
+        $resumo = $this->resumirIndicadoresDiario($rows);
+        $limite = max(1, min(100, (int) ($filtros['limite'] ?? 30)));
+        $linhas = [];
+        foreach (array_slice($rows, 0, $limite) as $r) {
+            $linhas[] = [
+                'turma_id' => (int) ($r['turma_id'] ?? 0),
+                'materia_id' => (int) ($r['materia_id'] ?? 0),
+                'professor_id' => (int) ($r['professor_id'] ?? 0),
+                'turma_nome' => trim((string) ($r['turma_nome'] ?? '')),
+                'materia_nome' => trim((string) ($r['materia_nome'] ?? '')),
+                'professor_nome' => trim((string) ($r['professor_nome'] ?? '')),
+                'pendentes_vencidas' => (int) ($r['pendentes_vencidas'] ?? 0),
+                'percentual' => isset($r['percentual']) ? (float) $r['percentual'] : null,
+                'ultima_data' => isset($r['ultima_data']) ? (string) $r['ultima_data'] : null,
+                'situacao' => (string) ($r['situacao'] ?? ''),
+                'situacao_label' => $this->rotuloSituacaoDiario((string) ($r['situacao'] ?? '')),
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'periodo' => ['inicio' => $inicio, 'fim' => $fim],
+            'professor' => $professor['professor'] ?? null,
+            'turma' => $turma['turma'] ?? null,
+            'resumo' => $resumo,
+            'diarios' => $linhas,
+            'total' => count($rows),
+            'aviso' => $linhas === [] ? 'Nenhuma pendência de diário encontrada para este filtro.' : null,
+        ];
+    }
+
+    /**
+     * Agenda/grade horária por turma, professor ou aluno.
+     *
+     * @param array<string,mixed> $filtros
+     * @return array<string,mixed>
+     */
+    public function gradeHorariaConsulta(array $filtros): array
+    {
+        $data = $this->normalizarData($filtros['data'] ?? null) ?? date('Y-m-d');
+        $diaSemana = (int) date('N', strtotime($data));
+        $periodo = trim((string) ($filtros['periodo'] ?? ''));
+
+        $escopo = null;
+        $params = ['dia_semana' => $diaSemana];
+        if ($periodo !== '') {
+            $params['periodo'] = $periodo;
+        }
+
+        if (!empty($filtros['professor_id']) || !empty($filtros['professor_nome']) || (!empty($filtros['nome']) && empty($filtros['aluno_nome']))) {
+            $professor = $this->professores->resolverProfessor($filtros);
+            if (empty($professor['ok'])) {
+                return $professor;
+            }
+            $params['professor_id'] = (int) ($professor['professor']['id'] ?? 0);
+            $escopo = ['tipo' => 'professor'] + ($professor['professor'] ?? []);
+        } elseif (!empty($filtros['turma_id']) || !empty($filtros['turma_nome']) || !empty($filtros['turma'])) {
+            $turma = $this->resolverTurma($filtros);
+            if (empty($turma['ok'])) {
+                return $turma;
+            }
+            $params['turma_id'] = (int) ($turma['turma']['id'] ?? 0);
+            $escopo = ['tipo' => 'turma'] + ($turma['turma'] ?? []);
+        } elseif (!empty($filtros['aluno_id']) || !empty($filtros['ra']) || !empty($filtros['aluno_nome'])) {
+            $aluno = $this->resolverAluno($filtros);
+            if (empty($aluno['ok'])) {
+                return $aluno;
+            }
+            $alunoInfo = $aluno['aluno'] ?? [];
+            $turmaId = (int) ($alunoInfo['turma_id'] ?? 0);
+            if ($turmaId <= 0) {
+                return ['ok' => false, 'error' => 'Aluno sem turma vinculada para consultar a grade.'];
+            }
+            $params['turma_id'] = $turmaId;
+            $escopo = [
+                'tipo' => 'aluno',
+                'aluno_id' => (int) ($alunoInfo['id'] ?? 0),
+                'aluno_nome' => trim((string) ($alunoInfo['nome'] ?? '')),
+                'turma_id' => $turmaId,
+                'turma_nome' => trim((string) ($alunoInfo['turma_nome'] ?? '')),
+            ];
+        } else {
+            return ['ok' => false, 'error' => 'Informe turma, professor ou aluno para consultar a grade.'];
+        }
+
+        $rows = (new GradeHorariaLeitura())->listar($params);
+        $aulas = [];
+        foreach ($rows as $r) {
+            $aulas[] = [
+                'dia_semana' => (int) ($r['dia_semana'] ?? 0),
+                'horario_de' => (string) ($r['horario_de'] ?? ''),
+                'horario_ate' => (string) ($r['horario_ate'] ?? ''),
+                'periodo' => isset($r['periodo']) ? (string) $r['periodo'] : null,
+                'turma_nome' => trim((string) ($r['turma_nome'] ?? '')),
+                'professor_nome' => trim((string) ($r['professor_nome'] ?? '')),
+                'materia_nome' => trim((string) ($r['materia_nome'] ?? '')),
+                'sala_nome' => isset($r['sala_nome']) && $r['sala_nome'] !== '' ? trim((string) $r['sala_nome']) : null,
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'data' => $data,
+            'dia_semana' => $diaSemana,
+            'dia_semana_label' => $this->rotuloDiaSemana($diaSemana),
+            'escopo' => $escopo,
+            'aulas' => $aulas,
+            'aviso' => $aulas === [] ? 'Nenhuma aula na grade para este dia/filtro.' : null,
+        ];
+    }
+
+    /**
+     * Ocorrências da turma, com foco em abertas/mais graves.
+     *
+     * @param array<string,mixed> $filtros
+     * @return array<string,mixed>
+     */
+    public function ocorrenciasTurma(array $filtros): array
+    {
+        $turma = $this->resolverTurma($filtros);
+        if (empty($turma['ok'])) {
+            return $turma;
+        }
+
+        $model = new Ocorrencia();
+        $status = trim((string) ($filtros['status'] ?? 'aberta'));
+        if ($status !== '' && $status !== 'todas' && !isset(Ocorrencia::STATUS[$status])) {
+            return ['ok' => false, 'error' => 'Status inválido para ocorrências da turma.'];
+        }
+        $gravidadeFiltro = trim((string) ($filtros['gravidade'] ?? $filtros['nivel_gravidade'] ?? ''));
+        if ($gravidadeFiltro !== '' && !isset(Ocorrencia::GRAVIDADES[$gravidadeFiltro])) {
+            return ['ok' => false, 'error' => 'Gravidade inválida para ocorrências da turma.'];
+        }
+
+        [$dataInicio, $dataFim] = $this->periodoFiltro($filtros);
+        $filtrosLista = ['turma_id' => (int) $turma['turma']['id']];
+        if ($status !== '' && $status !== 'todas') {
+            $filtrosLista['status'] = $status;
+        }
+        if ($gravidadeFiltro !== '') {
+            $filtrosLista['gravidade'] = $gravidadeFiltro;
+        }
+        if ($dataInicio !== null) {
+            $filtrosLista['data_inicio'] = $dataInicio;
+        }
+        if ($dataFim !== null) {
+            $filtrosLista['data_fim'] = $dataFim;
+        }
+
+        $limite = max(1, min(100, (int) ($filtros['limite'] ?? 30)));
+        $rows = $model->listar($filtrosLista, $limite, 0);
+        $total = $model->contar($filtrosLista);
+        $porGravidade = ['leve' => 0, 'moderado' => 0, 'grave' => 0];
+        $offsetResumo = 0;
+        $batchResumo = 1000;
+        do {
+            $chunkResumo = $model->listar($filtrosLista, $batchResumo, $offsetResumo);
+            foreach ($chunkResumo as $r) {
+                $gravidadeLinha = (string) ($r['nivel_gravidade'] ?? '');
+                if (isset($porGravidade[$gravidadeLinha])) {
+                    $porGravidade[$gravidadeLinha]++;
+                }
+            }
+            $offsetResumo += count($chunkResumo);
+        } while ($chunkResumo !== [] && $offsetResumo < $total);
+        $saida = [];
+        foreach ($rows as $r) {
+            $gravidadeLinha = (string) ($r['nivel_gravidade'] ?? '');
+            $saida[] = [
+                'id' => (int) ($r['id'] ?? 0),
+                'data' => isset($r['data_ocorrencia']) ? (string) $r['data_ocorrencia'] : null,
+                'alunos_nomes' => trim((string) ($r['alunos_nomes'] ?? '')),
+                'titulo' => trim((string) ($r['titulo'] ?? '')),
+                'detalhe' => trim((string) ($r['detalhe'] ?? '')),
+                'gravidade' => $gravidadeLinha !== '' ? $gravidadeLinha : null,
+                'gravidade_label' => $gravidadeLinha !== '' ? (Ocorrencia::GRAVIDADES[$gravidadeLinha] ?? $gravidadeLinha) : null,
+                'status' => isset($r['status']) ? (string) $r['status'] : null,
+                'status_label' => isset($r['status']) ? (Ocorrencia::STATUS[(string) $r['status']] ?? (string) $r['status']) : null,
+                'categoria' => isset($r['categoria_nome']) ? trim((string) $r['categoria_nome']) : null,
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'turma' => $turma['turma'],
+            'filtros' => [
+                'status' => $status !== '' ? $status : null,
+                'gravidade' => $gravidadeFiltro !== '' ? $gravidadeFiltro : null,
+                'data_inicio' => $dataInicio,
+                'data_fim' => $dataFim,
+            ],
+            'total' => $total,
+            'por_gravidade' => $porGravidade,
+            'ocorrencias' => $saida,
+            'aviso' => $saida === [] ? 'Nenhuma ocorrência encontrada para esta turma no filtro informado.' : null,
+        ];
+    }
+
+    /**
      * Faltas/frequência do aluno na turma (período ou visão recente do ano).
      *
      * @param array<string,mixed> $filtros
@@ -621,13 +1060,23 @@ class AssistenteConsultaAmpliadaService
         $inicio = $this->normalizarData($filtros['data_inicio'] ?? null);
         $fim = $this->normalizarData($filtros['data_fim'] ?? null);
         if ($inicio === null || $fim === null) {
-            $ano = $this->anoLetivoAtual((int) ($filtros['ano_letivo_id'] ?? 0));
-            $row = $ano !== null
-                ? $this->db->fetch(
-                    'SELECT data_inicio, data_fim, ano FROM ano_letivo WHERE id = :id LIMIT 1',
-                    ['id' => (int) $ano['id']]
-                )
-                : null;
+            $anoNumero = (int) ($filtros['ano_letivo'] ?? $filtros['ano'] ?? 0);
+            $row = null;
+            if ($anoNumero >= 2000) {
+                $row = $this->db->fetch(
+                    'SELECT data_inicio, data_fim, ano FROM ano_letivo WHERE ano = :ano ORDER BY id DESC LIMIT 1',
+                    ['ano' => $anoNumero]
+                );
+            }
+            if ($row === null) {
+                $ano = $this->anoLetivoAtual((int) ($filtros['ano_letivo_id'] ?? 0));
+                $row = $ano !== null
+                    ? $this->db->fetch(
+                        'SELECT data_inicio, data_fim, ano FROM ano_letivo WHERE id = :id LIMIT 1',
+                        ['id' => (int) $ano['id']]
+                    )
+                    : null;
+            }
             if ($row) {
                 $inicio = $inicio ?? (string) (($row['data_inicio'] ?? '') ?: ($row['ano'] . '-01-01'));
                 $fim = $fim ?? (string) (($row['data_fim'] ?? '') ?: ($row['ano'] . '-12-31'));
@@ -1239,6 +1688,227 @@ class AssistenteConsultaAmpliadaService
             return null;
         }
         return ['id' => (int) $r['id'], 'ano' => (int) $r['ano']];
+    }
+
+    /** @return array{id:int,ano:int,data_inicio?:string,data_fim?:string}|null */
+    private function resolverAnoLetivoFiltro(array $filtros): ?array
+    {
+        $anoId = (int) ($filtros['ano_letivo_id'] ?? 0);
+        if ($anoId > 0) {
+            $r = $this->db->fetch(
+                'SELECT id, ano, data_inicio, data_fim FROM ano_letivo WHERE id = :id LIMIT 1',
+                ['id' => $anoId]
+            );
+            if ($r) {
+                return [
+                    'id' => (int) $r['id'],
+                    'ano' => (int) $r['ano'],
+                    'data_inicio' => isset($r['data_inicio']) ? (string) $r['data_inicio'] : null,
+                    'data_fim' => isset($r['data_fim']) ? (string) $r['data_fim'] : null,
+                ];
+            }
+        }
+
+        $anoNumero = (int) ($filtros['ano_letivo'] ?? $filtros['ano'] ?? 0);
+        if ($anoNumero >= 2000) {
+            $r = $this->db->fetch(
+                'SELECT id, ano, data_inicio, data_fim FROM ano_letivo WHERE ano = :ano ORDER BY id DESC LIMIT 1',
+                ['ano' => $anoNumero]
+            );
+            if ($r) {
+                return [
+                    'id' => (int) $r['id'],
+                    'ano' => (int) $r['ano'],
+                    'data_inicio' => isset($r['data_inicio']) ? (string) $r['data_inicio'] : null,
+                    'data_fim' => isset($r['data_fim']) ? (string) $r['data_fim'] : null,
+                ];
+            }
+        }
+
+        $atual = $this->anoLetivoAtual();
+        if ($atual === null) {
+            return null;
+        }
+
+        $r = $this->db->fetch(
+            'SELECT id, ano, data_inicio, data_fim FROM ano_letivo WHERE id = :id LIMIT 1',
+            ['id' => (int) $atual['id']]
+        );
+        if ($r) {
+            return [
+                'id' => (int) $r['id'],
+                'ano' => (int) $r['ano'],
+                'data_inicio' => isset($r['data_inicio']) ? (string) $r['data_inicio'] : null,
+                'data_fim' => isset($r['data_fim']) ? (string) $r['data_fim'] : null,
+            ];
+        }
+
+        return $atual;
+    }
+
+    /** @return array{0:?string,1:?string} */
+    private function periodoFiltro(array $filtros): array
+    {
+        $inicio = $this->normalizarData($filtros['data_inicio'] ?? $filtros['inicio'] ?? null);
+        $fim = $this->normalizarData($filtros['data_fim'] ?? $filtros['fim'] ?? null);
+        if ($inicio !== null || $fim !== null) {
+            return [$inicio, $fim];
+        }
+
+        $ano = $this->resolverAnoLetivoFiltro($filtros);
+        if ($ano !== null) {
+            return [
+                isset($ano['data_inicio']) && $ano['data_inicio'] !== '' ? (string) $ano['data_inicio'] : ((int) $ano['ano'] >= 2000 ? sprintf('%04d-01-01', (int) $ano['ano']) : null),
+                isset($ano['data_fim']) && $ano['data_fim'] !== '' ? (string) $ano['data_fim'] : ((int) $ano['ano'] >= 2000 ? sprintf('%04d-12-31', (int) $ano['ano']) : null),
+            ];
+        }
+
+        return [null, null];
+    }
+
+    /** @param list<array<string,mixed>> $indicadores */
+    private function resumirIndicadoresDiario(array $indicadores): array
+    {
+        $resumo = [
+            'total' => count($indicadores),
+            'em_dia' => 0,
+            'atencao' => 0,
+            'atraso' => 0,
+            'pendentes_vencidas' => 0,
+            'horas_previstas' => 0.0,
+            'horas_ministradas' => 0.0,
+            'cobertura_media' => null,
+        ];
+        $somaPct = 0.0;
+        $countPct = 0;
+        foreach ($indicadores as $i) {
+            $situacao = (string) ($i['situacao'] ?? 'em_dia');
+            if (isset($resumo[$situacao])) {
+                $resumo[$situacao]++;
+            }
+            $resumo['pendentes_vencidas'] += (int) ($i['pendentes_vencidas'] ?? 0);
+            $resumo['horas_previstas'] += ((int) ($i['minutos_previstos'] ?? 0)) / 60;
+            $resumo['horas_ministradas'] += ((int) ($i['minutos_ministrados'] ?? 0)) / 60;
+            if (isset($i['percentual']) && $i['percentual'] !== null) {
+                $somaPct += (float) $i['percentual'];
+                $countPct++;
+            }
+        }
+        $resumo['horas_previstas'] = round((float) $resumo['horas_previstas'], 1);
+        $resumo['horas_ministradas'] = round((float) $resumo['horas_ministradas'], 1);
+        $resumo['cobertura_media'] = $countPct > 0 ? round($somaPct / $countPct, 1) : null;
+        return $resumo;
+    }
+
+    private function rotuloSituacaoDiario(string $situacao): string
+    {
+        return match ($situacao) {
+            'em_dia' => 'Em dia',
+            'atencao' => 'Atenção',
+            'atraso' => 'Em atraso',
+            default => $situacao,
+        };
+    }
+
+    private function rotuloDiaSemana(int $diaSemana): string
+    {
+        return match ($diaSemana) {
+            1 => 'Segunda-feira',
+            2 => 'Terça-feira',
+            3 => 'Quarta-feira',
+            4 => 'Quinta-feira',
+            5 => 'Sexta-feira',
+            6 => 'Sábado',
+            7 => 'Domingo',
+            default => 'Dia não informado',
+        };
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function indicadoresDiarioPeriodoCompleto(string $inicio, string $fim, int $professorId = 0): array
+    {
+        $start = new \DateTime($inicio);
+        $end = new \DateTime($fim);
+        if ($end < $start) {
+            return [];
+        }
+
+        $diario = new ClassDiary();
+        $dias = (int) $start->diff($end)->days;
+        if ($dias <= 200) {
+            return $diario->indicadores($inicio, $fim, $professorId);
+        }
+
+        $merge = [];
+        $cursor = clone $start;
+        while ($cursor <= $end) {
+            $fimBloco = (clone $cursor)->modify('+200 days');
+            if ($fimBloco > $end) {
+                $fimBloco = clone $end;
+            }
+            $chunk = $diario->indicadores($cursor->format('Y-m-d'), $fimBloco->format('Y-m-d'), $professorId);
+            foreach ($chunk as $row) {
+                $key = (int) ($row['grade_horaria_id'] ?? 0);
+                if ($key <= 0) {
+                    $key = crc32(
+                        (string) ($row['professor_id'] ?? 0) . '|'
+                        . (string) ($row['turma_id'] ?? 0) . '|'
+                        . (string) ($row['materia_id'] ?? 0) . '|'
+                        . (string) ($row['professor_nome'] ?? '') . '|'
+                        . (string) ($row['turma_nome'] ?? '') . '|'
+                        . (string) ($row['materia_nome'] ?? '')
+                    );
+                }
+                if (!isset($merge[$key])) {
+                    $merge[$key] = $row;
+                    continue;
+                }
+                $merge[$key]['aulas_previstas'] = (int) ($merge[$key]['aulas_previstas'] ?? 0) + (int) ($row['aulas_previstas'] ?? 0);
+                $merge[$key]['aulas_previstas_ate_hoje'] = (int) ($merge[$key]['aulas_previstas_ate_hoje'] ?? 0) + (int) ($row['aulas_previstas_ate_hoje'] ?? 0);
+                $merge[$key]['aulas_ministradas'] = (int) ($merge[$key]['aulas_ministradas'] ?? 0) + (int) ($row['aulas_ministradas'] ?? 0);
+                $merge[$key]['aulas_registradas'] = (int) ($merge[$key]['aulas_registradas'] ?? 0) + (int) ($row['aulas_registradas'] ?? 0);
+                $merge[$key]['minutos_previstos'] = (int) ($merge[$key]['minutos_previstos'] ?? 0) + (int) ($row['minutos_previstos'] ?? 0);
+                $merge[$key]['minutos_ministrados'] = (int) ($merge[$key]['minutos_ministrados'] ?? 0) + (int) ($row['minutos_ministrados'] ?? 0);
+                $ultimaA = (string) ($merge[$key]['ultima_data'] ?? '');
+                $ultimaB = (string) ($row['ultima_data'] ?? '');
+                if ($ultimaB !== '' && ($ultimaA === '' || $ultimaB > $ultimaA)) {
+                    $merge[$key]['ultima_data'] = $ultimaB;
+                }
+            }
+            $cursor = (clone $fimBloco)->modify('+1 day');
+        }
+
+        foreach ($merge as &$row) {
+            $previstasHoje = (int) ($row['aulas_previstas_ate_hoje'] ?? 0);
+            $registradas = (int) ($row['aulas_registradas'] ?? 0);
+            $pendentes = max(0, $previstasHoje - $registradas);
+            $row['pendentes_vencidas'] = $pendentes;
+            $previstasTotal = (int) ($row['aulas_previstas'] ?? 0);
+            $ministradas = (int) ($row['aulas_ministradas'] ?? 0);
+            $row['percentual'] = $previstasTotal > 0 ? min(100.0, round(($ministradas / $previstasTotal) * 100, 1)) : null;
+            if ($previstasHoje === 0 && $registradas === 0) {
+                $row['situacao'] = 'em_dia';
+            } elseif ($pendentes <= 0) {
+                $row['situacao'] = 'em_dia';
+            } elseif ($pendentes <= 2) {
+                $row['situacao'] = 'atencao';
+            } else {
+                $row['situacao'] = 'atraso';
+            }
+        }
+        unset($row);
+
+        $out = array_values($merge);
+        usort($out, static function (array $a, array $b): int {
+            $ordem = ['atraso' => 0, 'atencao' => 1, 'em_dia' => 2];
+            $sa = $ordem[(string) ($a['situacao'] ?? '')] ?? 3;
+            $sb = $ordem[(string) ($b['situacao'] ?? '')] ?? 3;
+            if ($sa !== $sb) {
+                return $sa <=> $sb;
+            }
+            return strcmp((string) ($a['professor_nome'] ?? ''), (string) ($b['professor_nome'] ?? ''));
+        });
+        return $out;
     }
 
     private function normalizarData($raw): ?string

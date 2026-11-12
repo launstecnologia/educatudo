@@ -18,7 +18,7 @@ class GradeHorariaLeitura
     }
 
     /**
-     * @param array{tipo_ensino?:string,serie?:string,turma_id?:int,periodo?:string,professor_id?:int,materia_id?:int} $filtros
+     * @param array{tipo_ensino?:string,serie?:string,turma_id?:int,periodo?:string,professor_id?:int,materia_id?:int,dia_semana?:int} $filtros
      * @return list<array<string,mixed>>
      */
     public function listar(array $filtros): array
@@ -48,6 +48,10 @@ class GradeHorariaLeitura
         if ((int) ($filtros['materia_id'] ?? 0) > 0) {
             $where[] = 'g.materia_id = :materia_id';
             $params['materia_id'] = (int) $filtros['materia_id'];
+        }
+        if ((int) ($filtros['dia_semana'] ?? 0) > 0) {
+            $where[] = 'g.dia_semana = :dia_semana';
+            $params['dia_semana'] = (int) $filtros['dia_semana'];
         }
         if (($filtros['tipo_ensino'] ?? '') !== '') {
             $where[] = 't.tipo_ensino = :tipo_ensino';
