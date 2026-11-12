@@ -705,11 +705,50 @@ class EventoAvaliativoService
     }
 
     /**
+     * Período de origem para o botão "Duplicar de …" (letivo ou recuperação).
+     *
+     * @return array{periodo:int,rotulo:string}|null
+     */
+    public function periodoOrigemDuplicacao(int $ano, int $periodo, int $regraId = 0): ?array
+    {
+        if ($ano < 2000 || $periodo <= 0) {
+            return null;
+        }
+        if (PeriodoLetivo::numeroValido($ano, $periodo)) {
+            if ($periodo < 2 || !PeriodoLetivo::numeroValido($ano, $periodo - 1)) {
+                return null;
+            }
+
+            return [
+                'periodo' => $periodo - 1,
+                'rotulo' => PeriodoLetivo::rotulo($ano, $periodo - 1),
+            ];
+        }
+
+        $ehCiclo = $periodo > RecuperacaoConfig::CODIGO_CICLO_BASE + 1 && $periodo < RecuperacaoConfig::CODIGO_PAR_BASE;
+        $ehPar = $periodo > RecuperacaoConfig::CODIGO_PAR_BASE + 1 && $periodo < RecuperacaoConfig::CODIGO_FINAL;
+        if (!$ehCiclo && !$ehPar) {
+            return null;
+        }
+        $anterior = $periodo - 1;
+        $recuperacao = new RecuperacaoConfig();
+        if (!$recuperacao->codigoAceito($ano, $periodo, $regraId) || !$recuperacao->codigoAceito($ano, $anterior, $regraId)) {
+            return null;
+        }
+        $rotulo = $recuperacao->rotuloDoCodigo($ano, $anterior, $regraId);
+
+        return [
+            'periodo' => $anterior,
+            'rotulo' => $rotulo !== null && $rotulo !== '' ? $rotulo : 'a recuperação anterior',
+        ];
+    }
+
+    /**
      * Copia os eventos do período anterior para o período atual, como rascunho.
      *
      * @return array{success:bool,criados?:int,error?:string}
      */
-    public function duplicarDoPeriodoAnterior(int $ano, int $periodo, int $usuarioId): array
+    public function duplicarDoPeriodoAnterior(int $ano, int $periodo, int $usuarioId, int $regraId = 0): array
     {
         if (!$this->model->tabelasProntas()) {
             return ['success' => false, 'error' => 'Rode a migration 2026_10_26_eventos_avaliativos.sql no painel Master.'];
@@ -717,13 +756,15 @@ class EventoAvaliativoService
         if (!$this->model->temColunaRascunho()) {
             return ['success' => false, 'error' => 'Rode a migration 2026_10_28_evento_rascunho.sql no painel Master.'];
         }
-        if ($periodo < 2 || !PeriodoLetivo::numeroValido($ano, $periodo) || !PeriodoLetivo::numeroValido($ano, $periodo - 1)) {
-            return ['success' => false, 'error' => 'A duplicação começa no segundo período.'];
+        $origemInfo = $this->periodoOrigemDuplicacao($ano, $periodo, $regraId);
+        if ($origemInfo === null) {
+            return ['success' => false, 'error' => 'A duplicação começa no segundo período (ou na segunda recuperação).'];
         }
 
-        $origem = $this->model->listar($ano, $periodo - 1);
+        $periodoOrigem = (int) $origemInfo['periodo'];
+        $origem = $this->model->listar($ano, $periodoOrigem);
         if ($origem === []) {
-            $rotulo = PeriodoLetivo::rotulo($ano, $periodo - 1);
+            $rotulo = trim((string) ($origemInfo['rotulo'] ?? ''));
             return ['success' => false, 'error' => 'Não há eventos em ' . ($rotulo !== '' ? $rotulo : 'o período anterior') . ' para duplicar.'];
         }
 
@@ -747,6 +788,9 @@ class EventoAvaliativoService
                 $erro = 'Não foi possível ler "' . $nome . '".';
                 continue;
             }
+            if ($regraId > 0) {
+                $post['regra'] = $regraId;
+            }
             $resultado = $this->criar($post, $usuarioId);
             if (empty($resultado['success'])) {
                 $erro = (string) ($resultado['error'] ?? 'Não foi possível duplicar "' . $nome . '".');
@@ -769,16 +813,17 @@ class EventoAvaliativoService
      *
      * @return array{success:bool,copiadas?:int,pares?:int,error?:string}
      */
-    public function duplicarNotasDoPeriodoAnterior(int $ano, int $periodo): array
+    public function duplicarNotasDoPeriodoAnterior(int $ano, int $periodo, int $regraId = 0): array
     {
         if (!$this->model->tabelasProntas()) {
             return ['success' => false, 'error' => 'Rode a migration 2026_10_26_eventos_avaliativos.sql no painel Master.'];
         }
-        if ($periodo < 2 || !PeriodoLetivo::numeroValido($ano, $periodo) || !PeriodoLetivo::numeroValido($ano, $periodo - 1)) {
-            return ['success' => false, 'error' => 'A duplicação de notas começa no segundo período.'];
+        $origemInfo = $this->periodoOrigemDuplicacao($ano, $periodo, $regraId);
+        if ($origemInfo === null) {
+            return ['success' => false, 'error' => 'A duplicação de notas começa no segundo período (ou na segunda recuperação).'];
         }
 
-        $origem = $this->model->listar($ano, $periodo - 1);
+        $origem = $this->model->listar($ano, (int) $origemInfo['periodo']);
         $destino = $this->model->listar($ano, $periodo);
         if ($origem === [] || $destino === []) {
             return ['success' => false, 'error' => 'Não há eventos nos dois períodos para parear notas.'];

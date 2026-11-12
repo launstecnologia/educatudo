@@ -116,6 +116,7 @@ class EventoAvaliativoAdminController extends AdminBaseController
                 $opcoesPeriodo[] = ['numero' => $periodoNum, 'rotulo' => $rotulo];
             }
         }
+        $origemDup = $this->service->periodoOrigemDuplicacao($ano, $periodoNum, $regraId);
         $this->viewWithLayout('admin', 'admin/eventos-avaliativos/index', $this->dados([
             'title' => $tituloRegra . ' - EducaTudo',
             'regra_id' => $regraId,
@@ -129,8 +130,8 @@ class EventoAvaliativoAdminController extends AdminBaseController
             'periodo_rotulo' => $rotulo,
             'periodos_opcoes' => $opcoesPeriodo,
             'tipo_rotulo' => $periodoEspecial ? 'Recuperação' : 'Avaliação',
-            'pode_duplicar' => PeriodoLetivo::numeroValido($ano, $periodoNum) && $periodoNum >= 2 && PeriodoLetivo::numeroValido($ano, $periodoNum - 1),
-            'rotulo_anterior' => PeriodoLetivo::numeroValido($ano, $periodoNum - 1) ? PeriodoLetivo::rotulo($ano, $periodoNum - 1) : '',
+            'pode_duplicar' => $origemDup !== null,
+            'rotulo_anterior' => (string) ($origemDup['rotulo'] ?? ''),
             'flash_status' => $flashStatus,
             'flash_message' => $flashMessage,
         ]));
@@ -151,7 +152,7 @@ class EventoAvaliativoAdminController extends AdminBaseController
             return;
         }
         $user = $this->auth->getUser() ?? [];
-        $res = $this->service->duplicarDoPeriodoAnterior($ano, $periodo, (int) ($user['id'] ?? 0));
+        $res = $this->service->duplicarDoPeriodoAnterior($ano, $periodo, (int) ($user['id'] ?? 0), $regra);
         if (empty($res['success'])) {
             $this->setFlashMessage((string) ($res['error'] ?? 'Não foi possível duplicar os eventos.'), 'error');
             $this->redirect($volta);
@@ -183,7 +184,7 @@ class EventoAvaliativoAdminController extends AdminBaseController
             $this->redirect($volta);
             return;
         }
-        $res = $this->service->duplicarNotasDoPeriodoAnterior($ano, $periodo);
+        $res = $this->service->duplicarNotasDoPeriodoAnterior($ano, $periodo, $regra);
         if (empty($res['success'])) {
             $this->setFlashMessage((string) ($res['error'] ?? 'Não foi possível duplicar as notas.'), 'error');
             $this->redirect($volta);
