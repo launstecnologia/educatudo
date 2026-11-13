@@ -171,7 +171,7 @@ class BoletimConsultaAssistenteService
             if ($this->parecePerguntaDeDado($mensagem) && !$this->parecePedidoDeFormula($mensagem)) {
                 $textoFinal = 'Consultei o sistema, mas não fechou uma resposta. Diga o nome do aluno e a matéria.';
             } elseif ($this->parecePedidoDeFormula($mensagem)) {
-                $textoFinal = 'Não fechei a fórmula. Me diga quais colunas entram, se tem substituta (CH), se tem Projeto/opcional e se PE soma fora.';
+                $textoFinal = 'Não fechei a fórmula. Me diga quais colunas entram, se tem substituta (ex.: 2ª Chamada), se tem Trabalho/opcional e se o ponto extra soma fora.';
             } else {
                 $textoFinal = 'Não entendi bem. Pode repetir com mais detalhe?';
             }
@@ -533,29 +533,30 @@ class BoletimConsultaAssistenteService
         ) {
             return "O | dentro de média ( ) separa PAPÉIS pela posição — não pelo nome da coluna:\n\n"
                 . "média ( provas | substituta | opcional )\n"
-                . "1º PP, PU = provas (a CH pode cobrir a 1ª que faltar)\n"
-                . "2º CH = substituta (1 coluna)\n"
-                . "3º PJ = opcional (só se tiver lançamento; a CH nunca cobre o PJ)\n\n"
-                . "Por isso o PJ fica depois do CH: opcional é o 3º grupo. "
-                . "Quem decide se tem PJ é o se ( PJ , … , … ) de fora — não a ordem dentro da média. "
-                . "PE soma fora: + PE.";
+                . "1º provas (ex.: Prova Parcial, Prova Bimestral) — a substituta pode cobrir a 1ª que faltar\n"
+                . "2º substituta (ex.: 2ª Chamada) — 1 coluna\n"
+                . "3º opcional (ex.: Trabalho) — só se tiver lançamento; a substituta nunca cobre o opcional\n\n"
+                . "Por isso o Trabalho fica depois da 2ª Chamada: opcional é o 3º grupo. "
+                . "Quem decide se tem Trabalho é o se ( Trabalho , … , … ) de fora — não a ordem dentro da média. "
+                . "Ponto extra soma fora: + PontoExtra. Use sempre as colunas DESTE evento.";
         }
 
         if ($pergunta && preg_match('/\bse\s*\(|\bse\b.*(verdadeiro|falso|condi|lan[cç]|existe)/u', $t) === 1) {
             return "se ( condição , conta_se_sim , conta_se_não ) funciona como o SE do Excel:\n\n"
-                . "• PJ ou PJ = verdadeiro → tem nota em PJ\n"
-                . "• PJ = falso → não tem\n"
-                . "• PP > 7 (ou >= < <= = !=) → compara a nota\n"
-                . "• PP > PU → compara duas colunas (se faltar nota em alguma, a condição é falsa)\n\n"
-                . "Ex.: se ( PJ , média ( PP , PU | CH | PJ ) , média ( PP , PU | CH ) ) + PE";
+                . "• Trabalho ou Trabalho = verdadeiro → tem nota em Trabalho\n"
+                . "• Trabalho = falso → não tem\n"
+                . "• ProvaParcial > 7 (ou >= < <= = !=) → compara a nota\n"
+                . "• ProvaParcial > ProvaBimestral → compara duas colunas (se faltar nota em alguma, a condição é falsa)\n\n"
+                . "Ex.: se ( Trabalho , média ( ProvaParcial , ProvaBimestral | 2aChamada | Trabalho ) , média ( ProvaParcial , ProvaBimestral | 2aChamada ) ) + PontoExtra";
         }
 
         if ($pergunta && preg_match('/nota substituta|chamada\s*\(|2a.?chamada|segunda.?chamada|substitut/u', $t) === 1
-            && !preg_match('/\bpj\b|projeto|opcional/u', $t)) {
-            return "nota substituta ( PP , PU , CH ) = média das bases; a CH cobre só a 1ª base que faltar. "
-                . "Se PP e PU existem, CH é ignorada. Já divide sozinha — não coloque ÷ 2 de novo. "
-                . "PE, se entrar, some fora: + PE.\n\n"
-                . "Parecido: média ( PP , PU | CH ) — aí o | marca CH como substituta.";
+            && !preg_match('/\bpj\b|projeto|opcional|trabalho/u', $t)) {
+            return "nota substituta ( ProvaParcial , ProvaBimestral , 2aChamada ) = média das bases; a 2ª chamada cobre só a 1ª base que faltar. "
+                . "Se as duas provas existem, a substituta é ignorada. Já divide sozinha — não coloque ÷ 2 de novo. "
+                . "Ponto extra, se entrar, some fora: + PontoExtra.\n\n"
+                . "Parecido: média ( ProvaParcial , ProvaBimestral | 2aChamada ) — aí o | marca a 2ª chamada como substituta. "
+                . "Troque pelos nomes das colunas deste evento.";
         }
 
         if ($pergunta && preg_match('/media c\/ rec|média c\/ rec|composicao|recupera/u', $t) === 1
@@ -1013,7 +1014,7 @@ class BoletimConsultaAssistenteService
         if (count($provas) < 2 || $subst === null) {
             $lista = $siglas !== [] ? implode(', ', $siglas) : '(nenhuma sigla no evento ainda)';
 
-            return "As siglas mudam por evento — não assumo PP/PU/CH.\n\n"
+            return "As colunas mudam por evento — use os nomes deste quadro (ex.: Prova Parcial, Prova Bimestral, Trabalho).\n\n"
                 . "Colunas deste evento: {$lista}.\n"
                 . "Me diga: quais 2 provas entram na média, qual é a substituta"
                 . ($querOpcional ? ', qual é o opcional' : '')
@@ -1530,60 +1531,60 @@ Você é o assistente da tela Evento de Notas do EducaTudo. Conversa em portugu�
 Como conversar (obrigatório):
 - Entenda o pedido em linguagem natural, mesmo informal, incompleto ou em várias mensagens. Use o histórico.
 - Se a intenção estiver clara, responda e, se for fórmula, entregue a linha pronta.
-- Se NÃO entender ou faltar informação, NÃO invente. Pergunte 1 a 3 perguntas objetivas para entender melhor (ex.: quais colunas entram na média? tem nota substituta/CH? tem Projeto/opcional? PE soma fora? em qual coluna amarela montar?).
+- Se NÃO entender ou faltar informação, NÃO invente. Pergunte 1 a 3 perguntas objetivas (ex.: quais colunas entram na média? tem 2ª chamada/substituta? tem Trabalho/opcional? ponto extra soma fora? em qual coluna amarela montar?).
 - Se o usuário responder a sua pergunta, continue a conversa e feche a fórmula.
 - Prefira os nomes das colunas que já existem no evento aberto (veja o JSON abaixo). Se o usuário citar um código que não existe no evento, pergunte qual coluna usar.
+- NUNCA use siglas de uma escola específica (PP, PU, PJ, CH, PE…) nos exemplos se elas não forem as colunas DESTE evento. Exemplos genéricos: ProvaParcial, ProvaBimestral, Trabalho, 2aChamada, PontoExtra.
 
 Manual canônico das fórmulas (OBRIGATÓRIO — não invente outra lógica):
 - Peça = tipo de nota (Prova Semanal, Avaliação Bimestral, ENAC, Jornada…). O título do evento não define o tipo.
 - Prova Semanal: eventos daquele tipo no bimestre marcado. S1–S8: Bloco A ímpares, Bloco B pares.
 - Conta aritmética: + − × ÷ e ( ). Média simples = (soma) ÷ quantidade. Ausente vira 0 só na conta pura +−×÷.
 - Funções: maior ( ), menor ( ), nota substituta ( ), média c/ rec ( ), média ( ), se ( ).
-- Ao sugerir fórmula: uma linha \Título = expressão. O título é a coluna amarela ABERTA (veja o evento abaixo). Nunca invente MS 2º se a aberta for MU.
+- Ao sugerir fórmula: uma linha Título = expressão. O título é a coluna amarela ABERTA (veja o evento abaixo).
 - Três caminhos iguais: chips, conversa aqui, ou digitar a condição — a nota final é a mesma.
 
 PAPÉIS DO | DENTRO DE média ( ) — responda SEMPRE assim quando perguntarem a ordem:
   média ( provas | substituta | opcional )
-  1º grupo = provas (ex.: PP, PU) — a substituta pode cobrir a 1ª que faltar
-  2º grupo = substituta (ex.: CH) — 1 coluna
-  3º grupo = opcional (ex.: PJ/Projeto) — só se houver lançamento; a substituta NUNCA cobre o opcional
-  O nome da coluna não muda o papel: muda a POSIÇÃO após o |. Por isso PJ fica DEPOIS do CH: opcional é o 3º grupo, CH é o 2º.
-  ERRADO dizer que “PJ vem depois do CH porque avalia a situação do aluno antes da média”. Isso é falso.
-  Quem decide “tem PJ?” é o se ( ) de FORA, não a ordem dentro da média.
-  PE sempre FORA: + PE. O | só existe DENTRO de média ( ). Nunca (PP+PU+CH|CH)÷3.
+  1º grupo = provas (ex.: ProvaParcial, ProvaBimestral) — a substituta pode cobrir a 1ª que faltar
+  2º grupo = substituta (ex.: 2aChamada) — 1 coluna
+  3º grupo = opcional (ex.: Trabalho) — só se houver lançamento; a substituta NUNCA cobre o opcional
+  O nome da coluna não muda o papel: muda a POSIÇÃO após o |. Por isso Trabalho fica DEPOIS da 2aChamada.
+  ERRADO inventar motivo pelo nome da coluna. Quem decide “tem Trabalho?” é o se ( ) de FORA.
+  Ponto extra sempre FORA: + PontoExtra. O | só existe DENTRO de média ( ).
 
 se ( condição , conta_se_sim , conta_se_não ):
-  · PJ ou PJ = verdadeiro → tem nota em PJ
-  · PJ = falso → não tem
-  · PP > 7 / >= / < / <= / = / != → compara valor; se faltar nota, condição falsa
-  · PP > PU → compara duas colunas
-  Ex. Projeto: se ( PJ , média ( PP , PU | CH | PJ ) , média ( PP , PU | CH ) ) + PE
-  (igual a se ( PJ = verdadeiro , … ))
+  · Trabalho ou Trabalho = verdadeiro → tem nota
+  · Trabalho = falso → não tem
+  · ProvaParcial > 7 / >= / < / <= / = / != → compara valor; se faltar nota, condição falsa
+  · ProvaParcial > ProvaBimestral → compara duas colunas
+  Ex.: se ( Trabalho , média ( ProvaParcial , ProvaBimestral | 2aChamada | Trabalho ) , média ( ProvaParcial , ProvaBimestral | 2aChamada ) ) + PontoExtra
 
-nota substituta ( bases… , CH ): média das bases; CH cobre só a 1ª base ausente; já divide sozinha.
-média c/ rec ( média , REC ): sem REC fica a média; com REC → (média+REC)÷2.
+nota substituta ( bases… , 2aChamada ): média das bases; substituta cobre só a 1ª base ausente; já divide sozinha.
+média c/ rec ( média , Recuperacao ): sem recuperação fica a média; com recuperação → (média+Recuperacao)÷2.
 maior ( A , B ): maior valor. menor ( A , B ): menor.
 ENAC só sobe a média: Resultado Final = maior ( Média Bim , ENAC ).
 (Média Bim + ENAC)÷2 só se melhorar: maior ( ( Média Bim + ENAC ) ÷ 2 , Média Bim ).
 Recuperação teto 7 sem cortar a média: maior ( Média Bim , menor ( 7 , Recuperação ) ).
 
-Exemplos de intenção (troque MU pelo título aberto):
-  · "PP+PU/2, CH substitui, se PJ ÷3, +PE" → MU = se ( PJ , média ( PP , PU | CH | PJ ) , média ( PP , PU | CH ) ) + PE
-  · Siglas (PP, PU, PJ, CH, PE, AV1…) mudam por evento. SEMPRE use as siglas de "Siglas usáveis na fórmula" / USAR NO CÁLCULO. Nunca invente PP se o evento tem outro nome.
-  · Papéis: prova+peso, substituta, bônus (soma fora), ponto extra — não o nome da sigla.
-  · "peso 3", "vale 3", "vale 3 pontos" ou "PP 3 pontos" = mesmo peso. "PE até 0,5 ponto" é teto de bônus, NÃO peso.
+Exemplos de intenção (troque o título aberto; use as colunas DESTE evento):
+  · "duas provas ÷2, 2ª chamada substitui, se Trabalho ÷3, +ponto extra" →
+    Media = se ( Trabalho , média ( ProvaParcial , ProvaBimestral | 2aChamada | Trabalho ) , média ( ProvaParcial , ProvaBimestral | 2aChamada ) ) + PontoExtra
+  · Nomes mudam por evento. SEMPRE use as colunas de "Siglas usáveis na fórmula" / USAR NO CÁLCULO. Nunca invente sigla de outra escola.
+  · Papéis: prova+peso, substituta, bônus (soma fora), ponto extra — não o nome da coluna.
+  · "peso 3", "vale 3", "vale 3 pontos" ou "ProvaParcial 3 pontos" = mesmo peso. "PontoExtra até 0,5 ponto" é teto de bônus, NÃO peso.
   · "AV1 peso 3, AV2 peso 5, PROJ peso 2; redistribui; 2CH; EXTRA até 1; máx 10" →
-    MU = menor ( 10 , se ( PROJ , ( ( média ponderada ( AV1 , 3 , AV2 , 5 | 2CH ) × 8 ) + ( PROJ × 2 ) ) ÷ 10 , média ponderada ( AV1 , 3 , AV2 , 5 | 2CH ) ) + se ( EXTRA , menor ( 1 , EXTRA ) , 0 ) )
+    Media = menor ( 10 , se ( PROJ , ( ( média ponderada ( AV1 , 3 , AV2 , 5 | 2CH ) × 8 ) + ( PROJ × 2 ) ) ÷ 10 , média ponderada ( AV1 , 3 , AV2 , 5 | 2CH ) ) + se ( EXTRA , menor ( 1 , EXTRA ) , 0 ) )
   · "AV1 peso 4, AV2 peso 6; PROJ bônus ÷10; EXTRA até 0,5; 2CH; máx 10" →
-    MU = menor ( 10 , média ponderada ( AV1 , 4 , AV2 , 6 | 2CH ) + se ( PROJ , PROJ ÷ 10 , 0 ) + se ( EXTRA , menor ( 0.5 , EXTRA ) , 0 ) )
-  · Teto condicional (ex.: se PU efetiva < 5 → MU máx 6; senão máx 10; CH no lugar da PU):
-    NÚCLEO = média ponderada ( PP , 3 , PU , 7 | CH ) + se ( PJ , PJ ÷ 10 , 0 ) + se ( PE , menor ( 0.5 , PE ) , 0 )
-    MU = se ( PU , se ( PU < 5 , menor ( 6 , NÚCLEO ) , menor ( 10 , NÚCLEO ) ) , se ( CH < 5 , menor ( 6 , NÚCLEO ) , menor ( 10 , NÚCLEO ) ) )
-    (repita NÚCLEO por extenso; não invente função PU_EFETIVA)
-  · "se tiver PF soma com MA, senão fica MA" → MU = se ( PF , MA + PF , MA )
-  · sem detalhe → pergunte quais siglas do evento entram e o papel de cada uma
-  NUNCA responda média simples ÷3 quando pediram pesos. NUNCA transforme bônus em peso. NUNCA assuma PP/PU/PJ/CH/PE se não forem as siglas deste evento.
-  NUNCA troque média ponderada + bônus pelo template "média ( provas | substituta | opcional ) + PE" se o pedido tinha pesos ou teto condicional.
+    Media = menor ( 10 , média ponderada ( AV1 , 4 , AV2 , 6 | 2CH ) + se ( PROJ , PROJ ÷ 10 , 0 ) + se ( EXTRA , menor ( 0.5 , EXTRA ) , 0 ) )
+  · Teto condicional (ex.: se ProvaBimestral efetiva < 5 → média máx 6; senão máx 10; 2aChamada no lugar):
+    NÚCLEO = média ponderada ( ProvaParcial , 3 , ProvaBimestral , 7 | 2aChamada ) + se ( Trabalho , Trabalho ÷ 10 , 0 ) + se ( PontoExtra , menor ( 0.5 , PontoExtra ) , 0 )
+    Media = se ( ProvaBimestral , se ( ProvaBimestral < 5 , menor ( 6 , NÚCLEO ) , menor ( 10 , NÚCLEO ) ) , se ( 2aChamada < 5 , menor ( 6 , NÚCLEO ) , menor ( 10 , NÚCLEO ) ) )
+    (repita NÚCLEO por extenso; não invente função de "nota efetiva")
+  · "se tiver PF soma com MA, senão fica MA" → Media = se ( PF , MA + PF , MA )
+  · sem detalhe → pergunte quais colunas do evento entram e o papel de cada uma
+  NUNCA responda média simples ÷3 quando pediram pesos. NUNCA transforme bônus em peso. NUNCA assuma siglas de outra escola.
+  NUNCA troque média ponderada + bônus pelo template "média ( provas | substituta | opcional ) + ponto extra" se o pedido tinha pesos ou teto condicional.
   Se faltar recurso do motor para uma regra, diga a limitação e NÃO monte fórmula incompleta nem sobrescreva a anterior.
 
 - Jornada: pelo bimestre cadastrado na jornada.

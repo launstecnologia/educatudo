@@ -657,12 +657,18 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             var htmlP = '<table class="min-w-full text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-600"><tr>'
                 + '<th class="px-3 py-2 text-left">Prova</th><th class="px-3 py-2 text-left">Matéria</th>'
                 + '<th class="px-3 py-2 text-right">Erros</th><th class="px-3 py-2"></th></tr></thead><tbody>';
+            var rankingCtx = !!(painel.aviso && /ranking/i.test(String(painel.aviso)))
+                || !!(painel.professor && painel.professor.id);
             (painel.candidatos_provas || []).forEach(function (p) {
-                var askP = 'Detalhe da prova_id ' + p.prova_id + ' só questões erradas';
+                var askP = rankingCtx
+                    ? ('Ranking de erros da prova_id ' + p.prova_id
+                        + (painel.professor && painel.professor.id ? (' professor_id=' + painel.professor.id) : ''))
+                    : ('Detalhe da prova_id ' + p.prova_id + ' só questões erradas');
                 htmlP += '<tr class="border-t"><td class="px-3 py-2 font-medium">' + esc(p.titulo || '—')
                     + '</td><td class="px-3 py-2">' + esc(p.materia || '—')
                     + '</td><td class="px-3 py-2 text-right text-rose-700">' + esc(p.erros != null ? p.erros : '—')
-                    + '</td><td class="px-3 py-2 text-right"><button type="button" class="pa-chip" data-ask="' + esc(askP) + '">Ver erros</button></td></tr>';
+                    + '</td><td class="px-3 py-2 text-right"><button type="button" class="pa-btn-confirmar" data-ask="'
+                    + esc(askP) + '">Confirmar</button></td></tr>';
             });
             htmlP += '</tbody></table>';
             listP.innerHTML = htmlP;
@@ -2158,6 +2164,10 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 var shell = appendAssistantShell();
                 if (painelFinal) renderPainel(shell, painelFinal, mensagemFinal);
                 else shell.innerHTML = simpleMarkdown(mensagemFinal);
+            } else {
+                // Stream cortou sem evento done (proxy/timeout) — não deixa só o “Consultando…”.
+                var vazio = appendAssistantShell();
+                vazio.textContent = 'A consulta não retornou resposta. Tente de novo em alguns segundos.';
             }
         } catch (e) {
             removerCarregando();

@@ -437,6 +437,64 @@ class ProvasAlunoAssistenteService
             }
         }
 
+        // Grade do professor / ranking de erros: nunca terminar em "Um momento…".
+        if ($this->pedidoPareceGradeProfessor($mensagemUsuario, $mensagens)) {
+            $gGrade = $this->garantirGradeProfessor(
+                $mensagemUsuario,
+                $mensagens,
+                $ultimaTool,
+                $ultimoResultado,
+                $onStatus
+            );
+            if (!empty($gGrade['consulta'])) {
+                $consultasFeitas[] = $gGrade['consulta'];
+            }
+            if (!empty($gGrade['tool'])) {
+                $ultimaTool = $gGrade['tool'];
+            }
+            if (is_array($gGrade['resultado'] ?? null)) {
+                $ultimoResultado = $gGrade['resultado'];
+            }
+            if (!empty($gGrade['texto'])) {
+                $textoFinal = (string) $gGrade['texto'];
+            }
+        }
+        if ($this->pedidoPareceRankingErros($mensagemUsuario, $mensagens)) {
+            $gRank = $this->garantirRankingErros(
+                $mensagemUsuario,
+                $mensagens,
+                $ultimaTool,
+                $ultimoResultado,
+                $onStatus
+            );
+            if (!empty($gRank['consulta'])) {
+                $consultasFeitas[] = $gRank['consulta'];
+            }
+            if (!empty($gRank['tool'])) {
+                $ultimaTool = $gRank['tool'];
+            }
+            if (is_array($gRank['resultado'] ?? null)) {
+                $ultimoResultado = $gRank['resultado'];
+            }
+            if (!empty($gRank['texto'])) {
+                $textoFinal = (string) $gRank['texto'];
+            }
+        }
+
+        // IA às vezes responde só "Um momento…" sem painel — força texto útil.
+        if ($this->textoPareceAdiamento($textoFinal)) {
+            $diretaPos = $this->montarRespostaDireta($mensagemUsuario, $ultimaTool, $ultimoResultado);
+            if ($diretaPos !== null) {
+                $textoFinal = $diretaPos;
+            } elseif (is_array($ultimoResultado) && !empty($ultimoResultado['error'])) {
+                $textoFinal = (string) $ultimoResultado['error'];
+            } elseif (is_array($ultimoResultado) && !empty($ultimoResultado['aviso'])) {
+                $textoFinal = (string) $ultimoResultado['aviso'];
+            } else {
+                $textoFinal = 'Não consegui concluir essa consulta. Reformule com o nome do professor (e a prova, no ranking de erros).';
+            }
+        }
+
         try {
             $this->debitarCreditos();
         } catch (\Throwable $e) {
@@ -568,11 +626,7 @@ class ProvasAlunoAssistenteService
                 );
 
             case 'ranking_erros_prova_professor':
-                return $this->professores->rankingErrosProva(
-                    (int) ($args['professor_id'] ?? 0),
-                    (int) ($args['prova_id'] ?? 0),
-                    (int) ($args['limite'] ?? 15)
-                );
+                return $this->rankingErrosProvaComFiltros($args);
 
             case 'saude_turmas_professor':
                 return $this->professores->saudeTurmasProfessor($args);
@@ -883,7 +937,7 @@ class ProvasAlunoAssistenteService
         if (
             in_array($tool, [
                 'listar_provas_professor', 'resumo_provas_professor', 'saude_turmas_professor', 'listar_turmas_professor',
-                'diario_pendencias', 'grade_horaria_consulta',
+                'diario_pendencias', 'grade_horaria_consulta', 'ranking_erros_prova_professor',
             ], true)
             && !empty($resultado['candidatos'])
             && is_array($resultado['candidatos'])
@@ -936,6 +990,18 @@ class ProvasAlunoAssistenteService
                     'Consolidado do professor',
                     'Ver outro aluno desta turma',
                 ],
+            ];
+        }
+        if (
+            $tool === 'ranking_erros_prova_professor'
+            && !empty($resultado['candidatos_provas'])
+            && is_array($resultado['candidatos_provas'])
+        ) {
+            return [
+                'tipo' => 'candidatos_provas',
+                'aviso' => (string) ($resultado['aviso'] ?? 'Há mais de uma prova. Qual delas para o ranking?'),
+                'professor' => $resultado['professor'] ?? null,
+                'candidatos_provas' => $resultado['candidatos_provas'],
             ];
         }
         if ($tool === 'ranking_erros_prova_professor' && !empty($resultado['ok'])) {
@@ -1311,7 +1377,7 @@ Tools — jornadas (aluno):
 
 Tools — professor:
 11) buscar_professores / 12) listar_turmas_professor / 13) listar_provas_professor
-14) resumo_provas_professor / 15) detalhar_prova_professor / 16) ranking_erros_prova_professor
+14) resumo_provas_professor / 15) detalhar_prova_professor / 16) ranking_erros_prova_professor — {"professor_nome":"Ana"} ou {"professor_id":10,"prova_id":55}. Se faltar prova_id, a tool lista candidatos. NUNCA responda só "Um momento".
 17) saude_turmas_professor / 18) resumo_jornadas_professor — {"professor_nome":"Ana","turma_nome":"2ªB"}
 
 Tools — turma / bloco / diário / agenda / boletim / faltas / ocorrências:
@@ -1319,7 +1385,7 @@ Tools — turma / bloco / diário / agenda / boletim / faltas / ocorrências:
 20) resumo_provas_turma — {"turma_nome":"2 Ano B"} — totais acertos/erros por matéria
 21) saude_academica — {"ano":2024} ou {"ano_letivo_id":4,"turma_nome":"1A"} — alertas cadastrais/matrícula
 22) diario_pendencias — {"turma_nome":"1A","situacao":"atraso"} ou {"professor_nome":"Ana"} — diários pendentes
-23) grade_horaria_consulta — {"turma_nome":"1A","data":"2026-11-13"} ou {"professor_nome":"Ana"} — aulas do dia. Se o usuário disser "hoje", use a data de hoje do contexto (fuso America/Sao_Paulo).
+23) grade_horaria_consulta — {"turma_nome":"1A","data":"2026-11-13"} ou {"professor_nome":"Ana"} — aulas do dia. Se o usuário disser "hoje", use a data de hoje do contexto (fuso America/Sao_Paulo). Grade de PROFESSOR → passe professor_nome/professor_id. NUNCA responda só "Um momento".
 24) buscar_blocos — {"titulo":"Simulado"} ou {"turma_nome":"2ªB"}
 25) resultados_bloco — {"bloco_id":10} ou {"titulo":"Simulado 1"}
 26) perfil_aluno_360 — {"ra":"24254","ano_letivo":2024} — resumo geral do aluno
@@ -1748,6 +1814,44 @@ PROMPT
                 $txt .= ($faltas !== null ? ' (frequência **' . $perc . '%**)' : ' está com frequência **' . $perc . '%**');
             }
             return $txt . '.';
+        }
+
+        if ($tool === 'grade_horaria_consulta') {
+            $data = (string) ($resultado['data'] ?? '');
+            $dia = (string) ($resultado['dia_semana_label'] ?? '');
+            $escopo = is_array($resultado['escopo'] ?? null) ? $resultado['escopo'] : [];
+            $tipoEsc = (string) ($escopo['tipo'] ?? '');
+            $nomeEsc = trim((string) ($escopo['nome'] ?? $escopo['professor_nome'] ?? $escopo['aluno_nome'] ?? $escopo['turma_nome'] ?? ''));
+            $aulas = is_array($resultado['aulas'] ?? null) ? $resultado['aulas'] : [];
+            $quando = trim(($dia !== '' ? $dia : '') . ($data !== '' ? ' (' . $this->formatarDataBr($data) . ')' : ''));
+            if ($aulas === []) {
+                return 'Nenhuma aula na grade'
+                    . ($nomeEsc !== '' ? ' d' . $this->artigoDe($nomeEsc) . ' **' . $nomeEsc . '**' : '')
+                    . ($quando !== '' ? ' em ' . $quando : '')
+                    . '.';
+            }
+            $rotulo = $tipoEsc === 'professor' ? 'Grade do professor' : 'Grade';
+            return $rotulo
+                . ($nomeEsc !== '' ? ' **' . $nomeEsc . '**' : '')
+                . ($quando !== '' ? ' — ' . $quando : '')
+                . ': **' . count($aulas) . '** aula' . (count($aulas) === 1 ? '' : 's') . ' abaixo.';
+        }
+
+        if ($tool === 'ranking_erros_prova_professor') {
+            $prof = trim((string) ($resultado['professor']['nome'] ?? 'professor'));
+            $prova = trim((string) ($resultado['prova']['titulo'] ?? 'prova'));
+            $questoes = is_array($resultado['questoes'] ?? null) ? $resultado['questoes'] : [];
+            if ($questoes === []) {
+                return 'Não há questões com erro registradas na prova **' . $prova . '** d'
+                    . $this->artigoDe($prof) . ' ' . $prof . '.';
+            }
+            $top = $questoes[0];
+            $enunciado = trim((string) ($top['enunciado'] ?? ''));
+            return 'Ranking de erros da prova **' . $prova . '** (' . $prof . '): '
+                . count($questoes) . ' questão' . (count($questoes) === 1 ? '' : 'ões')
+                . ' com erro. A mais errada teve **' . (int) ($top['erros'] ?? 0) . '** erros'
+                . ($enunciado !== '' ? ' — ' . mb_substr($enunciado, 0, 80) : '')
+                . '.';
         }
 
         if (
@@ -3065,6 +3169,344 @@ PROMPT
             'Ç' => 'C',
         ];
         return strtr($texto, $map);
+    }
+
+    /**
+     * Ranking de erros aceitando professor_nome e sem prova_id (lista candidatos).
+     *
+     * @param array<string,mixed> $args
+     * @return array<string,mixed>
+     */
+    private function rankingErrosProvaComFiltros(array $args): array
+    {
+        $provaId = (int) ($args['prova_id'] ?? 0);
+        $professorId = (int) ($args['professor_id'] ?? 0);
+        $limite = (int) ($args['limite'] ?? 15);
+
+        if ($professorId <= 0) {
+            $resolvido = $this->professores->resolverProfessor($args);
+            if (!empty($resolvido['candidatos'])) {
+                return $resolvido;
+            }
+            if (empty($resolvido['ok'])) {
+                return $resolvido;
+            }
+            $professorId = (int) ($resolvido['professor']['id'] ?? 0);
+        }
+
+        if ($provaId <= 0 && preg_match('/prova_id\s*[:=]?\s*(\d+)/i', (string) ($args['termo'] ?? ''), $m) === 1) {
+            $provaId = (int) $m[1];
+        }
+
+        if ($provaId <= 0) {
+            $lista = $this->professores->listarProvasProfessor([
+                'professor_id' => $professorId,
+                'limite' => 25,
+            ]);
+            if (empty($lista['ok'])) {
+                return $lista;
+            }
+            $provas = is_array($lista['provas'] ?? null) ? $lista['provas'] : [];
+            if ($provas === []) {
+                return [
+                    'ok' => false,
+                    'error' => 'Este professor não tem provas para montar o ranking de erros.',
+                    'professor' => $lista['professor'] ?? null,
+                ];
+            }
+            if (count($provas) === 1) {
+                $provaId = (int) ($provas[0]['prova_id'] ?? 0);
+            } else {
+                $cands = [];
+                foreach ($provas as $p) {
+                    $cands[] = [
+                        'prova_id' => (int) ($p['prova_id'] ?? 0),
+                        'titulo' => trim((string) ($p['titulo'] ?? '')),
+                        'materia' => trim((string) ($p['materia']['nome'] ?? '')),
+                        'erros' => $p['erros'] ?? null,
+                        'turma' => trim((string) ($p['turma']['nome'] ?? '')),
+                    ];
+                }
+                return [
+                    'ok' => false,
+                    'aviso' => 'Há mais de uma prova. Qual delas para o ranking de erros?',
+                    'candidatos_provas' => $cands,
+                    'professor' => $lista['professor'] ?? null,
+                ];
+            }
+        }
+
+        return $this->professores->rankingErrosProva($professorId, $provaId, $limite);
+    }
+
+    /** @param list<array{role?:string,content?:string}> $historico */
+    private function pedidoPareceGradeProfessor(string $pergunta, array $historico = []): bool
+    {
+        $p = mb_strtolower($this->semAcento($pergunta));
+        if (preg_match('/\b(grade|horario|agenda)\b/u', $p) !== 1) {
+            return false;
+        }
+        if (preg_match('/\bprofessor[ae]?\b/u', $p) === 1) {
+            return true;
+        }
+        // Continuação após grade de professor no histórico.
+        foreach (array_reverse(array_slice($historico, -6)) as $msg) {
+            $c = mb_strtolower($this->semAcento((string) ($msg['content'] ?? '')));
+            if (preg_match('/\bgrade\b.*\bprofessor|\bprofessor\b.*\bgrade/u', $c) === 1) {
+                return preg_match('/\b(hoje|amanha|ontem|\d{2}\/\d{2}|\d{4}-\d{2}-\d{2})\b/u', $p) === 1;
+            }
+        }
+        return false;
+    }
+
+    /** @param list<array{role?:string,content?:string}> $historico */
+    private function pedidoPareceRankingErros(string $pergunta, array $historico = []): bool
+    {
+        $p = mb_strtolower($this->semAcento($pergunta));
+        // Evita sequestrar "questões mais erradas do aluno" / erros da turma.
+        if (preg_match('/\b(alun[oa]|turma)\b/u', $p) === 1 && preg_match('/\bprofessor/u', $p) !== 1) {
+            if (preg_match('/ranking de erros da prova_id\s+\d+/iu', $pergunta) !== 1) {
+                return false;
+            }
+        }
+        if (preg_match('/\branking\b.*\berros?\b|\berros?\b.*\branking\b|\bquestoes?\s+mais\s+errad/u', $p) === 1) {
+            return true;
+        }
+        if (preg_match('/ranking de erros da prova_id\s+\d+/iu', $pergunta) === 1) {
+            return true;
+        }
+        if (preg_match('/\bprova_id\s+\d+/iu', $pergunta) === 1) {
+            foreach (array_reverse(array_slice($historico, -6)) as $msg) {
+                $c = mb_strtolower($this->semAcento((string) ($msg['content'] ?? '')));
+                if (preg_match('/\branking\b.*\berro|\berros?\b.*\branking/u', $c) === 1) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private function textoPareceAdiamento(string $texto): bool
+    {
+        $t = mb_strtolower(trim($this->semAcento($texto)));
+        if ($t === '') {
+            return true;
+        }
+        return (bool) preg_match(
+            '/^(um momento|aguarde|so um momento|ja retorno|ja ja|em instantes|processando|consultando)([.!,…\s]|$)/u',
+            $t
+        );
+    }
+
+    private function formatarDataBr(string $ymd): string
+    {
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $ymd, $m) === 1) {
+            return $m[3] . '/' . $m[2] . '/' . $m[1];
+        }
+        return $ymd;
+    }
+
+    private function extrairNomeProfessor(string $mensagem): ?string
+    {
+        if (preg_match('/\bprofessor[ae]?\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s.]{1,60})/iu', $mensagem, $m) === 1) {
+            $nome = trim($m[1]);
+            // Só corta em palavras-chave de data/contexto — não em "de"/"da" do meio do nome.
+            $nome = preg_replace('/\s+(?:hoje|amanh[aã]|ontem|para|turma|prova)\b.*$/iu', '', $nome) ?? $nome;
+            $nome = trim($nome, " \t\n\r\0\x0B,.");
+            return $nome !== '' ? $nome : null;
+        }
+        return null;
+    }
+
+    /**
+     * @param list<array{role?:string,content?:string}> $mensagens
+     * @param callable|null $onStatus
+     * @return array{tool?:?string,resultado?:?array,consulta?:array,texto?:string}
+     */
+    private function garantirGradeProfessor(
+        string $mensagemUsuario,
+        array $mensagens,
+        ?string $ultimaTool,
+        ?array $ultimoResultado,
+        $onStatus = null
+    ): array {
+        if (
+            $ultimaTool === 'grade_horaria_consulta'
+            && is_array($ultimoResultado)
+            && (!empty($ultimoResultado['ok']) || !empty($ultimoResultado['candidatos']))
+        ) {
+            $texto = !empty($ultimoResultado['ok'])
+                ? $this->montarRespostaDireta($mensagemUsuario, 'grade_horaria_consulta', $ultimoResultado)
+                : (string) ($ultimoResultado['aviso'] ?? 'Há mais de um professor. Escolha um:');
+            return [
+                'tool' => $ultimaTool,
+                'resultado' => $ultimoResultado,
+                'texto' => $texto,
+            ];
+        }
+
+        $args = [];
+        if (preg_match('/professor_id\s*=\s*(\d+)/i', $mensagemUsuario, $mId) === 1) {
+            $args['professor_id'] = (int) $mId[1];
+        }
+        $nome = $this->extrairNomeProfessor($mensagemUsuario);
+        if ($nome === null) {
+            $nome = $this->extrairNomeProfessor($this->ultimoPedidoUsuario($mensagens) ?: '');
+        }
+        if ($nome !== null) {
+            $args['professor_nome'] = $nome;
+        }
+        $hoje = $this->ampliada->hojeLocal();
+        if (preg_match('/\bhoje\b/iu', $mensagemUsuario) === 1) {
+            $args['data'] = $hoje;
+        } elseif (preg_match('/\bamanh[aã]\b/iu', $mensagemUsuario) === 1) {
+            $args['data'] = (new \DateTimeImmutable($hoje . ' 12:00:00', new \DateTimeZone('America/Sao_Paulo')))
+                ->modify('+1 day')
+                ->format('Y-m-d');
+        } elseif (preg_match('/\bontem\b/iu', $mensagemUsuario) === 1) {
+            $args['data'] = (new \DateTimeImmutable($hoje . ' 12:00:00', new \DateTimeZone('America/Sao_Paulo')))
+                ->modify('-1 day')
+                ->format('Y-m-d');
+        } elseif (preg_match('/\b(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})\b/', $mensagemUsuario, $mD) === 1) {
+            $args['data'] = $mD[1];
+        } else {
+            $args['data'] = $hoje;
+        }
+
+        if (empty($args['professor_id']) && empty($args['professor_nome'])) {
+            return [
+                'texto' => 'Para montar a grade do professor, informe o nome (ex.: grade do professor Ana hoje).',
+            ];
+        }
+
+        if ($onStatus !== null) {
+            $onStatus('Consultando grade do professor…');
+        }
+        $resultado = $this->ampliada->gradeHorariaConsulta($args);
+        $texto = null;
+        if (!empty($resultado['candidatos'])) {
+            $texto = (string) ($resultado['aviso'] ?? 'Há mais de um professor. Escolha um:');
+        } elseif (!empty($resultado['ok'])) {
+            $texto = $this->montarRespostaDireta($mensagemUsuario, 'grade_horaria_consulta', $resultado);
+        } else {
+            $texto = (string) ($resultado['error'] ?? 'Não encontrei a grade deste professor.');
+        }
+
+        return [
+            'tool' => 'grade_horaria_consulta',
+            'resultado' => $resultado,
+            'consulta' => ['tool' => 'grade_horaria_consulta', 'args' => $args],
+            'texto' => $texto,
+        ];
+    }
+
+    /**
+     * @param list<array{role?:string,content?:string}> $mensagens
+     * @param callable|null $onStatus
+     * @return array{tool?:?string,resultado?:?array,consulta?:array,texto?:string}
+     */
+    private function garantirRankingErros(
+        string $mensagemUsuario,
+        array $mensagens,
+        ?string $ultimaTool,
+        ?array $ultimoResultado,
+        $onStatus = null
+    ): array {
+        if (
+            $ultimaTool === 'ranking_erros_prova_professor'
+            && is_array($ultimoResultado)
+            && (
+                !empty($ultimoResultado['ok'])
+                || !empty($ultimoResultado['candidatos'])
+                || !empty($ultimoResultado['candidatos_provas'])
+            )
+        ) {
+            $texto = null;
+            if (!empty($ultimoResultado['ok'])) {
+                $texto = $this->montarRespostaDireta($mensagemUsuario, 'ranking_erros_prova_professor', $ultimoResultado);
+            } elseif (!empty($ultimoResultado['candidatos_provas'])) {
+                $texto = (string) ($ultimoResultado['aviso'] ?? 'Há mais de uma prova. Qual delas?');
+            } else {
+                $texto = (string) ($ultimoResultado['aviso'] ?? 'Há mais de um professor. Escolha um:');
+            }
+            return [
+                'tool' => $ultimaTool,
+                'resultado' => $ultimoResultado,
+                'texto' => $texto,
+            ];
+        }
+
+        $args = [];
+        if (preg_match('/professor_id\s*=\s*(\d+)/i', $mensagemUsuario, $mPid) === 1) {
+            $args['professor_id'] = (int) $mPid[1];
+        }
+        if (preg_match('/prova_id\s*[:=]?\s*(\d+)/i', $mensagemUsuario, $mPr) === 1) {
+            $args['prova_id'] = (int) $mPr[1];
+        }
+        $nome = $this->extrairNomeProfessor($mensagemUsuario);
+        if ($nome === null) {
+            $nome = $this->extrairNomeProfessor($this->ultimoPedidoUsuario($mensagens) ?: '');
+        }
+        if ($nome !== null) {
+            $args['professor_nome'] = $nome;
+        }
+        // Contexto: última listagem/resumo de professor.
+        if (empty($args['professor_id']) && is_array($ultimoResultado['professor'] ?? null)) {
+            $args['professor_id'] = (int) ($ultimoResultado['professor']['id'] ?? 0);
+        }
+        if (empty($args['prova_id']) && !empty($ultimoResultado['prova']['prova_id'])) {
+            $args['prova_id'] = (int) $ultimoResultado['prova']['prova_id'];
+        }
+
+        if (empty($args['professor_id']) && empty($args['professor_nome']) && empty($args['prova_id'])) {
+            // Não sobrescreve resposta válida de outra tool (ex.: erros do aluno/turma).
+            if (
+                $ultimaTool
+                && $ultimaTool !== 'ranking_erros_prova_professor'
+                && is_array($ultimoResultado)
+                && !empty($ultimoResultado['ok'])
+            ) {
+                return [];
+            }
+            return [
+                'texto' => 'Para o ranking de erros, informe o professor (e a prova, se souber).',
+            ];
+        }
+
+        // Troca de professor: não reaproveita prova do contexto anterior.
+        if (!empty($args['professor_id']) || !empty($args['professor_nome'])) {
+            $profCtxId = (int) ($ultimoResultado['professor']['id'] ?? 0);
+            if (
+                !empty($args['prova_id'])
+                && $profCtxId > 0
+                && !empty($args['professor_id'])
+                && (int) $args['professor_id'] !== $profCtxId
+            ) {
+                unset($args['prova_id']);
+            }
+        }
+
+        if ($onStatus !== null) {
+            $onStatus('Montando ranking de erros…');
+        }
+        $resultado = $this->rankingErrosProvaComFiltros($args);
+        $texto = null;
+        if (!empty($resultado['candidatos_provas'])) {
+            $texto = (string) ($resultado['aviso'] ?? 'Há mais de uma prova. Qual delas?');
+        } elseif (!empty($resultado['candidatos'])) {
+            $texto = (string) ($resultado['aviso'] ?? 'Há mais de um professor. Escolha um:');
+        } elseif (!empty($resultado['ok'])) {
+            $texto = $this->montarRespostaDireta($mensagemUsuario, 'ranking_erros_prova_professor', $resultado);
+        } else {
+            $texto = (string) ($resultado['error'] ?? 'Não consegui montar o ranking de erros.');
+        }
+
+        return [
+            'tool' => 'ranking_erros_prova_professor',
+            'resultado' => $resultado,
+            'consulta' => ['tool' => 'ranking_erros_prova_professor', 'args' => $args],
+            'texto' => $texto,
+        ];
     }
 
     /** @param array<string,mixed> $args */
