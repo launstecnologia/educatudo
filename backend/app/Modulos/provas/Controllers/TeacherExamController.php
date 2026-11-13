@@ -2562,23 +2562,27 @@ class TeacherExamController extends BaseController
         }
         $anoLetivoEvento = (int) ($bloco['ano_letivo'] ?? 0);
         $combos = $this->combosLancamentoNotaBloco($bloco, $materiaIdFiltro);
+        $professoresFiltro = [];
+        foreach ($combos as $comboProf) {
+            $pidLista = (int) ($comboProf['professor_id'] ?? 0);
+            if ($pidLista <= 0) {
+                continue;
+            }
+            $nomeLista = trim((string) ($comboProf['professor_nome'] ?? ''));
+            $professoresFiltro[$pidLista] = $nomeLista !== '' ? $nomeLista : ('Professor #' . $pidLista);
+        }
+        asort($professoresFiltro, SORT_NATURAL | SORT_FLAG_CASE);
+        if ($professorIdFiltro > 0 && !isset($professoresFiltro[$professorIdFiltro])) {
+            $professorIdFiltro = 0;
+        }
         if ($professorIdFiltro > 0) {
             $combos = array_values(array_filter($combos, static function (array $combo) use ($professorIdFiltro): bool {
                 return (int) ($combo['professor_id'] ?? 0) === $professorIdFiltro;
             }));
         }
-        $professorNomeFiltro = '';
-        if ($professorIdFiltro > 0) {
-            foreach ($bloco['professores'] ?? [] as $pe) {
-                if ((int) ($pe['professor_id'] ?? 0) !== $professorIdFiltro) {
-                    continue;
-                }
-                $professorNomeFiltro = trim((string) ($pe['professor_nome'] ?? ''));
-                if ($professorNomeFiltro !== '') {
-                    break;
-                }
-            }
-        }
+        $professorNomeFiltro = $professorIdFiltro > 0
+            ? (string) ($professoresFiltro[$professorIdFiltro] ?? '')
+            : '';
 
         $notasModel = new ExamBlockManualGrade();
         $existentes = $notasModel->fetchTodasNotasBlocoAdmin($blocoId);
@@ -2687,10 +2691,6 @@ class TeacherExamController extends BaseController
 
         $historico = $notasModel->fetchLogPorBloco($blocoId, 80);
         $edicaoDesbloqueada = $this->sessaoDesbloqueioLancamentoValida($blocoId);
-        $professoresDaAba = [];
-        foreach ($combos as $combo) {
-            $professoresDaAba[(int) ($combo['professor_id'] ?? 0)] = true;
-        }
         $escalaMax = $this->escalaMaximaDoBloco($bloco);
 
         $this->viewWithLayout('admin', 'admin/exams/blocks/lancar_notas_coordenacao', [
@@ -2699,6 +2699,7 @@ class TeacherExamController extends BaseController
             'bloco' => $bloco,
             'linhas' => $linhasPagina,
             'materias_filtro' => $materiasFiltro,
+            'professores_filtro' => $professoresFiltro,
             'turmas_filtro' => $turmasFiltro,
             'series_filtro' => $seriesFiltro,
             'materia_id_filtro' => $materiaIdFiltro,
@@ -2713,7 +2714,7 @@ class TeacherExamController extends BaseController
             'total_paginas' => $totalPaginas,
             'historico_alteracoes' => $historico,
             'edicao_desbloqueada' => $edicaoDesbloqueada,
-            'mostrar_professor' => !$notaUnicaTodasMaterias && count($professoresDaAba) > 1,
+            'mostrar_professor' => !$notaUnicaTodasMaterias && count($professoresFiltro) > 1,
             'enac_colag_habilitado' => \App\Core\FeatureGate::isModuleEnabled('enac_colag'),
             'escala_max' => $escalaMax,
             'csrf_token' => $this->generateCsrfToken(),

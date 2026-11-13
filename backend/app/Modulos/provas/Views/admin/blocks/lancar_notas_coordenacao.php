@@ -2,11 +2,15 @@
 $bloco = $bloco ?? [];
 $linhas = $linhas ?? [];
 $materiasFiltro = $materias_filtro ?? [];
+$professoresFiltro = is_array($professores_filtro ?? null) ? $professores_filtro : [];
 $turmasFiltro = $turmas_filtro ?? [];
 $seriesFiltro = $series_filtro ?? [];
 $materiaIdFiltro = (int) ($materia_id_filtro ?? 0);
 $professorIdFiltro = (int) ($professor_id_filtro ?? 0);
 $professorNomeFiltro = trim((string) ($professor_nome_filtro ?? ''));
+if ($professorNomeFiltro === '' && $professorIdFiltro > 0) {
+    $professorNomeFiltro = trim((string) ($professoresFiltro[$professorIdFiltro] ?? ''));
+}
 $turmaIdFiltro = (int) ($turma_id_filtro ?? 0);
 $serieIdFiltro = (int) ($serie_id_filtro ?? 0);
 $ordenarFiltro = (string) ($ordenar_filtro ?? 'nome');
@@ -202,12 +206,12 @@ if ($tipoFlash === 'error') {
 
     <div class="bg-white rounded-xl shadow-lg overflow-hidden">
         <?php if (!$notaUnicaTodasMaterias && count($materiasFiltro) > 0): ?>
-        <div class="flex flex-wrap border-b border-gray-200 px-2" role="tablist">
+        <div class="flex flex-wrap border-b border-gray-200 px-2" role="tablist" aria-label="Disciplinas">
             <?php foreach ($materiasFiltro as $midAba => $nomeAba): ?>
                 <?php
                 $qAba = $qsBase;
                 $qAba['materia_id'] = (int) $midAba;
-                unset($qAba['pagina']);
+                unset($qAba['pagina'], $qAba['professor_id']);
                 $qsAba = http_build_query($qAba);
                 $ativa = (int) $midAba === $materiaIdFiltro;
                 ?>
@@ -216,6 +220,37 @@ if ($tipoFlash === 'error') {
                    aria-selected="<?= $ativa ? 'true' : 'false' ?>"
                    class="shrink-0 px-4 py-3 text-sm font-semibold border-b-2 -mb-px whitespace-nowrap <?= $ativa ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300' ?>">
                     <?= htmlspecialchars((string) $nomeAba) ?>
+                </a>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+        <?php if ($mostrarProfessor && count($professoresFiltro) > 1): ?>
+        <div class="flex flex-wrap gap-2 px-4 py-3 border-b border-gray-100 bg-slate-50" role="tablist" aria-label="Professores">
+            <?php
+            $qTodosProf = $qsBase;
+            unset($qTodosProf['pagina'], $qTodosProf['professor_id']);
+            $qsTodosProf = http_build_query($qTodosProf);
+            $todosProfAtivo = $professorIdFiltro <= 0;
+            ?>
+            <a href="<?= htmlspecialchars($qsTodosProf !== '' ? $actionFiltro . '?' . $qsTodosProf : $actionFiltro) ?>"
+               role="tab"
+               aria-selected="<?= $todosProfAtivo ? 'true' : 'false' ?>"
+               class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold <?= $todosProfAtivo ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50' ?>">
+                Todos os professores
+            </a>
+            <?php foreach ($professoresFiltro as $pidAba => $nomeProfAba): ?>
+                <?php
+                $qProf = $qsBase;
+                $qProf['professor_id'] = (int) $pidAba;
+                unset($qProf['pagina']);
+                $qsProf = http_build_query($qProf);
+                $profAtivo = (int) $pidAba === $professorIdFiltro;
+                ?>
+                <a href="<?= htmlspecialchars($qsProf !== '' ? $actionFiltro . '?' . $qsProf : $actionFiltro) ?>"
+                   role="tab"
+                   aria-selected="<?= $profAtivo ? 'true' : 'false' ?>"
+                   class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold <?= $profAtivo ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50' ?>">
+                    <?= htmlspecialchars((string) $nomeProfAba) ?>
                 </a>
             <?php endforeach; ?>
         </div>
@@ -449,7 +484,7 @@ if ($tipoFlash === 'error') {
         <div class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-3 text-sm text-blue-900 space-y-2">
             <p class="font-medium">Passo a passo</p>
             <ol class="list-decimal pl-4 space-y-1 text-blue-900/90">
-                <li>Na tela, escolha a <strong>disciplina</strong> e, se precisar, o <strong>professor</strong>.</li>
+                <li>Na tela, escolha a <strong>disciplina</strong>. Se tiver mais de um professor, use as bolinhas de professor ou o botão <strong>Filtros</strong>.</li>
                 <li>Abra Importar e envie o(s) Word/planilha (vários de uma vez com Ctrl/Cmd).</li>
                 <li>Não precisa escolher aluno por aluno — a tabela do arquivo basta.</li>
             </ol>
@@ -547,11 +582,22 @@ if ($tipoFlash === 'error') {
         </button>
     </div>
     <form method="get" action="<?= htmlspecialchars($actionFiltro) ?>" class="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-        <?php if ($professorIdFiltro > 0): ?>
-        <input type="hidden" name="professor_id" value="<?= $professorIdFiltro ?>">
-        <?php endif; ?>
         <?php if ($materiaIdFiltro > 0): ?>
         <input type="hidden" name="materia_id" value="<?= $materiaIdFiltro ?>">
+        <?php endif; ?>
+        <?php if (!$notaUnicaTodasMaterias && count($professoresFiltro) > 0): ?>
+        <div>
+            <label for="professor_id" class="block text-sm font-medium text-gray-700 mb-1">Professor</label>
+            <select id="professor_id" name="professor_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white">
+                <option value="0" <?= $professorIdFiltro === 0 ? 'selected' : '' ?>>Todos os professores</option>
+                <?php foreach ($professoresFiltro as $pidOpt => $pnome): ?>
+                    <option value="<?= (int) $pidOpt ?>" <?= $professorIdFiltro === (int) $pidOpt ? 'selected' : '' ?>>
+                        <?= htmlspecialchars((string) $pnome) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <p class="mt-1 text-xs text-gray-500">Na importação do Word, a nota vai só para o professor escolhido (ou para todos, se deixar esta opção).</p>
+        </div>
         <?php endif; ?>
         <div>
             <label for="serie_id" class="block text-sm font-medium text-gray-700 mb-1">Série</label>
