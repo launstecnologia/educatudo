@@ -15,24 +15,86 @@ $tipoText = is_array($calendario_tipo_text ?? null) ? $calendario_tipo_text : []
 
 $mesesNomes = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 $hoje = (new DateTimeImmutable('now', new DateTimeZone('America/Sao_Paulo')))->format('Y-m-d');
+$jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 
 $eventMap = [];
+$tiposUsados = [];
 foreach ($eventos as $ev) {
     $start = strtotime((string) ($ev['data_inicio'] ?? ''));
     $end = strtotime((string) ($ev['data_fim'] ?? ($ev['data_inicio'] ?? '')));
     if ($start === false || $end === false) {
         continue;
     }
+    $tipo = (string) ($ev['tipo'] ?? '');
+    if ($tipo !== '') {
+        $tiposUsados[$tipo] = true;
+    }
+    $tituloEv = trim((string) ($ev['descricao'] ?? $ev['titulo'] ?? ''));
+    if ($tituloEv === '') {
+        $tituloEv = (string) ($tipoLabels[$tipo] ?? 'Evento');
+    }
+    $item = [
+        'tipo' => $tipo,
+        'titulo' => $tituloEv,
+        'descricao' => trim((string) ($ev['descricao'] ?? '')),
+        'local' => trim((string) ($ev['local_evento'] ?? '')),
+        'link' => trim((string) ($ev['link_reuniao'] ?? '')),
+        'inicio' => date('Y-m-d', $start),
+        'fim' => date('Y-m-d', $end),
+    ];
     for ($d = $start; $d <= $end; $d += 86400) {
         $key = date('Y-m-d', $d);
-        $eventMap[$key][] = $ev;
+        $eventMap[$key][] = $item;
     }
 }
+
+$tipoLabelsLegenda = $tiposUsados === []
+    ? $tipoLabels
+    : array_intersect_key($tipoLabels, $tiposUsados);
+
+$eventosMes = [];
+foreach ($eventos as $ev) {
+    $ini = (string) ($ev['data_inicio'] ?? '');
+    $fim = (string) ($ev['data_fim'] ?? $ini);
+    if ($ini === '') {
+        continue;
+    }
+    $mesIni = (int) date('n', strtotime($ini));
+    $anoIni = (int) date('Y', strtotime($ini));
+    $mesFim = (int) date('n', strtotime($fim));
+    $anoFim = (int) date('Y', strtotime($fim));
+    $cruzaMes = ($anoIni < $ano || ($anoIni === $ano && $mesIni <= $mes))
+        && ($anoFim > $ano || ($anoFim === $ano && $mesFim >= $mes));
+    if (!$cruzaMes) {
+        continue;
+    }
+    $tipo = (string) ($ev['tipo'] ?? '');
+    $tituloEv = trim((string) ($ev['descricao'] ?? $ev['titulo'] ?? ''));
+    if ($tituloEv === '') {
+        $tituloEv = (string) ($tipoLabels[$tipo] ?? 'Evento');
+    }
+    $eventosMes[] = [
+        'tipo' => $tipo,
+        'titulo' => $tituloEv,
+        'inicio' => $ini,
+        'fim' => $fim,
+        'local' => trim((string) ($ev['local_evento'] ?? '')),
+    ];
+}
+usort($eventosMes, static fn($a, $b) => strcmp((string) $a['inicio'], (string) $b['inicio']));
 
 $primeiroDia = mktime(0, 0, 0, $mes, 1, $ano);
 $diasNoMes = (int) date('t', $primeiroDia);
 $offset = (int) date('w', $primeiroDia);
 $diasSemanaLabel = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+$corCal = strtolower(trim((string) ($calendario_cor ?? '')));
+$textoCal = strtolower(trim((string) ($calendario_cor_texto ?? '')));
+if (!preg_match('/^#[0-9a-f]{6}$/', $corCal)) {
+    $corCal = $primaryHex;
+}
+if (!preg_match('/^#[0-9a-f]{6}$/', $textoCal)) {
+    $textoCal = '#ffffff';
+}
 ?>
 
 <div class="mb-6 md:mb-8">
@@ -71,52 +133,160 @@ $diasSemanaLabel = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
     <!-- Calendário escolar -->
-    <section class="xl:col-span-2 bg-white rounded-2xl shadow-md overflow-hidden border border-gray-100">
-        <div class="p-4 sm:p-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <h2 class="text-lg sm:text-xl font-semibold text-gray-900">Calendário escolar</h2>
-                <p class="text-xs sm:text-sm text-gray-500 mt-0.5">
-                    <?= htmlspecialchars($mesesNomes[$mes - 1] ?? '') ?> de <?= (int) $ano ?>
+    <section id="grupo-seb-calendario"
+             class="xl:col-span-2 bg-white rounded-2xl shadow-md overflow-hidden border border-gray-100"
+             data-ano="<?= (int) $ano ?>"
+             data-mes="<?= (int) $mes ?>"
+             data-hoje="<?= htmlspecialchars($hoje) ?>"
+             data-primary="<?= htmlspecialchars($primaryHex) ?>">
+        <div class="px-4 sm:px-6 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3" style="background: linear-gradient(135deg, <?= htmlspecialchars($corCal) ?> 0%, color-mix(in srgb, <?= htmlspecialchars($corCal) ?> 78%, #000) 100%);">
+            <div class="min-w-0 text-white">
+                <h2 class="text-lg sm:text-xl font-bold">Calendário escolar</h2>
+                <p class="text-xs sm:text-sm opacity-90 mt-0.5 truncate">
                     <?php if (!empty($calendario_nome)): ?>
-                        · <?= htmlspecialchars((string) $calendario_nome) ?>
+                        <?= htmlspecialchars((string) $calendario_nome) ?>
+                    <?php else: ?>
+                        Feriados, recessos e eventos do ano letivo
                     <?php endif; ?>
                 </p>
             </div>
-            <a href="<?= URL ?>/calendario-letivo" class="text-sm font-semibold hover:underline" style="color: <?= htmlspecialchars($primaryHex) ?>">Ver completo →</a>
+            <a href="<?= URL ?>/calendario-letivo" class="text-sm font-semibold text-white/95 hover:text-white underline-offset-2 hover:underline whitespace-nowrap">Ver completo →</a>
         </div>
-        <div class="grid grid-cols-7 border-b border-gray-100 bg-gray-50">
-            <?php foreach ($diasSemanaLabel as $d): ?>
-            <div class="py-2 text-center text-[10px] sm:text-xs font-semibold text-gray-500 uppercase"><?= $d ?></div>
+
+        <div class="p-4 sm:p-5 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-1.5">
+                <button type="button" id="gs-cal-prev" class="p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors" aria-label="Mês anterior">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                </button>
+                <span id="gs-cal-mes-label" class="text-sm sm:text-base font-bold text-gray-900 min-w-[150px] text-center"><?= htmlspecialchars(($mesesNomes[$mes - 1] ?? '') . ' de ' . $ano) ?></span>
+                <button type="button" id="gs-cal-next" class="p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors" aria-label="Próximo mês">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+            </div>
+            <button type="button" id="gs-cal-hoje" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors">Hoje</button>
+        </div>
+
+        <?php if ($tipoLabelsLegenda !== []): ?>
+        <div class="px-4 sm:px-5 pt-3 pb-1 flex flex-wrap gap-2">
+            <?php foreach ($tipoLabelsLegenda as $k => $v): ?>
+            <span class="inline-flex items-center gap-1.5 text-[10px] sm:text-xs font-medium px-2 py-1 rounded-full" style="background:<?= htmlspecialchars($tipoBg[$k] ?? '#f3f4f6') ?>;color:<?= htmlspecialchars($tipoText[$k] ?? '#374151') ?>">
+                <span class="w-1.5 h-1.5 rounded-full" style="background:<?= htmlspecialchars($tipoText[$k] ?? '#6b7280') ?>"></span>
+                <?= htmlspecialchars((string) $v) ?>
+            </span>
             <?php endforeach; ?>
         </div>
-        <div class="grid grid-cols-7">
-            <?php for ($i = 0; $i < $offset; $i++): ?>
-            <div class="min-h-[64px] sm:min-h-[80px] border-b border-r border-gray-50 bg-gray-50/40"></div>
-            <?php endfor; ?>
-            <?php for ($dia = 1; $dia <= $diasNoMes; $dia++):
-                $dataStr = sprintf('%04d-%02d-%02d', $ano, $mes, $dia);
-                $ehHoje = $dataStr === $hoje;
-                $evsDia = $eventMap[$dataStr] ?? [];
-            ?>
-            <div class="min-h-[64px] sm:min-h-[80px] border-b border-r border-gray-50 p-1 sm:p-2 <?= $ehHoje ? 'bg-blue-50/60' : '' ?>">
-                <div class="text-xs sm:text-sm font-semibold <?= $ehHoje ? 'text-blue-700' : 'text-gray-700' ?>"><?= $dia ?></div>
-                <div class="mt-1 space-y-0.5">
-                    <?php foreach (array_slice($evsDia, 0, 2) as $ev):
-                        $tipo = (string) ($ev['tipo'] ?? '');
-                        $bg = $tipoBg[$tipo] ?? '#e5e7eb';
-                        $tx = $tipoText[$tipo] ?? '#374151';
-                        $titulo = (string) ($ev['titulo'] ?? $tipoLabels[$tipo] ?? 'Evento');
+        <?php endif; ?>
+
+        <div class="p-3 sm:p-4">
+            <div class="grid grid-cols-7 mb-1">
+                <?php foreach ($diasSemanaLabel as $d): ?>
+                <div class="py-2 text-center text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wide"><?= $d ?></div>
+                <?php endforeach; ?>
+            </div>
+            <div id="gs-cal-grade" class="grid grid-cols-7 gap-1 sm:gap-1.5">
+                <?php for ($i = 0; $i < $offset; $i++): ?>
+                <div class="aspect-square rounded-lg bg-transparent"></div>
+                <?php endfor; ?>
+                <?php for ($dia = 1; $dia <= $diasNoMes; $dia++):
+                    $dataStr = sprintf('%04d-%02d-%02d', $ano, $mes, $dia);
+                    $ehHoje = $dataStr === $hoje;
+                    $evsDia = $eventMap[$dataStr] ?? [];
+                    $dow = (int) date('N', strtotime($dataStr));
+                    $isWeekend = $dow >= 6;
+                    $tiposDia = array_values(array_unique(array_column($evsDia, 'tipo')));
+                    $primTipo = $tiposDia[0] ?? null;
+                    if ($primTipo) {
+                        $cellBg = $tipoBg[$primTipo] ?? '#eef2ff';
+                        $cellText = $tipoText[$primTipo] ?? '#1e3a8a';
+                    } elseif ($isWeekend) {
+                        $cellBg = '#f9fafb';
+                        $cellText = '#9ca3af';
+                    } else {
+                        $cellBg = '#ffffff';
+                        $cellText = '#374151';
+                    }
+                ?>
+                <button type="button"
+                        class="gs-cal-dia relative aspect-square rounded-xl border border-gray-100 p-1 sm:p-1.5 text-left transition-all hover:shadow-md hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-offset-1 <?= $ehHoje ? 'ring-2 ring-offset-1' : '' ?> <?= $evsDia !== [] ? 'cursor-pointer' : 'cursor-default' ?>"
+                        style="background:<?= htmlspecialchars($cellBg) ?>;color:<?= htmlspecialchars($cellText) ?>;<?= $ehHoje ? 'ring-color:' . htmlspecialchars($primaryHex) . ';' : '' ?>"
+                        data-data="<?= htmlspecialchars($dataStr) ?>"
+                        aria-label="Dia <?= $dia ?>">
+                    <span class="inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 text-xs sm:text-sm font-bold rounded-full <?= $ehHoje ? 'text-white' : '' ?>"
+                          style="<?= $ehHoje ? 'background-color:' . htmlspecialchars($primaryHex) : '' ?>"><?= $dia ?></span>
+                    <?php if ($evsDia !== []): ?>
+                    <div class="absolute bottom-1 left-1 right-1 flex flex-wrap gap-0.5 justify-center">
+                        <?php foreach (array_slice($tiposDia, 0, 3) as $tipoDot): ?>
+                        <span class="w-1.5 h-1.5 rounded-full" style="background:<?= htmlspecialchars($tipoText[$tipoDot] ?? '#6b7280') ?>"></span>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+                </button>
+                <?php endfor; ?>
+            </div>
+        </div>
+
+        <div class="px-4 sm:px-6 pb-5 border-t border-gray-100 bg-gray-50/60">
+            <div class="pt-4 flex items-center justify-between gap-2 mb-3">
+                <h3 class="text-sm font-semibold text-gray-800" id="gs-cal-dia-titulo">
+                    Eventos de <?= date('d/m/Y', strtotime($hoje)) ?>
+                </h3>
+                <span class="text-[10px] sm:text-xs text-gray-400" id="gs-cal-dia-count"></span>
+            </div>
+            <div id="gs-cal-dia-lista" class="space-y-2 min-h-[3rem]">
+                <?php
+                $eventosHoje = $eventMap[$hoje] ?? [];
+                if ($eventosHoje === []):
+                ?>
+                <p class="text-sm text-gray-500">Nenhum evento escolar neste dia.</p>
+                <?php else: ?>
+                    <?php foreach ($eventosHoje as $ev):
+                        $tipoEv = (string) ($ev['tipo'] ?? '');
+                        $bgEv = $tipoBg[$tipoEv] ?? '#f3f4f6';
+                        $txEv = $tipoText[$tipoEv] ?? '#374151';
                     ?>
-                    <div class="truncate rounded px-1 py-0.5 text-[10px] sm:text-xs font-medium" style="background: <?= htmlspecialchars($bg) ?>; color: <?= htmlspecialchars($tx) ?>" title="<?= htmlspecialchars($titulo) ?>">
-                        <?= htmlspecialchars($titulo) ?>
+                    <div class="flex items-start gap-3 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
+                        <span class="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0" style="background:<?= htmlspecialchars($txEv) ?>"></span>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full" style="background:<?= htmlspecialchars($bgEv) ?>;color:<?= htmlspecialchars($txEv) ?>">
+                                    <?= htmlspecialchars($tipoLabels[$tipoEv] ?? $tipoEv) ?>
+                                </span>
+                                <?php if (!empty($ev['local'])): ?>
+                                <span class="text-[10px] text-gray-400 truncate"><i class="fa-solid fa-location-dot mr-0.5"></i><?= htmlspecialchars((string) $ev['local']) ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <p class="text-sm font-semibold text-gray-900 mt-1"><?= htmlspecialchars((string) $ev['titulo']) ?></p>
+                        </div>
+                        <?php if (!empty($ev['link'])): ?>
+                        <a href="<?= htmlspecialchars((string) $ev['link']) ?>" target="_blank" rel="noopener" class="text-xs font-medium flex-shrink-0 hover:underline" style="color:<?= htmlspecialchars($primaryHex) ?>">Link</a>
+                        <?php endif; ?>
                     </div>
                     <?php endforeach; ?>
-                    <?php if (count($evsDia) > 2): ?>
-                    <div class="text-[10px] text-gray-400 pl-1">+<?= count($evsDia) - 2 ?></div>
-                    <?php endif; ?>
-                </div>
+                <?php endif; ?>
             </div>
-            <?php endfor; ?>
+
+            <div id="gs-cal-mes-bloco" class="mt-5 pt-4 border-t border-gray-200 <?= ($eventosMes === [] && $eventos === []) ? '' : '' ?>">
+                <h3 class="text-sm font-semibold text-gray-800 mb-3">Neste mês</h3>
+                <ul id="gs-cal-mes-lista" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    <?php if ($eventosMes === []): ?>
+                    <li class="text-sm text-gray-500"><?= $eventos === [] ? 'Nenhum evento cadastrado no calendário letivo ainda.' : 'Nenhum evento neste mês.' ?></li>
+                    <?php else: ?>
+                        <?php foreach (array_slice($eventosMes, 0, 8) as $evMes):
+                            $tipoMes = (string) ($evMes['tipo'] ?? '');
+                            $txMes = $tipoText[$tipoMes] ?? '#6b7280';
+                            $iniBr = date('d/m', strtotime((string) $evMes['inicio']));
+                            $fimBr = date('d/m', strtotime((string) $evMes['fim']));
+                            $periodo = $iniBr === $fimBr ? $iniBr : $iniBr . ' – ' . $fimBr;
+                        ?>
+                        <li class="flex items-center gap-3 text-sm">
+                            <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:<?= htmlspecialchars($txMes) ?>"></span>
+                            <span class="text-xs font-medium text-gray-500 w-20 flex-shrink-0"><?= htmlspecialchars($periodo) ?></span>
+                            <span class="text-gray-900 truncate font-medium"><?= htmlspecialchars((string) $evMes['titulo']) ?></span>
+                        </li>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </ul>
+            </div>
         </div>
     </section>
 
@@ -192,7 +362,7 @@ $diasSemanaLabel = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
                     <li>
                         <a href="<?= URL ?>/mural-recados" class="block rounded-xl border border-gray-100 p-3 hover:bg-gray-50 transition-colors">
                             <div class="flex items-start justify-between gap-2">
-                                <p class="text-sm font-semibold text-gray-900 <?= $visto ? '' : '' ?>">
+                                <p class="text-sm font-semibold text-gray-900">
                                     <?php if (!$visto): ?><span class="inline-block w-2 h-2 rounded-full bg-amber-500 mr-1.5 align-middle"></span><?php endif; ?>
                                     <?= htmlspecialchars($titulo) ?>
                                 </p>
@@ -212,3 +382,216 @@ $diasSemanaLabel = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
         </section>
     </div>
 </div>
+
+<script>
+(function () {
+    var root = document.getElementById('grupo-seb-calendario');
+    if (!root) return;
+
+    var eventMap = <?= json_encode($eventMap, $jsonFlags) ?>;
+    var eventosAno = <?= json_encode(array_values(array_map(static function ($ev) use ($tipoLabels) {
+        $tipo = (string) ($ev['tipo'] ?? '');
+        $titulo = trim((string) ($ev['descricao'] ?? $ev['titulo'] ?? ''));
+        if ($titulo === '') {
+            $titulo = (string) ($tipoLabels[$tipo] ?? 'Evento');
+        }
+        return [
+            'tipo' => $tipo,
+            'titulo' => $titulo,
+            'inicio' => (string) ($ev['data_inicio'] ?? ''),
+            'fim' => (string) ($ev['data_fim'] ?? ($ev['data_inicio'] ?? '')),
+        ];
+    }, $eventos)), $jsonFlags) ?>;
+    var tipoLabels = <?= json_encode($tipoLabels, $jsonFlags) ?>;
+    var tipoBg = <?= json_encode($tipoBg, $jsonFlags) ?>;
+    var tipoText = <?= json_encode($tipoText, $jsonFlags) ?>;
+    var mesesNomes = <?= json_encode($mesesNomes, $jsonFlags) ?>;
+    var primaryHex = root.dataset.primary || '#3b82f6';
+    var hoje = root.dataset.hoje;
+    var ano = parseInt(root.dataset.ano, 10);
+    var mes = parseInt(root.dataset.mes, 10);
+    var diaSelecionado = hoje;
+
+    var elGrade = document.getElementById('gs-cal-grade');
+    var elLabel = document.getElementById('gs-cal-mes-label');
+    var elTitulo = document.getElementById('gs-cal-dia-titulo');
+    var elLista = document.getElementById('gs-cal-dia-lista');
+    var elCount = document.getElementById('gs-cal-dia-count');
+    var elMesLista = document.getElementById('gs-cal-mes-lista');
+
+    function pad(n) { return n < 10 ? '0' + n : String(n); }
+    function iso(y, m, d) { return y + '-' + pad(m) + '-' + pad(d); }
+    function br(isoDate) {
+        var p = String(isoDate).split('-');
+        return p[2] + '/' + p[1] + '/' + p[0];
+    }
+    function esc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function renderLista(dataIso) {
+        diaSelecionado = dataIso;
+        elTitulo.textContent = 'Eventos de ' + br(dataIso);
+        var evs = eventMap[dataIso] || [];
+        elCount.textContent = evs.length ? (evs.length === 1 ? '1 evento' : evs.length + ' eventos') : '';
+        if (!evs.length) {
+            elLista.innerHTML = '<p class="text-sm text-gray-500">Nenhum evento escolar neste dia.</p>';
+            return;
+        }
+        elLista.innerHTML = evs.map(function (ev) {
+            var tipo = ev.tipo || '';
+            var bg = tipoBg[tipo] || '#f3f4f6';
+            var tx = tipoText[tipo] || '#374151';
+            var label = tipoLabels[tipo] || tipo || 'Evento';
+            var local = ev.local
+                ? '<span class="text-[10px] text-gray-400 truncate"><i class="fa-solid fa-location-dot mr-0.5"></i>' + esc(ev.local) + '</span>'
+                : '';
+            var link = ev.link
+                ? '<a href="' + esc(ev.link) + '" target="_blank" rel="noopener" class="text-xs font-medium flex-shrink-0 hover:underline" style="color:' + primaryHex + '">Link</a>'
+                : '';
+            return '<div class="flex items-start gap-3 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">' +
+                '<span class="w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0" style="background:' + esc(tx) + '"></span>' +
+                '<div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2">' +
+                '<span class="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full" style="background:' + esc(bg) + ';color:' + esc(tx) + '">' + esc(label) + '</span>' +
+                local + '</div>' +
+                '<p class="text-sm font-semibold text-gray-900 mt-1">' + esc(ev.titulo || label) + '</p></div>' + link + '</div>';
+        }).join('');
+    }
+
+    function renderMesLista() {
+        if (!elMesLista) return;
+        var lista = eventosAno.filter(function (ev) {
+            if (!ev.inicio) return false;
+            var ini = ev.inicio.split('-');
+            var fim = (ev.fim || ev.inicio).split('-');
+            var yi = parseInt(ini[0], 10), mi = parseInt(ini[1], 10);
+            var yf = parseInt(fim[0], 10), mf = parseInt(fim[1], 10);
+            return (yi < ano || (yi === ano && mi <= mes)) && (yf > ano || (yf === ano && mf >= mes));
+        }).slice(0, 8);
+        if (!lista.length) {
+            elMesLista.innerHTML = '<li class="text-sm text-gray-500">' +
+                (eventosAno.length ? 'Nenhum evento neste mês.' : 'Nenhum evento cadastrado no calendário letivo ainda.') +
+                '</li>';
+            return;
+        }
+        elMesLista.innerHTML = lista.map(function (ev) {
+            var tx = tipoText[ev.tipo] || '#6b7280';
+            var iniP = String(ev.inicio).split('-');
+            var fimP = String(ev.fim || ev.inicio).split('-');
+            var iniBr = iniP[2] + '/' + iniP[1];
+            var fimBr = fimP[2] + '/' + fimP[1];
+            var periodo = iniBr === fimBr ? iniBr : (iniBr + ' – ' + fimBr);
+            return '<li class="flex items-center gap-3 text-sm">' +
+                '<span class="w-2 h-2 rounded-full flex-shrink-0" style="background:' + esc(tx) + '"></span>' +
+                '<span class="text-xs font-medium text-gray-500 w-20 flex-shrink-0">' + esc(periodo) + '</span>' +
+                '<span class="text-gray-900 truncate font-medium">' + esc(ev.titulo) + '</span></li>';
+        }).join('');
+    }
+
+    function renderGrade() {
+        var primeiro = new Date(ano, mes - 1, 1);
+        var diasNoMes = new Date(ano, mes, 0).getDate();
+        var offset = primeiro.getDay();
+        elLabel.textContent = mesesNomes[mes - 1] + ' de ' + ano;
+        renderMesLista();
+        var html = '';
+        var i, dia, dataStr, evs, tipos, prim, cellBg, cellText, dow, isWeekend, ehHoje, dots;
+        for (i = 0; i < offset; i++) {
+            html += '<div class="aspect-square rounded-lg bg-transparent"></div>';
+        }
+        for (dia = 1; dia <= diasNoMes; dia++) {
+            dataStr = iso(ano, mes, dia);
+            evs = eventMap[dataStr] || [];
+            tipos = [];
+            evs.forEach(function (e) {
+                if (e.tipo && tipos.indexOf(e.tipo) === -1) tipos.push(e.tipo);
+            });
+            prim = tipos[0] || null;
+            dow = new Date(ano, mes - 1, dia).getDay();
+            isWeekend = dow === 0 || dow === 6;
+            ehHoje = dataStr === hoje;
+            if (prim) {
+                cellBg = tipoBg[prim] || '#eef2ff';
+                cellText = tipoText[prim] || '#1e3a8a';
+            } else if (isWeekend) {
+                cellBg = '#f9fafb';
+                cellText = '#9ca3af';
+            } else {
+                cellBg = '#ffffff';
+                cellText = '#374151';
+            }
+            dots = tipos.slice(0, 3).map(function (t) {
+                return '<span class="w-1.5 h-1.5 rounded-full" style="background:' + esc(tipoText[t] || '#6b7280') + '"></span>';
+            }).join('');
+            html += '<button type="button" class="gs-cal-dia relative aspect-square rounded-xl border border-gray-100 p-1 sm:p-1.5 text-left transition-all hover:shadow-md hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-offset-1' +
+                (ehHoje || dataStr === diaSelecionado ? ' ring-2 ring-offset-1' : '') +
+                (evs.length ? ' cursor-pointer' : ' cursor-default') +
+                '" style="background:' + esc(cellBg) + ';color:' + esc(cellText) + ';' +
+                ((ehHoje || dataStr === diaSelecionado) ? 'ring-color:' + primaryHex + ';' : '') +
+                '" data-data="' + dataStr + '" aria-label="Dia ' + dia + '">' +
+                '<span class="inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 text-xs sm:text-sm font-bold rounded-full' +
+                (ehHoje ? ' text-white' : '') + '"' +
+                (ehHoje ? ' style="background-color:' + primaryHex + '"' : '') + '>' + dia + '</span>' +
+                (dots ? '<div class="absolute bottom-1 left-1 right-1 flex flex-wrap gap-0.5 justify-center">' + dots + '</div>' : '') +
+                '</button>';
+        }
+        elGrade.innerHTML = html;
+        elGrade.querySelectorAll('.gs-cal-dia').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                renderLista(btn.dataset.data);
+                elGrade.querySelectorAll('.gs-cal-dia').forEach(function (b) {
+                    var sel = b.dataset.data === diaSelecionado;
+                    b.classList.toggle('ring-2', sel || b.dataset.data === hoje);
+                    b.classList.toggle('ring-offset-1', sel || b.dataset.data === hoje);
+                    if (sel || b.dataset.data === hoje) {
+                        b.style.ringColor = primaryHex;
+                        b.style.setProperty('ring-color', primaryHex);
+                        b.style.boxShadow = '0 0 0 2px ' + primaryHex;
+                    } else {
+                        b.style.boxShadow = '';
+                    }
+                });
+            });
+        });
+    }
+
+    document.getElementById('gs-cal-prev').addEventListener('click', function () {
+        mes -= 1;
+        if (mes < 1) { mes = 12; ano -= 1; }
+        renderGrade();
+    });
+    document.getElementById('gs-cal-next').addEventListener('click', function () {
+        mes += 1;
+        if (mes > 12) { mes = 1; ano += 1; }
+        renderGrade();
+    });
+    document.getElementById('gs-cal-hoje').addEventListener('click', function () {
+        var p = hoje.split('-');
+        ano = parseInt(p[0], 10);
+        mes = parseInt(p[1], 10);
+        renderGrade();
+        renderLista(hoje);
+    });
+
+    elGrade.querySelectorAll('.gs-cal-dia').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            renderLista(btn.dataset.data);
+            elGrade.querySelectorAll('.gs-cal-dia').forEach(function (b) {
+                var sel = b.dataset.data === diaSelecionado;
+                if (sel || b.dataset.data === hoje) {
+                    b.style.boxShadow = '0 0 0 2px ' + primaryHex;
+                } else {
+                    b.style.boxShadow = '';
+                }
+            });
+        });
+    });
+
+    var evsHoje = eventMap[hoje] || [];
+    if (elCount) {
+        elCount.textContent = evsHoje.length ? (evsHoje.length === 1 ? '1 evento' : evsHoje.length + ' eventos') : '';
+    }
+})();
+</script>
