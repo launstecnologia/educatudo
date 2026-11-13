@@ -273,45 +273,28 @@ class NotasDemonstrativoGrupoService
                 }
             }
 
-            $nomeBol = $nomesBoletim[$boletimId]['nome'] ?? '';
+            $nomeBol = trim((string) ($nomesBoletim[$boletimId]['nome'] ?? ''));
+            $nomeBolL = mb_strtolower($nomeBol, 'UTF-8');
             $nomeEv = mb_strtolower(trim((string) ($ev['nome'] ?? '')), 'UTF-8');
-            // Sinal forte de itinerário: finalidade complementar ou o NOME DA REGRA.
-            // Não usar só o nome do boletim — na Colag regras gerais (“Notas Bimestrais”)
-            // às vezes apontam para o modelo ITINERÁRIO e sumiam da aba Oficial.
+            // Itinerário: finalidade complementar, nome do boletim/regra, ou só turma extra.
             $sinalItinerario = $finalidade === 'complementar'
+                || strpos($nomeBolL, 'itiner') !== false
                 || strpos($nomeEv, 'itiner') !== false;
 
-            $regularDoAluno = null;
-            foreach ($turmasAtivas as $tidAt => $infoAt) {
-                if (($infoAt['curso_tipo'] ?? '') !== 'extra') {
-                    $regularDoAluno = $tidAt;
-                    break;
-                }
-            }
-            // “Notas Bimestrais” genérico: era o demonstrativo que o aluno abria no 1º/2º.
-            // Se só bateu turma extra (lista ampla / boletim ITINERÁRIO), ainda assim
-            // vai para Oficial quando o aluno tem matrícula regular.
-            $nomeGenericoBimestral = strpos($nomeEv, 'notas bimestr') !== false;
-
-            // Quando a regra alcança turma regular (ou é o bimestral genérico), prioriza Oficial.
-            if (!$sinalItinerario && ($matchRegular !== null || ($nomeGenericoBimestral && $regularDoAluno !== null))) {
-                $tidRegular = $matchRegular !== null ? $matchRegular : $regularDoAluno;
-                $chave = 'regular-' . $tidRegular;
-                $rotuloBolOk = $nomeBol !== '' && strpos(mb_strtolower($nomeBol, 'UTF-8'), 'itiner') === false;
-                $rotulo = $rotuloBolOk
-                    ? $nomeBol
-                    : (string) ($turmasAtivas[$tidRegular]['turma_nome'] ?? 'Oficial');
+            if ($matchExtra !== null && ($sinalItinerario || $matchRegular === null)) {
+                $chave = 'extra-' . $matchExtra;
+                $rotulo = $nomeBol !== '' ? $nomeBol : $turmasAtivas[$matchExtra]['turma_nome'];
+                $cursoTipo = 'extra';
+                $finalidade = 'complementar';
+            } elseif ($matchRegular !== null) {
+                $chave = 'regular-' . $matchRegular;
+                $rotuloBolOk = $nomeBol !== '' && strpos($nomeBolL, 'itiner') === false;
+                $rotulo = $rotuloBolOk ? $nomeBol : $turmasAtivas[$matchRegular]['turma_nome'];
                 $cursoTipo = 'regular';
                 $finalidade = 'oficial';
-            } elseif ($matchExtra !== null || $sinalItinerario) {
-                $chave = 'extra-' . ($matchExtra !== null
-                    ? $matchExtra
-                    : ($boletimId > 0 ? ('bol-' . $boletimId) : 'geral'));
-                $rotulo = $nomeBol !== '' ? $nomeBol : (
-                    $matchExtra !== null
-                        ? $turmasAtivas[$matchExtra]['turma_nome']
-                        : 'Curso extra'
-                );
+            } elseif ($sinalItinerario) {
+                $chave = 'extra-' . ($boletimId > 0 ? ('bol-' . $boletimId) : 'geral');
+                $rotulo = $nomeBol !== '' ? $nomeBol : 'Curso extra';
                 $cursoTipo = 'extra';
                 $finalidade = 'complementar';
             } else {
@@ -323,17 +306,16 @@ class NotasDemonstrativoGrupoService
                 $rotulo = $cursoTipo === 'extra' ? 'Curso extra' : 'Demonstrativo';
             }
 
-            // Rótulos amigáveis quando o nome do boletim não deixa claro.
             $rotuloLower = mb_strtolower($rotulo, 'UTF-8');
             if ($cursoTipo === 'extra'
                 && strpos($rotuloLower, 'itiner') === false
                 && strpos($rotuloLower, 'extra') === false
                 && strpos($rotuloLower, 'complement') === false
             ) {
-                $rotulo = 'Itinerário / Extra — ' . $rotulo;
+                $rotulo = 'Itinerário — ' . $rotulo;
             } elseif ($cursoTipo === 'regular'
                 && strpos($rotuloLower, 'oficial') === false
-                && ($rotulo === 'Demonstrativo' || $nomeBol === '' || strpos($rotuloLower, 'itiner') !== false)
+                && ($rotulo === 'Demonstrativo' || $nomeBol === '')
             ) {
                 $rotulo = 'Oficial';
             }

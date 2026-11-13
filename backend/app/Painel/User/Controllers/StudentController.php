@@ -1567,6 +1567,7 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
             'fichas' => [],
             'ficha_id' => 0,
             'observacao' => ['conteudo' => '', 'updated_at' => null],
+            'quadro_impressao_html' => '',
         ];
         if ($alunoId <= 0) {
             return $vazio;
@@ -1592,10 +1593,10 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
                     error_log('Portal boletim fichas matrículas aluno #' . $alunoId . ': ' . $e->getMessage());
                 }
             }
+            $prontuarioSvc = new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService();
             $fichas = $model->schemaPronto() ? $model->listarFichasAluno($alunoId) : [];
             try {
-                $fichas = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
-                    ->enriquecerFichasComModelo($fichas, $alunoId);
+                $fichas = $prontuarioSvc->enriquecerFichasComModelo($fichas, $alunoId);
             } catch (\Throwable $e) {
                 error_log('Portal boletim enriquecer fichas aluno #' . $alunoId . ': ' . $e->getMessage());
             }
@@ -1626,11 +1627,31 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
                 $vida->recolherDesdobramentosSePrecisar($fichaIdEscolhida);
             }
 
+            $quadro = $fichaIdEscolhida > 0 ? $vida->quadro($fichaIdEscolhida, true) : null;
+
+            // Grupo Seb: monta o HTML do quadro na request (portal não usa o AJAX do admin).
+            $quadroImpressaoHtml = '';
+            if (GrupoSebService::estaAtivo() && is_array($quadro)) {
+                $fichaAtual = is_array($quadro['ficha'] ?? null) ? $quadro['ficha'] : [];
+                if ((int) ($fichaAtual['id'] ?? 0) <= 0 && $fichaIdEscolhida > 0) {
+                    $fichaAtual['id'] = $fichaIdEscolhida;
+                }
+                if ((int) ($fichaAtual['id'] ?? 0) > 0) {
+                    try {
+                        $quadroImpressaoHtml = $prontuarioSvc->htmlQuadroImpressaoParaAluno($alunoId, $fichaAtual);
+                    } catch (\Throwable $e) {
+                        error_log('Portal boletim quadro impressão aluno #' . $alunoId . ': ' . $e->getMessage());
+                        $quadroImpressaoHtml = '';
+                    }
+                }
+            }
+
             return [
-                'quadro' => $fichaIdEscolhida > 0 ? $vida->quadro($fichaIdEscolhida, true) : null,
+                'quadro' => $quadro,
                 'fichas' => $fichas,
                 'ficha_id' => $fichaIdEscolhida,
                 'observacao' => $observacao,
+                'quadro_impressao_html' => $quadroImpressaoHtml,
             ];
         } catch (\Throwable $e) {
             error_log('Portal de boletim aluno #' . $alunoId . ': ' . $e->getMessage());
@@ -1661,11 +1682,12 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
         } catch (\Throwable $e) {
             $provasMatrizBlocos = ['tabelas' => [], 'tem_dados' => false];
         }
-        // Demonstrativo = quadro ao vivo; boletim oficial = snapshot/ficha.
+        // Demonstrativo = quadro ao vivo + snapshots já gerados (1º/2º etc.).
         $notasEventosAoVivo = $this->notasEventosAoVivoDoAluno($aluno, []);
         $fichaIdPortal = isset($_GET['ficha_id']) ? (int) $_GET['ficha_id'] : 0;
         $boletimOficial = $this->boletimOficialPortal((int) $aluno['id'], $fichaIdPortal);
         $boletinsPortalOficiais = $this->boletinsVisiveisNoPortal((int) $aluno['id'], 'aluno', 'boletim');
+        $boletinsPortalNotas = $this->boletinsVisiveisNoPortal((int) $aluno['id'], 'aluno', 'notas');
 
         $primaryColor = LayoutHelper::get('primary_color', $this->config['school']['colors']['primary'] ?? '#3b82f6');
 
@@ -1678,8 +1700,8 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
             'provas_matriz_blocos' => $provasMatrizBlocos,
             'notas_lancamento_eventos' => [],
             'boletins_gerados' => [],
-            // Legado: snapshots de demonstrativo — portal prioriza ao vivo; mantém lista vazia na UI principal.
-            'boletins_gerados_notas' => [],
+            // Snapshots gerados (exibir_em=notas) — sem isso o 1º/2º ficam cinza se o ao vivo não montar.
+            'boletins_gerados_notas' => $boletinsPortalNotas,
             'notas_eventos_ao_vivo' => $notasEventosAoVivo,
             'boletins_gerados_notas_extra' => [],
             'boletins_gerados_boletim' => $boletinsPortalOficiais,

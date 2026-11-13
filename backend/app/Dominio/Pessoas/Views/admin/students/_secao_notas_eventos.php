@@ -537,8 +537,8 @@ foreach ($linhasPeriodo as &$linhaP) {
             }
             if (is_array($evGerado) && !empty($evGerado['linhas']) && !empty($evGerado['colunas'])) {
                 $colsGer = is_array($evGerado['colunas']) ? $evGerado['colunas'] : [];
+                $evGerado['decimal_places'] = $resolverCasasDoEvento($evGerado);
                 if (\App\Helpers\BoletimQuadroLayoutHelper::ehLayoutQuadro($colsGer) || $ridP <= 0) {
-                    $evGerado['decimal_places'] = $resolverCasasDoEvento($evGerado);
                     $boletinsGeradosBackup = $boletins_gerados ?? [];
                     $boletimPodeExcluirBackup = $boletim_pode_excluir ?? false;
                     $boletimAlunoIdBackup = $boletim_aluno_id ?? 0;
@@ -552,6 +552,9 @@ foreach ($linhasPeriodo as &$linhaP) {
                     $boletins_gerados = $boletinsGeradosBackup;
                     $boletim_pode_excluir = $boletimPodeExcluirBackup;
                     $boletim_aluno_id = $boletimAlunoIdBackup;
+                } else {
+                    // Snapshot sem layout de quadro (ex.: 1º/2º já gerados) — tabela de notas.
+                    $htmlQuadroPorChave[$chaveQuadro] = $renderNotasComoCoordenacao($evGerado);
                 }
             }
         }
