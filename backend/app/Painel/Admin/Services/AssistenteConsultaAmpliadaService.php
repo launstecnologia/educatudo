@@ -389,9 +389,9 @@ class AssistenteConsultaAmpliadaService
         $ultimoErroQuadro = null;
         foreach ($anosTentar as $anoFiltro) {
             $quadro = $this->montarQuadroBoletimAluno($alunoId, $anoFiltro, $regraId);
-            if (!empty($quadro['ok'])
-                && !empty($quadro['colunas'])
-                && !empty($quadro['linhas'])
+            if (
+                !empty($quadro['ok'])
+                && $this->quadroBoletimTemNotas($quadro)
             ) {
                 return [
                     'ok' => true,
@@ -407,7 +407,12 @@ class AssistenteConsultaAmpliadaService
                     'aviso' => $quadro['aviso'] ?? null,
                 ];
             }
-            $ultimoErroQuadro = $quadro['error'] ?? $ultimoErroQuadro;
+            if (!empty($quadro['ok']) && !$this->quadroBoletimTemNotas($quadro)) {
+                $ultimoErroQuadro = 'Encontrei a estrutura do boletim de ' . $anoFiltro
+                    . ', mas sem notas preenchidas nessa regra. Tentando outra fonte…';
+            } else {
+                $ultimoErroQuadro = $quadro['error'] ?? $ultimoErroQuadro;
+            }
         }
 
         // Fallback: eventos já gerados (demonstrativos/snapshots).
@@ -433,6 +438,9 @@ class AssistenteConsultaAmpliadaService
             if ($linhas === [] || empty($ev['colunas'])) {
                 continue;
             }
+            if (!$this->quadroBoletimTemNotas(['colunas' => $ev['colunas'] ?? [], 'linhas' => $linhas])) {
+                continue;
+            }
             $slim[] = [
                 'regra_nome' => trim((string) ($ev['regra_nome'] ?? $ev['nome'] ?? '')),
                 'bimestre' => $ev['bimestre'] ?? null,
@@ -448,9 +456,9 @@ class AssistenteConsultaAmpliadaService
             $anoMsg = $anoPedido > 0 ? (string) $anoPedido : implode('/', $anosTentar);
             return [
                 'ok' => false,
-                'error' => $ultimoErroQuadro
-                    ?? ('Não encontrei boletim com notas para exibir'
-                        . ($anoMsg !== '' ? ' (' . $anoMsg . ')' : '') . '.'),
+                'error' => 'Não encontrei boletim com notas preenchidas'
+                    . ($anoMsg !== '' ? ' para ' . $anoMsg : '')
+                    . '. A aluna pode ter notas lançadas, mas a regra de impressão não montou o quadro.',
                 'aluno' => $aluno['aluno'],
             ];
         }
@@ -1773,38 +1781,111 @@ class AssistenteConsultaAmpliadaService
     {
         $boletim = new BoletimConfig();
         $boletim->ensureSchema();
-        $regra = null;
+        $candidatas = [];
+
         if ($regraIdPreferida > 0) {
-            $regra = $boletim->getRuleById($regraIdPreferida);
-            if (is_array($regra) && (int) ($regra['ano_letivo'] ?? 0) !== $anoLetivo) {
+            $regraPref = $boletim->getRuleById($regraIdPreferida);
+            if (is_array($regraPref) && (int) ($regraPref['ano_letivo'] ?? 0) !== $anoLetivo) {
                 return [
                     'ok' => false,
                     'error' => 'A regra #' . $regraIdPreferida . ' não pertence ao ano letivo ' . $anoLetivo . '.',
                 ];
             }
+            if (is_array($regraPref) && !empty($regraPref['componentes'])) {
+                $candidatas[] = $regraPref;
+            }
         }
-        if (!is_array($regra) || empty($regra['componentes'])) {
-            $regra = $this->resolverRegraQuadroBoletim($anoLetivo);
+
+        foreach ($this->listarRegrasQuadroBoletim($anoLetivo) as $regraCand) {
+            $idCand = (int) ($regraCand['id'] ?? 0);
+            if ($idCand <= 0) {
+                continue;
+            }
+            if ($regraIdPreferida > 0 && $idCand === $regraIdPreferida) {
+                continue;
+            }
+            $candidatas[] = $regraCand;
         }
-        if (!is_array($regra) || empty($regra['componentes'])) {
+
+        if ($candidatas === []) {
             return ['ok' => false, 'error' => 'Nenhuma regra de boletim/impressão encontrada para ' . $anoLetivo . '.'];
         }
 
-        $matriz = $this->simularMatrizRegraAluno($regra, $alunoId, $anoLetivo);
-        if ($matriz === null || empty($matriz['colunas']) || empty($matriz['linhas'])) {
-            return ['ok' => false, 'error' => 'Não foi possível montar o quadro do boletim.'];
+        $melhorVazio = null;
+        foreach ($candidatas as $regra) {
+            $matriz = $this->simularMatrizRegraAluno($regra, $alunoId, $anoLetivo);
+            if ($matriz === null || empty($matriz['colunas']) || empty($matriz['linhas'])) {
+                continue;
+            }
+            $montado = [
+                'ok' => true,
+                'regra' => [
+                    'id' => (int) ($regra['id'] ?? 0),
+                    'nome' => trim((string) ($regra['nome'] ?? '')),
+                ],
+                'colunas' => $matriz['colunas'],
+                'grupos' => $this->agruparCabecalhosColunas($matriz['colunas']),
+                'linhas' => $matriz['linhas'],
+            ];
+            if ($this->quadroBoletimTemNotas($montado)) {
+                return $montado;
+            }
+            if ($melhorVazio === null) {
+                $melhorVazio = $montado;
+            }
         }
 
-        return [
-            'ok' => true,
-            'regra' => [
-                'id' => (int) ($regra['id'] ?? 0),
-                'nome' => trim((string) ($regra['nome'] ?? '')),
-            ],
-            'colunas' => $matriz['colunas'],
-            'grupos' => $this->agruparCabecalhosColunas($matriz['colunas']),
-            'linhas' => $matriz['linhas'],
-        ];
+        if ($melhorVazio !== null) {
+            $melhorVazio['aviso'] = 'Quadro montado sem notas preenchidas nesta regra.';
+            return $melhorVazio;
+        }
+
+        return ['ok' => false, 'error' => 'Não foi possível montar o quadro do boletim.'];
+    }
+
+    /**
+     * True se há ao menos uma nota/célula preenchida (não só "—" / Reprovado vazio).
+     *
+     * @param array<string,mixed> $quadro
+     */
+    private function quadroBoletimTemNotas(array $quadro): bool
+    {
+        $linhas = is_array($quadro['linhas'] ?? null) ? $quadro['linhas'] : [];
+        foreach ($linhas as $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            $notas = is_array($linha['notas'] ?? null) ? $linha['notas'] : [];
+            foreach ($notas as $valor) {
+                if ($valor === null || $valor === '') {
+                    continue;
+                }
+                if (is_string($valor)) {
+                    $v = trim($valor);
+                    if ($v === '' || $v === '—' || $v === '-' || strcasecmp($v, 'null') === 0) {
+                        continue;
+                    }
+                    // Status sozinho (Reprovado/Aprovado) sem nota numérica não conta como boletim de notas.
+                    if (preg_match('/^(reprovado|aprovado|recuperacao|recuperação)$/iu', $v) === 1) {
+                        continue;
+                    }
+                    return true;
+                }
+                if (is_numeric($valor)) {
+                    return true;
+                }
+                if (is_array($valor)) {
+                    $inner = $valor['valor'] ?? $valor['nota'] ?? $valor['texto'] ?? null;
+                    if ($inner !== null && $inner !== '' && !(is_string($inner) && trim($inner) === '—')) {
+                        if (is_string($inner) && preg_match('/^(reprovado|aprovado)$/iu', trim($inner)) === 1) {
+                            continue;
+                        }
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -1814,8 +1895,19 @@ class AssistenteConsultaAmpliadaService
      */
     private function resolverRegraQuadroBoletim(int $anoLetivo): ?array
     {
+        $lista = $this->listarRegrasQuadroBoletim($anoLetivo);
+        return $lista[0] ?? null;
+    }
+
+    /**
+     * Regras candidatas ao quadro anual, ordenadas da mais promissora à menos.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function listarRegrasQuadroBoletim(int $anoLetivo): array
+    {
         if ($anoLetivo < 2000) {
-            return null;
+            return [];
         }
         $boletim = new BoletimConfig();
         $rows = $this->db->fetchAll(
@@ -1829,8 +1921,7 @@ class AssistenteConsultaAmpliadaService
             ['ano' => $anoLetivo]
         ) ?: [];
 
-        $melhor = null;
-        $melhorScore = -1;
+        $ranqueadas = [];
         foreach ($rows as $row) {
             $id = (int) ($row['id'] ?? 0);
             if ($id <= 0) {
@@ -1842,7 +1933,7 @@ class AssistenteConsultaAmpliadaService
             }
             $comps = is_array($regra['componentes'] ?? null) ? $regra['componentes'] : [];
             $n = count($comps);
-            if ($n < 8) {
+            if ($n < 4) {
                 continue;
             }
             $blob = mb_strtolower(
@@ -1851,17 +1942,32 @@ class AssistenteConsultaAmpliadaService
             );
             $score = $n;
             if (str_contains($blob, 'impress') || str_contains($blob, 'print') || str_contains($blob, 'quadro')) {
-                $score += 100;
+                $score += 80;
             }
             if ((string) ($regra['exibir_em'] ?? '') === 'boletim') {
                 $score += 40;
             }
-            if ($score > $melhorScore) {
-                $melhorScore = $score;
-                $melhor = $regra;
+            // "Aprovação/do zero" costuma vir só com status e sem notas lançadas.
+            if (str_contains($blob, 'aprovac') || str_contains($blob, 'do zero') || str_contains($blob, 'do-zero')) {
+                $score -= 120;
             }
+            // Prefere quadro anual da escola em vez de só um bimestre.
+            if (preg_match('/\bb[1-4]\b|\bbim/u', $blob) === 1 && !str_contains($blob, 'ensino')) {
+                $score -= 20;
+            }
+            $ranqueadas[] = ['score' => $score, 'regra' => $regra];
         }
-        return $melhor;
+
+        usort(
+            $ranqueadas,
+            static fn(array $a, array $b): int => ((int) $b['score']) <=> ((int) $a['score'])
+        );
+
+        $out = [];
+        foreach ($ranqueadas as $item) {
+            $out[] = $item['regra'];
+        }
+        return $out;
     }
 
     /**

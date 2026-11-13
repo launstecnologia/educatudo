@@ -273,7 +273,7 @@ class ProvasAlunoAssistenteService
         }
 
         // Pedido de boletim: garante consulta real e nunca afirma quadro/PDF sem conteúdo.
-        if ($this->pedidoPareceBoletim($mensagemUsuario)) {
+        if ($this->pedidoPareceBoletim($mensagemUsuario, $mensagens)) {
             $garantia = $this->garantirConsultaBoletim(
                 $mensagemUsuario,
                 $mensagens,
@@ -316,7 +316,7 @@ class ProvasAlunoAssistenteService
 
         $painel = $this->montarPainel($ultimaTool, $ultimoResultado);
         if (
-            $this->pedidoPareceBoletim($mensagemUsuario)
+            $this->pedidoPareceBoletim($mensagemUsuario, $mensagens)
             && !$this->boletimTemConteudoExibivel($ultimoResultado)
             && $painel !== null
             && ($painel['tipo'] ?? '') === 'boletim_aluno'
@@ -1665,9 +1665,34 @@ PROMPT
         return null;
     }
 
-    private function pedidoPareceBoletim(string $pergunta): bool
+    /**
+     * @param list<array{role?:string,content?:string}> $historico
+     */
+    private function pedidoPareceBoletim(string $pergunta, array $historico = []): bool
     {
-        return (bool) preg_match('/\bboletim\b|\bquadro\s+de\s+notas\b/iu', $pergunta);
+        if (preg_match('/\bboletim\b|\bquadro\s+de\s+notas\b/iu', $pergunta) === 1) {
+            return true;
+        }
+        // Continuação do chat: "traga ano de 2024", "mostra 2024"
+        if (
+            preg_match('/\b(?:traga|mostra|quero|pegar|ver).{0,40}\b(20\d{2})\b|\bano\s+(?:de\s+)?(20\d{2})\b/iu', $pergunta) === 1
+            && $this->historicoRecenteFalaBoletim($historico)
+        ) {
+            return true;
+        }
+        return false;
+    }
+
+    /** @param list<array{role?:string,content?:string}> $historico */
+    private function historicoRecenteFalaBoletim(array $historico): bool
+    {
+        foreach (array_reverse(array_slice($historico, -8)) as $msg) {
+            $c = (string) ($msg['content'] ?? '');
+            if (preg_match('/\bboletim\b|\bquadro\s+de\s+notas\b|baixar o pdf/iu', $c) === 1) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function pedidoPareceIdentidadeAluno(string $pergunta): bool
@@ -1841,9 +1866,17 @@ PROMPT
         ?array $ultimoResultado,
         $onStatus = null
     ): array {
+        $anoPedido = 0;
+        if (preg_match('/\b(20\d{2})\b/', $mensagemUsuario, $mAno) === 1) {
+            $anoPedido = (int) $mAno[1];
+        }
+        $anoResultado = (int) ($ultimoResultado['ano_letivo'] ?? 0);
+        $mesmoAnoOk = $anoPedido <= 0 || $anoResultado === $anoPedido;
+
         if (
             $ultimaTool === 'boletim_aluno'
             && $this->boletimTemConteudoExibivel($ultimoResultado)
+            && $mesmoAnoOk
         ) {
             return ['tool' => $ultimaTool, 'resultado' => $ultimoResultado];
         }
@@ -1938,13 +1971,7 @@ PROMPT
             return false;
         }
         $quadro = is_array($resultado['quadro'] ?? null) ? $resultado['quadro'] : null;
-        if (
-            is_array($quadro)
-            && !empty($quadro['colunas'])
-            && is_array($quadro['colunas'])
-            && !empty($quadro['linhas'])
-            && is_array($quadro['linhas'])
-        ) {
+        if (is_array($quadro) && $this->quadroTemNotaPreenchida($quadro)) {
             return true;
         }
         $eventos = is_array($resultado['eventos'] ?? null) ? $resultado['eventos'] : [];
@@ -1952,8 +1979,50 @@ PROMPT
             if (!is_array($ev)) {
                 continue;
             }
-            if (!empty($ev['colunas']) && !empty($ev['linhas']) && is_array($ev['linhas'])) {
+            if ($this->quadroTemNotaPreenchida([
+                'colunas' => $ev['colunas'] ?? [],
+                'linhas' => $ev['linhas'] ?? [],
+            ])) {
                 return true;
+            }
+        }
+        return false;
+    }
+
+    /** @param array<string,mixed> $quadro */
+    private function quadroTemNotaPreenchida(array $quadro): bool
+    {
+        if (empty($quadro['colunas']) || empty($quadro['linhas']) || !is_array($quadro['linhas'])) {
+            return false;
+        }
+        foreach ($quadro['linhas'] as $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            $notas = is_array($linha['notas'] ?? null) ? $linha['notas'] : [];
+            foreach ($notas as $valor) {
+                if ($valor === null || $valor === '') {
+                    continue;
+                }
+                if (is_numeric($valor)) {
+                    return true;
+                }
+                if (is_string($valor)) {
+                    $v = trim($valor);
+                    if ($v === '' || $v === '—' || $v === '-') {
+                        continue;
+                    }
+                    if (preg_match('/^(reprovado|aprovado|recuperacao|recuperação)$/iu', $v) === 1) {
+                        continue;
+                    }
+                    return true;
+                }
+                if (is_array($valor)) {
+                    $inner = $valor['valor'] ?? $valor['nota'] ?? null;
+                    if ($inner !== null && $inner !== '' && is_numeric($inner)) {
+                        return true;
+                    }
+                }
             }
         }
         return false;
