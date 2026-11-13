@@ -75,6 +75,29 @@ test.describe('Tudinha ocorrência', () => {
     await expect(mensagens.getByRole('button', { name: 'Confirmar', exact: true })).toHaveCount(0);
   });
 
+  for (const [descricao, mensagem, nome] of [
+    ['após uma saudação', 'Olá, gostaria de saber se tem ocorrência na aluna Ana luiza', 'Ana luiza'],
+    ['em uma pergunta sobre o histórico', 'Você consegue ver se há ocorrências no histórico da aluna Ana luiza?', 'Ana luiza'],
+    ['antes do verbo', 'Gostaria de saber se a aluna Ana luiza tem ocorrências', 'Ana luiza'],
+    ['quando só há o primeiro nome', 'Pode consultar se tem ocorrência na aluna Ana?', 'Ana'],
+  ]) {
+    test(`consulta de ocorrências reconhece o nome ${descricao}`, async ({ page }) => {
+      await loginAdmin(page);
+      await novaConversaAssistente(page);
+      const resposta = page.waitForResponse(res => res.url().endsWith('/mensagem-stream') && res.ok());
+      await enviar(page, mensagem);
+      const stream = await (await resposta).text();
+      const eventoFinal = stream.match(/^event: done\r?\ndata: (.+)$/m);
+      expect(eventoFinal).not.toBeNull();
+      const turno = JSON.parse(eventoFinal![1]);
+      expect(turno.consultas).toContainEqual(expect.objectContaining({
+        tool: 'ocorrencias_aluno',
+        args: expect.objectContaining({ aluno_nome: nome }),
+      }));
+      expect(['ocorrencias_aluno', 'candidatos']).toContain(turno.painel?.tipo);
+    });
+  }
+
   test('frequência informa que o ano solicitado está indisponível', async ({ page }) => {
     await loginAdmin(page);
     await novaConversaAssistente(page);

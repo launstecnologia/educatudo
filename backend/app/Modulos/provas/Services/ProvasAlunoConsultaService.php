@@ -125,11 +125,11 @@ class ProvasAlunoConsultaService
         if ($t === '') {
             return null;
         }
-        // Só dígitos (3–12) ou alfanumérico com ao menos uma letra (ex.: SM24254, 24ABC).
+        // Sem prefixo, um código alfanumérico precisa ter letras e dígitos.
         if (preg_match('/^\d{3,12}$/', $t) === 1) {
             return $t;
         }
-        if (preg_match('/^(?=[A-Za-z0-9]*[A-Za-z])[A-Za-z0-9]{3,20}$/', $t) === 1) {
+        if (preg_match('/^(?=[A-Za-z0-9]*[A-Za-z])(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{3,20}$/', $t) === 1) {
             return strtoupper($t);
         }
         if (preg_match('/\bra\b\s*[:\-#]?\s*([A-Za-z0-9]{3,20})\b/iu', $t, $m) === 1) {

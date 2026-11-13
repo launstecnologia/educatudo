@@ -1585,6 +1585,7 @@ Regras importantes:
 3) NUNCA peça confirmação antes de consultar. Chame a tool primeiro. Se houver 1 aluno, use-o; se houver vários, mostre candidatos.
 4) termo/aluno_nome = só o nome (ex.: "Maria Clara" = nome + sobrenome com LIKE %%token%%), NUNCA junte turma no nome ("Maria Clara do 2 Ano B" está errado).
 5) Se o usuário informar RA/matrícula (ex.: "RA 24254" ou "RA SM24254"), passe args.ra com o código completo (aceita alfanumérico). NUNCA use aluno_id como RA. NUNCA peça id numérico ao usuário (aluno_id, turma_id, categoria_id, diario_aula_id, prova_id, professor_id) — localize sempre por nome, RA ou turma. Se a UI já trouxe aluno_id=76 no histórico interno, use esse id sem perguntar. Pronomes como "essa aluna"/"esse aluno" reusam o aluno já identificado na conversa.
+   Interprete a frase inteira, incluindo pedidos informais. Em "Oi, gostaria de saber se tem ocorrência na aluna Ana Luiza", chame ocorrencias_aluno com aluno_nome="Ana Luiza". Use ra apenas para um código de matrícula informado, nunca para um nome. Só aplique ano ou data quando o pedido ou uma referência explícita à conversa indicar o período.
 6) Ano letivo (ex.: 2024) vai em args.ano_letivo / args.ano, nunca dentro de aluno_nome ou ra.
 7) Pedido sobre ALUNO + provas → resumo_provas_aluno ou listar_provas_aluno (última prova = listar e pegar a mais recente).
 8) Pedido sobre ALUNO + jornadas → resumo_jornadas_aluno.
@@ -2992,15 +2993,22 @@ PROMPT
         if ($msg === '') {
             return null;
         }
-        // "ocorrências/faltas/boletim da|do|de Nome" — prioridade (ex.: "ocorrencias da Maria")
+        // Prioriza a entidade ligada à consulta, inclusive "ocorrência na aluna Ana Luiza".
         if (preg_match(
-            '/\b(?:ocorr[eê]ncias?|faltas?|frequ[eê]ncia|boletim|notas?|jornadas?|perfil)\s+(?:da|do|de)\s+(?:alun[oa]\s+)?([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'\-]{1,}(?:\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'\-]{1,}){0,4})/iu',
+            '/\b(?:ocorr[eê]ncias?|faltas?|frequ[eê]ncia|boletim|notas?|jornadas?|perfil)\s+(?:(?:da|do|de|sobre)\s+(?:alun[oa]\s+)?|(?:na|no|para\s+[ao])\s+alun[oa]\s+)([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'\-]{1,}(?:\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'\-]{1,}){0,4})/iu',
             $msg,
             $m
         ) === 1) {
             $n = $this->limparNomeAlunoCapturado($m[1]);
             if ($n !== null) {
                 return $n;
+            }
+        }
+        // A identificação explícita tem prioridade sobre preposições soltas da frase.
+        if (preg_match('/\b(?:aluna|aluno)\s+([\p{L}][\p{L}\'\-]*(?:\s+[\p{L}][\p{L}\'\-]*){0,4})/iu', $msg, $m) === 1) {
+            $nome = $this->limparNomeAlunoCapturado($m[1]);
+            if ($nome !== null) {
+                return $nome;
             }
         }
         // "da Maria" / "do João" / "de Pedro Santos"
@@ -3014,29 +3022,20 @@ PROMPT
                 return $cand;
             }
         }
-        // "aluno Nome" / "para Nome" (sem acionar busca de RA)
-        if (preg_match('/\b(?:aluna|aluno)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s]{1,60})/u', $msg, $m3) === 1) {
-            $n = $this->limparNomeAlunoCapturado(
-                preg_replace('/\s+(?:da|do|de|no|na|para|com|por|sobre|RA)\b.*$/iu', '', $m3[1]) ?? $m3[1]
-            );
-            if ($n !== null && preg_match('/^(ess[ae]|est[ae]|el[ae])$/iu', $n) !== 1) {
-                return $n;
-            }
-        }
         return null;
     }
 
     private function limparNomeAlunoCapturado(string $bruto): ?string
     {
         $nome = trim($bruto);
-        $nome = preg_replace('/\s+(?:(?:da|do|na|no)\s+turma\b|(?:em|no|na)\s+(?:ano|bimestre|per[ií]odo)\b|hoje\b|ontem\b|amanh[aã]\b|em$|no$|na$).*$/iu', '', $nome) ?? $nome;
+        $nome = preg_replace('/\s+(?:(?:da|do|na|no)\s+turma\b|(?:em|no|na|do|da|neste|nesta)\s+(?:(?:[uú]ltim[oa]|primeir[oa]|segund[oa])\s+)?(?:ano|bimestre|trimestre|per[ií]odo|m[eê]s|semana)\b|(?:hoje|ontem|amanh[aã]|desde|at[eé])\b|(?:tem|teve|possui)\s+(?:alguma?s?\s+)?ocorr[eê]ncias?\b|(?:em|no|na|do|da|de|com)$).*$/iu', '', $nome) ?? $nome;
         $nome = preg_replace('/[?.!,;:]+$/u', '', $nome) ?? $nome;
         $nome = trim($nome);
         if ($nome === '' || preg_match('/^(ela|ele|dessa|deste|desse|aluno|aluna|turma|sala|escola)$/iu', $nome) === 1) {
             return null;
         }
         // Evita capturar "ocorrencia" / palavras comuns como nome.
-        if (preg_match('/^(ocorr|falta|boletim|nota|jornada|prova|frequ)/iu', $nome) === 1) {
+        if (preg_match('/^(ocorr|falta|boletim|nota|jornada|prova|frequ|(?:saber|ver|consultar|listar|mostrar|que|no|na|em|ess[ea]|est[ea]|mesm[oa])\b)/iu', $nome) === 1) {
             return null;
         }
         return $nome;
@@ -3114,7 +3113,9 @@ PROMPT
         }
         if (in_array($tool, ['faltas_aluno', 'ocorrencias_aluno', 'boletim_aluno', 'notas_evento_aluno', 'nota_evento_sigla', 'perfil_aluno_360', 'propor_entrada_saida', 'propor_chamada_aula'], true)) {
             $aluno = $this->resolverArgsAlunoParaConsulta($pedido, []);
-            if (!empty($aluno['ra']) || !empty($aluno['aluno_id']) || (!empty($aluno['turma']) && !empty($aluno['aluno_nome']))) {
+            if (!empty($aluno['ra']) || !empty($aluno['aluno_id'])
+                || (!empty($aluno['aluno_nome']) && (!empty($aluno['turma']) || $tool === 'ocorrencias_aluno'))
+            ) {
                 unset($args['aluno_id'], $args['aluno_ra'], $args['ra'], $args['aluno_nome'], $args['nome'], $args['termo'], $args['alunos'], $args['alunos_ids'], $args['aluno_ids']);
                 if (!empty($aluno['turma'])) {
                     unset($args['turma_nome'], $args['turma_id']);
