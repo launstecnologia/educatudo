@@ -97,8 +97,9 @@ $fmtNota = static function ($c): string {
             $hrefFicha = isset($hrefAba) && is_callable($hrefAba)
                 ? $hrefAba('boletim', ['ficha_id' => (int) $f['id']])
                 : ($base . '?aba=boletim&ficha_id=' . (int) $f['id']);
+            // text-primary = cor do texto SOBRE o botão (branco na Colag) — some no fundo claro.
             $classeAba = $fichaAtiva
-                ? 'border-primary text-primary'
+                ? 'border-accent text-gray-900'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300';
         ?>
         <?php if (!$pillComLink): ?>
@@ -108,11 +109,11 @@ $fmtNota = static function ($c): string {
            class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 <?= $classeAba ?>"
            <?= $fichaAtiva ? 'aria-current="page"' : '' ?>>
         <?php endif; ?>
-            <span><?= $esc($abaRotulo) ?></span>
+            <span class="<?= $fichaAtiva ? 'text-gray-900' : '' ?>"><?= $esc($abaRotulo !== '' ? $abaRotulo : ($ehExtra ? 'Itinerário / Extra' : 'Boletim')) ?></span>
             <?php if ($ehExtra): ?>
             <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide <?= $fichaAtiva ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600' ?>">Extra</span>
             <?php endif; ?>
-            <span class="text-xs <?= $fichaAtiva ? 'text-primary/70' : 'text-gray-400' ?>"><?= (int) ($f['ano_letivo'] ?? 0) ?></span>
+            <span class="text-xs <?= $fichaAtiva ? 'text-gray-500' : 'text-gray-400' ?>"><?= (int) ($f['ano_letivo'] ?? 0) ?></span>
         <?php if (!$pillComLink): ?></span><?php else: ?></a><?php endif; ?>
     <?php endforeach; ?>
     </nav>
@@ -166,7 +167,13 @@ $fmtNota = static function ($c): string {
             <?php if ($ficha): ?>
             <a href="<?= $base ?>/pdf?ficha_id=<?= (int) $ficha['id'] ?>" download class="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium hover:bg-gray-50">Baixar boletim (PDF)</a>
             <?php endif; ?>
-            <?php if ($ficha && $editavelFicha): ?>
+            <?php
+            // Sync copia do boletim já gerado — permitido mesmo com células só leitura (Vida do Aluno).
+            $podeSincronizar = $ficha
+                && !$fichaHomologada
+                && !empty($admin_permissions['vida_escolar']['alterar']);
+            ?>
+            <?php if ($podeSincronizar): ?>
             <form method="post" action="<?= $base ?>/alimentar">
                 <input type="hidden" name="_token" value="<?= $esc($token) ?>">
                 <input type="hidden" name="periodo_ref" value="">

@@ -2216,11 +2216,20 @@ class ProntuarioVidaEscolarService
             $boletimFin = is_array($modelo)
                 ? ((($modelo['finalidade'] ?? '') === 'complementar') ? 'complementar' : 'oficial')
                 : ($finalidadePref === 'complementar' ? 'complementar' : 'oficial');
-            $turmaNome = trim((string) ($f['turma_nome'] ?? 'turma'));
+            $turmaNome = trim((string) ($f['turma_nome'] ?? ''));
+            if ($turmaNome === '') {
+                $turmaNome = 'turma';
+            }
             $f['curso_tipo'] = $cursoTipo;
             $f['boletim_nome'] = $boletimNome;
             $f['boletim_finalidade'] = $boletimFin;
-            $f['aba_rotulo'] = $boletimNome !== '' ? $boletimNome : $turmaNome;
+            if ($boletimNome !== '') {
+                $f['aba_rotulo'] = $boletimNome;
+            } elseif ($cursoTipo === 'extra' || $boletimFin === 'complementar') {
+                $f['aba_rotulo'] = 'Itinerário / Extra' . ($turmaNome !== 'turma' ? ' · ' . $turmaNome : '');
+            } else {
+                $f['aba_rotulo'] = $turmaNome;
+            }
             $out[] = $f;
         }
 
