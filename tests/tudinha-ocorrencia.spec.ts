@@ -21,6 +21,7 @@ async function novaConversaAssistente(page: Page): Promise<void> {
   await expect(page.locator('#assistente-input')).toBeEnabled({
     timeout: 20_000,
   });
+  await expect(page.getByText('Carregando conversa…', { exact: true })).toBeHidden();
   const nova = page.locator('#assistente-nova-conversa');
   const criada = page.waitForResponse(res => res.url().endsWith('/conversas/criar') && res.ok());
   await nova.click();
@@ -49,9 +50,36 @@ test.describe('Tudinha ocorrência', () => {
     await mensagens.getByRole('button', { name: 'Leve', exact: true }).click();
     await mensagens.getByRole('button', { name: 'Não, só essa pessoa', exact: true }).click();
     await expect(mensagens.getByRole('button', { name: 'Confirmar', exact: true })).toHaveCount(0);
-    await mensagens.getByRole('button', { name: 'Sim, notificar pais', exact: true }).click();
+    await expect(page.locator('#assistente-input')).toBeEnabled();
+    const resposta = page.waitForResponse(res => res.url().endsWith('/mensagem-stream') && res.ok()
+      && new URLSearchParams(res.request().postData() ?? '').get('mensagem') === 'não');
+    await mensagens.getByRole('button', { name: 'Não notificar', exact: true }).click();
     await expect(mensagens.getByRole('button', { name: 'Confirmar', exact: true })).toBeVisible({ timeout: 60_000 });
     await expect(mensagens.getByText(/RASCUNHO/i).first()).toBeVisible();
+    const stream = await (await resposta).text();
+    const eventoFinal = stream.match(/^event: done\r?\ndata: (.+)$/m);
+    expect(eventoFinal).not.toBeNull();
+    const painel = JSON.parse(eventoFinal![1]).painel;
+    expect(painel.tipo).toBe('proposta');
+    expect([0, false]).toContain(painel.payload.enviar_pais);
+  });
+
+  test('aproveita os dados já informados e usa a descrição quando o título é provisório', async ({ page }) => {
+    await loginAdmin(page);
+    await novaConversaAssistente(page);
+    const resposta = page.waitForResponse(res => res.url().endsWith('/mensagem-stream') && res.ok());
+    await enviar(page, 'Criar ocorrência RA 24254; categoria: Comportamento / convivência; descrição: Conversou durante toda a explicação; título: aguardando descrição; gravidade leve; sem outros envolvidos; sem notificar os responsáveis.');
+    const stream = await (await resposta).text();
+    const eventoFinal = stream.match(/^event: done\r?\ndata: (.+)$/m);
+    expect(eventoFinal).not.toBeNull();
+    const painel = JSON.parse(eventoFinal![1]).painel;
+    expect(painel?.tipo).toBe('proposta');
+    expect(painel.payload).toMatchObject({
+      titulo: 'Conversou durante toda a explicação',
+      detalhe: 'Conversou durante toda a explicação',
+      nivel_gravidade: 'leve',
+      enviar_pais: 0,
+    });
   });
 
   test('fluxo por nome completo pede categoria sem rascunho vazio', async ({ page }) => {

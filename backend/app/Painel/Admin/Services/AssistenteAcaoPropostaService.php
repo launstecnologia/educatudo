@@ -154,9 +154,6 @@ class AssistenteAcaoPropostaService
         ) {
             $detalhe = $titulo;
         }
-        if ($this->textoOcorrenciaEhPlaceholder($titulo)) {
-            $titulo = '';
-        }
         if (
             $this->textoOcorrenciaEhPlaceholder($detalhe)
             || (
@@ -166,11 +163,14 @@ class AssistenteAcaoPropostaService
         ) {
             $detalhe = '';
         }
-        if ($titulo === '' || $detalhe === '' || $nivel === '') {
-            return ['ok' => false, 'error' => 'Informe titulo, detalhe e nivel_gravidade (leve|moderado|grave).'];
+        if ($detalhe === '') {
+            return ['ok' => false, 'error' => 'Descreva o que aconteceu na ocorrência.', 'campo_invalido' => 'detalhe'];
+        }
+        if ($this->textoOcorrenciaEhPlaceholder($titulo)) {
+            $titulo = mb_substr($detalhe, 0, 120);
         }
         if (!isset(Ocorrencia::GRAVIDADES[$nivel])) {
-            return ['ok' => false, 'error' => 'Gravidade inválida. Use leve, moderado ou grave.'];
+            return ['ok' => false, 'error' => 'Informe a gravidade: leve, moderado ou grave.', 'campo_invalido' => 'gravidade'];
         }
         if (strtotime($data) === false) {
             return ['ok' => false, 'error' => 'Data da ocorrência inválida.'];

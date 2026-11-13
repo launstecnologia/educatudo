@@ -3976,14 +3976,24 @@ PROMPT
                 . '**. Revise o título, a descrição, a data/hora e os envolvidos abaixo e confirme.';
         } elseif (!empty($resultado['candidatos'])) {
             $texto = trim((string) ($resultado['aviso'] ?? 'Há mais de um aluno. Escolha um:'));
-        } elseif (
-            $tipo === 'criar_ocorrencia'
-            && empty($resultado['ok'])
-            && empty($resultado['candidatos_categorias'])
-            && preg_match('/titulo|detalhe|nivel_gravidade|categoria/iu', (string) ($resultado['error'] ?? '')) === 1
-        ) {
-            // Erro técnico de validação → pede campos em linguagem humana (não vaza "Informe titulo…").
+        } elseif ($tipo === 'criar_ocorrencia' && ($resultado['campo_invalido'] ?? '') === 'detalhe') {
+            $args['detalhe'] = '';
+            $args['titulo'] = '';
             return $this->pedirCamposOcorrencia($args, $mensagemUsuario, $mensagens, $onStatus);
+        } elseif ($tipo === 'criar_ocorrencia' && ($resultado['campo_invalido'] ?? '') === 'gravidade') {
+            $args['nivel_gravidade'] = '';
+            $args['nivel_gravidade_explicito'] = false;
+            return $this->pedirCamposOcorrencia($args, $mensagemUsuario, $mensagens, $onStatus);
+        } elseif ($tipo === 'criar_ocorrencia' && !empty($resultado['candidatos_categorias'])) {
+            $args['categoria'] = '';
+            unset($args['categoria_nome'], $args['categoria_id']);
+            return $this->pedirCamposOcorrencia(
+                $args,
+                $mensagemUsuario,
+                $mensagens,
+                $onStatus,
+                $resultado['candidatos_categorias']
+            );
         } else {
             $texto = trim((string) ($resultado['error'] ?? $resultado['aviso'] ?? ''));
             if ($texto === '') {
@@ -4320,15 +4330,18 @@ PROMPT
         $enviarPais = array_key_exists('enviar_pais', $args)
             ? !empty($args['enviar_pais'])
             : (array_key_exists('ocorrencia_pais', $ctx) ? (bool) $ctx['ocorrencia_pais'] : false);
-        if (preg_match('/\b(n[aã]o\s+)?(notificar|avisar|enviar).{0,20}pais\b/iu', $textoHist, $mPais) === 1) {
+        $textoNotificacao = $paisExplicito ? $mensagemUsuario : $textoHist;
+        if (preg_match('/\b((?:n[aã]o|nunca)\s+(?:(?:quero|precisa|preciso|deve|pode|[eé]\s+(?:para|pra))\s+)?|sem\s+)?(?:notificar|avisar|enviar(?:\s+aviso)?)\s+(?:(?:os|aos|para\s+os)\s+)?(?:pais|respons[aá]veis)\b/iu', $textoNotificacao, $mPais) === 1) {
             $enviarPais = empty($mPais[1]);
-            $paisExplicito = true;
-        } elseif (preg_match('/\b(sem\s+notificar|nao\s+avisar\s+os\s+pais)\b/iu', $textoHist) === 1) {
-            $enviarPais = false;
             $paisExplicito = true;
         }
 
         $envolvidosOk = !empty($args['envolvidos_ok']) || !empty($ctx['ocorrencia_envolvidos_ok']);
+        if ($this->pedidoPareceRegistroEscrita($mensagemUsuario)
+            && preg_match('/\b(?:sem\s+(?:mais\s+|outros?\s+)?envolvidos|n[aã]o\s+h[aá]\s+(?:mais\s+|outros?\s+)?envolvidos|s[oó]\s+(?:essa\s+pessoa|ess[ae]\s+alun[oa]|el[ae]))\b/iu', $mensagemUsuario) === 1
+        ) {
+            $envolvidosOk = true;
+        }
         // Só marca envolvidos_ok a partir da mensagem curta do usuário (não da descrição).
         $msgEnvolvidos = trim($mensagemUsuario);
         if (preg_match('/^(n[aã]o|nao)([,.\s].*)?$/iu', $msgEnvolvidos) === 1
@@ -4587,7 +4600,7 @@ PROMPT
      * @param callable|null $onStatus
      * @return array{tool?:?string,resultado?:?array,consulta?:array,texto?:string}
      */
-    private function pedirCamposOcorrencia(array $args, string $mensagemUsuario, array $mensagens, $onStatus = null): array
+    private function pedirCamposOcorrencia(array $args, string $mensagemUsuario, array $mensagens, $onStatus = null, ?array $categorias = null): array
     {
         $cat = trim((string) ($args['categoria'] ?? $args['categoria_nome'] ?? ''));
         $detalhe = trim((string) ($args['detalhe'] ?? ''));
@@ -4638,7 +4651,7 @@ PROMPT
             if ($onStatus !== null) {
                 $onStatus('Buscando categorias…');
             }
-            $lista = $this->acoes->listarCategoriasOcorrencia();
+            $lista = $categorias ?? $this->acoes->listarCategoriasOcorrencia();
             $texto = 'Vamos registrar a ocorrência de **' . $nomeAluno . '**. '
                 . 'Qual a **categoria**? Você pode **digitar** (ex.: Conversa) ou escolher uma sugestão abaixo.';
             return [
@@ -4704,7 +4717,7 @@ PROMPT
         }
 
         return [
-            'texto' => 'Ainda faltam dados para montar a proposta. Informe categoria, descrição, gravidade e se notifica os pais.',
+            'texto' => 'Não consegui preparar o rascunho da ocorrência. Tente novamente.',
         ];
     }
 
