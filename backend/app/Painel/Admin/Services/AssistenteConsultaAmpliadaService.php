@@ -2353,6 +2353,13 @@ class AssistenteConsultaAmpliadaService
         $turma = trim((string) ($filtros['turma_nome'] ?? $filtros['turma'] ?? ''));
         $ra = trim((string) ($filtros['ra'] ?? $filtros['aluno_ra'] ?? ''));
         $nome = trim((string) ($filtros['aluno_nome'] ?? $filtros['nome'] ?? $filtros['termo'] ?? ''));
+        if ($ra !== '' && preg_match('/\d/', $ra) !== 1) {
+            // RA sempre tem dígito; sem dígito é nome.
+            if ($nome === '') {
+                $nome = $ra;
+            }
+            $ra = '';
+        }
         if ($ra === '' && $nome !== '') {
             $ra = (string) ($this->alunos->extrairCodigoRa($nome) ?? '');
         }

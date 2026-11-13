@@ -3,36 +3,36 @@
 namespace App\Agentes;
 
 /**
- * EducaTudo - seleção de modelo por nível/papel pro motor de questões.
- * GPT-5.6 (família Sol/Terra/Luna, OpenAI, lançada em 07/2026) — endpoint
- * chat/completions compatível, mesma integração já usada em OpenAIService,
- * só troca a string do model.
+ * EducaTudo - seleção de modelo por nível/papel.
+ * Família OpenAI atual: GPT-6 Astra (topo) e GPT-5.6 Sol/Terra/Luna.
+ * Endpoint chat/completions compatível — só troca a string do model.
  */
 class ModeloIA
 {
+    /** Topo de linha — tarefas exigentes (assistente EducaSync, revisão crítica). */
+    public const ASTRA = 'gpt-6-astra';
     public const REVISAO = 'gpt-5.6-terra';
-    public const REVISAO_CRITICA = 'gpt-5.6-sol';
+    public const REVISAO_CRITICA = 'gpt-6-astra';
 
     public static function porDificuldade(string $dificuldade): string
     {
         return match ($dificuldade) {
             'facil' => 'gpt-5.6-luna',
-            'desafio' => 'gpt-5.6-sol',
+            'desafio' => self::ASTRA,
             default => 'gpt-5.6-terra', // medio, dificil
         };
     }
 
     /**
-     * Modelos "de raciocínio" (GPT-5.x, o1, o3) rejeitam o parâmetro
+     * Modelos "de raciocínio" (GPT-5.x/6.x, o1, o3) rejeitam o parâmetro
      * `max_tokens` do chat/completions clássico — exigem
      * `max_completion_tokens` no lugar (HTTP 400 "Unsupported parameter"
      * caso contrário). Lista por prefixo, não é exaustiva — revisitar a
-     * cada modelo novo lançado pela OpenAI (ex.: um futuro gpt-6/o4
-     * também tende a precisar disso).
+     * cada modelo novo lançado pela OpenAI.
      */
     public static function exigeMaxCompletionTokens(string $modelo): bool
     {
-        return (bool) preg_match('/^(gpt-5|o1|o3)/', $modelo);
+        return (bool) preg_match('/^(gpt-5|gpt-6|o1|o3)/', $modelo);
     }
 
     /**
@@ -67,16 +67,16 @@ class ModeloIA
 
     /**
      * Modelo pra tentar de novo quando a chamada original vier com HTTP 401
-     * "insufficient permissions" — sinal de que a conta/organização OpenAI
-     * ainda não tem acesso liberado àquele modelo específico (comum em
-     * lançamentos novos, exige verificação de organização). gpt-5.6-sol é o
-     * mais recente/restrito da família; cai pro gpt-5.6-terra, que já se
-     * mostrou acessível. Retorna null quando não há fallback definido pro
-     * modelo (não insiste indefinidamente).
+     * "insufficient permissions" — conta/organização sem acesso ao modelo.
+     * Cadeia: Astra → Sol → Terra. Retorna null quando não há próximo fallback.
      */
     public static function modeloFallback(string $modelo): ?string
     {
-        return $modelo === 'gpt-5.6-sol' ? 'gpt-5.6-terra' : null;
+        return match ($modelo) {
+            self::ASTRA => 'gpt-5.6-sol',
+            'gpt-5.6-sol' => 'gpt-5.6-terra',
+            default => null,
+        };
     }
 }
 

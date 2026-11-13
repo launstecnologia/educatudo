@@ -10,6 +10,7 @@ use App\Core\Database;
 class AssistenteHistoricoService
 {
     private $db;
+    private ?bool $estadoPronto = null;
 
     public function __construct()
     {
@@ -275,7 +276,7 @@ class AssistenteHistoricoService
      *
      * @return list<array{role:string,content:string,proposta_id?:int}>
      */
-    public function historicoParaLlm(int $usuarioId, int $conversaId, int $limite = 12): array
+    public function historicoParaLlm(int $usuarioId, int $conversaId, int $limite = 12, bool $somenteTexto = false): array
     {
         $conv = $this->obterConversa($usuarioId, $conversaId);
         if ($conv === null) {
@@ -284,7 +285,7 @@ class AssistenteHistoricoService
         $out = [];
         $alunoIdConv = isset($conv['aluno_id']) ? (int) $conv['aluno_id'] : 0;
         $alunoNomeConv = trim((string) ($conv['aluno_nome'] ?? ''));
-        if ($alunoIdConv > 0) {
+        if ($alunoIdConv > 0 && !$somenteTexto) {
             $out[] = [
                 'role' => 'user',
                 'content' => '[contexto_conversa] aluno_id=' . $alunoIdConv
@@ -304,7 +305,12 @@ class AssistenteHistoricoService
             if ($role !== 'user' && $role !== 'assistant') {
                 continue;
             }
-            if ($role === 'assistant' && !empty($m['painel']) && is_array($m['painel'])) {
+            if ($role === 'assistant' && $somenteTexto && !empty($m['painel']['tipo'])) {
+                $alunoPainel = trim((string) ($m['painel']['aluno']['nome'] ?? ''));
+                $content = trim($content . ' (painel exibido: ' . (string) $m['painel']['tipo']
+                    . ($alunoPainel !== '' ? ' — ' . $alunoPainel : '') . ')');
+            }
+            if ($role === 'assistant' && !$somenteTexto && !empty($m['painel']) && is_array($m['painel'])) {
                 $resumo = $this->resumoPainelParaLlm($m['painel']);
                 if ($resumo !== '') {
                     $content = ($content !== '' ? $content . "\n\n" : '') . $resumo;
@@ -515,6 +521,62 @@ class AssistenteHistoricoService
     public function pertenceAoUsuario(int $usuarioId, int $conversaId): bool
     {
         return $this->obterCabecalho($usuarioId, $conversaId) !== null;
+    }
+
+    /** Coluna estado_json (migration 2026_11_13_assistente_estado_conversa). */
+    public function estadoPronto(): bool
+    {
+        if ($this->estadoPronto !== null) {
+            return $this->estadoPronto;
+        }
+        try {
+            $r = $this->db->fetch(
+                'SELECT 1 AS ok FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = :t AND column_name = :c LIMIT 1',
+                ['t' => 'assistente_conversas', 'c' => 'estado_json']
+            );
+            $this->estadoPronto = !empty($r);
+        } catch (\Throwable $e) {
+            $this->estadoPronto = false;
+        }
+        return $this->estadoPronto;
+    }
+
+    /** @return array<string,mixed> */
+    public function obterEstado(int $usuarioId, int $conversaId): array
+    {
+        if ($usuarioId <= 0 || $conversaId <= 0 || !$this->tabelasProntas() || !$this->estadoPronto()) {
+            return [];
+        }
+        $r = $this->db->fetch(
+            'SELECT estado_json FROM assistente_conversas
+             WHERE id = :id AND usuario_id = :uid AND deleted_at IS NULL
+             LIMIT 1',
+            ['id' => $conversaId, 'uid' => $usuarioId]
+        );
+        if (!$r || empty($r['estado_json'])) {
+            return [];
+        }
+        $dec = json_decode((string) $r['estado_json'], true);
+        return is_array($dec) ? $dec : [];
+    }
+
+    /** @param array<string,mixed> $estado */
+    public function salvarEstado(int $usuarioId, int $conversaId, array $estado): bool
+    {
+        if ($usuarioId <= 0 || $conversaId <= 0 || !$this->tabelasProntas() || !$this->estadoPronto()) {
+            return false;
+        }
+        $json = json_encode($estado, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($json === false || strlen($json) > 60000) {
+            return false;
+        }
+        $this->db->query(
+            'UPDATE assistente_conversas SET estado_json = :estado
+             WHERE id = :id AND usuario_id = :uid AND deleted_at IS NULL',
+            ['estado' => $json, 'id' => $conversaId, 'uid' => $usuarioId]
+        );
+        return true;
     }
 
     /** Escapa aspas/quebras para tokens de contexto no histórico (regex "([^"]+)"). */

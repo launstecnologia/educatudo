@@ -22,6 +22,7 @@ use App\Painel\Admin\Models\AssistenteProposta;
  */
 class AssistenteAcaoPropostaService
 {
+    public const AVISO_SEM_CATEGORIAS = 'Não há categorias de ocorrência ativas nesta escola. Cadastre ou ative uma categoria em Secretaria → Ocorrências para continuar.';
     private const SITUACOES_CHAMADA = [
         'presente',
         'falta',
@@ -77,6 +78,11 @@ class AssistenteAcaoPropostaService
             'id' => (int) $c['id'],
             'nome' => (string) ($c['nome'] ?? ''),
         ], $this->ocorrenciaModel->categorias(true));
+    }
+
+    public function exigeCategoriaDeOcorrencia(): bool
+    {
+        return $this->ocorrenciaModel->schemaEstendido();
     }
 
     /**
@@ -198,7 +204,7 @@ class AssistenteAcaoPropostaService
             if ($lista === []) {
                 return [
                     'ok' => false,
-                    'error' => 'Não há categorias de ocorrência cadastradas nesta escola. Cadastre em Ocorrências antes de registrar pelo assistente.',
+                    'error' => self::AVISO_SEM_CATEGORIAS,
                 ];
             }
 

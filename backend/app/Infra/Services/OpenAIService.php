@@ -3054,19 +3054,30 @@ You MUST respond with a valid JSON object only, no other text, with exactly thes
                 $response = $this->fazerRequisicao($requestData, 3, 0, 'chat_completion');
             } catch (\Exception $e) {
                 // HTTP 401 "insufficient permissions" = conta/organização sem
-                // acesso liberado a este modelo específico (não é erro
-                // transitório, retentar o mesmo modelo não resolve) — cai
-                // pro modelo de fallback definido em ModeloIA, se houver.
-                $modeloFallback = \App\Agentes\ModeloIA::modeloFallback($modelo);
-                if ($modeloFallback !== null && str_contains($e->getMessage(), 'Erro HTTP 401')) {
-                    error_log("OpenAIService: {$modelo} sem permissão (401), tentando fallback {$modeloFallback}");
-                    // Todo modelo com fallback definido hoje é da mesma família
-                    // gpt-5.x (mesmas regras de max_completion_tokens/temperature
-                    // já aplicadas acima) — só troca o nome do modelo.
-                    $requestData['model'] = $modeloFallback;
-                    $response = $this->fazerRequisicao($requestData, 3, 0, 'chat_completion');
-                } else {
+                // acesso ao modelo — percorre a cadeia Astra → Sol → Terra.
+                if (!str_contains($e->getMessage(), 'Erro HTTP 401')) {
                     throw $e;
+                }
+                $modeloAtual = $modelo;
+                $ultimoErro = $e;
+                $response = null;
+                while (($modeloFallback = \App\Agentes\ModeloIA::modeloFallback($modeloAtual)) !== null) {
+                    error_log("OpenAIService: {$modeloAtual} sem permissão (401), tentando fallback {$modeloFallback}");
+                    $requestData['model'] = $modeloFallback;
+                    try {
+                        $response = $this->fazerRequisicao($requestData, 3, 0, 'chat_completion');
+                        $ultimoErro = null;
+                        break;
+                    } catch (\Exception $eFallback) {
+                        $ultimoErro = $eFallback;
+                        if (!str_contains($eFallback->getMessage(), 'Erro HTTP 401')) {
+                            throw $eFallback;
+                        }
+                        $modeloAtual = $modeloFallback;
+                    }
+                }
+                if ($response === null) {
+                    throw $ultimoErro ?? $e;
                 }
             }
             if (!isset($response['choices'][0]['message'])) {
@@ -3114,6 +3125,98 @@ You MUST respond with a valid JSON object only, no other text, with exactly thes
             error_log("Erro no chat completion: " . $e->getMessage());
             throw $e;
         }
+    }
+
+    /**
+     * Chat completion com function calling nativo (tools + tool_calls).
+     *
+     * @param list<array<string,mixed>> $mensagens Mensagens já no formato OpenAI (system/user/assistant/tool)
+     * @param list<array<string,mixed>> $ferramentas Definições `{"type":"function","function":{...}}`
+     * @return array{conteudo:string,tool_calls:list<array{id:string,nome:string,args:array<string,mixed>,args_brutos:string}>,tokens_usados:int,modelo:string}
+     */
+    public function chatCompletionComFerramentas(
+        array $mensagens,
+        array $ferramentas,
+        string $modelo,
+        int $maxTokens = 2000,
+        float $temperatura = 0.2
+    ): array {
+        $requestData = [
+            'model' => $modelo,
+            'messages' => $mensagens,
+        ];
+        if ($ferramentas !== []) {
+            $requestData['tools'] = $ferramentas;
+            $requestData['tool_choice'] = 'auto';
+            $requestData['parallel_tool_calls'] = false;
+        }
+        if (\App\Agentes\ModeloIA::exigeMaxCompletionTokens($modelo)) {
+            $requestData['max_completion_tokens'] = $maxTokens;
+            // chat/completions só aceita function tools nessa família com raciocínio desligado.
+            if ($ferramentas !== []) {
+                $requestData['reasoning_effort'] = 'none';
+            }
+        } else {
+            $requestData['max_tokens'] = $maxTokens;
+        }
+        if (\App\Agentes\ModeloIA::aceitaTemperaturaCustomizada($modelo)) {
+            $requestData['temperature'] = $temperatura;
+        }
+
+        try {
+            $response = $this->fazerRequisicao($requestData, 3, 0, 'chat_completion_tools');
+        } catch (\Exception $e) {
+            if (!str_contains($e->getMessage(), 'Erro HTTP 401')) {
+                throw $e;
+            }
+            $modeloAtual = $modelo;
+            $response = null;
+            $ultimoErro = $e;
+            while (($modeloFallback = \App\Agentes\ModeloIA::modeloFallback($modeloAtual)) !== null) {
+                error_log("OpenAIService: {$modeloAtual} sem permissão (401), tentando fallback {$modeloFallback}");
+                $requestData['model'] = $modeloFallback;
+                try {
+                    $response = $this->fazerRequisicao($requestData, 3, 0, 'chat_completion_tools');
+                    break;
+                } catch (\Exception $eFallback) {
+                    $ultimoErro = $eFallback;
+                    if (!str_contains($eFallback->getMessage(), 'Erro HTTP 401')) {
+                        throw $eFallback;
+                    }
+                    $modeloAtual = $modeloFallback;
+                }
+            }
+            if ($response === null) {
+                throw $ultimoErro;
+            }
+        }
+
+        $mensagem = $response['choices'][0]['message'] ?? null;
+        if (!is_array($mensagem)) {
+            throw new \Exception('Resposta inválida da OpenAI');
+        }
+
+        $chamadas = [];
+        foreach ((array) ($mensagem['tool_calls'] ?? []) as $tc) {
+            if (!is_array($tc) || ($tc['type'] ?? 'function') !== 'function') {
+                continue;
+            }
+            $brutos = (string) ($tc['function']['arguments'] ?? '{}');
+            $args = json_decode($brutos, true);
+            $chamadas[] = [
+                'id' => (string) ($tc['id'] ?? ''),
+                'nome' => (string) ($tc['function']['name'] ?? ''),
+                'args' => is_array($args) ? $args : [],
+                'args_brutos' => $brutos,
+            ];
+        }
+
+        return [
+            'conteudo' => (string) ($mensagem['content'] ?? ''),
+            'tool_calls' => $chamadas,
+            'tokens_usados' => (int) ($response['usage']['total_tokens'] ?? 0),
+            'modelo' => (string) ($requestData['model'] ?? $modelo),
+        ];
     }
     
     /**

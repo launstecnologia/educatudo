@@ -1,0 +1,141 @@
+{
+  "estados": {
+    "ana": {
+      "aluno_ativo": {"id": 3, "nome": "Ana Luiza Prado", "ra": "24999", "turma_nome": "2ª B"}
+    },
+    "coleta_categoria": {
+      "aluno_ativo": {"id": 4, "nome": "João Silva", "ra": "11111", "turma_nome": "1ª A"},
+      "fluxo": "criar_ocorrencia",
+      "rascunho": {"aluno": {"id": 4, "nome": "João Silva", "ra": "11111", "turma_nome": "1ª A"}}
+    },
+    "coleta_gravidade": {
+      "aluno_ativo": {"id": 4, "nome": "João Silva", "ra": "11111", "turma_nome": "1ª A"},
+      "fluxo": "criar_ocorrencia",
+      "rascunho": {
+        "aluno": {"id": 4, "nome": "João Silva", "ra": "11111", "turma_nome": "1ª A"},
+        "categoria": "Comportamento",
+        "detalhe": "Conversou durante toda a explicação e não parou quando o professor pediu."
+      }
+    },
+    "coleta_envolvidos": {
+      "aluno_ativo": {"id": 4, "nome": "João Silva", "ra": "11111", "turma_nome": "1ª A"},
+      "fluxo": "criar_ocorrencia",
+      "rascunho": {
+        "aluno": {"id": 4, "nome": "João Silva", "ra": "11111", "turma_nome": "1ª A"},
+        "categoria": "Comportamento",
+        "detalhe": "Brigou com colegas no intervalo.",
+        "nivel_gravidade": "grave"
+      }
+    },
+    "coleta_pais": {
+      "aluno_ativo": {"id": 4, "nome": "João Silva", "ra": "11111", "turma_nome": "1ª A"},
+      "fluxo": "criar_ocorrencia",
+      "rascunho": {
+        "aluno": {"id": 4, "nome": "João Silva", "ra": "11111", "turma_nome": "1ª A"},
+        "categoria": "Comportamento",
+        "detalhe": "Brigou com colegas no intervalo.",
+        "nivel_gravidade": "grave",
+        "mais_envolvidos": false
+      }
+    },
+    "provas_ana": {
+      "aluno_ativo": {"id": 3, "nome": "Ana Luiza Prado", "ra": "24999", "turma_nome": "2ª B"},
+      "referencias": {"provas": [{"prova_id": 501, "titulo": "Matemática - Bimestral 2", "data": "2026-10-20"}, {"prova_id": 488, "titulo": "Português - Semanal 7", "data": "2026-10-10"}]}
+    }
+  },
+  "casos": [
+    {"id": "oc-01", "frase": "poderia ver as ocorrencias da Maria", "tool": "ocorrencias_aluno", "args": {"aluno_nome": "Maria"}},
+    {"id": "oc-02", "frase": "quero saber quais ocorrências a Maria Clara tem", "tool": "ocorrencias_aluno", "args": {"aluno_nome": "Maria Clara"}},
+    {"id": "oc-03", "frase": "Oi, gostaria de saber se tem ocorrência na aluna Ana Luiza", "tool": "ocorrencias_aluno", "args": {"aluno_nome": "Ana Luiza"}},
+    {"id": "oc-04", "frase": "ocorrências do RA 24254", "tool": "ocorrencias_aluno", "args": {"ra": "24254"}},
+    {"id": "oc-05", "frase": "ela tem ocorrência?", "estado": "ana", "tool": "ocorrencias_aluno", "args": {"aluno_da_conversa": true}},
+    {"id": "oc-06", "frase": "e as ocorrências da Maria?", "estado": "ana", "tool": "ocorrencias_aluno", "args": {"aluno_nome": "Maria"}},
+    {"id": "oc-07", "frase": "o João Silva tem alguma ocorrência aberta?", "tool": "ocorrencias_aluno", "args": {"aluno_nome": "João Silva", "status": "aberta"}},
+    {"id": "oc-08", "frase": "ocorrências da turma 1A", "tool": "ocorrencias_turma", "args": {"turma_nome": "1A"}},
+    {"id": "oc-09", "frase": "quais ocorrências graves teve no 2 ano B?", "tool": "ocorrencias_turma", "args": {"turma_nome": "2", "gravidade": "grave"}},
+    {"id": "oc-10", "frase": "mostra as ocorrências dessa aluna", "estado": "ana", "tool": "ocorrencias_aluno", "args": {"aluno_da_conversa": true}},
+    {"id": "oc-11", "frase": "a Ana Luiza já levou advertência esse ano?", "tool": "ocorrencias_aluno", "args": {"aluno_nome": "Ana Luiza"}},
+    {"id": "oc-12", "frase": "historico disciplinar do joao silva", "tool": "ocorrencias_aluno", "args": {"aluno_nome": "joao silva"}},
+
+    {"id": "cr-01", "frase": "registrar uma ocorrência para o João Silva", "tool": "propor_criar_ocorrencia", "args": {"aluno_nome": "João Silva"}},
+    {"id": "cr-02", "frase": "quero criar ocorrência", "tool": "propor_criar_ocorrencia", "args": {}},
+    {"id": "cr-03", "frase": "abre uma ocorrência pra Maria Clara, ela xingou a professora", "tool": "propor_criar_ocorrencia", "args": {"aluno_nome": "Maria Clara", "detalhe": "xing"}},
+    {"id": "cr-04", "frase": "registra ocorrência leve de comportamento para o RA 11111: conversou durante a prova", "tool": "propor_criar_ocorrencia", "args": {"ra": "11111", "nivel_gravidade": "leve", "categoria": "comportamento", "detalhe": "convers"}},
+    {"id": "cr-05", "frase": "preciso registrar que ele tem batido nos colegas", "estado": "ana", "tool": "propor_criar_ocorrencia", "args": {"aluno_da_conversa": true, "detalhe": "bat"}},
+    {"id": "cr-06", "frase": "lançar ocorrência para essa aluna", "estado": "ana", "tool": "propor_criar_ocorrencia", "args": {"aluno_da_conversa": true}},
+    {"id": "cr-07", "frase": "Comportamento", "estado": "coleta_categoria", "historico": [{"role": "user", "content": "registrar ocorrência do João Silva"}, {"role": "assistant", "content": "Qual a categoria da ocorrência? Pode digitar ou escolher uma sugestão."}], "tool": "propor_criar_ocorrencia", "args": {"categoria": "Comportamento"}},
+    {"id": "cr-08", "frase": "médio", "estado": "coleta_gravidade", "historico": [{"role": "assistant", "content": "Qual o nível: leve, moderado ou grave?"}], "tool": "propor_criar_ocorrencia", "args": {"nivel_gravidade": "moderado"}},
+    {"id": "cr-09", "frase": "grave", "estado": "coleta_gravidade", "historico": [{"role": "assistant", "content": "Qual o nível: leve, moderado ou grave?"}], "tool": "propor_criar_ocorrencia", "args": {"nivel_gravidade": "grave"}},
+    {"id": "cr-10", "frase": "não", "estado": "coleta_envolvidos", "historico": [{"role": "assistant", "content": "Há mais alunos envolvidos?"}], "tool": "propor_criar_ocorrencia", "args": {"mais_envolvidos": false}},
+    {"id": "cr-11", "frase": "sim, o Pedro e a Maria Clara", "estado": "coleta_envolvidos", "historico": [{"role": "assistant", "content": "Há mais alunos envolvidos?"}], "tool": "propor_criar_ocorrencia", "args": {"envolvidos": "Pedro"}},
+    {"id": "cr-12", "frase": "sim", "estado": "coleta_pais", "historico": [{"role": "assistant", "content": "Deseja notificar os responsáveis?"}], "tool": "propor_criar_ocorrencia", "args": {"enviar_pais": true}},
+    {"id": "cr-13", "frase": "não precisa avisar os pais", "estado": "coleta_pais", "historico": [{"role": "assistant", "content": "Deseja notificar os responsáveis?"}], "tool": "propor_criar_ocorrencia", "args": {"enviar_pais": false}},
+    {"id": "cr-14", "frase": "Ele saiu da sala sem permissão e ficou no corredor durante a aula de matemática", "estado": "coleta_gravidade", "historico": [{"role": "assistant", "content": "Descreva o que aconteceu."}], "tool": "propor_criar_ocorrencia", "args": {}},
+
+    {"id": "pv-01", "frase": "na verdade, quais ocorrências o João tem?", "estado": "coleta_gravidade", "historico": [{"role": "assistant", "content": "Qual o nível: leve, moderado ou grave?"}], "tool": "ocorrencias_aluno", "args": {"aluno_nome": "João"}},
+    {"id": "pv-02", "frase": "espera, quantas faltas ele tem?", "estado": "coleta_gravidade", "historico": [{"role": "assistant", "content": "Qual o nível: leve, moderado ou grave?"}], "tool": "faltas_aluno", "args": {}},
+    {"id": "pv-03", "frase": "me mostra o boletim da Maria Clara", "estado": "coleta_pais", "historico": [{"role": "assistant", "content": "Deseja notificar os responsáveis?"}], "tool": "boletim_aluno", "args": {"aluno_nome": "Maria Clara"}},
+
+    {"id": "fa-01", "frase": "quantas faltas tem a Ana Luiza?", "tool": "faltas_aluno", "args": {"aluno_nome": "Ana Luiza"}},
+    {"id": "fa-02", "frase": "frequência do RA 24254 em 2024", "tool": "faltas_aluno", "args": {"ra": "24254", "ano_letivo": 2024}},
+    {"id": "fa-03", "frase": "ela falta muito?", "estado": "ana", "tool": "faltas_aluno", "args": {"aluno_da_conversa": true}},
+    {"id": "fa-04", "frase": "qual a presença do João Silva", "tool": "faltas_aluno", "args": {"aluno_nome": "João Silva"}},
+    {"id": "fa-05", "frase": "e as faltas da Maria?", "estado": "ana", "tool": "faltas_aluno", "args": {"aluno_nome": "Maria"}},
+    {"id": "fa-06", "frase": "o joao ta faltando muito? quero ver a frequencia dele", "tool": "faltas_aluno", "args": {"aluno_nome": "joao"}},
+
+    {"id": "bo-01", "frase": "boletim da Maria Clara", "tool": "boletim_aluno", "args": {"aluno_nome": "Maria Clara"}},
+    {"id": "bo-02", "frase": "boletim RA 24254 de 2024", "tool": "boletim_aluno", "args": {"ra": "24254", "ano_letivo": 2024}},
+    {"id": "bo-03", "frase": "me traz o boletim dela", "estado": "ana", "tool": "boletim_aluno", "args": {"aluno_da_conversa": true}},
+    {"id": "bo-04", "frase": "quadro de notas do João Silva do 1A", "tool": "boletim_aluno", "args": {"aluno_nome": "João Silva"}},
+    {"id": "bo-05", "frase": "boletim do ano passado da Ana Luiza", "tool": "boletim_aluno", "args": {"aluno_nome": "Ana Luiza", "ano_letivo": 2025}},
+
+    {"id": "no-01", "frase": "qual a nota de matemática da Júlia Martiz do 2B?", "tool": "notas_evento_aluno", "args": {"aluno_nome": "Júlia Martiz", "materia": "Matemática"}},
+    {"id": "no-02", "frase": "nota da PP de português da Ana Luiza no 1º bimestre", "tool": "notas_evento_aluno", "args": {"aluno_nome": "Ana Luiza", "coluna": "PP", "bimestre": 1}},
+    {"id": "no-03", "frase": "qual a MU dela em matemática 1?", "estado": "ana", "tool": "notas_evento_aluno", "args": {"aluno_da_conversa": true, "coluna": "MU"}},
+    {"id": "no-04", "frase": "quanto o João tirou de média final em história", "tool": "notas_evento_aluno", "args": {"aluno_nome": "João", "materia": "história"}},
+
+    {"id": "pr-01", "frase": "provas da Ana Luiza", "tool": ["listar_provas_aluno", "resumo_provas_aluno"], "args": {"aluno_nome": "Ana Luiza"}},
+    {"id": "pr-02", "frase": "qual foi a última prova do João Silva?", "tool": "listar_provas_aluno", "args": {"aluno_nome": "João Silva"}},
+    {"id": "pr-03", "frase": "quais questões ela errou na prova de matemática?", "estado": "provas_ana", "tool": "detalhar_prova_aluno", "args": {"aluno_da_conversa": true, "prova_id": 501, "somente_erros": true}},
+    {"id": "pr-04", "frase": "resumo do desempenho em provas da Maria Clara", "tool": "resumo_provas_aluno", "args": {"aluno_nome": "Maria Clara"}},
+    {"id": "pr-05", "frase": "como ela foi nas provas de português?", "estado": "ana", "tool": ["resumo_provas_aluno", "listar_provas_aluno"], "args": {"aluno_da_conversa": true}},
+
+    {"id": "jo-01", "frase": "jornadas da Ana Luiza", "tool": ["resumo_jornadas_aluno", "listar_jornadas_aluno"], "args": {"aluno_nome": "Ana Luiza"}},
+    {"id": "jo-02", "frase": "quais jornadas o João ainda não terminou?", "tool": "listar_jornadas_aluno", "args": {"aluno_nome": "João"}},
+    {"id": "jo-03", "frase": "como estão as trilhas dela?", "estado": "ana", "tool": ["resumo_jornadas_aluno", "listar_jornadas_aluno"], "args": {"aluno_da_conversa": true}},
+
+    {"id": "al-01", "frase": "qual a turma da Maria Clara?", "tool": "buscar_alunos", "args": {"termo": "Maria Clara"}},
+    {"id": "al-02", "frase": "quem é o aluno do RA 24254?", "tool": "buscar_alunos", "args": {"ra": "24254"}},
+    {"id": "al-03", "frase": "perfil completo da Ana Luiza", "tool": "perfil_aluno_360", "args": {"aluno_nome": "Ana Luiza"}},
+    {"id": "al-04", "frase": "me dá uma visão geral do João Silva", "tool": "perfil_aluno_360", "args": {"aluno_nome": "João Silva"}},
+
+    {"id": "tu-01", "frase": "como está a saúde da turma 2 ano B?", "tool": "saude_turma", "args": {"turma_nome": "2"}},
+    {"id": "tu-02", "frase": "resumo de provas do 1A por matéria", "tool": "resumo_provas_turma", "args": {"turma_nome": "1A"}},
+    {"id": "tu-03", "frase": "quais alunos estão sem matrícula esse ano?", "tool": "saude_academica", "args": {}},
+    {"id": "tu-04", "frase": "quais alunos do 2B estão em situação crítica?", "tool": "saude_turma", "args": {"turma_nome": "2B"}},
+
+    {"id": "gr-01", "frase": "qual a aula de hoje do 1A?", "tool": "grade_horaria_consulta", "args": {"turma_nome": "1A"}},
+    {"id": "gr-02", "frase": "grade da professora Ana hoje", "tool": "grade_horaria_consulta", "args": {"professor_nome": "Ana"}},
+    {"id": "di-01", "frase": "quais diários estão atrasados?", "tool": "diario_pendencias", "args": {}},
+    {"id": "di-02", "frase": "pendências de diário do professor Carlos", "tool": "diario_pendencias", "args": {"professor_nome": "Carlos"}},
+
+    {"id": "pf-01", "frase": "resumo das provas do professor Carlos", "tool": "resumo_provas_professor", "args": {"professor_nome": "Carlos"}},
+    {"id": "pf-02", "frase": "quais questões mais erradas na prova do professor Carlos?", "tool": "ranking_erros_prova_professor", "args": {"professor_nome": "Carlos"}},
+    {"id": "pf-03", "frase": "em quais turmas a professora Ana dá aula?", "tool": "listar_turmas_professor", "args": {"professor_nome": "Ana"}},
+    {"id": "pf-04", "frase": "saúde das turmas do professor Carlos", "tool": "saude_turmas_professor", "args": {"professor_nome": "Carlos"}},
+
+    {"id": "bl-01", "frase": "resultados do simulado 1", "tool": ["resultados_bloco", "buscar_blocos"], "args": {"titulo": "simulado"}},
+    {"id": "bl-02", "frase": "quais blocos de prova tem a turma 2B?", "tool": "buscar_blocos", "args": {"turma_nome": "2B"}},
+
+    {"id": "ev-01", "frase": "quais eventos avaliativos existem?", "tool": "listar_eventos_avaliativos", "args": {}},
+
+    {"id": "es-01", "frase": "registrar entrada do João Silva às 7h55", "tool": "propor_entrada_saida", "args": {"aluno_nome": "João Silva", "tipo": "entrada"}},
+    {"id": "es-02", "frase": "a Maria Clara saiu mais cedo agora, registra a saída", "tool": "propor_entrada_saida", "args": {"aluno_nome": "Maria Clara", "tipo": "saida"}},
+    {"id": "ch-01", "frase": "marcar falta para o João Silva na aula de matemática de hoje", "tool": "propor_chamada_aula", "args": {"aluno_nome": "João Silva", "situacao": "falta"}},
+    {"id": "ch-02", "frase": "coloca presença pra ela na chamada de hoje", "estado": "ana", "tool": "propor_chamada_aula", "args": {"aluno_da_conversa": true, "situacao": "presente"}},
+
+    {"id": "co-01", "frase": "oi, tudo bem?", "tool": null, "args": {}},
+    {"id": "co-02", "frase": "o que você consegue fazer?", "tool": null, "args": {}},
+    {"id": "co-03", "frase": "obrigado!", "tool": null, "args": {}}
+  ]
+}

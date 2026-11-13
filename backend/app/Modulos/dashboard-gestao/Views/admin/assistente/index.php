@@ -2125,7 +2125,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
         }
 
         // Remove welcome
-        var welcome = msgs.querySelector('.bg-indigo-50');
+        var welcome = msgs.querySelector('#assistente-welcome');
         if (welcome) welcome.remove();
 
         appendUser(mensagem);
@@ -2219,7 +2219,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 var eShell = appendAssistantShell();
                 eShell.textContent = erro;
             } else if (painelFinal || mensagemFinal) {
-                if (streamBubble && streamBubble.parentNode) streamBubble.parentNode.removeChild(streamBubble);
+                if (streamBubble && streamBubble.parentNode) streamBubble.parentNode.remove();
                 streamBubble = null;
                 var shell = appendAssistantShell();
                 if (painelFinal) renderPainel(shell, painelFinal, mensagemFinal);

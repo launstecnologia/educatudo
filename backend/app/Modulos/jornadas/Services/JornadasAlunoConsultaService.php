@@ -557,6 +557,13 @@ class JornadasAlunoConsultaService
         $alunoNome = trim((string) ($filtros['aluno_nome'] ?? $filtros['nome'] ?? $filtros['termo'] ?? ''));
         $turmaFiltro = trim((string) ($filtros['turma_nome'] ?? $filtros['turma'] ?? ''));
         $ra = trim((string) ($filtros['ra'] ?? $filtros['aluno_ra'] ?? ''));
+        if ($ra !== '' && preg_match('/\d/', $ra) !== 1) {
+            // RA sempre tem dígito; sem dígito é nome.
+            if ($alunoNome === '') {
+                $alunoNome = $ra;
+            }
+            $ra = '';
+        }
         if ($ra === '' && $alunoNome !== '' && method_exists($this->alunos, 'extrairCodigoRa')) {
             $ra = (string) ($this->alunos->extrairCodigoRa($alunoNome) ?? '');
         }

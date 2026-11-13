@@ -140,6 +140,7 @@ class ProvasAlunoAssistenteController extends BaseController
             (int) ($payload['conversa_id'] ?? 0),
             is_array($user) ? $user : null
         );
+        $this->assistente->definirEstadoConversa($payload['estado']);
         $resultado = $this->assistente->processarMensagem(
             $payload['mensagem'],
             $payload['historico']
@@ -147,6 +148,7 @@ class ProvasAlunoAssistenteController extends BaseController
         if (!empty($resultado['success'])) {
             $this->persistirTurno($payload, $resultado);
         }
+        unset($resultado['estado']);
         $this->json($resultado, !empty($resultado['success']) ? 200 : 400);
     }
 
@@ -195,6 +197,7 @@ class ProvasAlunoAssistenteController extends BaseController
             (int) ($payload['conversa_id'] ?? 0),
             is_array($user) ? $user : null
         );
+        $this->assistente->definirEstadoConversa($payload['estado']);
         $resultado = $this->assistente->processarMensagem(
             $payload['mensagem'],
             $payload['historico'],
@@ -323,6 +326,9 @@ class ProvasAlunoAssistenteController extends BaseController
             $payload['mensagem'],
             is_array($resultado['painel'] ?? null) ? $resultado['painel'] : null
         );
+        if (is_array($resultado['estado'] ?? null)) {
+            $this->historico->salvarEstado($userId, $conversaId, $resultado['estado']);
+        }
 
         $conv = $this->historico->obterConversa($userId, $conversaId);
         return [
@@ -331,7 +337,7 @@ class ProvasAlunoAssistenteController extends BaseController
         ];
     }
 
-    /** @return array{mensagem:string,historico:list,conversa_id:int} */
+    /** @return array{mensagem:string,historico:list,conversa_id:int,estado:array} */
     private function lerPayloadMensagem(): array
     {
         $mensagem = trim((string) ($_POST['mensagem'] ?? ''));
@@ -344,9 +350,16 @@ class ProvasAlunoAssistenteController extends BaseController
         $userId = (int) ($user['id'] ?? 0);
 
         $historico = [];
+        $estado = [];
         if ($this->historico->tabelasProntas()) {
             if ($conversaId > 0) {
-                $historico = $this->historico->historicoParaLlm($userId, $conversaId, 12);
+                $historico = $this->historico->historicoParaLlm(
+                    $userId,
+                    $conversaId,
+                    12,
+                    ProvasAlunoAssistenteService::MOTOR_V2
+                );
+                $estado = $this->historico->obterEstado($userId, $conversaId);
             }
             // Com histórico no banco, não aceita historico JSON do cliente.
         } else {
@@ -370,6 +383,7 @@ class ProvasAlunoAssistenteController extends BaseController
             'mensagem' => $mensagem,
             'historico' => $historico,
             'conversa_id' => $conversaId,
+            'estado' => $estado,
         ];
     }
 
