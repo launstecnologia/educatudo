@@ -239,6 +239,75 @@ class ProvasAlunoAssistenteService
             $textoFinal = 'Preparei uma proposta. Revise abaixo e confirme se estiver de acordo.';
         }
 
+        // Conferência server-side por RA/nome: a IA não pode inventar "não encontrei".
+        $identidade = $this->garantirIdentidadeAluno(
+            $mensagemUsuario,
+            $mensagens,
+            $ultimaTool,
+            $ultimoResultado,
+            $onStatus
+        );
+        if (!empty($identidade['consulta'])) {
+            $consultasFeitas[] = $identidade['consulta'];
+        }
+        if (!empty($identidade['tool'])) {
+            $ultimaTool = $identidade['tool'];
+        }
+        if (is_array($identidade['resultado'] ?? null)) {
+            $ultimoResultado = $identidade['resultado'];
+        }
+        if (!empty($identidade['texto'])) {
+            $textoFinal = (string) $identidade['texto'];
+        } elseif (
+            is_array($identidade['resultado']['aluno'] ?? null)
+            && preg_match('/n[aã]o\s+encontrei|n[aã]o\s+achei|nenhum\s+aluno|sem\s+registros/iu', (string) $textoFinal) === 1
+        ) {
+            // IA inventou "não encontrei", mas o RA existe no cadastro.
+            $textoFinal = $this->montarRespostaIdentidadeAluno(
+                $mensagemUsuario,
+                $identidade['resultado']['aluno']
+            );
+            if (($ultimaTool ?? '') === '' || $ultimaTool === null) {
+                $ultimaTool = 'buscar_alunos';
+            }
+        }
+
+        // Pedido de boletim: garante consulta real e nunca afirma quadro/PDF sem conteúdo.
+        if ($this->pedidoPareceBoletim($mensagemUsuario)) {
+            $garantia = $this->garantirConsultaBoletim(
+                $mensagemUsuario,
+                $mensagens,
+                $ultimaTool,
+                $ultimoResultado,
+                $onStatus
+            );
+            $ultimaTool = $garantia['tool'];
+            $ultimoResultado = $garantia['resultado'];
+            if (!empty($garantia['consulta'])) {
+                $consultasFeitas[] = $garantia['consulta'];
+            }
+            $temCandidatosAluno = is_array($ultimoResultado)
+                && !empty($ultimoResultado['candidatos'])
+                && is_array($ultimoResultado['candidatos']);
+            if ($this->boletimTemConteudoExibivel($ultimoResultado)) {
+                $diretaBoletim = $this->montarRespostaDireta($mensagemUsuario, 'boletim_aluno', $ultimoResultado);
+                $textoFinal = $diretaBoletim ?? $textoFinal;
+            } elseif ($temCandidatosAluno) {
+                $textoFinal = trim((string) ($ultimoResultado['aviso'] ?? 'Há mais de um aluno. Escolha um:'));
+            } else {
+                $erroBol = is_array($ultimoResultado)
+                    ? trim((string) ($ultimoResultado['error'] ?? $ultimoResultado['aviso'] ?? ''))
+                    : '';
+                $alunoBol = is_array($ultimoResultado['aluno'] ?? null) ? $ultimoResultado['aluno'] : [];
+                $nomeBol = trim((string) ($alunoBol['nome'] ?? ''));
+                $textoFinal = $erroBol !== ''
+                    ? $erroBol
+                    : ('Não encontrei boletim com notas para exibir'
+                        . ($nomeBol !== '' ? ' d' . $this->artigoDe($nomeBol) . ' ' . $nomeBol : '')
+                        . '. Verifique o RA/turma ou se há regra de boletim no ano letivo.');
+            }
+        }
+
         try {
             $this->debitarCreditos();
         } catch (\Throwable $e) {
@@ -246,6 +315,15 @@ class ProvasAlunoAssistenteService
         }
 
         $painel = $this->montarPainel($ultimaTool, $ultimoResultado);
+        if (
+            $this->pedidoPareceBoletim($mensagemUsuario)
+            && !$this->boletimTemConteudoExibivel($ultimoResultado)
+            && $painel !== null
+            && ($painel['tipo'] ?? '') === 'boletim_aluno'
+        ) {
+            // Sem conteúdo real: não devolve painel fingindo sucesso.
+            $painel = null;
+        }
 
         // Com painel estruturado, evita stream de texto longo/feio — o front renderiza o painel.
         if ($painel === null && $onTextoChunk !== null) {
@@ -1565,6 +1643,10 @@ PROMPT
             }
 
             if ($tool === 'boletim_aluno' && $this->pedidoPareceBoletim($pergunta)) {
+                if (!$this->boletimTemConteudoExibivel($resultado)) {
+                    return 'Não encontrei boletim com notas para exibir d'
+                        . $this->artigoDe($quem) . ' ' . $quem . '.';
+                }
                 $ano = (string) ($resultado['ano_letivo'] ?? '');
                 return 'Boletim d' . $this->artigoDe($quem) . ' **' . $quem . '**'
                     . ($ano !== '' ? ' — ' . $ano : '')
@@ -1586,6 +1668,295 @@ PROMPT
     private function pedidoPareceBoletim(string $pergunta): bool
     {
         return (bool) preg_match('/\bboletim\b|\bquadro\s+de\s+notas\b/iu', $pergunta);
+    }
+
+    private function pedidoPareceIdentidadeAluno(string $pergunta): bool
+    {
+        // Não use só "RA" aqui — senão qualquer pedido com RA vira resposta de identidade.
+        return (bool) preg_match(
+            '/\bturma\b|\bquem\s+(é|e)\b|\bnome\s+d[oa]\b|\bdados\s+d[oa]\b|\bcadastro\b|\b(em\s+)?qual\s+turma\b/iu',
+            $pergunta
+        );
+    }
+
+    /**
+     * Resolve aluno por RA/histórico e responde identidade/turma com dado real.
+     *
+     * @param list<array{role?:string,content?:string}> $mensagens
+     * @param callable|null $onStatus
+     * @return array{tool?:?string,resultado?:?array,consulta?:array,texto?:string}
+     */
+    private function garantirIdentidadeAluno(
+        string $mensagemUsuario,
+        array $mensagens,
+        ?string $ultimaTool,
+        ?array $ultimoResultado,
+        $onStatus = null
+    ): array {
+        $raMsg = $this->extrairRaDaMensagem($mensagemUsuario);
+        $precisaIdentidade = $this->pedidoPareceIdentidadeAluno($mensagemUsuario);
+
+        $alunoJa = is_array($ultimoResultado['aluno'] ?? null) ? $ultimoResultado['aluno'] : null;
+        $listaJa = [];
+        if (is_array($ultimoResultado['alunos'] ?? null)) {
+            $listaJa = $ultimoResultado['alunos'];
+        } elseif (is_array($ultimoResultado['candidatos'] ?? null)) {
+            $listaJa = $ultimoResultado['candidatos'];
+        }
+
+        $aluno = null;
+        $consulta = null;
+        $tool = $ultimaTool;
+        $resultado = $ultimoResultado;
+
+        if (is_array($alunoJa) && (int) ($alunoJa['id'] ?? 0) > 0) {
+            $aluno = $alunoJa;
+        } elseif (count($listaJa) === 1 && (int) ($listaJa[0]['id'] ?? 0) > 0) {
+            $aluno = $listaJa[0];
+        }
+
+        // Se a mensagem traz RA, confere no banco — mesmo que a IA diga que não achou.
+        if ($raMsg !== null && ($aluno === null || (string) ($aluno['ra'] ?? '') !== $raMsg)) {
+            if ($onStatus !== null) {
+                $onStatus('Conferindo aluno pelo RA…');
+            }
+            $lista = $this->consulta->buscarAlunos('ra ' . $raMsg, 10, null);
+            $consulta = ['tool' => 'buscar_alunos', 'args' => ['ra' => $raMsg]];
+            $tool = 'buscar_alunos';
+            if ($lista === []) {
+                $resultado = [
+                    'ok' => false,
+                    'alunos' => [],
+                    'error' => 'Não encontrei aluno com RA ' . $raMsg . ' nesta escola.',
+                ];
+                return [
+                    'tool' => $tool,
+                    'resultado' => $resultado,
+                    'consulta' => $consulta,
+                    'texto' => (string) $resultado['error'],
+                ];
+            }
+            if (count($lista) > 1) {
+                $resultado = [
+                    'ok' => false,
+                    'aviso' => 'Há mais de um aluno com RA ' . $raMsg . '. Escolha um:',
+                    'candidatos' => $lista,
+                    'alunos' => $lista,
+                ];
+                return [
+                    'tool' => $tool,
+                    'resultado' => $resultado,
+                    'consulta' => $consulta,
+                    'texto' => (string) $resultado['aviso'],
+                ];
+            }
+            $aluno = $lista[0];
+            $resultado = ['ok' => true, 'alunos' => [$aluno], 'aluno' => $aluno];
+        }
+
+        if ($aluno === null && $precisaIdentidade) {
+            // Sem RA: tenta aluno_id do histórico.
+            $ctx = $this->extrairContextoProvasDoHistorico($mensagens);
+            $alunoId = (int) ($ctx['aluno_id'] ?? 0);
+            if ($alunoId > 0) {
+                $aluno = $this->consulta->obterAluno($alunoId);
+                if ($aluno !== null) {
+                    $tool = 'buscar_alunos';
+                    $resultado = ['ok' => true, 'alunos' => [$aluno], 'aluno' => $aluno];
+                    $consulta = ['tool' => 'buscar_alunos', 'args' => ['aluno_id' => $alunoId]];
+                }
+            }
+        }
+
+        if ($aluno === null) {
+            return [];
+        }
+
+        $out = [
+            'tool' => $tool,
+            'resultado' => $resultado,
+        ];
+        if ($consulta !== null) {
+            $out['consulta'] = $consulta;
+        }
+
+        // Pedidos de identidade/turma: resposta assertiva com o cadastro real.
+        if ($precisaIdentidade && !$this->pedidoPareceBoletim($mensagemUsuario)) {
+            $out['texto'] = $this->montarRespostaIdentidadeAluno($mensagemUsuario, $aluno);
+            $out['tool'] = 'buscar_alunos';
+            $out['resultado'] = ['ok' => true, 'alunos' => [$aluno], 'aluno' => $aluno];
+        }
+
+        return $out;
+    }
+
+    /** @param array<string,mixed> $aluno */
+    private function montarRespostaIdentidadeAluno(string $pergunta, array $aluno): string
+    {
+        $nome = trim((string) ($aluno['nome'] ?? 'Aluno'));
+        $ra = trim((string) ($aluno['ra'] ?? ''));
+        $turma = trim((string) ($aluno['turma_nome'] ?? ''));
+        $pedeTurma = (bool) preg_match('/\bturma\b/iu', $pergunta);
+
+        if ($pedeTurma) {
+            if ($turma === '') {
+                return '**' . $nome . '**'
+                    . ($ra !== '' ? ' (RA ' . $ra . ')' : '')
+                    . ' está cadastrad' . $this->artigoDe($nome) . ', mas sem turma vinculada no momento.';
+            }
+            return 'A turma d' . $this->artigoDe($nome) . ' **' . $nome . '**'
+                . ($ra !== '' ? ' (RA ' . $ra . ')' : '')
+                . ' é **' . $turma . '**.';
+        }
+
+        return 'Aluno(a) encontrado(a): **' . $nome . '**'
+            . ($ra !== '' ? ' — RA **' . $ra . '**' : '')
+            . ($turma !== '' ? ' — turma **' . $turma . '**' : '')
+            . '.';
+    }
+
+    private function extrairRaDaMensagem(string $texto): ?string
+    {
+        $ra = $this->consulta->extrairCodigoRa($texto);
+        if ($ra !== null && $ra !== '') {
+            return $ra;
+        }
+        if (preg_match('/\bRA\s*[#:]?\s*(\d{3,12})\b/iu', $texto, $m) === 1) {
+            return $m[1];
+        }
+        return null;
+    }
+
+    /**
+     * Garante que um pedido de boletim passou pela tool e trouxe dados reais.
+     *
+     * @param list<array{role?:string,content?:string}> $mensagens
+     * @param callable|null $onStatus
+     * @return array{tool:?string,resultado:?array,consulta?:array}
+     */
+    private function garantirConsultaBoletim(
+        string $mensagemUsuario,
+        array $mensagens,
+        ?string $ultimaTool,
+        ?array $ultimoResultado,
+        $onStatus = null
+    ): array {
+        if (
+            $ultimaTool === 'boletim_aluno'
+            && $this->boletimTemConteudoExibivel($ultimoResultado)
+        ) {
+            return ['tool' => $ultimaTool, 'resultado' => $ultimoResultado];
+        }
+
+        // Ambiguidade de aluno: não força nova busca.
+        if (
+            is_array($ultimoResultado)
+            && !empty($ultimoResultado['candidatos'])
+            && is_array($ultimoResultado['candidatos'])
+        ) {
+            return ['tool' => $ultimaTool, 'resultado' => $ultimoResultado];
+        }
+
+        $args = $this->montarArgsBoletim($mensagemUsuario, $mensagens, $ultimoResultado);
+        if ($args === null) {
+            return [
+                'tool' => 'boletim_aluno',
+                'resultado' => [
+                    'ok' => false,
+                    'error' => 'Para trazer o boletim, informe o RA ou o nome completo do aluno (com turma, se possível).',
+                ],
+            ];
+        }
+
+        if ($onStatus !== null) {
+            $onStatus('Montando boletim…');
+        }
+        $resultado = $this->ampliada->boletimAluno($args);
+        return [
+            'tool' => 'boletim_aluno',
+            'resultado' => $resultado,
+            'consulta' => ['tool' => 'boletim_aluno', 'args' => $args],
+        ];
+    }
+
+    /**
+     * @param list<array{role?:string,content?:string}> $mensagens
+     * @return array<string,mixed>|null
+     */
+    private function montarArgsBoletim(string $mensagemUsuario, array $mensagens, ?array $ultimoResultado): ?array
+    {
+        $args = [];
+
+        $alunoId = (int) ($ultimoResultado['aluno']['id'] ?? 0);
+        if ($alunoId <= 0 && preg_match('/aluno_id\s*=\s*(\d+)/i', $mensagemUsuario, $m) === 1) {
+            $alunoId = (int) $m[1];
+        }
+        if ($alunoId <= 0) {
+            $ctx = $this->extrairContextoProvasDoHistorico($mensagens);
+            $alunoId = (int) ($ctx['aluno_id'] ?? 0);
+        }
+        if ($alunoId > 0) {
+            $args['aluno_id'] = $alunoId;
+        }
+
+        $ra = null;
+        if (method_exists($this->consulta, 'extrairCodigoRa')) {
+            $ra = $this->consulta->extrairCodigoRa($mensagemUsuario);
+        }
+        if ($ra === null && preg_match('/\bRA\s*[#:]?\s*(\d{3,})\b/iu', $mensagemUsuario, $mRa) === 1) {
+            $ra = $mRa[1];
+        }
+        if ($ra !== null && $ra !== '' && empty($args['aluno_id'])) {
+            $args['ra'] = (string) $ra;
+        }
+
+        if (preg_match('/\b(20\d{2})\b/', $mensagemUsuario, $mAno) === 1) {
+            $args['ano_letivo'] = (int) $mAno[1];
+        }
+
+        if (empty($args['aluno_id']) && empty($args['ra'])) {
+            // Último recurso: nome após "aluna/aluno"
+            if (preg_match('/\b(?:aluna|aluno)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s]{2,60})/u', $mensagemUsuario, $mNome) === 1) {
+                $nome = trim($mNome[1]);
+                $nome = preg_replace('/\s+d[oae]\s+\d.*$/iu', '', $nome) ?? $nome;
+                if ($nome !== '' && stripos($nome, 'RA') !== 0) {
+                    $args['aluno_nome'] = $nome;
+                }
+            }
+        }
+
+        if (empty($args['aluno_id']) && empty($args['ra']) && empty($args['aluno_nome'])) {
+            return null;
+        }
+        return $args;
+    }
+
+    /** @param array<string,mixed>|null $resultado */
+    private function boletimTemConteudoExibivel(?array $resultado): bool
+    {
+        if (!is_array($resultado) || empty($resultado['ok'])) {
+            return false;
+        }
+        $quadro = is_array($resultado['quadro'] ?? null) ? $resultado['quadro'] : null;
+        if (
+            is_array($quadro)
+            && !empty($quadro['colunas'])
+            && is_array($quadro['colunas'])
+            && !empty($quadro['linhas'])
+            && is_array($quadro['linhas'])
+        ) {
+            return true;
+        }
+        $eventos = is_array($resultado['eventos'] ?? null) ? $resultado['eventos'] : [];
+        foreach ($eventos as $ev) {
+            if (!is_array($ev)) {
+                continue;
+            }
+            if (!empty($ev['colunas']) && !empty($ev['linhas']) && is_array($ev['linhas'])) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function artigoDe(string $nomeComTurma): string

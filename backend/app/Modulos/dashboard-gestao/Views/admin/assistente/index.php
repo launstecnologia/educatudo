@@ -1473,6 +1473,14 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 avB.textContent = painel.aviso;
                 container.appendChild(avB);
             }
+            var temQuadro = painel.formato === 'quadro_anual'
+                && painel.quadro
+                && (painel.quadro.colunas || []).length
+                && (painel.quadro.linhas || []).length;
+            var evsBol = painel.eventos || [];
+            var temEventos = evsBol.some(function (ev) {
+                return (ev.colunas || []).length && (ev.linhas || []).length;
+            });
             if (painel.pdf_url || painel.pdf_oficial_url) {
                 var pdfBar = document.createElement('div');
                 pdfBar.className = 'flex flex-wrap gap-2 mb-2';
@@ -1496,20 +1504,14 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 }
                 container.appendChild(pdfBar);
             }
-            if (painel.formato === 'quadro_anual' && painel.quadro) {
+            if (temQuadro) {
                 var tituloQ = 'Boletim'
                     + (painel.ano_letivo ? ' · ' + painel.ano_letivo : '')
                     + (painel.regra && painel.regra.nome ? ' · ' + painel.regra.nome : '');
                 renderQuadroNotas(container, painel.quadro, tituloQ);
-            } else {
-                var evs = painel.eventos || [];
-                if (!evs.length) {
-                    var vazioB = document.createElement('p');
-                    vazioB.className = 'text-sm text-gray-600';
-                    vazioB.textContent = 'Nenhum boletim encontrado para exibir.';
-                    container.appendChild(vazioB);
-                }
-                evs.forEach(function (ev) {
+            } else if (temEventos) {
+                evsBol.forEach(function (ev) {
+                    if (!(ev.colunas || []).length || !(ev.linhas || []).length) return;
                     var tituloEv = (ev.regra_nome || 'Boletim')
                         + (ev.bimestre ? ' · ' + ev.bimestre + 'º bim' : '')
                         + (ev.ano_letivo ? ' · ' + ev.ano_letivo : '');
@@ -1517,6 +1519,11 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                         return { materia: l.materia, notas: l.notas || {} };
                     }) }, tituloEv);
                 });
+            } else {
+                var vazioB = document.createElement('p');
+                vazioB.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+                vazioB.textContent = 'Não há quadro de notas para exibir neste boletim.';
+                container.appendChild(vazioB);
             }
             renderOpcoes(container, painel.opcoes);
         }

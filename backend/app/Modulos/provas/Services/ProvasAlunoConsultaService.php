@@ -15,6 +15,8 @@ class ProvasAlunoConsultaService
 {
     private $db;
     private BoletimConfig $boletimConfig;
+    /** @var array<string,bool> */
+    private array $cacheColunasAlunos = [];
 
     public function __construct(?BoletimConfig $boletimConfig = null)
     {
@@ -38,28 +40,42 @@ class ProvasAlunoConsultaService
         $ra = $this->extrairCodigoRa($termo);
         if ($ra !== null) {
             $limiteSql = $temTurma ? min(120, max(40, $limit * 6)) : $limit;
-            $rows = $this->db->fetchAll(
-                "SELECT a.id, a.nome, a.ra, a.turma_id, t.nome AS turma_nome
-                 FROM alunos a
-                 LEFT JOIN turmas t ON t.id = a.turma_id
-                 WHERE a.ativo = 1
-                   AND (
-                        a.ra = :ra_eq
-                        OR a.codigo_aluno = :cod_eq
-                        OR a.ra LIKE :ra_like
-                        OR a.codigo_aluno LIKE :cod_like
-                   )
-                 ORDER BY (a.ra = :ra_ord) DESC, (a.codigo_aluno = :cod_ord) DESC, a.nome ASC
-                 LIMIT {$limiteSql}",
-                [
-                    'ra_eq' => $ra,
-                    'cod_eq' => $ra,
-                    'ra_like' => '%' . $ra . '%',
-                    'cod_like' => '%' . $ra . '%',
-                    'ra_ord' => $ra,
-                    'cod_ord' => $ra,
-                ]
-            ) ?: [];
+            $temCodigoAluno = $this->colunaAlunosExiste('codigo_aluno');
+            $whereRa = '(TRIM(CAST(a.ra AS CHAR)) = :ra_eq OR TRIM(CAST(a.ra AS CHAR)) LIKE :ra_like';
+            $paramsRa = [
+                'ra_eq' => $ra,
+                'ra_like' => '%' . $ra . '%',
+                'ra_ord' => $ra,
+            ];
+            if ($temCodigoAluno) {
+                $whereRa .= ' OR TRIM(CAST(a.codigo_aluno AS CHAR)) = :cod_eq OR TRIM(CAST(a.codigo_aluno AS CHAR)) LIKE :cod_like';
+                $paramsRa['cod_eq'] = $ra;
+                $paramsRa['cod_like'] = '%' . $ra . '%';
+                $paramsRa['cod_ord'] = $ra;
+            }
+            $whereRa .= ')';
+            // 1ª tentativa: só ativos. 2ª: qualquer status (RA confere mesmo se inativo).
+            $rows = [];
+            foreach ([true, false] as $somenteAtivos) {
+                $sql = "SELECT a.id, a.nome, a.ra, a.turma_id, t.nome AS turma_nome
+                        FROM alunos a
+                        LEFT JOIN turmas t ON t.id = a.turma_id
+                        WHERE {$whereRa}"
+                    . ($somenteAtivos ? ' AND a.ativo = 1' : '')
+                    . ' ORDER BY '
+                    . '(TRIM(CAST(a.ra AS CHAR)) = :ra_ord) DESC'
+                    . ($temCodigoAluno ? ', (TRIM(CAST(a.codigo_aluno AS CHAR)) = :cod_ord) DESC' : '')
+                    . ', a.nome ASC'
+                    . " LIMIT {$limiteSql}";
+                try {
+                    $rows = $this->db->fetchAll($sql, $paramsRa) ?: [];
+                } catch (\Throwable $e) {
+                    $rows = [];
+                }
+                if ($rows !== []) {
+                    break;
+                }
+            }
 
             return $this->mapearAlunosBusca($rows, $limit, $temTurma ? (string) $turma : null);
         }
@@ -1486,6 +1502,24 @@ class ProvasAlunoConsultaService
             $out[] = $w;
         }
         return array_values(array_unique($out));
+    }
+
+    private function colunaAlunosExiste(string $coluna): bool
+    {
+        $coluna = trim($coluna);
+        if ($coluna === '' || !preg_match('/^[a-zA-Z0-9_]+$/', $coluna)) {
+            return false;
+        }
+        if (array_key_exists($coluna, $this->cacheColunasAlunos)) {
+            return $this->cacheColunasAlunos[$coluna];
+        }
+        try {
+            $r = $this->db->fetchAll("SHOW COLUMNS FROM alunos LIKE '" . $coluna . "'");
+            $this->cacheColunasAlunos[$coluna] = !empty($r);
+        } catch (\Throwable $e) {
+            $this->cacheColunasAlunos[$coluna] = false;
+        }
+        return $this->cacheColunasAlunos[$coluna];
     }
 }
 

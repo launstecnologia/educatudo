@@ -370,37 +370,54 @@ class AssistenteConsultaAmpliadaService
             return $aluno;
         }
         $alunoId = (int) $aluno['aluno']['id'];
-        $anoFiltro = (int) ($filtros['ano_letivo'] ?? $filtros['ano'] ?? 0);
-        if ($anoFiltro <= 0) {
+        $anoPedido = (int) ($filtros['ano_letivo'] ?? $filtros['ano'] ?? 0);
+        $regraId = (int) ($filtros['regra_id'] ?? 0);
+        $anosTentar = [];
+        if ($anoPedido > 0) {
+            $anosTentar[] = $anoPedido;
+        } else {
             $anoAtual = $this->anoLetivoAtual();
-            $anoFiltro = $anoAtual['ano'] ?? (int) date('Y');
+            $anoBase = (int) ($anoAtual['ano'] ?? date('Y'));
+            // Sem ano explícito: tenta o atual e os anteriores (boletim antigo ainda conta).
+            foreach ([$anoBase, $anoBase - 1, $anoBase - 2, $anoBase - 3] as $y) {
+                if ($y >= 2000) {
+                    $anosTentar[] = $y;
+                }
+            }
         }
 
-        $quadro = $this->montarQuadroBoletimAluno($alunoId, $anoFiltro, (int) ($filtros['regra_id'] ?? 0));
-        if (!empty($quadro['ok'])) {
-            return [
-                'ok' => true,
-                'formato' => 'quadro_anual',
-                'aluno' => $aluno['aluno'],
-                'ano_letivo' => $anoFiltro,
-                'regra' => $quadro['regra'] ?? null,
-                'quadro' => [
-                    'colunas' => $quadro['colunas'] ?? [],
-                    'grupos' => $quadro['grupos'] ?? [],
-                    'linhas' => $quadro['linhas'] ?? [],
-                ],
-                'aviso' => $quadro['aviso'] ?? null,
-            ];
+        $ultimoErroQuadro = null;
+        foreach ($anosTentar as $anoFiltro) {
+            $quadro = $this->montarQuadroBoletimAluno($alunoId, $anoFiltro, $regraId);
+            if (!empty($quadro['ok'])
+                && !empty($quadro['colunas'])
+                && !empty($quadro['linhas'])
+            ) {
+                return [
+                    'ok' => true,
+                    'formato' => 'quadro_anual',
+                    'aluno' => $aluno['aluno'],
+                    'ano_letivo' => $anoFiltro,
+                    'regra' => $quadro['regra'] ?? null,
+                    'quadro' => [
+                        'colunas' => $quadro['colunas'] ?? [],
+                        'grupos' => $quadro['grupos'] ?? [],
+                        'linhas' => $quadro['linhas'] ?? [],
+                    ],
+                    'aviso' => $quadro['aviso'] ?? null,
+                ];
+            }
+            $ultimoErroQuadro = $quadro['error'] ?? $ultimoErroQuadro;
         }
 
         // Fallback: eventos já gerados (demonstrativos/snapshots).
         $boletim = new BoletimConfig();
         $boletim->ensureSchema();
         $eventos = $boletim->getGeneratedBoletinsByAluno($alunoId, 'coordenacao', null) ?: [];
-        if ($anoFiltro > 0) {
+        if ($anoPedido > 0) {
             $eventos = array_values(array_filter(
                 $eventos,
-                static fn($ev): bool => (int) ($ev['ano_letivo'] ?? 0) === $anoFiltro
+                static fn($ev): bool => (int) ($ev['ano_letivo'] ?? 0) === $anoPedido
             ));
         }
 
@@ -412,6 +429,9 @@ class AssistenteConsultaAmpliadaService
                     'materia' => trim((string) ($linha['materia_nome'] ?? '')),
                     'notas' => $linha['notas'] ?? [],
                 ];
+            }
+            if ($linhas === [] || empty($ev['colunas'])) {
+                continue;
             }
             $slim[] = [
                 'regra_nome' => trim((string) ($ev['regra_nome'] ?? $ev['nome'] ?? '')),
@@ -425,18 +445,23 @@ class AssistenteConsultaAmpliadaService
         }
 
         if ($slim === []) {
+            $anoMsg = $anoPedido > 0 ? (string) $anoPedido : implode('/', $anosTentar);
             return [
                 'ok' => false,
-                'error' => $quadro['error'] ?? ('Não encontrei boletim montado para ' . $anoFiltro . '.'),
+                'error' => $ultimoErroQuadro
+                    ?? ('Não encontrei boletim com notas para exibir'
+                        . ($anoMsg !== '' ? ' (' . $anoMsg . ')' : '') . '.'),
                 'aluno' => $aluno['aluno'],
             ];
         }
+
+        $anoUsado = (int) ($slim[0]['ano_letivo'] ?? ($anoPedido > 0 ? $anoPedido : 0));
 
         return [
             'ok' => true,
             'formato' => 'eventos',
             'aluno' => $aluno['aluno'],
-            'ano_letivo' => $anoFiltro,
+            'ano_letivo' => $anoUsado > 0 ? $anoUsado : null,
             'eventos' => $slim,
             'total_eventos' => count($slim),
         ];
