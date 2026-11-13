@@ -12866,6 +12866,9 @@ class BoletimConfigController extends BaseController
                 'regra_codigo' => $regraCodigo,
                 'componente_codigo' => $componenteCodigo,
             ];
+            if (isset($componente['config']) && is_array($componente['config']) && !empty($componente['config']['media_ciclo'])) {
+                $payload['media_ciclo'] = 1;
+            }
             if ($groupLine !== null) {
                 $payload['group_line'] = $groupLine;
             }

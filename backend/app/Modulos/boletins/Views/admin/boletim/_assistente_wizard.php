@@ -13260,12 +13260,37 @@ $boletimWizardSteps = [
         }
     }
 
+    function aplicarMediaCicloNosComponentesLocais(comps) {
+        if (!Array.isArray(comps)) return comps || [];
+        flushMediaCicloAberta();
+        return comps.map(function (c) {
+            if (!c || typeof c !== 'object') return c;
+            var src = String(c.source_type || '');
+            if (src !== 'calculado' && src !== 'evento_boletim') return c;
+            var cod = String(c.codigo || '').toLowerCase();
+            if (!cod) return c;
+            var out = Object.assign({}, c);
+            out.config = (c.config && typeof c.config === 'object') ? Object.assign({}, c.config) : {};
+            if (blocoEhMediaCiclo(cod)) {
+                out.config.media_ciclo = 1;
+            } else {
+                delete out.config.media_ciclo;
+            }
+            return out;
+        });
+    }
+
     function aplicarRascunhoNaConfiguracao(r, gerarNotas) {
         if (!r || typeof r !== 'object') return false;
         var infoMinSalvar = minimaExibida();
         r.nota_minima_aprovacao = infoMinSalvar.valor;
         r.nota_minima_origem = infoMinSalvar.origem;
         r.nota_minima_regra_nome = infoMinSalvar.nome || '';
+        // Garante a flag no JSON do POST mesmo se o montar remoto ainda não reidratou.
+        if (estado && estado.media_ciclo_blocos && typeof estado.media_ciclo_blocos === 'object') {
+            r.media_ciclo_blocos = estado.media_ciclo_blocos;
+        }
+        r.componentes = aplicarMediaCicloNosComponentesLocais(r.componentes);
         var comps = normalizarComponentesRascunho(r.componentes);
         if (!comps.length) {
             renderResumo('O assistente montou o evento, mas sem blocos.', [ehDemonstrativoNotas()
@@ -13273,7 +13298,7 @@ $boletimWizardSteps = [
                 : 'Volte em Tipo de Notas, marque as colunas e monte a média em Fórmula. Depois clique de novo em Concluir e aplicar.']);
             return false;
         }
-        r.componentes = comps;
+        r.componentes = aplicarMediaCicloNosComponentesLocais(comps);
         guardarRascunhoAssistente(r);
         if (document.getElementById('form-regra-boletim')) {
             aplicarRascunho(r);

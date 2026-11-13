@@ -65,11 +65,11 @@ class MediaCicloRecuperacaoService
         $codigo = strtolower(trim((string) ($comp['codigo'] ?? '')));
         $cfg = $this->configDoComponente($comp);
         $expressao = strtolower(trim((string) ($cfg['expressao'] ?? '')));
-        if ($codigo === '' || $expressao === '') {
+        if ($codigo === '') {
             return [
                 'configurada' => true,
                 'pendente' => true,
-                'codigo' => $codigo !== '' ? $codigo : null,
+                'codigo' => null,
                 'expressao' => null,
                 'regra_id' => (int) ($regra['id'] ?? 0),
                 'notas' => [],
@@ -78,19 +78,29 @@ class MediaCicloRecuperacaoService
         }
 
         $periodosOrigem = $this->periodosOrigem($codigoPeriodoRec);
+        // Snapshot primeiro (serve também para evento_boletim sem expressão própria).
         $notas = $this->notasDoSnapshot((int) $regra['id'], $ano, $periodosOrigem, $codigo, $turmaIds);
-        if ($notas === []) {
+        if ($notas === [] && $expressao !== '') {
             $notas = $this->notasPelaFormula($regra, $expressao, $turmaIds, $periodosOrigem, $ano);
+        }
+        // evento_boletim: tenta o código da coluna no demonstrativo referenciado.
+        if ($notas === [] && (string) ($comp['source_type'] ?? '') === 'evento_boletim') {
+            $codDemo = strtolower(trim((string) ($cfg['componente_codigo'] ?? '')));
+            if ($codDemo !== '' && $codDemo !== $codigo) {
+                $notas = $this->notasDoSnapshot((int) $regra['id'], $ano, $periodosOrigem, $codDemo, $turmaIds);
+            }
         }
 
         return [
             'configurada' => true,
             'pendente' => $notas === [],
             'codigo' => $codigo,
-            'expressao' => $expressao,
+            'expressao' => $expressao !== '' ? $expressao : null,
             'regra_id' => (int) ($regra['id'] ?? 0),
             'notas' => $notas,
-            'motivo' => $notas === [] ? 'aguardando_notas' : 'ok',
+            'motivo' => $notas === []
+                ? ($expressao === '' && (string) ($comp['source_type'] ?? '') !== 'evento_boletim' ? 'sem_formula' : 'aguardando_notas')
+                : 'ok',
         ];
     }
 
@@ -177,8 +187,7 @@ class MediaCicloRecuperacaoService
         }
 
         $seriesTurmas = $this->seriesDasTurmas($turmaIds);
-        $melhor = null;
-        $melhorScore = -1;
+        $candidatos = [];
         foreach ($rows as $regra) {
             if (!is_array($regra)) {
                 continue;
@@ -204,34 +213,62 @@ class MediaCicloRecuperacaoService
             if ((int) ($regra['ano_letivo'] ?? 0) === $ano) {
                 $score += 5;
             }
+            $candidatos[] = ['regra' => $regra, 'score' => $score];
+        }
+        if ($candidatos === []) {
+            return null;
+        }
+
+        $melhor = null;
+        $melhorScore = -1;
+        foreach ($candidatos as $item) {
+            $regra = $item['regra'];
+            $score = (int) $item['score'];
+            $id = (int) ($regra['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            try {
+                $comps = $this->db->fetchAll(
+                    'SELECT * FROM boletim_componentes WHERE regra_id = :rid AND ativo = 1 ORDER BY ordem ASC, id ASC',
+                    ['rid' => $id]
+                ) ?: [];
+            } catch (Throwable $e) {
+                $comps = [];
+            }
+            $nComps = 0;
+            $temMediaCiclo = false;
+            foreach ($comps as &$c) {
+                if (!is_array($c)) {
+                    continue;
+                }
+                $nComps++;
+                $c['config'] = $this->configDoComponente($c);
+                $cfg = $c['config'];
+                $src = (string) ($c['source_type'] ?? '');
+                if (
+                    !empty($cfg['media_ciclo'])
+                    && ($src === 'calculado' || $src === 'evento_boletim')
+                ) {
+                    $temMediaCiclo = true;
+                }
+            }
+            unset($c);
+            // Layout “print” vazio (0 colunas) não pode ganhar do boletim real só por updated_at.
+            if ($nComps === 0) {
+                $score -= 80;
+            } else {
+                $score += min(40, $nComps);
+            }
+            if ($temMediaCiclo) {
+                $score += 120;
+            }
+            $regra['componentes'] = $comps;
             if ($score > $melhorScore) {
                 $melhorScore = $score;
                 $melhor = $regra;
             }
         }
-        if ($melhor === null) {
-            return null;
-        }
-        $id = (int) ($melhor['id'] ?? 0);
-        if ($id <= 0) {
-            return null;
-        }
-        try {
-            $comps = $this->db->fetchAll(
-                'SELECT * FROM boletim_componentes WHERE regra_id = :rid AND ativo = 1 ORDER BY ordem ASC, id ASC',
-                ['rid' => $id]
-            ) ?: [];
-        } catch (Throwable $e) {
-            $comps = [];
-        }
-        foreach ($comps as &$c) {
-            if (!is_array($c)) {
-                continue;
-            }
-            $c['config'] = $this->configDoComponente($c);
-        }
-        unset($c);
-        $melhor['componentes'] = $comps;
 
         return $melhor;
     }
@@ -244,7 +281,12 @@ class MediaCicloRecuperacaoService
     {
         $candidatos = [];
         foreach ((array) ($regra['componentes'] ?? []) as $c) {
-            if (!is_array($c) || (string) ($c['source_type'] ?? '') !== 'calculado') {
+            if (!is_array($c)) {
+                continue;
+            }
+            $src = (string) ($c['source_type'] ?? '');
+            // Calculado (fórmula) ou coluna do demonstrativo no boletim (evento_boletim).
+            if ($src !== 'calculado' && $src !== 'evento_boletim') {
                 continue;
             }
             $cfg = $this->configDoComponente($c);

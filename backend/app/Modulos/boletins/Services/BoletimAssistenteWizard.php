@@ -8294,14 +8294,16 @@ class BoletimAssistenteWizard
                     ? $nomeCustom
                     : ($nomeExistente !== '' ? $nomeExistente : ($nomes[$codigoAlvo] ?? $codigoAlvo));
             }
-            if ($idxExistente !== null && $sourceExistente !== 'calculado') {
-                continue;
-            }
             $escalaAlvo = $this->escalaDoBloco($estado, $codigoAlvo);
             $grupoLayout = $this->layoutGroupDaColunaNoEstado($codigoAlvo, $estado);
             if ($idxExistente !== null) {
                 $c = $comps[$idxExistente];
                 $c['config'] = is_array($c['config'] ?? null) ? $c['config'] : [];
+                // Fórmula em cima de evento_boletim/outra origem: vira coluna calculada.
+                if ($sourceExistente !== 'calculado') {
+                    $c['source_type'] = 'calculado';
+                    $c['calc_type'] = 'media';
+                }
                 $c['config']['expressao'] = $exp;
                 if ($ehQuadro) {
                     $grupoAtual = strtolower(trim((string) ($c['config']['layout_group'] ?? '')));
@@ -8368,7 +8370,11 @@ class BoletimAssistenteWizard
             return $rascunho;
         }
         foreach ($comps as $i => $c) {
-            if (!is_array($c) || (string) ($c['source_type'] ?? '') !== 'calculado') {
+            if (!is_array($c)) {
+                continue;
+            }
+            $src = (string) ($c['source_type'] ?? '');
+            if ($src !== 'calculado' && $src !== 'evento_boletim') {
                 continue;
             }
             $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
