@@ -4448,8 +4448,8 @@ PROMPT
         // Campo pedido pela Tudinha na mensagem anterior (categoria / detalhe).
         $campoPedido = $this->assistentePediuCampoOcorrencia($mensagens);
         $msgLimpa = trim($mensagemUsuario);
-        // Chip de aluno não é categoria/detalhe.
-        if (preg_match('/aluno_id\s*=|usar\s+aluno_id|^alun[oa]\b/i', $msgLimpa) === 1) {
+        // Só comandos de seleção carregam um identificador de aluno.
+        if (preg_match('/aluno_id\s*=|usar\s+aluno_id/i', $msgLimpa) === 1) {
             $msgLimpa = '';
         }
         if (preg_match('/^(?:registrar\s+ocorr[eê]ncia\s+com\s+)?categoria\s+(.+)$/iu', $msgLimpa, $mCatDireta) === 1) {
@@ -4557,7 +4557,7 @@ PROMPT
                 if ($c === '' || str_starts_with($c, '[') || $this->pedidoPareceRegistroEscrita($c)) {
                     continue;
                 }
-                if (preg_match('/aluno_id\s*=|^alun[oa]\b|usar\s+aluno_id/i', $c) === 1) {
+                if (preg_match('/aluno_id\s*=|usar\s+aluno_id/i', $c) === 1) {
                     continue;
                 }
                 if (preg_match('/^(conversa|disciplina|atraso|bullying|uniforme|comportamento)\b.{0,60}$/iu', $c) === 1) {
@@ -4632,7 +4632,7 @@ PROMPT
         if (preg_match('/^(para|da|do|de)\s+/u', $n) === 1) {
             return false;
         }
-        if (preg_match('/aluno_id\s*=|usar\s+aluno_id|^alun[oa]\b/i', $t) === 1) {
+        if (preg_match('/aluno_id\s*=|usar\s+aluno_id|^alun[oa]$/i', $t) === 1) {
             return false;
         }
         if (preg_match('/retome o pedido original/iu', $t) === 1) {

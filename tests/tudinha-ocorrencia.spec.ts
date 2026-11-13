@@ -102,9 +102,9 @@ test.describe('Tudinha ocorrência', () => {
     const aluna = mensagens.getByRole('row', { name: /Ana Luiza Oliveira De Souza/ });
     await aluna.getByRole('button', { name: 'Confirmar', exact: true }).click();
     await expect(mensagens.getByRole('button', { name: 'Comportamento / convivência', exact: true })).toBeVisible({ timeout: 12_000 });
-    await mensagens.getByRole('button', { name: 'Comportamento / convivência', exact: true }).click();
+    await enviar(page, 'conversa');
     await expect(mensagens.getByText('Descreva o que aconteceu.', { exact: true })).toBeVisible();
-    await enviar(page, 'Ela conversou na aula de matemática');
+    await enviar(page, 'aluno conversou na aula de matematica');
     await mensagens.getByRole('button', { name: 'Leve', exact: true }).click();
     await mensagens.getByRole('button', { name: 'Não, só essa pessoa', exact: true }).click();
     await expect(page.locator('#assistente-input')).toBeEnabled();
@@ -117,7 +117,7 @@ test.describe('Tudinha ocorrência', () => {
     const painel = JSON.parse(eventoFinal![1]).painel;
     expect(painel.tipo).toBe('proposta');
     expect(painel.payload.alunos).toEqual([expect.objectContaining({ ra: '24254' })]);
-    expect(painel.payload.detalhe).toBe('Ela conversou na aula de matemática');
+    expect(painel.payload.detalhe).toBe('aluno conversou na aula de matematica');
     expect(painel.payload.enviar_pais).toBe(0);
   });
 
