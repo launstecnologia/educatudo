@@ -80,6 +80,41 @@ class AssistenteAcaoPropostaService
     }
 
     /**
+     * Resolve aluno(s) sem gravar proposta (uso em probes / chips).
+     *
+     * @param array<string,mixed> $args
+     * @return array{ok:bool,alunos?:list<array{id:int,nome:string,ra:?string,turma_id:?int,turma_nome:?string}>,aluno?:array{id:int,nome:string,ra:?string,turma_nome:?string},candidatos?:list,aviso?:string,error?:string}
+     */
+    public function resolverAlunosParaAcao(array $args): array
+    {
+        $resolucao = $this->resolverAlunosArgs($args);
+        if (!empty($resolucao['candidatos'])) {
+            return [
+                'ok' => false,
+                'aviso' => $resolucao['aviso'] ?? 'Há mais de um aluno. Escolha pelo id:',
+                'candidatos' => $resolucao['candidatos'],
+            ];
+        }
+        if ($resolucao['alunos'] === []) {
+            return [
+                'ok' => false,
+                'error' => $resolucao['error'] ?? 'Informe ao menos um aluno (nome+turma, RA ou aluno_id).',
+            ];
+        }
+        $primeiro = $resolucao['alunos'][0];
+        return [
+            'ok' => true,
+            'alunos' => $resolucao['alunos'],
+            'aluno' => [
+                'id' => (int) $primeiro['id'],
+                'nome' => (string) $primeiro['nome'],
+                'ra' => $primeiro['ra'] ?? null,
+                'turma_nome' => $primeiro['turma_nome'] ?? null,
+            ],
+        ];
+    }
+
+    /**
      * @param array<string,mixed> $args
      * @return array<string,mixed>
      */
@@ -108,6 +143,29 @@ class AssistenteAcaoPropostaService
         $detalhe = trim((string) ($args['detalhe'] ?? $args['descricao'] ?? ''));
         $nivel = strtolower(trim((string) ($args['nivel_gravidade'] ?? $args['gravidade'] ?? '')));
         $data = trim((string) ($args['data_ocorrencia'] ?? $args['data'] ?? date('Y-m-d H:i:s')));
+        $categoriaHint = trim((string) ($args['categoria'] ?? $args['categoria_nome'] ?? ''));
+        $tituloEhCategoria = $categoriaHint !== ''
+            && $this->normalizarTextoSimples($titulo) === $this->normalizarTextoSimples($categoriaHint);
+        // LLM às vezes copia o placeholder do prompt ("..."). Não espelha se o título é a categoria.
+        if (
+            $this->textoOcorrenciaEhPlaceholder($detalhe)
+            && !$this->textoOcorrenciaEhPlaceholder($titulo)
+            && !$tituloEhCategoria
+        ) {
+            $detalhe = $titulo;
+        }
+        if ($this->textoOcorrenciaEhPlaceholder($titulo)) {
+            $titulo = '';
+        }
+        if (
+            $this->textoOcorrenciaEhPlaceholder($detalhe)
+            || (
+                $categoriaHint !== ''
+                && $this->normalizarTextoSimples($detalhe) === $this->normalizarTextoSimples($categoriaHint)
+            )
+        ) {
+            $detalhe = '';
+        }
         if ($titulo === '' || $detalhe === '' || $nivel === '') {
             return ['ok' => false, 'error' => 'Informe titulo, detalhe e nivel_gravidade (leve|moderado|grave).'];
         }
@@ -129,6 +187,7 @@ class AssistenteAcaoPropostaService
         if ($this->normalizarTextoSimples($categoriaNome) === $this->normalizarTextoSimples('Ocorrência via assistente')) {
             $categoriaNome = '';
         }
+        $categoriaNomeResolvido = '';
         if ($this->ocorrenciaModel->schemaEstendido()) {
             $cats = $this->ocorrenciaModel->categorias(true);
             $lista = array_map(static fn($c) => [
@@ -137,42 +196,55 @@ class AssistenteAcaoPropostaService
             ], $cats);
 
             if ($lista === []) {
-                // Escola sem categorias cadastradas — não bloqueia o rascunho.
-                $categoriaId = 0;
-            } else {
-                if ($categoriaId <= 0 && $categoriaNome !== '') {
+                return [
+                    'ok' => false,
+                    'error' => 'Não há categorias de ocorrência cadastradas nesta escola. Cadastre em Ocorrências antes de registrar pelo assistente.',
+                ];
+            }
+
+            if ($categoriaId <= 0 && $categoriaNome !== '') {
+                $categoriaId = $this->resolverCategoriaId($categoriaNome);
+            }
+            if ($categoriaId <= 0 || !$this->ocorrenciaModel->categoriaExiste($categoriaId)) {
+                if (count($lista) === 1) {
+                    $categoriaId = (int) ($lista[0]['id'] ?? 0);
+                } elseif ($categoriaNome !== '') {
                     $categoriaId = $this->resolverCategoriaId($categoriaNome);
                 }
-                if ($categoriaId <= 0 || !$this->ocorrenciaModel->categoriaExiste($categoriaId)) {
-                    // Uma só categoria → usa sem pedir.
-                    if (count($lista) === 1) {
-                        $categoriaId = (int) ($lista[0]['id'] ?? 0);
-                    } elseif ($categoriaNome !== '') {
-                        $categoriaId = $this->resolverCategoriaId($categoriaNome);
+            }
+            // Nunca cria rascunho sem categoria válida (senão o Confirmar falha com "Selecione uma categoria").
+            if ($categoriaId <= 0 || !$this->ocorrenciaModel->categoriaExiste($categoriaId)) {
+                $filtrados = $categoriaNome !== ''
+                    ? $this->filtrarCategoriasPorNome($lista, $categoriaNome)
+                    : [];
+                $paraMostrar = $filtrados !== [] ? $filtrados : $lista;
+                $sugestao = $lista[0]['nome'] ?? 'Pedagógica';
+                foreach ($lista as $c) {
+                    if (str_contains($this->normalizarTextoSimples((string) $c['nome']), 'comportamento')) {
+                        $sugestao = (string) $c['nome'];
+                        break;
                     }
                 }
-                if ($categoriaId <= 0 || !$this->ocorrenciaModel->categoriaExiste($categoriaId)) {
-                    $filtrados = $categoriaNome !== ''
-                        ? $this->filtrarCategoriasPorNome($lista, $categoriaNome)
-                        : $lista;
-                    // Se o usuário já tentou um nome e nada casou, mostra a lista completa.
-                    $paraMostrar = ($filtrados !== [] && count($filtrados) < count($lista))
-                        ? $filtrados
-                        : $lista;
-                    return [
-                        'ok' => false,
-                        'aviso' => 'Confirme a categoria da ocorrência (pelo nome):',
-                        'candidatos_categorias' => $paraMostrar,
-                        'aluno' => $resolucao['alunos'][0] ?? null,
-                        'payload' => [
-                            'alunos' => $resolucao['alunos'],
-                            'titulo' => mb_substr($titulo, 0, 120),
-                            'detalhe' => $detalhe,
-                            'nivel_gravidade' => $nivel,
-                            'turma' => trim((string) ($args['turma'] ?? $args['turma_nome'] ?? '')),
-                        ],
-                        'error' => 'Informe a categoria pelo nome (ex.: Conversa).',
-                    ];
+                return [
+                    'ok' => false,
+                    'aviso' => 'Confirme a categoria da ocorrência (pelo nome cadastrado na escola):',
+                    'candidatos_categorias' => $paraMostrar,
+                    'aluno' => $resolucao['alunos'][0] ?? null,
+                    'payload' => [
+                        'alunos' => $resolucao['alunos'],
+                        'titulo' => mb_substr($titulo, 0, 120),
+                        'detalhe' => $detalhe,
+                        'nivel_gravidade' => $nivel,
+                        'turma' => trim((string) ($args['turma'] ?? $args['turma_nome'] ?? '')),
+                        'categoria_tentativa' => $categoriaNome,
+                    ],
+                    'error' => 'Informe a categoria pelo nome (ex.: ' . $sugestao . ').',
+                ];
+            }
+            foreach ($lista as $c) {
+                if ((int) $c['id'] === $categoriaId) {
+                    $categoriaNomeResolvido = (string) $c['nome'];
+                    break;
                 }
             }
         } else {
@@ -188,6 +260,7 @@ class AssistenteAcaoPropostaService
             'nivel_gravidade' => $nivel,
             'data_ocorrencia' => date('Y-m-d H:i:s', strtotime($data)),
             'categoria_id' => $categoriaId > 0 ? $categoriaId : null,
+            'categoria_nome' => $categoriaNomeResolvido !== '' ? $categoriaNomeResolvido : $categoriaNome,
             'local' => mb_substr(trim((string) ($args['local'] ?? '')), 0, 120),
             'encaminhamento' => trim((string) ($args['encaminhamento'] ?? '')),
             'enviar_pais' => $notificar ? 1 : 0,
@@ -386,6 +459,18 @@ class AssistenteAcaoPropostaService
             $grav = Ocorrencia::GRAVIDADES[(string) ($payload['nivel_gravidade'] ?? '')]
                 ?? (string) ($payload['nivel_gravidade'] ?? '');
             $extras = [];
+            $catNome = trim((string) ($payload['categoria_nome'] ?? ''));
+            if ($catNome === '' && (int) ($payload['categoria_id'] ?? 0) > 0) {
+                foreach ($this->ocorrenciaModel->categorias(true) as $c) {
+                    if ((int) ($c['id'] ?? 0) === (int) $payload['categoria_id']) {
+                        $catNome = trim((string) ($c['nome'] ?? ''));
+                        break;
+                    }
+                }
+            }
+            if ($catNome !== '') {
+                $extras[] = ['label' => 'Categoria', 'valor' => $catNome];
+            }
             if ($grav !== '') {
                 $extras[] = ['label' => 'Gravidade', 'valor' => $grav];
             }
@@ -1083,6 +1168,25 @@ class AssistenteAcaoPropostaService
         ];
     }
 
+    private function textoOcorrenciaEhPlaceholder(string $texto): bool
+    {
+        $t = trim($texto);
+        if ($t === '') {
+            return true;
+        }
+        $semAcento = function (string $s): string {
+            $map = ['á'=>'a','à'=>'a','ã'=>'a','â'=>'a','é'=>'e','ê'=>'e','í'=>'i','ó'=>'o','ô'=>'o','õ'=>'o','ú'=>'u','ç'=>'c',
+                'Á'=>'A','À'=>'A','Ã'=>'A','Â'=>'A','É'=>'E','Ê'=>'E','Í'=>'I','Ó'=>'O','Ô'=>'O','Õ'=>'O','Ú'=>'U','Ç'=>'C'];
+            return strtr($s, $map);
+        };
+        $norm = mb_strtolower($semAcento($t));
+        if (preg_match('/^(\.{1,}|…+|-+|_+|n\/?a|null|undefined|placeholder|aguardando(?:\s+descricao)?|sem descricao|a definir|ocorrencia via assistente)$/iu', $norm) === 1) {
+            return true;
+        }
+        $n = mb_strtolower(trim(preg_replace('/[\s«»"\'.,;:…\-_]+/u', '', $norm) ?? ''));
+        return $n === '';
+    }
+
     private function limparNomeCategoria(string $nome): string
     {
         $n = trim($nome);
@@ -1119,34 +1223,86 @@ class AssistenteAcaoPropostaService
         if ($nomeNorm === '') {
             return 0;
         }
-        /** @var list<array{id:int,len:int}> $parcial */
-        $parcial = [];
+
+        $cats = [];
         foreach ($this->ocorrenciaModel->categorias(true) as $c) {
             $n = $this->normalizarTextoSimples((string) ($c['nome'] ?? ''));
             if ($n === '') {
                 continue;
             }
-            $id = (int) $c['id'];
-            if ($n === $nomeNorm) {
-                return $id;
+            $cats[] = ['id' => (int) $c['id'], 'nome' => $n];
+        }
+
+        // 1) Match exato / parcial direto no texto do usuário.
+        $parcial = [];
+        foreach ($cats as $c) {
+            if ($c['nome'] === $nomeNorm) {
+                return (int) $c['id'];
             }
-            // "Conversa na Sala de Aula" → casa com categoria "Conversa" (mais longa vence).
-            if (str_contains($nomeNorm, $n) || str_contains($n, $nomeNorm)) {
-                $parcial[] = ['id' => $id, 'len' => mb_strlen($n)];
+            if (str_contains($nomeNorm, $c['nome']) || str_contains($c['nome'], $nomeNorm)) {
+                $parcial[] = ['id' => (int) $c['id'], 'len' => mb_strlen($c['nome'])];
             }
         }
-        if ($parcial === []) {
-            return 0;
+        if (count($parcial) === 1) {
+            return (int) $parcial[0]['id'];
         }
-        usort($parcial, static fn(array $a, array $b): int => $b['len'] <=> $a['len']);
-        // Empate de tamanho: só aceita se for um único id no maior comprimento.
-        $melhorLen = (int) $parcial[0]['len'];
-        $noTopo = array_values(array_filter(
-            $parcial,
-            static fn(array $p): bool => (int) $p['len'] === $melhorLen
-        ));
-        $ids = array_values(array_unique(array_map(static fn(array $p): int => (int) $p['id'], $noTopo)));
-        return count($ids) === 1 ? (int) $ids[0] : 0;
+        if ($parcial !== []) {
+            usort($parcial, static fn(array $a, array $b): int => $b['len'] <=> $a['len']);
+            $melhorLen = (int) $parcial[0]['len'];
+            $ids = [];
+            foreach ($parcial as $p) {
+                if ((int) $p['len'] === $melhorLen) {
+                    $ids[(int) $p['id']] = true;
+                }
+            }
+            if (count($ids) === 1) {
+                return (int) array_key_first($ids);
+            }
+        }
+
+        // 2) Sinônimos em ordem de preferência (primeira categoria que casar ganha).
+        foreach ($this->aliasCategoria($nomeNorm) as $fragmento) {
+            $achados = [];
+            foreach ($cats as $c) {
+                if (str_contains($c['nome'], $fragmento)) {
+                    $achados[] = (int) $c['id'];
+                }
+            }
+            $achados = array_values(array_unique($achados));
+            if (count($achados) === 1) {
+                return (int) $achados[0];
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Fragmentos preferidos do nome real da categoria (ordem importa).
+     *
+     * @return list<string>
+     */
+    private function aliasCategoria(string $nomeNorm): array
+    {
+        if (preg_match('/\bconversa|\bfalando|\bconversando|\bconversou|\bbate[- ]papo\b/u', $nomeNorm) === 1) {
+            return ['comportamento', 'convivencia', 'orientacao'];
+        }
+        if (preg_match('/\bindisciplina|\bbrig|\bxinga|\bagress/u', $nomeNorm) === 1) {
+            return ['comportamento', 'convivencia'];
+        }
+        if (preg_match('/\batras/u', $nomeNorm) === 1) {
+            return ['atraso'];
+        }
+        if (preg_match('/\bsaida\b|\bantecipad/u', $nomeNorm) === 1) {
+            return ['saida'];
+        }
+        if (preg_match('/\bmaterial|\bcaderno|\blivro/u', $nomeNorm) === 1) {
+            return ['material'];
+        }
+        if (preg_match('/\belogi/u', $nomeNorm) === 1) {
+            return ['elogio'];
+        }
+        return [];
     }
 
     /** Verifica se a grade tem aula no dia (mesmo sem registro no diário). */

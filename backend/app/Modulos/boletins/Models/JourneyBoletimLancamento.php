@@ -132,8 +132,12 @@ class JourneyBoletimLancamento
         }
         $placeholders = implode(',', array_fill(0, count($turmaIds), '?'));
         $materiaSql = $this->sqlJornadasMateriaIdSelect();
+        $colunas = $this->db->fetchAll('SHOW COLUMNS FROM jornadas') ?: [];
+        $nomesColunas = array_column($colunas, 'Field');
+        $anoSql = in_array('ano_letivo', $nomesColunas, true) ? 'j.ano_letivo' : 'NULL AS ano_letivo';
+        $bimestreSql = in_array('bimestre', $nomesColunas, true) ? 'j.bimestre' : 'NULL AS bimestre';
         $rows = $this->db->fetchAll(
-            "SELECT j.id, j.titulo, j.turma_id, j.estrutura, j.created_at, {$materiaSql}, j.professor_id, j.ano_letivo, j.bimestre
+            "SELECT j.id, j.titulo, j.turma_id, j.estrutura, j.created_at, {$materiaSql}, j.professor_id, {$anoSql}, {$bimestreSql}
              FROM jornadas j
              WHERE (j.ativo = 1 OR j.ativo IS NULL)
                AND (

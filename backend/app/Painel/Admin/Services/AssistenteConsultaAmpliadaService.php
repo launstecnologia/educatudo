@@ -306,6 +306,8 @@ class AssistenteConsultaAmpliadaService
         $jr = new JornadasRelatorioService($this->db);
         $relFiltros = [
             'jr_professor_id' => (int) $professor['id'],
+            'jr_ano_letivo' => '',
+            'jr_bimestre' => $filtros['bimestre'] ?? $filtros['jr_bimestre'] ?? '',
             'executar' => 1,
             'limit' => 80,
             'page' => 1,
@@ -320,9 +322,10 @@ class AssistenteConsultaAmpliadaService
             $tn = trim((string) ($filtros['turma_nome'] ?? $filtros['turma'] ?? ''));
             if ($tn !== '') {
                 $tr = $this->resolverTurma(['turma_nome' => $tn]);
-                if (!empty($tr['ok'])) {
-                    $turmaId = (int) $tr['turma']['id'];
+                if (empty($tr['ok'])) {
+                    return $tr + ['tipo_candidatos' => 'turmas'];
                 }
+                $turmaId = (int) $tr['turma']['id'];
             }
         }
         if ($turmaId > 0) {
@@ -1669,6 +1672,9 @@ class AssistenteConsultaAmpliadaService
                     'SELECT data_inicio, data_fim, ano FROM ano_letivo WHERE ano = :ano ORDER BY id DESC LIMIT 1',
                     ['ano' => $anoNumero]
                 );
+                if (!$row) {
+                    return ['ok' => false, 'error' => 'Ano letivo ' . $anoNumero . ' não encontrado.'];
+                }
             }
             if ($row === null) {
                 $ano = $this->anoLetivoAtual((int) ($filtros['ano_letivo_id'] ?? 0));
@@ -1763,22 +1769,6 @@ class AssistenteConsultaAmpliadaService
             $model = new Ocorrencia();
             $rows = $model->listar($filtrosLista, 40, 0);
             $total = $model->contar($filtrosLista);
-            // Se filtrou por ano e veio vazio, tenta sem período (ocorrência pode ser de outro ano).
-            if ($total === 0 && ($anoFiltro > 0 || $inicio !== null || $fim !== null) && !$qualquerPeriodo) {
-                $filtrosSemAno = ['aluno_id' => $alunoId];
-                if ($status !== '' && isset(Ocorrencia::STATUS[$status])) {
-                    $filtrosSemAno['status'] = $status;
-                }
-                $rowsAll = $model->listar($filtrosSemAno, 40, 0);
-                $totalAll = $model->contar($filtrosSemAno);
-                if ($totalAll > 0) {
-                    $rows = $rowsAll;
-                    $total = $totalAll;
-                    $inicio = null;
-                    $fim = null;
-                    $anoFiltro = 0;
-                }
-            }
         } catch (\Throwable $e) {
             error_log('AssistenteConsultaAmpliada ocorrenciasAluno: ' . $e->getMessage());
             return ['ok' => false, 'error' => 'Não foi possível consultar as ocorrências.'];
@@ -2479,7 +2469,11 @@ class AssistenteConsultaAmpliadaService
             return [$inicio, $fim];
         }
 
+        $anoPedido = (int) ($filtros['ano_letivo'] ?? $filtros['ano'] ?? 0);
         $ano = $this->resolverAnoLetivoFiltro($filtros);
+        if ($anoPedido >= 2000 && (int) ($ano['ano'] ?? 0) !== $anoPedido) {
+            return [sprintf('%04d-01-01', $anoPedido), sprintf('%04d-12-31', $anoPedido)];
+        }
         if ($ano !== null) {
             return [
                 isset($ano['data_inicio']) && $ano['data_inicio'] !== '' ? (string) $ano['data_inicio'] : ((int) $ano['ano'] >= 2000 ? sprintf('%04d-01-01', (int) $ano['ano']) : null),

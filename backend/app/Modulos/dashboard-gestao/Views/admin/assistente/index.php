@@ -497,27 +497,79 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             return;
         }
 
-        if (painel.tipo === 'candidatos_categorias') {
-            var avisoCat = document.createElement('p');
-            avisoCat.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
-            avisoCat.textContent = painel.aviso || 'Escolha a categoria:';
-            container.appendChild(avisoCat);
+        function enviarPerguntaAssistente(texto) {
+            input.value = texto;
+            form.dispatchEvent(new Event('submit', { cancelable: true }));
+        }
+
+        function montarChipsCategoria(lista, avisoTexto) {
+            if (avisoTexto) {
+                var avisoCat = document.createElement('p');
+                avisoCat.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+                avisoCat.textContent = avisoTexto;
+                container.appendChild(avisoCat);
+            }
             var listCat = document.createElement('div');
             listCat.className = 'flex flex-wrap gap-2';
-            (painel.candidatos_categorias || []).forEach(function (c) {
-                var askCat = 'Registrar ocorrência com categoria ' + (c.nome || '');
+            (lista || []).forEach(function (c) {
+                var nomeCat = c.nome || '';
                 var chipC = document.createElement('button');
                 chipC.type = 'button';
                 chipC.className = 'pa-btn-confirmar';
-                chipC.textContent = 'Confirmar — ' + (c.nome || 'Categoria');
-                chipC.setAttribute('data-ask', askCat);
+                chipC.textContent = nomeCat || 'Categoria';
+                chipC.setAttribute('data-ask', 'categoria ' + nomeCat);
                 chipC.addEventListener('click', function () {
-                    input.value = chipC.getAttribute('data-ask');
-                    form.dispatchEvent(new Event('submit', { cancelable: true }));
+                    enviarPerguntaAssistente(chipC.getAttribute('data-ask'));
                 });
                 listCat.appendChild(chipC);
             });
             container.appendChild(listCat);
+        }
+
+        if (painel.tipo === 'coleta_ocorrencia') {
+            var avisoColeta = document.createElement('p');
+            avisoColeta.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+            avisoColeta.textContent = painel.aviso || 'Complete os dados da ocorrência:';
+            container.appendChild(avisoColeta);
+            if (painel.aguardando_campo === 'categoria' && (painel.candidatos_categorias || []).length) {
+                montarChipsCategoria(painel.candidatos_categorias, '');
+            }
+            if (painel.aguardando_campo === 'gravidade' && (painel.opcoes_gravidade || []).length) {
+                var listG = document.createElement('div');
+                listG.className = 'flex flex-wrap gap-2';
+                (painel.opcoes_gravidade || []).forEach(function (o) {
+                    var chipG = document.createElement('button');
+                    chipG.type = 'button';
+                    chipG.className = 'pa-btn-confirmar';
+                    chipG.textContent = o.rotulo || o.valor || '';
+                    chipG.addEventListener('click', function () {
+                        enviarPerguntaAssistente(o.valor || o.rotulo || '');
+                    });
+                    listG.appendChild(chipG);
+                });
+                container.appendChild(listG);
+            }
+            if ((painel.aguardando_campo === 'notificar_pais' || painel.aguardando_campo === 'mais_envolvidos')
+                && (painel.opcoes_sim_nao || []).length) {
+                var listSN = document.createElement('div');
+                listSN.className = 'flex flex-wrap gap-2';
+                (painel.opcoes_sim_nao || []).forEach(function (o) {
+                    var chipSN = document.createElement('button');
+                    chipSN.type = 'button';
+                    chipSN.className = 'pa-btn-confirmar';
+                    chipSN.textContent = o.rotulo || o.valor || '';
+                    chipSN.addEventListener('click', function () {
+                        enviarPerguntaAssistente(o.valor === 'sim' ? 'sim' : 'não');
+                    });
+                    listSN.appendChild(chipSN);
+                });
+                container.appendChild(listSN);
+            }
+            return;
+        }
+
+        if (painel.tipo === 'candidatos_categorias') {
+            montarChipsCategoria(painel.candidatos_categorias || [], painel.aviso || 'Digite a categoria ou escolha uma sugestão:');
             return;
         }
 

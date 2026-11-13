@@ -239,7 +239,7 @@ class ProvasAlunoConsultaService
             }
         }
         // Fallback LIKE se normalização não pegou nada
-        if ($out === []) {
+        if ($out === [] && preg_match('/^\d+[a-z]$/', $this->normalizarTextoTurma($filtro)) !== 1) {
             $like = '%' . $filtro . '%';
             $rows = $this->db->fetchAll(
                 'SELECT id, nome FROM turmas WHERE nome LIKE :q ORDER BY nome ASC LIMIT ' . $limit,
@@ -304,6 +304,10 @@ class ProvasAlunoConsultaService
     {
         $alunoId = (int) ($filtros['aluno_id'] ?? 0);
         $alunoNome = trim((string) ($filtros['aluno_nome'] ?? $filtros['nome'] ?? ''));
+        $ra = trim((string) ($filtros['ra'] ?? $filtros['aluno_ra'] ?? ''));
+        if ($alunoId <= 0 && $ra !== '') {
+            $alunoNome = 'ra ' . $ra;
+        }
 
         if ($alunoId <= 0 && $alunoNome !== '') {
             $turmaFiltro = trim((string) ($filtros['turma_nome'] ?? $filtros['turma'] ?? ''));
@@ -1433,6 +1437,11 @@ class ProvasAlunoConsultaService
         if ($n === '') {
             return false;
         }
+        if (preg_match('/^(\d+)([a-z])$/', $f, $serie) === 1
+            && preg_match('/^(\d+)([a-z])/', $n, $turma) === 1
+        ) {
+            return $serie[1] === $turma[1] && $serie[2] === $turma[2];
+        }
         if ($n === $f || str_contains($n, $f) || str_contains($f, $n)) {
             return true;
         }
@@ -1469,7 +1478,7 @@ class ProvasAlunoConsultaService
             return '';
         }
         // Ordinals antes do translit: 2ª → 2, 1º → 1 (evita "2a" + "b" = "2ab" que quebra contains "2b").
-        $s = preg_replace('/(\d+)\s*[ªº°aao]\b/u', '$1', $s) ?? $s;
+        $s = preg_replace('/(\d+)\s*[ªº°]/u', '$1', $s) ?? $s;
         $s = str_replace(['ª', 'º', '°'], '', $s);
         if (function_exists('iconv')) {
             $t = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
@@ -1482,8 +1491,8 @@ class ProvasAlunoConsultaService
             ' ',
             $s
         ) ?? $s;
-        // Remove ordinal residual grudado no dígito (2a → 2).
-        $s = preg_replace('/(\d)[ao](?=[a-z]|\b)/', '$1', $s) ?? $s;
+        // "2a B" usa ordinal, enquanto "2A" identifica a letra da turma.
+        $s = preg_replace('/(\d)[ao](?=\s+[a-z]\b)/', '$1', $s) ?? $s;
         $s = preg_replace('/[^a-z0-9]+/', '', $s) ?? $s;
         return $s;
     }

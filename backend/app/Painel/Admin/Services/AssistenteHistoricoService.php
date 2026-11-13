@@ -273,7 +273,7 @@ class AssistenteHistoricoService
      * Histórico no formato do LLM (últimas N mensagens).
      * Inclui resumo do painel (prova_id, jornada_id, aluno_id) para follow-ups.
      *
-     * @return list<array{role:string,content:string}>
+     * @return list<array{role:string,content:string,proposta_id?:int}>
      */
     public function historicoParaLlm(int $usuarioId, int $conversaId, int $limite = 12): array
     {
@@ -314,6 +314,9 @@ class AssistenteHistoricoService
                 continue;
             }
             $out[] = ['role' => $role, 'content' => mb_substr($content, 0, 4000)];
+            if ($role === 'assistant' && ($m['painel']['tipo'] ?? '') === 'proposta') {
+                $out[array_key_last($out)]['proposta_id'] = (int) ($m['painel']['proposta_id'] ?? 0);
+            }
         }
         return $out;
     }
@@ -368,10 +371,10 @@ class AssistenteHistoricoService
             $linhas[] = 'proposta_pendente=1'
                 . ($tipoProp !== '' ? ' proposta_tipo="' . $tipoProp . '"' : '');
             if (!empty($payload['titulo'])) {
-                $linhas[] = 'ocorrencia_titulo="' . trim((string) $payload['titulo']) . '"';
+                $linhas[] = 'ocorrencia_titulo="' . $this->escaparValorContexto((string) $payload['titulo'], 120) . '"';
             }
             if (!empty($payload['detalhe'])) {
-                $linhas[] = 'ocorrencia_detalhe="' . mb_substr(trim((string) $payload['detalhe']), 0, 200) . '"';
+                $linhas[] = 'ocorrencia_detalhe="' . $this->escaparValorContexto((string) $payload['detalhe'], 500) . '"';
             }
             if (!empty($payload['turma'])) {
                 $linhas[] = 'turma_nome="' . trim((string) $payload['turma']) . '"';
@@ -387,8 +390,50 @@ class AssistenteHistoricoService
                 }
             }
         }
-        if ($tipo === 'candidatos_categorias') {
-            $linhas[] = 'aguardando_categoria=1 proposta_pendente=1 proposta_tipo="criar_ocorrencia"';
+        if ($tipo === 'candidatos_categorias' || $tipo === 'coleta_ocorrencia') {
+            $linhas[] = 'coleta_ocorrencia=1 aguardando_categoria=1 proposta_pendente=1 proposta_tipo="criar_ocorrencia"';
+            $payloadColeta = is_array($painel['payload'] ?? null) ? $painel['payload'] : [];
+            if (!empty($payloadColeta['categoria'])) {
+                $linhas[] = 'ocorrencia_categoria="' . $this->escaparValorContexto((string) $payloadColeta['categoria'], 80) . '"';
+            }
+            if (!empty($payloadColeta['titulo'])) {
+                $linhas[] = 'ocorrencia_titulo="' . $this->escaparValorContexto((string) $payloadColeta['titulo'], 120) . '"';
+            }
+            if (!empty($payloadColeta['detalhe'])) {
+                $linhas[] = 'ocorrencia_detalhe="' . $this->escaparValorContexto((string) $payloadColeta['detalhe'], 500) . '"';
+            }
+            if (!empty($payloadColeta['alunos']) && is_array($payloadColeta['alunos'])) {
+                $nomesExtra = [];
+                foreach ($payloadColeta['alunos'] as $aExtra) {
+                    if (is_string($aExtra) && trim($aExtra) !== '') {
+                        $nomesExtra[] = trim($aExtra);
+                    } elseif (is_array($aExtra) && !empty($aExtra['nome'])) {
+                        $nomesExtra[] = trim((string) $aExtra['nome']);
+                    }
+                }
+                if ($nomesExtra !== []) {
+                    $linhas[] = 'ocorrencia_envolvidos="' . $this->escaparValorContexto(implode(' | ', $nomesExtra), 200) . '"';
+                }
+            }
+            if (!empty($payloadColeta['nivel_gravidade_explicito']) && !empty($payloadColeta['nivel_gravidade'])) {
+                $linhas[] = 'ocorrencia_nivel=' . trim((string) $payloadColeta['nivel_gravidade']);
+            }
+            if (!empty($payloadColeta['enviar_pais_explicito'])) {
+                $linhas[] = 'ocorrencia_pais=' . (!empty($payloadColeta['enviar_pais']) ? '1' : '0');
+            }
+            if (!empty($payloadColeta['envolvidos_ok'])) {
+                $linhas[] = 'ocorrencia_envolvidos_ok=1';
+            }
+            if (!empty($painel['aguardando_campo'])) {
+                $linhas[] = 'aguardando_campo="' . trim((string) $painel['aguardando_campo']) . '"';
+            }
+            $alunoColeta = is_array($painel['aluno'] ?? null) ? $painel['aluno'] : null;
+            if ($alunoColeta && !empty($alunoColeta['id']) && empty($aluno['id'])) {
+                $linhas[] = 'aluno_id=' . (int) $alunoColeta['id']
+                    . ' aluno_nome="' . trim((string) ($alunoColeta['nome'] ?? '')) . '"'
+                    . (!empty($alunoColeta['ra']) ? ' ra="' . trim((string) $alunoColeta['ra']) . '"' : '')
+                    . (!empty($alunoColeta['turma_nome']) ? ' turma_nome="' . trim((string) $alunoColeta['turma_nome']) . '"' : '');
+            }
         }
 
         if ($tipo === 'lista' && !empty($painel['provas']) && is_array($painel['provas'])) {
@@ -470,6 +515,18 @@ class AssistenteHistoricoService
     public function pertenceAoUsuario(int $usuarioId, int $conversaId): bool
     {
         return $this->obterCabecalho($usuarioId, $conversaId) !== null;
+    }
+
+    /** Escapa aspas/quebras para tokens de contexto no histórico (regex "([^"]+)"). */
+    private function escaparValorContexto(string $valor, int $maxLen = 200): string
+    {
+        $v = trim($valor);
+        $v = str_replace(["\r", "\n", '"'], [' ', ' ', "'"], $v);
+        $v = preg_replace('/\s+/u', ' ', $v) ?? $v;
+        if (mb_strlen($v) > $maxLen) {
+            $v = mb_substr($v, 0, $maxLen);
+        }
+        return $v;
     }
 
     /** @return array{id:int,titulo:string,aluno_id:?int,aluno_nome:?string}|null */

@@ -357,7 +357,11 @@ class ProvasAlunoAssistenteController extends BaseController
                 }
                 $dec = json_decode($raw, true);
                 if (is_array($dec)) {
-                    $historico = $dec;
+                    foreach ($dec as $msg) {
+                        if (is_array($msg) && is_string($msg['role'] ?? null) && is_string($msg['content'] ?? null)) {
+                            $historico[] = ['role' => $msg['role'], 'content' => $msg['content']];
+                        }
+                    }
                 }
             }
         }

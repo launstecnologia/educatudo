@@ -236,7 +236,7 @@ class JornadasAlunoConsultaService
         if ($base === null) {
             // tenta mesmo assim se a jornada existe e cobre a turma
             $row = $this->db->fetch(
-                'SELECT j.id, j.titulo, j.turma_id, j.estrutura, j.created_at, j.materia_id, j.ano_letivo, j.bimestre
+                'SELECT j.id, j.titulo, j.turma_id, j.estrutura
                  FROM jornadas j WHERE j.id = :id AND (j.ativo = 1 OR j.ativo IS NULL) LIMIT 1',
                 ['id' => $jornadaId]
             );
