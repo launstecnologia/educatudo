@@ -81,58 +81,93 @@ $fmtNota = static function ($c): string {
     return number_format((float) $c['nota'], 1, ',', '');
 };
 ?>
+<?php
+// Oficial primeiro, Itinerário depois (quando o controller ainda não ordenou).
+if (count($fichas) > 1) {
+    usort($fichas, static function (array $a, array $b): int {
+        $hint = static function (array $f): int {
+            $txt = mb_strtolower(
+                (string) ($f['curso_tipo'] ?? '') . ' '
+                . (string) ($f['boletim_finalidade'] ?? '') . ' '
+                . (string) ($f['aba_rotulo'] ?? '') . ' '
+                . (string) ($f['turma_nome'] ?? ''),
+                'UTF-8'
+            );
+            if (($f['curso_tipo'] ?? '') === 'extra'
+                || ($f['boletim_finalidade'] ?? '') === 'complementar'
+                || strpos($txt, 'itiner') !== false
+            ) {
+                return 1;
+            }
+            return 0;
+        };
+        $cmp = $hint($a) <=> $hint($b);
+        if ($cmp !== 0) {
+            return $cmp;
+        }
+        return strnatcasecmp((string) ($a['aba_rotulo'] ?? ''), (string) ($b['aba_rotulo'] ?? ''));
+    });
+}
+$rotuloAbaFicha = static function (array $f): array {
+    $ehExtra = (($f['curso_tipo'] ?? '') === 'extra')
+        || (($f['boletim_finalidade'] ?? '') === 'complementar');
+    $rotulo = trim((string) ($f['aba_rotulo'] ?? ''));
+    if ($rotulo === '') {
+        $rotulo = trim((string) ($f['turma_nome'] ?? 'turma'));
+    }
+    $rotuloLower = mb_strtolower($rotulo, 'UTF-8');
+    if (!$ehExtra && strpos($rotuloLower, 'itiner') !== false) {
+        $ehExtra = true;
+    }
+    // Remove ano duplicado no início ("2026 · …").
+    $rotulo = preg_replace('/^\d{4}\s*[·\-–:]\s*/u', '', $rotulo) ?? $rotulo;
+    // Evita "Itinerário · ITINERÁRIO 2026 - …".
+    if ($ehExtra) {
+        $rotulo = preg_replace('/^itiner[aá]rio(\s*\/\s*extra)?\s*[·\-–:]?\s*/iu', '', $rotulo) ?? $rotulo;
+    }
+    $rotulo = trim((string) $rotulo);
+    $tipo = $ehExtra ? 'Itinerário' : 'Oficial';
+    $label = $rotulo !== '' ? ($tipo . ' · ' . $rotulo) : $tipo;
+    return ['extra' => $ehExtra, 'label' => $label];
+};
+?>
 <?php if (count($fichas) > 1): ?>
 <div class="mb-4">
-    <nav class="flex flex-wrap gap-2" aria-label="Boletins do aluno">
+    <nav class="inline-flex flex-wrap gap-1 p-1 rounded-xl bg-gray-100" aria-label="Boletins do aluno">
     <?php foreach ($fichas as $f): ?>
         <?php
             $fichaAtiva = (int) $ficha_id === (int) ($f['id'] ?? 0);
-            $abaRotulo = trim((string) ($f['aba_rotulo'] ?? ''));
-            if ($abaRotulo === '') {
-                $abaRotulo = trim((string) (($f['ano_letivo'] ?? '') . ' · ' . ($f['turma_nome'] ?? 'turma')));
-            }
-            $ehExtra = (($f['boletim_finalidade'] ?? '') === 'complementar')
-                || (($f['curso_tipo'] ?? '') === 'extra');
+            $metaAba = $rotuloAbaFicha($f);
+            $ehExtra = !empty($metaAba['extra']);
             $pillComLink = !$somenteLeitura || (isset($hrefAba) && is_callable($hrefAba));
             $hrefFicha = isset($hrefAba) && is_callable($hrefAba)
                 ? $hrefAba('boletim', ['ficha_id' => (int) $f['id']])
                 : ($base . '?aba=boletim&ficha_id=' . (int) $f['id']);
-            // Evitar text-primary (branco na Colag some no fundo claro).
-            if ($fichaAtiva && $ehExtra) {
-                $classeAba = 'bg-amber-600 text-white shadow-sm';
-                $classeBadge = 'bg-amber-500 text-white';
-            } elseif ($fichaAtiva) {
-                $classeAba = 'bg-blue-700 text-white shadow-sm';
-                $classeBadge = 'bg-blue-600 text-white';
+            if ($fichaAtiva) {
+                $classeAba = $ehExtra
+                    ? 'bg-white text-amber-800 shadow-sm ring-1 ring-amber-200'
+                    : 'bg-white text-blue-800 shadow-sm ring-1 ring-blue-200';
             } else {
-                $classeAba = 'bg-gray-100 text-gray-800 hover:bg-gray-200';
-                $classeBadge = 'bg-white text-gray-700 border border-gray-200';
+                $classeAba = 'text-gray-600 hover:text-gray-900 hover:bg-white/70';
             }
-            $seloFicha = $ehExtra ? 'Itinerário' : 'Oficial';
         ?>
         <?php if (!$pillComLink): ?>
-        <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium <?= $classeAba ?>">
+        <span class="inline-flex items-center px-3.5 py-2 rounded-lg text-sm font-semibold <?= $classeAba ?>">
         <?php else: ?>
         <a href="<?= $esc($hrefFicha) ?>"
-           class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium <?= $classeAba ?>"
+           class="inline-flex items-center px-3.5 py-2 rounded-lg text-sm font-semibold <?= $classeAba ?>"
            <?= $fichaAtiva ? 'aria-current="page"' : '' ?>>
         <?php endif; ?>
-            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide <?= $classeBadge ?>"><?= $esc($seloFicha) ?></span>
-            <span><?= $esc($abaRotulo !== '' ? $abaRotulo : ($ehExtra ? 'Itinerário' : 'Boletim')) ?></span>
-            <span class="text-xs <?= $fichaAtiva ? 'text-white/80' : 'text-gray-500' ?>"><?= (int) ($f['ano_letivo'] ?? 0) ?></span>
+            <?= $esc($metaAba['label']) ?>
         <?php if (!$pillComLink): ?></span><?php else: ?></a><?php endif; ?>
     <?php endforeach; ?>
     </nav>
 </div>
 <?php elseif (count($fichas) === 1): ?>
 <?php
-    $fUnica = $fichas[0];
-    $rotuloUnico = trim((string) ($fUnica['aba_rotulo'] ?? ''));
-    if ($rotuloUnico === '') {
-        $rotuloUnico = trim((string) (($fUnica['turma_nome'] ?? 'turma')));
-    }
+    $metaUnica = $rotuloAbaFicha($fichas[0]);
 ?>
-<p class="mb-3 text-xs text-gray-500"><?= $esc($rotuloUnico) ?> · <?= (int) ($fUnica['ano_letivo'] ?? 0) ?></p>
+<p class="mb-3 text-xs text-gray-500"><?= $esc($metaUnica['label']) ?></p>
 <?php endif; ?>
 
 <div class="bg-white rounded-xl shadow-lg p-6">

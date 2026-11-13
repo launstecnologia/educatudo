@@ -2154,7 +2154,14 @@ class ProntuarioVidaEscolarService
      * @param list<array<string,mixed>> $fichas
      * @return list<array<string,mixed>>
      */
-    private function enriquecerFichasComModelo(array $fichas, int $alunoId): array
+    /**
+     * Completa curso_tipo / rótulo e ordena Oficial antes de Itinerário.
+     * Usado no admin e no portal (aluno/pais).
+     *
+     * @param list<array<string,mixed>> $fichas
+     * @return list<array<string,mixed>>
+     */
+    public function enriquecerFichasComModelo(array $fichas, int $alunoId): array
     {
         if ($fichas === []) {
             return [];
@@ -2193,20 +2200,35 @@ class ProntuarioVidaEscolarService
             }
             $turmaId = (int) ($f['turma_id'] ?? 0);
             $ano = (int) ($f['ano_letivo'] ?? 0);
-            $cursoTipo = $cursoPorTurma[$turmaId] ?? 'regular';
+            $cursoTipo = $cursoPorTurma[$turmaId] ?? '';
+            $serieId = 0;
+            $turmaNomeDb = '';
+            if ($turmaId > 0) {
+                try {
+                    $turma = $this->db->fetch(
+                        "SELECT t.serie_id, t.nome AS turma_nome, COALESCE(c.tipo, 'regular') AS curso_tipo
+                         FROM turmas t
+                         LEFT JOIN curso c ON c.id = t.curso_novo_id
+                         WHERE t.id = :id LIMIT 1",
+                        ['id' => $turmaId]
+                    );
+                    if (is_array($turma)) {
+                        $serieId = (int) ($turma['serie_id'] ?? 0);
+                        $turmaNomeDb = trim((string) ($turma['turma_nome'] ?? ''));
+                        if ($cursoTipo === '') {
+                            $cursoTipo = strtolower(trim((string) ($turma['curso_tipo'] ?? 'regular')));
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // segue com o que tiver
+                }
+            }
+            if ($cursoTipo !== 'extra') {
+                $cursoTipo = 'regular';
+            }
             $finalidadePref = $cursoTipo === 'extra' ? 'complementar' : 'oficial';
             $modelo = null;
             if ($cadastro !== null) {
-                $serieId = 0;
-                try {
-                    $turma = $this->db->fetch(
-                        'SELECT serie_id FROM turmas WHERE id = :id LIMIT 1',
-                        ['id' => $turmaId]
-                    );
-                    $serieId = (int) (is_array($turma) ? ($turma['serie_id'] ?? 0) : 0);
-                } catch (\Throwable $e) {
-                    $serieId = 0;
-                }
                 $modelo = $cadastro->encontrarModeloParaTurma($turmaId, $serieId, $ano, $finalidadePref);
                 if ($modelo === null && $finalidadePref === 'complementar') {
                     $modelo = $cadastro->encontrarModeloParaTurma($turmaId, $serieId, $ano, 'oficial');
@@ -2216,22 +2238,47 @@ class ProntuarioVidaEscolarService
             $boletimFin = is_array($modelo)
                 ? ((($modelo['finalidade'] ?? '') === 'complementar') ? 'complementar' : 'oficial')
                 : ($finalidadePref === 'complementar' ? 'complementar' : 'oficial');
+            // Turma extra / nome de itinerário prevalece sobre finalidade=oficial do modelo Colag.
+            $nomeHint = mb_strtolower($boletimNome . ' ' . (string) ($f['turma_nome'] ?? '') . ' ' . $turmaNomeDb, 'UTF-8');
+            if ($cursoTipo === 'extra'
+                || $boletimFin === 'complementar'
+                || strpos($nomeHint, 'itiner') !== false
+            ) {
+                $cursoTipo = 'extra';
+                if ($boletimFin !== 'complementar') {
+                    $boletimFin = 'complementar';
+                }
+            }
             $turmaNome = trim((string) ($f['turma_nome'] ?? ''));
             if ($turmaNome === '') {
-                $turmaNome = 'turma';
+                $turmaNome = $turmaNomeDb !== '' ? $turmaNomeDb : 'turma';
             }
             $f['curso_tipo'] = $cursoTipo;
             $f['boletim_nome'] = $boletimNome;
             $f['boletim_finalidade'] = $boletimFin;
             if ($boletimNome !== '') {
                 $f['aba_rotulo'] = $boletimNome;
-            } elseif ($cursoTipo === 'extra' || $boletimFin === 'complementar') {
-                $f['aba_rotulo'] = 'Itinerário / Extra' . ($turmaNome !== 'turma' ? ' · ' . $turmaNome : '');
+            } elseif ($cursoTipo === 'extra') {
+                $f['aba_rotulo'] = 'Itinerário' . ($turmaNome !== 'turma' ? ' · ' . $turmaNome : '');
             } else {
                 $f['aba_rotulo'] = $turmaNome;
             }
             $out[] = $f;
         }
+
+        usort($out, static function (array $a, array $b): int {
+            $prioA = (($a['curso_tipo'] ?? '') === 'extra') ? 1 : 0;
+            $prioB = (($b['curso_tipo'] ?? '') === 'extra') ? 1 : 0;
+            if ($prioA !== $prioB) {
+                return $prioA <=> $prioB;
+            }
+            $anoCmp = ((int) ($b['ano_letivo'] ?? 0)) <=> ((int) ($a['ano_letivo'] ?? 0));
+            if ($anoCmp !== 0) {
+                return $anoCmp;
+            }
+
+            return strnatcasecmp((string) ($a['aba_rotulo'] ?? ''), (string) ($b['aba_rotulo'] ?? ''));
+        });
 
         return $out;
     }

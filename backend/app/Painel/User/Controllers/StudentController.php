@@ -1593,6 +1593,12 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
                 }
             }
             $fichas = $model->schemaPronto() ? $model->listarFichasAluno($alunoId) : [];
+            try {
+                $fichas = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
+                    ->enriquecerFichasComModelo($fichas, $alunoId);
+            } catch (\Throwable $e) {
+                error_log('Portal boletim enriquecer fichas aluno #' . $alunoId . ': ' . $e->getMessage());
+            }
             $fichaIdEscolhida = 0;
             if ($fichaId > 0) {
                 foreach ($fichas as $ficha) {
@@ -1602,6 +1608,7 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
                     }
                 }
             }
+            // Após ordenar Oficial → Itinerário, a primeira ficha é a oficial.
             if ($fichaIdEscolhida <= 0 && $fichas !== []) {
                 $fichaIdEscolhida = (int) ($fichas[0]['id'] ?? 0);
             }

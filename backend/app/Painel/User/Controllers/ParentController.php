@@ -866,6 +866,12 @@ class ParentController extends BaseController
                 }
             }
             $fichas = $model->schemaPronto() ? $model->listarFichasAluno($alunoId) : [];
+            try {
+                $fichas = (new \App\Modulos\VidaEscolar\Services\ProntuarioVidaEscolarService())
+                    ->enriquecerFichasComModelo($fichas, $alunoId);
+            } catch (\Throwable $e) {
+                error_log('Portal pais boletim enriquecer fichas aluno #' . $alunoId . ': ' . $e->getMessage());
+            }
             $fichaIdEscolhida = 0;
             if ($fichaId > 0) {
                 foreach ($fichas as $ficha) {

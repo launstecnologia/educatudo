@@ -660,33 +660,39 @@ $ocultarRefNotas = !empty($ocultar_ref_notas);
         <p class="text-sm text-gray-600">Quadro ao vivo: as notas aparecem conforme o lançamento. Use as abas para separar o demonstrativo oficial do itinerário/extra. O boletim oficial fica na aba Boletim.</p>
 
         <?php if ($temAbasNotas): ?>
-        <div class="flex flex-wrap items-center gap-2" id="notas-demo-abas" role="tablist" aria-label="Demonstrativos por curso">
+        <div class="inline-flex flex-wrap gap-1 p-1 rounded-xl bg-gray-100" id="notas-demo-abas" role="tablist" aria-label="Demonstrativos por curso">
             <?php foreach ($gruposNotas as $gIdx => $grupoNav): ?>
                 <?php
                 $ativaNav = $gIdx === $grupoAtivoNotas;
                 $ehExtraNav = ($grupoNav['curso_tipo'] ?? '') === 'extra';
-                // Não usar text-primary: na Colag é branco e some no fundo claro.
-                if ($ativaNav && $ehExtraNav) {
-                    $classeNav = 'bg-amber-600 text-white shadow-sm';
-                    $classeBadge = 'bg-amber-500 text-white';
-                } elseif ($ativaNav) {
-                    $classeNav = 'bg-blue-700 text-white shadow-sm';
-                    $classeBadge = 'bg-blue-600 text-white';
-                } else {
-                    $classeNav = 'bg-gray-100 text-gray-800 hover:bg-gray-200';
-                    $classeBadge = 'bg-white text-gray-700 border border-gray-200';
-                }
                 $seloNav = $ehExtraNav ? 'Itinerário' : 'Oficial';
+                $rotuloNav = trim((string) ($grupoNav['rotulo'] ?? ''));
+                $rotuloNav = preg_replace('/^\d{4}\s*[·\-–:]\s*/u', '', $rotuloNav) ?? $rotuloNav;
+                if ($ehExtraNav) {
+                    $rotuloNav = preg_replace('/^itiner[aá]rio(\s*\/\s*extra)?\s*[·\-–:]?\s*/iu', '', $rotuloNav) ?? $rotuloNav;
+                }
+                $rotuloNav = trim((string) $rotuloNav);
+                if ($rotuloNav === '' || strcasecmp($rotuloNav, 'Demonstrativo') === 0 || strcasecmp($rotuloNav, $seloNav) === 0) {
+                    $labelNav = $seloNav;
+                } else {
+                    $labelNav = $seloNav . ' · ' . $rotuloNav;
+                }
+                if ($ativaNav) {
+                    $classeNav = $ehExtraNav
+                        ? 'bg-white text-amber-800 shadow-sm ring-1 ring-amber-200'
+                        : 'bg-white text-blue-800 shadow-sm ring-1 ring-blue-200';
+                } else {
+                    $classeNav = 'text-gray-600 hover:text-gray-900 hover:bg-white/70';
+                }
                 ?>
                 <button type="button"
                         role="tab"
-                        class="js-notas-demo-aba inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium <?= $classeNav ?>"
+                        class="js-notas-demo-aba inline-flex items-center px-3.5 py-2 rounded-lg text-sm font-semibold <?= $classeNav ?>"
                         data-grupo="<?= $esc($grupoNav['chave']) ?>"
                         data-curso-tipo="<?= $esc($ehExtraNav ? 'extra' : 'regular') ?>"
                         aria-selected="<?= $ativaNav ? 'true' : 'false' ?>"
                         <?= $ativaNav ? 'aria-current="page"' : '' ?>>
-                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide <?= $classeBadge ?>"><?= $esc($seloNav) ?></span>
-                    <span><?= $esc($grupoNav['rotulo']) ?></span>
+                    <?= $esc($labelNav) ?>
                 </button>
             <?php endforeach; ?>
         </div>
@@ -772,9 +778,9 @@ $ocultarRefNotas = !empty($ocultar_ref_notas);
         var nav = document.getElementById('notas-demo-abas');
         if (!nav || nav.getAttribute('data-bound') === '1') return;
         nav.setAttribute('data-bound', '1');
-        var classesAtivaOficial = ['bg-blue-700', 'text-white', 'shadow-sm'];
-        var classesAtivaExtra = ['bg-amber-600', 'text-white', 'shadow-sm'];
-        var classesInativa = ['bg-gray-100', 'text-gray-800', 'hover:bg-gray-200'];
+        var classesAtivaOficial = ['bg-white', 'text-blue-800', 'shadow-sm', 'ring-1', 'ring-blue-200'];
+        var classesAtivaExtra = ['bg-white', 'text-amber-800', 'shadow-sm', 'ring-1', 'ring-amber-200'];
+        var classesInativa = ['text-gray-600', 'hover:text-gray-900', 'hover:bg-white/70'];
         var todas = classesAtivaOficial.concat(classesAtivaExtra).concat(classesInativa);
         nav.addEventListener('click', function (e) {
             var btn = e.target.closest('.js-notas-demo-aba');
@@ -790,13 +796,6 @@ $ocultarRefNotas = !empty($ocultar_ref_notas);
                 b.setAttribute('aria-selected', on ? 'true' : 'false');
                 if (on) b.setAttribute('aria-current', 'page');
                 else b.removeAttribute('aria-current');
-                var badge = b.querySelector('span.uppercase');
-                if (badge) {
-                    badge.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide '
-                        + (on
-                            ? (ehExtra ? 'bg-amber-500 text-white' : 'bg-blue-600 text-white')
-                            : 'bg-white text-gray-700 border border-gray-200');
-                }
             });
             document.querySelectorAll('.js-notas-demo-painel').forEach(function (painel) {
                 painel.classList.toggle('hidden', painel.getAttribute('data-grupo') !== grupo);
