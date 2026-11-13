@@ -42,44 +42,68 @@ $trilhaItens = \App\Helpers\TrilhaAdmin::montar(
     .bc2-chip {
         display: inline-flex;
         align-items: center;
-        gap: 0.35rem;
+        gap: 0.4rem;
         border-radius: 9999px;
-        padding: 0.35rem 0.7rem;
-        font-size: 0.8rem;
+        padding: 0.4rem 0.75rem;
+        font-size: 0.8125rem;
         font-weight: 600;
-        border: 1px solid transparent;
+        border: 1px solid #E2E8F0;
         cursor: pointer;
         user-select: none;
         white-space: nowrap;
+        background: #F8FAFC;
+        color: #334155;
     }
-    .bc2-chip.is-nota { background: #FFEDD5; color: #9A3412; border-color: #FDBA74; }
-    .bc2-chip.is-rec { background: #EDE9FE; color: #5B21B6; border-color: #C4B5FD; }
-    .bc2-chip.is-media { background: #FEF9C3; color: #854D0E; border-color: #FDE047; }
-    .bc2-chip.is-evento { background: #DBEAFE; color: #1E40AF; border-color: #93C5FD; }
-    .bc2-chip.is-op { background: #F1F5F9; color: #334155; border-color: #CBD5E1; font-family: ui-monospace, monospace; }
-    .bc2-chip.is-fn { background: #FFF7ED; color: #9A3412; border-color: #FDBA74; }
+    .bc2-chip.is-nota { background: #FFF7ED; color: #9A3412; border-color: #FED7AA; }
+    .bc2-chip.is-rec { background: #F5F3FF; color: #5B21B6; border-color: #DDD6FE; }
+    .bc2-chip.is-media { background: #FFFBEB; color: #92400E; border-color: #FDE68A; }
+    .bc2-chip.is-evento { background: #EFF6FF; color: #1E40AF; border-color: #BFDBFE; }
+    .bc2-chip.is-op { background: #F8FAFC; color: #475569; border-color: #E2E8F0; font-family: ui-monospace, monospace; }
+    .bc2-chip.is-fn { background: #FFF7ED; color: #9A3412; border-color: #FED7AA; }
     .bc2-chip.is-selected {
-        outline: 2px solid var(--bc2-primary);
-        outline-offset: 1px;
-        box-shadow: 0 0 0 3px rgba(91, 53, 230, 0.15);
+        border-color: var(--bc2-primary);
+        box-shadow: 0 0 0 2px rgba(91, 53, 230, 0.18);
+        background: #F5F3FF;
     }
     .bc2-scroll-y { overflow-y: auto; overscroll-behavior: contain; }
     .bc2-scroll-x { overflow-x: auto; overscroll-behavior: contain; scrollbar-width: thin; }
     .bc2-period-card {
-        min-width: 260px;
-        max-width: 280px;
-        flex: 0 0 260px;
-        border: 1.5px solid var(--bc2-border);
+        min-width: 300px;
+        width: 300px;
+        flex: 0 0 300px;
+        border: 1px solid var(--bc2-border);
         border-radius: var(--bc2-radius);
         background: #fff;
         transition: border-color .15s, box-shadow .15s;
     }
-    .bc2-period-card.is-done { border-color: #86EFAC; }
+    .bc2-period-card.is-done { border-color: #E2E8F0; }
     .bc2-period-card.is-active {
         border-color: var(--bc2-primary);
         box-shadow: 0 0 0 3px rgba(91, 53, 230, 0.12);
     }
-    .bc2-period-card.is-warn { border-color: #FCD34D; }
+    .bc2-period-card.is-warn { border-color: #F59E0B; }
+    .bc2-period-card .bc2-period-title {
+        font-size: 0.9375rem;
+        font-weight: 700;
+        color: #0f172a;
+        line-height: 1.25;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .bc2-aluno.is-selected {
+        background: var(--bc2-primary-soft);
+        color: #4C1D95;
+        font-weight: 600;
+    }
+    .bc2-aluno-vazio {
+        display: none;
+        padding: 1rem 0.75rem;
+        text-align: center;
+        font-size: 0.8125rem;
+        color: #94a3b8;
+    }
+    .bc2-aluno-vazio.is-visible { display: block; }
     .bc2-btn-primary {
         background: var(--bc2-primary);
         color: #fff;
@@ -141,9 +165,9 @@ $trilhaItens = \App\Helpers\TrilhaAdmin::montar(
     }
     .bc2-step.is-done .bc2-step-dot { background: var(--bc2-ok); color: #fff; border-color: var(--bc2-ok); }
     .bc2-step.is-current .bc2-step-dot { background: var(--bc2-primary); color: #fff; border-color: var(--bc2-primary); }
-    .bc2-cell-ok { background: #DCFCE7; color: #166534; font-weight: 700; }
-    .bc2-cell-warn { background: #FEF3C7; color: #92400E; font-weight: 700; }
-    .bc2-cell-err { background: #FEE2E2; color: #991B1B; font-weight: 700; }
+    .bc2-cell-ok { background: #F0FDF4; color: #166534; font-weight: 600; }
+    .bc2-cell-warn { background: #FFFBEB; color: #92400E; font-weight: 600; }
+    .bc2-cell-err { background: #FEF2F2; color: #991B1B; font-weight: 600; }
     .bc2-sticky-footer {
         position: sticky;
         bottom: 0;
@@ -355,35 +379,42 @@ $trilhaItens = \App\Helpers\TrilhaAdmin::montar(
                         $cls = $card['estado'] === 'active' ? 'is-active' : ($card['estado'] === 'done' ? 'is-done' : 'is-warn');
                     ?>
                     <article class="bc2-period-card <?= $cls ?>">
-                        <header class="flex items-center gap-2 border-b border-slate-100 px-3 py-2.5">
-                            <i class="fa-solid fa-grip-vertical text-slate-300 cursor-grab" aria-hidden="true"></i>
-                            <h3 class="text-sm font-bold text-slate-800 flex-1 truncate"><?= htmlspecialchars($card['titulo'], ENT_QUOTES, 'UTF-8') ?></h3>
-                            <span class="rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-[0.65rem] font-bold">Concluído</span>
-                            <button type="button" class="text-xs text-slate-500 hover:text-violet-600 font-semibold">Clonar</button>
-                            <button type="button" class="text-slate-400 hover:text-red-500" aria-label="Excluir período"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+                        <header class="border-b border-slate-100 px-3.5 py-3">
+                            <div class="flex items-start gap-2">
+                                <i class="fa-solid fa-grip-vertical text-slate-300 cursor-grab mt-1" aria-hidden="true"></i>
+                                <div class="min-w-0 flex-1">
+                                    <h3 class="bc2-period-title" title="<?= htmlspecialchars($card['titulo'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($card['titulo'], ENT_QUOTES, 'UTF-8') ?></h3>
+                                    <div class="mt-1.5 flex items-center gap-2">
+                                        <span class="rounded-full bg-emerald-50 text-emerald-700 px-2 py-0.5 text-[0.65rem] font-bold">Concluído</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 shrink-0 pt-0.5">
+                                    <button type="button" class="text-xs text-slate-500 hover:text-violet-600 font-semibold">Clonar</button>
+                                    <button type="button" class="text-slate-400 hover:text-red-500" aria-label="Excluir período"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+                                </div>
+                            </div>
                         </header>
-                        <div class="p-3 flex flex-wrap gap-2 min-h-[4.5rem]">
+                        <div class="p-3.5 flex flex-wrap gap-2 min-h-[5rem] content-start">
                             <?php foreach ($card['chips'] as [$label, $tipo]):
                                 $sel = $card['estado'] === 'active' && $label === 'Nota' ? ' is-selected' : '';
                             ?>
                             <button type="button" class="bc2-chip is-<?= htmlspecialchars($tipo, ENT_QUOTES, 'UTF-8') ?><?= $sel ?> bc2-col-chip" data-coluna="<?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>" data-periodo="<?= htmlspecialchars($card['titulo'], ENT_QUOTES, 'UTF-8') ?>">
-                                <i class="fa-solid fa-grip-vertical text-[0.6rem] opacity-50" aria-hidden="true"></i>
                                 <?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>
-                                <i class="fa-solid fa-xmark text-[0.65rem] opacity-60" aria-hidden="true"></i>
+                                <i class="fa-solid fa-xmark text-[0.65rem] opacity-40" aria-hidden="true"></i>
                             </button>
                             <?php endforeach; ?>
                         </div>
-                        <footer class="px-3 pb-3 text-xs text-slate-400 flex items-center gap-1.5">
+                        <footer class="px-3.5 pb-3.5 text-xs text-slate-400 flex items-center gap-1.5">
                             <i class="fa-solid fa-link" aria-hidden="true"></i>
                             Vincule os eventos do menu da lateral
                         </footer>
                     </article>
                     <?php endforeach; ?>
 
-                    <button type="button" class="bc2-period-card border-dashed flex flex-col items-center justify-center gap-2 text-violet-600 hover:bg-violet-50 min-h-[160px]" style="border-style:dashed">
+                    <button type="button" class="bc2-period-card border-dashed flex flex-col items-center justify-center gap-2 text-violet-600 hover:bg-violet-50 min-h-[168px]" style="border-style:dashed">
                         <span class="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 text-lg font-bold">+</span>
                         <span class="text-sm font-bold">Adicionar período</span>
-                        <span class="text-xs text-slate-400 px-4 text-center">Crie um novo bimestre, trimestre ou recuperação</span>
+                        <span class="text-xs text-slate-400 px-4 text-center">Novo bimestre, trimestre ou recuperação</span>
                     </button>
                 </div>
             </div>
@@ -600,20 +631,33 @@ $trilhaItens = \App\Helpers\TrilhaAdmin::montar(
                 <div class="p-3 border-b border-slate-100">
                     <p class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Simular com aluno</p>
                     <div class="relative">
-                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs" aria-hidden="true"></i>
-                        <input type="search" class="form-control w-full rounded-lg border-slate-200 text-sm pl-8" placeholder="Buscar aluno…">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none" aria-hidden="true"></i>
+                        <input type="search" id="bc2-busca-aluno" class="form-control w-full rounded-lg border-slate-200 text-sm pl-8 pr-8" placeholder="Buscar por nome…" autocomplete="off" aria-label="Buscar aluno">
+                        <button type="button" id="bc2-limpar-busca" class="absolute right-2 top-1/2 -translate-y-1/2 hidden text-slate-400 hover:text-slate-600 px-1" aria-label="Limpar busca">
+                            <i class="fa-solid fa-xmark text-xs" aria-hidden="true"></i>
+                        </button>
                     </div>
                 </div>
                 <div class="bc2-scroll-y flex-1 p-2 space-y-1" id="bc2-alunos">
                     <?php
-                    $alunos = ['Amanda Rosa', 'Carlos Mendes', 'João Ferreira', 'Maria Oliveira'];
+                    $alunos = [
+                        'Aline Marina',
+                        'Amanda Rosa',
+                        'Ana Souza',
+                        'Bruno Lima',
+                        'Carlos Mendes',
+                        'João Ferreira',
+                        'Maria Oliveira',
+                        'Pedro Santos',
+                    ];
                     foreach ($alunos as $idx => $nome):
                     ?>
-                    <button type="button" class="bc2-aluno w-full text-left rounded-lg px-3 py-2.5 text-sm font-medium <?= $idx === 0 ? 'bg-violet-100 text-violet-900' : 'text-slate-700 hover:bg-slate-50' ?>" data-aluno="<?= htmlspecialchars($nome, ENT_QUOTES, 'UTF-8') ?>">
+                    <button type="button" class="bc2-aluno w-full text-left rounded-lg px-3 py-2.5 text-sm <?= $idx === 1 ? 'is-selected' : 'text-slate-700 hover:bg-slate-50' ?>" data-aluno="<?= htmlspecialchars($nome, ENT_QUOTES, 'UTF-8') ?>">
                         <?= htmlspecialchars($nome, ENT_QUOTES, 'UTF-8') ?>
                     </button>
                     <?php endforeach; ?>
-                    <button type="button" class="bc2-aluno w-full text-left rounded-lg px-3 py-2.5 text-sm font-medium text-slate-500 border border-dashed border-slate-200 mt-2" data-aluno="">
+                    <p class="bc2-aluno-vazio" id="bc2-aluno-vazio" role="status">Nenhum aluno encontrado para essa busca.</p>
+                    <button type="button" class="bc2-aluno bc2-aluno-ficticio w-full text-left rounded-lg px-3 py-2.5 text-sm font-medium text-slate-500 border border-dashed border-slate-200 mt-2" data-aluno="">
                         Simulação sem aluno (dados fictícios)
                     </button>
                 </div>
@@ -741,8 +785,8 @@ $trilhaItens = \App\Helpers\TrilhaAdmin::montar(
     var prev = document.getElementById('bc2-quadro-prev');
     var next = document.getElementById('bc2-quadro-next');
     if (scrollEl && prev && next) {
-        prev.addEventListener('click', function () { scrollEl.scrollBy({ left: -280, behavior: 'smooth' }); });
-        next.addEventListener('click', function () { scrollEl.scrollBy({ left: 280, behavior: 'smooth' }); });
+        prev.addEventListener('click', function () { scrollEl.scrollBy({ left: -320, behavior: 'smooth' }); });
+        next.addEventListener('click', function () { scrollEl.scrollBy({ left: 320, behavior: 'smooth' }); });
     }
 
     var nomeCol = document.getElementById('bc2-coluna-nome');
@@ -782,15 +826,69 @@ $trilhaItens = \App\Helpers\TrilhaAdmin::montar(
         });
     });
 
-    root.querySelectorAll('.bc2-aluno').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            root.querySelectorAll('.bc2-aluno').forEach(function (b) {
-                b.classList.remove('bg-violet-100', 'text-violet-900');
+    function marcarAluno(btn) {
+        root.querySelectorAll('.bc2-aluno').forEach(function (b) {
+            b.classList.remove('is-selected');
+            if (!b.classList.contains('bc2-aluno-ficticio')) {
                 b.classList.add('text-slate-700');
-            });
-            btn.classList.add('bg-violet-100', 'text-violet-900');
-            btn.classList.remove('text-slate-700');
+            }
         });
+        btn.classList.add('is-selected');
+        btn.classList.remove('text-slate-700');
+        var detalhe = root.querySelector('[data-sim-panel="detalhe"] .font-bold');
+        var nome = (btn.getAttribute('data-aluno') || '').trim();
+        if (detalhe) {
+            detalhe.textContent = nome
+                ? ('Cálculo detalhado — ' + nome + ' · Geografia · 2º Trimestre')
+                : 'Cálculo detalhado — dados fictícios · Geografia · 2º Trimestre';
+        }
+    }
+
+    root.querySelectorAll('.bc2-aluno').forEach(function (btn) {
+        btn.addEventListener('click', function () { marcarAluno(btn); });
     });
+
+    var busca = document.getElementById('bc2-busca-aluno');
+    var limparBusca = document.getElementById('bc2-limpar-busca');
+    var vazioAluno = document.getElementById('bc2-aluno-vazio');
+
+    function normalizarTexto(t) {
+        return String(t || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .trim();
+    }
+
+    function filtrarAlunos() {
+        var q = normalizarTexto(busca ? busca.value : '');
+        if (limparBusca) limparBusca.classList.toggle('hidden', q === '');
+        var visiveis = 0;
+        root.querySelectorAll('.bc2-aluno:not(.bc2-aluno-ficticio)').forEach(function (btn) {
+            var nome = normalizarTexto(btn.getAttribute('data-aluno') || btn.textContent);
+            var ok = q === '' || nome.indexOf(q) >= 0;
+            btn.classList.toggle('hidden', !ok);
+            if (ok) visiveis += 1;
+        });
+        if (vazioAluno) vazioAluno.classList.toggle('is-visible', visiveis === 0);
+    }
+
+    if (busca) {
+        busca.addEventListener('input', filtrarAlunos);
+        busca.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                busca.value = '';
+                filtrarAlunos();
+                busca.blur();
+            }
+        });
+    }
+    if (limparBusca && busca) {
+        limparBusca.addEventListener('click', function () {
+            busca.value = '';
+            filtrarAlunos();
+            busca.focus();
+        });
+    }
 })();
 </script>
