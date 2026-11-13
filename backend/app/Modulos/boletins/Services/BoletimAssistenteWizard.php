@@ -7477,6 +7477,10 @@ class BoletimAssistenteWizard
             if ($blocosIds !== []) {
                 $filtroTitulo = '';
             }
+            $evPeca = (int) ($opts['evento_avaliativo_id'] ?? 0);
+            if ($evPeca > 0) {
+                $config['evento_avaliativo_id'] = $evPeca;
+            }
             $herdado = $this->fechamentoParaPeca($peca, $tipoId);
             if ($herdado !== null) {
                 $calc = $herdado['calc_type'];
@@ -7494,6 +7498,8 @@ class BoletimAssistenteWizard
             $escalaMax = 999.0;
         }
 
+        $evRetorno = (int) ($config['evento_avaliativo_id'] ?? $opts['evento_avaliativo_id'] ?? 0);
+
         return [
             'codigo' => $base['codigo'],
             'nome' => $base['nome'],
@@ -7510,6 +7516,7 @@ class BoletimAssistenteWizard
             'obrigatorio' => 0,
             'tipo_avaliacao_id' => $tipoId > 0 ? $tipoId : null,
             'tipo_avaliacao_nome' => $tipoNome !== '' ? $tipoNome : null,
+            'evento_avaliativo_id' => $evRetorno > 0 ? $evRetorno : null,
             'config' => $config,
         ];
     }

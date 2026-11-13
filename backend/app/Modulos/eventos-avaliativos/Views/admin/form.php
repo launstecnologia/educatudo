@@ -2949,11 +2949,13 @@ foreach ($familiasTituloJs as $paiTitulo => $cfgTitulo) {
     var media = 6;
     var pedido = 0;
     var tabelaPronta = true;
+    var mediaCicloConfigurada = false;
     var mediaCicloPendente = false;
     var mediaCicloPronta = false;
 
     function mediaDisponivelParaLista() {
-        return mediaCicloPronta;
+        // Com a métrica marcada no boletim já lista (mesmo sem média calculada).
+        return mediaCicloConfigurada;
     }
 
     function atualizarAvisoMedia(dados) {
@@ -2961,31 +2963,22 @@ foreach ($familiasTituloJs as $paiTitulo => $cfgTitulo) {
         var cfg = !!(dados && dados.media_ciclo_configurada);
         var pend = !!(dados && dados.media_ciclo_pendente);
         var motivo = String((dados && dados.media_ciclo_motivo) || '');
-        mediaCicloPendente = !cfg || pend;
+        mediaCicloConfigurada = cfg;
+        mediaCicloPendente = cfg && pend;
         mediaCicloPronta = cfg && !pend;
         if (botao) {
+            // Puxar abaixo só com média do ciclo calculada (evita marcar pela nota solta do período).
             botao.classList.toggle('hidden', !mediaCicloPronta);
             botao.disabled = !mediaCicloPronta;
         }
-        if (!mediaCicloPronta) {
-            var codEsc = escapar(String((dados && dados.media_ciclo_codigo) || '').trim());
+        if (!cfg) {
             var titulo = 'Os alunos em recuperação só serão definidos após a definição da métrica na sessão Boletim.';
-            var detalhe = 'Marque a <strong>Média do Ciclo</strong> no bloco de cálculo do boletim, clique em <strong>Salvar bloco</strong> e depois <strong>salve o boletim</strong>. '
+            var detalhe = 'Marque a <strong>Média do Ciclo</strong> no bloco de cálculo do boletim, escolha a REC, clique em <strong>Salvar bloco</strong> e depois <strong>salve o boletim</strong>. '
                 + 'Você pode salvar este evento agora e voltar depois para marcar quem faz a prova.';
-            if (cfg && motivo === 'sem_formula') {
-                titulo = 'A Média do Ciclo está marcada, mas o bloco ainda não tem fórmula.';
-                detalhe = 'Abra o bloco'
-                    + (codEsc ? (' “' + codEsc + '”') : '')
-                    + ' no boletim, monte o cálculo, salve o bloco e salve o boletim.';
-            } else if (cfg && pend) {
-                titulo = 'A Média do Ciclo já está marcada no boletim, mas ainda não há notas calculadas.';
-                detalhe = 'Lance as notas das peças da fórmula'
-                    + (codEsc ? (' (“' + codEsc + '”)') : '')
-                    + ' e, se usar boletim gerado, atualize o resultado. Depois volte aqui para listar quem ficou abaixo.';
-            } else if (motivo === 'sem_boletim') {
+            if (motivo === 'sem_boletim') {
                 detalhe = 'Não encontramos um boletim ativo para estas turmas. Confira o documento de boletim da série/turma e marque a <strong>Média do Ciclo</strong> no cálculo.';
             } else if (motivo === 'sem_metrica') {
-                detalhe = 'A flag ainda não está gravada no boletim desta turma/período. No cálculo, marque <strong>Média do Ciclo</strong>, salve o bloco e salve o boletim — o título do bloco precisa bater com esta recuperação (1º período → REC do 1º, etc.).';
+                detalhe = 'A flag ainda não está gravada no boletim desta turma/período. No cálculo, marque <strong>Média do Ciclo</strong>, escolha a REC, salve o bloco e salve o boletim.';
             }
             avisoMedia.className = 'mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-relaxed text-amber-950 sm:text-base';
             avisoMedia.innerHTML = '<p class="font-semibold text-base sm:text-lg text-amber-950">'
@@ -2993,6 +2986,23 @@ foreach ($familiasTituloJs as $paiTitulo => $cfgTitulo) {
                 + '</p>'
                 + '<p class="mt-1.5 text-sm text-amber-900/90">'
                 + detalhe
+                + '</p>';
+            avisoMedia.classList.remove('hidden');
+            return;
+        }
+        var codEsc = escapar(String((dados && dados.media_ciclo_codigo) || '').trim());
+        if (pend) {
+            avisoMedia.className = 'mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-relaxed text-amber-950 sm:text-base';
+            avisoMedia.innerHTML = '<p class="font-semibold text-base sm:text-lg text-amber-950">'
+                + 'Métrica ok'
+                + (codEsc ? (' (“' + codEsc + '”)') : '')
+                + ', mas a média do ciclo ainda não foi calculada.'
+                + '</p>'
+                + '<p class="mt-1.5 text-sm text-amber-900/90">'
+                + 'Listamos os alunos com as notas do período para você marcar. '
+                + 'Para destacar automaticamente quem ficou abaixo pela Média do Ciclo, lance as peças da fórmula'
+                + (codEsc ? (' de “' + codEsc + '”') : '')
+                + ' e atualize o boletim.'
                 + '</p>';
             avisoMedia.classList.remove('hidden');
             return;

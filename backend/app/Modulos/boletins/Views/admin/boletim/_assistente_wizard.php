@@ -1510,6 +1510,11 @@ $boletimWizardSteps = [
             estado.pecas_opcoes[peca.key].blocos_ids = atuais;
             estado.pecas_opcoes[peca.key].blocos_ids_manual = 1;
             estado.pecas_opcoes[peca.key].tipo_avaliacao_id = Number(peca.tipo_avaliacao_id || ev.tipo_avaliacao_id || 0);
+            // Nota da peça: sempre pelo ID do evento (igual ao motor do boletim).
+            var evId = Number(ev.id || 0);
+            if (evId > 0) {
+                estado.pecas_opcoes[peca.key].evento_avaliativo_id = evId;
+            }
         }
         bodyEl.querySelectorAll('.bw-evento-avaliativo:checked').forEach(function (el) {
             var id = Number(el.value);

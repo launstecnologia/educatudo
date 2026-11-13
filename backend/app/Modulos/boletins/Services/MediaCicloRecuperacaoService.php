@@ -460,6 +460,7 @@ class MediaCicloRecuperacaoService
             }
         }
 
+        // Igual ao boletim: nota da peça vem do evento_avaliativo_id (nunca adivinha por sigla).
         $eventoIds = [];
         $tipoIds = [];
         foreach (array_keys($codigos) as $cod) {
@@ -469,10 +470,15 @@ class MediaCicloRecuperacaoService
             }
             $cfg = $this->configDoComponente($c);
             $ev = (int) ($cfg['evento_avaliativo_id'] ?? $c['evento_avaliativo_id'] ?? 0);
-            $tipo = (int) ($cfg['tipo_avaliacao_id'] ?? $c['tipo_avaliacao_id'] ?? 0);
+            if ($ev <= 0) {
+                $ev = $this->eventoIdDosBlocos($c, $cfg);
+            }
             if ($ev > 0) {
                 $eventoIds[$cod] = $ev;
+                continue;
             }
+            // Legado sem vínculo de evento: só aí cai no tipo.
+            $tipo = (int) ($cfg['tipo_avaliacao_id'] ?? $c['tipo_avaliacao_id'] ?? 0);
             if ($tipo > 0) {
                 $tipoIds[$cod] = $tipo;
             }
@@ -551,8 +557,14 @@ class MediaCicloRecuperacaoService
         $filtroPeriodoFinal = $phPeriodo !== [] ? (' AND n.periodo IN (' . implode(', ', $phPeriodo) . ')') : '';
 
         foreach ($eventoIds as $cod => $eventoId) {
-            $params = $paramsBase;
-            $params['ev'] = $eventoId;
+            // Com ID do evento o escopo já está fechado — não filtra bimestre (evita perder nota).
+            $params = ['ano' => $ano, 'ev' => $eventoId];
+            $phTurmaEv = [];
+            foreach ($turmaIds as $i => $tid) {
+                $k = 'et' . $i;
+                $phTurmaEv[] = ':' . $k;
+                $params[$k] = $tid;
+            }
             try {
                 $rows = $this->db->fetchAll(
                     'SELECT n.aluno_id, n.materia_id, MAX(n.nota) AS nota
@@ -560,8 +572,8 @@ class MediaCicloRecuperacaoService
                        INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.deleted_at IS NULL
                       WHERE pb.ano_letivo = :ano
                         AND pb.evento_avaliativo_id = :ev
-                        AND n.turma_id IN (' . $inTurmas . ')
-                        AND n.nota IS NOT NULL' . $filtroPeriodoBloco . '
+                        AND n.turma_id IN (' . implode(', ', $phTurmaEv) . ')
+                        AND n.nota IS NOT NULL
                       GROUP BY n.aluno_id, n.materia_id',
                     $params
                 ) ?: [];
@@ -597,6 +609,23 @@ class MediaCicloRecuperacaoService
                 ) ?: [];
             } catch (Throwable $e) {
                 $rows = [];
+            }
+            if ($rows === []) {
+                try {
+                    $rows = $this->db->fetchAll(
+                        'SELECT n.aluno_id, n.materia_id, MAX(n.nota) AS nota
+                           FROM provas_blocos_notas_lancadas n
+                           INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.deleted_at IS NULL
+                          WHERE pb.ano_letivo = :ano
+                            AND pb.tipo_avaliacao_id = :tipo
+                            AND n.turma_id IN (' . $inTurmas . ')
+                            AND n.nota IS NOT NULL' . $filtroPeriodoBloco . '
+                          GROUP BY n.aluno_id, n.materia_id',
+                        $params
+                    ) ?: [];
+                } catch (Throwable $e) {
+                    $rows = [];
+                }
             }
             foreach ($rows as $row) {
                 $alunoId = (int) ($row['aluno_id'] ?? 0);
@@ -715,6 +744,65 @@ class MediaCicloRecuperacaoService
         }
 
         return $g;
+    }
+
+    /**
+     * Recupera o evento_avaliativo_id a partir dos blocos ligados à coluna.
+     *
+     * @param array<string,mixed> $componente
+     * @param array<string,mixed> $cfg
+     */
+    private function eventoIdDosBlocos(array $componente, array $cfg): int
+    {
+        $ids = [];
+        $raw = $cfg['blocos_ids'] ?? $componente['blocos_ids'] ?? null;
+        if (is_array($raw)) {
+            foreach ($raw as $id) {
+                $id = (int) $id;
+                if ($id > 0) {
+                    $ids[] = $id;
+                }
+            }
+        } elseif (is_string($raw) && trim($raw) !== '') {
+            foreach (explode(',', $raw) as $part) {
+                $id = (int) trim($part);
+                if ($id > 0) {
+                    $ids[] = $id;
+                }
+            }
+        }
+        $bid = (int) ($componente['bloco_id'] ?? $cfg['bloco_id'] ?? 0);
+        if ($bid > 0) {
+            $ids[] = $bid;
+        }
+        $ids = array_values(array_unique($ids));
+        if ($ids === []) {
+            return 0;
+        }
+        $params = [];
+        $ph = [];
+        foreach ($ids as $i => $id) {
+            $k = 'b' . $i;
+            $ph[] = ':' . $k;
+            $params[$k] = $id;
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT evento_avaliativo_id
+                   FROM provas_blocos
+                  WHERE deleted_at IS NULL
+                    AND id IN (' . implode(', ', $ph) . ')
+                    AND evento_avaliativo_id IS NOT NULL
+                    AND evento_avaliativo_id > 0
+                  ORDER BY id ASC
+                  LIMIT 1',
+                $params
+            );
+        } catch (Throwable $e) {
+            return 0;
+        }
+
+        return (int) ($row['evento_avaliativo_id'] ?? 0);
     }
 
     private function colunaExiste(string $tabela, string $coluna): bool

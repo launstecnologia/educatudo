@@ -1443,16 +1443,16 @@ class EventoAvaliativoService
         $usarMediaCiclo = !empty($mediaCiclo['configurada']);
         $mediaCicloPendente = $usarMediaCiclo && !empty($mediaCiclo['pendente']);
         $mediaCicloMotivo = (string) ($mediaCiclo['motivo'] ?? ($usarMediaCiclo ? 'ok' : 'sem_metrica'));
-        // Sem flag / sem média calculável: evento pode ser salvo sem vincular alunos.
-        if (!$usarMediaCiclo || $mediaCicloPendente) {
+        // Sem Média do Ciclo no boletim: não lista (pode salvar o evento sem vincular).
+        if (!$usarMediaCiclo) {
             return [
                 'media' => $media,
                 'alunos' => [],
                 'escala_max' => $escalaMax,
-                'media_ciclo_configurada' => $usarMediaCiclo,
-                'media_ciclo_pendente' => $mediaCicloPendente,
-                'media_ciclo_codigo' => $usarMediaCiclo ? ($mediaCiclo['codigo'] ?? null) : null,
-                'media_ciclo_motivo' => $mediaCicloMotivo,
+                'media_ciclo_configurada' => false,
+                'media_ciclo_pendente' => false,
+                'media_ciclo_codigo' => null,
+                'media_ciclo_motivo' => $mediaCicloMotivo !== '' ? $mediaCicloMotivo : 'sem_metrica',
             ];
         }
         try {
@@ -1473,6 +1473,13 @@ class EventoAvaliativoService
             $materiaId = (int) ($row['materia_id'] ?? 0);
             $alunoId = (int) ($row['id'] ?? 0);
             $notaNum = $svcMediaCiclo->notaAlunoMateria($mediaCiclo, $alunoId, $materiaId);
+            // Sem média do ciclo calculada: usa a nota do período só para listar/sugerir abaixo.
+            if ($notaNum === null && $mediaCicloPendente) {
+                $notaPeriodo = $row['menor_nota'] ?? $row['nota'] ?? $row['nota_final'] ?? null;
+                if (is_numeric($notaPeriodo)) {
+                    $notaNum = round((float) $notaPeriodo, 2);
+                }
+            }
             $turmaId = (int) ($row['turma_lista_id'] ?? $row['turma_id'] ?? 0);
             $chave = $alunoId . '|' . $materiaId;
             $vistos[$chave] = true;
@@ -1484,21 +1491,24 @@ class EventoAvaliativoService
                 'materia_id' => $materiaId,
                 'materia' => (string) ($row['materia_nome'] ?? ''),
                 'nota' => $notaNum,
-                'abaixo' => $notaNum !== null && $notaNum < $media,
+                // Com média pendente a nota do período é só referência — não auto-marca abaixo.
+                'abaixo' => !$mediaCicloPendente && $notaNum !== null && $notaNum < $media,
             ];
         }
-        $alunos = array_merge(
-            $alunos,
-            $this->linhasExtrasMediaCiclo($mediaCiclo, $vistos, $media, $turmaIds)
-        );
+        if (!$mediaCicloPendente) {
+            $alunos = array_merge(
+                $alunos,
+                $this->linhasExtrasMediaCiclo($mediaCiclo, $vistos, $media, $turmaIds)
+            );
+        }
         return [
             'media' => $media,
             'alunos' => $alunos,
             'escala_max' => $escalaMax,
             'media_ciclo_configurada' => true,
-            'media_ciclo_pendente' => false,
+            'media_ciclo_pendente' => $mediaCicloPendente,
             'media_ciclo_codigo' => $mediaCiclo['codigo'] ?? null,
-            'media_ciclo_motivo' => 'ok',
+            'media_ciclo_motivo' => $mediaCicloPendente ? $mediaCicloMotivo : 'ok',
         ];
     }
 
