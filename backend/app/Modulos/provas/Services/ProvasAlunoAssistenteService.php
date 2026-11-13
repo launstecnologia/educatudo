@@ -15,8 +15,8 @@ use App\Painel\Admin\Services\AssistenteConsultaAmpliadaService;
 class ProvasAlunoAssistenteService
 {
     public const MODULO_CREDITOS = 'provas_aluno_assistente_mensagem';
-    /** Só true em debug local — em produção deve ficar false (cobrança TudiCoins). */
-    public const LIBERAR_SEM_TUDICOINS = false;
+    /** Suspende a exigência e o débito de TudiCoins no Chat Assistente. */
+    public const LIBERAR_SEM_TUDICOINS = true;
     public const DELIMITADOR_INICIO = '<<<CONSULTA>>>';
     public const DELIMITADOR_FIM = '<<<FIM>>>';
     private const MAX_RODADAS = 6;
@@ -5755,15 +5755,11 @@ PROMPT
 
     private function assertCreditosDisponiveis(): void
     {
-        if (!CreditosModuleRegistry::isValid(self::MODULO_CREDITOS)) {
+        if (self::LIBERAR_SEM_TUDICOINS || !CreditosModuleRegistry::isValid(self::MODULO_CREDITOS)) {
             return;
         }
         $creditos = new \App\Services\CreditosService();
         if (!$creditos->isCreditosHabilitado()) {
-            // Liberação local: escola sem TudiCoins ainda usa o assistente.
-            if (self::LIBERAR_SEM_TUDICOINS) {
-                return;
-            }
             throw new \Exception('TudiCoins desabilitado para esta escola. Ações com IA não estão disponíveis.');
         }
         if (!$creditos->podeConsumir(
@@ -5777,14 +5773,11 @@ PROMPT
 
     private function debitarCreditos(): void
     {
-        if (!CreditosModuleRegistry::isValid(self::MODULO_CREDITOS)) {
+        if (self::LIBERAR_SEM_TUDICOINS || !CreditosModuleRegistry::isValid(self::MODULO_CREDITOS)) {
             return;
         }
         $creditos = new \App\Services\CreditosService();
         if (!$creditos->isCreditosHabilitado()) {
-            if (self::LIBERAR_SEM_TUDICOINS) {
-                return;
-            }
             throw new \Exception('TudiCoins desabilitado para esta escola. Ações com IA não estão disponíveis.');
         }
         $creditos->consumirEscola(self::MODULO_CREDITOS, 'provas_aluno_assistente');
