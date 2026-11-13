@@ -94,6 +94,8 @@ class ProvasAlunoAssistenteService
 
         // Clique "Selecionar" no painel: nunca trate o id como RA; retome o pedido anterior.
         $mensagemUsuario = $this->reescreverSelecaoAluno($mensagemUsuario, $historico);
+        $mensagemUsuario = $this->reescreverSelecaoCategoria($mensagemUsuario, $historico);
+        $mensagemUsuario = $this->reescreverSelecaoAula($mensagemUsuario, $historico);
 
         // "sim" / "confirmo" no chat aplica a proposta pendente (mesmo efeito do botão Confirmar).
         if ($this->mensagemConfirmaProposta($mensagemUsuario)) {
@@ -414,7 +416,8 @@ class ProvasAlunoAssistenteService
         // Registro (ocorrência/entrada/saída/chamada): exige painel com botão Confirmar.
         // Não sequestrar consultas de leitura já resolvidas.
         $toolConsultaOcorrencia = in_array($ultimaTool, ['ocorrencias_aluno', 'ocorrencias_turma'], true);
-        if ($this->pedidoPareceRegistroEscrita($mensagemUsuario) && !$toolConsultaOcorrencia) {
+        $continuacaoEscrita = $this->pedidoPareceContinuacaoEscrita($mensagemUsuario, $mensagens);
+        if (($this->pedidoPareceRegistroEscrita($mensagemUsuario) || $continuacaoEscrita) && !$toolConsultaOcorrencia) {
             $garantiaProp = $this->garantirPropostaEscrita(
                 $mensagemUsuario,
                 $mensagens,
@@ -770,14 +773,20 @@ class ProvasAlunoAssistenteService
             $detalhes = is_array($resultado['detalhes'] ?? null)
                 ? $resultado['detalhes']
                 : $this->acoes->detalhesProposta($tipoAcao, $payload);
+            $alunoPainel = null;
+            if (!empty($payload['alunos'][0]) && is_array($payload['alunos'][0])) {
+                $alunoPainel = $payload['alunos'][0];
+            }
             return [
                 'tipo' => 'proposta',
                 'proposta_id' => (int) $resultado['proposta_id'],
                 'acao' => $tipoAcao,
+                'proposta_tipo' => $tipoAcao,
                 'resumo' => (string) ($resultado['resumo'] ?? ''),
                 'detalhes' => $detalhes,
                 'situacao' => (string) ($resultado['situacao'] ?? 'RASCUNHO'),
                 'payload' => $payload,
+                'aluno' => $alunoPainel,
             ];
         }
         if (!empty($resultado['candidatos_aulas']) && is_array($resultado['candidatos_aulas'])) {
@@ -814,6 +823,8 @@ class ProvasAlunoAssistenteService
                 'tipo' => 'candidatos_categorias',
                 'aviso' => (string) ($resultado['aviso'] ?? 'Escolha a categoria:'),
                 'candidatos_categorias' => $resultado['candidatos_categorias'],
+                'aluno' => $resultado['aluno'] ?? null,
+                'payload' => $resultado['payload'] ?? null,
             ];
         }
         if (!empty($resultado['categorias']) && is_array($resultado['categorias']) && empty($resultado['ok'])) {
@@ -1314,6 +1325,8 @@ class ProvasAlunoAssistenteService
                 'tipo' => 'notas_evento_aluno',
                 'aluno' => $resultado['aluno'] ?? null,
                 'ano_letivo' => $resultado['ano_letivo'] ?? null,
+                'bimestre' => $resultado['bimestre'] ?? ($resultado['evento']['bimestre'] ?? null),
+                'materia' => $resultado['materia'] ?? null,
                 'evento' => $resultado['evento'] ?? null,
                 'coluna' => $resultado['coluna'] ?? null,
                 'quadro' => $resultado['quadro'] ?? null,
@@ -1388,7 +1401,7 @@ Regras importantes:
 2) Se citar turma (ex.: "2 Ano B", "2ªB"), SEMPRE passe args.turma / turma_nome (separado do nome).
 3) NUNCA peça confirmação antes de consultar. Chame a tool primeiro. Se houver 1 aluno, use-o; se houver vários, mostre candidatos.
 4) termo/aluno_nome = só o nome (ex.: "Maria Clara" = nome + sobrenome com LIKE %%token%%), NUNCA junte turma no nome ("Maria Clara do 2 Ano B" está errado).
-5) Se o usuário informar RA/matrícula (ex.: "RA 24254"), passe args.ra só com os dígitos ("24254"). NUNCA use aluno_id como RA. NUNCA peça id numérico ao usuário (aluno_id, turma_id, categoria_id, diario_aula_id, prova_id, professor_id) — localize sempre por nome, RA ou turma. Se a UI já trouxe aluno_id=76 no histórico interno, use esse id sem perguntar.
+5) Se o usuário informar RA/matrícula (ex.: "RA 24254" ou "RA SM24254"), passe args.ra com o código completo (aceita alfanumérico). NUNCA use aluno_id como RA. NUNCA peça id numérico ao usuário (aluno_id, turma_id, categoria_id, diario_aula_id, prova_id, professor_id) — localize sempre por nome, RA ou turma. Se a UI já trouxe aluno_id=76 no histórico interno, use esse id sem perguntar. Pronomes como "essa aluna"/"esse aluno" reusam o aluno já identificado na conversa.
 6) Ano letivo (ex.: 2024) vai em args.ano_letivo / args.ano, nunca dentro de aluno_nome ou ra.
 7) Pedido sobre ALUNO + provas → resumo_provas_aluno ou listar_provas_aluno (última prova = listar e pegar a mais recente).
 8) Pedido sobre ALUNO + jornadas → resumo_jornadas_aluno.
@@ -1398,7 +1411,7 @@ Regras importantes:
 12) Pedido de SAÚDE ACADÊMICA da escola / alunos com alerta cadastral → saude_academica.
 13) Pedido de PERFIL 360 / visão geral de um aluno → perfil_aluno_360.
 14) Pedido de DIÁRIO atrasado / pendências de diário → diario_pendencias.
-15) Pedido de GRADE HORÁRIA / "qual aula hoje" → grade_horaria_consulta.
+15) Pedido de GRADE HORÁRIA / "qual aula hoje" → grade_horaria_consulta. Isso NÃO é chamada do Diário. Marcar presença/falta → propor_chamada_aula (só se houver aula no diário).
 16) Pedido de BOLETIM completo → boletim_aluno. Pedido de UMA NOTA de matéria no boletim (ex.: "nota de matemática da Júlia") → notas_evento_aluno com materia="Matemática" (e bimestre/coluna se souber).
 17) Colunas do BOLETIM (PP, PU, MU, CH, PE, MS, MA, REC, PF) → SEMPRE notas_evento_aluno com args.coluna="PP" (etc.), materia exata (ex.: "Matemática 1") e bimestre se souber. NUNCA use nota_evento_sigla para essas siglas — elas não são Eventos Avaliativos; o valor DEVE ser a mesma célula do quadro/PDF. Se a coluna existir em vários bimestres e o usuário não disse qual, a tool devolve candidatos — peça o bimestre. Nota por SIGLA/NOME de Evento Avaliativo cadastrado (ex.: "PB", "prova bimestral", "PO") → nota_evento_sigla. Compare com o catálogo abaixo; NUNCA invente o significado da sigla.
 18) Frequência/presença/faltas (consulta) → faltas_aluno.
@@ -1416,8 +1429,9 @@ Regras importantes:
 25) Saude_academica é alerta cadastral/matrícula/chamada da escola; para rendimento de uma turma use saude_turma.
 26) CRIAR ocorrência / registrar incidente → OBRIGATÓRIO emitir <<<CONSULTA>>> propor_criar_ocorrencia. NUNCA peça "confirme" só em texto — sem a tool não há botão Confirmar. NÃO diga que criou; diga que preparou a proposta. Nunca afirme "ocorrência registrada" só porque o usuário escreveu "sim" sem a confirmação ter rodado.
 27) Registrar ENTRADA ou SAÍDA (portaria) → OBRIGATÓRIO propor_entrada_saida (mesmo: botão Confirmar via tool, nunca só texto).
-28) Marcar PRESENTE/FALTA na CHAMADA → OBRIGATÓRIO propor_chamada_aula.
-29) Em ações de escrita, se nome ficar ambíguo, devolva candidatos; nunca chute aluno_id. Sem titulo+detalhe+gravidade (ocorrência), peça esses campos — ainda assim NÃO simule confirmação em texto.
+28) Marcar PRESENTE/FALTA na CHAMADA → OBRIGATÓRIO propor_chamada_aula. Se a tool disser que a aula só está na grade (sem diário), explique isso — não invente chamada.
+29) Em ações de escrita, se nome ficar ambíguo, devolva candidatos clicáveis; nunca chute aluno_id. Categoria de ocorrência pelo NOME (ex.: Conversa). Preserve RA, turma e descrição entre mensagens. Sem titulo+detalhe+gravidade, complete com o que já houver no histórico — ainda assim NÃO simule confirmação em texto.
+30) Follow-up "no mesmo bimestre" / "dessa mesma turma" → reaproveite ano_letivo, bimestre e turma_nome do [contexto_estruturado].
 
 Para obter dados, emita EXATAMENTE:
 <<<CONSULTA>>>
@@ -1476,12 +1490,78 @@ PROMPT
      */
     private function extrairContextoProvasDoHistorico(array $mensagens): array
     {
+        $ctx = $this->extrairContextoConsultaDoHistorico($mensagens);
+        return [
+            'aluno_id' => (int) ($ctx['aluno_id'] ?? 0),
+            'provas' => is_array($ctx['provas'] ?? null) ? $ctx['provas'] : [],
+        ];
+    }
+
+    /**
+     * Contexto rico da conversa: aluno, RA, turma, bimestre, ano, ocorrência em andamento.
+     *
+     * @param list<array{role?:string,content?:string}> $mensagens
+     * @return array<string,mixed>
+     */
+    private function extrairContextoConsultaDoHistorico(array $mensagens): array
+    {
         $alunoId = 0;
+        $alunoNome = '';
+        $ra = '';
+        $turmaNome = '';
+        $bimestre = 0;
+        $anoLetivo = 0;
+        $coluna = '';
+        $materia = '';
+        $ocorrenciaTitulo = '';
+        $ocorrenciaDetalhe = '';
+        $propostaPendente = false;
         $provas = [];
+
         foreach ($mensagens as $msg) {
             $c = (string) ($msg['content'] ?? '');
             if (preg_match('/aluno_id\s*=\s*(\d+)/', $c, $m)) {
                 $alunoId = (int) $m[1];
+            }
+            if (preg_match('/aluno_nome="([^"]+)"/', $c, $mN)) {
+                $alunoNome = trim($mN[1]);
+            }
+            if (preg_match('/\bra="([^"]+)"/', $c, $mRa)) {
+                $ra = trim($mRa[1]);
+            } elseif (
+                str_contains($c, '[contexto_estruturado]') || str_contains($c, '[contexto_conversa]')
+            ) {
+                // Só lê RA livre dentro de blocos estruturados (evita falso positivo no chat).
+                if (preg_match('/\bRA\s*[#:]?\s*([A-Za-z0-9]{3,20})\b/iu', $c, $mRa2) === 1) {
+                    $cand = $mRa2[1];
+                    if (preg_match('/^20\d{2}$/', $cand) !== 1) {
+                        $ra = $cand;
+                    }
+                }
+            }
+            if (preg_match('/turma_nome="([^"]+)"/', $c, $mT)) {
+                $turmaNome = trim($mT[1]);
+            }
+            if (preg_match('/\bbimestre\s*=\s*([1-4])\b/', $c, $mB) === 1) {
+                $bimestre = (int) $mB[1];
+            }
+            if (preg_match('/\bano_letivo\s*=\s*(20\d{2})\b/', $c, $mA) === 1) {
+                $anoLetivo = (int) $mA[1];
+            }
+            if (preg_match('/coluna="([^"]+)"/', $c, $mC)) {
+                $coluna = trim($mC[1]);
+            }
+            if (preg_match('/materia="([^"]+)"/', $c, $mM)) {
+                $materia = trim($mM[1]);
+            }
+            if (preg_match('/ocorrencia_titulo="([^"]+)"/', $c, $mOt)) {
+                $ocorrenciaTitulo = trim($mOt[1]);
+            }
+            if (preg_match('/ocorrencia_detalhe="([^"]+)"/', $c, $mOd)) {
+                $ocorrenciaDetalhe = trim($mOd[1]);
+            }
+            if (preg_match('/proposta_pendente\s*=\s*1|aguardando_categoria\s*=\s*1/u', $c) === 1) {
+                $propostaPendente = true;
             }
             if (preg_match_all(
                 '/prova_id\s*=\s*(\d+)\s+titulo="([^"]*)"\s+materia="([^"]*)"(?:\s+erros=(\d+|—))?/',
@@ -1500,7 +1580,6 @@ PROMPT
                     ];
                 }
             }
-            // "Detalhe da prova_id 123"
             if (preg_match('/prova_id\s+(\d+)/', $c, $m2)) {
                 $pid = (int) $m2[1];
                 $exists = false;
@@ -1520,7 +1599,21 @@ PROMPT
                 }
             }
         }
-        return ['aluno_id' => $alunoId, 'provas' => $provas];
+
+        return [
+            'aluno_id' => $alunoId,
+            'aluno_nome' => $alunoNome,
+            'ra' => $ra,
+            'turma_nome' => $turmaNome,
+            'bimestre' => $bimestre,
+            'ano_letivo' => $anoLetivo,
+            'coluna' => $coluna,
+            'materia' => $materia,
+            'ocorrencia_titulo' => $ocorrenciaTitulo,
+            'ocorrencia_detalhe' => $ocorrenciaDetalhe,
+            'proposta_pendente' => $propostaPendente,
+            'provas' => $provas,
+        ];
     }
 
     private function pedidoPedeDetalheQuestoes(string $mensagem): bool
@@ -1636,13 +1729,22 @@ PROMPT
         $pedidoAnterior = $this->ultimoPedidoUsuario($historico, '/^usar\s+aluno_id\s+\d+/iu');
         $evento = $this->extrairEventoAvaliativoDoTexto($pedidoAnterior !== '' ? $pedidoAnterior : $mensagem);
         $materia = $this->extrairMateriaDaPergunta($pedidoAnterior !== '' ? $pedidoAnterior : $mensagem);
+        $acaoEscrita = $this->detectarTipoProposta($pedidoAnterior !== '' ? $pedidoAnterior : '');
 
         $parts = ['Aluno já escolhido: aluno_id=' . $alunoId . '.'];
         $parts[] = 'NÃO chame buscar_alunos. NÃO use esse número como RA.';
         if ($pedidoAnterior !== '') {
             $parts[] = 'Retome o pedido original: «' . mb_substr($pedidoAnterior, 0, 400) . '».';
         }
-        if ($evento !== null) {
+        if ($pedidoAnterior !== '' && $this->pedidoPareceRegistroEscrita($pedidoAnterior)) {
+            $toolHint = match ($acaoEscrita) {
+                'entrada_saida' => 'propor_entrada_saida',
+                'chamada_aula' => 'propor_chamada_aula',
+                default => 'propor_criar_ocorrencia',
+            };
+            $parts[] = 'Emita ' . $toolHint . ' com aluno_id=' . $alunoId
+                . ' e os demais dados do pedido (categoria/título/detalhe/data). Monte o rascunho com botão Confirmar.';
+        } elseif ($evento !== null) {
             $argsHint = [];
             if (!empty($evento['sigla'])) {
                 $argsHint[] = 'sigla="' . $evento['sigla'] . '"';
@@ -1661,6 +1763,79 @@ PROMPT
         } else {
             $parts[] = 'Continue a consulta pedida com aluno_id=' . $alunoId . ' imediatamente.';
         }
+        return implode(' ', $parts);
+    }
+
+    /**
+     * Chip "Categoria Conversa" / "Registrar ocorrência com categoria Conversa".
+     *
+     * @param list<array{role?:string,content?:string}> $historico
+     */
+    private function reescreverSelecaoCategoria(string $mensagem, array $historico): string
+    {
+        if (preg_match('/^(?:registrar\s+ocorr[eê]ncia\s+com\s+)?categoria\s+(.+)$/iu', trim($mensagem), $m) !== 1) {
+            return $mensagem;
+        }
+        $categoria = trim($m[1], " \t.,;:");
+        if ($categoria === '') {
+            return $mensagem;
+        }
+        $pedidoAnterior = $this->ultimoPedidoUsuario(
+            $historico,
+            '/^(?:registrar\s+ocorr[eê]ncia\s+com\s+)?categoria\s+/iu'
+        );
+        $ctx = $this->extrairContextoConsultaDoHistorico($historico);
+        $parts = [
+            'Registrar ocorrência com categoria "' . $categoria . '".',
+            'NÃO peça categoria_id. Use categoria="' . $categoria . '" em propor_criar_ocorrencia.',
+        ];
+        if (!empty($ctx['aluno_id'])) {
+            $parts[] = 'aluno_id=' . (int) $ctx['aluno_id'] . '.';
+        }
+        if (!empty($ctx['ra'])) {
+            $parts[] = 'RA ' . $ctx['ra'] . '.';
+        }
+        if (!empty($ctx['turma_nome'])) {
+            $parts[] = 'turma "' . $ctx['turma_nome'] . '".';
+        }
+        if (!empty($ctx['ocorrencia_titulo'])) {
+            $parts[] = 'titulo="' . $ctx['ocorrencia_titulo'] . '".';
+        }
+        if (!empty($ctx['ocorrencia_detalhe'])) {
+            $parts[] = 'detalhe="' . $ctx['ocorrencia_detalhe'] . '".';
+        }
+        if ($pedidoAnterior !== '') {
+            $parts[] = 'Retome o pedido original: «' . mb_substr($pedidoAnterior, 0, 400) . '».';
+        }
+        $parts[] = 'Monte o rascunho com botão Confirmar agora.';
+        return implode(' ', $parts);
+    }
+
+    /**
+     * Chip de aula do diário: "… diario_aula_id=123".
+     *
+     * @param list<array{role?:string,content?:string}> $historico
+     */
+    private function reescreverSelecaoAula(string $mensagem, array $historico): string
+    {
+        if (preg_match('/diario_aula_id\s*=\s*(\d+)/i', $mensagem, $m) !== 1) {
+            return $mensagem;
+        }
+        $aulaId = (int) $m[1];
+        if ($aulaId <= 0) {
+            return $mensagem;
+        }
+        $pedidoAnterior = $this->ultimoPedidoUsuario($historico, '/diario_aula_id\s*=\s*\d+/i');
+        $ctx = $this->extrairContextoConsultaDoHistorico($historico);
+        $parts = ['Aula do diário já escolhida: diario_aula_id=' . $aulaId . '.'];
+        $parts[] = 'Emita propor_chamada_aula com diario_aula_id=' . $aulaId . '.';
+        if (!empty($ctx['aluno_id'])) {
+            $parts[] = 'aluno_id=' . (int) $ctx['aluno_id'] . '.';
+        }
+        if ($pedidoAnterior !== '') {
+            $parts[] = 'Retome o pedido original: «' . mb_substr($pedidoAnterior, 0, 400) . '».';
+        }
+        $parts[] = 'Monte o rascunho com botão Confirmar.';
         return implode(' ', $parts);
     }
 
@@ -2241,8 +2416,12 @@ PROMPT
         if ($ra !== null && $ra !== '') {
             return $ra;
         }
-        if (preg_match('/\bRA\s*[#:]?\s*(\d{3,12})\b/iu', $texto, $m) === 1) {
-            return $m[1];
+        if (preg_match('/\bRA\s*[#:]?\s*([A-Za-z0-9]{3,20})\b/iu', $texto, $m) === 1) {
+            $cand = $m[1];
+            if (preg_match('/^20\d{2}$/', $cand) === 1) {
+                return null;
+            }
+            return preg_match('/[A-Za-z]/', $cand) === 1 ? strtoupper($cand) : $cand;
         }
         return null;
     }
@@ -2403,7 +2582,7 @@ PROMPT
             return false;
         }
         if (
-            preg_match('/\bmesmo\s+bimestre\b|\bmesma\s+coluna\b/iu', $pergunta) === 1
+            preg_match('/\b(?:no\s+|do\s+)?mesmo\s+bimestre\b|\bmesma\s+coluna\b/iu', $pergunta) === 1
             && $this->historicoRecenteFalaNotaColuna($historico)
         ) {
             return true;
@@ -2578,15 +2757,17 @@ PROMPT
             $args['materia'] = $materia;
         }
 
+        $ctxHist = $this->extrairContextoConsultaDoHistorico($mensagens);
+
         $bim = $this->extrairBimestreDaPergunta($mensagemUsuario);
-        if ($bim <= 0 && preg_match('/\bmesmo\s+bimestre\b/iu', $mensagemUsuario) === 1) {
-            $bim = (int) ($ultimoResultado['bimestre'] ?? $ultimoResultado['evento']['bimestre'] ?? 0);
+        if ($bim <= 0 && preg_match('/\b(?:no\s+|do\s+)?mesmo\s+bimestre\b/iu', $mensagemUsuario) === 1) {
+            $bim = (int) ($ultimoResultado['bimestre'] ?? $ultimoResultado['evento']['bimestre'] ?? $ctxHist['bimestre'] ?? 0);
         }
         if ($bim <= 0) {
             $bim = $this->extrairBimestreDaPergunta($this->ultimoPedidoUsuario($mensagens, null) ?: '');
         }
         if ($bim <= 0) {
-            $bim = (int) ($ultimoResultado['bimestre'] ?? $ultimoResultado['evento']['bimestre'] ?? 0);
+            $bim = (int) ($ultimoResultado['bimestre'] ?? $ultimoResultado['evento']['bimestre'] ?? $ctxHist['bimestre'] ?? 0);
         }
         if ($bim > 0) {
             $args['bimestre'] = $bim;
@@ -2596,6 +2777,8 @@ PROMPT
             $args['ano_letivo'] = (int) $mAno[1];
         } elseif (!empty($ultimoResultado['ano_letivo'])) {
             $args['ano_letivo'] = (int) $ultimoResultado['ano_letivo'];
+        } elseif (!empty($ctxHist['ano_letivo'])) {
+            $args['ano_letivo'] = (int) $ctxHist['ano_letivo'];
         } elseif (preg_match('/\b(20\d{2})\b/', $this->ultimoPedidoUsuario($mensagens, null) ?: '', $mAno2) === 1) {
             $args['ano_letivo'] = (int) $mAno2[1];
         }
@@ -2628,6 +2811,114 @@ PROMPT
             '/\b(registrar|registre|criar|crie|lancar|lançar|abra|abrir|marcar|marque)\b.{0,60}\b(ocorr[eê]ncia|incidente|entrada|sa[ií]da|chamada|presen[cç]a|falta|presente)\b/iu',
             $pergunta
         );
+    }
+
+    /**
+     * Continuação de rascunho (categoria, "essa aluna", descrição) sem repetir o verbo.
+     *
+     * @param list<array{role?:string,content?:string}> $historico
+     */
+    private function pedidoPareceContinuacaoEscrita(string $pergunta, array $historico): bool
+    {
+        $ctx = $this->extrairContextoConsultaDoHistorico($historico);
+        $p = trim($pergunta);
+        if (preg_match('/^(?:registrar\s+ocorr[eê]ncia\s+com\s+)?categoria\s+/iu', $p) === 1) {
+            return true;
+        }
+        if (preg_match('/diario_aula_id\s*=\s*\d+/i', $p) === 1) {
+            return true;
+        }
+        if (
+            preg_match('/\b(ess[ae]\s+alun[oa]|est[ae]\s+alun[oa]|el[ae]|dessel[ae]|dessa\s+aluna)\b/iu', $p) === 1
+            && (
+                !empty($ctx['aluno_id'])
+                || !empty($ctx['proposta_pendente'])
+                || $this->historicoRecenteFalaEscrita($historico)
+            )
+        ) {
+            return true;
+        }
+        // Seleção de aluno após pedido de escrita.
+        if (
+            preg_match('/aluno_id\s*=\s*\d+|usar\s+aluno_id\s+\d+/i', $p) === 1
+            && $this->historicoRecenteFalaEscrita($historico)
+        ) {
+            return true;
+        }
+
+        $emOcorrencia = !empty($ctx['proposta_pendente'])
+            || $this->historicoRecenteFalaEscrita($historico)
+            || $this->assistentePediuCampoOcorrencia($historico) !== null;
+        if (!$emOcorrencia) {
+            return false;
+        }
+
+        // Resposta livre após a Tudinha pedir categoria/detalhe (ex.: "Conversa na Sala de Aula").
+        if ($this->assistentePediuCampoOcorrencia($historico) !== null) {
+            return true;
+        }
+        if (preg_match('/^(conversa|disciplina|atraso|bullying|uniforme|comportamento)\b/iu', $p) === 1) {
+            return true;
+        }
+        if (preg_match('/(?:detalhe|descri[cç][aã]o|t[ií]tulo)\s*[:\-]/iu', $p) === 1) {
+            return true;
+        }
+        // Descrição longa sem verbo novo (continuação do rascunho).
+        if (mb_strlen($p) >= 12
+            && preg_match('/\b(boletim|nota|faltas?|grade|jornada|prova|chamada|entrada|sa[ií]da)\b/iu', $p) !== 1
+        ) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Última fala do assistente pedindo campo da ocorrência.
+     *
+     * @param list<array{role?:string,content?:string}> $historico
+     * @return 'categoria'|'detalhe'|'titulo'|'aluno'|null
+     */
+    private function assistentePediuCampoOcorrencia(array $historico): ?string
+    {
+        foreach (array_reverse(array_slice($historico, -6)) as $msg) {
+            if (($msg['role'] ?? '') !== 'assistant') {
+                continue;
+            }
+            $c = mb_strtolower($this->semAcento((string) ($msg['content'] ?? '')));
+            if ($c === '') {
+                continue;
+            }
+            if (preg_match('/categoria/u', $c) === 1) {
+                return 'categoria';
+            }
+            if (preg_match('/(detalhe|descricao|descreva|forneca um detalhe|informe o detalhe)/u', $c) === 1) {
+                return 'detalhe';
+            }
+            if (preg_match('/titulo/u', $c) === 1) {
+                return 'titulo';
+            }
+            if (preg_match('/(qual alun|informe o alun|confirme o alun)/u', $c) === 1) {
+                return 'aluno';
+            }
+            // Só olha a última resposta relevante do assistente.
+            break;
+        }
+        return null;
+    }
+
+    /** @param list<array{role?:string,content?:string}> $historico */
+    private function historicoRecenteFalaEscrita(array $historico): bool
+    {
+        foreach (array_reverse(array_slice($historico, -8)) as $msg) {
+            $c = (string) ($msg['content'] ?? '');
+            if ($this->pedidoPareceRegistroEscrita($c)) {
+                return true;
+            }
+            if (preg_match('/proposta_pendente\s*=\s*1|propor_criar_ocorrencia|propor_chamada_aula|propor_entrada_saida|candidatos_categorias|informe a categoria/iu', $c) === 1) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -2668,8 +2959,31 @@ PROMPT
                 'texto' => trim((string) ($ultimoResultado['aviso'] ?? 'Há mais de um aluno. Escolha um:')),
             ];
         }
+        // Categoria ambígua: manter chips (não deixar a IA inventar "não reconhecida").
+        if (
+            in_array($ultimaTool, $toolsProposta, true)
+            && is_array($ultimoResultado)
+            && !empty($ultimoResultado['candidatos_categorias'])
+            && empty($ultimoResultado['ok'])
+            && !$this->mensagemTrazCategoriaOuDetalhe($mensagemUsuario, $mensagens)
+        ) {
+            return [
+                'tool' => $ultimaTool,
+                'resultado' => $ultimoResultado,
+                'texto' => trim((string) ($ultimoResultado['aviso'] ?? 'Confirme a categoria pelo nome:')),
+            ];
+        }
 
         $tipo = $this->detectarTipoProposta($mensagemUsuario);
+        if ($tipo === 'criar_ocorrencia' && $this->historicoRecenteFalaEscrita($mensagens)) {
+            $tipo = 'criar_ocorrencia';
+        } elseif (
+            $this->historicoRecenteFalaEscrita($mensagens)
+            && !$this->pedidoPareceRegistroEscrita($mensagemUsuario)
+            && !preg_match('/\b(entrada|saida|chamada|presente|falta)\b/iu', $mensagemUsuario)
+        ) {
+            $tipo = 'criar_ocorrencia';
+        }
         $args = $this->montarArgsProposta($mensagemUsuario, $mensagens, $ultimoResultado, $tipo);
 
         // Sem aluno resolvido: busca candidatos com botão Confirmar (não só texto).
@@ -2714,7 +3028,7 @@ PROMPT
 
         // Completa defaults da ocorrência para o card Confirmar aparecer.
         if ($tipo === 'criar_ocorrencia') {
-            $args = $this->completarArgsOcorrencia($args, $mensagemUsuario);
+            $args = $this->completarArgsOcorrencia($args, $mensagemUsuario, $mensagens);
         }
 
         $tool = match ($tipo) {
@@ -2766,10 +3080,14 @@ PROMPT
         if (preg_match('/\bocorrencia\b|\bincidente\b/u', $p) === 1) {
             return 'criar_ocorrencia';
         }
+        // Chip/continuação de categoria → ocorrência (não consulta genérica).
+        if (preg_match('/^(?:registrar\s+ocorrencia\s+com\s+)?categoria\s+/u', $p) === 1) {
+            return 'criar_ocorrencia';
+        }
         if (preg_match('/\b(entrada|saida)\b/u', $p) === 1) {
             return 'entrada_saida';
         }
-        if (preg_match('/\b(chamada|presente|falta)\b/u', $p) === 1) {
+        if (preg_match('/\b(chamada|presente|falta|diario_aula_id)\b/u', $p) === 1) {
             return 'chamada_aula';
         }
         return 'criar_ocorrencia';
@@ -2786,27 +3104,57 @@ PROMPT
         string $tipo
     ): ?array {
         $args = [];
+        $ctx = $this->extrairContextoConsultaDoHistorico($mensagens);
+        $refPronome = preg_match(
+            '/\b(ess[ae]\s+alun[oa]|est[ae]\s+alun[oa]|el[ae]|dessa\s+aluna|desse\s+aluno)\b/iu',
+            $mensagemUsuario
+        ) === 1;
+
         $alunoId = (int) ($ultimoResultado['aluno']['id'] ?? 0);
         if ($alunoId <= 0) {
-            $ctx = $this->extrairContextoProvasDoHistorico($mensagens);
             $alunoId = (int) ($ctx['aluno_id'] ?? 0);
+        }
+        if ($alunoId <= 0 && preg_match('/aluno_id\s*=\s*(\d+)/i', $mensagemUsuario, $mAid) === 1) {
+            $alunoId = (int) $mAid[1];
         }
         if ($alunoId > 0) {
             $args['aluno_id'] = $alunoId;
         }
+
+        $raMsg = $this->extrairRaDaMensagem($mensagemUsuario);
+        if ($raMsg !== null && $raMsg !== '' && empty($args['aluno_id'])) {
+            $args['ra'] = $raMsg;
+            $args['aluno_nome'] = 'ra ' . $raMsg;
+            $args['alunos'] = ['ra ' . $raMsg];
+        } elseif (!empty($ctx['ra']) && ($refPronome || empty($args['aluno_id']))) {
+            $args['ra'] = (string) $ctx['ra'];
+        }
+
         $nomeAluno = trim((string) ($ultimoResultado['aluno']['nome'] ?? ''));
-        if ($nomeAluno === '' && preg_match(
+        if ($nomeAluno === '' && !empty($ctx['aluno_nome']) && ($refPronome || $alunoId > 0)) {
+            $nomeAluno = (string) $ctx['aluno_nome'];
+        }
+        if ($nomeAluno === '' && !$refPronome && preg_match(
             '/\b(?:aluna|aluno)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s]{2,60})/u',
             $mensagemUsuario,
             $mNome
         ) === 1) {
             $nomeAluno = trim($mNome[1]);
+            $nomeAluno = preg_replace('/\s+(?:da|do|de|no|na|para|com|por|sobre|RA)\b.*$/iu', '', $nomeAluno) ?? $nomeAluno;
+            $nomeAluno = trim($nomeAluno);
         }
         if ($nomeAluno !== '') {
             $args['aluno_nome'] = $nomeAluno;
             $args['alunos'] = [$nomeAluno];
         }
+
         $turma = trim((string) ($ultimoResultado['aluno']['turma_nome'] ?? $ultimoResultado['turma']['nome'] ?? ''));
+        if ($turma === '' && !empty($ctx['turma_nome'])) {
+            $turma = (string) $ctx['turma_nome'];
+        }
+        if ($turma === '' && preg_match('/\bturma\s+([A-Za-zÀ-ÿ0-9ªº°][A-Za-zÀ-ÿ0-9ªº°\s.\-]{0,40})/iu', $mensagemUsuario, $mTur) === 1) {
+            $turma = trim($mTur[1]);
+        }
         if ($turma !== '') {
             $args['turma'] = $turma;
         }
@@ -2823,7 +3171,7 @@ PROMPT
                     (int) $mH[2]
                 );
             }
-            if (empty($args['aluno_id']) && empty($args['aluno_nome'])) {
+            if (empty($args['aluno_id']) && empty($args['aluno_nome']) && empty($args['ra'])) {
                 return null;
             }
             return $args;
@@ -2832,6 +3180,9 @@ PROMPT
         if ($tipo === 'chamada_aula') {
             $p = mb_strtolower($this->semAcento($mensagemUsuario));
             $args['situacao'] = str_contains($p, 'falta') ? 'falta' : 'presente';
+            if (preg_match('/diario_aula_id\s*=\s*(\d+)/i', $mensagemUsuario, $mAula) === 1) {
+                $args['diario_aula_id'] = (int) $mAula[1];
+            }
             if (preg_match('/\b(\d{2})\/(\d{2})\/(\d{4})\b/', $mensagemUsuario, $mD) === 1) {
                 $args['data'] = $mD[3] . '-' . $mD[2] . '-' . $mD[1];
             } elseif (preg_match('/\b(\d{4}-\d{2}-\d{2})\b/', $mensagemUsuario, $mDi) === 1) {
@@ -2843,44 +3194,104 @@ PROMPT
             if ($mat !== null) {
                 $args['materia'] = $mat;
             }
-            if (empty($args['aluno_id']) && empty($args['aluno_nome'])) {
+            if (empty($args['aluno_id']) && empty($args['aluno_nome']) && empty($args['ra'])) {
                 return null;
             }
             return $args;
         }
 
         // Ocorrência: monta rascunho mesmo com campos parciais (defaults no completarArgsOcorrencia).
-        if (empty($args['aluno_id']) && empty($args['aluno_nome']) && empty($args['alunos'])) {
+        if (empty($args['aluno_id']) && empty($args['aluno_nome']) && empty($args['alunos']) && empty($args['ra'])) {
             $nomeLivre = $this->extrairNomeAlunoParaAcao($mensagemUsuario);
+            if ($nomeLivre === null) {
+                // Continuação: "Conversa na Sala…" / detalhe — reusa aluno do pedido original.
+                $pedidoOc = $this->ultimoPedidoUsuario($mensagens, null) ?: '';
+                foreach (array_reverse(array_slice($mensagens, -10)) as $msg) {
+                    if (($msg['role'] ?? '') !== 'user') {
+                        continue;
+                    }
+                    $c = (string) ($msg['content'] ?? '');
+                    if ($this->pedidoPareceRegistroEscrita($c) || preg_match('/\bocorr/iu', $c) === 1) {
+                        $pedidoOc = $c;
+                        break;
+                    }
+                }
+                $nomeLivre = $this->extrairNomeAlunoParaAcao($pedidoOc);
+                if ($nomeLivre === null) {
+                    // "para Ana Luiza" / "da Ana Luiza" sem a palavra aluno.
+                    if (preg_match('/\b(?:para|da|do)\s+(?:a\s+|o\s+)?([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s]{1,60})/u', $pedidoOc, $mP) === 1) {
+                        $nomeLivre = trim(preg_replace('/\s+(?:da|do|de|turma|RA|,).*$/iu', '', trim($mP[1])) ?? '');
+                        if ($nomeLivre === '') {
+                            $nomeLivre = null;
+                        }
+                    }
+                }
+            }
             if ($nomeLivre !== null) {
                 $args['aluno_nome'] = $nomeLivre;
                 $args['alunos'] = [$nomeLivre];
+            } elseif ($refPronome && !empty($ctx['aluno_id'])) {
+                $args['aluno_id'] = (int) $ctx['aluno_id'];
+            } elseif (!empty($ctx['aluno_id'])) {
+                $args['aluno_id'] = (int) $ctx['aluno_id'];
+            } elseif (!empty($ctx['aluno_nome'])) {
+                $args['aluno_nome'] = (string) $ctx['aluno_nome'];
+                $args['alunos'] = [(string) $ctx['aluno_nome']];
             } else {
                 return null;
             }
         }
-        return $this->completarArgsOcorrencia($args, $mensagemUsuario);
+        return $this->completarArgsOcorrencia($args, $mensagemUsuario, $mensagens);
     }
 
-    /** @param array<string,mixed> $args @return array<string,mixed> */
-    private function completarArgsOcorrencia(array $args, string $mensagemUsuario): array
+    /**
+     * @param array<string,mixed> $args
+     * @param list<array{role?:string,content?:string}> $mensagens
+     * @return array<string,mixed>
+     */
+    private function completarArgsOcorrencia(array $args, string $mensagemUsuario, array $mensagens = []): array
     {
+        $ctx = $mensagens !== [] ? $this->extrairContextoConsultaDoHistorico($mensagens) : [];
         $titulo = trim((string) ($args['titulo'] ?? ''));
         $detalhe = trim((string) ($args['detalhe'] ?? $args['descricao'] ?? ''));
         $nivel = strtolower(trim((string) ($args['nivel_gravidade'] ?? $args['gravidade'] ?? '')));
 
-        if ($titulo === '' && preg_match('/t[ií]tulo\s*[:\-]\s*([^\n;]+)/iu', $mensagemUsuario, $mT) === 1) {
+        if ($titulo === '' && !empty($ctx['ocorrencia_titulo'])) {
+            $titulo = (string) $ctx['ocorrencia_titulo'];
+        }
+        if ($detalhe === '' && !empty($ctx['ocorrencia_detalhe'])) {
+            $detalhe = (string) $ctx['ocorrencia_detalhe'];
+        }
+
+        // Junta texto de pedidos anteriores da ocorrência (preserva descrição entre mensagens).
+        $textoHist = $mensagemUsuario;
+        foreach (array_reverse(array_slice($mensagens, -8)) as $msg) {
+            if (($msg['role'] ?? '') !== 'user') {
+                continue;
+            }
+            $c = trim((string) ($msg['content'] ?? ''));
+            if ($c === '' || str_starts_with($c, '[')) {
+                continue;
+            }
+            if ($this->pedidoPareceRegistroEscrita($c)
+                || preg_match('/(?:detalhe|descri[cç][aã]o|t[ií]tulo|categoria|ocorr)/iu', $c) === 1
+            ) {
+                $textoHist .= "\n" . $c;
+            }
+        }
+
+        if ($titulo === '' && preg_match('/t[ií]tulo\s*[:\-]\s*([^\n;]+)/iu', $textoHist, $mT) === 1) {
             $titulo = trim($mT[1]);
         }
-        if ($detalhe === '' && preg_match('/(?:detalhe|descri[cç][aã]o)\s*[:\-]\s*([^\n;]+)/iu', $mensagemUsuario, $mD) === 1) {
+        if ($detalhe === '' && preg_match('/(?:detalhe|descri[cç][aã]o)\s*[:\-]\s*([^\n;]+)/iu', $textoHist, $mD) === 1) {
             $detalhe = trim($mD[1]);
         }
-        if ($nivel === '' && preg_match('/\b(leve|moderado|grave)\b/iu', $mensagemUsuario, $mN) === 1) {
+        if ($nivel === '' && preg_match('/\b(leve|moderado|grave)\b/iu', $textoHist, $mN) === 1) {
             $nivel = strtolower($mN[1]);
         }
         if ($titulo === '' && preg_match(
             '/ocorr[eê]ncia(?:\s+(?:de|por|sobre))?\s*[:\-]?\s*([A-Za-zÀ-ÿ0-9][^.]{3,80})/iu',
-            $mensagemUsuario,
+            $textoHist,
             $mOc
         ) === 1) {
             $titulo = trim($mOc[1]);
@@ -2889,7 +3300,7 @@ PROMPT
         }
         if ($titulo === '' && preg_match(
             '/\b(?:por|sobre|motivo)\s+([A-Za-zÀ-ÿ0-9][^.]{3,80})/iu',
-            $mensagemUsuario,
+            $textoHist,
             $mMot
         ) === 1) {
             $titulo = trim($mMot[1]);
@@ -2908,42 +3319,119 @@ PROMPT
         $args['detalhe'] = $detalhe;
         $args['nivel_gravidade'] = $nivel;
         $args['enviar_pais'] = !empty($args['enviar_pais'])
-            || preg_match('/\b(notificar|avisar|enviar).{0,20}pais\b/iu', $mensagemUsuario) === 1;
+            || preg_match('/\b(notificar|avisar|enviar).{0,20}pais\b/iu', $textoHist) === 1;
+
+        if (empty($args['turma']) && !empty($ctx['turma_nome'])) {
+            $args['turma'] = (string) $ctx['turma_nome'];
+        }
+        if (empty($args['ra']) && !empty($ctx['ra'])) {
+            $args['ra'] = (string) $ctx['ra'];
+        }
+
+        // Campo pedido pela Tudinha na mensagem anterior (categoria / detalhe).
+        $campoPedido = $this->assistentePediuCampoOcorrencia($mensagens);
+        $msgLimpa = trim($mensagemUsuario);
+        if ($campoPedido === 'categoria' && $msgLimpa !== '') {
+            $args['categoria'] = $msgLimpa;
+            if ($titulo === '' || $titulo === 'Ocorrência via assistente') {
+                $titulo = $msgLimpa;
+                $args['titulo'] = mb_substr($titulo, 0, 120);
+            }
+        }
+        if ($campoPedido === 'detalhe' && $msgLimpa !== '') {
+            $detalhe = $msgLimpa;
+            $args['detalhe'] = $detalhe;
+        }
+        if ($campoPedido === 'titulo' && $msgLimpa !== '') {
+            $titulo = $msgLimpa;
+            $args['titulo'] = mb_substr($titulo, 0, 120);
+        }
 
         // Categoria pelo nome (nunca peça categoria_id ao usuário).
         if (empty($args['categoria']) && empty($args['categoria_nome']) && empty($args['categoria_id'])) {
-            if (preg_match('/categoria\s*[:\-]?\s*([A-Za-zÀ-ÿ0-9][\wÀ-ÿ\s]{1,40})/iu', $mensagemUsuario, $mCat) === 1) {
+            if (preg_match('/categoria\s*[:\-]?\s*([A-Za-zÀ-ÿ0-9][\wÀ-ÿ\s]{1,80})/iu', $textoHist, $mCat) === 1) {
                 $args['categoria'] = trim($mCat[1]);
+            } elseif (preg_match('/^(conversa|disciplina|atraso|bullying|uniforme|comportamento)\b(.{0,60})$/iu', $msgLimpa, $mSo) === 1) {
+                // "Conversa" ou "Conversa na Sala de Aula"
+                $args['categoria'] = trim($mSo[0]);
+                if ($titulo === 'Ocorrência via assistente' || $titulo === '') {
+                    $args['titulo'] = mb_substr(trim($mSo[0]), 0, 120);
+                    if ($detalhe === '' || $detalhe === 'Ocorrência via assistente') {
+                        // Detalhe ainda pode vir na próxima mensagem.
+                        $args['detalhe'] = $args['titulo'];
+                    }
+                }
             } elseif ($titulo !== '' && $titulo !== 'Ocorrência via assistente') {
                 $args['categoria'] = $titulo;
-            } elseif (preg_match('/^(conversa|disciplina|atraso|bullying|uniforme|comportamento)[\s.!?]*$/iu', trim($mensagemUsuario), $mSo) === 1) {
-                $args['categoria'] = $mSo[1];
-                if ($titulo === 'Ocorrência via assistente' || $titulo === '') {
-                    $args['titulo'] = $mSo[1];
-                    $args['detalhe'] = $mSo[1];
+            }
+        }
+
+        // Recupera categoria digitada em turno anterior (mensagem curta após pedido).
+        if (empty($args['categoria']) && empty($args['categoria_nome'])) {
+            foreach (array_reverse(array_slice($mensagens, -8)) as $msg) {
+                if (($msg['role'] ?? '') !== 'user') {
+                    continue;
+                }
+                $c = trim((string) ($msg['content'] ?? ''));
+                if ($c === '' || str_starts_with($c, '[') || $this->pedidoPareceRegistroEscrita($c)) {
+                    continue;
+                }
+                if (preg_match('/^(conversa|disciplina|atraso|bullying|uniforme|comportamento)\b.{0,60}$/iu', $c) === 1
+                    || (mb_strlen($c) <= 60 && preg_match('/\b(boletim|nota|faltas?|grade|jornada|prova)\b/iu', $c) !== 1)
+                ) {
+                    // Só usa como categoria se o assistente tinha pedido categoria logo antes.
+                    $args['categoria'] = $c;
+                    break;
                 }
             }
         }
 
+        $args['titulo'] = mb_substr(trim((string) ($args['titulo'] ?? $titulo)), 0, 120);
+        $args['detalhe'] = trim((string) ($args['detalhe'] ?? $detalhe));
+        if ($args['detalhe'] === '') {
+            $args['detalhe'] = $args['titulo'];
+        }
+
         return $args;
+    }
+
+    /**
+     * @param list<array{role?:string,content?:string}> $mensagens
+     */
+    private function mensagemTrazCategoriaOuDetalhe(string $mensagem, array $mensagens): bool
+    {
+        $campo = $this->assistentePediuCampoOcorrencia($mensagens);
+        if ($campo === 'categoria' || $campo === 'detalhe' || $campo === 'titulo') {
+            return trim($mensagem) !== '';
+        }
+        return preg_match('/^(conversa|disciplina|atraso|bullying|uniforme|comportamento)\b/iu', trim($mensagem)) === 1
+            || preg_match('/(?:detalhe|descri[cç][aã]o|categoria)\s*[:\-]/iu', $mensagem) === 1;
     }
 
     private function extrairNomeAlunoParaAcao(string $mensagem): ?string
     {
         if (preg_match('/\b(?:aluna|aluno)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s]{1,60})/u', $mensagem, $m) === 1) {
             $nome = trim($m[1]);
+            // Pronome ("essa aluna") não é nome.
+            if (preg_match('/^(ess[ae]|est[ae]|el[ae])$/iu', $nome) === 1) {
+                return null;
+            }
             $nome = preg_replace('/\s+(?:da|do|de|no|na|para|com|por|sobre|RA)\b.*$/iu', '', $nome) ?? $nome;
             $nome = trim($nome);
             return $nome !== '' ? $nome : null;
         }
         if (preg_match('/\bpara\s+(?:a\s+|o\s+)?([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s]{1,60})/u', $mensagem, $m2) === 1) {
             $nome = trim($m2[1]);
+            if (preg_match('/^(ess[ae]|est[ae]|el[ae])$/iu', $nome) === 1) {
+                return null;
+            }
             $nome = preg_replace('/\s+(?:da|do|de|turma|RA|,).*$/iu', '', $nome) ?? $nome;
             $nome = trim($nome);
             return $nome !== '' ? $nome : null;
         }
-        if (preg_match('/\bRA\s*[#:]?\s*(\d{3,})\b/iu', $mensagem, $mRa) === 1) {
-            return 'ra ' . $mRa[1];
+        $ra = $this->extrairRaDaMensagem($mensagem);
+        if ($ra !== null && $ra !== '') {
+            return 'ra ' . $ra;
         }
         return null;
     }
@@ -3467,13 +3955,23 @@ PROMPT
             return false;
         }
         return preg_match('/\bturma\b/u', $p) === 1
-            || preg_match('/\b(grade|horario)\s+(da|do|de)\s+/u', $p) === 1;
+            || preg_match('/\b(grade|horario)\s+(da|do|de)\s+/u', $p) === 1
+            || preg_match('/\b(?:dessa|desta|mesma)\s+turma\b/u', $p) === 1;
     }
 
     private function extrairNomeTurma(string $mensagem): ?string
     {
+        // "dessa mesma turma" / "mesma turma" — sem nome literal.
+        if (preg_match('/\b(?:dessa|desta|mesma)\s+turma\b/iu', $mensagem) === 1
+            && preg_match('/\bturma\s+[A-Za-zÀ-ÿ0-9ªº°]/iu', $mensagem) !== 1
+        ) {
+            return null;
+        }
         if (preg_match('/\bturma\s+([A-Za-zÀ-ÿ0-9ªº°][A-Za-zÀ-ÿ0-9ªº°\s.\-]{0,40})/iu', $mensagem, $m) === 1) {
             $nome = trim($m[1]);
+            if (preg_match('/^(dessa|desta|mesma)$/iu', $nome) === 1) {
+                return null;
+            }
             $nome = preg_replace('/\s+(?:hoje|amanh[aã]|ontem|de|do|da)\b.*$/iu', '', $nome) ?? $nome;
             $nome = trim($nome, " \t,.");
             return $nome !== '' ? $nome : null;
@@ -3515,9 +4013,21 @@ PROMPT
         }
 
         $args = [];
+        $ctx = $this->extrairContextoConsultaDoHistorico($mensagens);
         $turma = $this->extrairNomeTurma($mensagemUsuario);
         if ($turma === null) {
             $turma = $this->extrairNomeTurma($this->ultimoPedidoUsuario($mensagens) ?: '');
+        }
+        if (
+            $turma === null
+            && preg_match('/\b(?:dessa|desta|mesma)\s+turma\b/iu', $mensagemUsuario) === 1
+            && !empty($ctx['turma_nome'])
+        ) {
+            $turma = (string) $ctx['turma_nome'];
+        }
+        if ($turma === null && !empty($ctx['turma_nome']) && preg_match('/\b(grade|horario|agenda)\b/iu', $mensagemUsuario) === 1) {
+            // Follow-up só com data nova ("e amanhã?") após grade da turma.
+            $turma = (string) $ctx['turma_nome'];
         }
         if ($turma !== null) {
             $args['turma_nome'] = $turma;

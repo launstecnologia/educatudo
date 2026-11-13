@@ -116,7 +116,7 @@ class ProvasAlunoConsultaService
     }
 
     /**
-     * Extrai RA/matrícula numérica do termo do usuário.
+     * Extrai RA/matrícula (numérico ou alfanumérico) do termo do usuário.
      * Evita misturar "ano 2024" na busca quando o RA está explícito.
      */
     public function extrairCodigoRa(string $termo): ?string
@@ -125,14 +125,27 @@ class ProvasAlunoConsultaService
         if ($t === '') {
             return null;
         }
+        // Só dígitos (3–12) ou alfanumérico com ao menos uma letra (ex.: SM24254, 24ABC).
         if (preg_match('/^\d{3,12}$/', $t) === 1) {
             return $t;
         }
-        if (preg_match('/\bra\b\s*[:\-#]?\s*(\d{3,12})\b/iu', $t, $m) === 1) {
-            return $m[1];
+        if (preg_match('/^(?=[A-Za-z0-9]*[A-Za-z])[A-Za-z0-9]{3,20}$/', $t) === 1) {
+            return strtoupper($t);
         }
-        if (preg_match('/\b(?:codigo|código|matricula)\b\s*[:\-#]?\s*(\d{3,12})\b/iu', $t, $m) === 1) {
-            return $m[1];
+        if (preg_match('/\bra\b\s*[:\-#]?\s*([A-Za-z0-9]{3,20})\b/iu', $t, $m) === 1) {
+            $ra = $m[1];
+            // Ano letivo solto (2024–2099) não é RA.
+            if (preg_match('/^20\d{2}$/', $ra) === 1) {
+                return null;
+            }
+            return preg_match('/[A-Za-z]/', $ra) === 1 ? strtoupper($ra) : $ra;
+        }
+        if (preg_match('/\b(?:codigo|código|matricula)\b\s*[:\-#]?\s*([A-Za-z0-9]{3,20})\b/iu', $t, $m) === 1) {
+            $ra = $m[1];
+            if (preg_match('/^20\d{2}$/', $ra) === 1) {
+                return null;
+            }
+            return preg_match('/[A-Za-z]/', $ra) === 1 ? strtoupper($ra) : $ra;
         }
         return null;
     }

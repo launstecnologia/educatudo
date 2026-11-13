@@ -108,27 +108,53 @@ class AssistenteAcaoPropostaService
             // Título/detalhe ou resposta curta ("Conversa") costumam ser o nome da categoria.
             $categoriaNome = trim((string) ($args['titulo'] ?? ''));
         }
+        $categoriaNome = $this->limparNomeCategoria($categoriaNome);
+        // Não use o título genérico como se fosse categoria.
+        if ($this->normalizarTextoSimples($categoriaNome) === $this->normalizarTextoSimples('Ocorrência via assistente')) {
+            $categoriaNome = '';
+        }
         if ($this->ocorrenciaModel->schemaEstendido()) {
-            if ($categoriaId <= 0 && $categoriaNome !== '') {
-                $categoriaId = $this->resolverCategoriaId($categoriaNome);
-            }
-            if ($categoriaId <= 0 || !$this->ocorrenciaModel->categoriaExiste($categoriaId)) {
-                $cats = $this->ocorrenciaModel->categorias(true);
-                $lista = array_map(static fn($c) => [
-                    'id' => (int) $c['id'],
-                    'nome' => (string) ($c['nome'] ?? ''),
-                ], $cats);
-                // Uma só categoria ou match parcial no título → usa sem pedir id.
-                if (count($lista) === 1) {
-                    $categoriaId = (int) ($lista[0]['id'] ?? 0);
-                } elseif ($categoriaNome !== '') {
+            $cats = $this->ocorrenciaModel->categorias(true);
+            $lista = array_map(static fn($c) => [
+                'id' => (int) $c['id'],
+                'nome' => (string) ($c['nome'] ?? ''),
+            ], $cats);
+
+            if ($lista === []) {
+                // Escola sem categorias cadastradas — não bloqueia o rascunho.
+                $categoriaId = 0;
+            } else {
+                if ($categoriaId <= 0 && $categoriaNome !== '') {
                     $categoriaId = $this->resolverCategoriaId($categoriaNome);
                 }
                 if ($categoriaId <= 0 || !$this->ocorrenciaModel->categoriaExiste($categoriaId)) {
+                    // Uma só categoria → usa sem pedir.
+                    if (count($lista) === 1) {
+                        $categoriaId = (int) ($lista[0]['id'] ?? 0);
+                    } elseif ($categoriaNome !== '') {
+                        $categoriaId = $this->resolverCategoriaId($categoriaNome);
+                    }
+                }
+                if ($categoriaId <= 0 || !$this->ocorrenciaModel->categoriaExiste($categoriaId)) {
+                    $filtrados = $categoriaNome !== ''
+                        ? $this->filtrarCategoriasPorNome($lista, $categoriaNome)
+                        : $lista;
+                    // Se o usuário já tentou um nome e nada casou, mostra a lista completa.
+                    $paraMostrar = ($filtrados !== [] && count($filtrados) < count($lista))
+                        ? $filtrados
+                        : $lista;
                     return [
                         'ok' => false,
                         'aviso' => 'Confirme a categoria da ocorrência (pelo nome):',
-                        'candidatos_categorias' => $lista,
+                        'candidatos_categorias' => $paraMostrar,
+                        'aluno' => $resolucao['alunos'][0] ?? null,
+                        'payload' => [
+                            'alunos' => $resolucao['alunos'],
+                            'titulo' => mb_substr($titulo, 0, 120),
+                            'detalhe' => $detalhe,
+                            'nivel_gravidade' => $nivel,
+                            'turma' => trim((string) ($args['turma'] ?? $args['turma_nome'] ?? '')),
+                        ],
                         'error' => 'Informe a categoria pelo nome (ex.: Conversa).',
                     ];
                 }
@@ -922,7 +948,7 @@ class AssistenteAcaoPropostaService
             return [
                 'alunos' => [],
                 'candidatos' => array_values($candidatos),
-                'aviso' => 'Há mais de um aluno com esse nome. Escolha pelo id (e informe a turma se souber):',
+                'aviso' => 'Há mais de um aluno com esse nome. Confirme qual deles (e a turma, se souber):',
             ];
         }
         if ($candidatos !== [] && $alunos !== []) {
@@ -930,7 +956,7 @@ class AssistenteAcaoPropostaService
             return [
                 'alunos' => [],
                 'candidatos' => array_values($candidatos),
-                'aviso' => 'Alguns nomes ficaram ambíguos. Escolha os alunos certos pelo id:',
+                'aviso' => 'Alguns nomes ficaram ambíguos. Confirme os alunos certos na lista:',
             ];
         }
         if ($alunos === []) {
@@ -1007,7 +1033,20 @@ class AssistenteAcaoPropostaService
         $sql .= ' ORDER BY da.horario_de ASC LIMIT 20';
         $rows = $this->db->fetchAll($sql, $params) ?: [];
         if ($rows === []) {
-            return ['error' => 'Nenhuma aula encontrada para essa turma/data.'];
+            $naGrade = $this->temAulaNaGrade($turmaId, $data, $materiaNome);
+            if ($naGrade) {
+                return [
+                    'error' => 'Há aula prevista na grade para essa turma/data'
+                        . ($materiaNome !== '' ? ' (' . $materiaNome . ')' : '')
+                        . ', mas não há chamada disponível no Diário de Classe. '
+                        . 'Abra/gere a aula no diário antes de lançar presença.',
+                ];
+            }
+            return [
+                'error' => 'Não há chamada disponível no Diário de Classe para essa turma/data'
+                    . ($materiaNome !== '' ? ' e matéria ' . $materiaNome : '')
+                    . '. Se a aula só aparece na grade, ela ainda não foi liberada no diário.',
+            ];
         }
         if (count($rows) === 1) {
             $aula = $this->diarioModel->getAula((int) $rows[0]['id']);
@@ -1028,26 +1067,103 @@ class AssistenteAcaoPropostaService
         ];
     }
 
+    private function limparNomeCategoria(string $nome): string
+    {
+        $n = trim($nome);
+        $n = preg_replace('/^categoria\s*[:\-]?\s*/iu', '', $n) ?? $n;
+        return trim($n);
+    }
+
+    /**
+     * @param list<array{id:int,nome:string}> $lista
+     * @return list<array{id:int,nome:string}>
+     */
+    private function filtrarCategoriasPorNome(array $lista, string $nome): array
+    {
+        $nomeNorm = $this->normalizarTextoSimples($this->limparNomeCategoria($nome));
+        if ($nomeNorm === '') {
+            return $lista;
+        }
+        $out = [];
+        foreach ($lista as $c) {
+            $n = $this->normalizarTextoSimples((string) ($c['nome'] ?? ''));
+            if ($n === '') {
+                continue;
+            }
+            if ($n === $nomeNorm || str_contains($n, $nomeNorm) || str_contains($nomeNorm, $n)) {
+                $out[] = $c;
+            }
+        }
+        return $out;
+    }
+
     private function resolverCategoriaId(string $nome): int
     {
-        $nomeNorm = $this->normalizarTextoSimples($nome);
+        $nomeNorm = $this->normalizarTextoSimples($this->limparNomeCategoria($nome));
         if ($nomeNorm === '') {
             return 0;
         }
-        $parcial = 0;
+        /** @var list<array{id:int,len:int}> $parcial */
+        $parcial = [];
         foreach ($this->ocorrenciaModel->categorias(true) as $c) {
             $n = $this->normalizarTextoSimples((string) ($c['nome'] ?? ''));
             if ($n === '') {
                 continue;
             }
+            $id = (int) $c['id'];
             if ($n === $nomeNorm) {
-                return (int) $c['id'];
+                return $id;
             }
-            if ($parcial <= 0 && (str_contains($n, $nomeNorm) || str_contains($nomeNorm, $n))) {
-                $parcial = (int) $c['id'];
+            // "Conversa na Sala de Aula" → casa com categoria "Conversa" (mais longa vence).
+            if (str_contains($nomeNorm, $n) || str_contains($n, $nomeNorm)) {
+                $parcial[] = ['id' => $id, 'len' => mb_strlen($n)];
             }
         }
-        return $parcial;
+        if ($parcial === []) {
+            return 0;
+        }
+        usort($parcial, static fn(array $a, array $b): int => $b['len'] <=> $a['len']);
+        // Empate de tamanho: só aceita se for um único id no maior comprimento.
+        $melhorLen = (int) $parcial[0]['len'];
+        $noTopo = array_values(array_filter(
+            $parcial,
+            static fn(array $p): bool => (int) $p['len'] === $melhorLen
+        ));
+        $ids = array_values(array_unique(array_map(static fn(array $p): int => (int) $p['id'], $noTopo)));
+        return count($ids) === 1 ? (int) $ids[0] : 0;
+    }
+
+    /** Verifica se a grade tem aula no dia (mesmo sem registro no diário). */
+    private function temAulaNaGrade(int $turmaId, string $data, string $materiaNome = ''): bool
+    {
+        if ($turmaId <= 0 || $data === '') {
+            return false;
+        }
+        try {
+            $dt = new \DateTimeImmutable($data . ' 12:00:00', new \DateTimeZone('America/Sao_Paulo'));
+        } catch (\Throwable $e) {
+            return false;
+        }
+        // 0=dom … 6=sáb no PHP; grade costuma 1=seg … 7=dom.
+        $dowPhp = (int) $dt->format('w');
+        $diaSemana = $dowPhp === 0 ? 7 : $dowPhp;
+        $params = ['turma_id' => $turmaId, 'dia' => $diaSemana];
+        $sql = 'SELECT gh.id
+                FROM grade_horaria gh
+                INNER JOIN materias m ON m.id = gh.materia_id
+                WHERE gh.turma_id = :turma_id
+                  AND gh.dia_semana = :dia';
+        if ($materiaNome !== '') {
+            $sql .= ' AND m.nome LIKE :materia_nome';
+            $params['materia_nome'] = '%' . $materiaNome . '%';
+        }
+        $sql .= ' LIMIT 1';
+        try {
+            $row = $this->db->fetch($sql, $params);
+            return !empty($row['id']);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     private function normalizarTextoSimples(string $texto): string

@@ -505,7 +505,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             var listCat = document.createElement('div');
             listCat.className = 'flex flex-wrap gap-2';
             (painel.candidatos_categorias || []).forEach(function (c) {
-                var askCat = 'Categoria ' + (c.nome || '');
+                var askCat = 'Registrar ocorrência com categoria ' + (c.nome || '');
                 var chipC = document.createElement('button');
                 chipC.type = 'button';
                 chipC.className = 'pa-btn-confirmar';

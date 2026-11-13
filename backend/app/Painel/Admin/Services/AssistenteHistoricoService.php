@@ -327,10 +327,70 @@ class AssistenteHistoricoService
         $aluno = is_array($painel['aluno'] ?? null) ? $painel['aluno'] : null;
         if ($aluno && !empty($aluno['id'])) {
             $linhas[] = 'aluno_id=' . (int) $aluno['id']
-                . ' aluno_nome="' . trim((string) ($aluno['nome'] ?? '')) . '"';
+                . ' aluno_nome="' . trim((string) ($aluno['nome'] ?? '')) . '"'
+                . (!empty($aluno['ra']) ? ' ra="' . trim((string) $aluno['ra']) . '"' : '')
+                . (!empty($aluno['turma_nome']) ? ' turma_nome="' . trim((string) $aluno['turma_nome']) . '"' : '');
         }
 
         $tipo = (string) ($painel['tipo'] ?? '');
+
+        // Contexto de consultas (bimestre/ano/turma/coluna/matéria) para follow-ups.
+        if (!empty($painel['bimestre'])) {
+            $linhas[] = 'bimestre=' . (int) $painel['bimestre'];
+        }
+        if (!empty($painel['ano_letivo'])) {
+            $linhas[] = 'ano_letivo=' . (int) $painel['ano_letivo'];
+        }
+        if (!empty($painel['coluna'])) {
+            $linhas[] = 'coluna="' . trim((string) $painel['coluna']) . '"';
+        }
+        if (!empty($painel['materia'])) {
+            $linhas[] = 'materia="' . trim((string) $painel['materia']) . '"';
+        }
+        if ($tipo === 'boletim_aluno' || $tipo === 'notas_evento_aluno' || !empty($painel['bimestre'])) {
+            $linhas[] = 'ultima_consulta=nota_boletim';
+        }
+        if ($tipo === 'grade_horaria_consulta') {
+            $escopo = is_array($painel['escopo'] ?? null) ? $painel['escopo'] : [];
+            $turmaGrade = trim((string) ($escopo['turma_nome'] ?? $escopo['nome'] ?? $painel['turma_nome'] ?? ''));
+            if ($turmaGrade !== '') {
+                $linhas[] = 'turma_nome="' . $turmaGrade . '"';
+            }
+            $dataGrade = trim((string) ($painel['data'] ?? $escopo['data'] ?? ''));
+            if ($dataGrade !== '') {
+                $linhas[] = 'data_grade="' . $dataGrade . '"';
+            }
+            $linhas[] = 'ultima_consulta=grade_horaria';
+        }
+        if ($tipo === 'proposta') {
+            $payload = is_array($painel['payload'] ?? null) ? $painel['payload'] : [];
+            $tipoProp = trim((string) ($painel['proposta_tipo'] ?? $painel['acao'] ?? $payload['tipo'] ?? $painel['tipo_acao'] ?? ''));
+            $linhas[] = 'proposta_pendente=1'
+                . ($tipoProp !== '' ? ' proposta_tipo="' . $tipoProp . '"' : '');
+            if (!empty($payload['titulo'])) {
+                $linhas[] = 'ocorrencia_titulo="' . trim((string) $payload['titulo']) . '"';
+            }
+            if (!empty($payload['detalhe'])) {
+                $linhas[] = 'ocorrencia_detalhe="' . mb_substr(trim((string) $payload['detalhe']), 0, 200) . '"';
+            }
+            if (!empty($payload['turma'])) {
+                $linhas[] = 'turma_nome="' . trim((string) $payload['turma']) . '"';
+            }
+            $alunosProp = is_array($payload['alunos'] ?? null) ? $payload['alunos'] : [];
+            if ($alunosProp !== [] && empty($aluno['id'])) {
+                $a0 = $alunosProp[0];
+                if (is_array($a0) && !empty($a0['id'])) {
+                    $linhas[] = 'aluno_id=' . (int) $a0['id']
+                        . ' aluno_nome="' . trim((string) ($a0['nome'] ?? '')) . '"'
+                        . (!empty($a0['ra']) ? ' ra="' . trim((string) $a0['ra']) . '"' : '')
+                        . (!empty($a0['turma_nome']) ? ' turma_nome="' . trim((string) $a0['turma_nome']) . '"' : '');
+                }
+            }
+        }
+        if ($tipo === 'candidatos_categorias') {
+            $linhas[] = 'aguardando_categoria=1 proposta_pendente=1 proposta_tipo="criar_ocorrencia"';
+        }
+
         if ($tipo === 'lista' && !empty($painel['provas']) && is_array($painel['provas'])) {
             $linhas[] = 'provas_listadas:';
             foreach (array_slice($painel['provas'], 0, 20) as $p) {
