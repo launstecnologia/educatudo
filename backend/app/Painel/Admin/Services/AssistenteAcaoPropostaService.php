@@ -74,6 +74,31 @@ class AssistenteAcaoPropostaService
         if (!$this->ocorrenciaModel->schemaEstendido()) {
             return [];
         }
+        $lista = array_map(static fn($c) => [
+            'id' => (int) $c['id'],
+            'nome' => (string) ($c['nome'] ?? ''),
+        ], $this->ocorrenciaModel->categorias(true));
+        if ($lista !== []) {
+            return $lista;
+        }
+        // Escola sem categorias: cadastra o catálogo padrão pra o assistente seguir.
+        foreach ([
+            'Pedagógica',
+            'Comportamento / convivência',
+            'Atraso',
+            'Saída antecipada',
+            'Material',
+            'Orientação',
+            'Elogio',
+            'Administrativa',
+            'Outra',
+        ] as $nomePadrao) {
+            try {
+                $this->ocorrenciaModel->criarCategoria($nomePadrao);
+            } catch (\Throwable $e) {
+                error_log('AssistenteAcaoPropostaService::listarCategoriasOcorrencia seed: ' . $e->getMessage());
+            }
+        }
         return array_map(static fn($c) => [
             'id' => (int) $c['id'],
             'nome' => (string) ($c['nome'] ?? ''),
@@ -195,64 +220,15 @@ class AssistenteAcaoPropostaService
         }
         $categoriaNomeResolvido = '';
         if ($this->ocorrenciaModel->schemaEstendido()) {
-            $cats = $this->ocorrenciaModel->categorias(true);
-            $lista = array_map(static fn($c) => [
-                'id' => (int) $c['id'],
-                'nome' => (string) ($c['nome'] ?? ''),
-            ], $cats);
-
-            if ($lista === []) {
+            $resolvida = $this->resolverOuCriarCategoria($categoriaId, $categoriaNome);
+            if ($resolvida === null) {
                 return [
                     'ok' => false,
                     'error' => self::AVISO_SEM_CATEGORIAS,
                 ];
             }
-
-            if ($categoriaId <= 0 && $categoriaNome !== '') {
-                $categoriaId = $this->resolverCategoriaId($categoriaNome);
-            }
-            if ($categoriaId <= 0 || !$this->ocorrenciaModel->categoriaExiste($categoriaId)) {
-                if (count($lista) === 1) {
-                    $categoriaId = (int) ($lista[0]['id'] ?? 0);
-                } elseif ($categoriaNome !== '') {
-                    $categoriaId = $this->resolverCategoriaId($categoriaNome);
-                }
-            }
-            // Nunca cria rascunho sem categoria válida (senão o Confirmar falha com "Selecione uma categoria").
-            if ($categoriaId <= 0 || !$this->ocorrenciaModel->categoriaExiste($categoriaId)) {
-                $filtrados = $categoriaNome !== ''
-                    ? $this->filtrarCategoriasPorNome($lista, $categoriaNome)
-                    : [];
-                $paraMostrar = $filtrados !== [] ? $filtrados : $lista;
-                $sugestao = $lista[0]['nome'] ?? 'Pedagógica';
-                foreach ($lista as $c) {
-                    if (str_contains($this->normalizarTextoSimples((string) $c['nome']), 'comportamento')) {
-                        $sugestao = (string) $c['nome'];
-                        break;
-                    }
-                }
-                return [
-                    'ok' => false,
-                    'aviso' => 'Confirme a categoria da ocorrência (pelo nome cadastrado na escola):',
-                    'candidatos_categorias' => $paraMostrar,
-                    'aluno' => $resolucao['alunos'][0] ?? null,
-                    'payload' => [
-                        'alunos' => $resolucao['alunos'],
-                        'titulo' => mb_substr($titulo, 0, 120),
-                        'detalhe' => $detalhe,
-                        'nivel_gravidade' => $nivel,
-                        'turma' => trim((string) ($args['turma'] ?? $args['turma_nome'] ?? '')),
-                        'categoria_tentativa' => $categoriaNome,
-                    ],
-                    'error' => 'Informe a categoria pelo nome (ex.: ' . $sugestao . ').',
-                ];
-            }
-            foreach ($lista as $c) {
-                if ((int) $c['id'] === $categoriaId) {
-                    $categoriaNomeResolvido = (string) $c['nome'];
-                    break;
-                }
-            }
+            $categoriaId = (int) $resolvida['id'];
+            $categoriaNomeResolvido = (string) $resolvida['nome'];
         } else {
             $categoriaId = 0;
         }
@@ -1221,6 +1197,126 @@ class AssistenteAcaoPropostaService
             }
         }
         return $out;
+    }
+
+    /**
+     * Resolve categoria por id/nome; se não achar, encaixa na mais próxima;
+     * se a escola não tiver nenhuma (ou o nome for novo sem vizinho), cadastra.
+     *
+     * @return array{id:int,nome:string,criada:bool}|null
+     */
+    private function resolverOuCriarCategoria(int $categoriaId, string $categoriaNome): ?array
+    {
+        $categoriaNome = $this->limparNomeCategoria($categoriaNome);
+        if ($this->normalizarTextoSimples($categoriaNome) === $this->normalizarTextoSimples('Ocorrência via assistente')) {
+            $categoriaNome = '';
+        }
+
+        $lista = $this->listarCategoriasOcorrencia();
+        if ($categoriaId > 0 && $this->ocorrenciaModel->categoriaExiste($categoriaId)) {
+            foreach ($lista as $c) {
+                if ((int) $c['id'] === $categoriaId) {
+                    return ['id' => $categoriaId, 'nome' => (string) $c['nome'], 'criada' => false];
+                }
+            }
+            return ['id' => $categoriaId, 'nome' => $categoriaNome !== '' ? $categoriaNome : 'Categoria', 'criada' => false];
+        }
+
+        if ($lista === []) {
+            $nomeNovo = $categoriaNome !== '' ? $categoriaNome : 'Comportamento / convivência';
+            return $this->cadastrarCategoriaAssistente($nomeNovo);
+        }
+
+        if (count($lista) === 1 && $categoriaNome === '') {
+            return ['id' => (int) $lista[0]['id'], 'nome' => (string) $lista[0]['nome'], 'criada' => false];
+        }
+
+        if ($categoriaNome !== '') {
+            $id = $this->resolverCategoriaId($categoriaNome);
+            if ($id > 0) {
+                foreach ($lista as $c) {
+                    if ((int) $c['id'] === $id) {
+                        return ['id' => $id, 'nome' => (string) $c['nome'], 'criada' => false];
+                    }
+                }
+            }
+            $proxima = $this->categoriaMaisProxima($lista, $categoriaNome);
+            if ($proxima !== null) {
+                return ['id' => (int) $proxima['id'], 'nome' => (string) $proxima['nome'], 'criada' => false];
+            }
+            // Sem vizinho próximo: usa "Outra" se existir; senão cadastra o nome digitado.
+            foreach ($lista as $c) {
+                if ($this->normalizarTextoSimples((string) $c['nome']) === 'outra') {
+                    return ['id' => (int) $c['id'], 'nome' => (string) $c['nome'], 'criada' => false];
+                }
+            }
+            return $this->cadastrarCategoriaAssistente($categoriaNome);
+        }
+
+        // Sem nome: prefere Comportamento / convivência, senão a primeira.
+        foreach ($lista as $c) {
+            if (str_contains($this->normalizarTextoSimples((string) $c['nome']), 'comportamento')) {
+                return ['id' => (int) $c['id'], 'nome' => (string) $c['nome'], 'criada' => false];
+            }
+        }
+        return ['id' => (int) $lista[0]['id'], 'nome' => (string) $lista[0]['nome'], 'criada' => false];
+    }
+
+    /** @return array{id:int,nome:string,criada:bool}|null */
+    private function cadastrarCategoriaAssistente(string $nome): ?array
+    {
+        $nome = mb_substr(trim($nome), 0, 80);
+        if ($nome === '') {
+            $nome = 'Comportamento / convivência';
+        }
+        try {
+            $id = $this->ocorrenciaModel->criarCategoria($nome);
+        } catch (\Throwable $e) {
+            error_log('AssistenteAcaoPropostaService::cadastrarCategoriaAssistente: ' . $e->getMessage());
+            return null;
+        }
+        if ($id <= 0) {
+            return null;
+        }
+        return ['id' => $id, 'nome' => $nome, 'criada' => true];
+    }
+
+    /**
+     * @param list<array{id:int,nome:string}> $lista
+     * @return array{id:int,nome:string}|null
+     */
+    private function categoriaMaisProxima(array $lista, string $nome): ?array
+    {
+        $alvo = $this->normalizarTextoSimples($this->limparNomeCategoria($nome));
+        if ($alvo === '' || $lista === []) {
+            return null;
+        }
+        $melhor = null;
+        $melhorPct = 0.0;
+        foreach ($lista as $c) {
+            $n = $this->normalizarTextoSimples((string) ($c['nome'] ?? ''));
+            if ($n === '') {
+                continue;
+            }
+            similar_text($alvo, $n, $pct);
+            // Tokens em comum elevam a similaridade (ex.: "conversa" ≈ "Comportamento / convivência" via alias já coberto;
+            // aqui "comport" vs "comportamento", "pedagogica" vs "Pedagógica").
+            $tokensAlvo = preg_split('/\s+/', $alvo) ?: [];
+            foreach ($tokensAlvo as $tok) {
+                if (mb_strlen($tok) >= 4 && str_contains($n, $tok)) {
+                    $pct = max($pct, 72.0);
+                }
+            }
+            if ($pct > $melhorPct) {
+                $melhorPct = $pct;
+                $melhor = $c;
+            }
+        }
+        // Encaixa só se estiver razoavelmente próximo.
+        if ($melhor === null || $melhorPct < 55.0) {
+            return null;
+        }
+        return $melhor;
     }
 
     private function resolverCategoriaId(string $nome): int
