@@ -66,6 +66,7 @@ foreach ($boletim_eventos_notas as $ev) {
     if ($grupoChave === '') {
         $grupoChave = 'regular';
     }
+    $cursoTipoLinha = (($ev['curso_tipo'] ?? '') === 'extra') ? 'extra' : 'regular';
     $linhasPeriodo[$chave] = [
         'ano' => $ano,
         'numero' => $bim,
@@ -76,7 +77,11 @@ foreach ($boletim_eventos_notas as $ev) {
         'resumo' => is_array($resumo) ? $resumo : null,
         'grupo_chave' => $grupoChave,
         'grupo_rotulo' => trim((string) ($ev['grupo_rotulo'] ?? 'Demonstrativo')),
-        'curso_tipo' => (($ev['curso_tipo'] ?? '') === 'extra') ? 'extra' : 'regular',
+        'curso_tipo' => $cursoTipoLinha,
+        'finalidade' => strtolower(trim((string) ($ev['finalidade'] ?? 'oficial'))) === 'complementar'
+            ? 'complementar'
+            : 'oficial',
+        'selo' => $cursoTipoLinha === 'extra' ? 'extra' : 'oficial',
     ];
 }
 if ($linhasPeriodo === []) {
@@ -652,29 +657,38 @@ $ocultarRefNotas = !empty($ocultar_ref_notas);
     </div>
 <?php else: ?>
     <div class="space-y-4">
-        <p class="text-sm text-gray-600">Quadro ao vivo: as notas aparecem conforme o lançamento. O boletim oficial fica na aba Boletim.</p>
+        <p class="text-sm text-gray-600">Quadro ao vivo: as notas aparecem conforme o lançamento. Use as abas para separar o demonstrativo oficial do itinerário/extra. O boletim oficial fica na aba Boletim.</p>
 
         <?php if ($temAbasNotas): ?>
-        <div class="border-b border-gray-200">
-            <nav class="flex flex-wrap gap-1 -mb-px" aria-label="Demonstrativos por curso" id="notas-demo-abas">
-                <?php foreach ($gruposNotas as $gIdx => $grupoNav): ?>
-                    <?php
-                    $ativaNav = $gIdx === $grupoAtivoNotas;
-                    $classeNav = $ativaNav
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300';
-                    ?>
-                    <button type="button"
-                            class="js-notas-demo-aba inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 <?= $classeNav ?>"
-                            data-grupo="<?= $esc($grupoNav['chave']) ?>"
-                            <?= $ativaNav ? 'aria-current="page"' : '' ?>>
-                        <span><?= $esc($grupoNav['rotulo']) ?></span>
-                        <?php if (($grupoNav['curso_tipo'] ?? '') === 'extra'): ?>
-                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide <?= $ativaNav ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600' ?>">Extra</span>
-                        <?php endif; ?>
-                    </button>
-                <?php endforeach; ?>
-            </nav>
+        <div class="flex flex-wrap items-center gap-2" id="notas-demo-abas" role="tablist" aria-label="Demonstrativos por curso">
+            <?php foreach ($gruposNotas as $gIdx => $grupoNav): ?>
+                <?php
+                $ativaNav = $gIdx === $grupoAtivoNotas;
+                $ehExtraNav = ($grupoNav['curso_tipo'] ?? '') === 'extra';
+                // Não usar text-primary: na Colag é branco e some no fundo claro.
+                if ($ativaNav && $ehExtraNav) {
+                    $classeNav = 'bg-amber-600 text-white shadow-sm';
+                    $classeBadge = 'bg-amber-500 text-white';
+                } elseif ($ativaNav) {
+                    $classeNav = 'bg-blue-700 text-white shadow-sm';
+                    $classeBadge = 'bg-blue-600 text-white';
+                } else {
+                    $classeNav = 'bg-gray-100 text-gray-800 hover:bg-gray-200';
+                    $classeBadge = 'bg-white text-gray-700 border border-gray-200';
+                }
+                $seloNav = $ehExtraNav ? 'Itinerário' : 'Oficial';
+                ?>
+                <button type="button"
+                        role="tab"
+                        class="js-notas-demo-aba inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium <?= $classeNav ?>"
+                        data-grupo="<?= $esc($grupoNav['chave']) ?>"
+                        data-curso-tipo="<?= $esc($ehExtraNav ? 'extra' : 'regular') ?>"
+                        aria-selected="<?= $ativaNav ? 'true' : 'false' ?>"
+                        <?= $ativaNav ? 'aria-current="page"' : '' ?>>
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide <?= $classeBadge ?>"><?= $esc($seloNav) ?></span>
+                    <span><?= $esc($grupoNav['rotulo']) ?></span>
+                </button>
+            <?php endforeach; ?>
         </div>
         <?php endif; ?>
 
@@ -705,9 +719,13 @@ $ocultarRefNotas = !empty($ocultar_ref_notas);
                                 $bimP = (int) $linhaP['numero'];
                                 $refP = (int) ($linhaP['regra_id'] ?? 0);
                                 $descricao = trim((string) $linhaP['descricao']);
+                                $seloLinha = (($linhaP['selo'] ?? $linhaP['curso_tipo'] ?? '') === 'extra') ? 'extra' : 'oficial';
+                                $rotuloSelo = $seloLinha === 'extra' ? 'Itinerário' : 'Oficial';
                                 $tituloModal = $descricao !== ''
                                     ? $descricao
                                     : ($anoP > 0 && $bimP > 0 ? \App\Core\PeriodoLetivo::rotulo($anoP, $bimP) : 'Notas');
+                                $tituloModal = $rotuloSelo . ' — ' . $tituloModal;
+                                $labelBtn = $seloLinha === 'extra' ? 'Demonstrativo Itinerário' : 'Demonstrativo Oficial';
                                 ?>
                                 <tr class="hover:bg-gray-50">
                                     <?php if (!$ocultarRefNotas): ?>
@@ -715,21 +733,26 @@ $ocultarRefNotas = !empty($ocultar_ref_notas);
                                     <?php endif; ?>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><?= $anoP > 0 ? $anoP : '—' ?></td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800"><?= $esc($celulaPeriodo($anoP, $bimP, $cabPeriodo)) ?></td>
-                                    <td class="px-6 py-4 text-sm text-gray-800"><?= $esc($descricao !== '' ? $descricao : '—') ?></td>
+                                    <td class="px-6 py-4 text-sm text-gray-800">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide <?= $seloLinha === 'extra' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800' ?>"><?= $esc($rotuloSelo) ?></span>
+                                            <span><?= $esc($descricao !== '' ? $descricao : '—') ?></span>
+                                        </div>
+                                    </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right">
                                         <div class="flex flex-wrap items-center justify-end gap-2">
                                             <?php if (!empty($linhaP['tem_quadro'])): ?>
                                                 <?php
                                                 $ui_btn_variant = 'primary';
-                                                $ui_btn_label = 'Demonstrativo de Notas';
+                                                $ui_btn_label = $labelBtn;
                                                 $ui_btn_icon = 'fa-solid fa-table-cells';
                                                 $ui_btn_class = 'px-3 py-1.5';
-                                                $ui_btn_onclick = $jsAbrir((string) $linhaP['id_quadro'], 'Demonstrativo de Notas — ' . $tituloModal);
+                                                $ui_btn_onclick = $jsAbrir((string) $linhaP['id_quadro'], $tituloModal);
                                                 require $btnNotasPartial;
                                                 ?>
                                             <?php else: ?>
                                                 <button type="button" disabled class="inline-flex items-center px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-400 bg-gray-50 cursor-not-allowed">
-                                                    <i class="fa-solid fa-table-cells mr-2"></i> Demonstrativo de Notas
+                                                    <i class="fa-solid fa-table-cells mr-2"></i> <?= $esc($labelBtn) ?>
                                                 </button>
                                             <?php endif; ?>
                                         </div>
@@ -749,24 +772,30 @@ $ocultarRefNotas = !empty($ocultar_ref_notas);
         var nav = document.getElementById('notas-demo-abas');
         if (!nav || nav.getAttribute('data-bound') === '1') return;
         nav.setAttribute('data-bound', '1');
+        var classesAtivaOficial = ['bg-blue-700', 'text-white', 'shadow-sm'];
+        var classesAtivaExtra = ['bg-amber-600', 'text-white', 'shadow-sm'];
+        var classesInativa = ['bg-gray-100', 'text-gray-800', 'hover:bg-gray-200'];
+        var todas = classesAtivaOficial.concat(classesAtivaExtra).concat(classesInativa);
         nav.addEventListener('click', function (e) {
             var btn = e.target.closest('.js-notas-demo-aba');
             if (!btn) return;
             var grupo = btn.getAttribute('data-grupo') || '';
             nav.querySelectorAll('.js-notas-demo-aba').forEach(function (b) {
                 var on = b === btn;
-                b.classList.toggle('border-primary', on);
-                b.classList.toggle('text-primary', on);
-                b.classList.toggle('border-transparent', !on);
-                b.classList.toggle('text-gray-500', !on);
+                var ehExtra = (b.getAttribute('data-curso-tipo') || '') === 'extra';
+                todas.forEach(function (c) { b.classList.remove(c); });
+                (on ? (ehExtra ? classesAtivaExtra : classesAtivaOficial) : classesInativa).forEach(function (c) {
+                    b.classList.add(c);
+                });
+                b.setAttribute('aria-selected', on ? 'true' : 'false');
                 if (on) b.setAttribute('aria-current', 'page');
                 else b.removeAttribute('aria-current');
                 var badge = b.querySelector('span.uppercase');
                 if (badge) {
-                    badge.classList.toggle('bg-amber-100', on);
-                    badge.classList.toggle('text-amber-800', on);
-                    badge.classList.toggle('bg-gray-100', !on);
-                    badge.classList.toggle('text-gray-600', !on);
+                    badge.className = 'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide '
+                        + (on
+                            ? (ehExtra ? 'bg-amber-500 text-white' : 'bg-blue-600 text-white')
+                            : 'bg-white text-gray-700 border border-gray-200');
                 }
             });
             document.querySelectorAll('.js-notas-demo-painel').forEach(function (painel) {

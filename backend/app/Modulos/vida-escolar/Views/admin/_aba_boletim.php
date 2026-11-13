@@ -82,8 +82,8 @@ $fmtNota = static function ($c): string {
 };
 ?>
 <?php if (count($fichas) > 1): ?>
-<div class="mb-4 border-b border-gray-200">
-    <nav class="flex flex-wrap gap-1 -mb-px" aria-label="Boletins do aluno">
+<div class="mb-4">
+    <nav class="flex flex-wrap gap-2" aria-label="Boletins do aluno">
     <?php foreach ($fichas as $f): ?>
         <?php
             $fichaAtiva = (int) $ficha_id === (int) ($f['id'] ?? 0);
@@ -97,23 +97,29 @@ $fmtNota = static function ($c): string {
             $hrefFicha = isset($hrefAba) && is_callable($hrefAba)
                 ? $hrefAba('boletim', ['ficha_id' => (int) $f['id']])
                 : ($base . '?aba=boletim&ficha_id=' . (int) $f['id']);
-            // text-primary = cor do texto SOBRE o botão (branco na Colag) — some no fundo claro.
-            $classeAba = $fichaAtiva
-                ? 'border-accent text-gray-900'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300';
+            // Evitar text-primary (branco na Colag some no fundo claro).
+            if ($fichaAtiva && $ehExtra) {
+                $classeAba = 'bg-amber-600 text-white shadow-sm';
+                $classeBadge = 'bg-amber-500 text-white';
+            } elseif ($fichaAtiva) {
+                $classeAba = 'bg-blue-700 text-white shadow-sm';
+                $classeBadge = 'bg-blue-600 text-white';
+            } else {
+                $classeAba = 'bg-gray-100 text-gray-800 hover:bg-gray-200';
+                $classeBadge = 'bg-white text-gray-700 border border-gray-200';
+            }
+            $seloFicha = $ehExtra ? 'Itinerário' : 'Oficial';
         ?>
         <?php if (!$pillComLink): ?>
-        <span class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 <?= $classeAba ?>">
+        <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium <?= $classeAba ?>">
         <?php else: ?>
         <a href="<?= $esc($hrefFicha) ?>"
-           class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 <?= $classeAba ?>"
+           class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium <?= $classeAba ?>"
            <?= $fichaAtiva ? 'aria-current="page"' : '' ?>>
         <?php endif; ?>
-            <span class="<?= $fichaAtiva ? 'text-gray-900' : '' ?>"><?= $esc($abaRotulo !== '' ? $abaRotulo : ($ehExtra ? 'Itinerário / Extra' : 'Boletim')) ?></span>
-            <?php if ($ehExtra): ?>
-            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide <?= $fichaAtiva ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600' ?>">Extra</span>
-            <?php endif; ?>
-            <span class="text-xs <?= $fichaAtiva ? 'text-gray-500' : 'text-gray-400' ?>"><?= (int) ($f['ano_letivo'] ?? 0) ?></span>
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide <?= $classeBadge ?>"><?= $esc($seloFicha) ?></span>
+            <span><?= $esc($abaRotulo !== '' ? $abaRotulo : ($ehExtra ? 'Itinerário' : 'Boletim')) ?></span>
+            <span class="text-xs <?= $fichaAtiva ? 'text-white/80' : 'text-gray-500' ?>"><?= (int) ($f['ano_letivo'] ?? 0) ?></span>
         <?php if (!$pillComLink): ?></span><?php else: ?></a><?php endif; ?>
     <?php endforeach; ?>
     </nav>

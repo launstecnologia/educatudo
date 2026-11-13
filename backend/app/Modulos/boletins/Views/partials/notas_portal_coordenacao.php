@@ -32,7 +32,7 @@ $idsListaPortal = static function ($raw): array {
     $ids = [];
     foreach ($decoded as $v) {
         if (is_array($v)) {
-            $cand = (int) ($v['id'] ?? $v['serie_id'] ?? $v['value'] ?? 0);
+            $cand = (int) ($v['id'] ?? $v['turma_id'] ?? $v['serie_id'] ?? $v['value'] ?? 0);
         } else {
             $cand = (int) $v;
         }
@@ -43,7 +43,17 @@ $idsListaPortal = static function ($raw): array {
 
     return array_values($ids);
 };
-$montarEventoPortal = static function (array $ev, int $rid, string $nome, string $codigo, string $updated, string $ini, string $fim, $bim, $ano) use (&$boletim_eventos_notas, &$vistosPortalNotas): void {
+$montarEventoPortal = static function (
+    array $ev,
+    int $rid,
+    string $nome,
+    string $codigo,
+    string $updated,
+    string $ini,
+    string $fim,
+    $bim,
+    $ano
+) use (&$boletim_eventos_notas, &$vistosPortalNotas, $idsListaPortal): void {
     $chave = $rid . ':' . (int) $ano . ':' . (int) $bim;
     if ($rid <= 0 || isset($vistosPortalNotas[$chave])) {
         return;
@@ -58,6 +68,12 @@ $montarEventoPortal = static function (array $ev, int $rid, string $nome, string
         'default_data_fim' => $fim,
         'bimestre' => $bim,
         'ano_letivo' => $ano,
+        'finalidade' => strtolower(trim((string) ($ev['finalidade'] ?? 'oficial'))) === 'complementar'
+            ? 'complementar'
+            : 'oficial',
+        'boletim_id' => (int) ($ev['boletim_id'] ?? 0),
+        'turmas_ids' => $idsListaPortal($ev['turmas_ids'] ?? null),
+        'series_ids' => $idsListaPortal($ev['series_ids'] ?? null),
     ];
 };
 if ($alunoIdPortal > 0) {
@@ -115,9 +131,28 @@ if ($alunoIdPortal > 0) {
             // Sem matrícula ativa, vale a turma principal.
         }
         $visCol = (($notas_perfil ?? 'aluno') === 'pais') ? 'vis_pais' : 'vis_aluno';
+        $colsRegraPortal = 'id, nome, codigo, updated_at, default_data_inicio, default_data_fim,
+                    bimestre, ano_letivo, series_ids, turmas_ids';
+        try {
+            $temFinalidade = $dbPortal->fetch(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'boletim_regras' AND COLUMN_NAME = 'finalidade'"
+            );
+            if ($temFinalidade) {
+                $colsRegraPortal .= ', finalidade';
+            }
+            $temBoletimId = $dbPortal->fetch(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'boletim_regras' AND COLUMN_NAME = 'boletim_id'"
+            );
+            if ($temBoletimId) {
+                $colsRegraPortal .= ', boletim_id';
+            }
+        } catch (\Throwable $eCols) {
+            // mantém colunas base
+        }
         $regrasPortal = $dbPortal->fetchAll(
-            "SELECT id, nome, codigo, updated_at, default_data_inicio, default_data_fim,
-                    bimestre, ano_letivo, series_ids, turmas_ids
+            "SELECT {$colsRegraPortal}
              FROM boletim_regras
              WHERE ativo = 1
                AND exibir_em = 'notas'
@@ -191,4 +226,12 @@ foreach ($boletins_gerados_notas as $evPortal) {
     );
 }
 $boletins_gerados_notas_por_regra = [];
+if ($boletim_eventos_notas !== [] && $alunoIdPortal > 0) {
+    try {
+        $boletim_eventos_notas = (new \App\Modulos\boletins\Services\NotasDemonstrativoGrupoService($dbPortal ?? \App\Core\Database::getInstance()))
+            ->enriquecerParaAluno($boletim_eventos_notas, $alunoIdPortal);
+    } catch (\Throwable $eGrupo) {
+        error_log('Grupo demonstrativo portal aluno #' . $alunoIdPortal . ': ' . $eGrupo->getMessage());
+    }
+}
 require \App\Core\ViewPaths::dominio('Pessoas', 'Views/admin/students/_secao_notas_eventos.php');
