@@ -30,6 +30,8 @@ $router->get('/admin/boletim-guia', 'Modulos/boletins/BoletimGuiaController@inde
 // Configuração e assistente
 $router->get('/admin/boletim-configuracao', 'Modulos/boletins/BoletimConfigController@index');
 $router->get('/admin/boletim-configuracao/assistente', 'Modulos/boletins/BoletimConfigController@assistente');
+// Layout novo (protótipo visual) — não altera o assistente atual.
+$router->get('/admin/boletim-configuracao/assistente2', 'Modulos/boletins/BoletimConfigController@assistente2');
 $router->get('/admin/boletim-configuracao/jornadas', 'Modulos/boletins/BoletimConfigController@jornadasJson');
 $router->get('/admin/boletim-configuracao/evento-componentes', 'Modulos/boletins/BoletimConfigController@eventoComponentesJson');
 $router->get('/admin/boletim-configuracao/keepalive', 'Modulos/boletins/BoletimConfigController@keepalive');

@@ -1004,6 +1004,24 @@ class BoletimConfigController extends BaseController
     }
 
     /**
+     * GET /admin/boletim-configuracao/assistente2
+     *
+     * Protótipo visual do redesign (Quadro + Fórmula + Simulação).
+     * Não altera o assistente atual nem o motor de cálculo — só layout HTML.
+     */
+    public function assistente2(): void
+    {
+        $user = $this->auth->getUser();
+        $this->viewWithLayout('admin', 'admin/boletim/assistente2', [
+            'title' => 'Construtor de Fórmula (layout) - EducaTudo',
+            'page_title' => 'Construtor de Fórmula',
+            'user' => $user,
+            'current_page' => 'boletim_config',
+            'csrf_token' => $this->generateCsrfToken(),
+        ]);
+    }
+
+    /**
      * GET /admin/boletim-configuracao/gerados
      *
      * Lista paginada dos boletins gerados (agrupados por aluno + regra + período)
