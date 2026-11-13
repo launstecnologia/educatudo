@@ -2357,11 +2357,14 @@ PROMPT
             if ($materiaPedido === null && !empty($resultado['materia'])) {
                 $materiaPedido = trim((string) $resultado['materia']);
             }
-            if ($tool === 'boletim_aluno' && $materiaPedido !== null && $this->boletimTemConteudoExibivel($resultado)) {
+            if ($tool === 'boletim_aluno' && $materiaPedido !== null) {
+                if (!$this->boletimTemConteudoExibivel($resultado)) {
+                    return 'Não encontrei um boletim com notas para exibir para **' . $quem . '**.';
+                }
                 $ano = (int) ($resultado['ano_letivo'] ?? 0);
                 return 'Encontrei o boletim de **' . $quem . '**'
                     . ($ano > 0 ? ' de **' . $ano . '**' : '')
-                    . '. Confira a linha de **' . $materiaPedido . '** no quadro abaixo. '
+                    . '. Confira as notas disponíveis no quadro abaixo. '
                     . 'Para consultar uma nota específica, diga o período ou a avaliação.';
             }
             $quadro = is_array($resultado['quadro'] ?? null) ? $resultado['quadro'] : null;
