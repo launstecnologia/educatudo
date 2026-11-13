@@ -12823,15 +12823,20 @@ class BoletimConfigController extends BaseController
             }
             $tracoMin = false;
             $mediaCiclo = false;
+            $mediaCicloDestino = '';
             if (isset($componente['config']) && is_array($componente['config'])) {
                 $tracoMin = !empty($componente['config']['traco_abaixo_minimo']);
                 $mediaCiclo = !empty($componente['config']['media_ciclo']);
+                $mediaCicloDestino = strtolower(trim((string) ($componente['config']['media_ciclo_destino'] ?? '')));
             }
             if ($tracoMin) {
                 $payload['traco_abaixo_minimo'] = true;
             }
             if ($mediaCiclo) {
                 $payload['media_ciclo'] = 1;
+                if (in_array($mediaCicloDestino, ['b1', 'b2', 'b3', 'b4', 's1', 's2', 'final'], true)) {
+                    $payload['media_ciclo_destino'] = $mediaCicloDestino;
+                }
             }
             if ($groupLine !== null) {
                 $payload['group_line'] = $groupLine;
@@ -12868,6 +12873,10 @@ class BoletimConfigController extends BaseController
             ];
             if (isset($componente['config']) && is_array($componente['config']) && !empty($componente['config']['media_ciclo'])) {
                 $payload['media_ciclo'] = 1;
+                $destEv = strtolower(trim((string) ($componente['config']['media_ciclo_destino'] ?? '')));
+                if (in_array($destEv, ['b1', 'b2', 'b3', 'b4', 's1', 's2', 'final'], true)) {
+                    $payload['media_ciclo_destino'] = $destEv;
+                }
             }
             if ($groupLine !== null) {
                 $payload['group_line'] = $groupLine;

@@ -2177,6 +2177,7 @@ $boletimWizardSteps = [
             nomes_blocos: {},
             escalas_blocos: {},
             media_ciclo_blocos: {},
+            media_ciclo_destinos: {},
             nomes_limpos: {},
             bloco_calc: '',
             materia_calc: 0,
@@ -2275,6 +2276,9 @@ $boletimWizardSteps = [
         }
         if (!estado.media_ciclo_blocos || typeof estado.media_ciclo_blocos !== 'object' || Array.isArray(estado.media_ciclo_blocos)) {
             estado.media_ciclo_blocos = {};
+        }
+        if (!estado.media_ciclo_destinos || typeof estado.media_ciclo_destinos !== 'object' || Array.isArray(estado.media_ciclo_destinos)) {
+            estado.media_ciclo_destinos = {};
         }
         if (!Array.isArray(estado.blocos_calc)) estado.blocos_calc = [];
         if (estado.bloco_calc == null) estado.bloco_calc = '';
@@ -4106,7 +4110,7 @@ $boletimWizardSteps = [
         function ehMuAuto(cod) { return /^b[1-4]_mu$/i.test(String(cod || '')); }
         estado.blocos_calc = (estado.blocos_calc || []).filter(function (c) { return !ehMuAuto(c); });
         estado.colunas_ordem = (estado.colunas_ordem || []).filter(function (c) { return !ehMuAuto(c); });
-        ['formulas_blocos', 'nomes_blocos', 'escalas_blocos', 'media_ciclo_blocos', 'formulas_materias_blocos'].forEach(function (chave) {
+        ['formulas_blocos', 'nomes_blocos', 'escalas_blocos', 'media_ciclo_blocos', 'media_ciclo_destinos', 'formulas_materias_blocos'].forEach(function (chave) {
             if (!estado[chave] || typeof estado[chave] !== 'object') return;
             Object.keys(estado[chave]).forEach(function (cod) {
                 if (ehMuAuto(cod)) delete estado[chave][cod];
@@ -4169,6 +4173,22 @@ $boletimWizardSteps = [
         if (inpEsc) inpEsc.value = String(escalaBlocoCalc(codigo));
         var inpCiclo = document.getElementById('bw-formula-media-ciclo');
         if (inpCiclo) inpCiclo.checked = blocoEhMediaCiclo(codigo);
+        var selCiclo = document.getElementById('bw-formula-media-ciclo-destino');
+        if (selCiclo) {
+            var dest = destinoMediaCicloDoBloco(codigo);
+            var tem = false;
+            Array.prototype.forEach.call(selCiclo.options || [], function (opt) {
+                if (String(opt.value) === dest) tem = true;
+            });
+            if (!tem && dest) {
+                var optNovo = document.createElement('option');
+                optNovo.value = dest;
+                optNovo.textContent = dest;
+                selCiclo.appendChild(optNovo);
+            }
+            selCiclo.value = dest;
+        }
+        sincronizarUiDestinoMediaCiclo();
         renderFormulaCanvas();
         var lista = document.getElementById('bw-colunas-lista');
         if (lista) {
@@ -5045,22 +5065,99 @@ $boletimWizardSteps = [
         return !!estado.media_ciclo_blocos[codigo] || !!estado.media_ciclo_blocos[codigo.toLowerCase()];
     }
 
+    function garantirMapaMediaCicloDestinos() {
+        if (!estado.media_ciclo_destinos || typeof estado.media_ciclo_destinos !== 'object' || Array.isArray(estado.media_ciclo_destinos)) {
+            estado.media_ciclo_destinos = {};
+        }
+    }
+
+    function opcoesDestinoMediaCiclo() {
+        var info = periodoInfo(estado && estado.ano_letivo);
+        var tipo = String((info && info.tipo) || 'bimestre');
+        var qtd = Number((info && info.quantidade) || 4) || 4;
+        var rotulos = (info && info.rotulos) || {};
+        var ops = [];
+        var i;
+        for (i = 1; i <= qtd; i++) {
+            ops.push({
+                value: 'b' + i,
+                label: 'REC · ' + String(rotulos[String(i)] || (i + 'º período'))
+            });
+        }
+        if (tipo === 'bimestre' && qtd >= 4) {
+            ops.push({ value: 's1', label: 'REC · 1º e 2º (a cada dois ciclos)' });
+            ops.push({ value: 's2', label: 'REC · 3º e 4º (a cada dois ciclos)' });
+        }
+        ops.push({ value: 'final', label: 'Rec Final' });
+        return ops;
+    }
+
+    function destinoMediaCicloPadrao(codigo) {
+        codigo = String(codigo || '').toLowerCase();
+        var chave = chaveCicloPalette(codigo);
+        if (/^b[1-4]$/.test(chave)) return chave;
+        if (chave === 's1' || chave === 's2' || chave === 'final') return chave;
+        var nome = String(rotuloPeriodoMediaCiclo(codigo) || '').toUpperCase();
+        if (/FINAL|RESULTADO/.test(nome)) return 'final';
+        if (/SEMESTRE|ETAPA/.test(nome)) {
+            if (/\b2|SEGUNDO|\bII\b/.test(nome) && !/\bIII\b/.test(nome)) return 's2';
+            return 's1';
+        }
+        if (/\b4|QUARTO|\bIV\b/.test(nome)) return 'b4';
+        if (/\b3|TERCEIRO|\bIII\b/.test(nome)) return 'b3';
+        if (/\b2|SEGUNDO|\bII\b/.test(nome) && !/\bIII\b/.test(nome)) return 'b2';
+        if (/\b1|PRIMEIRO|\bI\b/.test(nome)) return 'b1';
+        return (opcoesDestinoMediaCiclo()[0] || {}).value || 'b1';
+    }
+
+    function destinoMediaCicloDoBloco(codigo) {
+        codigo = String(codigo || '').toLowerCase();
+        garantirMapaMediaCicloDestinos();
+        if (estado.media_ciclo_destinos[codigo]) return String(estado.media_ciclo_destinos[codigo]);
+        var k;
+        for (k in estado.media_ciclo_destinos) {
+            if (String(k).toLowerCase() === codigo && estado.media_ciclo_destinos[k]) {
+                return String(estado.media_ciclo_destinos[k]);
+            }
+        }
+        return destinoMediaCicloPadrao(codigo);
+    }
+
+    function sincronizarUiDestinoMediaCiclo() {
+        var wrap = document.getElementById('bw-formula-media-ciclo-destino-wrap');
+        var sel = document.getElementById('bw-formula-media-ciclo-destino');
+        var chk = document.getElementById('bw-formula-media-ciclo');
+        if (!wrap || !sel || !chk) return;
+        wrap.classList.toggle('hidden', !chk.checked);
+        if (!chk.checked || !estado || !estado.bloco_calc) return;
+        var atual = destinoMediaCicloDoBloco(estado.bloco_calc);
+        if (sel.value !== atual) sel.value = atual;
+    }
+
     function flushMediaCicloAberta() {
         if (!estado || !estado.bloco_calc) return;
         if (!estado.media_ciclo_blocos || typeof estado.media_ciclo_blocos !== 'object') {
             estado.media_ciclo_blocos = {};
         }
+        garantirMapaMediaCicloDestinos();
         var el = document.getElementById('bw-formula-media-ciclo');
+        var sel = document.getElementById('bw-formula-media-ciclo-destino');
         var low = String(estado.bloco_calc).toLowerCase();
         Object.keys(estado.media_ciclo_blocos).forEach(function (k) {
             if (String(k).toLowerCase() === low) delete estado.media_ciclo_blocos[k];
         });
+        Object.keys(estado.media_ciclo_destinos).forEach(function (k) {
+            if (String(k).toLowerCase() === low) delete estado.media_ciclo_destinos[k];
+        });
         if (el && el.checked) {
             estado.media_ciclo_blocos[low] = 1;
+            var dest = String((sel && sel.value) || destinoMediaCicloPadrao(low)).toLowerCase();
+            if (!/^(b[1-4]|s[12]|final)$/.test(dest)) dest = destinoMediaCicloPadrao(low);
+            estado.media_ciclo_destinos[low] = dest;
         }
     }
 
-    /** Período do título em que o bloco está (para explicar qual REC usa a flag). */
+    /** Período do título em que o bloco está (para sugerir a REC). */
     function rotuloPeriodoMediaCiclo(codigo) {
         codigo = String(codigo || '').toLowerCase();
         if (!codigo || !estado) return '';
@@ -5272,6 +5369,11 @@ $boletimWizardSteps = [
                 if (String(k).toLowerCase() === low) delete estado.media_ciclo_blocos[k];
             });
         }
+        if (estado.media_ciclo_destinos) {
+            Object.keys(estado.media_ciclo_destinos).forEach(function (k) {
+                if (String(k).toLowerCase() === low) delete estado.media_ciclo_destinos[k];
+            });
+        }
         if (String(estado.bloco_calc || '').toLowerCase() === low) {
             estado.bloco_calc = '';
             estado.materia_calc = 0;
@@ -5333,6 +5435,7 @@ $boletimWizardSteps = [
         estado.nomes_blocos = {};
         estado.escalas_blocos = {};
         estado.media_ciclo_blocos = {};
+        estado.media_ciclo_destinos = {};
         estado.colunas_ordem = [];
         estado.linhas_layout = [];
         estado.cabecalhos_manuais = 1;
@@ -5370,8 +5473,21 @@ $boletimWizardSteps = [
         bodyEl._bwFormulaBound = true;
         var formulaArrastando = false;
         bodyEl.addEventListener('change', function (e) {
-            if (!e.target || e.target.id !== 'bw-formula-fechar-apos') return;
-            gravarFlagFecharAposSalvar(!!e.target.checked);
+            if (!e.target) return;
+            if (e.target.id === 'bw-formula-fechar-apos') {
+                gravarFlagFecharAposSalvar(!!e.target.checked);
+                return;
+            }
+            if (e.target.id === 'bw-formula-media-ciclo') {
+                sincronizarUiDestinoMediaCiclo();
+                flushMediaCicloAberta();
+                agendarMontar();
+                return;
+            }
+            if (e.target.id === 'bw-formula-media-ciclo-destino') {
+                flushMediaCicloAberta();
+                agendarMontar();
+            }
         });
         bodyEl.addEventListener('click', function (e) {
             if (e.target.closest('#bw-formula-salvar')) {
@@ -9652,8 +9768,13 @@ $boletimWizardSteps = [
             if (!estado.media_ciclo_blocos || typeof estado.media_ciclo_blocos !== 'object') {
                 estado.media_ciclo_blocos = {};
             }
+            garantirMapaMediaCicloDestinos();
             if (blocoEhMediaCiclo(cod)) {
                 estado.media_ciclo_blocos[novoCod] = 1;
+                var destClone = destinoMediaCicloDoBloco(cod);
+                if (/^(b[1-4]|s[12]|final)$/.test(destClone)) {
+                    estado.media_ciclo_destinos[novoCod] = destClone;
+                }
             }
             if (estado.blocos_calc.indexOf(novoCod) < 0) estado.blocos_calc.push(novoCod);
             mostrarColuna(novoCod);
@@ -11837,23 +11958,26 @@ $boletimWizardSteps = [
                 html += '<p id="bw-formula-salva" class="hidden text-sm font-semibold text-emerald-700">Salvo.</p>';
                 html += '</div>';
                 html += '</div>';
-                // Linha 2: flag Média do Ciclo em destaque
-                var periodoCiclo = rotuloPeriodoMediaCiclo(estado.bloco_calc || '');
-                html += '<label class="flex items-start gap-3 rounded-xl border border-amber-300 bg-white px-3.5 py-3 cursor-pointer hover:bg-amber-50/60 select-none" title="Usa esta coluna para marcar quem ficou abaixo da média na recuperação">';
+                // Linha 2: flag Média do Ciclo + destino da REC
+                var marcadoCiclo = blocoEhMediaCiclo(estado.bloco_calc || '');
+                var destCiclo = destinoMediaCicloDoBloco(estado.bloco_calc || '');
+                html += '<div class="rounded-xl border border-amber-300 bg-white px-3.5 py-3">';
+                html += '<label class="flex items-start gap-3 cursor-pointer hover:bg-amber-50/60 select-none -mx-1 px-1 rounded-lg" title="Usa esta coluna para marcar quem ficou abaixo da média na recuperação">';
                 html += '<input type="checkbox" id="bw-formula-media-ciclo" class="mt-0.5 rounded border-amber-300 text-amber-600"'
-                    + (blocoEhMediaCiclo(estado.bloco_calc || '') ? ' checked' : '') + '>';
+                    + (marcadoCiclo ? ' checked' : '') + '>';
                 html += '<span class="min-w-0">';
                 html += '<span class="block text-sm font-semibold text-amber-950">Média do Ciclo</span>';
-                html += '<span class="block text-xs text-amber-900/80 mt-0.5">Marque se esta coluna for a média que define quem entra na recuperação'
-                    + (periodoCiclo
-                        ? (' de <strong>' + esc(periodoCiclo) + '</strong>.')
-                        : '.')
-                    + ' O vínculo é pelo título em que o bloco está:'
-                    + ' <strong>1º Trimestre/Bimestre</strong> → REC desse ciclo;'
-                    + ' <strong>1º Semestre</strong> (média dos 2 bimestres) → REC “a cada dois ciclos”;'
-                    + ' <strong>Resultado Final / Média Final</strong> → Rec Final.'
-                    + '</span>';
+                html += '<span class="block text-xs text-amber-900/80 mt-0.5">Marque se esta coluna define quem entra na recuperação. Em seguida escolha <strong>para qual REC</strong> ela vale.</span>';
                 html += '</span></label>';
+                html += '<div id="bw-formula-media-ciclo-destino-wrap" class="mt-3 pl-7' + (marcadoCiclo ? '' : ' hidden') + '">';
+                html += '<label class="block text-xs font-medium text-amber-950 mb-1" for="bw-formula-media-ciclo-destino">Esta média vale para qual recuperação?</label>';
+                html += '<select id="bw-formula-media-ciclo-destino" class="w-full max-w-md h-10 border border-amber-200 rounded-lg px-3 text-sm bg-amber-50/40">';
+                opcoesDestinoMediaCiclo().forEach(function (op) {
+                    html += '<option value="' + esc(op.value) + '"'
+                        + (op.value === destCiclo ? ' selected' : '') + '>' + esc(op.label) + '</option>';
+                });
+                html += '</select>';
+                html += '</div></div>';
                 html += '</div>';
                 html += '<p id="bw-formula-bloco-titulo" class="text-sm font-semibold text-amber-950">Cálculo de <span id="bw-formula-bloco-nome">' + esc(nomeBlocoCalc(estado.bloco_calc || 'média')) + '</span></p>';
                 html += '<p id="bw-formula-bloco-ajuda" class="text-xs text-amber-900/80 mt-0.5 mb-2">A média é a soma entre parênteses, depois ÷ quantidade. Ex.: (Prova + Trabalho + Participação) ÷ 3.</p>';
@@ -12865,6 +12989,7 @@ $boletimWizardSteps = [
         var nomesLocal = JSON.parse(JSON.stringify(estado.nomes_blocos || {}));
         var escalasLocal = JSON.parse(JSON.stringify(estado.escalas_blocos || {}));
         var mediaCicloLocal = JSON.parse(JSON.stringify(estado.media_ciclo_blocos || {}));
+        var mediaCicloDestLocal = JSON.parse(JSON.stringify(estado.media_ciclo_destinos || {}));
         var formulaLocal = JSON.parse(JSON.stringify(estado.formulas_blocos || {}));
         var excecoesLocal = JSON.parse(JSON.stringify(estado.formulas_materias_blocos || {}));
         var tokensLocal = (estado.formula_tokens || []).slice();
@@ -12944,6 +13069,21 @@ $boletimWizardSteps = [
                     if ((remoto.media_ciclo_blocos || {})[cod]) cicloAgora[cod] = 1;
                 });
                 remoto.media_ciclo_blocos = cicloAgora;
+                var destAgora = {};
+                var fonteDest = (estado && estado.media_ciclo_destinos && typeof estado.media_ciclo_destinos === 'object' && !Array.isArray(estado.media_ciclo_destinos))
+                    ? estado.media_ciclo_destinos
+                    : (mediaCicloDestLocal || {});
+                Object.keys(fonteDest).forEach(function (cod) {
+                    var d = String(fonteDest[cod] || '').toLowerCase();
+                    if (!cod || !/^(b[1-4]|s[12]|final)$/.test(d)) return;
+                    destAgora[cod] = d;
+                });
+                Object.keys(remoto.media_ciclo_destinos || {}).forEach(function (cod) {
+                    if (destAgora[cod]) return;
+                    var dR = String((remoto.media_ciclo_destinos || {})[cod] || '').toLowerCase();
+                    if (/^(b[1-4]|s[12]|final)$/.test(dR)) destAgora[cod] = dR;
+                });
+                remoto.media_ciclo_destinos = destAgora;
                 var limposAgora = {};
                 var fonteLimpos = (estado && estado.nomes_limpos && typeof estado.nomes_limpos === 'object' && !Array.isArray(estado.nomes_limpos))
                     ? estado.nomes_limpos : {};
@@ -13263,6 +13403,7 @@ $boletimWizardSteps = [
     function aplicarMediaCicloNosComponentesLocais(comps) {
         if (!Array.isArray(comps)) return comps || [];
         flushMediaCicloAberta();
+        garantirMapaMediaCicloDestinos();
         return comps.map(function (c) {
             if (!c || typeof c !== 'object') return c;
             var src = String(c.source_type || '');
@@ -13273,8 +13414,15 @@ $boletimWizardSteps = [
             out.config = (c.config && typeof c.config === 'object') ? Object.assign({}, c.config) : {};
             if (blocoEhMediaCiclo(cod)) {
                 out.config.media_ciclo = 1;
+                var dest = destinoMediaCicloDoBloco(cod);
+                if (/^(b[1-4]|s[12]|final)$/.test(dest)) {
+                    out.config.media_ciclo_destino = dest;
+                    out.config.layout_group = dest;
+                    out.config.layout_type = out.config.layout_type || 'media';
+                }
             } else {
                 delete out.config.media_ciclo;
+                delete out.config.media_ciclo_destino;
             }
             return out;
         });
@@ -13289,6 +13437,9 @@ $boletimWizardSteps = [
         // Garante a flag no JSON do POST mesmo se o montar remoto ainda não reidratou.
         if (estado && estado.media_ciclo_blocos && typeof estado.media_ciclo_blocos === 'object') {
             r.media_ciclo_blocos = estado.media_ciclo_blocos;
+        }
+        if (estado && estado.media_ciclo_destinos && typeof estado.media_ciclo_destinos === 'object') {
+            r.media_ciclo_destinos = estado.media_ciclo_destinos;
         }
         r.componentes = aplicarMediaCicloNosComponentesLocais(r.componentes);
         var comps = normalizarComponentesRascunho(r.componentes);

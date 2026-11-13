@@ -810,6 +810,7 @@ class BoletimAssistenteWizard
             'nomes_blocos' => [],
             'escalas_blocos' => [],
             'media_ciclo_blocos' => [],
+            'media_ciclo_destinos' => [],
             'bloco_calc' => '',
             'materia_calc' => 0,
             'blocos_calc' => [],
@@ -2238,6 +2239,7 @@ class BoletimAssistenteWizard
         $merged['nomes_blocos'] = $this->normalizarNomesBlocos($merged['nomes_blocos'] ?? []);
         $merged['escalas_blocos'] = $this->normalizarEscalasBlocos($merged['escalas_blocos'] ?? []);
         $merged['media_ciclo_blocos'] = $this->normalizarMediaCicloBlocos($merged['media_ciclo_blocos'] ?? []);
+        $merged['media_ciclo_destinos'] = $this->normalizarMediaCicloDestinos($merged['media_ciclo_destinos'] ?? []);
         $merged['nomes_limpos'] = $this->normalizarNomesLimpos($merged['nomes_limpos'] ?? []);
         $merged['blocos_calc'] = $this->normalizarColunasOrdem($merged['blocos_calc'] ?? []);
         $merged['bloco_calc'] = strtolower(trim((string) ($merged['bloco_calc'] ?? '')));
@@ -2516,14 +2518,21 @@ class BoletimAssistenteWizard
         if (!is_array($estado['media_ciclo_blocos'] ?? null)) {
             $estado['media_ciclo_blocos'] = [];
         }
+        if (!is_array($estado['media_ciclo_destinos'] ?? null)) {
+            $estado['media_ciclo_destinos'] = [];
+        }
         $rascunho = is_array($estado['rascunho_preservado'] ?? null) ? $estado['rascunho_preservado'] : [];
         $comps = is_array($rascunho['componentes'] ?? null) ? $rascunho['componentes'] : [];
         foreach ($comps as $c) {
-            if (!is_array($c) || (string) ($c['source_type'] ?? '') !== 'calculado') {
+            if (!is_array($c)) {
+                continue;
+            }
+            $src = (string) ($c['source_type'] ?? '');
+            if ($src !== 'calculado' && $src !== 'evento_boletim') {
                 continue;
             }
             $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
-            if ($cod === '' || !empty($estado['media_ciclo_blocos'][$cod])) {
+            if ($cod === '') {
                 continue;
             }
             $cfg = is_array($c['config'] ?? null) ? $c['config'] : [];
@@ -2533,8 +2542,19 @@ class BoletimAssistenteWizard
                     $cfg = $decoded;
                 }
             }
-            if (!empty($cfg['media_ciclo'])) {
-                $estado['media_ciclo_blocos'][$cod] = 1;
+            if (empty($cfg['media_ciclo'])) {
+                continue;
+            }
+            $estado['media_ciclo_blocos'][$cod] = 1;
+            if (empty($estado['media_ciclo_destinos'][$cod])) {
+                $dest = strtolower(trim((string) (
+                    $cfg['media_ciclo_destino']
+                    ?? $cfg['layout_group']
+                    ?? ''
+                )));
+                if (in_array($dest, ['b1', 'b2', 'b3', 'b4', 's1', 's2', 'final'], true)) {
+                    $estado['media_ciclo_destinos'][$cod] = $dest;
+                }
             }
         }
     }
@@ -5417,7 +5437,7 @@ class BoletimAssistenteWizard
                 static fn ($cod) => !preg_match('/^b[1-4]_mu$/i', (string) $cod)
             ));
         }
-        foreach (['formulas_blocos', 'nomes_blocos', 'escalas_blocos', 'media_ciclo_blocos', 'formulas_materias_blocos'] as $chave) {
+        foreach (['formulas_blocos', 'nomes_blocos', 'escalas_blocos', 'media_ciclo_blocos', 'media_ciclo_destinos', 'formulas_materias_blocos'] as $chave) {
             if (!is_array($estado[$chave] ?? null)) {
                 continue;
             }
@@ -6660,6 +6680,57 @@ class BoletimAssistenteWizard
         }
 
         return $out;
+    }
+
+    /**
+     * @param mixed $raw
+     * @return array<string,string>
+     */
+    private function normalizarMediaCicloDestinos($raw): array
+    {
+        $out = [];
+        if (!is_array($raw)) {
+            return $out;
+        }
+        $ok = ['b1', 'b2', 'b3', 'b4', 's1', 's2', 'final'];
+        foreach ($raw as $codigo => $destino) {
+            $codigo = strtolower(trim((string) $codigo));
+            $destino = strtolower(trim((string) $destino));
+            if ($codigo === '' || !(bool) preg_match('/^[a-z][a-z0-9_]{0,40}$/', $codigo)) {
+                continue;
+            }
+            if (!in_array($destino, $ok, true)) {
+                continue;
+            }
+            $out[$codigo] = $destino;
+            if (count($out) >= 40) {
+                break;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string,mixed> $estado
+     */
+    private function destinoMediaCicloDoBloco(array $estado, string $codigo): string
+    {
+        $codigo = strtolower(trim($codigo));
+        if ($codigo === '') {
+            return '';
+        }
+        $mapa = is_array($estado['media_ciclo_destinos'] ?? null) ? $estado['media_ciclo_destinos'] : [];
+        if (!empty($mapa[$codigo]) && is_string($mapa[$codigo])) {
+            return strtolower(trim($mapa[$codigo]));
+        }
+        foreach ($mapa as $cod => $dest) {
+            if (strtolower(trim((string) $cod)) === $codigo) {
+                return strtolower(trim((string) $dest));
+            }
+        }
+
+        return '';
     }
 
     /**
@@ -8384,16 +8455,20 @@ class BoletimAssistenteWizard
             $cfg = is_array($c['config'] ?? null) ? $c['config'] : [];
             if ($this->blocoEhMediaCiclo($estado, $cod)) {
                 $cfg['media_ciclo'] = 1;
-                $grupoAtual = strtolower(trim((string) ($cfg['layout_group'] ?? '')));
-                if ($grupoAtual === '' || $grupoAtual === 'quadro_comum') {
-                    $inferido = $this->layoutGroupDaColunaNoEstado($cod, $estado);
-                    if ($inferido !== '' && $inferido !== 'quadro_comum') {
-                        $cfg['layout_group'] = $inferido;
-                        $cfg['layout_type'] = $cfg['layout_type'] ?? 'media';
-                    }
+                $destino = $this->destinoMediaCicloDoBloco($estado, $cod);
+                if ($destino === '') {
+                    $destino = $this->layoutGroupDaColunaNoEstado($cod, $estado);
+                }
+                if (!in_array($destino, ['b1', 'b2', 'b3', 'b4', 's1', 's2', 'final'], true)) {
+                    $destino = '';
+                }
+                if ($destino !== '') {
+                    $cfg['media_ciclo_destino'] = $destino;
+                    $cfg['layout_group'] = $destino;
+                    $cfg['layout_type'] = $cfg['layout_type'] ?? 'media';
                 }
             } else {
-                unset($cfg['media_ciclo']);
+                unset($cfg['media_ciclo'], $cfg['media_ciclo_destino']);
             }
             $comps[$i]['config'] = $cfg;
         }

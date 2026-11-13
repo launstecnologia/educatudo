@@ -323,21 +323,20 @@ class MediaCicloRecuperacaoService
             }
         }
 
-        // Quadro livre: bloco flagado sem grupo (ou quadro_comum).
+        // Quadro livre: bloco flagado sem grupo (ou quadro_comum) — só se for o único sem destino.
+        $semGrupo = [];
         foreach ($candidatos as $c) {
             $cfg = $this->configDoComponente($c);
             $g = $this->layoutGroupDoConfig($cfg, $c);
             if ($g === '' || $g === 'quadro_comum') {
-                return $c;
+                $semGrupo[] = $c;
             }
         }
-
-        // Um único bloco flagado no boletim: usa mesmo se o layout_group tiver se perdido no save.
-        if (count($candidatos) === 1) {
-            return $candidatos[0];
+        if (count($semGrupo) === 1) {
+            return $semGrupo[0];
         }
 
-        // Sem match do período: não usa bloco de outro ciclo (evita MIN → média errada).
+        // Sem match do período: não usa bloco de outro ciclo (evita REC 2 pegar média do 3º).
         return null;
     }
 
@@ -701,12 +700,19 @@ class MediaCicloRecuperacaoService
     private function layoutGroupDoConfig(array $cfg, array $componente): string
     {
         $layout = is_array($cfg['layout'] ?? null) ? $cfg['layout'] : [];
+        // Destino explícito da UI (“para qual REC?”) manda sobre o título do bloco.
         $g = strtolower(trim((string) (
-            $cfg['layout_group']
+            $cfg['media_ciclo_destino']
+            ?? $cfg['layout_group']
             ?? $layout['group']
             ?? $componente['layout_group']
             ?? ''
         )));
+        if (!in_array($g, ['b1', 'b2', 'b3', 'b4', 's1', 's2', 'final', 'quadro_comum'], true)
+            && !preg_match('/^grupo_[a-z0-9_]+$/', $g)
+        ) {
+            return '';
+        }
 
         return $g;
     }
