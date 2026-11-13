@@ -707,8 +707,45 @@ $ocultarRefNotas = !empty($ocultar_ref_notas);
             <?php if (!$temAbasNotas): ?>
             <p class="text-xs text-gray-500 mb-2"><?= $esc($grupoPainel['rotulo']) ?></p>
             <?php endif; ?>
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200">
-                <div class="overflow-x-auto">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <?php /* Mobile: cards com botão sempre visível (a tabela escondia Ações fora da tela). */ ?>
+                <div class="sm:hidden divide-y divide-gray-100">
+                    <?php foreach ($grupoPainel['linhas'] as $linhaP): ?>
+                        <?php
+                        $anoP = (int) $linhaP['ano'];
+                        $bimP = (int) $linhaP['numero'];
+                        $descricao = trim((string) $linhaP['descricao']);
+                        $seloLinha = (($linhaP['selo'] ?? $linhaP['curso_tipo'] ?? '') === 'extra') ? 'extra' : 'oficial';
+                        $rotuloSelo = $seloLinha === 'extra' ? 'Itinerário' : 'Oficial';
+                        $tituloModal = $descricao !== ''
+                            ? $descricao
+                            : ($anoP > 0 && $bimP > 0 ? \App\Core\PeriodoLetivo::rotulo($anoP, $bimP) : 'Notas');
+                        $tituloModal = $rotuloSelo . ' — ' . $tituloModal;
+                        $labelBtn = $seloLinha === 'extra' ? 'Abrir itinerário' : 'Abrir demonstrativo';
+                        ?>
+                        <div class="p-4 space-y-3">
+                            <div class="flex flex-wrap items-center gap-2 text-sm">
+                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide <?= $seloLinha === 'extra' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800' ?>"><?= $esc($rotuloSelo) ?></span>
+                                <span class="font-semibold text-gray-900"><?= $anoP > 0 ? $anoP : '—' ?></span>
+                                <span class="text-gray-500">·</span>
+                                <span class="text-gray-800"><?= $esc($celulaPeriodo($anoP, $bimP, $cabPeriodo)) ?></span>
+                            </div>
+                            <p class="text-sm text-gray-700"><?= $esc($descricao !== '' ? $descricao : '—') ?></p>
+                            <?php if (!empty($linhaP['tem_quadro'])): ?>
+                                <button type="button"
+                                        onclick="<?= $esc($jsAbrir((string) $linhaP['id_quadro'], $tituloModal)) ?>"
+                                        class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-blue-700 text-white shadow-sm">
+                                    <i class="fa-solid fa-table-cells"></i> <?= $esc($labelBtn) ?>
+                                </button>
+                            <?php else: ?>
+                                <button type="button" disabled class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-400 bg-gray-50 border border-gray-200 cursor-not-allowed">
+                                    <i class="fa-solid fa-table-cells"></i> <?= $esc($labelBtn) ?>
+                                </button>
+                            <?php endif; ?>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <div class="hidden sm:block overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
