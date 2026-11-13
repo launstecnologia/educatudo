@@ -30,6 +30,8 @@ class ProvasAlunoAssistenteService
     private $openai;
     private int $usuarioIdContexto = 0;
     private int $conversaIdContexto = 0;
+    /** @var array<string,mixed> */
+    private array $usuarioContexto = [];
 
     public function __construct(
         ?ProvasAlunoConsultaService $consulta = null,
@@ -50,10 +52,14 @@ class ProvasAlunoAssistenteService
     }
 
     /** Contexto do admin/conversa para gravar propostas de escrita. */
-    public function definirContextoAcao(int $usuarioId, int $conversaId = 0): void
+    public function definirContextoAcao(int $usuarioId, int $conversaId = 0, ?array $usuario = null): void
     {
         $this->usuarioIdContexto = max(0, $usuarioId);
         $this->conversaIdContexto = max(0, $conversaId);
+        $this->usuarioContexto = is_array($usuario) ? $usuario : [];
+        if ($this->usuarioContexto === [] && $usuarioId > 0) {
+            $this->usuarioContexto = ['id' => $usuarioId, 'tipo' => 'admin'];
+        }
     }
 
     public function acoes(): AssistenteAcaoPropostaService
@@ -88,6 +94,45 @@ class ProvasAlunoAssistenteService
 
         // Clique "Selecionar" no painel: nunca trate o id como RA; retome o pedido anterior.
         $mensagemUsuario = $this->reescreverSelecaoAluno($mensagemUsuario, $historico);
+
+        // "sim" / "confirmo" no chat aplica a proposta pendente (mesmo efeito do botão Confirmar).
+        if ($this->mensagemConfirmaProposta($mensagemUsuario)) {
+            if ($this->usuarioIdContexto <= 0) {
+                return ['success' => false, 'error' => 'Sessão inválida para confirmar proposta.'];
+            }
+            if ($onStatus !== null) {
+                $onStatus('Confirmando proposta…');
+            }
+            $conf = $this->acoes->confirmarPendenteNaConversa(
+                $this->usuarioIdContexto,
+                $this->conversaIdContexto,
+                $this->usuarioContexto
+            );
+            if (!empty($conf['success'])) {
+                $textoOk = (string) ($conf['mensagem'] ?? 'Proposta confirmada e gravada no sistema.');
+                if ($onTextoChunk !== null) {
+                    $this->emitirEmPedacos($textoOk, $onTextoChunk);
+                }
+                return [
+                    'success' => true,
+                    'mensagem' => $textoOk,
+                    'painel' => null,
+                    'consultas' => [['tool' => 'confirmar_proposta', 'args' => [
+                        'conversa_id' => $this->conversaIdContexto,
+                    ]]],
+                ];
+            }
+            $textoErro = (string) ($conf['error'] ?? 'Não foi possível confirmar a proposta.');
+            if ($onTextoChunk !== null) {
+                $this->emitirEmPedacos($textoErro, $onTextoChunk);
+            }
+            return [
+                'success' => true,
+                'mensagem' => $textoErro,
+                'painel' => null,
+                'consultas' => [],
+            ];
+        }
 
         try {
             $this->assertCreditosDisponiveis();
@@ -236,7 +281,15 @@ class ProvasAlunoAssistenteService
             && !empty($ultimoResultado['ok'])
             && !empty($ultimoResultado['proposta_id'])
         ) {
-            $textoFinal = 'Preparei uma proposta. Revise abaixo e confirme se estiver de acordo.';
+            $det = is_array($ultimoResultado['detalhes'] ?? null)
+                ? $ultimoResultado['detalhes']
+                : $this->acoes->detalhesProposta(
+                    (string) ($ultimoResultado['tipo'] ?? ''),
+                    is_array($ultimoResultado['payload'] ?? null) ? $ultimoResultado['payload'] : []
+                );
+            $textoFinal = 'Preparei uma proposta de **'
+                . trim((string) ($det['tipo_label'] ?? 'ação'))
+                . '**. Revise o título, a descrição, a data/hora e os envolvidos abaixo e confirme.';
         }
 
         // Conferência server-side por RA/nome: a IA não pode inventar "não encontrei".
@@ -536,13 +589,19 @@ class ProvasAlunoAssistenteService
             && !empty($resultado['ok'])
             && !empty($resultado['proposta_id'])
         ) {
+            $payload = is_array($resultado['payload'] ?? null) ? $resultado['payload'] : [];
+            $tipoAcao = (string) ($resultado['tipo'] ?? '');
+            $detalhes = is_array($resultado['detalhes'] ?? null)
+                ? $resultado['detalhes']
+                : $this->acoes->detalhesProposta($tipoAcao, $payload);
             return [
                 'tipo' => 'proposta',
                 'proposta_id' => (int) $resultado['proposta_id'],
-                'acao' => (string) ($resultado['tipo'] ?? ''),
+                'acao' => $tipoAcao,
                 'resumo' => (string) ($resultado['resumo'] ?? ''),
+                'detalhes' => $detalhes,
                 'situacao' => (string) ($resultado['situacao'] ?? 'RASCUNHO'),
-                'payload' => is_array($resultado['payload'] ?? null) ? $resultado['payload'] : [],
+                'payload' => $payload,
             ];
         }
         if (!empty($resultado['candidatos_aulas']) && is_array($resultado['candidatos_aulas'])) {
@@ -1120,7 +1179,7 @@ Regras importantes:
 23) NUNCA invente quantidade de faltas/ocorrências/notas. Sempre chame a tool adequada. Se frequencia=null ou aviso de sem lançamentos, diga isso — não chute um número.
 24) NUNCA escreva [contexto_estruturado], aluno_id=, prova_id= nem metadados internos na resposta ao usuário. Isso é só para a UI/histórico.
 25) Saude_academica é alerta cadastral/matrícula/chamada da escola; para rendimento de uma turma use saude_turma.
-26) CRIAR ocorrência / registrar incidente → propor_criar_ocorrencia (aceita vários alunos). NÃO diga que criou — diga que preparou a proposta e o usuário confirma no botão.
+26) CRIAR ocorrência / registrar incidente → propor_criar_ocorrencia (aceita vários alunos). NÃO diga que criou — diga que preparou a proposta e o usuário confirma no botão (ou diga "sim"). Nunca afirme "ocorrência registrada/criada" só porque o usuário escreveu "sim" sem a tool de confirmação ter rodado.
 27) Registrar ENTRADA ou SAÍDA (portaria) → propor_entrada_saida.
 28) Marcar PRESENTE/FALTA na CHAMADA de uma aula do diário → propor_chamada_aula.
 29) Em ações de escrita, se nome ficar ambíguo, devolva candidatos; nunca chute aluno_id.
@@ -1668,6 +1727,24 @@ PROMPT
     /**
      * @param list<array{role?:string,content?:string}> $historico
      */
+    private function mensagemConfirmaProposta(string $mensagem): bool
+    {
+        $t = mb_strtolower(trim($mensagem), 'UTF-8');
+        $t = preg_replace('/[!?.]+$/u', '', $t) ?? $t;
+        $t = trim($t);
+        if ($t === '') {
+            return false;
+        }
+        // Só confirmações curtas/explícitas — evita "sim, e mostra o boletim".
+        if (preg_match('/^(sim|ok|pode|confirma|confirmo|confirmar|pode confirmar|pode aplicar|aplicar|fechado|isso|isso mesmo|pode ser)(\s+por favor)?$/iu', $t) === 1) {
+            return true;
+        }
+        if (preg_match('/^(sim|ok),?\s+(pode\s+)?(confirmar|aplicar|gravar|registrar)\.?$/iu', $t) === 1) {
+            return true;
+        }
+        return false;
+    }
+
     private function pedidoPareceBoletim(string $pergunta, array $historico = []): bool
     {
         if (preg_match('/\bboletim\b|\bquadro\s+de\s+notas\b/iu', $pergunta) === 1) {

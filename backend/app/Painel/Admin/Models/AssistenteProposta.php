@@ -24,6 +24,7 @@ class AssistenteProposta
 
     public function tabelasProntas(): bool
     {
+        $this->ensureSchema();
         try {
             if (method_exists($this->db, 'tableExists')) {
                 return (bool) $this->db->tableExists('assistente_propostas');
@@ -37,6 +38,73 @@ class AssistenteProposta
         } catch (\Throwable $e) {
             return false;
         }
+    }
+
+    /** Idempotente — espelha 2026_11_12_assistente_propostas.sql. */
+    public function ensureSchema(): void
+    {
+        static $feito = false;
+        if ($feito) {
+            return;
+        }
+        $feito = true;
+        try {
+            $this->db->query(
+                "CREATE TABLE IF NOT EXISTS `assistente_propostas` (
+                    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                    `conversa_id` INT UNSIGNED NULL,
+                    `mensagem_id` BIGINT UNSIGNED NULL,
+                    `usuario_id` INT NOT NULL COMMENT 'usuarios.id do admin autor',
+                    `tipo` VARCHAR(40) NOT NULL COMMENT 'criar_ocorrencia|entrada_saida|chamada_aula',
+                    `payload_json` JSON NOT NULL,
+                    `confirmado` TINYINT(1) NOT NULL DEFAULT 0,
+                    `confirmado_em` DATETIME NULL,
+                    `resultado_json` JSON NULL,
+                    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (`id`),
+                    KEY `idx_assistente_prop_usuario` (`usuario_id`, `confirmado`, `created_at`),
+                    KEY `idx_assistente_prop_conversa` (`conversa_id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            );
+        } catch (\Throwable $e) {
+            error_log('AssistenteProposta::ensureSchema: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Última proposta em rascunho do usuário (opcionalmente da conversa).
+     *
+     * @return array<string,mixed>|null
+     */
+    public function encontrarPendente(int $usuarioId, int $conversaId = 0): ?array
+    {
+        if ($usuarioId <= 0 || !$this->tabelasProntas()) {
+            return null;
+        }
+        $params = ['usuario_id' => $usuarioId];
+        $sql = 'SELECT * FROM assistente_propostas
+                WHERE usuario_id = :usuario_id AND confirmado = 0';
+        if ($conversaId > 0) {
+            $sql .= ' AND conversa_id = :conversa_id';
+            $params['conversa_id'] = $conversaId;
+        }
+        $sql .= ' ORDER BY id DESC LIMIT 1';
+        $row = $this->db->fetch($sql, $params);
+        if ($row) {
+            return $row;
+        }
+        // Sem conversa amarrada: pega a mais recente do usuário (últimos 30 min).
+        if ($conversaId > 0) {
+            $row = $this->db->fetch(
+                'SELECT * FROM assistente_propostas
+                 WHERE usuario_id = :usuario_id AND confirmado = 0
+                   AND created_at >= (NOW() - INTERVAL 30 MINUTE)
+                 ORDER BY id DESC LIMIT 1',
+                ['usuario_id' => $usuarioId]
+            );
+            return $row ?: null;
+        }
+        return null;
     }
 
     /**

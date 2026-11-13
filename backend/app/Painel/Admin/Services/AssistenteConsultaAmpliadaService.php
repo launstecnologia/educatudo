@@ -1714,6 +1714,14 @@ class AssistenteConsultaAmpliadaService
         $inicio = $this->normalizarData($filtros['data_inicio'] ?? null);
         $fim = $this->normalizarData($filtros['data_fim'] ?? null);
         $anoFiltro = (int) ($filtros['ano_letivo'] ?? $filtros['ano'] ?? 0);
+        $qualquerPeriodo = !empty($filtros['qualquer_periodo'])
+            || !empty($filtros['todos_periodos'])
+            || !empty($filtros['sem_filtro_ano']);
+        if ($qualquerPeriodo) {
+            $anoFiltro = 0;
+            $inicio = null;
+            $fim = null;
+        }
         if ($anoFiltro > 0 && ($inicio === null || $fim === null)) {
             $inicio = $inicio ?? ($anoFiltro . '-01-01');
             $fim = $fim ?? ($anoFiltro . '-12-31');
@@ -1729,6 +1737,22 @@ class AssistenteConsultaAmpliadaService
             $model = new Ocorrencia();
             $rows = $model->listar($filtrosLista, 40, 0);
             $total = $model->contar($filtrosLista);
+            // Se filtrou por ano e veio vazio, tenta sem período (ocorrência pode ser de outro ano).
+            if ($total === 0 && ($anoFiltro > 0 || $inicio !== null || $fim !== null) && !$qualquerPeriodo) {
+                $filtrosSemAno = ['aluno_id' => $alunoId];
+                if ($status !== '' && isset(Ocorrencia::STATUS[$status])) {
+                    $filtrosSemAno['status'] = $status;
+                }
+                $rowsAll = $model->listar($filtrosSemAno, 40, 0);
+                $totalAll = $model->contar($filtrosSemAno);
+                if ($totalAll > 0) {
+                    $rows = $rowsAll;
+                    $total = $totalAll;
+                    $inicio = null;
+                    $fim = null;
+                    $anoFiltro = 0;
+                }
+            }
         } catch (\Throwable $e) {
             error_log('AssistenteConsultaAmpliada ocorrenciasAluno: ' . $e->getMessage());
             return ['ok' => false, 'error' => 'Não foi possível consultar as ocorrências.'];

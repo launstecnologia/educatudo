@@ -150,8 +150,9 @@ class AssistenteAcaoPropostaService
             'proposta_id' => $id,
             'tipo' => 'criar_ocorrencia',
             'resumo' => $this->resumoOcorrencia($payload),
+            'detalhes' => $this->detalhesProposta('criar_ocorrencia', $payload),
             'payload' => $payload,
-            'situacao' => 'RASCUNHO — nada foi gravado. Confirme no botão abaixo.',
+            'situacao' => 'RASCUNHO — nada foi gravado. Confirme abaixo.',
         ];
     }
 
@@ -207,8 +208,9 @@ class AssistenteAcaoPropostaService
             'proposta_id' => $id,
             'tipo' => 'entrada_saida',
             'resumo' => $this->resumoEntradaSaida($payload),
+            'detalhes' => $this->detalhesProposta('entrada_saida', $payload),
             'payload' => $payload,
-            'situacao' => 'RASCUNHO — nada foi gravado. Confirme no botão abaixo.',
+            'situacao' => 'RASCUNHO — nada foi gravado. Confirme abaixo.',
         ];
     }
 
@@ -282,15 +284,173 @@ class AssistenteAcaoPropostaService
             'proposta_id' => $id,
             'tipo' => 'chamada_aula',
             'resumo' => $this->resumoChamada($payload),
+            'detalhes' => $this->detalhesProposta('chamada_aula', $payload),
             'payload' => $payload,
-            'situacao' => 'RASCUNHO — nada foi gravado. Confirme no botão abaixo.',
+            'situacao' => 'RASCUNHO — nada foi gravado. Confirme abaixo.',
         ];
     }
 
     /**
-     * @param array<string,mixed> $usuario admin logado
+     * Campos fixos para o card de confirmação (título, descrição, data/hora, envolvidos).
+     *
+     * @param array<string,mixed> $payload
+     * @return array{
+     *   tipo_label:string,
+     *   titulo:string,
+     *   descricao:string,
+     *   data_hora:string,
+     *   data_hora_label:string,
+     *   envolvidos:list<string>,
+     *   extras?:list<array{label:string,valor:string}>
+     * }
+     */
+    public function detalhesProposta(string $tipo, array $payload): array
+    {
+        $envolvidos = [];
+        foreach ((array) ($payload['alunos'] ?? []) as $a) {
+            if (!is_array($a)) {
+                continue;
+            }
+            $nome = trim((string) ($a['nome'] ?? ''));
+            if ($nome === '') {
+                continue;
+            }
+            $turma = trim((string) ($a['turma_nome'] ?? ''));
+            $ra = trim((string) ($a['ra'] ?? ''));
+            $rotulo = $nome;
+            if ($turma !== '') {
+                $rotulo .= ' (' . $turma . ')';
+            }
+            if ($ra !== '') {
+                $rotulo .= ' · RA ' . $ra;
+            }
+            $envolvidos[] = $rotulo;
+        }
+
+        if ($tipo === 'criar_ocorrencia') {
+            $quandoRaw = (string) ($payload['data_ocorrencia'] ?? '');
+            $grav = Ocorrencia::GRAVIDADES[(string) ($payload['nivel_gravidade'] ?? '')]
+                ?? (string) ($payload['nivel_gravidade'] ?? '');
+            $extras = [];
+            if ($grav !== '') {
+                $extras[] = ['label' => 'Gravidade', 'valor' => $grav];
+            }
+            $local = trim((string) ($payload['local'] ?? ''));
+            if ($local !== '') {
+                $extras[] = ['label' => 'Local', 'valor' => $local];
+            }
+            $extras[] = [
+                'label' => 'Notificar responsáveis',
+                'valor' => !empty($payload['notificar_push']) || !empty($payload['enviar_pais']) ? 'Sim' : 'Não',
+            ];
+            return [
+                'tipo_label' => 'Ocorrência',
+                'titulo' => trim((string) ($payload['titulo'] ?? 'Ocorrência')),
+                'descricao' => trim((string) ($payload['detalhe'] ?? '')),
+                'data_hora' => $quandoRaw,
+                'data_hora_label' => $this->formatarDataHoraPt($quandoRaw),
+                'envolvidos' => $envolvidos,
+                'extras' => $extras,
+            ];
+        }
+
+        if ($tipo === 'entrada_saida') {
+            $rotulo = (($payload['tipo'] ?? '') === 'saida') ? 'Saída' : 'Entrada';
+            $quandoRaw = (string) ($payload['ocorrido_em'] ?? '');
+            return [
+                'tipo_label' => 'Portaria · ' . $rotulo,
+                'titulo' => 'Registrar ' . mb_strtolower($rotulo),
+                'descricao' => 'Registro de ' . mb_strtolower($rotulo) . ' na portaria/presença.',
+                'data_hora' => $quandoRaw,
+                'data_hora_label' => $this->formatarDataHoraPt($quandoRaw),
+                'envolvidos' => $envolvidos,
+                'extras' => [],
+            ];
+        }
+
+        if ($tipo === 'chamada_aula') {
+            $aula = is_array($payload['aula'] ?? null) ? $payload['aula'] : [];
+            $dataAula = trim((string) ($aula['data_aula'] ?? ''));
+            $horaDe = trim((string) ($aula['horario_de'] ?? ''));
+            $horaAte = trim((string) ($aula['horario_ate'] ?? ''));
+            $quandoRaw = $dataAula;
+            $quandoLabel = $this->formatarDataHoraPt($dataAula);
+            if ($horaDe !== '') {
+                $faixa = substr($horaDe, 0, 5);
+                if ($horaAte !== '') {
+                    $faixa .= '–' . substr($horaAte, 0, 5);
+                }
+                $quandoLabel = ($quandoLabel !== '—' ? $quandoLabel . ' · ' : '') . $faixa;
+                $quandoRaw = trim($dataAula . ' ' . $horaDe);
+            }
+            $materia = trim((string) ($aula['materia_nome'] ?? ''));
+            $turma = trim((string) ($aula['turma_nome'] ?? ''));
+            $situacao = trim((string) ($payload['situacao'] ?? 'presente'));
+            $obs = trim((string) ($payload['observacao'] ?? ''));
+            $extras = [];
+            if ($turma !== '') {
+                $extras[] = ['label' => 'Turma', 'valor' => $turma];
+            }
+            if ($materia !== '') {
+                $extras[] = ['label' => 'Matéria', 'valor' => $materia];
+            }
+            $extras[] = ['label' => 'Situação', 'valor' => str_replace('_', ' ', $situacao)];
+            return [
+                'tipo_label' => 'Chamada da aula',
+                'titulo' => 'Lançar ' . str_replace('_', ' ', $situacao) . ' na chamada',
+                'descricao' => $obs !== '' ? $obs : 'Confirme o lançamento da presença/falta na aula.',
+                'data_hora' => $quandoRaw,
+                'data_hora_label' => $quandoLabel,
+                'envolvidos' => $envolvidos,
+                'extras' => $extras,
+            ];
+        }
+
+        return [
+            'tipo_label' => 'Proposta',
+            'titulo' => 'Ação pendente',
+            'descricao' => '',
+            'data_hora' => '',
+            'data_hora_label' => '',
+            'envolvidos' => $envolvidos,
+            'extras' => [],
+        ];
+    }
+
+    private function formatarDataHoraPt(string $raw): string
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return '—';
+        }
+        $ts = strtotime($raw);
+        if ($ts === false) {
+            return $raw;
+        }
+        $temHora = preg_match('/\d{1,2}:\d{2}/', $raw) === 1;
+        return $temHora
+            ? date('d/m/Y H:i', $ts)
+            : date('d/m/Y', $ts);
+    }
+
+    /**
+     * Confirma a proposta pendente mais recente da conversa (ou do usuário, se a conversa não achar).
+     *
+     * @param array<string,mixed> $usuario
      * @return array{success:bool,error?:string,mensagem?:string,resultado?:array<string,mixed>}
      */
+    public function confirmarPendenteNaConversa(int $usuarioId, int $conversaId, array $usuario): array
+    {
+        $pendente = $this->propostas->encontrarPendente($usuarioId, $conversaId);
+        if ($pendente === null) {
+            return [
+                'success' => false,
+                'error' => 'Não há proposta pendente para confirmar. Peça a ação de novo e use o botão Confirmar, ou diga "sim" logo após a proposta.',
+            ];
+        }
+        return $this->confirmar((int) $pendente['id'], $usuarioId, $usuario);
+    }
+
     public function confirmar(int $propostaId, int $usuarioId, array $usuario): array
     {
         $row = $this->propostas->findDoUsuario($propostaId, $usuarioId);

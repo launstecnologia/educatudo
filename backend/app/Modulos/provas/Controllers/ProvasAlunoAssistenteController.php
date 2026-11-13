@@ -135,7 +135,11 @@ class ProvasAlunoAssistenteController extends BaseController
 
         $payload = $this->lerPayloadMensagem();
         $user = $this->auth->getUser();
-        $this->assistente->definirContextoAcao((int) ($user['id'] ?? 0), (int) ($payload['conversa_id'] ?? 0));
+        $this->assistente->definirContextoAcao(
+            (int) ($user['id'] ?? 0),
+            (int) ($payload['conversa_id'] ?? 0),
+            is_array($user) ? $user : null
+        );
         $resultado = $this->assistente->processarMensagem(
             $payload['mensagem'],
             $payload['historico']
@@ -186,7 +190,11 @@ class ProvasAlunoAssistenteController extends BaseController
 
         $payload = $this->lerPayloadMensagem();
         $user = $this->auth->getUser();
-        $this->assistente->definirContextoAcao((int) ($user['id'] ?? 0), (int) ($payload['conversa_id'] ?? 0));
+        $this->assistente->definirContextoAcao(
+            (int) ($user['id'] ?? 0),
+            (int) ($payload['conversa_id'] ?? 0),
+            is_array($user) ? $user : null
+        );
         $resultado = $this->assistente->processarMensagem(
             $payload['mensagem'],
             $payload['historico'],
@@ -234,7 +242,11 @@ class ProvasAlunoAssistenteController extends BaseController
             $args[$k] = $v;
         }
         $user = $this->auth->getUser();
-        $this->assistente->definirContextoAcao((int) ($user['id'] ?? 0), (int) ($_POST['conversa_id'] ?? 0));
+        $this->assistente->definirContextoAcao(
+            (int) ($user['id'] ?? 0),
+            (int) ($_POST['conversa_id'] ?? 0),
+            is_array($user) ? $user : null
+        );
         $resultado = $this->assistente->executarTool($tool, $args);
         $ok = !isset($resultado['ok']) || !empty($resultado['ok']);
         $this->json([

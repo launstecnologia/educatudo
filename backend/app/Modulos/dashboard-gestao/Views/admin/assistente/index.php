@@ -416,75 +416,132 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
         }
 
         if (painel.tipo === 'proposta') {
+            var d = painel.detalhes || {};
+            var payload = painel.payload || {};
+            var tituloCard = d.titulo || payload.titulo || 'Proposta pendente';
+            var descricaoCard = d.descricao || payload.detalhe || payload.observacao || '';
+            var dataHoraCard = d.data_hora_label || '';
+            if (!dataHoraCard) {
+                var rawDh = d.data_hora || payload.data_ocorrencia || payload.ocorrido_em || '';
+                dataHoraCard = rawDh ? String(rawDh) : '—';
+            }
+            var envolvidosCard = Array.isArray(d.envolvidos) ? d.envolvidos.slice() : [];
+            if (!envolvidosCard.length && Array.isArray(payload.alunos)) {
+                envolvidosCard = payload.alunos.map(function (a) {
+                    if (!a || !a.nome) return '';
+                    var t = String(a.nome);
+                    if (a.turma_nome) t += ' (' + a.turma_nome + ')';
+                    if (a.ra) t += ' · RA ' + a.ra;
+                    return t;
+                }).filter(Boolean);
+            }
+
             var box = document.createElement('div');
-            box.className = 'rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 space-y-3';
-            var tituloP = document.createElement('p');
-            tituloP.className = 'text-sm font-semibold text-indigo-900';
-            tituloP.textContent = 'Proposta pendente de confirmação';
-            box.appendChild(tituloP);
-            var resumoP = document.createElement('p');
-            resumoP.className = 'text-sm text-indigo-900';
-            resumoP.textContent = painel.resumo || 'Revise e confirme para aplicar.';
-            box.appendChild(resumoP);
-            if (painel.payload && painel.payload.detalhe) {
-                var detalheP = document.createElement('p');
-                detalheP.className = 'text-sm text-indigo-800 whitespace-pre-wrap border-t border-indigo-100 pt-2';
-                detalheP.textContent = 'Detalhe: ' + String(painel.payload.detalhe);
-                box.appendChild(detalheP);
+            box.className = 'rounded-xl border border-indigo-200 bg-white shadow-sm overflow-hidden';
+
+            var head = document.createElement('div');
+            head.className = 'px-4 py-3 bg-indigo-50 border-b border-indigo-100';
+            head.innerHTML = '<p class="text-xs font-semibold uppercase tracking-wide text-indigo-600">'
+                + esc(d.tipo_label || 'Proposta pendente')
+                + '</p><p class="text-base font-semibold text-indigo-950 mt-0.5">'
+                + esc(tituloCard) + '</p>';
+            box.appendChild(head);
+
+            var body = document.createElement('div');
+            body.className = 'px-4 py-3 space-y-3 text-sm text-slate-800';
+
+            var blocoDesc = document.createElement('div');
+            blocoDesc.innerHTML = '<p class="text-xs font-semibold uppercase text-slate-500 mb-1">Descrição detalhada</p>'
+                + '<p class="whitespace-pre-wrap text-slate-800">'
+                + esc(descricaoCard || '—') + '</p>';
+            body.appendChild(blocoDesc);
+
+            var blocoDh = document.createElement('div');
+            blocoDh.innerHTML = '<p class="text-xs font-semibold uppercase text-slate-500 mb-1">Dia e horário</p>'
+                + '<p class="font-medium text-slate-900">' + esc(dataHoraCard) + '</p>';
+            body.appendChild(blocoDh);
+
+            var blocoEnv = document.createElement('div');
+            var listaEnv = envolvidosCard.length
+                ? '<ul class="list-disc pl-5 space-y-0.5">' + envolvidosCard.map(function (n) {
+                    return '<li>' + esc(n) + '</li>';
+                }).join('') + '</ul>'
+                : '<p class="text-slate-500">—</p>';
+            blocoEnv.innerHTML = '<p class="text-xs font-semibold uppercase text-slate-500 mb-1">Envolvidos</p>' + listaEnv;
+            body.appendChild(blocoEnv);
+
+            if (Array.isArray(d.extras) && d.extras.length) {
+                var extrasWrap = document.createElement('div');
+                extrasWrap.className = 'grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-100';
+                d.extras.forEach(function (ex) {
+                    if (!ex || !ex.label) return;
+                    var item = document.createElement('div');
+                    item.innerHTML = '<p class="text-[11px] uppercase text-slate-500">' + esc(ex.label)
+                        + '</p><p class="font-medium text-slate-900">' + esc(ex.valor || '—') + '</p>';
+                    extrasWrap.appendChild(item);
+                });
+                body.appendChild(extrasWrap);
             }
-            if (painel.payload && Array.isArray(painel.payload.alunos) && painel.payload.alunos.length) {
-                var alunosP = document.createElement('p');
-                alunosP.className = 'text-xs text-indigo-700';
-                alunosP.textContent = 'Alunos: ' + painel.payload.alunos.map(function (a) {
-                    return (a && a.nome) ? a.nome : '';
-                }).filter(Boolean).join(', ');
-                box.appendChild(alunosP);
-            }
-            var situacaoP = document.createElement('p');
-            situacaoP.className = 'text-xs text-indigo-700';
-            situacaoP.textContent = painel.situacao || 'RASCUNHO';
-            box.appendChild(situacaoP);
+
+            var avisoR = document.createElement('p');
+            avisoR.className = 'text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+            avisoR.textContent = painel.situacao || 'RASCUNHO — nada foi gravado ainda.';
+            body.appendChild(avisoR);
+            box.appendChild(body);
+
+            var foot = document.createElement('div');
+            foot.className = 'px-4 py-3 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center gap-2';
             var btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-60';
-            btn.textContent = 'Confirmar proposta';
+            btn.className = 'inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60';
+            btn.textContent = 'Confirmar';
+            var hint = document.createElement('span');
+            hint.className = 'text-xs text-slate-500';
+            hint.textContent = 'Ou digite “sim” no chat.';
             btn.addEventListener('click', function () {
-                if (!window.confirm('Aplicar esta proposta agora? Esta ação grava no sistema.')) {
+                if (!window.confirm('Confirmar e gravar no sistema?\n\n'
+                    + tituloCard + '\n'
+                    + (descricaoCard ? descricaoCard + '\n' : '')
+                    + 'Quando: ' + dataHoraCard + '\n'
+                    + 'Envolvidos: ' + (envolvidosCard.join(', ') || '—'))) {
                     return;
                 }
                 btn.disabled = true;
                 btn.textContent = 'Confirmando…';
-                var body = new URLSearchParams();
-                body.set('_token', csrf);
-                body.set('proposta_id', String(painel.proposta_id || 0));
-                body.set('confirmar', '1');
+                var bodyReq = new URLSearchParams();
+                bodyReq.set('_token', csrf);
+                bodyReq.set('proposta_id', String(painel.proposta_id || 0));
+                bodyReq.set('confirmar', '1');
                 fetch(urls.confirmar, {
                     method: 'POST',
                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                    body: body,
+                    body: bodyReq,
                     credentials: 'same-origin'
                 }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
                   .then(function (res) {
                       var msg = document.createElement('p');
-                      msg.className = 'text-sm mt-2 ' + (res.ok && res.j.success ? 'text-emerald-700' : 'text-rose-700');
+                      msg.className = 'text-sm w-full ' + (res.ok && res.j.success ? 'text-emerald-700' : 'text-rose-700');
                       msg.textContent = (res.j && (res.j.mensagem || res.j.error)) || (res.ok ? 'Aplicado.' : 'Falha ao confirmar.');
-                      box.appendChild(msg);
+                      foot.appendChild(msg);
                       if (res.ok && res.j.success) {
                           btn.textContent = 'Confirmada';
+                          hint.textContent = 'Gravado no sistema.';
                       } else {
                           btn.disabled = false;
-                          btn.textContent = 'Confirmar proposta';
+                          btn.textContent = 'Confirmar';
                       }
                   }).catch(function () {
                       btn.disabled = false;
-                      btn.textContent = 'Confirmar proposta';
+                      btn.textContent = 'Confirmar';
                       var err = document.createElement('p');
-                      err.className = 'text-sm mt-2 text-rose-700';
+                      err.className = 'text-sm w-full text-rose-700';
                       err.textContent = 'Erro de rede ao confirmar.';
-                      box.appendChild(err);
+                      foot.appendChild(err);
                   });
             });
-            box.appendChild(btn);
+            foot.appendChild(btn);
+            foot.appendChild(hint);
+            box.appendChild(foot);
             container.appendChild(box);
             return;
         }
