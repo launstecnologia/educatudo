@@ -96,6 +96,7 @@ class ProvasAlunoAssistenteService
         // Clique "Selecionar" no painel: nunca trate o id como RA; retome o pedido anterior.
         $mensagemUsuario = $this->reescreverSelecaoAluno($mensagemUsuario, $historico);
         $mensagemUsuario = $this->reescreverSelecaoAula($mensagemUsuario, $historico);
+        $mensagemUsuario = $this->retomarNotaComTurma($mensagemUsuario, $historico);
         if (preg_match('/^Turma\s+.+\s+turma_id=(\d+)$/iu', $mensagemUsuario, $mTurma) === 1) {
             $pedidoAnterior = $this->ultimoPedidoUsuario($historico, '/^Turma\s+.+\s+turma_id=\d+$/iu');
             if ($this->pedidoPareceGradeTurma($pedidoAnterior) || $this->pedidoPareceConsultaOcorrencia($pedidoAnterior)) {
@@ -1939,7 +1940,26 @@ PROMPT
             return $mensagem;
         }
         $alunoId = (int) $m[1];
-        $pedidoAnterior = $this->ultimoPedidoUsuario($historico, '/^usar\s+aluno_id\s+\d+/iu');
+        $pedidoAnterior = $this->ultimoPedidoUsuario($historico, '/^(?:\[contexto_conversa\]|usar\s+aluno_id\s+\d+|alun[oa]\b.*\baluno_id=)/iu');
+        $pedidoAnterior = $this->retomarNotaComTurma($pedidoAnterior, $historico);
+        if (preg_match('/\b(?:notas?|boletim)\b/iu', $pedidoAnterior) === 1
+            && !$this->pedidoPareceRegistroEscrita($pedidoAnterior)
+            && preg_match('/\bnota\s+(?:na|no|da|do)\s+[A-Z][A-Z0-9]{1,9}\b/u', $pedidoAnterior) !== 1
+        ) {
+            return 'Aluno já escolhido: aluno_id=' . $alunoId . '. ' . $pedidoAnterior;
+        }
+        foreach (array_reverse($historico) as $msg) {
+            if (($msg['role'] ?? '') !== 'user') {
+                continue;
+            }
+            $original = (string) ($msg['content'] ?? '');
+            if ($this->pedidoPareceRegistroEscrita($original) && $this->detectarTipoProposta($original) === 'criar_ocorrencia') {
+                if ($original === $pedidoAnterior || preg_match('/^(?:sim|n[aã]o|leve|moderado|grave|categoria\b.*)[.!]?$/iu', $pedidoAnterior) === 1) {
+                    return 'Aluno já escolhido: aluno_id=' . $alunoId . '. ' . $original;
+                }
+                break;
+            }
+        }
         $evento = $this->extrairEventoAvaliativoDoTexto($pedidoAnterior !== '' ? $pedidoAnterior : $mensagem);
         $materia = $this->extrairMateriaDaPergunta($pedidoAnterior !== '' ? $pedidoAnterior : $mensagem);
         $acaoEscrita = $this->detectarTipoProposta($pedidoAnterior !== '' ? $pedidoAnterior : '');
@@ -2074,6 +2094,15 @@ PROMPT
             return $c;
         }
         return '';
+    }
+
+    private function retomarNotaComTurma(string $mensagem, array $historico): string
+    {
+        if (preg_match('/^(?:(?:ele|ela)\s+[eé]\s+)?(?:d[ao]\s+|turma\s+)(\d+[ªº°]?\s*[A-Za-z])\s*[.!?]*$/iu', $mensagem, $m) !== 1) {
+            return $mensagem;
+        }
+        $pedido = $this->ultimoPedidoUsuario($historico, '/^(?:\[contexto_conversa\]|(?:ele|ela)\s+[eé]\s+|turma\s+|d[ao]\s+\d|usar\s+aluno_id\s+\d+|alun[oa]\b.*\baluno_id=)/iu');
+        return preg_match('/\b(?:notas?|boletim)\b/iu', $pedido) === 1 ? $pedido . '; da turma ' . $m[1] : $mensagem;
     }
 
     /**
@@ -2672,7 +2701,13 @@ PROMPT
      */
     private function montarArgsBoletim(string $mensagemUsuario, array $mensagens, ?array $ultimoResultado): ?array
     {
-        $args = [];
+        $args = $this->resolverArgsAlunoParaConsulta($mensagemUsuario, []);
+        if (!empty($args['aluno_nome']) || !empty($args['ra']) || !empty($args['aluno_id'])) {
+            if (preg_match('/\b(20\d{2})\b/', $mensagemUsuario, $mAno) === 1) {
+                $args['ano_letivo'] = (int) $mAno[1];
+            }
+            return $args;
+        }
 
         $alunoId = (int) ($ultimoResultado['aluno']['id'] ?? 0);
         if ($alunoId <= 0 && preg_match('/aluno_id\s*=\s*(\d+)/i', $mensagemUsuario, $m) === 1) {
@@ -2993,6 +3028,14 @@ PROMPT
         if ($msg === '') {
             return null;
         }
+        if (preg_match('/^([\p{L}][\p{L}\s\x27-]{2,75}),\s*qual\s+(?:[eé]\s+)?a\s+nota\s+(?:del[ae]\s+)?de\s+/iu', $msg, $m) === 1
+            && preg_match('/^(?:ol[áa]|oi|por favor|bom dia|boa tarde|boa noite)$/iu', trim($m[1])) !== 1
+        ) {
+            return $this->limparNomeAlunoCapturado($m[1]);
+        }
+        if (preg_match('/\b(?:procurar|localizar|buscar)\s+([\p{L}][\p{L}\s\x27-]{2,75}?)\s+(?:na|no|da|do)\s+turma\b/iu', $msg, $m) === 1) {
+            return $this->limparNomeAlunoCapturado($m[1]);
+        }
         // Prioriza a entidade ligada à consulta, inclusive "ocorrência na aluna Ana Luiza".
         if (preg_match(
             '/\b(?:ocorr[eê]ncias?|faltas?|frequ[eê]ncia|boletim|notas?|jornadas?|perfil)\s+(?:(?:da|do|de|sobre)\s+(?:alun[oa]\s+)?|(?:na|no|para\s+[ao])\s+alun[oa]\s+)([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'\-]{1,}(?:\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'\-]{1,}){0,4})/iu',
@@ -3054,8 +3097,8 @@ PROMPT
         if (preg_match('/^Aluno já escolhido: aluno_id=(\d+)\./u', $mensagemUsuario, $m) === 1) {
             return ['aluno_id' => (int) $m[1]];
         }
-        if (preg_match('/\b(?:da|do|na|no)\s+turma\s+([\pL\dªº .-]+)/iu', $mensagemUsuario, $m) === 1) {
-            $turma = preg_split('/\s+(?:hoje|ontem|amanh[aã]|em|no|na)\b/iu', trim($m[1]), 2)[0] ?? '';
+        if (preg_match_all('/\b(?:da|do|na|no)\s+turma\s+([\pL\dªº .-]+)/iu', $mensagemUsuario, $m) > 0) {
+            $turma = preg_split('/\s+(?:hoje|ontem|amanh[aã]|em|no|na)\b/iu', trim($m[1][array_key_last($m[1])]), 2)[0] ?? '';
             $args['turma'] = trim($turma, ' .');
         }
         $raMsg = $this->extrairRaDaMensagem($mensagemUsuario);
@@ -3142,6 +3185,18 @@ PROMPT
     {
         $aluno = $this->resolverArgsAlunoParaConsulta($pedido, []);
         $normalizado = mb_strtolower($this->semAcento($pedido));
+        if ((!empty($aluno['aluno_nome']) || !empty($aluno['aluno_id']))
+            && $this->extrairMateriaDaPergunta($pedido) !== null
+            && (preg_match('/,\s*qual\s+(?:e\s+)?a\s+nota\s+(?:del[ae]\s+)?de\s+[\p{L}\s]+?(?:\s+em\s+20\d{2})?[.!?]*(?:;\s+da turma\s+\d+[ªº°]?\s*[a-z])?$/u', $normalizado) === 1
+                || preg_match('/\b(?:notas?|boletim)\b.*\bboletim\b/u', $normalizado) === 1)
+            && !preg_match('/\b(?:prova|recuperacao|avaliacao|bimestre|trimestre|semestre|periodo)\b/u', $normalizado)
+        ) {
+            $args = $aluno;
+            if (preg_match('/\b(20\d{2})\b/', $pedido, $ano) === 1) {
+                $args['ano_letivo'] = (int) $ano[1];
+            }
+            return ['tool' => 'boletim_aluno', 'args' => $args];
+        }
         if (!empty($aluno['ra'])
             && preg_match('/^quais\s+provas\s+(?:o\s+)?ra\s+[a-z0-9]+\s+(?:fez|realizou)[?.!]*$/u', $normalizado) === 1
         ) {
@@ -3946,10 +4001,14 @@ PROMPT
                     if (!empty($probe['aluno']['turma_nome'])) {
                         $args['turma'] = (string) $probe['aluno']['turma_nome'];
                     }
+                    $args['alunos'] = array_column($probe['alunos'] ?? [], 'nome');
                 }
             }
             if (!$this->ocorrenciaProntaParaProposta($args)) {
                 return $this->pedirCamposOcorrencia($args, $mensagemUsuario, $mensagens, $onStatus);
+            }
+            if (!empty($args['aluno_id'])) {
+                unset($args['aluno_nome'], $args['ra']);
             }
         }
 
@@ -4073,7 +4132,9 @@ PROMPT
             $args['ra'] = (string) $ctx['ra'];
         }
 
-        $nomeAluno = trim((string) ($ultimoResultado['aluno']['nome'] ?? ''));
+        $alunoConfirmado = $tipo === 'criar_ocorrencia' && $alunoId > 0
+            ? $this->consulta->obterAluno($alunoId) : null;
+        $nomeAluno = trim((string) ($alunoConfirmado['nome'] ?? $ultimoResultado['aluno']['nome'] ?? ''));
         if ($nomeAluno === '' && !empty($ctx['aluno_nome']) && ($refPronome || $alunoId > 0)) {
             $nomeAluno = (string) $ctx['aluno_nome'];
         }
@@ -4088,7 +4149,9 @@ PROMPT
         }
         if ($nomeAluno !== '') {
             $args['aluno_nome'] = $nomeAluno;
-            $args['alunos'] = [$nomeAluno];
+            if ($alunoConfirmado === null) {
+                $args['alunos'] = [$nomeAluno];
+            }
         }
         if ($raMsg !== null && !preg_match('/^Aluno já escolhido:/u', $mensagemUsuario)) {
             unset($args['aluno_id'], $args['aluno_nome'], $args['alunos']);
@@ -4096,7 +4159,7 @@ PROMPT
             $args['aluno_nome'] = 'ra ' . $raMsg;
         }
 
-        $turma = trim((string) ($ultimoResultado['aluno']['turma_nome'] ?? $ultimoResultado['turma']['nome'] ?? ''));
+        $turma = trim((string) ($alunoConfirmado['turma_nome'] ?? $ultimoResultado['aluno']['turma_nome'] ?? $ultimoResultado['turma']['nome'] ?? ''));
         if ($turma === '' && !empty($ctx['turma_nome'])) {
             $turma = (string) $ctx['turma_nome'];
         }
@@ -4415,9 +4478,17 @@ PROMPT
         }
         // Restaura lista de envolvidos de turnos anteriores.
         if (!empty($ctx['ocorrencia_envolvidos'])) {
+            $nomeConfirmado = mb_strtolower($this->semAcento((string) ($args['aluno_nome'] ?? '')));
+            $nomesExtras = $ctx['ocorrencia_envolvidos'];
+            if (!empty($args['aluno_id']) && $nomeConfirmado !== '') {
+                $nomesExtras = array_filter($nomesExtras, function (string $nome) use ($nomeConfirmado): bool {
+                    $nome = mb_strtolower($this->semAcento(trim($nome)));
+                    return $nome !== $nomeConfirmado && !str_starts_with($nomeConfirmado, $nome . ' ');
+                });
+            }
             $args['alunos'] = array_values(array_unique(array_merge(
                 (array) ($args['alunos'] ?? []),
-                $ctx['ocorrencia_envolvidos']
+                $nomesExtras
             )));
         }
 
@@ -4454,7 +4525,7 @@ PROMPT
         if (empty($args['categoria']) && empty($args['categoria_nome']) && empty($args['categoria_id'])) {
             if (preg_match('/^(?:registrar\s+ocorr[eê]ncia\s+com\s+)?categoria\s+(.+)$/iu', $msgLimpa, $mChip) === 1) {
                 $args['categoria'] = trim($mChip[1], " \t\"'.,;:");
-            } elseif (preg_match('/categoria\s*[:\-]?\s*([A-Za-zÀ-ÿ0-9][\wÀ-ÿ\s\/\-]{1,80})/iu', $textoHist, $mCat) === 1) {
+            } elseif (preg_match('/\bcategoria\s*[:\-]\s*([^\n;,]{2,80})/iu', $textoHist, $mCat) === 1) {
                 $args['categoria'] = trim($mCat[1], " \t\"'.,;:");
             } elseif ($msgLimpa !== ''
                 && preg_match('/^(conversa|disciplina|atraso|bullying|uniforme|comportamento)\b(.{0,60})$/iu', $msgLimpa, $mSo) === 1
@@ -4463,8 +4534,6 @@ PROMPT
                 if ($titulo === '') {
                     $titulo = trim($mSo[0]);
                 }
-            } elseif ($titulo !== '' && $this->textoOcorrenciaSignificativo($titulo)) {
-                $args['categoria'] = $titulo;
             }
         }
 

@@ -94,6 +94,55 @@ test.describe('Tudinha ocorrência', () => {
     await expect(page.getByText(/Selecione uma categoria/i)).toHaveCount(0);
   });
 
+  test('mantém a aluna escolhida até o rascunho ao iniciar pelo nome', async ({ page }) => {
+    await loginAdmin(page);
+    await novaConversaAssistente(page);
+    const mensagens = page.locator('#assistente-mensagens');
+    await enviar(page, 'Eu gostaria de criar uma ocorrência na aluna Ana');
+    const aluna = mensagens.getByRole('row', { name: /Ana Luiza Oliveira De Souza/ });
+    await aluna.getByRole('button', { name: 'Confirmar', exact: true }).click();
+    await expect(mensagens.getByRole('button', { name: 'Comportamento / convivência', exact: true })).toBeVisible({ timeout: 12_000 });
+    await mensagens.getByRole('button', { name: 'Comportamento / convivência', exact: true }).click();
+    await expect(mensagens.getByText('Descreva o que aconteceu.', { exact: true })).toBeVisible();
+    await enviar(page, 'Ela conversou na aula de matemática');
+    await mensagens.getByRole('button', { name: 'Leve', exact: true }).click();
+    await mensagens.getByRole('button', { name: 'Não, só essa pessoa', exact: true }).click();
+    await expect(page.locator('#assistente-input')).toBeEnabled();
+    const resposta = page.waitForResponse(res => res.url().endsWith('/mensagem-stream')
+      && new URLSearchParams(res.request().postData() ?? '').get('mensagem') === 'não');
+    await mensagens.getByRole('button', { name: 'Não notificar', exact: true }).click();
+    const stream = await (await resposta).text();
+    const eventoFinal = stream.match(/^event: done\r?\ndata: (.+)$/m);
+    expect(eventoFinal).not.toBeNull();
+    const painel = JSON.parse(eventoFinal![1]).painel;
+    expect(painel.tipo).toBe('proposta');
+    expect(painel.payload.alunos).toEqual([expect.objectContaining({ ra: '24254' })]);
+    expect(painel.payload.detalhe).toBe('Ela conversou na aula de matemática');
+    expect(painel.payload.enviar_pais).toBe(0);
+  });
+
+  test('retoma a consulta de nota quando o usuário informa a turma depois', async ({ page }) => {
+    await loginAdmin(page);
+    await novaConversaAssistente(page);
+    await enviar(page, 'Ana Luiza Sobrenome Inexistente, qual a nota dela de Matemática em 2024?');
+    await expect(page.locator('#assistente-mensagens').getByText('Nenhum aluno encontrado.', { exact: true })).toBeVisible();
+    await expect(page.locator('#assistente-input')).toBeEnabled();
+    await enviar(page, 'ela é da 1A');
+    const mensagens = page.locator('#assistente-mensagens');
+    await expect(mensagens.getByText('Encontrei nomes parecidos nessa turma. Confirme o aluno:', { exact: true }).first()).toBeVisible();
+    await expect(page.locator('#assistente-input')).toBeEnabled();
+    const resposta = page.waitForResponse(res => res.url().endsWith('/mensagem-stream') && res.ok());
+    await mensagens.getByRole('row', { name: /Ana Luiza Oliveira De Souza/ }).getByRole('button', { name: 'Confirmar', exact: true }).click();
+    const stream = await (await resposta).text();
+    const eventoFinal = stream.match(/^event: done\r?\ndata: (.+)$/m);
+    expect(eventoFinal).not.toBeNull();
+    expect(JSON.parse(eventoFinal![1]).painel).toMatchObject({
+      tipo: 'boletim_aluno',
+      ano_letivo: 2024,
+      aluno: { ra: '24254' },
+    });
+  });
+
   test('consulta de ocorrências mantém o ano informado', async ({ page }) => {
     await loginAdmin(page);
     await novaConversaAssistente(page);

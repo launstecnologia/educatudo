@@ -2363,6 +2363,12 @@ class AssistenteConsultaAmpliadaService
         $termoBusca = $ra !== '' ? ('ra ' . $ra) : $nome;
         $lista = $this->alunos->buscarAlunos($termoBusca, 15, $turma !== '' ? $turma : null);
         if ($lista === []) {
+            if ($ra === '' && $turma !== '' && preg_match('/^([\p{L}\x27-]+\s+[\p{L}\x27-]+)\s+\p{L}/u', $nome, $m) === 1) {
+                $sugestoes = $this->alunos->buscarAlunos($m[1], 15, $turma);
+                if ($sugestoes !== []) {
+                    return ['ok' => false, 'aviso' => 'Encontrei nomes parecidos nessa turma. Confirme o aluno:', 'candidatos' => $sugestoes];
+                }
+            }
             return ['ok' => false, 'error' => $ra !== '' ? ('Nenhum aluno encontrado com RA ' . $ra . '.') : 'Nenhum aluno encontrado.'];
         }
         if (count($lista) > 1) {
