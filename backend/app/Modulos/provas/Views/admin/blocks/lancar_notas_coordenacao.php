@@ -443,7 +443,6 @@ if ($tipoFlash === 'error') {
           class="flex-1 overflow-y-auto px-6 py-5 space-y-4">
         <input type="hidden" name="_token" value="<?= htmlspecialchars((string) $csrfToken) ?>">
         <input type="hidden" name="materia_id" value="<?= $materiaIdFiltro ?>">
-        <input type="hidden" name="professor_id" value="<?= $professorIdFiltro ?>">
         <input type="hidden" name="turma_id" value="<?= $turmaIdFiltro ?>">
         <input type="hidden" name="serie_id" value="<?= $serieIdFiltro ?>">
         <input type="hidden" name="ordenar" value="<?= htmlspecialchars($ordenarFiltro) ?>">
@@ -455,8 +454,11 @@ if ($tipoFlash === 'error') {
         $precisaDiscImport = !$notaUnicaTodasMaterias;
         $precisaProfImport = !$notaUnicaTodasMaterias && count($professoresFiltro) > 1;
         $discOkImport = !$precisaDiscImport || $materiaIdFiltro > 0;
-        $profOkImport = !$precisaProfImport || $professorIdFiltro > 0;
-        $importOk = $discOkImport && $profOkImport;
+        $importOk = $discOkImport;
+        $profUnicoId = 0;
+        if (!$precisaProfImport && count($professoresFiltro) === 1) {
+            $profUnicoId = (int) array_key_first($professoresFiltro);
+        }
         ?>
         <div class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-sm space-y-2">
             <p class="font-medium text-gray-900">Destino desta importação</p>
@@ -470,29 +472,40 @@ if ($tipoFlash === 'error') {
                     <strong>nota única (todas)</strong>
                 <?php endif; ?>
             </p>
-            <p class="text-gray-700">
-                <span class="text-gray-500">Professor:</span>
-                <?php if ($professorIdFiltro > 0): ?>
-                    <strong><?= htmlspecialchars($professorNomeFiltro !== '' ? $professorNomeFiltro : ('#' . $professorIdFiltro), ENT_QUOTES, 'UTF-8') ?></strong>
-                <?php elseif ($precisaProfImport): ?>
-                    <strong class="text-amber-700">obrigatório — selecione na tela</strong>
-                <?php else: ?>
-                    <strong>único professor desta disciplina</strong>
-                <?php endif; ?>
-            </p>
-            <?php if (!$importOk): ?>
+            <?php if (!$discOkImport): ?>
             <p class="text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5 text-xs">
-                Feche este painel, selecione a <strong>disciplina</strong><?= $precisaProfImport ? ' e o <strong>professor</strong> do arquivo' : '' ?> na tela, e abra Importar de novo.
-                Cada Word é de um professor — não misture.
+                Feche este painel, selecione a <strong>disciplina</strong> na tela e abra Importar de novo.
             </p>
             <?php endif; ?>
         </div>
+        <?php if ($precisaProfImport): ?>
+        <div>
+            <label for="import_professor_id" class="block text-sm font-medium text-gray-700 mb-1">Professor deste Word <span class="text-red-600">*</span></label>
+            <select id="import_professor_id" name="professor_id" required
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white"
+                    <?= $importOk ? '' : 'disabled' ?>>
+                <option value="">Selecione o professor dono deste arquivo</option>
+                <?php foreach ($professoresFiltro as $pidOpt => $pnome): ?>
+                    <option value="<?= (int) $pidOpt ?>" <?= $professorIdFiltro === (int) $pidOpt ? 'selected' : '' ?>>
+                        <?= htmlspecialchars((string) $pnome) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <p class="mt-1 text-xs text-amber-800">Obrigatório. A nota entra só para o professor escolhido — nunca para todos.</p>
+        </div>
+        <?php elseif ($profUnicoId > 0): ?>
+        <input type="hidden" name="professor_id" value="<?= $profUnicoId ?>">
+        <?php elseif ($professorIdFiltro > 0): ?>
+        <input type="hidden" name="professor_id" value="<?= $professorIdFiltro ?>">
+        <?php else: ?>
+        <input type="hidden" name="professor_id" value="0">
+        <?php endif; ?>
         <div class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-3 text-sm text-blue-900 space-y-2">
             <p class="font-medium">Passo a passo</p>
             <ol class="list-decimal pl-4 space-y-1 text-blue-900/90">
-                <li>Escolha a <strong>disciplina</strong> e o <strong>professor</strong> (bolinhas ou Filtros).</li>
-                <li>Importe só o Word desse professor. Depois troque o professor e importe o próximo.</li>
-                <li>Não precisa escolher aluno por aluno — a tabela do arquivo basta.</li>
+                <li>Confirme a disciplina na tela.</li>
+                <li>Aqui no painel, escolha o <strong>professor</strong> e envie só o Word dele.</li>
+                <li>Marque <strong>Substituir</strong> (com edição desbloqueada), importe; depois repita para o próximo professor.</li>
             </ol>
         </div>
         <p class="text-sm text-gray-600">
@@ -508,7 +521,7 @@ if ($tipoFlash === 'error') {
             <input type="file" id="planilha" name="planilha[]" multiple accept=".csv,.xlsx,.docx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required
                    class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-gray-100 file:text-gray-700"
                    <?= $importOk ? '' : 'disabled' ?>>
-            <p class="mt-1 text-xs text-gray-500">Vários arquivos só se forem do mesmo professor (ex.: várias turmas). Troque o professor entre imports.</p>
+            <p class="mt-1 text-xs text-gray-500">Vários arquivos só se forem do mesmo professor (ex.: várias turmas).</p>
         </div>
         <label class="flex items-start gap-2 text-sm text-gray-700">
             <input type="checkbox" name="substituir" value="1" class="mt-1" <?= $importOk ? '' : 'disabled' ?>>

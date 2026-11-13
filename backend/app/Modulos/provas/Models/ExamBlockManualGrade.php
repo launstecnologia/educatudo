@@ -539,8 +539,10 @@ class ExamBlockManualGrade
             if ($destino) {
                 return;
             }
+            // Não “rouba” nota de outro professor da mesma matéria (caso comum: 2+ professores no evento).
+            // Só realinha linha órfã sem nota (ex.: vínculo antigo vazio).
             $origem = $this->db->fetch(
-                'SELECT id FROM provas_blocos_notas_lancadas
+                'SELECT id, nota FROM provas_blocos_notas_lancadas
                  WHERE bloco_id = :bid AND materia_id = :mid
                    AND turma_id = :tid AND aluno_id = :aid AND professor_id <> :pid
                  ORDER BY CASE WHEN nota IS NOT NULL THEN 0 ELSE 1 END, updated_at DESC
@@ -554,6 +556,9 @@ class ExamBlockManualGrade
                 ]
             );
             if (!$origem || empty($origem['id'])) {
+                return;
+            }
+            if ($origem['nota'] !== null && $origem['nota'] !== '') {
                 return;
             }
             $this->db->query(
