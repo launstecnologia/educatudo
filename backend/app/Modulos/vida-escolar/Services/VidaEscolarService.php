@@ -704,10 +704,10 @@ class VidaEscolarService
         );
         $linhas = $this->linhasUnicasDoQuadro($ficha, $linhas, $idsOcultos);
         $modelo = $this->modeloOficialDaFicha($ficha);
-        $finalidadeQuadro = (($modelo['finalidade'] ?? '') === 'complementar'
-            || $this->cursoTipoDaTurma((int) ($ficha['turma_id'] ?? 0)) === 'extra')
-            ? 'complementar'
-            : 'oficial';
+        $finalidadeQuadro = $this->finalidadeResultadosDaFicha(
+            is_array($modelo) ? $modelo : null,
+            (int) ($ficha['turma_id'] ?? 0)
+        );
         $coberturaBims = $this->mapaCoberturaBimestresGerados(
             (int) ($ficha['aluno_id'] ?? 0),
             (int) ($ficha['ano_letivo'] ?? 0),
@@ -1067,10 +1067,12 @@ class VidaEscolarService
         $modeloFicha = $this->modeloOficialDaFicha($ficha);
         $modeloBoletimId = (int) (($modeloFicha ?? [])['id'] ?? 0);
         $boletimOficialTurmaId = $this->idBoletimOficialDaTurma(is_array($ficha) ? $ficha : []);
-        $finalidadeResultados = (($modeloFicha['finalidade'] ?? '') === 'complementar'
-            || $this->cursoTipoDaTurma((int) ($ficha['turma_id'] ?? 0)) === 'extra')
-            ? 'complementar'
-            : 'oficial';
+        // Finalidade do MODELO manda (Colag: itinerário oficial em turma extra).
+        // Só cai em complementar por curso extra quando não há modelo na ficha.
+        $finalidadeResultados = $this->finalidadeResultadosDaFicha(
+            is_array($modeloFicha) ? $modeloFicha : null,
+            (int) ($ficha['turma_id'] ?? 0)
+        );
         /** @var array<int, array<int, array{nota:?float, faltas:?int, prio:int}>> */
         $propostas = [];
         foreach ($this->model->listarResultadosGeradosPorFinalidade($alunoId, $finalidadeResultados) as $row) {
@@ -3964,6 +3966,22 @@ class VidaEscolarService
         return strtolower(trim((string) ($row['exibir_em'] ?? ''))) === 'boletim'
             && $boletimOficialTurmaId > 0
             && $rowBoletim === $boletimOficialTurmaId;
+    }
+
+    /**
+     * Finalidade dos resultados a sincronizar: a do modelo da ficha.
+     * Turma extra sem modelo cadastrado ainda assume complementar.
+     *
+     * @param array<string,mixed>|null $modelo
+     * @return 'oficial'|'complementar'
+     */
+    private function finalidadeResultadosDaFicha(?array $modelo, int $turmaId): string
+    {
+        if (is_array($modelo) && $modelo !== []) {
+            return (($modelo['finalidade'] ?? '') === 'complementar') ? 'complementar' : 'oficial';
+        }
+
+        return $this->cursoTipoDaTurma($turmaId) === 'extra' ? 'complementar' : 'oficial';
     }
 
     /**
