@@ -113,15 +113,20 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 </div>
             </div>
 
-            <form id="assistente-form" class="border-t border-gray-100 p-3 flex gap-2 bg-white">
-                <textarea id="assistente-input" rows="2"
-                          class="flex-1 text-sm border border-gray-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
-                          placeholder="Pergunte sobre aluno, professor, turma, bimestre…"
-                          <?= $disponivel ? '' : 'disabled' ?>></textarea>
-                <button type="submit" id="assistente-enviar"
-                        class="self-end px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 disabled:opacity-50"
-                        <?= $disponivel ? '' : 'disabled' ?>>Enviar</button>
-            </form>
+            <div class="border-t border-gray-100 bg-white px-3 pt-3 pb-2 space-y-2">
+                <form id="assistente-form" class="flex gap-2">
+                    <textarea id="assistente-input" rows="2"
+                              class="flex-1 text-sm border border-gray-300 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+                              placeholder="Pergunte sobre aluno, professor, turma, bimestre…"
+                              <?= $disponivel ? '' : 'disabled' ?>></textarea>
+                    <button type="submit" id="assistente-enviar"
+                            class="self-end px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 disabled:opacity-50"
+                            <?= $disponivel ? '' : 'disabled' ?>>Enviar</button>
+                </form>
+                <p class="text-[11px] leading-snug text-gray-500 px-0.5">
+                    A IA pode errar ou não entender o contexto. Em qualquer situação, comunique a equipe técnica.
+                </p>
+            </div>
         </section>
     </div>
 </div>
