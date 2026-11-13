@@ -2357,6 +2357,13 @@ PROMPT
             if ($materiaPedido === null && !empty($resultado['materia'])) {
                 $materiaPedido = trim((string) $resultado['materia']);
             }
+            if ($tool === 'boletim_aluno' && $materiaPedido !== null && $this->boletimTemConteudoExibivel($resultado)) {
+                $ano = (int) ($resultado['ano_letivo'] ?? 0);
+                return 'Encontrei o boletim de **' . $quem . '**'
+                    . ($ano > 0 ? ' de **' . $ano . '**' : '')
+                    . '. Confira a linha de **' . $materiaPedido . '** no quadro abaixo. '
+                    . 'Para consultar uma nota específica, diga o período ou a avaliação.';
+            }
             $quadro = is_array($resultado['quadro'] ?? null) ? $resultado['quadro'] : null;
             if ($quadro === null && !empty($resultado['eventos'][0]) && is_array($resultado['eventos'][0])) {
                 $ev0 = $resultado['eventos'][0];

@@ -136,11 +136,14 @@ test.describe('Tudinha ocorrência', () => {
     const stream = await (await resposta).text();
     const eventoFinal = stream.match(/^event: done\r?\ndata: (.+)$/m);
     expect(eventoFinal).not.toBeNull();
-    expect(JSON.parse(eventoFinal![1]).painel).toMatchObject({
+    const turno = JSON.parse(eventoFinal![1]);
+    expect(turno.painel).toMatchObject({
       tipo: 'boletim_aluno',
       ano_letivo: 2024,
       aluno: { ra: '24254' },
     });
+    expect(turno.mensagem).toContain('Para consultar uma nota específica');
+    expect(turno.mensagem).not.toMatch(/é \*\*(?:Reprovado|Aprovado)\*\*/i);
   });
 
   test('consulta de ocorrências mantém o ano informado', async ({ page }) => {
