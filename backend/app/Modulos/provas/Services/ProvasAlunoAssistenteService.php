@@ -437,6 +437,52 @@ class ProvasAlunoAssistenteService
             }
         }
 
+        // Jornadas pelo mesmo RA/nome que já funciona no boletim.
+        if ($this->pedidoPareceJornadasAluno($mensagemUsuario)) {
+            $gJor = $this->garantirJornadasAluno(
+                $mensagemUsuario,
+                $mensagens,
+                $ultimaTool,
+                $ultimoResultado,
+                $onStatus
+            );
+            if (!empty($gJor['consulta'])) {
+                $consultasFeitas[] = $gJor['consulta'];
+            }
+            if (!empty($gJor['tool'])) {
+                $ultimaTool = $gJor['tool'];
+            }
+            if (is_array($gJor['resultado'] ?? null)) {
+                $ultimoResultado = $gJor['resultado'];
+            }
+            if (!empty($gJor['texto'])) {
+                $textoFinal = (string) $gJor['texto'];
+            }
+        }
+
+        // Grade por nome de turma (sem pedir aluno/ID).
+        if ($this->pedidoPareceGradeTurma($mensagemUsuario) && !$this->pedidoPareceGradeProfessor($mensagemUsuario, $mensagens)) {
+            $gTurma = $this->garantirGradeTurma(
+                $mensagemUsuario,
+                $mensagens,
+                $ultimaTool,
+                $ultimoResultado,
+                $onStatus
+            );
+            if (!empty($gTurma['consulta'])) {
+                $consultasFeitas[] = $gTurma['consulta'];
+            }
+            if (!empty($gTurma['tool'])) {
+                $ultimaTool = $gTurma['tool'];
+            }
+            if (is_array($gTurma['resultado'] ?? null)) {
+                $ultimoResultado = $gTurma['resultado'];
+            }
+            if (!empty($gTurma['texto'])) {
+                $textoFinal = (string) $gTurma['texto'];
+            }
+        }
+
         // Grade do professor / ranking de erros: nunca terminar em "Um momento…".
         if ($this->pedidoPareceGradeProfessor($mensagemUsuario, $mensagens)) {
             $gGrade = $this->garantirGradeProfessor(
@@ -876,6 +922,17 @@ class ProvasAlunoAssistenteService
                     'Consolidado / resumo',
                     'Ver jornadas deste aluno',
                 ],
+            ];
+        }
+        if (
+            in_array($tool, ['resumo_jornadas_aluno', 'listar_jornadas_aluno'], true)
+            && !empty($resultado['candidatos'])
+            && is_array($resultado['candidatos'])
+        ) {
+            return [
+                'tipo' => 'candidatos',
+                'aviso' => (string) ($resultado['aviso'] ?? 'Há mais de um aluno. Confirme pelo nome:'),
+                'candidatos' => $resultado['candidatos'],
             ];
         }
         if ($tool === 'resumo_jornadas_aluno' && !empty($resultado['ok'])) {
@@ -1331,7 +1388,7 @@ Regras importantes:
 2) Se citar turma (ex.: "2 Ano B", "2ªB"), SEMPRE passe args.turma / turma_nome (separado do nome).
 3) NUNCA peça confirmação antes de consultar. Chame a tool primeiro. Se houver 1 aluno, use-o; se houver vários, mostre candidatos.
 4) termo/aluno_nome = só o nome (ex.: "Maria Clara" = nome + sobrenome com LIKE %%token%%), NUNCA junte turma no nome ("Maria Clara do 2 Ano B" está errado).
-5) Se o usuário informar RA/matrícula (ex.: "RA 24254"), passe args.ra só com os dígitos ("24254"). NUNCA use aluno_id como RA. Se a mensagem trouxer aluno_id=76, passe args.aluno_id=76 (inteiro) — não chame buscar_alunos de novo.
+5) Se o usuário informar RA/matrícula (ex.: "RA 24254"), passe args.ra só com os dígitos ("24254"). NUNCA use aluno_id como RA. NUNCA peça id numérico ao usuário (aluno_id, turma_id, categoria_id, diario_aula_id, prova_id, professor_id) — localize sempre por nome, RA ou turma. Se a UI já trouxe aluno_id=76 no histórico interno, use esse id sem perguntar.
 6) Ano letivo (ex.: 2024) vai em args.ano_letivo / args.ano, nunca dentro de aluno_nome ou ra.
 7) Pedido sobre ALUNO + provas → resumo_provas_aluno ou listar_provas_aluno (última prova = listar e pegar a mais recente).
 8) Pedido sobre ALUNO + jornadas → resumo_jornadas_aluno.
@@ -1398,9 +1455,9 @@ Tools — turma / bloco / diário / agenda / boletim / faltas / ocorrências:
 33) ocorrencias_turma — {"turma_nome":"1A","status":"aberta"} ou {"turma_id":37} — incidentes da turma
 
 Tools — ações (só rascunho; o usuário confirma no botão):
-34) propor_criar_ocorrencia — {"alunos":["João Silva","Maria Souza"],"turma":"1A","titulo":"Conversa","detalhe":"...","nivel_gravidade":"leve","categoria_id":1,"enviar_pais":false} — N alunos ok; nome+sobrenome; push SÓ se o usuário pedir notificar pais (enviar_pais=true)
-35) propor_entrada_saida — {"aluno_nome":"João Silva","turma":"1A","tipo":"entrada","ocorrido_em":"2026-11-12 07:55"} ou tipo=saida
-36) propor_chamada_aula — {"aluno_nome":"João Silva","turma":"1A","situacao":"presente","data":"2026-11-12","materia":"Matemática"} ou {"diario_aula_id":10,"aluno_id":123,"situacao":"falta"}
+34) propor_criar_ocorrencia — {"alunos":["João Silva"],"turma":"1A","titulo":"Conversa","detalhe":"...","nivel_gravidade":"leve","categoria":"Conversa","enviar_pais":false} — use categoria pelo NOME (nunca peça categoria_id)
+35) propor_entrada_saida — {"aluno_nome":"João Silva","turma":"1A","tipo":"entrada","ocorrido_em":"2026-11-13 07:55"} — aceite 7h55 / 07:55
+36) propor_chamada_aula — {"aluno_nome":"João Silva","turma":"1A","situacao":"presente","data":"13/11/2026","materia":"Matemática"} — data em BR ou ISO; nunca peça diario_aula_id
 
 Eventos Avaliativos desta escola (fonte oficial — use só estes nomes/siglas):
 PROMPT
@@ -1565,6 +1622,12 @@ PROMPT
     {
         if (preg_match('/^usar\s+evento(?:\s+avaliativo)?(?:\s+id)?\s+(\d+)\b/iu', $mensagem, $mEv) === 1) {
             return $this->reescreverSelecaoEvento((int) $mEv[1], $mensagem, $historico);
+        }
+        // Chip novo: "Aluna Nome da turma X RA Y aluno_id=123"
+        if (preg_match('/aluno_id\s*=\s*(\d+)/i', $mensagem, $mNovo) === 1
+            && preg_match('/^alun[oa]\b/iu', $mensagem) === 1
+        ) {
+            $mensagem = 'Usar aluno_id ' . (int) $mNovo[1];
         }
         if (preg_match('/^usar\s+aluno_id\s+(\d+)\b/iu', $mensagem, $m) !== 1) {
             return $mensagem;
@@ -2335,9 +2398,21 @@ PROMPT
         if ($this->extrairColunaBoletimDaPergunta($pergunta) !== null) {
             return true;
         }
-        // Continuação curta: "e a de matemática 2?", "do 2º bimestre" — não "faltas de matemática".
+        // Continuação curta: "e a de matemática 2?", "do 2º bimestre", "mesmo bimestre".
         if (preg_match('/\b(faltas?|frequencia|frequência|ocorr|jornada|prova online)\b/iu', $pergunta) === 1) {
             return false;
+        }
+        if (
+            preg_match('/\bmesmo\s+bimestre\b|\bmesma\s+coluna\b/iu', $pergunta) === 1
+            && $this->historicoRecenteFalaNotaColuna($historico)
+        ) {
+            return true;
+        }
+        if (
+            preg_match('/\b(nota|pp|pu|mu).{0,40}\b(matematica|matemática)\s*[12]?\b/iu', $pergunta) === 1
+            && $this->historicoRecenteFalaNotaColuna($historico)
+        ) {
+            return true;
         }
         if (
             preg_match('/^\s*(e\s+)?(a\s+)?(de\s+)?(matematica|matemática)\s*[12]?\s*\??\s*$/iu', $pergunta) === 1
@@ -2388,12 +2463,18 @@ PROMPT
             return [];
         }
 
-        // Já veio do quadro (nota única ou coluna filtrada) — só formata, não reconsulta.
+        // Já veio do quadro — só reaproveita se a matéria pedida for a mesma (senão "Mat 2" reaproveitaria Mat 1).
+        $materiaNova = $this->extrairMateriaDaPergunta($mensagemUsuario);
+        $materiaAntiga = trim((string) ($ultimoResultado['materia'] ?? ''));
+        $mesmaMateria = $materiaNova === null
+            || $materiaAntiga === ''
+            || $this->semAcento(mb_strtolower($materiaNova)) === $this->semAcento(mb_strtolower($materiaAntiga));
         if (
             is_array($ultimoResultado)
             && !empty($ultimoResultado['ok'])
             && ($ultimoResultado['fonte'] ?? '') === 'quadro_boletim'
             && strtoupper((string) ($ultimoResultado['coluna'] ?? '')) === $coluna
+            && $mesmaMateria
             && in_array((string) ($ultimoResultado['formato'] ?? ''), ['nota_unica', 'coluna_quadro'], true)
         ) {
             if (!empty($ultimoResultado['candidatos_materias'])) {
@@ -2498,8 +2579,14 @@ PROMPT
         }
 
         $bim = $this->extrairBimestreDaPergunta($mensagemUsuario);
+        if ($bim <= 0 && preg_match('/\bmesmo\s+bimestre\b/iu', $mensagemUsuario) === 1) {
+            $bim = (int) ($ultimoResultado['bimestre'] ?? $ultimoResultado['evento']['bimestre'] ?? 0);
+        }
         if ($bim <= 0) {
             $bim = $this->extrairBimestreDaPergunta($this->ultimoPedidoUsuario($mensagens, null) ?: '');
+        }
+        if ($bim <= 0) {
+            $bim = (int) ($ultimoResultado['bimestre'] ?? $ultimoResultado['evento']['bimestre'] ?? 0);
         }
         if ($bim > 0) {
             $args['bimestre'] = $bim;
@@ -2507,17 +2594,24 @@ PROMPT
 
         if (preg_match('/\b(20\d{2})\b/', $mensagemUsuario, $mAno) === 1) {
             $args['ano_letivo'] = (int) $mAno[1];
+        } elseif (!empty($ultimoResultado['ano_letivo'])) {
+            $args['ano_letivo'] = (int) $ultimoResultado['ano_letivo'];
         } elseif (preg_match('/\b(20\d{2})\b/', $this->ultimoPedidoUsuario($mensagens, null) ?: '', $mAno2) === 1) {
             $args['ano_letivo'] = (int) $mAno2[1];
         }
 
         if (empty($args['aluno_id']) && empty($args['ra'])) {
-            if (preg_match('/\b(?:aluna|aluno)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s]{2,60})/u', $mensagemUsuario, $mNome) === 1) {
+            $raCtx = trim((string) ($ultimoResultado['aluno']['ra'] ?? ''));
+            if ($raCtx !== '') {
+                $args['ra'] = $raCtx;
+            } elseif (preg_match('/\b(?:aluna|aluno)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s]{2,60})/u', $mensagemUsuario, $mNome) === 1) {
                 $nome = trim($mNome[1]);
                 $nome = preg_replace('/\s+d[oae]\s+\d.*$/iu', '', $nome) ?? $nome;
                 if ($nome !== '') {
                     $args['aluno_nome'] = $nome;
                 }
+            } elseif (!empty($ultimoResultado['aluno']['nome'])) {
+                $args['aluno_nome'] = trim((string) $ultimoResultado['aluno']['nome']);
             }
         }
 
@@ -2720,8 +2814,14 @@ PROMPT
         if ($tipo === 'entrada_saida') {
             $p = mb_strtolower($this->semAcento($mensagemUsuario));
             $args['tipo'] = str_contains($p, 'saida') ? 'saida' : 'entrada';
-            if (preg_match('/\b(\d{1,2}:\d{2})\b/', $mensagemUsuario, $mH) === 1) {
-                $args['ocorrido_em'] = $this->ampliada->hojeLocal() . ' ' . $mH[1] . ':00';
+            // 7h55, 07:55, 7:55
+            if (preg_match('/\b(\d{1,2})[h:](\d{2})\b/iu', $mensagemUsuario, $mH) === 1) {
+                $args['ocorrido_em'] = sprintf(
+                    '%s %02d:%02d:00',
+                    $this->ampliada->hojeLocal(),
+                    (int) $mH[1],
+                    (int) $mH[2]
+                );
             }
             if (empty($args['aluno_id']) && empty($args['aluno_nome'])) {
                 return null;
@@ -2732,8 +2832,10 @@ PROMPT
         if ($tipo === 'chamada_aula') {
             $p = mb_strtolower($this->semAcento($mensagemUsuario));
             $args['situacao'] = str_contains($p, 'falta') ? 'falta' : 'presente';
-            if (preg_match('/\b(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})\b/', $mensagemUsuario, $mD) === 1) {
-                $args['data'] = $mD[1];
+            if (preg_match('/\b(\d{2})\/(\d{2})\/(\d{4})\b/', $mensagemUsuario, $mD) === 1) {
+                $args['data'] = $mD[3] . '-' . $mD[2] . '-' . $mD[1];
+            } elseif (preg_match('/\b(\d{4}-\d{2}-\d{2})\b/', $mensagemUsuario, $mDi) === 1) {
+                $args['data'] = $mDi[1];
             } else {
                 $args['data'] = $this->ampliada->hojeLocal();
             }
@@ -2808,6 +2910,21 @@ PROMPT
         $args['enviar_pais'] = !empty($args['enviar_pais'])
             || preg_match('/\b(notificar|avisar|enviar).{0,20}pais\b/iu', $mensagemUsuario) === 1;
 
+        // Categoria pelo nome (nunca peça categoria_id ao usuário).
+        if (empty($args['categoria']) && empty($args['categoria_nome']) && empty($args['categoria_id'])) {
+            if (preg_match('/categoria\s*[:\-]?\s*([A-Za-zÀ-ÿ0-9][\wÀ-ÿ\s]{1,40})/iu', $mensagemUsuario, $mCat) === 1) {
+                $args['categoria'] = trim($mCat[1]);
+            } elseif ($titulo !== '' && $titulo !== 'Ocorrência via assistente') {
+                $args['categoria'] = $titulo;
+            } elseif (preg_match('/^(conversa|disciplina|atraso|bullying|uniforme|comportamento)[\s.!?]*$/iu', trim($mensagemUsuario), $mSo) === 1) {
+                $args['categoria'] = $mSo[1];
+                if ($titulo === 'Ocorrência via assistente' || $titulo === '') {
+                    $args['titulo'] = $mSo[1];
+                    $args['detalhe'] = $mSo[1];
+                }
+            }
+        }
+
         return $args;
     }
 
@@ -2847,16 +2964,24 @@ PROMPT
             return false;
         }
         $t = trim($mensagemUsuario);
-        // Só nome curto isolado ("Ana") ou "aluno Ana" sem sobrenome/RA/turma.
-        if (preg_match('/^(alun[oa]\s+)?[A-Za-zÀ-ÿ]{2,20}$/u', $t) !== 1) {
-            return false;
-        }
         if (preg_match('/\bRA\b|\d{3,}/u', $t) === 1) {
             return false;
         }
-        $stop = ['hoje', 'ontem', 'turma', 'boletim', 'nota', 'faltas', 'ocorrencia', 'sim', 'ok', 'pp', 'pu', 'mu'];
-        $soNome = mb_strtolower($this->semAcento(preg_replace('/^alun[oa]\s+/iu', '', $t) ?? $t));
-        return !in_array($soNome, $stop, true);
+        // "Ana", "aluno Ana", "busca Ana", "encontre a aluna Ana"
+        if (preg_match('/^(alun[oa]\s+)?[A-Za-zÀ-ÿ]{2,20}$/u', $t) === 1) {
+            $soNome = mb_strtolower($this->semAcento(preg_replace('/^alun[oa]\s+/iu', '', $t) ?? $t));
+            $stop = ['hoje', 'ontem', 'turma', 'boletim', 'nota', 'faltas', 'ocorrencia', 'sim', 'ok', 'pp', 'pu', 'mu'];
+            return !in_array($soNome, $stop, true);
+        }
+        if (preg_match(
+            '/\b(?:busca|busque|encontre|localiza|quem\s+[eé]|alun[oa])\s+(?:a\s+|o\s+)?([A-Za-zÀ-ÿ]{2,20})\b/iu',
+            $t,
+            $m
+        ) === 1) {
+            // Só primeiro nome (sem sobrenome na frase).
+            return preg_match('/\b' . preg_quote($m[1], '/') . '\s+[A-Za-zÀ-ÿ]{2,}/u', $t) !== 1;
+        }
+        return false;
     }
 
     /**
@@ -2866,7 +2991,11 @@ PROMPT
     private function garantirCandidatosAluno(string $mensagemUsuario, $onStatus = null): array
     {
         $termo = trim($mensagemUsuario);
-        if (preg_match('/\b(?:alun[oa]|nota|boletim|faltas|ocorr).{0,20}\b([A-Za-zÀ-ÿ]{2,20})\b/iu', $termo, $m) === 1) {
+        if (preg_match(
+            '/\b(?:busca|busque|encontre|localiza|alun[oa]|nota|boletim|faltas|ocorr)\s+(?:a\s+|o\s+)?([A-Za-zÀ-ÿ]{2,20})\b/iu',
+            $termo,
+            $m
+        ) === 1) {
             $termo = $m[1];
         }
         $termo = preg_replace('/^(alun[oa]\s+)/iu', '', $termo) ?? $termo;
@@ -3237,6 +3366,202 @@ PROMPT
         }
 
         return $this->professores->rankingErrosProva($professorId, $provaId, $limite);
+    }
+
+    private function pedidoPareceJornadasAluno(string $pergunta): bool
+    {
+        return (bool) preg_match('/\bjornadas?\b/iu', $pergunta);
+    }
+
+    /**
+     * @param list<array{role?:string,content?:string}> $mensagens
+     * @param callable|null $onStatus
+     * @return array{tool?:?string,resultado?:?array,consulta?:array,texto?:string}
+     */
+    private function garantirJornadasAluno(
+        string $mensagemUsuario,
+        array $mensagens,
+        ?string $ultimaTool,
+        ?array $ultimoResultado,
+        $onStatus = null
+    ): array {
+        $toolsOk = ['resumo_jornadas_aluno', 'listar_jornadas_aluno'];
+        if (
+            in_array($ultimaTool, $toolsOk, true)
+            && is_array($ultimoResultado)
+            && (!empty($ultimoResultado['ok']) || !empty($ultimoResultado['candidatos']))
+        ) {
+            if (!empty($ultimoResultado['candidatos'])) {
+                return [
+                    'tool' => $ultimaTool,
+                    'resultado' => $ultimoResultado,
+                    'texto' => (string) ($ultimoResultado['aviso'] ?? 'Há mais de um aluno. Confirme pelo nome:'),
+                ];
+            }
+            return ['tool' => $ultimaTool, 'resultado' => $ultimoResultado];
+        }
+
+        $args = [];
+        $alunoId = (int) ($ultimoResultado['aluno']['id'] ?? 0);
+        if ($alunoId <= 0) {
+            $ctx = $this->extrairContextoProvasDoHistorico($mensagens);
+            $alunoId = (int) ($ctx['aluno_id'] ?? 0);
+        }
+        if ($alunoId > 0) {
+            $args['aluno_id'] = $alunoId;
+        }
+        $ra = null;
+        if (method_exists($this->consulta, 'extrairCodigoRa')) {
+            $ra = $this->consulta->extrairCodigoRa($mensagemUsuario);
+        }
+        if ($ra === null) {
+            $ra = method_exists($this->consulta, 'extrairCodigoRa')
+                ? $this->consulta->extrairCodigoRa($this->ultimoPedidoUsuario($mensagens) ?: '')
+                : null;
+        }
+        if (($ra === null || $ra === '') && !empty($ultimoResultado['aluno']['ra'])) {
+            $ra = (string) $ultimoResultado['aluno']['ra'];
+        }
+        if ($ra !== null && $ra !== '' && empty($args['aluno_id'])) {
+            $args['ra'] = (string) $ra;
+        }
+        if (empty($args['aluno_id']) && empty($args['ra']) && !empty($ultimoResultado['aluno']['nome'])) {
+            $args['aluno_nome'] = trim((string) $ultimoResultado['aluno']['nome']);
+        }
+        if (empty($args['aluno_id']) && empty($args['ra']) && empty($args['aluno_nome'])) {
+            return [
+                'texto' => 'Para consultar jornadas, informe o RA ou o nome do aluno.',
+            ];
+        }
+
+        if ($onStatus !== null) {
+            $onStatus('Consultando jornadas…');
+        }
+        $resultado = $this->jornadas->resumoJornadasAluno($args);
+        $texto = null;
+        if (!empty($resultado['candidatos'])) {
+            $texto = (string) ($resultado['aviso'] ?? 'Há mais de um aluno. Confirme pelo nome:');
+        } elseif (!empty($resultado['ok'])) {
+            $total = (int) ($resultado['total_jornadas'] ?? 0);
+            $nome = trim((string) ($resultado['aluno']['nome'] ?? 'aluno'));
+            $texto = 'Jornadas d' . $this->artigoDe($nome) . ' **' . $nome . '**: **' . $total . '** no total.';
+        } else {
+            $texto = (string) ($resultado['error'] ?? 'Não encontrei jornadas para este aluno.');
+        }
+
+        return [
+            'tool' => 'resumo_jornadas_aluno',
+            'resultado' => $resultado,
+            'consulta' => ['tool' => 'resumo_jornadas_aluno', 'args' => $args],
+            'texto' => $texto,
+        ];
+    }
+
+    private function pedidoPareceGradeTurma(string $pergunta): bool
+    {
+        $p = mb_strtolower($this->semAcento($pergunta));
+        if (preg_match('/\b(grade|horario|agenda)\b/u', $p) !== 1) {
+            return false;
+        }
+        if (preg_match('/\bprofessor/u', $p) === 1) {
+            return false;
+        }
+        return preg_match('/\bturma\b/u', $p) === 1
+            || preg_match('/\b(grade|horario)\s+(da|do|de)\s+/u', $p) === 1;
+    }
+
+    private function extrairNomeTurma(string $mensagem): ?string
+    {
+        if (preg_match('/\bturma\s+([A-Za-zÀ-ÿ0-9ªº°][A-Za-zÀ-ÿ0-9ªº°\s.\-]{0,40})/iu', $mensagem, $m) === 1) {
+            $nome = trim($m[1]);
+            $nome = preg_replace('/\s+(?:hoje|amanh[aã]|ontem|de|do|da)\b.*$/iu', '', $nome) ?? $nome;
+            $nome = trim($nome, " \t,.");
+            return $nome !== '' ? $nome : null;
+        }
+        if (preg_match('/\b(?:grade|horario|agenda)\s+(?:da|do|de)\s+([A-Za-zÀ-ÿ0-9ªº°][A-Za-zÀ-ÿ0-9ªº°\s.\-]{1,40})/iu', $mensagem, $m2) === 1) {
+            $nome = trim($m2[1]);
+            $nome = preg_replace('/\s+(?:hoje|amanh[aã]|ontem)\b.*$/iu', '', $nome) ?? $nome;
+            return trim($nome) !== '' ? trim($nome) : null;
+        }
+        return null;
+    }
+
+    /**
+     * @param list<array{role?:string,content?:string}> $mensagens
+     * @param callable|null $onStatus
+     * @return array{tool?:?string,resultado?:?array,consulta?:array,texto?:string}
+     */
+    private function garantirGradeTurma(
+        string $mensagemUsuario,
+        array $mensagens,
+        ?string $ultimaTool,
+        ?array $ultimoResultado,
+        $onStatus = null
+    ): array {
+        if (
+            $ultimaTool === 'grade_horaria_consulta'
+            && is_array($ultimoResultado)
+            && (!empty($ultimoResultado['ok']) || !empty($ultimoResultado['candidatos']))
+            && (($ultimoResultado['escopo']['tipo'] ?? '') === 'turma' || !empty($ultimoResultado['candidatos']))
+        ) {
+            $texto = !empty($ultimoResultado['ok'])
+                ? $this->montarRespostaDireta($mensagemUsuario, 'grade_horaria_consulta', $ultimoResultado)
+                : (string) ($ultimoResultado['aviso'] ?? 'Há mais de uma turma. Confirme pelo nome:');
+            return [
+                'tool' => $ultimaTool,
+                'resultado' => $ultimoResultado,
+                'texto' => $texto,
+            ];
+        }
+
+        $args = [];
+        $turma = $this->extrairNomeTurma($mensagemUsuario);
+        if ($turma === null) {
+            $turma = $this->extrairNomeTurma($this->ultimoPedidoUsuario($mensagens) ?: '');
+        }
+        if ($turma !== null) {
+            $args['turma_nome'] = $turma;
+        }
+        $hoje = $this->ampliada->hojeLocal();
+        if (preg_match('/\bhoje\b/iu', $mensagemUsuario) === 1) {
+            $args['data'] = $hoje;
+        } elseif (preg_match('/\bamanh[aã]\b/iu', $mensagemUsuario) === 1) {
+            $args['data'] = (new \DateTimeImmutable($hoje . ' 12:00:00', new \DateTimeZone('America/Sao_Paulo')))
+                ->modify('+1 day')->format('Y-m-d');
+        } elseif (preg_match('/\bontem\b/iu', $mensagemUsuario) === 1) {
+            $args['data'] = (new \DateTimeImmutable($hoje . ' 12:00:00', new \DateTimeZone('America/Sao_Paulo')))
+                ->modify('-1 day')->format('Y-m-d');
+        } elseif (preg_match('/\b(\d{2})\/(\d{2})\/(\d{4})\b/', $mensagemUsuario, $mD) === 1) {
+            $args['data'] = $mD[3] . '-' . $mD[2] . '-' . $mD[1];
+        } else {
+            $args['data'] = $hoje;
+        }
+
+        if (empty($args['turma_nome'])) {
+            return [
+                'texto' => 'Para a grade da turma, informe o nome (ex.: grade da turma 2ª B hoje).',
+            ];
+        }
+
+        if ($onStatus !== null) {
+            $onStatus('Consultando grade da turma…');
+        }
+        $resultado = $this->ampliada->gradeHorariaConsulta($args);
+        $texto = null;
+        if (!empty($resultado['candidatos'])) {
+            $texto = (string) ($resultado['aviso'] ?? 'Há mais de uma turma. Confirme pelo nome:');
+        } elseif (!empty($resultado['ok'])) {
+            $texto = $this->montarRespostaDireta($mensagemUsuario, 'grade_horaria_consulta', $resultado);
+        } else {
+            $texto = (string) ($resultado['error'] ?? 'Não encontrei a grade desta turma.');
+        }
+
+        return [
+            'tool' => 'grade_horaria_consulta',
+            'resultado' => $resultado,
+            'consulta' => ['tool' => 'grade_horaria_consulta', 'args' => $args],
+            'texto' => $texto,
+        ];
     }
 
     /** @param list<array{role?:string,content?:string}> $historico */

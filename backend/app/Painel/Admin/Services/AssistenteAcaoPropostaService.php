@@ -104,6 +104,10 @@ class AssistenteAcaoPropostaService
 
         $categoriaId = (int) ($args['categoria_id'] ?? 0);
         $categoriaNome = trim((string) ($args['categoria'] ?? $args['categoria_nome'] ?? ''));
+        if ($categoriaNome === '') {
+            // Título/detalhe ou resposta curta ("Conversa") costumam ser o nome da categoria.
+            $categoriaNome = trim((string) ($args['titulo'] ?? ''));
+        }
         if ($this->ocorrenciaModel->schemaEstendido()) {
             if ($categoriaId <= 0 && $categoriaNome !== '') {
                 $categoriaId = $this->resolverCategoriaId($categoriaNome);
@@ -114,16 +118,18 @@ class AssistenteAcaoPropostaService
                     'id' => (int) $c['id'],
                     'nome' => (string) ($c['nome'] ?? ''),
                 ], $cats);
-                // Rascunho com 1ª categoria ativa — o card Confirmar aparece; usuário revisa antes de gravar.
-                if (count($lista) === 1 || (count($lista) > 1 && empty($args['exigir_categoria']))) {
+                // Uma só categoria ou match parcial no título → usa sem pedir id.
+                if (count($lista) === 1) {
                     $categoriaId = (int) ($lista[0]['id'] ?? 0);
+                } elseif ($categoriaNome !== '') {
+                    $categoriaId = $this->resolverCategoriaId($categoriaNome);
                 }
                 if ($categoriaId <= 0 || !$this->ocorrenciaModel->categoriaExiste($categoriaId)) {
                     return [
                         'ok' => false,
-                        'aviso' => 'Escolha a categoria da ocorrência:',
+                        'aviso' => 'Confirme a categoria da ocorrência (pelo nome):',
                         'candidatos_categorias' => $lista,
-                        'error' => 'Informe categoria_id válida.',
+                        'error' => 'Informe a categoria pelo nome (ex.: Conversa).',
                     ];
                 }
             }
@@ -185,19 +191,18 @@ class AssistenteAcaoPropostaService
         if (!empty($resolucao['candidatos'])) {
             return [
                 'ok' => false,
-                'aviso' => $resolucao['aviso'] ?? 'Há mais de um aluno. Escolha pelo id:',
+                'aviso' => $resolucao['aviso'] ?? 'Há mais de um aluno. Confirme pelo nome:',
                 'candidatos' => $resolucao['candidatos'],
             ];
         }
         if ($resolucao['alunos'] === []) {
-            return ['ok' => false, 'error' => $resolucao['error'] ?? 'Informe o aluno (nome+turma, RA ou aluno_id).'];
+            return ['ok' => false, 'error' => $resolucao['error'] ?? 'Informe o aluno (nome+turma ou RA).'];
         }
 
         $quando = trim((string) ($args['ocorrido_em'] ?? $args['horario'] ?? $args['data'] ?? ''));
-        try {
-            $dt = $quando !== '' ? new \DateTimeImmutable($quando) : new \DateTimeImmutable('now');
-        } catch (\Throwable $e) {
-            return ['ok' => false, 'error' => 'Data/horário inválidos.'];
+        $dt = $this->normalizarDataHora($quando);
+        if ($dt === null) {
+            return ['ok' => false, 'error' => 'Data/horário inválidos. Use 7h55, 07:55 ou 13/11/2026 07:55.'];
         }
 
         $payload = [
@@ -246,24 +251,24 @@ class AssistenteAcaoPropostaService
         if (!empty($resolucao['candidatos'])) {
             return [
                 'ok' => false,
-                'aviso' => $resolucao['aviso'] ?? 'Há mais de um aluno. Escolha pelo id:',
+                'aviso' => $resolucao['aviso'] ?? 'Há mais de um aluno. Confirme pelo nome:',
                 'candidatos' => $resolucao['candidatos'],
             ];
         }
         if ($resolucao['alunos'] === []) {
-            return ['ok' => false, 'error' => $resolucao['error'] ?? 'Informe o aluno (nome+turma, RA ou aluno_id).'];
+            return ['ok' => false, 'error' => $resolucao['error'] ?? 'Informe o aluno (nome+turma ou RA).'];
         }
 
         $aulaRes = $this->resolverAula($args, $resolucao['alunos']);
         if (!empty($aulaRes['candidatos'])) {
             return [
                 'ok' => false,
-                'aviso' => $aulaRes['aviso'] ?? 'Há mais de uma aula. Informe diario_aula_id:',
+                'aviso' => $aulaRes['aviso'] ?? 'Há mais de uma aula. Confirme a matéria/horário:',
                 'candidatos_aulas' => $aulaRes['candidatos'],
             ];
         }
         if (empty($aulaRes['aula'])) {
-            return ['ok' => false, 'error' => $aulaRes['error'] ?? 'Informe diario_aula_id ou turma+data (+ matéria).'];
+            return ['ok' => false, 'error' => $aulaRes['error'] ?? 'Informe a turma (nome), a data e, se possível, a matéria.'];
         }
         $aula = $aulaRes['aula'];
 
@@ -964,24 +969,24 @@ class AssistenteAcaoPropostaService
             return ['aula' => $aula];
         }
 
-        $data = trim((string) ($args['data'] ?? $args['data_aula'] ?? date('Y-m-d')));
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data)) {
-            $ts = strtotime($data);
-            if ($ts === false) {
-                return ['error' => 'Data da aula inválida.'];
-            }
-            $data = date('Y-m-d', $ts);
+        $data = $this->normalizarDataOnly((string) ($args['data'] ?? $args['data_aula'] ?? ''));
+        if ($data === null) {
+            return ['error' => 'Data da aula inválida. Use 13/11/2026 ou 2026-11-13.'];
         }
 
         $turmaId = (int) ($args['turma_id'] ?? 0);
         if ($turmaId <= 0 && !empty($alunos[0]['turma_id'])) {
             $turmaId = (int) $alunos[0]['turma_id'];
         }
+        $turmaNome = trim((string) ($args['turma'] ?? $args['turma_nome'] ?? $alunos[0]['turma_nome'] ?? ''));
+        if ($turmaId <= 0 && $turmaNome !== '') {
+            $turmaId = $this->resolverTurmaIdPorNome($turmaNome);
+        }
         $materiaId = (int) ($args['materia_id'] ?? 0);
         $materiaNome = trim((string) ($args['materia'] ?? $args['materia_nome'] ?? ''));
 
         if ($turmaId <= 0) {
-            return ['error' => 'Informe diario_aula_id ou turma do aluno + data.'];
+            return ['error' => 'Informe a turma (nome) do aluno e a data da aula.'];
         }
 
         $params = ['turma_id' => $turmaId, 'data' => $data];
@@ -1019,25 +1024,122 @@ class AssistenteAcaoPropostaService
                     'horario' => trim((string) ($r['horario_de'] ?? '') . '–' . (string) ($r['horario_ate'] ?? ''), '–'),
                 ];
             }, $rows),
-            'aviso' => 'Há mais de uma aula nesse dia. Informe diario_aula_id:',
+            'aviso' => 'Há mais de uma aula nesse dia. Confirme a matéria/horário:',
         ];
     }
 
     private function resolverCategoriaId(string $nome): int
     {
-        $nomeNorm = mb_strtolower(trim($nome));
+        $nomeNorm = $this->normalizarTextoSimples($nome);
+        if ($nomeNorm === '') {
+            return 0;
+        }
+        $parcial = 0;
         foreach ($this->ocorrenciaModel->categorias(true) as $c) {
-            if (mb_strtolower(trim((string) ($c['nome'] ?? ''))) === $nomeNorm) {
+            $n = $this->normalizarTextoSimples((string) ($c['nome'] ?? ''));
+            if ($n === '') {
+                continue;
+            }
+            if ($n === $nomeNorm) {
                 return (int) $c['id'];
             }
-        }
-        foreach ($this->ocorrenciaModel->categorias(true) as $c) {
-            $n = mb_strtolower(trim((string) ($c['nome'] ?? '')));
-            if ($n !== '' && (str_contains($n, $nomeNorm) || str_contains($nomeNorm, $n))) {
-                return (int) $c['id'];
+            if ($parcial <= 0 && (str_contains($n, $nomeNorm) || str_contains($nomeNorm, $n))) {
+                $parcial = (int) $c['id'];
             }
         }
-        return 0;
+        return $parcial;
+    }
+
+    private function normalizarTextoSimples(string $texto): string
+    {
+        $t = mb_strtolower(trim($texto), 'UTF-8');
+        $map = [
+            'á' => 'a', 'à' => 'a', 'â' => 'a', 'ã' => 'a',
+            'é' => 'e', 'ê' => 'e', 'í' => 'i',
+            'ó' => 'o', 'ô' => 'o', 'õ' => 'o',
+            'ú' => 'u', 'ü' => 'u', 'ç' => 'c',
+        ];
+        return strtr($t, $map);
+    }
+
+    /** Aceita 7h55, 07:55, 13/11/2026 7h55, 2026-11-13 07:55. */
+    private function normalizarDataHora(string $raw): ?\DateTimeImmutable
+    {
+        $s = trim($raw);
+        $tz = new \DateTimeZone('America/Sao_Paulo');
+        if ($s === '') {
+            return new \DateTimeImmutable('now', $tz);
+        }
+        // 7h55 / 07h55 / 7:55
+        if (preg_match('/^(\d{1,2})[h:](\d{2})$/iu', $s, $m) === 1) {
+            $hoje = (new \DateTimeImmutable('now', $tz))->format('Y-m-d');
+            return \DateTimeImmutable::createFromFormat('Y-m-d H:i', sprintf('%s %02d:%02d', $hoje, (int) $m[1], (int) $m[2]), $tz) ?: null;
+        }
+        // 13/11/2026 7h55 ou 13/11/2026 07:55
+        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{1,2})[h:](\d{2}))?$/u', $s, $m) === 1) {
+            $hora = isset($m[4]) ? (int) $m[4] : 0;
+            $min = isset($m[5]) ? (int) $m[5] : 0;
+            return \DateTimeImmutable::createFromFormat(
+                'Y-m-d H:i',
+                sprintf('%s-%s-%s %02d:%02d', $m[3], $m[2], $m[1], $hora, $min),
+                $tz
+            ) ?: null;
+        }
+        // 2026-11-13 07:55:00
+        if (preg_match('/^\d{4}-\d{2}-\d{2}/', $s) === 1) {
+            try {
+                return new \DateTimeImmutable($s, $tz);
+            } catch (\Throwable $e) {
+                return null;
+            }
+        }
+        try {
+            return new \DateTimeImmutable($s, $tz);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function normalizarDataOnly(string $raw): ?string
+    {
+        $s = trim($raw);
+        $tz = new \DateTimeZone('America/Sao_Paulo');
+        if ($s === '') {
+            return (new \DateTimeImmutable('now', $tz))->format('Y-m-d');
+        }
+        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $s, $m) === 1) {
+            return $m[3] . '-' . $m[2] . '-' . $m[1];
+        }
+        if (preg_match('/^\d{4}-\d{2}-\d{2}/', $s) === 1) {
+            return substr($s, 0, 10);
+        }
+        $dt = $this->normalizarDataHora($s);
+        return $dt ? $dt->format('Y-m-d') : null;
+    }
+
+    private function resolverTurmaIdPorNome(string $nome): int
+    {
+        $nome = trim($nome);
+        if ($nome === '') {
+            return 0;
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT id, nome FROM turmas WHERE nome LIKE :n ORDER BY nome ASC LIMIT 20',
+            ['n' => '%' . $nome . '%']
+        ) ?: [];
+        if ($rows === []) {
+            return 0;
+        }
+        if (count($rows) === 1) {
+            return (int) ($rows[0]['id'] ?? 0);
+        }
+        $alvo = $this->normalizarTextoSimples($nome);
+        foreach ($rows as $r) {
+            if ($this->normalizarTextoSimples((string) ($r['nome'] ?? '')) === $alvo) {
+                return (int) ($r['id'] ?? 0);
+            }
+        }
+        return (int) ($rows[0]['id'] ?? 0);
     }
 
     /**

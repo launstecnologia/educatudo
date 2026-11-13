@@ -554,8 +554,34 @@ class JornadasAlunoConsultaService
     private function resolverAluno(array $filtros): array
     {
         $alunoId = (int) ($filtros['aluno_id'] ?? 0);
-        $alunoNome = trim((string) ($filtros['aluno_nome'] ?? $filtros['nome'] ?? ''));
+        $alunoNome = trim((string) ($filtros['aluno_nome'] ?? $filtros['nome'] ?? $filtros['termo'] ?? ''));
         $turmaFiltro = trim((string) ($filtros['turma_nome'] ?? $filtros['turma'] ?? ''));
+        $ra = trim((string) ($filtros['ra'] ?? $filtros['aluno_ra'] ?? ''));
+        if ($ra === '' && $alunoNome !== '' && method_exists($this->alunos, 'extrairCodigoRa')) {
+            $ra = (string) ($this->alunos->extrairCodigoRa($alunoNome) ?? '');
+        }
+        if ($ra === '' && method_exists($this->alunos, 'extrairCodigoRa')) {
+            $ra = (string) ($this->alunos->extrairCodigoRa((string) ($filtros['termo'] ?? '')) ?? '');
+        }
+
+        // Mesmo caminho do boletim/provas: RA explícito.
+        if ($alunoId <= 0 && $ra !== '') {
+            $candsRa = $this->buscarAlunos('ra ' . $ra, 10, $turmaFiltro !== '' ? $turmaFiltro : null);
+            if ($candsRa === [] && $turmaFiltro !== '') {
+                $candsRa = $this->buscarAlunos('ra ' . $ra, 10, null);
+            }
+            if (count($candsRa) === 1) {
+                $alunoId = (int) ($candsRa[0]['id'] ?? 0);
+            } elseif (count($candsRa) > 1) {
+                return [
+                    'ok' => false,
+                    'aviso' => 'Há mais de um aluno com esse RA. Confirme pelo nome:',
+                    'candidatos' => $candsRa,
+                ];
+            } else {
+                return ['ok' => false, 'error' => 'Nenhum aluno encontrado com RA ' . $ra . '.'];
+            }
+        }
 
         if ($alunoId <= 0 && $alunoNome !== '') {
             $cands = $this->buscarAlunos($alunoNome, 15, $turmaFiltro !== '' ? $turmaFiltro : null);
@@ -564,8 +590,8 @@ class JornadasAlunoConsultaService
                     $semTurma = $this->buscarAlunos($alunoNome, 10, null);
                     if ($semTurma !== []) {
                         return [
-                            'ok' => true,
-                            'aviso' => 'Nenhum aluno com esse nome na turma informada. Candidatos em outras turmas:',
+                            'ok' => false,
+                            'aviso' => 'Nenhum aluno com esse nome na turma informada. Confirme em outras turmas:',
                             'candidatos' => $semTurma,
                         ];
                     }
@@ -580,8 +606,8 @@ class JornadasAlunoConsultaService
                     $alunoId = (int) $exatos[0]['id'];
                 } else {
                     return [
-                        'ok' => true,
-                        'aviso' => 'Há mais de um aluno. Informe aluno_id.',
+                        'ok' => false,
+                        'aviso' => 'Há mais de um aluno. Confirme pelo nome:',
                         'candidatos' => $cands,
                     ];
                 }
@@ -592,7 +618,7 @@ class JornadasAlunoConsultaService
 
         $aluno = $this->obterAluno($alunoId);
         if ($aluno === null) {
-            return ['ok' => false, 'error' => 'Aluno não encontrado.'];
+            return ['ok' => false, 'error' => 'Aluno não encontrado. Informe o RA ou o nome completo.'];
         }
         return ['ok' => true, 'aluno' => $aluno];
     }

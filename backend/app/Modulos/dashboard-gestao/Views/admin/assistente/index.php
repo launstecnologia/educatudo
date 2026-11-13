@@ -374,7 +374,10 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             var html = '<table class="min-w-full text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-600"><tr>'
                 + '<th class="px-3 py-2 text-left">Nome</th><th class="px-3 py-2 text-left">Turma</th><th class="px-3 py-2"></th></tr></thead><tbody>';
             (painel.candidatos || []).forEach(function (a) {
-                var ask = 'Usar aluno_id ' + a.id + ' (' + (a.nome || '') + (a.turma_nome ? ' — ' + a.turma_nome : '') + ')';
+                var ask = 'Aluna ' + (a.nome || '')
+                    + (a.turma_nome ? ' da turma ' + a.turma_nome : '')
+                    + (a.ra ? ' RA ' + a.ra : '')
+                    + (a.id ? ' aluno_id=' + a.id : '');
                 html += '<tr class="border-t"><td class="px-3 py-2 font-medium">' + esc(a.nome)
                     + '</td><td class="px-3 py-2">' + esc(a.turma_nome || '—')
                     + '</td><td class="px-3 py-2 text-right"><button type="button" class="pa-btn-confirmar" data-ask="' + esc(ask) + '">Confirmar</button></td></tr>';
@@ -402,10 +405,12 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 + '<th class="px-3 py-2 text-left">Aula</th><th class="px-3 py-2 text-left">Matéria</th>'
                 + '<th class="px-3 py-2 text-left">Horário</th><th class="px-3 py-2"></th></tr></thead><tbody>';
             (painel.candidatos_aulas || []).forEach(function (a) {
-                var askA = 'Usar diario_aula_id ' + a.diario_aula_id
-                    + ' (' + (a.materia_nome || '') + ' · ' + (a.data_aula || '') + ')';
-                htmlA += '<tr class="border-t"><td class="px-3 py-2 font-medium">#' + esc(a.diario_aula_id)
-                    + ' · ' + esc(a.turma_nome || '—')
+                var askA = 'Aula de ' + (a.materia_nome || 'matéria')
+                    + (a.turma_nome ? ' na turma ' + a.turma_nome : '')
+                    + (a.data_aula ? ' em ' + a.data_aula : '')
+                    + (a.horario ? ' às ' + a.horario : '')
+                    + (a.diario_aula_id ? ' diario_aula_id=' + a.diario_aula_id : '');
+                htmlA += '<tr class="border-t"><td class="px-3 py-2 font-medium">' + esc(a.turma_nome || '—')
                     + '</td><td class="px-3 py-2">' + esc(a.materia_nome || '—')
                     + '</td><td class="px-3 py-2">' + esc(a.horario || '—')
                     + '</td><td class="px-3 py-2 text-right"><button type="button" class="pa-btn-confirmar" data-ask="' + esc(askA) + '">Confirmar</button></td></tr>';
@@ -500,11 +505,11 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             var listCat = document.createElement('div');
             listCat.className = 'flex flex-wrap gap-2';
             (painel.candidatos_categorias || []).forEach(function (c) {
-                var askCat = 'Usar categoria_id ' + (c.id || 0) + ' (' + (c.nome || '') + ')';
+                var askCat = 'Categoria ' + (c.nome || '');
                 var chipC = document.createElement('button');
                 chipC.type = 'button';
                 chipC.className = 'pa-btn-confirmar';
-                chipC.textContent = 'Confirmar — ' + (c.nome || ('Categoria #' + (c.id || '')));
+                chipC.textContent = 'Confirmar — ' + (c.nome || 'Categoria');
                 chipC.setAttribute('data-ask', askCat);
                 chipC.addEventListener('click', function () {
                     input.value = chipC.getAttribute('data-ask');
@@ -986,7 +991,8 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             var htmlPr = '<table class="min-w-full text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-600"><tr>'
                 + '<th class="px-3 py-2 text-left">Nome</th><th class="px-3 py-2 text-left">E-mail</th><th class="px-3 py-2"></th></tr></thead><tbody>';
             (painel.candidatos || []).forEach(function (p) {
-                var askPr = 'Usar professor_id ' + p.id + ' (' + (p.nome || '') + ')';
+                var askPr = 'Professor ' + (p.nome || '')
+                    + (p.id ? ' professor_id=' + p.id : '');
                 htmlPr += '<tr class="border-t"><td class="px-3 py-2 font-medium">' + esc(p.nome)
                     + '</td><td class="px-3 py-2">' + esc(p.email || '—')
                     + '</td><td class="px-3 py-2 text-right"><button type="button" class="pa-btn-confirmar" data-ask="' + esc(askPr) + '">Confirmar</button></td></tr>';
@@ -1196,7 +1202,8 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             var ht = '<table class="min-w-full text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-600"><tr>'
                 + '<th class="px-3 py-2 text-left">Turma</th><th class="px-3 py-2"></th></tr></thead><tbody>';
             (painel.candidatos || []).forEach(function (t) {
-                var ask = 'Usar turma_id ' + t.id + ' (' + (t.nome || '') + ')';
+                var ask = 'Turma ' + (t.nome || '')
+                    + (t.id ? ' turma_id=' + t.id : '');
                 ht += '<tr class="border-t"><td class="px-3 py-2 font-medium">' + esc(t.nome || '—')
                     + '</td><td class="px-3 py-2 text-right"><button type="button" class="pa-btn-confirmar" data-ask="' + esc(ask) + '">Confirmar</button></td></tr>';
             });
@@ -1223,7 +1230,8 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 + '<th class="px-3 py-2 text-left">Bloco</th><th class="px-3 py-2 text-left">Data</th><th class="px-3 py-2"></th></tr></thead><tbody>';
             (painel.candidatos || []).forEach(function (b) {
                 var bid = b.bloco_id || b.id;
-                var ask = 'Usar bloco_id ' + bid + ' (' + (b.titulo || '') + ')';
+                var ask = 'Bloco ' + (b.titulo || '')
+                    + (bid ? ' bloco_id=' + bid : '');
                 hb += '<tr class="border-t"><td class="px-3 py-2 font-medium">' + esc(b.titulo || '—')
                     + '</td><td class="px-3 py-2">' + esc(b.data_prova || '—')
                     + '</td><td class="px-3 py-2 text-right"><button type="button" class="pa-btn-confirmar" data-ask="' + esc(ask) + '">Confirmar</button></td></tr>';

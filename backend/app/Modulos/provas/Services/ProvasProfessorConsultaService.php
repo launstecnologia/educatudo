@@ -41,6 +41,28 @@ class ProvasProfessorConsultaService
             ['q' => $like, 'q2' => $like, 'q3' => $like]
         ) ?: [];
 
+        // Nome completo falhou: casa por tokens (ex.: "Ana Souza" encontra "Ana Clara Souza").
+        if ($rows === []) {
+            $tokens = preg_split('/\s+/u', $termo) ?: [];
+            $tokens = array_values(array_filter($tokens, static fn($t) => mb_strlen(trim($t)) >= 2));
+            if (count($tokens) >= 2) {
+                $where = ['(p.ativo = 1 OR p.ativo IS NULL)'];
+                $params = [];
+                foreach ($tokens as $i => $tok) {
+                    $where[] = 'p.nome LIKE :t' . $i;
+                    $params['t' . $i] = '%' . $tok . '%';
+                }
+                $rows = $this->db->fetchAll(
+                    'SELECT p.id, p.nome, p.email, p.codigo_prof
+                     FROM professores p
+                     WHERE ' . implode(' AND ', $where) . '
+                     ORDER BY p.nome ASC
+                     LIMIT ' . $limit,
+                    $params
+                ) ?: [];
+            }
+        }
+
         $out = [];
         foreach ($rows as $r) {
             $id = (int) ($r['id'] ?? 0);
