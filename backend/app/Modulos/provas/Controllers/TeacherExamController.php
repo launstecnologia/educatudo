@@ -2315,9 +2315,82 @@ class TeacherExamController extends BaseController
         }
 
         $notaUnica = !empty($bloco['nota_unica_todas_materias']);
+        $materiaFiltroImport = (int) ($filtros['materia_id'] ?? 0);
+        $professorFiltroImport = (int) ($filtros['professor_id'] ?? 0);
+        // Word costuma vir só com nome/nota: usa a disciplina já filtrada na tela.
+        $elegiveisImport = $this->alunosPorComboLancamento($bloco, $materiaFiltroImport);
+        if ($professorFiltroImport > 0) {
+            $elegiveisImport = array_values(array_filter(
+                $elegiveisImport,
+                static function (array $row) use ($professorFiltroImport): bool {
+                    return (int) ($row['professor_id'] ?? 0) === $professorFiltroImport;
+                }
+            ));
+        }
+        if (!$notaUnica && $materiaFiltroImport > 0) {
+            if ($elegiveisImport === []) {
+                $this->setFlashMessage(
+                    'A disciplina selecionada não tem alunos elegíveis neste evento. Confira o filtro e tente de novo.',
+                    'error'
+                );
+                $this->redirect($urlVolta);
+                return;
+            }
+            $nomeMateriaFiltro = '';
+            foreach ($elegiveisImport as $rowEleg) {
+                if ((int) ($rowEleg['materia_id'] ?? 0) !== $materiaFiltroImport) {
+                    continue;
+                }
+                $nomeMateriaFiltro = trim((string) ($rowEleg['materia_nome'] ?? ''));
+                if ($nomeMateriaFiltro !== '') {
+                    break;
+                }
+            }
+            if ($nomeMateriaFiltro === '') {
+                $this->setFlashMessage(
+                    'Não foi possível identificar a disciplina filtrada neste evento. Selecione a disciplina na tela e importe de novo.',
+                    'error'
+                );
+                $this->redirect($urlVolta);
+                return;
+            }
+            foreach ($linhasArquivo as &$linhaArq) {
+                if (!is_array($linhaArq)) {
+                    continue;
+                }
+                if (trim((string) ($linhaArq['disciplina'] ?? '')) === '') {
+                    $linhaArq['disciplina'] = $nomeMateriaFiltro;
+                }
+            }
+            unset($linhaArq);
+        } elseif (!$notaUnica && $materiaFiltroImport <= 0) {
+            $faltaDisc = false;
+            foreach ($linhasArquivo as $linhaCheck) {
+                if (!is_array($linhaCheck)) {
+                    continue;
+                }
+                if (trim((string) ($linhaCheck['codigo'] ?? '')) === ''
+                    && trim((string) ($linhaCheck['nome'] ?? '')) === ''
+                ) {
+                    continue;
+                }
+                if (trim((string) ($linhaCheck['disciplina'] ?? '')) === '') {
+                    $faltaDisc = true;
+                    break;
+                }
+            }
+            if ($faltaDisc) {
+                $this->setFlashMessage(
+                    'No Word/planilha sem coluna de disciplina, selecione a disciplina na tela de lançamento antes de importar. Ou inclua a coluna disciplina no arquivo.',
+                    'error'
+                );
+                $this->redirect($urlVolta);
+                return;
+            }
+        }
         $cruzamento = $servico->cruzar(
             $linhasArquivo,
-            $this->alunosPorComboLancamento($bloco, 0),
+            $elegiveisImport,
             $notaUnica,
             $this->escalaMaximaDoBloco($bloco)
         );
