@@ -61,7 +61,9 @@ $usarQuadroImpressaoPronto = $quadroImpressaoHtml !== '' && stripos($quadroImpre
 $moduloEventosAvaliativos = class_exists(\App\Core\LayoutHelper::class)
     && \App\Core\LayoutHelper::isModuleEnabled('eventos_avaliativos');
 // Quadro do assistente sobe via AJAX (montagem pesada); placeholder evita cair no Quadro SM.
-$quadroImpressaoLazy = !$usarQuadroImpressaoPronto
+// Portal aluno/pais pode desligar o lazy (sem endpoint admin) via $desligar_quadro_impressao_lazy.
+$quadroImpressaoLazy = empty($desligar_quadro_impressao_lazy)
+    && !$usarQuadroImpressaoPronto
     && $moduloEventosAvaliativos
     && is_array($ficha)
     && (int) ($ficha['id'] ?? $ficha_id ?? 0) > 0;

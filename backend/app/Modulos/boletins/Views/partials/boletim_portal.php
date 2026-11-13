@@ -9,10 +9,17 @@ $dadosBoletimOficial = is_array($boletim_oficial ?? null) ? $boletim_oficial : [
 $quadro = is_array($dadosBoletimOficial['quadro'] ?? null) ? $dadosBoletimOficial['quadro'] : null;
 $fichas = is_array($dadosBoletimOficial['fichas'] ?? null) ? $dadosBoletimOficial['fichas'] : [];
 $ficha_id = (int) ($dadosBoletimOficial['ficha_id'] ?? 0);
+$quadro_impressao_html = trim((string) ($dadosBoletimOficial['quadro_impressao_html'] ?? ($quadro_impressao_html ?? '')));
 if (is_array($dadosBoletimOficial['observacao'] ?? null)) {
     $boletim_observacao = $dadosBoletimOficial['observacao'];
 }
 $boletim_somente_leitura = true;
+// Portal do aluno (Grupo Seb) não tem o AJAX admin — evita spinner eterno.
+if (class_exists(\App\Modulos\GrupoSeb\Services\GrupoSebService::class)
+    && \App\Modulos\GrupoSeb\Services\GrupoSebService::estaAtivo()
+) {
+    $desligar_quadro_impressao_lazy = true;
+}
 $aluno_id = 0;
 if (is_array($aluno ?? null)) {
     $aluno_id = (int) ($aluno['id'] ?? 0);
