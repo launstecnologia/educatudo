@@ -2319,6 +2319,22 @@ class TeacherExamController extends BaseController
         $professorFiltroImport = (int) ($filtros['professor_id'] ?? 0);
         // Word costuma vir só com nome/nota: usa a disciplina já filtrada na tela.
         $elegiveisImport = $this->alunosPorComboLancamento($bloco, $materiaFiltroImport);
+        $professoresNaDisciplina = [];
+        foreach ($elegiveisImport as $rowProfDisc) {
+            $pidDisc = (int) ($rowProfDisc['professor_id'] ?? 0);
+            if ($pidDisc > 0) {
+                $professoresNaDisciplina[$pidDisc] = true;
+            }
+        }
+        // Com 2+ professores, a mesma nota não pode ir para todos (ex.: Ana Paula 3,0 e Paulo 2,0).
+        if (!$notaUnica && count($professoresNaDisciplina) > 1 && $professorFiltroImport <= 0) {
+            $this->setFlashMessage(
+                'Esta disciplina tem mais de um professor. Selecione o professor na tela (bolinhas ou Filtros) e importe o Word dele. Sem isso a nota entraria igual para todos.',
+                'error'
+            );
+            $this->redirect($urlVolta);
+            return;
+        }
         if ($professorFiltroImport > 0) {
             $elegiveisImport = array_values(array_filter(
                 $elegiveisImport,
@@ -2455,6 +2471,7 @@ class TeacherExamController extends BaseController
 
         $notaUnica = !empty($bloco['nota_unica_todas_materias']);
         $materiaFiltro = 0;
+        $professorFiltroEnac = (int) ($filtros['professor_id'] ?? 0);
         if (!$notaUnica) {
             $materiaFiltro = (int) ($filtros['materia_id'] ?? 0);
             if ($materiaFiltro <= 0) {
@@ -2477,9 +2494,33 @@ class TeacherExamController extends BaseController
             return;
         }
 
+        $elegiveisEnac = $this->alunosPorComboLancamento($bloco, $materiaFiltro);
+        $profsEnac = [];
+        foreach ($elegiveisEnac as $rowEnac) {
+            $pidEnac = (int) ($rowEnac['professor_id'] ?? 0);
+            if ($pidEnac > 0) {
+                $profsEnac[$pidEnac] = true;
+            }
+        }
+        if (!$notaUnica && count($profsEnac) > 1 && $professorFiltroEnac <= 0) {
+            $this->setFlashMessage(
+                'Esta disciplina tem mais de um professor. Selecione o professor na tela antes de importar o ENAC.',
+                'error'
+            );
+            $this->redirect($urlVolta);
+            return;
+        }
+        if ($professorFiltroEnac > 0) {
+            $elegiveisEnac = array_values(array_filter(
+                $elegiveisEnac,
+                static function (array $row) use ($professorFiltroEnac): bool {
+                    return (int) ($row['professor_id'] ?? 0) === $professorFiltroEnac;
+                }
+            ));
+        }
         $cruzamento = $servico->cruzar(
             $lido['linhas'],
-            $this->alunosPorComboLancamento($bloco, $materiaFiltro),
+            $elegiveisEnac,
             $notaUnica,
             $this->escalaMaximaDoBloco($bloco)
         );

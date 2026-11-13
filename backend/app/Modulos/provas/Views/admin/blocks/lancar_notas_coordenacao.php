@@ -453,7 +453,10 @@ if ($tipoFlash === 'error') {
             ? (string) ($materiasFiltro[$materiaIdFiltro] ?? ('#' . $materiaIdFiltro))
             : '';
         $precisaDiscImport = !$notaUnicaTodasMaterias;
+        $precisaProfImport = !$notaUnicaTodasMaterias && count($professoresFiltro) > 1;
         $discOkImport = !$precisaDiscImport || $materiaIdFiltro > 0;
+        $profOkImport = !$precisaProfImport || $professorIdFiltro > 0;
+        $importOk = $discOkImport && $profOkImport;
         ?>
         <div class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-sm space-y-2">
             <p class="font-medium text-gray-900">Destino desta importação</p>
@@ -471,21 +474,24 @@ if ($tipoFlash === 'error') {
                 <span class="text-gray-500">Professor:</span>
                 <?php if ($professorIdFiltro > 0): ?>
                     <strong><?= htmlspecialchars($professorNomeFiltro !== '' ? $professorNomeFiltro : ('#' . $professorIdFiltro), ENT_QUOTES, 'UTF-8') ?></strong>
+                <?php elseif ($precisaProfImport): ?>
+                    <strong class="text-amber-700">obrigatório — selecione na tela</strong>
                 <?php else: ?>
-                    <strong>todos os professores desta disciplina</strong>
+                    <strong>único professor desta disciplina</strong>
                 <?php endif; ?>
             </p>
-            <?php if (!$discOkImport): ?>
+            <?php if (!$importOk): ?>
             <p class="text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5 text-xs">
-                Feche este painel, selecione a <strong>disciplina</strong> (e o professor, se quiser) na tela, e abra Importar de novo.
+                Feche este painel, selecione a <strong>disciplina</strong><?= $precisaProfImport ? ' e o <strong>professor</strong> do arquivo' : '' ?> na tela, e abra Importar de novo.
+                Cada Word é de um professor — não misture.
             </p>
             <?php endif; ?>
         </div>
         <div class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-3 text-sm text-blue-900 space-y-2">
             <p class="font-medium">Passo a passo</p>
             <ol class="list-decimal pl-4 space-y-1 text-blue-900/90">
-                <li>Na tela, escolha a <strong>disciplina</strong>. Se tiver mais de um professor, use as bolinhas de professor ou o botão <strong>Filtros</strong>.</li>
-                <li>Abra Importar e envie o(s) Word/planilha (vários de uma vez com Ctrl/Cmd).</li>
+                <li>Escolha a <strong>disciplina</strong> e o <strong>professor</strong> (bolinhas ou Filtros).</li>
+                <li>Importe só o Word desse professor. Depois troque o professor e importe o próximo.</li>
                 <li>Não precisa escolher aluno por aluno — a tabela do arquivo basta.</li>
             </ol>
         </div>
@@ -501,16 +507,16 @@ if ($tipoFlash === 'error') {
             <label for="planilha" class="block text-sm font-medium text-gray-700 mb-1">Arquivos</label>
             <input type="file" id="planilha" name="planilha[]" multiple accept=".csv,.xlsx,.docx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required
                    class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-gray-100 file:text-gray-700"
-                   <?= $discOkImport ? '' : 'disabled' ?>>
-            <p class="mt-1 text-xs text-gray-500">Segure Ctrl (Windows) ou Cmd (Mac) para escolher mais de um arquivo.</p>
+                   <?= $importOk ? '' : 'disabled' ?>>
+            <p class="mt-1 text-xs text-gray-500">Vários arquivos só se forem do mesmo professor (ex.: várias turmas). Troque o professor entre imports.</p>
         </div>
         <label class="flex items-start gap-2 text-sm text-gray-700">
-            <input type="checkbox" name="substituir" value="1" class="mt-1" <?= $discOkImport ? '' : 'disabled' ?>>
+            <input type="checkbox" name="substituir" value="1" class="mt-1" <?= $importOk ? '' : 'disabled' ?>>
             <span>Substituir notas já lançadas. Isso só vale depois de desbloquear a edição com a senha.</span>
         </label>
         <div class="pt-2">
             <button type="submit" class="btn-primary-custom w-full px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                    <?= $discOkImport ? '' : 'disabled' ?>>
+                    <?= $importOk ? '' : 'disabled' ?>>
                 Importar
             </button>
         </div>

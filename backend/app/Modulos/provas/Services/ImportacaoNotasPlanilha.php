@@ -299,6 +299,20 @@ class ImportacaoNotasPlanilha
                 $arquivosErro[$arquivoChave] = ($arquivosErro[$arquivoChave] ?? 0) + 1;
                 continue;
             }
+            if (!$notaUnica) {
+                $profsAtivos = [];
+                foreach ($ativos as $rowAtivo) {
+                    $pidAtivo = (int) ($rowAtivo['professor_id'] ?? 0);
+                    if ($pidAtivo > 0) {
+                        $profsAtivos[$pidAtivo] = true;
+                    }
+                }
+                if (count($profsAtivos) > 1) {
+                    $erros[] = $rotulo . ': há mais de um professor nesta disciplina. Selecione o professor na tela antes de importar.';
+                    $arquivosErro[$arquivoChave] = ($arquivosErro[$arquivoChave] ?? 0) + 1;
+                    continue;
+                }
+            }
             foreach ($ativos as $row) {
                 $chave = (int) ($row['professor_id'] ?? 0) . '_'
                     . (int) ($row['materia_id'] ?? 0) . '_'
