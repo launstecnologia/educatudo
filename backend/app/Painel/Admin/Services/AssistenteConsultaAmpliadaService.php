@@ -499,6 +499,17 @@ class AssistenteConsultaAmpliadaService
         $coluna = strtoupper(trim((string) ($filtros['coluna'] ?? $filtros['campo'] ?? '')));
         $materiaFiltro = trim((string) ($filtros['materia'] ?? $filtros['materia_nome'] ?? $filtros['disciplina'] ?? ''));
 
+        // Colunas do quadro anual (PP/PU/MU…) → mesma fonte do boletim exibido no chat.
+        if ($this->ehCodigoColunaBoletim($coluna) && $regraId <= 0 && $eventoNome === '') {
+            return $this->notaColunaBoletim([
+                'aluno_id' => $alunoId,
+                'ano_letivo' => $anoFiltro,
+                'bimestre' => $bimestre,
+                'coluna' => $coluna,
+                'materia' => $materiaFiltro,
+            ] + $filtros);
+        }
+
         $boletim = new BoletimConfig();
         $boletim->ensureSchema();
         $regra = null;
@@ -744,6 +755,21 @@ class AssistenteConsultaAmpliadaService
             } else {
                 $eventoNome = $termo;
             }
+        }
+
+        // PP/PU/MU/CH/PE etc. são colunas do quadro do boletim — mesma fonte da UI.
+        // Nunca buscar lançamento bruto por essas siglas (escala/célula divergem).
+        if ($this->ehCodigoColunaBoletim($sigla)) {
+            $filtrosColuna = $filtros;
+            $filtrosColuna['coluna'] = $sigla;
+            unset($filtrosColuna['sigla'], $filtrosColuna['evento_sigla'], $filtrosColuna['codigo']);
+            return $this->notaColunaBoletim($filtrosColuna);
+        }
+        if ($sigla === '' && $this->ehCodigoColunaBoletim(strtoupper(preg_replace('/\s+/u', '', $eventoNome) ?? ''))) {
+            $filtrosColuna = $filtros;
+            $filtrosColuna['coluna'] = strtoupper(preg_replace('/\s+/u', '', $eventoNome) ?? '');
+            unset($filtrosColuna['evento_nome'], $filtrosColuna['evento'], $filtrosColuna['nome_evento']);
+            return $this->notaColunaBoletim($filtrosColuna);
         }
         // Não repassa termo/prova ao resolverAluno (evita buscar aluno "prova bimestral").
         $filtrosAluno = $filtros;
@@ -1455,8 +1481,8 @@ class AssistenteConsultaAmpliadaService
      */
     public function gradeHorariaConsulta(array $filtros): array
     {
-        $data = $this->normalizarData($filtros['data'] ?? null) ?? date('Y-m-d');
-        $diaSemana = (int) date('N', strtotime($data));
+        $data = $this->normalizarData($filtros['data'] ?? null) ?? $this->hojeLocal();
+        $diaSemana = $this->diaSemanaLocal($data);
         $periodo = trim((string) ($filtros['periodo'] ?? ''));
 
         $escopo = null;
@@ -2636,6 +2662,315 @@ class AssistenteConsultaAmpliadaService
             return substr($s, 0, 10);
         }
         return null;
+    }
+
+    /** Data de hoje no fuso America/Sao_Paulo (evita “ontem” quando o PHP está em UTC). */
+    public function hojeLocal(): string
+    {
+        return (new \DateTimeImmutable('now', new \DateTimeZone('America/Sao_Paulo')))->format('Y-m-d');
+    }
+
+    private function diaSemanaLocal(string $dataYmd): int
+    {
+        $dt = \DateTimeImmutable::createFromFormat(
+            'Y-m-d H:i:s',
+            $dataYmd . ' 12:00:00',
+            new \DateTimeZone('America/Sao_Paulo')
+        );
+        if (!$dt instanceof \DateTimeImmutable) {
+            $dt = new \DateTimeImmutable($dataYmd . ' 12:00:00', new \DateTimeZone('America/Sao_Paulo'));
+        }
+        return (int) $dt->format('N');
+    }
+
+    private function anoCivilLocal(): int
+    {
+        return (int) (new \DateTimeImmutable('now', new \DateTimeZone('America/Sao_Paulo')))->format('Y');
+    }
+
+    /** Siglas que são coluna do quadro do boletim (não evento avaliativo cadastrado). */
+    public function ehCodigoColunaBoletim(string $codigo): bool
+    {
+        $c = strtoupper(preg_replace('/\s+/u', '', trim($codigo)) ?? '');
+        return in_array($c, ['PP', 'PU', 'MU', 'CH', 'PE', 'MS', 'MA', 'REC', 'PF', 'RF', 'MEDIA', 'MÉDIA'], true);
+    }
+
+    /**
+     * Nota de uma coluna do quadro anual — mesma célula exibida no boletim do chat.
+     *
+     * @param array<string,mixed> $filtros
+     * @return array<string,mixed>
+     */
+    public function notaColunaBoletim(array $filtros): array
+    {
+        $aluno = $this->resolverAluno($filtros);
+        if (empty($aluno['ok'])) {
+            return $aluno;
+        }
+        $alunoId = (int) $aluno['aluno']['id'];
+        $anoFiltro = (int) ($filtros['ano_letivo'] ?? $filtros['ano'] ?? 0);
+        if ($anoFiltro <= 0) {
+            $anoAtual = $this->anoLetivoAtual();
+            $anoFiltro = (int) ($anoAtual['ano'] ?? $this->anoCivilLocal());
+        }
+        $bimestre = (int) ($filtros['bimestre'] ?? $filtros['periodo'] ?? 0);
+        $coluna = strtoupper(trim((string) ($filtros['coluna'] ?? $filtros['sigla'] ?? $filtros['campo'] ?? '')));
+        $coluna = preg_replace('/\s+/u', '', $coluna) ?? '';
+        $materiaFiltro = trim((string) ($filtros['materia'] ?? $filtros['materia_nome'] ?? $filtros['disciplina'] ?? ''));
+
+        if ($coluna === '' || !$this->ehCodigoColunaBoletim($coluna)) {
+            return [
+                'ok' => false,
+                'error' => 'Informe a coluna do boletim (PP, PU, MU, CH, PE…).',
+                'aluno' => $aluno['aluno'],
+            ];
+        }
+
+        // Sem bimestre: se a coluna existir em vários bimestres com valor para a matéria, peça escolha.
+        if ($bimestre <= 0 && $materiaFiltro !== '') {
+            $amb = $this->listarBimestresComNotaColuna($alunoId, $anoFiltro, $coluna, $materiaFiltro);
+            if (count($amb) > 1) {
+                return [
+                    'ok' => false,
+                    'aviso' => 'A coluna ' . $coluna . ' aparece em mais de um bimestre. Qual deles?',
+                    'candidatos_bimestres' => $amb,
+                    'aluno' => $aluno['aluno'],
+                    'ano_letivo' => $anoFiltro,
+                    'coluna' => $coluna,
+                    'materia' => $materiaFiltro,
+                ];
+            }
+            if (count($amb) === 1) {
+                $bimestre = (int) ($amb[0]['bimestre'] ?? 0);
+            }
+        }
+
+        $doQuadro = $this->extrairColunaQuadroAnual($alunoId, $anoFiltro, $bimestre, $coluna);
+        if (empty($doQuadro['ok'])) {
+            return [
+                'ok' => false,
+                'error' => (string) ($doQuadro['error'] ?? 'Coluna não encontrada no boletim.'),
+                'aluno' => $aluno['aluno'],
+                'ano_letivo' => $anoFiltro,
+                'coluna' => $coluna,
+            ];
+        }
+
+        $quadro = $doQuadro['quadro'];
+        $linhas = is_array($quadro['linhas'] ?? null) ? $quadro['linhas'] : [];
+        $materiaResolvida = $materiaFiltro;
+        if ($materiaFiltro !== '') {
+            $escolhida = $this->escolherLinhaMateria($linhas, $materiaFiltro);
+            if ($escolhida === null) {
+                return [
+                    'ok' => false,
+                    'error' => 'Matéria "' . $materiaFiltro . '" não encontrada no boletim para a coluna ' . $coluna . '.',
+                    'aluno' => $aluno['aluno'],
+                    'ano_letivo' => $anoFiltro,
+                    'coluna' => $coluna,
+                ];
+            }
+            if (!empty($escolhida['ambiguidade']) && !empty($escolhida['candidatos'])) {
+                return [
+                    'ok' => false,
+                    'aviso' => 'Há mais de uma matéria correspondente a "' . $materiaFiltro . '". Qual delas?',
+                    'candidatos_materias' => $escolhida['candidatos'],
+                    'aluno' => $aluno['aluno'],
+                    'ano_letivo' => $anoFiltro,
+                    'bimestre' => $bimestre > 0 ? $bimestre : null,
+                    'coluna' => $coluna,
+                    'materia' => $materiaFiltro,
+                ];
+            }
+            $linhas = [$escolhida['linha']];
+            $materiaResolvida = $escolhida['materia'];
+        }
+
+        $quadro['linhas'] = $linhas;
+
+        // Uma matéria + uma coluna → nota única (mesma célula do boletim).
+        if ($materiaFiltro !== '' && count($linhas) === 1) {
+            $notas = is_array($linhas[0]['notas'] ?? null) ? $linhas[0]['notas'] : [];
+            $valor = $this->primeiroValorNota($notas);
+            $bimLabel = $bimestre > 0 ? $bimestre : $this->inferirBimestreDasColunas($quadro['colunas'] ?? []);
+            return [
+                'ok' => true,
+                'formato' => 'nota_unica',
+                'fonte' => 'quadro_boletim',
+                'aluno' => $aluno['aluno'],
+                'ano_letivo' => $anoFiltro,
+                'bimestre' => $bimLabel,
+                'coluna' => $coluna,
+                'materia' => $materiaResolvida,
+                'nota' => $valor,
+                'evento' => [
+                    'id' => 0,
+                    'nome' => 'Boletim — coluna ' . $coluna,
+                    'sigla' => $coluna,
+                    'bimestre' => $bimLabel,
+                ],
+                'quadro' => $quadro,
+                'aviso' => 'Valor lido do quadro do boletim (mesma fonte da tabela/PDF).',
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'formato' => 'coluna_quadro',
+            'fonte' => 'quadro_boletim',
+            'aluno' => $aluno['aluno'],
+            'ano_letivo' => $anoFiltro,
+            'bimestre' => $bimestre > 0 ? $bimestre : null,
+            'coluna' => $coluna,
+            'materia' => $materiaFiltro !== '' ? $materiaResolvida : null,
+            'evento' => [
+                'id' => 0,
+                'nome' => 'Boletim — coluna ' . $coluna,
+                'sigla' => $coluna,
+                'bimestre' => $bimestre > 0 ? $bimestre : null,
+            ],
+            'quadro' => $quadro,
+            'aviso' => 'Valores lidos do quadro do boletim (mesma fonte da tabela/PDF).',
+        ];
+    }
+
+    /**
+     * @param list<array<string,mixed>> $linhas
+     * @return array{linha?:array,materia?:string,ambiguidade?:bool,candidatos?:list}|null
+     */
+    private function escolherLinhaMateria(array $linhas, string $materiaFiltro): ?array
+    {
+        $alvo = $this->normalizarTextoBusca($materiaFiltro);
+        if ($alvo === '') {
+            return null;
+        }
+        $exatas = [];
+        $prefixos = [];
+        $parciais = [];
+        foreach ($linhas as $linha) {
+            $nome = trim((string) ($linha['materia'] ?? $linha['materia_nome'] ?? ''));
+            if ($nome === '') {
+                continue;
+            }
+            $norm = $this->normalizarTextoBusca($nome);
+            $item = ['linha' => $linha, 'materia' => $nome];
+            if ($norm === $alvo) {
+                $exatas[] = $item;
+                continue;
+            }
+            if (str_starts_with($norm, $alvo) || str_starts_with($alvo, $norm)) {
+                $prefixos[] = $item;
+                continue;
+            }
+            if (str_contains($norm, $alvo) || str_contains($alvo, $norm)) {
+                $parciais[] = $item;
+            }
+        }
+        if (count($exatas) === 1) {
+            return $exatas[0];
+        }
+        if (count($exatas) > 1) {
+            return $this->ambiguidadeMaterias($exatas);
+        }
+        if (count($prefixos) === 1) {
+            return $prefixos[0];
+        }
+        if (count($prefixos) > 1) {
+            return $this->ambiguidadeMaterias($prefixos);
+        }
+        if (count($parciais) === 1) {
+            return $parciais[0];
+        }
+        if (count($parciais) > 1) {
+            return $this->ambiguidadeMaterias($parciais);
+        }
+        return null;
+    }
+
+    /**
+     * @param list<array{linha:array,materia:string}> $itens
+     * @return array{ambiguidade:bool,candidatos:list<array{materia:string}>}
+     */
+    private function ambiguidadeMaterias(array $itens): array
+    {
+        $cands = [];
+        foreach ($itens as $it) {
+            $cands[] = ['materia' => (string) ($it['materia'] ?? '')];
+        }
+        return ['ambiguidade' => true, 'candidatos' => $cands];
+    }
+
+    /**
+     * @param array<string,mixed> $notas
+     */
+    private function primeiroValorNota(array $notas): ?string
+    {
+        foreach ($notas as $val) {
+            if ($val === null || $val === '') {
+                continue;
+            }
+            if (is_numeric($val)) {
+                $n = (float) $val;
+                if (abs($n - round($n)) < 0.00001) {
+                    return (string) (int) round($n);
+                }
+                return rtrim(rtrim(number_format($n, 2, ',', ''), '0'), ',');
+            }
+            return (string) $val;
+        }
+        return null;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $colunas
+     */
+    private function inferirBimestreDasColunas(array $colunas): ?int
+    {
+        foreach ($colunas as $c) {
+            $grupo = strtolower(trim((string) ($c['layout_group'] ?? '')));
+            if (preg_match('/^b([1-4])$/', $grupo, $m) === 1) {
+                return (int) $m[1];
+            }
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if (preg_match('/^b([1-4])_/', $cod, $m) === 1) {
+                return (int) $m[1];
+            }
+        }
+        return null;
+    }
+
+    /**
+     * @return list<array{bimestre:int,materia:string,nota:string|null,rotulo:string}>
+     */
+    private function listarBimestresComNotaColuna(
+        int $alunoId,
+        int $anoLetivo,
+        string $coluna,
+        string $materiaFiltro
+    ): array {
+        $out = [];
+        for ($b = 1; $b <= 4; $b++) {
+            $doQuadro = $this->extrairColunaQuadroAnual($alunoId, $anoLetivo, $b, $coluna);
+            if (empty($doQuadro['ok'])) {
+                continue;
+            }
+            $linhas = is_array($doQuadro['quadro']['linhas'] ?? null) ? $doQuadro['quadro']['linhas'] : [];
+            $escolhida = $this->escolherLinhaMateria($linhas, $materiaFiltro);
+            if ($escolhida === null || !empty($escolhida['ambiguidade']) || empty($escolhida['linha'])) {
+                continue;
+            }
+            $valor = $this->primeiroValorNota(is_array($escolhida['linha']['notas'] ?? null) ? $escolhida['linha']['notas'] : []);
+            if ($valor === null || $valor === '') {
+                continue;
+            }
+            $out[] = [
+                'bimestre' => $b,
+                'materia' => $escolhida['materia'],
+                'nota' => $valor,
+                'rotulo' => $b . 'º bimestre — ' . $escolhida['materia'] . ' ' . $coluna . ': ' . $valor,
+            ];
+        }
+        return $out;
     }
 }
 

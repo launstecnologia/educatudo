@@ -159,6 +159,13 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
     background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; cursor: pointer;
 }
 .pa-chip:hover { background: #e0e7ff; }
+.pa-btn-confirmar {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 600;
+    background: #4f46e5; color: #fff; border: none; cursor: pointer;
+}
+.pa-btn-confirmar:hover { background: #4338ca; }
+.pa-btn-confirmar:disabled { opacity: 0.6; cursor: not-allowed; }
 .assistente-item { border: 1px solid transparent; }
 .assistente-item.ativo { background: #fff; border-color: #c7d2fe; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
 </style>
@@ -370,7 +377,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 var ask = 'Usar aluno_id ' + a.id + ' (' + (a.nome || '') + (a.turma_nome ? ' — ' + a.turma_nome : '') + ')';
                 html += '<tr class="border-t"><td class="px-3 py-2 font-medium">' + esc(a.nome)
                     + '</td><td class="px-3 py-2">' + esc(a.turma_nome || '—')
-                    + '</td><td class="px-3 py-2 text-right"><button type="button" class="pa-chip" data-ask="' + esc(ask) + '">Selecionar</button></td></tr>';
+                    + '</td><td class="px-3 py-2 text-right"><button type="button" class="pa-btn-confirmar" data-ask="' + esc(ask) + '">Confirmar</button></td></tr>';
             });
             html += '</tbody></table>';
             list.innerHTML = html;
@@ -401,7 +408,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                     + ' · ' + esc(a.turma_nome || '—')
                     + '</td><td class="px-3 py-2">' + esc(a.materia_nome || '—')
                     + '</td><td class="px-3 py-2">' + esc(a.horario || '—')
-                    + '</td><td class="px-3 py-2 text-right"><button type="button" class="pa-chip" data-ask="' + esc(askA) + '">Selecionar</button></td></tr>';
+                    + '</td><td class="px-3 py-2 text-right"><button type="button" class="pa-btn-confirmar" data-ask="' + esc(askA) + '">Confirmar</button></td></tr>';
             });
             htmlA += '</tbody></table>';
             listA.innerHTML = htmlA;
@@ -412,6 +419,100 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 });
             });
             container.appendChild(listA);
+            return;
+        }
+
+        if (painel.tipo === 'candidatos_bimestres') {
+            var avisoBim = document.createElement('p');
+            avisoBim.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+            avisoBim.textContent = painel.aviso || 'Há mais de um bimestre:';
+            container.appendChild(avisoBim);
+            var listBim = document.createElement('div');
+            listBim.className = 'flex flex-wrap gap-2';
+            var colB = painel.coluna || 'PP';
+            var matB = painel.materia || '';
+            var alunoB = (painel.aluno && painel.aluno.nome) ? painel.aluno.nome : '';
+            var raB = (painel.aluno && painel.aluno.ra) ? String(painel.aluno.ra) : '';
+            var idB = (painel.aluno && painel.aluno.id) ? String(painel.aluno.id) : '';
+            var anoB = painel.ano_letivo || '';
+            (painel.candidatos_bimestres || []).forEach(function (b) {
+                var askBim = 'Nota da ' + colB
+                    + (matB ? ' de ' + matB : '')
+                    + (alunoB ? ' da aluna ' + alunoB : '')
+                    + (raB ? ' RA ' + raB : (idB ? ' aluno_id=' + idB : ''))
+                    + ' no ' + (b.bimestre || '') + 'º bimestre'
+                    + (anoB ? ' de ' + anoB : '');
+                var chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'pa-btn-confirmar';
+                chip.textContent = 'Confirmar — ' + (b.rotulo || ((b.bimestre || '') + 'º bimestre'));
+                chip.setAttribute('data-ask', askBim);
+                chip.addEventListener('click', function () {
+                    input.value = chip.getAttribute('data-ask');
+                    form.dispatchEvent(new Event('submit', { cancelable: true }));
+                });
+                listBim.appendChild(chip);
+            });
+            container.appendChild(listBim);
+            return;
+        }
+
+        if (painel.tipo === 'candidatos_materias') {
+            var avisoMat = document.createElement('p');
+            avisoMat.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+            avisoMat.textContent = painel.aviso || 'Há mais de uma matéria:';
+            container.appendChild(avisoMat);
+            var listMat = document.createElement('div');
+            listMat.className = 'flex flex-wrap gap-2';
+            var colM = painel.coluna || 'PP';
+            var alunoM = (painel.aluno && painel.aluno.nome) ? painel.aluno.nome : '';
+            var raM = (painel.aluno && painel.aluno.ra) ? String(painel.aluno.ra) : '';
+            var idM = (painel.aluno && painel.aluno.id) ? String(painel.aluno.id) : '';
+            var anoM = painel.ano_letivo || '';
+            var bimM = painel.bimestre || '';
+            (painel.candidatos_materias || []).forEach(function (m) {
+                var nomeMat = m.materia || '';
+                var askMat = 'Nota da ' + colM + ' de ' + nomeMat
+                    + (alunoM ? ' da aluna ' + alunoM : '')
+                    + (raM ? ' RA ' + raM : (idM ? ' aluno_id=' + idM : ''))
+                    + (bimM ? ' no ' + bimM + 'º bimestre' : '')
+                    + (anoM ? ' de ' + anoM : '');
+                var chipM = document.createElement('button');
+                chipM.type = 'button';
+                chipM.className = 'pa-btn-confirmar';
+                chipM.textContent = 'Confirmar — ' + (nomeMat || 'Matéria');
+                chipM.setAttribute('data-ask', askMat);
+                chipM.addEventListener('click', function () {
+                    input.value = chipM.getAttribute('data-ask');
+                    form.dispatchEvent(new Event('submit', { cancelable: true }));
+                });
+                listMat.appendChild(chipM);
+            });
+            container.appendChild(listMat);
+            return;
+        }
+
+        if (painel.tipo === 'candidatos_categorias') {
+            var avisoCat = document.createElement('p');
+            avisoCat.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+            avisoCat.textContent = painel.aviso || 'Escolha a categoria:';
+            container.appendChild(avisoCat);
+            var listCat = document.createElement('div');
+            listCat.className = 'flex flex-wrap gap-2';
+            (painel.candidatos_categorias || []).forEach(function (c) {
+                var askCat = 'Usar categoria_id ' + (c.id || 0) + ' (' + (c.nome || '') + ')';
+                var chipC = document.createElement('button');
+                chipC.type = 'button';
+                chipC.className = 'pa-btn-confirmar';
+                chipC.textContent = 'Confirmar — ' + (c.nome || ('Categoria #' + (c.id || '')));
+                chipC.setAttribute('data-ask', askCat);
+                chipC.addEventListener('click', function () {
+                    input.value = chipC.getAttribute('data-ask');
+                    form.dispatchEvent(new Event('submit', { cancelable: true }));
+                });
+                listCat.appendChild(chipC);
+            });
+            container.appendChild(listCat);
             return;
         }
 
@@ -493,7 +594,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             foot.className = 'px-4 py-3 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center gap-2';
             var btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60';
+            btn.className = 'pa-btn-confirmar';
             btn.textContent = 'Confirmar';
             var hint = document.createElement('span');
             hint.className = 'text-xs text-slate-500';
@@ -882,7 +983,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 var askPr = 'Usar professor_id ' + p.id + ' (' + (p.nome || '') + ')';
                 htmlPr += '<tr class="border-t"><td class="px-3 py-2 font-medium">' + esc(p.nome)
                     + '</td><td class="px-3 py-2">' + esc(p.email || '—')
-                    + '</td><td class="px-3 py-2 text-right"><button type="button" class="pa-chip" data-ask="' + esc(askPr) + '">Selecionar</button></td></tr>';
+                    + '</td><td class="px-3 py-2 text-right"><button type="button" class="pa-btn-confirmar" data-ask="' + esc(askPr) + '">Confirmar</button></td></tr>';
             });
             htmlPr += '</tbody></table>';
             listPr.innerHTML = htmlPr;
@@ -1091,7 +1192,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             (painel.candidatos || []).forEach(function (t) {
                 var ask = 'Usar turma_id ' + t.id + ' (' + (t.nome || '') + ')';
                 ht += '<tr class="border-t"><td class="px-3 py-2 font-medium">' + esc(t.nome || '—')
-                    + '</td><td class="px-3 py-2 text-right"><button type="button" class="pa-chip" data-ask="' + esc(ask) + '">Selecionar</button></td></tr>';
+                    + '</td><td class="px-3 py-2 text-right"><button type="button" class="pa-btn-confirmar" data-ask="' + esc(ask) + '">Confirmar</button></td></tr>';
             });
             ht += '</tbody></table>';
             listT.innerHTML = ht;
@@ -1119,7 +1220,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 var ask = 'Usar bloco_id ' + bid + ' (' + (b.titulo || '') + ')';
                 hb += '<tr class="border-t"><td class="px-3 py-2 font-medium">' + esc(b.titulo || '—')
                     + '</td><td class="px-3 py-2">' + esc(b.data_prova || '—')
-                    + '</td><td class="px-3 py-2 text-right"><button type="button" class="pa-chip" data-ask="' + esc(ask) + '">Selecionar</button></td></tr>';
+                    + '</td><td class="px-3 py-2 text-right"><button type="button" class="pa-btn-confirmar" data-ask="' + esc(ask) + '">Confirmar</button></td></tr>';
             });
             hb += '</tbody></table>';
             listB.innerHTML = hb;
@@ -1597,8 +1698,8 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             (painel.candidatos || []).forEach(function (ev) {
                 var b = document.createElement('button');
                 b.type = 'button';
-                b.className = 'pa-chip';
-                b.textContent = (ev.nome || ('Evento #' + ev.id))
+                b.className = 'pa-btn-confirmar';
+                b.textContent = 'Confirmar — ' + (ev.nome || ('Evento #' + ev.id))
                     + (ev.bimestre ? ' · bim ' + ev.bimestre : '');
                 b.addEventListener('click', function () {
                     if (enviando) return;
@@ -1623,8 +1724,8 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 var eid = ev.evento_id || ev.id;
                 var b = document.createElement('button');
                 b.type = 'button';
-                b.className = 'pa-chip';
-                b.textContent = (ev.sigla ? (ev.sigla + ' · ') : '')
+                b.className = 'pa-btn-confirmar';
+                b.textContent = 'Confirmar — ' + (ev.sigla ? (ev.sigla + ' · ') : '')
                     + (ev.nome || ('Evento #' + eid))
                     + (ev.ano_letivo ? ' · ' + ev.ano_letivo : '')
                     + (ev.bimestre ? ' · bim ' + ev.bimestre : '');

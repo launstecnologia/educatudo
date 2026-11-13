@@ -361,6 +361,82 @@ class ProvasAlunoAssistenteService
             }
         }
 
+        // Nota de coluna do boletim (PP/PU/MU…): mesma célula do quadro — nunca lançamento bruto.
+        if ($this->pedidoPareceNotaColunaBoletim($mensagemUsuario, $mensagens)) {
+            $garantiaNota = $this->garantirNotaColunaBoletim(
+                $mensagemUsuario,
+                $mensagens,
+                $ultimaTool,
+                $ultimoResultado,
+                $onStatus
+            );
+            if (!empty($garantiaNota['consulta'])) {
+                $consultasFeitas[] = $garantiaNota['consulta'];
+            }
+            if (!empty($garantiaNota['tool'])) {
+                $ultimaTool = $garantiaNota['tool'];
+            }
+            if (is_array($garantiaNota['resultado'] ?? null)) {
+                $ultimoResultado = $garantiaNota['resultado'];
+            }
+            if (!empty($garantiaNota['texto'])) {
+                $textoFinal = (string) $garantiaNota['texto'];
+            }
+        }
+
+        // Nome ambíguo (ex.: só "Ana"): força chips clicáveis via buscar_alunos.
+        // Não sobrescreve resultado já resolvido (nota/boletim/proposta).
+        $jaResolvidoEstruturado = is_array($ultimoResultado) && (
+            !empty($ultimoResultado['proposta_id'])
+            || ($ultimoResultado['formato'] ?? '') === 'nota_unica'
+            || $this->boletimTemConteudoExibivel($ultimoResultado)
+            || !empty($ultimoResultado['candidatos_bimestres'])
+        );
+        if (
+            !$jaResolvidoEstruturado
+            && $this->pedidoPareceBuscaAlunoAmbiguo($mensagemUsuario, $ultimaTool, $ultimoResultado)
+        ) {
+            $garantiaAlunos = $this->garantirCandidatosAluno($mensagemUsuario, $onStatus);
+            if (!empty($garantiaAlunos['consulta'])) {
+                $consultasFeitas[] = $garantiaAlunos['consulta'];
+            }
+            if (!empty($garantiaAlunos['tool'])) {
+                $ultimaTool = $garantiaAlunos['tool'];
+            }
+            if (is_array($garantiaAlunos['resultado'] ?? null)) {
+                $ultimoResultado = $garantiaAlunos['resultado'];
+            }
+            if (!empty($garantiaAlunos['texto'])) {
+                $textoFinal = (string) $garantiaAlunos['texto'];
+            }
+        }
+
+        // Registro (ocorrência/entrada/saída/chamada): exige painel com botão Confirmar.
+        // Não sequestrar consultas de leitura já resolvidas.
+        $toolConsultaOcorrencia = in_array($ultimaTool, ['ocorrencias_aluno', 'ocorrencias_turma'], true);
+        if ($this->pedidoPareceRegistroEscrita($mensagemUsuario) && !$toolConsultaOcorrencia) {
+            $garantiaProp = $this->garantirPropostaEscrita(
+                $mensagemUsuario,
+                $mensagens,
+                $ultimaTool,
+                $ultimoResultado,
+                $textoFinal,
+                $onStatus
+            );
+            if (!empty($garantiaProp['consulta'])) {
+                $consultasFeitas[] = $garantiaProp['consulta'];
+            }
+            if (!empty($garantiaProp['tool'])) {
+                $ultimaTool = $garantiaProp['tool'];
+            }
+            if (is_array($garantiaProp['resultado'] ?? null)) {
+                $ultimoResultado = $garantiaProp['resultado'];
+            }
+            if (!empty($garantiaProp['texto'])) {
+                $textoFinal = (string) $garantiaProp['texto'];
+            }
+        }
+
         try {
             $this->debitarCreditos();
         } catch (\Throwable $e) {
@@ -609,6 +685,42 @@ class ProvasAlunoAssistenteService
                 'tipo' => 'candidatos_aulas',
                 'aviso' => (string) ($resultado['aviso'] ?? 'Há mais de uma aula. Escolha uma:'),
                 'candidatos_aulas' => $resultado['candidatos_aulas'],
+            ];
+        }
+        if (!empty($resultado['candidatos_bimestres']) && is_array($resultado['candidatos_bimestres'])) {
+            return [
+                'tipo' => 'candidatos_bimestres',
+                'aviso' => (string) ($resultado['aviso'] ?? 'Há mais de um bimestre. Escolha um:'),
+                'candidatos_bimestres' => $resultado['candidatos_bimestres'],
+                'aluno' => $resultado['aluno'] ?? null,
+                'coluna' => $resultado['coluna'] ?? null,
+                'materia' => $resultado['materia'] ?? null,
+                'ano_letivo' => $resultado['ano_letivo'] ?? null,
+            ];
+        }
+        if (!empty($resultado['candidatos_materias']) && is_array($resultado['candidatos_materias'])) {
+            return [
+                'tipo' => 'candidatos_materias',
+                'aviso' => (string) ($resultado['aviso'] ?? 'Há mais de uma matéria. Qual delas?'),
+                'candidatos_materias' => $resultado['candidatos_materias'],
+                'aluno' => $resultado['aluno'] ?? null,
+                'coluna' => $resultado['coluna'] ?? null,
+                'ano_letivo' => $resultado['ano_letivo'] ?? null,
+                'bimestre' => $resultado['bimestre'] ?? null,
+            ];
+        }
+        if (!empty($resultado['candidatos_categorias']) && is_array($resultado['candidatos_categorias'])) {
+            return [
+                'tipo' => 'candidatos_categorias',
+                'aviso' => (string) ($resultado['aviso'] ?? 'Escolha a categoria:'),
+                'candidatos_categorias' => $resultado['candidatos_categorias'],
+            ];
+        }
+        if (!empty($resultado['categorias']) && is_array($resultado['categorias']) && empty($resultado['ok'])) {
+            return [
+                'tipo' => 'candidatos_categorias',
+                'aviso' => (string) ($resultado['aviso'] ?? $resultado['error'] ?? 'Escolha a categoria:'),
+                'candidatos_categorias' => $resultado['categorias'],
             ];
         }
         if (!empty($resultado['candidatos']) && is_array($resultado['candidatos'])) {
@@ -1165,7 +1277,7 @@ Regras importantes:
 14) Pedido de DIÁRIO atrasado / pendências de diário → diario_pendencias.
 15) Pedido de GRADE HORÁRIA / "qual aula hoje" → grade_horaria_consulta.
 16) Pedido de BOLETIM completo → boletim_aluno. Pedido de UMA NOTA de matéria no boletim (ex.: "nota de matemática da Júlia") → notas_evento_aluno com materia="Matemática" (e bimestre/coluna se souber).
-17) Pedido de nota de avaliação/prova por SIGLA ou NOME (ex.: "PB", "prova bimestral", "PO de matemática") → nota_evento_sigla. Compare SEMPRE com o catálogo de Eventos Avaliativos desta escola (abaixo): use a sigla cadastrada em args.sigla OU o nome cadastrado em args.evento_nome / args.termo. NUNCA invente o significado da sigla (não diga que PO = "Prova Objetiva" se isso não estiver no cadastro). Se não souber qual evento, chame listar_eventos_avaliativos. Coluna do boletim (PP/PU/MU) → notas_evento_aluno.
+17) Colunas do BOLETIM (PP, PU, MU, CH, PE, MS, MA, REC, PF) → SEMPRE notas_evento_aluno com args.coluna="PP" (etc.), materia exata (ex.: "Matemática 1") e bimestre se souber. NUNCA use nota_evento_sigla para essas siglas — elas não são Eventos Avaliativos; o valor DEVE ser a mesma célula do quadro/PDF. Se a coluna existir em vários bimestres e o usuário não disse qual, a tool devolve candidatos — peça o bimestre. Nota por SIGLA/NOME de Evento Avaliativo cadastrado (ex.: "PB", "prova bimestral", "PO") → nota_evento_sigla. Compare com o catálogo abaixo; NUNCA invente o significado da sigla.
 18) Frequência/presença/faltas (consulta) → faltas_aluno.
 19) CONSULTA de ocorrência/incidente de ALUNO → ocorrencias_aluno. Ocorrências da TURMA → ocorrencias_turma. NUNCA use faltas_aluno para ocorrência.
 20) Detalhe de questão → detalhar_prova_aluno com somente_erros=true.
@@ -1179,10 +1291,10 @@ Regras importantes:
 23) NUNCA invente quantidade de faltas/ocorrências/notas. Sempre chame a tool adequada. Se frequencia=null ou aviso de sem lançamentos, diga isso — não chute um número.
 24) NUNCA escreva [contexto_estruturado], aluno_id=, prova_id= nem metadados internos na resposta ao usuário. Isso é só para a UI/histórico.
 25) Saude_academica é alerta cadastral/matrícula/chamada da escola; para rendimento de uma turma use saude_turma.
-26) CRIAR ocorrência / registrar incidente → propor_criar_ocorrencia (aceita vários alunos). NÃO diga que criou — diga que preparou a proposta e o usuário confirma no botão (ou diga "sim"). Nunca afirme "ocorrência registrada/criada" só porque o usuário escreveu "sim" sem a tool de confirmação ter rodado.
-27) Registrar ENTRADA ou SAÍDA (portaria) → propor_entrada_saida.
-28) Marcar PRESENTE/FALTA na CHAMADA de uma aula do diário → propor_chamada_aula.
-29) Em ações de escrita, se nome ficar ambíguo, devolva candidatos; nunca chute aluno_id.
+26) CRIAR ocorrência / registrar incidente → OBRIGATÓRIO emitir <<<CONSULTA>>> propor_criar_ocorrencia. NUNCA peça "confirme" só em texto — sem a tool não há botão Confirmar. NÃO diga que criou; diga que preparou a proposta. Nunca afirme "ocorrência registrada" só porque o usuário escreveu "sim" sem a confirmação ter rodado.
+27) Registrar ENTRADA ou SAÍDA (portaria) → OBRIGATÓRIO propor_entrada_saida (mesmo: botão Confirmar via tool, nunca só texto).
+28) Marcar PRESENTE/FALTA na CHAMADA → OBRIGATÓRIO propor_chamada_aula.
+29) Em ações de escrita, se nome ficar ambíguo, devolva candidatos; nunca chute aluno_id. Sem titulo+detalhe+gravidade (ocorrência), peça esses campos — ainda assim NÃO simule confirmação em texto.
 
 Para obter dados, emita EXATAMENTE:
 <<<CONSULTA>>>
@@ -1207,14 +1319,14 @@ Tools — turma / bloco / diário / agenda / boletim / faltas / ocorrências:
 20) resumo_provas_turma — {"turma_nome":"2 Ano B"} — totais acertos/erros por matéria
 21) saude_academica — {"ano":2024} ou {"ano_letivo_id":4,"turma_nome":"1A"} — alertas cadastrais/matrícula
 22) diario_pendencias — {"turma_nome":"1A","situacao":"atraso"} ou {"professor_nome":"Ana"} — diários pendentes
-23) grade_horaria_consulta — {"turma_nome":"1A","data":"2026-11-12"} ou {"professor_nome":"Ana"} — aulas do dia
+23) grade_horaria_consulta — {"turma_nome":"1A","data":"2026-11-13"} ou {"professor_nome":"Ana"} — aulas do dia. Se o usuário disser "hoje", use a data de hoje do contexto (fuso America/Sao_Paulo).
 24) buscar_blocos — {"titulo":"Simulado"} ou {"turma_nome":"2ªB"}
 25) resultados_bloco — {"bloco_id":10} ou {"titulo":"Simulado 1"}
 26) perfil_aluno_360 — {"ra":"24254","ano_letivo":2024} — resumo geral do aluno
 27) boletim_aluno — {"ra":"24254","ano_letivo":2024} — quadro anual (PP/PU/CH/PE/MU por bimestre); a UI oferece PDF
-28) notas_evento_aluno — {"ra":"24254","materia":"Matemática","bimestre":2} ou {"coluna":"MU","bimestre":2} — nota/matéria/coluna do boletim/demonstrativo
+28) notas_evento_aluno — {"ra":"24254","coluna":"PP","materia":"Matemática 1","bimestre":1,"ano_letivo":2024} — coluna do boletim (mesma célula do quadro). Use materia com número quando houver (Matemática 1 ≠ Matemática 2).
 29) listar_eventos_avaliativos — {"ano_letivo":2026} ou {"termo":"bimestral"} — catálogo vivo (sigla+nome) desta escola
-30) nota_evento_sigla — {"aluno_id":76,"sigla":"PB","materia":"Matemática"} OU {"aluno_id":76,"evento_nome":"Prova Bimestral","materia":"Matemática"} OU {"termo":"prova bimestral","materia":"Matemática","aluno_id":76} — compara com Eventos Avaliativos cadastrados (sigla OU nome). Nunca invente sigla.
+30) nota_evento_sigla — {"aluno_id":76,"sigla":"PB","materia":"Matemática"} — SÓ para Eventos Avaliativos cadastrados (NÃO use para PP/PU/MU/CH/PE).
 31) faltas_aluno — {"ra":"24254","ano_letivo":2024} ou {"aluno_id":365} — frequência/presença (NÃO é ocorrência). Passe o mesmo ano_letivo da conversa.
 32) ocorrencias_aluno — {"ra":"24254","ano_letivo":2024} ou {"aluno_id":123,"status":"aberta"} — incidentes disciplinares
 33) ocorrencias_turma — {"turma_nome":"1A","status":"aberta"} ou {"turma_id":37} — incidentes da turma
@@ -1229,6 +1341,7 @@ PROMPT
             . json_encode($eventosResumo, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
             . "\n\nTipos de avaliação (provas) desta escola:\n"
             . json_encode($tiposResumo, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            . "\n\nHoje (America/Sao_Paulo): " . $this->ampliada->hojeLocal()
             . "\n\nQuando já tiver os dados, responda de forma ASSERTIVA e formatada (sem <<<CONSULTA>>>), destacando o valor pedido em **negrito**.";
     }
 
@@ -1467,14 +1580,17 @@ PROMPT
     /**
      * @param list<array{role?:string,content?:string}> $historico
      */
-    private function ultimoPedidoUsuario(array $historico, string $ignorarPadrao): string
+    private function ultimoPedidoUsuario(array $historico, ?string $ignorarPadrao = null): string
     {
         foreach (array_reverse($historico) as $msg) {
             if (($msg['role'] ?? '') !== 'user') {
                 continue;
             }
             $c = trim((string) ($msg['content'] ?? ''));
-            if ($c === '' || preg_match($ignorarPadrao, $c) === 1) {
+            if ($c === '') {
+                continue;
+            }
+            if ($ignorarPadrao !== null && $ignorarPadrao !== '' && preg_match($ignorarPadrao, $c) === 1) {
                 continue;
             }
             return $c;
@@ -1634,22 +1750,43 @@ PROMPT
             return $txt . '.';
         }
 
-        if ($tool === 'nota_evento_sigla') {
-            $sigla = strtoupper(trim((string) ($resultado['evento']['sigla'] ?? '')));
+        if (
+            $tool === 'nota_evento_sigla'
+            || (
+                in_array($tool, ['notas_evento_aluno', 'nota_coluna_boletim'], true)
+                && ($resultado['formato'] ?? '') === 'nota_unica'
+            )
+        ) {
+            $sigla = strtoupper(trim((string) ($resultado['evento']['sigla'] ?? $resultado['coluna'] ?? '')));
             $nomeEv = trim((string) ($resultado['evento']['nome'] ?? $sigla));
             $rotuloEv = $sigla !== '' ? $sigla : $nomeEv;
             if (($resultado['formato'] ?? '') === 'nota_unica') {
                 $mat = trim((string) ($resultado['materia'] ?? ''));
                 $nota = $resultado['nota'] ?? null;
+                $bim = (int) ($resultado['bimestre'] ?? $resultado['evento']['bimestre'] ?? 0);
+                $ano = (int) ($resultado['ano_letivo'] ?? 0);
+                $sufixoPeriodo = '';
+                if ($bim > 0) {
+                    $sufixoPeriodo .= ' no ' . $bim . 'º bimestre';
+                }
+                if ($ano > 0) {
+                    $sufixoPeriodo .= ($sufixoPeriodo !== '' ? ' de ' : ' em ') . $ano;
+                }
                 if ($nota === null || $nota === '') {
                     return 'Não há nota lançada da ' . $rotuloEv
                         . ($mat !== '' ? ' de ' . $mat : '')
-                        . ' para ' . $quem . '.';
+                        . ' para ' . $quem
+                        . $sufixoPeriodo . '.';
                 }
                 return 'A nota da ' . $rotuloEv
                     . ($mat !== '' ? ' de ' . $mat : '')
                     . ' d' . $this->artigoDe($quem) . ' ' . $quem
-                    . ' é **' . $nota . '**.';
+                    . $sufixoPeriodo
+                    . ' é **' . $nota . '**'
+                    . (!empty($resultado['fonte']) && $resultado['fonte'] === 'quadro_boletim'
+                        ? ' (quadro do boletim)'
+                        : '')
+                    . '.';
             }
             $linhas = is_array($resultado['notas'] ?? null) ? $resultado['notas'] : [];
             if ($linhas === []) {
@@ -1690,13 +1827,27 @@ PROMPT
             }
 
             if ($materiaPedido !== null && is_array($quadro)) {
-                $achado = $this->buscarNotaMateriaNoQuadro($quadro, $materiaPedido);
+                $colunaPref = strtoupper(trim((string) ($resultado['coluna'] ?? '')));
+                $achado = $this->buscarNotaMateriaNoQuadro($quadro, $materiaPedido, $colunaPref !== '' ? $colunaPref : null);
                 if ($achado !== null) {
                     $rotuloMat = $achado['materia'] !== '' ? $achado['materia'] : $materiaPedido;
+                    $bim = (int) ($resultado['bimestre'] ?? $resultado['evento']['bimestre'] ?? 0);
+                    $ano = (int) ($resultado['ano_letivo'] ?? 0);
+                    $sufixo = '';
+                    if ($colunaPref !== '') {
+                        $sufixo .= ' (' . $colunaPref . ')';
+                    }
+                    if ($bim > 0) {
+                        $sufixo .= ' — ' . $bim . 'º bimestre';
+                    }
+                    if ($ano > 0) {
+                        $sufixo .= ($bim > 0 ? ' de ' : ' — ') . $ano;
+                    }
                     if ($achado['valor'] === null || $achado['valor'] === '') {
-                        return 'Não há nota lançada de ' . $rotuloMat . ' para ' . $quem . '.';
+                        return 'Não há nota lançada de ' . $rotuloMat . ' para ' . $quem . $sufixo . '.';
                     }
                     return 'A nota de ' . $rotuloMat . ' d' . $this->artigoDe($quem) . ' ' . $quem
+                        . $sufixo
                         . ' é **' . $achado['valor'] . '**.';
                 }
             }
@@ -2041,6 +2192,600 @@ PROMPT
         return $args;
     }
 
+    private function extrairColunaBoletimDaPergunta(string $pergunta): ?string
+    {
+        // Siglas curtas só em MAIÚSCULAS (evita "pe", "ma", "mu" no meio da frase).
+        if (preg_match('/\b(PP|PU|MU|CH|PE|MS|MA|REC|PF|RF)\b/', $pergunta, $m) === 1) {
+            return $m[1];
+        }
+        // Nomes falados comuns das colunas do boletim.
+        $p = mb_strtolower($this->semAcento($pergunta));
+        $mapa = [
+            'prova parcial' => 'PP',
+            'prova unica' => 'PU',
+            'media unica' => 'MU',
+            'media bimestral' => 'MU',
+        ];
+        foreach ($mapa as $termo => $cod) {
+            if (str_contains($p, $this->semAcento($termo))) {
+                return $cod;
+            }
+        }
+        return null;
+    }
+
+    private function extrairBimestreDaPergunta(string $pergunta): int
+    {
+        if (preg_match('/\b([1-4])\s*[ºªo]?\s*bimestre\b/iu', $pergunta, $m) === 1) {
+            return (int) $m[1];
+        }
+        if (preg_match('/\bbimestre\s*([1-4])\b/iu', $pergunta, $m) === 1) {
+            return (int) $m[1];
+        }
+        return 0;
+    }
+
+    /** @param list<array{role?:string,content?:string}> $historico */
+    private function pedidoPareceNotaColunaBoletim(string $pergunta, array $historico = []): bool
+    {
+        if ($this->extrairColunaBoletimDaPergunta($pergunta) !== null) {
+            return true;
+        }
+        // Continuação curta: "e a de matemática 2?", "do 2º bimestre" — não "faltas de matemática".
+        if (preg_match('/\b(faltas?|frequencia|frequência|ocorr|jornada|prova online)\b/iu', $pergunta) === 1) {
+            return false;
+        }
+        if (
+            preg_match('/^\s*(e\s+)?(a\s+)?(de\s+)?(matematica|matemática)\s*[12]?\s*\??\s*$/iu', $pergunta) === 1
+            && $this->historicoRecenteFalaNotaColuna($historico)
+        ) {
+            return true;
+        }
+        if (
+            preg_match('/^\s*(e\s+)?(no\s+|do\s+)?([1-4])\s*[ºªo]?\s*bimestre\s*\??\s*$/iu', $pergunta) === 1
+            && $this->historicoRecenteFalaNotaColuna($historico)
+        ) {
+            return true;
+        }
+        return false;
+    }
+
+    /** @param list<array{role?:string,content?:string}> $historico */
+    private function historicoRecenteFalaNotaColuna(array $historico): bool
+    {
+        foreach (array_reverse(array_slice($historico, -8)) as $msg) {
+            $c = (string) ($msg['content'] ?? '');
+            if ($this->extrairColunaBoletimDaPergunta($c) !== null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param list<array{role?:string,content?:string}> $mensagens
+     * @param callable|null $onStatus
+     * @return array{tool?:?string,resultado?:?array,consulta?:array,texto?:string}
+     */
+    private function garantirNotaColunaBoletim(
+        string $mensagemUsuario,
+        array $mensagens,
+        ?string $ultimaTool,
+        ?array $ultimoResultado,
+        $onStatus = null
+    ): array {
+        $coluna = $this->extrairColunaBoletimDaPergunta($mensagemUsuario);
+        if ($coluna === null) {
+            $coluna = $this->extrairColunaBoletimDaPergunta(
+                $this->ultimoPedidoUsuario($mensagens, null) ?: ''
+            );
+        }
+        if ($coluna === null) {
+            return [];
+        }
+
+        // Já veio do quadro (nota única ou coluna filtrada) — só formata, não reconsulta.
+        if (
+            is_array($ultimoResultado)
+            && !empty($ultimoResultado['ok'])
+            && ($ultimoResultado['fonte'] ?? '') === 'quadro_boletim'
+            && strtoupper((string) ($ultimoResultado['coluna'] ?? '')) === $coluna
+            && in_array((string) ($ultimoResultado['formato'] ?? ''), ['nota_unica', 'coluna_quadro'], true)
+        ) {
+            if (!empty($ultimoResultado['candidatos_materias'])) {
+                return [
+                    'tool' => $ultimaTool ?? 'notas_evento_aluno',
+                    'resultado' => $ultimoResultado,
+                    'texto' => (string) ($ultimoResultado['aviso'] ?? 'Há mais de uma matéria. Qual delas?'),
+                ];
+            }
+            $texto = $this->montarRespostaDireta($mensagemUsuario, 'notas_evento_aluno', $ultimoResultado);
+            return [
+                'tool' => $ultimaTool ?? 'notas_evento_aluno',
+                'resultado' => $ultimoResultado,
+                'texto' => $texto ?? null,
+            ];
+        }
+
+        if (!empty($ultimoResultado['candidatos_bimestres']) || !empty($ultimoResultado['candidatos'])) {
+            return [
+                'tool' => $ultimaTool,
+                'resultado' => $ultimoResultado,
+                'texto' => trim((string) ($ultimoResultado['aviso'] ?? 'Há mais de uma opção. Escolha uma:')),
+            ];
+        }
+
+        $args = $this->montarArgsNotaColuna($mensagemUsuario, $mensagens, $ultimoResultado, $coluna);
+        if ($args === null) {
+            return [
+                'tool' => 'notas_evento_aluno',
+                'resultado' => [
+                    'ok' => false,
+                    'error' => 'Para consultar a ' . $coluna . ' do boletim, informe o aluno (RA ou nome) e a matéria.',
+                ],
+                'texto' => 'Para consultar a **' . $coluna . '** do boletim, informe o aluno (RA ou nome) e a matéria.',
+            ];
+        }
+
+        if ($onStatus !== null) {
+            $onStatus('Consultando coluna ' . $coluna . ' do boletim…');
+        }
+        $resultado = $this->ampliada->notaColunaBoletim($args);
+        $texto = null;
+        if (!empty($resultado['candidatos_bimestres'])) {
+            $texto = (string) ($resultado['aviso'] ?? 'A coluna aparece em mais de um bimestre. Qual deles?');
+        } elseif (!empty($resultado['candidatos_materias'])) {
+            $texto = (string) ($resultado['aviso'] ?? 'Há mais de uma matéria. Qual delas?');
+        } elseif (!empty($resultado['ok'])) {
+            $texto = $this->montarRespostaDireta($mensagemUsuario, 'notas_evento_aluno', $resultado);
+        } else {
+            $texto = trim((string) ($resultado['error'] ?? $resultado['aviso'] ?? 'Não encontrei essa nota no boletim.'));
+        }
+
+        return [
+            'tool' => 'notas_evento_aluno',
+            'resultado' => $resultado,
+            'consulta' => ['tool' => 'notas_evento_aluno', 'args' => $args],
+            'texto' => $texto,
+        ];
+    }
+
+    /**
+     * @param list<array{role?:string,content?:string}> $mensagens
+     * @return array<string,mixed>|null
+     */
+    private function montarArgsNotaColuna(
+        string $mensagemUsuario,
+        array $mensagens,
+        ?array $ultimoResultado,
+        string $coluna
+    ): ?array {
+        $args = ['coluna' => $coluna];
+
+        $alunoId = (int) ($ultimoResultado['aluno']['id'] ?? 0);
+        if ($alunoId <= 0 && preg_match('/aluno_id\s*=\s*(\d+)/i', $mensagemUsuario, $m) === 1) {
+            $alunoId = (int) $m[1];
+        }
+        if ($alunoId <= 0) {
+            $ctx = $this->extrairContextoProvasDoHistorico($mensagens);
+            $alunoId = (int) ($ctx['aluno_id'] ?? 0);
+        }
+        if ($alunoId > 0) {
+            $args['aluno_id'] = $alunoId;
+        }
+
+        $ra = null;
+        if (method_exists($this->consulta, 'extrairCodigoRa')) {
+            $ra = $this->consulta->extrairCodigoRa($mensagemUsuario);
+        }
+        if ($ra === null && preg_match('/\bRA\s*[#:]?\s*(\d{3,})\b/iu', $mensagemUsuario, $mRa) === 1) {
+            $ra = $mRa[1];
+        }
+        if ($ra !== null && $ra !== '' && empty($args['aluno_id'])) {
+            $args['ra'] = (string) $ra;
+        }
+
+        $materia = $this->extrairMateriaDaPergunta($mensagemUsuario);
+        if ($materia === null) {
+            $materia = $this->extrairMateriaDaPergunta($this->ultimoPedidoUsuario($mensagens, null) ?: '');
+        }
+        if ($materia !== null) {
+            $args['materia'] = $materia;
+        }
+
+        $bim = $this->extrairBimestreDaPergunta($mensagemUsuario);
+        if ($bim <= 0) {
+            $bim = $this->extrairBimestreDaPergunta($this->ultimoPedidoUsuario($mensagens, null) ?: '');
+        }
+        if ($bim > 0) {
+            $args['bimestre'] = $bim;
+        }
+
+        if (preg_match('/\b(20\d{2})\b/', $mensagemUsuario, $mAno) === 1) {
+            $args['ano_letivo'] = (int) $mAno[1];
+        } elseif (preg_match('/\b(20\d{2})\b/', $this->ultimoPedidoUsuario($mensagens, null) ?: '', $mAno2) === 1) {
+            $args['ano_letivo'] = (int) $mAno2[1];
+        }
+
+        if (empty($args['aluno_id']) && empty($args['ra'])) {
+            if (preg_match('/\b(?:aluna|aluno)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s]{2,60})/u', $mensagemUsuario, $mNome) === 1) {
+                $nome = trim($mNome[1]);
+                $nome = preg_replace('/\s+d[oae]\s+\d.*$/iu', '', $nome) ?? $nome;
+                if ($nome !== '') {
+                    $args['aluno_nome'] = $nome;
+                }
+            }
+        }
+
+        if (empty($args['aluno_id']) && empty($args['ra']) && empty($args['aluno_nome'])) {
+            return null;
+        }
+        return $args;
+    }
+
+    private function pedidoPareceRegistroEscrita(string $pergunta): bool
+    {
+        // Só verbos de escrita — não capturar consulta ("tem ocorrência do João?").
+        return (bool) preg_match(
+            '/\b(registrar|registre|criar|crie|lancar|lançar|abra|abrir|marcar|marque)\b.{0,60}\b(ocorr[eê]ncia|incidente|entrada|sa[ií]da|chamada|presen[cç]a|falta|presente)\b/iu',
+            $pergunta
+        );
+    }
+
+    /**
+     * @param list<array{role?:string,content?:string}> $mensagens
+     * @param callable|null $onStatus
+     * @return array{tool?:?string,resultado?:?array,consulta?:array,texto?:string}
+     */
+    private function garantirPropostaEscrita(
+        string $mensagemUsuario,
+        array $mensagens,
+        ?string $ultimaTool,
+        ?array $ultimoResultado,
+        string $textoAtual,
+        $onStatus = null
+    ): array {
+        $toolsProposta = ['propor_criar_ocorrencia', 'propor_entrada_saida', 'propor_chamada_aula'];
+        if (
+            in_array($ultimaTool, $toolsProposta, true)
+            && is_array($ultimoResultado)
+            && !empty($ultimoResultado['ok'])
+            && !empty($ultimoResultado['proposta_id'])
+        ) {
+            return [
+                'tool' => $ultimaTool,
+                'resultado' => $ultimoResultado,
+            ];
+        }
+
+        // Candidatos de aluno já resolvidos pela tool de propor — manter chips.
+        if (
+            in_array($ultimaTool, $toolsProposta, true)
+            && is_array($ultimoResultado)
+            && !empty($ultimoResultado['candidatos'])
+        ) {
+            return [
+                'tool' => $ultimaTool,
+                'resultado' => $ultimoResultado,
+                'texto' => trim((string) ($ultimoResultado['aviso'] ?? 'Há mais de um aluno. Escolha um:')),
+            ];
+        }
+
+        $tipo = $this->detectarTipoProposta($mensagemUsuario);
+        $args = $this->montarArgsProposta($mensagemUsuario, $mensagens, $ultimoResultado, $tipo);
+
+        // Sem aluno resolvido: busca candidatos com botão Confirmar (não só texto).
+        if ($args === null || (empty($args['aluno_id']) && empty($args['aluno_nome']) && empty($args['alunos']))) {
+            $termoAluno = $this->extrairNomeAlunoParaAcao($mensagemUsuario);
+            if ($termoAluno !== null) {
+                if ($onStatus !== null) {
+                    $onStatus('Buscando aluno para a ação…');
+                }
+                $busca = $this->executarTool('buscar_alunos', ['termo' => $termoAluno]);
+                $alunos = is_array($busca['alunos'] ?? null) ? $busca['alunos'] : [];
+                if (count($alunos) > 1) {
+                    return [
+                        'tool' => 'buscar_alunos',
+                        'resultado' => $busca + ['aviso' => 'Confirme o aluno para continuar a ação:'],
+                        'consulta' => ['tool' => 'buscar_alunos', 'args' => ['termo' => $termoAluno]],
+                        'texto' => 'Encontrei mais de um aluno. Confirme qual deles:',
+                    ];
+                }
+                if (count($alunos) === 1) {
+                    $args = $args ?? [];
+                    $args['aluno_id'] = (int) ($alunos[0]['id'] ?? 0);
+                    $args['aluno_nome'] = trim((string) ($alunos[0]['nome'] ?? ''));
+                    $args['alunos'] = [$args['aluno_nome']];
+                    if (!empty($alunos[0]['turma_nome'])) {
+                        $args['turma'] = (string) $alunos[0]['turma_nome'];
+                    }
+                }
+            }
+        }
+
+        if ($args === null || (empty($args['aluno_id']) && empty($args['aluno_nome']) && empty($args['alunos']))) {
+            return [
+                'texto' => 'Para montar a proposta com o botão **Confirmar**, informe o aluno (nome+turma ou RA)'
+                    . ($tipo === 'criar_ocorrencia'
+                        ? ' e o motivo da ocorrência.'
+                        : ($tipo === 'entrada_saida'
+                            ? ', se é entrada ou saída, e o horário.'
+                            : ', a situação (presente/falta) e a data/matéria da aula.')),
+            ];
+        }
+
+        // Completa defaults da ocorrência para o card Confirmar aparecer.
+        if ($tipo === 'criar_ocorrencia') {
+            $args = $this->completarArgsOcorrencia($args, $mensagemUsuario);
+        }
+
+        $tool = match ($tipo) {
+            'entrada_saida' => 'propor_entrada_saida',
+            'chamada_aula' => 'propor_chamada_aula',
+            default => 'propor_criar_ocorrencia',
+        };
+
+        if ($onStatus !== null) {
+            $onStatus('Preparando proposta…');
+        }
+        $resultado = $this->executarTool($tool, $args);
+        $texto = null;
+        if (!empty($resultado['ok']) && !empty($resultado['proposta_id'])) {
+            $det = is_array($resultado['detalhes'] ?? null)
+                ? $resultado['detalhes']
+                : $this->acoes->detalhesProposta(
+                    (string) ($resultado['tipo'] ?? ''),
+                    is_array($resultado['payload'] ?? null) ? $resultado['payload'] : []
+                );
+            $texto = 'Preparei uma proposta de **'
+                . trim((string) ($det['tipo_label'] ?? 'ação'))
+                . '**. Revise o título, a descrição, a data/hora e os envolvidos abaixo e confirme.';
+        } elseif (!empty($resultado['candidatos'])) {
+            $texto = trim((string) ($resultado['aviso'] ?? 'Há mais de um aluno. Escolha um:'));
+        } else {
+            $texto = trim((string) ($resultado['error'] ?? $resultado['aviso'] ?? ''));
+            if ($texto === '') {
+                $texto = 'Não consegui montar a proposta com botão Confirmar. '
+                    . 'Informe os dados faltantes (aluno, título/detalhe/gravidade ou horário).';
+            }
+            // Evita resposta da IA pedindo "confirme" sem painel.
+            if (preg_match('/confirm/iu', $textoAtual) === 1 && empty($resultado['proposta_id'])) {
+                $texto = $texto !== '' ? $texto : 'Faltam dados para montar a proposta com o botão Confirmar.';
+            }
+        }
+
+        return [
+            'tool' => $tool,
+            'resultado' => $resultado,
+            'consulta' => ['tool' => $tool, 'args' => $args],
+            'texto' => $texto,
+        ];
+    }
+
+    private function detectarTipoProposta(string $pergunta): string
+    {
+        $p = mb_strtolower($this->semAcento($pergunta));
+        if (preg_match('/\bocorrencia\b|\bincidente\b/u', $p) === 1) {
+            return 'criar_ocorrencia';
+        }
+        if (preg_match('/\b(entrada|saida)\b/u', $p) === 1) {
+            return 'entrada_saida';
+        }
+        if (preg_match('/\b(chamada|presente|falta)\b/u', $p) === 1) {
+            return 'chamada_aula';
+        }
+        return 'criar_ocorrencia';
+    }
+
+    /**
+     * @param list<array{role?:string,content?:string}> $mensagens
+     * @return array<string,mixed>|null
+     */
+    private function montarArgsProposta(
+        string $mensagemUsuario,
+        array $mensagens,
+        ?array $ultimoResultado,
+        string $tipo
+    ): ?array {
+        $args = [];
+        $alunoId = (int) ($ultimoResultado['aluno']['id'] ?? 0);
+        if ($alunoId <= 0) {
+            $ctx = $this->extrairContextoProvasDoHistorico($mensagens);
+            $alunoId = (int) ($ctx['aluno_id'] ?? 0);
+        }
+        if ($alunoId > 0) {
+            $args['aluno_id'] = $alunoId;
+        }
+        $nomeAluno = trim((string) ($ultimoResultado['aluno']['nome'] ?? ''));
+        if ($nomeAluno === '' && preg_match(
+            '/\b(?:aluna|aluno)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s]{2,60})/u',
+            $mensagemUsuario,
+            $mNome
+        ) === 1) {
+            $nomeAluno = trim($mNome[1]);
+        }
+        if ($nomeAluno !== '') {
+            $args['aluno_nome'] = $nomeAluno;
+            $args['alunos'] = [$nomeAluno];
+        }
+        $turma = trim((string) ($ultimoResultado['aluno']['turma_nome'] ?? $ultimoResultado['turma']['nome'] ?? ''));
+        if ($turma !== '') {
+            $args['turma'] = $turma;
+        }
+
+        if ($tipo === 'entrada_saida') {
+            $p = mb_strtolower($this->semAcento($mensagemUsuario));
+            $args['tipo'] = str_contains($p, 'saida') ? 'saida' : 'entrada';
+            if (preg_match('/\b(\d{1,2}:\d{2})\b/', $mensagemUsuario, $mH) === 1) {
+                $args['ocorrido_em'] = $this->ampliada->hojeLocal() . ' ' . $mH[1] . ':00';
+            }
+            if (empty($args['aluno_id']) && empty($args['aluno_nome'])) {
+                return null;
+            }
+            return $args;
+        }
+
+        if ($tipo === 'chamada_aula') {
+            $p = mb_strtolower($this->semAcento($mensagemUsuario));
+            $args['situacao'] = str_contains($p, 'falta') ? 'falta' : 'presente';
+            if (preg_match('/\b(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})\b/', $mensagemUsuario, $mD) === 1) {
+                $args['data'] = $mD[1];
+            } else {
+                $args['data'] = $this->ampliada->hojeLocal();
+            }
+            $mat = $this->extrairMateriaDaPergunta($mensagemUsuario);
+            if ($mat !== null) {
+                $args['materia'] = $mat;
+            }
+            if (empty($args['aluno_id']) && empty($args['aluno_nome'])) {
+                return null;
+            }
+            return $args;
+        }
+
+        // Ocorrência: monta rascunho mesmo com campos parciais (defaults no completarArgsOcorrencia).
+        if (empty($args['aluno_id']) && empty($args['aluno_nome']) && empty($args['alunos'])) {
+            $nomeLivre = $this->extrairNomeAlunoParaAcao($mensagemUsuario);
+            if ($nomeLivre !== null) {
+                $args['aluno_nome'] = $nomeLivre;
+                $args['alunos'] = [$nomeLivre];
+            } else {
+                return null;
+            }
+        }
+        return $this->completarArgsOcorrencia($args, $mensagemUsuario);
+    }
+
+    /** @param array<string,mixed> $args @return array<string,mixed> */
+    private function completarArgsOcorrencia(array $args, string $mensagemUsuario): array
+    {
+        $titulo = trim((string) ($args['titulo'] ?? ''));
+        $detalhe = trim((string) ($args['detalhe'] ?? $args['descricao'] ?? ''));
+        $nivel = strtolower(trim((string) ($args['nivel_gravidade'] ?? $args['gravidade'] ?? '')));
+
+        if ($titulo === '' && preg_match('/t[ií]tulo\s*[:\-]\s*([^\n;]+)/iu', $mensagemUsuario, $mT) === 1) {
+            $titulo = trim($mT[1]);
+        }
+        if ($detalhe === '' && preg_match('/(?:detalhe|descri[cç][aã]o)\s*[:\-]\s*([^\n;]+)/iu', $mensagemUsuario, $mD) === 1) {
+            $detalhe = trim($mD[1]);
+        }
+        if ($nivel === '' && preg_match('/\b(leve|moderado|grave)\b/iu', $mensagemUsuario, $mN) === 1) {
+            $nivel = strtolower($mN[1]);
+        }
+        if ($titulo === '' && preg_match(
+            '/ocorr[eê]ncia(?:\s+(?:de|por|sobre))?\s*[:\-]?\s*([A-Za-zÀ-ÿ0-9][^.]{3,80})/iu',
+            $mensagemUsuario,
+            $mOc
+        ) === 1) {
+            $titulo = trim($mOc[1]);
+            $titulo = preg_replace('/\s+para\s+.+$/iu', '', $titulo) ?? $titulo;
+            $titulo = preg_replace('/\s+d[oa]\s+alun[oa]\s+.+$/iu', '', $titulo) ?? $titulo;
+        }
+        if ($titulo === '' && preg_match(
+            '/\b(?:por|sobre|motivo)\s+([A-Za-zÀ-ÿ0-9][^.]{3,80})/iu',
+            $mensagemUsuario,
+            $mMot
+        ) === 1) {
+            $titulo = trim($mMot[1]);
+        }
+        if ($titulo === '') {
+            $titulo = 'Ocorrência via assistente';
+        }
+        if ($detalhe === '') {
+            $detalhe = $titulo;
+        }
+        if ($nivel === '' || !in_array($nivel, ['leve', 'moderado', 'grave'], true)) {
+            $nivel = 'leve';
+        }
+
+        $args['titulo'] = mb_substr($titulo, 0, 120);
+        $args['detalhe'] = $detalhe;
+        $args['nivel_gravidade'] = $nivel;
+        $args['enviar_pais'] = !empty($args['enviar_pais'])
+            || preg_match('/\b(notificar|avisar|enviar).{0,20}pais\b/iu', $mensagemUsuario) === 1;
+
+        return $args;
+    }
+
+    private function extrairNomeAlunoParaAcao(string $mensagem): ?string
+    {
+        if (preg_match('/\b(?:aluna|aluno)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s]{1,60})/u', $mensagem, $m) === 1) {
+            $nome = trim($m[1]);
+            $nome = preg_replace('/\s+(?:da|do|de|no|na|para|com|por|sobre|RA)\b.*$/iu', '', $nome) ?? $nome;
+            $nome = trim($nome);
+            return $nome !== '' ? $nome : null;
+        }
+        if (preg_match('/\bpara\s+(?:a\s+|o\s+)?([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s]{1,60})/u', $mensagem, $m2) === 1) {
+            $nome = trim($m2[1]);
+            $nome = preg_replace('/\s+(?:da|do|de|turma|RA|,).*$/iu', '', $nome) ?? $nome;
+            $nome = trim($nome);
+            return $nome !== '' ? $nome : null;
+        }
+        if (preg_match('/\bRA\s*[#:]?\s*(\d{3,})\b/iu', $mensagem, $mRa) === 1) {
+            return 'ra ' . $mRa[1];
+        }
+        return null;
+    }
+
+    /**
+     * @param array<string,mixed>|null $ultimoResultado
+     */
+    private function pedidoPareceBuscaAlunoAmbiguo(
+        string $mensagemUsuario,
+        ?string $ultimaTool,
+        ?array $ultimoResultado
+    ): bool {
+        // Já tem chips.
+        if (is_array($ultimoResultado) && !empty($ultimoResultado['candidatos']) && is_array($ultimoResultado['candidatos'])) {
+            return false;
+        }
+        if ($ultimaTool === 'buscar_alunos' && !empty($ultimoResultado['alunos']) && count((array) $ultimoResultado['alunos']) > 1) {
+            return false;
+        }
+        $t = trim($mensagemUsuario);
+        // Só nome curto isolado ("Ana") ou "aluno Ana" sem sobrenome/RA/turma.
+        if (preg_match('/^(alun[oa]\s+)?[A-Za-zÀ-ÿ]{2,20}$/u', $t) !== 1) {
+            return false;
+        }
+        if (preg_match('/\bRA\b|\d{3,}/u', $t) === 1) {
+            return false;
+        }
+        $stop = ['hoje', 'ontem', 'turma', 'boletim', 'nota', 'faltas', 'ocorrencia', 'sim', 'ok', 'pp', 'pu', 'mu'];
+        $soNome = mb_strtolower($this->semAcento(preg_replace('/^alun[oa]\s+/iu', '', $t) ?? $t));
+        return !in_array($soNome, $stop, true);
+    }
+
+    /**
+     * @param callable|null $onStatus
+     * @return array{tool?:?string,resultado?:?array,consulta?:array,texto?:string}
+     */
+    private function garantirCandidatosAluno(string $mensagemUsuario, $onStatus = null): array
+    {
+        $termo = trim($mensagemUsuario);
+        if (preg_match('/\b(?:alun[oa]|nota|boletim|faltas|ocorr).{0,20}\b([A-Za-zÀ-ÿ]{2,20})\b/iu', $termo, $m) === 1) {
+            $termo = $m[1];
+        }
+        $termo = preg_replace('/^(alun[oa]\s+)/iu', '', $termo) ?? $termo;
+        $termo = trim($termo);
+        if ($termo === '') {
+            return [];
+        }
+        if ($onStatus !== null) {
+            $onStatus('Buscando alunos…');
+        }
+        $resultado = $this->executarTool('buscar_alunos', ['termo' => $termo]);
+        $alunos = is_array($resultado['alunos'] ?? null) ? $resultado['alunos'] : [];
+        if (count($alunos) <= 1) {
+            return [];
+        }
+        return [
+            'tool' => 'buscar_alunos',
+            'resultado' => $resultado + ['aviso' => 'Encontrei mais de um aluno. Qual deles?'],
+            'consulta' => ['tool' => 'buscar_alunos', 'args' => ['termo' => $termo]],
+            'texto' => 'Encontrei mais de um aluno. Qual deles?',
+        ];
+    }
+
     /** @param array<string,mixed>|null $resultado */
     private function boletimTemConteudoExibivel(?array $resultado): bool
     {
@@ -2123,9 +2868,18 @@ PROMPT
     private function extrairMateriaDaPergunta(string $pergunta): ?string
     {
         $p = mb_strtolower($this->semAcento($pergunta));
+        // Preferência: "matemática 1", "lingua portuguesa 2" (número faz parte do nome no boletim).
+        // Não capturar o dígito de "2º bimestre".
+        if (preg_match(
+            '/\b(matematica|portugues|lingua portuguesa|ciencias|historia|geografia|ingles|educacao fisica|artes?|biologia|fisica|quimica|filosofia|sociologia|redacao)\s*([12])\b(?!\s*[ºoa]?\s*bimestre)/u',
+            $p,
+            $m
+        )) {
+            return $this->rotuloMateriaCanonico($m[1]) . ' ' . $m[2];
+        }
         // "nota de matemática", "em matemática", "matéria matemática"
         if (preg_match(
-            '/\b(?:nota|media|média|desempenho|resultado)?\s*(?:de|em|da|do)?\s*(matematica|portugues|lingua portuguesa|ciencias|historia|geografia|ingles|educacao fisica|artes?|biologia|fisica|quimica|filosofia|sociologia|redacao)\b/u',
+            '/\b(?:nota|media|média|desempenho|resultado|pp|pu|mu|ch|pe)?\s*(?:de|em|da|do)?\s*(matematica|portugues|lingua portuguesa|ciencias|historia|geografia|ingles|educacao fisica|artes?|biologia|fisica|quimica|filosofia|sociologia|redacao)\b/u',
             $p,
             $m
         )) {
@@ -2161,11 +2915,14 @@ PROMPT
      * @param array{colunas?:list,linhas?:list} $quadro
      * @return array{materia:string,valor:string|null}|null
      */
-    private function buscarNotaMateriaNoQuadro(array $quadro, string $materiaPedido): ?array
+    private function buscarNotaMateriaNoQuadro(array $quadro, string $materiaPedido, ?string $colunaPreferida = null): ?array
     {
         $alvo = $this->semAcento(mb_strtolower($materiaPedido));
         $linhas = is_array($quadro['linhas'] ?? null) ? $quadro['linhas'] : [];
-        $melhor = null;
+        $exatas = [];
+        $prefixos = [];
+        $parciais = [];
+        $colunas = is_array($quadro['colunas'] ?? null) ? $quadro['colunas'] : [];
         foreach ($linhas as $linha) {
             $nome = trim((string) ($linha['materia'] ?? $linha['materia_nome'] ?? ''));
             if ($nome === '') {
@@ -2176,23 +2933,70 @@ PROMPT
                 continue;
             }
             $notas = is_array($linha['notas'] ?? null) ? $linha['notas'] : [];
-            $valor = $this->escolherValorNota($notas, is_array($quadro['colunas'] ?? null) ? $quadro['colunas'] : []);
-            $melhor = ['materia' => $nome, 'valor' => $valor];
+            $valor = $this->escolherValorNota($notas, $colunas, $colunaPreferida);
+            $item = ['materia' => $nome, 'valor' => $valor];
             if ($norm === $alvo) {
-                break;
+                $exatas[] = $item;
+                continue;
             }
+            if (str_starts_with($norm, $alvo) || str_starts_with($alvo, $norm)) {
+                $prefixos[] = $item;
+                continue;
+            }
+            $parciais[] = $item;
         }
-        return $melhor;
+        if (count($exatas) === 1) {
+            return $exatas[0];
+        }
+        if (count($exatas) > 1 || count($prefixos) > 1 || (count($exatas) === 0 && count($prefixos) === 0 && count($parciais) > 1)) {
+            // Ambiguidade: não inventa a primeira linha.
+            return null;
+        }
+        if (count($prefixos) === 1) {
+            return $prefixos[0];
+        }
+        if (count($parciais) === 1) {
+            return $parciais[0];
+        }
+        return null;
     }
 
     /**
      * @param array<string,mixed> $notas
      * @param list<array<string,mixed>> $colunas
      */
-    private function escolherValorNota(array $notas, array $colunas): ?string
+    private function escolherValorNota(array $notas, array $colunas, ?string $colunaPreferida = null): ?string
     {
         if ($notas === []) {
             return null;
+        }
+        $prefUser = $colunaPreferida !== null ? strtoupper(trim($colunaPreferida)) : '';
+        if ($prefUser !== '') {
+            foreach ($notas as $cod => $val) {
+                $c = strtoupper((string) $cod);
+                $nomeCol = '';
+                foreach ($colunas as $col) {
+                    if ((string) ($col['codigo'] ?? $col['chave'] ?? '') === (string) $cod) {
+                        $nomeCol = strtoupper(trim((string) ($col['nome'] ?? $col['label'] ?? '')));
+                        break;
+                    }
+                }
+                if (
+                    $c === $prefUser
+                    || $nomeCol === $prefUser
+                    || str_ends_with($c, '_' . $prefUser)
+                    || str_starts_with($c, $prefUser . '_')
+                ) {
+                    if ($val === null || $val === '') {
+                        return null;
+                    }
+                    return is_numeric($val)
+                        ? (abs((float) $val - round((float) $val)) < 0.00001
+                            ? (string) (int) round((float) $val)
+                            : rtrim(rtrim(number_format((float) $val, 2, ',', ''), '0'), ','))
+                        : (string) $val;
+                }
+            }
         }
         // Preferência: MU / média / última coluna com valor.
         $preferidas = ['MU', 'MEDIA', 'MÉDIA', 'MS', 'MA', 'RF', 'RESULTADO'];

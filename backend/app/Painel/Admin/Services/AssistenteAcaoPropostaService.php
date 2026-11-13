@@ -114,11 +114,18 @@ class AssistenteAcaoPropostaService
                     'id' => (int) $c['id'],
                     'nome' => (string) ($c['nome'] ?? ''),
                 ], $cats);
-                return [
-                    'ok' => false,
-                    'error' => 'Informe categoria_id válida.',
-                    'categorias' => $lista,
-                ];
+                // Rascunho com 1ª categoria ativa — o card Confirmar aparece; usuário revisa antes de gravar.
+                if (count($lista) === 1 || (count($lista) > 1 && empty($args['exigir_categoria']))) {
+                    $categoriaId = (int) ($lista[0]['id'] ?? 0);
+                }
+                if ($categoriaId <= 0 || !$this->ocorrenciaModel->categoriaExiste($categoriaId)) {
+                    return [
+                        'ok' => false,
+                        'aviso' => 'Escolha a categoria da ocorrência:',
+                        'candidatos_categorias' => $lista,
+                        'error' => 'Informe categoria_id válida.',
+                    ];
+                }
             }
         } else {
             $categoriaId = 0;
