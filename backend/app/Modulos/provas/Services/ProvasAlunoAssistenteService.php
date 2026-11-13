@@ -3172,6 +3172,9 @@ PROMPT
         if (preg_match('/^(?:quais|listar|buscar)\s+blocos?(?:\s+de\s+provas?)?\s+com\s+(.+?)\s+no\s+t[ií]tulo(?:\s+est[aã]o\s+cadastrados)?[?.!]*$/iu', $pedido, $m) === 1) {
             return ['tool' => 'buscar_blocos', 'args' => ['titulo' => trim($m[1], " \"'“”")]];
         }
+        if (preg_match('/^quais\s+diarios\s+estao\s+em\s+atraso[?.!]*$/u', $normalizado) === 1) {
+            return ['tool' => 'diario_pendencias', 'args' => ['situacao' => 'atraso']];
+        }
         return null;
     }
 

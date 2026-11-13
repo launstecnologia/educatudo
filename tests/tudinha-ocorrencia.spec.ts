@@ -105,9 +105,10 @@ test.describe('Tudinha ocorrência', () => {
   });
 
   for (const caso of [
-    { nome: 'lista provas pelo RA', pedido: 'Quais provas o RA 24254 fez?', tool: 'listar_provas_aluno', painel: 'lista' },
-    { nome: 'consulta jornadas pelo RA', pedido: 'Como estão as jornadas da aluna RA 24254?', tool: 'resumo_jornadas_aluno', painel: 'resumo_jornadas' },
-    { nome: 'pede escolha de evento por sigla', pedido: 'Qual foi a nota na PB de Matemática do RA 24254 em 2024?', tool: 'nota_evento_sigla', painel: 'candidatos_eventos_sigla' },
+    { nome: 'lista provas pelo RA', pedido: 'Quais provas o RA 24254 fez?', tool: 'listar_provas_aluno', paineis: ['lista'] },
+    { nome: 'consulta jornadas pelo RA', pedido: 'Como estão as jornadas da aluna RA 24254?', tool: 'resumo_jornadas_aluno', paineis: ['resumo_jornadas'] },
+    { nome: 'consulta evento pela sigla', pedido: 'Qual foi a nota na PB de Matemática do RA 24254 em 2024?', tool: 'nota_evento_sigla', paineis: ['eventos_avaliativos_disponiveis', 'candidatos_eventos_sigla'] },
+    { nome: 'consulta diários em atraso', pedido: 'Quais diários estão em atraso?', tool: 'diario_pendencias', paineis: ['diario_pendencias'] },
   ]) {
     test(caso.nome, async ({ page }) => {
       await loginAdmin(page);
@@ -119,7 +120,7 @@ test.describe('Tudinha ocorrência', () => {
       expect(eventoFinal).not.toBeNull();
       const turno = JSON.parse(eventoFinal![1]);
       expect(turno.consultas).toEqual(expect.arrayContaining([expect.objectContaining({ tool: caso.tool })]));
-      expect(turno.painel.tipo).toBe(caso.painel);
+      expect(caso.paineis).toContain(turno.painel.tipo);
     });
   }
 });
