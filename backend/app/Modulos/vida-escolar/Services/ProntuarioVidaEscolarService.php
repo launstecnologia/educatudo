@@ -2141,24 +2141,11 @@ class ProntuarioVidaEscolarService
 
     /**
      * Garante ficha por matrícula ativa (regular + curso extra), para abas no detalhe.
+     * Itinerário/extra também sincroniza notas geradas — sem isso a aba fica só com "—".
      */
     private function garantirFichasMatriculasAtivas(int $alunoId, VidaEscolarService $vida): void
     {
-        if ($alunoId <= 0 || !class_exists(\App\Dominio\Pessoas\Services\AlunoTurmaResolver::class)) {
-            return;
-        }
-        $resolver = new \App\Dominio\Pessoas\Services\AlunoTurmaResolver();
-        foreach ($resolver->listarMatriculasAtivas($alunoId) as $mat) {
-            if (!is_array($mat)) {
-                continue;
-            }
-            $turmaId = (int) ($mat['turma_id'] ?? 0);
-            $ano = (int) ($mat['ano_letivo_ano'] ?? 0);
-            if ($turmaId <= 0 || $ano <= 0) {
-                continue;
-            }
-            $vida->garantirFicha($alunoId, $turmaId, $ano);
-        }
+        $vida->garantirFichasMatriculasAtivas($alunoId);
     }
 
     /**

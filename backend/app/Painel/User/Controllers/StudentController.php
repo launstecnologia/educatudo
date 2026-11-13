@@ -1543,9 +1543,7 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
                 if (!is_array($ev)) {
                     continue;
                 }
-                if ($exibir === 'boletim' && strtolower(trim((string) ($ev['finalidade'] ?? 'oficial'))) === 'complementar') {
-                    continue;
-                }
+                // Complementar/itinerário também entra no portal (ficha + snapshot legado).
                 $lista[] = $ev;
             }
 
@@ -1581,6 +1579,19 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
             }
             $vida = new \App\Modulos\VidaEscolar\Services\VidaEscolarService();
             $model = $vida->model();
+            if ($model->schemaPronto()) {
+                try {
+                    $vida->materializarFichaOficialSeFaltar($alunoId);
+                } catch (\Throwable $e) {
+                    error_log('Portal boletim materializar aluno #' . $alunoId . ': ' . $e->getMessage());
+                }
+                try {
+                    // Regular + itinerário/extra: cria ficha e preenche se ainda estiver vazia.
+                    $vida->garantirFichasMatriculasAtivas($alunoId);
+                } catch (\Throwable $e) {
+                    error_log('Portal boletim fichas matrículas aluno #' . $alunoId . ': ' . $e->getMessage());
+                }
+            }
             $fichas = $model->schemaPronto() ? $model->listarFichasAluno($alunoId) : [];
             $fichaIdEscolhida = 0;
             if ($fichaId > 0) {

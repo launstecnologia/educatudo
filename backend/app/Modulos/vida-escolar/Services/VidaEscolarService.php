@@ -704,10 +704,16 @@ class VidaEscolarService
         );
         $linhas = $this->linhasUnicasDoQuadro($ficha, $linhas, $idsOcultos);
         $modelo = $this->modeloOficialDaFicha($ficha);
+        $finalidadeQuadro = (($modelo['finalidade'] ?? '') === 'complementar'
+            || $this->cursoTipoDaTurma((int) ($ficha['turma_id'] ?? 0)) === 'extra')
+            ? 'complementar'
+            : 'oficial';
         $coberturaBims = $this->mapaCoberturaBimestresGerados(
             (int) ($ficha['aluno_id'] ?? 0),
             (int) ($ficha['ano_letivo'] ?? 0),
-            (int) ($modelo['id'] ?? 0)
+            (int) ($modelo['id'] ?? 0),
+            0,
+            $finalidadeQuadro
         );
         $fichaCriadaTs = strtotime((string) ($ficha['created_at'] ?? '')) ?: 0;
         $grid = [];
@@ -1183,7 +1189,13 @@ class VidaEscolarService
         if (!$forcarEscrita) {
             $n += $this->limparBimsSemEventoNaFicha(
                 $linhas,
-                $this->mapaCoberturaBimestresGerados($alunoId, $ano, $modeloBoletimId, $boletimOficialTurmaId),
+                $this->mapaCoberturaBimestresGerados(
+                    $alunoId,
+                    $ano,
+                    $modeloBoletimId,
+                    $boletimOficialTurmaId,
+                    $finalidadeResultados
+                ),
                 $linhasTocadas,
                 $incluirReabertas,
                 false
@@ -3933,14 +3945,17 @@ class VidaEscolarService
         string $finalidade = 'oficial'
     ): bool {
         if ($boletimId <= 0) {
+            // Sem modelo na ficha: oficial ainda aceita legado; complementar precisa do id.
             return $finalidade !== 'complementar';
         }
         $rowBoletim = (int) ($row['boletim_id'] ?? 0);
         if ($rowBoletim === $boletimId) {
             return true;
         }
+        // Complementar já veio filtrado por finalidade no SQL.
+        // Legado pré-cadastro de boletins (boletim_id NULL) entra na ficha do modelo atual.
         if ($finalidade === 'complementar') {
-            return false;
+            return $rowBoletim <= 0;
         }
         if ($rowBoletim <= 0) {
             return true;
@@ -3949,6 +3964,81 @@ class VidaEscolarService
         return strtolower(trim((string) ($row['exibir_em'] ?? ''))) === 'boletim'
             && $boletimOficialTurmaId > 0
             && $rowBoletim === $boletimOficialTurmaId;
+    }
+
+    /**
+     * Copia notas geradas para a ficha se ela ainda estiver sem notas (oficial ou itinerário/extra).
+     *
+     * @param array<string,mixed> $usuario
+     * @return array{success:bool,atualizadas?:int,error?:string}
+     */
+    public function sincronizarFichaSeVazia(int $alunoId, int $fichaId, array $usuario = []): array
+    {
+        if ($alunoId <= 0 || $fichaId <= 0 || !$this->model->schemaPronto()) {
+            return ['success' => false, 'error' => 'Ficha inválida.'];
+        }
+        $ficha = $this->model->findFicha($fichaId);
+        if (!$ficha || (int) ($ficha['aluno_id'] ?? 0) !== $alunoId) {
+            return ['success' => false, 'error' => 'Ficha não encontrada para este aluno.'];
+        }
+        if (($ficha['status'] ?? '') === 'homologada') {
+            return ['success' => true, 'atualizadas' => 0];
+        }
+        if (!$this->fichaSemNotas($fichaId) && !$this->fichaSemFaltasNasNotas($fichaId)) {
+            return ['success' => true, 'atualizadas' => 0];
+        }
+
+        return $this->sincronizarDeEventosGerados(
+            $alunoId,
+            $usuario,
+            null,
+            null,
+            $fichaId,
+            false,
+            false
+        );
+    }
+
+    /**
+     * Cria ficha (e sincroniza se vazia) para cada matrícula ativa — regular e itinerário/extra.
+     */
+    public function garantirFichasMatriculasAtivas(int $alunoId, array $usuario = []): void
+    {
+        if ($alunoId <= 0 || !$this->model->schemaPronto()) {
+            return;
+        }
+        if (!class_exists(\App\Dominio\Pessoas\Services\AlunoTurmaResolver::class)) {
+            return;
+        }
+        $resolver = new \App\Dominio\Pessoas\Services\AlunoTurmaResolver();
+        foreach ($resolver->listarMatriculasAtivas($alunoId) as $mat) {
+            if (!is_array($mat)) {
+                continue;
+            }
+            $turmaId = (int) ($mat['turma_id'] ?? 0);
+            $ano = (int) ($mat['ano_letivo_ano'] ?? 0);
+            if ($turmaId <= 0 || $ano <= 0) {
+                continue;
+            }
+            $ok = $this->garantirFicha(
+                $alunoId,
+                $turmaId,
+                $ano,
+                isset($usuario['id']) ? (int) $usuario['id'] : null
+            );
+            $fichaId = (int) ($ok['id'] ?? 0);
+            if ($fichaId <= 0 || empty($ok['success'])) {
+                continue;
+            }
+            try {
+                $this->sincronizarFichaSeVazia($alunoId, $fichaId, $usuario);
+            } catch (\Throwable $e) {
+                error_log(
+                    'Vida escolar sync ficha #' . $fichaId
+                    . ' (matrícula ativa aluno #' . $alunoId . '): ' . $e->getMessage()
+                );
+            }
+        }
     }
 
     /**
@@ -3973,22 +4063,30 @@ class VidaEscolarService
     /**
      * Cobertura de bimestres gerados: por materia_id e por nome (group_line,
      * ex.: Língua Portuguesa com materia_id nulo no resultado).
+     * Itinerário/extra usa finalidade complementar — mapa só-oficial apagava as notas.
      *
+     * @param 'oficial'|'complementar' $finalidade
      * @return array{materias: array<int, array<int, true>>, nomes: array<string, array<int, true>>}
      */
-    private function mapaCoberturaBimestresGerados(int $alunoId, int $anoLetivo, int $boletimId = 0, int $boletimOficialTurmaId = 0): array
-    {
+    private function mapaCoberturaBimestresGerados(
+        int $alunoId,
+        int $anoLetivo,
+        int $boletimId = 0,
+        int $boletimOficialTurmaId = 0,
+        string $finalidade = 'oficial'
+    ): array {
         $materias = [];
         $nomes = [];
         if ($alunoId <= 0 || $anoLetivo <= 0) {
             return ['materias' => $materias, 'nomes' => $nomes];
         }
+        $finalidade = $finalidade === 'complementar' ? 'complementar' : 'oficial';
         $grupos = $this->gruposLinhaDoAluno($alunoId, $anoLetivo);
-        foreach ($this->model->listarResultadosGeradosOficiais($alunoId) as $row) {
+        foreach ($this->model->listarResultadosGeradosPorFinalidade($alunoId, $finalidade) as $row) {
             if (!$this->eventoPertenceAoAno($row, $anoLetivo)) {
                 continue;
             }
-            if (!$this->resultadoPertenceAoModelo($row, $boletimId, $boletimOficialTurmaId)) {
+            if (!$this->resultadoPertenceAoModelo($row, $boletimId, $boletimOficialTurmaId, $finalidade)) {
                 continue;
             }
             $bimsLinha = [];

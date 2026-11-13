@@ -817,9 +817,7 @@ class ParentController extends BaseController
                 if (!is_array($ev)) {
                     continue;
                 }
-                if ($exibir === 'boletim' && strtolower(trim((string) ($ev['finalidade'] ?? 'oficial'))) === 'complementar') {
-                    continue;
-                }
+                // Complementar/itinerário também entra no portal dos pais.
                 $lista[] = $ev;
             }
 
@@ -855,6 +853,18 @@ class ParentController extends BaseController
             }
             $vida = new \App\Modulos\VidaEscolar\Services\VidaEscolarService();
             $model = $vida->model();
+            if ($model->schemaPronto()) {
+                try {
+                    $vida->materializarFichaOficialSeFaltar($alunoId);
+                } catch (\Throwable $e) {
+                    error_log('Portal pais boletim materializar aluno #' . $alunoId . ': ' . $e->getMessage());
+                }
+                try {
+                    $vida->garantirFichasMatriculasAtivas($alunoId);
+                } catch (\Throwable $e) {
+                    error_log('Portal pais boletim fichas matrículas aluno #' . $alunoId . ': ' . $e->getMessage());
+                }
+            }
             $fichas = $model->schemaPronto() ? $model->listarFichasAluno($alunoId) : [];
             $fichaIdEscolhida = 0;
             if ($fichaId > 0) {
