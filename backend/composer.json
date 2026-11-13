@@ -75,6 +75,7 @@
             "App\\Modulos\\Arquivos\\": "app/Modulos/arquivos/",
             "App\\Modulos\\Presenca\\": "app/Modulos/presenca/",
             "App\\Modulos\\ExpoColag\\": "app/Modulos/expo-colag/",
+            "App\\Modulos\\GrupoSeb\\": "app/Modulos/grupo-seb/",
             "App\\Modulos\\EnacColag\\": "app/Modulos/enac-colag/",
             "App\\Modulos\\AgrupamentosComponentes\\": "app/Modulos/agrupamentos-componentes/",
             "App\\Modulos\\EducaHits\\": "app/Modulos/educahits/",

@@ -14,6 +14,7 @@ use App\Core\LayoutHelper;
 use App\Core\Logger;
 use App\Services\MediaStorageService;
 use App\Models\Education\OnlineClass;
+use App\Modulos\GrupoSeb\Services\GrupoSebService;
 use App\Services\SchoolCalendarService;
 use App\Services\StudentAgendaService;
 use App\Services\TudinhaService;
@@ -576,6 +577,68 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
         $primaryColor = LayoutHelper::get('primary_color', $this->config['school']['colors']['primary'] ?? '#3b82f6');
         $jornadasAtivasLayout = LayoutHelper::get('jornadas_ativas_layout', 'default');
         $onboardingCompletado = !empty($aluno['onboarding_completado']);
+
+        // Grupo Seb: dashboard enxuto (calendário escolar + aula do dia + mural)
+        if (GrupoSebService::estaAtivo()) {
+            $grupoSeb = new GrupoSebService($this->db);
+            $calendario = $grupoSeb->dadosCalendarioEscolar($turmaId);
+            $aulasDoDia = $grupoSeb->aulasDoDia($turmaId);
+            $muralRecados = array_slice($this->getMuralRecadosParaAluno($alunoId, $turmaId, false) ?: [], 0, 5);
+            $vistosMap = [];
+            if ($muralRecados !== []) {
+                $ids = array_values(array_filter(array_map(
+                    static fn($r) => (int) ($r['id'] ?? 0),
+                    $muralRecados
+                )));
+                if ($ids !== []) {
+                    $placeholders = [];
+                    $paramsVistos = ['aid' => $alunoId];
+                    foreach ($ids as $i => $rid) {
+                        $ph = 'rid' . $i;
+                        $placeholders[] = ':' . $ph;
+                        $paramsVistos[$ph] = $rid;
+                    }
+                    $vistosRows = $this->db->fetchAll(
+                        'SELECT mural_recado_id FROM mural_recados_vistos
+                         WHERE aluno_id = :aid AND mural_recado_id IN (' . implode(', ', $placeholders) . ')',
+                        $paramsVistos
+                    ) ?: [];
+                    foreach ($vistosRows as $vr) {
+                        $vistosMap[(int) ($vr['mural_recado_id'] ?? 0)] = true;
+                    }
+                }
+            }
+            foreach ($muralRecados as &$recadoSeb) {
+                $rid = (int) ($recadoSeb['id'] ?? 0);
+                $recadoSeb['ja_visto'] = $rid > 0 && !empty($vistosMap[$rid]);
+            }
+            unset($recadoSeb);
+            $muralNaoLidos = $this->countUnreadMuralRecadosForAluno($alunoId, $turmaId);
+
+            $this->viewWithLayout('student', 'student/grupo-seb/dashboard', [
+                'title' => 'Dashboard - EducaTudo',
+                'user' => $user,
+                'aluno' => $aluno,
+                'primary_color' => $primaryColor,
+                'current_page' => 'dashboard',
+                'csrf_token' => $this->generateCsrfToken(),
+                'turmas_cursos_select' => $turmasCursosSelect,
+                'aulas_do_dia' => $aulasDoDia,
+                'mural_recados' => $muralRecados,
+                'mural_recados_nao_lidos_count' => $muralNaoLidos,
+                'calendario_ano' => (int) ($calendario['ano'] ?? date('Y')),
+                'calendario_mes' => (int) ($calendario['mes'] ?? date('n')),
+                'calendario_eventos' => $calendario['eventos'] ?? [],
+                'calendario_tipo_labels' => $calendario['tipoLabels'] ?? [],
+                'calendario_tipo_bg' => $calendario['tipoBg'] ?? [],
+                'calendario_tipo_text' => $calendario['tipoText'] ?? [],
+                'calendario_nome' => (string) ($calendario['calendario_nome'] ?? ''),
+                'calendario_cor' => (string) ($calendario['calendario_cor'] ?? ''),
+                'calendario_cor_texto' => (string) ($calendario['calendario_cor_texto'] ?? ''),
+                'grupo_seb_ativo' => true,
+            ]);
+            return;
+        }
 
         $dashboardSliders = $this->medirDashboard('sliders', function () {
             return $this->parseDashboardSliders();
