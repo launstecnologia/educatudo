@@ -131,12 +131,12 @@ $diasSemanaLabel = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
              data-mes="<?= (int) $mes ?>"
              data-hoje="<?= htmlspecialchars($hoje) ?>"
              data-primary="<?= htmlspecialchars($primaryHex) ?>">
-        <div class="px-4 sm:px-5 py-3.5 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
-            <div class="min-w-0 flex items-center gap-2.5">
-                <span class="w-1 h-8 rounded-full flex-shrink-0" style="background:<?= htmlspecialchars($primaryHex) ?>"></span>
+        <div class="px-5 sm:px-6 py-5 sm:py-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
+            <div class="min-w-0 flex items-center gap-3">
+                <span class="w-1.5 h-10 rounded-full flex-shrink-0" style="background:<?= htmlspecialchars($primaryHex) ?>"></span>
                 <div>
-                    <h2 class="text-base sm:text-lg font-semibold text-gray-900">Calendário escolar</h2>
-                    <p class="text-xs text-gray-500 truncate">
+                    <h2 class="text-lg sm:text-xl font-semibold text-gray-900">Calendário escolar</h2>
+                    <p class="text-sm text-gray-500 mt-1 truncate">
                         <?php if (!empty($calendario_nome)): ?>
                             <?= htmlspecialchars((string) $calendario_nome) ?>
                         <?php else: ?>
@@ -148,7 +148,7 @@ $diasSemanaLabel = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
             <a href="<?= URL ?>/calendario-letivo" class="text-sm font-medium hover:underline whitespace-nowrap" style="color:<?= htmlspecialchars($primaryHex) ?>">Ver completo →</a>
         </div>
 
-        <div class="px-4 sm:px-5 py-3 flex flex-wrap items-center justify-between gap-2">
+        <div class="px-5 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2">
             <div class="flex items-center gap-1">
                 <button type="button" id="gs-cal-prev" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors" aria-label="Mês anterior">
                     <svg class="w-4 h-4" fill="none" stroke="#6b7280" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path></svg>
