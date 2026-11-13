@@ -64,6 +64,22 @@ class AssistenteAcaoPropostaService
     }
 
     /**
+     * Categorias ativas para chips do assistente (sem gravar proposta).
+     *
+     * @return list<array{id:int,nome:string}>
+     */
+    public function listarCategoriasOcorrencia(): array
+    {
+        if (!$this->ocorrenciaModel->schemaEstendido()) {
+            return [];
+        }
+        return array_map(static fn($c) => [
+            'id' => (int) $c['id'],
+            'nome' => (string) ($c['nome'] ?? ''),
+        ], $this->ocorrenciaModel->categorias(true));
+    }
+
+    /**
      * @param array<string,mixed> $args
      * @return array<string,mixed>
      */

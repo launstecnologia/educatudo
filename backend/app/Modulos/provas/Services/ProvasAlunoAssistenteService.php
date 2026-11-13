@@ -1737,13 +1737,19 @@ PROMPT
             $parts[] = 'Retome o pedido original: «' . mb_substr($pedidoAnterior, 0, 400) . '».';
         }
         if ($pedidoAnterior !== '' && $this->pedidoPareceRegistroEscrita($pedidoAnterior)) {
-            $toolHint = match ($acaoEscrita) {
-                'entrada_saida' => 'propor_entrada_saida',
-                'chamada_aula' => 'propor_chamada_aula',
-                default => 'propor_criar_ocorrencia',
-            };
-            $parts[] = 'Emita ' . $toolHint . ' com aluno_id=' . $alunoId
-                . ' e os demais dados do pedido (categoria/título/detalhe/data). Monte o rascunho com botão Confirmar.';
+            if ($acaoEscrita === 'criar_ocorrencia') {
+                $parts[] = 'Aluno definido. NÃO invente título/descrição. '
+                    . 'Se faltar categoria ou detalhe do fato, peça ao usuário (ou mostre categorias). '
+                    . 'Só emita propor_criar_ocorrencia quando houver categoria e descrição reais do ocorrido.';
+            } else {
+                $toolHint = match ($acaoEscrita) {
+                    'entrada_saida' => 'propor_entrada_saida',
+                    'chamada_aula' => 'propor_chamada_aula',
+                    default => 'propor_criar_ocorrencia',
+                };
+                $parts[] = 'Emita ' . $toolHint . ' com aluno_id=' . $alunoId
+                    . ' e os demais dados do pedido. Monte o rascunho com botão Confirmar.';
+            }
         } elseif ($evento !== null) {
             $argsHint = [];
             if (!empty($evento['sigla'])) {
@@ -3026,9 +3032,12 @@ PROMPT
             ];
         }
 
-        // Completa defaults da ocorrência para o card Confirmar aparecer.
+        // Completa ocorrência; sem categoria/descrição reais NÃO inventa rascunho vazio.
         if ($tipo === 'criar_ocorrencia') {
             $args = $this->completarArgsOcorrencia($args, $mensagemUsuario, $mensagens);
+            if (!$this->ocorrenciaProntaParaProposta($args)) {
+                return $this->pedirCamposOcorrencia($args, $mensagemUsuario, $mensagens, $onStatus);
+            }
         }
 
         $tool = match ($tipo) {
@@ -3256,10 +3265,21 @@ PROMPT
         $detalhe = trim((string) ($args['detalhe'] ?? $args['descricao'] ?? ''));
         $nivel = strtolower(trim((string) ($args['nivel_gravidade'] ?? $args['gravidade'] ?? '')));
 
-        if ($titulo === '' && !empty($ctx['ocorrencia_titulo'])) {
+        if ($titulo !== '' && !$this->textoOcorrenciaSignificativo($titulo)) {
+            $titulo = '';
+        }
+        if ($detalhe !== '' && !$this->textoOcorrenciaSignificativo($detalhe)) {
+            $detalhe = '';
+        }
+
+        if ($titulo === '' && !empty($ctx['ocorrencia_titulo'])
+            && $this->textoOcorrenciaSignificativo((string) $ctx['ocorrencia_titulo'])
+        ) {
             $titulo = (string) $ctx['ocorrencia_titulo'];
         }
-        if ($detalhe === '' && !empty($ctx['ocorrencia_detalhe'])) {
+        if ($detalhe === '' && !empty($ctx['ocorrencia_detalhe'])
+            && $this->textoOcorrenciaSignificativo((string) $ctx['ocorrencia_detalhe'])
+        ) {
             $detalhe = (string) $ctx['ocorrencia_detalhe'];
         }
 
@@ -3273,50 +3293,64 @@ PROMPT
             if ($c === '' || str_starts_with($c, '[')) {
                 continue;
             }
+            // Ignora chip de seleção de aluno e o pedido inicial só com nome.
+            if (preg_match('/aluno_id\s*=|usar\s+aluno_id/i', $c) === 1) {
+                continue;
+            }
             if ($this->pedidoPareceRegistroEscrita($c)
-                || preg_match('/(?:detalhe|descri[cç][aã]o|t[ií]tulo|categoria|ocorr)/iu', $c) === 1
+                || preg_match('/(?:detalhe|descri[cç][aã]o|t[ií]tulo|categoria)/iu', $c) === 1
+                || preg_match('/^(conversa|disciplina|atraso|bullying|uniforme|comportamento)\b/iu', $c) === 1
             ) {
                 $textoHist .= "\n" . $c;
             }
         }
 
         if ($titulo === '' && preg_match('/t[ií]tulo\s*[:\-]\s*([^\n;]+)/iu', $textoHist, $mT) === 1) {
-            $titulo = trim($mT[1]);
+            $cand = trim($mT[1]);
+            if ($this->textoOcorrenciaSignificativo($cand)) {
+                $titulo = $cand;
+            }
         }
         if ($detalhe === '' && preg_match('/(?:detalhe|descri[cç][aã]o)\s*[:\-]\s*([^\n;]+)/iu', $textoHist, $mD) === 1) {
-            $detalhe = trim($mD[1]);
+            $cand = trim($mD[1]);
+            if ($this->textoOcorrenciaSignificativo($cand)) {
+                $detalhe = $cand;
+            }
         }
         if ($nivel === '' && preg_match('/\b(leve|moderado|grave)\b/iu', $textoHist, $mN) === 1) {
             $nivel = strtolower($mN[1]);
         }
+        // Só pega motivo explícito: "ocorrência por conversa" / "ocorrência: conversa"
+        // NÃO captura "ocorrência para Ana Luiza".
         if ($titulo === '' && preg_match(
-            '/ocorr[eê]ncia(?:\s+(?:de|por|sobre))?\s*[:\-]?\s*([A-Za-zÀ-ÿ0-9][^.]{3,80})/iu',
+            '/ocorr[eê]ncia\s+(?:de|por|sobre|:\s*)\s*([A-Za-zÀ-ÿ0-9][^.]{2,80})/iu',
             $textoHist,
             $mOc
         ) === 1) {
-            $titulo = trim($mOc[1]);
-            $titulo = preg_replace('/\s+para\s+.+$/iu', '', $titulo) ?? $titulo;
-            $titulo = preg_replace('/\s+d[oa]\s+alun[oa]\s+.+$/iu', '', $titulo) ?? $titulo;
+            $cand = trim($mOc[1]);
+            $cand = preg_replace('/\s+para\s+.+$/iu', '', $cand) ?? $cand;
+            $cand = preg_replace('/\s+d[oa]\s+alun[oa]\s+.+$/iu', '', $cand) ?? $cand;
+            if ($this->textoOcorrenciaSignificativo($cand)) {
+                $titulo = $cand;
+            }
         }
         if ($titulo === '' && preg_match(
-            '/\b(?:por|sobre|motivo)\s+([A-Za-zÀ-ÿ0-9][^.]{3,80})/iu',
+            '/\b(?:por|sobre|motivo)\s+([A-Za-zÀ-ÿ0-9][^.]{2,80})/iu',
             $textoHist,
             $mMot
         ) === 1) {
-            $titulo = trim($mMot[1]);
-        }
-        if ($titulo === '') {
-            $titulo = 'Ocorrência via assistente';
-        }
-        if ($detalhe === '') {
-            $detalhe = $titulo;
+            $cand = trim($mMot[1]);
+            // "por Ana Luiza" não é motivo.
+            if ($this->textoOcorrenciaSignificativo($cand)
+                && preg_match('/^(?:a\s+|o\s+)?[A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+){0,3}$/u', $cand) !== 1
+            ) {
+                $titulo = $cand;
+            }
         }
         if ($nivel === '' || !in_array($nivel, ['leve', 'moderado', 'grave'], true)) {
             $nivel = 'leve';
         }
 
-        $args['titulo'] = mb_substr($titulo, 0, 120);
-        $args['detalhe'] = $detalhe;
         $args['nivel_gravidade'] = $nivel;
         $args['enviar_pais'] = !empty($args['enviar_pais'])
             || preg_match('/\b(notificar|avisar|enviar).{0,20}pais\b/iu', $textoHist) === 1;
@@ -3331,42 +3365,40 @@ PROMPT
         // Campo pedido pela Tudinha na mensagem anterior (categoria / detalhe).
         $campoPedido = $this->assistentePediuCampoOcorrencia($mensagens);
         $msgLimpa = trim($mensagemUsuario);
+        // Chip de aluno não é categoria/detalhe.
+        if (preg_match('/aluno_id\s*=|usar\s+aluno_id|^alun[oa]\b/i', $msgLimpa) === 1) {
+            $msgLimpa = '';
+        }
         if ($campoPedido === 'categoria' && $msgLimpa !== '') {
             $args['categoria'] = $msgLimpa;
-            if ($titulo === '' || $titulo === 'Ocorrência via assistente') {
+            if ($titulo === '' && $this->textoOcorrenciaSignificativo($msgLimpa)) {
                 $titulo = $msgLimpa;
-                $args['titulo'] = mb_substr($titulo, 0, 120);
             }
         }
         if ($campoPedido === 'detalhe' && $msgLimpa !== '') {
             $detalhe = $msgLimpa;
-            $args['detalhe'] = $detalhe;
         }
         if ($campoPedido === 'titulo' && $msgLimpa !== '') {
             $titulo = $msgLimpa;
-            $args['titulo'] = mb_substr($titulo, 0, 120);
         }
 
         // Categoria pelo nome (nunca peça categoria_id ao usuário).
         if (empty($args['categoria']) && empty($args['categoria_nome']) && empty($args['categoria_id'])) {
             if (preg_match('/categoria\s*[:\-]?\s*([A-Za-zÀ-ÿ0-9][\wÀ-ÿ\s]{1,80})/iu', $textoHist, $mCat) === 1) {
                 $args['categoria'] = trim($mCat[1]);
-            } elseif (preg_match('/^(conversa|disciplina|atraso|bullying|uniforme|comportamento)\b(.{0,60})$/iu', $msgLimpa, $mSo) === 1) {
-                // "Conversa" ou "Conversa na Sala de Aula"
+            } elseif ($msgLimpa !== ''
+                && preg_match('/^(conversa|disciplina|atraso|bullying|uniforme|comportamento)\b(.{0,60})$/iu', $msgLimpa, $mSo) === 1
+            ) {
                 $args['categoria'] = trim($mSo[0]);
-                if ($titulo === 'Ocorrência via assistente' || $titulo === '') {
-                    $args['titulo'] = mb_substr(trim($mSo[0]), 0, 120);
-                    if ($detalhe === '' || $detalhe === 'Ocorrência via assistente') {
-                        // Detalhe ainda pode vir na próxima mensagem.
-                        $args['detalhe'] = $args['titulo'];
-                    }
+                if ($titulo === '') {
+                    $titulo = trim($mSo[0]);
                 }
-            } elseif ($titulo !== '' && $titulo !== 'Ocorrência via assistente') {
+            } elseif ($titulo !== '' && $this->textoOcorrenciaSignificativo($titulo)) {
                 $args['categoria'] = $titulo;
             }
         }
 
-        // Recupera categoria digitada em turno anterior (mensagem curta após pedido).
+        // Recupera categoria digitada em turno anterior (só nomes tipicamente de categoria).
         if (empty($args['categoria']) && empty($args['categoria_nome'])) {
             foreach (array_reverse(array_slice($mensagens, -8)) as $msg) {
                 if (($msg['role'] ?? '') !== 'user') {
@@ -3376,23 +3408,149 @@ PROMPT
                 if ($c === '' || str_starts_with($c, '[') || $this->pedidoPareceRegistroEscrita($c)) {
                     continue;
                 }
-                if (preg_match('/^(conversa|disciplina|atraso|bullying|uniforme|comportamento)\b.{0,60}$/iu', $c) === 1
-                    || (mb_strlen($c) <= 60 && preg_match('/\b(boletim|nota|faltas?|grade|jornada|prova)\b/iu', $c) !== 1)
-                ) {
-                    // Só usa como categoria se o assistente tinha pedido categoria logo antes.
+                if (preg_match('/aluno_id\s*=|^alun[oa]\b|usar\s+aluno_id/i', $c) === 1) {
+                    continue;
+                }
+                if (preg_match('/^(conversa|disciplina|atraso|bullying|uniforme|comportamento)\b.{0,60}$/iu', $c) === 1) {
                     $args['categoria'] = $c;
+                    if ($titulo === '') {
+                        $titulo = $c;
+                    }
                     break;
                 }
             }
         }
 
-        $args['titulo'] = mb_substr(trim((string) ($args['titulo'] ?? $titulo)), 0, 120);
-        $args['detalhe'] = trim((string) ($args['detalhe'] ?? $detalhe));
-        if ($args['detalhe'] === '') {
+        // Se o usuário já mandou um detalhe longo (e a categoria veio antes), usa como descrição.
+        if ($detalhe === '' && $msgLimpa !== '' && $campoPedido === null
+            && mb_strlen($msgLimpa) >= 20
+            && preg_match('/^(conversa|disciplina|atraso|bullying|uniforme|comportamento)\b/iu', $msgLimpa) !== 1
+            && $this->textoOcorrenciaSignificativo($msgLimpa)
+        ) {
+            $detalhe = $msgLimpa;
+        }
+
+        $args['titulo'] = $titulo !== '' ? mb_substr($titulo, 0, 120) : '';
+        $args['detalhe'] = $detalhe;
+        // Só espelha titulo→detalhe quando o título é conteúdo real (não placeholder).
+        if ($args['detalhe'] === '' && $this->textoOcorrenciaSignificativo($args['titulo'])) {
             $args['detalhe'] = $args['titulo'];
         }
 
         return $args;
+    }
+
+    /** Título/descrição inventados a partir do pedido ("para Ana Luiza»") não contam. */
+    private function textoOcorrenciaSignificativo(string $texto): bool
+    {
+        $t = trim($texto);
+        if ($t === '' || mb_strlen($t) < 3) {
+            return false;
+        }
+        $n = mb_strtolower($this->semAcento($t));
+        $n = trim($n, " \t«»\"'.,;:");
+        if ($n === 'ocorrencia via assistente' || $n === 'ocorrencia') {
+            return false;
+        }
+        if (preg_match('/^(para|da|do|de)\s+/u', $n) === 1) {
+            return false;
+        }
+        if (preg_match('/aluno_id\s*=|usar\s+aluno_id|^alun[oa]\b/i', $t) === 1) {
+            return false;
+        }
+        if (preg_match('/retome o pedido original/iu', $t) === 1) {
+            return false;
+        }
+        return true;
+    }
+
+    /** @param array<string,mixed> $args */
+    private function ocorrenciaProntaParaProposta(array $args): bool
+    {
+        $titulo = trim((string) ($args['titulo'] ?? ''));
+        $detalhe = trim((string) ($args['detalhe'] ?? ''));
+        $cat = trim((string) ($args['categoria'] ?? $args['categoria_nome'] ?? ''));
+        if ((int) ($args['categoria_id'] ?? 0) > 0) {
+            $cat = 'ok';
+        }
+        // Precisa de categoria (ou título que sirva de categoria) + descrição real do fato.
+        $temCategoria = $cat !== '' || $this->textoOcorrenciaSignificativo($titulo);
+        $temDetalhe = $this->textoOcorrenciaSignificativo($detalhe)
+            && !($this->textoOcorrenciaSignificativo($titulo) && $detalhe === $titulo && mb_strlen($detalhe) < 20 && $cat !== '' && $detalhe === $cat);
+        // Se só tem categoria curta espelhada no detalhe, ainda falta a descrição do ocorrido.
+        if ($temCategoria && $cat !== '' && $detalhe !== '' && mb_strtolower($this->semAcento($detalhe)) === mb_strtolower($this->semAcento($cat)) && mb_strlen($detalhe) < 40) {
+            $temDetalhe = false;
+        }
+        return $temCategoria && $temDetalhe;
+    }
+
+    /**
+     * Aluno ok, mas faltam categoria e/ou descrição → chips ou pergunta (sem rascunho vazio).
+     *
+     * @param array<string,mixed> $args
+     * @param list<array{role?:string,content?:string}> $mensagens
+     * @param callable|null $onStatus
+     * @return array{tool?:?string,resultado?:?array,consulta?:array,texto?:string}
+     */
+    private function pedirCamposOcorrencia(array $args, string $mensagemUsuario, array $mensagens, $onStatus = null): array
+    {
+        $cat = trim((string) ($args['categoria'] ?? $args['categoria_nome'] ?? ''));
+        $detalhe = trim((string) ($args['detalhe'] ?? ''));
+        $temCat = $cat !== '' || (int) ($args['categoria_id'] ?? 0) > 0;
+        $temDetalhe = $this->textoOcorrenciaSignificativo($detalhe)
+            && !($temCat && mb_strtolower($this->semAcento($detalhe)) === mb_strtolower($this->semAcento($cat)));
+
+        $aluno = null;
+        if (!empty($args['aluno_id'])) {
+            $aluno = [
+                'id' => (int) $args['aluno_id'],
+                'nome' => trim((string) ($args['aluno_nome'] ?? '')),
+                'ra' => $args['ra'] ?? null,
+                'turma_nome' => $args['turma'] ?? null,
+            ];
+        }
+
+        if (!$temCat) {
+            if ($onStatus !== null) {
+                $onStatus('Buscando categorias…');
+            }
+            $lista = $this->acoes->listarCategoriasOcorrencia();
+            if ($lista !== []) {
+                return [
+                    'tool' => 'propor_criar_ocorrencia',
+                    'resultado' => [
+                        'ok' => false,
+                        'aviso' => 'Confirme a categoria da ocorrência (pelo nome):',
+                        'candidatos_categorias' => $lista,
+                        'aluno' => $aluno,
+                        'payload' => [
+                            'alunos' => !empty($args['aluno_id']) ? [[
+                                'id' => (int) $args['aluno_id'],
+                                'nome' => trim((string) ($args['aluno_nome'] ?? '')),
+                                'ra' => $args['ra'] ?? null,
+                                'turma_nome' => $args['turma'] ?? null,
+                            ]] : [],
+                            'turma' => trim((string) ($args['turma'] ?? '')),
+                        ],
+                    ],
+                    'texto' => 'Aluna confirmada. Escolha a **categoria** da ocorrência:',
+                ];
+            }
+            return [
+                'texto' => 'Aluna confirmada. Qual a **categoria** da ocorrência? (ex.: Conversa)',
+            ];
+        }
+
+        if (!$temDetalhe) {
+            return [
+                'texto' => 'Categoria **' . ($cat !== '' ? $cat : 'definida') . '**. '
+                    . 'Agora descreva o que aconteceu (detalhe da ocorrência).',
+            ];
+        }
+
+        return [
+            'texto' => 'Informe a categoria e a descrição do que aconteceu para montar a proposta.',
+        ];
     }
 
     /**
