@@ -75,6 +75,8 @@ $router->get('/logout', 'Auth/AuthController@logout');
 $router->get('/auth/entrar-como', 'Auth/AuthController@entrarComo');
 $router->get('/termos-de-uso', 'Auth/AuthController@termosDeUso');
 $router->get('/politica-privacidade', 'Auth/AuthController@politicaPrivacidade');
+$router->get('/politica-privacidade-app', 'Auth/AuthController@politicaPrivacidadeAppFamilia');
+$router->get('/app-familia/politica-privacidade', 'Auth/AuthController@politicaPrivacidadeAppFamilia');
 $router->get('/politica-retencao', 'Auth/AuthController@politicaRetencao');
 $router->get('/recuperar-senha', 'Auth/AuthController@recuperarSenha');
 $router->post('/enviar-recuperacao', 'Auth/AuthController@enviarRecuperacao');

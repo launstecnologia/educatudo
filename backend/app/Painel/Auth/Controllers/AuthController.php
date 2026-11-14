@@ -688,6 +688,24 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
     }
 
     /**
+     * Política de privacidade do app família (Play Store / App Store).
+     * Preferir o HTML estático em /legal/politica-privacidade-app.html quando possível.
+     */
+    public function politicaPrivacidadeAppFamilia()
+    {
+        $static = dirname(__DIR__, 4) . '/public/legal/politica-privacidade-app.html';
+        if (is_file($static)) {
+            header('Content-Type: text/html; charset=UTF-8');
+            readfile($static);
+            exit;
+        }
+
+        $this->view('legal/privacy', [
+            'title' => 'Política de Privacidade — Escola Educa (App Família)'
+        ]);
+    }
+
+    /**
      * Política de retenção (página pública)
      */
     public function politicaRetencao()
