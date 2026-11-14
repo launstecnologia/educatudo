@@ -4,6 +4,8 @@ namespace App\API\Controllers\V1;
 
 use App\Core\BaseController;
 use App\Core\Database;
+use App\Dominio\Pessoas\Services\ResponsavelFotoService;
+use App\Helpers\AvatarUrlHelper;
 use App\Services\JWTService;
 use App\Middleware\MobileApiAuthMiddleware;
 
@@ -46,8 +48,9 @@ class MobileAuthController extends BaseController
         $formattedCpf = substr($cpf, 0, 3) . '.' . substr($cpf, 3, 3) . '.'
             . substr($cpf, 6, 3) . '-' . substr($cpf, 9, 2);
 
+        $fotoSelect = (new ResponsavelFotoService($this->db))->temColunaFoto() ? ', foto_url' : '';
         $parents = $this->db->fetchAll(
-            "SELECT id, nome, email, cpf, telefone, senha_hash, force_password_change
+            "SELECT id, nome, email, cpf, telefone, senha_hash, force_password_change{$fotoSelect}
              FROM responsaveis
              WHERE (cpf = :cpf_digits OR cpf = :cpf_formatted)
                AND ativo = 1
@@ -154,12 +157,18 @@ class MobileAuthController extends BaseController
 
     private function serializeParent(array $parent): array
     {
+        $photoUrl = null;
+        if (!empty($parent['foto_url'])) {
+            $photoUrl = AvatarUrlHelper::normalizeAdminAvatarUrl((string) $parent['foto_url']);
+        }
+
         return [
             'id' => (int) $parent['id'],
             'name' => (string) $parent['nome'],
             'email' => $parent['email'] !== null ? (string) $parent['email'] : null,
             'cpf' => preg_replace('/\D+/', '', (string) ($parent['cpf'] ?? '')),
             'phone' => $parent['telefone'] !== null ? (string) $parent['telefone'] : null,
+            'photo_url' => $photoUrl,
             'must_change_password' => !empty($parent['force_password_change']),
         ];
     }

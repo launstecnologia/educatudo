@@ -29,6 +29,63 @@ class MobileAcademicController extends BaseController
     public function reportCard($id): void { $this->respond($id, 'reportCard', true); }
     public function occurrences($id): void { $this->respond($id, 'occurrences', true); }
 
+    public function classFiles($id): void
+    {
+        $studentId = $this->authorizedStudentId($id);
+        $data = $this->service->classFiles($studentId);
+        $this->json(['data' => $data, 'meta' => ['count' => count($data)]]);
+    }
+
+    public function classFile($id, $fileId): void
+    {
+        $studentId = $this->authorizedStudentId($id);
+        $validated = filter_var($fileId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($validated === false) {
+            $this->notFound('class_file_not_found', 'Arquivo não encontrado.');
+        }
+        $data = $this->service->classFile($studentId, (int) $validated);
+        if ($data === null) {
+            $this->notFound('class_file_not_found', 'Arquivo não encontrado.');
+        }
+        $this->json(['data' => $data]);
+    }
+
+    public function classFileAttachment($id, $attachmentId): void
+    {
+        $studentId = $this->authorizedStudentId($id);
+        $validated = filter_var($attachmentId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($validated === false) {
+            $this->notFound('attachment_not_found', 'Anexo não encontrado.');
+        }
+        $student = \App\Core\Database::getInstance()->fetch(
+            'SELECT turma_id FROM alunos WHERE id = :id',
+            ['id' => $studentId]
+        );
+        $turmaId = (int) ($student['turma_id'] ?? 0);
+        if ($turmaId <= 0 || !\App\Core\LayoutHelper::isModuleEnabled('aluno_arquivos')) {
+            $this->notFound('attachment_not_found', 'Anexo não encontrado.');
+        }
+        try {
+            $service = new \App\Modulos\Arquivos\Services\ArquivosService();
+            $anexo = $service->anexos()->findById((int) $validated);
+            if (
+                !$anexo
+                || !$service->arquivos()->alunoPodeVer(
+                    (int) ($anexo['modulo_arquivo_id'] ?? 0),
+                    $turmaId,
+                    $studentId
+                )
+            ) {
+                $this->notFound('attachment_not_found', 'Anexo não encontrado.');
+            }
+            $download = (!empty($_GET['download']) && (string) $_GET['download'] === '1');
+            $service->enviarAnexoAoNavegador($anexo, $this->config, $download);
+        } catch (\Throwable $e) {
+            $this->notFound('attachment_not_found', 'Anexo não encontrado.');
+        }
+        exit;
+    }
+
     public function studentCard($id): void
     {
         $studentId = $this->authorizedStudentId($id);

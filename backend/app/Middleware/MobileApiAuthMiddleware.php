@@ -55,8 +55,11 @@ class MobileApiAuthMiddleware
             $this->unauthorized('invalid_token', 'Token inválido.');
         }
 
+        $fotoSelect = (new \App\Dominio\Pessoas\Services\ResponsavelFotoService())->temColunaFoto()
+            ? ', r.foto_url'
+            : '';
         $parent = Database::getInstance()->fetch(
-            "SELECT r.id, r.nome, r.email, r.cpf, r.telefone, r.force_password_change
+            "SELECT r.id, r.nome, r.email, r.cpf, r.telefone, r.force_password_change{$fotoSelect}
              FROM responsaveis r INNER JOIN mobile_auth_sessions s ON s.parent_id = r.id
              WHERE r.id = :id AND r.ativo = 1 AND s.id = :session_id
                AND s.revoked_at IS NULL AND s.expires_at > NOW() LIMIT 1",

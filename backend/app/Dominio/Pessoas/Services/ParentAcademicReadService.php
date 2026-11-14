@@ -146,6 +146,7 @@ class ParentAcademicReadService
             return [];
         }
 
+        $diasPorChave = $this->absenceDaysFromDiary($studentId);
         $series = [];
         foreach ($rows as $row) {
             if (!is_array($row)) {
@@ -168,6 +169,7 @@ class ParentAcademicReadService
                     'subject_name' => $nomeMateria,
                     'absences' => 0.0,
                     'periods' => [],
+                    '_materia_id' => $materiaId,
                 ];
             }
             $ano = (int) ($row['ano_letivo'] ?? 0);
@@ -190,6 +192,11 @@ class ParentAcademicReadService
                 'label' => $rotulo,
                 'event_name' => $evento,
                 'absences' => $faltas,
+                'days' => $this->daysForPeriod(
+                    $diasPorChave[$chave] ?? [],
+                    $ano,
+                    $periodo
+                ),
             ];
             if ($nota !== '') {
                 $item['note'] = $nota;
@@ -198,12 +205,131 @@ class ParentAcademicReadService
             $series[$chave]['absences'] = round((float) $series[$chave]['absences'] + $faltas, 2);
         }
 
-        $lista = array_values($series);
+        $lista = [];
+        foreach ($series as $item) {
+            unset($item['_materia_id']);
+            $lista[] = $item;
+        }
         usort($lista, static function (array $a, array $b): int {
             return strcasecmp((string) $a['subject_name'], (string) $b['subject_name']);
         });
 
         return $lista;
+    }
+
+    /**
+     * Dias de falta do diário, indexados por chave de matéria (m{id}|geral).
+     *
+     * @return array<string, list<array{date:string,situation:string,note?:string,year:int,term:int}>>
+     */
+    private function absenceDaysFromDiary(int $studentId): array
+    {
+        if ($studentId <= 0
+            || !$this->db->tableExists('diario_frequencias')
+            || !$this->db->tableExists('diario_aulas')) {
+            return [];
+        }
+
+        $rows = $this->db->fetchAll(
+            'SELECT da.materia_id,
+                    da.data_aula,
+                    df.situacao,
+                    df.observacao
+               FROM diario_frequencias df
+               INNER JOIN diario_aulas da ON da.id = df.diario_aula_id
+              WHERE df.aluno_id = :aluno
+                AND df.situacao IN (\'falta\', \'falta_justificada\')
+                AND da.status <> \'cancelada\'
+              ORDER BY da.data_aula DESC',
+            ['aluno' => $studentId]
+        );
+        if (!is_array($rows) || $rows === []) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $data = trim((string) ($row['data_aula'] ?? ''));
+            if ($data === '' || !preg_match('/^\d{4}-\d{2}-\d{2}/', $data)) {
+                continue;
+            }
+            $data = substr($data, 0, 10);
+            $ano = (int) substr($data, 0, 4);
+            $materiaId = (int) ($row['materia_id'] ?? 0);
+            $chave = $materiaId > 0 ? 'm' . $materiaId : 'geral';
+            $termo = 0;
+            try {
+                $termo = (int) \App\Core\PeriodoLetivo::numeroDaData($ano, $data);
+            } catch (\Throwable $e) {
+                $termo = 0;
+            }
+            $item = [
+                'date' => $data,
+                'situation' => (string) ($row['situacao'] ?? 'falta'),
+                'year' => $ano,
+                'term' => $termo,
+            ];
+            $nota = trim((string) ($row['observacao'] ?? ''));
+            if ($nota !== '') {
+                $item['note'] = $nota;
+            }
+            $out[$chave][] = $item;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<array{date:string,situation:string,note?:string,year:int,term:int}> $days
+     * @return list<array{date:string,situation:string,note?:string}>
+     */
+    private function daysForPeriod(array $days, int $year, int $term): array
+    {
+        $inicio = null;
+        $fim = null;
+        if ($year > 0 && $term > 0) {
+            try {
+                $intervalo = \App\Core\PeriodoLetivo::intervalo($year, $term);
+                $inicio = (string) ($intervalo['inicio'] ?? '');
+                $fim = (string) ($intervalo['fim'] ?? '');
+            } catch (\Throwable $e) {
+                $inicio = null;
+                $fim = null;
+            }
+        }
+
+        $filtered = [];
+        foreach ($days as $day) {
+            $data = (string) ($day['date'] ?? '');
+            if ($data === '') {
+                continue;
+            }
+            if ($inicio !== null && $inicio !== '' && $fim !== null && $fim !== '') {
+                if ($data < $inicio || $data > $fim) {
+                    continue;
+                }
+            } else {
+                if ($year > 0 && (int) ($day['year'] ?? 0) !== $year) {
+                    continue;
+                }
+                if ($term > 0 && (int) ($day['term'] ?? 0) !== $term) {
+                    continue;
+                }
+            }
+            $item = [
+                'date' => $data,
+                'situation' => (string) ($day['situation'] ?? 'falta'),
+            ];
+            if (!empty($day['note'])) {
+                $item['note'] = (string) $day['note'];
+            }
+            $filtered[] = $item;
+        }
+
+        return $filtered;
     }
 
     /**
@@ -317,6 +443,154 @@ class ParentAcademicReadService
         }
 
         return $items;
+    }
+
+    /**
+     * Materiais do módulo Arquivos (professor → aluno), visíveis ao responsável.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function classFiles(int $studentId): array
+    {
+        if ($studentId <= 0
+            || !\App\Core\LayoutHelper::isModuleEnabled('aluno_arquivos')
+            || !$this->db->tableExists('modulos_arquivos')) {
+            return [];
+        }
+        $student = $this->db->fetch(
+            'SELECT turma_id FROM alunos WHERE id = :id',
+            ['id' => $studentId]
+        );
+        $turmaId = (int) ($student['turma_id'] ?? 0);
+        if ($turmaId <= 0) {
+            return [];
+        }
+
+        try {
+            $model = new \App\Modulos\Arquivos\Models\ModuloArquivo();
+            $ativo = $model->sqlFiltroAtivo('ma');
+            $visivel = \App\Modulos\Arquivos\Models\ModuloArquivo::sqlVisibilidadeAluno();
+            $temRecuperacao = $this->hasColumn('modulos_arquivos', 'recuperacao');
+            $extraRecuperacao = $temRecuperacao
+                ? ' AND (ma.recuperacao = 0 OR ma.recuperacao IS NULL)'
+                : '';
+            $rows = $this->db->fetchAll(
+                'SELECT ma.id, ma.titulo, ma.descricao, ma.created_at,
+                        m.nome AS materia_nome, p.nome AS professor_nome,
+                        (SELECT COUNT(*) FROM modulos_arquivos_anexos a
+                          WHERE a.modulo_arquivo_id = ma.id) AS total_anexos
+                   FROM modulos_arquivos ma
+                   LEFT JOIN materias m ON m.id = ma.materia_id
+                   LEFT JOIN professores p ON p.id = ma.professor_id
+                  WHERE ' . $ativo . '
+                    AND ' . $visivel . $extraRecuperacao . '
+                  ORDER BY ma.created_at DESC, ma.id DESC
+                  LIMIT 100',
+                [
+                    'turma_id' => $turmaId,
+                    'turma_id2' => $turmaId,
+                    'aluno_id' => $studentId,
+                ]
+            );
+        } catch (\Throwable $e) {
+            return [];
+        }
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        $lista = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $lista[] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'title' => (string) ($row['titulo'] ?? 'Arquivo'),
+                'description' => trim((string) ($row['descricao'] ?? '')),
+                'subject_name' => trim((string) ($row['materia_nome'] ?? '')),
+                'teacher_name' => trim((string) ($row['professor_nome'] ?? '')),
+                'attachments_count' => (int) ($row['total_anexos'] ?? 0),
+                'created_at' => $this->isoDate($row['created_at'] ?? null),
+            ];
+        }
+
+        return $lista;
+    }
+
+    /**
+     * Detalhe de um material do módulo Arquivos.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function classFile(int $studentId, int $fileId): ?array
+    {
+        if ($studentId <= 0
+            || $fileId <= 0
+            || !\App\Core\LayoutHelper::isModuleEnabled('aluno_arquivos')
+            || !$this->db->tableExists('modulos_arquivos')) {
+            return null;
+        }
+        $student = $this->db->fetch(
+            'SELECT turma_id FROM alunos WHERE id = :id',
+            ['id' => $studentId]
+        );
+        $turmaId = (int) ($student['turma_id'] ?? 0);
+        if ($turmaId <= 0) {
+            return null;
+        }
+
+        try {
+            $service = new \App\Modulos\Arquivos\Services\ArquivosService();
+            $pub = $service->arquivos()->findVisivelParaAluno($fileId, $turmaId, $studentId);
+            if (!$pub) {
+                return null;
+            }
+            $anexos = $service->anexos()->listByModuloArquivo($fileId);
+            $videos = $service->videosComEmbed($fileId);
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        $attachments = [];
+        foreach ($anexos as $anexo) {
+            if (!is_array($anexo)) {
+                continue;
+            }
+            $ext = strtolower(trim((string) ($anexo['extensao'] ?? '')));
+            $attachments[] = [
+                'id' => (int) ($anexo['id'] ?? 0),
+                'name' => (string) ($anexo['nome_original'] ?? 'Anexo'),
+                'extension' => $ext,
+                'size' => isset($anexo['tamanho']) ? (int) $anexo['tamanho'] : null,
+            ];
+        }
+        $videoItems = [];
+        foreach ($videos as $video) {
+            if (!is_array($video)) {
+                continue;
+            }
+            $url = trim((string) ($video['url'] ?? $video['embed_url'] ?? ''));
+            if ($url === '') {
+                continue;
+            }
+            $videoItems[] = [
+                'id' => (int) ($video['id'] ?? 0),
+                'title' => (string) ($video['titulo'] ?? 'Vídeo'),
+                'url' => $url,
+            ];
+        }
+
+        return [
+            'id' => (int) ($pub['id'] ?? 0),
+            'title' => (string) ($pub['titulo'] ?? 'Arquivo'),
+            'description' => trim((string) ($pub['descricao'] ?? '')),
+            'subject_name' => trim((string) ($pub['materia_nome'] ?? '')),
+            'teacher_name' => trim((string) ($pub['professor_nome'] ?? '')),
+            'created_at' => $this->isoDate($pub['created_at'] ?? null),
+            'attachments' => $attachments,
+            'videos' => $videoItems,
+        ];
     }
 
     public function reportCard(int $studentId): array
@@ -1029,6 +1303,18 @@ class ParentAcademicReadService
         $minima = (float) ($layout['media_minima'] ?? 6);
         $formula = (string) ($layout['formula_final_media'] ?? '');
         $layoutCalc = new \App\Modulos\EventosAvaliativos\Models\BoletimLayout();
+        $materiaIds = [];
+        foreach ($grid as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $linha = is_array($row['linha'] ?? null) ? $row['linha'] : [];
+            $materiaId = (int) ($linha['materia_id'] ?? 0);
+            if ($materiaId > 0) {
+                $materiaIds[$materiaId] = true;
+            }
+        }
+        $siglas = $this->siglasPorMateria(array_keys($materiaIds));
         $subjects = [];
         foreach ($grid as $row) {
             if (!is_array($row)) {
@@ -1039,6 +1325,11 @@ class ParentAcademicReadService
             $nome = trim((string) ($linha['componente_nome'] ?? ''));
             if ($nome === '') {
                 $nome = 'Componente';
+            }
+            $materiaId = (int) ($linha['materia_id'] ?? 0);
+            $sigla = trim((string) ($siglas[$materiaId] ?? ''));
+            if ($sigla === '') {
+                $sigla = $this->siglaCurtaDoNome($nome);
             }
             $medias = [];
             $faltas = [];
@@ -1085,6 +1376,7 @@ class ParentAcademicReadService
                 $grades[(string) $coluna['codigo']] = $valor;
             }
             $subjects[] = [
+                'subject' => $sigla,
                 'subject_name' => $nome,
                 'grades' => $grades,
             ];
@@ -1107,6 +1399,92 @@ class ParentAcademicReadService
             'columns' => $publicColumns,
             'subjects' => $subjects,
         ];
+    }
+
+    /**
+     * @param list<int> $materiaIds
+     * @return array<int, string>
+     */
+    private function siglasPorMateria(array $materiaIds): array
+    {
+        $ids = [];
+        foreach ($materiaIds as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $ids[$id] = $id;
+            }
+        }
+        if ($ids === [] || !$this->db->tableExists('materias')) {
+            return [];
+        }
+        $siglaSql = $this->sqlSiglaMateria();
+        if ($siglaSql === 'NULL') {
+            return [];
+        }
+        $params = [];
+        $placeholders = [];
+        $i = 0;
+        foreach ($ids as $id) {
+            $key = 'm' . $i;
+            $placeholders[] = ':' . $key;
+            $params[$key] = $id;
+            $i++;
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT m.id, ' . $siglaSql . ' AS sigla
+               FROM materias m
+              WHERE m.id IN (' . implode(',', $placeholders) . ')',
+            $params
+        );
+        $out = [];
+        if (!is_array($rows)) {
+            return [];
+        }
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $id = (int) ($row['id'] ?? 0);
+            $sigla = trim((string) ($row['sigla'] ?? ''));
+            if ($id > 0 && $sigla !== '') {
+                $out[$id] = $sigla;
+            }
+        }
+
+        return $out;
+    }
+
+    private function siglaCurtaDoNome(string $nome): string
+    {
+        $nome = trim($nome);
+        if ($nome === '') {
+            return 'MAT';
+        }
+        $partes = preg_split('/\s+/u', $nome) ?: [];
+        $sigla = '';
+        foreach ($partes as $parte) {
+            $parte = trim((string) $parte);
+            if ($parte === '') {
+                continue;
+            }
+            $letra = function_exists('mb_substr')
+                ? mb_substr($parte, 0, 1, 'UTF-8')
+                : substr($parte, 0, 1);
+            $sigla .= $letra;
+            if (function_exists('mb_strlen') ? mb_strlen($sigla, 'UTF-8') >= 4 : strlen($sigla) >= 4) {
+                break;
+            }
+        }
+        if ($sigla === '') {
+            $sigla = function_exists('mb_substr')
+                ? mb_substr($nome, 0, 3, 'UTF-8')
+                : substr($nome, 0, 3);
+        }
+        $sigla = function_exists('mb_strtoupper')
+            ? mb_strtoupper($sigla, 'UTF-8')
+            : strtoupper($sigla);
+
+        return $sigla !== '' ? $sigla : 'MAT';
     }
 
     /**

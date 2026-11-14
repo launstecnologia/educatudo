@@ -6,16 +6,19 @@ require_once __DIR__ . '/../../../Policies/ParentStudentAccessPolicy.php';
 use App\Helpers\AvatarUrlHelper;
 use App\Core\BaseController;
 use App\Core\Database;
+use App\Dominio\Pessoas\Services\ResponsavelFotoService;
 use App\Middleware\MobileApiAuthMiddleware;
 
 class MobileParentController extends BaseController
 {
     private $db;
+    private ResponsavelFotoService $fotoService;
 
     public function __construct()
     {
         parent::__construct();
         $this->db = Database::getInstance();
+        $this->fotoService = new ResponsavelFotoService($this->db, $this->config);
     }
 
     public function me(): void
@@ -24,6 +27,31 @@ class MobileParentController extends BaseController
         if (!is_array($parent)) {
             $this->json(['error' => ['code' => 'unauthorized', 'message' => 'Não autorizado.']], 401);
         }
+
+        $this->json(['data' => $this->serializeParent($parent)]);
+    }
+
+    public function updatePhoto(): void
+    {
+        $parentId = (int) MobileApiAuthMiddleware::$parentId;
+        if ($parentId <= 0) {
+            $this->json(['error' => ['code' => 'unauthorized', 'message' => 'Não autorizado.']], 401);
+        }
+
+        $file = $_FILES['foto'] ?? $_FILES['photo'] ?? $_FILES['avatar'] ?? [];
+        try {
+            $salvo = $this->fotoService->salvar($parentId, is_array($file) ? $file : []);
+        } catch (\InvalidArgumentException $e) {
+            $this->json(['error' => ['code' => 'invalid_file', 'message' => $e->getMessage()]], 422);
+            return;
+        } catch (\RuntimeException $e) {
+            $this->json(['error' => ['code' => 'upload_unavailable', 'message' => $e->getMessage()]], 503);
+            return;
+        }
+
+        $parent = is_array(MobileApiAuthMiddleware::$parent) ? MobileApiAuthMiddleware::$parent : ['id' => $parentId];
+        $parent['foto_url'] = $salvo['foto_url'];
+        MobileApiAuthMiddleware::$parent = $parent;
 
         $this->json(['data' => $this->serializeParent($parent)]);
     }
@@ -55,12 +83,26 @@ class MobileParentController extends BaseController
 
     private function serializeParent(array $parent): array
     {
+        $fotoUrl = $parent['foto_url'] ?? null;
+        if (($fotoUrl === null || $fotoUrl === '') && $this->fotoService->temColunaFoto() && !empty($parent['id'])) {
+            try {
+                $row = $this->db->fetch(
+                    'SELECT foto_url FROM responsaveis WHERE id = :id LIMIT 1',
+                    ['id' => (int) $parent['id']]
+                );
+                $fotoUrl = $row['foto_url'] ?? null;
+            } catch (\Throwable $e) {
+                $fotoUrl = null;
+            }
+        }
+
         return [
             'id' => (int) $parent['id'],
             'name' => (string) $parent['nome'],
             'email' => $parent['email'] !== null ? (string) $parent['email'] : null,
             'cpf' => preg_replace('/\D+/', '', (string) ($parent['cpf'] ?? '')),
             'phone' => $parent['telefone'] !== null ? (string) $parent['telefone'] : null,
+            'photo_url' => $this->fotoService->urlNormalizada($fotoUrl !== null ? (string) $fotoUrl : null),
             'must_change_password' => !empty($parent['force_password_change']),
         ];
     }

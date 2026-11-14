@@ -33,6 +33,7 @@ $router->post('/api/autenticacao/renovar', 'Api/V1/MobileAuthController@refresh'
 
 $router->middleware('MobileApiAuth', function ($router) {
     $router->get('/api/v1/me', 'Api/V1/MobileParentController@me');
+    $router->post('/api/v1/me/photo', 'Api/V1/MobileParentController@updatePhoto');
     $router->get('/api/v1/students', 'Api/V1/MobileParentController@students');
     $router->get('/api/v1/students/{id}/dashboard', 'Api/V1/MobileAcademicController@dashboard');
     $router->get('/api/v1/students/{id}/exams', 'Api/V1/MobileAcademicController@exams');
@@ -45,6 +46,9 @@ $router->middleware('MobileApiAuth', function ($router) {
     $router->get('/api/v1/students/{id}/writing-journeys', 'Api/V1/MobileAcademicController@writingJourneys');
     $router->get('/api/v1/students/{id}/essays', 'Api/V1/MobileAcademicController@essays');
     $router->get('/api/v1/students/{id}/notices', 'Api/V1/MobileAcademicController@notices');
+    $router->get('/api/v1/students/{id}/class-files', 'Api/V1/MobileAcademicController@classFiles');
+    $router->get('/api/v1/students/{id}/class-files/attachments/{attachmentId}', 'Api/V1/MobileAcademicController@classFileAttachment');
+    $router->get('/api/v1/students/{id}/class-files/{fileId}', 'Api/V1/MobileAcademicController@classFile');
     $router->get('/api/v1/students/{id}/report-card', 'Api/V1/MobileAcademicController@reportCard');
     $router->get('/api/v1/students/{id}/occurrences', 'Api/V1/MobileAcademicController@occurrences');
     $router->get('/api/v1/students/{id}/student-card', 'Api/V1/MobileAcademicController@studentCard');
@@ -73,6 +77,7 @@ $router->middleware('MobileApiAuth', function ($router) {
 
     $router->post('/api/autenticacao/sair', 'Api/V1/MobileAuthController@logout');
     $router->get('/api/eu', 'Api/V1/MobileParentController@me');
+    $router->post('/api/eu/foto', 'Api/V1/MobileParentController@updatePhoto');
     $router->get('/api/alunos', 'Api/V1/MobileParentController@students');
     $router->get('/api/alunos/{id}/painel', 'Api/V1/MobileAcademicController@dashboard');
     $router->get('/api/alunos/{id}/provas', 'Api/V1/MobileAcademicController@exams');
@@ -85,6 +90,9 @@ $router->middleware('MobileApiAuth', function ($router) {
     $router->get('/api/alunos/{id}/jornadas-de-redacao', 'Api/V1/MobileAcademicController@writingJourneys');
     $router->get('/api/alunos/{id}/redacoes', 'Api/V1/MobileAcademicController@essays');
     $router->get('/api/alunos/{id}/avisos', 'Api/V1/MobileAcademicController@notices');
+    $router->get('/api/alunos/{id}/arquivos-turma', 'Api/V1/MobileAcademicController@classFiles');
+    $router->get('/api/alunos/{id}/arquivos-turma/anexos/{attachmentId}', 'Api/V1/MobileAcademicController@classFileAttachment');
+    $router->get('/api/alunos/{id}/arquivos-turma/{fileId}', 'Api/V1/MobileAcademicController@classFile');
     $router->get('/api/alunos/{id}/boletim', 'Api/V1/MobileAcademicController@reportCard');
     $router->get('/api/alunos/{id}/ocorrencias', 'Api/V1/MobileAcademicController@occurrences');
     $router->get('/api/alunos/{id}/carteirinha', 'Api/V1/MobileAcademicController@studentCard');
