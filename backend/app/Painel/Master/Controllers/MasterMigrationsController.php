@@ -264,6 +264,157 @@ class MasterMigrationsController extends BaseController
     }
 
     /**
+     * Executa migrations selecionadas em todas as escolas ativas ou só nas escolhidas.
+     * POST: migrations[] (arquivos), escopo=todas|selecionadas, escola_ids[] (se escopo=selecionadas)
+     */
+    public function executarSelecionadasEmEscolas()
+    {
+        $this->requireMaster();
+        header('Content-Type: application/json; charset=utf-8');
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            echo json_encode(['success' => false, 'error' => 'Token CSRF inválido. Recarregue a página.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $this->exigirConfirmacaoAcao();
+
+        $migrations = isset($_POST['migrations']) && is_array($_POST['migrations'])
+            ? array_values(array_filter(array_map('trim', $_POST['migrations'])))
+            : [];
+        if (empty($migrations)) {
+            echo json_encode(['success' => false, 'error' => 'Selecione ao menos uma migration'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $migrationFiles = $this->getMigrationFiles();
+        $validSet = array_flip($migrationFiles);
+        $selected = array_values(array_filter($migrations, static function ($f) use ($validSet) {
+            return isset($validSet[$f]);
+        }));
+        if (empty($selected)) {
+            echo json_encode(['success' => false, 'error' => 'Nenhuma migration válida selecionada'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $escopo = (string) ($_POST['escopo'] ?? 'todas');
+        if (!in_array($escopo, ['todas', 'selecionadas'], true)) {
+            echo json_encode(['success' => false, 'error' => 'Escopo inválido. Use todas ou selecionadas.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $db = Database::getInstance();
+        $masterPdo = $db->getPdo();
+
+        if ($escopo === 'selecionadas') {
+            $escolaIds = isset($_POST['escola_ids']) && is_array($_POST['escola_ids'])
+                ? array_values(array_unique(array_filter(array_map('intval', $_POST['escola_ids']))))
+                : [];
+            if (empty($escolaIds)) {
+                echo json_encode(['success' => false, 'error' => 'Selecione ao menos uma escola'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            $params = [];
+            $placeholders = [];
+            foreach ($escolaIds as $i => $id) {
+                $chave = 'eid_' . $i;
+                $placeholders[] = ':' . $chave;
+                $params[$chave] = (int) $id;
+            }
+            $escolas = $db->query("
+                SELECT e.id, e.nome,
+                       b.host, b.porta, b.nome_banco, b.usuario, b.senha_criptografada
+                FROM escolas e
+                INNER JOIN config_escolas_banco b ON b.escola_id = e.id
+                WHERE e.id IN (" . implode(',', $placeholders) . ")
+                ORDER BY e.nome
+            ", $params)->fetchAll(\PDO::FETCH_ASSOC);
+            if (empty($escolas)) {
+                echo json_encode(['success' => false, 'error' => 'Nenhuma escola válida com banco configurado'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+        } else {
+            $escolas = $db->query("
+                SELECT e.id, e.nome,
+                       b.host, b.porta, b.nome_banco, b.usuario, b.senha_criptografada
+                FROM escolas e
+                INNER JOIN config_escolas_banco b ON b.escola_id = e.id
+                WHERE e.ativo = 1
+                ORDER BY e.nome
+            ")->fetchAll(\PDO::FETCH_ASSOC);
+        }
+
+        $emBackground = false;
+        foreach ($selected as $file) {
+            if (stripos($file, 'escola_teste_em_2025') !== false) {
+                $emBackground = true;
+                break;
+            }
+        }
+
+        $resultados = [];
+        if ($emBackground) {
+            try {
+                if (!MasterFilaService::tabelaExiste($masterPdo)) {
+                    echo json_encode(['success' => false, 'error' => 'A fila do Master não está configurada. Rode a migration 2026_09_16_fila_jobs_master.sql no banco master.'], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+            } catch (\Throwable $e) {
+                echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+
+            foreach ($escolas as $escola) {
+                $escolaId = (int) $escola['id'];
+                try {
+                    if (MasterFilaService::temJobAbertoDaEscola(MasterFilaService::TIPO_MIGRATION_ESCOLA, $escolaId)) {
+                        $resultados[] = [
+                            'escola_id' => $escolaId,
+                            'nome' => $escola['nome'],
+                            'status' => 'erro',
+                            'message' => 'Já existe uma carga desta escola rodando em segundo plano.',
+                        ];
+                        continue;
+                    }
+                    $jobId = MasterFilaService::enfileirar(
+                        MasterFilaService::TIPO_MIGRATION_ESCOLA,
+                        ['escola_id' => $escolaId, 'migrations' => $selected],
+                        null,
+                        $escolaId,
+                        (int) ($_SESSION[self::SESSION_MASTER_USER_ID] ?? 0)
+                    );
+                    $resultados[] = [
+                        'escola_id' => $escolaId,
+                        'nome' => $escola['nome'],
+                        'status' => 'background',
+                        'job_id' => $jobId,
+                        'message' => 'Carga enfileirada em segundo plano.',
+                    ];
+                } catch (\Throwable $e) {
+                    $resultados[] = [
+                        'escola_id' => $escolaId,
+                        'nome' => $escola['nome'],
+                        'status' => 'erro',
+                        'message' => $e->getMessage(),
+                    ];
+                }
+            }
+
+            echo json_encode([
+                'success' => true,
+                'background' => true,
+                'resultados' => $resultados,
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        foreach ($escolas as $escola) {
+            $resultados[] = $this->executarMigrationsSelecionadasNaEscola($masterPdo, $escola, $selected);
+        }
+
+        echo json_encode(['success' => true, 'resultados' => $resultados], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    /**
      * Executa migrations pendentes em uma escola especifica (todas as pendentes).
      */
     public function executarEscola()
@@ -545,6 +696,55 @@ class MasterMigrationsController extends BaseController
         } catch (\Throwable $e) {
             $errorMessage = $e->getMessage();
             error_log('[MasterMigrations] Erro ao executar migrations da escola ' . (int) $escola['id'] . ': ' . $errorMessage);
+            return [
+                'escola_id' => (int) $escola['id'],
+                'nome' => $escola['nome'],
+                'status' => 'erro',
+                'message' => $errorMessage,
+                'error_type' => get_class($e),
+                'db_name' => (string) ($dbName ?? ''),
+                'db_host' => (string) ($host ?? ''),
+                'db_port' => (int) ($port ?? 0),
+            ];
+        }
+    }
+
+    /**
+     * @param string[] $selected
+     */
+    private function executarMigrationsSelecionadasNaEscola(\PDO $masterPdo, array $escola, array $selected): array
+    {
+        $host = $escola['host'] ?? 'localhost';
+        $port = (int) ($escola['porta'] ?? 3306);
+        $dbName = $escola['nome_banco'] ?? '';
+        $user = $escola['usuario'] ?? '';
+        $pass = MasterSecretVault::decryptDbPassword($escola['senha_criptografada'] ?? '');
+
+        try {
+            $dsn = "mysql:host={$host};port={$port};dbname={$dbName};charset=utf8mb4";
+            $tenantPdo = new \PDO($dsn, $user, $pass, [
+                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+                \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+                \PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
+            ]);
+            $tenantPdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
+
+            MysqlProvisioningService::runTenantMigrationsSelected(
+                $masterPdo,
+                $tenantPdo,
+                (int) $escola['id'],
+                $selected
+            );
+
+            return [
+                'escola_id' => (int) $escola['id'],
+                'nome' => $escola['nome'],
+                'status' => 'ok',
+                'message' => count($selected) . ' migration(s) processada(s) (já executadas são ignoradas)',
+            ];
+        } catch (\Throwable $e) {
+            $errorMessage = $e->getMessage();
+            error_log('[MasterMigrations] Erro ao executar migrations selecionadas da escola ' . (int) $escola['id'] . ': ' . $errorMessage);
             return [
                 'escola_id' => (int) $escola['id'],
                 'nome' => $escola['nome'],

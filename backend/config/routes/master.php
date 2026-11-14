@@ -18,6 +18,7 @@ $router->post('/master/escolas/verificar-dominio', 'Master/MasterEscolasControll
 $router->get('/master/escolas/verificar-dominios-cron', 'Master/MasterEscolasController@verificarDominiosCron');
 $router->get('/master/migrations', 'Master/MasterMigrationsController@index');
 $router->post('/master/migrations/executar-todas', 'Master/MasterMigrationsController@executarTodas');
+$router->post('/master/migrations/executar-selecionadas-escolas', 'Master/MasterMigrationsController@executarSelecionadasEmEscolas');
 
 // Performance Profiler (diagnóstico de queries/páginas lentas — só popula dado com APP_DEBUG=true)
 $router->get('/master/performance', 'Master/MasterPerformanceController@index');
