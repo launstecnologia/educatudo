@@ -3999,7 +3999,7 @@ class StudentAdminController extends AdminBaseController
             'total_masculino' => $totais['masculino'],
             'total_feminino' => $totais['feminino'],
         ], EXTR_SKIP);
-        require __DIR__ . '/../../Views/admin/turmas/lista-chamada-pdf.php';
+        require __DIR__ . '/../../Escola/Views/admin/turmas/lista-chamada-pdf.php';
         $html = (string) ob_get_clean();
 
         $oldDisplayErrors = ini_get('display_errors');
