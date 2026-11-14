@@ -129,6 +129,7 @@ class MasterMigrationsController extends BaseController
                 'ativo' => $e['ativo'],
                 'nome_banco' => $e['nome_banco'],
                 'executadas' => count(array_intersect($exec, $schemaFiles)),
+                'executadas_lista' => array_values($exec),
                 'pendentes' => count($pendentesSchema),
                 'pendentes_lista' => $pendentesSchema,
                 'cargas_pendentes' => count($cargasPendentes),

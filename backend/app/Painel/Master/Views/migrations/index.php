@@ -150,14 +150,25 @@ $schemaFilesOnly = array_values(array_filter($migrationFiles, static function ($
                         <!-- preenchido via JS -->
                     </ul>
                 </div>
-                <div class="px-6 py-4 border-t border-slate-200 flex flex-wrap items-center gap-2 justify-between">
-                    <div class="flex gap-2">
-                        <button type="button" id="modal-escolher-master-marcar-todos" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Marcar todos</button>
-                        <button type="button" id="modal-escolher-master-desmarcar-todos" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Desmarcar todos</button>
+                <div class="px-6 py-4 border-t border-slate-200 space-y-3">
+                    <label class="flex items-start gap-2 text-sm text-slate-700">
+                        <input type="checkbox" id="modal-escolher-master-aceite" class="mt-1 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+                        <span>Confirmo que desejo executar no banco Master.</span>
+                    </label>
+                    <div>
+                        <label for="modal-escolher-master-senha" class="block text-sm font-medium text-slate-700 mb-1">Senha de acesso</label>
+                        <input type="password" id="modal-escolher-master-senha" autocomplete="current-password"
+                               class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500" placeholder="Sua senha do Painel Master">
                     </div>
-                    <div class="flex gap-2">
-                    <button type="button" id="modal-escolher-master-fechar" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Cancelar</button>
-                    <button type="submit" class="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700">Executar selecionadas</button>
+                    <div class="flex flex-wrap items-center gap-2 justify-between">
+                        <div class="flex gap-2">
+                            <button type="button" id="modal-escolher-master-marcar-todos" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Marcar todos</button>
+                            <button type="button" id="modal-escolher-master-desmarcar-todos" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Desmarcar todos</button>
+                        </div>
+                        <div class="flex gap-2">
+                            <button type="button" id="modal-escolher-master-fechar" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Cancelar</button>
+                            <button type="submit" class="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700">Executar selecionadas</button>
+                        </div>
                     </div>
                 </div>
             </form>
@@ -196,7 +207,11 @@ $schemaFilesOnly = array_values(array_filter($migrationFiles, static function ($
                             data-migrations="<?= htmlspecialchars(json_encode(array_values(array_reverse($migrationFiles)))) ?>"
                             data-escolas="<?= htmlspecialchars(json_encode(array_map(static function ($e) {
                                 return ['id' => (int) $e['id'], 'nome' => $e['nome'], 'slug' => $e['slug'], 'ativo' => (int) $e['ativo']];
-                            }, $escolasData))) ?>">
+                            }, $escolasData))) ?>"
+                            data-executadas="<?= htmlspecialchars(json_encode(array_reduce($escolasData, static function ($acc, $e) {
+                                $acc[(string) (int) $e['id']] = array_values($e['executadas_lista'] ?? []);
+                                return $acc;
+                            }, []))) ?>">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
                         Escolher migrations e escolas
                     </button>
@@ -330,7 +345,9 @@ $schemaFilesOnly = array_values(array_filter($migrationFiles, static function ($
                                 <button type="button" id="modal-em-escolas-mig-desmarcar" class="px-2 py-1 border border-slate-300 rounded text-xs font-medium text-slate-700 hover:bg-slate-50">Desmarcar</button>
                             </div>
                         </div>
+                        <p class="text-xs text-slate-500 mb-2">Arquivos já aplicados em <strong>todas</strong> as escolas do destino não aparecem — pode fechar se não houver nada pendente.</p>
                         <ul id="modal-em-escolas-lista-migrations" class="space-y-2 max-h-48 overflow-y-auto border border-slate-200 rounded-lg p-3"></ul>
+                        <p id="modal-em-escolas-vazio" class="hidden mt-2 text-sm text-green-800 bg-green-50 border border-green-200 rounded-lg px-3 py-2">Nada pendente neste destino. Pode fechar esta tela.</p>
                     </div>
                     <div>
                         <p class="text-sm font-semibold text-slate-800 mb-2">Destino</p>
@@ -356,9 +373,21 @@ $schemaFilesOnly = array_values(array_filter($migrationFiles, static function ($
                         </div>
                     </div>
                 </div>
-                <div class="px-6 py-4 border-t border-slate-200 flex flex-wrap items-center gap-2 justify-end">
-                    <button type="button" id="modal-escolher-em-escolas-fechar" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Cancelar</button>
-                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Executar</button>
+                <div class="px-6 py-4 border-t border-slate-200 space-y-3">
+                    <label class="flex items-start gap-2 text-sm text-slate-700">
+                        <input type="checkbox" id="modal-em-escolas-aceite" class="mt-1 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                        <span>Confirmo que desejo executar esta ação.</span>
+                    </label>
+                    <div>
+                        <label for="modal-em-escolas-senha" class="block text-sm font-medium text-slate-700 mb-1">Senha de acesso</label>
+                        <input type="password" id="modal-em-escolas-senha" autocomplete="current-password"
+                               class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Sua senha do Painel Master">
+                    </div>
+                    <p id="modal-em-escolas-erro" class="hidden text-xs text-red-600"></p>
+                    <div class="flex flex-wrap items-center gap-2 justify-end">
+                        <button type="button" id="modal-escolher-em-escolas-fechar" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Fechar</button>
+                        <button type="submit" id="modal-em-escolas-submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Executar</button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -383,14 +412,26 @@ $schemaFilesOnly = array_values(array_filter($migrationFiles, static function ($
                     </ul>
                 </div>
                 <p id="modal-escolher-status" class="hidden mx-6 mb-3 rounded-lg border px-4 py-3 text-sm font-medium" role="status" aria-live="polite"></p>
-                <div class="px-6 py-4 border-t border-slate-200 flex flex-wrap items-center gap-2 justify-between">
-                    <div class="flex gap-2">
-                        <button type="button" id="modal-escolher-marcar-todos" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Marcar todos</button>
-                        <button type="button" id="modal-escolher-desmarcar-todos" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Desmarcar todos</button>
+                <div class="px-6 py-4 border-t border-slate-200 space-y-3">
+                    <label class="flex items-start gap-2 text-sm text-slate-700">
+                        <input type="checkbox" id="modal-escolher-aceite" class="mt-1 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                        <span>Confirmo que desejo executar nesta escola.</span>
+                    </label>
+                    <div>
+                        <label for="modal-escolher-senha" class="block text-sm font-medium text-slate-700 mb-1">Senha de acesso</label>
+                        <input type="password" id="modal-escolher-senha" autocomplete="current-password"
+                               class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Sua senha do Painel Master">
                     </div>
-                    <div class="flex gap-2">
-                    <button type="button" id="modal-escolher-fechar" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Cancelar</button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Executar selecionadas</button>
+                    <p id="modal-escolher-erro" class="hidden text-xs text-red-600"></p>
+                    <div class="flex flex-wrap items-center gap-2 justify-between">
+                        <div class="flex gap-2">
+                            <button type="button" id="modal-escolher-marcar-todos" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Marcar todos</button>
+                            <button type="button" id="modal-escolher-desmarcar-todos" class="px-3 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Desmarcar todos</button>
+                        </div>
+                        <div class="flex gap-2">
+                            <button type="button" id="modal-escolher-fechar" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50">Fechar</button>
+                            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Executar selecionadas</button>
+                        </div>
                     </div>
                 </div>
             </form>
@@ -687,11 +728,22 @@ $schemaFilesOnly = array_values(array_filter($migrationFiles, static function ($
             if (pendentes.length === 0) {
                 modalEscolherMasterLista.innerHTML = '<li class="text-sm text-slate-500">Nenhuma migration pendente.</li>';
             }
+            var senhaMaster = document.getElementById('modal-escolher-master-senha');
+            var aceiteMaster = document.getElementById('modal-escolher-master-aceite');
+            if (senhaMaster) senhaMaster.value = '';
+            if (aceiteMaster) aceiteMaster.checked = false;
             modalEscolherMaster.classList.remove('hidden');
         });
     }
-    if (modalEscolherMasterBackdrop) modalEscolherMasterBackdrop.addEventListener('click', function() { modalEscolherMaster.classList.add('hidden'); });
-    if (modalEscolherMasterFechar) modalEscolherMasterFechar.addEventListener('click', function() { modalEscolherMaster.classList.add('hidden'); });
+    function fecharModalMaster() {
+        if (modalEscolherMaster) modalEscolherMaster.classList.add('hidden');
+        var senhaMaster = document.getElementById('modal-escolher-master-senha');
+        var aceiteMaster = document.getElementById('modal-escolher-master-aceite');
+        if (senhaMaster) senhaMaster.value = '';
+        if (aceiteMaster) aceiteMaster.checked = false;
+    }
+    if (modalEscolherMasterBackdrop) modalEscolherMasterBackdrop.addEventListener('click', fecharModalMaster);
+    if (modalEscolherMasterFechar) modalEscolherMasterFechar.addEventListener('click', fecharModalMaster);
     var btnMasterMarcarTodos = document.getElementById('modal-escolher-master-marcar-todos');
     var btnMasterDesmarcarTodos = document.getElementById('modal-escolher-master-desmarcar-todos');
     if (btnMasterMarcarTodos) {
@@ -712,10 +764,14 @@ $schemaFilesOnly = array_values(array_filter($migrationFiles, static function ($
                 alert('Selecione ao menos uma migration.');
                 return;
             }
+            var senha = validarSenhaInline(
+                document.getElementById('modal-escolher-master-aceite'),
+                document.getElementById('modal-escolher-master-senha'),
+                null
+            );
+            if (!senha) return;
             var arquivos = [];
             checkboxes.forEach(function(cb) { arquivos.push(cb.value); });
-            abrirConfirmacao('Executar no banco master:\n' + nomesMarcados(checkboxes)).then(function(senha) {
-            if (!senha) return;
             var formData = formComConfirmacao(senha, { 'migrations[]': arquivos });
             var btnSubmit = formEscolherMaster.querySelector('button[type="submit"]');
             var origText = btnSubmit.textContent;
@@ -725,7 +781,7 @@ $schemaFilesOnly = array_values(array_filter($migrationFiles, static function ($
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     if (data.success) {
-                        modalEscolherMaster.classList.add('hidden');
+                        fecharModalMaster();
                         if (statusMasterEl) statusMasterEl.textContent = data.message || 'OK.';
                         setTimeout(function() { location.reload(); }, 800);
                     } else {
@@ -739,7 +795,6 @@ $schemaFilesOnly = array_values(array_filter($migrationFiles, static function ($
                     btnSubmit.disabled = false;
                     btnSubmit.textContent = origText;
                 });
-            });
         });
     }
 
@@ -779,6 +834,34 @@ $schemaFilesOnly = array_values(array_filter($migrationFiles, static function ($
         });
     }
 
+    function validarSenhaInline(aceiteEl, senhaEl, erroEl) {
+        if (erroEl) {
+            erroEl.classList.add('hidden');
+            erroEl.textContent = '';
+        }
+        if (!aceiteEl || !aceiteEl.checked) {
+            if (erroEl) {
+                erroEl.textContent = 'Marque que você confirma esta ação.';
+                erroEl.classList.remove('hidden');
+            } else {
+                alert('Marque que você confirma esta ação.');
+            }
+            return null;
+        }
+        var senha = senhaEl ? String(senhaEl.value || '') : '';
+        if (senha === '') {
+            if (erroEl) {
+                erroEl.textContent = 'Digite sua senha de acesso.';
+                erroEl.classList.remove('hidden');
+            } else {
+                alert('Digite sua senha de acesso.');
+            }
+            if (senhaEl) senhaEl.focus();
+            return null;
+        }
+        return senha;
+    }
+
     // Modal: escolher migrations e destino (todas / escolas)
     var btnEscolherEmEscolas = document.getElementById('btn-escolher-em-escolas');
     var modalEmEscolas = document.getElementById('modal-escolher-em-escolas');
@@ -786,9 +869,92 @@ $schemaFilesOnly = array_values(array_filter($migrationFiles, static function ($
     var listaMigEmEscolas = document.getElementById('modal-em-escolas-lista-migrations');
     var listaEscEmEscolas = document.getElementById('modal-em-escolas-lista-escolas');
     var blocoEscEmEscolas = document.getElementById('modal-em-escolas-bloco-escolas');
+    var avisoVazioEmEscolas = document.getElementById('modal-em-escolas-vazio');
+    var btnSubmitEmEscolas = document.getElementById('modal-em-escolas-submit');
+    var emEscolasCache = { migrations: [], escolas: [], executadas: {} };
 
     function fecharModalEmEscolas() {
         if (modalEmEscolas) modalEmEscolas.classList.add('hidden');
+        var senhaEl = document.getElementById('modal-em-escolas-senha');
+        var aceiteEl = document.getElementById('modal-em-escolas-aceite');
+        if (senhaEl) senhaEl.value = '';
+        if (aceiteEl) aceiteEl.checked = false;
+    }
+
+    function idsDestinoEmEscolas() {
+        if (!formEmEscolas) return [];
+        var escopo = (formEmEscolas.querySelector('input[name="escopo"]:checked') || {}).value || 'todas';
+        if (escopo === 'selecionadas') {
+            var ids = [];
+            formEmEscolas.querySelectorAll('input[name="escola_ids[]"]:checked').forEach(function(cb) {
+                ids.push(String(cb.value));
+            });
+            return ids;
+        }
+        return (emEscolasCache.escolas || [])
+            .filter(function(esc) { return !!esc.ativo; })
+            .map(function(esc) { return String(esc.id); });
+    }
+
+    function migrationPendenteNoDestino(file, destinoIds) {
+        if (!destinoIds || destinoIds.length === 0) return false;
+        var isCarga = String(file).indexOf('importar_dados_') !== -1;
+        if (isCarga) return true;
+        for (var i = 0; i < destinoIds.length; i++) {
+            var lista = emEscolasCache.executadas[destinoIds[i]] || [];
+            if (lista.indexOf(file) === -1) return true;
+        }
+        return false;
+    }
+
+    function renderListaMigrationsEmEscolas() {
+        if (!listaMigEmEscolas) return;
+        var destinoIds = idsDestinoEmEscolas();
+        var marcados = {};
+        listaMigEmEscolas.querySelectorAll('input[name="migrations[]"]:checked').forEach(function(cb) {
+            marcados[cb.value] = true;
+        });
+        listaMigEmEscolas.innerHTML = '';
+        var visiveis = 0;
+        (emEscolasCache.migrations || []).forEach(function(file) {
+            if (!migrationPendenteNoDestino(file, destinoIds)) return;
+            visiveis++;
+            var isCarga = String(file).indexOf('importar_dados_') !== -1;
+            var li = document.createElement('li');
+            li.className = 'flex items-center gap-2';
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.name = 'migrations[]';
+            cb.value = file;
+            cb.id = 'mig-em-esc-' + file.replace(/[^a-z0-9_]/gi, '-');
+            cb.checked = !!marcados[file];
+            cb.className = 'rounded border-slate-300 text-indigo-600 focus:ring-indigo-500';
+            var label = document.createElement('label');
+            label.htmlFor = cb.id;
+            label.className = 'text-sm text-slate-700 font-mono cursor-pointer';
+            label.textContent = file + (isCarga ? '  (carga)' : '');
+            li.appendChild(cb);
+            li.appendChild(label);
+            listaMigEmEscolas.appendChild(li);
+        });
+        if (destinoIds.length === 0) {
+            listaMigEmEscolas.innerHTML = '<li class="text-sm text-slate-500">Selecione ao menos uma escola no destino.</li>';
+            visiveis = 0;
+        } else if (visiveis === 0) {
+            listaMigEmEscolas.innerHTML = '';
+        }
+        if (avisoVazioEmEscolas) {
+            if (destinoIds.length > 0 && visiveis === 0) {
+                avisoVazioEmEscolas.classList.remove('hidden');
+            } else {
+                avisoVazioEmEscolas.classList.add('hidden');
+            }
+        }
+        if (btnSubmitEmEscolas) {
+            btnSubmitEmEscolas.disabled = visiveis === 0;
+            btnSubmitEmEscolas.classList.toggle('opacity-50', visiveis === 0);
+            btnSubmitEmEscolas.classList.toggle('cursor-not-allowed', visiveis === 0);
+        }
     }
 
     function sincronizarBlocoEscolas() {
@@ -799,41 +965,17 @@ $schemaFilesOnly = array_values(array_filter($migrationFiles, static function ($
         } else {
             blocoEscEmEscolas.classList.add('hidden');
         }
+        renderListaMigrationsEmEscolas();
     }
 
     function abrirModalEmEscolas() {
         if (!btnEscolherEmEscolas || !listaMigEmEscolas || !listaEscEmEscolas) return;
-        var migrations = [];
-        var escolas = [];
-        try { migrations = JSON.parse(btnEscolherEmEscolas.getAttribute('data-migrations') || '[]'); } catch (e) {}
-        try { escolas = JSON.parse(btnEscolherEmEscolas.getAttribute('data-escolas') || '[]'); } catch (e) {}
-
-        listaMigEmEscolas.innerHTML = '';
-        migrations.forEach(function(file) {
-            var isCarga = String(file).indexOf('importar_dados_') !== -1;
-            var li = document.createElement('li');
-            li.className = 'flex items-center gap-2';
-            var cb = document.createElement('input');
-            cb.type = 'checkbox';
-            cb.name = 'migrations[]';
-            cb.value = file;
-            cb.id = 'mig-em-esc-' + file.replace(/[^a-z0-9_]/gi, '-');
-            cb.checked = false;
-            cb.className = 'rounded border-slate-300 text-indigo-600 focus:ring-indigo-500';
-            var label = document.createElement('label');
-            label.htmlFor = cb.id;
-            label.className = 'text-sm text-slate-700 font-mono cursor-pointer';
-            label.textContent = file + (isCarga ? '  (carga)' : '');
-            li.appendChild(cb);
-            li.appendChild(label);
-            listaMigEmEscolas.appendChild(li);
-        });
-        if (migrations.length === 0) {
-            listaMigEmEscolas.innerHTML = '<li class="text-sm text-slate-500">Nenhuma migration de tenant encontrada.</li>';
-        }
+        try { emEscolasCache.migrations = JSON.parse(btnEscolherEmEscolas.getAttribute('data-migrations') || '[]'); } catch (e) { emEscolasCache.migrations = []; }
+        try { emEscolasCache.escolas = JSON.parse(btnEscolherEmEscolas.getAttribute('data-escolas') || '[]'); } catch (e) { emEscolasCache.escolas = []; }
+        try { emEscolasCache.executadas = JSON.parse(btnEscolherEmEscolas.getAttribute('data-executadas') || '{}'); } catch (e) { emEscolasCache.executadas = {}; }
 
         listaEscEmEscolas.innerHTML = '';
-        escolas.forEach(function(esc) {
+        emEscolasCache.escolas.forEach(function(esc) {
             var li = document.createElement('li');
             li.className = 'flex items-center gap-2';
             var cb = document.createElement('input');
@@ -843,6 +985,7 @@ $schemaFilesOnly = array_values(array_filter($migrationFiles, static function ($
             cb.id = 'esc-em-esc-' + esc.id;
             cb.checked = !!esc.ativo;
             cb.className = 'rounded border-slate-300 text-indigo-600 focus:ring-indigo-500';
+            cb.addEventListener('change', renderListaMigrationsEmEscolas);
             var label = document.createElement('label');
             label.htmlFor = cb.id;
             label.className = 'text-sm text-slate-700 cursor-pointer';
@@ -851,13 +994,22 @@ $schemaFilesOnly = array_values(array_filter($migrationFiles, static function ($
             li.appendChild(label);
             listaEscEmEscolas.appendChild(li);
         });
-        if (escolas.length === 0) {
+        if (emEscolasCache.escolas.length === 0) {
             listaEscEmEscolas.innerHTML = '<li class="text-sm text-slate-500">Nenhuma escola com banco.</li>';
         }
 
         if (formEmEscolas) {
             var radioTodas = formEmEscolas.querySelector('input[name="escopo"][value="todas"]');
             if (radioTodas) radioTodas.checked = true;
+            var senhaEl = document.getElementById('modal-em-escolas-senha');
+            var aceiteEl = document.getElementById('modal-em-escolas-aceite');
+            var erroEl = document.getElementById('modal-em-escolas-erro');
+            if (senhaEl) senhaEl.value = '';
+            if (aceiteEl) aceiteEl.checked = false;
+            if (erroEl) {
+                erroEl.classList.add('hidden');
+                erroEl.textContent = '';
+            }
         }
         sincronizarBlocoEscolas();
         modalEmEscolas.classList.remove('hidden');
@@ -885,12 +1037,14 @@ $schemaFilesOnly = array_values(array_filter($migrationFiles, static function ($
         btnEscMarcar.addEventListener('click', function() {
             if (!formEmEscolas) return;
             formEmEscolas.querySelectorAll('input[name="escola_ids[]"]').forEach(function(cb) { cb.checked = true; });
+            renderListaMigrationsEmEscolas();
         });
     }
     if (btnEscDesmarcar) {
         btnEscDesmarcar.addEventListener('click', function() {
             if (!formEmEscolas) return;
             formEmEscolas.querySelectorAll('input[name="escola_ids[]"]').forEach(function(cb) { cb.checked = false; });
+            renderListaMigrationsEmEscolas();
         });
     }
     if (formEmEscolas) {
@@ -912,50 +1066,51 @@ $schemaFilesOnly = array_values(array_filter($migrationFiles, static function ($
                     return;
                 }
             }
+            var senha = validarSenhaInline(
+                document.getElementById('modal-em-escolas-aceite'),
+                document.getElementById('modal-em-escolas-senha'),
+                document.getElementById('modal-em-escolas-erro')
+            );
+            if (!senha) return;
+
             var arquivos = [];
             migCbs.forEach(function(cb) { arquivos.push(cb.value); });
-            var destinoTxt = escopo === 'todas'
-                ? 'todas as escolas ativas'
-                : (escolaIds.length + ' escola(s) selecionada(s)');
-            abrirConfirmacao('Executar em ' + destinoTxt + ':\n' + nomesMarcados(migCbs)).then(function(senha) {
-                if (!senha) return;
-                var extras = {
-                    escopo: escopo,
-                    'migrations[]': arquivos
-                };
-                if (escopo === 'selecionadas') {
-                    extras['escola_ids[]'] = escolaIds;
-                }
-                var formData = formComConfirmacao(senha, extras);
-                var btnSubmit = formEmEscolas.querySelector('button[type="submit"]');
-                var origText = btnSubmit.textContent;
-                btnSubmit.disabled = true;
-                btnSubmit.textContent = 'Executando...';
-                if (statusGeralEl) statusGeralEl.textContent = 'Aguarde, pode levar alguns segundos...';
-                fetch(baseUrl + '/master/migrations/executar-selecionadas-escolas', { method: 'POST', body: formData })
-                    .then(function(r) { return r.json(); })
-                    .then(function(data) {
-                        if (data.success && data.resultados) {
-                            fecharModalEmEscolas();
-                            var hasErrors = mostrarResultado(data.resultados);
-                            if (!hasErrors && !data.background) {
-                                setTimeout(function() { location.reload(); }, 1500);
-                            } else if (data.background && !hasErrors) {
-                                setTimeout(function() { location.reload(); }, 2500);
-                            }
-                        } else {
-                            alert('Erro: ' + (data.error || 'desconhecido'));
+            var extras = {
+                escopo: escopo,
+                'migrations[]': arquivos
+            };
+            if (escopo === 'selecionadas') {
+                extras['escola_ids[]'] = escolaIds;
+            }
+            var formData = formComConfirmacao(senha, extras);
+            var btnSubmit = formEmEscolas.querySelector('button[type="submit"]');
+            var origText = btnSubmit.textContent;
+            btnSubmit.disabled = true;
+            btnSubmit.textContent = 'Executando...';
+            if (statusGeralEl) statusGeralEl.textContent = 'Aguarde, pode levar alguns segundos...';
+            fetch(baseUrl + '/master/migrations/executar-selecionadas-escolas', { method: 'POST', body: formData })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success && data.resultados) {
+                        fecharModalEmEscolas();
+                        var hasErrors = mostrarResultado(data.resultados);
+                        if (!hasErrors && !data.background) {
+                            setTimeout(function() { location.reload(); }, 1500);
+                        } else if (data.background && !hasErrors) {
+                            setTimeout(function() { location.reload(); }, 2500);
                         }
-                        btnSubmit.disabled = false;
-                        btnSubmit.textContent = origText;
-                    })
-                    .catch(function(err) {
-                        alert('Erro de rede: ' + err.message);
-                        btnSubmit.disabled = false;
-                        btnSubmit.textContent = origText;
-                        if (statusGeralEl) statusGeralEl.textContent = '';
-                    });
-            });
+                    } else {
+                        alert('Erro: ' + (data.error || 'desconhecido'));
+                    }
+                    btnSubmit.disabled = false;
+                    btnSubmit.textContent = origText;
+                })
+                .catch(function(err) {
+                    alert('Erro de rede: ' + err.message);
+                    btnSubmit.disabled = false;
+                    btnSubmit.textContent = origText;
+                    if (statusGeralEl) statusGeralEl.textContent = '';
+                });
         });
     }
 
@@ -1042,7 +1197,16 @@ $schemaFilesOnly = array_values(array_filter($migrationFiles, static function ($
             modalLista.appendChild(li);
         });
         if (list.length === 0) {
-            modalLista.innerHTML = '<li class="text-sm text-slate-500">Nada pendente nesta escola. Se o seed não aparece, o arquivo ainda não está na pasta de migrations deste servidor.</li>';
+            modalLista.innerHTML = '<li class="text-sm text-slate-500">Nada pendente nesta escola. Se o seed não aparece, o arquivo ainda não está na pasta de migrations deste servidor. Pode fechar.</li>';
+        }
+        var senhaEsc = document.getElementById('modal-escolher-senha');
+        var aceiteEsc = document.getElementById('modal-escolher-aceite');
+        var erroEsc = document.getElementById('modal-escolher-erro');
+        if (senhaEsc) senhaEsc.value = '';
+        if (aceiteEsc) aceiteEsc.checked = false;
+        if (erroEsc) {
+            erroEsc.classList.add('hidden');
+            erroEsc.textContent = '';
         }
         modalEscolher.classList.remove('hidden');
     }
@@ -1120,6 +1284,10 @@ $schemaFilesOnly = array_values(array_filter($migrationFiles, static function ($
     function closeModalEscolher() {
         if (migrationAndamento && migrationAndamento.ativo) return;
         modalEscolher.classList.add('hidden');
+        var senhaEsc = document.getElementById('modal-escolher-senha');
+        var aceiteEsc = document.getElementById('modal-escolher-aceite');
+        if (senhaEsc) senhaEsc.value = '';
+        if (aceiteEsc) aceiteEsc.checked = false;
     }
 
     if (modalBackdrop) modalBackdrop.addEventListener('click', closeModalEscolher);
@@ -1219,11 +1387,14 @@ $schemaFilesOnly = array_values(array_filter($migrationFiles, static function ($
                 alert('Selecione ao menos uma migration.');
                 return;
             }
+            var senha = validarSenhaInline(
+                document.getElementById('modal-escolher-aceite'),
+                document.getElementById('modal-escolher-senha'),
+                document.getElementById('modal-escolher-erro')
+            );
+            if (!senha) return;
             var arquivos = [];
             checkboxes.forEach(function(cb) { arquivos.push(cb.value); });
-            var escolaNome = modalNome.textContent || ('Escola #' + modalEscolaId.value);
-            abrirConfirmacao('Executar na escola ' + escolaNome + ':\n' + nomesMarcados(checkboxes)).then(function(senha) {
-            if (!senha) return;
             var formData = formComConfirmacao(senha, {
                 escola_id: modalEscolaId.value,
                 'migrations[]': arquivos
@@ -1265,7 +1436,6 @@ $schemaFilesOnly = array_values(array_filter($migrationFiles, static function ($
                     btnSubmit.disabled = false;
                     btnSubmit.textContent = origText;
                 });
-            });
         });
     }
 
