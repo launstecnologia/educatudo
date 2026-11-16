@@ -158,7 +158,7 @@
         $sistemaOpen = in_array($cp, ['sistema', 'avatares_alunos', 'essays_config', 'dev_tickets'], true);
         $usuariosOpen = in_array($cp, ['gestao_usuarios', 'usuarios', 'monitors'], true) || $permissoesAtivo;
         $zConfigOpen = in_array($cp, [
-            'z_configuracao', 'dev', 'unidades', 'maintenance_panel', 'settings', 'ui_modelos', 'layouts_documentos',
+            'z_configuracao', 'dev', 'layout_sistema', 'unidades', 'maintenance_panel', 'settings', 'ui_modelos', 'layouts_documentos',
             'documentos_institucionais', 'assinatura_digital', 'modelos_documentos',
             'tudicoins_escola', 'creditos_pacotes', 'zerar_popular_educa', 'reiniciar_homologacoes_educa',
         ], true);
@@ -906,6 +906,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'layouts_documentos': 'z-configuracao',
         'z_configuracao': 'z-configuracao',
         'dev': 'z-configuracao',
+        'layout_sistema': 'z-configuracao',
         'unidades': 'z-configuracao',
         'maintenance_panel': 'z-configuracao',
         'settings': 'z-configuracao',

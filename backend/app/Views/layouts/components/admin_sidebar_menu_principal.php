@@ -780,6 +780,12 @@ $urlRecursosEscolares = $canViewSidebar(['almoxarifado'])
             <span class="sidebar-text text-sm">Slider Dashboard</span>
         </a>
         <?php endif; ?>
+        <?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
+        <a href="<?= URL ?>/admin/dev/aparencia" class="<?= $linkCls($cp === 'layout_sistema') ?>">
+            <i class="fa-solid fa-paintbrush w-4 h-4 mr-3"></i>
+            <span class="sidebar-text text-sm">Layout do Sistema</span>
+        </a>
+        <?php endif; ?>
         <?php if ($canViewSidebar(['resultados_finais']) && $modOn('resultados_finais')): ?>
         <a href="<?= URL ?>/admin/resultados-finais/layouts" class="<?= $linkCls($cp === 'layouts_documentos') ?>">
             <i class="fa-solid fa-table-columns w-4 h-4 mr-3"></i>

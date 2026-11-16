@@ -434,6 +434,7 @@ class TrilhaAdmin
             ['/admin/modelos-documentos', 'Configuração', 'Layout de documentos'],
             ['/admin/tudicoins', 'Configuração', 'TudiCoins da Escola'],
             ['/admin/creditos/pacotes', 'Configuração', 'Pacotes de TudiCoins'],
+            ['/admin/dev/aparencia', 'Configuração', 'Layout do Sistema'],
             ['/admin/dev', 'Configuração', 'Dev Settings'],
             ['/admin/unidades', 'Configuração', 'Instituição'],
             ['/admin/maintenance', 'Configuração', 'Modo Manutenção'],

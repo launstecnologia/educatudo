@@ -133,7 +133,7 @@ class DevAdminController extends AdminBaseController
         $data = [
             'title' => 'Aparência e Menu - EducaTudo',
             'user' => $user,
-            'current_page' => 'dev',
+            'current_page' => 'layout_sistema',
             'csrf_token' => $this->generateCsrfToken(),
             'flash_message' => $flash['message'] ?? '',
             'flash_type' => $flash['type'] ?? '',

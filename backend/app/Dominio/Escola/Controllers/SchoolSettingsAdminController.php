@@ -408,7 +408,7 @@ class SchoolSettingsAdminController extends AdminBaseController
         return [
             'title' => $titulo . ' - EducaTudo',
             'user' => $user,
-            'current_page' => 'dev',
+            'current_page' => 'layout_sistema',
             'config_layout' => $this->carregarConfigLayout(),
             'csrf_token' => $this->generateCsrfToken(),
             'flash_message' => $flash['message'] ?? '',
