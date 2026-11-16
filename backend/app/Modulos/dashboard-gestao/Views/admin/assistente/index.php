@@ -99,7 +99,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                             <li>“Como andam as provas da Maria Clara no 2º Ano B?”</li>
                             <li>“Como está a saúde da turma 2ªB?”</li>
                             <li>“Quem precisa de atenção na escola em 2024?”</li>
-                            <li>“Me dá um 360 da Ana Luiza.”</li>
+                            <li>“Me dá um relatório 360 da Ana Luiza.”</li>
                             <li>“Quais diários estão em atraso?”</li>
                             <li>“Qual aula a turma 1A tem hoje?”</li>
                             <li>“Resultados do bloco Simulado 1 — quem precisa de atenção?”</li>
@@ -744,7 +744,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             return;
         }
 
-        if (painel.aluno) {
+        if (painel.aluno && painel.tipo !== 'perfil_aluno_360') {
             var head = document.createElement('div');
             head.className = 'rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-sm';
             head.innerHTML = '<span class="font-semibold">' + esc(painel.aluno.nome) + '</span>'
@@ -1417,6 +1417,19 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
         }
 
         if (painel.tipo === 'perfil_aluno_360') {
+            var aluno360 = painel.aluno || {};
+            var ident360 = document.createElement('div');
+            ident360.className = 'grid grid-cols-1 sm:grid-cols-3 gap-2';
+            function campo360(label, val) {
+                return '<div class="rounded-lg border border-gray-200 bg-white px-3 py-2">'
+                    + '<div class="text-[11px] uppercase tracking-wide text-slate-500">' + esc(label) + '</div>'
+                    + '<div class="font-medium text-gray-900">' + esc(val || '—') + '</div></div>';
+            }
+            ident360.innerHTML = campo360('Nome', aluno360.nome)
+                + campo360('RA', aluno360.ra)
+                + campo360('Turma', aluno360.turma_nome);
+            container.appendChild(ident360);
+
             var ind360 = painel.indicadores || {};
             var atv360 = painel.atividade || {};
             var pen360 = painel.pendencias || {};
@@ -1427,31 +1440,177 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                     + '<div class="text-[11px] uppercase tracking-wide text-slate-500">' + esc(label) + '</div>'
                     + '<div class="text-lg font-semibold ' + (cls || 'text-gray-900') + '">' + esc(val) + '</div></div>';
             }
-            cards360.innerHTML = card360('Provas %', ind360.provas_pct != null ? ind360.provas_pct + '%' : '—')
-                + card360('Frequência', ind360.frequencia_pct != null ? ind360.frequencia_pct + '%' : '—')
-                + card360('Jornadas %', ind360.jornadas_pct != null ? ind360.jornadas_pct + '%' : '—')
-                + card360('Ocorrências abertas', pen360.ocorrencias_abertas != null ? pen360.ocorrencias_abertas : 0, 'text-rose-700');
+            cards360.innerHTML = card360('Frequência', ind360.frequencia_pct != null ? ind360.frequencia_pct + '%' : '—')
+                + card360('Faltas', pen360.faltas != null ? pen360.faltas : '—', 'text-rose-700')
+                + card360('Ocorrências', pen360.ocorrencias != null ? pen360.ocorrencias : 0)
+                + card360('Provas %', ind360.provas_pct != null ? ind360.provas_pct + '%' : '—');
             container.appendChild(cards360);
 
-            var meta360 = document.createElement('div');
-            meta360.className = 'grid grid-cols-1 sm:grid-cols-2 gap-2';
-            meta360.innerHTML = '<div class="rounded-lg border border-gray-200 bg-white px-3 py-2"><div class="text-xs uppercase text-slate-500">RA</div><div class="font-medium text-gray-900">' + esc((painel.aluno && painel.aluno.ra) || '—') + '</div></div>'
-                + '<div class="rounded-lg border border-gray-200 bg-white px-3 py-2"><div class="text-xs uppercase text-slate-500">Atividade</div><div class="font-medium text-gray-900">'
-                + esc((atv360.total_provas || 0) + ' provas · ' + (atv360.jornadas_concluidas || 0) + '/' + (atv360.total_jornadas || 0) + ' jornadas') + '</div></div>';
-            container.appendChild(meta360);
-
-            var destaques360 = painel.destaques || [];
-            if (destaques360.length) {
-                var box360 = document.createElement('div');
-                box360.className = 'rounded-lg border border-gray-200 bg-white px-4 py-3';
-                var html360 = '<div class="text-xs font-semibold uppercase text-slate-600 mb-2">Destaques</div><ul class="list-disc pl-5 space-y-1 text-sm text-gray-700">';
-                destaques360.forEach(function (d) {
-                    html360 += '<li>' + esc(d) + '</li>';
-                });
-                html360 += '</ul>';
-                box360.innerHTML = html360;
-                container.appendChild(box360);
+            function tituloSecao360(texto) {
+                var t = document.createElement('div');
+                t.className = 'text-xs font-semibold uppercase tracking-wide text-slate-600 pt-1';
+                t.textContent = texto;
+                container.appendChild(t);
             }
+
+            tituloSecao360('Boletim / notas');
+            var bol360 = painel.boletim || {};
+            if (painel.pdf_url || painel.pdf_oficial_url) {
+                var pdf360 = document.createElement('div');
+                pdf360.className = 'flex flex-wrap gap-2';
+                if (painel.pdf_url) {
+                    var aPdf360 = document.createElement('a');
+                    aPdf360.href = painel.pdf_url;
+                    aPdf360.target = '_blank';
+                    aPdf360.rel = 'noopener';
+                    aPdf360.className = 'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700';
+                    aPdf360.innerHTML = '<i class="fa-solid fa-file-pdf"></i> Baixar boletim (PDF)';
+                    pdf360.appendChild(aPdf360);
+                }
+                if (painel.pdf_oficial_url) {
+                    var aOf360 = document.createElement('a');
+                    aOf360.href = painel.pdf_oficial_url;
+                    aOf360.target = '_blank';
+                    aOf360.rel = 'noopener';
+                    aOf360.className = 'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-indigo-200 text-indigo-800 text-sm font-medium hover:bg-indigo-50';
+                    aOf360.innerHTML = '<i class="fa-solid fa-stamp"></i> PDF oficial (fechamento)';
+                    pdf360.appendChild(aOf360);
+                }
+                container.appendChild(pdf360);
+            }
+            var quadro360 = bol360.quadro || null;
+            var temQuadro360 = bol360.formato === 'quadro_anual'
+                && quadro360
+                && (quadro360.colunas || []).length
+                && (quadro360.linhas || []).length;
+            var evs360 = bol360.eventos || [];
+            var temEventos360 = evs360.some(function (ev) {
+                return (ev.colunas || []).length && (ev.linhas || []).length;
+            });
+            if (temQuadro360) {
+                var tituloQ360 = 'Boletim'
+                    + (bol360.ano_letivo ? ' · ' + bol360.ano_letivo : '')
+                    + (bol360.regra && bol360.regra.nome ? ' · ' + bol360.regra.nome : '');
+                renderQuadroNotas(container, quadro360, tituloQ360);
+            } else if (temEventos360) {
+                evs360.forEach(function (ev) {
+                    if (!(ev.colunas || []).length || !(ev.linhas || []).length) return;
+                    var tituloEv360 = (ev.regra_nome || 'Boletim')
+                        + (ev.bimestre ? ' · ' + ev.bimestre + 'º bim' : '')
+                        + (ev.ano_letivo ? ' · ' + ev.ano_letivo : '');
+                    renderQuadroNotas(container, { colunas: ev.colunas || [], linhas: (ev.linhas || []).map(function (l) {
+                        return { materia: l.materia, notas: l.notas || {} };
+                    }) }, tituloEv360);
+                });
+            } else {
+                var vazioBol360 = document.createElement('p');
+                vazioBol360.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+                vazioBol360.textContent = bol360.aviso || 'Sem boletim com notas neste período.';
+                container.appendChild(vazioBol360);
+            }
+
+            tituloSecao360('Faltas');
+            var faltas360 = painel.faltas || {};
+            var freq360 = faltas360.frequencia || null;
+            var cardsF360 = document.createElement('div');
+            cardsF360.className = 'grid grid-cols-2 sm:grid-cols-4 gap-2';
+            if (freq360) {
+                cardsF360.innerHTML = card360('Aulas', freq360.total_aulas || 0)
+                    + card360('Presenças', freq360.presencas || 0)
+                    + card360('Faltas', freq360.faltas || 0, 'text-rose-700')
+                    + card360('Frequência', freq360.percentual != null ? freq360.percentual + '%' : '—');
+            } else {
+                cardsF360.innerHTML = card360('Frequência', 'Sem dados');
+            }
+            container.appendChild(cardsF360);
+            if (faltas360.aviso) {
+                var avF360 = document.createElement('p');
+                avF360.className = 'text-sm text-amber-800';
+                avF360.textContent = faltas360.aviso;
+                container.appendChild(avF360);
+            }
+
+            tituloSecao360('Ocorrências');
+            var oco360 = painel.ocorrencias || {};
+            var listaOco360 = oco360.itens || [];
+            if (oco360.aviso && !listaOco360.length) {
+                var avO360 = document.createElement('p');
+                avO360.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+                avO360.textContent = oco360.aviso;
+                container.appendChild(avO360);
+            }
+            var boxO360 = document.createElement('div');
+            boxO360.className = 'overflow-x-auto border border-gray-200 rounded-lg';
+            var ho360 = '<table class="min-w-full text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-600"><tr>'
+                + '<th class="px-3 py-2 text-left">Data</th>'
+                + '<th class="px-3 py-2 text-left">Título</th>'
+                + '<th class="px-3 py-2 text-left">Gravidade</th>'
+                + '<th class="px-3 py-2 text-left">Status</th>'
+                + '<th class="px-3 py-2 text-left">Categoria</th></tr></thead><tbody>';
+            if (!listaOco360.length) {
+                ho360 += '<tr><td colspan="5" class="px-3 py-4 text-center text-gray-500">Nenhuma ocorrência neste período.</td></tr>';
+            }
+            listaOco360.forEach(function (o) {
+                ho360 += '<tr class="border-t align-top">'
+                    + '<td class="px-3 py-2 whitespace-nowrap">' + esc(o.data || '—') + '</td>'
+                    + '<td class="px-3 py-2"><div class="font-medium text-gray-900">' + esc(o.titulo || '—') + '</div>'
+                    + (o.detalhe ? '<div class="text-xs text-gray-500 mt-0.5">' + esc(o.detalhe) + '</div>' : '')
+                    + '</td>'
+                    + '<td class="px-3 py-2">' + esc(o.gravidade_label || o.gravidade || '—') + '</td>'
+                    + '<td class="px-3 py-2">' + esc(o.status_label || o.status || '—') + '</td>'
+                    + '<td class="px-3 py-2">' + esc(o.categoria || '—') + '</td></tr>';
+            });
+            ho360 += '</tbody></table>';
+            if (oco360.total && oco360.total > listaOco360.length) {
+                ho360 += '<div class="px-3 py-2 text-xs text-slate-500 border-t bg-slate-50">Mostrando '
+                    + listaOco360.length + ' de ' + oco360.total + '</div>';
+            }
+            boxO360.innerHTML = ho360;
+            container.appendChild(boxO360);
+
+            var provas360 = painel.provas_online || {};
+            var listaProv360 = provas360.provas || [];
+            tituloSecao360('Provas online');
+            if (listaProv360.length) {
+                var cardsP360 = document.createElement('div');
+                cardsP360.className = 'grid grid-cols-2 sm:grid-cols-3 gap-2';
+                cardsP360.innerHTML = card360('Acertos', provas360.total_acertos != null ? provas360.total_acertos : 0, 'text-emerald-700')
+                    + card360('Erros', provas360.total_erros != null ? provas360.total_erros : 0, 'text-rose-700')
+                    + card360('% acerto', provas360.percentual_acerto != null ? provas360.percentual_acerto + '%' : '—');
+                container.appendChild(cardsP360);
+                var boxP360 = document.createElement('div');
+                boxP360.className = 'overflow-x-auto border border-gray-200 rounded-lg';
+                var hp360 = '<table class="min-w-full text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-600"><tr>'
+                    + '<th class="px-3 py-2 text-left">Prova</th>'
+                    + '<th class="px-3 py-2 text-left">Matéria</th>'
+                    + '<th class="px-3 py-2 text-left">Data</th>'
+                    + '<th class="px-3 py-2 text-right">Acertos</th>'
+                    + '<th class="px-3 py-2 text-right">Erros</th>'
+                    + '<th class="px-3 py-2 text-right">Nota</th></tr></thead><tbody>';
+                listaProv360.forEach(function (p) {
+                    hp360 += '<tr class="border-t">'
+                        + '<td class="px-3 py-2 font-medium">' + esc(p.titulo || '—') + '</td>'
+                        + '<td class="px-3 py-2">' + esc(p.materia || '—') + '</td>'
+                        + '<td class="px-3 py-2 whitespace-nowrap">' + esc(p.data || '—') + '</td>'
+                        + '<td class="px-3 py-2 text-right text-emerald-700">' + esc(p.acertos != null ? p.acertos : 0) + '</td>'
+                        + '<td class="px-3 py-2 text-right text-rose-700">' + esc(p.erros != null ? p.erros : 0) + '</td>'
+                        + '<td class="px-3 py-2 text-right">' + esc(p.nota != null ? p.nota : '—') + '</td></tr>';
+                });
+                hp360 += '</tbody></table>';
+                if (provas360.total && provas360.total > listaProv360.length) {
+                    hp360 += '<div class="px-3 py-2 text-xs text-slate-500 border-t bg-slate-50">Mostrando '
+                        + listaProv360.length + ' de ' + provas360.total
+                        + '. Os totais de acertos e erros somam essas ' + provas360.total + ' provas.</div>';
+                }
+                boxP360.innerHTML = hp360;
+                container.appendChild(boxP360);
+            } else {
+                var vazioP360 = document.createElement('p');
+                vazioP360.className = 'text-sm text-gray-600 bg-slate-50 border border-gray-200 rounded-lg px-3 py-2';
+                vazioP360.textContent = provas360.aviso || 'Nenhuma prova online para este aluno.';
+                container.appendChild(vazioP360);
+            }
+
             renderOpcoes(container, painel.opcoes);
         }
 

@@ -108,6 +108,9 @@
     {"id": "al-02", "frase": "quem é o aluno do RA 24254?", "tool": "buscar_alunos", "args": {"ra": "24254"}},
     {"id": "al-03", "frase": "perfil completo da Ana Luiza", "tool": "perfil_aluno_360", "args": {"aluno_nome": "Ana Luiza"}},
     {"id": "al-04", "frase": "me dá uma visão geral do João Silva", "tool": "perfil_aluno_360", "args": {"aluno_nome": "João Silva"}},
+    {"id": "al-05", "frase": "me dá um relatório geral da Ana Luiza", "tool": "perfil_aluno_360", "args": {"aluno_nome": "Ana Luiza"}},
+    {"id": "al-06", "frase": "relatório 360 do João Silva", "tool": "perfil_aluno_360", "args": {"aluno_nome": "João Silva"}},
+    {"id": "al-07", "frase": "me dá um 360 da Ana Luiza", "tool": "perfil_aluno_360", "args": {"aluno_nome": "Ana Luiza"}},
 
     {"id": "tu-01", "frase": "como está a saúde da turma 2 ano B?", "tool": "saude_turma", "args": {"turma_nome": "2"}},
     {"id": "tu-02", "frase": "resumo de provas do 1A por matéria", "tool": "resumo_provas_turma", "args": {"turma_nome": "1A"}},

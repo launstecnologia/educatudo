@@ -1279,7 +1279,8 @@ class AssistenteConsultaAmpliadaService
     }
 
     /**
-     * Visão 360 resumida do aluno para coordenação.
+     * Relatório geral do aluno: identidade, boletim, faltas, ocorrências
+     * e acertos/erros das provas online.
      *
      * @param array<string,mixed> $filtros
      * @return array<string,mixed>
@@ -1304,7 +1305,6 @@ class AssistenteConsultaAmpliadaService
             ['id' => $alunoId]
         ) ?: [];
 
-        $provas = $this->alunos->resumoProvasAluno(['aluno_id' => $alunoId]);
         $jornadas = ['ok' => false];
         try {
             $jornadas = (new JornadasAlunoConsultaService($this->alunos))->resumoJornadasAluno(['aluno_id' => $alunoId]);
@@ -1318,9 +1318,48 @@ class AssistenteConsultaAmpliadaService
         ]);
         $ocorrencias = $this->ocorrenciasAluno([
             'aluno_id' => $alunoId,
+            'ano_letivo' => $ano['ano'] ?? null,
+        ]);
+        $abertas = $this->ocorrenciasAluno([
+            'aluno_id' => $alunoId,
             'status' => 'aberta',
             'ano_letivo' => $ano['ano'] ?? null,
         ]);
+
+        $anoExplicito = (int) ($filtros['ano_letivo'] ?? $filtros['ano'] ?? 0);
+        $filtrosBoletim = ['aluno_id' => $alunoId];
+        if ($anoExplicito >= 2000) {
+            $filtrosBoletim['ano_letivo'] = $anoExplicito;
+        }
+        try {
+            $boletim = $this->boletimAluno($filtrosBoletim);
+        } catch (\Throwable $e) {
+            error_log('AssistenteConsultaAmpliada perfilAluno360 boletim: ' . $e->getMessage());
+            $boletim = ['ok' => false, 'error' => 'Boletim indisponível nesta consulta.'];
+        }
+
+        try {
+            $provas = $this->provasOnlineDoAluno($alunoId, (int) ($ano['ano'] ?? 0));
+        } catch (\Throwable $e) {
+            error_log('AssistenteConsultaAmpliada perfilAluno360 provas: ' . $e->getMessage());
+            $provas = [
+                'ok' => false,
+                'total' => 0,
+                'total_acertos' => 0,
+                'total_erros' => 0,
+                'percentual_acerto' => null,
+                'provas' => [],
+                'aviso' => 'Provas online indisponíveis nesta consulta.',
+            ];
+        }
+
+        $nome = trim((string) ($baseAluno['nome'] ?? $a['nome'] ?? ''));
+        $ra = $baseAluno['ra'] ?? ($a['ra'] ?? null);
+        $turmaNome = trim((string) ($baseAluno['turma_nome'] ?? $a['turma_nome'] ?? ''));
+        $boletimOk = !empty($boletim['ok']);
+        $totalOcorrencias = (int) ($ocorrencias['total'] ?? 0);
+        $totalAbertas = (int) ($abertas['total'] ?? 0);
+        $totalProvas = (int) ($provas['total'] ?? 0);
 
         $indicadores = [
             'provas_pct' => $provas['percentual_acerto'] ?? null,
@@ -1329,28 +1368,42 @@ class AssistenteConsultaAmpliadaService
             'media_provas' => $provas['percentual_acerto'] ?? null,
         ];
         $atividade = [
-            'total_provas' => (int) ($provas['total_provas'] ?? 0),
+            'total_provas' => $totalProvas,
+            'total_acertos' => (int) ($provas['total_acertos'] ?? 0),
+            'total_erros' => (int) ($provas['total_erros'] ?? 0),
             'total_jornadas' => (int) ($jornadas['total_jornadas'] ?? 0),
             'jornadas_concluidas' => (int) ($jornadas['concluidas'] ?? 0),
             'jornadas_em_andamento' => (int) ($jornadas['em_andamento'] ?? 0),
         ];
         $pendencias = [
-            'ocorrencias_abertas' => (int) ($ocorrencias['total'] ?? 0),
+            'ocorrencias_abertas' => $totalAbertas,
+            'ocorrencias' => $totalOcorrencias,
             'faltas' => isset($faltas['frequencia']['faltas']) ? (int) $faltas['frequencia']['faltas'] : null,
             'sem_frequencia' => empty($faltas['frequencia']),
         ];
 
         $destaques = [];
-        if (($ocorrencias['total'] ?? 0) > 0) {
-            $destaques[] = (int) $ocorrencias['total'] . ' ocorrência(s) aberta(s).';
+        if ($totalOcorrencias > 0) {
+            $destaques[] = $totalOcorrencias . ' ocorrência(s), ' . $totalAbertas . ' aberta(s).';
+        } elseif (!empty($ocorrencias['aviso'])) {
+            $destaques[] = (string) $ocorrencias['aviso'];
         }
         if (!empty($faltas['aviso'])) {
             $destaques[] = (string) $faltas['aviso'];
         } elseif (isset($faltas['frequencia']['faltas'])) {
             $destaques[] = 'Faltas no período: ' . (int) $faltas['frequencia']['faltas'] . '.';
         }
-        if (($provas['total_provas'] ?? 0) > 0 && isset($provas['percentual_acerto'])) {
-            $destaques[] = 'Acerto médio em provas: ' . $provas['percentual_acerto'] . '%.';
+        if ($totalProvas > 0) {
+            $destaques[] = 'Provas online: ' . (int) ($provas['total_acertos'] ?? 0) . ' acertos e '
+                . (int) ($provas['total_erros'] ?? 0) . ' erros.';
+        } elseif (!empty($provas['aviso'])) {
+            $destaques[] = (string) $provas['aviso'];
+        }
+        if ($boletimOk) {
+            $anoBoletim = (int) ($boletim['ano_letivo'] ?? 0);
+            $destaques[] = 'Boletim' . ($anoBoletim > 0 ? ' de ' . $anoBoletim : '') . ' incluído.';
+        } elseif (!empty($boletim['error'])) {
+            $destaques[] = (string) $boletim['error'];
         }
         if (($jornadas['total_jornadas'] ?? 0) > 0) {
             $destaques[] = 'Jornadas: ' . (int) ($jornadas['concluidas'] ?? 0) . ' concluída(s) de '
@@ -1359,20 +1412,142 @@ class AssistenteConsultaAmpliadaService
             $destaques[] = (string) $jornadas['error'];
         }
 
+        $boletimPainel = $boletimOk ? [
+            'formato' => $boletim['formato'] ?? null,
+            'ano_letivo' => $boletim['ano_letivo'] ?? null,
+            'regra' => $boletim['regra'] ?? null,
+            'quadro' => $boletim['quadro'] ?? null,
+            'eventos' => $boletim['eventos'] ?? [],
+            'aviso' => $boletim['aviso'] ?? null,
+        ] : [
+            'formato' => null,
+            'ano_letivo' => null,
+            'regra' => null,
+            'quadro' => null,
+            'eventos' => [],
+            'aviso' => (string) ($boletim['error'] ?? 'Boletim sem notas neste período.'),
+        ];
+
         return [
             'ok' => true,
+            'resumo' => [
+                'nome' => $nome,
+                'ra' => $ra !== null && $ra !== '' ? (string) $ra : null,
+                'turma' => $turmaNome !== '' ? $turmaNome : null,
+                'faltas' => $pendencias['faltas'],
+                'frequencia_pct' => $indicadores['frequencia_pct'],
+                'ocorrencias' => $totalOcorrencias,
+                'ocorrencias_abertas' => $totalAbertas,
+                'boletim_ano' => $boletimOk ? ($boletim['ano_letivo'] ?? null) : null,
+                'boletim_tem_notas' => $boletimOk,
+                'provas_online_total' => $totalProvas,
+                'provas_online_acertos' => $totalProvas > 0 ? (int) ($provas['total_acertos'] ?? 0) : null,
+                'provas_online_erros' => $totalProvas > 0 ? (int) ($provas['total_erros'] ?? 0) : null,
+            ],
             'aluno' => [
                 'id' => $alunoId,
-                'nome' => trim((string) ($baseAluno['nome'] ?? $a['nome'] ?? '')),
-                'ra' => $baseAluno['ra'] ?? ($a['ra'] ?? null),
+                'nome' => $nome,
+                'ra' => $ra,
                 'turma_id' => isset($baseAluno['turma_id']) ? (int) $baseAluno['turma_id'] : ($a['turma_id'] ?? null),
-                'turma_nome' => trim((string) ($baseAluno['turma_nome'] ?? $a['turma_nome'] ?? '')),
+                'turma_nome' => $turmaNome,
             ],
             'ano_letivo' => $ano,
+            'faltas' => [
+                'periodo' => $faltas['periodo'] ?? null,
+                'frequencia' => $faltas['frequencia'] ?? null,
+                'turma_percentual' => $faltas['turma_percentual'] ?? null,
+                'aviso' => $faltas['aviso'] ?? ($faltas['error'] ?? null),
+            ],
+            'ocorrencias' => [
+                'total' => $totalOcorrencias,
+                'abertas' => $totalAbertas,
+                'itens' => $ocorrencias['ocorrencias'] ?? [],
+                'aviso' => $ocorrencias['aviso'] ?? ($ocorrencias['error'] ?? null),
+            ],
+            'provas_online' => $provas,
             'indicadores' => $indicadores,
             'atividade' => $atividade,
             'pendencias' => $pendencias,
             'destaques' => array_slice($destaques, 0, 6),
+            'boletim' => $boletimPainel,
+        ];
+    }
+
+    /**
+     * Provas online finalizadas do aluno, com acertos e erros.
+     * Lançamento de notas da coordenação fica de fora.
+     *
+     * @return array<string,mixed>
+     */
+    private function provasOnlineDoAluno(int $alunoId, int $anoLetivo = 0): array
+    {
+        $lista = $this->alunos->listarProvasAluno([
+            'aluno_id' => $alunoId,
+            'limite' => 200,
+            'status' => 'finalizado',
+        ]);
+        if (empty($lista['ok'])) {
+            return [
+                'ok' => false,
+                'total' => 0,
+                'total_acertos' => 0,
+                'total_erros' => 0,
+                'percentual_acerto' => null,
+                'provas' => [],
+                'aviso' => (string) ($lista['error'] ?? 'Provas online indisponíveis.'),
+            ];
+        }
+
+        $vistas = [];
+        $linhas = [];
+        $acertos = 0;
+        $erros = 0;
+        $total = 0;
+        foreach ($lista['provas'] ?? [] as $p) {
+            if (!is_array($p) || ($p['origem'] ?? '') !== 'prova_online') {
+                continue;
+            }
+            $anoProva = (int) ($p['evento']['ano_letivo'] ?? 0);
+            if ($anoLetivo > 0 && $anoProva > 0 && $anoProva !== $anoLetivo) {
+                continue;
+            }
+            $provaId = (int) ($p['prova_id'] ?? 0);
+            if ($provaId > 0 && isset($vistas[$provaId])) {
+                continue;
+            }
+            if ($provaId > 0) {
+                $vistas[$provaId] = true;
+            }
+            $total++;
+            $ac = (int) ($p['realizacao']['acertos'] ?? 0);
+            $er = (int) ($p['realizacao']['erros'] ?? 0);
+            $acertos += $ac;
+            $erros += $er;
+            if (count($linhas) < 20) {
+                $linhas[] = [
+                    'titulo' => trim((string) ($p['titulo'] ?? '')),
+                    'materia' => trim((string) ($p['materia']['nome'] ?? '')),
+                    'data' => $p['evento']['data_prova'] ?? ($p['realizacao']['dia_realizacao'] ?? null),
+                    'acertos' => $ac,
+                    'erros' => $er,
+                    'nota' => $p['realizacao']['nota'] ?? null,
+                    'percentual_acerto' => $p['realizacao']['percentual_acerto'] ?? null,
+                ];
+            }
+        }
+
+        $totalQuestoes = $acertos + $erros;
+
+        return [
+            'ok' => true,
+            'total' => $total,
+            'total_acertos' => $acertos,
+            'total_erros' => $erros,
+            'percentual_acerto' => $totalQuestoes > 0 ? round(($acertos / $totalQuestoes) * 100, 1) : null,
+            'provas' => $linhas,
+            'aviso' => $total === 0
+                ? ('Nenhuma prova online finalizada' . ($anoLetivo > 0 ? ' em ' . $anoLetivo : '') . '.')
+                : null,
         ];
     }
 

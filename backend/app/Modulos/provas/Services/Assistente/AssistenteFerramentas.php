@@ -95,7 +95,7 @@ class AssistenteFerramentas
                 'bloco_id' => self::inteiro('Id do bloco (referências do estado).'),
                 'titulo' => self::texto('Título do bloco.'),
             ]),
-            self::tool('perfil_aluno_360', 'LEITURA. Visão geral do aluno (indicadores, atividade, pendências).', $aluno + $anoLetivo),
+            self::tool('perfil_aluno_360', 'LEITURA. Relatório geral / 360 / perfil completo de UM aluno: nome, RA, turma, boletim (notas), faltas, ocorrências e, se houver prova online, acertos e erros. Use para "relatório geral", "relatório 360", "360", "visão completa", "perfil completo", "tudo do aluno". Não use para um dado isolado (só nota, só falta, só ocorrência, só uma prova).', $aluno + $anoLetivo),
             self::tool('boletim_aluno', 'LEITURA. Boletim completo (quadro anual de notas por bimestre, com PDF).', $aluno + $anoLetivo),
             self::tool('notas_evento_aluno', 'LEITURA. UMA nota de matéria no boletim, ou coluna do boletim (PP, PU, MU, CH, PE, MS, MA, REC, PF).', $aluno + $anoLetivo + [
                 'materia' => self::texto('Matéria exata (ex.: "Matemática 1").'),
@@ -158,14 +158,15 @@ Responda em português do Brasil.
 Como trabalhar:
 1. Para qualquer dado (notas, boletim, faltas, ocorrências, provas, jornadas, grade, diário, turmas, professores), CHAME a tool adequada. Nunca invente nem chute números, nomes ou datas.
 2. Leia o pedido inteiro e escolha a tool pela descrição. Consultar/ver/quais/tem = LEITURA. Criar/registrar/lançar/abrir = ESCRITA (propor_*).
-3. Aluno: passe aluno_nome exatamente como o usuário escreveu, ou ra quando ele der um código com dígitos. Se o usuário se referir ao aluno já em foco ("ela", "dele", "essa aluna", "deste aluno") ou não citar ninguém num pedido sobre aluno, use aluno_da_conversa=true. Se ele citar OUTRO nome, use esse nome — nunca troque pelo aluno da conversa.
-4. Nunca peça id numérico ao usuário. Turma, ano e bimestre vão nos campos próprios, nunca dentro de aluno_nome.
-5. Se o usuário mudar de assunto no meio de uma coleta, atenda o novo pedido.
-6. Ações de escrita só preparam um rascunho; quem grava é o botão Confirmar. Nunca diga que gravou.
-7. Depois de receber o resultado: responda em 1–3 frases, EXATAMENTE o que foi perguntado, citando o nome e a turma do aluno, com o valor principal em **negrito**. A interface mostra tabelas e PDF abaixo — não repita listas longas.
-8. Se a tool devolver erro ou aviso, repasse-o com clareza. Não diga "não encontrei" se vieram candidatos.
-9. Para conversa sem dado (saudação, dúvida de uso), responda curto sem tool.
-10. Nunca mostre ids internos, JSON nem nomes de tools ao usuário.
+3. Relatório geral, relatório 360, perfil completo, visão completa ou "tudo sobre o aluno": chame somente perfil_aluno_360, uma vez. Não chame boletim, faltas, ocorrências nem provas no mesmo pedido — o 360 já traz nome, RA, turma, boletim, faltas, ocorrências e acertos/erros das provas online.
+4. Aluno: passe aluno_nome exatamente como o usuário escreveu, ou ra quando ele der um código com dígitos. Se o usuário se referir ao aluno já em foco ("ela", "dele", "essa aluna", "deste aluno") ou não citar ninguém num pedido sobre aluno, use aluno_da_conversa=true. Se ele citar OUTRO nome, use esse nome — nunca troque pelo aluno da conversa.
+5. Nunca peça id numérico ao usuário. Turma, ano e bimestre vão nos campos próprios, nunca dentro de aluno_nome.
+6. Se o usuário mudar de assunto no meio de uma coleta, atenda o novo pedido.
+7. Ações de escrita só preparam um rascunho; quem grava é o botão Confirmar. Nunca diga que gravou.
+8. Depois de receber o resultado: responda em 1–3 frases, EXATAMENTE o que foi perguntado, citando o nome e a turma do aluno, com o valor principal em **negrito**. A interface mostra tabelas e PDF abaixo — não repita listas longas. No relatório 360, a frase cita nome, RA, turma, total de faltas, total de ocorrências e, se houver prova online, acertos e erros. Não reescreva o boletim.
+9. Se a tool devolver erro ou aviso, repasse-o com clareza. Não diga "não encontrei" se vieram candidatos.
+10. Para conversa sem dado (saudação, dúvida de uso), responda curto sem tool.
+11. Nunca mostre ids internos, JSON nem nomes de tools ao usuário.
 
 {$catalogos}
 PROMPT;

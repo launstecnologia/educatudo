@@ -852,18 +852,34 @@ class ProvasAlunoAssistenteService
             ];
         }
         if ($tool === 'perfil_aluno_360' && !empty($resultado['ok'])) {
+            $alunoId = (int) ($resultado['aluno']['id'] ?? 0);
+            $base = defined('URL') ? rtrim((string) URL, '/') : '';
+            $pdfUrl = $alunoId > 0 ? ($base . '/admin/students/' . $alunoId . '/boletim/pdf') : null;
+            $pdfOficial = $alunoId > 0
+                ? ($base . '/admin/resultados-finais/aluno/' . $alunoId . '/boletim/pdf'
+                    . (!empty($resultado['aluno']['turma_id'])
+                        ? ('?turma_id=' . (int) $resultado['aluno']['turma_id'])
+                        : ''))
+                : null;
             return [
                 'tipo' => 'perfil_aluno_360',
                 'aluno' => $resultado['aluno'] ?? null,
                 'ano_letivo' => $resultado['ano_letivo'] ?? null,
+                'resumo' => $resultado['resumo'] ?? [],
                 'indicadores' => $resultado['indicadores'] ?? [],
                 'atividade' => $resultado['atividade'] ?? [],
                 'pendencias' => $resultado['pendencias'] ?? [],
                 'destaques' => $resultado['destaques'] ?? [],
+                'boletim' => $resultado['boletim'] ?? null,
+                'faltas' => $resultado['faltas'] ?? null,
+                'ocorrencias' => $resultado['ocorrencias'] ?? null,
+                'provas_online' => $resultado['provas_online'] ?? null,
+                'pdf_url' => $pdfUrl,
+                'pdf_oficial_url' => $pdfOficial,
                 'opcoes' => [
-                    'Ver boletim deste aluno',
-                    'Ver faltas deste aluno',
-                    'Ver ocorrências deste aluno',
+                    'Notas do 1º bimestre',
+                    'Ver jornadas deste aluno',
+                    'Detalhar a última prova online',
                 ],
             ];
         }
