@@ -426,6 +426,7 @@ class TrilhaAdmin
             ['/admin/usuarios', 'Usuários', 'Administradores'],
             ['/admin/monitors', 'Usuários', 'Monitores'],
             ['/admin/permissoes-perfis', 'Usuários', 'Perfis de Permissão'],
+            ['/admin/z-configuracao/reiniciar-homologacoes', 'Configuração', 'Reiniciar homologações'],
             ['/admin/z-configuracao/zerar-popular', 'Configuração', 'Zerar e popular EM 2025'],
             ['/admin/z-configuracao', null, 'Configuração'],
             ['/admin/documentos-institucionais', 'Configuração', 'Documentos Institucionais'],

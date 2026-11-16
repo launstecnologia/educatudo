@@ -109,4 +109,13 @@ if ($mostraZerarPopularEduca) {
     ];
 }
 
+if (\App\Modulos\Fechamento\Services\FechamentoService::escolaPermiteReinicioHomologacao()) {
+    $hub_cards[] = [
+        'href' => URL . '/admin/z-configuracao/reiniciar-homologacoes',
+        'title' => 'Reiniciar homologações',
+        'description' => 'Reabre os períodos homologados para homologar de novo nesta escola de teste.',
+        'icon' => 'fa-solid fa-rotate',
+    ];
+}
+
 include \App\Core\ViewPaths::adminPartial('hub_modulos.php');

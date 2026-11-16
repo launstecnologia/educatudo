@@ -809,6 +809,12 @@ $urlRecursosEscolares = $canViewSidebar(['almoxarifado'])
             <span class="sidebar-text text-sm">Zerar e popular EM 2025</span>
         </a>
         <?php endif; ?>
+        <?php if (\App\Modulos\Fechamento\Services\FechamentoService::escolaPermiteReinicioHomologacao()): ?>
+        <a href="<?= URL ?>/admin/z-configuracao/reiniciar-homologacoes" class="<?= $linkCls($cp === 'reiniciar_homologacoes_educa') ?>">
+            <i class="fa-solid fa-rotate w-4 h-4 mr-3"></i>
+            <span class="sidebar-text text-sm">Reiniciar homologações</span>
+        </a>
+        <?php endif; ?>
     </div>
 </div>
 <?php endif; ?>

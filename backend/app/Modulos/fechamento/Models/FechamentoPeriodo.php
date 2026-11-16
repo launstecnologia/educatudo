@@ -171,6 +171,25 @@ class FechamentoPeriodo
         return $porTurma;
     }
 
+    /**
+     * Períodos vigentes num status, para o reinício de teste da escola Educa.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function listarVigentesPorStatus(string $status): array
+    {
+        if (!$this->schemaPronto()) {
+            return [];
+        }
+        $status = FechamentoMaquinaEstados::normalizar($status);
+        return $this->db->fetchAll(
+            'SELECT * FROM fechamento_periodo
+             WHERE vigente = 1 AND status = :status
+             ORDER BY ano_letivo ASC, turma_id ASC, id ASC',
+            ['status' => $status]
+        ) ?: [];
+    }
+
     public function estaTravado(int $turmaId, int $anoLetivo, string $periodoTipo, int $periodoNumero): bool
     {
         $row = $this->findVigente($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);

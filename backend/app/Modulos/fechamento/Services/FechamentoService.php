@@ -10,6 +10,8 @@ use App\Modulos\Fechamento\Models\FechamentoPeriodo;
  */
 class FechamentoService
 {
+    public const SLUG_TESTE_HOMOLOGACAO = 'colegio-educa';
+
     private FechamentoPeriodo $model;
     private ResultadoHomologacaoService $homologacao;
 
@@ -201,6 +203,48 @@ class FechamentoService
         }
 
         return ['success' => true, 'fechamento' => $this->model->findById($novoId)];
+    }
+
+    public static function escolaPermiteReinicioHomologacao(): bool
+    {
+        return defined('TENANT_SLUG') && (string) TENANT_SLUG === self::SLUG_TESTE_HOMOLOGACAO;
+    }
+
+    /**
+     * Reabre todo período homologado desta escola de teste para homologar de novo.
+     * O snapshot anterior permanece no livro, como na retificação.
+     *
+     * @return array{success:bool,error?:string,reabertos?:int,erros?:list<string>}
+     */
+    public function reiniciarHomologacoesParaTeste(int $usuarioId): array
+    {
+        if (!self::escolaPermiteReinicioHomologacao()) {
+            return ['success' => false, 'error' => 'Recusado: esta escola não é a de teste. Nada foi alterado.'];
+        }
+        if ($usuarioId <= 0) {
+            return ['success' => false, 'error' => 'Usuário inválido. Nada foi alterado.'];
+        }
+
+        $periodos = $this->model->listarVigentesPorStatus(FechamentoMaquinaEstados::HOMOLOGADO);
+        $reabertos = 0;
+        $erros = [];
+        foreach ($periodos as $periodo) {
+            $resultado = $this->retificar(
+                (int) ($periodo['turma_id'] ?? 0),
+                (int) ($periodo['ano_letivo'] ?? 0),
+                (string) ($periodo['periodo_tipo'] ?? 'ano'),
+                (int) ($periodo['periodo_numero'] ?? 0),
+                $usuarioId,
+                'Reinício de homologação para teste da escola Educa.'
+            );
+            if (!empty($resultado['success'])) {
+                $reabertos++;
+                continue;
+            }
+            $erros[] = (string) ($resultado['error'] ?? 'Não foi possível reabrir um período.');
+        }
+
+        return ['success' => true, 'reabertos' => $reabertos, 'erros' => $erros];
     }
 
     /**

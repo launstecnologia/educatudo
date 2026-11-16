@@ -9,6 +9,9 @@ use App\Core\Database;
 use App\Dominio\Escola\Services\AnoLetivoService;
 use App\Painel\Admin\Services\LogAnoLetivoService;
 use App\Helpers\AdminPasswordHelper;
+use App\Modulos\Fechamento\Models\FechamentoPeriodo;
+use App\Modulos\Fechamento\Services\FechamentoMaquinaEstados;
+use App\Modulos\Fechamento\Services\FechamentoService;
 use App\Painel\Master\Services\LimparDadosEscolaEducaService;
 use App\Painel\Master\Services\MasterFilaService;
 
@@ -318,6 +321,100 @@ class AnoLetivoController extends BaseController
             'success'
         );
         $this->redirect('/admin/z-configuracao');
+    }
+
+    /**
+     * Reabre homologações só na escola de teste colegio-educa.
+     */
+    public function reiniciarHomologacoesEduca()
+    {
+        $user = $this->auth->getUser();
+        if (!$this->podeReiniciarHomologacoes($user)) {
+            $this->redirect('/admin/z-configuracao');
+            return;
+        }
+
+        $periodos = [];
+        try {
+            $model = new FechamentoPeriodo();
+            $periodos = $model->listarVigentesPorStatus(FechamentoMaquinaEstados::HOMOLOGADO);
+        } catch (\Throwable $e) {
+            $periodos = [];
+        }
+
+        $this->viewWithLayout('admin', 'admin/z-configuracao/reiniciar-homologacoes', [
+            'title' => 'Reiniciar homologações - EducaTudo',
+            'user' => $user,
+            'current_page' => 'reiniciar_homologacoes_educa',
+            'periodos_homologados' => count($periodos),
+            'csrf_token' => $this->generateCsrfToken(),
+            'flash' => $this->getFlashMessage(),
+        ]);
+    }
+
+    public function reiniciarHomologacoesEducaExecutar()
+    {
+        $user = $this->auth->getUser();
+        $volta = '/admin/z-configuracao/reiniciar-homologacoes';
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Sessão expirada. Abra a tela de novo e confirme outra vez.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+        if (!$this->podeReiniciarHomologacoes($user)) {
+            $this->setFlashMessage('Recusado: esta escola não é a de teste. Nada foi alterado.', 'error');
+            $this->redirect('/admin/z-configuracao');
+            return;
+        }
+
+        $senha = (string) ($_POST['senha'] ?? '');
+        if (trim($senha) === '') {
+            $this->setFlashMessage('Digite sua senha para confirmar.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+        if (!is_array($user) || !AdminPasswordHelper::verifyAdminPassword($this->db, $user, $senha)) {
+            $this->setFlashMessage('Senha incorreta. Nada foi alterado.', 'error');
+            $this->redirect($volta);
+            return;
+        }
+
+        $usuarioId = (int) ($user['id'] ?? 0);
+        $resultado = (new FechamentoService())->reiniciarHomologacoesParaTeste($usuarioId);
+        if (empty($resultado['success'])) {
+            $this->setFlashMessage((string) ($resultado['error'] ?? 'Não foi possível reiniciar. Nada foi alterado.'), 'error');
+            $this->redirect($volta);
+            return;
+        }
+
+        $reabertos = (int) ($resultado['reabertos'] ?? 0);
+        $erros = is_array($resultado['erros'] ?? null) ? $resultado['erros'] : [];
+        if ($reabertos === 0 && $erros === []) {
+            $this->setFlashMessage('Nenhum período estava homologado. No Fechamento você já pode homologar.', 'success');
+        } elseif ($erros !== []) {
+            $this->setFlashMessage(
+                $reabertos . ' período(s) reaberto(s). Alguns não reabriram: ' . implode(' ', array_slice($erros, 0, 3)),
+                'error'
+            );
+        } else {
+            $this->setFlashMessage(
+                $reabertos . ' período(s) reaberto(s). Abra o Fechamento e homologue de novo. Depois gere os documentos na impressão em lote.',
+                'success'
+            );
+        }
+        $this->redirect($volta);
+    }
+
+    /**
+     * @param array<string,mixed>|null $user
+     */
+    private function podeReiniciarHomologacoes(?array $user): bool
+    {
+        $perms = AdminPermissionMatrix::effectivePermissionsForUser($this->db, $user ?? []);
+        if (!AdminPermissionMatrix::usuarioPodeVerZConfiguracao($perms)) {
+            return false;
+        }
+        return FechamentoService::escolaPermiteReinicioHomologacao();
     }
 
     /**
