@@ -12,7 +12,7 @@ use App\Helpers\AlunoLancamentoNotaHelper;
  */
 class ImportacaoNotasPlanilha
 {
-    private const MAX_BYTES = 2000000;
+    private const MAX_BYTES = 20971520;
     private const MAX_XML_BYTES = 10000000;
     private const MAX_LINHAS = 8000;
     private const MAX_ARQUIVOS = 30;
@@ -111,7 +111,7 @@ class ImportacaoNotasPlanilha
             throw new \RuntimeException('Arquivo de planilha inválido.');
         }
         if ($tamanho <= 0 || $tamanho > self::MAX_BYTES) {
-            throw new \RuntimeException('A planilha precisa ter até 2 MB.');
+            throw new \RuntimeException('A planilha precisa ter até 20 MB.');
         }
         $this->turmaDocLida = '';
         $this->turmaPorLinha = [];
