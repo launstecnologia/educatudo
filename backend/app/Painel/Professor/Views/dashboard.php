@@ -19,6 +19,124 @@
     </div>
 </div>
 
+<?php if (!empty($grupo_seb_ativo)): ?>
+<?php
+$aulasHoje = is_array($aulas_do_dia_professor ?? null) ? $aulas_do_dia_professor : [];
+$desempenho = is_array($desempenho_turmas ?? null) ? $desempenho_turmas : ['media_geral' => null, 'turmas' => []];
+$linhasDesempenho = is_array($desempenho['turmas'] ?? null) ? $desempenho['turmas'] : [];
+$mediaGeral = isset($desempenho['media_geral']) && $desempenho['media_geral'] !== null
+    ? (float) $desempenho['media_geral']
+    : null;
+$tzPainel = new DateTimeZone('America/Sao_Paulo');
+$agoraPainel = new DateTimeImmutable('now', $tzPainel);
+$diasSemanaPainel = [1 => 'segunda-feira', 2 => 'terça-feira', 3 => 'quarta-feira', 4 => 'quinta-feira', 5 => 'sexta-feira', 6 => 'sábado', 7 => 'domingo'];
+$rotuloHoje = ($diasSemanaPainel[(int) $agoraPainel->format('N')] ?? '') . ', ' . $agoraPainel->format('d/m');
+$corMedia = static function ($media): string {
+    if ($media === null) {
+        return 'text-gray-400';
+    }
+    $nota = (float) $media;
+    $bom = $nota > 10 ? 70 : 7;
+    $regular = $nota > 10 ? 50 : 5;
+    if ($nota >= $bom) {
+        return 'text-green-600';
+    }
+    if ($nota >= $regular) {
+        return 'text-amber-600';
+    }
+    return 'text-red-600';
+};
+?>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8">
+    <div class="bg-white rounded-xl shadow-lg">
+        <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-xl font-semibold text-gray-900">Aulas de hoje</h2>
+                    <p class="text-sm text-gray-500 mt-1"><?= htmlspecialchars($rotuloHoje) ?></p>
+                </div>
+                <a href="<?= URL ?>/professor/grade-horaria" class="text-blue-600 hover:text-blue-700 text-sm font-medium whitespace-nowrap">Minha grade</a>
+            </div>
+        </div>
+        <div class="p-6">
+            <?php if ($aulasHoje === []): ?>
+                <p class="text-sm text-gray-500">Nenhuma aula prevista para hoje.</p>
+            <?php else: ?>
+                <ul class="space-y-3">
+                    <?php foreach ($aulasHoje as $aula):
+                        $de = substr((string) ($aula['horario_de'] ?? ''), 0, 5);
+                        $ate = substr((string) ($aula['horario_ate'] ?? ''), 0, 5);
+                        $turmaAula = trim((string) ($aula['turma_nome'] ?? ''));
+                        $materiaAula = trim((string) ($aula['materia_nome'] ?? ''));
+                        $salaAula = trim((string) ($aula['sala_nome'] ?? ''));
+                    ?>
+                    <li class="flex gap-3 rounded-lg border border-gray-100 p-3">
+                        <div class="w-16 flex-shrink-0 text-center">
+                            <p class="text-sm font-bold text-gray-900"><?= htmlspecialchars($de) ?></p>
+                            <p class="text-xs text-gray-400"><?= htmlspecialchars($ate) ?></p>
+                        </div>
+                        <div class="min-w-0 flex-1 border-l-4 border-blue-500 pl-3">
+                            <p class="text-sm font-semibold text-gray-900 truncate"><?= htmlspecialchars($turmaAula !== '' ? $turmaAula : 'Turma') ?></p>
+                            <?php if ($materiaAula !== ''): ?>
+                            <p class="text-xs text-gray-600 truncate"><?= htmlspecialchars($materiaAula) ?></p>
+                            <?php endif; ?>
+                            <?php if ($salaAula !== ''): ?>
+                            <p class="text-xs text-gray-400 truncate"><?= htmlspecialchars($salaAula) ?></p>
+                            <?php endif; ?>
+                        </div>
+                    </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-lg">
+        <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-xl font-semibold text-gray-900">Desempenho das turmas</h2>
+                    <p class="text-sm text-gray-500 mt-1">Média das avaliações nas turmas em que você leciona</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs text-gray-500">Média geral</p>
+                    <p class="text-2xl font-bold <?= $corMedia($mediaGeral) ?>">
+                        <?= $mediaGeral === null ? '—' : htmlspecialchars(number_format($mediaGeral, 1, ',', '.')) ?>
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="p-6">
+            <?php if ($linhasDesempenho === []): ?>
+                <p class="text-sm text-gray-500">Nenhuma turma vinculada à sua grade.</p>
+            <?php else: ?>
+                <ul class="space-y-3">
+                    <?php foreach ($linhasDesempenho as $linha):
+                        $mediaLinha = isset($linha['media']) && $linha['media'] !== null ? (float) $linha['media'] : null;
+                        $alunosLinha = (int) ($linha['alunos'] ?? 0);
+                    ?>
+                    <li class="flex items-center justify-between gap-3 rounded-lg border border-gray-100 p-3">
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-gray-900 truncate"><?= htmlspecialchars((string) ($linha['turma_nome'] ?? 'Turma')) ?></p>
+                            <p class="text-xs text-gray-500 truncate">
+                                <?= htmlspecialchars((string) ($linha['materia_nome'] ?? '')) ?>
+                                <?php if ($alunosLinha > 0): ?>
+                                    · <?= $alunosLinha ?> <?= $alunosLinha === 1 ? 'aluno' : 'alunos' ?>
+                                <?php endif; ?>
+                            </p>
+                        </div>
+                        <p class="text-lg font-bold <?= $corMedia($mediaLinha) ?> whitespace-nowrap">
+                            <?= $mediaLinha === null ? 'Sem notas' : htmlspecialchars(number_format($mediaLinha, 1, ',', '.')) ?>
+                        </p>
+                    </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- Stats Cards -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
     <!-- Card Jornadas -->
@@ -237,7 +355,7 @@
     <div class="bg-white rounded-xl shadow-lg">
         <div class="p-6 border-b border-gray-200">
             <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold text-gray-900">Prova Online</h2>
+                <h2 class="text-xl font-semibold text-gray-900"><?= !empty($grupo_seb_ativo) ? 'Avaliações' : 'Prova Online' ?></h2>
                 <a href="<?= URL ?>/professor/provas" class="text-blue-600 hover:text-blue-700 text-sm font-medium">
                     Ver todas
                 </a>

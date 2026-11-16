@@ -125,6 +125,7 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
             'professor_arquivos' => \App\Core\LayoutHelper::get('module_professor_arquivos', '1') === '1',
             'professor_apostilas' => \App\Core\LayoutHelper::get('module_professor_apostilas', '1') === '1',
         ];
+        $grupoSebAtivoLayout = \App\Core\LayoutHelper::isModuleEnabled('grupo_seb');
 
         $externalAppsLinks = json_decode(\App\Core\LayoutHelper::get('external_apps_links', '[]'), true);
         if (!is_array($externalAppsLinks)) {
@@ -230,6 +231,57 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
         }
         ?>
         <nav class="space-y-1">
+            <?php if (!empty($grupoSebAtivoLayout)): ?>
+            <!-- Grupo Seb: menu plano do professor -->
+            <a href="<?= URL ?>/professor/dashboard" class="flex items-center px-4 py-3 <?= ($current_page ?? '') === 'dashboard' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
+                </svg>
+                <span class="sidebar-text">Dashboard</span>
+            </a>
+            <?php if (\App\Core\FeatureGate::isModuleEnabled('diario_classe')): ?>
+            <a href="<?= URL ?>/professor/diarios" class="flex items-center px-4 py-3 <?= ($current_page ?? '') === 'diarios_classe' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <span class="sidebar-text">Diários de Classe</span>
+            </a>
+            <?php endif; ?>
+            <?php if (\App\Core\LayoutHelper::isModuleEnabled('mural_recados')): ?>
+            <a href="<?= URL ?>/professor/mural-recados" class="flex items-center px-4 py-3 <?= ($current_page ?? '') === 'mural-recados' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                </svg>
+                <span class="sidebar-text">Mural de Recados</span>
+            </a>
+            <?php endif; ?>
+            <?php if (!empty($modulosProfessor['professor_provas'])): ?>
+            <a href="<?= URL ?>/professor/provas" class="flex items-center px-4 py-3 <?= ($current_page ?? '') === 'provas' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                </svg>
+                <span class="sidebar-text">Avaliações</span>
+            </a>
+            <?php endif; ?>
+            <a href="<?= URL ?>/professor/questoes" class="flex items-center px-4 py-3 <?= ($current_page ?? '') === 'questoes' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9h8M8 13h6m-6 4h8M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H7l-4 3V7a2 2 0 012-2z"></path>
+                </svg>
+                <span class="sidebar-text">Questões</span>
+            </a>
+            <a href="<?= URL ?>/professor/grade-horaria" class="flex items-center px-4 py-3 <?= ($current_page ?? '') === 'grade_horaria' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                <span class="sidebar-text">Minha grade</span>
+            </a>
+            <a href="<?= URL ?>/logout?portal=professor" class="flex items-center px-4 py-3 text-red-200 hover:bg-red-500/20 hover:text-red-100 rounded-xl transition-all duration-200 hover:scale-105 mt-4">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                </svg>
+                <span class="sidebar-text">Sair</span>
+            </a>
+            <?php else: ?>
             <!-- Dashboard -->
             <a href="<?= URL ?>/professor/dashboard" class="flex items-center px-4 py-3 <?= ($current_page ?? '') === 'dashboard' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105">
                 <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -582,6 +634,7 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                 </svg>
                 <span class="sidebar-text">Sair</span>
             </a>
+            <?php endif; ?>
         </nav>
         <script>
         (function () {
@@ -623,8 +676,12 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                 }
             }
             var navProfessor = document.querySelector('#sidebar nav');
-            ordenarItensMenu(navProfessor, true, true);
-            ordenarItensMenu(document.getElementById('academico-submenu'), false, false);
+            var grupoSebMenu = <?= !empty($grupoSebAtivoLayout) ? 'true' : 'false' ?>;
+            // Grupo Seb: manter a ordem fixa do menu plano (não alfabetizar)
+            if (!grupoSebMenu) {
+                ordenarItensMenu(navProfessor, true, true);
+                ordenarItensMenu(document.getElementById('academico-submenu'), false, false);
+            }
         })();
         </script>
     </div>

@@ -727,6 +727,16 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
         
         // Total de mensagens não lidas (mantido para compatibilidade com o card de mensagens)
         $total_mensagens_nao_lidas = 0;
+
+        $grupoSebAtivo = \App\Modulos\GrupoSeb\Services\GrupoSebService::estaAtivo();
+        $aulasDoDiaProfessor = [];
+        $desempenhoTurmas = ['media_geral' => null, 'turmas' => []];
+        if ($grupoSebAtivo) {
+            $grupoSeb = new \App\Modulos\GrupoSeb\Services\GrupoSebService($this->db);
+            $professorId = (int) ($professor['id'] ?? 0);
+            $aulasDoDiaProfessor = $grupoSeb->aulasDoDiaDoProfessor($professorId);
+            $desempenhoTurmas = $grupoSeb->desempenhoTurmasProfessor($professorId);
+        }
         
         $data = [
             'title' => 'Painel do Professor - EducaTudo',
@@ -735,6 +745,9 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
             'jornadas_recentes' => $jornadas_recentes,
             'eventos_prova_recentes' => $eventos_prova_recentes,
             'total_mensagens_nao_lidas' => $total_mensagens_nao_lidas,
+            'grupo_seb_ativo' => $grupoSebAtivo,
+            'aulas_do_dia_professor' => $aulasDoDiaProfessor,
+            'desempenho_turmas' => $desempenhoTurmas,
             'user' => $user,
             'current_page' => 'dashboard'
         ];

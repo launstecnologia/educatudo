@@ -77,6 +77,202 @@ class GrupoSebService
     }
 
     /**
+     * Aulas de hoje do professor (grade_horaria). dia_semana: 1=Seg … 7=Dom.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function aulasDoDiaDoProfessor(int $professorId, ?\DateTimeInterface $quando = null): array
+    {
+        if ($professorId <= 0) {
+            return [];
+        }
+
+        $quando = $quando ?? new \DateTimeImmutable('now', new \DateTimeZone('America/Sao_Paulo'));
+        $diaSemana = (int) $quando->format('N');
+
+        try {
+            return (new GradeHorariaLeitura())->listar([
+                'professor_id' => $professorId,
+                'dia_semana' => $diaSemana,
+            ]);
+        } catch (\Throwable $e) {
+            error_log('GrupoSeb aulasDoDiaDoProfessor: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Média das notas das turmas e matérias em que o professor leciona.
+     * Prioriza o lançamento de notas; completa com a nota das avaliações online.
+     *
+     * @return array{media_geral:?float,turmas:list<array{turma_id:int,turma_nome:string,materia_id:int,materia_nome:string,media:?float,alunos:int}>}
+     */
+    public function desempenhoTurmasProfessor(int $professorId): array
+    {
+        $vazio = ['media_geral' => null, 'turmas' => []];
+        if ($professorId <= 0) {
+            return $vazio;
+        }
+
+        try {
+            $pares = $this->db->fetchAll(
+                'SELECT g.turma_id, g.materia_id,
+                        MAX(t.nome) AS turma_nome,
+                        MAX(m.nome) AS materia_nome
+                 FROM grade_horaria g
+                 INNER JOIN turmas t ON t.id = g.turma_id
+                 INNER JOIN materias m ON m.id = g.materia_id
+                 WHERE g.professor_id = :professor_id
+                 GROUP BY g.turma_id, g.materia_id
+                 ORDER BY turma_nome ASC, materia_nome ASC',
+                ['professor_id' => $professorId]
+            ) ?: [];
+        } catch (\Throwable $e) {
+            error_log('GrupoSeb desempenhoTurmasProfessor: ' . $e->getMessage());
+            return $vazio;
+        }
+
+        $medias = $this->mediasLancadasPorTurmaMateria($professorId);
+        $online = $this->mediasProvasPorTurmaMateria($professorId);
+
+        $turmas = [];
+        $soma = 0.0;
+        $peso = 0;
+        foreach ($pares as $par) {
+            $turmaId = (int) ($par['turma_id'] ?? 0);
+            $materiaId = (int) ($par['materia_id'] ?? 0);
+            if ($turmaId <= 0 || $materiaId <= 0) {
+                continue;
+            }
+            $chave = $turmaId . ':' . $materiaId;
+            $fonte = $medias[$chave] ?? $online[$chave] ?? null;
+            $media = isset($fonte['media']) ? (float) $fonte['media'] : null;
+            $alunos = (int) ($fonte['alunos'] ?? 0);
+            $turmas[] = [
+                'turma_id' => $turmaId,
+                'turma_nome' => trim((string) ($par['turma_nome'] ?? '')),
+                'materia_id' => $materiaId,
+                'materia_nome' => trim((string) ($par['materia_nome'] ?? '')),
+                'media' => $media,
+                'alunos' => $alunos,
+            ];
+            if ($media !== null && $alunos > 0) {
+                $soma += $media * $alunos;
+                $peso += $alunos;
+            }
+        }
+
+        return [
+            'media_geral' => $peso > 0 ? round($soma / $peso, 1) : null,
+            'turmas' => $turmas,
+        ];
+    }
+
+    /**
+     * @return array<string,array{media:float,alunos:int}>
+     */
+    private function mediasLancadasPorTurmaMateria(int $professorId): array
+    {
+        if (!$this->tabelaExiste('provas_blocos_notas_lancadas')) {
+            return [];
+        }
+
+        try {
+            $rows = $this->db->fetchAll(
+                'SELECT n.turma_id, n.materia_id,
+                        ROUND(AVG(n.nota), 1) AS media,
+                        COUNT(DISTINCT n.aluno_id) AS alunos
+                 FROM provas_blocos_notas_lancadas n
+                 INNER JOIN provas_blocos pb ON pb.id = n.bloco_id AND pb.deleted_at IS NULL
+                 WHERE n.professor_id = :professor_id
+                   AND n.nota IS NOT NULL
+                   AND n.turma_id IS NOT NULL
+                   AND n.materia_id IS NOT NULL
+                 GROUP BY n.turma_id, n.materia_id',
+                ['professor_id' => $professorId]
+            ) ?: [];
+        } catch (\Throwable $e) {
+            error_log('GrupoSeb mediasLancadas: ' . $e->getMessage());
+            return [];
+        }
+
+        return $this->indexarMedias($rows);
+    }
+
+    /**
+     * @return array<string,array{media:float,alunos:int}>
+     */
+    private function mediasProvasPorTurmaMateria(int $professorId): array
+    {
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT a.turma_id, p.materia_id,
+                        ROUND(AVG(pr.nota), 1) AS media,
+                        COUNT(DISTINCT pr.aluno_id) AS alunos
+                 FROM provas p
+                 INNER JOIN provas_realizacoes pr ON pr.prova_id = p.id
+                   AND pr.nota IS NOT NULL
+                   AND pr.status IN ('finalizado', 'finalizada')
+                 INNER JOIN alunos a ON a.id = pr.aluno_id AND a.ativo = 1
+                 WHERE p.professor_id = :professor_id
+                   AND p.deleted_at IS NULL
+                   AND (p.ativo = 1 OR p.ativo IS NULL)
+                   AND a.turma_id IS NOT NULL
+                   AND p.materia_id IS NOT NULL
+                 GROUP BY a.turma_id, p.materia_id",
+                ['professor_id' => $professorId]
+            ) ?: [];
+        } catch (\Throwable $e) {
+            error_log('GrupoSeb mediasProvas: ' . $e->getMessage());
+            return [];
+        }
+
+        return $this->indexarMedias($rows);
+    }
+
+    /**
+     * @param list<array<string,mixed>> $rows
+     * @return array<string,array{media:float,alunos:int}>
+     */
+    private function indexarMedias(array $rows): array
+    {
+        $mapa = [];
+        foreach ($rows as $row) {
+            $turmaId = (int) ($row['turma_id'] ?? 0);
+            $materiaId = (int) ($row['materia_id'] ?? 0);
+            if ($turmaId <= 0 || $materiaId <= 0 || !isset($row['media']) || $row['media'] === null) {
+                continue;
+            }
+            $mapa[$turmaId . ':' . $materiaId] = [
+                'media' => (float) $row['media'],
+                'alunos' => (int) ($row['alunos'] ?? 0),
+            ];
+        }
+
+        return $mapa;
+    }
+
+    private function tabelaExiste(string $tabela): bool
+    {
+        if (!preg_match('/^[a-z0-9_]+$/', $tabela)) {
+            return false;
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT 1 AS ok
+                 FROM information_schema.tables
+                 WHERE table_schema = DATABASE()
+                   AND table_name = :tabela
+                 LIMIT 1',
+                ['tabela' => $tabela]
+            );
+            return !empty($row);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
      * Dados do calendário escolar (letivo) visíveis ao aluno no mês corrente.
      *
      * @return array{
