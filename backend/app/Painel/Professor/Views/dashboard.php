@@ -106,7 +106,7 @@ $corMedia = static function ($media): string {
                 </div>
             </div>
         </div>
-        <div class="p-6">
+        <div class="p-6 max-h-96 overflow-y-auto">
             <?php if ($linhasDesempenho === []): ?>
                 <p class="text-sm text-gray-500">Nenhuma turma vinculada à sua grade.</p>
             <?php else: ?>
@@ -137,6 +137,7 @@ $corMedia = static function ($media): string {
 </div>
 <?php endif; ?>
 
+<?php if (empty($grupo_seb_ativo)): ?>
 <!-- Stats Cards -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
     <!-- Card Jornadas -->
@@ -243,9 +244,11 @@ $corMedia = static function ($media): string {
         <?php endif; ?>
     </div>
 </div>
+<?php endif; ?>
 
 <!-- Main Content Grid -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+<div class="grid grid-cols-1 <?= empty($grupo_seb_ativo) ? 'lg:grid-cols-2' : '' ?> gap-8">
+    <?php if (empty($grupo_seb_ativo)): ?>
     <!-- Jornadas Recentes -->
     <div class="bg-white rounded-xl shadow-lg">
         <div class="p-6 border-b border-gray-200">
@@ -350,6 +353,7 @@ $corMedia = static function ($media): string {
             <?php endif; ?>
         </div>
     </div>
+    <?php endif; ?>
 
     <!-- Prova Online -->
     <div class="bg-white rounded-xl shadow-lg">
