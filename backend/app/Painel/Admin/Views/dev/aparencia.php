@@ -1,15 +1,5 @@
 <?php require __DIR__ . '/_styles.php'; ?>
-
-<header class="mb-8 pb-6 border-b border-gray-200">
-    <a href="<?= URL ?>/admin/dev" class="text-sm text-indigo-600 hover:text-indigo-800">&larr; Configurações Avançadas</a>
-    <div class="flex items-center gap-3 mt-2">
-        <span class="flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-100 text-indigo-600 text-2xl">🎨</span>
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Aparência e Menu</h1>
-            <p class="text-sm text-gray-500 mt-0.5">Logos, cores, título e a montagem dos dashboards</p>
-        </div>
-    </div>
-</header>
+<?php include __DIR__ . '/_aparencia_abas.php'; ?>
 
 <?php
 $flash_message = $flash_message ?? '';
@@ -22,34 +12,9 @@ if ($flash_message !== ''):
 </div>
 <?php endif; ?>
 
-<div class="space-y-6 max-w-5xl">
+<div class="space-y-6">
 
-    <?php
-    $atalhosAparencia = [
-        ['Logos', 'Padrão do sistema, navbar, tela inicial, capa do login e tamanho das logos.', URL . '/admin/dev/aparencia/logos', 'Abrir logos'],
-        ['Cores', 'Menu, botões, fundo das páginas e faixa da carteirinha.', URL . '/admin/dev/aparencia/cores', 'Abrir cores'],
-        ['Título e subtítulo', 'Nome do sistema, texto da tela de login e grupo do menu do aluno.', URL . '/admin/dev/aparencia/titulo', 'Abrir título'],
-        ['Dashboard do admin', 'Ordem e blocos da home da escola. O layout de hoje é o padrão.', URL . '/admin/dev/aparencia/dashboard/admin', 'Montar dashboard'],
-        ['Dashboard do aluno', 'Ordem e blocos da tela inicial do aluno. O layout de hoje é o padrão.', URL . '/admin/dev/aparencia/dashboard/aluno', 'Montar dashboard'],
-        ['Dashboard do professor', 'Ordem e blocos do painel do professor. O layout de hoje é o padrão.', URL . '/admin/dev/aparencia/dashboard/professor', 'Montar dashboard'],
-        ['PWA por perfil', 'Nome, ícones e cores do app instalável por perfil.', URL . '/admin/dev-settings/pwa', 'Abrir PWA'],
-        ['Layout mobile', 'Layout mobile do aluno e do admin.', URL . '/admin/dev-settings/layout-mobile', 'Abrir layout mobile'],
-    ];
-    ?>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <?php foreach ($atalhosAparencia as $atalho): ?>
-        <div class="dev-card">
-            <div class="dev-card-header"><?= htmlspecialchars($atalho[0]) ?></div>
-            <div class="dev-card-body">
-                <p class="text-sm text-gray-600 mb-4"><?= htmlspecialchars($atalho[1]) ?></p>
-                <a href="<?= htmlspecialchars($atalho[2]) ?>" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm">
-                    <?= htmlspecialchars($atalho[3]) ?>
-                </a>
-            </div>
-        </div>
-        <?php endforeach; ?>
-    </div>
-
+    <?php if (($aba_aparencia ?? '') === 'menu'): ?>
     <div class="dev-card">
         <div class="dev-card-header">Ordem e nomes do menu do Aluno — grupo "Estudo"</div>
         <p class="text-gray-500 text-sm mt-1 px-4 pt-2 pb-0">Arraste para reordenar. Edite o nome se quiser renomear o item no menu (deixe em branco para usar o nome padrão).</p>
@@ -133,6 +98,9 @@ if ($flash_message !== ''):
         </div>
     </div>
 
+    <?php endif; ?>
+
+    <?php if (($aba_aparencia ?? '') === 'links'): ?>
     <div class="dev-card">
         <div class="dev-card-header">Links no Submenu (Aluno/Professor)</div>
         <p class="text-gray-500 text-sm mt-1 px-4 pt-2 pb-0">Adicione links personalizados no submenu do aluno e/ou professor.</p>
@@ -189,6 +157,7 @@ if ($flash_message !== ''):
             </form>
         </div>
     </div>
+    <?php endif; ?>
 
 </div>
 

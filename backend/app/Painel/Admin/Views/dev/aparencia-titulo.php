@@ -1,12 +1,4 @@
-<div class="mb-8">
-    <div class="flex justify-between items-center">
-        <div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">Título e subtítulo</h2>
-            <p class="text-gray-600">Nome que a escola vê no sistema, na tela de login e no grupo do menu do aluno.</p>
-        </div>
-        <a href="<?= URL ?>/admin/dev/aparencia" class="text-gray-600 hover:text-gray-900">← Voltar</a>
-    </div>
-</div>
+<?php $aba_aparencia = 'titulo'; include __DIR__ . '/_aparencia_abas.php'; ?>
 
 <div class="bg-white rounded-xl shadow-lg p-6">
     <form id="layout-form">

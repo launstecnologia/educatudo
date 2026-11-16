@@ -7,16 +7,10 @@ $titulos = [
 ];
 $tituloPagina = $titulos[$perfilDashboard] ?? 'Dashboard';
 $blocos = is_array($blocos ?? null) ? $blocos : [];
+$aba_aparencia = 'dash-' . $perfilDashboard;
 ?>
-<div class="mb-8">
-    <div class="flex justify-between items-center">
-        <div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2"><?= htmlspecialchars($tituloPagina) ?></h2>
-            <p class="text-gray-600">Desmarcar um bloco só esconde aquele bloco. Arrastar muda a ordem e empilha os blocos. Sem salvar uma ordem diferente, o dashboard continua como está hoje.</p>
-        </div>
-        <a href="<?= URL ?>/admin/dev/aparencia" class="text-gray-600 hover:text-gray-900">← Voltar</a>
-    </div>
-</div>
+<?php include __DIR__ . '/_aparencia_abas.php'; ?>
+<p class="text-sm text-gray-600 mb-6">Desmarcar um bloco só esconde aquele bloco. Arrastar muda a ordem e empilha os blocos. Sem salvar uma ordem diferente, o dashboard continua como está hoje.</p>
 
 <?php
 $flash_message = $flash_message ?? '';

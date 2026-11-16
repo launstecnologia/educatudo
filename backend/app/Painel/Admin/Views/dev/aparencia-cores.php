@@ -22,15 +22,7 @@ $camposCor = [
     ['chave' => 'carteirinha_barra_cor', 'label' => 'Cor da barra da carteirinha', 'valor' => $corBarraCarteirinha, 'placeholder' => '#0f766e', 'ajuda' => 'Faixa do cartão. Prefira uma cor escura: o texto dela é branco.'],
 ];
 ?>
-<div class="mb-8">
-    <div class="flex justify-between items-center">
-        <div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">Cores</h2>
-            <p class="text-gray-600">Cores do menu, dos botões, do fundo e da faixa da carteirinha.</p>
-        </div>
-        <a href="<?= URL ?>/admin/dev/aparencia" class="text-gray-600 hover:text-gray-900">← Voltar</a>
-    </div>
-</div>
+<?php $aba_aparencia = 'cores'; include __DIR__ . '/_aparencia_abas.php'; ?>
 
 <div class="space-y-6">
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm w-full overflow-hidden">

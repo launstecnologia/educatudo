@@ -69,6 +69,7 @@ $studentConfig = is_array($studentConfig) ? array_replace_recursive($defaultStud
 $adminConfig = is_array($adminConfig) ? array_replace_recursive($defaultAdmin, $adminConfig) : $defaultAdmin;
 ?>
 
+<?php include __DIR__ . '/_aparencia_abas.php'; ?>
 <div class="space-y-6">
     <div class="bg-white rounded-lg shadow-sm border border-gray-200">
         <div class="p-6 border-b border-gray-200">

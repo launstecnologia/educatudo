@@ -129,6 +129,11 @@ class DevAdminController extends AdminBaseController
             return;
         }
 
+        $aba = (string) ($_GET['aba'] ?? '');
+        if (!in_array($aba, ['menu', 'links'], true)) {
+            $this->redirect('/admin/dev/aparencia/logos');
+        }
+
         $flash = $this->getFlashMessage();
         $data = [
             'title' => 'Aparência e Menu - EducaTudo',
@@ -137,6 +142,7 @@ class DevAdminController extends AdminBaseController
             'csrf_token' => $this->generateCsrfToken(),
             'flash_message' => $flash['message'] ?? '',
             'flash_type' => $flash['type'] ?? '',
+            'aba_aparencia' => $aba,
         ];
 
         $this->viewWithLayout('admin', 'admin/dev/aparencia', $data);
@@ -223,7 +229,8 @@ class DevAdminController extends AdminBaseController
         $data = [
             'title' => 'PWA - Dev Settings',
             'user' => $user,
-            'current_page' => 'dev',
+            'current_page' => 'layout_sistema',
+            'aba_aparencia' => 'pwa',
             'csrf_token' => $this->generateCsrfToken()
         ];
 
@@ -240,7 +247,8 @@ class DevAdminController extends AdminBaseController
         $data = [
             'title' => 'Layout Mobile - Dev Settings',
             'user' => $user,
-            'current_page' => 'dev',
+            'current_page' => 'layout_sistema',
+            'aba_aparencia' => 'mobile',
             'csrf_token' => $this->generateCsrfToken()
         ];
 

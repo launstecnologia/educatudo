@@ -1,12 +1,4 @@
-<div class="mb-8">
-    <div class="flex justify-between items-center">
-        <div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">Logos</h2>
-            <p class="text-gray-600">Padrão do sistema, navbar, tela inicial, capa do login e o tamanho de cada logo.</p>
-        </div>
-        <a href="<?= URL ?>/admin/dev/aparencia" class="text-gray-600 hover:text-gray-900">← Voltar</a>
-    </div>
-</div>
+<?php $aba_aparencia = 'logos'; include __DIR__ . '/_aparencia_abas.php'; ?>
 
 <div class="space-y-6">
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm w-full overflow-hidden">
