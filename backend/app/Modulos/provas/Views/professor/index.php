@@ -2,6 +2,7 @@
 
 <?php
 $stats = is_array($stats ?? null) ? $stats : [];
+$grupoSebProfessor = \App\Core\LayoutHelper::isModuleEnabled('grupo_seb');
 $statCards = [
     ['label' => 'Total', 'value' => (int)($stats['total'] ?? 0), 'icon' => 'fa-regular fa-file-lines', 'color' => 'blue'],
     ['label' => 'Liberadas', 'value' => (int)($stats['liberadas'] ?? 0), 'icon' => 'fa-solid fa-circle-check', 'color' => 'green'],
@@ -13,9 +14,10 @@ $statCards = [
 <div class="mb-6">
     <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-1">Minhas Provas</h2>
-            <p class="text-gray-600 text-sm">Gerencie suas provas online e acompanhe o desempenho dos alunos.</p>
+            <h2 class="text-2xl font-bold text-gray-900 mb-1"><?= !empty($grupoSebProfessor) ? 'Minhas Avaliações' : 'Minhas Provas' ?></h2>
+            <p class="text-gray-600 text-sm"><?= !empty($grupoSebProfessor) ? 'Gerencie suas avaliações e acompanhe o desempenho dos alunos.' : 'Gerencie suas provas online e acompanhe o desempenho dos alunos.' ?></p>
         </div>
+        <?php if (empty($grupoSebProfessor)): ?>
         <div class="flex items-center gap-3 flex-shrink-0">
             <a href="<?= URL ?>/professor/provas/criar"
                class="inline-flex items-center px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors shadow-sm">
@@ -23,6 +25,7 @@ $statCards = [
                 Novo Evento
             </a>
         </div>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -58,8 +61,8 @@ $statCards = [
 <?php if (!empty($eventos)): ?>
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
     <div class="px-6 py-4 border-b border-gray-200">
-        <h3 class="text-lg font-semibold text-gray-900">Eventos de Prova</h3>
-        <p class="text-sm text-gray-600 mt-1">Eventos criados pela coordenação: prova online com questões ou lançamento de notas.</p>
+        <h3 class="text-lg font-semibold text-gray-900"><?= !empty($grupoSebProfessor) ? 'Eventos de Avaliação' : 'Eventos de Prova' ?></h3>
+        <p class="text-sm text-gray-600 mt-1"><?= !empty($grupoSebProfessor) ? 'Eventos criados pela coordenação: avaliação com questões ou lançamento de notas.' : 'Eventos criados pela coordenação: prova online com questões ou lançamento de notas.' ?></p>
     </div>
     <div class="p-6">
         <div class="space-y-4">
@@ -93,41 +96,78 @@ $statCards = [
                 $preen = (int)($evento['lancamento_notas_preenchidas'] ?? 0);
                 $okLanc = $totA > 0 && $preen >= $totA;
                 if ($escolaElaboraImpressa) {
-                    $actionLabel = 'A escola elabora a prova';
+                    $actionLabel = !empty($grupoSebProfessor) ? 'A escola elabora a avaliação' : 'A escola elabora a prova';
                     $actionIcon = 'fa-solid fa-school';
                     $actionClass = 'border-gray-300 bg-white text-gray-700';
                 } elseif ($isLancamentoNota) {
-                    $actionLabel = $lancamentoCoordOnly ? 'Coordenação lança notas' : 'Lançar notas';
-                    $actionIcon = $lancamentoCoordOnly ? 'fa-solid fa-user-shield' : 'fa-solid fa-pen-to-square';
-                    $actionClass = $lancamentoCoordOnly
-                        ? 'border-gray-300 bg-white text-gray-700'
-                        : 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-300';
+                    if ($lancamentoCoordOnly && !empty($grupoSebProfessor)) {
+                        $actionLabel = '';
+                        $actionIcon = '';
+                        $actionClass = '';
+                    } elseif ($lancamentoCoordOnly) {
+                        $actionLabel = 'Coordenação lança notas';
+                        $actionIcon = 'fa-solid fa-user-shield';
+                        $actionClass = 'border-gray-300 bg-white text-gray-700';
+                    } else {
+                        $actionLabel = 'Lançar notas';
+                        $actionIcon = 'fa-solid fa-pen-to-square';
+                        $actionClass = 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-300';
+                    }
                 } elseif (!empty($evento['prova_existente_id'])) {
                     $actionLabel = 'Continuar edição';
                     $actionIcon = 'fa-solid fa-pen';
                     $actionClass = 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-300';
                 } else {
-                    $actionLabel = 'Criar prova';
+                    $actionLabel = !empty($grupoSebProfessor) ? 'Criar avaliação' : 'Criar prova';
                     $actionIcon = 'fa-solid fa-plus';
                     $actionClass = 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-300';
                 }
+                $mostrarAcao = $actionLabel !== '';
+                $nomesTurmas = [];
+                if (!empty($evento['turmas']) && is_array($evento['turmas'])) {
+                    foreach ($evento['turmas'] as $turmaCard) {
+                        $nomeTurma = trim((string) ($turmaCard['nome'] ?? ''));
+                        if ($nomeTurma !== '') {
+                            $nomesTurmas[] = $nomeTurma;
+                        }
+                    }
+                }
+                $descricaoEvento = trim((string) ($evento['descricao'] ?? ''));
+                $mostrarDescricao = $descricaoEvento !== '' && (str_contains($descricaoEvento, ' ') || mb_strlen($descricaoEvento) > 12);
+                $quandoExibir = $dataExibir ? date('d/m/Y', $dataExibir) : '—';
+                if ($horaExibir) {
+                    $quandoExibir .= ' · ' . date('H:i', $horaExibir);
+                }
                 ?>
+                <?php if ($mostrarAcao): ?>
                 <a href="<?= htmlspecialchars($urlProva) ?>"
-                   class="block border border-gray-200 rounded-lg p-5 hover:bg-gray-50 transition-colors">
-                    <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-center flex-wrap gap-2 mb-2">
-                                <h4 class="text-base font-semibold text-gray-900"><?= htmlspecialchars($evento['titulo'] ?? 'Evento de prova') ?></h4>
-                                <?php if (($evento['tipo_prova'] ?? '') === 'substitutiva'): ?>
-                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">Substitutiva</span>
-                                <?php else: ?>
-                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Original</span>
+                   class="block border border-gray-200 rounded-xl p-5 hover:border-gray-300 hover:bg-gray-50 transition-colors">
+                <?php else: ?>
+                <div class="block border border-gray-200 rounded-xl p-5">
+                <?php endif; ?>
+                    <div class="flex flex-col gap-4">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <h4 class="text-base font-semibold text-gray-900"><?= htmlspecialchars($evento['titulo'] ?? (!empty($grupoSebProfessor) ? 'Evento de avaliação' : 'Evento de prova')) ?></h4>
+                                <?php if ($mostrarDescricao): ?>
+                                    <p class="text-sm text-gray-500 mt-1"><?= htmlspecialchars($descricaoEvento) ?></p>
                                 <?php endif; ?>
-                                <?php if ($isProvaImpressa): ?>
-                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-teal-100 text-teal-800">Prova impressa</span>
-                                <?php endif; ?>
+                                <div class="flex flex-wrap gap-2 mt-2">
+                                    <?php if (($evento['tipo_prova'] ?? '') === 'substitutiva'): ?>
+                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">Substitutiva</span>
+                                    <?php else: ?>
+                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Original</span>
+                                    <?php endif; ?>
+                                    <?php if ($isProvaImpressa): ?>
+                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-teal-100 text-teal-800"><?= !empty($grupoSebProfessor) ? 'Avaliação impressa' : 'Prova impressa' ?></span>
+                                    <?php endif; ?>
+                                    <?php if ($isLancamentoNota): ?>
+                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">Lançamento de notas</span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <div class="flex flex-col items-stretch sm:items-end gap-2 shrink-0">
                                 <?php if ($isLancamentoNota): ?>
-                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">Lançamento de notas</span>
                                     <?php if ($totA <= 0): ?>
                                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-700">Sem alunos</span>
                                     <?php elseif ($okLanc): ?>
@@ -138,27 +178,46 @@ $statCards = [
                                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">Pendente</span>
                                     <?php endif; ?>
                                 <?php elseif (($evento['provas_criadas_professor'] ?? 0) > 0): ?>
-                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Prova criada</span>
+                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800"><?= !empty($grupoSebProfessor) ? 'Avaliação criada' : 'Prova criada' ?></span>
                                 <?php else: ?>
                                     <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">Pendente</span>
                                 <?php endif; ?>
-                            </div>
-                            <?php if (!empty($evento['descricao'])): ?>
-                                <p class="text-sm text-gray-600 mb-3"><?= htmlspecialchars($evento['descricao']) ?></p>
-                            <?php endif; ?>
-                            <div class="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600">
-                                <span><span class="font-medium text-gray-700">Matéria:</span> <?= htmlspecialchars($evento['materia_nome'] ?? 'N/A') ?></span>
-                                <span><span class="font-medium text-gray-700">Turma(s):</span> <?= !empty($evento['turmas']) ? htmlspecialchars(implode(', ', array_column($evento['turmas'], 'nome'))) : 'N/A' ?></span>
-                                <span><span class="font-medium text-gray-700">Data limite:</span> <?= $dataExibir ? date('d/m/Y', $dataExibir) : '—' ?></span>
-                                <span><span class="font-medium text-gray-700">Horário:</span> <?= $horaExibir ? date('H:i', $horaExibir) : '—' ?></span>
+                                <?php if ($mostrarAcao): ?>
+                                <span class="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium whitespace-nowrap transition-colors <?= $actionClass ?>">
+                                    <i class="<?= $actionIcon ?>"></i>
+                                    <?= htmlspecialchars($actionLabel) ?>
+                                </span>
+                                <?php endif; ?>
                             </div>
                         </div>
-                        <span class="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors <?= $actionClass ?>">
-                            <i class="<?= $actionIcon ?>"></i>
-                            <?= htmlspecialchars($actionLabel) ?>
-                        </span>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-gray-100">
+                            <div>
+                                <p class="text-xs font-medium text-gray-500">Matéria</p>
+                                <p class="text-sm text-gray-900 mt-0.5"><?= htmlspecialchars($evento['materia_nome'] ?? 'N/A') ?></p>
+                            </div>
+                            <div>
+                                <p class="text-xs font-medium text-gray-500">Data e horário</p>
+                                <p class="text-sm text-gray-900 mt-0.5"><?= htmlspecialchars($quandoExibir) ?></p>
+                            </div>
+                            <div class="sm:col-span-2">
+                                <p class="text-xs font-medium text-gray-500 mb-1.5">Turmas</p>
+                                <?php if ($nomesTurmas === []): ?>
+                                    <p class="text-sm text-gray-500">Nenhuma turma</p>
+                                <?php else: ?>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        <?php foreach ($nomesTurmas as $nomeTurma): ?>
+                                            <span class="inline-flex px-2 py-0.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-md"><?= htmlspecialchars($nomeTurma) ?></span>
+                                        <?php endforeach; ?>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
                     </div>
+                <?php if ($mostrarAcao): ?>
                 </a>
+                <?php else: ?>
+                </div>
+                <?php endif; ?>
                 <?php if ($isProvaImpressa && !empty($evento['prova_existente_id'])): ?>
                 <a href="<?= URL ?>/professor/leitor-gabarito/provas/<?= (int) $evento['prova_existente_id'] ?>"
                    class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-teal-800">
@@ -169,9 +228,42 @@ $statCards = [
             <?php endforeach; ?>
         </div>
     </div>
+    <?php
+    $pag = is_array($paginacao_eventos ?? null) ? $paginacao_eventos : [];
+    $total = (int) ($pag['total'] ?? 0);
+    $perPage = (int) ($pag['per_page'] ?? 10);
+    $page = (int) ($pag['page'] ?? 1);
+    $totalPages = (int) ($pag['total_pages'] ?? 1);
+    $queryParams = $_GET ?? [];
+    unset($queryParams['page']);
+    $baseQuery = $queryParams === [] ? '' : ('?' . http_build_query($queryParams));
+    $sep = $baseQuery === '' ? '?' : '&';
+    $rotaEventos = URL . '/professor/provas';
+    ?>
+    <?php if ($total > 0): ?>
+    <div class="px-6 py-4 border-t border-gray-200 flex flex-wrap items-center justify-between gap-2">
+        <p class="text-sm text-gray-600">
+            Exibindo <?= min(($page - 1) * $perPage + 1, $total) ?>–<?= min($page * $perPage, $total) ?> de <?= $total ?> registro(s)
+        </p>
+        <?php if ($totalPages > 1): ?>
+        <div class="flex items-center gap-1">
+            <?php if ($page > 1): ?>
+                <a href="<?= $rotaEventos . $baseQuery . $sep ?>page=<?= $page - 1 ?>" class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Anterior</a>
+            <?php endif; ?>
+            <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
+                <a href="<?= $rotaEventos . $baseQuery . $sep ?>page=<?= $i ?>" class="px-3 py-1.5 text-sm font-medium rounded-lg <?= $i === $page ? 'bg-primary text-white' : 'text-gray-700 bg-gray-100 hover:bg-gray-200' ?>"><?= $i ?></a>
+            <?php endfor; ?>
+            <?php if ($page < $totalPages): ?>
+                <a href="<?= $rotaEventos . $baseQuery . $sep ?>page=<?= $page + 1 ?>" class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Próxima</a>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
 </div>
 <?php endif; ?>
 
+<?php if (empty($grupoSebProfessor)): ?>
 <div class="bg-white rounded-xl shadow-sm border border-gray-200">
     <div class="px-6 py-4 border-b border-gray-200">
         <h3 class="text-lg font-semibold text-gray-900">Provas</h3>
@@ -277,6 +369,7 @@ $statCards = [
         </div>
     <?php endif; ?>
 </div>
+<?php endif; ?>
 
 <script>
 function toggleLiberada(id) {

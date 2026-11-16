@@ -529,14 +529,37 @@ class ExamController extends BaseController
             'ativas' => count(array_filter($provas, fn($p) => $p['ativo'] == 1)),
             'total_eventos' => $totalEventos
         ];
+
+        $paginacaoEventos = null;
+        if (\App\Modulos\GrupoSeb\Services\GrupoSebService::estaAtivo()) {
+            $porPagina = 10;
+            $totalPaginas = max(1, (int) ceil($totalEventos / $porPagina));
+            $pagina = max(1, (int) ($_GET['page'] ?? 1));
+            if ($pagina > $totalPaginas) {
+                $pagina = $totalPaginas;
+            }
+            $eventos = array_slice($eventos, ($pagina - 1) * $porPagina, $porPagina);
+            $paginacaoEventos = [
+                'total' => $totalEventos,
+                'per_page' => $porPagina,
+                'page' => $pagina,
+                'total_pages' => $totalPaginas,
+            ];
+        }
         
         $data = [
-            'title' => 'Minhas Provas - EducaTudo',
+            'title' => \App\Modulos\GrupoSeb\Services\GrupoSebService::estaAtivo()
+                ? 'Minhas Avaliações - EducaTudo'
+                : 'Minhas Provas - EducaTudo',
+            'page_title' => \App\Modulos\GrupoSeb\Services\GrupoSebService::estaAtivo()
+                ? 'Minhas Avaliações'
+                : 'Minhas Provas',
             'user' => $user,
             'professor' => $professor,
             'eventos' => $eventos,
             'provas' => $provas,
             'stats' => $stats,
+            'paginacao_eventos' => $paginacaoEventos,
             'current_page' => 'provas',
         ];
         
