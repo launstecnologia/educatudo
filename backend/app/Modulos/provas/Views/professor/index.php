@@ -11,7 +11,7 @@ $statCards = [
 ];
 ?>
 
-<div class="mb-6">
+<div class="mb-6<?= !empty($grupoSebProfessor) ? ' hidden md:block' : '' ?>">
     <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
             <h2 class="text-2xl font-bold text-gray-900 mb-1"><?= !empty($grupoSebProfessor) ? 'Minhas Avaliações' : 'Minhas Provas' ?></h2>
@@ -29,7 +29,7 @@ $statCards = [
     </div>
 </div>
 
-<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+<div class="grid <?= !empty($grupoSebProfessor) ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4' ?> gap-3 md:gap-4 mb-6 md:mb-8">
     <?php foreach ($statCards as $card): ?>
         <?php
         $color = $card['color'];
@@ -44,11 +44,11 @@ $statCards = [
             'amber' => 'border-amber-200',
         ][$color] ?? 'border-gray-200';
         ?>
-        <div class="bg-white rounded-xl shadow-sm border <?= $borderClasses ?> p-5">
-            <div class="flex items-center justify-between gap-4">
-                <div>
-                    <p class="text-sm font-medium text-gray-600"><?= htmlspecialchars($card['label']) ?></p>
-                    <p class="mt-1 text-3xl font-bold text-gray-900"><?= (int)$card['value'] ?></p>
+        <div class="bg-white rounded-xl shadow-sm border <?= $borderClasses ?> p-4 md:p-5">
+            <div class="flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                    <p class="text-xs md:text-sm font-medium text-gray-600 truncate"><?= htmlspecialchars($card['label']) ?></p>
+                    <p class="mt-1 text-2xl md:text-3xl font-bold text-gray-900"><?= (int)$card['value'] ?></p>
                 </div>
                 <div class="w-11 h-11 rounded-lg flex items-center justify-center <?= $iconClasses ?>">
                     <i class="<?= htmlspecialchars($card['icon']) ?>"></i>
@@ -141,12 +141,12 @@ $statCards = [
                 ?>
                 <?php if ($mostrarAcao): ?>
                 <a href="<?= htmlspecialchars($urlProva) ?>"
-                   class="block border border-gray-200 rounded-xl p-5 hover:border-gray-300 hover:bg-gray-50 transition-colors">
+                   class="block border border-gray-200 rounded-xl p-4 sm:p-5 hover:border-gray-300 hover:bg-gray-50 transition-colors">
                 <?php else: ?>
-                <div class="block border border-gray-200 rounded-xl p-5">
+                <div class="block border border-gray-200 rounded-xl p-4 sm:p-5">
                 <?php endif; ?>
                     <div class="flex flex-col gap-4">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                             <div class="min-w-0">
                                 <h4 class="text-base font-semibold text-gray-900"><?= htmlspecialchars($evento['titulo'] ?? (!empty($grupoSebProfessor) ? 'Evento de avaliação' : 'Evento de prova')) ?></h4>
                                 <?php if ($mostrarDescricao): ?>
@@ -166,7 +166,7 @@ $statCards = [
                                     <?php endif; ?>
                                 </div>
                             </div>
-                            <div class="flex flex-col items-stretch sm:items-end gap-2 shrink-0">
+                            <div class="flex flex-row sm:flex-col items-center sm:items-end justify-between gap-2 w-full sm:w-auto shrink-0">
                                 <?php if ($isLancamentoNota): ?>
                                     <?php if ($totA <= 0): ?>
                                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-700">Sem alunos</span>

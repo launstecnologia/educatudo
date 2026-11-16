@@ -880,7 +880,13 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Toggle sidebar function (apenas desktop)
     function toggleSidebar() {
-        if (isMobile) return; // Não fazer nada no mobile
+        if (window.innerWidth <= 768) {
+            sidebar.classList.remove('mobile-open');
+            const overlay = document.getElementById('sidebar-overlay');
+            if (overlay) overlay.classList.remove('active');
+            document.body.style.overflow = '';
+            return;
+        }
         
         sidebar.classList.toggle('collapsed');
         
