@@ -509,7 +509,7 @@ if ($tipoFlash === 'error') {
             </ol>
         </div>
         <p class="text-sm text-gray-600">
-            Aceita CSV, Excel (.xlsx) e Word (.docx). Com disciplina já selecionada, o Word só precisa de <strong>nome</strong> e <strong>nota</strong>.
+            Aceita CSV, Excel (.xlsx) e Word (.docx). A nota do Word entra pelo <strong>nome</strong>, só na turma escrita no arquivo (ex.: 1ª SÉRIE A). A coluna <strong>nº</strong> é o número de chamada, não o código do aluno.
         </p>
         <a href="<?= URL ?>/admin/provas/blocos/<?= $blocoId ?>/modelo-notas-planilha"
            class="inline-flex items-center gap-2 text-sm font-medium text-indigo-700 hover:text-indigo-900">

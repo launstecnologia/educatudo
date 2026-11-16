@@ -3775,6 +3775,7 @@ class TeacherExamController extends BaseController
                     'materia_nome' => (string) ($combo['materia_nome'] ?? ''),
                     'turma_id' => (int) ($aluno['turma_id'] ?? 0),
                     'turma_nome' => (string) ($aluno['turma_nome'] ?? ''),
+                    'serie_nome' => (string) ($aluno['serie_nome'] ?? ''),
                     'aluno_id' => (int) ($aluno['id'] ?? 0),
                     'aluno_nome' => (string) ($aluno['nome'] ?? ''),
                     'codigo_aluno' => trim((string) ($aluno['codigo_aluno'] ?? '')),

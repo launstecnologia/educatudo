@@ -7,6 +7,8 @@ use App\Helpers\AlunoLancamentoNotaHelper;
 /**
  * Lê planilha/documento de notas (CSV, Excel ou Word) e cruza com os alunos
  * já convocados no evento. Aceita código/RA ou nome do aluno.
+ * No Word com "nº" e "Aluno", o nº é chamada da turma — a nota segue o nome,
+ * e só entra na turma escrita no arquivo (ex.: "1ª SÉRIE A").
  */
 class ImportacaoNotasPlanilha
 {
@@ -14,6 +16,12 @@ class ImportacaoNotasPlanilha
     private const MAX_XML_BYTES = 10000000;
     private const MAX_LINHAS = 8000;
     private const MAX_ARQUIVOS = 30;
+
+    /** Texto da turma lido do Word (parágrafo antes da tabela ou nome do arquivo). */
+    private string $turmaDocLida = '';
+
+    /** Turma de cada linha bruta do Word, na mesma ordem de lerDocx(). */
+    private array $turmaPorLinha = [];
 
     /**
      * Normaliza $_FILES (um arquivo ou planilha[]).
@@ -105,6 +113,8 @@ class ImportacaoNotasPlanilha
         if ($tamanho <= 0 || $tamanho > self::MAX_BYTES) {
             throw new \RuntimeException('A planilha precisa ter até 2 MB.');
         }
+        $this->turmaDocLida = '';
+        $this->turmaPorLinha = [];
         $ext = strtolower(pathinfo($nome, PATHINFO_EXTENSION));
         if (!in_array($ext, ['csv', 'xlsx', 'docx'], true)) {
             throw new \RuntimeException('Use um arquivo .csv, .xlsx ou .docx (Word).');
@@ -132,6 +142,17 @@ class ImportacaoNotasPlanilha
             $tabela = $this->lerXlsx($tmp);
         } elseif ($ext === 'docx') {
             $tabela = $this->lerDocx($tmp);
+            if ($this->rotuloTurma($this->turmaDocLida) === null) {
+                $doNome = pathinfo($nome, PATHINFO_FILENAME);
+                if ($this->rotuloTurma($doNome) !== null) {
+                    $this->turmaDocLida = $doNome;
+                    foreach ($this->turmaPorLinha as $i => $turmaLinha) {
+                        if ($this->rotuloTurma((string) $turmaLinha) === null) {
+                            $this->turmaPorLinha[$i] = $doNome;
+                        }
+                    }
+                }
+            }
         } else {
             $tabela = $this->lerCsv($tmp);
         }
@@ -160,7 +181,10 @@ class ImportacaoNotasPlanilha
         $ambiguosCodigo = [];
         $porNome = [];
         $ambiguosNome = [];
+        $porNomeRotulo = [];
+        $ambiguosNomeRotulo = [];
         $materiasPorNorma = [];
+        $rotulosNoEvento = [];
         foreach ($elegiveis as $row) {
             if (!is_array($row)) {
                 continue;
@@ -192,6 +216,18 @@ class ImportacaoNotasPlanilha
             $norma = $this->normalizarTexto((string) ($row['materia_nome'] ?? ''));
             if ($norma !== '') {
                 $materiasPorNorma[$norma] = true;
+            }
+            $chaveRotulo = $this->chaveRotulo($this->rotuloDoAluno($row));
+            if ($chaveRotulo !== '') {
+                $rotulosNoEvento[$chaveRotulo] = true;
+                if ($nomeNorma !== '') {
+                    $chaveNomeRotulo = $chaveRotulo . '|' . $nomeNorma;
+                    if (isset($porNomeRotulo[$chaveNomeRotulo]) && $porNomeRotulo[$chaveNomeRotulo] !== $aid) {
+                        $ambiguosNomeRotulo[$chaveNomeRotulo] = true;
+                    } else {
+                        $porNomeRotulo[$chaveNomeRotulo] = $aid;
+                    }
+                }
             }
         }
 
@@ -237,7 +273,22 @@ class ImportacaoNotasPlanilha
             }
 
             $aid = 0;
-            if ($cod !== '') {
+            $chaveArquivo = $this->chaveRotulo($this->rotuloTurma((string) ($linha['turma_doc'] ?? '')));
+            $buscaNaTurma = $chaveArquivo !== '' && isset($rotulosNoEvento[$chaveArquivo]) && $nomeLinha !== '';
+            if ($buscaNaTurma) {
+                $chaveNomeRotulo = $chaveArquivo . '|' . $nomeLinha;
+                if (!isset($porNomeRotulo[$chaveNomeRotulo]) || isset($ambiguosNomeRotulo[$chaveNomeRotulo])) {
+                    $erros[] = isset($ambiguosNomeRotulo[$chaveNomeRotulo])
+                        ? $rotulo . ': o nome ' . $this->recortar((string) ($linha['nome'] ?? '')) . ' aparece em mais de um aluno nesta turma.'
+                        : $rotulo . ': o nome ' . $this->recortar((string) ($linha['nome'] ?? '')) . ' não está na turma deste arquivo. A nota não foi lançada.';
+                    if (!isset($ambiguosNomeRotulo[$chaveNomeRotulo])) {
+                        $naoEncontrados++;
+                    }
+                    $arquivosErro[$arquivoChave] = ($arquivosErro[$arquivoChave] ?? 0) + 1;
+                    continue;
+                }
+                $aid = $porNomeRotulo[$chaveNomeRotulo];
+            } elseif ($cod !== '') {
                 if (!isset($porCodigo[$cod]) || isset($ambiguosCodigo[$cod])) {
                     $erros[] = isset($ambiguosCodigo[$cod])
                         ? $rotulo . ': o código ' . $this->recortar((string) ($linha['codigo'] ?? '')) . ' aparece em mais de um aluno.'
@@ -264,6 +315,24 @@ class ImportacaoNotasPlanilha
             }
 
             $candidatos = $porAluno[$aid] ?? [];
+            $naTurma = $this->candidatosNaTurmaDoArquivo(
+                $candidatos,
+                (string) ($linha['turma_doc'] ?? ''),
+                $rotulosNoEvento
+            );
+            if ($naTurma !== null) {
+                $quem = trim((string) ($linha['nome'] ?? ''));
+                if ($quem === '') {
+                    $quem = trim((string) ($linha['codigo'] ?? ''));
+                }
+                if ($naTurma === []) {
+                    $erros[] = $rotulo . ': ' . $this->recortar($quem)
+                        . ' não está na turma deste arquivo. A nota não foi lançada.';
+                    $arquivosErro[$arquivoChave] = ($arquivosErro[$arquivoChave] ?? 0) + 1;
+                    continue;
+                }
+                $candidatos = $naTurma;
+            }
             if (!$notaUnica) {
                 $disciplina = $this->normalizarTexto($disciplinaBruta);
                 if ($disciplina === '' && count($materiasPorNorma) === 1) {
@@ -469,6 +538,8 @@ class ImportacaoNotasPlanilha
      */
     private function lerDocx(string $caminho): array
     {
+        $this->turmaPorLinha = [];
+        $this->turmaDocLida = '';
         if (!class_exists(\ZipArchive::class)) {
             throw new \RuntimeException('Este servidor não abre Word. Salve a tabela como CSV ou Excel.');
         }
@@ -494,22 +565,52 @@ class ImportacaoNotasPlanilha
 
         $xp = new \DOMXPath($dom);
         $xp->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
-        // Só tabelas do corpo (evita tabela aninhada / cabeçalho).
-        $tabelasXml = $xp->query('/w:document/w:body/w:tbl');
-        if ($tabelasXml === false || $tabelasXml->length === 0) {
-            $tabelasXml = $xp->query('//w:body/w:tbl');
+        $corpo = $xp->query('/w:document/w:body/*');
+        $nos = [];
+        if ($corpo !== false) {
+            foreach ($corpo as $child) {
+                if ($child instanceof \DOMElement) {
+                    $nos[] = $child;
+                }
+            }
         }
-        if ($tabelasXml === false || $tabelasXml->length === 0) {
+        if ($nos === []) {
+            $tabelasXml = $xp->query('//w:body/w:tbl');
+            if ($tabelasXml !== false) {
+                foreach ($tabelasXml as $child) {
+                    if ($child instanceof \DOMElement) {
+                        $nos[] = $child;
+                    }
+                }
+            }
+        }
+        $temTabela = false;
+        foreach ($nos as $child) {
+            if ($child->localName === 'tbl') {
+                $temTabela = true;
+                break;
+            }
+        }
+        if (!$temTabela) {
             throw new \RuntimeException('O Word precisa ter uma tabela com as notas (código ou nome, e nota).');
         }
 
         $tabela = [];
         $cabecalhoNorma = null;
-        foreach ($tabelasXml as $tbl) {
-            if (!$tbl instanceof \DOMElement) {
+        $turmaAtual = '';
+        foreach ($nos as $child) {
+            if ($child->localName === 'p') {
+                $texto = $this->textoElementoWord($xp, $child);
+                if ($this->rotuloTurma($texto) !== null) {
+                    $turmaAtual = $texto;
+                    $this->turmaDocLida = $texto;
+                }
                 continue;
             }
-            $linhasXml = $xp->query('./w:tr', $tbl);
+            if ($child->localName !== 'tbl') {
+                continue;
+            }
+            $linhasXml = $xp->query('./w:tr', $child);
             if ($linhasXml === false) {
                 continue;
             }
@@ -548,11 +649,11 @@ class ImportacaoNotasPlanilha
                     if ($cabecalhoNorma === null) {
                         $cabecalhoNorma = $normaLinha;
                     } elseif ($normaLinha === $cabecalhoNorma) {
-                        // Cabeçalho repetido em outra tabela do mesmo arquivo.
                         continue;
                     }
                 }
                 $tabela[] = $row;
+                $this->turmaPorLinha[] = $turmaAtual;
             }
         }
 
@@ -609,15 +710,23 @@ class ImportacaoNotasPlanilha
      */
     private function tabelaParaLinhas(array $tabela): array
     {
-        $tabela = array_values(array_filter($tabela, static function (array $row): bool {
+        $tabelaFiltrada = [];
+        $turmasFiltradas = [];
+        foreach ($tabela as $i => $row) {
+            $temValor = false;
             foreach ($row as $celula) {
                 if (trim((string) $celula) !== '') {
-                    return true;
+                    $temValor = true;
+                    break;
                 }
             }
-
-            return false;
-        }));
+            if (!$temValor) {
+                continue;
+            }
+            $tabelaFiltrada[] = $row;
+            $turmasFiltradas[] = (string) ($this->turmaPorLinha[$i] ?? $this->turmaDocLida);
+        }
+        $tabela = $tabelaFiltrada;
         if ($tabela === []) {
             throw new \RuntimeException('A planilha está vazia.');
         }
@@ -626,7 +735,14 @@ class ImportacaoNotasPlanilha
         if ($mapa !== null) {
             $inicio = 1;
         } else {
-            $mapa = ['codigo' => 0, 'nome' => -1, 'disciplina' => 1, 'nota' => 2];
+            $mapa = $this->mapaPorAmostra($tabela);
+            if ($mapa !== null) {
+                $inicio = $this->linhaPareceCabecalho($tabela[0]) ? 1 : 0;
+            } elseif ($this->linhaPareceCabecalho($tabela[0])) {
+                throw new \RuntimeException('Não foi possível identificar as colunas de nome e nota. Confira o cabeçalho (nº, Aluno e nota).');
+            } else {
+                $mapa = ['codigo' => 0, 'nome' => -1, 'disciplina' => 1, 'nota' => 2, 'chamada' => -1];
+            }
         }
         $saida = [];
         for ($i = $inicio; $i < count($tabela); $i++) {
@@ -640,6 +756,7 @@ class ImportacaoNotasPlanilha
                 'nome' => trim((string) ($row[$mapa['nome']] ?? '')),
                 'disciplina' => trim((string) ($row[$mapa['disciplina']] ?? '')),
                 'nota' => trim((string) ($row[$mapa['nota']] ?? '')),
+                'turma_doc' => (string) ($turmasFiltradas[$i] ?? $this->turmaDocLida),
             ];
         }
         if ($saida === []) {
@@ -703,7 +820,157 @@ class ImportacaoNotasPlanilha
             'nome' => $achou['nome'],
             'disciplina' => $achou['disciplina'],
             'nota' => $achou['nota'],
+            'chamada' => -1,
         ];
+    }
+
+    /**
+     * Tabela sem cabeçalho reconhecido, no formato nº | nome | nota.
+     * Não trata o nº como código/RA.
+     *
+     * @param list<list<string>> $tabela
+     * @return array{codigo:int,nome:int,disciplina:int,nota:int,chamada:int}|null
+     */
+    private function mapaPorAmostra(array $tabela): ?array
+    {
+        $amostra = array_slice($tabela, $this->linhaPareceCabecalho($tabela[0]) ? 1 : 0, 8);
+        $bateu = 0;
+        foreach ($amostra as $row) {
+            $c0 = trim((string) ($row[0] ?? ''));
+            $c1 = trim((string) ($row[1] ?? ''));
+            $c2 = trim((string) ($row[2] ?? ''));
+            $notaOk = $c2 === '' || $this->notaVaziaOuMarcador($c2) || preg_match('/^\d+(?:[.,]\d+)?$/', $c2) === 1;
+            if (preg_match('/^\d{1,3}$/', $c0) === 1 && preg_match('/\p{L}/u', $c1) === 1 && $notaOk) {
+                $bateu++;
+            }
+        }
+        $minimo = $this->linhaPareceCabecalho($tabela[0]) ? 1 : 3;
+        if ($bateu < $minimo) {
+            return null;
+        }
+
+        return [
+            'codigo' => -1,
+            'nome' => 1,
+            'disciplina' => -1,
+            'nota' => 2,
+            'chamada' => 0,
+        ];
+    }
+
+    /**
+     * @param list<string> $row
+     */
+    private function linhaPareceCabecalho(array $row): bool
+    {
+        foreach ($row as $celula) {
+            $norma = $this->normalizarTexto((string) $celula);
+            if ($norma === '') {
+                continue;
+            }
+            if (in_array($norma, ['aluno', 'nome', 'estudante', 'nome do aluno', 'nome aluno', 'nome completo', 'disciplina', 'materia'], true)) {
+                return true;
+            }
+            if (str_starts_with($norma, 'nota') || str_starts_with($norma, 'codigo')) {
+                return true;
+            }
+            $semOrdinal = str_replace(['º', 'ª', '°', '.'], '', $norma);
+            if (in_array(trim($semOrdinal), ['n', 'no', 'numero', 'chamada'], true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function textoElementoWord(\DOMXPath $xp, \DOMElement $el): string
+    {
+        $textos = [];
+        foreach ($xp->query('.//w:t', $el) ?: [] as $t) {
+            $textos[] = (string) ($t->textContent ?? '');
+        }
+
+        return trim(preg_replace('/\s+/u', ' ', implode('', $textos)) ?? '');
+    }
+
+    /**
+     * "1ª SÉRIE A /2026" ou "1ª A" → número da série + letra da turma.
+     *
+     * @return array{numero:string,letra:string}|null
+     */
+    private function rotuloTurma(string $texto): ?array
+    {
+        $t = str_replace(['º', 'ª', '°'], '', $this->normalizarTexto($texto));
+        $t = preg_replace('/\b20\d{2}\b/u', ' ', $t) ?? $t;
+        $t = preg_replace('/[^a-z0-9]+/u', ' ', $t) ?? $t;
+        $t = trim(preg_replace('/\s+/u', ' ', $t) ?? $t);
+        if ($t === '') {
+            return null;
+        }
+        if (preg_match('/(\d{1,2}) (?:serie|ano) ([a-z])\b/u', $t, $m) === 1) {
+            return ['numero' => $m[1], 'letra' => $m[2]];
+        }
+        if (preg_match_all('/(\d{1,2}) ([a-z])\b/u', $t, $todos, PREG_SET_ORDER) >= 1) {
+            $ultimo = $todos[count($todos) - 1];
+
+            return ['numero' => $ultimo[1], 'letra' => $ultimo[2]];
+        }
+        if (preg_match('/(\d{1,2})([a-z])\b/u', $t, $m) === 1) {
+            return ['numero' => $m[1], 'letra' => $m[2]];
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string,mixed> $row
+     * @return array{numero:string,letra:string}|null
+     */
+    private function rotuloDoAluno(array $row): ?array
+    {
+        $junto = trim((string) ($row['serie_nome'] ?? '') . ' ' . (string) ($row['turma_nome'] ?? ''));
+        $rotulo = $this->rotuloTurma($junto);
+        if ($rotulo !== null) {
+            return $rotulo;
+        }
+
+        return $this->rotuloTurma((string) ($row['turma_nome'] ?? ''));
+    }
+
+    /**
+     * @param array{numero:string,letra:string}|null $rotulo
+     */
+    private function chaveRotulo(?array $rotulo): string
+    {
+        if ($rotulo === null) {
+            return '';
+        }
+
+        return $rotulo['numero'] . '|' . $rotulo['letra'];
+    }
+
+    /**
+     * null = o arquivo não identificou uma turma do evento (não filtra).
+     * lista vazia = o aluno não está nessa turma.
+     *
+     * @param list<array<string,mixed>> $candidatos
+     * @param array<string,bool> $rotulosNoEvento
+     * @return list<array<string,mixed>>|null
+     */
+    private function candidatosNaTurmaDoArquivo(array $candidatos, string $turmaDoc, array $rotulosNoEvento): ?array
+    {
+        $chave = $this->chaveRotulo($this->rotuloTurma($turmaDoc));
+        if ($chave === '' || !isset($rotulosNoEvento[$chave])) {
+            return null;
+        }
+        $naTurma = [];
+        foreach ($candidatos as $row) {
+            if ($this->chaveRotulo($this->rotuloDoAluno($row)) === $chave) {
+                $naTurma[] = $row;
+            }
+        }
+
+        return $naTurma;
     }
 
     private function notaVaziaOuMarcador(string $nota): bool
