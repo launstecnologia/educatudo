@@ -15,6 +15,7 @@ class ImpressaoLoteFechamentoService
         'ficha' => 'Ficha individual',
         'historico' => 'Histórico escolar',
         'resultado' => 'Consolidado final',
+        'ata_completa' => 'Ata completa da turma',
         'relatorio' => 'Relatório de fechamento por turma',
     ];
 
@@ -274,7 +275,7 @@ class ImpressaoLoteFechamentoService
             $jobId
         );
         $this->gravarAndamento($jobId, $documento, 'Gerando o PDF…');
-        $orientacao = $documento === 'relatorio' ? 'landscape' : 'portrait';
+        $orientacao = in_array($documento, ['relatorio', 'ata_completa'], true) ? 'landscape' : 'portrait';
         $pdf = $this->pdfDeHtml($html, $orientacao);
         unset($html);
         if ($pdf === '') {
@@ -504,7 +505,7 @@ class ImpressaoLoteFechamentoService
         $htmls = [];
         $feitos = 0;
         $totalFolhas = $this->estimarFolhas($paineis, $documento);
-        $orientacao = $documento === 'relatorio' ? 'landscape' : 'portrait';
+        $orientacao = in_array($documento, ['relatorio', 'ata_completa'], true) ? 'landscape' : 'portrait';
 
         foreach ($paineis as $painel) {
             $turmaId = (int) ($painel['turma']['id'] ?? 0);
@@ -513,9 +514,19 @@ class ImpressaoLoteFechamentoService
                 continue;
             }
             $this->pulso($jobId, $feitos, $totalFolhas, $documento);
-            if ($documento === 'relatorio' || $documento === 'resultado') {
+            if ($documento === 'relatorio' || $documento === 'resultado' || $documento === 'ata_completa') {
                 $emitido = $documento === 'resultado'
                     ? $this->documentos->emitirAta(
+                        $turmaId,
+                        $anoLetivo,
+                        $periodoTipo,
+                        $periodoNumero,
+                        $usuarioId > 0 ? $usuarioId : null,
+                        $configApp,
+                        false
+                    )
+                    : ($documento === 'ata_completa'
+                    ? $this->documentos->emitirAtaCompleta(
                         $turmaId,
                         $anoLetivo,
                         $periodoTipo,
@@ -534,7 +545,7 @@ class ImpressaoLoteFechamentoService
                         $configApp,
                         [],
                         false
-                    );
+                    ));
                 $htmls[] = (string) ($emitido['html'] ?? '');
                 $feitos++;
                 if (($emitido['orientacao'] ?? '') === 'landscape') {
@@ -786,7 +797,7 @@ class ImpressaoLoteFechamentoService
      */
     private function estimarFolhas(array $paineis, string $documento): int
     {
-        if ($documento === 'resultado' || $documento === 'relatorio') {
+        if ($documento === 'resultado' || $documento === 'relatorio' || $documento === 'ata_completa') {
             return count($paineis);
         }
         $total = 0;

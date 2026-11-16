@@ -114,6 +114,74 @@ class DocumentoOficialService
     }
 
     /**
+     * Ata em tabela única (uma linha por aluno, uma coluna por componente).
+     * Não altera a ata atual, que segue com capa e uma página por aluno.
+     *
+     * @return array{html:string,orientacao:string,papel:string,numero:int,modelo_codigo:string,payload:array}
+     */
+    public function emitirAtaCompleta(int $turmaId, int $anoLetivo, string $periodoTipo, int $periodoNumero, ?int $usuarioId, ?array $configApp = null, bool $registrarEmissao = true): array
+    {
+        $preview = $this->homologacao->previewTurma($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
+        $linhas = is_array($preview['linhas'] ?? null) ? $preview['linhas'] : [];
+        if ($linhas === []) {
+            throw new \RuntimeException('Não há matrículas válidas nesta turma para emitir a ata.');
+        }
+        $turma = is_array($preview['turma'] ?? null) ? $preview['turma'] : [];
+        $detalhe = $this->db->fetch(
+            'SELECT t.*, c.nome AS curso_nome, s.nome AS serie_nome
+             FROM turmas t
+             LEFT JOIN curso c ON c.id = t.curso_novo_id
+             LEFT JOIN serie s ON s.id = t.serie_id
+             WHERE t.id = :id LIMIT 1',
+            ['id' => $turmaId]
+        ) ?: [];
+        $turma = array_merge($turma, $detalhe);
+        $turma['turno_label'] = $this->rotuloTurno((string) ($turma['turno'] ?? ''));
+        if (empty($turma['ano_letivo'])) {
+            $turma['ano_letivo'] = (int) ($preview['periodo']['ano_letivo'] ?? $anoLetivo);
+        }
+        $unidade = $this->unidadeDaTurma($turmaId);
+        $periodo = is_array($preview['periodo'] ?? null) ? $preview['periodo'] : [];
+        $etapa = trim((string) ($turma['curso_nome'] ?? $turma['serie_nome'] ?? $turma['serie'] ?? ''));
+        $serie = trim((string) ($turma['serie_nome'] ?? $turma['serie'] ?? ''));
+        $cidade = trim((string) ($unidade['cidade'] ?? $unidade['cidade_nome'] ?? ''));
+        $docs = array_filter([
+            !empty($unidade['cnpj']) ? 'CNPJ ' . $unidade['cnpj'] : '',
+            !empty($unidade['inep']) ? 'Código INEP ' . $unidade['inep'] : '',
+        ]);
+        $componentes = AtaCompletaTurmaService::componentesDasLinhas($linhas);
+        $payload = [
+            'turma' => $turma,
+            'periodo' => $periodo,
+            'linhas' => $linhas,
+            'resumo' => $preview['resumo'] ?? [],
+            'unidade' => $unidade,
+            'tabela_html' => (new AtaCompletaTurmaService())->html([
+                'linhas' => $linhas,
+                'escola_nome' => (string) ($unidade['razao_social'] ?? $unidade['nome'] ?? (class_exists('LayoutHelper') ? LayoutHelper::getSystemTitle() : 'Escola')),
+                'escola_endereco' => (string) ($unidade['endereco_completo'] ?? $unidade['endereco'] ?? ''),
+                'escola_docs' => implode(' | ', $docs),
+                'ano_letivo' => (string) ($turma['ano_letivo'] ?? $anoLetivo),
+                'etapa' => $etapa,
+                'serie' => $serie,
+                'turma_nome' => (string) ($turma['nome'] ?? ''),
+                'turno' => (string) ($turma['turno_label'] ?? ''),
+                'organizacao' => (string) ($periodo['label'] ?? 'Ano letivo'),
+                'encerramento' => $this->dataEncerramentoAta($linhas),
+                'cidade_data' => trim(($cidade !== '' ? $cidade . ', ' : '') . $this->dataPorExtenso(date('Y-m-d'))),
+                'diretor_nome' => (string) ($unidade['diretor_nome'] ?? ''),
+                'secretario_nome' => (string) ($unidade['secretario_nome'] ?? ''),
+                'siglas_cadastro' => $this->siglasDasMaterias($componentes),
+                'glossario' => $this->glossarioDaAta($turma),
+                'embutido' => true,
+            ]),
+        ];
+        $payload['conselho_label'] = $this->ehEmissaoOficial('ata_completa', $payload) ? 'Homologado' : 'Preliminar';
+
+        return $this->emitirDocumento('ata_completa', $payload, $usuarioId, $configApp, null, $turmaId, $registrarEmissao);
+    }
+
+    /**
      * @return array{html:string,orientacao:string,papel:string,numero:int,modelo_codigo:string,payload:array}
      */
     public function emitirBoletim(int $alunoId, int $turmaId, int $anoLetivo, string $periodoTipo, int $periodoNumero, ?int $usuarioId, ?array $configApp = null, bool $registrarEmissao = true): array
@@ -259,8 +327,11 @@ class DocumentoOficialService
 
         $html = (string) ($render['html'] ?? '');
         if (!$oficial) {
-            $html = '<div style="border:2px dashed #b45309;background:#fffbeb;color:#92400e;padding:8px 12px;margin-bottom:16px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;text-align:center">Rascunho — sem valor oficial</div>'
-                . $html;
+            $aviso = $tipo === 'ata_completa'
+                ? 'PRELIMINAR — SEM VALIDADE PARA ESCRITURAÇÃO DEFINITIVA'
+                : 'Rascunho — sem valor oficial';
+            $html = '<div style="border:2px dashed #b45309;background:#fffbeb;color:#92400e;padding:8px 12px;margin-bottom:16px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;text-align:center">'
+                . $aviso . '</div>' . $html;
         }
 
         return [
@@ -283,6 +354,28 @@ class DocumentoOficialService
         if (trim((string) ($vars['logo_html'] ?? '')) === '') {
             $svcLogo = new \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService($this->db);
             $vars['logo_html'] = $svcLogo->logoHtmlInstitucional($unidade, $configApp);
+        }
+        if (str_contains((string) ($vars['tabela_html'] ?? ''), '<!--LOGO-->')) {
+            $vars['tabela_html'] = str_replace('<!--LOGO-->', (string) ($vars['logo_html'] ?? ''), (string) $vars['tabela_html']);
+        }
+        $modelo = $this->buscarModelo($codigo);
+        $layoutSalvo = is_array($modelo) && (new \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService($this->db))->modeloTemEstruturaVisual($modelo);
+        if ($tipo === 'ata_completa' && !is_array($modelo)) {
+            $modelo = $this->modeloSugerido($codigo);
+            $layoutSalvo = is_array($modelo);
+        }
+        if (($tipo === 'ata_completa' || $layoutSalvo) && is_array($modelo)) {
+            $svc = new \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService($this->db);
+            if ($tipo === 'boletim') {
+                $vars = $svc->aplicarFonteBoletimDoModelo($modelo, $vars, (int) ($payload['aluno']['id'] ?? 0), (int) ($payload['turma']['id'] ?? 0), (int) ($payload['periodo']['ano_letivo'] ?? 0));
+            }
+            $html = $svc->renderHtml($modelo, $vars, \App\Modulos\ModelosDocumentos\Services\ModeloDocumentoService::estiloDoModelo($modelo), $configApp);
+
+            return [
+                'html' => $html,
+                'orientacao' => $tipo === 'ata_completa' ? 'landscape' : $svc->orientacaoDompdf($modelo),
+                'papel' => $svc->papelDompdf($modelo),
+            ];
         }
         if ($tipo === 'ata_resultados' || $tipo === 'ficha_individual') {
             return [
@@ -324,6 +417,26 @@ class DocumentoOficialService
         }
     }
 
+    /**
+     * @return array<string,mixed>|null
+     */
+    private function modeloSugerido(string $codigo): ?array
+    {
+        $estrutura = EstruturaDocumentosOficiais::paraCodigo($codigo);
+        if (!is_array($estrutura)) {
+            return null;
+        }
+        $paisagem = (($estrutura['page']['orientation'] ?? '') === 'landscape');
+
+        return [
+            'codigo' => $codigo,
+            'nome' => $codigo,
+            'orientacao' => $paisagem ? 'paisagem' : 'retrato',
+            'formato_papel' => 'a4',
+            'estrutura_json' => json_encode($estrutura, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        ];
+    }
+
     private function buscarModelo(string $codigo): ?array
     {
         $codigo = trim($codigo);
@@ -347,6 +460,7 @@ class DocumentoOficialService
         $file = match (true) {
             $tipo === 'ficha_individual' => 'ficha.php',
             $tipo === 'ata_resultados' => 'ata.php',
+            $tipo === 'ata_completa' => 'ata_completa.php',
             $tipo === 'boletim' => 'boletim.php',
             default => 'relatorio.php',
         };
@@ -1503,6 +1617,125 @@ class DocumentoOficialService
         } catch (\Throwable $e) {
             return [];
         }
+    }
+
+    /**
+     * @param list<array<string,mixed>> $linhas
+     */
+    private function dataEncerramentoAta(array $linhas): string
+    {
+        $maisRecente = '';
+        foreach ($linhas as $linha) {
+            if (!is_array($linha)) {
+                continue;
+            }
+            $data = substr(trim((string) ($linha['homologado_em'] ?? '')), 0, 10);
+            if ($data !== '' && $data !== '0000-00-00' && $data > $maisRecente) {
+                $maisRecente = $data;
+            }
+        }
+        if ($maisRecente === '') {
+            return '';
+        }
+        $dt = \DateTime::createFromFormat('Y-m-d', $maisRecente);
+
+        return $dt instanceof \DateTime ? $dt->format('d/m/Y') : '';
+    }
+
+    /**
+     * @param list<array<string,mixed>> $componentes
+     * @return array<int,string>
+     */
+    private function siglasDasMaterias(array $componentes): array
+    {
+        $ids = [];
+        foreach ($componentes as $comp) {
+            $id = (int) ($comp['materia_id'] ?? 0);
+            if ($id > 0) {
+                $ids[$id] = $id;
+            }
+        }
+        if ($ids === []) {
+            return [];
+        }
+        try {
+            $coluna = $this->db->fetch("SHOW COLUMNS FROM `materias` LIKE 'sigla'");
+            if (!$coluna) {
+                return [];
+            }
+            $marcas = [];
+            $params = [];
+            $i = 0;
+            foreach ($ids as $id) {
+                $chave = 'id' . $i;
+                $marcas[] = ':' . $chave;
+                $params[$chave] = $id;
+                $i++;
+            }
+            $rows = $this->db->fetchAll(
+                'SELECT id, sigla FROM materias WHERE id IN (' . implode(', ', $marcas) . ')',
+                $params
+            ) ?: [];
+            $out = [];
+            foreach ($rows as $row) {
+                $sigla = strtoupper((string) preg_replace('/[^A-Z0-9]/i', '', (string) ($row['sigla'] ?? '')));
+                if ($sigla !== '') {
+                    $out[(int) $row['id']] = substr($sigla, 0, 12);
+                }
+            }
+
+            return $out;
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $turma
+     * @return list<array<string,mixed>>
+     */
+    private function glossarioDaAta(array $turma): array
+    {
+        try {
+            $codigo = $this->model->getLayoutCodigo('ata_completa');
+            $codigoEtapa = $this->codigoModeloDaEtapa(
+                'ata_completa',
+                (int) ($turma['curso_novo_id'] ?? 0),
+                (int) ($turma['serie_id'] ?? 0)
+            );
+            if ($codigoEtapa !== null && $codigoEtapa !== '') {
+                $codigo = $codigoEtapa;
+            }
+            $modelo = $this->buscarModelo($codigo);
+            if (!is_array($modelo)) {
+                return [];
+            }
+            $estrutura = $modelo['estrutura'] ?? null;
+            if (!is_array($estrutura)) {
+                $estrutura = json_decode((string) ($modelo['estrutura_json'] ?? ''), true);
+            }
+            $glossario = is_array($estrutura) ? ($estrutura['glossario'] ?? null) : null;
+
+            return is_array($glossario) ? $glossario : [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * @param array<string,mixed>|null $modelo
+     */
+    private function modeloTemTabelaColetiva(?array $modelo): bool
+    {
+        if (!is_array($modelo)) {
+            return false;
+        }
+        $bruto = (string) ($modelo['estrutura_json'] ?? '');
+        if ($bruto === '' && isset($modelo['estrutura'])) {
+            $bruto = (string) json_encode($modelo['estrutura']);
+        }
+
+        return str_contains($bruto, 'tabela_coletiva');
     }
 
     /**

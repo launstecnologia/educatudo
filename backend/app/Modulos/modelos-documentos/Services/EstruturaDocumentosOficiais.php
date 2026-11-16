@@ -20,6 +20,7 @@ class EstruturaDocumentosOficiais
             str_contains($codigo, 'boletim') => self::boletim(),
             $codigo === 'resultado_ficha_individual' => self::ficha(),
             $codigo === 'resultado_ata_finais' => self::ata(),
+            $codigo === 'resultado_ata_completa' => self::ataCompleta(),
             $codigo === 'resultado_historico',
             $codigo === 'declaracao_historico',
             $codigo === 'vida_escolar_historico' => self::historico(),
@@ -111,6 +112,27 @@ class EstruturaDocumentosOficiais
             self::secaoBloco('tabela_coletiva'),
             self::secaoTexto('{{ata_totais}}'),
             self::secaoTexto('Espaço adicional para assinaturas do Conselho de Classe, quando previsto pela instituição.'),
+        ];
+        self::assinaturas($est);
+        self::rodapeInstitucional($est);
+        return $est;
+    }
+
+    /**
+     * Casca da ata completa. A grade de alunos fica no bloco tabela coletiva.
+     *
+     * @return array<string,mixed>
+     */
+    public static function ataCompleta(): array
+    {
+        $est = self::base('paisagem');
+        self::cabecalho($est, 'ATA DE RESULTADOS FINAIS — {{ano_letivo}}');
+        $est['body']['sections'] = [
+            self::secaoHtml(
+                '<p style="text-align:center;font-size:9pt;margin:0 0 6px;">'
+                . '{{etapa}} · {{serie}} · Turma {{turma_nome}} · {{turno}} · {{organizacao}}</p>'
+            ),
+            self::secaoBloco('tabela_coletiva'),
         ];
         self::assinaturas($est);
         self::rodapeInstitucional($est);

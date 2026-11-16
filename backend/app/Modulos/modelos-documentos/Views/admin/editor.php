@@ -263,6 +263,7 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
                     <option value="ficha_individual">Ficha individual</option>
                     <option value="boletim">Boletim</option>
                     <option value="ata_resultados">Ata de resultados finais</option>
+                    <option value="ata_completa">Ata completa da turma</option>
                     <option value="historico">Histórico escolar</option>
                     <option value="relatorio">Relatório final</option>
                 </select>

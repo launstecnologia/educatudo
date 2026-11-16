@@ -245,6 +245,10 @@ class VidaEscolarPdfService
         }
         $tabela = GradeHistoricoOficial::html($dadosPdf, $logo);
         $tabela = \App\Modulos\ModelosDocumentos\Services\GiradorTextoVerticalDocumento::aplicar($tabela);
+        $peloLayout = $this->htmlHistoricoPeloLayout($dadosPdf, $tabela, $logo, $config);
+        if ($peloLayout !== null) {
+            return $peloLayout;
+        }
         $cssPath = dirname(__DIR__, 4) . '/public/static/css/folha-oficial.css';
         $css = is_file($cssPath) ? (string) file_get_contents($cssPath) : '';
         $doc = is_array($dadosPdf['documento'] ?? null) ? $dadosPdf['documento'] : [];
@@ -258,6 +262,60 @@ class VidaEscolarPdfService
             . 'body{margin:0;font-family:DejaVu Sans,sans-serif;}'
             . $css
             . '</style></head><body>' . $tabela . '</body></html>';
+    }
+
+    /**
+     * Usa o layout salvo quando ele reserva o bloco do histórico.
+     * Sem esse bloco, permanece a grade oficial.
+     *
+     * @param array<string,mixed> $dadosPdf
+     */
+    private function htmlHistoricoPeloLayout(array $dadosPdf, string $tabela, string $logo, ?array $config): ?string
+    {
+        try {
+            $codigo = 'resultado_historico';
+            $academico = new \App\Modulos\Fechamento\Models\ResultadoAcademico();
+            $codigoSalvo = $academico->getLayoutCodigo('historico');
+            if ($codigoSalvo !== '') {
+                $codigo = $codigoSalvo;
+            }
+            $modelo = $this->modelos->findByCodigo($codigo);
+            if (!is_array($modelo) || !$this->modelos->modeloTemEstruturaVisual($modelo)) {
+                return null;
+            }
+            $bruto = (string) ($modelo['estrutura_json'] ?? '');
+            if (!str_contains($bruto, 'historico_html') && !str_contains($bruto, '"historico"')) {
+                return null;
+            }
+            $aluno = is_array($dadosPdf['aluno'] ?? null) ? $dadosPdf['aluno'] : [];
+            $unidade = is_array($dadosPdf['unidade'] ?? null) ? $dadosPdf['unidade'] : [];
+            $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
+            $vars = [
+                'historico_html' => $tabela,
+                'logo_html' => $logo,
+                'aluno_nome' => $esc($aluno['nome'] ?? ''),
+                'aluno_ra' => $esc($aluno['ra'] ?? $aluno['codigo_aluno'] ?? ''),
+                'aluno_rg' => $esc($aluno['rg'] ?? ''),
+                'aluno_cpf' => $esc($aluno['cpf'] ?? ''),
+                'aluno_data_nasc' => $esc($aluno['data_nasc'] ?? ''),
+                'aluno_naturalidade' => $esc($aluno['naturalidade'] ?? ''),
+                'aluno_nacionalidade' => $esc($aluno['nacionalidade'] ?? ''),
+                'escola_nome' => $esc($unidade['razao_social'] ?? $unidade['nome'] ?? ''),
+                'escola_endereco' => $esc($unidade['endereco_completo'] ?? $unidade['endereco'] ?? ''),
+                'escola_docs' => $esc(trim(implode(' | ', array_filter([
+                    !empty($unidade['cnpj']) ? 'CNPJ ' . $unidade['cnpj'] : '',
+                    !empty($unidade['inep']) ? 'Código INEP ' . $unidade['inep'] : '',
+                ])))),
+                'ano_letivo' => $esc($dadosPdf['ano_letivo'] ?? $aluno['ano_letivo'] ?? ''),
+                'serie' => $esc($dadosPdf['serie'] ?? $aluno['serie'] ?? ''),
+                'etapa' => $esc($dadosPdf['etapa'] ?? ''),
+                'turma_nome' => $esc($dadosPdf['turma_nome'] ?? ''),
+            ];
+
+            return $this->modelos->renderHtml($modelo, $vars, ModeloDocumentoService::estiloDoModelo($modelo), $config);
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /**

@@ -27,7 +27,7 @@ final class CatalogoDocumentosSecretariaTest extends TestCase
             'fonte boletim' => [['codigo' => 'modelo_19', 'estrutura_json' => '{"fonte_boletim_id":12}'], true],
             'sem vinculo' => [['codigo' => 'modelo_24', 'estrutura_json' => '{"emissao":{"tipo":""}}'], false],
         ];
-        foreach (['boletim', 'historico', 'ficha_individual', 'ata_resultados', 'relatorio'] as $tipo) {
+        foreach (['boletim', 'historico', 'ficha_individual', 'ata_resultados', 'ata_completa', 'relatorio'] as $tipo) {
             $casos['vinculo ' . $tipo] = [['codigo' => 'modelo_personalizado', 'estrutura_json' => json_encode(['emissao' => ['tipo' => $tipo]])], true];
         }
         return $casos;

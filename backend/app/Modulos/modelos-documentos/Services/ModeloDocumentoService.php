@@ -324,6 +324,7 @@ class ModeloDocumentoService
         'declaracao_bolsista_integral',
         'resultado_ficha_individual',
         'resultado_ata_finais',
+        'resultado_ata_completa',
         'resultado_boletim_padrao',
         'resultado_relatorio_padrao',
         'resultado_historico',
@@ -1891,7 +1892,7 @@ class ModeloDocumentoService
             return null;
         }
         $tipo = (string) ($emissao['tipo'] ?? '');
-        if (!in_array($tipo, ['ficha_individual', 'relatorio', 'boletim', 'ata_resultados', 'historico'], true)) {
+        if (!in_array($tipo, ['ficha_individual', 'relatorio', 'boletim', 'ata_resultados', 'ata_completa', 'historico'], true)) {
             return null;
         }
         return [
@@ -2337,7 +2338,7 @@ class ModeloDocumentoService
     public function codigoParaEmissao(string $tipo, int $cursoId, int $serieId): ?string
     {
         $chave = str_starts_with($tipo, 'relatorio_') ? 'relatorio' : $tipo;
-        if (!in_array($chave, ['ficha_individual', 'relatorio', 'boletim', 'ata_resultados', 'historico'], true) || !$this->temColuna('estrutura_json')) {
+        if (!in_array($chave, ['ficha_individual', 'relatorio', 'boletim', 'ata_resultados', 'ata_completa', 'historico'], true) || !$this->temColuna('estrutura_json')) {
             return null;
         }
         $rows = $this->db->fetchAll(

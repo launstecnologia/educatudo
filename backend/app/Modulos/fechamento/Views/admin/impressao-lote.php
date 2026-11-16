@@ -241,7 +241,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 
 <?php if (!$escopoOk): ?>
 <div class="mb-6 p-4 rounded-lg bg-sky-50 border border-sky-200 text-sky-900 text-sm">
-    Escolha a série. A lista mostra cada turma, e em Ações você baixa a ficha, o histórico e o consolidado final.
+    Escolha a série. A lista mostra cada turma, e em Ações você baixa a ficha, o histórico, o consolidado final e a ata completa.
 </div>
 <?php elseif ($linhas === []): ?>
 <div class="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
@@ -254,7 +254,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             <h3 class="text-lg font-semibold text-gray-900"><?= $turmaId > 0 ? 'Esta turma' : htmlspecialchars($segmento !== '' ? $segmento : $serie) ?></h3>
             <p class="text-sm text-gray-500 mt-1">
                 <?= $homologadas ?> de <?= count($linhas) ?> turma(s) homologada(s).
-                Emite ficha, histórico e consolidado final só do que ainda não tem PDF. O histórico sai emitido, com as escolas dos anos anteriores.
+                Emite ficha, histórico e consolidado final só do que ainda não tem PDF. A ata completa da turma fica em Ações, separada do consolidado. O histórico sai emitido, com as escolas dos anos anteriores.
             </p>
         </div>
         <div class="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0">
