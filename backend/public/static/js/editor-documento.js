@@ -6325,6 +6325,19 @@
       if (serie.value !== String(atual)) serie.value = '0';
     }
     var em = state.estrutura.emissao || {};
+    var codigoModelo = String((C.modelo && C.modelo.codigo) || '').toLowerCase();
+    var tipoDoCodigo = {
+      resultado_ficha_individual: 'ficha_individual',
+      resultado_ata_finais: 'ata_resultados',
+      resultado_ata_completa: 'ata_completa',
+      resultado_boletim_padrao: 'boletim',
+      resultado_historico: 'historico',
+      resultado_relatorio_padrao: 'relatorio'
+    }[codigoModelo] || '';
+    if (!em.tipo && tipoDoCodigo) {
+      em = { tipo: tipoDoCodigo, curso_id: 0, serie_id: 0 };
+      state.estrutura.emissao = em;
+    }
     tipo.value = em.tipo || '';
     curso.value = String(em.curso_id || 0);
     preencherSeries();

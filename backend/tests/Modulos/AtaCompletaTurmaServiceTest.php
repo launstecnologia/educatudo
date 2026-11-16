@@ -108,6 +108,18 @@ final class AtaCompletaTurmaServiceTest extends TestCase
         $this->assertStringContainsString('PORT — Língua Portuguesa', $html);
     }
 
+    public function testEmbutidoNoLayoutSoEntregaAGrade(): void
+    {
+        $html = (new AtaCompletaTurmaService())->html($this->contexto($this->alunos(20), 3) + ['embutido' => true]);
+
+        $this->assertStringNotContainsString('Página ', $html);
+        $this->assertStringNotContainsString('class="folha', $html);
+        $this->assertStringNotContainsString('class="assinaturas"', $html);
+        $this->assertStringNotContainsString('@page', $html);
+        $this->assertSame(20, substr_count($html, 'td class="nome"'));
+        $this->assertStringContainsString('class="ata"', $html);
+    }
+
     public function testJanelasCobremTodosOsAlunosSemSobrepor(): void
     {
         foreach ([5, 9, 30, 50, 100] as $total) {

@@ -1012,12 +1012,19 @@ class ModeloDocumentoService
             'Sofia Martins',
             'Pedro Henrique Lima',
         ];
-        $html = '<table class="dados"><thead><tr>'
-            . '<th>Nº</th><th>Aluno</th><th>Situação</th><th>Frequência</th>'
+        $html = '<table class="dados ata"><thead><tr>'
+            . '<th>Nº</th><th>RA</th><th>Nome do aluno</th>'
+            . '<th>BIO</th><th>FIS</th><th>GEO</th><th>HIS</th><th>LPO</th><th>MAT</th><th>QUI</th><th>SOC</th>'
+            . '<th>Freq.</th><th>Resultado</th>'
             . '</tr></thead><tbody>';
+        $notas = ['7,4', '7,6', '7,5', '7,7', '7,4', '7,4', '7,7', '7,2'];
         foreach ($alunos as $i => $nome) {
-            $html .= '<tr><td>' . ($i + 1) . '</td><td>' . htmlspecialchars($nome, ENT_QUOTES, 'UTF-8')
-                . '</td><td>Aprovado</td><td>95%</td></tr>';
+            $html .= '<tr><td>' . ($i + 1) . '</td><td>ET25' . (100 + $i) . '</td><td>'
+                . htmlspecialchars($nome, ENT_QUOTES, 'UTF-8') . '</td>';
+            foreach ($notas as $nota) {
+                $html .= '<td>' . $nota . '</td>';
+            }
+            $html .= '<td>95%</td><td>Aprovado</td></tr>';
         }
 
         return $html . '</tbody></table>';
@@ -1590,6 +1597,12 @@ class ModeloDocumentoService
             $base['glossario'] = $glossario;
         }
         $emissao = self::emissaoValida($estrutura['emissao'] ?? null);
+        if ($emissao === null) {
+            $tipoDoCodigo = self::tipoEmissaoDoCodigo((string) ($modelo['codigo'] ?? ''));
+            if ($tipoDoCodigo !== null) {
+                $emissao = ['tipo' => $tipoDoCodigo, 'curso_id' => 0, 'serie_id' => 0];
+            }
+        }
         if ($emissao !== null) {
             $base['emissao'] = $emissao;
         }
@@ -1886,6 +1899,19 @@ class ModeloDocumentoService
     /**
      * @return array{tipo:string,curso_id:int,serie_id:int}|null
      */
+    public static function tipoEmissaoDoCodigo(string $codigo): ?string
+    {
+        return match (strtolower(trim($codigo))) {
+            'resultado_ficha_individual' => 'ficha_individual',
+            'resultado_ata_finais' => 'ata_resultados',
+            'resultado_ata_completa' => 'ata_completa',
+            'resultado_boletim_padrao' => 'boletim',
+            'resultado_historico' => 'historico',
+            'resultado_relatorio_padrao' => 'relatorio',
+            default => null,
+        };
+    }
+
     public static function emissaoValida(mixed $emissao): ?array
     {
         if (!is_array($emissao)) {
@@ -4035,6 +4061,11 @@ CSS;
   figure.table table { width: 100%; }
   table.dados { margin: 8px 0; }
   table.dados td, table.dados th { border: 1px solid #ccc; }
+  table.ata { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 4px 0 2px; font-size: 8pt; }
+  table.ata th, table.ata td { border: 1px solid #d1d5db; padding: 3px 4px; vertical-align: middle; word-wrap: break-word; }
+  table.ata th { background: #f3f4f6; font-size: 7.5pt; text-align: center; font-weight: bold; }
+  table.ata td { text-align: center; }
+  table.ata td:nth-child(3), table.ata th:nth-child(3) { text-align: left; }
   table.ident-boletim { width: 100%; border-collapse: collapse; margin: 0 0 10px; }
   table.ident-boletim td { border: 1px solid #d1d5db; padding: 4px 6px; font-size: 8pt; }
   table.ident-boletim td.label { background-color: #9ca3af; color: #111; font-weight: bold; width: 12%; }
@@ -4457,6 +4488,11 @@ CSS;
   .corpo { margin: 0 4px; }
   .corpo p { margin: 0 0 0.6em 0; }
   .destaque { font-weight: bold; color: #111827; }
+  table.ata { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 4px 0 2px; font-size: 8pt; }
+  table.ata th, table.ata td { border: 1px solid #d1d5db; padding: 3px 4px; vertical-align: middle; word-wrap: break-word; }
+  table.ata th { background: #f3f4f6; font-size: 7.5pt; text-align: center; font-weight: bold; }
+  table.ata td { text-align: center; }
+  table.ata td:nth-child(3), table.ata th:nth-child(3) { text-align: left; }
   table.dados { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: inherit; }
   table.dados td { border: 1px solid #d1d5db; padding: 6px 9px; font-size: inherit; }
   table.dados td.label { background: #9ca3af; color: #111; font-weight: bold; width: 38%; }
