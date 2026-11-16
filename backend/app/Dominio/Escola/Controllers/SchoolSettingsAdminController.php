@@ -9,6 +9,7 @@ use App\Painel\Admin\Controllers\AdminBaseController;
 
 
 use App\Core\LayoutHelper;
+use App\Dominio\Escola\Services\MontagemDashboardService;
 use App\Services\MediaStorageService;
 use App\Core\ModuloRegistry;
 use App\Core\RedisCache;
@@ -294,15 +295,146 @@ class SchoolSettingsAdminController extends AdminBaseController
 
     public function layout()
     {
+        $this->exigirDevAparencia();
+        $this->redirect('/admin/dev/aparencia/logos');
+    }
+
+    public function aparenciaLogos()
+    {
+        $this->viewWithLayout('admin', 'admin/dev/aparencia-logos', $this->dadosPaginaAparencia('Logos'));
+    }
+
+    public function aparenciaCores()
+    {
+        $this->viewWithLayout('admin', 'admin/dev/aparencia-cores', $this->dadosPaginaAparencia('Cores'));
+    }
+
+    public function aparenciaTitulo()
+    {
+        $this->viewWithLayout('admin', 'admin/dev/aparencia-titulo', $this->dadosPaginaAparencia('Título e subtítulo'));
+    }
+
+    public function aparenciaDashboard($perfil = '')
+    {
+        $perfil = (string) $perfil;
+        if (!in_array($perfil, MontagemDashboardService::PERFIS, true)) {
+            $this->redirect('/admin/dev/aparencia');
+        }
+        $titulos = [
+            'admin' => 'Dashboard do admin',
+            'aluno' => 'Dashboard do aluno',
+            'professor' => 'Dashboard do professor',
+        ];
+        $data = $this->dadosPaginaAparencia($titulos[$perfil]);
+        $data['perfil_dashboard'] = $perfil;
+        $data['blocos'] = MontagemDashboardService::ler($perfil);
+        $data['ordem_personalizada'] = MontagemDashboardService::ordemPersonalizada($perfil);
+        $this->viewWithLayout('admin', 'admin/dev/aparencia-dashboard', $data);
+    }
+
+    public function salvarMontagemDashboard()
+    {
+        $this->exigirDevAparencia();
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Token inválido.', 'error');
+            $this->redirect('/admin/dev/aparencia');
+        }
+
+        $perfil = (string) ($_POST['perfil'] ?? '');
+        if (!in_array($perfil, MontagemDashboardService::PERFIS, true)) {
+            $this->setFlashMessage('Painel inválido.', 'error');
+            $this->redirect('/admin/dev/aparencia');
+        }
+
+        $destino = '/admin/dev/aparencia/dashboard/' . $perfil;
+        $chave = MontagemDashboardService::chaveConfig($perfil);
+
+        if ((string) ($_POST['restaurar'] ?? '') === '1') {
+            $this->db->query(
+                'DELETE FROM config_layout WHERE config_key = :config_key',
+                ['config_key' => $chave]
+            );
+            LayoutHelper::invalidateCache();
+            $this->setFlashMessage('Dashboard restaurado para o padrão atual.', 'success');
+            $this->redirect($destino);
+        }
+
+        $ordem = $_POST['ordem'] ?? [];
+        $visiveis = $_POST['visivel'] ?? [];
+        if (!is_array($ordem)) {
+            $ordem = [];
+        }
+        if (!is_array($visiveis)) {
+            $visiveis = [];
+        }
+
+        $permitidas = array_fill_keys(MontagemDashboardService::padrao($perfil), true);
+        $itens = [];
+        foreach ($ordem as $chaveBloco) {
+            $chaveBloco = (string) $chaveBloco;
+            if (!isset($permitidas[$chaveBloco]) || isset($itens[$chaveBloco])) {
+                continue;
+            }
+            $itens[$chaveBloco] = [
+                'chave' => $chaveBloco,
+                'visivel' => !empty($visiveis[$chaveBloco]),
+            ];
+        }
+        foreach (MontagemDashboardService::padrao($perfil) as $chaveBloco) {
+            if (!isset($itens[$chaveBloco])) {
+                $itens[$chaveBloco] = ['chave' => $chaveBloco, 'visivel' => true];
+            }
+        }
+
+        $json = json_encode(array_values($itens), JSON_UNESCAPED_UNICODE);
+        $this->db->query(
+            'INSERT INTO config_layout (config_key, config_value) VALUES (:config_key, :config_value)
+             ON DUPLICATE KEY UPDATE config_value = VALUES(config_value), updated_at = CURRENT_TIMESTAMP',
+            ['config_key' => $chave, 'config_value' => $json]
+        );
+        LayoutHelper::invalidateCache();
+        $this->setFlashMessage('Montagem do dashboard salva.', 'success');
+        $this->redirect($destino);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function dadosPaginaAparencia(string $titulo): array
+    {
+        $user = $this->exigirDevAparencia();
+        $flash = $this->getFlashMessage();
+
+        return [
+            'title' => $titulo . ' - EducaTudo',
+            'user' => $user,
+            'current_page' => 'dev',
+            'config_layout' => $this->carregarConfigLayout(),
+            'csrf_token' => $this->generateCsrfToken(),
+            'flash_message' => $flash['message'] ?? '',
+            'flash_type' => $flash['type'] ?? 'info',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function exigirDevAparencia(): array
+    {
         $user = $this->auth->getUser();
-        if (!$user || $user['perfil_admin'] !== 'dev') {
-            // Debug: mostrar informações do usuário
-            error_log("Layout access denied. User: " . json_encode($user));
+        if (!$user || ($user['perfil_admin'] ?? '') !== 'dev') {
             $this->redirect('/admin/dashboard');
         }
-        
-        // Buscar configurações atuais (URLs de mídia no host da escola, igual ao sidebar)
-        $configs = $this->db->fetchAll("SELECT * FROM config_layout ORDER BY config_key");
+
+        return $user;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function carregarConfigLayout(): array
+    {
+        $configs = $this->db->fetchAll('SELECT * FROM config_layout ORDER BY config_key');
         $layoutConfig = [];
         foreach ($configs as $config) {
             $key = (string) ($config['config_key'] ?? '');
@@ -312,16 +444,8 @@ class SchoolSettingsAdminController extends AdminBaseController
             }
             $layoutConfig[$key] = $value;
         }
-        
-        $data = [
-            'title' => 'Layout do Sistema - EducaTudo',
-            'user' => $this->auth->getUser(),
-            'current_page' => 'dev',
-            'config_layout' => $layoutConfig,
-            'csrf_token' => $this->generateCsrfToken()
-        ];
-        
-        $this->viewWithLayout('admin', 'admin/dev/layout', $data);
+
+        return $layoutConfig;
     }
 
     /**

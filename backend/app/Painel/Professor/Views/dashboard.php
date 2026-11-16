@@ -1,5 +1,22 @@
+<?php
+$dashVisivel = static function (string $chave): bool {
+    return \App\Dominio\Escola\Services\MontagemDashboardService::visivel('professor', $chave);
+};
+$dashOrdemCustom = \App\Dominio\Escola\Services\MontagemDashboardService::ordemPersonalizada('professor');
+$abrirBlocoDash = static function (string $chave) use ($dashOrdemCustom): void {
+    if ($dashOrdemCustom) {
+        $ordem = \App\Dominio\Escola\Services\MontagemDashboardService::posicao('professor', $chave);
+        echo '<div style="order:' . (int) $ordem . '">';
+    }
+};
+$fecharBlocoDash = static function () use ($dashOrdemCustom): void {
+    if ($dashOrdemCustom) {
+        echo '</div>';
+    }
+};
+?>
 <!-- Header Section -->
-<div class="mb-6 md:mb-8">
+<div class="mb-6 md:mb-8<?= !empty($grupo_seb_ativo) ? ' hidden md:block' : '' ?>">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div class="flex-1">
             <h1 class="text-2xl md:text-3xl font-bold text-gray-900">Painel do Professor</h1>
@@ -19,6 +36,7 @@
     </div>
 </div>
 
+<?php if ($dashOrdemCustom): ?><div class="flex flex-col"><?php endif; ?>
 <?php if (!empty($grupo_seb_ativo)): ?>
 <?php
 $aulasHoje = is_array($aulas_do_dia_professor ?? null) ? $aulas_do_dia_professor : [];
@@ -46,19 +64,26 @@ $corMedia = static function ($media): string {
     }
     return 'text-red-600';
 };
+$mostrarAulasHoje = $dashVisivel('aulas_hoje');
+$mostrarDesempenhoProf = $dashVisivel('desempenho');
+$gradeSeb = !$dashOrdemCustom && ($mostrarAulasHoje || $mostrarDesempenhoProf);
 ?>
+<?php if ($gradeSeb): ?>
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8">
+<?php endif; ?>
+<?php if ($mostrarAulasHoje): ?>
+<?php $abrirBlocoDash('aulas_hoje'); ?>
     <div class="bg-white rounded-xl shadow-lg">
-        <div class="p-6 border-b border-gray-200">
+        <div class="p-4 md:p-6 border-b border-gray-200">
             <div class="flex items-center justify-between gap-3">
-                <div>
-                    <h2 class="text-xl font-semibold text-gray-900">Aulas de hoje</h2>
+                <div class="min-w-0">
+                    <h2 class="text-lg md:text-xl font-semibold text-gray-900">Aulas de hoje</h2>
                     <p class="text-sm text-gray-500 mt-1"><?= htmlspecialchars($rotuloHoje) ?></p>
                 </div>
                 <a href="<?= URL ?>/professor/grade-horaria" class="text-blue-600 hover:text-blue-700 text-sm font-medium whitespace-nowrap">Minha grade</a>
             </div>
         </div>
-        <div class="p-6">
+        <div class="p-4 md:p-6">
             <?php if ($aulasHoje === []): ?>
                 <p class="text-sm text-gray-500">Nenhuma aula prevista para hoje.</p>
             <?php else: ?>
@@ -90,13 +115,17 @@ $corMedia = static function ($media): string {
             <?php endif; ?>
         </div>
     </div>
+<?php $fecharBlocoDash(); ?>
+<?php endif; ?>
 
+<?php if ($mostrarDesempenhoProf): ?>
+<?php $abrirBlocoDash('desempenho'); ?>
     <div class="bg-white rounded-xl shadow-lg">
-        <div class="p-6 border-b border-gray-200">
-            <div class="flex items-center justify-between gap-3">
-                <div>
-                    <h2 class="text-xl font-semibold text-gray-900">Desempenho das turmas</h2>
-                    <p class="text-sm text-gray-500 mt-1">Média das avaliações nas turmas em que você leciona</p>
+        <div class="p-4 md:p-6 border-b border-gray-200">
+            <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <h2 class="text-lg md:text-xl font-semibold text-gray-900">Desempenho das turmas</h2>
+                    <p class="hidden sm:block text-sm text-gray-500 mt-1">Média das avaliações nas turmas em que você leciona</p>
                 </div>
                 <div class="text-right">
                     <p class="text-xs text-gray-500">Média geral</p>
@@ -106,7 +135,7 @@ $corMedia = static function ($media): string {
                 </div>
             </div>
         </div>
-        <div class="p-6 max-h-96 overflow-y-auto">
+        <div class="p-4 md:p-6 max-h-96 overflow-y-auto">
             <?php if ($linhasDesempenho === []): ?>
                 <p class="text-sm text-gray-500">Nenhuma turma vinculada à sua grade.</p>
             <?php else: ?>
@@ -134,10 +163,15 @@ $corMedia = static function ($media): string {
             <?php endif; ?>
         </div>
     </div>
+<?php $fecharBlocoDash(); ?>
+<?php endif; ?>
+<?php if ($gradeSeb): ?>
 </div>
 <?php endif; ?>
+<?php endif; ?>
 
-<?php if (empty($grupo_seb_ativo)): ?>
+<?php if (empty($grupo_seb_ativo) && $dashVisivel('resumo')): ?>
+<?php $abrirBlocoDash('resumo'); ?>
 <!-- Stats Cards -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
     <!-- Card Jornadas -->
@@ -244,12 +278,19 @@ $corMedia = static function ($media): string {
         <?php endif; ?>
     </div>
 </div>
+<?php $fecharBlocoDash(); ?>
 <?php endif; ?>
 
-<!-- Main Content Grid -->
-<div class="grid grid-cols-1 <?= empty($grupo_seb_ativo) ? 'lg:grid-cols-2' : '' ?> gap-8">
-    <?php if (empty($grupo_seb_ativo)): ?>
-    <!-- Jornadas Recentes -->
+<?php
+$mostrarJornadasRecentes = empty($grupo_seb_ativo) && $dashVisivel('jornadas_recentes');
+$mostrarProvasProf = $dashVisivel('provas');
+$gradeProf = !$dashOrdemCustom && ($mostrarJornadasRecentes || $mostrarProvasProf);
+?>
+<?php if ($gradeProf): ?>
+<div class="grid grid-cols-1 <?= ($mostrarJornadasRecentes && $mostrarProvasProf) ? 'lg:grid-cols-2' : '' ?> gap-8">
+<?php endif; ?>
+    <?php if ($mostrarJornadasRecentes): ?>
+    <?php $abrirBlocoDash('jornadas_recentes'); ?>
     <div class="bg-white rounded-xl shadow-lg">
         <div class="p-6 border-b border-gray-200">
             <div class="flex items-center justify-between">
@@ -353,9 +394,11 @@ $corMedia = static function ($media): string {
             <?php endif; ?>
         </div>
     </div>
+    <?php $fecharBlocoDash(); ?>
     <?php endif; ?>
 
-    <!-- Prova Online -->
+    <?php if ($mostrarProvasProf): ?>
+    <?php $abrirBlocoDash('provas'); ?>
     <div class="bg-white rounded-xl shadow-lg">
         <div class="p-6 border-b border-gray-200">
             <div class="flex items-center justify-between">
@@ -392,8 +435,8 @@ $corMedia = static function ($media): string {
                     ?>
                         <a href="<?= $urlProva ?>" 
                            class="block p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
-                            <div class="flex items-start justify-between mb-2">
-                                <div class="flex-1">
+                            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-2">
+                                <div class="flex-1 min-w-0">
                                     <h3 class="font-medium text-gray-900 mb-1"><?= htmlspecialchars($evento['titulo']) ?></h3>
                                     <p class="text-sm text-gray-600 mb-1">
                                         <span class="font-semibold">Matéria:</span> <?= htmlspecialchars($evento['materia_nome'] ?? 'N/A') ?>
@@ -405,7 +448,7 @@ $corMedia = static function ($media): string {
                                         </p>
                                     <?php endif; ?>
                                 </div>
-                                <div class="ml-4 text-right">
+                                <div class="sm:ml-4 sm:text-right shrink-0">
                                     <?php if ($isLancamentoNota): ?>
                                         <span class="px-2 py-1 bg-violet-100 text-violet-800 text-xs rounded-full font-medium">
                                             Lançamento de notas
@@ -434,4 +477,9 @@ $corMedia = static function ($media): string {
             <?php endif; ?>
         </div>
     </div>
+    <?php $fecharBlocoDash(); ?>
+    <?php endif; ?>
+<?php if ($gradeProf): ?>
 </div>
+<?php endif; ?>
+<?php if ($dashOrdemCustom): ?></div><?php endif; ?>

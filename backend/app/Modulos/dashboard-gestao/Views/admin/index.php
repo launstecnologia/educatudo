@@ -13,7 +13,9 @@ $alunosOnline = (int) ($alunos_online ?? 0);
 $alertasNovos = $alertas_novos ?? null;
 $aulasOnline = is_array($aulas_online ?? null) ? $aulas_online : [];
 
-$tem = static fn (string $k): bool => in_array($k, $widgets, true);
+$visivelAdmin = static fn (string $k): bool => \App\Dominio\Escola\Services\MontagemDashboardService::visivel('admin', $k);
+$ordemCustom = \App\Dominio\Escola\Services\MontagemDashboardService::ordemPersonalizada('admin');
+$tem = static fn (string $k): bool => in_array($k, $widgets, true) && $visivelAdmin($k);
 $card = 'bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 min-w-0';
 $selectPill = 'bg-transparent border-0 text-sm font-semibold text-gray-900 py-1 pl-1 pr-7 focus:outline-none focus:ring-0 cursor-pointer';
 
@@ -104,52 +106,22 @@ $rotuloPeriodo = (string) (\App\Core\PeriodoLetivo::doAno($anoDash)['rotulo_camp
 </form>
 </div>
 
-<?php if ($alunosOnline > 0 || (int) $alertasNovos > 0): ?>
-<div class="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
-    <?php if ($alunosOnline > 0): ?>
-    <a href="<?= URL ?>/admin/alunos-online" class="<?= $card ?> hover:shadow-md transition-shadow">
-        <p class="text-xs text-slate-500">Alunos online</p>
-        <p id="alunos-online-count" class="mt-1 text-2xl font-bold text-gray-900"><?= $alunosOnline ?></p>
-    </a>
-    <?php endif; ?>
-    <?php if ((int) $alertasNovos > 0): ?>
-    <a href="<?= URL ?>/admin/monitoramento/alertas" class="<?= $card ?> hover:shadow-md transition-shadow">
-        <p class="text-xs text-slate-500">Alertas sensíveis</p>
-        <p class="mt-1 text-2xl font-bold text-rose-600"><?= (int) $alertasNovos ?></p>
-    </a>
-    <?php endif; ?>
-</div>
+<?php if (!$ordemCustom && $visivelAdmin('avisos') && ($alunosOnline > 0 || (int) $alertasNovos > 0)): ?>
+<?php include __DIR__ . '/_bloco_avisos.php'; ?>
 <?php endif; ?>
 
-<?php if ($aulasOnline !== []): ?>
-<div class="<?= $card ?> mb-4">
-    <div class="flex items-center justify-between mb-3">
-        <h3 class="text-sm font-semibold text-gray-900">Aulas online</h3>
-        <a href="<?= URL ?>/admin/aulas-online" class="text-xs font-medium text-accent hover:underline">Ver todas</a>
-    </div>
-    <div class="space-y-2">
-        <?php foreach ($aulasOnline as $aula): ?>
-            <?php
-                $inicioTs = !empty($aula['inicio_em']) ? strtotime((string) $aula['inicio_em']) : false;
-                $fimTs = !empty($aula['fim_em']) ? strtotime((string) $aula['fim_em']) : false;
-                $aoVivo = $inicioTs !== false && time() >= $inicioTs && ($fimTs === false || time() <= $fimTs);
-            ?>
-            <div class="flex items-center justify-between gap-3 rounded-xl px-3 py-2 <?= $aoVivo ? 'bg-rose-50' : 'bg-slate-50' ?>">
-                <div class="min-w-0">
-                    <p class="text-sm font-medium text-gray-900 truncate"><?= htmlspecialchars((string) ($aula['titulo'] ?? 'Aula')) ?></p>
-                    <p class="text-xs text-gray-500"><?= $aoVivo ? 'Ao vivo' : ($inicioTs ? date('d/m H:i', $inicioTs) : '') ?></p>
-                </div>
-                <a href="<?= URL ?>/admin/aulas-online/chat?id=<?= (int) ($aula['id'] ?? 0) ?>" class="text-xs font-semibold text-accent hover:underline shrink-0">Abrir</a>
-            </div>
-        <?php endforeach; ?>
-    </div>
-</div>
+<?php if (!$ordemCustom && $visivelAdmin('aulas_online') && $aulasOnline !== []): ?>
+<?php include __DIR__ . '/_bloco_aulas.php'; ?>
 <?php endif; ?>
 
 <div id="dash-gestao-root"
+     class="<?= $ordemCustom ? 'flex flex-col gap-4' : '' ?>"
      data-widget-url="<?= htmlspecialchars($widgetUrl) ?>"
      data-filtros-url="<?= htmlspecialchars($filtrosUrl) ?>"
      data-base-url="<?= htmlspecialchars(URL) ?>">
+<?php if ($ordemCustom): ?>
+<?php include __DIR__ . '/_montagem_linear.php'; ?>
+<?php else: ?>
 
     <?php if ($tem('kpis')): ?>
     <div data-widget="kpis" class="mb-4"><?php include __DIR__ . '/_skeleton_cards.php'; ?></div>
@@ -227,6 +199,7 @@ $rotuloPeriodo = (string) (\App\Core\PeriodoLetivo::doAno($anoDash)['rotulo_camp
         <?php endif; ?>
     </div>
     <?php endif; ?>
+<?php endif; ?>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>

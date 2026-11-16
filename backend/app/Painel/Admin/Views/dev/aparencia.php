@@ -6,7 +6,7 @@
         <span class="flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-100 text-indigo-600 text-2xl">🎨</span>
         <div>
             <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Aparência e Menu</h1>
-            <p class="text-sm text-gray-500 mt-0.5">Cores, logos, PWA e organização do menu lateral</p>
+            <p class="text-sm text-gray-500 mt-0.5">Logos, cores, título e a montagem dos dashboards</p>
         </div>
     </div>
 </header>
@@ -24,34 +24,30 @@ if ($flash_message !== ''):
 
 <div class="space-y-6 max-w-5xl">
 
+    <?php
+    $atalhosAparencia = [
+        ['Logos', 'Padrão do sistema, navbar, tela inicial, capa do login e tamanho das logos.', URL . '/admin/dev/aparencia/logos', 'Abrir logos'],
+        ['Cores', 'Menu, botões, fundo das páginas e faixa da carteirinha.', URL . '/admin/dev/aparencia/cores', 'Abrir cores'],
+        ['Título e subtítulo', 'Nome do sistema, texto da tela de login e grupo do menu do aluno.', URL . '/admin/dev/aparencia/titulo', 'Abrir título'],
+        ['Dashboard do admin', 'Ordem e blocos da home da escola. O layout de hoje é o padrão.', URL . '/admin/dev/aparencia/dashboard/admin', 'Montar dashboard'],
+        ['Dashboard do aluno', 'Ordem e blocos da tela inicial do aluno. O layout de hoje é o padrão.', URL . '/admin/dev/aparencia/dashboard/aluno', 'Montar dashboard'],
+        ['Dashboard do professor', 'Ordem e blocos do painel do professor. O layout de hoje é o padrão.', URL . '/admin/dev/aparencia/dashboard/professor', 'Montar dashboard'],
+        ['PWA por perfil', 'Nome, ícones e cores do app instalável por perfil.', URL . '/admin/dev-settings/pwa', 'Abrir PWA'],
+        ['Layout mobile', 'Layout mobile do aluno e do admin.', URL . '/admin/dev-settings/layout-mobile', 'Abrir layout mobile'],
+    ];
+    ?>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <?php foreach ($atalhosAparencia as $atalho): ?>
         <div class="dev-card">
-            <div class="dev-card-header">Layout do Sistema</div>
+            <div class="dev-card-header"><?= htmlspecialchars($atalho[0]) ?></div>
             <div class="dev-card-body">
-                <p class="text-sm text-gray-600 mb-4">Cores, logotipos e nome do grupo de menu.</p>
-                <a href="<?= URL ?>/admin/dev/layout" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm">
-                    Abrir Layout do Sistema
+                <p class="text-sm text-gray-600 mb-4"><?= htmlspecialchars($atalho[1]) ?></p>
+                <a href="<?= htmlspecialchars($atalho[2]) ?>" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm">
+                    <?= htmlspecialchars($atalho[3]) ?>
                 </a>
             </div>
         </div>
-        <div class="dev-card">
-            <div class="dev-card-header">PWA por Perfil</div>
-            <div class="dev-card-body">
-                <p class="text-sm text-gray-600 mb-4">Nome, ícones e cores do app instalável por perfil.</p>
-                <a href="<?= URL ?>/admin/dev-settings/pwa" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm">
-                    Abrir PWA Settings
-                </a>
-            </div>
-        </div>
-        <div class="dev-card">
-            <div class="dev-card-header">Layout Mobile</div>
-            <div class="dev-card-body">
-                <p class="text-sm text-gray-600 mb-4">Layout mobile do Aluno e Admin.</p>
-                <a href="<?= URL ?>/admin/dev-settings/layout-mobile" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm">
-                    Abrir Layout Mobile
-                </a>
-            </div>
-        </div>
+        <?php endforeach; ?>
     </div>
 
     <div class="dev-card">

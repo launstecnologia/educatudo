@@ -57,8 +57,27 @@
     </div>
 </div>
 
+<?php
+$dashVisivel = static function (string $chave): bool {
+    return \App\Dominio\Escola\Services\MontagemDashboardService::visivel('aluno', $chave);
+};
+$dashOrdemCustom = \App\Dominio\Escola\Services\MontagemDashboardService::ordemPersonalizada('aluno');
+$abrirBlocoDash = static function (string $chave) use ($dashOrdemCustom): void {
+    if ($dashOrdemCustom) {
+        $ordem = \App\Dominio\Escola\Services\MontagemDashboardService::posicao('aluno', $chave);
+        echo '<div style="order:' . (int) $ordem . '">';
+    }
+};
+$fecharBlocoDash = static function () use ($dashOrdemCustom): void {
+    if ($dashOrdemCustom) {
+        echo '</div>';
+    }
+};
+?>
+<?php if ($dashOrdemCustom): ?><div class="flex flex-col"><?php endif; ?>
 <?php $primaryHex = $primary_color ?? '#3b82f6'; ?>
-<?php if (!empty($dashboard_sliders) && is_array($dashboard_sliders)): ?>
+<?php if (!empty($dashboard_sliders) && is_array($dashboard_sliders) && $dashVisivel('slider')): ?>
+<?php $abrirBlocoDash('slider'); ?>
 <?php
 $sliderModuleRoutes = [
     'chat_tudinha' => '/chat',
@@ -118,7 +137,9 @@ $sliderModuleRoutes = [
         <?php endif; ?>
     </div>
 </div>
-<?php elseif (empty($dashboard_acao_cards)): ?>
+<?php $fecharBlocoDash(); ?>
+<?php elseif (empty($dashboard_acao_cards) && $dashVisivel('numeros')): ?>
+<?php $abrirBlocoDash('numeros'); ?>
 <!-- Stats Cards: 2 por linha no mobile, 4 no desktop -->
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-6 md:mb-8">
     <div class="bg-white rounded-xl sm:rounded-2xl shadow-md hover:shadow-lg transition-shadow p-4 sm:p-6 border-l-4 overflow-hidden flex flex-col" style="border-left-color: <?= htmlspecialchars($primaryHex) ?>">
@@ -204,8 +225,11 @@ $sliderModuleRoutes = [
         </div>
     </div>
 </div>
+<?php $fecharBlocoDash(); ?>
 <?php endif; ?>
 
+<?php if ($dashVisivel('acoes')): ?>
+<?php $abrirBlocoDash('acoes'); ?>
 <!-- Cards: Jornadas abertas + Mural + Provas (+ Jornada de redação na X da Questão) -->
 <?php
 $jornadasAbertas = $jornadas_abertas_count ?? null;
@@ -278,7 +302,11 @@ $fmtContagem = static function ($valor): string {
     </a>
     <?php endif; ?>
 </div>
+<?php $fecharBlocoDash(); ?>
+<?php endif; ?>
 
+<?php if ($dashVisivel('atalhos')): ?>
+<?php $abrirBlocoDash('atalhos'); ?>
 <!-- Quick links: Flashcards + Mural -->
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6 md:mb-8">
     <a href="<?= URL ?>/flashcards" class="group flex items-center gap-3 sm:gap-4 p-4 sm:p-5 bg-white rounded-xl sm:rounded-2xl shadow-md border border-gray-100 hover:shadow-lg hover:border-gray-200 transition-all duration-200 text-left">
@@ -309,8 +337,11 @@ $fmtContagem = static function ($valor): string {
     </a>
     <?php endif; ?>
 </div>
+<?php $fecharBlocoDash(); ?>
+<?php endif; ?>
 
-<?php if (\App\Core\LayoutHelper::isModuleEnabled('aulas_online') && !empty($aulas_online) && is_array($aulas_online)): ?>
+<?php if (\App\Core\LayoutHelper::isModuleEnabled('aulas_online') && !empty($aulas_online) && is_array($aulas_online) && $dashVisivel('aulas_online')): ?>
+<?php $abrirBlocoDash('aulas_online'); ?>
 <!-- Aulas Online -->
 <div class="mb-6 sm:mb-8">
     <div class="bg-white rounded-2xl shadow-md overflow-hidden">
@@ -365,12 +396,19 @@ $fmtContagem = static function ($valor): string {
         </div>
     </div>
 </div>
+<?php $fecharBlocoDash(); ?>
 <?php endif; ?>
 
-<!-- Main Content Grid -->
-<div class="grid grid-cols-1 <?= $jornadas_habilitadas ? 'lg:grid-cols-2' : 'lg:grid-cols-1' ?> gap-8">
-    <!-- Jornadas Ativas (apenas se módulo estiver habilitado) -->
-    <?php if ($jornadas_habilitadas): ?>
+<?php
+$mostrarJornadasDash = !empty($jornadas_habilitadas) && $dashVisivel('jornadas_ativas');
+$mostrarAgendaDash = $dashVisivel('agenda');
+$gradeJornadasAgenda = !$dashOrdemCustom && ($mostrarJornadasDash || $mostrarAgendaDash);
+?>
+<?php if ($gradeJornadasAgenda): ?>
+<div class="grid grid-cols-1 <?= ($mostrarJornadasDash && $mostrarAgendaDash) ? 'lg:grid-cols-2' : 'lg:grid-cols-1' ?> gap-8">
+<?php endif; ?>
+    <?php if ($mostrarJornadasDash): ?>
+    <?php $abrirBlocoDash('jornadas_ativas'); ?>
     <div class="bg-white rounded-2xl shadow-md overflow-hidden">
         <div class="p-6 border-b border-gray-100">
             <div class="flex items-center justify-between">
@@ -520,11 +558,18 @@ $fmtContagem = static function ($valor): string {
             <?php endif; ?>
         </div>
     </div>
+    <?php $fecharBlocoDash(); ?>
     <?php endif; ?>
 
-    <!-- Agenda do mês -->
+    <?php if ($mostrarAgendaDash): ?>
+    <?php $abrirBlocoDash('agenda'); ?>
     <?php include __DIR__ . '/partials/dashboard-calendario-agenda.php'; ?>
+    <?php $fecharBlocoDash(); ?>
+    <?php endif; ?>
+<?php if ($gradeJornadasAgenda): ?>
 </div>
+<?php endif; ?>
+<?php if ($dashOrdemCustom): ?></div><?php endif; ?>
 
 <!-- Modal: Aviso de recados no Mural (só informa quantidade; ao clicar em Visualizar vai para a tela do Mural) -->
 <?php if (!empty($mural_recados_nao_vistos)): $qtd_recados = count($mural_recados_nao_vistos); $modalPrimary = $primary_color ?? '#3b82f6'; ?>
