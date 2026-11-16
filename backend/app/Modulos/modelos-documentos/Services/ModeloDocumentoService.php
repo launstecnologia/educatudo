@@ -4066,6 +4066,9 @@ CSS;
   table.ata th { background: #f3f4f6; font-size: 7.5pt; text-align: center; font-weight: bold; }
   table.ata td { text-align: center; }
   table.ata td:nth-child(3), table.ata th:nth-child(3) { text-align: left; }
+  .tabela-coletiva-wrap, .tabela-coletiva-wrap table.ata { page-break-inside: auto; break-inside: auto; }
+  table.ata thead { display: table-header-group; }
+  table.ata tr { page-break-inside: avoid; break-inside: avoid; }
   table.ident-boletim { width: 100%; border-collapse: collapse; margin: 0 0 10px; }
   table.ident-boletim td { border: 1px solid #d1d5db; padding: 4px 6px; font-size: 8pt; }
   table.ident-boletim td.label { background-color: #9ca3af; color: #111; font-weight: bold; width: 12%; }

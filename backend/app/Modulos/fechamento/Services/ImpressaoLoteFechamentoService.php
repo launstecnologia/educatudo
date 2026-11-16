@@ -327,6 +327,7 @@ class ImpressaoLoteFechamentoService
         // v6: migration 2026_10_09 limpa emissões; chave nova evita reaproveitar PDF antigo no storage.
         $versao = match ($documento) {
             'resultado', 'historico', 'ficha' => 'v6',
+            'ata_completa' => 'v3',
             default => 'v2',
         };
         $arquivo = $documento . '_' . $versao . '.pdf';
@@ -350,7 +351,7 @@ class ImpressaoLoteFechamentoService
     ): array {
         $atual = self::chavePdf($ano, $periodoTipo, $periodoNumero, $turmaId, $serie, $documento);
         $documento = strtolower(preg_replace('/[^a-z_]/i', '', $documento) ?: 'doc');
-        if (in_array($documento, ['resultado', 'ficha', 'historico'], true)) {
+        if (in_array($documento, ['resultado', 'ficha', 'historico', 'ata_completa'], true)) {
             return [$atual];
         }
         $pasta = dirname($atual);

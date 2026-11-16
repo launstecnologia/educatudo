@@ -116,6 +116,7 @@ final class AtaCompletaTurmaServiceTest extends TestCase
         $this->assertStringNotContainsString('class="folha', $html);
         $this->assertStringNotContainsString('class="assinaturas"', $html);
         $this->assertStringNotContainsString('@page', $html);
+        $this->assertStringNotContainsString('<style', $html);
         $this->assertSame(20, substr_count($html, 'td class="nome"'));
         $this->assertStringContainsString('class="ata"', $html);
     }

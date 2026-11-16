@@ -96,6 +96,12 @@ class DocumentoRenderer
         if ($quebraDentro) {
             $wrapStyle .= 'page-break-inside:avoid;';
         }
+        $solta = $this->htmlTabelaSolta($secao);
+        if ($solta !== null) {
+            return '<div class="doc-secao tabela-coletiva-wrap" style="page-break-inside:auto;' . $wrapStyle . '">'
+                . $solta
+                . '</div>';
+        }
 
         $tds = [];
         $colgroup = [];
@@ -127,6 +133,30 @@ class DocumentoRenderer
             . '<colgroup>' . implode('', $colgroup) . '</colgroup>'
             . '<tbody><tr>' . implode('', $tds) . '</tr></tbody></table>'
             . '</div>';
+    }
+
+    /**
+     * Grade longa não pode ficar dentro de table.doc-linha: o Dompdf não quebra
+     * a linha externa e a tabela nasce numa página sem o timbre.
+     *
+     * @param array<string,mixed> $secao
+     */
+    private function htmlTabelaSolta(array $secao): ?string
+    {
+        $cols = is_array($secao['columns'] ?? null) ? array_values($secao['columns']) : [];
+        if (count($cols) !== 1 || !is_array($cols[0])) {
+            return null;
+        }
+        $els = is_array($cols[0]['elements'] ?? null) ? array_values($cols[0]['elements']) : [];
+        if (count($els) !== 1 || !is_array($els[0])) {
+            return null;
+        }
+        $tipo = (string) ($els[0]['type'] ?? '');
+        if (!in_array($tipo, ['tabela_coletiva', 'historico'], true)) {
+            return null;
+        }
+
+        return $this->renderizarElemento($els[0]);
     }
 
     /**

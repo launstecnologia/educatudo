@@ -79,12 +79,10 @@ class AtaCompletaTurmaService
      */
     private function htmlNoLayout(array $linhas, array $grupos): string
     {
-        $partes = [$this->css(true)];
         if ($linhas === [] || $grupos === []) {
-            $partes[] = '<p class="aviso">Nenhuma matrícula válida nesta turma.</p>';
-
-            return implode('', $partes);
+            return '<p class="aviso">Nenhuma matrícula válida nesta turma.</p>';
         }
+        $partes = [];
         $ultimo = count($grupos) - 1;
         foreach ($grupos as $gi => $grupo) {
             $quebra = $gi > 0 ? ' style="page-break-before:always;"' : '';
@@ -746,23 +744,8 @@ class AtaCompletaTurmaService
             . '</tr></table></div>';
     }
 
-    private function css(bool $noLayout = false): string
+    private function css(): string
     {
-        if ($noLayout) {
-            return '<style>
-table.ata { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 4px 0 2px; font-size: 8pt; }
-table.ata th, table.ata td { border: 1px solid #d1d5db; padding: 3px 4px; vertical-align: middle; word-wrap: break-word; overflow-wrap: break-word; }
-table.ata th { background: #f3f4f6; font-size: 7.5pt; text-align: center; font-weight: bold; }
-table.ata td.nota, table.ata td.freq, table.ata td.num, table.ata td.ra, table.ata td.resultado { text-align: center; }
-table.ata td.nome, table.ata th.nome { text-align: left; }
-table.ata th.num, table.ata td.num { width: 4%; }
-table.ata th.ra, table.ata td.ra { width: 11%; }
-table.ata th.freq, table.ata td.freq { width: 8%; }
-table.ata th.resultado, table.ata td.resultado { width: 16%; }
-.legenda, .aviso { font-size: 8pt; color: #333; margin: 2px 0 8px; }
-</style>';
-        }
-
         return '<style>
 @page { margin: 8mm; }
 body { font-family: DejaVu Sans, sans-serif; color: #111; font-size: 9pt; }
