@@ -22,7 +22,7 @@ $painelQs = http_build_query([
 ]);
 $homologadas = (int) ($resumo['homologadas'] ?? 0);
 $page_header_title = 'Impressão em lote';
-$page_header_subtitle = 'Escolha a série ou a etapa inteira, emita os três documentos e baixe cada um no menu da turma.';
+$page_header_subtitle = 'Escolha a série ou a etapa inteira, emita os quatro documentos e baixe cada um no menu da turma.';
 ob_start();
 ?>
 <a href="<?= URL ?>/admin/fechamento?<?= htmlspecialchars($painelQs) ?>" class="text-gray-600 hover:text-gray-900 text-sm">← Fechamento</a>
@@ -254,7 +254,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             <h3 class="text-lg font-semibold text-gray-900"><?= $turmaId > 0 ? 'Esta turma' : htmlspecialchars($segmento !== '' ? $segmento : $serie) ?></h3>
             <p class="text-sm text-gray-500 mt-1">
                 <?= $homologadas ?> de <?= count($linhas) ?> turma(s) homologada(s).
-                Emite ficha, histórico e consolidado final só do que ainda não tem PDF. A ata completa da turma fica em Ações, separada do consolidado. O histórico sai emitido, com as escolas dos anos anteriores.
+                Emite ficha, histórico, consolidado final e ata completa da turma só do que ainda não tem PDF. O histórico sai emitido, com as escolas dos anos anteriores.
             </p>
         </div>
         <div class="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0">
@@ -361,7 +361,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                             <input type="hidden" name="documento" value="pacote">
                             <input type="hidden" name="regenerar" value="1">
                             <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                                <i class="fa-solid fa-rotate text-gray-400 w-4 text-center"></i> Gerar os três de novo
+                                <i class="fa-solid fa-rotate text-gray-400 w-4 text-center"></i> Gerar os quatro de novo
                             </button>
                         </form>
                         <?php

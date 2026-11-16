@@ -7,7 +7,7 @@ use App\Services\HistoricoEscolarService;
 
 /**
  * Impressão em lote do fechamento homologado:
- * ficha individual, histórico e consolidado final (ata) da turma.
+ * ficha individual, histórico, consolidado final e ata completa da turma.
  */
 class ImpressaoLoteFechamentoService
 {
@@ -19,8 +19,8 @@ class ImpressaoLoteFechamentoService
         'relatorio' => 'Relatório de fechamento por turma',
     ];
 
-    /** Os três documentos do pacote, na ordem de impressão. */
-    public const PACOTE = ['ficha', 'historico', 'resultado'];
+    /** Os quatro documentos do pacote, na ordem de impressão. */
+    public const PACOTE = ['ficha', 'historico', 'resultado', 'ata_completa'];
 
     public const TIPO_JOB = 'fechamento_impressao_lote';
 
