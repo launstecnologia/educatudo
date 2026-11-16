@@ -329,7 +329,7 @@ class ImpressaoLoteFechamentoService
         // v6: migration 2026_10_09 limpa emissões; chave nova evita reaproveitar PDF antigo no storage.
         $versao = match ($documento) {
             'resultado', 'historico', 'ficha' => 'v6',
-            'ata_completa' => 'v5',
+            'ata_completa' => 'v6',
             default => 'v2',
         };
         $arquivo = $documento . '_' . $versao . '.pdf';

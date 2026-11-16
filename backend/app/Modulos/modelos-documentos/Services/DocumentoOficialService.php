@@ -1402,19 +1402,48 @@ class DocumentoOficialService
      */
     private function ehEmissaoOficial(string $tipo, array $payload): bool
     {
+        if ($this->periodoHomologado($payload)) {
+            return true;
+        }
         if (in_array($tipo, ['ficha_individual', 'boletim', 'historico'], true)) {
-            return !empty($payload['_homologado']);
+            return !empty($payload['_homologado']) || (($payload['status'] ?? '') === 'homologado');
         }
         $linhas = is_array($payload['linhas'] ?? null) ? $payload['linhas'] : [];
         if ($linhas === []) {
             return false;
         }
         foreach ($linhas as $linha) {
-            if (empty($linha['_homologado'])) {
+            if (!is_array($linha)) {
+                return false;
+            }
+            if (empty($linha['_homologado']) && ($linha['status'] ?? '') !== 'homologado') {
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * O painel marca a turma como Homologado pelo período, não por um campo de cada linha.
+     *
+     * @param array<string,mixed> $payload
+     */
+    private function periodoHomologado(array $payload): bool
+    {
+        $turma = is_array($payload['turma'] ?? null) ? $payload['turma'] : [];
+        $periodo = is_array($payload['periodo'] ?? null) ? $payload['periodo'] : [];
+        $turmaId = (int) ($turma['id'] ?? $payload['turma_id'] ?? 0);
+        $ano = (int) ($periodo['ano_letivo'] ?? $turma['ano_letivo'] ?? 0);
+        $tipo = (string) ($periodo['tipo'] ?? 'ano');
+        $numero = (int) ($periodo['numero'] ?? 0);
+        if ($turmaId <= 0 || $ano <= 0 || $tipo === '') {
+            return false;
+        }
+        try {
+            return (new \App\Modulos\Fechamento\Models\FechamentoPeriodo())->estaTravado($turmaId, $ano, $tipo, $numero);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     /**

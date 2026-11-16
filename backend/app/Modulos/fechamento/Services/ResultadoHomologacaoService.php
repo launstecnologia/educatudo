@@ -806,6 +806,7 @@ class ResultadoHomologacaoService
             'rotulo' => $avaliado['rotulo'],
             'pendencias' => $pendencias,
             'pendencias_criticas' => $pendenciasCriticas,
+            '_homologado' => $status === 'homologado',
             '_persistido_homologado' => $persistidoHomologado,
         ];
     }
