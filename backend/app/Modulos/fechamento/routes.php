@@ -6,6 +6,7 @@
  */
 
 $router->get('/admin/fechamento', 'Modulos/fechamento/FechamentoAdminController@index');
+$router->post('/admin/fechamento/homologar-todos', 'Modulos/fechamento/FechamentoAdminController@homologarTodos');
 $router->get('/admin/fechamento/painel', 'Modulos/fechamento/FechamentoAdminController@painelLista');
 $router->get('/admin/fechamento/impressao-lote', 'Modulos/fechamento/FechamentoAdminController@impressaoLote');
 $router->get('/admin/fechamento/apoio-digitacao', 'Modulos/fechamento/FechamentoAdminController@apoioDigitacao');

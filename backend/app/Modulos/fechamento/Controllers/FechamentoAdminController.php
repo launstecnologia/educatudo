@@ -50,6 +50,7 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
             'turmas' => $svc->homologacao()->model()->turmasAtivas($anoLetivo),
             'schema_pronto' => $svc->model()->schemaPronto(),
             'simular_regra_id' => $this->simularRegraId(),
+            'pode_alterar' => $this->podeAlterarResultadosFinais(),
             'csrf_token' => $this->generateCsrfToken(),
             'flash_status' => $flash['type'] === 'success' ? 'success' : ($flash['message'] ? 'error' : ''),
             'flash_message' => $flash['message'] ?? '',
@@ -80,6 +81,8 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
         $ano_letivo = $anoLetivo;
         $periodo_tipo = $periodoTipo;
         $periodo_numero = $periodoNumero;
+        $pode_alterar = $this->podeAlterarResultadosFinais();
+        $csrf_token = $this->generateCsrfToken();
         include __DIR__ . '/../Views/admin/_painel_linhas.php';
         $html = ob_get_clean();
 
@@ -226,7 +229,9 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
             return;
         }
         [$anoLetivo, $periodoTipo, $periodoNumero] = $this->anoPeriodoDoPostTurma($turmaId);
-        $voltar = $this->urlTurma($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
+        $voltar = (($_POST['origem'] ?? '') === 'painel')
+            ? $this->urlPainel()
+            : $this->urlTurma($turmaId, $anoLetivo, $periodoTipo, $periodoNumero);
         if (!$this->csrfOuRedirect($voltar)) {
             return;
         }
@@ -254,6 +259,79 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
                 . ' · ignorados: ' . (int) ($result['ignorados'] ?? 0) . '.',
                 'success'
             );
+        }
+        $this->redirect($voltar);
+    }
+
+    public function homologarTodos(): void
+    {
+        if (!$this->enforceAdminPermissionKey('resultados_finais', 'alterar', false)) {
+            return;
+        }
+        $voltar = $this->urlPainel();
+        if (!$this->csrfOuRedirect($voltar)) {
+            return;
+        }
+        set_time_limit(180);
+
+        $svc = $this->service();
+        $anos = $svc->homologacao()->model()->anosLetivosTurmas();
+        $anoLetivo = (int) ($_POST['ano_letivo'] ?? 0);
+        if (!in_array($anoLetivo, $anos, true)) {
+            $anoLetivo = $this->anoDaRequest($anos);
+        }
+        [$periodoTipo, $periodoNumero] = $this->periodoDoPost();
+        $turmaFiltro = (int) ($_POST['turma_id'] ?? 0);
+        $paineis = $svc->painel($anoLetivo, $periodoTipo, $periodoNumero, $turmaFiltro);
+        $usuarioId = (int) ($this->auth->getUser()['id'] ?? 0);
+
+        $homologadas = 0;
+        $jaHomologadas = 0;
+        $falhas = [];
+        foreach ($paineis as $painel) {
+            $tid = (int) ($painel['turma']['id'] ?? 0);
+            $nome = trim((string) ($painel['turma']['nome'] ?? ''));
+            if ($nome === '') {
+                $nome = 'Turma ' . $tid;
+            }
+            if ($tid <= 0) {
+                continue;
+            }
+            if (!empty($painel['travado']) || FechamentoMaquinaEstados::estaTravado((string) ($painel['status'] ?? ''))) {
+                $jaHomologadas++;
+                continue;
+            }
+            $result = $svc->homologacao()->homologarTurma(
+                $tid,
+                $anoLetivo,
+                $periodoTipo,
+                $periodoNumero,
+                $usuarioId,
+                [],
+                true
+            );
+            if (!empty($result['success'])) {
+                $homologadas++;
+                continue;
+            }
+            $falhas[] = $nome . ': ' . (string) ($result['error'] ?? 'não foi possível homologar');
+        }
+
+        if ($paineis === []) {
+            $this->setFlashMessage('Nenhuma turma neste filtro.', 'error');
+        } elseif ($homologadas === 0 && $falhas === []) {
+            $this->setFlashMessage('Todas as turmas deste filtro já estão homologadas.', 'success');
+        } elseif ($falhas !== []) {
+            $this->setFlashMessage(
+                $homologadas . ' turma(s) homologada(s). ' . implode(' ', array_slice($falhas, 0, 3)),
+                $homologadas > 0 ? 'success' : 'error'
+            );
+        } else {
+            $texto = $homologadas . ' turma(s) homologada(s).';
+            if ($jaHomologadas > 0) {
+                $texto .= ' ' . $jaHomologadas . ' já estavam homologadas.';
+            }
+            $this->setFlashMessage($texto, 'success');
         }
         $this->redirect($voltar);
     }
@@ -1216,6 +1294,19 @@ class FechamentoAdminController extends \App\Controllers\Admin\AdminBaseControll
         }
 
         return [$anoLetivo, $periodoTipo, $periodoNumero];
+    }
+
+    private function urlPainel(): string
+    {
+        $qs = [];
+        foreach (['ano_letivo', 'periodo_tipo', 'periodo_numero', 'turma_id'] as $chave) {
+            $valor = $_POST[$chave] ?? $_GET[$chave] ?? null;
+            if ($valor === null || $valor === '' || $valor === '0') {
+                continue;
+            }
+            $qs[$chave] = $valor;
+        }
+        return '/admin/fechamento' . ($qs !== [] ? ('?' . http_build_query($qs)) : '');
     }
 
     private function urlTurma(int $turmaId, ?int $ano = null, ?string $tipo = null, ?int $numero = null): string

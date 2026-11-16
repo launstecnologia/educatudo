@@ -38,6 +38,28 @@ $ui_btn_icon = 'fa-solid fa-filter';
 $ui_btn_onclick = 'openFilterDrawer()';
 $ui_btn_filter_count = $filtrosAtivosCount;
 include __DIR__ . '/../../../../Views/admin/_partials/ui/btn.php';
+if (!empty($pode_alterar)):
+?>
+<form method="POST" action="<?= URL ?>/admin/fechamento/homologar-todos" class="inline"
+      onsubmit="return window.fechIniciarHomologacao(this)"
+      data-confirm-msg="Homologar todas as turmas deste filtro que ainda não estão homologadas?">
+    <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
+    <input type="hidden" name="ano_letivo" value="<?= $anoLetivo ?>">
+    <input type="hidden" name="periodo_tipo" value="<?= htmlspecialchars($periodoTipo) ?>">
+    <input type="hidden" name="periodo_numero" value="<?= $periodoNumero ?>">
+    <?php if ($turmaIdFiltro > 0): ?>
+    <input type="hidden" name="turma_id" value="<?= $turmaIdFiltro ?>">
+    <?php endif; ?>
+    <?php
+    $ui_btn_variant = 'primary';
+    $ui_btn_label = 'Homologar todos';
+    $ui_btn_icon = 'fa-solid fa-circle-check';
+    $ui_btn_type = 'submit';
+    include __DIR__ . '/../../../../Views/admin/_partials/ui/btn.php';
+    ?>
+</form>
+<?php
+endif;
 $page_header_actions = ob_get_clean();
 include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
 include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
@@ -87,6 +109,33 @@ include __DIR__ . '/../../../modelos-documentos/Views/admin/resultados-finais/_f
     </p>
 </div>
 <?php include __DIR__ . '/_drawer_consulta.php'; ?>
+<div id="fech-homologar-overlay" class="hidden fixed inset-0 z-[9999] bg-slate-900/60 flex items-center justify-center p-4" aria-live="polite" aria-busy="true">
+    <div class="bg-white rounded-xl shadow-xl px-6 py-5 max-w-sm w-full text-center">
+        <i class="fa-solid fa-spinner fa-spin text-2xl text-indigo-600 mb-3" aria-hidden="true"></i>
+        <p class="text-base font-semibold text-gray-900">Homologando…</p>
+        <p class="text-sm text-gray-500 mt-1">Gravando o resultado oficial. Aguarde sem fechar a página.</p>
+    </div>
+</div>
+<script>
+window.fechIniciarHomologacao = function (form) {
+    if (!form || form.dataset.fechEnviando === '1') {
+        return false;
+    }
+    var msg = form.dataset.confirmMsg || 'Homologar os alunos elegíveis?';
+    if (!window.confirm(msg)) {
+        return false;
+    }
+    form.dataset.fechEnviando = '1';
+    var overlay = document.getElementById('fech-homologar-overlay');
+    if (overlay) {
+        overlay.classList.remove('hidden');
+    }
+    form.querySelectorAll('button[type="submit"]').forEach(function (btn) {
+        btn.disabled = true;
+    });
+    return true;
+};
+</script>
 <script>
 (function () {
     var corpo = document.getElementById('fech-painel-corpo');

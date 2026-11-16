@@ -4,6 +4,8 @@ $paineis = is_array($paineis ?? null) ? $paineis : [];
 $anoLetivo = (int) ($ano_letivo ?? date('Y'));
 $periodoTipo = (string) ($periodo_tipo ?? 'ano');
 $periodoNumero = (int) ($periodo_numero ?? 0);
+$podeAlterar = !empty($pode_alterar);
+$csrfToken = (string) ($csrf_token ?? '');
 
 $statusBadge = static function (string $status): string {
     return match (\App\Modulos\Fechamento\Services\FechamentoMaquinaEstados::normalizar($status)) {
@@ -79,6 +81,21 @@ else:
     </td>
     <td class="px-6 py-4 text-right">
         <?php ob_start(); ?>
+        <?php if ($podeAlterar && !$periodoEncerrado): ?>
+        <form method="POST" action="<?= URL ?>/admin/fechamento/turma/<?= $tid ?>/homologar"
+              onsubmit="return window.fechIniciarHomologacao(this)"
+              data-confirm-msg="Homologar a turma <?= htmlspecialchars((string) ($turma['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>?">
+            <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
+            <input type="hidden" name="ano_letivo" value="<?= $anoLetivo ?>">
+            <input type="hidden" name="periodo_tipo" value="<?= htmlspecialchars($periodoTipo) ?>">
+            <input type="hidden" name="periodo_numero" value="<?= $periodoNumero ?>">
+            <input type="hidden" name="homologar_todos" value="1">
+            <input type="hidden" name="origem" value="painel">
+            <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                <i class="fa-solid fa-circle-check text-gray-400 w-4 text-center"></i> Homologar turma
+            </button>
+        </form>
+        <?php endif; ?>
         <a href="<?= $urlTurma ?>"
            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
             <i class="fa-solid fa-user-group text-gray-400 w-4 text-center"></i> Alunos
