@@ -640,7 +640,8 @@ class AtaCompletaTurmaService
     private function tabela(array $alunos, array $grupo, int $offset, bool $comResultado): string
     {
         $colspanAviso = 3 + count($grupo) + ($comResultado ? 2 : 0);
-        $html = '<table class="ata"><thead><tr>'
+        $html = '<table class="ata">' . $this->colgroup(count($grupo), $comResultado)
+            . '<thead><tr>'
             . '<th class="num">Nº</th><th class="ra">RA</th><th class="nome">Nome do aluno</th>';
         foreach ($grupo as $comp) {
             $html .= '<th class="disc">' . $this->e($comp['sigla']) . '</th>';
@@ -679,6 +680,31 @@ class AtaCompletaTurmaService
         }
 
         return $html . '</tbody></table>';
+    }
+
+    /**
+     * Larguras iniciais. O editor substitui este colgroup quando o usuário arrasta as colunas.
+     */
+    private function colgroup(int $disciplinas, bool $comResultado): string
+    {
+        $cauda = $comResultado ? 20.0 : 0.0;
+        $resto = max(1.0, 100.0 - 38.0 - $cauda);
+        $cada = $disciplinas > 0 ? $resto / $disciplinas : 0.0;
+        $pesos = [5.0, 11.0, 22.0];
+        for ($i = 0; $i < $disciplinas; $i++) {
+            $pesos[] = $cada;
+        }
+        if ($comResultado) {
+            $pesos[] = 8.0;
+            $pesos[] = 12.0;
+        }
+        $soma = array_sum($pesos) ?: 1.0;
+        $html = '<colgroup>';
+        foreach ($pesos as $peso) {
+            $html .= '<col style="width:' . number_format($peso / $soma * 100, 2, '.', '') . '%">';
+        }
+
+        return $html . '</colgroup>';
     }
 
     /**

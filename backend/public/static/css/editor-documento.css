@@ -853,6 +853,11 @@ body.edoc-selecionando-celulas * { user-select: none !important; }
 .edoc-el-body[contenteditable="true"] table:not(.seed-folha):not(.edoc-grade-livre) th {
   cursor: text;
 }
+.edoc-html-raw.tabela-coletiva-wrap { overflow: visible; }
+.edoc-html-raw.tabela-coletiva-wrap table.ata {
+  table-layout: fixed !important;
+  width: 100% !important;
+}
 .edoc-html-raw.tabela-coletiva-wrap table.ata th,
 .edoc-html-raw.tabela-coletiva-wrap table.ata td {
   font-size: var(--ata-fonte, 8pt) !important;

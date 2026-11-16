@@ -1012,7 +1012,12 @@ class ModeloDocumentoService
             'Sofia Martins',
             'Pedro Henrique Lima',
         ];
-        $html = '<table class="dados ata"><thead><tr>'
+        $html = '<table class="dados ata"><colgroup>'
+            . '<col style="width:5%"><col style="width:11%"><col style="width:22%">'
+            . '<col style="width:5.25%"><col style="width:5.25%"><col style="width:5.25%"><col style="width:5.25%">'
+            . '<col style="width:5.25%"><col style="width:5.25%"><col style="width:5.25%"><col style="width:5.25%">'
+            . '<col style="width:8%"><col style="width:12%">'
+            . '</colgroup><thead><tr>'
             . '<th>Nº</th><th>RA</th><th>Nome do aluno</th>'
             . '<th>BIO</th><th>FIS</th><th>GEO</th><th>HIS</th><th>LPO</th><th>MAT</th><th>QUI</th><th>SOC</th>'
             . '<th>Freq.</th><th>Resultado</th>'
@@ -2749,6 +2754,12 @@ class ModeloDocumentoService
             $cab = $this->aplicarPlaceholders($partes['cabecalho'], $vars);
             $corpo = $this->aplicarPlaceholders($partes['corpo'], $vars);
             $rodape = $this->aplicarPlaceholders($partes['rodape'], $vars);
+            $largurasAta = $this->largurasAtaDaEstrutura($estruturaVisual);
+            if ($largurasAta !== []) {
+                $cab = DocumentoRenderer::aplicarLargurasAta($cab, $largurasAta);
+                $corpo = DocumentoRenderer::aplicarLargurasAta($corpo, $largurasAta);
+                $rodape = DocumentoRenderer::aplicarLargurasAta($rodape, $largurasAta);
+            }
         } else {
             $htmlBrutoCab = (string) ($modelo['cabecalho_html'] ?? '');
             $htmlBrutoCorpo = (string) ($modelo['corpo_html'] ?? '');
@@ -4360,6 +4371,10 @@ CSS;
   body.folha-impressa table.edoc-grade-livre th.edoc-sub {
     font-size: 7.5pt !important;
   }
+  .tabela-coletiva-wrap table.ata {
+    table-layout: fixed !important;
+    width: 100% !important;
+  }
   .tabela-coletiva-wrap table.ata th,
   .tabela-coletiva-wrap table.ata td {
     font-size: var(--ata-fonte, 8pt) !important;
@@ -4367,6 +4382,47 @@ CSS;
     padding-right: var(--ata-espaco, 5px) !important;
   }
 CSS;
+    }
+
+    /**
+     * Larguras gravadas ao arrastar as colunas da grade no editor.
+     *
+     * @param array<string,mixed>|null $estrutura
+     * @return list<float>
+     */
+    private function largurasAtaDaEstrutura(?array $estrutura): array
+    {
+        if ($estrutura === null) {
+            return [];
+        }
+        $achou = [];
+        $visitar = function (mixed $no) use (&$visitar, &$achou): void {
+            if ($achou !== [] || !is_array($no)) {
+                return;
+            }
+            if (($no['type'] ?? '') === 'tabela_coletiva') {
+                $lista = is_array($no['props']['largurasColunas'] ?? null) ? $no['props']['largurasColunas'] : [];
+                $numeros = [];
+                foreach ($lista as $valor) {
+                    if (is_numeric($valor) && (float) $valor > 0) {
+                        $numeros[] = (float) $valor;
+                    }
+                }
+                if (count($numeros) >= 5) {
+                    $achou = $numeros;
+                }
+
+                return;
+            }
+            foreach ($no as $filho) {
+                if (is_array($filho)) {
+                    $visitar($filho);
+                }
+            }
+        };
+        $visitar($estrutura);
+
+        return $achou;
     }
 
     /**

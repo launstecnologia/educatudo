@@ -1641,6 +1641,45 @@
     scheduleSave();
   }
 
+  function gravarLargurasAta(table) {
+    var elNode = table.closest('.edoc-el');
+    if (!elNode || elNode.getAttribute('data-type') !== 'tabela_coletiva') return false;
+    var path = findPath(elNode.getAttribute('data-id'));
+    if (!path || !path.element) return false;
+    var cols = table.querySelectorAll('colgroup col');
+    if (!cols.length) return false;
+    var vals = [];
+    var soma = 0;
+    Array.prototype.forEach.call(cols, function (col) {
+      var m = /([0-9.]+)\s*%/.exec(col.style.width || '');
+      var n = m ? parseFloat(m[1]) : 0;
+      vals.push(n);
+      soma += n;
+    });
+    if (soma <= 0 || vals.length < 5) return false;
+    path.element.props = path.element.props || {};
+    path.element.props.largurasColunas = vals.map(function (n) {
+      return Math.round(n / soma * 1000) / 10;
+    });
+    pushHist();
+    scheduleSave();
+    setStatus('Largura das colunas atualizada. Arraste de novo para ajustar.');
+    return true;
+  }
+
+  function injetarColgroupAta(html, larguras) {
+    if (!html || !larguras || larguras.length < 5) return html;
+    var ths = html.match(/<th\b/gi);
+    if (ths && ths.length !== larguras.length) return html;
+    var cg = '<colgroup>' + larguras.map(function (w) {
+      var n = parseFloat(w);
+      if (!isFinite(n) || n <= 0) n = 1;
+      return '<col style="width:' + n.toFixed(2) + '%">';
+    }).join('') + '</colgroup>';
+    if (/<colgroup>/i.test(html)) return html.replace(/<colgroup>[\s\S]*?<\/colgroup>/i, cg);
+    return html.replace(/<table class="[^"]*\bata\b[^"]*">/i, function (tag) { return tag + cg; });
+  }
+
   function separarCelula(td) {
     var table = td.closest('table');
     if (!table) return;
@@ -2307,11 +2346,10 @@
       var espacoAta = parseInt(p.espacoColuna, 10);
       if (!espacoAta || espacoAta < 1) espacoAta = 5;
       espacoAta = Math.max(1, Math.min(24, espacoAta));
-      return htmlBlocoHtml(
-        'tabela_html',
-        st + '--ata-fonte:' + fonteAta + 'pt;--ata-espaco:' + espacoAta + 'px;',
-        'edoc-html-raw tabela-coletiva-wrap'
-      );
+      var mioloAta = injetarColgroupAta(htmlVar('tabela_html'), p.largurasColunas || []);
+      if (!mioloAta) mioloAta = '<span class="edoc-ph">{{tabela_html}}</span>';
+      return '<div class="edoc-html-raw tabela-coletiva-wrap edoc-el-body" style="' + st
+        + '--ata-fonte:' + fonteAta + 'pt;--ata-espaco:' + espacoAta + 'px;">' + mioloAta + '</div>';
     }
     if (t === 'tabela_frequencia' || t === 'frequencia') {
       return '<div class="edoc-html-raw edoc-el-body" style="' + st + '">'
@@ -2995,9 +3033,12 @@
     var table = cell.closest('table');
     if (!table || !table.closest('.edoc-html-raw, .edoc-el-body')) return null;
     var rect = cell.getBoundingClientRect();
-    var tolerancia = Math.min(5, rect.width / 4);
-    var direita = rect.right - e.clientX <= tolerancia && e.clientX <= rect.right + 3;
-    var esquerda = e.clientX - rect.left <= tolerancia && e.clientX >= rect.left - 3;
+    var ata = table.classList.contains('ata');
+    var tolerancia = ata ? 8 : Math.min(5, rect.width / 4);
+    var distDir = Math.abs(rect.right - e.clientX);
+    var distEsq = Math.abs(e.clientX - rect.left);
+    var direita = distDir <= tolerancia && distDir <= distEsq && e.clientX <= rect.right + 3;
+    var esquerda = distEsq <= tolerancia && distEsq < distDir && e.clientX >= rect.left - 3;
     if (!direita && !esquerda) return null;
     var grid = matrizTabela(table);
     var pos = indiceVisualCelula(grid, cell);
@@ -3073,10 +3114,11 @@
     var esq0 = widths[info.esquerda];
     var dir0 = widths[info.direita];
     var somaPar = esq0 + dir0;
+    var minimo = info.table.classList.contains('ata') ? 14 : 22;
     function move(ev) {
       var na = esq0 + (ev.clientX - startX);
-      if (na < 22) na = 22;
-      if (na > somaPar - 22) na = somaPar - 22;
+      if (na < minimo) na = minimo;
+      if (na > somaPar - minimo) na = somaPar - minimo;
       widths[info.esquerda] = na;
       widths[info.direita] = somaPar - na;
       aplicarLargurasTabela(info.table, widths);
@@ -3091,7 +3133,7 @@
       document.removeEventListener('mouseup', up);
       document.body.classList.remove('edoc-arrastando-col');
       esconderGuia();
-      gravarMedidasDaFolha(info.table);
+      if (!gravarLargurasAta(info.table)) gravarMedidasDaFolha(info.table);
     }
     document.body.classList.add('edoc-arrastando-col');
     document.addEventListener('mousemove', move);
@@ -4689,7 +4731,7 @@
       html += '<div class="edoc-sec-label">GRADE DA ATA</div>'
         + '<label>Espaço entre colunas (px)</label>'
         + inp('espacoColuna', p.espacoColuna || 5, 'type="number" min="1" max="24" step="1"')
-        + '<p class="edoc-hint">A fonte da grade fica em Tipografia. O espaço abre o respiro de cada coluna na ata gerada.</p>';
+        + '<p class="edoc-hint">Arraste a linha entre duas colunas para mudar a largura, como no Excel. A da esquerda cresce e a da direita encolhe. A fonte fica em Tipografia.</p>';
     }
     if (el.type !== 'logo' && el.type !== 'imagem') {
       var minPt = (el.type === 'boletim' || el.type === 'demonstrativo_notas' || el.type === 'tabela_notas' || el.type === 'tabela_coletiva') ? '4' : '8';

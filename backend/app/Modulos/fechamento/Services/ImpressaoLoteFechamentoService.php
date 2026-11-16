@@ -329,7 +329,7 @@ class ImpressaoLoteFechamentoService
         // v6: migration 2026_10_09 limpa emissões; chave nova evita reaproveitar PDF antigo no storage.
         $versao = match ($documento) {
             'resultado', 'historico', 'ficha' => 'v6',
-            'ata_completa' => 'v4',
+            'ata_completa' => 'v5',
             default => 'v2',
         };
         $arquivo = $documento . '_' . $versao . '.pdf';
@@ -735,11 +735,58 @@ class ImpressaoLoteFechamentoService
     }
 
     /**
+     * O Abrir PDF do layout já é a folha inteira. Reembrulhar o HTML tirava
+     * a classe da página e a grade saía mais apertada que o modelo.
+     *
+     * @param list<string> $htmls
+     */
+    private function todasFolhasDeLayout(array $htmls): bool
+    {
+        if ($htmls === []) {
+            return false;
+        }
+        foreach ($htmls as $html) {
+            if (!str_contains($html, 'folha-impressa') && !str_contains($html, 'doc-linha')) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param list<string> $htmls
+     */
+    private function juntarFolhasDeLayout(array $htmls): string
+    {
+        $base = $htmls[0];
+        if (count($htmls) === 1) {
+            return $base;
+        }
+        if (!preg_match('/^(.*<body[^>]*>)(.*)(<\/body>.*)$/is', $base, $abertura)) {
+            return $base;
+        }
+        $extras = '';
+        foreach (array_slice($htmls, 1) as $html) {
+            if (!preg_match('/<body[^>]*>(.*)<\/body>/is', $html, $corpo)) {
+                continue;
+            }
+            $extras .= '<div style="page-break-before:always;break-before:page;">' . $corpo[1] . '</div>';
+        }
+
+        return $abertura[1] . $abertura[2] . $extras . $abertura[3];
+    }
+
+    /**
      * @param list<string> $htmls
      * @param list<string> $avisos
      */
     private function juntarParaImpressao(string $titulo, array $htmls, string $orientacao, array $avisos, string $voltarUrl): string
     {
+        if ($this->todasFolhasDeLayout($htmls)) {
+            return $this->juntarFolhasDeLayout($htmls);
+        }
+
         $css = '';
         $corpos = [];
         foreach ($htmls as $html) {

@@ -330,8 +330,10 @@ class DocumentoOficialService
             $aviso = $tipo === 'ata_completa'
                 ? 'PRELIMINAR — SEM VALIDADE PARA ESCRITURAÇÃO DEFINITIVA'
                 : 'Rascunho — sem valor oficial';
-            $html = '<div style="border:2px dashed #b45309;background:#fffbeb;color:#92400e;padding:8px 12px;margin-bottom:16px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;text-align:center">'
-                . $aviso . '</div>' . $html;
+            $faixa = '<div style="border:2px dashed #b45309;background:#fffbeb;color:#92400e;padding:8px 12px;margin-bottom:16px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;text-align:center">'
+                . $aviso . '</div>';
+            $comFaixa = preg_replace('/<body[^>]*>/i', '$0' . $faixa, $html, 1);
+            $html = is_string($comFaixa) ? $comFaixa : $faixa . $html;
         }
 
         return [

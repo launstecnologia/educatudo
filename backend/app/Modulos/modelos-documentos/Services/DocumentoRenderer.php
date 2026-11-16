@@ -502,6 +502,95 @@ class DocumentoRenderer
             . '--ata-espaco:' . $espaco . 'px;">{{tabela_html}}</div>';
     }
 
+    /**
+     * Aplica as larguras arrastadas no editor em cada grade da ata.
+     * A amostra tem Nº, RA, nome, disciplinas, frequência e resultado.
+     * Uma folha só com parte das disciplinas reaproveita esses papéis.
+     *
+     * @param list<int|float|string> $larguras
+     */
+    public static function aplicarLargurasAta(string $html, array $larguras): string
+    {
+        $numeros = [];
+        foreach ($larguras as $valor) {
+            if (!is_numeric($valor)) {
+                continue;
+            }
+            $n = (float) $valor;
+            if ($n > 0) {
+                $numeros[] = $n;
+            }
+        }
+        if (count($numeros) < 5) {
+            return $html;
+        }
+
+        $saida = preg_replace_callback(
+            '/<table class="([^"]*\bata\b[^"]*)">(?:\s*<colgroup\b[^>]*>.*?<\/colgroup>)?(\s*<thead>\s*<tr\b[^>]*>)(.*?)(<\/tr>)/is',
+            static function (array $m) use ($numeros): string {
+                $colunas = preg_match_all('/<th\b/i', $m[3]);
+                if ($colunas < 4) {
+                    return $m[0];
+                }
+                $comResultado = (bool) preg_match('/>\s*Resultado\s*</i', $m[3]);
+                $pesos = self::pesosColunasAta($numeros, $colunas, $comResultado);
+                if ($pesos === []) {
+                    return $m[0];
+                }
+                $cg = '<colgroup>';
+                foreach ($pesos as $peso) {
+                    $cg .= '<col style="width:' . number_format($peso, 2, '.', '') . '%">';
+                }
+                $cg .= '</colgroup>';
+
+                return '<table class="' . $m[1] . '">' . $cg . $m[2] . $m[3] . $m[4];
+            },
+            $html
+        );
+
+        return is_string($saida) ? $saida : $html;
+    }
+
+    /**
+     * @param list<float> $salvas
+     * @return list<float>
+     */
+    private static function pesosColunasAta(array $salvas, int $colunas, bool $comResultado): array
+    {
+        if (count($salvas) < 5) {
+            return [];
+        }
+        $disciplinasSalvas = array_slice($salvas, 3, -2);
+        $nDisc = $comResultado ? $colunas - 5 : $colunas - 3;
+        if ($nDisc < 1 || $disciplinasSalvas === []) {
+            return [];
+        }
+        if (count($disciplinasSalvas) === $nDisc) {
+            $disciplinas = array_values($disciplinasSalvas);
+        } else {
+            $media = array_sum($disciplinasSalvas) / count($disciplinasSalvas);
+            $disciplinas = array_fill(0, $nDisc, $media);
+        }
+        $pesos = array_merge(
+            [(float) $salvas[0], (float) $salvas[1], (float) $salvas[2]],
+            $disciplinas
+        );
+        if ($comResultado) {
+            $pesos[] = (float) $salvas[count($salvas) - 2];
+            $pesos[] = (float) $salvas[count($salvas) - 1];
+        }
+        if (count($pesos) !== $colunas) {
+            return [];
+        }
+        $soma = array_sum($pesos) ?: 1.0;
+        $out = [];
+        foreach ($pesos as $peso) {
+            $out[] = round($peso / $soma * 100, 2);
+        }
+
+        return $out;
+    }
+
     private function blocoHtmlLivre(string $inner, string $css, string $classe = ''): string
     {
         $atributo = $classe !== '' ? ' class="' . $classe . '"' : '';
