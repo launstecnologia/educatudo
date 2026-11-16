@@ -234,10 +234,7 @@ class DocumentoRenderer
             ], $css),
             'boletim' => $this->blocoBoletim($props, $css, 'boletim'),
             'demonstrativo_notas', 'tabela_notas' => $this->blocoBoletim($props, $css, 'demonstrativo_notas'),
-            'tabela_coletiva' => $this->blocoHtmlLivre(
-                '<div class="tabela-coletiva-wrap">{{tabela_html}}</div>',
-                $css
-            ),
+            'tabela_coletiva' => $this->blocoTabelaColetiva($props, $style, $css),
             'tabela_frequencia' => $this->blocoHtmlLivre('{{frequencia_html}}', $css),
             'historico' => $this->blocoHtmlLivre('{{historico_html}}', $css),
             'resultado_final' => $this->tabelaChaveValor([
@@ -483,6 +480,26 @@ class DocumentoRenderer
         }
         return '<table class="dados" width="100%" style="width:100%;border-collapse:collapse;margin:0 0 10px;'
             . $css . '">' . $rows . '</table>';
+    }
+
+    /**
+     * @param array<string,mixed> $props
+     * @param array<string,mixed> $style
+     */
+    private function blocoTabelaColetiva(array $props, array $style, string $css): string
+    {
+        $espaco = (int) ($props['espacoColuna'] ?? 5);
+        if ($espaco < 1) {
+            $espaco = 5;
+        }
+        $espaco = min(24, $espaco);
+        $fonte = (float) ($style['fontSize'] ?? 0);
+        $variavelFonte = ($fonte >= 4 && $fonte <= 72)
+            ? '--ata-fonte:' . rtrim(rtrim(number_format($fonte, 2, '.', ''), '0'), '.') . 'pt;'
+            : '';
+
+        return '<div class="tabela-coletiva-wrap" style="' . $css . $variavelFonte
+            . '--ata-espaco:' . $espaco . 'px;">{{tabela_html}}</div>';
     }
 
     private function blocoHtmlLivre(string $inner, string $css, string $classe = ''): string

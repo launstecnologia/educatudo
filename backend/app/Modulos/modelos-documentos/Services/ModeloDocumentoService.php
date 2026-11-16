@@ -4360,6 +4360,12 @@ CSS;
   body.folha-impressa table.edoc-grade-livre th.edoc-sub {
     font-size: 7.5pt !important;
   }
+  .tabela-coletiva-wrap table.ata th,
+  .tabela-coletiva-wrap table.ata td {
+    font-size: var(--ata-fonte, 8pt) !important;
+    padding-left: var(--ata-espaco, 5px) !important;
+    padding-right: var(--ata-espaco, 5px) !important;
+  }
 CSS;
     }
 

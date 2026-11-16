@@ -2302,7 +2302,16 @@
       );
     }
     if (t === 'tabela_coletiva') {
-      return htmlBlocoHtml('tabela_html', st, 'edoc-html-raw');
+      var fonteAta = parseFloat(el.style && el.style.fontSize);
+      if (!isFinite(fonteAta) || fonteAta <= 0) fonteAta = 8;
+      var espacoAta = parseInt(p.espacoColuna, 10);
+      if (!espacoAta || espacoAta < 1) espacoAta = 5;
+      espacoAta = Math.max(1, Math.min(24, espacoAta));
+      return htmlBlocoHtml(
+        'tabela_html',
+        st + '--ata-fonte:' + fonteAta + 'pt;--ata-espaco:' + espacoAta + 'px;',
+        'edoc-html-raw tabela-coletiva-wrap'
+      );
     }
     if (t === 'tabela_frequencia' || t === 'frequencia') {
       return '<div class="edoc-html-raw edoc-el-body" style="' + st + '">'
@@ -4676,8 +4685,14 @@
           ['bottom', 'fa-arrow-down', 'Base']
         ]) + '</div>';
     }
+    if (el.type === 'tabela_coletiva') {
+      html += '<div class="edoc-sec-label">GRADE DA ATA</div>'
+        + '<label>Espaço entre colunas (px)</label>'
+        + inp('espacoColuna', p.espacoColuna || 5, 'type="number" min="1" max="24" step="1"')
+        + '<p class="edoc-hint">A fonte da grade fica em Tipografia. O espaço abre o respiro de cada coluna na ata gerada.</p>';
+    }
     if (el.type !== 'logo' && el.type !== 'imagem') {
-      var minPt = (el.type === 'boletim' || el.type === 'demonstrativo_notas' || el.type === 'tabela_notas') ? '4' : '8';
+      var minPt = (el.type === 'boletim' || el.type === 'demonstrativo_notas' || el.type === 'tabela_notas' || el.type === 'tabela_coletiva') ? '4' : '8';
       html += '<div class="edoc-sec-label">TIPOGRAFIA</div><div class="edoc-prop-row">'
         + '<div><label>Tamanho (pt)</label>' + inp('fontSize', st.fontSize || '', 'type="number" min="' + minPt + '" max="72" step="0.5"') + '</div>'
         + '<div><label>Peso do bloco</label><select data-f="fontWeight"><option value="">Normal</option><option value="bold">Negrito</option></select></div></div>'

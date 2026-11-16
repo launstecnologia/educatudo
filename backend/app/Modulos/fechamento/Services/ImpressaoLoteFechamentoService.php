@@ -263,6 +263,8 @@ class ImpressaoLoteFechamentoService
         if (function_exists('ini_set')) {
             @ini_set('memory_limit', '512M');
         }
+        $config = $this->configApp();
+        $config['tenant']['slug'] = $slug;
         $html = $this->htmlParaImpressao(
             $documento,
             $paineis,
@@ -270,7 +272,7 @@ class ImpressaoLoteFechamentoService
             $periodoTipo,
             $periodoNumero,
             $usuarioId,
-            null,
+            $config,
             '',
             $jobId
         );
@@ -327,7 +329,7 @@ class ImpressaoLoteFechamentoService
         // v6: migration 2026_10_09 limpa emissões; chave nova evita reaproveitar PDF antigo no storage.
         $versao = match ($documento) {
             'resultado', 'historico', 'ficha' => 'v6',
-            'ata_completa' => 'v3',
+            'ata_completa' => 'v4',
             default => 'v2',
         };
         $arquivo = $documento . '_' . $versao . '.pdf';
@@ -860,6 +862,14 @@ class ImpressaoLoteFechamentoService
 
     private function pdfDeHtml(string $html, string $orientacao): string
     {
+        $html = $this->htmlSemBarraDeTela($html);
+        if (str_contains($html, 'doc-linha') || str_contains($html, 'seed-folha')) {
+            $folha = (new \App\Modulos\ModelosDocumentos\Services\GeradorPdfFolhaService())->gerarSeFolhaOficial($html);
+            if (is_string($folha) && $folha !== '') {
+                return $folha;
+            }
+        }
+
         $autoload = dirname(__DIR__, 4) . '/vendor/autoload.php';
         if (!class_exists(\Dompdf\Dompdf::class) && is_file($autoload)) {
             require_once $autoload;
@@ -869,7 +879,6 @@ class ImpressaoLoteFechamentoService
         $options->set('isRemoteEnabled', false);
         $options->set('defaultFont', 'DejaVu Sans');
         $options->set('defaultMediaType', 'print');
-        $html = $this->htmlSemBarraDeTela($html);
         $dompdf = new \Dompdf\Dompdf($options);
         $dompdf->loadHtml($html, 'UTF-8');
         $dompdf->setPaper('A4', $orientacao === 'landscape' ? 'landscape' : 'portrait');
