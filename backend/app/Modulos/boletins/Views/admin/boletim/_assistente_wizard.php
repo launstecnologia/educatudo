@@ -487,7 +487,7 @@ $boletimWizardSteps = [
 .bw-linha-cols:empty::before { content: 'Arraste eventos da esquerda para cá'; color: #94a3b8; font-size: 11px; font-weight: 600; }
 .bw-linha-topo { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .bw-linha-grip { cursor: grab; opacity: 0.55; letter-spacing: -1px; font-size: 13px; line-height: 1; padding: 2px 2px 2px 0; color: #3730a3; touch-action: none; user-select: none; }
-.bw-linha-rotulo { font-size: 12px; font-weight: 700; color: #312e81; line-height: 1.2; outline: none; border-radius: 0.35rem; padding: 2px 6px; min-width: 3rem; flex: 0 1 auto; white-space: nowrap; cursor: text; }
+.bw-linha-rotulo { font-size: 12px; font-weight: 700; color: #312e81; line-height: 1.2; outline: none; border-radius: 0.35rem; padding: 2px 6px; min-width: 3rem; flex: 0 0 auto; white-space: nowrap; cursor: text; }
 .bw-linha-caixa.confirmado .bw-linha-rotulo { color: #166534; }
 .bw-linha-rotulo:hover, .bw-linha-rotulo:focus { background: #eef2ff; box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.35); }
 .bw-linha-ok { margin-left: 2px; flex-shrink: 0; font-size: 11px; font-weight: 700; line-height: 1.2; padding: 3px 8px; border-radius: 999px; border: 1px solid #86efac; background: #fff; color: #15803d; cursor: pointer; transition: background .15s ease, color .15s ease, border-color .15s ease; }
