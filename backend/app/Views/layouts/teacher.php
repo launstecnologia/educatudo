@@ -66,6 +66,7 @@
         <?= $content ?>
     </main>
 
+    <?php if (!\App\Core\LayoutHelper::isModuleEnabled('grupo_seb')): ?>
     <!-- Botão Flutuante WhatsApp Suporte -->
     <a href="https://wa.me/5516997360690" 
        target="_blank" 
@@ -76,6 +77,7 @@
         </svg>
         <span class="font-semibold">Suporte</span>
     </a>
+    <?php endif; ?>
 
     <!-- Common JavaScript -->
     <script>

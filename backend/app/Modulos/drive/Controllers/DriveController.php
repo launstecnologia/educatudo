@@ -93,7 +93,8 @@ class DriveController extends \App\Core\BaseController
     {
         // layout global continua student/teacher; views do módulo em aluno/professor
         if ($tipo === 'professor') {
-            return ['layout' => 'teacher', 'viewFolder' => 'professor'];
+            $layout = \App\Core\LayoutHelper::isModuleEnabled('grupo_seb') ? 'professor' : 'teacher';
+            return ['layout' => $layout, 'viewFolder' => 'professor'];
         }
         return ['layout' => 'student', 'viewFolder' => 'aluno'];
     }

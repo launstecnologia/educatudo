@@ -3,7 +3,7 @@ $current_page = 'drive';
 $flash = $flash ?? null;
 $baseUrl = $baseUrl ?? (URL . '/professor/drive');
 ?>
-<div class="max-w-5xl mx-auto">
+<div class="w-full">
     <!-- Overlay de loading no upload -->
     <div id="drive-upload-overlay" class="hidden fixed inset-0 bg-black/50 z-[100] flex items-center justify-center">
         <div class="bg-white rounded-xl shadow-xl px-8 py-6 flex flex-col items-center gap-4 min-w-[200px]">

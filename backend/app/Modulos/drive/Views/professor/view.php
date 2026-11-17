@@ -14,7 +14,7 @@ $ext = strtolower(pathinfo($item['name'], PATHINFO_EXTENSION));
 $isImage = in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'], true);
 ?>
 <div class="mobile-content flex-1 overflow-y-auto w-full min-h-0 p-4 md:p-6">
-    <div class="w-full max-w-5xl mx-auto">
+    <div class="w-full">
         <!-- Breadcrumb -->
         <nav class="flex items-center gap-2 text-sm text-gray-600 mb-4">
             <?php foreach ($breadcrumb as $i => $b): ?>
