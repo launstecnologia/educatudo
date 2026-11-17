@@ -3928,22 +3928,24 @@ class BoletimAssistenteWizard
                 }
                 // Slots bN_* e s1_rec/s2_rec/pf já existem vazios no print SM —
                 // ainda assim emite para a mesclagem substituir o placeholder `nenhuma`.
-                $ehSlotBimestre = (bool) preg_match('/^b[1-4]_(pp|pu|ch|pe|fal)$/', $codigoBase);
+                $ehSlotBimestre = (bool) preg_match('/^b[1-4]_/', $codigoBase);
                 $ehSlotRecPf = in_array($codigoBase, ['s1_rec', 's2_rec', 'pf', 'rec'], true);
-                // Slot já emitido nesta passada (2º evento no mesmo s1_rec/pf): usa eva{id}.
-                if (isset($vistos[$codigoBase]) && ($ehSlotBimestre || $ehSlotRecPf)
-                    && !empty($vistos['__emitido_' . $codigoBase])) {
-                    $codigoBase = 'eva' . $id;
+                $jaExiste = isset($vistos[$codigoBase]);
+                $ehPlaceholder = !empty($placeholdersPorCodigo[$codigoBase]);
+                $jaEmitidoNestaPassada = !empty($vistos['__emitido_' . $codigoBase]);
+                // Coluna deste período já está no quadro: não cria outra com a mesma sigla.
+                // Segundo evento no mesmo código, nesta passada, ganha eva{id}.
+                if ($jaExiste && !$ehPlaceholder) {
+                    if (!$jaEmitidoNestaPassada) {
+                        continue;
+                    }
+                    $alt = $id > 0 ? ('eva' . $id) : '';
+                    if ($alt === '' || isset($vistos[$alt])) {
+                        continue;
+                    }
+                    $codigoBase = $alt;
                     $ehSlotBimestre = false;
                     $ehSlotRecPf = false;
-                }
-                if (
-                    isset($vistos[$codigoBase])
-                    && !$ehSlotBimestre
-                    && !$ehSlotRecPf
-                    && empty($placeholdersPorCodigo[$codigoBase])
-                ) {
-                    continue;
                 }
                 $vistos[$codigoBase] = true;
                 if ($ehSlotBimestre || $ehSlotRecPf) {
@@ -3968,7 +3970,7 @@ class BoletimAssistenteWizard
                         $cfg['layout_group'] = 'final';
                     }
                 }
-                if (preg_match('/^(b[1-4])_(pp|pu|ch|pe|fal)$/', $codigoBase, $mSlot)) {
+                if (preg_match('/^(b[1-4])_(.+)$/', $codigoBase, $mSlot)) {
                     $cfg['layout_group'] = $mSlot[1];
                     $cfg['layout_type'] = $mSlot[2] === 'fal' ? 'faltas' : 'media';
                 }
@@ -4026,10 +4028,20 @@ class BoletimAssistenteWizard
     {
         $sigla = strtolower(preg_replace('/[^a-z0-9_]+/i', '', (string) ($ev['sigla'] ?? '')) ?? '');
         $bim = (int) ($ev['bimestre'] ?? 0);
-        // Print Santa Maria / boletim: encaixa no slot do bimestre (b1_pp, b2_pu…).
-        if ($bim >= 1 && $bim <= 4 && in_array($sigla, ['pp', 'pu', 'ch', 'pe', 'fal', 'faltas'], true)) {
+        // Cada período tem coluna própria (b1_pt ≠ b2_pt). Sigla solta repetida virava um chip só.
+        if ($bim >= 1 && $bim <= 4 && $sigla !== '') {
             $leaf = $sigla === 'faltas' ? 'fal' : $sigla;
+
             return 'b' . $bim . '_' . $leaf;
+        }
+        if ($bim === 81) {
+            return 's1_rec';
+        }
+        if ($bim === 82) {
+            return 's2_rec';
+        }
+        if ($bim >= 61 && $bim < 80) {
+            return 'rec' . ($bim - 60);
         }
         if ($sigla !== '' && !isset($vistos[$sigla])) {
             return $sigla;
@@ -4167,6 +4179,29 @@ class BoletimAssistenteWizard
     }
 
     /**
+     * 1 Trimestre / II BIMESTRE / 3º período → número do período. 0 se o título não diz.
+     */
+    private function bimestrePeloTituloPeriodo(string $nome): int
+    {
+        $n = function_exists('mb_strtoupper') ? mb_strtoupper($nome, 'UTF-8') : strtoupper($nome);
+        if (preg_match('/\bIV\b|4\s*[ºO°]?\s*(?:BIMESTRE|TRIMESTRE|PER[IÍ]ODO)|QUARTO/u', $n)) {
+            return 4;
+        }
+        if (preg_match('/\bIII\b|3\s*[ºO°]?\s*(?:BIMESTRE|TRIMESTRE|PER[IÍ]ODO)|TERCEIRO/u', $n)) {
+            return 3;
+        }
+        if (preg_match('/\bII\b|2\s*[ºO°]?\s*(?:BIMESTRE|TRIMESTRE|PER[IÍ]ODO)|SEGUNDO/u', $n)
+            && !preg_match('/\bIII\b/u', $n)) {
+            return 2;
+        }
+        if (preg_match('/\bI\b|1\s*[ºO°]?\s*(?:BIMESTRE|TRIMESTRE|PER[IÍ]ODO)|PRIMEIRO/u', $n)) {
+            return 1;
+        }
+
+        return 0;
+    }
+
+    /**
      * @param array<string,mixed> $estado
      * @param list<string> $erros
      * @param list<array<string,mixed>> $componentes
@@ -4207,6 +4242,37 @@ class BoletimAssistenteWizard
 
         $quadroLivre = !empty($estado['quadro_livre']) || ($estado['origem'] ?? '') === 'quadro-impressao';
 
+        // Sigla solta antiga (código "pt") pertence a um evento. O outro período ganha b2_pt,
+        // e não uma segunda coluna com o mesmo código.
+        $donoSiglaLegada = [];
+        $bimDaSiglaLegada = [];
+        foreach ($this->normalizarLinhasLayout($estado['linhas_layout'] ?? []) as $linLay) {
+            $bimLay = $this->bimestrePeloTituloPeriodo((string) ($linLay['nome'] ?? ''));
+            foreach ((array) ($linLay['colunas'] ?? []) as $colLay) {
+                $colLay = strtolower(trim((string) $colLay));
+                if ($colLay !== '' && !isset($bimDaSiglaLegada[$colLay])) {
+                    $bimDaSiglaLegada[$colLay] = $bimLay;
+                }
+            }
+        }
+        foreach ($componentes as $cLegado) {
+            if (!is_array($cLegado)) {
+                continue;
+            }
+            $codLegado = strtolower(trim((string) ($cLegado['codigo'] ?? '')));
+            if ($codLegado === ''
+                || preg_match('/^b[1-4]_/', $codLegado)
+                || preg_match('/^s[12]_/', $codLegado)
+                || preg_match('/^eva_?\d+$/', $codLegado)
+                || preg_match('/^rec\d+$/', $codLegado)) {
+                continue;
+            }
+            if (!array_key_exists($codLegado, $donoSiglaLegada)) {
+                $cfgLegado = $this->configDoComponente($cLegado);
+                $donoSiglaLegada[$codLegado] = (int) ($cfgLegado['evento_avaliativo_id'] ?? 0);
+            }
+        }
+
         // Substitui slots vazios s1_rec/s2_rec/pf quando o evento bate o código.
         foreach ($extras as $extra) {
             $codExtra = strtolower(trim((string) ($extra['codigo'] ?? '')));
@@ -4215,6 +4281,23 @@ class BoletimAssistenteWizard
                 $tituloExtra = trim((string) ($extra['nome'] ?? ''));
             }
             $extra['nome'] = $tituloExtra;
+
+            if (preg_match('/^b([1-4])_(.+)$/', $codExtra, $mLegado)) {
+                $leafLegado = $mLegado[2] === 'faltas' ? 'fal' : $mLegado[2];
+                $bimExtra = (int) $mLegado[1];
+                if (array_key_exists($leafLegado, $donoSiglaLegada)) {
+                    $idExtra = (int) (($extra['config']['evento_avaliativo_id'] ?? 0));
+                    $dono = (int) $donoSiglaLegada[$leafLegado];
+                    $bimLegado = (int) ($bimDaSiglaLegada[$leafLegado] ?? 0);
+                    $mesmoEvento = $idExtra > 0 && $dono === $idExtra;
+                    // Sem dono: o chip solto fica no período do título onde ele já está.
+                    // Com dono, o outro período precisa da coluna nova mesmo se o chip foi arrastado.
+                    $mesmoPeriodo = $dono <= 0 && $bimLegado > 0 && $bimLegado === $bimExtra;
+                    if ($mesmoEvento || $mesmoPeriodo) {
+                        continue;
+                    }
+                }
+            }
 
             // No Montar quadro: uma coluna por sigla (evita 10× REC / 5× PF),
             // exceto slots por bimestre (b1_pp ≠ b2_pp), REC de semestre e PF.

@@ -3539,16 +3539,17 @@ $boletimWizardSteps = [
             var sig = String(siglaDoEvento(ev) || '').toUpperCase();
             if (!sig) return;
             var codSigla = sig.toLowerCase().replace(/[^a-z0-9_]+/g, '');
-            if (codSigla) estado.nomes_blocos[codSigla] = sig;
+            // Sigla solta (legado) só nomeia o chip deste evento. Não apelida o PT do outro período.
+            if (codSigla && !ehCodigoBlocoCalc(codSigla) && chipCodigoPertenceAoEvento(codSigla, ev)) {
+                estado.nomes_blocos[codSigla] = sig;
+            }
             estado.nomes_blocos['eva' + id] = sig;
             estado.nomes_blocos['eva_' + id] = sig;
             var bim = Number(ev.bimestre || 0);
             var anoEv = Number(ev.ano_letivo || (estado && estado.ano_letivo) || 0);
             if (periodoNumeroValido(bim, anoEv) && codSigla) {
                 var leaf = codSigla === 'faltas' ? 'fal' : codSigla;
-                if (['pp', 'pu', 'ch', 'pe', 'fal'].indexOf(leaf) >= 0) {
-                    estado.nomes_blocos['b' + bim + '_' + leaf] = sig;
-                }
+                estado.nomes_blocos['b' + bim + '_' + leaf] = sig;
             }
             if (bim === 81) {
                 estado.nomes_blocos.s1_rec = (sig === 'REC') ? 'REC 1º' : sig;
@@ -4433,14 +4434,21 @@ $boletimWizardSteps = [
         if (!low) return null;
         var lista = eventosAvaliativosDoAnoQuadro() || [];
         var i;
+        var mEva = low.match(/^eva_?(\d+)$/);
+        if (mEva) {
+            var idEva = Number(mEva[1] || 0);
+            for (i = 0; i < lista.length; i++) {
+                if (Number(lista[i] && lista[i].id || 0) === idEva) return lista[i];
+            }
+        }
+        var dono = eventoIdDoCodigoColuna(low);
+        if (dono > 0) {
+            for (i = 0; i < lista.length; i++) {
+                if (Number(lista[i] && lista[i].id || 0) === dono) return lista[i];
+            }
+        }
         for (i = 0; i < lista.length; i++) {
-            var ev = lista[i];
-            var pref = String(codigoPreferidoEvento(ev) || '').toLowerCase();
-            if (pref && pref === low) return ev;
-            var id = Number(ev && ev.id || 0);
-            if (id > 0 && (low === ('eva' + id) || low === ('eva_' + id))) return ev;
-            var sig = String(siglaDoEvento(ev) || '').toLowerCase().replace(/[^a-z0-9_]+/g, '');
-            if (sig && sig === low) return ev;
+            if (chipCodigoPertenceAoEvento(low, lista[i])) return lista[i];
         }
         return null;
     }
@@ -4503,10 +4511,10 @@ $boletimWizardSteps = [
             && !/1\s*[ºO]?\s*SEM|2\s*[ºO]?\s*SEM/.test(n)) {
             return 'final';
         }
-        if (/\bIV\b|4\s*[ºO]|QUARTO/.test(n)) return 'p-4';
-        if (/\bIII\b|3\s*[ºO]|TERCEIRO/.test(n)) return 'p-3';
-        if (/\bII\b|2\s*[ºO]|SEGUNDO/.test(n) && !/\bIII\b/.test(n)) return 'p-2';
-        if (/\bI\b|1\s*[ºO]|PRIMEIRO/.test(n)) return 'p-1';
+        if (/\bIV\b|4\s*[ºO°]?\s*(?:BIMESTRE|TRIMESTRE|PER[IÍ]ODO)|QUARTO/.test(n)) return 'p-4';
+        if (/\bIII\b|3\s*[ºO°]?\s*(?:BIMESTRE|TRIMESTRE|PER[IÍ]ODO)|TERCEIRO/.test(n)) return 'p-3';
+        if (/\bII\b|2\s*[ºO°]?\s*(?:BIMESTRE|TRIMESTRE|PER[IÍ]ODO)|SEGUNDO/.test(n) && !/\bIII\b/.test(n)) return 'p-2';
+        if (/\bI\b|1\s*[ºO°]?\s*(?:BIMESTRE|TRIMESTRE|PER[IÍ]ODO)|PRIMEIRO/.test(n)) return 'p-1';
         if (/1\s*[ºO]?\s*SEM/.test(n)) return 's1';
         if (/2\s*[ºO]?\s*SEM/.test(n)) return 's2';
         return '';
@@ -4939,6 +4947,10 @@ $boletimWizardSteps = [
         }
         if (!estado.escalas_blocos || typeof estado.escalas_blocos !== 'object') estado.escalas_blocos = {};
         if (estado.escalas_blocos[codigo] == null) estado.escalas_blocos[codigo] = escalaPadraoRegra();
+        var destinoBloco = (typeof destinoTituloPeriodoAtivo === 'function') ? destinoTituloPeriodoAtivo() : null;
+        if (destinoBloco && (destinoBloco.linhaId || destinoBloco.nomeCab)) {
+            moverCodigoParaCabecalho(codigo, destinoBloco.nomeCab || '', destinoBloco.linhaId || '');
+        }
         estado.quadro_chips_manuais = 1;
         marcarEdicaoManual();
         previewAtual = null;
@@ -8395,13 +8407,113 @@ $boletimWizardSteps = [
         return filtrados.length ? filtrados : todos;
     }
 
+    function siglaCodigoEvento(ev) {
+        return String(siglaDoEvento(ev) || '').toLowerCase().replace(/[^a-z0-9_]+/g, '');
+    }
+
+    function eventoIdDoCodigoColuna(codigo) {
+        var comp = componentePorCodigo(codigo);
+        if (!comp) return 0;
+        var cfg = configDoComp(comp);
+        return Number((cfg && cfg.evento_avaliativo_id) || comp.evento_avaliativo_id || 0);
+    }
+
+    /**
+     * O chip é deste evento — nunca de outro período com a mesma sigla.
+     * PT do 1º trimestre e PT do 2º são colunas diferentes.
+     */
+    function chipCodigoPertenceAoEvento(codigo, ev) {
+        codigo = String(codigo || '').toLowerCase();
+        if (!codigo || !ev) return false;
+        var id = Number(ev.id || 0);
+        if (id > 0 && (codigo === ('eva' + id) || codigo === ('eva_' + id))) return true;
+        var pref = String(codigoPreferidoEvento(ev) || '').toLowerCase();
+        if (pref && codigo === pref) {
+            var donoPref = eventoIdDoCodigoColuna(codigo);
+            return donoPref <= 0 || donoPref === id;
+        }
+        var dono = eventoIdDoCodigoColuna(codigo);
+        if (dono > 0) return dono === id;
+        var sigla = siglaCodigoEvento(ev);
+        if (!sigla || codigo !== sigla) return false;
+        if (ehCodigoBlocoCalc(codigo)) return false;
+        var outros = (eventosCatalogoBuilder() || []).filter(function (outro) {
+            return Number(outro && outro.id || 0) !== id && siglaCodigoEvento(outro) === sigla;
+        });
+        if (!outros.length) return true;
+        var chaveEv = chavePeriodoItem(ev);
+        var linhas = (estado && estado.linhas_layout) || [];
+        var i;
+        for (i = 0; i < linhas.length; i++) {
+            var lin = linhas[i];
+            if (!lin) continue;
+            var cols = (lin.colunas || []).map(function (c) { return String(c || '').toLowerCase(); });
+            if (cols.indexOf(codigo) < 0) continue;
+            var chaveLin = chaveCicloDeNomeCabecalho(lin.nome);
+            if (chaveLin && chaveLin === chaveEv) return true;
+        }
+        return false;
+    }
+
+    function codigoExisteNoEstado(codigo) {
+        codigo = String(codigo || '').toLowerCase();
+        if (!codigo || !estado) return false;
+        if ((estado.colunas_ordem || []).some(function (c) { return String(c || '').toLowerCase() === codigo; })) return true;
+        if ((estado.colunas_ocultas || []).some(function (c) { return String(c || '').toLowerCase() === codigo; })) return true;
+        if ((estado.linhas_layout || []).some(function (lin) {
+            return (lin && lin.colunas || []).some(function (c) { return String(c || '').toLowerCase() === codigo; });
+        })) return true;
+        return !!componentePorCodigo(codigo);
+    }
+
+    function codigoOcupadoPorOutroEvento(codigo, ev) {
+        codigo = String(codigo || '').toLowerCase();
+        if (!codigo || !codigoExisteNoEstado(codigo)) return false;
+        if (ehCodigoBlocoCalc(codigo)) return true;
+        return !chipCodigoPertenceAoEvento(codigo, ev);
+    }
+
+    function codigoColunaDesteEvento(ev) {
+        if (!ev || !estado) return '';
+        var id = Number(ev.id || 0);
+        var pref = String(codigoPreferidoEvento(ev) || '').toLowerCase();
+        var vistos = [];
+        function add(cod) {
+            var low = String(cod || '').toLowerCase();
+            if (low && vistos.indexOf(low) < 0) vistos.push(low);
+        }
+        (estado.colunas_ordem || []).forEach(add);
+        (estado.colunas_ocultas || []).forEach(add);
+        (estado.linhas_layout || []).forEach(function (lin) {
+            (lin && lin.colunas || []).forEach(add);
+        });
+        (((rascunhoAtual || {}).componentes) || []).forEach(function (c) { add(c && c.codigo); });
+        var preferidos = [];
+        if (id > 0) {
+            preferidos.push('eva' + id);
+            preferidos.push('eva_' + id);
+        }
+        if (pref) preferidos.push(pref);
+        var i;
+        for (i = 0; i < preferidos.length; i++) {
+            if (vistos.indexOf(preferidos[i]) >= 0 && chipCodigoPertenceAoEvento(preferidos[i], ev)) {
+                return preferidos[i];
+            }
+        }
+        for (i = 0; i < vistos.length; i++) {
+            if (chipCodigoPertenceAoEvento(vistos[i], ev)) return vistos[i];
+        }
+        return '';
+    }
+
     function codigoPreferidoEvento(ev) {
         if (!ev) return '';
-        var sigla = String(ev.sigla || '').toLowerCase().replace(/[^a-z0-9_]+/g, '');
+        var sigla = siglaCodigoEvento(ev);
         var bim = Number(ev.bimestre || 0);
         var id = Number(ev.id || 0);
         var anoEv = Number(ev.ano_letivo || (estado && estado.ano_letivo) || 0);
-        if (periodoNumeroValido(bim, anoEv) && ['pp', 'pu', 'ch', 'pe', 'fal', 'faltas'].indexOf(sigla) >= 0) {
+        // Cada período tem o próprio chip. PT do 1º não é o PT do 2º.
+        if (periodoNumeroValido(bim, anoEv) && sigla) {
             return 'b' + bim + '_' + (sigla === 'faltas' ? 'fal' : sigla);
         }
         // Semestral / par (81/82): códigos Santa Maria. Ciclo (61–63) NÃO cai aqui —
@@ -8409,7 +8521,6 @@ $boletimWizardSteps = [
         if (bim === 81) return 's1_rec';
         if (bim === 82) return 's2_rec';
         if (bim >= 61 && bim < 80) {
-            if (sigla) return sigla;
             return 'rec' + (bim - 60);
         }
         // Recuperação final / Prova Final (ano).
@@ -8434,45 +8545,25 @@ $boletimWizardSteps = [
         return id > 0 ? ('eva_' + id) : '';
     }
 
-    /** Só conta chip visível no quadro (ordem/título). Peça só na fórmula não conta. */
+    /** Só conta chip visível no quadro (ordem/título) deste evento. Peça só na fórmula não conta. */
     function colunaEventoJaNoQuadro(ev) {
         if (!ev || !estado) return false;
-        var pref = String(codigoPreferidoEvento(ev) || '').toLowerCase();
-        var id = Number(ev.id || 0);
-        var ordem = {};
-        function marcar(cod) {
-            var low = String(cod || '').toLowerCase();
-            if (!low || colunaOculta(low)) return;
-            ordem[low] = true;
-        }
-        (estado.colunas_ordem || []).forEach(marcar);
-        (estado.linhas_layout || []).forEach(function (lin) {
-            (lin && lin.colunas || []).forEach(marcar);
+        var cod = codigoColunaDesteEvento(ev);
+        if (!cod || colunaOculta(cod)) return false;
+        var low = String(cod).toLowerCase();
+        if ((estado.colunas_ordem || []).some(function (c) {
+            return String(c || '').toLowerCase() === low;
+        })) return true;
+        return (estado.linhas_layout || []).some(function (lin) {
+            return (lin && lin.colunas || []).some(function (c) {
+                return String(c || '').toLowerCase() === low;
+            });
         });
-        if (pref && ordem[pref]) return true;
-        if (id > 0 && (ordem['eva' + id] || ordem['eva_' + id])) return true;
-        return false;
     }
 
-    /** Resolve o código da coluna do evento (mesmo se já estiver no quadro). */
+    /** Código da coluna deste evento, se ela já existe. Não devolve a sigla de outro período. */
     function codigoColunaExistenteDoEvento(ev) {
-        if (!ev || !estado) return '';
-        var pref = String(codigoPreferidoEvento(ev) || '').toLowerCase();
-        var id = Number(ev.id || 0);
-        var ordem = {};
-        function marcar(cod) {
-            var low = String(cod || '').toLowerCase();
-            if (low) ordem[low] = true;
-        }
-        (estado.colunas_ordem || []).forEach(marcar);
-        (((rascunhoAtual || {}).componentes) || []).forEach(function (c) { marcar(c && c.codigo); });
-        (estado.linhas_layout || []).forEach(function (lin) {
-            (lin && lin.colunas || []).forEach(marcar);
-        });
-        if (pref && ordem[pref]) return pref;
-        if (id > 0 && ordem['eva' + id]) return 'eva' + id;
-        if (id > 0 && ordem['eva_' + id]) return 'eva_' + id;
-        return pref || (id > 0 ? ('eva' + id) : '');
+        return codigoColunaDesteEvento(ev);
     }
 
     /** Garante chip visível na ordem/título (tira de colunas_ocultas). */
@@ -8539,9 +8630,15 @@ $boletimWizardSteps = [
                 if (low) vistos[low] = true;
             });
         });
-        // Se a sigla preferida está oculta (só na fórmula), reusa o código e reaparece no quadro.
+        // Sigla já usada por outro período ou por um bloco de cálculo: cria código novo.
         var pref = String(codigoPreferidoEvento(ev) || '').toLowerCase();
-        var codigo = (pref && colunaOculta(pref)) ? pref : codigoColunaDoEventoJs(ev, vistos);
+        if (pref && codigoOcupadoPorOutroEvento(pref, ev)) vistos[pref] = true;
+        var jaDeste = codigoColunaDesteEvento(ev);
+        var codigo = (jaDeste && colunaOculta(jaDeste))
+            ? jaDeste
+            : ((pref && colunaOculta(pref) && !codigoOcupadoPorOutroEvento(pref, ev))
+                ? pref
+                : codigoColunaDoEventoJs(ev, vistos));
         if (!codigo) return false;
         garantirChipVisivelNoQuadro(codigo);
         if (!estado.nomes_blocos || typeof estado.nomes_blocos !== 'object') estado.nomes_blocos = {};
@@ -8931,6 +9028,7 @@ $boletimWizardSteps = [
         if (!faixas.length) {
             html += '<div class="bw-quadro-vazio w-full">Digite o título (ex.: IV BIMESTRE) e clique em Novo título do período — depois arraste os eventos da esquerda</div>';
         } else {
+            var soltasHtml = '';
             faixas.forEach(function (faixa) {
                 if (faixa.tipo === 'grupo') {
                     var linRef = (faixa.cols[0] && linhaLayoutDaColuna(faixa.cols[0].codigo, faixa.cols[0])) || {};
@@ -8961,8 +9059,14 @@ $boletimWizardSteps = [
                     html += '</div>';
                     return;
                 }
-                html += htmlChipColuna(faixa.col);
+                soltasHtml += htmlChipColuna(faixa.col);
             });
+            if (soltasHtml) {
+                html += '<div class="w-full flex flex-wrap items-center gap-2">';
+                html += '<span class="text-[11px] font-semibold text-slate-500">Fora dos títulos</span>';
+                html += soltasHtml;
+                html += '</div>';
+            }
         }
         html += '</div></div></section></div>';
         return html;
@@ -9368,9 +9472,10 @@ $boletimWizardSteps = [
     function eventoPorCodigoNoCatalogo(codigo) {
         codigo = String(codigo || '').toLowerCase();
         if (!codigo) return null;
-        var mB = codigo.match(/^b([1-4])_(pp|pu|ch|pe|fal|faltas)$/);
+        var mB = codigo.match(/^b([1-4])_([a-z0-9_]+)$/);
         if (mB) {
             var leaf = mB[2] === 'faltas' ? 'fal' : mB[2];
+            if (leaf === 'mu' || leaf === 'ms') return null;
             var bim = Number(mB[1]);
             return eventosCatalogoBuilder().filter(function (ev) {
                 if (Number(ev && ev.bimestre || 0) !== bim) return false;
@@ -9681,7 +9786,7 @@ $boletimWizardSteps = [
                 mapa[cod] = garantirColunaRecSemestreClone(semRec);
                 return;
             }
-            var mB = cod.match(/^b([1-4])_(pp|pu|ch|pe|fal|faltas)$/);
+            var mB = cod.match(/^b([1-4])_([a-z0-9_]+)$/);
             if (mB && bimDest >= 1 && bimDest <= 4) {
                 var leaf = mB[2] === 'faltas' ? 'fal' : mB[2];
                 if (leaf === 'fal') {
