@@ -91,10 +91,9 @@ class DriveController extends \App\Core\BaseController
 
     private function layoutAndViewFolder($tipo)
     {
-        // layout global continua student/teacher; views do módulo em aluno/professor
+        // Professor usa o mesmo shell do painel (menu lateral). Aluno segue o layout do aluno.
         if ($tipo === 'professor') {
-            $layout = \App\Core\LayoutHelper::isModuleEnabled('grupo_seb') ? 'professor' : 'teacher';
-            return ['layout' => $layout, 'viewFolder' => 'professor'];
+            return ['layout' => 'professor', 'viewFolder' => 'professor'];
         }
         return ['layout' => 'student', 'viewFolder' => 'aluno'];
     }
