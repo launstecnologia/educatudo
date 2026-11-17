@@ -105,7 +105,17 @@ $limparUrl = URL . '/master/llm-custos';
     </div>
 </div>
 
-<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+<?php
+$custoAlvoCredito = (float) ($financeiro['custo_alvo_brl_por_credito'] ?? 0.10);
+$lucroAlvoCredito = (float) ($financeiro['lucro_alvo_brl_por_credito'] ?? max(0, $brlPorCredito - $custoAlvoCredito));
+$tokensAlvo = $financeiro['tokens_por_credito_alvo'] ?? null;
+$tokensReal = $financeiro['tokens_por_credito_real'] ?? null;
+$custoRealCredito = $financeiro['custo_real_por_credito_brl'] ?? null;
+$dentroMeta = $financeiro['dentro_meta_custo'] ?? null;
+$usdMaxCredito = $financeiro['usd_max_por_credito'] ?? null;
+?>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
         <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">TudiCoins consumidos</p>
         <p class="text-2xl font-bold text-slate-900 mt-1"><?= $fmtTc($financeiro['creditos_consumidos'] ?? 0) ?></p>
@@ -127,12 +137,103 @@ $limparUrl = URL . '/master/llm-custos';
         <p class="text-2xl font-bold <?= $lucroClasse ?> mt-1"><?= $fmtBrl($financeiro['lucro_medio_por_credito_brl']) ?></p>
         <p class="text-xs text-slate-500 mt-1">
             Margem <?= $financeiro['margem_pct'] !== null ? $fmtDec($financeiro['margem_pct'], 1) . '%' : '—' ?>
+            <?php if ($custoRealCredito !== null): ?>
+            · custo <?= $fmtBrl($custoRealCredito) ?>
+            <?php endif; ?>
         </p>
         <?php else: ?>
         <p class="text-2xl font-bold text-slate-400 mt-1">—</p>
         <p class="text-xs text-slate-500 mt-1">Sem consumo de créditos no período</p>
         <?php endif; ?>
     </div>
+</div>
+
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 mb-8">
+    <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+        <div>
+            <h3 class="text-base font-semibold text-slate-900">Meta por crédito</h3>
+            <p class="text-sm text-slate-600 mt-1">
+                Cobrar <strong>R$ <?= $fmtDec($brlPorCredito, 2) ?></strong>,
+                gastar no máximo <strong>R$ <?= $fmtDec($custoAlvoCredito, 2) ?></strong> de LLM
+                → lucro alvo <strong>R$ <?= $fmtDec($lucroAlvoCredito, 2) ?></strong>
+                <?php if ($usdMaxCredito !== null): ?>
+                (≈ <?= $fmtUsd($usdMaxCredito) ?>).
+                <?php else: ?>.
+                <?php endif; ?>
+            </p>
+        </div>
+        <?php if ($dentroMeta !== null): ?>
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold <?= $dentroMeta ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800' ?>">
+            <?= $dentroMeta ? 'Dentro da meta no período' : 'Acima do custo alvo no período' ?>
+        </span>
+        <?php endif; ?>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mt-4">
+        <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[11px] uppercase tracking-wide text-slate-500">1 crédito ≈ quantos tokens?</p>
+            <?php if ($tokensAlvo !== null): ?>
+            <p class="text-2xl font-bold text-slate-900 mt-1"><?= $fmtInt($tokensAlvo) ?></p>
+            <p class="text-xs text-slate-500 mt-1">Orçamento no mix in/out deste período (custo alvo R$ <?= $fmtDec($custoAlvoCredito, 2) ?>)</p>
+            <?php else: ?>
+            <p class="text-2xl font-bold text-slate-400 mt-1">—</p>
+            <p class="text-xs text-slate-500 mt-1">Sem tokens/custo no período para estimar</p>
+            <?php endif; ?>
+        </div>
+        <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[11px] uppercase tracking-wide text-slate-500">Cobrança fracionada</p>
+            <?php
+            $creditosUso = (float) ($financeiro['creditos_equivalentes_uso'] ?? 0);
+            $exemploTokens = $tokensAlvo !== null ? (int) max(1, round($tokensAlvo / 2)) : null;
+            $exemploCreditos = ($exemploTokens !== null && $tokensAlvo > 0)
+                ? \App\Core\CreditosDecimalHelper::creditosPorTokens($exemploTokens, (int) $tokensAlvo)
+                : null;
+            ?>
+            <?php if ($creditosUso > 0): ?>
+            <p class="text-2xl font-bold text-slate-900 mt-1"><?= $fmtTc($creditosUso) ?></p>
+            <p class="text-xs text-slate-500 mt-1">
+                Custo R$ ÷ R$ <?= $fmtDec($custoAlvoCredito, 2) ?>
+                <?php if ($exemploCreditos !== null): ?>
+                · ex.: <?= $fmtInt($exemploTokens) ?> tok ≈ TC$ <?= $fmtDec($exemploCreditos, 2) ?>
+                <?php endif; ?>
+            </p>
+            <?php else: ?>
+            <p class="text-2xl font-bold text-slate-400 mt-1">—</p>
+            <p class="text-xs text-slate-500 mt-1">Sem custo LLM no período</p>
+            <?php endif; ?>
+        </div>
+        <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[11px] uppercase tracking-wide text-slate-500">Receita se cobrar pelo uso</p>
+            <?php if ($creditosUso > 0): ?>
+            <p class="text-2xl font-bold text-blue-700 mt-1"><?= $fmtBrl($financeiro['receita_ideal_brl'] ?? 0) ?></p>
+            <p class="text-xs text-slate-500 mt-1">
+                Lucro <?= $fmtBrl($financeiro['lucro_ideal_brl'] ?? 0) ?>
+                (meta R$ <?= $fmtDec($lucroAlvoCredito, 2) ?> / crédito cheio)
+            </p>
+            <?php else: ?>
+            <p class="text-2xl font-bold text-slate-400 mt-1">—</p>
+            <p class="text-xs text-slate-500 mt-1">Sem base de custo</p>
+            <?php endif; ?>
+        </div>
+        <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <p class="text-[11px] uppercase tracking-wide text-slate-500">Custo real / crédito debitado</p>
+            <?php if ($custoRealCredito !== null): ?>
+            <p class="text-2xl font-bold <?= ($dentroMeta === false) ? 'text-amber-700' : 'text-slate-900' ?> mt-1"><?= $fmtBrl($custoRealCredito) ?></p>
+            <p class="text-xs text-slate-500 mt-1">
+                Meta ≤ R$ <?= $fmtDec($custoAlvoCredito, 2) ?>
+                <?php if ($tokensReal !== null): ?>
+                · <?= $fmtInt($tokensReal) ?> tok/crédito
+                <?php endif; ?>
+            </p>
+            <?php else: ?>
+            <p class="text-2xl font-bold text-slate-400 mt-1">—</p>
+            <p class="text-xs text-slate-500 mt-1">Sem créditos consumidos no período</p>
+            <?php endif; ?>
+        </div>
+    </div>
+    <p class="text-xs text-slate-500 mt-4">
+        Regra: usou metade dos tokens do orçamento → cobra ~0,5 crédito (R$ 0,10 de receita, ~R$ 0,05 de custo, ~R$ 0,05 de lucro).
+        A Tudinha admin já debita assim, proporcional ao custo LLM da mensagem.
+    </p>
 </div>
 
 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-4">

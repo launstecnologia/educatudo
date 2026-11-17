@@ -111,6 +111,38 @@ class CreditosDecimalHelper
     {
         return '\R$ ' . self::formatNumero(self::toReais($tudicoins), 2);
     }
+
+    /**
+     * Cobrança fracionada por uso de LLM.
+     * Meta: 1 crédito “cheio” cobre até $custoAlvoBrlPorCredito de custo OpenAI.
+     * Ex.: custo R$ 0,05 e alvo R$ 0,10 → 0,5 crédito; R$ 0,10 → 1,0; R$ 0,15 → 1,5.
+     */
+    public static function creditosPorCustoLlmBrl(
+        float $custoBrl,
+        float $custoAlvoBrlPorCredito = 0.10,
+        float $minimo = 0.0001
+    ): float {
+        $alvo = max(0.0001, $custoAlvoBrlPorCredito);
+        $custo = max(0.0, $custoBrl);
+        if ($custo <= 0) {
+            return 0.0;
+        }
+        return round(max($minimo, $custo / $alvo), self::SCALE);
+    }
+
+    /**
+     * Fração do orçamento de tokens de 1 crédito.
+     * Ex.: usou 6.000 de 13.000 → ~0,4615 crédito.
+     */
+    public static function creditosPorTokens(int $tokensUsados, int $tokensPorCreditoAlvo, float $minimo = 0.0001): float
+    {
+        $alvo = max(1, $tokensPorCreditoAlvo);
+        $usados = max(0, $tokensUsados);
+        if ($usados <= 0) {
+            return 0.0;
+        }
+        return round(max($minimo, $usados / $alvo), self::SCALE);
+    }
 }
 
 if (!class_exists('CreditosDecimalHelper', false) && class_exists(__NAMESPACE__ . '\\CreditosDecimalHelper', false)) {

@@ -157,7 +157,6 @@ class CreditosService
 
     public function consumir(string $userType, int $userId, string $moduloKey, $referenciaId = null): void
     {
-        $this->assertUserType($userType, true);
         if (!\App\Core\CreditosModuleRegistry::isValid($moduloKey)) {
             return;
         }
@@ -168,6 +167,33 @@ class CreditosService
             return;
         }
         $custo = $this->getCustoModulo($moduloKey);
+        if ($custo <= 0) {
+            return;
+        }
+        $this->consumirValor($userType, $userId, $moduloKey, $custo, $referenciaId);
+    }
+
+    /**
+     * Debita um valor fracionado de TudiCoins (ex.: 0,46 por uso parcial de tokens).
+     */
+    public function consumirValor(
+        string $userType,
+        int $userId,
+        string $moduloKey,
+        float $valor,
+        $referenciaId = null
+    ): void {
+        $this->assertUserType($userType, true);
+        if (!\App\Core\CreditosModuleRegistry::isValid($moduloKey)) {
+            return;
+        }
+        if (!$this->isCreditosHabilitado()) {
+            throw new \Exception('TudiCoins desabilitado para esta escola. Ações com IA não estão disponíveis.');
+        }
+        if (!$this->moduloCobraCredito($moduloKey)) {
+            return;
+        }
+        $custo = round(max(0.0, $valor), \App\Core\CreditosDecimalHelper::SCALE);
         if ($custo <= 0) {
             return;
         }
@@ -247,10 +273,80 @@ class CreditosService
         }
     }
 
+    public function podeConsumirValor(string $userType, int $userId, string $moduloKey, float $valor): bool
+    {
+        if (!\App\Core\CreditosModuleRegistry::isValid($moduloKey)) {
+            return true;
+        }
+        if (!$this->isCreditosHabilitado()) {
+            return false;
+        }
+        if (!$this->moduloCobraCredito($moduloKey)) {
+            return true;
+        }
+        $custo = round(max(0.0, $valor), \App\Core\CreditosDecimalHelper::SCALE);
+        if ($custo <= 0) {
+            return true;
+        }
+        [$payType, $payId] = $this->resolverPagador($userType, $userId, $moduloKey);
+        return round($this->getSaldo($payType, $payId), \App\Core\CreditosDecimalHelper::SCALE) + 1e-9
+            >= round($custo, \App\Core\CreditosDecimalHelper::SCALE);
+    }
+
     /** Atalho: debita sempre a carteira institucional da escola. */
     public function consumirEscola(string $moduloKey, $referenciaId = null): void
     {
         $this->consumir('escola', \App\Core\CreditosModuleRegistry::ESCOLA_CARTEIRA_USER_ID, $moduloKey, $referenciaId);
+    }
+
+    public function consumirEscolaValor(string $moduloKey, float $valor, $referenciaId = null): void
+    {
+        $this->consumirValor(
+            'escola',
+            \App\Core\CreditosModuleRegistry::ESCOLA_CARTEIRA_USER_ID,
+            $moduloKey,
+            $valor,
+            $referenciaId
+        );
+    }
+
+    /**
+     * Converte uso LLM (tokens/custo USD) em TudiCoins fracionados.
+     * Preferência: custo USD real; senão estima pelo modelo; senão fração por tokens do período.
+     *
+     * @param array{prompt_tokens?:int,completion_tokens?:int,total_tokens?:int,modelo?:string,cost_usd?:float}|null $uso
+     */
+    public function creditosPorUsoLlm(?array $uso): float
+    {
+        $uso = is_array($uso) ? $uso : [];
+        $prompt = max(0, (int) ($uso['prompt_tokens'] ?? 0));
+        $completion = max(0, (int) ($uso['completion_tokens'] ?? 0));
+        $total = max(0, (int) ($uso['total_tokens'] ?? ($prompt + $completion)));
+        $modelo = trim((string) ($uso['modelo'] ?? 'gpt-4o-mini'));
+        $custoUsd = isset($uso['cost_usd']) && is_numeric($uso['cost_usd'])
+            ? max(0.0, (float) $uso['cost_usd'])
+            : null;
+
+        $cotacao = \App\Services\MasterLlmCustosService::cotacaoUsdBrl(null);
+        $alvoBrl = \App\Services\MasterLlmCustosService::custoAlvoBrlPorCredito();
+
+        if ($custoUsd === null || $custoUsd <= 0) {
+            if ($prompt > 0 || $completion > 0) {
+                $custoUsd = \App\Services\MasterLlmCustosService::estimarCustoUsd($modelo, $prompt, $completion);
+            } else {
+                $custoUsd = 0.0;
+            }
+        }
+
+        $custoBrl = round($custoUsd * $cotacao, 6);
+        $porCusto = \App\Core\CreditosDecimalHelper::creditosPorCustoLlmBrl($custoBrl, $alvoBrl);
+        if ($porCusto > 0) {
+            return $porCusto;
+        }
+
+        // Sem custo conhecido: se houver tokens_alvo no mix recente, usa fração por tokens.
+        // Sem isso, não debita por uso (caller pode cair no custo fixo do catálogo).
+        return 0.0;
     }
 
     public function adicionarCreditosEscola(float $valor, string $tipo, $referenciaId = null): void

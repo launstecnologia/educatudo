@@ -69,44 +69,87 @@ class MasterLlmCustosService
         return self::USD_BRL_PADRAO;
     }
 
+    /** Meta padrão: gastar no máx. R$ 0,10 de LLM por crédito cobrado a R$ 0,20. */
+    private const CUSTO_ALVO_BRL_POR_CREDITO_PADRAO = 0.10;
+
+    public static function custoAlvoBrlPorCredito(): float
+    {
+        $cfg = self::carregarConfigPrecos();
+        $v = (float) ($cfg['custo_alvo_brl_por_credito'] ?? 0);
+        if ($v > 0) {
+            return round($v, 4);
+        }
+        return self::CUSTO_ALVO_BRL_POR_CREDITO_PADRAO;
+    }
+
     /**
      * Receita/custo/lucro em BRL com base em TudiCoins consumidos e custo LLM.
      * 1 TudiCoin = R$ 0,20 (CreditosDecimalHelper::BRL_POR_UNIDADE).
+     * Meta: custo LLM ≤ R$ 0,10/crédito → lucro alvo R$ 0,10/crédito.
      *
-     * @return array{
-     *   cotacao_usd_brl:float,
-     *   brl_por_credito:float,
-     *   creditos_consumidos:float,
-     *   receita_brl:float,
-     *   custo_usd:float,
-     *   custo_brl:float,
-     *   lucro_brl:float,
-     *   margem_pct:float|null,
-     *   lucro_medio_por_credito_brl:float|null
-     * }
+     * @return array<string,mixed>
      */
-    public static function montarFinanceiro(float $creditosConsumidos, float $custoUsd, ?float $cotacao = null): array
-    {
+    public static function montarFinanceiro(
+        float $creditosConsumidos,
+        float $custoUsd,
+        ?float $cotacao = null,
+        int $totalTokens = 0
+    ): array {
         $cotacao = self::cotacaoUsdBrl($cotacao);
         $brlPorCredito = (float) \App\Core\CreditosDecimalHelper::BRL_POR_UNIDADE;
+        $custoAlvoBrl = self::custoAlvoBrlPorCredito();
+        $lucroAlvoBrl = round(max(0.0, $brlPorCredito - $custoAlvoBrl), 4);
         $creditos = round(max(0.0, $creditosConsumidos), 4);
         $custoUsd = round(max(0.0, $custoUsd), 6);
+        $totalTokens = max(0, $totalTokens);
         $receitaBrl = round($creditos * $brlPorCredito, 2);
         $custoBrl = round($custoUsd * $cotacao, 2);
         $lucroBrl = round($receitaBrl - $custoBrl, 2);
         $margem = $receitaBrl > 0 ? round(($lucroBrl / $receitaBrl) * 100, 1) : null;
         $lucroMedio = $creditos > 0 ? round($lucroBrl / $creditos, 4) : null;
+        $custoRealPorCredito = $creditos > 0 ? round($custoBrl / $creditos, 4) : null;
+        $tokensPorCreditoReal = ($creditos > 0 && $totalTokens > 0)
+            ? (int) round($totalTokens / $creditos)
+            : null;
+
+        // Mix do período: R$/token → quantos tokens cabem no custo alvo de 1 crédito.
+        $brlPorToken = ($totalTokens > 0 && $custoBrl > 0)
+            ? ($custoBrl / $totalTokens)
+            : null;
+        $tokensPorCreditoAlvo = ($brlPorToken !== null && $brlPorToken > 0)
+            ? (int) max(1, round($custoAlvoBrl / $brlPorToken))
+            : null;
+        $usdMaxPorCredito = $cotacao > 0 ? round($custoAlvoBrl / $cotacao, 6) : null;
+        $dentroMeta = $custoRealPorCredito !== null
+            ? ($custoRealPorCredito <= $custoAlvoBrl + 0.00005)
+            : null;
+
+        // Quanto deveria ser cobrado se debitasse 1 crédito a cada R$ custo_alvo de LLM.
+        $creditosEquivalentesUso = \App\Core\CreditosDecimalHelper::creditosPorCustoLlmBrl($custoBrl, $custoAlvoBrl);
+        $receitaIdealBrl = round($creditosEquivalentesUso * $brlPorCredito, 2);
+        $lucroIdealBrl = round($receitaIdealBrl - $custoBrl, 2);
 
         return [
             'cotacao_usd_brl' => $cotacao,
             'brl_por_credito' => $brlPorCredito,
+            'custo_alvo_brl_por_credito' => $custoAlvoBrl,
+            'lucro_alvo_brl_por_credito' => $lucroAlvoBrl,
+            'usd_max_por_credito' => $usdMaxPorCredito,
             'creditos_consumidos' => $creditos,
+            'creditos_equivalentes_uso' => $creditosEquivalentesUso,
+            'receita_ideal_brl' => $receitaIdealBrl,
+            'lucro_ideal_brl' => $lucroIdealBrl,
             'receita_brl' => $receitaBrl,
             'custo_usd' => $custoUsd,
             'custo_brl' => $custoBrl,
             'lucro_brl' => $lucroBrl,
             'margem_pct' => $margem,
             'lucro_medio_por_credito_brl' => $lucroMedio,
+            'custo_real_por_credito_brl' => $custoRealPorCredito,
+            'tokens_por_credito_real' => $tokensPorCreditoReal,
+            'tokens_por_credito_alvo' => $tokensPorCreditoAlvo,
+            'brl_por_token' => $brlPorToken !== null ? round($brlPorToken, 8) : null,
+            'dentro_meta_custo' => $dentroMeta,
         ];
     }
 
@@ -447,7 +490,8 @@ class MasterLlmCustosService
         $out['financeiro'] = self::montarFinanceiro(
             (float) $out['totais']['creditos_consumidos'],
             (float) $out['totais']['cost_usd'],
-            $cotacao
+            $cotacao,
+            (int) ($out['totais']['total_tokens'] ?? 0)
         );
         $out['totais']['cost_brl'] = $out['financeiro']['custo_brl'];
         $out['por_escola'] = $porEscola;

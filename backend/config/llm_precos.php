@@ -10,6 +10,12 @@ return [
     'atualizado_em' => '2026-07-09',
     /** Cotação de referência USD → BRL para estimar custo/lucro em reais no Master. */
     'usd_brl' => 5.78,
+    /**
+     * Meta comercial: custo LLM máximo por TudiCoin (R$).
+     * Cobrança fixa = CreditosDecimalHelper::BRL_POR_UNIDADE (R$ 0,20).
+     * Lucro alvo por crédito = cobrança − este valor (ex.: 0,20 − 0,10 = R$ 0,10).
+     */
+    'custo_alvo_brl_por_credito' => 0.10,
     'modelos' => [
         'gpt-4o' => ['input' => 2.50, 'output' => 10.00],
         'gpt-4o-mini' => ['input' => 0.15, 'output' => 0.60],

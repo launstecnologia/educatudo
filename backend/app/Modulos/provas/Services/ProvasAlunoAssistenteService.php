@@ -137,7 +137,11 @@ class ProvasAlunoAssistenteService
         }
 
         try {
-            $this->debitarCreditos();
+            $usoTokens = is_array($resultado['uso_tokens'] ?? null) ? $resultado['uso_tokens'] : null;
+            $cobrado = $this->debitarCreditos($usoTokens);
+            if ($cobrado > 0) {
+                $resultado['creditos_debitados'] = $cobrado;
+            }
         } catch (\Throwable $e) {
             return ['success' => false, 'error' => $e->getMessage()];
         }
@@ -1916,25 +1920,47 @@ class ProvasAlunoAssistenteService
         if (!$creditos->isCreditosHabilitado()) {
             throw new \Exception('TudiCoins desabilitado para esta escola. Ações com IA não estão disponíveis.');
         }
-        if (!$creditos->podeConsumir(
+        // Pré-checagem: precisa de pelo menos o piso fracionado (0,01) ou o custo de catálogo — o que for menor.
+        $piso = 0.01;
+        $catalogo = $creditos->getCustoModulo(self::MODULO_CREDITOS);
+        $minimo = $catalogo > 0 ? min($piso, $catalogo) : $piso;
+        if (!$creditos->podeConsumirValor(
             'escola',
             \App\Core\CreditosModuleRegistry::ESCOLA_CARTEIRA_USER_ID,
-            self::MODULO_CREDITOS
+            self::MODULO_CREDITOS,
+            $minimo
         )) {
             throw new \Exception('TudiCoins insuficientes na carteira da escola.');
         }
     }
 
-    private function debitarCreditos(): void
+    /**
+     * Debita TudiCoins conforme o uso real de tokens/custo LLM (fracionado).
+     * Sem uso mensurável, cai no custo fixo do catálogo.
+     *
+     * @param array<string,mixed>|null $usoTokens
+     */
+    private function debitarCreditos(?array $usoTokens = null): float
     {
         if (self::LIBERAR_SEM_TUDICOINS || !CreditosModuleRegistry::isValid(self::MODULO_CREDITOS)) {
-            return;
+            return 0.0;
         }
         $creditos = new \App\Services\CreditosService();
         if (!$creditos->isCreditosHabilitado()) {
             throw new \Exception('TudiCoins desabilitado para esta escola. Ações com IA não estão disponíveis.');
         }
-        $creditos->consumirEscola(self::MODULO_CREDITOS, 'provas_aluno_assistente');
+
+        $valor = $creditos->creditosPorUsoLlm($usoTokens);
+        if ($valor <= 0) {
+            $valor = $creditos->getCustoModulo(self::MODULO_CREDITOS);
+        }
+        $valor = round(max(0.0, $valor), \App\Core\CreditosDecimalHelper::SCALE);
+        if ($valor <= 0) {
+            return 0.0;
+        }
+
+        $creditos->consumirEscolaValor(self::MODULO_CREDITOS, $valor, 'provas_aluno_assistente');
+        return $valor;
     }
 }
 
