@@ -87,7 +87,7 @@ class SaudeAprendizagemService
                 'jornadas_progresso_pct' => isset($jornadas[$id]) ? round((float) $jornadas[$id]['percentual'], 1) : null,
                 'faltas_total' => isset($faltas[$id]) ? round((float) $faltas[$id], 1) : null,
             ]);
-            $linha = array_merge($linha, $this->classificar($linha, $regras));
+            $linha = array_merge($linha, $this->classificar($linha, $regras, $fontes));
             $kpis['total']++;
             $kpis[$linha['nivel']]++;
             if ($nivel === null || $nivel === '' || $linha['nivel'] === $nivel) {
@@ -134,13 +134,21 @@ class SaudeAprendizagemService
         ];
     }
 
-    /** @return array<string,mixed> */
-    private function classificar(array $linha, array $r): array
+    /**
+     * @param array<string,mixed> $linha
+     * @param array<string,mixed> $r
+     * @param array<string,bool> $fontes
+     * @return array<string,mixed>
+     */
+    private function classificar(array $linha, array $r, array $fontes = []): array
     {
         $pontos = 0;
         $indicadores = 0;
         $indicadoresAcademicos = 0;
         $motivos = [];
+        $usaProvas = !empty($fontes['provas']);
+        $usaExercicios = !empty($fontes['exercicios']);
+        $usaJornadas = !empty($fontes['jornadas']);
 
         if ($linha['notas_media'] !== null && $linha['notas_total'] > 0) {
             $indicadores++;
@@ -157,7 +165,7 @@ class SaudeAprendizagemService
                 $pontos += 2;
                 $motivos[] = ['tipo' => 'notas', 'severidade' => 'media', 'texto' => $abaixo . ' resultado(s) abaixo da média mínima; média consolidada ' . $this->nota($media) . '.'];
             }
-        } elseif ($linha['provas_media_pct'] !== null && $linha['provas_total'] > 0) {
+        } elseif ($usaProvas && $linha['provas_media_pct'] !== null && $linha['provas_total'] > 0) {
             $indicadores++;
             $indicadoresAcademicos++;
             $v = (float) $linha['provas_media_pct'];
@@ -170,7 +178,7 @@ class SaudeAprendizagemService
             }
         }
 
-        if ($linha['exercicios_media_pct'] !== null && $linha['exercicios_total'] >= $r['min_exercicios']) {
+        if ($usaExercicios && $linha['exercicios_media_pct'] !== null && $linha['exercicios_total'] >= $r['min_exercicios']) {
             $indicadores++;
             $indicadoresAcademicos++;
             $v = (float) $linha['exercicios_media_pct'];
@@ -183,7 +191,7 @@ class SaudeAprendizagemService
             }
         }
 
-        if ($linha['jornadas_progresso_pct'] !== null && $linha['jornadas_modulos_total'] > 0) {
+        if ($usaJornadas && $linha['jornadas_progresso_pct'] !== null && $linha['jornadas_modulos_total'] > 0) {
             $indicadores++;
             $indicadoresAcademicos++;
             $v = (float) $linha['jornadas_progresso_pct'];
@@ -501,14 +509,38 @@ class SaudeAprendizagemService
     /** @return array<string,bool> */
     private function fontesDisponiveis(): array
     {
+        // Só conta o que a escola realmente usa (módulo ativo). Tabela no schema
+        // não basta — muitas escolas não têm prova online, exercícios ou jornadas.
         return [
             'boletim' => ($this->tableExists('boletim_resultados_gerados') && $this->tableExists('boletim_regras'))
                 || ($this->tableExists('provas_blocos_notas_lancadas') && $this->tableExists('provas_blocos')),
-            'provas' => $this->tableExists('provas_realizacoes') && $this->tableExists('provas'),
-            'exercicios' => $this->tableExists('exercicios_historico'),
-            'jornadas' => $this->tableExists('jornadas') && $this->tableExists('jornadas_modulos') && $this->tableExists('jornadas_progresso_alunos'),
+            'provas' => $this->moduloAtivo('provas')
+                && $this->tableExists('provas_realizacoes')
+                && $this->tableExists('provas'),
+            'exercicios' => $this->moduloAtivo('exercicios')
+                && $this->tableExists('exercicios_historico'),
+            'jornadas' => $this->moduloAtivo('jornadas')
+                && $this->tableExists('jornadas')
+                && $this->tableExists('jornadas_modulos')
+                && $this->tableExists('jornadas_progresso_alunos'),
             'faltas' => $this->tableExists('faltas_eventos') && $this->tableExists('faltas_lancamentos'),
         ];
+    }
+
+    private function moduloAtivo(string $modulo): bool
+    {
+        try {
+            if (class_exists(\App\Core\FeatureGate::class)) {
+                return \App\Core\FeatureGate::isModuleEnabled($modulo);
+            }
+            if (class_exists('LayoutHelper') && method_exists('LayoutHelper', 'isModuleEnabled')) {
+                return (bool) \LayoutHelper::isModuleEnabled($modulo);
+            }
+        } catch (\Throwable $e) {
+            // Sem gate, não inventa fonte opcional.
+        }
+
+        return false;
     }
 
     private function tableExists(string $table): bool
