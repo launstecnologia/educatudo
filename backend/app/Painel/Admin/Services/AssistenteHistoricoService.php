@@ -175,13 +175,15 @@ class AssistenteHistoricoService
 
     /**
      * @param array<string,mixed>|null $painel
+     * @param array{prompt_tokens?:int,completion_tokens?:int,total_tokens?:int,modelo?:string}|null $usoTokens
      */
     public function adicionarMensagem(
         int $usuarioId,
         int $conversaId,
         string $role,
         string $conteudo,
-        ?array $painel = null
+        ?array $painel = null,
+        ?array $usoTokens = null
     ): bool {
         if ($this->obterCabecalho($usuarioId, $conversaId) === null) {
             return false;
@@ -197,22 +199,74 @@ class AssistenteHistoricoService
             ? json_encode($painel, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
             : null;
 
-        $this->db->query(
-            'INSERT INTO assistente_mensagens (conversa_id, role, conteudo, painel_json)
-             VALUES (:cid, :role, :conteudo, :painel)',
-            [
-                'cid' => $conversaId,
-                'role' => $role,
-                'conteudo' => $conteudo !== '' ? $conteudo : ' ',
-                'painel' => $painelJson,
-            ]
-        );
+        $prompt = max(0, (int) ($usoTokens['prompt_tokens'] ?? 0));
+        $completion = max(0, (int) ($usoTokens['completion_tokens'] ?? 0));
+        $total = max(0, (int) ($usoTokens['total_tokens'] ?? ($prompt + $completion)));
+        $modelo = trim((string) ($usoTokens['modelo'] ?? ''));
+        if ($modelo === '') {
+            $modelo = null;
+        } elseif (mb_strlen($modelo) > 80) {
+            $modelo = mb_substr($modelo, 0, 80);
+        }
+
+        if ($this->colunaMensagensExiste('prompt_tokens')) {
+            $this->db->query(
+                'INSERT INTO assistente_mensagens
+                    (conversa_id, role, conteudo, painel_json, prompt_tokens, completion_tokens, total_tokens, modelo)
+                 VALUES
+                    (:cid, :role, :conteudo, :painel, :prompt, :completion, :total, :modelo)',
+                [
+                    'cid' => $conversaId,
+                    'role' => $role,
+                    'conteudo' => $conteudo !== '' ? $conteudo : ' ',
+                    'painel' => $painelJson,
+                    'prompt' => $prompt,
+                    'completion' => $completion,
+                    'total' => $total,
+                    'modelo' => $modelo,
+                ]
+            );
+        } else {
+            $this->db->query(
+                'INSERT INTO assistente_mensagens (conversa_id, role, conteudo, painel_json)
+                 VALUES (:cid, :role, :conteudo, :painel)',
+                [
+                    'cid' => $conversaId,
+                    'role' => $role,
+                    'conteudo' => $conteudo !== '' ? $conteudo : ' ',
+                    'painel' => $painelJson,
+                ]
+            );
+        }
         $this->db->query(
             'UPDATE assistente_conversas SET updated_at = NOW()
              WHERE id = :id AND usuario_id = :uid',
             ['id' => $conversaId, 'uid' => $usuarioId]
         );
         return true;
+    }
+
+    private function colunaMensagensExiste(string $coluna): bool
+    {
+        static $cache = [];
+        if (array_key_exists($coluna, $cache)) {
+            return $cache[$coluna];
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT 1 AS ok FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = :t
+                   AND COLUMN_NAME = :c
+                 LIMIT 1',
+                ['t' => 'assistente_mensagens', 'c' => $coluna]
+            );
+            $cache[$coluna] = !empty($row);
+        } catch (\Throwable $e) {
+            $cache[$coluna] = false;
+        }
+
+        return $cache[$coluna];
     }
 
     /**

@@ -313,12 +313,14 @@ class ProvasAlunoAssistenteController extends BaseController
         }
 
         $this->historico->adicionarMensagem($userId, $conversaId, 'user', $payload['mensagem']);
+        $usoTokens = is_array($resultado['uso_tokens'] ?? null) ? $resultado['uso_tokens'] : null;
         $this->historico->adicionarMensagem(
             $userId,
             $conversaId,
             'assistant',
             (string) ($resultado['mensagem'] ?? ''),
-            is_array($resultado['painel'] ?? null) ? $resultado['painel'] : null
+            is_array($resultado['painel'] ?? null) ? $resultado['painel'] : null,
+            $usoTokens
         );
         $this->historico->atualizarMetaAposResposta(
             $userId,

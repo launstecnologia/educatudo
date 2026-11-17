@@ -56,6 +56,13 @@ class AssistenteMotorService
         $parada = null;
         $alunoUsado = null;
         $textoModelo = '';
+        $usoTokens = [
+            'prompt_tokens' => 0,
+            'completion_tokens' => 0,
+            'total_tokens' => 0,
+            'modelo' => $this->modelo,
+            'requisicoes' => 0,
+        ];
 
         $selecao = $this->extrairSelecao($mensagem);
         if ($selecao !== null && $estado['pendente'] !== null) {
@@ -79,6 +86,13 @@ class AssistenteMotorService
             try {
                 for ($rodada = 0; $rodada < self::MAX_RODADAS; $rodada++) {
                     $resp = $this->openai->chatCompletionComFerramentas($mensagens, $definicoes, $this->modelo, 1500);
+                    $usoTokens['prompt_tokens'] += (int) ($resp['prompt_tokens'] ?? 0);
+                    $usoTokens['completion_tokens'] += (int) ($resp['completion_tokens'] ?? 0);
+                    $usoTokens['total_tokens'] += (int) ($resp['total_tokens'] ?? $resp['tokens_usados'] ?? 0);
+                    $usoTokens['requisicoes']++;
+                    if (!empty($resp['modelo'])) {
+                        $usoTokens['modelo'] = (string) $resp['modelo'];
+                    }
                     $chamadas = $resp['tool_calls'];
                     if ($chamadas === []) {
                         $textoModelo = trim($resp['conteudo']);
@@ -142,6 +156,7 @@ class AssistenteMotorService
             'painel' => $painel,
             'consultas' => $consultas,
             'estado' => $estado,
+            'uso_tokens' => $usoTokens,
         ];
     }
 
@@ -426,6 +441,15 @@ class AssistenteMotorService
             if ($aluno !== null) {
                 $estado = AssistenteEstadoConversa::definirAlunoAtivo($estado, $aluno);
             }
+        }
+        // Resume não passa por executar(): reaplicar ano/turma do estado se a tool original omitiu.
+        if ((int) ($args['ano_letivo'] ?? 0) <= 0 && (int) ($estado['ano_letivo'] ?? 0) > 0) {
+            $args['ano_letivo'] = (int) $estado['ano_letivo'];
+        }
+        if ((int) ($args['turma_id'] ?? 0) <= 0 && (int) ($estado['turma_id'] ?? 0) > 0
+            && empty($args['turma_nome']) && empty($args['turma'])
+        ) {
+            $args['turma_id'] = (int) $estado['turma_id'];
         }
         if ($onStatus !== null) {
             $onStatus($this->rotuloStatus($tool));

@@ -4,7 +4,9 @@ $escolas = $escolas ?? [];
 $date_start = $date_start ?? date('Y-m-d', strtotime('-30 days'));
 $date_end = $date_end ?? date('Y-m-d');
 $filtro_escola = (int) ($filtro_escola ?? 0);
+$filtro_cotacao = (float) ($filtro_cotacao ?? ($relatorio['financeiro']['cotacao_usd_brl'] ?? 5.78));
 $totais = $relatorio['totais'] ?? [];
+$financeiro = $relatorio['financeiro'] ?? [];
 $porModelo = $relatorio['por_modelo'] ?? [];
 $porEscola = $relatorio['por_escola'] ?? [];
 $porTipo = $relatorio['por_tipo'] ?? [];
@@ -12,8 +14,11 @@ $porDia = $relatorio['por_dia'] ?? [];
 $erros = $relatorio['erros'] ?? [];
 
 $fmtInt = static fn ($n) => number_format((int) $n, 0, ',', '.');
+$fmtDec = static fn ($n, $c = 2) => number_format((float) $n, $c, ',', '.');
 $fmtUsd = static fn ($n) => '$' . number_format((float) $n, 4, '.', ',');
 $fmtUsdShort = static fn ($n) => '$' . number_format((float) $n, 2, '.', ',');
+$fmtBrl = static fn ($n) => 'R$ ' . number_format((float) $n, 2, ',', '.');
+$fmtTc = static fn ($n) => 'TC$ ' . number_format((float) $n, 2, ',', '.');
 $fmtData = static function ($ymd) {
     $ymd = trim((string) $ymd);
     if ($ymd === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $ymd)) {
@@ -22,6 +27,11 @@ $fmtData = static function ($ymd) {
     $ts = strtotime($ymd);
     return $ts ? date('d/m/Y', $ts) : $ymd;
 };
+
+$lucroBrl = (float) ($financeiro['lucro_brl'] ?? 0);
+$lucroClasse = $lucroBrl >= 0 ? 'text-emerald-700' : 'text-red-600';
+$brlPorCredito = (float) ($financeiro['brl_por_credito'] ?? 0.20);
+$cotacao = (float) ($financeiro['cotacao_usd_brl'] ?? $filtro_cotacao);
 
 $filtrosAtivos = 0;
 if ($filtro_escola > 0) {
@@ -35,6 +45,10 @@ if ($date_start !== $padraoIni) {
 if ($date_end !== $padraoFim) {
     $filtrosAtivos++;
 }
+$cotacaoPadrao = \App\Services\MasterLlmCustosService::cotacaoUsdBrl(null);
+if (abs($cotacao - $cotacaoPadrao) > 0.0001) {
+    $filtrosAtivos++;
+}
 $limparUrl = URL . '/master/llm-custos';
 ?>
 
@@ -43,7 +57,7 @@ $limparUrl = URL . '/master/llm-custos';
         <div>
             <h2 class="text-2xl font-bold text-slate-900 mb-1">Custo LLM</h2>
             <p class="text-slate-600 text-sm">
-                Tokens de input e output e custo em USD, agregados por escola, modelo e período.
+                Tokens, custo USD/R$ e lucro estimado (1 TudiCoin = R$ <?= $fmtDec($brlPorCredito, 2) ?> · dólar R$ <?= $fmtDec($cotacao, 2) ?>).
             </p>
         </div>
         <button type="button" onclick="openFilterDrawer()"
@@ -71,7 +85,7 @@ $limparUrl = URL . '/master/llm-custos';
 </div>
 <?php endif; ?>
 
-<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
         <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">Requisições</p>
         <p class="text-2xl font-bold text-slate-900 mt-1"><?= $fmtInt($totais['requests'] ?? 0) ?></p>
@@ -85,8 +99,39 @@ $limparUrl = URL . '/master/llm-custos';
         <p class="text-2xl font-bold text-violet-600 mt-1"><?= $fmtInt($totais['completion_tokens'] ?? 0) ?></p>
     </div>
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-        <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">Custo USD</p>
-        <p class="text-2xl font-bold text-emerald-700 mt-1"><?= $fmtUsdShort($totais['cost_usd'] ?? 0) ?></p>
+        <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">Custo LLM</p>
+        <p class="text-2xl font-bold text-slate-900 mt-1"><?= $fmtUsdShort($totais['cost_usd'] ?? 0) ?></p>
+        <p class="text-sm text-slate-500 mt-0.5"><?= $fmtBrl($financeiro['custo_brl'] ?? 0) ?></p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+        <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">TudiCoins consumidos</p>
+        <p class="text-2xl font-bold text-slate-900 mt-1"><?= $fmtTc($financeiro['creditos_consumidos'] ?? 0) ?></p>
+        <p class="text-xs text-slate-500 mt-1">× R$ <?= $fmtDec($brlPorCredito, 2) ?> / crédito</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+        <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">Receita (créditos)</p>
+        <p class="text-2xl font-bold text-blue-700 mt-1"><?= $fmtBrl($financeiro['receita_brl'] ?? 0) ?></p>
+        <p class="text-xs text-slate-500 mt-1">Valor gerado pelo consumo no período</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+        <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">Lucro estimado</p>
+        <p class="text-2xl font-bold <?= $lucroClasse ?> mt-1"><?= $fmtBrl($lucroBrl) ?></p>
+        <p class="text-xs text-slate-500 mt-1">Receita − custo LLM em R$</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+        <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">Média / crédito</p>
+        <?php if (($financeiro['lucro_medio_por_credito_brl'] ?? null) !== null): ?>
+        <p class="text-2xl font-bold <?= $lucroClasse ?> mt-1"><?= $fmtBrl($financeiro['lucro_medio_por_credito_brl']) ?></p>
+        <p class="text-xs text-slate-500 mt-1">
+            Margem <?= $financeiro['margem_pct'] !== null ? $fmtDec($financeiro['margem_pct'], 1) . '%' : '—' ?>
+        </p>
+        <?php else: ?>
+        <p class="text-2xl font-bold text-slate-400 mt-1">—</p>
+        <p class="text-xs text-slate-500 mt-1">Sem consumo de créditos no período</p>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -105,6 +150,7 @@ $limparUrl = URL . '/master/llm-custos';
                     <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Output</th>
                     <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Total</th>
                     <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">USD</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">R$</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
@@ -115,11 +161,12 @@ $limparUrl = URL . '/master/llm-custos';
                     <td class="px-4 py-3 text-sm text-right text-blue-700"><?= $fmtInt($row['prompt_tokens'] ?? 0) ?></td>
                     <td class="px-4 py-3 text-sm text-right text-violet-700"><?= $fmtInt($row['completion_tokens'] ?? 0) ?></td>
                     <td class="px-4 py-3 text-sm text-right font-medium text-slate-900"><?= $fmtInt($row['total_tokens'] ?? 0) ?></td>
-                    <td class="px-4 py-3 text-sm text-right text-emerald-700"><?= $fmtUsd($row['cost_usd'] ?? 0) ?></td>
+                    <td class="px-4 py-3 text-sm text-right text-slate-700"><?= $fmtUsd($row['cost_usd'] ?? 0) ?></td>
+                    <td class="px-4 py-3 text-sm text-right text-emerald-700"><?= $fmtBrl($row['cost_brl'] ?? 0) ?></td>
                 </tr>
                 <?php endforeach; ?>
                 <?php if (empty($porModelo)): ?>
-                <tr><td colspan="6" class="px-4 py-10 text-center text-sm text-slate-500">Nenhum uso de LLM no período.</td></tr>
+                <tr><td colspan="7" class="px-4 py-10 text-center text-sm text-slate-500">Nenhum uso de LLM no período.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
@@ -136,21 +183,24 @@ $limparUrl = URL . '/master/llm-custos';
                 <thead class="bg-slate-50">
                     <tr>
                         <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Escola</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Input</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Output</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">USD</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Créditos</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Custo R$</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Lucro R$</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     <?php foreach ($porEscola as $row): ?>
+                    <?php $lucroEsc = (float) ($row['lucro_brl'] ?? 0); ?>
                     <tr class="hover:bg-slate-50">
                         <td class="px-4 py-3 text-sm">
                             <span class="font-medium text-slate-900"><?= htmlspecialchars($row['nome'] ?? '') ?></span>
-                            <span class="block text-xs text-slate-400"><?= htmlspecialchars($row['slug'] ?? '') ?> · <?= $fmtInt($row['requests'] ?? 0) ?> req.</span>
+                            <span class="block text-xs text-slate-400">
+                                <?= htmlspecialchars($row['slug'] ?? '') ?> · <?= $fmtInt($row['requests'] ?? 0) ?> req. · <?= $fmtUsd($row['cost_usd'] ?? 0) ?>
+                            </span>
                         </td>
-                        <td class="px-4 py-3 text-sm text-right text-blue-700"><?= $fmtInt($row['prompt_tokens'] ?? 0) ?></td>
-                        <td class="px-4 py-3 text-sm text-right text-violet-700"><?= $fmtInt($row['completion_tokens'] ?? 0) ?></td>
-                        <td class="px-4 py-3 text-sm text-right font-medium text-emerald-700"><?= $fmtUsd($row['cost_usd'] ?? 0) ?></td>
+                        <td class="px-4 py-3 text-sm text-right text-slate-700"><?= $fmtTc($row['creditos_consumidos'] ?? 0) ?></td>
+                        <td class="px-4 py-3 text-sm text-right text-slate-700"><?= $fmtBrl($row['cost_brl'] ?? 0) ?></td>
+                        <td class="px-4 py-3 text-sm text-right font-medium <?= $lucroEsc >= 0 ? 'text-emerald-700' : 'text-red-600' ?>"><?= $fmtBrl($lucroEsc) ?></td>
                     </tr>
                     <?php endforeach; ?>
                     <?php if (empty($porEscola)): ?>
@@ -173,6 +223,7 @@ $limparUrl = URL . '/master/llm-custos';
                         <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Req.</th>
                         <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Tokens</th>
                         <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">USD</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">R$</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -181,11 +232,12 @@ $limparUrl = URL . '/master/llm-custos';
                         <td class="px-4 py-3 text-sm font-mono text-slate-800"><?= htmlspecialchars($row['usage_type'] ?? '') ?></td>
                         <td class="px-4 py-3 text-sm text-right text-slate-700"><?= $fmtInt($row['requests'] ?? 0) ?></td>
                         <td class="px-4 py-3 text-sm text-right text-slate-700"><?= $fmtInt($row['total_tokens'] ?? 0) ?></td>
-                        <td class="px-4 py-3 text-sm text-right text-emerald-700"><?= $fmtUsd($row['cost_usd'] ?? 0) ?></td>
+                        <td class="px-4 py-3 text-sm text-right text-slate-700"><?= $fmtUsd($row['cost_usd'] ?? 0) ?></td>
+                        <td class="px-4 py-3 text-sm text-right text-emerald-700"><?= $fmtBrl($row['cost_brl'] ?? 0) ?></td>
                     </tr>
                     <?php endforeach; ?>
                     <?php if (empty($porTipo)): ?>
-                    <tr><td colspan="4" class="px-4 py-8 text-center text-sm text-slate-500">Sem dados no período.</td></tr>
+                    <tr><td colspan="5" class="px-4 py-8 text-center text-sm text-slate-500">Sem dados no período.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -194,8 +246,9 @@ $limparUrl = URL . '/master/llm-custos';
 </div>
 
 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-8">
-    <div class="px-6 py-4 border-b border-slate-200">
+    <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between gap-3">
         <h3 class="text-lg font-semibold text-slate-900">Por dia</h3>
+        <span class="text-xs text-slate-500">Clique em um dia para ver chats e chamadas</span>
     </div>
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
@@ -207,26 +260,54 @@ $limparUrl = URL . '/master/llm-custos';
                     <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Output</th>
                     <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Total</th>
                     <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">USD</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">R$</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
                 <?php foreach (array_reverse($porDia) as $row): ?>
-                <tr class="hover:bg-slate-50">
-                    <td class="px-4 py-2.5 text-sm text-slate-800"><?= htmlspecialchars($fmtData($row['date'] ?? '')) ?></td>
+                <tr class="hover:bg-blue-50 cursor-pointer transition-colors"
+                    tabindex="0"
+                    role="button"
+                    data-dia="<?= htmlspecialchars($row['date'] ?? '') ?>"
+                    onclick="abrirDetalheDia(this.getAttribute('data-dia'))"
+                    onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();abrirDetalheDia(this.getAttribute('data-dia'));}">
+                    <td class="px-4 py-2.5 text-sm text-blue-700 font-medium">
+                        <?= htmlspecialchars($fmtData($row['date'] ?? '')) ?>
+                        <i class="fa-solid fa-chevron-right ml-1 text-[10px] text-slate-400"></i>
+                    </td>
                     <td class="px-4 py-2.5 text-sm text-right text-slate-700"><?= $fmtInt($row['requests'] ?? 0) ?></td>
                     <td class="px-4 py-2.5 text-sm text-right text-blue-700"><?= $fmtInt($row['prompt_tokens'] ?? 0) ?></td>
                     <td class="px-4 py-2.5 text-sm text-right text-violet-700"><?= $fmtInt($row['completion_tokens'] ?? 0) ?></td>
                     <td class="px-4 py-2.5 text-sm text-right font-medium"><?= $fmtInt($row['total_tokens'] ?? 0) ?></td>
-                    <td class="px-4 py-2.5 text-sm text-right text-emerald-700"><?= $fmtUsd($row['cost_usd'] ?? 0) ?></td>
+                    <td class="px-4 py-2.5 text-sm text-right text-slate-700"><?= $fmtUsd($row['cost_usd'] ?? 0) ?></td>
+                    <td class="px-4 py-2.5 text-sm text-right text-emerald-700"><?= $fmtBrl($row['cost_brl'] ?? 0) ?></td>
                 </tr>
                 <?php endforeach; ?>
                 <?php if (empty($porDia)): ?>
-                <tr><td colspan="6" class="px-4 py-8 text-center text-sm text-slate-500">Sem dados no período.</td></tr>
+                <tr><td colspan="7" class="px-4 py-8 text-center text-sm text-slate-500">Sem dados no período.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
 </div>
+
+<div id="diaDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[80] hidden" onclick="fecharDetalheDia()"></div>
+<aside id="diaDrawer"
+       class="fixed top-0 right-0 h-full w-full max-w-2xl bg-white shadow-2xl z-[90] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
+       aria-hidden="true">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+        <div>
+            <h3 id="diaDrawerTitle" class="text-lg font-semibold text-slate-900">Detalhe do dia</h3>
+            <p id="diaDrawerSub" class="text-xs text-slate-500 mt-0.5"></p>
+        </div>
+        <button type="button" onclick="fecharDetalheDia()" class="text-slate-400 hover:text-slate-600 p-1" aria-label="Fechar">
+            <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+    </div>
+    <div id="diaDrawerBody" class="flex-1 overflow-y-auto px-6 py-5">
+        <p class="text-sm text-slate-500">Carregando…</p>
+    </div>
+</aside>
 
 <div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" onclick="closeFilterDrawer()"></div>
 <aside id="filterDrawer"
@@ -262,6 +343,15 @@ $limparUrl = URL . '/master/llm-custos';
                     <?php endforeach; ?>
                 </select>
             </div>
+            <div>
+                <label for="filtro_cotacao" class="block text-sm font-medium text-slate-700 mb-1.5">Cotação USD → BRL</label>
+                <input type="number" step="0.0001" min="0.01" id="filtro_cotacao" name="cotacao"
+                       value="<?= htmlspecialchars(number_format($cotacao, 4, '.', '')) ?>"
+                       class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <p class="text-xs text-slate-500 mt-1.5">
+                    Usada para converter custo OpenAI em reais. Lucro = (TudiCoins × R$ <?= $fmtDec($brlPorCredito, 2) ?>) − custo R$.
+                </p>
+            </div>
         </div>
         <div class="px-6 py-4 border-t border-slate-200 flex gap-3 bg-slate-50">
             <a href="<?= htmlspecialchars($limparUrl) ?>"
@@ -277,6 +367,9 @@ $limparUrl = URL . '/master/llm-custos';
 </aside>
 
 <script>
+var LLM_CUSTOS_ESCOLA = <?= (int) $filtro_escola ?>;
+var LLM_CUSTOS_DIA_URL = <?= json_encode(URL . '/master/llm-custos/dia', JSON_UNESCAPED_SLASHES) ?>;
+
 function openFilterDrawer() {
     document.getElementById('filterDrawerBackdrop').classList.remove('hidden');
     var drawer = document.getElementById('filterDrawer');
@@ -291,7 +384,158 @@ function closeFilterDrawer() {
     drawer.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
 }
+
+function fmtIntJs(n) {
+    return Number(n || 0).toLocaleString('pt-BR');
+}
+function fmtUsdJs(n) {
+    return '$' + Number(n || 0).toFixed(4);
+}
+function fmtBrlJs(n) {
+    return 'R$ ' + Number(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+var LLM_CUSTOS_COTACAO = <?= json_encode((float) $cotacao) ?>;
+function fmtDataJs(ymd) {
+    if (!ymd || !/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return ymd || '';
+    var p = ymd.split('-');
+    return p[2] + '/' + p[1] + '/' + p[0];
+}
+function escHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function abrirDetalheDia(data) {
+    if (!data) return;
+    closeFilterDrawer();
+    document.getElementById('diaDrawerBackdrop').classList.remove('hidden');
+    var drawer = document.getElementById('diaDrawer');
+    drawer.classList.remove('translate-x-full');
+    drawer.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    document.getElementById('diaDrawerTitle').textContent = 'Detalhe · ' + fmtDataJs(data);
+    document.getElementById('diaDrawerSub').textContent = 'Chats Tudinha e chamadas LLM';
+    document.getElementById('diaDrawerBody').innerHTML = '<p class="text-sm text-slate-500">Carregando…</p>';
+
+    var url = LLM_CUSTOS_DIA_URL + '?data=' + encodeURIComponent(data) + '&escola_id=' + encodeURIComponent(LLM_CUSTOS_ESCOLA);
+    fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+        .then(function(r) { return r.json(); })
+        .then(function(payload) {
+            if (!payload || !payload.success) {
+                document.getElementById('diaDrawerBody').innerHTML =
+                    '<p class="text-sm text-red-600">' + escHtml((payload && payload.error) || 'Falha ao carregar.') + '</p>';
+                return;
+            }
+            document.getElementById('diaDrawerBody').innerHTML = renderDetalheDia(payload);
+        })
+        .catch(function() {
+            document.getElementById('diaDrawerBody').innerHTML =
+                '<p class="text-sm text-red-600">Erro de rede ao carregar o detalhe.</p>';
+        });
+}
+
+function fecharDetalheDia() {
+    document.getElementById('diaDrawerBackdrop').classList.add('hidden');
+    var drawer = document.getElementById('diaDrawer');
+    drawer.classList.add('translate-x-full');
+    drawer.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+}
+
+function renderDetalheDia(data) {
+    var totais = data.totais || {};
+    var conversas = data.conversas || [];
+    var chamadas = data.chamadas || [];
+    var html = '';
+
+    var custoBrlDia = Number(totais.cost_usd || 0) * Number(LLM_CUSTOS_COTACAO || 0);
+    html += '<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">';
+    html += '<div class="rounded-lg border border-slate-200 p-3"><p class="text-[11px] uppercase text-slate-500">Conversas</p><p class="text-lg font-semibold text-slate-900">' + fmtIntJs(totais.conversas) + '</p></div>';
+    html += '<div class="rounded-lg border border-slate-200 p-3"><p class="text-[11px] uppercase text-slate-500">Msgs IA</p><p class="text-lg font-semibold text-slate-900">' + fmtIntJs(totais.mensagens) + '</p></div>';
+    html += '<div class="rounded-lg border border-slate-200 p-3"><p class="text-[11px] uppercase text-slate-500">Chamadas</p><p class="text-lg font-semibold text-slate-900">' + fmtIntJs(totais.chamadas) + '</p></div>';
+    html += '<div class="rounded-lg border border-slate-200 p-3"><p class="text-[11px] uppercase text-slate-500">Custo</p><p class="text-lg font-semibold text-slate-900">' + fmtUsdJs(totais.cost_usd) + '</p><p class="text-xs text-slate-500">' + fmtBrlJs(custoBrlDia) + '</p></div>';
+    html += '</div>';
+
+    html += '<h4 class="text-sm font-semibold text-slate-900 mb-2">Chats Tudinha</h4>';
+    if (!conversas.length) {
+        html += '<p class="text-sm text-slate-500 mb-6">Nenhum chat com tokens neste dia' +
+            (totais.mensagens === 0 ? ' (mensagens futuras passam a gravar tokens após a migration).' : '.') +
+            '</p>';
+    } else {
+        html += '<div class="space-y-3 mb-6">';
+        conversas.forEach(function(c) {
+            html += '<div class="border border-slate-200 rounded-lg p-3">';
+            html += '<div class="flex items-start justify-between gap-3">';
+            html += '<div><p class="text-sm font-medium text-slate-900">' + escHtml(c.titulo || 'Conversa') + '</p>';
+            html += '<p class="text-xs text-slate-500 mt-0.5">' + escHtml(c.escola_nome || '') +
+                (c.usuario_nome ? ' · ' + escHtml(c.usuario_nome) : '') +
+                (c.aluno_nome ? ' · aluno: ' + escHtml(c.aluno_nome) : '') +
+                '</p></div>';
+            html += '<div class="text-right text-xs whitespace-nowrap">' +
+                '<span class="text-blue-700">' + fmtIntJs(c.prompt_tokens) + ' in</span> · ' +
+                '<span class="text-violet-700">' + fmtIntJs(c.completion_tokens) + ' out</span><br>' +
+                '<span class="font-medium text-slate-800">' + fmtIntJs(c.total_tokens) + ' total</span></div>';
+            html += '</div>';
+            var msgs = c.mensagens || [];
+            if (msgs.length) {
+                html += '<ul class="mt-2 space-y-1.5 border-t border-slate-100 pt-2">';
+                msgs.forEach(function(m) {
+                    html += '<li class="text-xs text-slate-600"><span class="text-slate-400">' +
+                        escHtml((m.created_at || '').substring(11, 19)) + '</span> ' +
+                        escHtml(m.preview || '') +
+                        ' <span class="text-slate-400">(' + fmtIntJs(m.total_tokens) + ' tok' +
+                        (m.modelo ? ', ' + escHtml(m.modelo) : '') + ')</span></li>';
+                });
+                html += '</ul>';
+            }
+            html += '</div>';
+        });
+        html += '</div>';
+    }
+
+    html += '<h4 class="text-sm font-semibold text-slate-900 mb-2">Chamadas LLM (logs)</h4>';
+    if (!chamadas.length) {
+        html += '<p class="text-sm text-slate-500">Nenhuma chamada registrada neste dia.</p>';
+    } else {
+        html += '<div class="overflow-x-auto border border-slate-200 rounded-lg">';
+        html += '<table class="min-w-full divide-y divide-gray-200 text-xs">';
+        html += '<thead class="bg-slate-50"><tr>' +
+            '<th class="px-3 py-2 text-left font-medium text-slate-500">Hora</th>' +
+            '<th class="px-3 py-2 text-left font-medium text-slate-500">Escola</th>' +
+            '<th class="px-3 py-2 text-left font-medium text-slate-500">Tipo</th>' +
+            '<th class="px-3 py-2 text-left font-medium text-slate-500">Modelo</th>' +
+            '<th class="px-3 py-2 text-right font-medium text-slate-500">In</th>' +
+            '<th class="px-3 py-2 text-right font-medium text-slate-500">Out</th>' +
+            '<th class="px-3 py-2 text-right font-medium text-slate-500">USD</th>' +
+            '<th class="px-3 py-2 text-right font-medium text-slate-500">R$</th>' +
+            '</tr></thead><tbody class="divide-y divide-gray-100">';
+        chamadas.forEach(function(ch) {
+            var chBrl = Number(ch.cost_usd || 0) * Number(LLM_CUSTOS_COTACAO || 0);
+            html += '<tr class="hover:bg-slate-50">';
+            html += '<td class="px-3 py-2 text-slate-700">' + escHtml((ch.created_at || '').substring(11, 19)) + '</td>';
+            html += '<td class="px-3 py-2 text-slate-700">' + escHtml(ch.escola_nome || '') + '</td>';
+            html += '<td class="px-3 py-2 font-mono text-slate-700">' + escHtml(ch.usage_type || '') + '</td>';
+            html += '<td class="px-3 py-2 font-mono text-slate-700">' + escHtml(ch.model || '') + '</td>';
+            html += '<td class="px-3 py-2 text-right text-blue-700">' + fmtIntJs(ch.prompt_tokens) + '</td>';
+            html += '<td class="px-3 py-2 text-right text-violet-700">' + fmtIntJs(ch.completion_tokens) + '</td>';
+            html += '<td class="px-3 py-2 text-right text-slate-700">' + fmtUsdJs(ch.cost_usd) + '</td>';
+            html += '<td class="px-3 py-2 text-right text-emerald-700">' + fmtBrlJs(chBrl) + '</td>';
+            html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+    }
+
+    if ((data.erros || []).length) {
+        html += '<p class="mt-4 text-xs text-amber-700">Avisos: ' + escHtml((data.erros || []).slice(0, 3).join(' · ')) + '</p>';
+    }
+    return html;
+}
+
 document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeFilterDrawer();
+    if (e.key === 'Escape') {
+        fecharDetalheDia();
+        closeFilterDrawer();
+    }
 });
 </script>

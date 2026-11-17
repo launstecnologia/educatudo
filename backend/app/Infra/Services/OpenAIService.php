@@ -3132,7 +3132,7 @@ You MUST respond with a valid JSON object only, no other text, with exactly thes
      *
      * @param list<array<string,mixed>> $mensagens Mensagens já no formato OpenAI (system/user/assistant/tool)
      * @param list<array<string,mixed>> $ferramentas Definições `{"type":"function","function":{...}}`
-     * @return array{conteudo:string,tool_calls:list<array{id:string,nome:string,args:array<string,mixed>,args_brutos:string}>,tokens_usados:int,modelo:string}
+     * @return array{conteudo:string,tool_calls:list<array{id:string,nome:string,args:array<string,mixed>,args_brutos:string}>,tokens_usados:int,prompt_tokens:int,completion_tokens:int,total_tokens:int,modelo:string}
      */
     public function chatCompletionComFerramentas(
         array $mensagens,
@@ -3211,10 +3211,17 @@ You MUST respond with a valid JSON object only, no other text, with exactly thes
             ];
         }
 
+        $promptTokens = (int) ($response['usage']['prompt_tokens'] ?? 0);
+        $completionTokens = (int) ($response['usage']['completion_tokens'] ?? 0);
+        $totalTokens = (int) ($response['usage']['total_tokens'] ?? ($promptTokens + $completionTokens));
+
         return [
             'conteudo' => (string) ($mensagem['content'] ?? ''),
             'tool_calls' => $chamadas,
-            'tokens_usados' => (int) ($response['usage']['total_tokens'] ?? 0),
+            'tokens_usados' => $totalTokens,
+            'prompt_tokens' => $promptTokens,
+            'completion_tokens' => $completionTokens,
+            'total_tokens' => $totalTokens,
             'modelo' => (string) ($requestData['model'] ?? $modelo),
         ];
     }

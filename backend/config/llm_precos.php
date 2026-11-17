@@ -8,6 +8,8 @@
  */
 return [
     'atualizado_em' => '2026-07-09',
+    /** Cotação de referência USD → BRL para estimar custo/lucro em reais no Master. */
+    'usd_brl' => 5.78,
     'modelos' => [
         'gpt-4o' => ['input' => 2.50, 'output' => 10.00],
         'gpt-4o-mini' => ['input' => 0.15, 'output' => 0.60],

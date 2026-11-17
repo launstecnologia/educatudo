@@ -60,6 +60,7 @@ $router->get('/master/creditos/alunos/extrato/pdf', 'Master/MasterCreditosAlunos
 $router->post('/master/creditos/alunos/creditar', 'Master/MasterCreditosAlunosController@creditar');
 $router->get('/master/creditos/extrato', 'Master/MasterCreditosExtratoController@index');
 $router->get('/master/llm-custos', 'Master/MasterLlmCustosController@index');
+$router->get('/master/llm-custos/dia', 'Master/MasterLlmCustosController@detalheDia');
 $router->get('/master/fila-ia', 'Master/MasterFilaIaController@index');
 $router->get('/master/fila-ia/job', 'Master/MasterFilaIaController@job');
 $router->get('/master/fila-ia/cron', 'Master/MasterFilaIaController@cron');

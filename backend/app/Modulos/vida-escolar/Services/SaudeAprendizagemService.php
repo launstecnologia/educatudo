@@ -239,9 +239,57 @@ class SaudeAprendizagemService
         return $row ?: null;
     }
 
-    /** @return list<array<string,mixed>> */
+    /**
+     * Roster da turma/ano via matrícula (turma histórica), não só alunos.turma_id atual.
+     * Ano passado: inclui concluído/transferido. Ano atual: só matrícula ativa.
+     *
+     * @return list<array<string,mixed>>
+     */
     private function buscarAlunos(int $anoLetivoId, int $turmaId): array
     {
+        if ($this->tableExists('matricula')) {
+            $status = $this->statusMatriculaParaSaude($anoLetivoId);
+            $statusSql = implode(',', array_map(
+                static fn (string $s): string => "'" . str_replace("'", '', $s) . "'",
+                $status
+            ));
+            $anoAtual = $this->ehAnoLetivoAtivo($anoLetivoId);
+            $filtroAtivo = $anoAtual ? ' AND a.ativo = 1' : '';
+            $filtroSaida = $anoAtual ? ' AND m.data_saida IS NULL' : '';
+
+            if ($turmaId > 0) {
+                $sql = "SELECT DISTINCT a.id AS aluno_id, a.nome, a.ra, m.turma_id, t.nome AS turma_nome
+                        FROM matricula m
+                        INNER JOIN alunos a ON a.id = m.aluno_id
+                        INNER JOIN turmas t ON t.id = m.turma_id
+                        WHERE m.turma_id = :turma_id
+                          AND m.ano_letivo_id = :ano_id
+                          AND m.status IN ({$statusSql})
+                          {$filtroSaida}
+                          {$filtroAtivo}
+                        ORDER BY a.nome ASC
+                        LIMIT 500";
+                return $this->db->fetchAll($sql, [
+                    'turma_id' => $turmaId,
+                    'ano_id' => $anoLetivoId,
+                ]) ?: [];
+            }
+
+            $sql = "SELECT DISTINCT a.id AS aluno_id, a.nome, a.ra, m.turma_id, t.nome AS turma_nome
+                    FROM matricula m
+                    INNER JOIN alunos a ON a.id = m.aluno_id
+                    LEFT JOIN turmas t ON t.id = m.turma_id
+                    WHERE m.ano_letivo_id = :ano_id
+                      AND m.turma_id IS NOT NULL
+                      AND m.status IN ({$statusSql})
+                      {$filtroSaida}
+                      {$filtroAtivo}
+                    ORDER BY a.nome ASC
+                    LIMIT 500";
+            return $this->db->fetchAll($sql, ['ano_id' => $anoLetivoId]) ?: [];
+        }
+
+        // Fallback só sem tabela matricula: turma atual do cadastro (sem filtro de ano).
         $sql = "SELECT DISTINCT a.id AS aluno_id, a.nome, a.ra, a.turma_id, t.nome AS turma_nome
                 FROM alunos a
                 INNER JOIN turmas t ON t.id = a.turma_id
@@ -251,12 +299,35 @@ class SaudeAprendizagemService
             $sql .= ' AND a.turma_id = :turma_id';
             $params['turma_id'] = $turmaId;
         }
-        if ($this->tableExists('matricula')) {
-            $sql .= " AND EXISTS (SELECT 1 FROM matricula m WHERE m.aluno_id = a.id AND m.ano_letivo_id = :ano_id AND m.status = 'ativa' AND m.data_saida IS NULL)";
-            $params['ano_id'] = $anoLetivoId;
-        }
         $sql .= ' ORDER BY a.nome ASC LIMIT 500';
         return $this->db->fetchAll($sql, $params) ?: [];
+    }
+
+    private function ehAnoLetivoAtivo(int $anoLetivoId): bool
+    {
+        if ($anoLetivoId <= 0 || !$this->tableExists('ano_letivo')) {
+            return false;
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT id FROM ano_letivo WHERE ativo = 1 ORDER BY ano DESC LIMIT 1'
+            );
+            return $row !== null && (int) ($row['id'] ?? 0) === $anoLetivoId;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function statusMatriculaParaSaude(int $anoLetivoId): array
+    {
+        if ($this->ehAnoLetivoAtivo($anoLetivoId)) {
+            return ['ativa'];
+        }
+        // Ano encerrado / histórico: alunos já podem estar em outra turma no cadastro.
+        return ['ativa', 'concluido', 'transferido'];
     }
 
     /** @return array<int,array<string,mixed>> */
