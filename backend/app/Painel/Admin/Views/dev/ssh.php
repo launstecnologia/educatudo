@@ -154,7 +154,7 @@ $ssh2Available = function_exists('ssh2_connect');
                         </button>
                     </div>
                     <p class="mt-1 text-xs text-gray-500">
-                        Comandos permitidos: git (pull, status, log, branch, fetch, diff), ls, pwd, whoami, php -v, composer --version
+                        O comando precisa ser idêntico a um destes: git pull, git status, git log, git log --oneline -10, git branch, git fetch, git diff, ls, pwd, whoami, php -v, composer --version
                     </p>
                 </div>
             </form>

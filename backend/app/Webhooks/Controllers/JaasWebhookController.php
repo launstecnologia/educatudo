@@ -10,7 +10,7 @@ use App\Models\Education\OnlineClass;
 if (!class_exists(__NAMESPACE__ . '\\JaasWebhookController', false)) {
 class JaasWebhookController extends BaseController
 {
-    // No default token: if JAAS_WEBHOOK_SECRET is not configured the endpoint rejects all requests.
+    // Sem segredo de bearer nem de assinatura, a rota recusa qualquer requisição.
 
     private $onlineClass;
 
@@ -71,20 +71,22 @@ class JaasWebhookController extends BaseController
     private function isAuthorized(string $rawBody): bool
     {
         $expected = $this->resolveWebhookSecret();
-        if ($expected === '') {
-            return true;
+        $signingSecret = $this->resolveSigningSecret();
+        if ($expected === '' && $signingSecret === '') {
+            return false;
         }
 
-        $authorization = trim((string) ($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? ''));
-        if ($authorization !== '') {
-            $received = preg_replace('/^Bearer\s+/i', '', $authorization);
-            if (hash_equals($expected, (string) $received) || hash_equals('Bearer ' . $expected, $authorization)) {
-                return true;
+        if ($expected !== '') {
+            $authorization = trim((string) ($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? ''));
+            if ($authorization !== '') {
+                $received = preg_replace('/^Bearer\s+/i', '', $authorization);
+                if (hash_equals($expected, (string) $received) || hash_equals('Bearer ' . $expected, $authorization)) {
+                    return true;
+                }
             }
         }
 
         $signatureHeader = trim((string) ($_SERVER['HTTP_X_JAAS_SIGNATURE'] ?? ''));
-        $signingSecret = $this->resolveSigningSecret();
         if ($signatureHeader !== '' && $signingSecret !== '') {
             return $this->verifyJaasSignature($signatureHeader, $rawBody, $signingSecret);
         }

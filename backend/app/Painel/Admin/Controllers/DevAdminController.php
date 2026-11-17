@@ -7,6 +7,7 @@ namespace App\Painel\Admin\Controllers;
 
 
 use App\Core\Logger;
+use App\Core\MasterSecretVault;
 use App\Services\EvolutionApiService;
 
 if (!class_exists(__NAMESPACE__ . '\\DevAdminController', false)) {
@@ -1444,6 +1445,8 @@ class DevAdminController extends AdminBaseController
         
         // Para cada escola, verificar quais migrations já foram executadas
         foreach ($escolas as &$escola) {
+            $escola['db_pass'] = MasterSecretVault::decryptDbPassword($escola['db_pass'] ?? '');
+            $escola['ssh_pass'] = MasterSecretVault::decryptDbPassword($escola['ssh_pass'] ?? '');
             $migrationsExecutadas = $this->db->fetchAll(
                 "SELECT migration_file, executada_em, status, mensagem_erro 
                  FROM migrations_executadas 
@@ -1503,6 +1506,11 @@ class DevAdminController extends AdminBaseController
             if (empty($escola_nome) || empty($db_host) || empty($db_name) || empty($db_user) || empty($db_pass)) {
                 throw new \Exception('Todos os campos de banco de dados são obrigatórios');
             }
+
+            $db_pass = $this->cifrarSegredoConexao($db_pass, 'senha do banco');
+            $ssh_pass = trim((string) $ssh_pass) === ''
+                ? null
+                : $this->cifrarSegredoConexao($ssh_pass, 'senha SSH');
             
             if ($id) {
                 // Atualizar
@@ -1525,7 +1533,7 @@ class DevAdminController extends AdminBaseController
                         'ssh_host' => $ssh_host ?: null,
                         'ssh_port' => $ssh_port,
                         'ssh_user' => $ssh_user ?: null,
-                        'ssh_pass' => $ssh_pass ?: null,
+                        'ssh_pass' => $ssh_pass,
                         'ssh_path' => $ssh_path ?: null
                     ]
                 );
@@ -1547,7 +1555,7 @@ class DevAdminController extends AdminBaseController
                         'ssh_host' => $ssh_host ?: null,
                         'ssh_port' => $ssh_port,
                         'ssh_user' => $ssh_user ?: null,
-                        'ssh_pass' => $ssh_pass ?: null,
+                        'ssh_pass' => $ssh_pass,
                         'ssh_path' => $ssh_path ?: null
                     ]
                 );
@@ -1578,9 +1586,12 @@ class DevAdminController extends AdminBaseController
             $escola_id = (int)($_POST['escola_id'] ?? 0);
             $migration_file = trim($_POST['migration_file'] ?? '');
             
-            if (empty($escola_id) || empty($migration_file)) {
+            if (empty($escola_id) || $migration_file === '') {
                 throw new \Exception('Escola e migration são obrigatórios');
             }
+
+            $migrationPath = $this->resolverArquivoMigration($migration_file);
+            $migration_file = basename($migrationPath);
             
             // Verificar se já foi executada com sucesso (permitir reexecutar se houve erro)
             $jaExecutada = $this->db->fetch(
@@ -1603,14 +1614,6 @@ class DevAdminController extends AdminBaseController
                 throw new \Exception('Escola não encontrada ou inativa');
             }
             
-            // Ler arquivo de migration
-            $migrationsDir = (defined('BASE_PATH') ? BASE_PATH : dirname(__DIR__, 4)) . '/database/migrations';
-            $migrationPath = $migrationsDir . '/' . $migration_file;
-            
-            if (!file_exists($migrationPath)) {
-                throw new \Exception('Arquivo de migration não encontrado: ' . $migration_file);
-            }
-            
             $sql = file_get_contents($migrationPath);
             if (empty(trim($sql))) {
                 throw new \Exception('Arquivo de migration está vazio');
@@ -1624,7 +1627,8 @@ class DevAdminController extends AdminBaseController
                 \PDO::ATTR_EMULATE_PREPARES => false,
             ];
             
-            $pdo = new \PDO($dsn, $escola['db_user'], $escola['db_pass'], $options);
+            $senhaBanco = MasterSecretVault::decryptDbPassword($escola['db_pass'] ?? '');
+            $pdo = new \PDO($dsn, $escola['db_user'], $senhaBanco, $options);
             $pdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
             
             // Executar SQL diretamente (sem transação para evitar problemas)
@@ -1902,47 +1906,9 @@ class DevAdminController extends AdminBaseController
                 throw new \Exception('Configuração SSH não encontrada para esta escola');
             }
             
-            // Validar comando (permitir apenas comandos seguros)
-            $comandosPermitidos = [
-                'git pull',
-                'git status',
-                'git log',
-                'git branch',
-                'git fetch',
-                'git diff',
-                'ls',
-                'pwd',
-                'whoami',
-                'php -v',
-                'composer --version'
-            ];
-            
-            $comandoValido = false;
-            foreach ($comandosPermitidos as $cmd) {
-                if (strpos($comando, $cmd) === 0) {
-                    $comandoValido = true;
-                    break;
-                }
-            }
-            
-            // Permitir comandos git customizados (mas com validação)
-            if (!$comandoValido && strpos($comando, 'git ') === 0) {
-                // Validar que não contém comandos perigosos
-                $comandosPerigosos = ['rm', 'delete', 'drop', 'truncate', '>', '>>', '|', '&', ';', '&&', '||'];
-                $perigoso = false;
-                foreach ($comandosPerigosos as $cmd) {
-                    if (strpos($comando, $cmd) !== false) {
-                        $perigoso = true;
-                        break;
-                    }
-                }
-                if (!$perigoso) {
-                    $comandoValido = true;
-                }
-            }
-            
-            if (!$comandoValido) {
-                throw new \Exception('Comando não permitido. Use apenas comandos git, ls, pwd, whoami, php -v ou composer --version');
+            $comandosPermitidos = $this->comandosSshPermitidos();
+            if (!in_array($comando, $comandosPermitidos, true)) {
+                throw new \Exception('Comando não permitido. Use apenas um destes, por extenso: ' . implode(', ', $comandosPermitidos));
             }
             
             // Verificar se extensão SSH2 está disponível
@@ -1956,7 +1922,8 @@ class DevAdminController extends AdminBaseController
                 throw new \Exception('Não foi possível conectar ao servidor SSH. Verifique host, porta e conectividade.');
             }
             
-            if (!@ssh2_auth_password($connection, $escola['ssh_user'], $escola['ssh_pass'])) {
+            $senhaSsh = MasterSecretVault::decryptDbPassword($escola['ssh_pass'] ?? '');
+            if (!@ssh2_auth_password($connection, $escola['ssh_user'], $senhaSsh)) {
                 throw new \Exception('Falha na autenticação SSH. Verifique usuário e senha.');
             }
             
@@ -2192,6 +2159,60 @@ class DevAdminController extends AdminBaseController
         } catch (\Exception $e) {
             $this->json(['error' => 'Erro ao enviar métricas: ' . $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function comandosSshPermitidos(): array
+    {
+        return [
+            'git pull',
+            'git status',
+            'git log',
+            'git log --oneline -10',
+            'git branch',
+            'git fetch',
+            'git diff',
+            'ls',
+            'pwd',
+            'whoami',
+            'php -v',
+            'composer --version',
+        ];
+    }
+
+    private function cifrarSegredoConexao(string $valor, string $rotulo): string
+    {
+        $cifrado = MasterSecretVault::encryptDbPassword($valor);
+        if ($cifrado === null || $cifrado === '') {
+            throw new \Exception('Não foi possível proteger a ' . $rotulo);
+        }
+
+        return $cifrado;
+    }
+
+    private function resolverArquivoMigration(string $migrationFile): string
+    {
+        $nome = basename(str_replace('\\', '/', $migrationFile));
+        if (!preg_match('/^[A-Za-z0-9._-]+\.sql$/', $nome)) {
+            throw new \Exception('Arquivo de migration inválido');
+        }
+
+        $base = (defined('BASE_PATH') ? BASE_PATH : dirname(__DIR__, 4)) . '/database/migrations';
+        $migrationsDir = realpath($base);
+        if ($migrationsDir === false || !is_dir($migrationsDir)) {
+            throw new \Exception('Diretório de migrations não encontrado');
+        }
+
+        $caminho = $migrationsDir . DIRECTORY_SEPARATOR . $nome;
+        $real = realpath($caminho);
+        $prefixo = $migrationsDir . DIRECTORY_SEPARATOR;
+        if ($real === false || !is_file($real) || strncmp($real, $prefixo, strlen($prefixo)) !== 0) {
+            throw new \Exception('Arquivo de migration não encontrado');
+        }
+
+        return $real;
     }
 }
 }

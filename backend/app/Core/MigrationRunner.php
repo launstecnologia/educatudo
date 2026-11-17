@@ -256,7 +256,8 @@ class MigrationRunner
                 PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
             ];
             
-            $pdo = new PDO($dsn, $this->targetDb['db_user'], $this->targetDb['db_pass'], $options);
+            $senhaBanco = MasterSecretVault::decryptDbPassword($this->targetDb['db_pass'] ?? '');
+            $pdo = new PDO($dsn, $this->targetDb['db_user'], $senhaBanco, $options);
             $pdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
             return $pdo;
         }
