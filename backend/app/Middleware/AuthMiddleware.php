@@ -266,14 +266,16 @@ class AuthMiddleware
         $moduleKey = $resolved['module_key'] ?? null;
         $actionKey = $resolved['action_key'] ?? null;
         if ($moduleKey === null || $actionKey === null) {
-            return true;
+            $caminho = parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH);
+            if (AdminPermissionMatrix::rotaExcecaoSemModulo(is_string($caminho) ? $caminho : '')) {
+                return true;
+            }
+            http_response_code(302);
+            header('Location: ' . URL . '/admin/dashboard');
+            exit;
         }
 
         if (!empty($permissions[$moduleKey][$actionKey])) {
-            return true;
-        }
-
-        if ($moduleKey === 'grupos_regras_notas') {
             return true;
         }
 

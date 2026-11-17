@@ -33,7 +33,8 @@ class TenantResolver
 
     /**
      * Resolve o tenant da requisição atual.
-     * Ordem: header X-Tenant (slug), depois HTTP_HOST (dominio).
+     * Em produção a escola sai só do domínio cadastrado.
+     * Fora de produção, o header X-Tenant (slug) tem prioridade sobre o domínio.
      *
      * @return int|null escola_id ou null se não encontrar / inativo
      */
@@ -45,7 +46,8 @@ class TenantResolver
 
     /**
      * Resolve metadados do tenant da requisição atual.
-     * Ordem: header X-Tenant (slug), depois HTTP_HOST (dominio).
+     * Em produção a escola sai só do domínio cadastrado.
+     * Fora de produção, o header X-Tenant (slug) tem prioridade sobre o domínio.
      *
      * @return array{id:int,slug:string,dominio:?string}|null
      */
@@ -102,7 +104,7 @@ class TenantResolver
 
     /**
      * Chave Redis de resolução de tenant para a requisição atual (TTL 60s).
-     * Formato: tenant_<host> ou tenant_<host>_<slug> quando X-Tenant está presente.
+     * Formato: tenant_<host>. Fora de produção, inclui o slug quando X-Tenant está presente.
      */
     public static function cacheKeyFromRequest(): string
     {
@@ -140,10 +142,14 @@ class TenantResolver
     }
 
     /**
-     * Header X-Tenant para dev (valor = slug da escola).
+     * Header X-Tenant só fora de produção. Em produção o cabeçalho é ignorado.
      */
     private static function slugFromHeader(): ?string
     {
+        if (defined('ENVIRONMENT') && ENVIRONMENT === 'production') {
+            return null;
+        }
+
         if (function_exists('getallheaders')) {
             $headers = array_change_key_case(getallheaders(), CASE_LOWER);
             $slug = strtolower(trim((string) ($headers['x-tenant'] ?? '')));

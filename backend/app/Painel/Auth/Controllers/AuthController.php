@@ -1288,6 +1288,7 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
         $_SESSION['last_activity'] = time();
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         $_SESSION['impersonated_by_master'] = true;
+        \App\Core\AuthManager::gravarEscolaNaSessao();
 
         if ($user['tipo'] === 'admin') {
             $_SESSION['perfil_admin'] = $user['perfil_admin'];

@@ -361,6 +361,32 @@ class AdminPermissionMatrix
     }
 
     /**
+     * Rotas de sessão que não são um módulo da matriz.
+     * Qualquer outro caminho sem module_key é recusado para quem tem permissão customizada.
+     *
+     * @return list<string>
+     */
+    public static function rotasExcecaoSemModulo(): array
+    {
+        return [
+            '/logout',
+            '/admin/ai-job',
+        ];
+    }
+
+    public static function rotaExcecaoSemModulo(string $path): bool
+    {
+        $path = rtrim($path, '/') ?: '/';
+        foreach (self::rotasExcecaoSemModulo() as $excecao) {
+            if ($path === $excecao || str_starts_with($path, $excecao . '/')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * @return array{module_key:?string, action_key:?string}
      */
     public static function resolveModuleAndAction(string $requestUri, string $method): array

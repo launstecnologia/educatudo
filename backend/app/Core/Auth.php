@@ -181,6 +181,7 @@ class Auth
         if ($user['tipo'] === 'admin_escola') {
             $_SESSION['perfil_admin'] = $user['perfil_admin'];
         }
+        AuthManager::gravarEscolaNaSessao();
         
         // Regenera ID da sessão ANTES de registrar no banco (apenas se não estivermos em CLI)
         if (php_sapi_name() !== 'cli') {
@@ -221,6 +222,11 @@ class Auth
     public function isLoggedIn()
     {
         if (!isset($_SESSION['user_id'])) {
+            return false;
+        }
+
+        if (!AuthManager::sessaoConfereComEscolaAtual()) {
+            $this->logout();
             return false;
         }
         
@@ -277,8 +283,7 @@ class Auth
      */
     public function logout()
     {
-        if (isset($_SESSION['user_id'])) {
-            // Remove sessão do banco
+        if (AuthManager::sessaoConfereComEscolaAtual() && isset($_SESSION['user_id'])) {
             $this->db->query("DELETE FROM sessoes WHERE id = :id", ['id' => session_id()]);
         }
         

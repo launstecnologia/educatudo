@@ -404,6 +404,7 @@ class AuthManager
         $_SESSION['login_time'] = time();
         $_SESSION['last_activity'] = time();
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        self::gravarEscolaNaSessao();
         if (array_key_exists('is_default_password', $user) || array_key_exists('must_change_password', $user)) {
             $_SESSION['senha_padrao_pendente'] = (!empty($user['is_default_password']) || !empty($user['must_change_password'])) ? 1 : 0;
         }
@@ -475,6 +476,30 @@ class AuthManager
     }
     
     /**
+     * Grava a escola desta requisição na sessão, no momento do login.
+     */
+    public static function gravarEscolaNaSessao(): void
+    {
+        if (defined('MULTI_TENANT_ACTIVE') && MULTI_TENANT_ACTIVE && defined('TENANT_ID') && (int) TENANT_ID > 0) {
+            $_SESSION['tenant_id'] = (int) TENANT_ID;
+        }
+    }
+
+    /**
+     * A sessão só vale na escola que autenticou o usuário.
+     * Sem multi-tenant, não há o que comparar.
+     */
+    public static function sessaoConfereComEscolaAtual(): bool
+    {
+        if (!defined('MULTI_TENANT_ACTIVE') || !MULTI_TENANT_ACTIVE || !defined('TENANT_ID') || (int) TENANT_ID <= 0) {
+            return true;
+        }
+
+        $escolaDaSessao = (int) ($_SESSION['tenant_id'] ?? 0);
+        return $escolaDaSessao > 0 && $escolaDaSessao === (int) TENANT_ID;
+    }
+
+    /**
      * Verificar se usuário está logado
      */
     public function isLoggedIn()
@@ -490,6 +515,11 @@ class AuthManager
         
         // Verificar se os valores da sessão são válidos
         if (empty($_SESSION['user_id']) || empty($_SESSION['user_type'])) {
+            return false;
+        }
+
+        if (!self::sessaoConfereComEscolaAtual()) {
+            $this->logout();
             return false;
         }
         
@@ -539,8 +569,10 @@ class AuthManager
      */
     public function logout()
     {
-        // Registrar logout se for aluno
-        if (isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'aluno' && isset($_SESSION['user_id'])) {
+        // Só grava o logout no banco da escola que autenticou a sessão.
+        if (self::sessaoConfereComEscolaAtual()
+            && isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'aluno'
+            && isset($_SESSION['user_id'])) {
             $this->registrarLogoutAluno($_SESSION['user_id']);
         }
 

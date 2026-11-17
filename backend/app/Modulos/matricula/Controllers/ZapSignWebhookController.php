@@ -15,8 +15,8 @@ class ZapSignWebhookController extends \App\Core\BaseController
     {
         header('Content-Type: application/json; charset=utf-8');
 
-        // URL /webhooks/zapsign/{slug} deve bater com o tenant já resolvido (via Host ou X-Tenant).
-        // ZapSign deve enviar header X-Tenant (registrado em ZapSignService::registrarWebhookNaZapSign).
+        // URL /webhooks/zapsign/{slug} deve bater com o tenant já resolvido pelo domínio.
+        // Em desenvolvimento o header X-Tenant ainda pode resolver a escola.
         $slugUrl = strtolower(trim((string) $tenantSlug));
         if ($slugUrl !== '' && defined('TENANT_SLUG')) {
             $slugAtual = strtolower(trim((string) TENANT_SLUG));

@@ -38,7 +38,7 @@
                     <label class="block text-sm font-medium text-slate-700 mb-1">Slug</label>
                     <input type="text" name="slug" id="campo_slug" required value="<?= $campo('slug') ?>"
                            placeholder="minha-escola" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    <p class="text-xs text-slate-500 mt-1">Apenas letras minúsculas, números e hífen. Usado no header X-Tenant.</p>
+                    <p class="text-xs text-slate-500 mt-1">Apenas letras minúsculas, números e hífen. Em produção a escola é o domínio cadastrado. O header X-Tenant só vale em desenvolvimento.</p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Domínio (subdomínio)</label>
