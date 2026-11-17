@@ -459,7 +459,7 @@ $usdMaxCredito = $financeiro['usd_max_por_credito'] ?? null;
 
 <div id="diaDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[80] hidden" onclick="fecharDetalheDia()"></div>
 <aside id="diaDrawer"
-       class="fixed top-0 right-0 h-full w-full max-w-2xl bg-white shadow-2xl z-[90] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
+       class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-[90] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
         <div>
@@ -683,11 +683,8 @@ function renderDetalheDia(data) {
         html += '<table class="min-w-full divide-y divide-gray-200 text-xs">';
         html += '<thead class="bg-slate-50"><tr>' +
             '<th class="px-3 py-2 text-left font-medium text-slate-500">Hora</th>' +
-            '<th class="px-3 py-2 text-left font-medium text-slate-500">Escola</th>' +
-            '<th class="px-3 py-2 text-left font-medium text-slate-500">Tipo</th>' +
-            '<th class="px-3 py-2 text-left font-medium text-slate-500">Modelo</th>' +
-            '<th class="px-3 py-2 text-right font-medium text-slate-500">In</th>' +
-            '<th class="px-3 py-2 text-right font-medium text-slate-500">Out</th>' +
+            '<th class="px-3 py-2 text-left font-medium text-slate-500">Chamada</th>' +
+            '<th class="px-3 py-2 text-right font-medium text-slate-500">Tokens</th>' +
             '<th class="px-3 py-2 text-right font-medium text-slate-500">Custo</th>' +
             '<th class="px-3 py-2 text-right font-medium text-slate-500">Venda</th>' +
             '<th class="px-3 py-2 text-right font-medium text-slate-500">Lucro</th>' +
@@ -700,16 +697,30 @@ function renderDetalheDia(data) {
                 chVenda = tc * Number(LLM_CUSTOS_BRL_CREDITO || 0.2);
             }
             var chLucro = Number(ch.lucro_brl != null ? ch.lucro_brl : (chVenda - chCusto));
+            var chTc = Number(ch.creditos_equivalentes_uso || 0);
+            if (!chTc && chCusto > 0) {
+                chTc = chCusto / Number(LLM_CUSTOS_CUSTO_ALVO || 0.1);
+            }
             html += '<tr class="hover:bg-slate-50">';
-            html += '<td class="px-3 py-2 text-slate-700">' + escHtml((ch.created_at || '').substring(11, 19)) + '</td>';
-            html += '<td class="px-3 py-2 text-slate-700">' + escHtml(ch.escola_nome || '') + '</td>';
-            html += '<td class="px-3 py-2 font-mono text-slate-700">' + escHtml(ch.usage_type || '') + '</td>';
-            html += '<td class="px-3 py-2 font-mono text-slate-700">' + escHtml(ch.model || '') + '</td>';
-            html += '<td class="px-3 py-2 text-right text-blue-700">' + fmtIntJs(ch.prompt_tokens) + '</td>';
-            html += '<td class="px-3 py-2 text-right text-violet-700">' + fmtIntJs(ch.completion_tokens) + '</td>';
-            html += '<td class="px-3 py-2 text-right text-slate-700">' + fmtBrlJs(chCusto) + '<div class="text-[10px] text-slate-400">' + fmtUsdJs(ch.cost_usd) + '</div></td>';
-            html += '<td class="px-3 py-2 text-right text-blue-700">' + fmtBrlJs(chVenda) + '</td>';
-            html += '<td class="px-3 py-2 text-right ' + (chLucro >= 0 ? 'text-emerald-700' : 'text-red-600') + '">' + fmtBrlJs(chLucro) + '</td>';
+            html += '<td class="px-3 py-2 text-slate-700 whitespace-nowrap">' + escHtml((ch.created_at || '').substring(11, 19)) + '</td>';
+            html += '<td class="px-3 py-2 text-slate-700">' +
+                '<span class="font-medium">' + escHtml(ch.escola_nome || '') + '</span>' +
+                '<span class="block font-mono text-[11px] text-slate-500">' + escHtml(ch.usage_type || '') + '</span>' +
+                '<span class="block font-mono text-[11px] text-slate-400">' + escHtml(ch.model || '') + '</span>' +
+                '</td>';
+            html += '<td class="px-3 py-2 text-right text-slate-700 whitespace-nowrap">' +
+                '<span class="font-medium">' + fmtIntJs(ch.total_tokens || ((ch.prompt_tokens || 0) + (ch.completion_tokens || 0))) + '</span>' +
+                '<span class="block text-[10px] text-slate-400">' +
+                '<span class="text-blue-700">' + fmtIntJs(ch.prompt_tokens) + ' in</span> · ' +
+                '<span class="text-violet-700">' + fmtIntJs(ch.completion_tokens) + ' out</span></span></td>';
+            html += '<td class="px-3 py-2 text-right text-slate-700 whitespace-nowrap">' +
+                '<span class="font-medium">' + fmtBrlJs(chCusto) + '</span>' +
+                '<div class="text-[10px] text-slate-400">' + fmtUsdJs(ch.cost_usd) + '</div></td>';
+            html += '<td class="px-3 py-2 text-right text-blue-700 whitespace-nowrap">' +
+                '<span class="font-medium">' + fmtBrlJs(chVenda) + '</span>' +
+                '<div class="text-[10px] text-slate-400">' + fmtTcJs(chTc) + '</div></td>';
+            html += '<td class="px-3 py-2 text-right whitespace-nowrap font-medium ' + (chLucro >= 0 ? 'text-emerald-700' : 'text-red-600') + '">' +
+                fmtBrlJs(chLucro) + '</td>';
             html += '</tr>';
         });
         html += '</tbody></table></div>';
