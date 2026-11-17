@@ -276,32 +276,62 @@ $usdMaxCredito = $financeiro['usd_max_por_credito'] ?? null;
 
 <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-200">
+        <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between gap-3">
             <h3 class="text-lg font-semibold text-slate-900">Por escola</h3>
+            <span class="text-xs text-slate-500">Custo LLM · venda pelo uso (R$ <?= $fmtDec($brlPorCredito, 2) ?>/crédito)</span>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-slate-50">
                     <tr>
                         <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Escola</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Créditos</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Custo R$</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Lucro R$</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Custo</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Venda</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Lucro</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     <?php foreach ($porEscola as $row): ?>
-                    <?php $lucroEsc = (float) ($row['lucro_brl'] ?? 0); ?>
+                    <?php
+                    $custoEsc = (float) ($row['custo_brl'] ?? $row['cost_brl'] ?? 0);
+                    $vendaEsc = (float) ($row['venda_brl'] ?? 0);
+                    if ($vendaEsc <= 0 && $custoEsc > 0) {
+                        // Fallback: venda = custo × (0,20 / 0,10) = 2× custo na meta atual.
+                        $vendaEsc = round(
+                            \App\Core\CreditosDecimalHelper::creditosPorCustoLlmBrl($custoEsc, $custoAlvoCredito)
+                            * $brlPorCredito,
+                            2
+                        );
+                    }
+                    $lucroEsc = (float) ($row['lucro_brl'] ?? ($vendaEsc - $custoEsc));
+                    $tcUso = (float) ($row['creditos_equivalentes_uso'] ?? 0);
+                    $tcCobrado = (float) ($row['creditos_consumidos'] ?? 0);
+                    ?>
                     <tr class="hover:bg-slate-50">
                         <td class="px-4 py-3 text-sm">
                             <span class="font-medium text-slate-900"><?= htmlspecialchars($row['nome'] ?? '') ?></span>
                             <span class="block text-xs text-slate-400">
                                 <?= htmlspecialchars($row['slug'] ?? '') ?> · <?= $fmtInt($row['requests'] ?? 0) ?> req. · <?= $fmtUsd($row['cost_usd'] ?? 0) ?>
                             </span>
+                            <span class="block text-xs text-slate-400 mt-0.5">
+                                Uso ≈ <?= $fmtTc($tcUso) ?>
+                                <?php if ($tcCobrado > 0): ?>
+                                · debitado <?= $fmtTc($tcCobrado) ?>
+                                <?php endif; ?>
+                            </span>
                         </td>
-                        <td class="px-4 py-3 text-sm text-right text-slate-700"><?= $fmtTc($row['creditos_consumidos'] ?? 0) ?></td>
-                        <td class="px-4 py-3 text-sm text-right text-slate-700"><?= $fmtBrl($row['cost_brl'] ?? 0) ?></td>
-                        <td class="px-4 py-3 text-sm text-right font-medium <?= $lucroEsc >= 0 ? 'text-emerald-700' : 'text-red-600' ?>"><?= $fmtBrl($lucroEsc) ?></td>
+                        <td class="px-4 py-3 text-sm text-right text-slate-700">
+                            <span class="font-medium"><?= $fmtBrl($custoEsc) ?></span>
+                            <span class="block text-[11px] text-slate-400">gasto LLM</span>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-right text-blue-700">
+                            <span class="font-medium"><?= $fmtBrl($vendaEsc) ?></span>
+                            <span class="block text-[11px] text-slate-400">cobrança pelo uso</span>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-right font-medium <?= $lucroEsc >= 0 ? 'text-emerald-700' : 'text-red-600' ?>">
+                            <?= $fmtBrl($lucroEsc) ?>
+                            <span class="block text-[11px] font-normal text-slate-400">venda − custo</span>
+                        </td>
                     </tr>
                     <?php endforeach; ?>
                     <?php if (empty($porEscola)): ?>
@@ -496,6 +526,11 @@ function fmtBrlJs(n) {
     return 'R$ ' + Number(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 var LLM_CUSTOS_COTACAO = <?= json_encode((float) $cotacao) ?>;
+var LLM_CUSTOS_BRL_CREDITO = <?= json_encode((float) $brlPorCredito) ?>;
+var LLM_CUSTOS_CUSTO_ALVO = <?= json_encode((float) $custoAlvoCredito) ?>;
+function fmtTcJs(n) {
+    return 'TC$ ' + Number(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+}
 function fmtDataJs(ymd) {
     if (!ymd || !/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return ymd || '';
     var p = ymd.split('-');
@@ -519,7 +554,10 @@ function abrirDetalheDia(data) {
     document.getElementById('diaDrawerSub').textContent = 'Chats Tudinha e chamadas LLM';
     document.getElementById('diaDrawerBody').innerHTML = '<p class="text-sm text-slate-500">Carregando…</p>';
 
-    var url = LLM_CUSTOS_DIA_URL + '?data=' + encodeURIComponent(data) + '&escola_id=' + encodeURIComponent(LLM_CUSTOS_ESCOLA);
+    var url = LLM_CUSTOS_DIA_URL
+        + '?data=' + encodeURIComponent(data)
+        + '&escola_id=' + encodeURIComponent(LLM_CUSTOS_ESCOLA)
+        + '&cotacao=' + encodeURIComponent(LLM_CUSTOS_COTACAO);
     fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
         .then(function(r) { return r.json(); })
         .then(function(payload) {
@@ -550,13 +588,20 @@ function renderDetalheDia(data) {
     var chamadas = data.chamadas || [];
     var html = '';
 
-    var custoBrlDia = Number(totais.cost_usd || 0) * Number(LLM_CUSTOS_COTACAO || 0);
-    html += '<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">';
+    var custoBrlDia = Number(totais.custo_brl != null ? totais.custo_brl : (Number(totais.cost_usd || 0) * Number(LLM_CUSTOS_COTACAO || 0)));
+    var vendaBrlDia = Number(totais.venda_brl || 0);
+    var lucroBrlDia = Number(totais.lucro_brl != null ? totais.lucro_brl : (vendaBrlDia - custoBrlDia));
+    var tcUsoDia = Number(totais.creditos_equivalentes_uso || 0);
+    html += '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">';
     html += '<div class="rounded-lg border border-slate-200 p-3"><p class="text-[11px] uppercase text-slate-500">Conversas</p><p class="text-lg font-semibold text-slate-900">' + fmtIntJs(totais.conversas) + '</p></div>';
     html += '<div class="rounded-lg border border-slate-200 p-3"><p class="text-[11px] uppercase text-slate-500">Msgs IA</p><p class="text-lg font-semibold text-slate-900">' + fmtIntJs(totais.mensagens) + '</p></div>';
     html += '<div class="rounded-lg border border-slate-200 p-3"><p class="text-[11px] uppercase text-slate-500">Chamadas</p><p class="text-lg font-semibold text-slate-900">' + fmtIntJs(totais.chamadas) + '</p></div>';
-    html += '<div class="rounded-lg border border-slate-200 p-3"><p class="text-[11px] uppercase text-slate-500">Custo</p><p class="text-lg font-semibold text-slate-900">' + fmtUsdJs(totais.cost_usd) + '</p><p class="text-xs text-slate-500">' + fmtBrlJs(custoBrlDia) + '</p></div>';
+    html += '<div class="rounded-lg border border-slate-200 p-3"><p class="text-[11px] uppercase text-slate-500">Custo</p><p class="text-lg font-semibold text-slate-900">' + fmtBrlJs(custoBrlDia) + '</p><p class="text-xs text-slate-500">' + fmtUsdJs(totais.cost_usd) + '</p></div>';
+    html += '<div class="rounded-lg border border-slate-200 p-3"><p class="text-[11px] uppercase text-slate-500">Venda</p><p class="text-lg font-semibold text-blue-700">' + fmtBrlJs(vendaBrlDia) + '</p><p class="text-xs text-slate-500">' + fmtTcJs(tcUsoDia) + ' pelo uso</p></div>';
+    html += '<div class="rounded-lg border border-slate-200 p-3"><p class="text-[11px] uppercase text-slate-500">Lucro</p><p class="text-lg font-semibold ' + (lucroBrlDia >= 0 ? 'text-emerald-700' : 'text-red-600') + '">' + fmtBrlJs(lucroBrlDia) + '</p><p class="text-xs text-slate-500">venda − custo</p></div>';
     html += '</div>';
+    html += '<p class="text-xs text-slate-500 mb-4">Meta: custo ≤ R$ ' + Number(LLM_CUSTOS_CUSTO_ALVO || 0.1).toFixed(2).replace('.', ',') +
+        ' · venda R$ ' + Number(LLM_CUSTOS_BRL_CREDITO || 0.2).toFixed(2).replace('.', ',') + ' por crédito cheio (cobrança fracionada pelo uso).</p>';
 
     html += '<h4 class="text-sm font-semibold text-slate-900 mb-2">Chats Tudinha</h4>';
     if (!conversas.length) {
@@ -608,11 +653,18 @@ function renderDetalheDia(data) {
             '<th class="px-3 py-2 text-left font-medium text-slate-500">Modelo</th>' +
             '<th class="px-3 py-2 text-right font-medium text-slate-500">In</th>' +
             '<th class="px-3 py-2 text-right font-medium text-slate-500">Out</th>' +
-            '<th class="px-3 py-2 text-right font-medium text-slate-500">USD</th>' +
-            '<th class="px-3 py-2 text-right font-medium text-slate-500">R$</th>' +
+            '<th class="px-3 py-2 text-right font-medium text-slate-500">Custo</th>' +
+            '<th class="px-3 py-2 text-right font-medium text-slate-500">Venda</th>' +
+            '<th class="px-3 py-2 text-right font-medium text-slate-500">Lucro</th>' +
             '</tr></thead><tbody class="divide-y divide-gray-100">';
         chamadas.forEach(function(ch) {
-            var chBrl = Number(ch.cost_usd || 0) * Number(LLM_CUSTOS_COTACAO || 0);
+            var chCusto = Number(ch.custo_brl != null ? ch.custo_brl : (Number(ch.cost_usd || 0) * Number(LLM_CUSTOS_COTACAO || 0)));
+            var chVenda = Number(ch.venda_brl || 0);
+            if (!chVenda && chCusto > 0) {
+                var tc = chCusto / Number(LLM_CUSTOS_CUSTO_ALVO || 0.1);
+                chVenda = tc * Number(LLM_CUSTOS_BRL_CREDITO || 0.2);
+            }
+            var chLucro = Number(ch.lucro_brl != null ? ch.lucro_brl : (chVenda - chCusto));
             html += '<tr class="hover:bg-slate-50">';
             html += '<td class="px-3 py-2 text-slate-700">' + escHtml((ch.created_at || '').substring(11, 19)) + '</td>';
             html += '<td class="px-3 py-2 text-slate-700">' + escHtml(ch.escola_nome || '') + '</td>';
@@ -620,8 +672,9 @@ function renderDetalheDia(data) {
             html += '<td class="px-3 py-2 font-mono text-slate-700">' + escHtml(ch.model || '') + '</td>';
             html += '<td class="px-3 py-2 text-right text-blue-700">' + fmtIntJs(ch.prompt_tokens) + '</td>';
             html += '<td class="px-3 py-2 text-right text-violet-700">' + fmtIntJs(ch.completion_tokens) + '</td>';
-            html += '<td class="px-3 py-2 text-right text-slate-700">' + fmtUsdJs(ch.cost_usd) + '</td>';
-            html += '<td class="px-3 py-2 text-right text-emerald-700">' + fmtBrlJs(chBrl) + '</td>';
+            html += '<td class="px-3 py-2 text-right text-slate-700">' + fmtBrlJs(chCusto) + '<div class="text-[10px] text-slate-400">' + fmtUsdJs(ch.cost_usd) + '</div></td>';
+            html += '<td class="px-3 py-2 text-right text-blue-700">' + fmtBrlJs(chVenda) + '</td>';
+            html += '<td class="px-3 py-2 text-right ' + (chLucro >= 0 ? 'text-emerald-700' : 'text-red-600') + '">' + fmtBrlJs(chLucro) + '</td>';
             html += '</tr>';
         });
         html += '</tbody></table></div>';

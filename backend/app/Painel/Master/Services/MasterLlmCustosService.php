@@ -363,7 +363,7 @@ class MasterLlmCustosService
             }
 
             $costBrl = round($cost * $cotacao, 2);
-            $finEscola = self::montarFinanceiro($creditosEscola, $cost, $cotacao);
+            $finEscola = self::montarFinanceiro($creditosEscola, $cost, $cotacao, $tt);
 
             if ($req > 0 || $tt > 0 || $creditosEscola > 0) {
                 $porEscola[] = [
@@ -378,8 +378,13 @@ class MasterLlmCustosService
                     'cost_brl' => $costBrl,
                     'cost_estimado' => round($est, 6),
                     'creditos_consumidos' => $creditosEscola,
+                    'creditos_equivalentes_uso' => (float) ($finEscola['creditos_equivalentes_uso'] ?? 0),
+                    // Custo = gasto LLM; venda = cobrança pelo uso (meta R$ 0,20 / crédito cheio).
+                    'custo_brl' => $costBrl,
+                    'venda_brl' => (float) ($finEscola['receita_ideal_brl'] ?? 0),
                     'receita_brl' => $finEscola['receita_brl'],
-                    'lucro_brl' => $finEscola['lucro_brl'],
+                    'lucro_brl' => (float) ($finEscola['lucro_ideal_brl'] ?? $finEscola['lucro_brl']),
+                    'lucro_cobrado_brl' => $finEscola['lucro_brl'],
                 ];
             }
 
@@ -514,8 +519,16 @@ class MasterLlmCustosService
      *   erros: list<string>
      * }
      */
-    public static function detalheDia(string $date, int $escolaIdFiltro = 0, int $limiteChamadas = 200, int $limiteMensagens = 100): array
-    {
+    public static function detalheDia(
+        string $date,
+        int $escolaIdFiltro = 0,
+        int $limiteChamadas = 200,
+        int $limiteMensagens = 100,
+        ?float $cotacaoUsdBrl = null
+    ): array {
+        $cotacao = self::cotacaoUsdBrl($cotacaoUsdBrl);
+        $brlPorCredito = (float) \App\Core\CreditosDecimalHelper::BRL_POR_UNIDADE;
+        $custoAlvoBrl = self::custoAlvoBrlPorCredito();
         $out = [
             'date' => $date,
             'escola_id' => $escolaIdFiltro,
@@ -529,6 +542,15 @@ class MasterLlmCustosService
                 'completion_tokens' => 0,
                 'total_tokens' => 0,
                 'cost_usd' => 0.0,
+                'custo_brl' => 0.0,
+                'venda_brl' => 0.0,
+                'lucro_brl' => 0.0,
+                'creditos_equivalentes_uso' => 0.0,
+            ],
+            'meta' => [
+                'cotacao_usd_brl' => $cotacao,
+                'brl_por_credito' => $brlPorCredito,
+                'custo_alvo_brl_por_credito' => $custoAlvoBrl,
             ],
             'erros' => [],
         ];
@@ -592,6 +614,9 @@ class MasterLlmCustosService
                         $ct = (int) ($row['completion_tokens'] ?? 0);
                         $tt = (int) ($row['total_tokens'] ?? ($pt + $ct));
                         $cost = (float) ($row['cost_usd'] ?? 0);
+                        $custoBrl = round($cost * $cotacao, 4);
+                        $creditosUso = \App\Core\CreditosDecimalHelper::creditosPorCustoLlmBrl($custoBrl, $custoAlvoBrl);
+                        $vendaBrl = round($creditosUso * $brlPorCredito, 4);
                         $chamadas[] = [
                             'escola_id' => $eid,
                             'escola_nome' => $nomeEscola,
@@ -602,6 +627,10 @@ class MasterLlmCustosService
                             'completion_tokens' => $ct,
                             'total_tokens' => $tt,
                             'cost_usd' => round($cost, 6),
+                            'custo_brl' => $custoBrl,
+                            'venda_brl' => $vendaBrl,
+                            'lucro_brl' => round($vendaBrl - $custoBrl, 4),
+                            'creditos_equivalentes_uso' => $creditosUso,
                             'usage_type' => (string) ($row['usage_type'] ?? ''),
                             'created_at' => (string) ($row['created_at'] ?? ''),
                         ];
@@ -718,6 +747,18 @@ class MasterLlmCustosService
         $out['conversas'] = $conversas;
         $out['chamadas'] = $chamadas;
         $out['totais']['cost_usd'] = round($out['totais']['cost_usd'], 6);
+
+        $fin = self::montarFinanceiro(
+            0.0,
+            (float) $out['totais']['cost_usd'],
+            $cotacao,
+            (int) ($out['totais']['total_tokens'] ?? 0)
+        );
+        $out['totais']['custo_brl'] = (float) ($fin['custo_brl'] ?? 0);
+        $out['totais']['venda_brl'] = (float) ($fin['receita_ideal_brl'] ?? 0);
+        $out['totais']['lucro_brl'] = (float) ($fin['lucro_ideal_brl'] ?? 0);
+        $out['totais']['creditos_equivalentes_uso'] = (float) ($fin['creditos_equivalentes_uso'] ?? 0);
+        $out['financeiro'] = $fin;
 
         return $out;
     }

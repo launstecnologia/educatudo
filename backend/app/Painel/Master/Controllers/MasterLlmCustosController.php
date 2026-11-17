@@ -87,6 +87,10 @@ class MasterLlmCustosController extends BaseController
 
         $date = trim((string) ($_GET['data'] ?? ''));
         $escolaId = (int) ($_GET['escola_id'] ?? 0);
+        $cotacaoRaw = str_replace(',', '.', trim((string) ($_GET['cotacao'] ?? '')));
+        $cotacao = is_numeric($cotacaoRaw) && (float) $cotacaoRaw > 0
+            ? (float) $cotacaoRaw
+            : null;
 
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
             http_response_code(400);
@@ -94,7 +98,7 @@ class MasterLlmCustosController extends BaseController
             return;
         }
 
-        $detalhe = \App\Services\MasterLlmCustosService::detalheDia($date, $escolaId);
+        $detalhe = \App\Services\MasterLlmCustosService::detalheDia($date, $escolaId, 200, 100, $cotacao);
         echo json_encode(['success' => true] + $detalhe, JSON_UNESCAPED_UNICODE);
     }
 }
