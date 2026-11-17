@@ -149,7 +149,7 @@
             <?php
             if (!class_exists('CreditosModuleRegistry', false)) {
             }
-            $tudicoinsProvaIa = \App\Core\CreditosModuleRegistry::acaoIaDisponivel('gerar_exercicio_ia_professor');
+            $tudicoinsProvaIa = \App\Core\CreditosModuleRegistry::gerarExercicioProvaLiberado();
             ?>
             <?php if ($tudicoinsProvaIa): ?>
             <button onclick="abrirModalGerarIA()" class="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors">
@@ -163,9 +163,6 @@
             <?php endif; ?>
             <button onclick="abrirModalLerImagem()" class="px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
                 Importar PDF ou imagem
-            </button>
-            <button onclick="abrirModalColarJson()" class="px-6 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors">
-                📚 Importar da Apostila
             </button>
         </div>
     </div>

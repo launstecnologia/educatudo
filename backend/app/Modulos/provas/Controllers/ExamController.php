@@ -7196,8 +7196,10 @@ class ExamController extends BaseController
 
             $creditosService = new \App\Services\CreditosService();
             $papelCarteira = \App\Services\CreditosService::tipoCarteiraDoUsuario((string) ($user['tipo'] ?? 'professor'));
+            $slugEscola = defined('TENANT_SLUG') ? strtolower(trim((string) TENANT_SLUG)) : '';
+            $provaLiberadaSemTudicoins = $slugEscola === 'colegio-educa' && !$creditosService->isCreditosHabilitado();
             $moduloCreditoSelecionado = null;
-            if ($creditosService->moduloCobraCredito('gerar_exercicio_ia_professor') && $creditosService->getCustoModulo('gerar_exercicio_ia_professor') > 0) {
+            if (!$provaLiberadaSemTudicoins && $creditosService->moduloCobraCredito('gerar_exercicio_ia_professor') && $creditosService->getCustoModulo('gerar_exercicio_ia_professor') > 0) {
                 $moduloCreditoSelecionado = 'gerar_exercicio_ia_professor';
             }
 

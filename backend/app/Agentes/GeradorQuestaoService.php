@@ -62,8 +62,12 @@ class GeradorQuestaoService
 
         $refCredito = 'gerar_questao_' . $usuarioId . '_' . str_replace('.', '', uniqid('', true));
 
+        $slug = defined('TENANT_SLUG') ? strtolower(trim((string) TENANT_SLUG)) : '';
+        $provaSemCobranca = $origem === 'prova' && $slug === 'colegio-educa';
         $creditosService = new \App\Services\CreditosService();
-        $creditosService->consumir($papel, $usuarioId, $modulo, $refCredito);
+        if (!$provaSemCobranca || $creditosService->isCreditosHabilitado()) {
+            $creditosService->consumir($papel, $usuarioId, $modulo, $refCredito);
+        }
 
         $dispararImediatamente = !empty($blueprint['disparar_imediatamente']);
         $payload = $blueprint;

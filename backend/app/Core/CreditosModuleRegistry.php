@@ -385,6 +385,20 @@ class CreditosModuleRegistry
     }
 
     /**
+     * Gerar questão por IA na prova online.
+     * Na escola de teste colegio-educa a ação fica disponível mesmo com TudiCoins desligado.
+     */
+    public static function gerarExercicioProvaLiberado(): bool
+    {
+        if (self::acaoIaDisponivel('gerar_exercicio_ia_professor')) {
+            return true;
+        }
+        $slug = defined('TENANT_SLUG') ? strtolower(trim((string) TENANT_SLUG)) : '';
+
+        return $slug === 'colegio-educa';
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public static function getMeta(string $moduloKey): ?array
