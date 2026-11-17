@@ -472,6 +472,21 @@ body.edoc-body {
   background: #eff6ff;
   color: #1e40af;
 }
+.edoc-ia-erro {
+  margin: 0 0 10px;
+  color: #991b1b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.edoc-file-off {
+  position: fixed;
+  left: -100px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+}
 .edoc-tree { font-size: 12px; }
 .edoc-tree-item { padding: 4px 6px; border-radius: 6px; cursor: pointer; display: flex; gap: 6px; align-items: center; }
 .edoc-tree-item:hover { background: #f3f4f6; }

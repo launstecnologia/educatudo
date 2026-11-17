@@ -79,6 +79,60 @@ test('reprodução sem TudiCoins no domínio de teste revisa o HTML antes de ins
   await page.pdf({ path: test.info().outputPath('folha-ajustada.pdf'), preferCSSPageSize: true });
 });
 
+test('colar captura sem tipo MIME envia a imagem e formato ilegível avisa no modal', async ({ page }) => {
+  const html = execFileSync('php', [fixture, '--imagem-sem-tudicoins'], { encoding: 'utf8', cwd: raiz });
+  const estrutura = JSON.parse(execFileSync('php', [fixture, '--reproducao'], {
+    encoding: 'utf8', cwd: raiz, input: JSON.stringify({ orientacao: 'retrato', html: '<p>Layout da captura</p>' }),
+  }));
+  let tipoEnviado = '';
+  await page.route('**/*', async route => {
+    const url = new URL(route.request().url());
+    if (url.hostname !== 'editor.localhost') return route.abort();
+    if (url.pathname.startsWith('/static/')) return route.fulfill({ path: path.join(raiz, 'backend/public', url.pathname) });
+    if (url.pathname.endsWith('/editor')) return route.fulfill({ contentType: 'text/html', body: html });
+    if (url.pathname.endsWith('/reproduzir-imagem')) {
+      const corpo = await new Response(route.request().postDataBuffer(), {
+        headers: { 'content-type': route.request().headers()['content-type'] },
+      }).formData();
+      tipoEnviado = String(corpo.get('imagem') instanceof File ? (corpo.get('imagem') as File).type : '');
+      return route.fulfill({ json: { success: true, job_id: 7 } });
+    }
+    if (url.pathname.endsWith('/ai-job/7/status')) return route.fulfill({ json: { status: 'done', result: { estrutura } } });
+    return route.fulfill({ json: { ok: true, turmas: [], boletins: [] } });
+  });
+  await page.goto('http://editor.localhost/admin/modelos-documentos/21/editor');
+  await page.getByRole('button', { name: 'Abrir assistente de documentos' }).click();
+  await page.getByRole('button', { name: 'Reproduzir de imagem' }).click();
+  await page.evaluate((dados) => {
+    const arquivo = new File([Uint8Array.from(dados)], 'captura.png', { type: '' });
+    const ev = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(ev, 'clipboardData', {
+      value: { files: [], items: [{ kind: 'file', type: 'image/png', getAsFile: () => arquivo }] },
+    });
+    document.dispatchEvent(ev);
+  }, Array.from(imagem.buffer));
+  await expect(page.getByRole('dialog', { name: 'Reprodução da imagem' })).toBeVisible();
+  expect(tipoEnviado).toBe('image/png');
+  await page.getByRole('button', { name: 'Descartar' }).click();
+  await page.getByRole('button', { name: 'Abrir assistente de documentos' }).click();
+  await page.getByRole('button', { name: 'Reproduzir de imagem' }).click();
+  await page.locator('#edoc-ia-file').setInputFiles({
+    name: 'foto.heic',
+    mimeType: 'image/heic',
+    buffer: Buffer.from('nao-e-uma-imagem'),
+  });
+  await expect(page.locator('#edoc-ia-erro')).toContainText('HEIC');
+  await expect(page.locator('#edoc-ia-modal')).toBeVisible();
+  await page.getByRole('button', { name: 'Cancelar' }).click();
+  const [seletor] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.locator('#edoc-fundo-escolher').click(),
+  ]);
+  await seletor.setFiles(imagem);
+  await expect.poll(() => page.locator('#edoc-paper').evaluate(folha => getComputedStyle(folha).backgroundImage)).toContain('data:image/jpeg');
+  await expect(page.getByRole('button', { name: 'Remover imagem' })).toBeVisible();
+});
+
 test('o chat explica variáveis e deixa revisar o HTML de uma proposta', async ({ page }) => {
   const html = execFileSync('php', [fixture], { encoding: 'utf8', cwd: raiz });
   const proposta = JSON.parse(execFileSync('php', [fixture, '--assistente'], {

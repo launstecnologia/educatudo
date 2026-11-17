@@ -354,15 +354,16 @@ $vJs = is_file(BASE_PATH . '/public/static/js/editor-documento.js')
 <?php endif; ?>
 
 <?php if (!empty($ia_disponivel)): ?>
-<input type="file" id="edoc-ia-file" accept="image/png,image/jpeg,image/webp" hidden>
+<input type="file" id="edoc-ia-file" class="edoc-file-off" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/tiff,image/heic,image/heif,.heic,.heif">
 <div class="edoc-modal" id="edoc-ia-modal">
     <div class="edoc-modal-box">
         <h3 style="margin:0 0 8px;font-size:16px">Reproduzir de imagem</h3>
         <p class="edoc-hint">Cole a foto ou o scan com <strong>Ctrl+V</strong> (⌘V), arraste o arquivo para a área abaixo ou escolha um arquivo. A IA gera um HTML editável. Confira o resultado antes de inserir na folha.</p>
-        <div class="edoc-dropzone" id="edoc-ia-cola" tabindex="0" role="button" aria-label="Área para colar ou soltar a imagem">
-            <strong>Clique aqui e cole a imagem</strong>
-            <span>Ctrl+V / ⌘V · ou arraste o arquivo · PNG, JPG ou WebP</span>
+        <div class="edoc-dropzone" id="edoc-ia-cola" tabindex="0" role="button" aria-label="Escolher, colar ou soltar a imagem">
+            <strong>Clique para escolher a imagem</strong>
+            <span>Ou cole com Ctrl+V / ⌘V, ou arraste PNG, JPG ou WebP</span>
         </div>
+        <p id="edoc-ia-erro" class="edoc-ia-erro" role="status" hidden></p>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
             <button type="button" class="edoc-btn" id="edoc-ia-fechar">Cancelar</button>
             <button type="button" class="edoc-btn edoc-btn-primary" id="edoc-ia-escolher">Escolher arquivo</button>

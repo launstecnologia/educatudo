@@ -185,43 +185,165 @@
 
   var IMG_DATA_MAX = 350000;
 
+  function prioridadeImagem(tipo) {
+    tipo = String(tipo || '').toLowerCase();
+    if (tipo === 'image/png') return 5;
+    if (tipo === 'image/jpeg' || tipo === 'image/jpg') return 4;
+    if (tipo === 'image/webp') return 3;
+    if (tipo === 'image/gif') return 2;
+    if (/^image\//.test(tipo)) return 1;
+    return 0;
+  }
+
+  function normalizarTipoImagem(tipo) {
+    tipo = String(tipo || '').toLowerCase();
+    if (tipo === 'image/jpg' || tipo === 'image/pjpeg') return 'image/jpeg';
+    if (tipo === 'image/x-png') return 'image/png';
+    if (tipo === 'image/tif') return 'image/tiff';
+    return tipo;
+  }
+
+  function tipoPeloNome(nome) {
+    var ext = String(nome || '').split('.').pop().toLowerCase();
+    var mapa = {
+      png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp',
+      gif: 'image/gif', tif: 'image/tiff', tiff: 'image/tiff', bmp: 'image/bmp',
+      heic: 'image/heic', heif: 'image/heif'
+    };
+    return mapa[ext] || '';
+  }
+
+  function tipoPelaAssinatura(buf) {
+    var b = new Uint8Array(buf || []);
+    if (b.length >= 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png';
+    if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+    if (b.length >= 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46
+      && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'image/webp';
+    if (b.length >= 6 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return 'image/gif';
+    if (b.length >= 2 && b[0] === 0x42 && b[1] === 0x4d) return 'image/bmp';
+    if (b.length >= 4 && ((b[0] === 0x49 && b[1] === 0x49 && b[2] === 0x2a) || (b[0] === 0x4d && b[1] === 0x4d && b[3] === 0x2a))) return 'image/tiff';
+    if (b.length >= 12 && b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) {
+      var marca = String.fromCharCode(b[8], b[9], b[10], b[11]).toLowerCase();
+      if (/^(heic|heix|heif|mif1|msf1)$/.test(marca)) return 'image/heic';
+    }
+    return '';
+  }
+
+  function arquivoComTipo(file, tipo) {
+    if (!file) return null;
+    tipo = normalizarTipoImagem(tipo || file.type || '');
+    if (!tipo || file.type === tipo) return file;
+    try {
+      return new File([file], file.name || 'imagem', { type: tipo, lastModified: file.lastModified || Date.now() });
+    } catch (err) {
+      return file;
+    }
+  }
+
+  function identificarTipoImagem(file, cb) {
+    var declarado = normalizarTipoImagem(file.type || tipoPeloNome(file.name));
+    if (/^image\/(png|jpeg|webp|gif)$/.test(declarado)) {
+      cb(declarado);
+      return;
+    }
+    var leitor = new FileReader();
+    leitor.onload = function () {
+      cb(tipoPelaAssinatura(leitor.result) || declarado);
+    };
+    leitor.onerror = function () { cb(declarado); };
+    leitor.readAsArrayBuffer(file.slice(0, 16));
+  }
+
   function arquivoDoClipboard(dt) {
     if (!dt) return null;
+    var lista = [];
     var i;
+    var item;
+    var file;
+    var tipo;
+    function guardar(origem, tipoItem) {
+      if (!origem) return;
+      lista.push(arquivoComTipo(origem, tipoItem || origem.type || ''));
+    }
     if (dt.files && dt.files.length) {
       for (i = 0; i < dt.files.length; i++) {
-        if (/^image\//i.test(dt.files[i].type)) return dt.files[i];
+        file = dt.files[i];
+        if (!file) continue;
+        if (!file.type || /^image\//i.test(file.type)) guardar(file, file.type);
       }
     }
     if (dt.items) {
       for (i = 0; i < dt.items.length; i++) {
-        if (dt.items[i].kind === 'file' && /^image\//i.test(dt.items[i].type)) {
-          return dt.items[i].getAsFile();
-        }
+        item = dt.items[i];
+        if (!item || item.kind !== 'file') continue;
+        tipo = item.type || '';
+        if (tipo && !/^image\//i.test(tipo)) continue;
+        guardar(item.getAsFile(), tipo);
       }
     }
-    return null;
+    if (!lista.length) return null;
+    lista.sort(function (a, b) { return prioridadeImagem(b.type) - prioridadeImagem(a.type); });
+    return lista[0];
+  }
+
+  function mensagemFormatoImagem(tipo) {
+    if (/heic|heif|tiff/i.test(tipo || '')) {
+      return 'Este navegador não abre HEIC nem TIFF. Exporte a foto como JPG ou PNG e tente de novo.';
+    }
+    return 'Não foi possível ler a imagem. Use PNG, JPG ou WebP.';
+  }
+
+  function rasterizarImagem(file, maxW, cb) {
+    function pintar(fonte, w, h, fechar) {
+      function quadro(largura, altura) {
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(largura));
+        canvas.height = Math.max(1, Math.round(altura));
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(fonte, 0, 0, canvas.width, canvas.height);
+        return canvas;
+      }
+      var scale = w > maxW ? maxW / w : 1;
+      var canvas = quadro(w * scale, h * scale);
+      if (fechar) fechar();
+      cb(canvas);
+    }
+    function viaElemento() {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        pintar(img, img.naturalWidth || img.width || 1, img.naturalHeight || img.height || 1);
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        cb(null, 'Não foi possível ler a imagem.');
+      };
+      img.src = url;
+    }
+    if (window.createImageBitmap) {
+      createImageBitmap(file).then(function (bmp) {
+        pintar(bmp, bmp.width || 1, bmp.height || 1, function () { bmp.close(); });
+      }).catch(viaElemento);
+      return;
+    }
+    viaElemento();
   }
 
   function arquivoParaDataUri(file, cb) {
-    if (!file || !/^image\/(png|jpeg|jpg|gif|webp)$/i.test(file.type || '')) {
-      cb(null, 'Use PNG, JPG, GIF ou WebP.');
-      return;
-    }
-    var reader = new FileReader();
-    reader.onerror = function () { cb(null, 'Não foi possível ler a imagem.'); };
-    reader.onload = function () {
-      var img = new Image();
-      img.onload = function () {
-        var maxW = 900;
-        var w = img.naturalWidth || img.width || 1;
-        var h = img.naturalHeight || img.height || 1;
-        var scale = w > maxW ? maxW / w : 1;
-        var canvas = document.createElement('canvas');
-        canvas.width = Math.max(1, Math.round(w * scale));
-        canvas.height = Math.max(1, Math.round(h * scale));
-        var ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    if (!file) { cb(null, 'Escolha uma imagem.'); return; }
+    identificarTipoImagem(file, function (tipo) {
+      if (tipo && !/^image\//i.test(tipo)) {
+        cb(null, 'Use PNG, JPG, GIF ou WebP.');
+        return;
+      }
+      rasterizarImagem(arquivoComTipo(file, tipo), 900, function (canvas, err) {
+        if (!canvas) {
+          cb(null, /heic|heif|tiff/i.test(tipo) ? mensagemFormatoImagem(tipo) : (err || 'Imagem inválida.'));
+          return;
+        }
         var q = 0.82;
         var out = canvas.toDataURL('image/jpeg', q);
         while (out.length > IMG_DATA_MAX && q > 0.4) {
@@ -229,22 +351,43 @@
           out = canvas.toDataURL('image/jpeg', q);
         }
         if (out.length > IMG_DATA_MAX) {
-          canvas.width = Math.max(1, Math.round(canvas.width * 0.55));
-          canvas.height = Math.max(1, Math.round(canvas.height * 0.55));
-          ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          out = canvas.toDataURL('image/jpeg', 0.68);
+          var menor = document.createElement('canvas');
+          menor.width = Math.max(1, Math.round(canvas.width * 0.55));
+          menor.height = Math.max(1, Math.round(canvas.height * 0.55));
+          var ctx = menor.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, menor.width, menor.height);
+          ctx.drawImage(canvas, 0, 0, menor.width, menor.height);
+          out = menor.toDataURL('image/jpeg', 0.68);
         }
         if (out.length > IMG_DATA_MAX) {
           cb(null, 'Imagem grande demais. Use um arquivo menor.');
           return;
         }
         cb(out);
-      };
-      img.onerror = function () { cb(null, 'Imagem inválida.'); };
-      img.src = String(reader.result || '');
-    };
-    reader.readAsDataURL(file);
+      });
+    });
+  }
+
+  function prepararArquivoIa(file, cb) {
+    if (!file) { cb(null, 'Cole ou escolha uma imagem PNG, JPG ou WebP.'); return; }
+    identificarTipoImagem(file, function (tipo) {
+      var corrigido = arquivoComTipo(file, tipo);
+      if (/^image\/(png|jpeg|webp)$/i.test((corrigido && corrigido.type) || tipo || '')) {
+        cb(corrigido);
+        return;
+      }
+      rasterizarImagem(corrigido || file, 2000, function (canvas, err) {
+        if (!canvas) {
+          cb(null, err && !/heic|heif|tiff/i.test(tipo) ? err : mensagemFormatoImagem(tipo));
+          return;
+        }
+        canvas.toBlob(function (blob) {
+          if (!blob) { cb(null, mensagemFormatoImagem(tipo)); return; }
+          cb(new File([blob], 'documento.jpg', { type: 'image/jpeg' }));
+        }, 'image/jpeg', 0.86);
+      });
+    });
   }
 
   function htmlImgData(uri) {
@@ -1278,10 +1421,18 @@
   function escolherArquivoImagem(cb) {
     var inp = document.createElement('input');
     inp.type = 'file';
-    inp.accept = 'image/png,image/jpeg,image/gif,image/webp';
+    inp.accept = 'image/png,image/jpeg,image/webp,image/gif,image/bmp,image/tiff,image/heic,image/heif,.heic,.heif';
+    inp.className = 'edoc-file-off';
+    function encerrar() {
+      if (inp.isConnected) inp.remove();
+    }
     inp.addEventListener('change', function () {
-      if (inp.files && inp.files[0]) cb(inp.files[0]);
+      var file = inp.files && inp.files[0];
+      encerrar();
+      if (file) cb(file);
     });
+    inp.addEventListener('cancel', encerrar);
+    document.body.appendChild(inp);
     inp.click();
   }
 
@@ -4158,7 +4309,7 @@
       + '<label class="edoc-chk"><input type="checkbox" data-ocultar-area="ocultarRodape"' + (p.ocultarRodape ? ' checked' : '') + '> Ocultar rodapé</label>'
       + '<div class="edoc-sec-label">IMAGEM DE REFERÊNCIA</div>'
       + '<p class="edoc-hint">Fundo da folha para copiar o layout da escola. A impressão só inclui a imagem se você marcar abaixo.</p>'
-      + '<input type="file" id="edoc-fundo" accept="image/png,image/jpeg,image/webp,image/gif">'
+      + '<button type="button" class="edoc-btn" id="edoc-fundo-escolher">' + (p.fundo ? 'Trocar imagem' : 'Escolher arquivo') + '</button>'
       + (p.fundo ? '<button type="button" class="edoc-btn" id="edoc-fundo-limpar" style="margin-top:6px">Remover imagem</button>' : '')
       + '<label class="edoc-chk"><input type="checkbox" id="edoc-imprimir-fundo"' + (p.imprimirFundo ? ' checked' : '') + '> Imprimir a imagem no PDF</label>'
       + '<label class="edoc-chk"><input type="checkbox" id="edoc-rodape-fim"' + (p.rodapeNoFim ? ' checked' : '') + '> Rodapé no fim da página</label>';
@@ -4695,7 +4846,7 @@
         + ' placeholder="Automática" value="' + (larguraFotoAluno(p.fotoAlunoLargura) || '') + '">' + html;
     }
     if (el.type === 'imagem') {
-      html += '<label>Arquivo</label><input type="file" id="edoc-img-file" accept="image/png,image/jpeg,image/gif,image/webp">';
+      html += '<label>Arquivo</label><button type="button" class="edoc-btn" id="edoc-img-escolher">Escolher arquivo</button>';
       html += '<p class="edoc-hint">Cole com Ctrl+V, escolha um arquivo ou arraste a imagem para a folha.</p>';
     }
     if (el.type === 'logo' || el.type === 'imagem') {
@@ -4797,16 +4948,16 @@
           };
         }
       });
-      var fundo = box.querySelector('#edoc-fundo');
-      if (fundo) {
-        fundo.addEventListener('change', function () {
-          if (!fundo.files || !fundo.files[0]) return;
-          arquivoParaDataUri(fundo.files[0], function (uri, err) {
-            fundo.value = '';
-            if (err || !uri) { setStatus(err || 'Falha ao carregar imagem.'); return; }
-            p.fundo = uri;
-            pushHist(); render();
-            setStatus('Imagem de referência na folha');
+      var escolherFundo = box.querySelector('#edoc-fundo-escolher');
+      if (escolherFundo) {
+        escolherFundo.addEventListener('click', function () {
+          escolherArquivoImagem(function (file) {
+            arquivoParaDataUri(file, function (uri, err) {
+              if (err || !uri) { setStatus(err || 'Falha ao carregar imagem.'); return; }
+              p.fundo = uri;
+              pushHist(); render();
+              setStatus('Imagem de referência na folha');
+            });
           });
         });
       }
@@ -4882,18 +5033,18 @@
       });
     }
     if (kind === 'element' && target.type === 'imagem') {
-      var imgFile = $('#edoc-img-file', box);
-      if (imgFile) {
-        imgFile.addEventListener('change', function () {
-          if (!imgFile.files || !imgFile.files[0]) return;
-          arquivoParaDataUri(imgFile.files[0], function (uri, err) {
-            imgFile.value = '';
-            if (err || !uri) { setStatus(err || 'Falha ao carregar imagem.'); return; }
-            target.props = target.props || {};
-            target.props.src = uri;
-            pushHist();
-            render();
-            setStatus('Imagem adicionada');
+      var imgEscolher = $('#edoc-img-escolher', box);
+      if (imgEscolher) {
+        imgEscolher.addEventListener('click', function () {
+          escolherArquivoImagem(function (file) {
+            arquivoParaDataUri(file, function (uri, err) {
+              if (err || !uri) { setStatus(err || 'Falha ao carregar imagem.'); return; }
+              target.props = target.props || {};
+              target.props.src = uri;
+              pushHist();
+              render();
+              setStatus('Imagem adicionada');
+            });
           });
         });
       }
@@ -6643,12 +6794,17 @@
   }
 
   function imagemAceitaIa(file) {
-    return !!(file && /^image\/(png|jpeg|jpg|webp)$/i.test(file.type || ''));
+    return !!(file && /^image\/(png|jpeg|webp)$/i.test(file.type || ''));
   }
 
   function enviarImagemIa(file) {
     var btn = $('#edoc-ia');
     if (!btn || !C.iaUrl || !imagemAceitaIa(file)) {
+      var erro = $('#edoc-ia-erro');
+      if (erro) {
+        erro.hidden = false;
+        erro.textContent = 'Use PNG, JPG ou WebP.';
+      }
       setStatus('Use PNG, JPG ou WebP.');
       return;
     }
@@ -6680,26 +6836,50 @@
     var modal = $('#edoc-ia-modal');
     var zona = $('#edoc-ia-cola');
     if (!btn || !input || !modal || !C.iaUrl) return;
+    input.removeAttribute('hidden');
+    input.classList.add('edoc-file-off');
+    var leitura = 0;
+    function avisarImagemIa(texto) {
+      var erro = $('#edoc-ia-erro');
+      if (erro) {
+        erro.hidden = !texto;
+        erro.textContent = texto || '';
+      }
+      if (texto) setStatus(texto);
+    }
     function fechar() {
       modal.classList.remove('open');
       if (zona) zona.classList.remove('is-drag');
     }
     function receberArquivo(file) {
-      if (!imagemAceitaIa(file)) {
-        setStatus('Use PNG, JPG ou WebP.');
+      var ticket = ++leitura;
+      avisarImagemIa('');
+      if (!file) {
+        avisarImagemIa('Não encontrei uma imagem. Cole com Ctrl+V, arraste o arquivo ou escolha PNG, JPG ou WebP.');
         return;
       }
-      fechar();
-      enviarImagemIa(file);
+      setStatus('Lendo a imagem…');
+      prepararArquivoIa(file, function (pronto, err) {
+        if (ticket !== leitura || !modal.classList.contains('open')) return;
+        if (err || !pronto) {
+          avisarImagemIa(err || 'Não foi possível ler a imagem. Use PNG, JPG ou WebP.');
+          return;
+        }
+        fechar();
+        enviarImagemIa(pronto);
+      });
     }
     btn.addEventListener('click', function () {
+      avisarImagemIa('');
       modal.classList.add('open');
       if (zona) zona.focus();
     });
+    function abrirSeletor() { input.click(); }
     var escolher = $('#edoc-ia-escolher');
-    if (escolher) escolher.addEventListener('click', function () { input.click(); });
+    if (escolher) escolher.addEventListener('click', abrirSeletor);
     var fecharBtn = $('#edoc-ia-fechar');
     function cancelar() {
+      leitura += 1;
       fechar();
       $('#edoc-assistente-abrir').focus();
     }
@@ -6715,7 +6895,10 @@
       receberArquivo(file);
     });
     if (zona) {
-      zona.addEventListener('click', function () { zona.focus(); });
+      zona.addEventListener('click', function () {
+        zona.focus();
+        abrirSeletor();
+      });
       zona.addEventListener('dragenter', function (e) {
         e.preventDefault();
         zona.classList.add('is-drag');
@@ -6729,8 +6912,7 @@
       zona.addEventListener('drop', function (e) {
         e.preventDefault();
         zona.classList.remove('is-drag');
-        var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-        receberArquivo(file);
+        receberArquivo(arquivoDoClipboard(e.dataTransfer));
       });
     }
     document.addEventListener('paste', function (e) {
