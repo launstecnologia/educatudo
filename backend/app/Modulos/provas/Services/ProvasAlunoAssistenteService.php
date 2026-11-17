@@ -874,6 +874,7 @@ class ProvasAlunoAssistenteService
                 'faltas' => $resultado['faltas'] ?? null,
                 'ocorrencias' => $resultado['ocorrencias'] ?? null,
                 'provas_online' => $resultado['provas_online'] ?? null,
+                'evolucao' => $resultado['evolucao'] ?? null,
                 'pdf_url' => $pdfUrl,
                 'pdf_oficial_url' => $pdfOficial,
                 'opcoes' => [

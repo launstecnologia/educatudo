@@ -225,8 +225,29 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
     }
     function fmtData(iso) {
         if (!iso) return '—';
-        var m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
-        return m ? (m[3] + '/' + m[2] + '/' + m[1]) : esc(iso);
+        var s = String(iso).trim();
+        var m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::\d{2})?)?(Z|[+-]\d{2}:?\d{2})?/);
+        if (!m) return esc(s);
+        if (m[6]) {
+            var dt = new Date(s);
+            if (!isNaN(dt.getTime())) {
+                var partes = new Intl.DateTimeFormat('pt-BR', {
+                    timeZone: 'America/Sao_Paulo',
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: m[4] ? '2-digit' : undefined,
+                    minute: m[4] ? '2-digit' : undefined,
+                    hourCycle: 'h23'
+                }).formatToParts(dt);
+                var map = {};
+                partes.forEach(function (p) { map[p.type] = p.value; });
+                var dataBr = map.day + '/' + map.month + '/' + map.year;
+                return m[4] ? (dataBr + ' ' + map.hour + ':' + map.minute) : dataBr;
+            }
+        }
+        var data = m[3] + '/' + m[2] + '/' + m[1];
+        return m[4] ? (data + ' ' + m[4] + ':' + m[5]) : data;
     }
     function fmtNota(n) {
         if (n === null || n === undefined || n === '') return '—';
@@ -586,7 +607,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             var dataHoraCard = d.data_hora_label || '';
             if (!dataHoraCard) {
                 var rawDh = d.data_hora || payload.data_ocorrencia || payload.ocorrido_em || '';
-                dataHoraCard = rawDh ? String(rawDh) : '—';
+                dataHoraCard = rawDh ? fmtData(rawDh) : '—';
             }
             var envolvidosCard = Array.isArray(d.envolvidos) ? d.envolvidos.slice() : [];
             if (!envolvidosCard.length && Array.isArray(payload.alunos)) {
@@ -1290,7 +1311,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 var ask = 'Bloco ' + (b.titulo || '')
                     + (bid ? ' bloco_id=' + bid : '');
                 hb += '<tr class="border-t"><td class="px-3 py-2 font-medium">' + esc(b.titulo || '—')
-                    + '</td><td class="px-3 py-2">' + esc(b.data_prova || '—')
+                    + '</td><td class="px-3 py-2">' + fmtData(b.data_prova)
                     + '</td><td class="px-3 py-2 text-right"><button type="button" class="pa-btn-confirmar" data-ask="' + esc(ask) + '">Confirmar</button></td></tr>';
             });
             hb += '</tbody></table>';
@@ -1453,6 +1474,74 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 container.appendChild(t);
             }
 
+            tituloSecao360('Evolução');
+            var evo360 = painel.evolucao || {};
+            var score360 = document.createElement('div');
+            score360.className = 'grid grid-cols-2 sm:grid-cols-3 gap-2';
+            var tend360 = evo360.tendencia === 'subiu' ? 'Subiu'
+                : evo360.tendencia === 'caiu' ? 'Caiu'
+                : evo360.tendencia === 'estavel' ? 'Estável' : '—';
+            var tendCls360 = evo360.tendencia === 'subiu' ? 'text-emerald-700'
+                : evo360.tendencia === 'caiu' ? 'text-rose-700' : 'text-gray-900';
+            score360.innerHTML = card360('Score', evo360.score_label || '—', 'text-indigo-700')
+                + card360('Tendência', tend360, tendCls360)
+                + card360(evo360.rotulo_plural || 'Períodos', (evo360.periodos || []).filter(function (p) { return p.media != null; }).length);
+            container.appendChild(score360);
+            if (evo360.legenda) {
+                var leg360 = document.createElement('p');
+                leg360.className = 'text-xs text-slate-500 -mt-1';
+                leg360.textContent = evo360.legenda;
+                container.appendChild(leg360);
+            }
+            var pontos360 = (evo360.periodos || []).filter(function (p) { return p.media != null; });
+            if (!pontos360.length) {
+                var vazioEvo = document.createElement('p');
+                vazioEvo.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+                vazioEvo.textContent = evo360.aviso || 'Sem notas por bimestre ou trimestre para o gráfico.';
+                container.appendChild(vazioEvo);
+            } else {
+                var escala360 = Number(evo360.escala) > 0 ? Number(evo360.escala) : 10;
+                var W = 560, H = 210, L = 44, R = 16, T = 28, B = 42;
+                var iw = W - L - R, ih = H - T - B;
+                var nPts = pontos360.length;
+                function xEvo(i) { return L + (nPts === 1 ? iw / 2 : (iw * i / (nPts - 1))); }
+                function yEvo(v) {
+                    var c = Math.max(0, Math.min(escala360, Number(v)));
+                    return T + ih - (c / escala360) * ih;
+                }
+                var dLinha = pontos360.map(function (p, i) {
+                    return (i ? 'L' : 'M') + xEvo(i).toFixed(1) + ' ' + yEvo(p.media).toFixed(1);
+                }).join(' ');
+                var dArea = dLinha + ' L' + xEvo(nPts - 1).toFixed(1) + ' ' + (T + ih)
+                    + ' L' + xEvo(0).toFixed(1) + ' ' + (T + ih) + ' Z';
+                var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" class="w-full h-auto" role="img" aria-label="Evolução por período">';
+                [0, escala360 / 2, escala360].forEach(function (tick) {
+                    var y = yEvo(tick);
+                    svg += '<line x1="' + L + '" y1="' + y.toFixed(1) + '" x2="' + (W - R) + '" y2="' + y.toFixed(1) + '" stroke="#e2e8f0" stroke-width="1"/>';
+                    svg += '<text x="' + (L - 8) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="end" font-size="11" fill="#64748b">' + esc(String(tick).replace('.', ',')) + '</text>';
+                });
+                svg += '<path d="' + dArea + '" fill="#4f46e5" fill-opacity="0.12"/>';
+                svg += '<path d="' + dLinha + '" fill="none" stroke="#4f46e5" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
+                pontos360.forEach(function (p, i) {
+                    var x = xEvo(i), y = yEvo(p.media);
+                    svg += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="4.5" fill="#4f46e5" stroke="#fff" stroke-width="2"/>';
+                    svg += '<text x="' + x.toFixed(1) + '" y="' + (y - 10).toFixed(1) + '" text-anchor="middle" font-size="12" font-weight="600" fill="#312e81">' + esc(String(p.media).replace('.', ',')) + '</text>';
+                    svg += '<text x="' + x.toFixed(1) + '" y="' + (T + ih + 18) + '" text-anchor="middle" font-size="11" fill="#475569">' + esc(p.rotulo_curto || p.rotulo || '') + '</text>';
+                });
+                svg += '</svg>';
+                var boxEvo = document.createElement('div');
+                boxEvo.className = 'rounded-lg border border-gray-200 bg-white px-2 py-2';
+                boxEvo.innerHTML = svg;
+                container.appendChild(boxEvo);
+            }
+            if (evo360.analise) {
+                var ana360 = document.createElement('div');
+                ana360.className = 'rounded-lg border border-indigo-100 bg-indigo-50/70 px-4 py-3';
+                ana360.innerHTML = '<div class="text-xs font-semibold uppercase tracking-wide text-indigo-700 mb-1">Análise da Tudinha</div>'
+                    + '<p class="text-sm text-indigo-950 leading-relaxed">' + esc(evo360.analise) + '</p>';
+                container.appendChild(ana360);
+            }
+
             tituloSecao360('Boletim / notas');
             var bol360 = painel.boletim || {};
             if (painel.pdf_url || painel.pdf_oficial_url) {
@@ -1552,7 +1641,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             }
             listaOco360.forEach(function (o) {
                 ho360 += '<tr class="border-t align-top">'
-                    + '<td class="px-3 py-2 whitespace-nowrap">' + esc(o.data || '—') + '</td>'
+                    + '<td class="px-3 py-2 whitespace-nowrap">' + fmtData(o.data) + '</td>'
                     + '<td class="px-3 py-2"><div class="font-medium text-gray-900">' + esc(o.titulo || '—') + '</div>'
                     + (o.detalhe ? '<div class="text-xs text-gray-500 mt-0.5">' + esc(o.detalhe) + '</div>' : '')
                     + '</td>'
@@ -1591,7 +1680,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                     hp360 += '<tr class="border-t">'
                         + '<td class="px-3 py-2 font-medium">' + esc(p.titulo || '—') + '</td>'
                         + '<td class="px-3 py-2">' + esc(p.materia || '—') + '</td>'
-                        + '<td class="px-3 py-2 whitespace-nowrap">' + esc(p.data || '—') + '</td>'
+                        + '<td class="px-3 py-2 whitespace-nowrap">' + fmtData(p.data) + '</td>'
                         + '<td class="px-3 py-2 text-right text-emerald-700">' + esc(p.acertos != null ? p.acertos : 0) + '</td>'
                         + '<td class="px-3 py-2 text-right text-rose-700">' + esc(p.erros != null ? p.erros : 0) + '</td>'
                         + '<td class="px-3 py-2 text-right">' + esc(p.nota != null ? p.nota : '—') + '</td></tr>';
@@ -1668,7 +1757,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             var boxG = document.createElement('div');
             boxG.className = 'overflow-x-auto border border-gray-200 rounded-lg';
             var tituloG = 'Agenda de ' + esc(painel.dia_semana_label || 'hoje')
-                + (painel.data ? ' · ' + esc(painel.data) : '');
+                + (painel.data ? ' · ' + fmtData(painel.data) : '');
             var hg = '<div class="px-3 py-2 text-xs font-semibold uppercase text-slate-600 bg-slate-50 border-b">' + tituloG + '</div>'
                 + '<table class="min-w-full text-sm"><thead><tr class="text-xs text-slate-500 text-left">'
                 + '<th class="px-3 py-2">Horário</th><th class="px-3 py-2">Turma</th><th class="px-3 py-2">Professor</th><th class="px-3 py-2">Matéria</th><th class="px-3 py-2">Sala</th></tr></thead><tbody>';
@@ -1698,7 +1787,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             (painel.blocos || []).forEach(function (b) {
                 var ask = 'Mostrar resultados do bloco_id ' + b.bloco_id;
                 hlb += '<tr class="border-t"><td class="px-3 py-2 font-medium">' + esc(b.titulo || '—')
-                    + '</td><td class="px-3 py-2">' + esc(b.data_prova || '—')
+                    + '</td><td class="px-3 py-2">' + fmtData(b.data_prova)
                     + '</td><td class="px-3 py-2 text-right"><button type="button" class="pa-chip" data-ask="' + esc(ask) + '">Resultados</button></td></tr>';
             });
             hlb += '</tbody></table>';
@@ -2043,7 +2132,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                     + '<th class="px-3 py-2 text-left">Categoria</th></tr></thead><tbody>';
                 listaOco.forEach(function (o) {
                     ho += '<tr class="border-t align-top">'
-                        + '<td class="px-3 py-2 whitespace-nowrap">' + esc(o.data || '—') + '</td>'
+                        + '<td class="px-3 py-2 whitespace-nowrap">' + fmtData(o.data) + '</td>'
                         + '<td class="px-3 py-2"><div class="font-medium text-gray-900">' + esc(o.titulo || '—') + '</div>'
                         + (o.detalhe ? '<div class="text-xs text-gray-500 mt-0.5">' + esc(o.detalhe) + '</div>' : '')
                         + '</td>'
@@ -2088,7 +2177,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 + '<table class="min-w-full text-sm"><thead><tr class="text-xs text-slate-500 text-left">'
                 + '<th class="px-3 py-2">Data</th><th class="px-3 py-2">Aluno(s)</th><th class="px-3 py-2">Título</th><th class="px-3 py-2">Gravidade</th><th class="px-3 py-2">Status</th></tr></thead><tbody>';
             (painel.ocorrencias || []).forEach(function (o) {
-                hot += '<tr class="border-t align-top"><td class="px-3 py-2 whitespace-nowrap">' + esc(o.data || '—')
+                hot += '<tr class="border-t align-top"><td class="px-3 py-2 whitespace-nowrap">' + fmtData(o.data)
                     + '</td><td class="px-3 py-2">' + esc(o.alunos_nomes || '—')
                     + '</td><td class="px-3 py-2"><div class="font-medium text-gray-900">' + esc(o.titulo || '—') + '</div>'
                     + (o.detalhe ? '<div class="text-xs text-gray-500 mt-0.5">' + esc(o.detalhe) + '</div>' : '')

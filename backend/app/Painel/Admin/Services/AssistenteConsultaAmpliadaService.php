@@ -1412,6 +1412,39 @@ class AssistenteConsultaAmpliadaService
             $destaques[] = (string) $jornadas['error'];
         }
 
+        try {
+            $evolucao = $this->montarEvolucao360(
+                $boletimOk ? $boletim : [],
+                $provas,
+                (int) ($boletim['ano_letivo'] ?? $ano['ano'] ?? 0),
+                $nome,
+                isset($faltas['frequencia']['percentual']) ? (float) $faltas['frequencia']['percentual'] : null,
+                $pendencias['faltas'],
+                $totalOcorrencias,
+                $totalAbertas,
+                $totalProvas > 0 ? (int) ($provas['total_acertos'] ?? 0) : null,
+                $totalProvas > 0 ? (int) ($provas['total_erros'] ?? 0) : null
+            );
+        } catch (\Throwable $e) {
+            error_log('AssistenteConsultaAmpliada perfilAluno360 evolucao: ' . $e->getMessage());
+            $evolucao = [
+                'fonte' => null,
+                'escala' => 10,
+                'rotulo_campo' => 'Bimestre',
+                'rotulo_plural' => 'Bimestres',
+                'legenda' => 'Média das notas',
+                'score' => null,
+                'score_label' => null,
+                'tendencia' => null,
+                'delta' => null,
+                'periodos' => [],
+                'melhor' => null,
+                'atencao' => null,
+                'analise' => 'Não foi possível montar o score e a evolução neste momento.',
+                'aviso' => 'Evolução indisponível nesta consulta.',
+            ];
+        }
+
         $boletimPainel = $boletimOk ? [
             'formato' => $boletim['formato'] ?? null,
             'ano_letivo' => $boletim['ano_letivo'] ?? null,
@@ -1443,6 +1476,10 @@ class AssistenteConsultaAmpliadaService
                 'provas_online_total' => $totalProvas,
                 'provas_online_acertos' => $totalProvas > 0 ? (int) ($provas['total_acertos'] ?? 0) : null,
                 'provas_online_erros' => $totalProvas > 0 ? (int) ($provas['total_erros'] ?? 0) : null,
+                'score' => $evolucao['score'],
+                'score_label' => $evolucao['score_label'],
+                'tendencia' => $evolucao['tendencia'],
+                'analise' => $evolucao['analise'],
             ],
             'aluno' => [
                 'id' => $alunoId,
@@ -1469,6 +1506,7 @@ class AssistenteConsultaAmpliadaService
             'atividade' => $atividade,
             'pendencias' => $pendencias,
             'destaques' => array_slice($destaques, 0, 6),
+            'evolucao' => $evolucao,
             'boletim' => $boletimPainel,
         ];
     }
@@ -1530,6 +1568,7 @@ class AssistenteConsultaAmpliadaService
                     'data' => $p['evento']['data_prova'] ?? ($p['realizacao']['dia_realizacao'] ?? null),
                     'acertos' => $ac,
                     'erros' => $er,
+                    'bimestre' => isset($p['evento']['bimestre']) ? (int) $p['evento']['bimestre'] : null,
                     'nota' => $p['realizacao']['nota'] ?? null,
                     'percentual_acerto' => $p['realizacao']['percentual_acerto'] ?? null,
                 ];
@@ -1549,6 +1588,516 @@ class AssistenteConsultaAmpliadaService
                 ? ('Nenhuma prova online finalizada' . ($anoLetivo > 0 ? ' em ' . $anoLetivo : '') . '.')
                 : null,
         ];
+    }
+
+    /**
+     * Score e série por bimestre ou trimestre, com a análise escrita da Tudinha.
+     *
+     * @param array<string,mixed> $boletim
+     * @param array<string,mixed> $provas
+     * @return array<string,mixed>
+     */
+    private function montarEvolucao360(
+        array $boletim,
+        array $provas,
+        int $ano,
+        string $nome,
+        ?float $frequencia,
+        ?int $faltas,
+        int $ocorrencias,
+        int $abertas,
+        ?int $acertos,
+        ?int $erros
+    ): array {
+        $ano = $ano > 0 ? $ano : (int) date('Y');
+        $quadro = is_array($boletim['quadro'] ?? null) ? $boletim['quadro'] : [];
+        $periodos = $this->periodosDoQuadro($quadro, $ano);
+        $fonte = $periodos !== [] ? 'boletim' : null;
+        if ($periodos === []) {
+            $periodos = $this->periodosDosEventos(is_array($boletim['eventos'] ?? null) ? $boletim['eventos'] : [], $ano);
+            $fonte = $periodos !== [] ? 'boletim' : null;
+        }
+        if ($periodos === []) {
+            $periodos = $this->periodosDasProvas(is_array($provas['provas'] ?? null) ? $provas['provas'] : [], $ano);
+            $fonte = $periodos !== [] ? 'provas_online' : null;
+        }
+
+        $escala = 10;
+        foreach ($periodos as $p) {
+            if (($p['media'] ?? 0) > 10) {
+                $escala = 100;
+                break;
+            }
+        }
+        if ($fonte === 'provas_online') {
+            $escala = 100;
+        }
+
+        $score = null;
+        if ($periodos !== []) {
+            $soma = 0.0;
+            foreach ($periodos as $p) {
+                $soma += (float) $p['media'];
+            }
+            $score = round($soma / count($periodos), 1);
+        }
+
+        $tendencia = null;
+        $delta = null;
+        if (count($periodos) >= 2) {
+            $delta = round((float) $periodos[count($periodos) - 1]['media'] - (float) $periodos[0]['media'], 1);
+            $limite = $escala > 10 ? 3.0 : 0.3;
+            if (abs($delta) < $limite) {
+                $tendencia = 'estavel';
+            } elseif ($delta > 0) {
+                $tendencia = 'subiu';
+            } else {
+                $tendencia = 'caiu';
+            }
+        }
+
+        $ultimo = $periodos !== [] ? $periodos[count($periodos) - 1] : null;
+        $melhor = null;
+        $atencao = null;
+        if (is_array($ultimo) && !empty($ultimo['materias']) && is_array($ultimo['materias'])) {
+            $ordenadas = $ultimo['materias'];
+            usort($ordenadas, static fn(array $a, array $b): int => ($a['media'] <=> $b['media']));
+            $atencao = $ordenadas[0];
+            $melhor = $ordenadas[count($ordenadas) - 1];
+            if ($melhor !== null && $atencao !== null && $melhor['materia'] === $atencao['materia']) {
+                $melhor = null;
+            }
+        }
+
+        $info = \App\Core\PeriodoLetivo::doAno($ano);
+        $rotuloCampo = (string) ($info['rotulo_campo'] ?? 'Bimestre');
+        $rotuloPlural = (string) ($info['rotulo_campo_plural'] ?? 'Bimestres');
+        if ($periodos !== []) {
+            $blob = '';
+            foreach ($periodos as $p) {
+                $blob .= ' ' . (string) ($p['rotulo'] ?? '');
+            }
+            $blob = function_exists('mb_strtolower') ? mb_strtolower($blob, 'UTF-8') : strtolower($blob);
+            if (str_contains($blob, 'trimestre')) {
+                $rotuloCampo = 'Trimestre';
+                $rotuloPlural = 'Trimestres';
+            } elseif (str_contains($blob, 'semestre')) {
+                $rotuloCampo = 'Semestre';
+                $rotuloPlural = 'Semestres';
+            } elseif (str_contains($blob, 'bimestre')) {
+                $rotuloCampo = 'Bimestre';
+                $rotuloPlural = 'Bimestres';
+            }
+        }
+
+        $periodosSaida = [];
+        foreach ($periodos as $p) {
+            $periodosSaida[] = [
+                'numero' => (int) $p['numero'],
+                'rotulo' => (string) $p['rotulo'],
+                'rotulo_curto' => (string) $p['rotulo_curto'],
+                'media' => $p['media'],
+            ];
+        }
+
+        $legenda = $fonte === 'provas_online'
+            ? 'Acerto médio nas provas online'
+            : 'Média das notas';
+
+        return [
+            'fonte' => $fonte,
+            'escala' => $escala,
+            'rotulo_campo' => $rotuloCampo,
+            'rotulo_plural' => $rotuloPlural,
+            'legenda' => $legenda,
+            'score' => $score,
+            'score_label' => $score === null ? null : $this->fmtNotaBr($score),
+            'tendencia' => $tendencia,
+            'delta' => $delta,
+            'periodos' => $periodosSaida,
+            'melhor' => $melhor,
+            'atencao' => $atencao,
+            'analise' => $this->textoAnalise360(
+                $nome,
+                $fonte,
+                $rotuloPlural,
+                $score,
+                $tendencia,
+                $delta,
+                $periodosSaida,
+                $melhor,
+                $atencao,
+                $frequencia,
+                $faltas,
+                $ocorrencias,
+                $abertas,
+                $acertos,
+                $erros
+            ),
+            'aviso' => $periodosSaida === []
+                ? 'Sem notas por bimestre ou trimestre para montar a evolução.'
+                : null,
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $quadro
+     * @return list<array<string,mixed>>
+     */
+    private function periodosDoQuadro(array $quadro, int $ano): array
+    {
+        $colunas = is_array($quadro['colunas'] ?? null) ? $quadro['colunas'] : [];
+        $linhas = is_array($quadro['linhas'] ?? null) ? $quadro['linhas'] : [];
+        if ($colunas === [] || $linhas === []) {
+            return [];
+        }
+
+        $porNumero = [];
+        foreach ($colunas as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            $n = $this->numeroPeriodoColuna($c);
+            if ($n === null) {
+                continue;
+            }
+            $porNumero[$n][] = $c;
+        }
+        ksort($porNumero);
+
+        $out = [];
+        foreach ($porNumero as $n => $cols) {
+            $mediaCols = array_values(array_filter($cols, fn(array $c): bool => $this->colunaEhMedia($c)));
+            $soMu = array_values(array_filter($mediaCols, fn(array $c): bool => $this->colunaTerminaEm($c, 'MU')));
+            if ($soMu !== []) {
+                $mediaCols = $soMu;
+            }
+            $usar = $mediaCols !== []
+                ? $mediaCols
+                : array_values(array_filter($cols, fn(array $c): bool => !$this->colunaEhFaltaOuSituacao($c)));
+            if ($usar === []) {
+                continue;
+            }
+
+            $materias = [];
+            foreach ($linhas as $linha) {
+                if (!is_array($linha)) {
+                    continue;
+                }
+                $vals = [];
+                $notas = is_array($linha['notas'] ?? null) ? $linha['notas'] : [];
+                foreach ($usar as $c) {
+                    $cod = (string) ($c['codigo'] ?? '');
+                    if ($cod === '' || !array_key_exists($cod, $notas)) {
+                        continue;
+                    }
+                    $num = $this->notaNumericaCelula($notas[$cod]);
+                    if ($num !== null) {
+                        $vals[] = $num;
+                    }
+                }
+                if ($vals === []) {
+                    continue;
+                }
+                $materia = trim((string) ($linha['materia'] ?? ''));
+                $materias[] = [
+                    'materia' => $materia !== '' ? $materia : 'Componente',
+                    'media' => round(array_sum($vals) / count($vals), 1),
+                ];
+            }
+            if ($materias === []) {
+                continue;
+            }
+            $media = round(array_sum(array_column($materias, 'media')) / count($materias), 1);
+            $rotulo = \App\Core\PeriodoLetivo::rotulo($ano, (int) $n);
+            if ($rotulo === '') {
+                $rotulo = $n . 'º período';
+            }
+            $out[] = [
+                'numero' => (int) $n,
+                'rotulo' => $rotulo,
+                'rotulo_curto' => $n . 'º',
+                'media' => $media,
+                'materias' => $materias,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $eventos
+     * @return list<array<string,mixed>>
+     */
+    private function periodosDosEventos(array $eventos, int $ano): array
+    {
+        $porNumero = [];
+        foreach ($eventos as $ev) {
+            if (!is_array($ev)) {
+                continue;
+            }
+            $n = (int) ($ev['bimestre'] ?? 0);
+            if ($n < 1 || $n > 6) {
+                continue;
+            }
+            foreach ($ev['linhas'] ?? [] as $linha) {
+                if (!is_array($linha)) {
+                    continue;
+                }
+                $notas = is_array($linha['notas'] ?? null) ? $linha['notas'] : [];
+                $vals = [];
+                foreach ($notas as $valor) {
+                    $num = $this->notaNumericaCelula($valor);
+                    if ($num !== null) {
+                        $vals[] = $num;
+                    }
+                }
+                if ($vals === []) {
+                    continue;
+                }
+                $materia = trim((string) ($linha['materia'] ?? ''));
+                $porNumero[$n][] = [
+                    'materia' => $materia !== '' ? $materia : 'Componente',
+                    'media' => round(array_sum($vals) / count($vals), 1),
+                ];
+            }
+        }
+        ksort($porNumero);
+        $out = [];
+        foreach ($porNumero as $n => $materias) {
+            $media = round(array_sum(array_column($materias, 'media')) / count($materias), 1);
+            $rotulo = \App\Core\PeriodoLetivo::rotulo($ano, (int) $n);
+            $out[] = [
+                'numero' => (int) $n,
+                'rotulo' => $rotulo !== '' ? $rotulo : ($n . 'º período'),
+                'rotulo_curto' => $n . 'º',
+                'media' => $media,
+                'materias' => $materias,
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $provas
+     * @return list<array<string,mixed>>
+     */
+    private function periodosDasProvas(array $provas, int $ano): array
+    {
+        $porNumero = [];
+        foreach ($provas as $p) {
+            if (!is_array($p)) {
+                continue;
+            }
+            $n = (int) ($p['bimestre'] ?? 0);
+            if ($n < 1 || $n > 6) {
+                continue;
+            }
+            $pct = $p['percentual_acerto'] ?? null;
+            if ($pct === null || $pct === '' || !is_numeric($pct)) {
+                continue;
+            }
+            $porNumero[$n][] = (float) $pct;
+        }
+        ksort($porNumero);
+        $out = [];
+        foreach ($porNumero as $n => $vals) {
+            $media = round(array_sum($vals) / count($vals), 1);
+            $rotulo = \App\Core\PeriodoLetivo::rotulo($ano, (int) $n);
+            $out[] = [
+                'numero' => (int) $n,
+                'rotulo' => $rotulo !== '' ? $rotulo : ($n . 'º período'),
+                'rotulo_curto' => $n . 'º',
+                'media' => $media,
+                'materias' => [],
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * @param array<string,mixed> $coluna
+     */
+    private function numeroPeriodoColuna(array $coluna): ?int
+    {
+        $layout = strtolower(trim((string) ($coluna['layout_group'] ?? '')));
+        $cod = strtolower(trim((string) ($coluna['codigo'] ?? '')));
+        $cab = trim((string) ($coluna['cabecalho'] ?? ''));
+        if (preg_match('/^(?:b|t|tri|bim|sem)(\d)$/', $layout, $m) === 1) {
+            $n = (int) $m[1];
+            return ($n >= 1 && $n <= 6) ? $n : null;
+        }
+        if (preg_match('/(?:^|_)(?:b|t|tri|bim)(\d)(?:_|$)/', $cod, $m) === 1) {
+            $n = (int) $m[1];
+            return ($n >= 1 && $n <= 6) ? $n : null;
+        }
+        if (preg_match('/(\d)\s*[ºo°]/u', $cab, $m) === 1) {
+            $n = (int) $m[1];
+            return ($n >= 1 && $n <= 6) ? $n : null;
+        }
+        if (preg_match('/\b(IV|III|II|I)\b/u', $cab, $m) === 1) {
+            return ['I' => 1, 'II' => 2, 'III' => 3, 'IV' => 4][$m[1]] ?? null;
+        }
+        return null;
+    }
+
+    /**
+     * @param array<string,mixed> $coluna
+     */
+    private function colunaEhMedia(array $coluna): bool
+    {
+        $nome = $this->tokenColuna((string) ($coluna['nome'] ?? ''));
+        $cod = $this->tokenColuna((string) ($coluna['codigo'] ?? ''));
+        if (in_array($nome, ['MU', 'MS', 'MEDIA'], true)) {
+            return true;
+        }
+        if (preg_match('/(?:^|_)MU$/', $cod) === 1 || preg_match('/(?:^|_)MS$/', $cod) === 1) {
+            return true;
+        }
+        if (str_contains($nome, 'MEDIA') && !str_contains($nome, 'FINAL') && !str_contains($nome, 'ANUAL')) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @param array<string,mixed> $coluna
+     */
+    private function colunaTerminaEm(array $coluna, string $sufixo): bool
+    {
+        $nome = $this->tokenColuna((string) ($coluna['nome'] ?? ''));
+        $cod = $this->tokenColuna((string) ($coluna['codigo'] ?? ''));
+        $sufixo = $this->tokenColuna($sufixo);
+        return $nome === $sufixo || str_ends_with($cod, '_' . $sufixo) || str_ends_with($cod, $sufixo);
+    }
+
+    /**
+     * @param array<string,mixed> $coluna
+     */
+    private function colunaEhFaltaOuSituacao(array $coluna): bool
+    {
+        $nome = $this->tokenColuna((string) ($coluna['nome'] ?? ''));
+        if (in_array($nome, ['CH', 'FALTAS', 'FALTA', 'SIT', 'SITUACAO'], true)) {
+            return true;
+        }
+        return str_contains($nome, 'FALTA') || str_contains($nome, 'SITUAC');
+    }
+
+    private function tokenColuna(string $texto): string
+    {
+        $texto = trim($texto);
+        if (function_exists('mb_strtoupper')) {
+            $texto = mb_strtoupper($texto, 'UTF-8');
+        } else {
+            $texto = strtoupper($texto);
+        }
+        $texto = strtr($texto, ['Á' => 'A', 'À' => 'A', 'Â' => 'A', 'Ã' => 'A', 'É' => 'E', 'Ê' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ô' => 'O', 'Õ' => 'O', 'Ú' => 'U', 'Ç' => 'C']);
+        return $texto;
+    }
+
+    private function notaNumericaCelula($valor): ?float
+    {
+        if (is_array($valor)) {
+            $valor = $valor['valor'] ?? $valor['nota'] ?? $valor['texto'] ?? null;
+        }
+        if (is_int($valor) || is_float($valor)) {
+            return (float) $valor;
+        }
+        if (!is_string($valor)) {
+            return null;
+        }
+        $v = trim($valor);
+        if ($v === '' || $v === '—' || $v === '-') {
+            return null;
+        }
+        if (preg_match('/^(reprovado|aprovado|recuperacao|recuperação)$/iu', $v) === 1) {
+            return null;
+        }
+        $v = str_replace([' ', '%'], '', $v);
+        if (str_contains($v, ',') && str_contains($v, '.')) {
+            $v = str_replace('.', '', $v);
+        }
+        $v = str_replace(',', '.', $v);
+        if (!is_numeric($v)) {
+            return null;
+        }
+        return (float) $v;
+    }
+
+    private function fmtNotaBr(float $n): string
+    {
+        $casas = abs($n - round($n)) < 0.05 ? 0 : 1;
+        return number_format($n, $casas, ',', '');
+    }
+
+    /**
+     * @param list<array<string,mixed>> $periodos
+     * @param array{materia:string,media:float}|null $melhor
+     * @param array{materia:string,media:float}|null $atencao
+     */
+    private function textoAnalise360(
+        string $nome,
+        ?string $fonte,
+        string $rotuloPlural,
+        ?float $score,
+        ?string $tendencia,
+        ?float $delta,
+        array $periodos,
+        ?array $melhor,
+        ?array $atencao,
+        ?float $frequencia,
+        ?int $faltas,
+        int $ocorrencias,
+        int $abertas,
+        ?int $acertos,
+        ?int $erros
+    ): string {
+        $quem = trim($nome) !== '' ? trim($nome) : 'Este aluno';
+        $frases = [];
+        if ($score !== null) {
+            $frase = $quem . ' está com score ' . $this->fmtNotaBr($score);
+            $frase .= $fonte === 'provas_online'
+                ? ', o acerto médio das provas online ao longo dos ' . mb_strtolower($rotuloPlural) . '.'
+                : ', a média das notas nos ' . mb_strtolower($rotuloPlural) . '.';
+            $frases[] = $frase;
+        }
+        if ($tendencia !== null && $delta !== null && count($periodos) >= 2) {
+            $ini = (string) $periodos[0]['rotulo'];
+            $fim = (string) $periodos[count($periodos) - 1]['rotulo'];
+            $movimento = match ($tendencia) {
+                'subiu' => 'subiu ' . $this->fmtNotaBr(abs($delta)),
+                'caiu' => 'caiu ' . $this->fmtNotaBr(abs($delta)),
+                default => 'ficou estável',
+            };
+            $frases[] = 'Do ' . $ini . ' ao ' . $fim . ' a média ' . $movimento . '.';
+        } elseif (count($periodos) === 1) {
+            $frases[] = 'Há nota lançada só no ' . $periodos[0]['rotulo'] . ' (' . $this->fmtNotaBr((float) $periodos[0]['media']) . ').';
+        }
+        if (is_array($atencao)) {
+            $frases[] = 'No último período, ' . $atencao['materia'] . ' pede atenção (' . $this->fmtNotaBr((float) $atencao['media']) . ').';
+        }
+        if (is_array($melhor)) {
+            $frases[] = 'O resultado mais alto foi em ' . $melhor['materia'] . ' (' . $this->fmtNotaBr((float) $melhor['media']) . ').';
+        }
+        if ($frequencia !== null) {
+            $txtFreq = 'A frequência está em ' . $this->fmtNotaBr($frequencia) . '%';
+            if ($faltas !== null) {
+                $txtFreq .= ', com ' . $faltas . ' falta' . ($faltas === 1 ? '' : 's');
+            }
+            $frases[] = $txtFreq . '.';
+        }
+        if ($abertas > 0) {
+            $frases[] = 'Há ' . $abertas . ' ocorrência' . ($abertas === 1 ? '' : 's') . ' aberta' . ($abertas === 1 ? '' : 's') . '.';
+        } elseif ($ocorrencias > 0) {
+            $frases[] = 'As ' . $ocorrencias . ' ocorrências do período estão encerradas ou em acompanhamento.';
+        }
+        if ($fonte !== 'provas_online' && $acertos !== null && $erros !== null) {
+            $frases[] = 'Nas provas online, ' . $acertos . ' acertos e ' . $erros . ' erros.';
+        }
+        if ($frases === []) {
+            return 'Ainda não há notas por período, faltas ou ocorrências para analisar este aluno.';
+        }
+        return implode(' ', $frases);
     }
 
     /**
