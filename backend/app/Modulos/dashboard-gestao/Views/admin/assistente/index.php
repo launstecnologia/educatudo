@@ -1534,6 +1534,47 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 boxEvo.innerHTML = svg;
                 container.appendChild(boxEvo);
             }
+            var disc360 = evo360.disciplinas || [];
+            if (disc360.length) {
+                tituloSecao360('Por disciplina');
+                var k360 = evo360.kpis || {};
+                var cardsDisc = document.createElement('div');
+                cardsDisc.className = 'grid grid-cols-2 sm:grid-cols-5 gap-2';
+                cardsDisc.innerHTML = card360('Disciplinas', k360.disciplinas || disc360.length)
+                    + card360('Na média ou acima', k360.acima || 0, 'text-emerald-700')
+                    + card360('Abaixo da média', k360.abaixo || 0, 'text-rose-700')
+                    + card360('Subiram', k360.subiram || 0, 'text-emerald-700')
+                    + card360('Caíram', k360.cairam || 0, 'text-rose-700');
+                container.appendChild(cardsDisc);
+
+                var colsPer = (evo360.periodos || []).filter(function (p) { return p.media != null; });
+                var boxDisc = document.createElement('div');
+                boxDisc.className = 'overflow-x-auto border border-gray-200 rounded-lg';
+                var hd = '<table class="min-w-full text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-600"><tr>'
+                    + '<th class="px-3 py-2 text-left">Disciplina</th>';
+                colsPer.forEach(function (p) {
+                    hd += '<th class="px-3 py-2 text-right">' + esc(p.rotulo_curto || p.rotulo || '') + '</th>';
+                });
+                hd += '<th class="px-3 py-2 text-right">Média</th><th class="px-3 py-2 text-right">Variação</th><th class="px-3 py-2 text-left">Tendência</th></tr></thead><tbody>';
+                disc360.forEach(function (d) {
+                    var mapa = {};
+                    (d.pontos || []).forEach(function (pt) { mapa[pt.numero] = pt.media; });
+                    var tendTxt = d.tendencia === 'subiu' ? 'Subiu' : d.tendencia === 'caiu' ? 'Caiu' : d.tendencia === 'estavel' ? 'Estável' : '—';
+                    var tendCor = d.tendencia === 'subiu' ? 'text-emerald-700' : d.tendencia === 'caiu' ? 'text-rose-700' : 'text-slate-600';
+                    var varCor = (d.delta || 0) > 0 ? 'text-emerald-700' : (d.delta || 0) < 0 ? 'text-rose-700' : 'text-slate-600';
+                    hd += '<tr class="border-t"><td class="px-3 py-2 font-medium text-gray-900">' + esc(d.materia || '—') + '</td>';
+                    colsPer.forEach(function (p) {
+                        var nota = mapa[p.numero];
+                        hd += '<td class="px-3 py-2 text-right">' + (nota == null ? '—' : esc(String(nota).replace('.', ','))) + '</td>';
+                    });
+                    hd += '<td class="px-3 py-2 text-right font-semibold">' + esc(d.media_label || '—') + '</td>'
+                        + '<td class="px-3 py-2 text-right ' + varCor + '">' + esc(d.delta_label || '—') + '</td>'
+                        + '<td class="px-3 py-2 ' + tendCor + '">' + esc(tendTxt) + '</td></tr>';
+                });
+                hd += '</tbody></table>';
+                boxDisc.innerHTML = hd;
+                container.appendChild(boxDisc);
+            }
             if (evo360.analise) {
                 var ana360 = document.createElement('div');
                 ana360.className = 'rounded-lg border border-indigo-100 bg-indigo-50/70 px-4 py-3';

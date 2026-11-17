@@ -1438,6 +1438,15 @@ class AssistenteConsultaAmpliadaService
                 'tendencia' => null,
                 'delta' => null,
                 'periodos' => [],
+                'disciplinas' => [],
+                'kpis' => [
+                    'disciplinas' => 0,
+                    'acima' => 0,
+                    'abaixo' => 0,
+                    'subiram' => 0,
+                    'cairam' => 0,
+                    'estaveis' => 0,
+                ],
                 'melhor' => null,
                 'atencao' => null,
                 'analise' => 'Não foi possível montar o score e a evolução neste momento.',
@@ -1690,6 +1699,31 @@ class AssistenteConsultaAmpliadaService
             }
         }
 
+        $limiteDisc = $escala > 10 ? 3.0 : 0.3;
+        $disciplinas = $this->disciplinasDaEvolucao($periodos, $limiteDisc, $score);
+        $kpis = [
+            'disciplinas' => count($disciplinas),
+            'acima' => 0,
+            'abaixo' => 0,
+            'subiram' => 0,
+            'cairam' => 0,
+            'estaveis' => 0,
+        ];
+        foreach ($disciplinas as $disc) {
+            if (($disc['faixa'] ?? '') === 'acima') {
+                $kpis['acima']++;
+            } elseif (($disc['faixa'] ?? '') === 'abaixo') {
+                $kpis['abaixo']++;
+            }
+            if (($disc['tendencia'] ?? '') === 'subiu') {
+                $kpis['subiram']++;
+            } elseif (($disc['tendencia'] ?? '') === 'caiu') {
+                $kpis['cairam']++;
+            } elseif (($disc['tendencia'] ?? '') === 'estavel') {
+                $kpis['estaveis']++;
+            }
+        }
+
         $periodosSaida = [];
         foreach ($periodos as $p) {
             $periodosSaida[] = [
@@ -1715,6 +1749,8 @@ class AssistenteConsultaAmpliadaService
             'tendencia' => $tendencia,
             'delta' => $delta,
             'periodos' => $periodosSaida,
+            'disciplinas' => $disciplinas,
+            'kpis' => $kpis,
             'melhor' => $melhor,
             'atencao' => $atencao,
             'analise' => $this->textoAnalise360(
@@ -1738,6 +1774,93 @@ class AssistenteConsultaAmpliadaService
                 ? 'Sem notas por bimestre ou trimestre para montar a evolução.'
                 : null,
         ];
+    }
+
+    /**
+     * Uma série por disciplina, na ordem do boletim, com média e tendência.
+     *
+     * @param list<array<string,mixed>> $periodos
+     * @return list<array<string,mixed>>
+     */
+    private function disciplinasDaEvolucao(array $periodos, float $limite, ?float $referencia): array
+    {
+        $mapa = [];
+        $ordem = [];
+        foreach ($periodos as $p) {
+            if (!is_array($p)) {
+                continue;
+            }
+            $numero = (int) ($p['numero'] ?? 0);
+            if ($numero < 1) {
+                continue;
+            }
+            foreach ($p['materias'] ?? [] as $m) {
+                if (!is_array($m)) {
+                    continue;
+                }
+                $nome = trim((string) ($m['materia'] ?? ''));
+                if ($nome === '' || !isset($m['media']) || !is_numeric($m['media'])) {
+                    continue;
+                }
+                $chave = function_exists('mb_strtolower') ? mb_strtolower($nome, 'UTF-8') : strtolower($nome);
+                if (!isset($mapa[$chave])) {
+                    $mapa[$chave] = ['materia' => $nome, 'pontos' => []];
+                    $ordem[] = $chave;
+                }
+                $mapa[$chave]['pontos'][$numero] = [
+                    'numero' => $numero,
+                    'rotulo_curto' => (string) ($p['rotulo_curto'] ?? ($numero . 'º')),
+                    'media' => round((float) $m['media'], 1),
+                ];
+            }
+        }
+
+        $out = [];
+        foreach ($ordem as $chave) {
+            $item = $mapa[$chave];
+            ksort($item['pontos']);
+            $pontos = array_values($item['pontos']);
+            if ($pontos === []) {
+                continue;
+            }
+            $soma = 0.0;
+            foreach ($pontos as $pt) {
+                $soma += (float) $pt['media'];
+            }
+            $media = round($soma / count($pontos), 1);
+            $ultima = (float) $pontos[count($pontos) - 1]['media'];
+            $delta = count($pontos) >= 2
+                ? round($ultima - (float) $pontos[0]['media'], 1)
+                : null;
+            $tendencia = null;
+            if ($delta !== null) {
+                if (abs($delta) < $limite) {
+                    $tendencia = 'estavel';
+                } elseif ($delta > 0) {
+                    $tendencia = 'subiu';
+                } else {
+                    $tendencia = 'caiu';
+                }
+            }
+            $faixa = null;
+            if ($referencia !== null) {
+                $faixa = ($media + 0.05) >= $referencia ? 'acima' : 'abaixo';
+            }
+            $out[] = [
+                'materia' => $item['materia'],
+                'pontos' => $pontos,
+                'media' => $media,
+                'media_label' => $this->fmtNotaBr($media),
+                'ultima' => $ultima,
+                'ultima_label' => $this->fmtNotaBr($ultima),
+                'delta' => $delta,
+                'delta_label' => $delta === null ? null : (($delta > 0 ? '+' : '') . $this->fmtNotaBr($delta)),
+                'tendencia' => $tendencia,
+                'faixa' => $faixa,
+            ];
+        }
+
+        return $out;
     }
 
     /**
