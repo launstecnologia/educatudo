@@ -47,8 +47,8 @@ class JaasWebhookController extends BaseController
         }
 
         $preAuthenticatedLink = trim((string) ($payload['data']['preAuthenticatedLink'] ?? $payload['preAuthenticatedLink'] ?? ''));
-        if ($preAuthenticatedLink === '' || filter_var($preAuthenticatedLink, FILTER_VALIDATE_URL) === false) {
-            $this->json(['success' => false, 'error' => 'Link de gravação ausente'], 422);
+        if ($preAuthenticatedLink === '' || !$this->linkDeGravacaoPermitido($preAuthenticatedLink)) {
+            $this->json(['success' => false, 'error' => 'Link de gravação não permitido'], 422);
             return;
         }
 
@@ -107,7 +107,15 @@ class JaasWebhookController extends BaseController
             }
         }
 
-        if ($timestamp === '' || $signature === '') {
+        if ($timestamp === '' || $signature === '' || !preg_match('/^[0-9]{10,13}$/', $timestamp)) {
+            return false;
+        }
+
+        $momento = (int) $timestamp;
+        if ($momento > 9999999999) {
+            $momento = intdiv($momento, 1000);
+        }
+        if (abs(time() - $momento) > 300) {
             return false;
         }
 
@@ -132,39 +140,74 @@ class JaasWebhookController extends BaseController
         $relativePath = $relativeDir . '/jaas_recording_' . $sessionId . '.mp4';
         $absolutePath = __DIR__ . '/../../../storage/' . $relativePath;
 
-        $write = @fopen($absolutePath, 'wb');
-        if (!$write) {
-            throw new \RuntimeException('Não foi possível criar o arquivo local da gravação.');
+        if (!function_exists('curl_init')) {
+            throw new \RuntimeException('cURL é necessário para baixar a gravação.');
         }
 
-        if (function_exists('curl_init')) {
-            $ch = curl_init($url);
-            curl_setopt_array($ch, [
+        $urlAtual = $url;
+        $baixou = false;
+        for ($salto = 0; $salto < 4; $salto++) {
+            if (!$this->linkDeGravacaoPermitido($urlAtual)) {
+                @unlink($absolutePath);
+                throw new \RuntimeException('Link de gravação não permitido.');
+            }
+
+            $write = @fopen($absolutePath, 'wb');
+            if (!$write) {
+                throw new \RuntimeException('Não foi possível criar o arquivo local da gravação.');
+            }
+
+            $ch = curl_init($urlAtual);
+            $opcoesCurl = [
                 CURLOPT_FILE => $write,
-                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_FOLLOWLOCATION => false,
                 CURLOPT_CONNECTTIMEOUT => 15,
                 CURLOPT_TIMEOUT => 600,
-                CURLOPT_FAILONERROR => true,
                 CURLOPT_SSL_VERIFYPEER => true,
                 CURLOPT_SSL_VERIFYHOST => 2,
-            ]);
+            ];
+            if (defined('CURLPROTO_HTTPS')) {
+                $opcoesCurl[CURLOPT_PROTOCOLS] = CURLPROTO_HTTPS;
+            }
+            curl_setopt_array($ch, $opcoesCurl);
+            $destino = $this->destinoFixoDoLink($urlAtual);
+            if ($destino === null) {
+                curl_close($ch);
+                fclose($write);
+                @unlink($absolutePath);
+                throw new \RuntimeException('Link de gravação não permitido.');
+            }
+            curl_setopt($ch, CURLOPT_RESOLVE, $destino);
+
             $ok = curl_exec($ch);
-            $error = curl_error($ch);
+            $codigo = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+            $redirecionamento = (string) curl_getinfo($ch, CURLINFO_REDIRECT_URL);
             curl_close($ch);
             fclose($write);
+
             if (!$ok) {
                 @unlink($absolutePath);
-                throw new \RuntimeException('Download via cURL falhou: ' . $error);
+                throw new \RuntimeException('Download via cURL falhou.');
             }
-        } else {
-            $read = @fopen($url, 'rb');
-            if (!$read) {
-                fclose($write);
-                throw new \RuntimeException('Não foi possível abrir o link temporário da JaaS.');
+
+            if ($codigo >= 300 && $codigo < 400 && $redirecionamento !== '') {
+                @unlink($absolutePath);
+                $urlAtual = $redirecionamento;
+                continue;
             }
-            stream_copy_to_stream($read, $write);
-            fclose($read);
-            fclose($write);
+
+            if ($codigo !== 200) {
+                @unlink($absolutePath);
+                throw new \RuntimeException('Download da gravação recusado pelo servidor de origem.');
+            }
+
+            $baixou = true;
+            break;
+        }
+
+        if (!$baixou) {
+            @unlink($absolutePath);
+            throw new \RuntimeException('Download da gravação excedeu os redirecionamentos permitidos.');
         }
 
         if (!is_file($absolutePath) || filesize($absolutePath) <= 0) {
@@ -173,6 +216,106 @@ class JaasWebhookController extends BaseController
         }
 
         return $relativePath;
+    }
+
+    private function linkDeGravacaoPermitido(string $url): bool
+    {
+        $partes = parse_url($url);
+        if (!is_array($partes) || strtolower((string) ($partes['scheme'] ?? '')) !== 'https') {
+            return false;
+        }
+        $host = strtolower((string) ($partes['host'] ?? ''));
+        if ($host === '' || $host === 'localhost' || str_ends_with($host, '.local') || str_ends_with($host, '.internal')) {
+            return false;
+        }
+        if (isset($partes['user']) || isset($partes['pass'])) {
+            return false;
+        }
+
+        return $this->destinoFixoDoLink($url) !== null;
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private function destinoFixoDoLink(string $url): ?array
+    {
+        $partes = parse_url($url);
+        if (!is_array($partes)) {
+            return null;
+        }
+        $host = trim((string) ($partes['host'] ?? ''), '[]');
+        $porta = isset($partes['port']) ? (int) $partes['port'] : 443;
+        if ($host === '' || $porta < 1 || $porta > 65535) {
+            return null;
+        }
+
+        $ips = $this->ipsPublicosDoHost($host);
+        if ($ips === []) {
+            return null;
+        }
+
+        $destino = [];
+        foreach ($ips as $ip) {
+            $endereco = str_contains($ip, ':') ? '[' . $ip . ']' : $ip;
+            $destino[] = $host . ':' . $porta . ':' . $endereco;
+        }
+
+        return $destino;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function ipsPublicosDoHost(string $host): array
+    {
+        $host = strtolower(trim($host, '[]'));
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            return $this->ipPublico($host) ? [$host] : [];
+        }
+
+        $encontrados = [];
+        if (function_exists('dns_get_record')) {
+            $registros = @dns_get_record($host, DNS_A + DNS_AAAA);
+            if (is_array($registros)) {
+                foreach ($registros as $registro) {
+                    if (!empty($registro['ip'])) {
+                        $encontrados[] = (string) $registro['ip'];
+                    }
+                    if (!empty($registro['ipv6'])) {
+                        $encontrados[] = (string) $registro['ipv6'];
+                    }
+                }
+            }
+        }
+        if ($encontrados === []) {
+            $v4 = @gethostbynamel($host);
+            if (is_array($v4)) {
+                $encontrados = $v4;
+            }
+        }
+        if ($encontrados === []) {
+            return [];
+        }
+
+        $publicos = [];
+        foreach ($encontrados as $ip) {
+            if (!$this->ipPublico((string) $ip)) {
+                return [];
+            }
+            $publicos[] = (string) $ip;
+        }
+
+        return array_values(array_unique($publicos));
+    }
+
+    private function ipPublico(string $ip): bool
+    {
+        return filter_var(
+            $ip,
+            FILTER_VALIDATE_IP,
+            FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+        ) !== false;
     }
 
     private function resolveWebhookSecret(): string

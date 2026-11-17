@@ -206,10 +206,11 @@
                 
                 <div>
                     <label for="db_pass" class="block text-sm font-medium text-gray-700 mb-2">
-                        Senha <span class="text-red-500">*</span>
+                        Senha <span class="text-red-500" id="db_pass_obrigatoria">*</span>
                     </label>
-                    <input type="password" id="db_pass" name="db_pass" required
+                    <input type="password" id="db_pass" name="db_pass" autocomplete="new-password"
                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <p class="mt-1 text-xs text-gray-500">Na edição, deixe em branco para manter a senha atual.</p>
                 </div>
             </div>
             
@@ -252,7 +253,8 @@
                         <label for="ssh_pass" class="block text-sm font-medium text-gray-700 mb-2">
                             SSH Senha
                         </label>
-                        <input type="password" id="ssh_pass" name="ssh_pass"
+                        <input type="password" id="ssh_pass" name="ssh_pass" autocomplete="new-password"
+                               placeholder="Em branco mantém a senha atual"
                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                     </div>
                 </div>
@@ -307,7 +309,8 @@ function abrirModalEscola(escola = null) {
         document.getElementById('db_port').value = escola.db_port;
         document.getElementById('db_name').value = escola.db_name;
         document.getElementById('db_user').value = escola.db_user;
-        document.getElementById('db_pass').value = escola.db_pass;
+        document.getElementById('db_pass').value = '';
+        document.getElementById('db_pass').required = false;
         document.getElementById('escola_ativo').checked = escola.ativo == 1;
         
         // Campos SSH
@@ -315,13 +318,14 @@ function abrirModalEscola(escola = null) {
             document.getElementById('ssh_host').value = escola.ssh_host || '';
             document.getElementById('ssh_port').value = escola.ssh_port || 22;
             document.getElementById('ssh_user').value = escola.ssh_user || '';
-            document.getElementById('ssh_pass').value = escola.ssh_pass || '';
+            document.getElementById('ssh_pass').value = '';
             document.getElementById('ssh_path').value = escola.ssh_path || '';
         }
     } else {
         titulo.textContent = 'Adicionar Escola';
         form.reset();
         document.getElementById('escola_id').value = '';
+        document.getElementById('db_pass').required = true;
         document.getElementById('escola_ativo').checked = true;
         if (document.getElementById('ssh_port')) {
             document.getElementById('ssh_port').value = 22;

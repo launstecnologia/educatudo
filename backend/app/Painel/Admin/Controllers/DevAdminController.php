@@ -1445,8 +1445,8 @@ class DevAdminController extends AdminBaseController
         
         // Para cada escola, verificar quais migrations já foram executadas
         foreach ($escolas as &$escola) {
-            $escola['db_pass'] = MasterSecretVault::decryptDbPassword($escola['db_pass'] ?? '');
-            $escola['ssh_pass'] = MasterSecretVault::decryptDbPassword($escola['ssh_pass'] ?? '');
+            $this->cifrarSenhasDaEscolaNoBanco($escola);
+            unset($escola['db_pass'], $escola['ssh_pass']);
             $migrationsExecutadas = $this->db->fetchAll(
                 "SELECT migration_file, executada_em, status, mensagem_erro 
                  FROM migrations_executadas 
@@ -1493,24 +1493,47 @@ class DevAdminController extends AdminBaseController
             $db_port = !empty($_POST['db_port']) ? (int)$_POST['db_port'] : 3306;
             $db_name = trim($_POST['db_name'] ?? '');
             $db_user = trim($_POST['db_user'] ?? '');
-            $db_pass = $_POST['db_pass'] ?? '';
+            $db_pass = trim((string) ($_POST['db_pass'] ?? ''));
             $ativo = isset($_POST['ativo']) ? (int)$_POST['ativo'] : 1;
             
             // Campos SSH (opcionais, apenas para demo.educatudo.com)
             $ssh_host = trim($_POST['ssh_host'] ?? '');
             $ssh_port = !empty($_POST['ssh_port']) ? (int)$_POST['ssh_port'] : 22;
             $ssh_user = trim($_POST['ssh_user'] ?? '');
-            $ssh_pass = $_POST['ssh_pass'] ?? '';
+            $ssh_pass = trim((string) ($_POST['ssh_pass'] ?? ''));
             $ssh_path = trim($_POST['ssh_path'] ?? '');
             
-            if (empty($escola_nome) || empty($db_host) || empty($db_name) || empty($db_user) || empty($db_pass)) {
+            if (empty($escola_nome) || empty($db_host) || empty($db_name) || empty($db_user)) {
                 throw new \Exception('Todos os campos de banco de dados são obrigatórios');
             }
 
-            $db_pass = $this->cifrarSegredoConexao($db_pass, 'senha do banco');
-            $ssh_pass = trim((string) $ssh_pass) === ''
-                ? null
-                : $this->cifrarSegredoConexao($ssh_pass, 'senha SSH');
+            if ($id) {
+                $atual = $this->db->fetch(
+                    "SELECT db_pass, ssh_pass FROM config_escolas_database WHERE id = :id",
+                    ['id' => $id]
+                );
+                if (!$atual) {
+                    throw new \Exception('Escola não encontrada');
+                }
+                $db_pass = $db_pass === ''
+                    ? $this->cifrarSeTextoPuro((string) ($atual['db_pass'] ?? ''))
+                    : $this->cifrarSegredoConexao($db_pass, 'senha do banco');
+                if ($db_pass === '') {
+                    throw new \Exception('Senha do banco é obrigatória');
+                }
+                if ($ssh_pass === '') {
+                    $sshArmazenada = (string) ($atual['ssh_pass'] ?? '');
+                    $ssh_pass = $sshArmazenada === '' ? null : $this->cifrarSeTextoPuro($sshArmazenada);
+                } else {
+                    $ssh_pass = $this->cifrarSegredoConexao($ssh_pass, 'senha SSH');
+                }
+            } else {
+                if ($db_pass === '') {
+                    throw new \Exception('Todos os campos de banco de dados são obrigatórios');
+                }
+                $db_pass = $this->cifrarSegredoConexao($db_pass, 'senha do banco');
+                $ssh_pass = $ssh_pass === '' ? null : $this->cifrarSegredoConexao($ssh_pass, 'senha SSH');
+            }
             
             if ($id) {
                 // Atualizar
@@ -1858,6 +1881,10 @@ class DevAdminController extends AdminBaseController
             );
         }
         
+        if (is_array($escola)) {
+            unset($escola['db_pass'], $escola['ssh_pass']);
+        }
+
         $data = [
             'title' => 'SSH e Git - EducaTudo',
             'user' => $user,
@@ -1906,10 +1933,7 @@ class DevAdminController extends AdminBaseController
                 throw new \Exception('Configuração SSH não encontrada para esta escola');
             }
             
-            $comandosPermitidos = $this->comandosSshPermitidos();
-            if (!in_array($comando, $comandosPermitidos, true)) {
-                throw new \Exception('Comando não permitido. Use apenas um destes, por extenso: ' . implode(', ', $comandosPermitidos));
-            }
+            $comando = $this->comandoSshCanonico($comando);
             
             // Verificar se extensão SSH2 está disponível
             if (!function_exists('ssh2_connect')) {
@@ -1927,10 +1951,10 @@ class DevAdminController extends AdminBaseController
                 throw new \Exception('Falha na autenticação SSH. Verifique usuário e senha.');
             }
             
-            // Navegar para o diretório do projeto se especificado
-            $comandoFinal = $comando;
+            $partes = array_map('escapeshellarg', explode(' ', $comando));
+            $comandoFinal = implode(' ', $partes);
             if (!empty($escola['ssh_path'])) {
-                $comandoFinal = "cd " . escapeshellarg($escola['ssh_path']) . " && " . $comando;
+                $comandoFinal = 'cd ' . escapeshellarg((string) $escola['ssh_path']) . ' && ' . $comandoFinal;
             }
             
             $stream = @ssh2_exec($connection, $comandoFinal);
@@ -2180,6 +2204,56 @@ class DevAdminController extends AdminBaseController
             'php -v',
             'composer --version',
         ];
+    }
+
+    private function comandoSshCanonico(string $comando): string
+    {
+        $permitidos = $this->comandosSshPermitidos();
+        $indice = array_search($comando, $permitidos, true);
+        if ($indice === false) {
+            throw new \Exception('Comando não permitido. Use apenas um destes, por extenso: ' . implode(', ', $permitidos));
+        }
+
+        return $permitidos[$indice];
+    }
+
+    private function cifrarSeTextoPuro(string $valor): string
+    {
+        if ($valor === '' || MasterSecretVault::isEncryptedDbPassword($valor)) {
+            return $valor;
+        }
+
+        $cifrado = MasterSecretVault::encryptDbPassword($valor);
+        return ($cifrado === null || $cifrado === '') ? $valor : $cifrado;
+    }
+
+    private function cifrarSenhasDaEscolaNoBanco(array &$escola): void
+    {
+        $dbPass = (string) ($escola['db_pass'] ?? '');
+        $sshPass = (string) ($escola['ssh_pass'] ?? '');
+        $dbNova = $this->cifrarSeTextoPuro($dbPass);
+        $sshNova = $this->cifrarSeTextoPuro($sshPass);
+        if ($dbNova === $dbPass && $sshNova === $sshPass) {
+            return;
+        }
+
+        $parametros = [
+            'id' => (int) $escola['id'],
+            'db_pass' => $dbNova,
+            'ssh_pass' => $sshNova === '' ? null : $sshNova,
+            'db_pass_lida' => $dbPass,
+        ];
+        if ($sshPass === '') {
+            $sql = "UPDATE config_escolas_database
+                    SET db_pass = :db_pass, ssh_pass = :ssh_pass
+                    WHERE id = :id AND db_pass = :db_pass_lida AND (ssh_pass IS NULL OR ssh_pass = '')";
+        } else {
+            $sql = "UPDATE config_escolas_database
+                    SET db_pass = :db_pass, ssh_pass = :ssh_pass
+                    WHERE id = :id AND db_pass = :db_pass_lida AND ssh_pass = :ssh_pass_lida";
+            $parametros['ssh_pass_lida'] = $sshPass;
+        }
+        $this->db->update($sql, $parametros);
     }
 
     private function cifrarSegredoConexao(string $valor, string $rotulo): string
