@@ -71,6 +71,12 @@ class ApiAuthMiddleware
             return;
         }
 
+        if (($payload['api_version'] ?? '') === 'v1' || array_key_exists('session_id', $payload)) {
+            $this->logInvalidAttempt();
+            $this->unauthorized('Token da API mobile não é aceito nesta rota');
+            return;
+        }
+
         $parentId = isset($payload['user_id']) ? (int) $payload['user_id'] : 0;
         if ($parentId <= 0) {
             $this->unauthorized('Token inválido');

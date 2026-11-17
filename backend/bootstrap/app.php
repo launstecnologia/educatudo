@@ -742,21 +742,42 @@ if (strpos($path, 'static/') === 0) {
         exit;
     }
 }
-// Servir /public/uploads/* (layout, capa login, logos etc. — evita "rota não encontrada" no log)
-if (strpos($path, 'public/uploads/') === 0 && strpos($path, 'public/uploads/cadernos_aluno/') !== 0) {
-    $uploadsFile = BASE_PATH . '/' . $path;
-    if (file_exists($uploadsFile) && is_file($uploadsFile)) {
-        $realPath = realpath($uploadsFile);
-        $realDir = realpath(BASE_PATH . '/public/uploads');
-        if ($realDir !== false && $realPath !== false && strpos($realPath, $realDir) === 0) {
-            $ext = strtolower(pathinfo($uploadsFile, PATHINFO_EXTENSION));
-            $mimes = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp', 'svg' => 'image/svg+xml', 'ico' => 'image/x-icon'];
-            if (isset($mimes[$ext])) {
-                header('Content-Type: ' . $mimes[$ext]);
+// /uploads/ e /public/uploads/ passam por aqui. Redação, arquivo de aluno,
+// mensagem e ticket só saem com permissão no registro. O resto (logo, tema,
+// documento de jornada) continua público, sem execução de script.
+$uploadRel = null;
+if (strpos($path, 'public/uploads/') === 0) {
+    $uploadRel = substr($path, strlen('public/'));
+} elseif (strpos($path, 'uploads/') === 0) {
+    $uploadRel = $path;
+}
+if ($uploadRel !== null && strpos($uploadRel, '..') === false) {
+    $decisaoUpload = \App\Infra\Services\AcessoArquivoPrivado::pastaDireta($uploadRel);
+    if ($decisaoUpload === 'negado') {
+        http_response_code(403);
+        header('X-Content-Type-Options: nosniff');
+        exit;
+    }
+    if ($decisaoUpload !== 'rota') {
+        $uploadsFile = BASE_PATH . '/public/' . $uploadRel;
+        $ext = strtolower(pathinfo($uploadsFile, PATHINFO_EXTENSION));
+        $extBloqueada = in_array($ext, ['php', 'phtml', 'phar', 'html', 'htm', 'xhtml', 'js', 'shtml', 'svg'], true);
+        if (!$extBloqueada && is_file($uploadsFile)) {
+            $realPath = realpath($uploadsFile);
+            $realDir = realpath(BASE_PATH . '/public/uploads');
+            if ($realDir !== false && $realPath !== false && strpos($realPath, $realDir . DIRECTORY_SEPARATOR) === 0) {
+                $mimes = [
+                    'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
+                    'gif' => 'image/gif', 'webp' => 'image/webp', 'ico' => 'image/x-icon',
+                    'pdf' => 'application/pdf', 'mp4' => 'video/mp4', 'webm' => 'video/webm',
+                    'mp3' => 'audio/mpeg', 'wav' => 'audio/wav',
+                ];
+                header('Content-Type: ' . ($mimes[$ext] ?? 'application/octet-stream'));
+                header('X-Content-Type-Options: nosniff');
+                header('Cache-Control: ' . ($decisaoUpload === 'privado' ? 'private, max-age=3600' : 'public, max-age=86400'));
+                readfile($uploadsFile);
+                exit;
             }
-            header('Cache-Control: public, max-age=86400');
-            readfile($uploadsFile);
-            exit;
         }
     }
 }
