@@ -373,24 +373,8 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
      */
     public function buscarAlunosPorTurma()
     {
-        header('Content-Type: application/json');
-        $turmaId = (int)($_GET['turma_id'] ?? 0);
-        if ($turmaId <= 0) {
-            $this->json(['alunos' => []]);
-            return;
-        }
-
-        $db = Database::getInstance();
-        $alunos = $db->fetchAll(
-            "SELECT id, nome 
-             FROM alunos 
-             WHERE turma_id = :turma_id 
-               AND (senha_hash IS NULL OR senha_hash = '') 
-               AND (primeiro_acesso IS NULL OR primeiro_acesso = 1)
-             ORDER BY nome ASC",
-            ['turma_id' => $turmaId]
-        );
-        $this->json(['alunos' => $alunos]);
+        http_response_code(404);
+        $this->json(['error' => 'Recurso indisponível']);
     }
 
     /**

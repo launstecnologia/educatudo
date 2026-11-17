@@ -60,6 +60,8 @@ class AuthMiddleware
             $this->redirectToLogin();
         }
 
+        $this->bloquearSeSenhaPadraoPendente();
+
         $user = $this->auth->getUser();
         if ($this->adminFoiOcultadoDaListagem($user)) {
             try {
@@ -278,6 +280,106 @@ class AuthMiddleware
         http_response_code(302);
         header('Location: ' . URL . '/admin/dashboard');
         exit;
+    }
+
+    /**
+     * Conta com senha inicial só acessa a tela de troca e o logout.
+     * A checagem no banco ocorre uma vez por sessão.
+     */
+    private function bloquearSeSenhaPadraoPendente(): void
+    {
+        if (!empty($_SESSION['impersonated_by_master'])) {
+            return;
+        }
+
+        $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '';
+        $path = rtrim((string) $path, '/') ?: '/';
+        $liberados = [
+            '/aluno/alterar-senha-obrigatoria',
+            '/professor/alterar-senha-obrigatoria',
+            '/monitor/alterar-senha-obrigatoria',
+            '/pais/alterar-senha-obrigatoria',
+            '/logout',
+        ];
+        foreach ($liberados as $liberado) {
+            if ($path === $liberado) {
+                return;
+            }
+        }
+
+        if (!array_key_exists('senha_padrao_pendente', $_SESSION)) {
+            $user = $this->auth->getUser();
+            $_SESSION['senha_padrao_pendente'] = (is_array($user) && $this->detectarSenhaPadraoPendente($user)) ? 1 : 0;
+        }
+        if ((int) $_SESSION['senha_padrao_pendente'] !== 1) {
+            return;
+        }
+
+        $tipo = (string) ($_SESSION['user_type'] ?? '');
+        $destinos = [
+            'aluno' => '/aluno/alterar-senha-obrigatoria',
+            'professor' => '/professor/alterar-senha-obrigatoria',
+            'monitor' => '/monitor/alterar-senha-obrigatoria',
+            'pai' => '/pais/alterar-senha-obrigatoria',
+        ];
+        $destino = $destinos[$tipo] ?? '';
+        if ($destino === '') {
+            return;
+        }
+
+        $isAjax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower((string) $_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+        $acceptsJson = isset($_SERVER['HTTP_ACCEPT']) && strpos((string) $_SERVER['HTTP_ACCEPT'], 'application/json') !== false;
+        if ($isAjax || $acceptsJson) {
+            http_response_code(403);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'success' => false,
+                'error' => 'Altere a senha inicial para continuar.',
+                'redirect' => URL . $destino,
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        header('Location: ' . URL . $destino);
+        exit;
+    }
+
+    private function detectarSenhaPadraoPendente(array $user): bool
+    {
+        $tipo = (string) ($user['tipo'] ?? '');
+        $id = (int) ($user['id'] ?? 0);
+        if ($id <= 0) {
+            return false;
+        }
+
+        if ($tipo === 'pai') {
+            $row = $this->db->fetch(
+                'SELECT force_password_change, senha_hash FROM responsaveis WHERE id = :id AND ativo = 1',
+                ['id' => $id]
+            );
+            if (!$row) {
+                return false;
+            }
+            if ((int) ($row['force_password_change'] ?? 0) === 1) {
+                return true;
+            }
+            return password_verify('123456', (string) ($row['senha_hash'] ?? ''));
+        }
+
+        if ($tipo === 'aluno') {
+            $row = $this->db->fetch('SELECT senha_hash FROM alunos WHERE id = :id', ['id' => $id]);
+        } elseif ($tipo === 'professor') {
+            $row = $this->db->fetch('SELECT senha_hash FROM professores WHERE id = :id', ['id' => $id]);
+        } elseif ($tipo === 'monitor') {
+            $row = $this->db->fetch('SELECT senha_hash FROM monitores WHERE id = :id', ['id' => $id]);
+        } else {
+            return false;
+        }
+        if (!$row || empty($row['senha_hash'])) {
+            return false;
+        }
+
+        return password_verify('123456', (string) $row['senha_hash']);
     }
 
 }

@@ -483,7 +483,7 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
         );
         
         if (!$aluno || !password_verify('123456', $aluno['senha_hash'])) {
-            // Se não tem senha padrão, redireciona para dashboard
+            $this->authManager->liberarAcessoAposTrocaDeSenha();
             $this->redirect(URL . '/dashboard');
         }
         
@@ -539,6 +539,8 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
             if ($result === false) {
                 throw new \Exception('Erro ao atualizar senha');
             }
+
+            $this->authManager->liberarAcessoAposTrocaDeSenha();
             
             $this->json([
                 'success' => true, 
@@ -3404,6 +3406,10 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
             http_response_code(400);
             exit;
         }
+        if (!\App\Infra\Services\AcessoArquivoPrivado::podeLer('chat', $f)) {
+            http_response_code(403);
+            exit;
+        }
         $media = new MediaStorageService($this->config);
         if ($media->isS3()) {
             $url = $media->getViewUrl('chat', $f, $f);
@@ -3413,16 +3419,18 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
             }
         }
         $filepath = $media->getLocalPath('chat', $f);
+        if (($filepath === null || !is_file($filepath)) && strpos($f, '/') === false) {
+            $filepath = $media->getLocalPath('chat', 'files/' . $f);
+        }
         if ($filepath === null || !is_file($filepath)) {
             http_response_code(404);
             exit;
         }
         $ext = strtolower(pathinfo($filepath, PATHINFO_EXTENSION));
-        $mimes = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp'];
-        if (isset($mimes[$ext])) {
-            header('Content-Type: ' . $mimes[$ext]);
-        }
-        header('Cache-Control: public, max-age=86400');
+        $mimes = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp', 'pdf' => 'application/pdf'];
+        header('Content-Type: ' . ($mimes[$ext] ?? 'application/octet-stream'));
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, max-age=3600');
         readfile($filepath);
         exit;
     }

@@ -42,7 +42,7 @@ $router->post('/api/auth/login', 'Api/AuthController@login');
 $router->get('/api/docs', 'Api/SwaggerController@index');
 $router->get('/api/openapi.json', 'Api/SwaggerController@openapi');
 
-// API de geração de imagens educacionais (OpenAI Images)
+// Geração de imagem (OpenAI). A rota fica aqui, mas o controller só aceita sessão Master.
 $router->post('/api/generate-image', 'Api/GenerateImageController@generate');
 
 // API REST Pais - Rotas protegidas por JWT (ApiAuth)
@@ -86,6 +86,7 @@ $router->post('/recuperar-senha/reset', 'Auth/AuthController@processarReset');
 // Primeiro acesso do aluno (GET = formulário; POST = valida na mesma URL, sem fetch)
 $router->get('/primeiro-acesso', 'Auth/AuthController@primeiroAcesso');
 $router->post('/primeiro-acesso', 'Auth/AuthController@primeiroAcesso');
+// Legado: não lista mais alunos. O formulário pede o nome completo.
 $router->get('/primeiro-acesso/alunos', 'Auth/AuthController@buscarAlunosPorTurma');
 $router->get('/primeiro-acesso/validar', 'Auth/AuthController@redirectPrimeiroAcesso'); // GET → redireciona para o formulário
 $router->post('/primeiro-acesso/validar', 'Auth/AuthController@validarPrimeiroAcesso');

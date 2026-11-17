@@ -48,15 +48,20 @@ class FileProcessorService
             throw new Exception('Tipo de arquivo não suportado. Tipos aceitos: ' . implode(', ', $allowedTypes));
         }
         
-        // Salvar arquivo
-        $filename = 'file_' . time() . '_' . uniqid() . '.' . $extension;
+        $alunoId = (int) ($_SESSION['user_id'] ?? 0);
+        if (($_SESSION['user_type'] ?? '') !== 'aluno' || $alunoId <= 0) {
+            throw new Exception('Não autorizado');
+        }
+
+        // Salvar arquivo com o id do aluno no nome, servido só pela rota autenticada.
+        $filename = 'file_' . $alunoId . '_' . bin2hex(random_bytes(8)) . '.' . $extension;
         $filepath = $this->uploadDir . $filename;
         
         if (!move_uploaded_file($file['tmp_name'], $filepath)) {
             throw new Exception('Erro ao salvar arquivo');
         }
         
-        $url = URL . '/storage/chat/files/' . $filename;
+        $url = rtrim((string) URL, '/') . '/chat/ver-imagem?f=' . rawurlencode('files/' . $filename);
         
         // Extrair conteúdo baseado no tipo
         $texto = '';

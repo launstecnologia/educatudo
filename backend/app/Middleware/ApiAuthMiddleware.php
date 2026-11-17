@@ -7,6 +7,7 @@ namespace App\Middleware;
  */
 
 
+use App\Core\Database;
 use App\Services\JWTService;
 use App\Core\Logger;
 class ApiAuthMiddleware
@@ -63,8 +64,24 @@ class ApiAuthMiddleware
             return;
         }
 
+        $tenant = (string) ($payload['tenant'] ?? '');
+        if ($tenant === '' || !hash_equals(MobileApiAuthMiddleware::currentTenantKey(), $tenant)) {
+            $this->logInvalidAttempt();
+            $this->unauthorized('Token emitido para outra escola');
+            return;
+        }
+
         $parentId = isset($payload['user_id']) ? (int) $payload['user_id'] : 0;
         if ($parentId <= 0) {
+            $this->unauthorized('Token inválido');
+            return;
+        }
+
+        $parent = Database::getInstance()->fetch(
+            'SELECT id FROM responsaveis WHERE id = :id AND ativo = 1',
+            ['id' => $parentId]
+        );
+        if (!$parent) {
             $this->unauthorized('Token inválido');
             return;
         }

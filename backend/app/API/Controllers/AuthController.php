@@ -9,6 +9,7 @@ namespace App\API\Controllers;
 
 use App\Core\BaseController;
 use App\Core\Database;
+use App\Middleware\MobileApiAuthMiddleware;
 use App\Services\JWTService;
 use App\Core\Logger;
 
@@ -76,6 +77,7 @@ class AuthController extends BaseController
         $payload = [
             'user_id' => (int) $pai['id'],
             'role' => 'parent',
+            'tenant' => MobileApiAuthMiddleware::currentTenantKey(),
         ];
         $token = $this->jwt->encode($payload);
 

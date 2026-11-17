@@ -151,6 +151,7 @@ class AuthManager
                     'turma_nome' => $aluno['turma_nome'],
                     'serie' => $aluno['serie'],
                     'tipo' => 'aluno',
+                    'is_default_password' => password_verify('123456', (string) ($aluno['senha_hash'] ?? '')),
                 ];
             }
         } elseif ($tipo === 'admin') {
@@ -179,6 +180,7 @@ class AuthManager
                     'nome' => $professor['nome'],
                     'email' => $professor['email'],
                     'tipo' => 'professor',
+                    'is_default_password' => password_verify('123456', (string) ($professor['senha_hash'] ?? '')),
                 ];
             }
         } elseif ($tipo === 'pai') {
@@ -193,7 +195,8 @@ class AuthManager
                     'email' => $pai['email'] ?? '',
                     'telefone' => $pai['telefone'] ?? '',
                     'tipo' => 'pai',
-                    'must_change_password' => 0,
+                    'is_default_password' => password_verify('123456', (string) ($pai['senha_hash'] ?? '')),
+                    'must_change_password' => (int) ($pai['force_password_change'] ?? 0) === 1,
                 ];
             }
         }
@@ -201,6 +204,11 @@ class AuthManager
             throw new \Exception('Esta conta LEX ainda não foi sincronizada nesta escola.');
         }
         $this->createSession($user, $user['tipo']);
+    }
+
+    public function liberarAcessoAposTrocaDeSenha(): void
+    {
+        $_SESSION['senha_padrao_pendente'] = 0;
     }
     
     /**
@@ -269,7 +277,8 @@ class AuthManager
             'turma_nome' => $aluno['turma_nome'],
             'serie' => $aluno['serie'],
             'data_nasc' => $aluno['data_nasc'],
-            'tipo' => 'aluno'
+            'tipo' => 'aluno',
+            'is_default_password' => password_verify('123456', (string) ($aluno['senha_hash'] ?? '')),
         ];
     }
     
@@ -368,6 +377,7 @@ class AuthManager
             'cpf' => $pai['cpf'],
             'telefone' => $pai['telefone'],
             'tipo' => 'pai',
+            'is_default_password' => password_verify('123456', (string) ($pai['senha_hash'] ?? '')),
             'must_change_password' => (int)($pai['force_password_change'] ?? 0) === 1
         ];
     }
@@ -394,6 +404,9 @@ class AuthManager
         $_SESSION['login_time'] = time();
         $_SESSION['last_activity'] = time();
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        if (array_key_exists('is_default_password', $user) || array_key_exists('must_change_password', $user)) {
+            $_SESSION['senha_padrao_pendente'] = (!empty($user['is_default_password']) || !empty($user['must_change_password'])) ? 1 : 0;
+        }
 
         switch ($tipo) {
             case 'admin':

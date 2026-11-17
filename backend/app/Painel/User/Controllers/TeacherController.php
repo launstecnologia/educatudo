@@ -71,7 +71,7 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
         );
         
         if (!$professor || !password_verify('123456', $professor['senha_hash'])) {
-            // Se não tem senha padrão, redireciona para dashboard
+            $this->authManager->liberarAcessoAposTrocaDeSenha();
             $this->redirect(URL . '/professor/dashboard');
         }
         
@@ -130,6 +130,8 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
             if ($result === false) {
                 throw new \Exception('Erro ao atualizar senha');
             }
+
+            $this->authManager->liberarAcessoAposTrocaDeSenha();
             
             $this->json([
                 'success' => true, 

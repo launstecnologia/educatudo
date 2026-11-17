@@ -114,17 +114,6 @@ class AIJobController
                 }
             }
 
-            if (!empty($_GET['debug']) && $_GET['debug'] === '1') {
-                $response['debug'] = [
-                    'job_id' => $jobId,
-                    'user_id_session' => $currentUserId,
-                    'user_type' => $userType,
-                    'job_user_id' => (int) ($job['user_id'] ?? 0),
-                    'job_user_role' => (string) ($job['user_role'] ?? ''),
-                    'request_uri' => (string) ($_SERVER['REQUEST_URI'] ?? ''),
-                ];
-            }
-
             if ($job['status'] === 'done') {
                 $response['result'] = is_array($decoded) ? $decoded : ['raw' => $job['result']];
             }

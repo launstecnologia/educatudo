@@ -1518,10 +1518,13 @@ class ParentController extends BaseController
     {
         $user = $this->auth->getUser();
         $responsavel = $this->db->fetch(
-            "SELECT id, force_password_change FROM responsaveis WHERE id = :id AND ativo = 1",
+            "SELECT id, force_password_change, senha_hash FROM responsaveis WHERE id = :id AND ativo = 1",
             ['id' => $user['id'] ?? 0]
         );
-        if (!$responsavel || (int)($responsavel['force_password_change'] ?? 0) !== 1) {
+        $senhaInicial = $responsavel && password_verify('123456', (string) ($responsavel['senha_hash'] ?? ''));
+        $trocaForcada = $responsavel && (int) ($responsavel['force_password_change'] ?? 0) === 1;
+        if (!$responsavel || (!$trocaForcada && !$senhaInicial)) {
+            $this->auth->liberarAcessoAposTrocaDeSenha();
             $this->redirect('/pais/dashboard');
             return;
         }
@@ -1573,6 +1576,7 @@ class ParentController extends BaseController
                  WHERE id = :id",
                 ['senha_hash' => password_hash($novaSenha, PASSWORD_DEFAULT), 'id' => $responsavel['id']]
             );
+            $this->auth->liberarAcessoAposTrocaDeSenha();
 
             $this->json([
                 'success' => true,

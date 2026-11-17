@@ -427,10 +427,10 @@ class CadernoController extends BaseController
         exit;
     }
 
-    private function processarAnexos($cadernoId)
+    private function processarAnexos($cadernoId): int
     {
         if (empty($_FILES['anexos']) || $_FILES['anexos']['error'][0] === UPLOAD_ERR_NO_FILE) {
-            return;
+            return 0;
         }
         $baseDir = $this->uploadDir . $cadernoId;
         if (!is_dir($baseDir)) {
@@ -447,18 +447,33 @@ class CadernoController extends BaseController
                 'size' => [$files['size']],
             ];
         }
-        $allowedImages = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        $mapaMime = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            'image/webp' => 'webp',
+            'application/pdf' => 'pdf',
+        ];
         $maxSize = 10 * 1024 * 1024; // 10MB
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $recusados = 0;
         for ($i = 0; $i < $count; $i++) {
             if ($files['error'][$i] !== UPLOAD_ERR_OK || $files['size'][$i] > $maxSize) {
                 continue;
             }
-            $mime = $files['type'][$i];
-            $tipo = in_array($mime, $allowedImages) ? 'imagem' : 'documento';
-            $ext = pathinfo($files['name'][$i], PATHINFO_EXTENSION) ?: 'bin';
-            $nomeArquivo = uniqid('anexo_', true) . '.' . $ext;
+            $tmp = (string) ($files['tmp_name'][$i] ?? '');
+            if ($tmp === '' || !is_uploaded_file($tmp)) {
+                continue;
+            }
+            $mime = (string) ($finfo->file($tmp) ?: '');
+            if (!isset($mapaMime[$mime])) {
+                $recusados++;
+                continue;
+            }
+            $tipo = str_starts_with($mime, 'image/') ? 'imagem' : 'documento';
+            $nomeArquivo = bin2hex(random_bytes(16)) . '.' . $mapaMime[$mime];
             $caminho = $baseDir . '/' . $nomeArquivo;
-            if (!move_uploaded_file($files['tmp_name'][$i], $caminho)) {
+            if (!move_uploaded_file($tmp, $caminho)) {
                 continue;
             }
             $this->db->insert(
@@ -466,13 +481,17 @@ class CadernoController extends BaseController
                 [
                     'caderno_id' => $cadernoId,
                     'tipo' => $tipo,
-                    'nome_original' => $files['name'][$i],
+                    'nome_original' => basename((string) ($files['name'][$i] ?? 'anexo')),
                     'caminho_arquivo' => $caminho,
                     'mime_type' => $mime,
                     'tamanho' => (int)$files['size'][$i],
                 ]
             );
         }
+        if ($recusados > 0) {
+            $_SESSION['error_message'] = 'Algum anexo foi ignorado. Envie apenas imagem (JPG, PNG, GIF, WEBP) ou PDF.';
+        }
+        return $recusados;
     }
 
     public function excluirAnexo()
@@ -525,10 +544,20 @@ class CadernoController extends BaseController
             header('HTTP/1.0 404 Not Found');
             exit;
         }
-        $mime = $anexo['mime_type'] ?: 'application/octet-stream';
-        $disposition = $anexo['tipo'] === 'imagem' ? 'inline' : 'attachment';
+        $permitidos = [
+            'image/jpeg' => 'inline',
+            'image/png' => 'inline',
+            'image/gif' => 'inline',
+            'image/webp' => 'inline',
+            'application/pdf' => 'inline',
+        ];
+        $mimeGravado = (string) ($anexo['mime_type'] ?? '');
+        $mimePermitido = isset($permitidos[$mimeGravado]);
+        $disposition = $mimePermitido ? $permitidos[$mimeGravado] : 'attachment';
+        $mime = $mimePermitido ? $mimeGravado : 'application/octet-stream';
         header('Content-Type: ' . $mime);
-        header('Content-Disposition: ' . $disposition . '; filename="' . str_replace('"', '\\"', $anexo['nome_original']) . '"');
+        header('X-Content-Type-Options: nosniff');
+        header('Content-Disposition: ' . $disposition . '; filename="' . str_replace('"', '\\"', basename((string) ($anexo['nome_original'] ?? 'anexo'))) . '"');
         readfile($anexo['caminho_arquivo']);
         exit;
     }

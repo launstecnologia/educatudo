@@ -25,6 +25,11 @@ class GenerateImageController extends BaseController
             return;
         }
 
+        if (empty($_SESSION['master_user_id'])) {
+            $this->json(['success' => false, 'error' => 'Não autorizado'], 401);
+            return;
+        }
+
         $input = $this->getJsonInput();
         $prompt = isset($input['prompt']) ? trim((string) $input['prompt']) : '';
 

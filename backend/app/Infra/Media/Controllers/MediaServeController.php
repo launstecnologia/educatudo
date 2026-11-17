@@ -12,6 +12,7 @@ namespace App\Infra\Media\Controllers;
  */
 
 use App\Core\BaseController;
+use App\Infra\Services\AcessoArquivoPrivado;
 use App\Infra\Services\MediaStorageService;
 
 class MediaServeController extends BaseController
@@ -81,6 +82,10 @@ class MediaServeController extends BaseController
         // Tipos privados: exige sessão autenticada (cookie enviado pelo <img>/<a>).
         if (!in_array($type, self::PUBLIC_TYPES, true) && !$isLoggedIn) {
             http_response_code(401);
+            exit;
+        }
+        if (!in_array($type, self::PUBLIC_TYPES, true) && !AcessoArquivoPrivado::podeLer($type, $key)) {
+            http_response_code(403);
             exit;
         }
 

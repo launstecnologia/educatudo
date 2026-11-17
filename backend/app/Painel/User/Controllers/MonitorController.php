@@ -42,6 +42,7 @@ if (!class_exists(__NAMESPACE__ . '\\MonitorController', false)) {
             $user = $this->authManager->getUser();
             $monitor = $this->getMonitorRecord();
             if (!$monitor || !password_verify('123456', $monitor['senha_hash'])) {
+                $this->authManager->liberarAcessoAposTrocaDeSenha();
                 $this->redirect('/monitor/dashboard');
                 return;
             }
@@ -78,6 +79,7 @@ if (!class_exists(__NAMESPACE__ . '\\MonitorController', false)) {
                     "UPDATE monitores SET senha_hash = :hash WHERE id = :id",
                     ['hash' => password_hash($nova, PASSWORD_DEFAULT), 'id' => $user['id']]
                 );
+                $this->authManager->liberarAcessoAposTrocaDeSenha();
                 $this->json(['success' => true, 'redirect' => URL . '/monitor/dashboard']);
             } catch (\Exception $e) {
                 $this->json(['error' => $e->getMessage()], 400);

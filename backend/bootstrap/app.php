@@ -180,6 +180,7 @@ if (session_status() === PHP_SESSION_NONE && extension_loaded('redis')) {
 
 // ─── Configuração segura de sessão (antes de session_start) ───
 if (session_status() === PHP_SESSION_NONE) {
+    $pedidoHttps = educatudoDetectHttps();
     if (!headers_sent()) {
         $sessionDomain = (string) ($bootstrapEnv['SESSION_DOMAIN'] ?? '');
         // Chrome/Chromium rejeitam cookies com Domain=localhost ou Domain=.localhost
@@ -189,13 +190,13 @@ if (session_status() === PHP_SESSION_NONE) {
         if ($sessionDomainNorm === 'localhost') {
             $sessionDomain = '';
         }
-        // SESSION_SECURE explícito no .env tem prioridade; senão detecta HTTPS (proxy-aware).
-        if ($bootstrapEnv['SESSION_SECURE'] !== null && $bootstrapEnv['SESSION_SECURE'] !== '') {
-            $isSecure = strtolower((string) $bootstrapEnv['SESSION_SECURE']) === 'true'
-                || $bootstrapEnv['SESSION_SECURE'] === '1';
-        } else {
-            $isSecure = educatudoDetectHttps();
-        }
+        // HTTPS real (inclusive atrás de proxy) sempre marca o cookie Secure.
+        // SESSION_SECURE=false no .env não desliga isso; só deixa o cookie inseguro no HTTP local.
+        $secureExplicito = $bootstrapEnv['SESSION_SECURE'] !== null
+            && $bootstrapEnv['SESSION_SECURE'] !== ''
+            && (strtolower((string) $bootstrapEnv['SESSION_SECURE']) === 'true' || $bootstrapEnv['SESSION_SECURE'] === '1');
+        $isSecure = $pedidoHttps || $secureExplicito;
+        session_name('EDUCATUDO_SESSION');
         if (PHP_VERSION_ID >= 70300) {
             session_set_cookie_params([
                 'lifetime' => 0,
@@ -210,6 +211,9 @@ if (session_status() === PHP_SESSION_NONE) {
         }
     }
     @session_start();
+    if ($pedidoHttps && !headers_sent()) {
+        header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+    }
     // Token CSRF é criado apenas em BaseController::generateCsrf() (nunca aqui, para não sobrescrever).
 }
 
@@ -739,7 +743,7 @@ if (strpos($path, 'static/') === 0) {
     }
 }
 // Servir /public/uploads/* (layout, capa login, logos etc. — evita "rota não encontrada" no log)
-if (strpos($path, 'public/uploads/') === 0) {
+if (strpos($path, 'public/uploads/') === 0 && strpos($path, 'public/uploads/cadernos_aluno/') !== 0) {
     $uploadsFile = BASE_PATH . '/' . $path;
     if (file_exists($uploadsFile) && is_file($uploadsFile)) {
         $realPath = realpath($uploadsFile);
@@ -756,16 +760,16 @@ if (strpos($path, 'public/uploads/') === 0) {
         }
     }
 }
-// Servir /storage/chat/* quando o arquivo existe (localhost e produção; evita "rota não encontrada" para imagens do chat)
+// /storage/chat/* não é público. Só entrega com sessão que pode ler o arquivo.
 $pathForStorage = ltrim($path, '/');
 if (strpos($pathForStorage, 'storage/chat/') === 0) {
-    $relFile = $pathForStorage; // ex: storage/chat/chat_3_xxx.jpg
-    $filename = substr($relFile, strlen('storage/chat/'));
-    // Mesmo caminho que StudentController usa no upload (BASE_PATH = src ao rodar index.php)
+    $filename = substr($pathForStorage, strlen('storage/chat/'));
+    if ($filename === '' || strpos($filename, '..') !== false || !\App\Infra\Services\AcessoArquivoPrivado::podeLer('chat', $filename)) {
+        http_response_code(403);
+        exit;
+    }
     $baseDirs = [
         BASE_PATH . '/storage/chat',
-        BASE_PATH . '/storage/chat',
-        BASE_PATH . '/app/Controllers/User/../../storage/chat'
     ];
     foreach ($baseDirs as $storageChatDir) {
         $storageChatFile = $storageChatDir . '/' . $filename;
@@ -774,16 +778,17 @@ if (strpos($pathForStorage, 'storage/chat/') === 0) {
             $realDir = realpath($storageChatDir);
             if ($realDir !== false && $realPath !== false && strpos($realPath, $realDir) === 0) {
                 $ext = strtolower(pathinfo($storageChatFile, PATHINFO_EXTENSION));
-                $mimes = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp'];
-                if (isset($mimes[$ext])) {
-                    header('Content-Type: ' . $mimes[$ext]);
-                }
-                header('Cache-Control: public, max-age=86400');
+                $mimes = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp', 'pdf' => 'application/pdf'];
+                header('Content-Type: ' . ($mimes[$ext] ?? 'application/octet-stream'));
+                header('X-Content-Type-Options: nosniff');
+                header('Cache-Control: private, max-age=3600');
                 readfile($storageChatFile);
                 exit;
             }
         }
     }
+    http_response_code(404);
+    exit;
 }
 // Servir /storage/images/* (imagens geradas pela API de geração educacional)
 if (strpos($pathForStorage, 'storage/images/') === 0) {
