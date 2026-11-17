@@ -12,6 +12,10 @@
  *
  * Idempotente (prefixo SM24). Recusa qualquer banco que não seja educatudo_educa.
  *
+ * No painel Master esta carga não aparece: o Escolher lista só
+ * database/migrations/*importar_dados_*.sql
+ *   2026_11_16_importar_dados_santa_maria_ana_2024_frequencia.sql
+ *
  * Uso (no container PHP / servidor da escola de teste):
  *   php scripts/seed_frequencia_ocorrencia_faltas_ana_2024.php --confirmar
  *   php scripts/seed_frequencia_ocorrencia_faltas_ana_2024.php --confirmar --dry-run
