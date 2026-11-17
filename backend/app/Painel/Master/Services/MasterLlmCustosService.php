@@ -477,7 +477,12 @@ class MasterLlmCustosService
         usort($porTipo, static fn ($a, $b) => $b['cost_usd'] <=> $a['cost_usd']);
         foreach ($porTipo as &$row) {
             $row['cost_usd'] = round((float) $row['cost_usd'], 6);
-            $row['cost_brl'] = round((float) $row['cost_usd'] * $cotacao, 2);
+            $finTipo = self::montarFinanceiro(0.0, (float) $row['cost_usd'], $cotacao, (int) ($row['total_tokens'] ?? 0));
+            $row['cost_brl'] = (float) ($finTipo['custo_brl'] ?? 0);
+            $row['custo_brl'] = $row['cost_brl'];
+            $row['venda_brl'] = (float) ($finTipo['receita_ideal_brl'] ?? 0);
+            $row['lucro_brl'] = (float) ($finTipo['lucro_ideal_brl'] ?? 0);
+            $row['creditos_equivalentes_uso'] = (float) ($finTipo['creditos_equivalentes_uso'] ?? 0);
         }
         unset($row);
 
@@ -485,7 +490,12 @@ class MasterLlmCustosService
         $porDia = array_values($aggDia);
         foreach ($porDia as &$row) {
             $row['cost_usd'] = round((float) $row['cost_usd'], 6);
-            $row['cost_brl'] = round((float) $row['cost_usd'] * $cotacao, 2);
+            $finDia = self::montarFinanceiro(0.0, (float) $row['cost_usd'], $cotacao, (int) ($row['total_tokens'] ?? 0));
+            $row['cost_brl'] = (float) ($finDia['custo_brl'] ?? 0);
+            $row['custo_brl'] = $row['cost_brl'];
+            $row['venda_brl'] = (float) ($finDia['receita_ideal_brl'] ?? 0);
+            $row['lucro_brl'] = (float) ($finDia['lucro_ideal_brl'] ?? 0);
+            $row['creditos_equivalentes_uso'] = (float) ($finDia['creditos_equivalentes_uso'] ?? 0);
         }
         unset($row);
 

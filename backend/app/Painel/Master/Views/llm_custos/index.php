@@ -353,22 +353,39 @@ $usdMaxCredito = $financeiro['usd_max_por_credito'] ?? null;
                         <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Tipo</th>
                         <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Req.</th>
                         <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Tokens</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">USD</th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">R$</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Custo</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Venda</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Lucro</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     <?php foreach ($porTipo as $row): ?>
+                    <?php
+                    $custoTipo = (float) ($row['custo_brl'] ?? $row['cost_brl'] ?? 0);
+                    $vendaTipo = (float) ($row['venda_brl'] ?? 0);
+                    if ($vendaTipo <= 0 && $custoTipo > 0) {
+                        $vendaTipo = round(
+                            \App\Core\CreditosDecimalHelper::creditosPorCustoLlmBrl($custoTipo, $custoAlvoCredito)
+                            * $brlPorCredito,
+                            2
+                        );
+                    }
+                    $lucroTipo = (float) ($row['lucro_brl'] ?? ($vendaTipo - $custoTipo));
+                    ?>
                     <tr class="hover:bg-slate-50">
                         <td class="px-4 py-3 text-sm font-mono text-slate-800"><?= htmlspecialchars($row['usage_type'] ?? '') ?></td>
                         <td class="px-4 py-3 text-sm text-right text-slate-700"><?= $fmtInt($row['requests'] ?? 0) ?></td>
                         <td class="px-4 py-3 text-sm text-right text-slate-700"><?= $fmtInt($row['total_tokens'] ?? 0) ?></td>
-                        <td class="px-4 py-3 text-sm text-right text-slate-700"><?= $fmtUsd($row['cost_usd'] ?? 0) ?></td>
-                        <td class="px-4 py-3 text-sm text-right text-emerald-700"><?= $fmtBrl($row['cost_brl'] ?? 0) ?></td>
+                        <td class="px-4 py-3 text-sm text-right text-slate-700">
+                            <span class="font-medium"><?= $fmtBrl($custoTipo) ?></span>
+                            <span class="block text-[11px] text-slate-400"><?= $fmtUsd($row['cost_usd'] ?? 0) ?></span>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-right text-blue-700 font-medium"><?= $fmtBrl($vendaTipo) ?></td>
+                        <td class="px-4 py-3 text-sm text-right font-medium <?= $lucroTipo >= 0 ? 'text-emerald-700' : 'text-red-600' ?>"><?= $fmtBrl($lucroTipo) ?></td>
                     </tr>
                     <?php endforeach; ?>
                     <?php if (empty($porTipo)): ?>
-                    <tr><td colspan="5" class="px-4 py-8 text-center text-sm text-slate-500">Sem dados no período.</td></tr>
+                    <tr><td colspan="6" class="px-4 py-8 text-center text-sm text-slate-500">Sem dados no período.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -379,7 +396,7 @@ $usdMaxCredito = $financeiro['usd_max_por_credito'] ?? null;
 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-8">
     <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between gap-3">
         <h3 class="text-lg font-semibold text-slate-900">Por dia</h3>
-        <span class="text-xs text-slate-500">Clique em um dia para ver chats e chamadas</span>
+        <span class="text-xs text-slate-500">Custo · venda · lucro · clique no dia para detalhe</span>
     </div>
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
@@ -387,15 +404,26 @@ $usdMaxCredito = $financeiro['usd_max_por_credito'] ?? null;
                 <tr>
                     <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Data</th>
                     <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Req.</th>
-                    <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Input</th>
-                    <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Output</th>
-                    <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Total</th>
-                    <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">USD</th>
-                    <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">R$</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Tokens</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Custo</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Venda</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Lucro</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
                 <?php foreach (array_reverse($porDia) as $row): ?>
+                <?php
+                $custoDia = (float) ($row['custo_brl'] ?? $row['cost_brl'] ?? 0);
+                $vendaDia = (float) ($row['venda_brl'] ?? 0);
+                if ($vendaDia <= 0 && $custoDia > 0) {
+                    $vendaDia = round(
+                        \App\Core\CreditosDecimalHelper::creditosPorCustoLlmBrl($custoDia, $custoAlvoCredito)
+                        * $brlPorCredito,
+                        2
+                    );
+                }
+                $lucroDia = (float) ($row['lucro_brl'] ?? ($vendaDia - $custoDia));
+                ?>
                 <tr class="hover:bg-blue-50 cursor-pointer transition-colors"
                     tabindex="0"
                     role="button"
@@ -407,15 +435,22 @@ $usdMaxCredito = $financeiro['usd_max_por_credito'] ?? null;
                         <i class="fa-solid fa-chevron-right ml-1 text-[10px] text-slate-400"></i>
                     </td>
                     <td class="px-4 py-2.5 text-sm text-right text-slate-700"><?= $fmtInt($row['requests'] ?? 0) ?></td>
-                    <td class="px-4 py-2.5 text-sm text-right text-blue-700"><?= $fmtInt($row['prompt_tokens'] ?? 0) ?></td>
-                    <td class="px-4 py-2.5 text-sm text-right text-violet-700"><?= $fmtInt($row['completion_tokens'] ?? 0) ?></td>
-                    <td class="px-4 py-2.5 text-sm text-right font-medium"><?= $fmtInt($row['total_tokens'] ?? 0) ?></td>
-                    <td class="px-4 py-2.5 text-sm text-right text-slate-700"><?= $fmtUsd($row['cost_usd'] ?? 0) ?></td>
-                    <td class="px-4 py-2.5 text-sm text-right text-emerald-700"><?= $fmtBrl($row['cost_brl'] ?? 0) ?></td>
+                    <td class="px-4 py-2.5 text-sm text-right text-slate-700">
+                        <span class="font-medium"><?= $fmtInt($row['total_tokens'] ?? 0) ?></span>
+                        <span class="block text-[11px] text-slate-400">
+                            in <?= $fmtInt($row['prompt_tokens'] ?? 0) ?> · out <?= $fmtInt($row['completion_tokens'] ?? 0) ?>
+                        </span>
+                    </td>
+                    <td class="px-4 py-2.5 text-sm text-right text-slate-700">
+                        <span class="font-medium"><?= $fmtBrl($custoDia) ?></span>
+                        <span class="block text-[11px] text-slate-400"><?= $fmtUsd($row['cost_usd'] ?? 0) ?></span>
+                    </td>
+                    <td class="px-4 py-2.5 text-sm text-right text-blue-700 font-medium"><?= $fmtBrl($vendaDia) ?></td>
+                    <td class="px-4 py-2.5 text-sm text-right font-medium <?= $lucroDia >= 0 ? 'text-emerald-700' : 'text-red-600' ?>"><?= $fmtBrl($lucroDia) ?></td>
                 </tr>
                 <?php endforeach; ?>
                 <?php if (empty($porDia)): ?>
-                <tr><td colspan="7" class="px-4 py-8 text-center text-sm text-slate-500">Sem dados no período.</td></tr>
+                <tr><td colspan="6" class="px-4 py-8 text-center text-sm text-slate-500">Sem dados no período.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
