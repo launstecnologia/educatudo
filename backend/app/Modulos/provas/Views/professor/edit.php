@@ -153,7 +153,7 @@
             ?>
             <?php if ($tudicoinsProvaIa): ?>
             <button onclick="abrirModalGerarIA()" class="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors">
-                🤖 Gerar com IA
+                Gerar com IA
             </button>
             <?php endif; ?>
             <?php if (false): /* Integração da API externa pausada. Trocar para true para voltar o banco da API na prova. */ ?>
