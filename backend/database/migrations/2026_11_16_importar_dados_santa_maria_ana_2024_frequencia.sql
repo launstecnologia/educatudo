@@ -288,8 +288,7 @@ BEGIN
       UNION ALL SELECT 3, 'SM24 Faltas 3º bimestre 2024'
       UNION ALL SELECT 4, 'SM24 Faltas 4º bimestre 2024'
     ) ev
-    INNER JOIN faltas_eventos e ON e.nome = ev.nome AND e.ativo = 1 AND e.ano_letivo = 2024
-  ON DUPLICATE KEY UPDATE faltas = VALUES(faltas), created_by = VALUES(created_by);
+    INNER JOIN faltas_eventos e ON e.nome = ev.nome AND e.ativo = 1 AND e.ano_letivo = 2024;
 
   INSERT INTO ocorrencias_categorias (slug, nome, ordem, ativo)
   SELECT c.slug, c.nome, c.ordem, 1
@@ -504,17 +503,18 @@ BEGIN
      );
     DROP TEMPORARY TABLE IF EXISTS sm24f_aulas_existentes;
 
+    DELETE df FROM diario_frequencias df
+    INNER JOIN diario_aulas da ON da.id = df.diario_aula_id
+    INNER JOIN sm24f_plano p ON p.grade_id = da.grade_horaria_id AND p.d = da.data_aula
+    WHERE df.aluno_id = v_aluno;
+
     INSERT INTO diario_frequencias (diario_aula_id, aluno_id, situacao, observacao, origem)
     SELECT da.id, v_aluno,
            IF(p.rn <= p.faltas_bim, 'falta', 'presente'),
            IF(p.rn <= p.faltas_bim, 'Falta do fechamento de 2024.', NULL),
            'importacao'
       FROM sm24f_plano p
-      INNER JOIN diario_aulas da ON da.grade_horaria_id = p.grade_id AND da.data_aula = p.d
-    ON DUPLICATE KEY UPDATE
-      situacao = VALUES(situacao),
-      observacao = VALUES(observacao),
-      origem = 'importacao';
+      INNER JOIN diario_aulas da ON da.grade_horaria_id = p.grade_id AND da.data_aula = p.d;
 
     IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'presenca_eventos') > 0 THEN
       DROP TEMPORARY TABLE IF EXISTS sm24f_pres;
