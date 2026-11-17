@@ -120,6 +120,8 @@ class DriveController extends \App\Core\BaseController
         $lv = $this->layoutAndViewFolder($tipo);
         $this->viewWithLayout($lv['layout'], $lv['viewFolder'] . '/drive/index', [
             'title' => 'Meu Drive - EducaTudo',
+            'page_title' => 'Meu Drive',
+            'current_page' => 'drive',
             'user' => $user,
             'baseUrl' => $baseUrl,
             'items' => $items,
@@ -170,6 +172,8 @@ class DriveController extends \App\Core\BaseController
         $lv = $this->layoutAndViewFolder($tipo);
         $this->viewWithLayout($lv['layout'], $lv['viewFolder'] . '/drive/index', [
             'title' => $folder['name'] . ' - Drive EducaTudo',
+            'page_title' => 'Meu Drive',
+            'current_page' => 'drive',
             'user' => $user,
             'baseUrl' => $baseUrl,
             'items' => $items,
@@ -640,6 +644,8 @@ class DriveController extends \App\Core\BaseController
         $lv = $this->layoutAndViewFolder($tipo);
         $this->viewWithLayout($lv['layout'], $lv['viewFolder'] . '/drive/view', [
             'title' => $item['name'] . ' - Drive EducaTudo',
+            'page_title' => 'Meu Drive',
+            'current_page' => 'drive',
             'user' => $user,
             'baseUrl' => $baseUrl,
             'item' => $item,

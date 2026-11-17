@@ -52,7 +52,7 @@ $tomCal = $corCal !== '' ? '--button-primary-color:' . $corCal . ';--primary-tex
 
 <div class="mb-6">
     <div class="flex flex-wrap items-center gap-2">
-        <h1 class="text-2xl font-bold text-gray-900 flex-1">Calendário Letivo <?= $ano ?></h1>
+        <h1 class="text-2xl font-bold text-gray-900 flex-1">Calendário escolar <?= $ano ?></h1>
         <?php
         $calendariosVisao = $calendarios ?? [];
         $calendarioIdVisao = (int) ($calendario_id ?? 0);
@@ -81,6 +81,43 @@ $tomCal = $corCal !== '' ? '--button-primary-color:' . $corCal . ';--primary-tex
     </div>
     <p class="text-sm text-gray-500 mt-1">Feriados, recessos, avaliações e eventos do ano letivo.<?php if ($calendarioNome !== ''): ?> <?= htmlspecialchars($calendarioNome) ?><?= $calendarioRotulo !== '' ? ' · ' . htmlspecialchars($calendarioRotulo) : '' ?><?php endif; ?></p>
 </div>
+
+<?php if (!empty($aviso)): ?>
+<div class="mb-4 rounded-lg px-4 py-3 text-sm <?= ($aviso_tipo ?? '') === 'error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700' ?>">
+    <?= htmlspecialchars((string) $aviso) ?>
+</div>
+<?php endif; ?>
+
+<?php if (!empty($pode_adicionar) && $calendarioIdVisao > 0): ?>
+<div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 mb-6">
+    <h2 class="text-base font-semibold text-gray-900">Adicionar informação</h2>
+    <p class="text-sm text-gray-500 mt-1 mb-4">Fica só no seu calendário. O calendário da escola continua igual para alunos e para a coordenação.</p>
+    <form method="post" action="<?= URL ?>/professor/calendario-letivo/informacao" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
+        <input type="hidden" name="ano" value="<?= $ano ?>">
+        <input type="hidden" name="calendario_id" value="<?= $calendarioIdVisao ?>">
+        <label class="block text-sm">
+            <span class="text-gray-600">Data</span>
+            <input type="date" name="data_inicio" required class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2">
+        </label>
+        <label class="block text-sm">
+            <span class="text-gray-600">Até</span>
+            <input type="date" name="data_fim" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2">
+        </label>
+        <label class="block text-sm sm:col-span-2">
+            <span class="text-gray-600">Informação</span>
+            <input type="text" name="descricao" required maxlength="255" placeholder="Ex.: Reunião de pais, entrega de trabalho" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2">
+        </label>
+        <label class="block text-sm sm:col-span-2 lg:col-span-3">
+            <span class="text-gray-600">Local</span>
+            <input type="text" name="local_evento" maxlength="255" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2">
+        </label>
+        <div class="flex items-end">
+            <button type="submit" class="w-full px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">Adicionar</button>
+        </div>
+    </form>
+</div>
+<?php endif; ?>
 
 <!-- Legenda -->
 <div class="flex flex-wrap gap-3 mb-5">
@@ -169,6 +206,7 @@ $tomCal = $corCal !== '' ? '--button-primary-color:' . $corCal . ';--primary-tex
                             'fim'          => date('d/m/Y', strtotime($e['data_fim'])),
                             'link_reuniao' => $e['link_reuniao'] ?? '',
                             'local_evento' => $e['local_evento'] ?? '',
+                            'minha' => !empty($e['minha_informacao']),
                         ], array_values($evsDia)),
                     ], $jsonJs), ENT_QUOTES);
                 }
@@ -198,13 +236,24 @@ $tomCal = $corCal !== '' ? '--button-primary-color:' . $corCal . ';--primary-tex
         $dtF    = date('d/m/Y', strtotime((string) $ev['data_fim']));
         $periodo = ($ev['data_inicio'] === $ev['data_fim']) ? $dtI : "$dtI – $dtF";
     ?>
-        <div class="flex items-center gap-4 px-6 py-3 hover:bg-gray-50">
+        <div class="flex flex-wrap items-center gap-3 px-4 sm:px-6 py-3 hover:bg-gray-50">
             <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:<?= $tipoText[$t] ?? '#6b7280' ?>"></span>
             <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-gray-900 truncate"><?= htmlspecialchars((string) $ev['descricao']) ?></p>
                 <p class="text-xs text-gray-500"><?= $periodo ?><?= !empty($ev['local_evento']) ? ' · <i class="fa-solid fa-location-dot"></i> ' . htmlspecialchars($ev['local_evento']) : '' ?></p>
             </div>
+            <?php if (!empty($ev['minha_informacao'])): ?>
+            <span class="text-xs font-semibold px-2 py-1 rounded-full bg-blue-50 text-blue-700">Minha</span>
+            <form method="post" action="<?= URL ?>/professor/calendario-letivo/informacao/excluir" onsubmit="return confirm('Remover esta informação do seu calendário?');">
+                <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
+                <input type="hidden" name="ano" value="<?= $ano ?>">
+                <input type="hidden" name="calendario_id" value="<?= (int) ($calendario_id ?? 0) ?>">
+                <input type="hidden" name="id" value="<?= (int) ($ev['id'] ?? 0) ?>">
+                <button type="submit" class="text-xs font-medium text-red-600 hover:text-red-800">Remover</button>
+            </form>
+            <?php else: ?>
             <span class="text-xs font-semibold px-2 py-1 rounded-full" style="background:<?= htmlspecialchars($tipoBg[$t] ?? '#f3f4f6') ?>;color:<?= htmlspecialchars($tipoText[$t] ?? '#374151') ?>"><?= htmlspecialchars($tipoLabels[$t] ?? $t) ?></span>
+            <?php endif; ?>
             <?php if (!empty($ev['link_reuniao'])): ?>
             <a href="<?= htmlspecialchars($ev['link_reuniao']) ?>" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800 text-xs"><i class="fa-solid fa-link"></i></a>
             <?php endif; ?>
@@ -251,6 +300,7 @@ var eventData   = <?php
             'fim'          => date('d/m/Y', strtotime($e['data_fim'])),
             'link_reuniao' => $e['link_reuniao'] ?? '',
             'local_evento' => $e['local_evento'] ?? '',
+            'minha' => !empty($e['minha_informacao']),
         ], array_values($evs));
     }
     echo json_encode($jsMap, $jsonJs);
@@ -378,7 +428,7 @@ function renderMes(mes) {
         div.innerHTML =
             '<span class="w-2 h-2 rounded-full flex-shrink-0" style="background:' + (tipoText[ev.tipo]||'#6b7280') + '"></span>' +
             '<div class="flex-1"><p class="font-medium" style="color:' + (tipoText[ev.tipo]||'#111') + '">' + escHtml(ev.descricao) + '</p>' +
-            '<p class="text-xs opacity-75">' + escHtml(ev.label) + ' · ' + dtRange + '</p></div>';
+            '<p class="text-xs opacity-75">' + escHtml(ev.label) + (ev.minha ? ' · Sua informação' : '') + ' · ' + dtRange + '</p></div>';
         list.appendChild(div);
     });
 }
@@ -411,7 +461,7 @@ function openDayModal(payloadStr) {
 
         div.innerHTML =
             '<p class="text-sm font-semibold" style="color:' + (tipoText[ev.tipo]||'#111') + '">' + escHtml(ev.descricao) + '</p>' +
-            '<p class="text-xs mt-0.5 opacity-75" style="color:' + (tipoText[ev.tipo]||'#666') + '">' + escHtml(ev.label) + ' · ' + escHtml(periodo) + '</p>' +
+            '<p class="text-xs mt-0.5 opacity-75" style="color:' + (tipoText[ev.tipo]||'#666') + '">' + escHtml(ev.label) + (ev.minha ? ' · Sua informação' : '') + ' · ' + escHtml(periodo) + '</p>' +
             (extras ? '<p class="text-xs mt-1" style="color:' + (tipoText[ev.tipo]||'#666') + '">' + extras + '</p>' : '');
         body.appendChild(div);
     });

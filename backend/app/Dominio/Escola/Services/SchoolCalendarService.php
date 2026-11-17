@@ -1128,13 +1128,19 @@ class SchoolCalendarService
         if ($calendarioId <= 0 || !$this->tableExists()) {
             return [];
         }
+        $semProfessor = $this->colunaExiste('calendario_letivo_eventos', 'professor_id')
+            ? ' AND (professor_id IS NULL OR professor_id = 0)'
+            : '';
         if (!$this->vinculoAvisoDisponivel()) {
             $rows = $this->db->fetchAll(
-                "SELECT * FROM calendario_letivo_eventos WHERE calendario_id = :id ORDER BY data_inicio ASC",
+                "SELECT * FROM calendario_letivo_eventos WHERE calendario_id = :id{$semProfessor} ORDER BY data_inicio ASC",
                 ['id' => $calendarioId]
             ) ?: [];
             return $this->anexarAvisos($rows, false);
         }
+        $semProfessorAlias = $semProfessor !== ''
+            ? ' AND (e.professor_id IS NULL OR e.professor_id = 0)'
+            : '';
         $rows = $this->db->fetchAll(
             "SELECT e.*,
                     s.id AS aviso_id,
@@ -1146,11 +1152,116 @@ class SchoolCalendarService
                     DATE_FORMAT(s.fim_em, '%H:%i') AS aviso_hora_fim
              FROM calendario_letivo_eventos e
              LEFT JOIN school_calendar_events s ON s.id = e.evento_escolar_id
-             WHERE e.calendario_id = :id
+             WHERE e.calendario_id = :id{$semProfessorAlias}
              ORDER BY e.data_inicio ASC",
             ['id' => $calendarioId]
         ) ?: [];
         return $this->anexarAvisos($rows, true);
+    }
+
+    /**
+     * Eventos da escola visíveis ao professor e as informações que ele mesmo incluiu.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function eventosDoProfessor(int $calendarioId, int $professorId): array
+    {
+        $oficiais = array_values(array_filter(
+            $this->eventos($calendarioId),
+            static fn ($evento) => (int) ($evento['visivel_professor'] ?? 0) === 1
+        ));
+        if ($professorId <= 0 || !$this->colunaExiste('calendario_letivo_eventos', 'professor_id')) {
+            return $oficiais;
+        }
+        $proprios = $this->db->fetchAll(
+            "SELECT * FROM calendario_letivo_eventos
+             WHERE calendario_id = :id AND professor_id = :professor
+             ORDER BY data_inicio ASC",
+            ['id' => $calendarioId, 'professor' => $professorId]
+        ) ?: [];
+        $porId = [];
+        foreach ($oficiais as $evento) {
+            $porId[(int) ($evento['id'] ?? 0)] = $evento;
+        }
+        foreach ($proprios as $evento) {
+            $evento['minha_informacao'] = 1;
+            $porId[(int) ($evento['id'] ?? 0)] = $evento;
+        }
+        $lista = array_values($porId);
+        usort(
+            $lista,
+            static fn ($a, $b) => strcmp((string) ($a['data_inicio'] ?? ''), (string) ($b['data_inicio'] ?? ''))
+        );
+
+        return $lista;
+    }
+
+    public function podeIncluirInformacaoProfessor(): bool
+    {
+        return $this->tableExists() && $this->colunaExiste('calendario_letivo_eventos', 'professor_id');
+    }
+
+    /**
+     * @return array{ok:bool,erro?:string}
+     */
+    public function salvarInformacaoProfessor(
+        int $calendarioId,
+        int $professorId,
+        string $inicio,
+        string $fim,
+        string $descricao,
+        string $localEvento = ''
+    ): array {
+        if (!$this->podeIncluirInformacaoProfessor() || $calendarioId <= 0 || $professorId <= 0) {
+            return ['ok' => false, 'erro' => 'A inclusão de informações ainda não está disponível nesta escola.'];
+        }
+        $descricao = trim($descricao);
+        if ($descricao === '') {
+            return ['ok' => false, 'erro' => 'Informe a descrição.'];
+        }
+        if (!$this->datasEventoGravaveis($inicio, $fim)) {
+            return ['ok' => false, 'erro' => 'Informe uma data válida.'];
+        }
+        $id = (int) $this->db->insert(
+            "INSERT INTO calendario_letivo_eventos
+                (calendario_id, professor_id, data_inicio, data_fim, tipo, descricao, local_evento, visivel_aluno, visivel_professor, visivel_pais)
+             VALUES (:c, :professor, :i, :f, 'evento', :d, :le, 0, 1, 0)",
+            [
+                'c' => $calendarioId,
+                'professor' => $professorId,
+                'i' => $inicio,
+                'f' => $fim,
+                'd' => mb_substr($descricao, 0, 255),
+                'le' => trim($localEvento) !== '' ? mb_substr(trim($localEvento), 0, 255) : null,
+            ]
+        );
+
+        return $id > 0
+            ? ['ok' => true]
+            : ['ok' => false, 'erro' => 'Não foi possível salvar a informação.'];
+    }
+
+    public function excluirInformacaoProfessor(int $eventoId, int $professorId): bool
+    {
+        if ($eventoId <= 0 || $professorId <= 0 || !$this->podeIncluirInformacaoProfessor()) {
+            return false;
+        }
+        $existe = $this->db->fetch(
+            "SELECT id FROM calendario_letivo_eventos
+             WHERE id = :id AND professor_id = :professor
+             LIMIT 1",
+            ['id' => $eventoId, 'professor' => $professorId]
+        );
+        if (!$existe) {
+            return false;
+        }
+        $this->db->query(
+            "DELETE FROM calendario_letivo_eventos
+             WHERE id = :id AND professor_id = :professor",
+            ['id' => $eventoId, 'professor' => $professorId]
+        );
+
+        return true;
     }
 
     /**

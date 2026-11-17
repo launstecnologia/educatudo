@@ -17,7 +17,7 @@ use App\Core\JornadaExercicioAvaliacao;
 use App\Services\JornadasRelatorioService;
 use App\Core\LayoutHelper;
 use App\Services\MediaStorageService;
-use App\Services\SchoolCalendarService;
+use App\Dominio\Escola\Services\SchoolCalendarService;
 use App\Helpers\StudentFormHelper;
 if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
     class TeacherController extends BaseController
@@ -2435,14 +2435,27 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
         if (!$cfg) {
             $cfg = $service->resolverEscopos($ano, $escopos);
         }
-        $todos   = $cfg ? $service->eventos((int) $cfg['id']) : [];
-        $eventos = array_values(array_filter($todos, fn($e) => (int) ($e['visivel_professor'] ?? 0) === 1));
+        $professorId = (int) ($user['id'] ?? 0);
+        $grupoSeb = \App\Modulos\GrupoSeb\Services\GrupoSebService::estaAtivo();
+        $podeAdicionar = $grupoSeb && $service->podeIncluirInformacaoProfessor();
+        $eventos = $cfg
+            ? $service->eventosDoProfessor((int) $cfg['id'], $grupoSeb ? $professorId : 0)
+            : [];
+        $aviso = $_SESSION['calendario_professor_aviso'] ?? null;
+        $avisoTipo = $_SESSION['calendario_professor_aviso_tipo'] ?? 'info';
+        unset($_SESSION['calendario_professor_aviso'], $_SESSION['calendario_professor_aviso_tipo']);
         $visuais = $service->visuaisTipos();
         $this->viewWithLayout('professor', 'teacher/calendario-letivo', [
-            'title'   => 'Calendário Letivo - EducaTudo',
+            'title'   => 'Calendário escolar - EducaTudo',
+            'page_title' => 'Calendário escolar',
+            'current_page' => 'calendario_letivo',
             'user'    => $user,
+            'csrf_token' => $this->generateCsrfToken(),
             'ano'     => $ano,
             'eventos' => $eventos,
+            'pode_adicionar' => $podeAdicionar,
+            'aviso' => is_string($aviso) ? $aviso : '',
+            'aviso_tipo' => is_string($avisoTipo) ? $avisoTipo : 'info',
             'tipoLabels' => $visuais['labels'],
             'tipoBg' => $visuais['bg'],
             'tipoText' => $visuais['text'],
@@ -2453,6 +2466,116 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
             'calendario_cor' => (string) ($cfg['cor'] ?? ''),
             'calendario_cor_texto' => (string) ($cfg['cor_texto'] ?? ''),
         ]);
+    }
+
+    public function salvarInformacaoCalendario(): void
+    {
+        $ano = (int) ($_POST['ano'] ?? date('Y'));
+        $calendarioId = (int) ($_POST['calendario_id'] ?? 0);
+        $this->redirecionarCalendarioProfessor($ano, $calendarioId, $this->gravarInformacaoCalendario());
+    }
+
+    public function excluirInformacaoCalendario(): void
+    {
+        $ano = (int) ($_POST['ano'] ?? date('Y'));
+        $calendarioId = (int) ($_POST['calendario_id'] ?? 0);
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->redirecionarCalendarioProfessor($ano, $calendarioId, 'Sessão expirada. Tente novamente.', 'error');
+            return;
+        }
+        if (!\App\Modulos\GrupoSeb\Services\GrupoSebService::estaAtivo()) {
+            $this->redirect('/professor/calendario-letivo');
+            return;
+        }
+        $user = $this->authManager->getUser();
+        $service = new SchoolCalendarService($this->db);
+        $ok = $service->excluirInformacaoProfessor((int) ($_POST['id'] ?? 0), (int) ($user['id'] ?? 0));
+        $this->redirecionarCalendarioProfessor(
+            $ano,
+            $calendarioId,
+            $ok ? 'Informação removida do seu calendário.' : 'Não foi possível remover a informação.',
+            $ok ? 'success' : 'error'
+        );
+    }
+
+    private function gravarInformacaoCalendario(): string
+    {
+        if (!\App\Modulos\GrupoSeb\Services\GrupoSebService::estaAtivo()) {
+            return '';
+        }
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $_SESSION['calendario_professor_aviso_tipo'] = 'error';
+            return 'Sessão expirada. Tente novamente.';
+        }
+        $user = $this->authManager->getUser();
+        $professorId = (int) ($user['id'] ?? 0);
+        $ano = (int) ($_POST['ano'] ?? date('Y'));
+        $calendarioId = (int) ($_POST['calendario_id'] ?? 0);
+        $service = new SchoolCalendarService($this->db);
+        if (!$this->calendarioPermitidoAoProfessor($service, $ano, $calendarioId, $professorId)) {
+            $_SESSION['calendario_professor_aviso_tipo'] = 'error';
+            return 'Esse calendário não está disponível para você.';
+        }
+        $datas = SchoolCalendarService::validarDatasEvento(
+            (string) ($_POST['data_inicio'] ?? ''),
+            (string) ($_POST['data_fim'] ?? '')
+        );
+        if ($datas['ok'] !== true) {
+            $_SESSION['calendario_professor_aviso_tipo'] = 'error';
+            return (string) (reset($datas['erros']) ?: 'Informe uma data válida.');
+        }
+        $resultado = $service->salvarInformacaoProfessor(
+            $calendarioId,
+            $professorId,
+            $datas['inicio'],
+            $datas['fim'],
+            (string) ($_POST['descricao'] ?? ''),
+            (string) ($_POST['local_evento'] ?? '')
+        );
+        $_SESSION['calendario_professor_aviso_tipo'] = !empty($resultado['ok']) ? 'success' : 'error';
+
+        return !empty($resultado['ok'])
+            ? 'Informação adicionada ao seu calendário.'
+            : (string) ($resultado['erro'] ?? 'Não foi possível salvar a informação.');
+    }
+
+    private function calendarioPermitidoAoProfessor(SchoolCalendarService $service, int $ano, int $calendarioId, int $professorId): bool
+    {
+        if ($calendarioId <= 0) {
+            return false;
+        }
+        $cfg = $service->getPorId($calendarioId);
+        if (!$cfg || (int) ($cfg['ano'] ?? 0) !== $ano) {
+            return false;
+        }
+        $idsPermitidos = [];
+        foreach ($service->escoposDoProfessor($professorId) as $escopo) {
+            $compativel = $service->resolver($ano, (int) $escopo['serie_id'], (int) $escopo['curso_id']);
+            if ($compativel) {
+                $idsPermitidos[(int) $compativel['id']] = true;
+            }
+        }
+        $geral = $service->getAno($ano);
+        if ($geral) {
+            $idsPermitidos[(int) $geral['id']] = true;
+        }
+
+        return isset($idsPermitidos[$calendarioId]);
+    }
+
+    private function redirecionarCalendarioProfessor(int $ano, int $calendarioId, string $aviso, string $tipo = 'info'): void
+    {
+        if ($aviso !== '') {
+            $_SESSION['calendario_professor_aviso'] = $aviso;
+            if (!isset($_SESSION['calendario_professor_aviso_tipo'])) {
+                $_SESSION['calendario_professor_aviso_tipo'] = $tipo;
+            }
+        }
+        $query = 'ano=' . $ano;
+        if ($calendarioId > 0) {
+            $query .= '&id=' . $calendarioId;
+        }
+        $this->redirect('/professor/calendario-letivo?' . $query);
     }
 }
 }

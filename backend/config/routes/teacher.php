@@ -134,3 +134,5 @@ $router->get('/api/monitoramento/stream', 'MonitoramentoController@apiStream');
 
 // Calendário letivo
 $router->get('/professor/calendario-letivo', 'User/TeacherController@calendarioLetivo');
+$router->post('/professor/calendario-letivo/informacao', 'User/TeacherController@salvarInformacaoCalendario');
+$router->post('/professor/calendario-letivo/informacao/excluir', 'User/TeacherController@excluirInformacaoCalendario');

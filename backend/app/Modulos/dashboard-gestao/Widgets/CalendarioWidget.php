@@ -82,11 +82,14 @@ class CalendarioWidget implements WidgetDashboard
         $localSql = $this->consulta->colunaExiste('calendario_letivo_eventos', 'local_evento')
             ? ', e.local_evento'
             : '';
+        $semProfessor = $this->consulta->colunaExiste('calendario_letivo_eventos', 'professor_id')
+            ? ' AND (e.professor_id IS NULL OR e.professor_id = 0)'
+            : '';
         $rows = $db->fetchAll(
             "SELECT e.descricao, e.data_inicio, e.tipo{$localSql}
              FROM calendario_letivo_eventos e
              INNER JOIN calendario_letivo c ON c.id = e.calendario_id
-             WHERE c.ano = :ano AND e.data_fim >= :hoje
+             WHERE c.ano = :ano AND e.data_fim >= :hoje{$semProfessor}
              ORDER BY e.data_inicio ASC
              LIMIT 6",
             ['ano' => $filtro->anoCivil, 'hoje' => $filtro->hoje]

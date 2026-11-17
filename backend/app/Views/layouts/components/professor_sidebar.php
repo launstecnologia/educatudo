@@ -275,6 +275,20 @@ if (isset($user['avatar_url']) && is_string($user['avatar_url'])) {
                 </svg>
                 <span class="sidebar-text">Minha grade</span>
             </a>
+            <a href="<?= URL ?>/professor/calendario-letivo" class="flex items-center px-4 py-3 <?= ($current_page ?? '') === 'calendario_letivo' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                <span class="sidebar-text">Calendário escolar</span>
+            </a>
+            <?php if (\App\Core\LayoutHelper::isModuleEnabled('drive')): ?>
+            <a href="<?= URL ?>/professor/drive" class="flex items-center px-4 py-3 <?= ($current_page ?? '') === 'drive' ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105">
+                <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                </svg>
+                <span class="sidebar-text">Meu Drive</span>
+            </a>
+            <?php endif; ?>
             <a href="<?= URL ?>/logout?portal=professor" class="flex items-center px-4 py-3 text-red-200 hover:bg-red-500/20 hover:text-red-100 rounded-xl transition-all duration-200 hover:scale-105 mt-4">
                 <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>

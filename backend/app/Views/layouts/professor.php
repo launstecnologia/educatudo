@@ -423,6 +423,10 @@
                 <span class="text-[11px] mt-0.5 truncate w-full text-center">Avaliações</span>
             </a>
             <?php endif; ?>
+            <a href="<?= URL ?>/professor/calendario-letivo" class="flex flex-col items-center justify-center flex-1 min-w-0 px-1 text-gray-600 <?= ($current_page ?? '') === 'calendario_letivo' ? 'text-purple-700 bg-purple-50 font-medium' : '' ?>">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                <span class="text-[11px] mt-0.5 truncate w-full text-center">Agenda</span>
+            </a>
             <a href="<?= URL ?>/professor/grade-horaria" class="flex flex-col items-center justify-center flex-1 min-w-0 px-1 text-gray-600 <?= ($current_page ?? '') === 'grade_horaria' ? 'text-purple-700 bg-purple-50 font-medium' : '' ?>">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                 <span class="text-[11px] mt-0.5 truncate w-full text-center">Grade</span>
