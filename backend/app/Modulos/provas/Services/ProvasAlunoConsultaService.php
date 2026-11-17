@@ -1477,15 +1477,19 @@ class ProvasAlunoConsultaService
         if ($s === '') {
             return '';
         }
+        // Typos frequentes: "séria"/"seria" → série (ex.: "1 séria A" → 1A).
+        $s = preg_replace('/\bs[eéèê]r[iíì]a?s?\b/u', 'serie', $s) ?? $s;
         // Ordinals antes do translit: 2ª → 2, 1º → 1 (evita "2a" + "b" = "2ab" que quebra contains "2b").
         $s = preg_replace('/(\d+)\s*[ªº°]/u', '$1', $s) ?? $s;
-        $s = str_replace(['ª', 'º', '°'], '', $s);
+        $s = str_replace(['ª', 'º', '°', "'", '`', '´'], '', $s);
         if (function_exists('iconv')) {
             $t = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
             if (is_string($t) && $t !== '') {
                 $s = $t;
             }
         }
+        // iconv em alguns locales gera apóstrofo (s'erie); remove antes das stopwords.
+        $s = str_replace(["'", '`', '´'], '', $s);
         $s = preg_replace(
             '/\b(ano|serie|série|turma|ensino|medio|médio|fundamental|infantil|tecnico|técnico|em|do|da|de|dos|das|e)\b/u',
             ' ',

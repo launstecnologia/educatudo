@@ -52,7 +52,7 @@ class AssistenteConsultaAmpliadaService
             return $turma;
         }
         $turmaId = (int) $turma['turma']['id'];
-        $ano = $this->anoLetivoAtual((int) ($filtros['ano_letivo_id'] ?? 0));
+        $ano = $this->resolverAnoLetivoFiltro($filtros);
         if ($ano === null) {
             return ['ok' => false, 'error' => 'Ano letivo não encontrado.'];
         }
@@ -91,6 +91,332 @@ class AssistenteConsultaAmpliadaService
             'kpis' => $kpis,
             'total_alunos' => count($linhas),
             'alunos_atencao' => array_slice($atencao, 0, 40),
+        ];
+    }
+
+    /**
+     * Relatório geral / 360 de uma turma (saúde, provas, ocorrências, médias).
+     *
+     * @param array<string,mixed> $filtros
+     * @return array<string,mixed>
+     */
+    public function perfilTurma360(array $filtros): array
+    {
+        $turma = $this->resolverTurma($filtros);
+        if (empty($turma['ok'])) {
+            return $turma;
+        }
+        $turmaId = (int) $turma['turma']['id'];
+        $ano = $this->resolverAnoLetivoFiltro($filtros);
+        if ($ano === null) {
+            return ['ok' => false, 'error' => 'Ano letivo não encontrado.', 'turma' => $turma['turma']];
+        }
+
+        $saudeSvc = new SaudeAprendizagemService();
+        $analise = $saudeSvc->analisar((int) $ano['id'], $turmaId, null);
+        $linhas = is_array($analise['linhas'] ?? null) ? $analise['linhas'] : [];
+        $kpis = is_array($analise['kpis'] ?? null) ? $analise['kpis'] : [];
+
+        $atencao = [];
+        $somaNotas = 0.0;
+        $nNotas = 0;
+        $somaProvas = 0.0;
+        $nProvas = 0;
+        $somaJornadas = 0.0;
+        $nJornadas = 0;
+        $somaFaltas = 0.0;
+        $nFaltas = 0;
+        foreach ($linhas as $l) {
+            if (!is_array($l)) {
+                continue;
+            }
+            $nivel = (string) ($l['nivel'] ?? '');
+            if (in_array($nivel, [SaudeAprendizagemService::NIVEL_CRITICO, SaudeAprendizagemService::NIVEL_ATENCAO], true)) {
+                $atencao[] = [
+                    'aluno_id' => (int) ($l['aluno_id'] ?? 0),
+                    'nome' => trim((string) ($l['nome'] ?? '')),
+                    'turma_nome' => trim((string) ($l['turma_nome'] ?? $turma['turma']['nome'] ?? '')),
+                    'nivel' => $nivel,
+                    'nivel_rotulo' => $saudeSvc->rotuloNivel($nivel),
+                    'notas_media' => $l['notas_media'] ?? null,
+                    'provas_media_pct' => $l['provas_media_pct'] ?? null,
+                    'faltas_total' => $l['faltas_total'] ?? null,
+                ];
+            }
+            if (isset($l['notas_media']) && is_numeric($l['notas_media'])) {
+                $somaNotas += (float) $l['notas_media'];
+                $nNotas++;
+            }
+            if (isset($l['provas_media_pct']) && is_numeric($l['provas_media_pct'])) {
+                $somaProvas += (float) $l['provas_media_pct'];
+                $nProvas++;
+            }
+            if (isset($l['jornadas_progresso_pct']) && is_numeric($l['jornadas_progresso_pct'])) {
+                $somaJornadas += (float) $l['jornadas_progresso_pct'];
+                $nJornadas++;
+            }
+            if (isset($l['faltas_total']) && is_numeric($l['faltas_total'])) {
+                $somaFaltas += (float) $l['faltas_total'];
+                $nFaltas++;
+            }
+        }
+
+        $filtrosTurma = $filtros + [
+            'turma_id' => $turmaId,
+            'turma_nome' => $turma['turma']['nome'],
+        ];
+        try {
+            $provas = $this->resumoProvasTurma($filtrosTurma);
+        } catch (\Throwable $e) {
+            $provas = ['ok' => false, 'error' => 'Provas indisponíveis.'];
+        }
+        try {
+            $ocorrencias = $this->ocorrenciasTurma($filtrosTurma + ['status' => 'todas', 'limite' => 20]);
+        } catch (\Throwable $e) {
+            $ocorrencias = ['ok' => false, 'error' => 'Ocorrências indisponíveis.', 'total' => 0, 'ocorrencias' => []];
+        }
+
+        $totalAlunos = count($linhas);
+        $critico = (int) ($kpis['critico'] ?? 0);
+        $aten = (int) ($kpis['atencao'] ?? 0);
+        $destaques = [];
+        if ($totalAlunos <= 0) {
+            $destaques[] = 'Nenhum aluno ativo com matrícula neste ano letivo para esta turma.';
+        } else {
+            $destaques[] = $totalAlunos . ' aluno(s) na turma.';
+            if ($critico + $aten > 0) {
+                $destaques[] = ($critico + $aten) . ' em crítico/atenção.';
+            } else {
+                $destaques[] = 'Nenhum aluno em crítico/atenção.';
+            }
+        }
+        if (!empty($provas['ok']) && (int) ($provas['total_provas'] ?? 0) > 0) {
+            $destaques[] = 'Provas online: ' . (int) $provas['total_acertos'] . ' acertos e '
+                . (int) $provas['total_erros'] . ' erros'
+                . (isset($provas['percentual_acerto']) ? ' (' . $provas['percentual_acerto'] . '%).' : '.');
+        }
+        if (!empty($ocorrencias['ok'])) {
+            $destaques[] = (int) ($ocorrencias['total'] ?? 0) . ' ocorrência(s) no período.';
+        }
+
+        $indicadores = [
+            'notas_media' => $nNotas > 0 ? round($somaNotas / $nNotas, 2) : null,
+            'provas_pct' => $nProvas > 0 ? round($somaProvas / $nProvas, 1) : ($provas['percentual_acerto'] ?? null),
+            'jornadas_pct' => $nJornadas > 0 ? round($somaJornadas / $nJornadas, 1) : null,
+            'faltas_media' => $nFaltas > 0 ? round($somaFaltas / $nFaltas, 1) : null,
+        ];
+
+        return [
+            'ok' => true,
+            'turma' => $turma['turma'],
+            'ano_letivo' => $ano,
+            'kpis' => $kpis,
+            'total_alunos' => $totalAlunos,
+            'alunos_atencao' => array_slice($atencao, 0, 40),
+            'indicadores' => $indicadores,
+            'destaques' => $destaques,
+            'provas' => !empty($provas['ok']) ? [
+                'total_provas' => (int) ($provas['total_provas'] ?? 0),
+                'total_acertos' => (int) ($provas['total_acertos'] ?? 0),
+                'total_erros' => (int) ($provas['total_erros'] ?? 0),
+                'percentual_acerto' => $provas['percentual_acerto'] ?? null,
+                'por_materia' => array_slice($provas['por_materia'] ?? [], 0, 12),
+            ] : [
+                'aviso' => (string) ($provas['error'] ?? 'Sem provas online nesta turma.'),
+                'total_provas' => 0,
+                'total_acertos' => 0,
+                'total_erros' => 0,
+                'percentual_acerto' => null,
+                'por_materia' => [],
+            ],
+            'ocorrencias' => [
+                'total' => (int) ($ocorrencias['total'] ?? 0),
+                'por_gravidade' => $ocorrencias['por_gravidade'] ?? ['leve' => 0, 'moderado' => 0, 'grave' => 0],
+                'ocorrencias' => $ocorrencias['ocorrencias'] ?? [],
+                'aviso' => $ocorrencias['aviso'] ?? null,
+            ],
+        ];
+    }
+
+    /**
+     * Relatório geral / 360 de um professor (turmas, saúde, provas, jornadas, diário).
+     *
+     * @param array<string,mixed> $filtros
+     * @return array<string,mixed>
+     */
+    public function perfilProfessor360(array $filtros): array
+    {
+        $saude = $this->professores->saudeTurmasProfessor($filtros);
+        if (!empty($saude['candidatos'])) {
+            return $saude;
+        }
+        if (empty($saude['ok'])) {
+            return $saude;
+        }
+
+        $professor = $saude['professor'] ?? null;
+        $professorId = (int) ($professor['id'] ?? $filtros['professor_id'] ?? 0);
+        $turmas = [];
+        try {
+            $turmas = $professorId > 0 ? $this->professores->listarTurmasProfessor($professorId) : [];
+        } catch (\Throwable $e) {
+            $turmas = [];
+        }
+
+        $filtrosProf = $filtros;
+        if ($professorId > 0) {
+            $filtrosProf['professor_id'] = $professorId;
+        }
+        try {
+            $provas = $this->professores->resumoProvasProfessor($filtrosProf);
+        } catch (\Throwable $e) {
+            $provas = ['ok' => false, 'error' => 'Provas indisponíveis.'];
+        }
+        try {
+            $jornadas = $this->resumoJornadasProfessor($filtrosProf);
+        } catch (\Throwable $e) {
+            $jornadas = ['ok' => false, 'error' => 'Jornadas indisponíveis.'];
+        }
+        try {
+            $diario = $this->diarioPendencias($filtrosProf);
+        } catch (\Throwable $e) {
+            $diario = ['ok' => false, 'error' => 'Diário indisponível.', 'total' => 0];
+        }
+
+        $destaques = [];
+        $destaques[] = count($turmas) . ' turma(s) vinculadas.';
+        $destaques[] = (int) ($saude['total_alunos'] ?? 0) . ' aluno(s) na visão.';
+        $k = $saude['kpis'] ?? [];
+        $risco = (int) ($k['critico'] ?? 0) + (int) ($k['atencao'] ?? 0);
+        $destaques[] = $risco > 0
+            ? $risco . ' aluno(s) em crítico/atenção.'
+            : 'Nenhum aluno em crítico/atenção.';
+        if (!empty($provas['ok'])) {
+            $destaques[] = 'Provas: ' . (int) ($provas['total_provas'] ?? $provas['total'] ?? 0)
+                . ' · acerto '
+                . (isset($provas['percentual_acerto']) ? $provas['percentual_acerto'] . '%' : '—');
+        }
+        if (!empty($jornadas['ok'])) {
+            $destaques[] = 'Jornadas: ' . (int) ($jornadas['concluidas'] ?? 0) . '/'
+                . (int) ($jornadas['total_jornadas'] ?? 0) . ' concluídas.';
+        }
+        if (!empty($diario['ok'])) {
+            $destaques[] = (int) ($diario['total'] ?? 0) . ' diário(s) pendente(s).';
+        }
+
+        return [
+            'ok' => true,
+            'professor' => $professor,
+            'ano_letivo' => $saude['ano_letivo'] ?? $this->resolverAnoLetivoFiltro($filtros),
+            'turmas' => array_slice($turmas, 0, 40),
+            'kpis' => $k,
+            'total_alunos' => (int) ($saude['total_alunos'] ?? 0),
+            'alunos_atencao' => $saude['alunos_atencao'] ?? [],
+            'destaques' => $destaques,
+            'provas' => !empty($provas['ok']) ? $provas : ['aviso' => $provas['error'] ?? 'Sem provas.'],
+            'jornadas' => !empty($jornadas['ok']) ? $jornadas : ['aviso' => $jornadas['error'] ?? 'Sem jornadas.'],
+            'diario' => [
+                'total' => (int) ($diario['total'] ?? 0),
+                'resumo' => $diario['resumo'] ?? [],
+                'aviso' => $diario['aviso'] ?? null,
+            ],
+        ];
+    }
+
+    /**
+     * Relatório geral / 360 de um curso ou série (agrega turmas vinculadas).
+     *
+     * @param array<string,mixed> $filtros
+     * @return array<string,mixed>
+     */
+    public function perfilCurso360(array $filtros): array
+    {
+        $escopo = $this->resolverCursoOuSerie($filtros);
+        if (empty($escopo['ok'])) {
+            return $escopo;
+        }
+        $ano = $this->resolverAnoLetivoFiltro($filtros);
+        if ($ano === null) {
+            return ['ok' => false, 'error' => 'Ano letivo não encontrado.'];
+        }
+
+        $turmaIds = [];
+        foreach ($escopo['turmas'] as $t) {
+            $id = (int) ($t['id'] ?? 0);
+            if ($id > 0) {
+                $turmaIds[$id] = trim((string) ($t['nome'] ?? ''));
+            }
+        }
+        if ($turmaIds === []) {
+            return [
+                'ok' => false,
+                'error' => 'Nenhuma turma vinculada a este ' . ($escopo['tipo'] ?? 'curso') . '.',
+                'escopo' => $escopo['escopo'] ?? null,
+            ];
+        }
+
+        $saudeSvc = new SaudeAprendizagemService();
+        $kpis = array_fill_keys(array_merge(['total'], SaudeAprendizagemService::NIVEIS), 0);
+        $atencao = [];
+        $porTurma = [];
+        foreach ($turmaIds as $tid => $tnome) {
+            $porTurma[$tid] = [
+                'id' => $tid,
+                'nome' => $tnome,
+                'total' => 0,
+                'critico' => 0,
+                'atencao' => 0,
+            ];
+            try {
+                $analise = $saudeSvc->analisar((int) $ano['id'], (int) $tid, null);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            $linhasTurma = is_array($analise['linhas'] ?? null) ? $analise['linhas'] : [];
+            foreach ($linhasTurma as $l) {
+                if (!is_array($l)) {
+                    continue;
+                }
+                $nivel = (string) ($l['nivel'] ?? SaudeAprendizagemService::NIVEL_SEM_DADOS);
+                $kpis['total']++;
+                if (isset($kpis[$nivel])) {
+                    $kpis[$nivel]++;
+                }
+                $porTurma[$tid]['total']++;
+                if ($nivel === SaudeAprendizagemService::NIVEL_CRITICO) {
+                    $porTurma[$tid]['critico']++;
+                }
+                if ($nivel === SaudeAprendizagemService::NIVEL_ATENCAO) {
+                    $porTurma[$tid]['atencao']++;
+                }
+                if (in_array($nivel, [SaudeAprendizagemService::NIVEL_CRITICO, SaudeAprendizagemService::NIVEL_ATENCAO], true)) {
+                    $atencao[] = [
+                        'aluno_id' => (int) ($l['aluno_id'] ?? 0),
+                        'nome' => trim((string) ($l['nome'] ?? '')),
+                        'turma_nome' => trim((string) ($l['turma_nome'] ?? $tnome)),
+                        'nivel' => $nivel,
+                        'nivel_rotulo' => $saudeSvc->rotuloNivel($nivel),
+                    ];
+                }
+            }
+        }
+
+        $destaques = [
+            count($turmaIds) . ' turma(s) no escopo.',
+            $kpis['total'] . ' aluno(s).',
+            ((int) ($kpis['critico'] ?? 0) + (int) ($kpis['atencao'] ?? 0)) . ' em crítico/atenção.',
+        ];
+
+        return [
+            'ok' => true,
+            'escopo' => $escopo['escopo'],
+            'tipo' => $escopo['tipo'],
+            'ano_letivo' => $ano,
+            'turmas' => array_values($porTurma),
+            'kpis' => $kpis,
+            'total_alunos' => $kpis['total'],
+            'alunos_atencao' => array_slice($atencao, 0, 50),
+            'destaques' => $destaques,
         ];
     }
 
@@ -402,6 +728,7 @@ class AssistenteConsultaAmpliadaService
                     'aluno' => $aluno['aluno'],
                     'ano_letivo' => $anoFiltro,
                     'regra' => $quadro['regra'] ?? null,
+                    'casas_decimais' => (int) ($quadro['casas_decimais'] ?? 2),
                     'quadro' => [
                         'colunas' => $quadro['colunas'] ?? [],
                         'grupos' => $quadro['grupos'] ?? [],
@@ -473,6 +800,7 @@ class AssistenteConsultaAmpliadaService
             'formato' => 'eventos',
             'aluno' => $aluno['aluno'],
             'ano_letivo' => $anoUsado > 0 ? $anoUsado : null,
+            'casas_decimais' => 2,
             'eventos' => $slim,
             'total_eventos' => count($slim),
         ];
@@ -2955,15 +3283,17 @@ class AssistenteConsultaAmpliadaService
             if ($matriz === null || empty($matriz['colunas']) || empty($matriz['linhas'])) {
                 continue;
             }
+            $layout = $this->aplicarLayoutOficialQuadro($regra, $matriz['colunas'], $matriz['linhas']);
             $montado = [
                 'ok' => true,
                 'regra' => [
                     'id' => (int) ($regra['id'] ?? 0),
                     'nome' => trim((string) ($regra['nome'] ?? '')),
                 ],
-                'colunas' => $matriz['colunas'],
-                'grupos' => $this->agruparCabecalhosColunas($matriz['colunas']),
-                'linhas' => $matriz['linhas'],
+                'colunas' => $layout['colunas'],
+                'grupos' => $layout['grupos'],
+                'linhas' => $layout['linhas'],
+                'casas_decimais' => $this->casasDecimaisDaRegra($regra),
             ];
             if ($this->quadroBoletimTemNotas($montado)) {
                 return $montado;
@@ -2983,17 +3313,39 @@ class AssistenteConsultaAmpliadaService
 
     /**
      * True se há ao menos uma nota/célula preenchida (não só "—" / Reprovado vazio).
+     * Quando o quadro traz colunas (layout oficial), só considera essas chaves.
      *
      * @param array<string,mixed> $quadro
      */
     private function quadroBoletimTemNotas(array $quadro): bool
     {
+        $codigosVisiveis = [];
+        foreach ((array) ($quadro['colunas'] ?? []) as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            $cod = trim((string) ($c['codigo'] ?? ''));
+            if ($cod !== '') {
+                $codigosVisiveis[strtolower($cod)] = $cod;
+            }
+        }
+
         $linhas = is_array($quadro['linhas'] ?? null) ? $quadro['linhas'] : [];
         foreach ($linhas as $linha) {
             if (!is_array($linha)) {
                 continue;
             }
             $notas = is_array($linha['notas'] ?? null) ? $linha['notas'] : [];
+            if ($codigosVisiveis !== []) {
+                $filtradas = [];
+                foreach ($notas as $chave => $valor) {
+                    $k = strtolower(trim((string) $chave));
+                    if (isset($codigosVisiveis[$k])) {
+                        $filtradas[$chave] = $valor;
+                    }
+                }
+                $notas = $filtradas;
+            }
             foreach ($notas as $valor) {
                 if ($valor === null || $valor === '') {
                     continue;
@@ -3084,6 +3436,22 @@ class AssistenteConsultaAmpliadaService
             }
             if ((string) ($regra['exibir_em'] ?? '') === 'boletim') {
                 $score += 40;
+            }
+            // Prefere o layout oficial (cabeçalhos 1/2/3 TRIMESTRE + ANUAL) alterado no wizard.
+            $extras = $this->extrasDaRegra($regra);
+            $linhasLayout = is_array($extras['linhas_layout'] ?? null) ? $extras['linhas_layout'] : [];
+            if ($linhasLayout !== []) {
+                $score += 60;
+                $nomesLayout = mb_strtolower(implode(' ', array_map(
+                    static fn($l): string => is_array($l) ? trim((string) ($l['nome'] ?? '')) : '',
+                    $linhasLayout
+                )), 'UTF-8');
+                if (str_contains($nomesLayout, 'trimestre') || str_contains($nomesLayout, 'anual')) {
+                    $score += 40;
+                }
+                if (str_contains($nomesLayout, 'bimestre')) {
+                    $score += 20;
+                }
             }
             // "Aprovação/do zero" costuma vir só com status e sem notas lançadas.
             if (str_contains($blob, 'aprovac') || str_contains($blob, 'do zero') || str_contains($blob, 'do-zero')) {
@@ -3331,6 +3699,135 @@ class AssistenteConsultaAmpliadaService
     }
 
     /**
+     * @param array<string,mixed> $regra
+     * @return array<string,mixed>
+     */
+    private function extrasDaRegra(array $regra): array
+    {
+        $raw = $regra['extras_json'] ?? ($regra['extras'] ?? null);
+        if (is_array($raw)) {
+            return $raw;
+        }
+        if (!is_string($raw) || trim($raw) === '') {
+            return [];
+        }
+        $decoded = json_decode($raw, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * @param array<string,mixed> $regra
+     */
+    private function casasDecimaisDaRegra(array $regra): int
+    {
+        $casas = (int) ($regra['decimal_places'] ?? 2);
+        if ($casas < 0) {
+            $casas = 0;
+        }
+        if ($casas > 4) {
+            $casas = 4;
+        }
+
+        return $casas;
+    }
+
+    /**
+     * Espelha o preview oficial do boletim: só as colunas do linhas_layout
+     * (ex.: SIM/PT/REC/Média/Nota por trimestre + ANUAL), na ordem do wizard.
+     *
+     * @param array<string,mixed> $regra
+     * @param list<array<string,mixed>> $colunas
+     * @param list<array<string,mixed>> $linhas
+     * @return array{colunas:list<array<string,mixed>>,grupos:list<array{titulo:string,colspan:int}>,linhas:list<array<string,mixed>>}
+     */
+    private function aplicarLayoutOficialQuadro(array $regra, array $colunas, array $linhas): array
+    {
+        $extras = $this->extrasDaRegra($regra);
+        $ocultas = [];
+        foreach ((array) ($extras['colunas_ocultas'] ?? []) as $codOc) {
+            $codOc = strtolower(trim((string) $codOc));
+            if ($codOc !== '') {
+                $ocultas[$codOc] = true;
+            }
+        }
+
+        $mapa = [];
+        foreach ($colunas as $c) {
+            if (!is_array($c)) {
+                continue;
+            }
+            $cod = strtolower(trim((string) ($c['codigo'] ?? '')));
+            if ($cod === '' || isset($ocultas[$cod])) {
+                continue;
+            }
+            $mapa[$cod] = $c;
+        }
+
+        $linhasLayout = is_array($extras['linhas_layout'] ?? null) ? $extras['linhas_layout'] : [];
+        if ($linhasLayout === []) {
+            $filtradas = array_values($mapa);
+
+            return [
+                'colunas' => $filtradas,
+                'grupos' => $this->agruparCabecalhosColunas($filtradas),
+                'linhas' => $linhas,
+            ];
+        }
+
+        $colunasOut = [];
+        $grupos = [];
+        $vistos = [];
+        foreach ($linhasLayout as $faixa) {
+            if (!is_array($faixa)) {
+                continue;
+            }
+            $titulo = trim((string) ($faixa['nome'] ?? ''));
+            if ($titulo === '') {
+                continue;
+            }
+            $colsFaixa = [];
+            foreach ((array) ($faixa['colunas'] ?? []) as $codRaw) {
+                $cod = strtolower(trim((string) $codRaw));
+                if ($cod === '' || isset($vistos[$cod]) || isset($ocultas[$cod])) {
+                    continue;
+                }
+                if (!isset($mapa[$cod])) {
+                    continue;
+                }
+                $col = $mapa[$cod];
+                $col['cabecalho'] = $titulo;
+                $colsFaixa[] = $col;
+                $vistos[$cod] = true;
+            }
+            if ($colsFaixa === []) {
+                continue;
+            }
+            $grupos[] = ['titulo' => $titulo, 'colspan' => count($colsFaixa)];
+            foreach ($colsFaixa as $col) {
+                $colunasOut[] = $col;
+            }
+        }
+
+        // Sem match no layout (códigos divergentes): cai no quadro completo sem ocultas.
+        if ($colunasOut === []) {
+            $filtradas = array_values($mapa);
+
+            return [
+                'colunas' => $filtradas,
+                'grupos' => $this->agruparCabecalhosColunas($filtradas),
+                'linhas' => $linhas,
+            ];
+        }
+
+        return [
+            'colunas' => $colunasOut,
+            'grupos' => $grupos,
+            'linhas' => $linhas,
+        ];
+    }
+
+    /**
      * @param list<array<string,mixed>> $colunas
      * @return list<array{titulo:string,colspan:int}>
      */
@@ -3341,11 +3838,18 @@ class AssistenteConsultaAmpliadaService
             'b2' => 'II BIMESTRE',
             'b3' => 'III BIMESTRE',
             'b4' => 'IV BIMESTRE',
+            't1' => '1 TRIMESTRE',
+            't2' => '2 TRIMESTRE',
+            't3' => '3 TRIMESTRE',
+            'tri1' => '1 TRIMESTRE',
+            'tri2' => '2 TRIMESTRE',
+            'tri3' => '3 TRIMESTRE',
             's1' => '1º SEMESTRE',
             's2' => '2º SEMESTRE',
             'sem1' => '1º SEMESTRE',
             'sem2' => '2º SEMESTRE',
             'final' => 'RESULTADO FINAL',
+            'anual' => 'ANUAL',
             'rf' => 'RESULTADO FINAL',
             'faltas' => 'FALTAS',
         ];
@@ -3392,6 +3896,179 @@ class AssistenteConsultaAmpliadaService
             $grupos[] = ['titulo' => $atualTitulo ?? ' ', 'colspan' => $span];
         }
         return $grupos;
+    }
+
+    /**
+     * Resolve curso ou série pelo nome (e lista turmas vinculadas).
+     *
+     * @param array<string,mixed> $filtros
+     * @return array{ok:bool,tipo?:string,escopo?:array,turmas?:list,error?:string,candidatos?:list,aviso?:string}
+     */
+    private function resolverCursoOuSerie(array $filtros): array
+    {
+        $cursoId = (int) ($filtros['curso_id'] ?? 0);
+        $serieId = (int) ($filtros['serie_id'] ?? 0);
+        $termo = trim((string) ($filtros['curso_nome'] ?? $filtros['serie_nome'] ?? $filtros['nome'] ?? $filtros['termo'] ?? ''));
+
+        if ($serieId > 0) {
+            $serie = $this->db->fetch(
+                'SELECT s.id, s.nome, s.curso_id, c.nome AS curso_nome
+                 FROM serie s
+                 LEFT JOIN curso c ON c.id = s.curso_id
+                 WHERE s.id = :id
+                 LIMIT 1',
+                ['id' => $serieId]
+            );
+            if (!$serie) {
+                return ['ok' => false, 'error' => 'Série não encontrada.'];
+            }
+            $turmas = $this->turmasDoEscopo(0, $serieId);
+
+            return [
+                'ok' => true,
+                'tipo' => 'serie',
+                'escopo' => [
+                    'serie_id' => (int) $serie['id'],
+                    'serie_nome' => trim((string) ($serie['nome'] ?? '')),
+                    'curso_id' => (int) ($serie['curso_id'] ?? 0) ?: null,
+                    'curso_nome' => trim((string) ($serie['curso_nome'] ?? '')) ?: null,
+                    'nome' => trim((string) ($serie['nome'] ?? '')),
+                ],
+                'turmas' => $turmas,
+            ];
+        }
+
+        if ($cursoId > 0) {
+            $curso = $this->db->fetch(
+                'SELECT id, nome FROM curso WHERE id = :id LIMIT 1',
+                ['id' => $cursoId]
+            );
+            if (!$curso) {
+                return ['ok' => false, 'error' => 'Curso não encontrado.'];
+            }
+            $turmas = $this->turmasDoEscopo($cursoId, 0);
+
+            return [
+                'ok' => true,
+                'tipo' => 'curso',
+                'escopo' => [
+                    'curso_id' => (int) $curso['id'],
+                    'curso_nome' => trim((string) ($curso['nome'] ?? '')),
+                    'nome' => trim((string) ($curso['nome'] ?? '')),
+                ],
+                'turmas' => $turmas,
+            ];
+        }
+
+        if ($termo === '') {
+            return ['ok' => false, 'error' => 'Informe o nome do curso ou da série (ex.: "Ensino Médio", "1º Ano").'];
+        }
+
+        $like = '%' . $termo . '%';
+        $series = $this->db->fetchAll(
+            'SELECT s.id, s.nome, s.curso_id, c.nome AS curso_nome
+             FROM serie s
+             LEFT JOIN curso c ON c.id = s.curso_id
+             WHERE s.nome LIKE :q
+             ORDER BY s.nome ASC
+             LIMIT 20',
+            ['q' => $like]
+        ) ?: [];
+        $cursos = $this->db->fetchAll(
+            'SELECT id, nome FROM curso WHERE nome LIKE :q ORDER BY nome ASC LIMIT 20',
+            ['q' => $like]
+        ) ?: [];
+
+        $candidatos = [];
+        foreach ($series as $s) {
+            $candidatos[] = [
+                'tipo' => 'serie',
+                'id' => (int) $s['id'],
+                'nome' => trim((string) ($s['nome'] ?? '')),
+                'curso_nome' => trim((string) ($s['curso_nome'] ?? '')) ?: null,
+            ];
+        }
+        foreach ($cursos as $c) {
+            $candidatos[] = [
+                'tipo' => 'curso',
+                'id' => (int) $c['id'],
+                'nome' => trim((string) ($c['nome'] ?? '')),
+                'curso_nome' => null,
+            ];
+        }
+
+        if ($candidatos === []) {
+            return ['ok' => false, 'error' => 'Nenhum curso ou série encontrado com "' . $termo . '".'];
+        }
+        if (count($candidatos) > 1) {
+            return [
+                'ok' => false,
+                'aviso' => 'Há mais de um curso/série. Escolha um:',
+                'tipo_candidatos' => 'curso_serie',
+                'candidatos' => $candidatos,
+            ];
+        }
+
+        $unico = $candidatos[0];
+        if (($unico['tipo'] ?? '') === 'serie') {
+            return $this->resolverCursoOuSerie(['serie_id' => (int) $unico['id']]);
+        }
+
+        return $this->resolverCursoOuSerie(['curso_id' => (int) $unico['id']]);
+    }
+
+    /**
+     * @return list<array{id:int,nome:string}>
+     */
+    private function turmasDoEscopo(int $cursoId, int $serieId): array
+    {
+        $params = [];
+        $sql = 'SELECT id, nome FROM turmas WHERE 1=1';
+        try {
+            $temAtivo = (bool) $this->db->fetch("SHOW COLUMNS FROM turmas LIKE 'ativo'");
+            if ($temAtivo) {
+                $sql .= ' AND (ativo = 1 OR ativo IS NULL)';
+            }
+        } catch (\Throwable $e) {
+            // ignora
+        }
+        if ($serieId > 0) {
+            $sql .= ' AND serie_id = :sid';
+            $params['sid'] = $serieId;
+        } elseif ($cursoId > 0) {
+            $temCursoNovo = false;
+            try {
+                $temCursoNovo = (bool) $this->db->fetch("SHOW COLUMNS FROM turmas LIKE 'curso_novo_id'");
+            } catch (\Throwable $e) {
+                $temCursoNovo = false;
+            }
+            if ($temCursoNovo) {
+                $sql .= ' AND (curso_novo_id = :cid OR serie_id IN (SELECT id FROM serie WHERE curso_id = :cid2))';
+                $params['cid'] = $cursoId;
+                $params['cid2'] = $cursoId;
+            } else {
+                $sql .= ' AND serie_id IN (SELECT id FROM serie WHERE curso_id = :cid)';
+                $params['cid'] = $cursoId;
+            }
+        } else {
+            return [];
+        }
+        $sql .= ' ORDER BY nome ASC LIMIT 80';
+        try {
+            $rows = $this->db->fetchAll($sql, $params) ?: [];
+        } catch (\Throwable $e) {
+            error_log('AssistenteConsultaAmpliada turmasDoEscopo: ' . $e->getMessage());
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = [
+                'id' => (int) ($r['id'] ?? 0),
+                'nome' => trim((string) ($r['nome'] ?? '')),
+            ];
+        }
+
+        return $out;
     }
 
     /**

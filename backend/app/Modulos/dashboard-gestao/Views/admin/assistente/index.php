@@ -1326,39 +1326,228 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             return;
         }
 
-        if (painel.tipo === 'saude_turma') {
-            var kT = painel.kpis || {};
-            var cardsT = document.createElement('div');
-            cardsT.className = 'grid grid-cols-2 sm:grid-cols-5 gap-2';
-            function cardT(label, val, cls) {
+        function renderKpisSaude(containerEl, kpis, totalAlunos, tituloEsquerda) {
+            var k = kpis || {};
+            var cards = document.createElement('div');
+            cards.className = 'grid grid-cols-2 sm:grid-cols-5 gap-2';
+            function card(label, val, cls) {
                 return '<div class="rounded-lg border border-gray-200 bg-slate-50 px-3 py-2">'
                     + '<div class="text-[11px] uppercase tracking-wide text-slate-500">' + esc(label) + '</div>'
                     + '<div class="text-lg font-semibold ' + (cls || 'text-gray-900') + '">' + esc(val) + '</div></div>';
             }
-            var turmaNome = (painel.turma && painel.turma.nome) ? painel.turma.nome : 'Turma';
-            cardsT.innerHTML = cardT(turmaNome, painel.total_alunos || kT.total || 0)
-                + cardT('Crítico', kT.critico || 0, 'text-rose-700')
-                + cardT('Atenção', kT.atencao || 0, 'text-amber-700')
-                + cardT('Monitorar', kT.monitorar || 0, 'text-sky-700')
-                + cardT('Saudável', kT.saudavel || 0, 'text-emerald-700');
-            container.appendChild(cardsT);
-            var atT = painel.alunos_atencao || [];
-            var boxT = document.createElement('div');
-            boxT.className = 'overflow-x-auto border border-gray-200 rounded-lg';
-            var hst = '<div class="px-3 py-2 text-xs font-semibold uppercase text-slate-600 bg-slate-50 border-b">Alunos em atenção</div>'
+            cards.innerHTML = card(tituloEsquerda || 'Alunos', totalAlunos || k.total || 0)
+                + card('Crítico', k.critico || 0, 'text-rose-700')
+                + card('Atenção', k.atencao || 0, 'text-amber-700')
+                + card('Monitorar', k.monitorar || 0, 'text-sky-700')
+                + card('Saudável', k.saudavel || 0, 'text-emerald-700');
+            containerEl.appendChild(cards);
+        }
+
+        function renderAlunosAtencao(containerEl, lista, comTurma) {
+            var at = lista || [];
+            var box = document.createElement('div');
+            box.className = 'overflow-x-auto border border-gray-200 rounded-lg';
+            var cols = comTurma ? 3 : 2;
+            var h = '<div class="px-3 py-2 text-xs font-semibold uppercase text-slate-600 bg-slate-50 border-b">Alunos em atenção</div>'
                 + '<table class="min-w-full text-sm"><thead><tr class="text-xs text-slate-500 text-left">'
-                + '<th class="px-3 py-2">Aluno</th><th class="px-3 py-2">Nível</th></tr></thead><tbody>';
-            if (!atT.length) {
-                hst += '<tr><td colspan="2" class="px-3 py-4 text-center text-gray-500">Nenhum aluno em crítico/atenção.</td></tr>';
+                + '<th class="px-3 py-2">Aluno</th>'
+                + (comTurma ? '<th class="px-3 py-2">Turma</th>' : '')
+                + '<th class="px-3 py-2">Nível</th></tr></thead><tbody>';
+            if (!at.length) {
+                h += '<tr><td colspan="' + cols + '" class="px-3 py-4 text-center text-gray-500">Nenhum aluno em crítico/atenção.</td></tr>';
             }
-            atT.forEach(function (a) {
-                hst += '<tr class="border-t"><td class="px-3 py-2 font-medium">' + esc(a.nome || '—')
-                    + '</td><td class="px-3 py-2">' + esc(a.nivel_rotulo || a.nivel || '—') + '</td></tr>';
+            at.forEach(function (a) {
+                h += '<tr class="border-t"><td class="px-3 py-2 font-medium">' + esc(a.nome || '—') + '</td>';
+                if (comTurma) h += '<td class="px-3 py-2">' + esc(a.turma_nome || '—') + '</td>';
+                h += '<td class="px-3 py-2">' + esc(a.nivel_rotulo || a.nivel || '—') + '</td></tr>';
             });
-            hst += '</tbody></table>';
-            boxT.innerHTML = hst;
-            container.appendChild(boxT);
+            h += '</tbody></table>';
+            box.innerHTML = h;
+            containerEl.appendChild(box);
+        }
+
+        function renderDestaquesLista(containerEl, destaques) {
+            if (!(destaques || []).length) return;
+            var ul = document.createElement('ul');
+            ul.className = 'list-disc pl-5 text-sm text-slate-700 space-y-1';
+            destaques.forEach(function (d) {
+                var li = document.createElement('li');
+                li.textContent = d;
+                ul.appendChild(li);
+            });
+            containerEl.appendChild(ul);
+        }
+
+        if (painel.tipo === 'saude_turma') {
+            var turmaNome = (painel.turma && painel.turma.nome) ? painel.turma.nome : 'Turma';
+            renderKpisSaude(container, painel.kpis, painel.total_alunos, turmaNome);
+            renderAlunosAtencao(container, painel.alunos_atencao, false);
             renderOpcoes(container, painel.opcoes);
+        }
+
+        if (painel.tipo === 'perfil_turma_360') {
+            var identT = document.createElement('div');
+            identT.className = 'grid grid-cols-1 sm:grid-cols-3 gap-2';
+            function campoT(label, val) {
+                return '<div class="rounded-lg border border-gray-200 bg-white px-3 py-2">'
+                    + '<div class="text-[11px] uppercase tracking-wide text-slate-500">' + esc(label) + '</div>'
+                    + '<div class="font-medium text-gray-900">' + esc(val || '—') + '</div></div>';
+            }
+            var anoT = painel.ano_letivo && (painel.ano_letivo.ano || painel.ano_letivo);
+            identT.innerHTML = campoT('Turma', painel.turma && painel.turma.nome)
+                + campoT('Ano letivo', anoT)
+                + campoT('Alunos', painel.total_alunos);
+            container.appendChild(identT);
+            renderKpisSaude(container, painel.kpis, painel.total_alunos, 'Alunos');
+            var indT = painel.indicadores || {};
+            var cardsIndT = document.createElement('div');
+            cardsIndT.className = 'grid grid-cols-2 sm:grid-cols-4 gap-2';
+            function cardInd(label, val) {
+                return '<div class="rounded-lg border border-gray-200 bg-slate-50 px-3 py-2">'
+                    + '<div class="text-[11px] uppercase tracking-wide text-slate-500">' + esc(label) + '</div>'
+                    + '<div class="text-lg font-semibold text-gray-900">' + esc(val) + '</div></div>';
+            }
+            cardsIndT.innerHTML = cardInd('Média notas', indT.notas_media != null ? indT.notas_media : '—')
+                + cardInd('Provas %', indT.provas_pct != null ? indT.provas_pct + '%' : '—')
+                + cardInd('Jornadas %', indT.jornadas_pct != null ? indT.jornadas_pct + '%' : '—')
+                + cardInd('Faltas méd.', indT.faltas_media != null ? indT.faltas_media : '—');
+            container.appendChild(cardsIndT);
+            renderDestaquesLista(container, painel.destaques);
+            renderAlunosAtencao(container, painel.alunos_atencao, false);
+            var provasT = painel.provas || {};
+            if ((provasT.por_materia || []).length) {
+                var boxPM360 = document.createElement('div');
+                boxPM360.className = 'overflow-x-auto border border-gray-200 rounded-lg';
+                var hpm360 = '<div class="px-3 py-2 text-xs font-semibold uppercase text-slate-600 bg-slate-50 border-b">Provas online por matéria</div>'
+                    + '<table class="min-w-full text-sm"><thead><tr class="text-xs text-slate-500 text-left">'
+                    + '<th class="px-3 py-2">Matéria</th><th class="px-3 py-2">Acertos</th><th class="px-3 py-2">Erros</th></tr></thead><tbody>';
+                provasT.por_materia.forEach(function (r) {
+                    hpm360 += '<tr class="border-t"><td class="px-3 py-2 font-medium">' + esc(r.materia || '—')
+                        + '</td><td class="px-3 py-2">' + esc(r.acertos)
+                        + '</td><td class="px-3 py-2">' + esc(r.erros) + '</td></tr>';
+                });
+                hpm360 += '</tbody></table>';
+                boxPM360.innerHTML = hpm360;
+                container.appendChild(boxPM360);
+            }
+            var ocT = painel.ocorrencias || {};
+            if ((ocT.ocorrencias || []).length || (ocT.total || 0) > 0) {
+                var boxOc = document.createElement('div');
+                boxOc.className = 'overflow-x-auto border border-gray-200 rounded-lg';
+                var hoc = '<div class="px-3 py-2 text-xs font-semibold uppercase text-slate-600 bg-slate-50 border-b">Ocorrências ('
+                    + esc(ocT.total || 0) + ')</div>'
+                    + '<table class="min-w-full text-sm"><thead><tr class="text-xs text-slate-500 text-left">'
+                    + '<th class="px-3 py-2">Data</th><th class="px-3 py-2">Aluno(s)</th><th class="px-3 py-2">Título</th><th class="px-3 py-2">Gravidade</th></tr></thead><tbody>';
+                if (!(ocT.ocorrencias || []).length) {
+                    hoc += '<tr><td colspan="4" class="px-3 py-4 text-center text-gray-500">Nenhuma ocorrência listada.</td></tr>';
+                }
+                (ocT.ocorrencias || []).forEach(function (o) {
+                    hoc += '<tr class="border-t"><td class="px-3 py-2">' + fmtData(o.data)
+                        + '</td><td class="px-3 py-2">' + esc(o.alunos_nomes || '—')
+                        + '</td><td class="px-3 py-2">' + esc(o.titulo || '—')
+                        + '</td><td class="px-3 py-2">' + esc(o.gravidade_label || o.gravidade || '—') + '</td></tr>';
+                });
+                hoc += '</tbody></table>';
+                boxOc.innerHTML = hoc;
+                container.appendChild(boxOc);
+            }
+            renderOpcoes(container, painel.opcoes);
+        }
+
+        if (painel.tipo === 'perfil_professor_360') {
+            var identP = document.createElement('div');
+            identP.className = 'grid grid-cols-1 sm:grid-cols-3 gap-2';
+            function campoP(label, val) {
+                return '<div class="rounded-lg border border-gray-200 bg-white px-3 py-2">'
+                    + '<div class="text-[11px] uppercase tracking-wide text-slate-500">' + esc(label) + '</div>'
+                    + '<div class="font-medium text-gray-900">' + esc(val || '—') + '</div></div>';
+            }
+            identP.innerHTML = campoP('Professor', painel.professor && painel.professor.nome)
+                + campoP('Turmas', (painel.turmas || []).length)
+                + campoP('Alunos', painel.total_alunos);
+            container.appendChild(identP);
+            renderKpisSaude(container, painel.kpis, painel.total_alunos, 'Alunos');
+            renderDestaquesLista(container, painel.destaques);
+            if ((painel.turmas || []).length) {
+                var boxTurmasP = document.createElement('div');
+                boxTurmasP.className = 'overflow-x-auto border border-gray-200 rounded-lg';
+                var htP = '<div class="px-3 py-2 text-xs font-semibold uppercase text-slate-600 bg-slate-50 border-b">Turmas</div>'
+                    + '<table class="min-w-full text-sm"><thead><tr class="text-xs text-slate-500 text-left">'
+                    + '<th class="px-3 py-2">Turma</th></tr></thead><tbody>';
+                painel.turmas.forEach(function (t) {
+                    htP += '<tr class="border-t"><td class="px-3 py-2 font-medium">' + esc(t.nome || '—') + '</td></tr>';
+                });
+                htP += '</tbody></table>';
+                boxTurmasP.innerHTML = htP;
+                container.appendChild(boxTurmasP);
+            }
+            renderAlunosAtencao(container, painel.alunos_atencao, true);
+            renderOpcoes(container, painel.opcoes);
+        }
+
+        if (painel.tipo === 'perfil_curso_360') {
+            var escopoC = painel.escopo || {};
+            var identC = document.createElement('div');
+            identC.className = 'grid grid-cols-1 sm:grid-cols-3 gap-2';
+            function campoC(label, val) {
+                return '<div class="rounded-lg border border-gray-200 bg-white px-3 py-2">'
+                    + '<div class="text-[11px] uppercase tracking-wide text-slate-500">' + esc(label) + '</div>'
+                    + '<div class="font-medium text-gray-900">' + esc(val || '—') + '</div></div>';
+            }
+            identC.innerHTML = campoC(painel.tipo_escopo === 'serie' ? 'Série' : 'Curso', escopoC.nome || escopoC.serie_nome || escopoC.curso_nome)
+                + campoC('Turmas', (painel.turmas || []).length)
+                + campoC('Alunos', painel.total_alunos);
+            container.appendChild(identC);
+            renderKpisSaude(container, painel.kpis, painel.total_alunos, 'Alunos');
+            renderDestaquesLista(container, painel.destaques);
+            if ((painel.turmas || []).length) {
+                var boxTurmasC = document.createElement('div');
+                boxTurmasC.className = 'overflow-x-auto border border-gray-200 rounded-lg';
+                var htC = '<div class="px-3 py-2 text-xs font-semibold uppercase text-slate-600 bg-slate-50 border-b">Turmas do escopo</div>'
+                    + '<table class="min-w-full text-sm"><thead><tr class="text-xs text-slate-500 text-left">'
+                    + '<th class="px-3 py-2">Turma</th><th class="px-3 py-2">Alunos</th><th class="px-3 py-2">Crítico</th><th class="px-3 py-2">Atenção</th></tr></thead><tbody>';
+                painel.turmas.forEach(function (t) {
+                    htC += '<tr class="border-t"><td class="px-3 py-2 font-medium">' + esc(t.nome || '—')
+                        + '</td><td class="px-3 py-2">' + esc(t.total || 0)
+                        + '</td><td class="px-3 py-2 text-rose-700">' + esc(t.critico || 0)
+                        + '</td><td class="px-3 py-2 text-amber-700">' + esc(t.atencao || 0) + '</td></tr>';
+                });
+                htC += '</tbody></table>';
+                boxTurmasC.innerHTML = htC;
+                container.appendChild(boxTurmasC);
+            }
+            renderAlunosAtencao(container, painel.alunos_atencao, true);
+            renderOpcoes(container, painel.opcoes);
+        }
+
+        if (painel.tipo === 'candidatos_curso_serie') {
+            var avisoCS = document.createElement('p');
+            avisoCS.className = 'text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2';
+            avisoCS.textContent = painel.aviso || 'Há mais de um curso/série:';
+            container.appendChild(avisoCS);
+            var listCS = document.createElement('div');
+            listCS.className = 'overflow-x-auto border border-gray-200 rounded-lg';
+            var hcs = '<table class="min-w-full text-sm"><thead class="bg-slate-50 text-xs uppercase text-slate-600"><tr>'
+                + '<th class="px-3 py-2 text-left">Tipo</th><th class="px-3 py-2 text-left">Nome</th><th class="px-3 py-2"></th></tr></thead><tbody>';
+            (painel.candidatos || []).forEach(function (c) {
+                var ask = (c.tipo === 'serie' ? 'Série ' : 'Curso ') + (c.nome || '')
+                    + (c.tipo === 'serie' && c.id ? ' serie_id=' + c.id : '')
+                    + (c.tipo === 'curso' && c.id ? ' curso_id=' + c.id : '');
+                hcs += '<tr class="border-t"><td class="px-3 py-2">' + esc(c.tipo === 'serie' ? 'Série' : 'Curso')
+                    + '</td><td class="px-3 py-2 font-medium">' + esc(c.nome || '—')
+                    + (c.curso_nome ? '<div class="text-xs text-gray-500">' + esc(c.curso_nome) + '</div>' : '')
+                    + '</td><td class="px-3 py-2 text-right"><button type="button" class="pa-btn-confirmar" data-ask="' + esc(ask) + '">Confirmar</button></td></tr>';
+            });
+            hcs += '</tbody></table>';
+            listCS.innerHTML = hcs;
+            listCS.querySelectorAll('[data-ask]').forEach(function (el) {
+                el.addEventListener('click', function () {
+                    input.value = el.getAttribute('data-ask');
+                    form.dispatchEvent(new Event('submit', { cancelable: true }));
+                });
+            });
+            container.appendChild(listCS);
+            return;
         }
 
         if (painel.tipo === 'resumo_turma') {
@@ -1627,11 +1816,13 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             var temEventos360 = evs360.some(function (ev) {
                 return (ev.colunas || []).length && (ev.linhas || []).length;
             });
+            var casas360 = bol360.casas_decimais != null ? Number(bol360.casas_decimais) : (painel.casas_decimais != null ? Number(painel.casas_decimais) : 2);
             if (temQuadro360) {
-                var tituloQ360 = 'Boletim'
-                    + (bol360.ano_letivo ? ' · ' + bol360.ano_letivo : '')
-                    + (bol360.regra && bol360.regra.nome ? ' · ' + bol360.regra.nome : '');
-                renderQuadroNotas(container, quadro360, tituloQ360);
+                renderQuadroNotas(container, quadro360, {
+                    titulo: 'Boletim',
+                    subtitulo: 'Médias e faltas por bimestre.',
+                    casasDecimais: casas360
+                });
             } else if (temEventos360) {
                 evs360.forEach(function (ev) {
                     if (!(ev.colunas || []).length || !(ev.linhas || []).length) return;
@@ -1640,7 +1831,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                         + (ev.ano_letivo ? ' · ' + ev.ano_letivo : '');
                     renderQuadroNotas(container, { colunas: ev.colunas || [], linhas: (ev.linhas || []).map(function (l) {
                         return { materia: l.materia, notas: l.notas || {} };
-                    }) }, tituloEv360);
+                    }) }, { titulo: tituloEv360, casasDecimais: casas360 });
                 });
             } else {
                 var vazioBol360 = document.createElement('p');
@@ -1939,17 +2130,34 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
             renderOpcoes(container, painel.opcoes);
         }
 
-        function fmtNota(v) {
+        function fmtNota(v, casas) {
             if (v == null || v === '') return '—';
-            if (typeof v === 'object') v = v.valor != null ? v.valor : null;
+            if (typeof v === 'object') v = v.valor != null ? v.valor : (v.nota != null ? v.nota : null);
             if (v == null || v === '') return '—';
-            if (typeof v === 'number') {
-                return (Math.round(v * 10) / 10).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+            if (typeof v === 'string') {
+                var t = v.trim();
+                if (t === '' || t === '—' || t === '-') return '—';
+                var nStr = Number(String(t).replace(',', '.'));
+                if (isFinite(nStr) && /^-?\d+([.,]\d+)?$/.test(t)) {
+                    v = nStr;
+                } else {
+                    return t;
+                }
+            }
+            if (typeof v === 'number' && isFinite(v)) {
+                var dec = (casas != null && casas >= 0) ? Number(casas) : 2;
+                if (dec < 0) dec = 0;
+                if (dec > 4) dec = 4;
+                return v.toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
             }
             return String(v);
         }
 
-        function renderQuadroNotas(containerEl, quadro, tituloQuadro) {
+        function renderQuadroNotas(containerEl, quadro, opts) {
+            if (typeof opts === 'string') {
+                opts = { titulo: opts };
+            }
+            opts = opts || {};
             if (!quadro || !quadro.colunas || !quadro.colunas.length) {
                 var vazioQ = document.createElement('p');
                 vazioQ.className = 'text-sm text-gray-600';
@@ -1958,34 +2166,62 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 return;
             }
             var box = document.createElement('div');
-            box.className = 'overflow-x-auto border border-gray-200 rounded-lg';
+            box.className = 'overflow-x-auto border border-gray-300 rounded-lg bg-white';
             var cols = quadro.colunas || [];
             var grupos = quadro.grupos || [];
+            var casas = opts.casasDecimais != null ? opts.casasDecimais : 2;
             var html = '';
-            if (tituloQuadro) {
-                html += '<div class="px-3 py-2 text-xs font-semibold uppercase text-slate-600 bg-slate-50 border-b">' + esc(tituloQuadro) + '</div>';
+            if (opts.titulo || opts.subtitulo) {
+                html += '<div class="px-3 py-2 border-b border-gray-200 bg-white">';
+                if (opts.titulo) {
+                    html += '<div class="text-base font-bold text-slate-800">' + esc(opts.titulo) + '</div>';
+                }
+                if (opts.subtitulo) {
+                    html += '<div class="text-xs text-slate-500 mt-0.5">' + esc(opts.subtitulo) + '</div>';
+                }
+                html += '</div>';
             }
-            html += '<table class="min-w-full text-xs sm:text-sm"><thead>';
+            html += '<table class="min-w-full text-xs sm:text-sm border-collapse"><thead>';
             if (grupos.length) {
-                html += '<tr class="bg-slate-600 text-white text-[10px] uppercase">';
-                html += '<th class="px-2 py-1.5 text-left sticky left-0 bg-slate-600 z-10">Matérias</th>';
+                html += '<tr style="background:#64748b;color:#fff">';
+                html += '<th rowspan="2" class="px-2 py-1.5 text-left sticky left-0 z-10 font-semibold border border-slate-500" style="background:#64748b">Matérias</th>';
                 grupos.forEach(function (g) {
-                    html += '<th class="px-1 py-1.5 text-center" colspan="' + (g.colspan || 1) + '">' + esc(g.titulo || '') + '</th>';
+                    html += '<th class="px-1 py-1.5 text-center uppercase tracking-wide font-semibold border border-slate-500" colspan="'
+                        + (g.colspan || 1) + '">' + esc(g.titulo || '') + '</th>';
+                });
+                html += '</tr>';
+                html += '<tr style="background:#e2e8f0;color:#334155">';
+                cols.forEach(function (c) {
+                    html += '<th class="px-1.5 py-1 text-center whitespace-nowrap font-bold border border-slate-300">'
+                        + esc(c.nome || c.codigo || '—') + '</th>';
+                });
+                html += '</tr>';
+            } else {
+                html += '<tr style="background:#64748b;color:#fff">';
+                html += '<th class="px-2 py-1.5 text-left sticky left-0 z-10 font-semibold border border-slate-500" style="background:#64748b">Matérias</th>';
+                cols.forEach(function (c) {
+                    html += '<th class="px-1.5 py-1.5 text-center whitespace-nowrap font-semibold border border-slate-500">'
+                        + esc(c.nome || c.codigo || '—') + '</th>';
                 });
                 html += '</tr>';
             }
-            html += '<tr class="bg-slate-100 text-[10px] uppercase text-slate-600"><th class="px-2 py-1.5 text-left sticky left-0 bg-slate-100 z-10">Componente</th>';
-            cols.forEach(function (c) {
-                html += '<th class="px-1.5 py-1.5 text-center whitespace-nowrap">' + esc(c.nome || c.codigo || '—') + '</th>';
-            });
-            html += '</tr></thead><tbody>';
-            (quadro.linhas || []).forEach(function (linha) {
-                html += '<tr class="border-t"><td class="px-2 py-1.5 font-medium text-gray-900 whitespace-nowrap sticky left-0 bg-white z-10">'
-                    + esc(linha.materia || '—') + '</td>';
+            html += '</thead><tbody>';
+            (quadro.linhas || []).forEach(function (linha, idx) {
+                var bg = idx % 2 === 1 ? '#f8fafc' : '#fff';
+                html += '<tr style="background:' + bg + '"><td class="px-2 py-1.5 font-semibold text-gray-900 whitespace-nowrap sticky left-0 z-10 border border-slate-200" style="background:'
+                    + bg + '">' + esc(linha.materia || '—') + '</td>';
                 var notas = linha.notas || {};
                 cols.forEach(function (c) {
                     var key = c.codigo || c.chave || c.key;
-                    html += '<td class="px-1.5 py-1.5 text-center tabular-nums">' + esc(fmtNota(key != null ? notas[key] : null)) + '</td>';
+                    var val = null;
+                    if (key != null) {
+                        val = notas[key];
+                        if (val == null && typeof key === 'string') {
+                            val = notas[key.toLowerCase()] != null ? notas[key.toLowerCase()] : notas[key.toUpperCase()];
+                        }
+                    }
+                    html += '<td class="px-1.5 py-1.5 text-center tabular-nums border border-slate-200">'
+                        + esc(fmtNota(val, casas)) + '</td>';
                 });
                 html += '</tr>';
             });
@@ -2032,11 +2268,13 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 }
                 container.appendChild(pdfBar);
             }
+            var casasPainel = painel.casas_decimais != null ? Number(painel.casas_decimais) : 2;
             if (temQuadro) {
-                var tituloQ = 'Boletim'
-                    + (painel.ano_letivo ? ' · ' + painel.ano_letivo : '')
-                    + (painel.regra && painel.regra.nome ? ' · ' + painel.regra.nome : '');
-                renderQuadroNotas(container, painel.quadro, tituloQ);
+                renderQuadroNotas(container, painel.quadro, {
+                    titulo: 'Boletim',
+                    subtitulo: 'Médias e faltas por bimestre.',
+                    casasDecimais: casasPainel
+                });
             } else if (temEventos) {
                 evsBol.forEach(function (ev) {
                     if (!(ev.colunas || []).length || !(ev.linhas || []).length) return;
@@ -2045,7 +2283,7 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                         + (ev.ano_letivo ? ' · ' + ev.ano_letivo : '');
                     renderQuadroNotas(container, { colunas: ev.colunas || [], linhas: (ev.linhas || []).map(function (l) {
                         return { materia: l.materia, notas: l.notas || {} };
-                    }) }, tituloEv);
+                    }) }, { titulo: tituloEv, casasDecimais: casasPainel });
                 });
             } else {
                 var vazioB = document.createElement('p');

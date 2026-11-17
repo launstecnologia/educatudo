@@ -38,6 +38,7 @@ final class AssistenteEstadoConversa
             'versao' => 1,
             'aluno_ativo' => $aluno,
             'turma_ativa' => self::textoOuNull($estado['turma_ativa'] ?? null),
+            'turma_id' => (int) ($estado['turma_id'] ?? 0) > 0 ? (int) $estado['turma_id'] : null,
             'ano_letivo' => (int) ($estado['ano_letivo'] ?? 0) > 0 ? (int) $estado['ano_letivo'] : null,
             'fluxo' => $fluxo,
             'rascunho' => $fluxo !== null && is_array($estado['rascunho'] ?? null) ? $estado['rascunho'] : [],
@@ -223,6 +224,7 @@ final class AssistenteEstadoConversa
         $visivel = [
             'aluno_em_foco' => $estado['aluno_ativo'] ?? null,
             'turma_em_foco' => $estado['turma_ativa'] ?? null,
+            'turma_id' => $estado['turma_id'] ?? null,
             'ano_letivo' => $estado['ano_letivo'] ?? null,
         ];
         if (($estado['fluxo'] ?? null) === self::FLUXO_OCORRENCIA) {

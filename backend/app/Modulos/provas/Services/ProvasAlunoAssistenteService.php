@@ -331,6 +331,15 @@ class ProvasAlunoAssistenteService
             case 'saude_turma':
                 return $this->ampliada->saudeTurma($args);
 
+            case 'perfil_turma_360':
+                return $this->ampliada->perfilTurma360($args);
+
+            case 'perfil_professor_360':
+                return $this->ampliada->perfilProfessor360($args);
+
+            case 'perfil_curso_360':
+                return $this->ampliada->perfilCurso360($args);
+
             case 'resumo_provas_turma':
                 return $this->ampliada->resumoProvasTurma($args);
 
@@ -523,8 +532,23 @@ class ProvasAlunoAssistenteService
                     'candidatos' => $resultado['candidatos'],
                 ];
             }
+            if (($resultado['tipo_candidatos'] ?? '') === 'curso_serie'
+                || $tool === 'perfil_curso_360'
+            ) {
+                $primeiroCand = $resultado['candidatos'][0] ?? [];
+                if (isset($primeiroCand['tipo']) && in_array((string) $primeiroCand['tipo'], ['curso', 'serie'], true)) {
+                    return [
+                        'tipo' => 'candidatos_curso_serie',
+                        'aviso' => (string) ($resultado['aviso'] ?? 'Há mais de um curso/série. Escolha um:'),
+                        'candidatos' => $resultado['candidatos'],
+                    ];
+                }
+            }
             if (($resultado['tipo_candidatos'] ?? '') === 'turmas'
-                || in_array($tool, ['saude_turma', 'resumo_provas_turma', 'saude_academica', 'diario_pendencias', 'grade_horaria_consulta', 'ocorrencias_turma'], true)
+                || in_array($tool, [
+                    'saude_turma', 'perfil_turma_360', 'resumo_provas_turma',
+                    'saude_academica', 'diario_pendencias', 'grade_horaria_consulta', 'ocorrencias_turma',
+                ], true)
             ) {
                 return [
                     'tipo' => 'candidatos_turmas',
@@ -775,9 +799,66 @@ class ProvasAlunoAssistenteService
                 'alunos_atencao' => $resultado['alunos_atencao'] ?? [],
                 'total_alunos' => (int) ($resultado['total_alunos'] ?? 0),
                 'opcoes' => [
+                    'Relatório completo desta turma',
                     'Resumo de provas desta turma',
                     'Só alunos críticos',
-                    'Ver faltas de um aluno',
+                ],
+            ];
+        }
+        if ($tool === 'perfil_turma_360' && !empty($resultado['ok'])) {
+            return [
+                'tipo' => 'perfil_turma_360',
+                'turma' => $resultado['turma'] ?? null,
+                'ano_letivo' => $resultado['ano_letivo'] ?? null,
+                'kpis' => $resultado['kpis'] ?? [],
+                'alunos_atencao' => $resultado['alunos_atencao'] ?? [],
+                'total_alunos' => (int) ($resultado['total_alunos'] ?? 0),
+                'indicadores' => $resultado['indicadores'] ?? [],
+                'destaques' => $resultado['destaques'] ?? [],
+                'provas' => $resultado['provas'] ?? [],
+                'ocorrencias' => $resultado['ocorrencias'] ?? [],
+                'opcoes' => [
+                    'Resumo de provas desta turma',
+                    'Ver ocorrências desta turma',
+                    'Perfil 360 de um aluno',
+                ],
+            ];
+        }
+        if ($tool === 'perfil_professor_360' && !empty($resultado['ok'])) {
+            return [
+                'tipo' => 'perfil_professor_360',
+                'professor' => $resultado['professor'] ?? null,
+                'ano_letivo' => $resultado['ano_letivo'] ?? null,
+                'turmas' => $resultado['turmas'] ?? [],
+                'kpis' => $resultado['kpis'] ?? [],
+                'alunos_atencao' => $resultado['alunos_atencao'] ?? [],
+                'total_alunos' => (int) ($resultado['total_alunos'] ?? 0),
+                'destaques' => $resultado['destaques'] ?? [],
+                'provas' => $resultado['provas'] ?? [],
+                'jornadas' => $resultado['jornadas'] ?? [],
+                'diario' => $resultado['diario'] ?? [],
+                'opcoes' => [
+                    'Resumo de provas do professor',
+                    'Diários pendentes',
+                    'Filtrar por turma',
+                ],
+            ];
+        }
+        if ($tool === 'perfil_curso_360' && !empty($resultado['ok'])) {
+            return [
+                'tipo' => 'perfil_curso_360',
+                'escopo' => $resultado['escopo'] ?? null,
+                'tipo_escopo' => $resultado['tipo'] ?? null,
+                'ano_letivo' => $resultado['ano_letivo'] ?? null,
+                'turmas' => $resultado['turmas'] ?? [],
+                'kpis' => $resultado['kpis'] ?? [],
+                'alunos_atencao' => $resultado['alunos_atencao'] ?? [],
+                'total_alunos' => (int) ($resultado['total_alunos'] ?? 0),
+                'destaques' => $resultado['destaques'] ?? [],
+                'opcoes' => [
+                    'Relatório completo de uma turma',
+                    'Só alunos críticos',
+                    'Ver uma turma específica',
                 ],
             ];
         }
@@ -949,6 +1030,7 @@ class ProvasAlunoAssistenteService
                 'aluno' => $resultado['aluno'] ?? null,
                 'ano_letivo' => $resultado['ano_letivo'] ?? null,
                 'regra' => $resultado['regra'] ?? null,
+                'casas_decimais' => (int) ($resultado['casas_decimais'] ?? 2),
                 'quadro' => $resultado['quadro'] ?? null,
                 'eventos' => $resultado['eventos'] ?? [],
                 'total_eventos' => (int) ($resultado['total_eventos'] ?? 0),

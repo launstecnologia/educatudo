@@ -77,7 +77,14 @@ class AssistenteFerramentas
             ]),
             self::tool('saude_turmas_professor', 'Saúde (alunos críticos/atenção) das turmas de um professor.', $professor + $turma),
             self::tool('resumo_jornadas_professor', 'Consolidado das jornadas dos alunos de um professor.', $professor + $turma),
-            self::tool('saude_turma', 'Saúde de UMA turma: KPIs de alunos crítico/atenção pelo rendimento.', $turma + $anoLetivo),
+            self::tool('saude_turma', 'Saúde de UMA turma: KPIs de alunos crítico/atenção pelo rendimento. Para relatório geral/completo da turma use perfil_turma_360.', $turma + $anoLetivo),
+            self::tool('perfil_turma_360', 'LEITURA. Relatório geral / 360 / panorama completo de UMA turma: saúde (crítico/atenção), médias, provas online, ocorrências e destaques. Use para "relatório geral da turma", "panorama da turma", "visão completa da turma", "tudo da turma". Não use para um dado isolado (só provas ou só ocorrências).', $turma + $anoLetivo),
+            self::tool('perfil_professor_360', 'LEITURA. Relatório geral / 360 de UM professor: turmas, saúde dos alunos, provas, jornadas e diários pendentes. Use para "relatório do professor", "panorama do professor", "visão completa do professor".', $professor + $turma + $anoLetivo),
+            self::tool('perfil_curso_360', 'LEITURA. Relatório geral / 360 de um CURSO ou SÉRIE (agrega turmas): saúde dos alunos e visão por turma. Use para "relatório do curso", "panorama da série", "visão do Ensino Médio", "1º ano completo".', [
+                'curso_nome' => self::texto('Nome do curso ou da série como o usuário escreveu (ex.: "Ensino Médio", "1º Ano", "Fundamental").'),
+                'curso_id' => self::inteiro('Id do curso se já conhecido (candidatos).'),
+                'serie_id' => self::inteiro('Id da série se já conhecido (candidatos).'),
+            ] + $anoLetivo),
             self::tool('resumo_provas_turma', 'Totais de acertos/erros de provas de uma turma por matéria.', $turma),
             self::tool('saude_academica', 'Alertas CADASTRAIS da escola (sem matrícula no ano, sem chamada). Não é rendimento — para rendimento use saude_turma.', $turma + [
                 'ano' => self::inteiro('Ano letivo.'),
@@ -158,9 +165,14 @@ Responda em português do Brasil.
 Como trabalhar:
 1. Para qualquer dado (notas, boletim, faltas, ocorrências, provas, jornadas, grade, diário, turmas, professores), CHAME a tool adequada. Nunca invente nem chute números, nomes ou datas.
 2. Leia o pedido inteiro e escolha a tool pela descrição. Consultar/ver/quais/tem = LEITURA. Criar/registrar/lançar/abrir = ESCRITA (propor_*).
-3. Relatório geral, relatório 360, perfil completo, visão completa ou "tudo sobre o aluno": chame somente perfil_aluno_360, uma vez. Não chame boletim, faltas, ocorrências nem provas no mesmo pedido — o 360 já traz nome, RA, turma, score, evolução, análise, boletim, faltas, ocorrências e acertos/erros das provas online.
+3. Relatório geral / 360 / panorama / visão completa / "tudo sobre…":
+   - do ALUNO → somente perfil_aluno_360;
+   - da TURMA → somente perfil_turma_360 (também para "panorama geral da turma", "relatório da 1A", "visão da turma");
+   - do PROFESSOR → somente perfil_professor_360;
+   - do CURSO ou da SÉRIE → somente perfil_curso_360.
+   Em todos esses casos chame a tool 360 uma vez; não monte o relatório com várias tools soltas.
 4. Aluno: passe aluno_nome exatamente como o usuário escreveu, ou ra quando ele der um código com dígitos. Se o usuário se referir ao aluno já em foco ("ela", "dele", "essa aluna", "deste aluno") ou não citar ninguém num pedido sobre aluno, use aluno_da_conversa=true. Se ele citar OUTRO nome, use esse nome — nunca troque pelo aluno da conversa.
-5. Nunca peça id numérico ao usuário. Turma, ano e bimestre vão nos campos próprios, nunca dentro de aluno_nome.
+5. Turma: passe turma_nome exatamente como o usuário escreveu (ex.: "1 séria A", "1A", "1º A") — o servidor normaliza typos. Se o pedido for sobre a turma já em foco ("dessa turma", "traga 2025") e não citar outra, reutilize a turma da conversa (turma_nome do estado). Nunca peça id numérico. Ano e bimestre vão nos campos próprios.
 6. Se o usuário mudar de assunto no meio de uma coleta, atenda o novo pedido.
 7. Ações de escrita só preparam um rascunho; quem grava é o botão Confirmar. Nunca diga que gravou.
 8. Depois de receber o resultado: responda em 1–3 frases, EXATAMENTE o que foi perguntado, citando o nome e a turma do aluno, com o valor principal em **negrito**. A interface mostra tabelas e PDF abaixo — não repita listas longas. No relatório 360, cite o nome, o RA, a turma e o score em **negrito**, com a tendência (subiu, caiu ou estável). O gráfico, a análise, os pontos de atenção (estudante, escola e pais) e as tabelas já aparecem no painel — não os reescreva. Datas no texto sempre em dd/mm/aaaa. Horários no fuso de Brasília (America/Sao_Paulo), nunca em UTC.

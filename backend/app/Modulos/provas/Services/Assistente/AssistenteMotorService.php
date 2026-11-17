@@ -171,6 +171,32 @@ class AssistenteMotorService
             $estado['ano_letivo'] = (int) $args['ano_letivo'];
         }
 
+        // Reusa turma/ano da conversa quando o modelo omite (ex.: "traga 2025").
+        $toolsTurma = [
+            'saude_turma', 'perfil_turma_360', 'resumo_provas_turma', 'ocorrencias_turma',
+            'saude_academica', 'diario_pendencias', 'grade_horaria_consulta', 'buscar_blocos',
+        ];
+        if (in_array($tool, $toolsTurma, true)) {
+            if ((int) ($args['turma_id'] ?? 0) <= 0 && empty($args['turma_nome']) && empty($args['turma'])) {
+                if ((int) ($estado['turma_id'] ?? 0) > 0) {
+                    $args['turma_id'] = (int) $estado['turma_id'];
+                } elseif (!empty($estado['turma_ativa'])) {
+                    $args['turma_nome'] = (string) $estado['turma_ativa'];
+                }
+            }
+            if ((int) ($args['ano_letivo'] ?? 0) <= 0 && (int) ($estado['ano_letivo'] ?? 0) > 0) {
+                $args['ano_letivo'] = (int) $estado['ano_letivo'];
+            }
+        }
+        if (in_array($tool, ['perfil_professor_360', 'saude_turmas_professor', 'resumo_provas_professor', 'resumo_jornadas_professor'], true)) {
+            if ((int) ($args['ano_letivo'] ?? 0) <= 0 && (int) ($estado['ano_letivo'] ?? 0) > 0) {
+                $args['ano_letivo'] = (int) $estado['ano_letivo'];
+            }
+        }
+        if ($tool === 'perfil_curso_360' && (int) ($args['ano_letivo'] ?? 0) <= 0 && (int) ($estado['ano_letivo'] ?? 0) > 0) {
+            $args['ano_letivo'] = (int) $estado['ano_letivo'];
+        }
+
         $aluno = null;
         if (in_array($tool, AssistenteFerramentas::TOOLS_ALUNO, true)) {
             $res = $this->resolvedor->resolver($args, $estado['aluno_ativo']);
@@ -204,6 +230,13 @@ class AssistenteMotorService
         } elseif ($tool === 'buscar_alunos' && count((array) ($resultado['alunos'] ?? [])) === 1) {
             $aluno = $resultado['alunos'][0];
             $estado = AssistenteEstadoConversa::definirAlunoAtivo($estado, $aluno);
+        }
+        if (is_array($resultado['turma'] ?? null) && (int) ($resultado['turma']['id'] ?? 0) > 0) {
+            $estado['turma_id'] = (int) $resultado['turma']['id'];
+            $estado['turma_ativa'] = trim((string) ($resultado['turma']['nome'] ?? $estado['turma_ativa'] ?? ''));
+        }
+        if (is_array($resultado['ano_letivo'] ?? null) && (int) ($resultado['ano_letivo']['ano'] ?? 0) > 0) {
+            $estado['ano_letivo'] = (int) $resultado['ano_letivo']['ano'];
         }
         $estado = AssistenteEstadoConversa::registrarReferencias($estado, $tool, $resultado);
 
@@ -382,6 +415,10 @@ class AssistenteMotorService
         }
         if (isset($selecao['turma_id'])) {
             unset($args['turma_nome'], $args['turma']);
+            $estado['turma_id'] = (int) $selecao['turma_id'];
+        }
+        if (isset($selecao['curso_id']) || isset($selecao['serie_id'])) {
+            unset($args['curso_nome'], $args['serie_nome'], $args['nome'], $args['termo']);
         }
         if (isset($selecao['aluno_id'])) {
             $args = self::semCamposAluno($args) + ['aluno_id' => (int) $selecao['aluno_id']];
@@ -397,6 +434,13 @@ class AssistenteMotorService
         $aluno = is_array($resultado['aluno'] ?? null) ? $resultado['aluno'] : null;
         if ($aluno !== null && (int) ($aluno['id'] ?? 0) > 0) {
             $estado = AssistenteEstadoConversa::definirAlunoAtivo($estado, $aluno);
+        }
+        if (is_array($resultado['turma'] ?? null) && (int) ($resultado['turma']['id'] ?? 0) > 0) {
+            $estado['turma_id'] = (int) $resultado['turma']['id'];
+            $estado['turma_ativa'] = trim((string) ($resultado['turma']['nome'] ?? ''));
+        }
+        if (is_array($resultado['ano_letivo'] ?? null) && (int) ($resultado['ano_letivo']['ano'] ?? 0) > 0) {
+            $estado['ano_letivo'] = (int) $resultado['ano_letivo']['ano'];
         }
         $estado = AssistenteEstadoConversa::registrarReferencias($estado, $tool, $resultado);
         $parada = null;
@@ -431,6 +475,12 @@ class AssistenteMotorService
         }
         if (preg_match('/\bturma_id\s*=\s*(\d+)/i', $mensagem, $m) === 1) {
             $sel['turma_id'] = (int) $m[1];
+        }
+        if (preg_match('/\bcurso_id\s*=\s*(\d+)/i', $mensagem, $m) === 1) {
+            $sel['curso_id'] = (int) $m[1];
+        }
+        if (preg_match('/\bserie_id\s*=\s*(\d+)/i', $mensagem, $m) === 1) {
+            $sel['serie_id'] = (int) $m[1];
         }
         if (preg_match('/\bdiario_aula_id\s*=\s*(\d+)/i', $mensagem, $m) === 1) {
             $sel['diario_aula_id'] = (int) $m[1];
@@ -669,6 +719,10 @@ class AssistenteMotorService
     {
         return match (true) {
             $tool === 'boletim_aluno' => 'Montando boletim…',
+            $tool === 'perfil_aluno_360' => 'Montando relatório do aluno…',
+            $tool === 'perfil_turma_360' => 'Montando relatório da turma…',
+            $tool === 'perfil_professor_360' => 'Montando relatório do professor…',
+            $tool === 'perfil_curso_360' => 'Montando relatório do curso…',
             $tool === 'faltas_aluno' => 'Consultando frequência…',
             str_starts_with($tool, 'ocorrencias_') => 'Consultando ocorrências…',
             $tool === 'propor_criar_ocorrencia' => 'Preparando ocorrência…',

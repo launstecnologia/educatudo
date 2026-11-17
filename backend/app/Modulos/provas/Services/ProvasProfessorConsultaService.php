@@ -579,7 +579,18 @@ class ProvasProfessorConsultaService
             ];
         }
 
-        $ano = $this->anoLetivoAtual((int) ($filtros['ano_letivo_id'] ?? 0));
+        $anoIdPref = (int) ($filtros['ano_letivo_id'] ?? 0);
+        $ano = $this->anoLetivoAtual($anoIdPref);
+        $anoNumero = (int) ($filtros['ano_letivo'] ?? $filtros['ano'] ?? 0);
+        if ($anoIdPref <= 0 && $anoNumero >= 2000) {
+            $porAno = $this->db->fetch(
+                'SELECT id, ano FROM ano_letivo WHERE ano = :ano ORDER BY id DESC LIMIT 1',
+                ['ano' => $anoNumero]
+            );
+            if ($porAno) {
+                $ano = ['id' => (int) $porAno['id'], 'ano' => (int) $porAno['ano']];
+            }
+        }
         if ($ano === null) {
             return ['ok' => false, 'error' => 'Ano letivo não encontrado.'];
         }
