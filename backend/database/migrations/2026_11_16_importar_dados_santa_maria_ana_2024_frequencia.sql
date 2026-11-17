@@ -255,7 +255,10 @@ BEGIN
   END IF;
 
   DROP TEMPORARY TABLE IF EXISTS sm24f_ev_tem;
-  CREATE TEMPORARY TABLE sm24f_ev_tem AS
+  CREATE TEMPORARY TABLE sm24f_ev_tem (
+    nome VARCHAR(150) NOT NULL PRIMARY KEY
+  );
+  INSERT INTO sm24f_ev_tem (nome)
   SELECT nome FROM faltas_eventos
    WHERE nome IN (
      'SM24 Faltas 1º bimestre 2024',
@@ -398,10 +401,15 @@ BEGIN
      AND (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'diario_aulas') > 0 THEN
 
     DROP TEMPORARY TABLE IF EXISTS sm24f_sem_grade;
-    CREATE TEMPORARY TABLE sm24f_sem_grade AS
+    CREATE TEMPORARY TABLE sm24f_sem_grade (
+      materia_id INT NOT NULL PRIMARY KEY,
+      dia INT NOT NULL,
+      faixa INT NOT NULL
+    );
+    INSERT INTO sm24f_sem_grade (materia_id, dia, faixa)
     SELECT materia_id,
-           ((ROW_NUMBER() OVER (ORDER BY materia_id) - 1) % 5) + 1 AS dia,
-           (FLOOR((ROW_NUMBER() OVER (ORDER BY materia_id) - 1) / 5) % 4) + 1 AS faixa
+           ((ROW_NUMBER() OVER (ORDER BY materia_id) - 1) % 5) + 1,
+           (FLOOR((ROW_NUMBER() OVER (ORDER BY materia_id) - 1) / 5) % 4) + 1
       FROM sm24f_mat mat
      WHERE NOT EXISTS (
        SELECT 1 FROM grade_horaria g
@@ -417,8 +425,20 @@ BEGIN
     DROP TEMPORARY TABLE IF EXISTS sm24f_sem_grade;
 
     DROP TEMPORARY TABLE IF EXISTS sm24f_slot;
-    CREATE TEMPORARY TABLE sm24f_slot AS
-    SELECT mat.materia_id, g.id AS grade_id, g.professor_id, g.dia_semana,
+    CREATE TEMPORARY TABLE sm24f_slot (
+      materia_id INT NOT NULL PRIMARY KEY,
+      grade_id INT NOT NULL,
+      professor_id INT NOT NULL,
+      dia_semana TINYINT NOT NULL,
+      horario_de TIME NOT NULL,
+      horario_ate TIME NOT NULL,
+      b1 INT NOT NULL,
+      b2 INT NOT NULL,
+      b3 INT NOT NULL,
+      b4 INT NOT NULL
+    );
+    INSERT INTO sm24f_slot (materia_id, grade_id, professor_id, dia_semana, horario_de, horario_ate, b1, b2, b3, b4)
+    SELECT mat.materia_id, g.id, g.professor_id, g.dia_semana,
            g.horario_de, g.horario_ate, mat.b1, mat.b2, mat.b3, mat.b4
       FROM sm24f_mat mat
       INNER JOIN grade_horaria g ON g.id = (
@@ -429,7 +449,19 @@ BEGIN
       );
 
     DROP TEMPORARY TABLE IF EXISTS sm24f_slot2;
-    CREATE TEMPORARY TABLE sm24f_slot2 AS SELECT * FROM sm24f_slot;
+    CREATE TEMPORARY TABLE sm24f_slot2 (
+      materia_id INT NOT NULL PRIMARY KEY,
+      grade_id INT NOT NULL,
+      professor_id INT NOT NULL,
+      dia_semana TINYINT NOT NULL,
+      horario_de TIME NOT NULL,
+      horario_ate TIME NOT NULL,
+      b1 INT NOT NULL,
+      b2 INT NOT NULL,
+      b3 INT NOT NULL,
+      b4 INT NOT NULL
+    );
+    INSERT INTO sm24f_slot2 SELECT * FROM sm24f_slot;
 
     DROP TEMPORARY TABLE IF EXISTS sm24f_per;
     CREATE TEMPORARY TABLE sm24f_per (
@@ -470,10 +502,21 @@ BEGIN
     SELECT d FROM seq;
 
     DROP TEMPORARY TABLE IF EXISTS sm24f_plano;
-    CREATE TEMPORARY TABLE sm24f_plano AS
-    SELECT s.grade_id, s.professor_id, s.materia_id, s.horario_de, s.horario_ate,
-           x.d, x.rn,
-           CASE x.numero WHEN 1 THEN s.b1 WHEN 2 THEN s.b2 WHEN 3 THEN s.b3 ELSE s.b4 END AS faltas_bim
+    CREATE TEMPORARY TABLE sm24f_plano (
+      materia_id INT NOT NULL,
+      d DATE NOT NULL,
+      grade_id INT NOT NULL,
+      professor_id INT NOT NULL,
+      horario_de TIME NOT NULL,
+      horario_ate TIME NOT NULL,
+      rn INT NOT NULL,
+      faltas_bim INT NOT NULL,
+      PRIMARY KEY (materia_id, d)
+    );
+    INSERT INTO sm24f_plano (materia_id, d, grade_id, professor_id, horario_de, horario_ate, rn, faltas_bim)
+    SELECT s.materia_id, x.d, s.grade_id, s.professor_id, s.horario_de, s.horario_ate,
+           x.rn,
+           CASE x.numero WHEN 1 THEN s.b1 WHEN 2 THEN s.b2 WHEN 3 THEN s.b3 ELSE s.b4 END
       FROM sm24f_slot s
       INNER JOIN (
         SELECT s2.materia_id, d.d, p.numero,
@@ -485,7 +528,12 @@ BEGIN
      WHERE x.rn <= 6;
 
     DROP TEMPORARY TABLE IF EXISTS sm24f_aulas_existentes;
-    CREATE TEMPORARY TABLE sm24f_aulas_existentes AS
+    CREATE TEMPORARY TABLE sm24f_aulas_existentes (
+      grade_horaria_id INT NOT NULL,
+      data_aula DATE NOT NULL,
+      PRIMARY KEY (grade_horaria_id, data_aula)
+    );
+    INSERT INTO sm24f_aulas_existentes (grade_horaria_id, data_aula)
     SELECT da.grade_horaria_id, da.data_aula
       FROM diario_aulas da
       INNER JOIN sm24f_plano p ON p.grade_id = da.grade_horaria_id AND p.d = da.data_aula;
@@ -518,13 +566,19 @@ BEGIN
 
     IF (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'presenca_eventos') > 0 THEN
       DROP TEMPORARY TABLE IF EXISTS sm24f_pres;
-      CREATE TEMPORARY TABLE sm24f_pres AS
+      CREATE TEMPORARY TABLE sm24f_pres (
+        d DATE NOT NULL PRIMARY KEY
+      );
+      INSERT INTO sm24f_pres (d)
       SELECT DISTINCT p.d
         FROM sm24f_plano p
        WHERE p.rn > p.faltas_bim;
 
       DROP TEMPORARY TABLE IF EXISTS sm24f_pres_tem;
-      CREATE TEMPORARY TABLE sm24f_pres_tem AS
+      CREATE TEMPORARY TABLE sm24f_pres_tem (
+        id_externo VARCHAR(190) NOT NULL PRIMARY KEY
+      );
+      INSERT INTO sm24f_pres_tem (id_externo)
       SELECT id_externo FROM presenca_eventos
        WHERE id_externo LIKE CONCAT('SM24-ana-', v_aluno, '-%');
 
