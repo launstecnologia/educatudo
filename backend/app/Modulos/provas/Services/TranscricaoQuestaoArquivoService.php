@@ -495,7 +495,7 @@ class TranscricaoQuestaoArquivoService
                             'type' => 'image_url',
                             'image_url' => [
                                 'url' => 'data:image/jpeg;base64,' . $envio,
-                                'detail' => 'high',
+                                'detail' => 'low',
                             ],
                         ],
                     ],
@@ -639,8 +639,8 @@ class TranscricaoQuestaoArquivoService
         }
         $celula = 8;
         $tinta = [];
-        for ($y = 0; $y < $altura; $y += 2) {
-            for ($x = 0; $x < $largura; $x += 2) {
+        for ($y = 0; $y < $altura; $y += 4) {
+            for ($x = 0; $x < $largura; $x += 4) {
                 if (imagecolorat($mascara, $x, $y) !== 0) {
                     continue;
                 }
@@ -667,6 +667,10 @@ class TranscricaoQuestaoArquivoService
             $x1 = (max($xs) + 1) * $celula / $sx;
             $y1 = (max($ys) + 1) * $celula / $sy;
             if (($x1 - $x0) < 18 || ($y1 - $y0) < 12 || (($y1 - $y0) < 8 && ($x1 - $x0) > $larguraPt * 0.6)) {
+                continue;
+            }
+            $areaPagina = $larguraPt * $alturaPt;
+            if ($areaPagina > 0 && (($x1 - $x0) * ($y1 - $y0)) / $areaPagina > 0.35) {
                 continue;
             }
             $caixa = [$x0, $y0, $x1, $y1];
@@ -940,17 +944,17 @@ class TranscricaoQuestaoArquivoService
             . 'gabarito é só a letra A, B, C, D ou E, ou string vazia quando o arquivo não trouxer a resposta. O texto da alternativa é só o conteúdo, sem a letra A), B), C), D) ou E). figura é o número da figura do arquivo (1 a ' . $quantidadeFiguras . ') que pertence à questão, ou 0. '
             . 'No máximo 40 questões.';
         $trecho = $this->trechoParaModelo($texto);
-        $openai = new OpenAIService();
-        $response = $openai->chatCompletion(
-            [[
-                'role' => 'user',
-                'content' => "Extraia todas as questões desta prova. Há {$quantidadeFiguras} figura(s) no arquivo, na ordem em que aparecem.\n\n" . $trecho,
-            ]],
-            $systemPrompt,
-            'gpt-4o',
-            0.2,
-            8000
-        );
+            $openai = new OpenAIService();
+            $response = $openai->chatCompletion(
+                [[
+                    'role' => 'user',
+                    'content' => "Extraia todas as questões desta prova. Há {$quantidadeFiguras} figura(s) no arquivo, na ordem em que aparecem.\n\n" . $trecho,
+                ]],
+                $systemPrompt,
+                'gpt-4o-mini',
+                0.2,
+                4000
+            );
         $conteudo = (string) ($response['resposta'] ?? '');
         $json = $conteudo;
         if (preg_match('/```(?:json)?\s*([\s\S]*?)```/', $conteudo, $bloco)) {
@@ -1055,9 +1059,32 @@ class TranscricaoQuestaoArquivoService
      * @param list<array{enunciado:string,tipo:string,valor:float,alternativas:list<array{texto:string,correta:int,ordem:int}>,explicacao:?string,figura:int,tem_figura:bool}> $questoes
      * @return list<array{enunciado:string,tipo:string,valor:float,alternativas:list<array{texto:string,correta:int,ordem:int}>,explicacao:?string,figura:int,tem_figura:bool}>
      */
+    /**
+     * @param list<array{tipo:string,alternativas:list<array{correta:int}>}> $questoes
+     */
+    private function gabaritoJaMarcado(array $questoes): bool
+    {
+        $objetivas = 0;
+        $marcadas = 0;
+        foreach ($questoes as $questao) {
+            if (($questao['tipo'] ?? '') !== 'multipla_escolha' || ($questao['alternativas'] ?? []) === []) {
+                continue;
+            }
+            $objetivas++;
+            foreach ($questao['alternativas'] as $alternativa) {
+                if (!empty($alternativa['correta'])) {
+                    $marcadas++;
+                    break;
+                }
+            }
+        }
+
+        return $objetivas > 0 && $marcadas === $objetivas;
+    }
+
     private function atribuirGabarito(string $texto, array $questoes): array
     {
-        if ($questoes === []) {
+        if ($questoes === [] || $this->gabaritoJaMarcado($questoes)) {
             return $questoes;
         }
         $resumo = [];
@@ -1086,9 +1113,9 @@ class TranscricaoQuestaoArquivoService
                 . 'Não calcule e não invente. Se o texto não trouxer a resposta, deixe letra e resposta vazias. '
                 . 'Devolva somente JSON: {"gabaritos":[{"numero":1,"letra":"B","resposta":"66","trecho":"cópia fiel do pedaço que prova a resposta"}]}. '
                 . 'O trecho precisa existir no texto, citar o número da questão e a resposta (letra ao lado de gabarito, alternativa ou resposta, ou o texto da opção certa). Não copie a lista de alternativas da questão.',
-                'gpt-4o',
+                'gpt-4o-mini',
                 0.1,
-                4000
+                2000
             );
             $decodificado = $this->decodificarJson((string) ($response['resposta'] ?? ''));
         } catch (\Throwable $e) {
