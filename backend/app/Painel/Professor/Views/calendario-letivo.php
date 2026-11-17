@@ -292,16 +292,18 @@ $tomCal = $corCal !== '' ? '--button-primary-color:' . $corCal . ';--primary-tex
 <?php endif; ?>
 
 <!-- Modal: Detalhe do dia -->
-<div id="modalDia" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 hidden">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4">
-        <div id="modalDiaHeader" class="flex items-center justify-between px-6 py-4 rounded-t-2xl">
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-wider opacity-75" id="modalDiaTipoLabel"></p>
-                <h3 class="text-lg font-bold" id="modalDiaData"></h3>
+<div id="modalDia" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 hidden p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+        <div id="modalDiaHeader" class="flex items-start justify-between gap-4 px-6 py-5 border-b border-gray-100">
+            <div class="min-w-0">
+                <p class="text-sm text-gray-500" id="modalDiaTipoLabel"></p>
+                <h3 class="text-xl font-bold text-gray-900 mt-0.5" id="modalDiaData"></h3>
             </div>
-            <button onclick="closeDayModal()" class="opacity-75 hover:opacity-100"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <button type="button" onclick="closeDayModal()" class="text-gray-400 hover:text-gray-600 p-1 shrink-0" aria-label="Fechar">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
         </div>
-        <div id="modalDiaBody" class="px-6 pb-6 space-y-3 max-h-80 overflow-y-auto"></div>
+        <div id="modalDiaBody" class="px-6 py-5 space-y-3 max-h-[28rem] overflow-y-auto bg-gray-50"></div>
     </div>
 </div>
 
@@ -478,36 +480,64 @@ function renderMes(mes) {
     });
 }
 
+function dataPorExtenso(br) {
+    var partes = String(br || '').split('/');
+    if (partes.length !== 3) return { semana: '', titulo: br };
+    var dia = parseInt(partes[0], 10);
+    var mes = parseInt(partes[1], 10);
+    var ano = partes[2];
+    var dt = new Date(parseInt(ano, 10), mes - 1, dia);
+    var semana = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
+    var nomeMes = (MESES_NOMES[mes - 1] || '').toLowerCase();
+    return {
+        semana: semana[dt.getDay()] || '',
+        titulo: dia + ' de ' + nomeMes + ' de ' + ano
+    };
+}
+
+function periodoPorExtenso(inicio, fim) {
+    var a = dataPorExtenso(inicio);
+    if (!fim || inicio === fim) return a.titulo;
+    var b = dataPorExtenso(fim);
+    if (inicio.slice(3) === fim.slice(3)) {
+        return parseInt(inicio, 10) + ' a ' + b.titulo;
+    }
+    return a.titulo + ' a ' + b.titulo;
+}
+
 function openDayModal(payloadStr) {
-    var data   = JSON.parse(payloadStr);
-    var events = data.events;
-    var primTipo = events.length ? events[0].tipo : 'evento';
-
+    var data = JSON.parse(payloadStr);
+    var events = data.events || [];
+    var quando = dataPorExtenso(data.date);
     var header = document.getElementById('modalDiaHeader');
-    header.style.backgroundColor = tipoBg[primTipo] || '#f3f4f6';
-    header.style.color = tipoText[primTipo] || '#111827';
-    document.getElementById('modalDiaData').textContent = data.date;
-
-    var tipos = [...new Set(events.map(function(e){ return e.label; }))];
-    document.getElementById('modalDiaTipoLabel').textContent = tipos.join(' · ');
+    header.style.backgroundColor = '';
+    header.style.color = '';
+    document.getElementById('modalDiaTipoLabel').textContent = quando.semana;
+    document.getElementById('modalDiaData').textContent = quando.titulo;
 
     var body = document.getElementById('modalDiaBody');
     body.innerHTML = '';
     events.forEach(function(ev) {
-        var periodo = ev.inicio === ev.fim ? ev.inicio : ev.inicio + ' – ' + ev.fim;
+        var periodo = periodoPorExtenso(ev.inicio, ev.fim);
+        var cor = tipoText[ev.tipo] || '#374151';
+        var fundo = tipoBg[ev.tipo] || '#f9fafb';
         var div = document.createElement('div');
-        div.className = 'p-3 rounded-xl border';
-        div.style.backgroundColor = tipoBg[ev.tipo] || '#f9fafb';
-        div.style.borderColor = tipoText[ev.tipo] + '33' || '#e5e7eb';
+        div.className = 'bg-white rounded-xl border border-gray-200 p-4';
+        div.style.borderLeftWidth = '4px';
+        div.style.borderLeftColor = cor;
 
         var extras = '';
-        if (ev.local_evento) extras += '<span class="inline-flex items-center gap-1 mr-2"><i class="fa-solid fa-location-dot text-xs"></i>' + escHtml(ev.local_evento) + '</span>';
-        if (ev.link_reuniao) extras += '<a href="' + escHtml(ev.link_reuniao) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-1 underline"><i class="fa-solid fa-link text-xs"></i>Acessar link</a>';
+        if (ev.local_evento) extras += '<p class="text-sm text-gray-600 mt-2"><i class="fa-solid fa-location-dot mr-1.5 text-gray-400"></i>' + escHtml(ev.local_evento) + '</p>';
+        if (ev.link_reuniao) extras += '<p class="text-sm mt-2"><a href="' + escHtml(ev.link_reuniao) + '" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800 font-medium"><i class="fa-solid fa-link mr-1.5"></i>Acessar link</a></p>';
 
         div.innerHTML =
-            '<p class="text-sm font-semibold" style="color:' + (tipoText[ev.tipo]||'#111') + '">' + escHtml(ev.descricao) + '</p>' +
-            '<p class="text-xs mt-0.5 opacity-75" style="color:' + (tipoText[ev.tipo]||'#666') + '">' + escHtml(ev.label) + (ev.minha ? ' · Sua informação' : '') + ' · ' + escHtml(periodo) + '</p>' +
-            (extras ? '<p class="text-xs mt-1" style="color:' + (tipoText[ev.tipo]||'#666') + '">' + extras + '</p>' : '');
+            '<div class="flex items-center justify-between gap-3">' +
+                '<span class="inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full" style="background:' + fundo + ';color:' + cor + '">' + escHtml(ev.label) + '</span>' +
+                (ev.minha ? '<span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">Minha</span>' : '') +
+            '</div>' +
+            '<p class="text-base font-semibold text-gray-900 mt-3">' + escHtml(ev.descricao) + '</p>' +
+            '<p class="text-sm text-gray-500 mt-1">' + escHtml(periodo) + '</p>' +
+            extras;
         body.appendChild(div);
     });
 
