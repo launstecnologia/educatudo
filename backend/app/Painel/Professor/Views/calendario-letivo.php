@@ -52,7 +52,13 @@ $tomCal = $corCal !== '' ? '--button-primary-color:' . $corCal . ';--primary-tex
 
 <div class="mb-6">
     <div class="flex flex-wrap items-center gap-2">
-        <h1 class="text-2xl font-bold text-gray-900 flex-1">Calendário escolar <?= $ano ?></h1>
+        <h1 class="text-2xl font-bold text-gray-900 flex-1 min-w-[12rem]">Calendário escolar <?= $ano ?></h1>
+        <?php if (!empty($pode_adicionar)): ?>
+        <button type="button" onclick="abrirLembrete()" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 shrink-0">
+            <i class="fa-solid fa-plus"></i>
+            Meu evento
+        </button>
+        <?php endif; ?>
         <?php
         $calendariosVisao = $calendarios ?? [];
         $calendarioIdVisao = (int) ($calendario_id ?? 0);
@@ -69,12 +75,6 @@ $tomCal = $corCal !== '' ? '--button-primary-color:' . $corCal . ';--primary-tex
         <?php endif; ?>
         <a href="?ano=<?= $ano - 1 ?>" class="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-left"></i></a>
         <a href="?ano=<?= $ano + 1 ?>" class="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-right"></i></a>
-        <?php if (!empty($pode_adicionar) && $calendarioIdVisao > 0): ?>
-        <button type="button" onclick="abrirLembrete()" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">
-            <i class="fa-solid fa-plus"></i>
-            Lembrete
-        </button>
-        <?php endif; ?>
         <div class="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
             <button id="btnViewYear" onclick="setView('year')" class="px-3 py-2 text-sm font-medium"><i class="fa-solid fa-calendar-days mr-1.5"></i>Ano</button>
             <button id="btnViewMonth" onclick="setView('month')" class="px-3 py-2 text-sm font-medium border-l border-gray-300"><i class="fa-solid fa-calendar mr-1.5"></i>Mês</button>
@@ -94,30 +94,32 @@ $tomCal = $corCal !== '' ? '--button-primary-color:' . $corCal . ';--primary-tex
 </div>
 <?php endif; ?>
 
-<?php if (!empty($pode_adicionar) && $calendarioIdVisao > 0): ?>
-<div id="modalLembrete" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4" onclick="if (event.target === this) fecharLembrete()">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-            <div>
-                <h2 class="text-lg font-semibold text-gray-900">Novo lembrete</h2>
-                <p class="text-sm text-gray-500 mt-1">Fica só no seu calendário.</p>
-            </div>
-            <button type="button" onclick="fecharLembrete()" class="text-gray-400 hover:text-gray-600" aria-label="Fechar">
-                <i class="fa-solid fa-xmark text-xl"></i>
-            </button>
+<?php if (!empty($pode_adicionar)): ?>
+<div id="lembreteBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" onclick="fecharLembrete()"></div>
+<aside id="lembreteDrawer" class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-[70] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="lembreteDrawerTitle">
+    <div class="flex items-center justify-between px-6 py-5 border-b border-gray-200">
+        <div>
+            <h2 id="lembreteDrawerTitle" class="text-xl font-bold text-gray-900">Meu evento</h2>
+            <p class="text-sm text-gray-500 mt-1">Fica só no seu calendário. Ninguém mais vê.</p>
         </div>
-        <form method="post" action="<?= URL ?>/professor/calendario-letivo/informacao" class="px-6 py-5 space-y-4">
-            <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
-            <input type="hidden" name="ano" value="<?= $ano ?>">
-            <input type="hidden" name="calendario_id" value="<?= $calendarioIdVisao ?>">
+        <button type="button" onclick="fecharLembrete()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+            <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+    </div>
+    <?php if ($calendarioIdVisao > 0): ?>
+    <form method="post" action="<?= URL ?>/professor/calendario-letivo/informacao" class="flex flex-col flex-1 overflow-hidden">
+        <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
+        <input type="hidden" name="ano" value="<?= $ano ?>">
+        <input type="hidden" name="calendario_id" value="<?= $calendarioIdVisao ?>">
+        <div class="flex-1 overflow-y-auto px-6 py-5 space-y-4">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label class="block text-sm">
                     <span class="text-gray-600">Data</span>
-                    <input type="date" name="data_inicio" required class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2">
+                    <input type="date" name="data_inicio" required class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 bg-white">
                 </label>
                 <label class="block text-sm">
                     <span class="text-gray-600">Até</span>
-                    <input type="date" name="data_fim" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2">
+                    <input type="date" name="data_fim" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 bg-white">
                 </label>
             </div>
             <label class="block text-sm">
@@ -128,13 +130,16 @@ $tomCal = $corCal !== '' ? '--button-primary-color:' . $corCal . ';--primary-tex
                 <span class="text-gray-600">Local</span>
                 <input type="text" name="local_evento" maxlength="255" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2">
             </label>
-            <div class="flex justify-end gap-2 pt-2">
-                <button type="button" onclick="fecharLembrete()" class="px-4 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700">Cancelar</button>
-                <button type="submit" class="px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">Salvar lembrete</button>
-            </div>
-        </form>
-    </div>
-</div>
+        </div>
+        <div class="flex justify-end gap-2 px-6 py-4 border-t border-gray-200">
+            <button type="button" onclick="fecharLembrete()" class="px-4 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700">Cancelar</button>
+            <button type="submit" class="px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">Salvar</button>
+        </div>
+    </form>
+    <?php else: ?>
+    <p class="px-6 py-5 text-sm text-gray-600">A escola ainda não publicou o calendário de <?= $ano ?>. Quando ele existir, o evento particular pode ser salvo aqui.</p>
+    <?php endif; ?>
+</aside>
 <?php endif; ?>
 
 <!-- Legenda -->
@@ -325,16 +330,25 @@ var eventData   = <?php
 ?>;
 
 function abrirLembrete() {
-    var modal = document.getElementById('modalLembrete');
-    if (!modal) return;
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
+    var drawer = document.getElementById('lembreteDrawer');
+    var backdrop = document.getElementById('lembreteBackdrop');
+    if (!drawer || !backdrop) return;
+    backdrop.classList.remove('hidden');
+    drawer.classList.remove('translate-x-full');
+    drawer.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('overflow-hidden');
 }
 function fecharLembrete() {
-    var modal = document.getElementById('modalLembrete');
-    if (!modal) return;
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
+    var drawer = document.getElementById('lembreteDrawer');
+    var backdrop = document.getElementById('lembreteBackdrop');
+    if (!drawer || !backdrop) return;
+    drawer.classList.add('translate-x-full');
+    drawer.setAttribute('aria-hidden', 'true');
+    backdrop.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
+}
+if (new URLSearchParams(window.location.search).get('evento') === '1') {
+    abrirLembrete();
 }
 
 function setView(v) {

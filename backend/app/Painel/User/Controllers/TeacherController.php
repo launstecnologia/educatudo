@@ -2462,12 +2462,29 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
         if (!$cfg) {
             $cfg = $service->resolverEscopos($ano, $escopos);
         }
+        if (!$cfg) {
+            $cfg = $service->getAno($ano);
+        }
         $professorId = (int) ($user['id'] ?? 0);
         $grupoSeb = \App\Modulos\GrupoSeb\Services\GrupoSebService::estaAtivo();
-        $podeAdicionar = $grupoSeb && (int) ($cfg['id'] ?? 0) > 0;
-        $eventos = $cfg
-            ? $service->eventosDoProfessor((int) $cfg['id'], $grupoSeb ? $professorId : 0)
-            : [];
+        $noEscopo = $cfg && isset($idsPermitidos[(int) $cfg['id']]);
+        $destinoParticular = false;
+        if (!$cfg && $grupoSeb) {
+            $qualquer = $service->listarDoAno($ano);
+            $cfg = $qualquer[0] ?? null;
+            $destinoParticular = $cfg !== null;
+        }
+        $podeAdicionar = $grupoSeb;
+        if ($cfg && $noEscopo) {
+            $eventos = $service->eventosDoProfessor((int) $cfg['id'], $grupoSeb ? $professorId : 0);
+        } elseif ($cfg && $destinoParticular) {
+            $eventos = array_values(array_filter(
+                $service->eventosDoProfessor((int) $cfg['id'], $professorId),
+                static fn ($evento) => !empty($evento['minha_informacao'])
+            ));
+        } else {
+            $eventos = [];
+        }
         $aviso = $_SESSION['calendario_professor_aviso'] ?? null;
         $avisoTipo = $_SESSION['calendario_professor_aviso_tipo'] ?? 'info';
         unset($_SESSION['calendario_professor_aviso'], $_SESSION['calendario_professor_aviso_tipo']);
@@ -2488,10 +2505,10 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
             'tipoText' => $visuais['text'],
             'calendarios' => $lista,
             'calendario_id' => (int) ($cfg['id'] ?? 0),
-            'calendario_nome' => (string) ($cfg['nome'] ?? ''),
-            'calendario_rotulo' => (string) ($cfg['rotulo'] ?? ''),
-            'calendario_cor' => (string) ($cfg['cor'] ?? ''),
-            'calendario_cor_texto' => (string) ($cfg['cor_texto'] ?? ''),
+            'calendario_nome' => $destinoParticular ? '' : (string) ($cfg['nome'] ?? ''),
+            'calendario_rotulo' => $destinoParticular ? '' : (string) ($cfg['rotulo'] ?? ''),
+            'calendario_cor' => $destinoParticular ? '' : (string) ($cfg['cor'] ?? ''),
+            'calendario_cor_texto' => $destinoParticular ? '' : (string) ($cfg['cor_texto'] ?? ''),
         ]);
     }
 
@@ -2586,8 +2603,15 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
         if ($geral) {
             $idsPermitidos[(int) $geral['id']] = true;
         }
+        if (isset($idsPermitidos[$calendarioId])) {
+            return true;
+        }
+        if (!\App\Modulos\GrupoSeb\Services\GrupoSebService::estaAtivo() || $idsPermitidos !== []) {
+            return false;
+        }
+        $qualquer = $service->listarDoAno($ano);
 
-        return isset($idsPermitidos[$calendarioId]);
+        return isset($qualquer[0]) && (int) ($qualquer[0]['id'] ?? 0) === $calendarioId;
     }
 
     private function redirecionarCalendarioProfessor(int $ano, int $calendarioId, string $aviso, string $tipo = 'info'): void

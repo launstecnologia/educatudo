@@ -68,6 +68,114 @@ $mostrarAulasHoje = $dashVisivel('aulas_hoje');
 $mostrarDesempenhoProf = $dashVisivel('desempenho');
 $gradeSeb = !$dashOrdemCustom && ($mostrarAulasHoje || $mostrarDesempenhoProf);
 ?>
+<?php if ($dashVisivel('calendario')): ?>
+<?php
+$calPainel = is_array($calendario_painel ?? null) ? $calendario_painel : [];
+$calAno = (int) ($calPainel['ano'] ?? date('Y'));
+$calMes = (int) ($calPainel['mes'] ?? date('n'));
+$calEventos = is_array($calPainel['eventos'] ?? null) ? $calPainel['eventos'] : [];
+$calLabels = is_array($calPainel['labels'] ?? null) ? $calPainel['labels'] : [];
+$calBg = is_array($calPainel['bg'] ?? null) ? $calPainel['bg'] : [];
+$calText = is_array($calPainel['text'] ?? null) ? $calPainel['text'] : [];
+$mesesPainel = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+$eventosPorDia = [];
+$eventosDoMes = [];
+foreach ($calEventos as $evCal) {
+    $inicioCal = strtotime((string) ($evCal['data_inicio'] ?? ''));
+    $fimCal = strtotime((string) ($evCal['data_fim'] ?? ''));
+    if (!$inicioCal || !$fimCal) {
+        continue;
+    }
+    $entraNoMes = false;
+    for ($diaCal = $inicioCal; $diaCal <= $fimCal; $diaCal += 86400) {
+        if ((int) date('Y', $diaCal) === $calAno && (int) date('n', $diaCal) === $calMes) {
+            $eventosPorDia[date('Y-m-d', $diaCal)][] = $evCal;
+            $entraNoMes = true;
+        }
+    }
+    if ($entraNoMes) {
+        $eventosDoMes[] = $evCal;
+    }
+}
+$primeiroDiaCal = mktime(0, 0, 0, $calMes, 1, $calAno);
+$diasNoMesCal = (int) date('t', $primeiroDiaCal);
+$offsetCal = (int) date('w', $primeiroDiaCal);
+$hojeCal = date('Y-m-d');
+$abrirBlocoDash('calendario');
+?>
+<div class="bg-white rounded-xl shadow-lg mb-6 md:mb-8">
+    <div class="p-4 md:p-6 border-b border-gray-200">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="min-w-0">
+                <h2 class="text-lg md:text-xl font-semibold text-gray-900">Calendário escolar</h2>
+                <p class="text-sm text-gray-500 mt-1"><?= htmlspecialchars($mesesPainel[$calMes - 1] ?? '') ?> de <?= $calAno ?></p>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="<?= URL ?>/professor/calendario-letivo?evento=1" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">
+                    <i class="fa-solid fa-plus"></i>
+                    Meu evento
+                </a>
+                <a href="<?= URL ?>/professor/calendario-letivo" class="text-blue-600 hover:text-blue-700 text-sm font-medium whitespace-nowrap">Ver ano</a>
+            </div>
+        </div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2">
+        <div class="p-4 md:p-6">
+            <div class="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-gray-400 mb-1">
+                <?php foreach (['D','S','T','Q','Q','S','S'] as $siglaDia): ?>
+                <div class="py-1"><?= $siglaDia ?></div>
+                <?php endforeach; ?>
+            </div>
+            <div class="grid grid-cols-7 gap-1">
+                <?php for ($vazio = 0; $vazio < $offsetCal; $vazio++): ?>
+                <div class="h-10"></div>
+                <?php endfor; ?>
+                <?php for ($diaNum = 1; $diaNum <= $diasNoMesCal; $diaNum++):
+                    $chaveDia = sprintf('%04d-%02d-%02d', $calAno, $calMes, $diaNum);
+                    $evsDia = $eventosPorDia[$chaveDia] ?? [];
+                    $primeiroTipo = (string) ($evsDia[0]['tipo'] ?? '');
+                    $ehHoje = $chaveDia === $hojeCal;
+                ?>
+                <div class="h-10 rounded-lg flex flex-col items-center justify-center text-sm <?= $ehHoje ? 'ring-2 ring-blue-500 font-bold' : '' ?>"
+                     style="<?= $primeiroTipo !== '' ? 'background:' . htmlspecialchars((string) ($calBg[$primeiroTipo] ?? '#f3f4f6')) . ';color:' . htmlspecialchars((string) ($calText[$primeiroTipo] ?? '#111827')) : '' ?>">
+                    <span><?= $diaNum ?></span>
+                    <?php if (count($evsDia) > 1): ?>
+                    <span class="text-[10px] leading-none"><?= count($evsDia) ?></span>
+                    <?php endif; ?>
+                </div>
+                <?php endfor; ?>
+            </div>
+        </div>
+        <div class="p-4 md:p-6 border-t lg:border-t-0 lg:border-l border-gray-100 max-h-96 overflow-y-auto">
+            <?php if ($eventosDoMes === []): ?>
+            <p class="text-sm text-gray-500">Nenhum compromisso neste mês.</p>
+            <?php else: ?>
+            <ul class="space-y-2">
+                <?php foreach ($eventosDoMes as $evMes):
+                    $tipoMes = (string) ($evMes['tipo'] ?? '');
+                    $iniMes = strtotime((string) ($evMes['data_inicio'] ?? ''));
+                    $fimMes = strtotime((string) ($evMes['data_fim'] ?? ''));
+                    $periodoMes = $iniMes ? date('d/m', $iniMes) : '';
+                    if ($fimMes && $iniMes && date('Y-m-d', $iniMes) !== date('Y-m-d', $fimMes)) {
+                        $periodoMes .= ' – ' . date('d/m', $fimMes);
+                    }
+                ?>
+                <li class="rounded-lg px-3 py-2" style="background:<?= htmlspecialchars((string) ($calBg[$tipoMes] ?? '#f3f4f6')) ?>">
+                    <p class="text-sm font-medium" style="color:<?= htmlspecialchars((string) ($calText[$tipoMes] ?? '#111827')) ?>"><?= htmlspecialchars((string) ($evMes['descricao'] ?? '')) ?></p>
+                    <p class="text-xs mt-0.5" style="color:<?= htmlspecialchars((string) ($calText[$tipoMes] ?? '#4b5563')) ?>">
+                        <?= htmlspecialchars($periodoMes) ?>
+                        · <?= htmlspecialchars((string) ($calLabels[$tipoMes] ?? $tipoMes)) ?>
+                        <?= !empty($evMes['minha_informacao']) ? ' · Meu lembrete' : '' ?>
+                    </p>
+                </li>
+                <?php endforeach; ?>
+            </ul>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+<?php $fecharBlocoDash(); ?>
+<?php endif; ?>
 <?php if ($gradeSeb): ?>
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8">
 <?php endif; ?>
@@ -167,114 +275,6 @@ $gradeSeb = !$dashOrdemCustom && ($mostrarAulasHoje || $mostrarDesempenhoProf);
 <?php endif; ?>
 <?php if ($gradeSeb): ?>
 </div>
-<?php endif; ?>
-<?php if ($dashVisivel('calendario')): ?>
-<?php
-$calPainel = is_array($calendario_painel ?? null) ? $calendario_painel : [];
-$calAno = (int) ($calPainel['ano'] ?? date('Y'));
-$calMes = (int) ($calPainel['mes'] ?? date('n'));
-$calEventos = is_array($calPainel['eventos'] ?? null) ? $calPainel['eventos'] : [];
-$calLabels = is_array($calPainel['labels'] ?? null) ? $calPainel['labels'] : [];
-$calBg = is_array($calPainel['bg'] ?? null) ? $calPainel['bg'] : [];
-$calText = is_array($calPainel['text'] ?? null) ? $calPainel['text'] : [];
-$mesesPainel = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-$eventosPorDia = [];
-$eventosDoMes = [];
-foreach ($calEventos as $evCal) {
-    $inicioCal = strtotime((string) ($evCal['data_inicio'] ?? ''));
-    $fimCal = strtotime((string) ($evCal['data_fim'] ?? ''));
-    if (!$inicioCal || !$fimCal) {
-        continue;
-    }
-    $entraNoMes = false;
-    for ($diaCal = $inicioCal; $diaCal <= $fimCal; $diaCal += 86400) {
-        if ((int) date('Y', $diaCal) === $calAno && (int) date('n', $diaCal) === $calMes) {
-            $eventosPorDia[date('Y-m-d', $diaCal)][] = $evCal;
-            $entraNoMes = true;
-        }
-    }
-    if ($entraNoMes) {
-        $eventosDoMes[] = $evCal;
-    }
-}
-$primeiroDiaCal = mktime(0, 0, 0, $calMes, 1, $calAno);
-$diasNoMesCal = (int) date('t', $primeiroDiaCal);
-$offsetCal = (int) date('w', $primeiroDiaCal);
-$hojeCal = date('Y-m-d');
-$abrirBlocoDash('calendario');
-?>
-<div class="bg-white rounded-xl shadow-lg mb-6 md:mb-8">
-    <div class="p-4 md:p-6 border-b border-gray-200">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <div class="min-w-0">
-                <h2 class="text-lg md:text-xl font-semibold text-gray-900">Calendário escolar</h2>
-                <p class="text-sm text-gray-500 mt-1"><?= htmlspecialchars($mesesPainel[$calMes - 1] ?? '') ?> de <?= $calAno ?></p>
-            </div>
-            <div class="flex items-center gap-2">
-                <a href="<?= URL ?>/professor/calendario-letivo" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">
-                    <i class="fa-solid fa-plus"></i>
-                    Lembrete
-                </a>
-                <a href="<?= URL ?>/professor/calendario-letivo" class="text-blue-600 hover:text-blue-700 text-sm font-medium whitespace-nowrap">Ver ano</a>
-            </div>
-        </div>
-    </div>
-    <div class="grid grid-cols-1 lg:grid-cols-2">
-        <div class="p-4 md:p-6">
-            <div class="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-gray-400 mb-1">
-                <?php foreach (['D','S','T','Q','Q','S','S'] as $siglaDia): ?>
-                <div class="py-1"><?= $siglaDia ?></div>
-                <?php endforeach; ?>
-            </div>
-            <div class="grid grid-cols-7 gap-1">
-                <?php for ($vazio = 0; $vazio < $offsetCal; $vazio++): ?>
-                <div class="h-10"></div>
-                <?php endfor; ?>
-                <?php for ($diaNum = 1; $diaNum <= $diasNoMesCal; $diaNum++):
-                    $chaveDia = sprintf('%04d-%02d-%02d', $calAno, $calMes, $diaNum);
-                    $evsDia = $eventosPorDia[$chaveDia] ?? [];
-                    $primeiroTipo = (string) ($evsDia[0]['tipo'] ?? '');
-                    $ehHoje = $chaveDia === $hojeCal;
-                ?>
-                <div class="h-10 rounded-lg flex flex-col items-center justify-center text-sm <?= $ehHoje ? 'ring-2 ring-blue-500 font-bold' : '' ?>"
-                     style="<?= $primeiroTipo !== '' ? 'background:' . htmlspecialchars((string) ($calBg[$primeiroTipo] ?? '#f3f4f6')) . ';color:' . htmlspecialchars((string) ($calText[$primeiroTipo] ?? '#111827')) : '' ?>">
-                    <span><?= $diaNum ?></span>
-                    <?php if (count($evsDia) > 1): ?>
-                    <span class="text-[10px] leading-none"><?= count($evsDia) ?></span>
-                    <?php endif; ?>
-                </div>
-                <?php endfor; ?>
-            </div>
-        </div>
-        <div class="p-4 md:p-6 border-t lg:border-t-0 lg:border-l border-gray-100 max-h-96 overflow-y-auto">
-            <?php if ($eventosDoMes === []): ?>
-            <p class="text-sm text-gray-500">Nenhum compromisso neste mês.</p>
-            <?php else: ?>
-            <ul class="space-y-2">
-                <?php foreach ($eventosDoMes as $evMes):
-                    $tipoMes = (string) ($evMes['tipo'] ?? '');
-                    $iniMes = strtotime((string) ($evMes['data_inicio'] ?? ''));
-                    $fimMes = strtotime((string) ($evMes['data_fim'] ?? ''));
-                    $periodoMes = $iniMes ? date('d/m', $iniMes) : '';
-                    if ($fimMes && $iniMes && date('Y-m-d', $iniMes) !== date('Y-m-d', $fimMes)) {
-                        $periodoMes .= ' – ' . date('d/m', $fimMes);
-                    }
-                ?>
-                <li class="rounded-lg px-3 py-2" style="background:<?= htmlspecialchars((string) ($calBg[$tipoMes] ?? '#f3f4f6')) ?>">
-                    <p class="text-sm font-medium" style="color:<?= htmlspecialchars((string) ($calText[$tipoMes] ?? '#111827')) ?>"><?= htmlspecialchars((string) ($evMes['descricao'] ?? '')) ?></p>
-                    <p class="text-xs mt-0.5" style="color:<?= htmlspecialchars((string) ($calText[$tipoMes] ?? '#4b5563')) ?>">
-                        <?= htmlspecialchars($periodoMes) ?>
-                        · <?= htmlspecialchars((string) ($calLabels[$tipoMes] ?? $tipoMes)) ?>
-                        <?= !empty($evMes['minha_informacao']) ? ' · Meu lembrete' : '' ?>
-                    </p>
-                </li>
-                <?php endforeach; ?>
-            </ul>
-            <?php endif; ?>
-        </div>
-    </div>
-</div>
-<?php $fecharBlocoDash(); ?>
 <?php endif; ?>
 <?php endif; ?>
 
