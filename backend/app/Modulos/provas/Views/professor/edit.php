@@ -153,7 +153,7 @@
             ?>
             <?php if ($tudicoinsProvaIa): ?>
             <button onclick="abrirModalGerarIA()" class="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors">
-                Gerar com IA
+                Gerar com a Tudinha
             </button>
             <?php endif; ?>
             <?php if (false): /* Integração da API externa pausada. Trocar para true para voltar o banco da API na prova. */ ?>
@@ -313,9 +313,12 @@
 
 <!-- Modal Editar Questão -->
 <div id="modal-editar-questao" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" style="display: none;">
-    <div class="bg-white rounded-xl shadow-2xl p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <div class="flex justify-between items-center mb-6">
-            <h3 class="text-2xl font-bold text-gray-900">Editar Questão</h3>
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center px-6 py-5 border-b border-gray-100">
+            <div>
+                <h3 class="text-xl font-bold text-gray-900">Editar questão</h3>
+                <p class="text-sm text-gray-500 mt-1">Ajuste o enunciado e marque o gabarito.</p>
+            </div>
             <button onclick="fecharModalEditar()" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -323,7 +326,7 @@
             </button>
         </div>
         
-        <form id="editarQuestaoForm" class="space-y-4">
+        <form id="editarQuestaoForm" class="space-y-5 px-6 py-5">
             <input type="hidden" id="edit-questao-id" name="questao_id">
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -406,7 +409,10 @@
                 </div>
             </div>
             <div id="edit-opcoes-container" class="hidden">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Alternativas (Múltipla Escolha) *</label>
+                <div class="flex items-end justify-between gap-3 mb-3">
+                    <label class="block text-sm font-medium text-gray-700">Alternativas</label>
+                    <span class="text-xs text-gray-500">Marque o gabarito em uma delas.</span>
+                </div>
                 <div id="edit-opcoes-lista" class="space-y-3 mb-3"></div>
                 <div class="flex flex-wrap items-center gap-4 mt-2">
                     <button type="button" onclick="adicionarOpcaoEdicao()" class="px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors">
@@ -434,7 +440,7 @@
 <div id="modal-gerar-ia" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" style="display: none;">
     <div class="bg-white rounded-xl shadow-2xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center mb-6">
-            <h3 class="text-2xl font-bold text-gray-900">🤖 Gerar Questões com IA</h3>
+            <h3 class="text-2xl font-bold text-gray-900">Gerar com a Tudinha</h3>
             <button onclick="fecharModalGerarIA()" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -592,7 +598,7 @@
                 </button>
                 <button type="submit" 
                         class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                    🤖 Gerar Questões
+                    Gerar Questões
                 </button>
             </div>
         </form>
@@ -2068,7 +2074,7 @@ function adicionarOpcao() {
         <div class="alt-actions flex items-center gap-3 flex-shrink-0">
             <label for="radio-${idx}" class="flex items-center gap-2 cursor-pointer alt-actions-label">
                 <input type="radio" name="resposta_opcao" value="${idx}" id="radio-${idx}" class="w-5 h-5 text-blue-600 focus:ring-blue-500">
-                <span class="alt-correct">Correta</span>
+                <span class="alt-correct">Gabarito</span>
             </label>
             <button type="button" onclick="removerOpcao(this)" class="px-3 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors whitespace-nowrap">
                 Remover
@@ -2684,7 +2690,7 @@ document.getElementById('adicionarQuestaoForm').addEventListener('submit', funct
         }
         
         if (respostaIndex === null || respostaIndex === '') {
-            alert('Selecione a alternativa correta');
+            alert('Marque o gabarito.');
             return;
         }
         
@@ -3457,6 +3463,7 @@ function editarQuestao(questaoId) {
             adicionarOpcaoEdicao();
             adicionarOpcaoEdicao();
         }
+        marcarGabaritoEdicao();
     } else {
         container.classList.add('hidden');
         lista.innerHTML = '';
@@ -3485,10 +3492,10 @@ function adicionarOpcaoEdicao(texto = '', correta = false) {
     
     const container = document.getElementById('edit-opcoes-lista');
     const div = document.createElement('div');
-    div.className = 'alt-item flex items-start gap-3 p-3 border border-gray-300 rounded-lg bg-gray-50';
+    div.className = 'alt-item flex items-start gap-3 p-3 border border-gray-200 rounded-xl bg-white';
     div.setAttribute('data-opcao-index', index);
     div.innerHTML = `
-        <div class="alt-letter flex-shrink-0">${letra}</div>
+        <div class="alt-letter flex-shrink-0 w-8 h-8 rounded-full bg-gray-100 text-gray-700 text-sm font-bold flex items-center justify-center">${letra}</div>
         <div class="alt-input-wrap flex-1 min-w-0">
             <div class="alt-toolbar">
                 <button type="button" class="alt-tb-btn" onmousedown="event.preventDefault();document.execCommand('bold')" title="Negrito"><b>B</b></button>
@@ -3501,11 +3508,11 @@ function adicionarOpcaoEdicao(texto = '', correta = false) {
             </div>
             <div class="alt-editor min-h-[60px] px-3 py-2 border border-gray-200 rounded-b-lg text-gray-900 outline-none" id="edit-opcao-editor-${index}" contenteditable="true" data-math="inline" data-placeholder="Alternativa ${letra}..."></div>
         </div>
-        <div class="flex items-center gap-2 flex-shrink-0">
-            <input type="radio" name="resposta_opcao_edit" value="${index}" id="edit-radio-${index}" class="w-5 h-5 text-blue-600 focus:ring-blue-500" ${correta ? 'checked' : ''}>
-            <label for="edit-radio-${index}" class="text-sm text-gray-700 cursor-pointer">Correta</label>
-        </div>
-        <button type="button" onclick="removerOpcaoEdicao(this)" class="px-3 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors flex-shrink-0">
+        <label for="edit-radio-${index}" class="flex items-center gap-2 flex-shrink-0 mt-1 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 cursor-pointer">
+            <input type="radio" name="resposta_opcao_edit" value="${index}" id="edit-radio-${index}" class="w-4 h-4 text-green-600 focus:ring-green-500" ${correta ? 'checked' : ''} onchange="marcarGabaritoEdicao()">
+            <span class="text-sm font-medium text-gray-700">Gabarito</span>
+        </label>
+        <button type="button" onclick="removerOpcaoEdicao(this)" class="px-3 py-2 border border-red-200 text-red-600 rounded-lg text-sm hover:bg-red-50 transition-colors flex-shrink-0">
             Remover
         </button>
     `;
@@ -3538,6 +3545,19 @@ function adicionarOpcaoEdicao(texto = '', correta = false) {
     atualizarIndicesOpcoesEdicao();
 }
 
+function marcarGabaritoEdicao() {
+    var lista = document.getElementById('edit-opcoes-lista');
+    if (!lista) return;
+    lista.querySelectorAll('.alt-item').forEach(function(item) {
+        var radio = item.querySelector('input[type="radio"]');
+        var marcado = radio && radio.checked;
+        item.classList.toggle('border-green-400', marcado);
+        item.classList.toggle('bg-green-50', marcado);
+        item.classList.toggle('border-gray-200', !marcado);
+        item.classList.toggle('bg-white', !marcado);
+    });
+}
+
 function removerOpcaoEdicao(button) {
     const div = button.closest('div[data-opcao-index]');
     div.remove();
@@ -3566,6 +3586,7 @@ function atualizarIndicesOpcoesEdicao() {
         var label = opcao.querySelector('label');
         if (label) label.setAttribute('for', 'edit-radio-' + index);
     });
+    marcarGabaritoEdicao();
 }
 
 function uploadImagemQuestaoEdicao(input) {
@@ -3669,7 +3690,7 @@ document.getElementById('editarQuestaoForm').addEventListener('submit', function
         }
         
         if (respostaIndex === null || respostaIndex === '') {
-            alert('Selecione a alternativa correta');
+            alert('Marque o gabarito.');
             return;
         }
         
