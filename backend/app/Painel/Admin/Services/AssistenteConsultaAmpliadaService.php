@@ -1423,7 +1423,8 @@ class AssistenteConsultaAmpliadaService
                 $totalOcorrencias,
                 $totalAbertas,
                 $totalProvas > 0 ? (int) ($provas['total_acertos'] ?? 0) : null,
-                $totalProvas > 0 ? (int) ($provas['total_erros'] ?? 0) : null
+                $totalProvas > 0 ? (int) ($provas['total_erros'] ?? 0) : null,
+                is_array($ocorrencias['ocorrencias'] ?? null) ? $ocorrencias['ocorrencias'] : []
             );
         } catch (\Throwable $e) {
             error_log('AssistenteConsultaAmpliada perfilAluno360 evolucao: ' . $e->getMessage());
@@ -1449,6 +1450,7 @@ class AssistenteConsultaAmpliadaService
                 ],
                 'melhor' => null,
                 'atencao' => null,
+                'pontos_atencao' => [],
                 'analise' => 'Não foi possível montar o score e a evolução neste momento.',
                 'aviso' => 'Evolução indisponível nesta consulta.',
             ];
@@ -1616,7 +1618,8 @@ class AssistenteConsultaAmpliadaService
         int $ocorrencias,
         int $abertas,
         ?int $acertos,
-        ?int $erros
+        ?int $erros,
+        array $listaOcorrencias = []
     ): array {
         $ano = $ano > 0 ? $ano : (int) date('Y');
         $quadro = is_array($boletim['quadro'] ?? null) ? $boletim['quadro'] : [];
@@ -1769,6 +1772,18 @@ class AssistenteConsultaAmpliadaService
                 $abertas,
                 $acertos,
                 $erros
+            ),
+            'pontos_atencao' => $this->pontosAtencao360(
+                $nome,
+                $disciplinas,
+                $escala,
+                $frequencia,
+                $faltas,
+                $abertas,
+                $listaOcorrencias,
+                $acertos,
+                $erros,
+                $fonte
             ),
             'aviso' => $periodosSaida === []
                 ? 'Sem notas por bimestre ou trimestre para montar a evolução.'
@@ -2221,6 +2236,242 @@ class AssistenteConsultaAmpliadaService
             return 'Ainda não há notas por período, faltas ou ocorrências para analisar este aluno.';
         }
         return implode(' ', $frases);
+    }
+
+    /**
+     * Pontos de atenção com ação para o estudante, a escola e os pais,
+     * escritos a partir das disciplinas, faltas e ocorrências deste aluno.
+     *
+     * @param list<array<string,mixed>> $disciplinas
+     * @param list<array<string,mixed>> $listaOcorrencias
+     * @return list<array{titulo:string,texto:string}>
+     */
+    private function pontosAtencao360(
+        string $nome,
+        array $disciplinas,
+        int $escala,
+        ?float $frequencia,
+        ?int $faltas,
+        int $abertas,
+        array $listaOcorrencias,
+        ?int $acertos,
+        ?int $erros,
+        ?string $fonte
+    ): array {
+        $corte = $escala > 10 ? 60.0 : 6.0;
+        $quedas = array_values(array_filter(
+            $disciplinas,
+            static fn(array $d): bool => ($d['tendencia'] ?? '') === 'caiu'
+        ));
+        usort($quedas, static fn(array $a, array $b): int => ((float) ($a['delta'] ?? 0)) <=> ((float) ($b['delta'] ?? 0)));
+        $quedas = array_slice($quedas, 0, 3);
+
+        $baixas = array_values(array_filter(
+            $disciplinas,
+            static fn(array $d): bool => isset($d['ultima']) && (float) $d['ultima'] < $corte
+        ));
+        usort($baixas, static fn(array $a, array $b): int => ((float) $a['ultima']) <=> ((float) $b['ultima']));
+        $baixas = array_slice($baixas, 0, 3);
+
+        $subidas = array_values(array_filter(
+            $disciplinas,
+            static fn(array $d): bool => ($d['tendencia'] ?? '') === 'subiu'
+        ));
+        usort($subidas, static fn(array $a, array $b): int => ((float) ($b['delta'] ?? 0)) <=> ((float) ($a['delta'] ?? 0)));
+        $subida = $subidas[0] ?? null;
+
+        $foco = $baixas[0] ?? ($quedas[0] ?? null);
+        $ocorrenciaAberta = null;
+        foreach ($listaOcorrencias as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            if ((string) ($item['status'] ?? '') === 'aberta') {
+                $ocorrenciaAberta = $item;
+                break;
+            }
+        }
+        $muitasFaltas = $faltas !== null && $faltas >= 20;
+        $frequenciaBaixa = $frequencia !== null && $frequencia < 85;
+        $provasFracas = $fonte !== 'provas_online'
+            && $acertos !== null
+            && $erros !== null
+            && ($acertos + $erros) > 0
+            && ($erros / ($acertos + $erros)) >= 0.4;
+
+        $pedacosNome = preg_split('/\s+/', trim($nome)) ?: [];
+        $quem = ($pedacosNome[0] ?? '') !== '' ? $pedacosNome[0] : 'o estudante';
+        $pontos = [];
+
+        $onde = [];
+        if ($quedas !== []) {
+            $onde[] = 'A queda está em ' . $this->listarDisciplinasAtencao($quedas) . '.';
+        }
+        $jaCitadas = array_map(static fn(array $d): string => (string) ($d['materia'] ?? ''), $quedas);
+        $baixasNovas = array_values(array_filter(
+            $baixas,
+            static fn(array $d): bool => !in_array((string) ($d['materia'] ?? ''), $jaCitadas, true)
+        ));
+        if ($baixasNovas !== []) {
+            $onde[] = 'No último período, as notas mais baixas são ' . $this->listarDisciplinasAtencao($baixasNovas) . '.';
+        } elseif ($quedas === [] && $baixas !== []) {
+            $onde[] = 'No último período, as notas mais baixas são ' . $this->listarDisciplinasAtencao($baixas) . '.';
+        }
+        if ($frequenciaBaixa) {
+            $onde[] = 'A frequência pede atenção: ' . $this->fmtNotaBr($frequencia) . '%'
+                . ($faltas !== null ? ', com ' . $faltas . ' faltas' : '') . '.';
+        } elseif ($muitasFaltas) {
+            $onde[] = 'São ' . $faltas . ' faltas no ano'
+                . ($frequencia !== null ? ' (' . $this->fmtNotaBr($frequencia) . '% de frequência)' : '')
+                . '. Vale ver em quais disciplinas elas se concentram.';
+        }
+        if (is_array($ocorrenciaAberta)) {
+            $tituloOco = trim((string) ($ocorrenciaAberta['titulo'] ?? ''));
+            $categoria = trim((string) ($ocorrenciaAberta['categoria'] ?? ''));
+            if ($tituloOco !== '') {
+                $onde[] = 'Há ocorrência aberta: «' . $tituloOco . '»'
+                    . ($categoria !== '' ? ' (' . $categoria . ')' : '') . '.';
+            }
+        }
+        if ($onde !== []) {
+            $pontos[] = ['titulo' => 'Onde melhorar', 'texto' => implode(' ', $onde)];
+        }
+
+        $aluno = [];
+        if (is_array($foco)) {
+            $aluno[] = 'Em ' . $foco['materia'] . ', revisar o conteúdo do último período e refazer as atividades da nota '
+                . ($foco['ultima_label'] ?? $this->fmtNotaBr((float) $foco['ultima']))
+                . ' antes da próxima avaliação.';
+        }
+        if (count($quedas) > 1) {
+            $nomesQueda = array_map(static fn(array $d): string => (string) $d['materia'], $quedas);
+            $aluno[] = 'Separar dois horários curtos na semana só para ' . $this->juntarLista($nomesQueda) . '.';
+        }
+        if (is_array($subida) && is_array($foco) && $subida['materia'] !== $foco['materia']) {
+            $aluno[] = 'O que funcionou em ' . $subida['materia'] . ' (subiu '
+                . $this->fmtNotaBr(abs((float) ($subida['delta'] ?? 0)))
+                . ') pode ser repetido em ' . $foco['materia'] . ': mesmo horário, mesma revisão antes da prova.';
+        }
+        if ($muitasFaltas || $frequenciaBaixa) {
+            $aluno[] = 'Pedir o conteúdo dos dias de falta e entregar o que ficou para trás'
+                . ($faltas !== null ? ' — são ' . $faltas . ' faltas no ano' : '') . '.';
+        }
+        if ($provasFracas) {
+            $materiaProva = is_array($foco) ? (string) $foco['materia'] : 'a disciplina mais baixa';
+            $aluno[] = 'Nas provas online, refazer as questões erradas (' . $erros . ' erros e ' . $acertos
+                . ' acertos), começando por ' . $materiaProva . '.';
+        }
+        if ($aluno !== []) {
+            $pontos[] = ['titulo' => 'O que ' . $quem . ' pode fazer', 'texto' => implode(' ', $aluno)];
+        }
+
+        $escola = [];
+        $nomesFoco = [];
+        foreach (array_slice(array_values(array_unique(array_merge(
+            array_map(static fn(array $d): string => (string) $d['materia'], $baixas),
+            array_map(static fn(array $d): string => (string) $d['materia'], $quedas)
+        ), SORT_STRING)), 0, 3) as $nomeDisc) {
+            if ($nomeDisc !== '') {
+                $nomesFoco[] = $nomeDisc;
+            }
+        }
+        if ($nomesFoco !== []) {
+            $escola[] = 'Montar um reforço curto com o professor de ' . $this->juntarLista($nomesFoco)
+                . ', partindo da nota do último período.';
+        }
+        if (($muitasFaltas || $frequenciaBaixa) && $nomesFoco !== []) {
+            $escola[] = 'Cruzar as faltas com o diário de ' . $this->juntarLista($nomesFoco)
+                . ' para ver se a ausência explica a nota.';
+        } elseif ($muitasFaltas || $frequenciaBaixa) {
+            $escola[] = 'Olhar em quais aulas as ' . ($faltas ?? 0) . ' faltas se concentraram antes de definir o reforço.';
+        }
+        if (is_array($ocorrenciaAberta)) {
+            $tituloOco = trim((string) ($ocorrenciaAberta['titulo'] ?? ''));
+            $categoria = trim((string) ($ocorrenciaAberta['categoria'] ?? ''));
+            if ($tituloOco !== '') {
+                $escola[] = 'Dar sequência à ocorrência «' . $tituloOco . '»'
+                    . ($categoria !== '' ? ' (' . $categoria . ')' : '')
+                    . ', com combinado escrito e retorno aos responsáveis.';
+            }
+        } elseif ($abertas > 1) {
+            $escola[] = 'Há ' . $abertas . ' ocorrências abertas: priorizar a mais recente e registrar o combinado de acompanhamento.';
+        }
+        if ($escola !== []) {
+            $pontos[] = ['titulo' => 'O que a escola pode fazer', 'texto' => implode(' ', $escola)];
+        }
+
+        $pais = [];
+        if ($muitasFaltas || $frequenciaBaixa) {
+            $pais[] = 'Acompanhar a presença e avisar a escola quando a falta for prevista'
+                . ($faltas !== null ? '. No ano já são ' . $faltas . ' faltas' : '')
+                . ($frequencia !== null ? ' (' . $this->fmtNotaBr($frequencia) . '% de frequência)' : '') . '.';
+        }
+        if (is_array($foco)) {
+            $pais[] = 'Reservar um horário fixo em casa para ' . $foco['materia']
+                . ' e conferir se a tarefa foi feita, sem resolver no lugar do estudante.';
+        }
+        if (is_array($ocorrenciaAberta)) {
+            $tituloOco = trim((string) ($ocorrenciaAberta['titulo'] ?? ''));
+            if ($tituloOco !== '') {
+                $pais[] = 'Conversar sobre a ocorrência «' . $tituloOco . '» e repetir em casa o combinado feito com a escola.';
+            }
+        }
+        if ($pais !== []) {
+            $pontos[] = ['titulo' => 'O que os pais podem fazer', 'texto' => implode(' ', $pais)];
+        }
+
+        if ($pontos === [] && $disciplinas !== []) {
+            $pontos[] = [
+                'titulo' => 'Onde melhorar',
+                'texto' => 'Não há queda nem nota abaixo da referência neste recorte. O próximo passo é manter a rotina do período atual.',
+            ];
+        }
+
+        return $pontos;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $disciplinas
+     */
+    private function listarDisciplinasAtencao(array $disciplinas): string
+    {
+        $partes = [];
+        foreach ($disciplinas as $d) {
+            $nome = trim((string) ($d['materia'] ?? ''));
+            if ($nome === '') {
+                continue;
+            }
+            if (($d['tendencia'] ?? '') === 'caiu' && isset($d['delta'])) {
+                $partes[] = $nome . ' (caiu ' . $this->fmtNotaBr(abs((float) $d['delta']))
+                    . ', último período ' . ($d['ultima_label'] ?? $this->fmtNotaBr((float) ($d['ultima'] ?? 0))) . ')';
+                continue;
+            }
+            if (isset($d['ultima_label'])) {
+                $partes[] = $nome . ' (' . $d['ultima_label'] . ')';
+                continue;
+            }
+            $partes[] = $nome;
+        }
+
+        return $this->juntarLista($partes);
+    }
+
+    /**
+     * @param list<string> $itens
+     */
+    private function juntarLista(array $itens): string
+    {
+        $itens = array_values(array_filter($itens, static fn(string $item): bool => $item !== ''));
+        $total = count($itens);
+        if ($total === 0) {
+            return '';
+        }
+        if ($total === 1) {
+            return $itens[0];
+        }
+        $ultimo = array_pop($itens);
+
+        return implode(', ', $itens) . ' e ' . $ultimo;
     }
 
     /**

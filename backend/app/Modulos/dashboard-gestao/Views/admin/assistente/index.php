@@ -1575,11 +1575,21 @@ $assistenteNome = htmlspecialchars((string) ($assistente_nome ?? 'Tudinha'), ENT
                 boxDisc.innerHTML = hd;
                 container.appendChild(boxDisc);
             }
-            if (evo360.analise) {
+            if (evo360.analise || (evo360.pontos_atencao || []).length) {
                 var ana360 = document.createElement('div');
-                ana360.className = 'rounded-lg border border-indigo-100 bg-indigo-50/70 px-4 py-3';
-                ana360.innerHTML = '<div class="text-xs font-semibold uppercase tracking-wide text-indigo-700 mb-1">Análise da Tudinha</div>'
-                    + '<p class="text-sm text-indigo-950 leading-relaxed">' + esc(evo360.analise) + '</p>';
+                ana360.className = 'rounded-lg border border-indigo-100 bg-indigo-50/70 px-4 py-3 space-y-3';
+                var htmlAna = '';
+                if (evo360.analise) {
+                    htmlAna += '<div><div class="text-xs font-semibold uppercase tracking-wide text-indigo-700 mb-1">Análise da Tudinha</div>'
+                        + '<p class="text-sm text-indigo-950 leading-relaxed">' + esc(evo360.analise) + '</p></div>';
+                }
+                (evo360.pontos_atencao || []).forEach(function (ponto) {
+                    if (!ponto || !ponto.texto) return;
+                    htmlAna += '<div class="rounded-lg bg-white/80 border border-indigo-100 px-3 py-2">'
+                        + '<div class="text-xs font-semibold text-indigo-800 mb-0.5">' + esc(ponto.titulo || 'Ponto de atenção') + '</div>'
+                        + '<p class="text-sm text-indigo-950 leading-relaxed">' + esc(ponto.texto) + '</p></div>';
+                });
+                ana360.innerHTML = htmlAna;
                 container.appendChild(ana360);
             }
 
