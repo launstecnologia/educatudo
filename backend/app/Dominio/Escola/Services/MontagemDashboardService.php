@@ -54,6 +54,7 @@ class MontagemDashboardService
             'professor' => [
                 ['chave' => 'aulas_hoje', 'nome' => 'Aulas de hoje', 'descricao' => 'Grade do dia. Aparece no painel do Grupo SEB.'],
                 ['chave' => 'desempenho', 'nome' => 'Desempenho das turmas', 'descricao' => 'Média das turmas. Aparece no painel do Grupo SEB.'],
+                ['chave' => 'calendario', 'nome' => 'Calendário escolar', 'descricao' => 'Mês atual do calendário. Aparece no painel do Grupo SEB.'],
                 ['chave' => 'resumo', 'nome' => 'Resumo', 'descricao' => 'Jornadas, mensagens e turmas. Fica de fora no painel do Grupo SEB.'],
                 ['chave' => 'jornadas_recentes', 'nome' => 'Jornadas recentes', 'descricao' => 'Últimas jornadas criadas. Fica de fora no painel do Grupo SEB.'],
                 ['chave' => 'provas', 'nome' => 'Provas', 'descricao' => 'Eventos de prova recentes.'],

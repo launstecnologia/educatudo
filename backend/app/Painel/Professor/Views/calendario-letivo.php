@@ -69,6 +69,12 @@ $tomCal = $corCal !== '' ? '--button-primary-color:' . $corCal . ';--primary-tex
         <?php endif; ?>
         <a href="?ano=<?= $ano - 1 ?>" class="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-left"></i></a>
         <a href="?ano=<?= $ano + 1 ?>" class="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-right"></i></a>
+        <?php if (!empty($pode_adicionar) && $calendarioIdVisao > 0): ?>
+        <button type="button" onclick="abrirLembrete()" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">
+            <i class="fa-solid fa-plus"></i>
+            Lembrete
+        </button>
+        <?php endif; ?>
         <div class="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
             <button id="btnViewYear" onclick="setView('year')" class="px-3 py-2 text-sm font-medium"><i class="fa-solid fa-calendar-days mr-1.5"></i>Ano</button>
             <button id="btnViewMonth" onclick="setView('month')" class="px-3 py-2 text-sm font-medium border-l border-gray-300"><i class="fa-solid fa-calendar mr-1.5"></i>Mês</button>
@@ -89,33 +95,45 @@ $tomCal = $corCal !== '' ? '--button-primary-color:' . $corCal . ';--primary-tex
 <?php endif; ?>
 
 <?php if (!empty($pode_adicionar) && $calendarioIdVisao > 0): ?>
-<div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-6 mb-6">
-    <h2 class="text-base font-semibold text-gray-900">Adicionar informação</h2>
-    <p class="text-sm text-gray-500 mt-1 mb-4">Fica só no seu calendário. O calendário da escola continua igual para alunos e para a coordenação.</p>
-    <form method="post" action="<?= URL ?>/professor/calendario-letivo/informacao" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
-        <input type="hidden" name="ano" value="<?= $ano ?>">
-        <input type="hidden" name="calendario_id" value="<?= $calendarioIdVisao ?>">
-        <label class="block text-sm">
-            <span class="text-gray-600">Data</span>
-            <input type="date" name="data_inicio" required class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2">
-        </label>
-        <label class="block text-sm">
-            <span class="text-gray-600">Até</span>
-            <input type="date" name="data_fim" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2">
-        </label>
-        <label class="block text-sm sm:col-span-2">
-            <span class="text-gray-600">Informação</span>
-            <input type="text" name="descricao" required maxlength="255" placeholder="Ex.: Reunião de pais, entrega de trabalho" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2">
-        </label>
-        <label class="block text-sm sm:col-span-2 lg:col-span-3">
-            <span class="text-gray-600">Local</span>
-            <input type="text" name="local_evento" maxlength="255" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2">
-        </label>
-        <div class="flex items-end">
-            <button type="submit" class="w-full px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">Adicionar</button>
+<div id="modalLembrete" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4" onclick="if (event.target === this) fecharLembrete()">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900">Novo lembrete</h2>
+                <p class="text-sm text-gray-500 mt-1">Fica só no seu calendário.</p>
+            </div>
+            <button type="button" onclick="fecharLembrete()" class="text-gray-400 hover:text-gray-600" aria-label="Fechar">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
         </div>
-    </form>
+        <form method="post" action="<?= URL ?>/professor/calendario-letivo/informacao" class="px-6 py-5 space-y-4">
+            <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
+            <input type="hidden" name="ano" value="<?= $ano ?>">
+            <input type="hidden" name="calendario_id" value="<?= $calendarioIdVisao ?>">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label class="block text-sm">
+                    <span class="text-gray-600">Data</span>
+                    <input type="date" name="data_inicio" required class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2">
+                </label>
+                <label class="block text-sm">
+                    <span class="text-gray-600">Até</span>
+                    <input type="date" name="data_fim" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2">
+                </label>
+            </div>
+            <label class="block text-sm">
+                <span class="text-gray-600">O que lembrar</span>
+                <input type="text" name="descricao" required maxlength="255" placeholder="Ex.: Reunião de pais, entrega de trabalho" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2">
+            </label>
+            <label class="block text-sm">
+                <span class="text-gray-600">Local</span>
+                <input type="text" name="local_evento" maxlength="255" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2">
+            </label>
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="fecharLembrete()" class="px-4 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700">Cancelar</button>
+                <button type="submit" class="px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">Salvar lembrete</button>
+            </div>
+        </form>
+    </div>
 </div>
 <?php endif; ?>
 
@@ -305,6 +323,19 @@ var eventData   = <?php
     }
     echo json_encode($jsMap, $jsonJs);
 ?>;
+
+function abrirLembrete() {
+    var modal = document.getElementById('modalLembrete');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+function fecharLembrete() {
+    var modal = document.getElementById('modalLembrete');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
 
 function setView(v) {
     currentView = v;

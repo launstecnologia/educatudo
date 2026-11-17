@@ -731,11 +731,37 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
         $grupoSebAtivo = \App\Modulos\GrupoSeb\Services\GrupoSebService::estaAtivo();
         $aulasDoDiaProfessor = [];
         $desempenhoTurmas = ['media_geral' => null, 'turmas' => []];
+        $calendarioPainel = [
+            'ano' => (int) date('Y'),
+            'mes' => (int) date('n'),
+            'eventos' => [],
+            'labels' => [],
+            'bg' => [],
+            'text' => [],
+        ];
         if ($grupoSebAtivo) {
             $grupoSeb = new \App\Modulos\GrupoSeb\Services\GrupoSebService($this->db);
             $professorId = (int) ($professor['id'] ?? 0);
             $aulasDoDiaProfessor = $grupoSeb->aulasDoDiaDoProfessor($professorId);
             $desempenhoTurmas = $grupoSeb->desempenhoTurmasProfessor($professorId);
+            try {
+                $calendario = new SchoolCalendarService($this->db);
+                $anoCalendario = (int) date('Y');
+                $cfgCalendario = $calendario->resolverEscopos($anoCalendario, $calendario->escoposDoProfessor($professorId));
+                $visuaisCalendario = $calendario->visuaisTipos();
+                $calendarioPainel = [
+                    'ano' => $anoCalendario,
+                    'mes' => (int) date('n'),
+                    'eventos' => $cfgCalendario
+                        ? $calendario->eventosDoProfessor((int) $cfgCalendario['id'], $professorId)
+                        : [],
+                    'labels' => $visuaisCalendario['labels'],
+                    'bg' => $visuaisCalendario['bg'],
+                    'text' => $visuaisCalendario['text'],
+                ];
+            } catch (\Throwable $e) {
+                error_log('Calendário do painel do professor: ' . $e->getMessage());
+            }
         }
         
         $data = [
@@ -748,6 +774,7 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
             'grupo_seb_ativo' => $grupoSebAtivo,
             'aulas_do_dia_professor' => $aulasDoDiaProfessor,
             'desempenho_turmas' => $desempenhoTurmas,
+            'calendario_painel' => $calendarioPainel,
             'user' => $user,
             'current_page' => 'dashboard'
         ];
@@ -2437,7 +2464,7 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
         }
         $professorId = (int) ($user['id'] ?? 0);
         $grupoSeb = \App\Modulos\GrupoSeb\Services\GrupoSebService::estaAtivo();
-        $podeAdicionar = $grupoSeb && $service->podeIncluirInformacaoProfessor();
+        $podeAdicionar = $grupoSeb && (int) ($cfg['id'] ?? 0) > 0;
         $eventos = $cfg
             ? $service->eventosDoProfessor((int) $cfg['id'], $grupoSeb ? $professorId : 0)
             : [];
