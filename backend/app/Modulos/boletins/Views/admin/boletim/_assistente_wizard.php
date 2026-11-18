@@ -2518,6 +2518,8 @@ $boletimWizardSteps = [
         if (tok.type === 'op' && tok.value === '<=') return '≤';
         if (tok.type === 'op' && (tok.value === '!=' || tok.value === '<>')) return '≠';
         if (tok.type === 'peca') {
+            var nomePeriodo = nomeSiglaPeriodoFormula(tok.label) || nomeSiglaPeriodoFormula(tok.value);
+            if (nomePeriodo) return nomePeriodo;
             var doSub = tituloSubeventoDaColuna(tok.value);
             if (doSub) return doSub;
             var sigla = siglaFormula(tok.value, tok.label);
@@ -9512,6 +9514,17 @@ $boletimWizardSteps = [
         })[0] || null;
     }
 
+    /** Nome visível da sigla no período: b1_faz vira b2_faz, rec1 vira REC2. */
+    function nomeSiglaPeriodoFormula(codigo) {
+        var raw = String(codigo || '').trim();
+        var low = raw.toLowerCase();
+        var m = low.match(/^b([1-4])_([a-z0-9_]+)$/);
+        if (m) return 'b' + m[1] + '_' + m[2];
+        var rec = low.match(/^rec([1-4])$/);
+        if (rec) return 'REC' + rec[1];
+        return '';
+    }
+
     function remapearTokensFormulaClone(tokens, mapa) {
         return (tokens || []).map(function (tok) {
             if (!tok || typeof tok !== 'object') return tok;
@@ -9521,19 +9534,24 @@ $boletimWizardSteps = [
                 if (mapa[v]) {
                     var novo = String(mapa[v] || '');
                     copia.value = novo;
-                    var lab = String(copia.label || '');
-                    if (!lab || lab.toLowerCase() === v) {
-                        copia.label = novo;
+                    var nomeNovo = nomeSiglaPeriodoFormula(novo);
+                    if (nomeNovo) {
+                        copia.label = nomeNovo;
                     } else {
-                        var mN = novo.match(/^b([1-4])_/);
-                        var mO = v.match(/^b([1-4])_/);
-                        if (mN && mO && lab.toLowerCase().indexOf('b' + mO[1] + '_') === 0) {
-                            copia.label = 'b' + mN[1] + '_' + lab.slice(('b' + mO[1] + '_').length);
-                        }
-                        var dePer = (v.match(/^(?:b|rec)([1-4])/) || [])[1];
-                        var paraPer = (novo.match(/^(?:b|rec)([1-4])/) || [])[1];
-                        if (dePer && paraPer && dePer !== paraPer) {
-                            copia.label = String(copia.label).replace(new RegExp(dePer + '[ºo°]', 'gi'), paraPer + 'º');
+                        var lab = String(copia.label || '');
+                        if (!lab || lab.toLowerCase() === v) {
+                            copia.label = novo;
+                        } else {
+                            var mN = novo.match(/^b([1-4])_/);
+                            var mO = v.match(/^b([1-4])_/);
+                            if (mN && mO && lab.toLowerCase().indexOf('b' + mO[1] + '_') === 0) {
+                                copia.label = 'b' + mN[1] + '_' + lab.slice(('b' + mO[1] + '_').length);
+                            }
+                            var dePer = (v.match(/^(?:b|rec)([1-4])/) || [])[1];
+                            var paraPer = (novo.match(/^(?:b|rec)([1-4])/) || [])[1];
+                            if (dePer && paraPer && dePer !== paraPer) {
+                                copia.label = String(copia.label).replace(new RegExp(dePer + '[ºo°]', 'gi'), paraPer + 'º');
+                            }
                         }
                     }
                 }
