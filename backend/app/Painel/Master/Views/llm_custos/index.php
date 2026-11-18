@@ -459,7 +459,7 @@ $usdMaxCredito = $financeiro['usd_max_por_credito'] ?? null;
 
 <div id="diaDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[80] hidden" onclick="fecharDetalheDia()"></div>
 <aside id="diaDrawer"
-       class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-[90] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
+       class="fixed top-0 right-0 h-full w-full max-w-5xl bg-white shadow-2xl z-[90] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
         <div>
@@ -565,6 +565,33 @@ var LLM_CUSTOS_BRL_CREDITO = <?= json_encode((float) $brlPorCredito) ?>;
 var LLM_CUSTOS_CUSTO_ALVO = <?= json_encode((float) $custoAlvoCredito) ?>;
 function fmtTcJs(n) {
     return 'TC$ ' + Number(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+}
+function rotuloPerfilChamada(tipo) {
+    var mapa = {
+        aluno: 'Aluno',
+        professor: 'Professor',
+        admin: 'Admin',
+        admin_escola: 'Admin',
+        pai: 'Responsável',
+        monitor: 'Monitor',
+        master: 'Master'
+    };
+    return mapa[tipo] || tipo || '';
+}
+function htmlUsuarioChamada(ch) {
+    var nome = String(ch.usuario_nome || '').trim();
+    var perfil = rotuloPerfilChamada(String(ch.usuario_tipo || '').trim());
+    if (!nome && !perfil) {
+        return '<span class="text-slate-400">Não registrado</span>';
+    }
+    var html = '';
+    if (nome) {
+        html += '<span class="font-medium text-slate-800">' + escHtml(nome) + '</span>';
+    }
+    if (perfil) {
+        html += '<span class="block text-[11px] text-slate-500">' + escHtml(perfil) + '</span>';
+    }
+    return html;
 }
 function fmtDataJs(ymd) {
     if (!ymd || !/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return ymd || '';
@@ -679,10 +706,12 @@ function renderDetalheDia(data) {
     if (!chamadas.length) {
         html += '<p class="text-sm text-slate-500">Nenhuma chamada registrada neste dia.</p>';
     } else {
+        var semUsuario = chamadas.some(function(ch) { return !(ch.usuario_nome || '').trim(); });
         html += '<div class="overflow-x-auto border border-slate-200 rounded-lg">';
-        html += '<table class="min-w-full divide-y divide-gray-200 text-xs">';
+        html += '<table class="min-w-full divide-y divide-gray-200 text-sm">';
         html += '<thead class="bg-slate-50"><tr>' +
             '<th class="px-3 py-2 text-left font-medium text-slate-500">Hora</th>' +
+            '<th class="px-3 py-2 text-left font-medium text-slate-500">Usuário</th>' +
             '<th class="px-3 py-2 text-left font-medium text-slate-500">Chamada</th>' +
             '<th class="px-3 py-2 text-right font-medium text-slate-500">Tokens</th>' +
             '<th class="px-3 py-2 text-right font-medium text-slate-500">Custo</th>' +
@@ -702,28 +731,32 @@ function renderDetalheDia(data) {
                 chTc = chCusto / Number(LLM_CUSTOS_CUSTO_ALVO || 0.1);
             }
             html += '<tr class="hover:bg-slate-50">';
-            html += '<td class="px-3 py-2 text-slate-700 whitespace-nowrap">' + escHtml((ch.created_at || '').substring(11, 19)) + '</td>';
-            html += '<td class="px-3 py-2 text-slate-700">' +
+            html += '<td class="px-3 py-2.5 text-slate-700 whitespace-nowrap">' + escHtml((ch.created_at || '').substring(11, 19)) + '</td>';
+            html += '<td class="px-3 py-2.5 text-slate-700">' + htmlUsuarioChamada(ch) + '</td>';
+            html += '<td class="px-3 py-2.5 text-slate-700">' +
                 '<span class="font-medium">' + escHtml(ch.escola_nome || '') + '</span>' +
                 '<span class="block font-mono text-[11px] text-slate-500">' + escHtml(ch.usage_type || '') + '</span>' +
                 '<span class="block font-mono text-[11px] text-slate-400">' + escHtml(ch.model || '') + '</span>' +
                 '</td>';
-            html += '<td class="px-3 py-2 text-right text-slate-700 whitespace-nowrap">' +
+            html += '<td class="px-3 py-2.5 text-right text-slate-700 whitespace-nowrap">' +
                 '<span class="font-medium">' + fmtIntJs(ch.total_tokens || ((ch.prompt_tokens || 0) + (ch.completion_tokens || 0))) + '</span>' +
                 '<span class="block text-[10px] text-slate-400">' +
                 '<span class="text-blue-700">' + fmtIntJs(ch.prompt_tokens) + ' in</span> · ' +
                 '<span class="text-violet-700">' + fmtIntJs(ch.completion_tokens) + ' out</span></span></td>';
-            html += '<td class="px-3 py-2 text-right text-slate-700 whitespace-nowrap">' +
+            html += '<td class="px-3 py-2.5 text-right text-slate-700 whitespace-nowrap">' +
                 '<span class="font-medium">' + fmtBrlJs(chCusto) + '</span>' +
                 '<div class="text-[10px] text-slate-400">' + fmtUsdJs(ch.cost_usd) + '</div></td>';
-            html += '<td class="px-3 py-2 text-right text-blue-700 whitespace-nowrap">' +
+            html += '<td class="px-3 py-2.5 text-right text-blue-700 whitespace-nowrap">' +
                 '<span class="font-medium">' + fmtBrlJs(chVenda) + '</span>' +
                 '<div class="text-[10px] text-slate-400">' + fmtTcJs(chTc) + '</div></td>';
-            html += '<td class="px-3 py-2 text-right whitespace-nowrap font-medium ' + (chLucro >= 0 ? 'text-emerald-700' : 'text-red-600') + '">' +
+            html += '<td class="px-3 py-2.5 text-right whitespace-nowrap font-medium ' + (chLucro >= 0 ? 'text-emerald-700' : 'text-red-600') + '">' +
                 fmtBrlJs(chLucro) + '</td>';
             html += '</tr>';
         });
         html += '</tbody></table></div>';
+        if (semUsuario) {
+            html += '<p class="mt-2 text-xs text-slate-500">Chamadas sem nome foram feitas antes de gravarmos quem estava logado. As próximas passam a mostrar o usuário.</p>';
+        }
     }
 
     if ((data.erros || []).length) {

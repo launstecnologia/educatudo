@@ -3766,13 +3766,84 @@ You MUST respond with a valid JSON object only, no other text, with exactly thes
             if (!class_exists('Database', false)) {
             }
             $db = \App\Core\Database::getInstance();
+            $params = [
+                $model,
+                (int) $promptTokens,
+                (int) $completionTokens,
+                (int) $totalTokens,
+                (float) $costUsd,
+                substr((string) $usageType, 0, 60),
+            ];
+            if ($this->logsUsoLlmTemUsuario($db)) {
+                $usuario = $this->usuarioDaSessao();
+                $params[] = $usuario['tipo'];
+                $params[] = $usuario['id'];
+                $params[] = $usuario['nome'];
+                $db->insert(
+                    "INSERT INTO logs_uso_llm (model, prompt_tokens, completion_tokens, total_tokens, cost_usd, usage_type, usuario_tipo, usuario_id, usuario_nome) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    $params
+                );
+                return;
+            }
             $db->insert(
                 "INSERT INTO logs_uso_llm (model, prompt_tokens, completion_tokens, total_tokens, cost_usd, usage_type) VALUES (?, ?, ?, ?, ?, ?)",
-                [$model, (int)$promptTokens, (int)$completionTokens, (int)$totalTokens, (float)$costUsd, substr((string)$usageType, 0, 60)]
+                $params
             );
         } catch (\Exception $e) {
             error_log("Erro ao gravar logs_uso_llm: " . $e->getMessage());
         }
+    }
+
+    /**
+     * A migration 2026_11_18_logs_uso_llm_usuario pode ainda não ter rodado nesta escola.
+     */
+    private function logsUsoLlmTemUsuario(\App\Core\Database $db): bool
+    {
+        static $cache = [];
+        $chave = 'default';
+        try {
+            $atual = $db->fetch('SELECT DATABASE() AS nome');
+            $chave = (string) ($atual['nome'] ?? 'default');
+        } catch (\Throwable $e) {
+            $chave = 'default';
+        }
+        if (array_key_exists($chave, $cache)) {
+            return $cache[$chave];
+        }
+        try {
+            $col = $db->fetch("SHOW COLUMNS FROM logs_uso_llm WHERE Field = 'usuario_nome'");
+            $cache[$chave] = !empty($col);
+        } catch (\Throwable $e) {
+            $cache[$chave] = false;
+        }
+        return $cache[$chave];
+    }
+
+    /**
+     * Nome e perfil de quem disparou a chamada. Job e cron ficam sem usuário.
+     * Depois de session_write_close() a sessão não está mais ativa, mas $_SESSION segue preenchida.
+     *
+     * @return array{id:?int,tipo:?string,nome:?string}
+     */
+    private function usuarioDaSessao(): array
+    {
+        $vazio = ['id' => null, 'tipo' => null, 'nome' => null];
+        if (!isset($_SESSION) || !is_array($_SESSION)) {
+            return $vazio;
+        }
+        $id = (int) ($_SESSION['user_id'] ?? 0);
+        $tipo = substr(trim((string) ($_SESSION['user_type'] ?? '')), 0, 32);
+        $nome = trim((string) ($_SESSION['user_name'] ?? ''));
+        if (function_exists('mb_substr')) {
+            $nome = mb_substr($nome, 0, 160);
+        } else {
+            $nome = substr($nome, 0, 160);
+        }
+        return [
+            'id' => $id > 0 ? $id : null,
+            'tipo' => $tipo !== '' ? $tipo : null,
+            'nome' => $nome !== '' ? $nome : null,
+        ];
     }
 
     /**

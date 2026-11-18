@@ -610,9 +610,23 @@ class MasterLlmCustosService
             if ($restanteChamadas > 0) {
                 try {
                     $pdo->query('SELECT 1 FROM logs_uso_llm LIMIT 1');
+                    $temUsuario = false;
+                    try {
+                        $chkUsuario = $pdo->query(
+                            "SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                             WHERE TABLE_SCHEMA = DATABASE()
+                               AND TABLE_NAME = 'logs_uso_llm'
+                               AND COLUMN_NAME = 'usuario_nome'
+                             LIMIT 1"
+                        );
+                        $temUsuario = (bool) $chkUsuario->fetchColumn();
+                    } catch (\Throwable $e) {
+                        $temUsuario = false;
+                    }
+                    $colunasUsuario = $temUsuario ? ', usuario_id, usuario_tipo, usuario_nome' : '';
                     $limLocal = $restanteChamadas;
                     $stL = $pdo->prepare(
-                        "SELECT id, model, prompt_tokens, completion_tokens, total_tokens, cost_usd, usage_type, created_at
+                        "SELECT id, model, prompt_tokens, completion_tokens, total_tokens, cost_usd, usage_type, created_at{$colunasUsuario}
                          FROM logs_uso_llm
                          WHERE created_at >= ? AND created_at <= ?
                          ORDER BY created_at DESC, id DESC
@@ -643,6 +657,9 @@ class MasterLlmCustosService
                             'creditos_equivalentes_uso' => $creditosUso,
                             'usage_type' => (string) ($row['usage_type'] ?? ''),
                             'created_at' => (string) ($row['created_at'] ?? ''),
+                            'usuario_id' => isset($row['usuario_id']) && $row['usuario_id'] !== null ? (int) $row['usuario_id'] : null,
+                            'usuario_tipo' => (string) ($row['usuario_tipo'] ?? ''),
+                            'usuario_nome' => (string) ($row['usuario_nome'] ?? ''),
                         ];
                         $out['totais']['chamadas']++;
                         $out['totais']['prompt_tokens'] += $pt;
