@@ -266,11 +266,11 @@ class App
         if ($allowAnyOrigin) {
             header('Access-Control-Allow-Origin: *');
         } else {
-            header('Vary: \Origin');
+            header('Vary: Origin');
             header('Access-Control-Allow-Origin: ' . $origin);
         }
-        header('Access-Control-Allow-Headers: \Authorization, Content-Type, Accept, X-Request-ID, X-Device-ID, X-Device-Token');
-        header('Access-Control-Allow-Methods: \GET, POST, PUT, DELETE, OPTIONS');
+        header('Access-Control-Allow-Headers: Authorization, Content-Type, Accept, X-Request-ID, X-Device-ID, X-Device-Token');
+        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
         header('Access-Control-Max-Age: 86400');
     }
 
@@ -342,11 +342,11 @@ class App
             return;
         }
 
-        header('Vary: \Origin');
+        header('Vary: Origin');
         header('Access-Control-Allow-Origin: ' . $origin);
         header('Access-Control-Allow-Credentials: true');
-        header('Access-Control-Allow-Headers: \Content-Type, Accept');
-        header('Access-Control-Allow-Methods: \GET, POST, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Accept');
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
         header('Access-Control-Max-Age: 86400');
     }
 
