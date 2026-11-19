@@ -214,6 +214,11 @@ if (session_status() === PHP_SESSION_NONE) {
     if ($pedidoHttps && !headers_sent()) {
         header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
     }
+    if (!headers_sent()) {
+        header('Referrer-Policy: strict-origin-when-cross-origin');
+        header('Permissions-Policy: geolocation=(), payment=(), usb=()');
+        header("Content-Security-Policy-Report-Only: default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://unpkg.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https:; frame-src 'self' https:; media-src 'self' blob: https:");
+    }
     // Token CSRF é criado apenas em BaseController::generateCsrf() (nunca aqui, para não sobrescrever).
 }
 
@@ -742,76 +747,8 @@ if (strpos($path, 'static/') === 0) {
         exit;
     }
 }
-// /uploads/ e /public/uploads/ passam por aqui. Redação, arquivo de aluno,
-// mensagem e ticket só saem com permissão no registro. O resto (logo, tema,
-// documento de jornada) continua público, sem execução de script.
-$uploadRel = null;
-if (strpos($path, 'public/uploads/') === 0) {
-    $uploadRel = substr($path, strlen('public/'));
-} elseif (strpos($path, 'uploads/') === 0) {
-    $uploadRel = $path;
-}
-if ($uploadRel !== null && strpos($uploadRel, '..') === false) {
-    $decisaoUpload = \App\Infra\Services\AcessoArquivoPrivado::pastaDireta($uploadRel);
-    if ($decisaoUpload === 'negado') {
-        http_response_code(403);
-        header('X-Content-Type-Options: nosniff');
-        exit;
-    }
-    if ($decisaoUpload !== 'rota') {
-        $uploadsFile = BASE_PATH . '/public/' . $uploadRel;
-        $ext = strtolower(pathinfo($uploadsFile, PATHINFO_EXTENSION));
-        $extBloqueada = in_array($ext, ['php', 'phtml', 'phar', 'html', 'htm', 'xhtml', 'js', 'shtml', 'svg'], true);
-        if (!$extBloqueada && is_file($uploadsFile)) {
-            $realPath = realpath($uploadsFile);
-            $realDir = realpath(BASE_PATH . '/public/uploads');
-            if ($realDir !== false && $realPath !== false && strpos($realPath, $realDir . DIRECTORY_SEPARATOR) === 0) {
-                $mimes = [
-                    'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
-                    'gif' => 'image/gif', 'webp' => 'image/webp', 'ico' => 'image/x-icon',
-                    'pdf' => 'application/pdf', 'mp4' => 'video/mp4', 'webm' => 'video/webm',
-                    'mp3' => 'audio/mpeg', 'wav' => 'audio/wav',
-                ];
-                header('Content-Type: ' . ($mimes[$ext] ?? 'application/octet-stream'));
-                header('X-Content-Type-Options: nosniff');
-                header('Cache-Control: ' . ($decisaoUpload === 'privado' ? 'private, max-age=3600' : 'public, max-age=86400'));
-                readfile($uploadsFile);
-                exit;
-            }
-        }
-    }
-}
-// /storage/chat/* não é público. Só entrega com sessão que pode ler o arquivo.
-$pathForStorage = ltrim($path, '/');
-if (strpos($pathForStorage, 'storage/chat/') === 0) {
-    $filename = substr($pathForStorage, strlen('storage/chat/'));
-    if ($filename === '' || strpos($filename, '..') !== false || !\App\Infra\Services\AcessoArquivoPrivado::podeLer('chat', $filename)) {
-        http_response_code(403);
-        exit;
-    }
-    $baseDirs = [
-        BASE_PATH . '/storage/chat',
-    ];
-    foreach ($baseDirs as $storageChatDir) {
-        $storageChatFile = $storageChatDir . '/' . $filename;
-        if (is_file($storageChatFile)) {
-            $realPath = realpath($storageChatFile);
-            $realDir = realpath($storageChatDir);
-            if ($realDir !== false && $realPath !== false && strpos($realPath, $realDir) === 0) {
-                $ext = strtolower(pathinfo($storageChatFile, PATHINFO_EXTENSION));
-                $mimes = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp', 'pdf' => 'application/pdf'];
-                header('Content-Type: ' . ($mimes[$ext] ?? 'application/octet-stream'));
-                header('X-Content-Type-Options: nosniff');
-                header('Cache-Control: private, max-age=3600');
-                readfile($storageChatFile);
-                exit;
-            }
-        }
-    }
-    http_response_code(404);
-    exit;
-}
 // Servir /storage/images/* (imagens geradas pela API de geração educacional)
+$pathForStorage = ltrim($path, '/');
 if (strpos($pathForStorage, 'storage/images/') === 0) {
     $filename = substr($pathForStorage, strlen('storage/images/'));
     $baseDirs = [
@@ -848,7 +785,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['__path'])) {
 }
 
 // Bootstrap multi-tenant (se MULTI_TENANT=true no .env): resolve escola e registra conexão do tenant
+$caminhoPedido = $path;
 require_once BASE_PATH . '/app/Core/bootstrap_multi_tenant.php';
+
+// /uploads/ só depois da escola resolvida, para a permissão ler o banco certo.
+// Logo, tema de redação e proposta continuam públicos. O restante precisa de sessão e vínculo.
+$uploadRel = null;
+if (strpos($caminhoPedido, 'public/uploads/') === 0) {
+    $uploadRel = substr($caminhoPedido, strlen('public/'));
+} elseif (strpos($caminhoPedido, 'uploads/') === 0) {
+    $uploadRel = $caminhoPedido;
+}
+if ($uploadRel !== null && strpos($uploadRel, '..') === false) {
+    $decisaoUpload = \App\Infra\Services\AcessoArquivoPrivado::pastaDireta($uploadRel);
+    if ($decisaoUpload === 'sem_sessao') {
+        http_response_code(401);
+        header('X-Content-Type-Options: nosniff');
+        exit;
+    }
+    if ($decisaoUpload === 'negado') {
+        http_response_code(403);
+        header('X-Content-Type-Options: nosniff');
+        exit;
+    }
+    if ($decisaoUpload !== 'rota') {
+        $uploadsFile = BASE_PATH . '/public/' . $uploadRel;
+        $ext = strtolower(pathinfo($uploadsFile, PATHINFO_EXTENSION));
+        $extBloqueada = in_array($ext, ['php', 'phtml', 'phar', 'html', 'htm', 'xhtml', 'js', 'shtml', 'svg'], true);
+        if (!$extBloqueada && is_file($uploadsFile)) {
+            $realPath = realpath($uploadsFile);
+            $realDir = realpath(BASE_PATH . '/public/uploads');
+            if ($realDir !== false && $realPath !== false && strpos($realPath, $realDir . DIRECTORY_SEPARATOR) === 0) {
+                $mimes = [
+                    'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
+                    'gif' => 'image/gif', 'webp' => 'image/webp', 'ico' => 'image/x-icon',
+                    'pdf' => 'application/pdf', 'mp4' => 'video/mp4', 'webm' => 'video/webm',
+                    'mp3' => 'audio/mpeg', 'wav' => 'audio/wav',
+                ];
+                header('Content-Type: ' . ($mimes[$ext] ?? 'application/octet-stream'));
+                header('X-Content-Type-Options: nosniff');
+                header('Cache-Control: ' . ($decisaoUpload === 'privado' ? 'private, max-age=3600' : 'public, max-age=86400'));
+                readfile($uploadsFile);
+                exit;
+            }
+        }
+    }
+}
+$caminhoStorage = ltrim($caminhoPedido, '/');
+if (strpos($caminhoStorage, 'storage/chat/') === 0) {
+    $filename = substr($caminhoStorage, strlen('storage/chat/'));
+    $podeChat = $filename !== '' && strpos($filename, '..') === false && \App\Infra\Services\AcessoArquivoPrivado::podeLer('chat', $filename);
+    if (!$podeChat) {
+        http_response_code(!empty($_SESSION['user_id']) ? 403 : 401);
+        header('X-Content-Type-Options: nosniff');
+        exit;
+    }
+    $storageChatDir = BASE_PATH . '/storage/chat';
+    $storageChatFile = $storageChatDir . '/' . $filename;
+    if (is_file($storageChatFile)) {
+        $realPath = realpath($storageChatFile);
+        $realDir = realpath($storageChatDir);
+        if ($realDir !== false && $realPath !== false && strpos($realPath, $realDir) === 0) {
+            $ext = strtolower(pathinfo($storageChatFile, PATHINFO_EXTENSION));
+            $mimes = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp', 'pdf' => 'application/pdf'];
+            header('Content-Type: ' . ($mimes[$ext] ?? 'application/octet-stream'));
+            header('X-Content-Type-Options: nosniff');
+            header('Cache-Control: private, max-age=3600');
+            readfile($storageChatFile);
+            exit;
+        }
+    }
+    http_response_code(404);
+    exit;
+}
 
 // Inicializar aplicação
 try {

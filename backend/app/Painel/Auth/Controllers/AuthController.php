@@ -298,6 +298,9 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
         if ($alunoId <= 0 && $alunoNome === '') {
             return ['error' => 'Nome completo é obrigatório.'];
         }
+        if (!$this->recuperacaoDentroDoLimite($alunoNome !== '' ? $alunoNome : ('aluno:' . $alunoId), 'primeiro-acesso')) {
+            return ['error' => 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'];
+        }
 
         $db = Database::getInstance();
         if ($alunoId > 0) {
@@ -541,6 +544,10 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
             $this->json(['error' => 'Nickname é obrigatório'], 400);
             return;
         }
+        if (!$this->recuperacaoDentroDoLimite($nickname, 'pergunta-aluno')) {
+            $this->json(['error' => 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'], 429);
+            return;
+        }
 
         $db = Database::getInstance();
         $aluno = $db->fetch("SELECT id FROM alunos WHERE nickname = :nickname", ['nickname' => $nickname]);
@@ -592,6 +599,11 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
         $db = Database::getInstance();
         $seg = $db->fetch("SELECT resposta_hash FROM alunos_seguranca WHERE aluno_id = :aluno_id", ['aluno_id' => $alunoId]);
         if (!$seg || !password_verify(mb_strtolower($resposta), $seg['resposta_hash'])) {
+            if (!$this->recuperacaoDentroDoLimite('reset:' . (int) $alunoId, 'reset-aluno')) {
+                unset($_SESSION['recuperacao_aluno_id']);
+                $this->json(['error' => 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'], 429);
+                return;
+            }
             $this->json(['error' => 'Resposta incorreta'], 400);
         }
 
@@ -1010,6 +1022,80 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
         }
     }
 
+    /**
+     * Limite da recuperação e do primeiro acesso.
+     * Usa os mesmos tetos do login: 5 por identificador e 50 por IP, na janela de lockout_duration.
+     * O identificador entra só como hash, para o arquivo de limite não guardar e-mail nem nome.
+     */
+    private function recuperacaoDentroDoLimite(string $identificador, string $fluxo = 'recuperacao'): bool
+    {
+        $sec = $this->getSecurityConfig();
+        $window = max(60, (int) ($sec['lockout_duration'] ?? 900));
+        $maxIp = max(1, (int) ($sec['max_login_attempts_ip'] ?? 50));
+        $maxId = max(1, (int) ($sec['max_login_attempts'] ?? 5));
+        $fluxo = preg_replace('/[^a-z0-9_-]/', '', $fluxo) ?: 'recuperacao';
+        $limites = [];
+        $ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+        if ($ip !== '') {
+            $limites[$fluxo . ':ip:' . $ip] = $maxIp;
+        }
+        $id = mb_strtolower(trim($identificador));
+        if ($id !== '') {
+            $limites[$fluxo . ':id:' . hash('sha256', $id)] = $maxId;
+        }
+        if ($limites === []) {
+            return true;
+        }
+
+        $dir = (defined('BASE_PATH') ? BASE_PATH : dirname(__DIR__, 4)) . '/storage/logs';
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0755, true);
+        }
+        $file = $dir . '/recuperacao_rate_limit.json';
+        $now = time();
+        $fp = @fopen($file, 'c+');
+        if (!$fp || !flock($fp, LOCK_EX)) {
+            return true;
+        }
+        $raw = stream_get_contents($fp);
+        $data = $raw !== false && $raw !== '' ? (@json_decode($raw, true) ?: []) : [];
+        if (!is_array($data)) {
+            $data = [];
+        }
+        foreach ($data as $key => $entry) {
+            if (!is_array($entry) || !isset($entry['t']) || ($now - (int) $entry['t']) > $window) {
+                unset($data[$key]);
+            }
+        }
+        foreach ($limites as $key => $max) {
+            $entry = isset($data[$key]) && is_array($data[$key]) ? $data[$key] : ['c' => 0, 't' => $now];
+            if (($now - (int) ($entry['t'] ?? $now)) > $window) {
+                $entry = ['c' => 0, 't' => $now];
+            }
+            if ((int) ($entry['c'] ?? 0) >= $max) {
+                flock($fp, LOCK_UN);
+                fclose($fp);
+                return false;
+            }
+        }
+        foreach ($limites as $key => $max) {
+            $entry = isset($data[$key]) && is_array($data[$key]) ? $data[$key] : ['c' => 0, 't' => $now];
+            if (($now - (int) ($entry['t'] ?? $now)) > $window) {
+                $entry = ['c' => 0, 't' => $now];
+            }
+            $entry['c'] = (int) ($entry['c'] ?? 0) + 1;
+            $entry['t'] = (int) ($entry['t'] ?? $now);
+            $data[$key] = $entry;
+        }
+        ftruncate($fp, 0);
+        rewind($fp);
+        fwrite($fp, json_encode($data));
+        flock($fp, LOCK_UN);
+        fclose($fp);
+
+        return true;
+    }
+
     private function assertConsentAccepted(array $payload, $userType)
     {
         $accepted = $this->isConsentAcceptedPayload($payload);
@@ -1218,24 +1304,22 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
             exit;
         }
 
-        // Anti-replay: token é de uso único. Se o jti já foi consumido (Redis), rejeita.
-        // Fail-open se o Redis estiver indisponível (HMAC + expiração ainda protegem).
+        // Anti-replay: token é de uso único. Sem Redis, o reuso não pode ser impedido, então o token é recusado.
         $jti = isset($payload['jti']) ? (string) $payload['jti'] : '';
         if ($jti !== '') {
             if (!class_exists('RedisCache')) {
             }
             $nonceKey = 'entrar_como_jti_' . $jti;
-            if (RedisCache::get($nonceKey) !== null) {
+            if (!RedisCache::gravarSeAusente($nonceKey, '1', max(1, (int) $payload['exp'] - time()))) {
                 if (!class_exists('Logger')) {
                 }
-                Logger::warning('Token "Entrar como" reutilizado (replay bloqueado)', [
+                Logger::warning('Token "Entrar como" recusado', [
                     'escola_id' => (int) $payload['escola_id'],
                     'jti' => $jti,
                 ], 'seguranca');
                 header('Location: ' . (defined('URL') ? URL : '') . '/login');
                 exit;
             }
-            RedisCache::set($nonceKey, '1', max(1, (int) $payload['exp'] - time()));
         }
 
         $tipo = $payload['tipo'];
@@ -1435,6 +1519,10 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 throw new \Exception('Email inválido');
             }
+            if (!$this->recuperacaoDentroDoLimite($email, 'email')) {
+                $this->json(['error' => 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'], 429);
+                return;
+            }
             
             // Busca usuário por email
             $db = Database::getInstance();
@@ -1501,22 +1589,18 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
                     $resetUrl
                 );
             } catch (\Exception $emailException) {
-                // Logar erro de envio de email
                 Logger::error(
                     "Erro ao enviar email de recuperação de senha",
                     [
                         'exception' => $emailException,
-                        'email' => $email,
                         'user_type' => $userType,
-                        'user_name' => $user['nome'] ?? 'N/A',
-                        'reset_url' => $resetUrl
                     ],
                     'email'
                 );
-                throw $emailException; // Re-lançar para ser capturado pelo catch externo
+                throw $emailException;
             }
             
-            $this->json(['message' => 'Instruções de recuperação enviadas para seu email']);
+            $this->json(['message' => 'Se o email estiver cadastrado, você receberá instruções de recuperação']);
             
         } catch (\Exception $e) {
             // Logar erro completo no app.data.log
@@ -1524,12 +1608,7 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
                 "Erro ao processar recuperação de senha",
                 [
                     'exception' => $e,
-                    'email' => $email ?? 'N/A',
                     'tipo' => $tipo ?? 'N/A',
-                    'message' => $e->getMessage(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                    'trace' => $e->getTraceAsString()
                 ],
                 'email'
             );
@@ -1889,6 +1968,10 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 throw new \Exception('Email inválido');
             }
+            if (!$this->recuperacaoDentroDoLimite($email, 'email-professor')) {
+                $this->json(['error' => 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'], 429);
+                return;
+            }
             
             // Busca professor por email
             $db = Database::getInstance();
@@ -1934,23 +2017,18 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
                     $resetUrl
                 );
             } catch (\Exception $emailException) {
-                // Logar erro de envio de email
                 Logger::error(
                     "Erro ao enviar email de recuperação de senha do professor",
                     [
                         'exception' => $emailException,
-                        'email' => $email,
                         'user_type' => 'professor',
-                        'user_name' => $professor['nome'] ?? 'N/A',
-                        'professor_id' => $professor['id'] ?? 'N/A',
-                        'reset_url' => $resetUrl
                     ],
                     'email'
                 );
-                throw $emailException; // Re-lançar para ser capturado pelo catch externo
+                throw $emailException;
             }
             
-            $this->json(['message' => 'Instruções de recuperação enviadas para seu email']);
+            $this->json(['message' => 'Se o email estiver cadastrado, você receberá instruções de recuperação']);
             
         } catch (\Exception $e) {
             // Logar erro completo no app.data.log
@@ -1958,11 +2036,7 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
                 "Erro ao processar recuperação de senha do professor",
                 [
                     'exception' => $e,
-                    'email' => $email ?? 'N/A',
-                    'message' => $e->getMessage(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                    'trace' => $e->getTraceAsString()
+                    'user_type' => 'professor',
                 ],
                 'email'
             );

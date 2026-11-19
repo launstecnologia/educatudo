@@ -49,7 +49,7 @@ class EspecificacaoOpenApiService
     private function guia(): string
     {
         return <<<'TXT'
-Esta API lê os dados reais da escola do endereço em que você abriu a página. Não existe base de teste: use o CPF e a senha de um responsável cadastrado.
+Esta API lê os dados da escola do endereço em que você abriu a página. Use uma conta de responsável criada para teste. Não digite a senha de uma pessoa real nesta tela.
 
 Os caminhos estão em português. Os nomes dos campos no JSON seguem o contrato já usado pelo aplicativo (por exemplo access_token, name, grade). Em cada rota, o texto explica o que o campo significa.
 

@@ -164,6 +164,24 @@ class RedisCache
         }
     }
 
+    /** Grava só se a chave ainda não existe. False se já existe ou se o Redis não respondeu. */
+    public static function gravarSeAusente(string $key, string $value, int $ttl): bool
+    {
+        $redis = self::connect();
+        if ($redis === null || $ttl < 1) {
+            return false;
+        }
+        try {
+            $ok = $redis->rawCommand('SET', self::PREFIX . $key, $value, 'EX', (string) $ttl, 'NX');
+
+            return $ok === true || $ok === 'OK';
+        } catch (\Throwable $e) {
+            self::$failed = true;
+            self::$redis = null;
+            return false;
+        }
+    }
+
     /** Remove uma chave do cache (ex.: invalidar config_layout após sync do Master). */
     public static function delete(string $key): bool
     {

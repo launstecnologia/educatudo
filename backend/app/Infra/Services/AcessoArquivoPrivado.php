@@ -13,6 +13,16 @@ class AcessoArquivoPrivado
 {
     private const TIPOS_DO_ALUNO = ['chat', 'redacoes', 'tickets', 'arquivos', 'mensagens'];
 
+    /** Conteúdo da escola: sessão não basta; o registro precisa ligar o usuário ao recurso. */
+    private const TIPOS_DA_ESCOLA = [
+        'provas_questoes',
+        'jornadas_exercicios',
+        'jornadas_documentos',
+        'jornadas_videos',
+        'apostilas',
+        'notifications',
+    ];
+
     public static function podeLer(string $type, string $key): bool
     {
         $tipo = (string) ($_SESSION['user_type'] ?? '');
@@ -22,7 +32,11 @@ class AcessoArquivoPrivado
         }
 
         if (!in_array($type, self::TIPOS_DO_ALUNO, true)) {
-            return $userId > 0 && $tipo !== '';
+            if (!in_array($type, self::TIPOS_DA_ESCOLA, true)) {
+                return false;
+            }
+
+            return self::podeLerConteudoEscola($type, $key, $tipo, $userId);
         }
 
         $registro = self::registro($type, $key);
@@ -56,30 +70,76 @@ class AcessoArquivoPrivado
         if (strpos($relativo, 'uploads/redacoes/') === 0 && strpos($relativo, 'uploads/redacoes_temas/') !== 0) {
             $key = substr($relativo, strlen('uploads/redacoes/'));
 
-            return self::podeLer('redacoes', $key) ? 'privado' : 'negado';
+            return self::decidirPrivado('redacoes', $key);
         }
         if (strpos($relativo, 'uploads/arquivos/') === 0) {
             $key = substr($relativo, strlen('uploads/arquivos/'));
 
-            return self::podeLer('arquivos', $key) ? 'privado' : 'negado';
+            return self::decidirPrivado('arquivos', $key);
         }
         if (strpos($relativo, 'uploads/mensagens/') === 0) {
             $key = substr($relativo, strlen('uploads/mensagens/'));
 
-            return self::podeLer('mensagens', $key) ? 'privado' : 'negado';
+            return self::decidirPrivado('mensagens', $key);
         }
         if (strpos($relativo, 'uploads/essays/submissions/') === 0 || strpos($relativo, 'uploads/essays/feedback_audio/') === 0) {
             $key = substr($relativo, strlen('uploads/'));
 
-            return self::podeLer('redacoes', $key) ? 'privado' : 'negado';
+            return self::decidirPrivado('redacoes', $key);
         }
         if (strpos($relativo, 'uploads/tickets/') === 0) {
             $key = substr($relativo, strlen('uploads/tickets/'));
 
-            return self::podeLer('tickets', $key) ? 'privado' : 'negado';
+            return self::decidirPrivado('tickets', $key);
+        }
+        if (strpos($relativo, 'uploads/layout/') === 0
+            || strpos($relativo, 'uploads/essays/proposals/') === 0
+            || strpos($relativo, 'uploads/redacoes_temas/') === 0) {
+            return 'publico';
+        }
+        if (strpos($relativo, 'uploads/documentos/') === 0) {
+            return self::decidirPrivado('jornadas_documentos', substr($relativo, strlen('uploads/documentos/')));
+        }
+        if (strpos($relativo, 'uploads/videos/') === 0) {
+            return self::decidirPrivado('jornadas_videos', substr($relativo, strlen('uploads/videos/')));
+        }
+        if (strpos($relativo, 'uploads/apostilas/') === 0) {
+            return self::decidirPrivado('apostilas', substr($relativo, strlen('uploads/apostilas/')));
+        }
+        if (strpos($relativo, 'uploads/notifications/') === 0) {
+            return self::decidirPrivado('notifications', substr($relativo, strlen('uploads/notifications/')));
+        }
+        if (strpos($relativo, 'uploads/minicursos/') === 0
+            || strpos($relativo, 'uploads/expo-colag/') === 0
+            || strpos($relativo, 'uploads/ingles/') === 0) {
+            return self::decidirSessao();
         }
 
-        return 'publico';
+        return 'negado';
+    }
+
+    private static function temSessao(): bool
+    {
+        if (!empty($_SESSION['master_user_id'])) {
+            return true;
+        }
+
+        return !empty($_SESSION['user_id']) && !empty($_SESSION['user_type']);
+    }
+
+    private static function decidirPrivado(string $type, string $key): string
+    {
+        if (!self::temSessao()) {
+            return 'sem_sessao';
+        }
+
+        return self::podeLer($type, $key) ? 'privado' : 'negado';
+    }
+
+    /** Pasta da escola sem dono por arquivo: anônimo não lê; sessão da escola lê. */
+    private static function decidirSessao(): string
+    {
+        return self::temSessao() ? 'privado' : 'sem_sessao';
     }
 
     /**
@@ -88,25 +148,44 @@ class AcessoArquivoPrivado
     private static function sessaoPodeRegistro(string $type, string $tipo, int $userId, array $registro): bool
     {
         $alunoId = (int) $registro['aluno_id'];
-        $turmaId = (int) $registro['turma_id'];
+        $turmas = self::turmasDoRegistro($registro);
+        $alunosIds = isset($registro['alunos_ids']) && is_array($registro['alunos_ids']) ? $registro['alunos_ids'] : [];
+
+        if (!empty($registro['oculto_aluno']) && in_array($tipo, ['aluno', 'pai', 'monitor'], true)) {
+            return false;
+        }
 
         if ($tipo === 'aluno' && $userId > 0) {
+            if ($alunosIds !== [] && !in_array($userId, $alunosIds, true)) {
+                return false;
+            }
             if ($alunoId > 0 && $userId === $alunoId) {
                 return true;
             }
-            if ($alunoId === 0 && $turmaId > 0 && self::turmaDoAluno($userId) === $turmaId) {
+            if ($alunoId === 0 && !empty($registro['qualquer_turma'])) {
                 return true;
+            }
+            if ($alunoId === 0 && $turmas !== []) {
+                return self::alunoEmAlgumaTurma($userId, $turmas);
             }
 
             return false;
         }
 
         if ($tipo === 'pai' && $userId > 0) {
+            if (!empty($registro['qualquer_turma'])) {
+                return true;
+            }
+            if ($alunosIds !== []) {
+                return self::paiPodeAlgumAluno($userId, $alunosIds);
+            }
             if ($alunoId > 0) {
                 return self::paiPodeAluno($userId, $alunoId);
             }
-            if ($turmaId > 0) {
-                return self::paiTemFilhoNaTurma($userId, $turmaId);
+            foreach ($turmas as $turmaId) {
+                if (self::paiTemFilhoNaTurma($userId, $turmaId)) {
+                    return true;
+                }
             }
 
             return false;
@@ -117,18 +196,56 @@ class AcessoArquivoPrivado
         }
 
         if ($tipo === 'professor' && $userId > 0) {
+            if (!empty($registro['qualquer_turma'])) {
+                return true;
+            }
             if (in_array($userId, $registro['professor_ids'], true)) {
                 return true;
             }
+            foreach ($turmas as $turmaId) {
+                if (self::professorDaTurma($userId, $turmaId)) {
+                    return true;
+                }
+            }
 
-            return $turmaId > 0 && self::professorDaTurma($userId, $turmaId);
+            return false;
         }
 
         if ($tipo === 'monitor' && $userId > 0) {
-            return $turmaId > 0 && self::monitorDaTurma($userId, $turmaId);
+            if (!empty($registro['qualquer_turma'])) {
+                return true;
+            }
+            foreach ($turmas as $turmaId) {
+                if (self::monitorDaTurma($userId, $turmaId)) {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         return false;
+    }
+
+    /**
+     * @param array{aluno_id:int,turma_id:int,professor_ids:array<int,int>,so_dono:bool,turmas?:array<int,int>} $registro
+     * @return array<int,int>
+     */
+    private static function turmasDoRegistro(array $registro): array
+    {
+        $turmas = [];
+        $principal = (int) ($registro['turma_id'] ?? 0);
+        if ($principal > 0) {
+            $turmas[] = $principal;
+        }
+        foreach ($registro['turmas'] ?? [] as $turmaId) {
+            $turmaId = (int) $turmaId;
+            if ($turmaId > 0) {
+                $turmas[] = $turmaId;
+            }
+        }
+
+        return array_values(array_unique($turmas));
     }
 
     private static function ehDonoOuPai(string $tipo, int $userId, int $dono): bool
@@ -141,6 +258,534 @@ class AcessoArquivoPrivado
         }
         if ($tipo === 'pai') {
             return self::paiPodeAluno($userId, $dono);
+        }
+
+        return false;
+    }
+
+    private static function podeLerConteudoEscola(string $type, string $key, string $tipo, int $userId): bool
+    {
+        if ($userId <= 0 || $tipo === '') {
+            return false;
+        }
+        if ($type === 'notifications') {
+            return self::podeLerNotificacao($key, $tipo, $userId);
+        }
+        if (self::arquivoDoProfessorDaSessao($key, $tipo, $userId)) {
+            return true;
+        }
+
+        $nome = self::nomeArquivoSeguro($key);
+        if ($nome === null) {
+            return false;
+        }
+
+        try {
+            $linhas = self::linhasDoConteudo($type, $nome);
+        } catch (\Throwable $e) {
+            return false;
+        }
+        foreach ($linhas as $linha) {
+            if (self::sessaoPodeRegistro($type, $tipo, $userId, $linha)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function arquivoDoProfessorDaSessao(string $key, string $tipo, int $userId): bool
+    {
+        if ($tipo !== 'professor' || $userId <= 0) {
+            return false;
+        }
+        $caminho = str_replace('\\', '/', $key);
+
+        return preg_match('#(?:^|/)teacher/' . $userId . '(?:/|$)#', $caminho) === 1;
+    }
+
+    private static function nomeArquivoSeguro(string $key): ?string
+    {
+        $nome = basename(str_replace('\\', '/', $key));
+        if ($nome === '' || $nome === '.' || $nome === '..' || strlen($nome) > 255 || strpbrk($nome, "%\\\0") !== false) {
+            return null;
+        }
+
+        return $nome;
+    }
+
+    /**
+     * @return list<array{aluno_id:int,turma_id:int,professor_ids:array<int,int>,so_dono:bool,turmas?:array<int,int>,alunos_ids?:array<int,int>,oculto_aluno?:bool}>
+     */
+    private static function linhasDoConteudo(string $type, string $nome): array
+    {
+        $db = Database::getInstance();
+        if ($type === 'jornadas_exercicios') {
+            return self::linhasJornada(
+                array_merge(
+                    self::buscarLinhas(
+                        $db,
+                        'SELECT j.turma_id, j.professor_id, j.estrutura
+                         FROM jornadas_modulos_exercicios me
+                         INNER JOIN jornadas_modulos m ON m.id = me.modulo_id
+                         INNER JOIN jornadas j ON j.id = m.jornada_id
+                         WHERE LOCATE(:nome, COALESCE(me.enunciado, \'\')) > 0
+                            OR LOCATE(:nome, COALESCE(me.questoes_json, \'\')) > 0',
+                        $nome
+                    ),
+                    self::buscarLinhas(
+                        $db,
+                        'SELECT j.turma_id, j.professor_id, j.estrutura
+                         FROM jornadas_modulos_exercicios me
+                         INNER JOIN jornadas_modulos m ON m.id = me.modulo_id
+                         INNER JOIN jornadas j ON j.id = m.jornada_id
+                         WHERE LOCATE(:nome, COALESCE(me.imagem_url, \'\')) > 0',
+                        $nome
+                    )
+                ),
+                self::buscarLinhas(
+                    $db,
+                    'SELECT j.turma_id, j.professor_id, j.estrutura
+                     FROM jornadas_exercicios je
+                     INNER JOIN jornadas j ON j.id = je.jornada_id
+                     WHERE LOCATE(:nome, COALESCE(je.descricao, \'\')) > 0
+                        OR LOCATE(:nome, COALESCE(je.questoes_json, \'\')) > 0',
+                    $nome
+                )
+            );
+        }
+        if ($type === 'jornadas_documentos') {
+            return self::linhasJornada(self::buscarLinhas(
+                $db,
+                'SELECT j.turma_id, j.professor_id, j.estrutura
+                 FROM jornadas_modulos_documentos d
+                 INNER JOIN jornadas_modulos m ON m.id = d.modulo_id
+                 INNER JOIN jornadas j ON j.id = m.jornada_id
+                 WHERE LOCATE(:nome, COALESCE(d.arquivo, \'\')) > 0',
+                $nome
+            ), []);
+        }
+        if ($type === 'jornadas_videos') {
+            return self::linhasJornada(self::buscarLinhas(
+                $db,
+                'SELECT j.turma_id, j.professor_id, j.estrutura
+                 FROM jornadas_modulos_videos v
+                 INNER JOIN jornadas_modulos m ON m.id = v.modulo_id
+                 INNER JOIN jornadas j ON j.id = m.jornada_id
+                 WHERE LOCATE(:nome, COALESCE(v.arquivo_video, \'\')) > 0',
+                $nome
+            ), []);
+        }
+        if ($type === 'provas_questoes') {
+            return self::linhasProva(array_merge(
+                self::buscarLinhas(
+                    $db,
+                    'SELECT p.id, p.turma_id, p.professor_id
+                     FROM provas_questoes q
+                     INNER JOIN provas p ON p.id = q.prova_id
+                     WHERE LOCATE(:nome, COALESCE(q.imagem_url, \'\')) > 0
+                        OR LOCATE(:nome, COALESCE(q.enunciado, \'\')) > 0',
+                    $nome
+                ),
+                self::buscarLinhas(
+                    $db,
+                    'SELECT p.id, p.turma_id, p.professor_id
+                     FROM provas_alternativas a
+                     INNER JOIN provas_questoes q ON q.id = a.questao_id
+                     INNER JOIN provas p ON p.id = q.prova_id
+                     WHERE LOCATE(:nome, COALESCE(a.texto, \'\')) > 0',
+                    $nome
+                )
+            ));
+        }
+        if ($type === 'apostilas') {
+            return self::linhasApostila($db, $nome);
+        }
+
+        return [];
+    }
+
+    /**
+     * @return array<int,array<string,mixed>>
+     */
+    private static function buscarLinhas(Database $db, string $sql, string $nome): array
+    {
+        try {
+            $rows = $db->fetchAll($sql, ['nome' => $nome]);
+
+            return is_array($rows) ? $rows : [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * @param array<int,array<string,mixed>>|false $principal
+     * @param array<int,array<string,mixed>>|false $extra
+     * @return list<array{aluno_id:int,turma_id:int,professor_ids:array<int,int>,so_dono:bool,turmas?:array<int,int>,alunos_ids?:array<int,int>}>
+     */
+    private static function linhasJornada($principal, $extra): array
+    {
+        $saida = [];
+        foreach (array_merge(is_array($principal) ? $principal : [], is_array($extra) ? $extra : []) as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $turmas = self::turmasDaJornada($row);
+            $saida[] = self::montar(0, $turmas[0] ?? 0, self::idsValidos([$row['professor_id'] ?? 0]), false) + [
+                'turmas' => $turmas,
+                'alunos_ids' => self::alunosSelecionadosDaJornada($row),
+            ];
+        }
+
+        return $saida;
+    }
+
+    /**
+     * @param array<int,array<string,mixed>> $rows
+     * @return list<array{aluno_id:int,turma_id:int,professor_ids:array<int,int>,so_dono:bool}>
+     */
+    private static function linhasProva(array $rows): array
+    {
+        $porId = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id <= 0 || !is_array($row)) {
+                continue;
+            }
+            $porId[$id] = $row;
+        }
+        if ($porId === []) {
+            return [];
+        }
+
+        $ids = array_keys($porId);
+        $db = Database::getInstance();
+        $turmasPorProva = [];
+        foreach (self::buscarPorIds($db, 'SELECT prova_id, turma_id FROM provas_turmas WHERE prova_id IN (%s)', $ids) as $extra) {
+            $turmasPorProva[(int) ($extra['prova_id'] ?? 0)][] = (int) ($extra['turma_id'] ?? 0);
+        }
+
+        $blocosPorProva = [];
+        $blocoIds = [];
+        foreach (self::buscarPorIds(
+            $db,
+            'SELECT pbv.prova_id, pb.id AS bloco_id, pb.turma_id
+             FROM provas_blocos_vinculo pbv
+             INNER JOIN provas_blocos pb ON pb.id = pbv.bloco_id AND pb.deleted_at IS NULL
+             WHERE pbv.prova_id IN (%s)',
+            $ids
+        ) as $bloco) {
+            $provaId = (int) ($bloco['prova_id'] ?? 0);
+            $blocoId = (int) ($bloco['bloco_id'] ?? 0);
+            if ($provaId <= 0 || $blocoId <= 0) {
+                continue;
+            }
+            $blocosPorProva[$provaId][$blocoId] = [
+                'turma_id' => (int) ($bloco['turma_id'] ?? 0),
+                'extras' => [],
+            ];
+            $blocoIds[$blocoId] = $blocoId;
+        }
+        if ($blocoIds !== []) {
+            foreach (self::buscarPorIds(
+                $db,
+                'SELECT bloco_id, turma_id FROM provas_blocos_turmas WHERE bloco_id IN (%s)',
+                array_values($blocoIds)
+            ) as $extraBloco) {
+                $blocoId = (int) ($extraBloco['bloco_id'] ?? 0);
+                $turmaId = (int) ($extraBloco['turma_id'] ?? 0);
+                foreach ($blocosPorProva as &$blocos) {
+                    if ($turmaId > 0 && isset($blocos[$blocoId])) {
+                        $blocos[$blocoId]['extras'][] = $turmaId;
+                    }
+                }
+                unset($blocos);
+            }
+        }
+
+        $saida = [];
+        foreach ($porId as $id => $row) {
+            $turmas = [];
+            $principal = (int) ($row['turma_id'] ?? 0);
+            if ($principal > 0) {
+                $turmas[] = $principal;
+            }
+            foreach ($turmasPorProva[$id] ?? [] as $turmaId) {
+                if ($turmaId > 0) {
+                    $turmas[] = $turmaId;
+                }
+            }
+            $provaSemTurma = $turmas === [];
+            $temBloco = !empty($blocosPorProva[$id]);
+            $blocoAberto = false;
+            foreach ($blocosPorProva[$id] ?? [] as $bloco) {
+                $doBloco = [];
+                if ($bloco['turma_id'] > 0) {
+                    $doBloco[] = $bloco['turma_id'];
+                }
+                foreach ($bloco['extras'] as $turmaId) {
+                    if ($turmaId > 0) {
+                        $doBloco[] = $turmaId;
+                    }
+                }
+                if ($doBloco === []) {
+                    $blocoAberto = true;
+                } else {
+                    $turmas = array_merge($turmas, $doBloco);
+                }
+            }
+            $turmas = array_values(array_unique($turmas));
+            $qualquerTurma = ($provaSemTurma && (!$temBloco || $blocoAberto)) || $blocoAberto;
+            $saida[] = self::montar(0, $turmas[0] ?? 0, self::idsValidos([$row['professor_id'] ?? 0]), false) + [
+                'turmas' => $turmas,
+                'qualquer_turma' => $qualquerTurma,
+            ];
+        }
+
+        return $saida;
+    }
+
+    /**
+     * @param array<int,int> $ids
+     * @return array<int,array<string,mixed>>
+     */
+    private static function buscarPorIds(Database $db, string $sql, array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn (int $id): bool => $id > 0)));
+        if ($ids === []) {
+            return [];
+        }
+        $partes = [];
+        $params = [];
+        foreach ($ids as $i => $id) {
+            $chave = 'id' . $i;
+            $partes[] = ':' . $chave;
+            $params[$chave] = $id;
+        }
+        try {
+            $rows = $db->fetchAll(sprintf($sql, implode(', ', $partes)), $params);
+
+            return is_array($rows) ? $rows : [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * @return list<array{aluno_id:int,turma_id:int,professor_ids:array<int,int>,so_dono:bool,turmas?:array<int,int>,oculto_aluno?:bool}>
+     */
+    private static function linhasApostila(Database $db, string $nome): array
+    {
+        try {
+            $rows = $db->fetchAll(
+                'SELECT ma.id, ma.turma_id, ma.professor_id, ma.visibilidade
+                 FROM modulos_apostilas_anexos aa
+                 INNER JOIN modulos_apostilas ma ON ma.id = aa.modulo_apostila_id
+                 WHERE LOCATE(:nome, COALESCE(aa.caminho, \'\')) > 0',
+                ['nome' => $nome]
+            );
+        } catch (\Throwable $e) {
+            return [];
+        }
+        if (!is_array($rows) || $rows === []) {
+            return [];
+        }
+
+        $saida = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $turmas = [];
+            $principal = (int) ($row['turma_id'] ?? 0);
+            if ($principal > 0) {
+                $turmas[] = $principal;
+            }
+            try {
+                $extras = $db->fetchAll(
+                    'SELECT turma_id FROM modulos_apostilas_turmas WHERE modulo_apostila_id = :id',
+                    ['id' => (int) $row['id']]
+                );
+                foreach (is_array($extras) ? $extras : [] as $extra) {
+                    $turmaId = (int) ($extra['turma_id'] ?? 0);
+                    if ($turmaId > 0) {
+                        $turmas[] = $turmaId;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // A turma principal já está na lista.
+            }
+            $turmas = array_values(array_unique($turmas));
+            $visivelAoAluno = in_array((string) ($row['visibilidade'] ?? ''), ['aluno', 'ambos'], true);
+            $saida[] = self::montar(0, $turmas[0] ?? 0, self::idsValidos([$row['professor_id'] ?? 0]), false) + [
+                'turmas' => $turmas,
+                'oculto_aluno' => !$visivelAoAluno,
+            ];
+        }
+
+        return $saida;
+    }
+
+    /**
+     * @param array<string,mixed> $row
+     * @return array<int,int>
+     */
+    private static function turmasDaJornada(array $row): array
+    {
+        $turmas = [];
+        $principal = (int) ($row['turma_id'] ?? 0);
+        if ($principal > 0) {
+            $turmas[] = $principal;
+        }
+        $estrutura = json_decode((string) ($row['estrutura'] ?? ''), true);
+        if (is_array($estrutura) && !empty($estrutura['turmas_selecionadas']) && is_array($estrutura['turmas_selecionadas'])) {
+            foreach ($estrutura['turmas_selecionadas'] as $turmaId) {
+                $turmaId = (int) $turmaId;
+                if ($turmaId > 0) {
+                    $turmas[] = $turmaId;
+                }
+            }
+        }
+
+        return array_values(array_unique($turmas));
+    }
+
+    /**
+     * @param array<string,mixed> $row
+     * @return array<int,int>
+     */
+    private static function alunosSelecionadosDaJornada(array $row): array
+    {
+        $estrutura = json_decode((string) ($row['estrutura'] ?? ''), true);
+        if (!is_array($estrutura)) {
+            return [];
+        }
+        $tipo = strtolower(trim((string) ($estrutura['tipo_selecao_alunos'] ?? 'todos')));
+        if ($tipo !== 'selecionados') {
+            return [];
+        }
+        $ids = [];
+        foreach ((array) ($estrutura['alunos_selecionados'] ?? []) as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+
+        return $ids;
+    }
+
+    private static function podeLerNotificacao(string $key, string $tipo, int $userId): bool
+    {
+        $nome = self::nomeArquivoSeguro($key);
+        if ($nome === null) {
+            return false;
+        }
+        $mapa = [
+            'aluno' => 'alunos',
+            'professor' => 'professores',
+            'pai' => 'pais',
+            'admin' => 'usuarios',
+            'admin_escola' => 'usuarios',
+            'monitor' => 'monitores',
+        ];
+        $tipoDestino = $mapa[$tipo] ?? '';
+        if ($tipoDestino === '') {
+            return false;
+        }
+        try {
+            $db = Database::getInstance();
+            $aviso = $db->fetch(
+                'SELECT id, enviado_por, tipo_enviador
+                 FROM notificacoes
+                 WHERE LOCATE(:nome, COALESCE(arquivo_url, \'\')) > 0
+                 LIMIT 1',
+                ['nome' => $nome]
+            );
+            if (!$aviso) {
+                return false;
+            }
+            $enviadoPor = (int) ($aviso['enviado_por'] ?? 0);
+            $tipoEnviador = (string) ($aviso['tipo_enviador'] ?? '');
+            if ($enviadoPor === $userId && (
+                ($tipoEnviador === 'professor' && $tipo === 'professor')
+                || ($tipoEnviador === 'admin' && in_array($tipo, ['admin', 'admin_escola'], true))
+            )) {
+                return true;
+            }
+            $paramsDestino = [
+                'id' => (int) $aviso['id'],
+                'tipo' => $tipoDestino,
+                'uid' => $userId,
+                'tipo_usuario' => $tipo,
+            ];
+            $filtroTurma = '1 = 0';
+            if ($tipo === 'aluno') {
+                $partesTurma = [];
+                foreach (self::turmasDoAluno($userId) as $i => $turmaId) {
+                    $chave = 'turma' . $i;
+                    $partesTurma[] = ':' . $chave;
+                    $paramsDestino[$chave] = $turmaId;
+                }
+                if ($partesTurma !== []) {
+                    $filtroTurma = 'nd.turma_id IN (' . implode(', ', $partesTurma) . ')';
+                }
+            }
+            $row = $db->fetch(
+                'SELECT nd.id
+                 FROM notificacoes_destinatarios nd
+                 WHERE nd.notificacao_id = :id
+                   AND (
+                        nd.tipo_destinatario = \'todos\'
+                        OR (nd.tipo_destinatario = :tipo AND nd.destinatario_id = :uid)
+                        OR (nd.tipo_destinatario = \'turma\' AND :tipo_usuario = \'aluno\' AND ' . $filtroTurma . ')
+                   )
+                 LIMIT 1',
+                $paramsDestino
+            );
+            if ($row) {
+                return true;
+            }
+            if ($tipo !== 'pai' && $tipo !== 'professor' && $tipo !== 'monitor') {
+                return false;
+            }
+            $turmas = $db->fetchAll(
+                'SELECT turma_id FROM notificacoes_destinatarios
+                 WHERE notificacao_id = :id AND tipo_destinatario = \'turma\' AND turma_id > 0',
+                ['id' => (int) $aviso['id']]
+            );
+            foreach (is_array($turmas) ? $turmas : [] as $turma) {
+                $turmaId = (int) ($turma['turma_id'] ?? 0);
+                if ($turmaId <= 0) {
+                    continue;
+                }
+                if ($tipo === 'pai' && self::paiTemFilhoNaTurma($userId, $turmaId)) {
+                    return true;
+                }
+                if ($tipo === 'professor' && self::professorDaTurma($userId, $turmaId)) {
+                    return true;
+                }
+                if ($tipo === 'monitor' && self::monitorDaTurma($userId, $turmaId)) {
+                    return true;
+                }
+            }
+        } catch (\Throwable $e) {
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<int,int> $alunosIds
+     */
+    private static function paiPodeAlgumAluno(int $paiId, array $alunosIds): bool
+    {
+        foreach ($alunosIds as $alunoId) {
+            if (self::paiPodeAluno($paiId, (int) $alunoId)) {
+                return true;
+            }
         }
 
         return false;
@@ -361,16 +1006,6 @@ class AcessoArquivoPrivado
         return (new \ParentStudentAccessPolicy())->canAccess($paiId, $alunoId);
     }
 
-    private static function turmaDoAluno(int $alunoId): int
-    {
-        $row = Database::getInstance()->fetch(
-            'SELECT turma_id FROM alunos WHERE id = :id',
-            ['id' => $alunoId]
-        );
-
-        return (int) ($row['turma_id'] ?? 0);
-    }
-
     private static function paiTemFilhoNaTurma(int $paiId, int $turmaId): bool
     {
         $row = Database::getInstance()->fetch(
@@ -388,7 +1023,61 @@ class AcessoArquivoPrivado
             ['turma' => $turmaId, 'pai' => $paiId]
         );
 
-        return (bool) $row;
+        if ($row) {
+            return true;
+        }
+        try {
+            $extra = Database::getInstance()->fetch(
+                'SELECT a.id
+                 FROM alunos a
+                 INNER JOIN matricula m ON m.aluno_id = a.id
+                 WHERE m.turma_id = :turma
+                   AND m.status = \'ativa\'
+                   AND m.data_saida IS NULL
+                   AND (
+                        a.responsavel_id = :pai
+                        OR EXISTS (
+                            SELECT 1 FROM alunos_responsaveis ar
+                            WHERE ar.aluno_id = a.id AND ar.responsavel_id = :pai AND ar.ativo = 1
+                        )
+                   )
+                 LIMIT 1',
+                ['turma' => $turmaId, 'pai' => $paiId]
+            );
+
+            return (bool) $extra;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * @return array<int,int>
+     */
+    private static function turmasDoAluno(int $alunoId): array
+    {
+        if ($alunoId <= 0) {
+            return [];
+        }
+        if (!class_exists(\App\Core\AlunoTurmaHelper::class)) {
+        }
+        $ids = \App\Core\AlunoTurmaHelper::getTurmaIds(Database::getInstance(), $alunoId);
+
+        return array_values(array_unique(array_map('intval', is_array($ids) ? $ids : [])));
+    }
+
+    /**
+     * @param array<int,int> $turmas
+     */
+    private static function alunoEmAlgumaTurma(int $alunoId, array $turmas): bool
+    {
+        foreach (self::turmasDoAluno($alunoId) as $turmaId) {
+            if (in_array($turmaId, $turmas, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function professorDaTurma(int $professorId, int $turmaId): bool

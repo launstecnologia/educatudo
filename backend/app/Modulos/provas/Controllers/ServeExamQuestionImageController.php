@@ -2,12 +2,13 @@
 
 namespace App\Modulos\Provas\Controllers;
 /**
- * Serve imagens de enunciado/alternativas de questões (provas).
- * Rota pública para que o <img> carregue no editor e na visualização.
+ * Serve imagens de enunciado e alternativas de questões.
+ * Exige sessão e vínculo com a prova. O professor que enviou o arquivo ainda vê a prévia.
  */
 
 
 use App\Core\BaseController;
+use App\Infra\Services\AcessoArquivoPrivado;
 use App\Services\MediaStorageService;
 if (!class_exists(__NAMESPACE__ . '\\ServeExamQuestionImageController', false)) {
 class ServeExamQuestionImageController extends BaseController
@@ -23,10 +24,21 @@ class ServeExamQuestionImageController extends BaseController
             http_response_code(400);
             exit('Nome de arquivo inválido');
         }
+        if (empty($_SESSION['master_user_id']) && (empty($_SESSION['user_id']) || empty($_SESSION['user_type']))) {
+            http_response_code(401);
+            header('X-Content-Type-Options: nosniff');
+            exit;
+        }
+        if (!AcessoArquivoPrivado::podeLer('provas_questoes', $filename)) {
+            http_response_code(403);
+            header('X-Content-Type-Options: nosniff');
+            exit;
+        }
         $media = new MediaStorageService($this->config);
         if ($media->isS3()) {
             $url = $media->getViewUrl('provas_questoes', $filename, $filename);
             if ($url !== null && $url !== '') {
+                header('Cache-Control: private, no-store');
                 header('Location: ' . $url);
                 exit;
             }
@@ -46,7 +58,8 @@ class ServeExamQuestionImageController extends BaseController
         $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
         $mime = $mimes[$ext] ?? 'application/octet-stream';
         header('Content-Type: ' . $mime);
-        header('Cache-Control: public, max-age=86400');
+        header('Cache-Control: private, no-store');
+        header('X-Content-Type-Options: nosniff');
         readfile($path);
         exit;
     }
