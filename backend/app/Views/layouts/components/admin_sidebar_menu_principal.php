@@ -124,6 +124,12 @@ if ($nomeMenuEscola === '') {
             <span class="sidebar-text text-sm">Grade Horária</span>
         </a>
         <?php endif; ?>
+        <?php if ($modOn('educasync') && $canViewSidebar(['educasync'])): ?>
+        <a href="<?= URL ?>/admin/educasync" class="<?= $linkCls($cp === 'educasync') ?>">
+            <i class="fa-solid fa-wand-magic-sparkles w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">EducaSync</span>
+        </a>
+        <?php endif; ?>
         </div>
         </div>
         <?php $menu_subcab_titulo = 'Como a escola avalia'; $menu_subcab_periodo = ''; $menu_subcab_ordenar = true; $menu_subcab_id = 'como-avalia'; $menu_subcab_aberto = !empty($avaliaNestedOpen); require __DIR__ . '/admin_sidebar_subcabecalho.php'; ?>

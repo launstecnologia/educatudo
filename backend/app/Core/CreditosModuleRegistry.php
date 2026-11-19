@@ -249,6 +249,20 @@ class CreditosModuleRegistry
             'feature_modules' => [],
             'pagador' => 'escola',
         ],
+        'educasync_otimizar' => [
+            'label' => 'EducaSync — otimizar grade horária',
+            'grupo' => 'EducaSync',
+            'escopo_ui' => 'acao',
+            'feature_modules' => ['educasync'],
+            'pagador' => 'escola',
+        ],
+        'educasync_assistente_mensagem' => [
+            'label' => 'EducaSync — mensagem ao assistente',
+            'grupo' => 'EducaSync',
+            'escopo_ui' => 'acao',
+            'feature_modules' => ['educasync'],
+            'pagador' => 'escola',
+        ],
         'provas_aluno_assistente_mensagem' => [
             'label' => 'Assistente de provas do aluno (IA)',
             'grupo' => 'Avaliações',

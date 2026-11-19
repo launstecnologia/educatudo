@@ -96,7 +96,7 @@
         $showUsuariosGroup = $canViewSidebar(['administradores']);
         $showAcademicoGroup = $canViewSidebar([
             'alunos', 'ano_letivo', 'calendario_letivo', 'materias',
-            'curso', 'series', 'grade_horaria', 'matriz_curricular', 'professores',
+            'curso', 'series', 'grade_horaria', 'educasync', 'matriz_curricular', 'professores',
             'salas', 'turmas', 'regras_academicas',
             'grupos_regras_notas', 'configuracao_boletim', 'provas_online',
         ]);
@@ -118,7 +118,7 @@
         $permissoesAtivo = strpos($uriAtual, '/admin/permissoes-perfis') !== false;
         $academicoOpen = in_array($cp, [
             'academico', 'students', 'ano_letivo', 'calendario_letivo',
-            'componentes-curriculares', 'curso', 'cursos-series', 'grade_horaria', 'matriz-curricular',
+            'componentes-curriculares', 'curso', 'cursos-series', 'grade_horaria', 'educasync', 'matriz-curricular',
             'teachers', 'grupos-regras-notas', 'quadros-notas', 'implantar-academico',
             'agrupamentos-componentes', 'regras-academicas', 'recuperacao', 'salas', 'serie', 'turmas',
             'tipos_avaliacao', 'boletins', 'boletim_guia', 'boletim-layout', 'reports_boletim_coordenacao',
@@ -168,7 +168,7 @@
             'curso', 'cursos-series', 'matriz-curricular', 'serie',
         ], true);
         $pessoasNestedOpen = in_array($cp, [
-            'teachers', 'students', 'turmas', 'grade_horaria', 'salas',
+            'teachers', 'students', 'turmas', 'grade_horaria', 'educasync', 'salas',
         ], true);
         $avaliaNestedOpen = in_array($cp, [
             'grupos-regras-notas', 'quadros-notas', 'regras-academicas', 'recuperacao',
@@ -820,6 +820,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'curso': 'academico',
         'cursos-series': 'academico',
         'grade_horaria': 'academico',
+        'educasync': 'academico',
         'matriz-curricular': 'academico',
         'teachers': 'academico',
         'grupos-regras-notas': 'academico',
@@ -940,6 +941,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'students': 'pessoas-turmas',
         'turmas': 'pessoas-turmas',
         'grade_horaria': 'pessoas-turmas',
+        'educasync': 'pessoas-turmas',
         'salas': 'pessoas-turmas',
         'grupos-regras-notas': 'como-avalia',
         'quadros-notas': 'como-avalia',

@@ -1,0 +1,93 @@
+{
+  "host_indicado": "https://educa.educatudo.com",
+  "arquivos_criados": "somente no disco deste repositorio; nada foi enviado ao host",
+  "canarios": [
+    {
+      "id": "exercicio",
+      "arquivo_local": "backend/public/uploads/jornadas/exercicios/auditoria-canario-e7c4a91f.png",
+      "url": "https://educa.educatudo.com/uploads/jornadas/exercicios/auditoria-canario-e7c4a91f.png",
+      "tipo": "jornadas_exercicios",
+      "http_sem_autenticacao_hoje": 200,
+      "http_sem_autenticacao_esperado": 401,
+      "observacao": "ServeImagemExercicioController entrega o arquivo sem sessao e com Cache-Control public. No host indicado o arquivo ainda nao existe, entao a resposta de hoje seria 404 ate a copia."
+    },
+    {
+      "id": "media_privada",
+      "arquivo_local": "backend/storage/provas/questoes/auditoria-canario-m3b8d26e.png",
+      "url": "https://educa.educatudo.com/media/serve?type=provas_questoes&key=auditoria-canario-m3b8d26e.png",
+      "tipo": "provas_questoes",
+      "http_sem_autenticacao_hoje": 401,
+      "http_sem_autenticacao_esperado": 401,
+      "observacao": "Tipo privado. MediaServeController exige sessao antes de ler o arquivo. Com sessao de qualquer usuario da escola, o codigo atual libera este tipo sem conferir o dono."
+    }
+  ],
+  "pastas_de_upload": {
+    "public/uploads/layout": "publico (marca)",
+    "public/uploads/jornadas/exercicios": "rota publica sem sessao",
+    "public/uploads/documentos": "jornadas_documentos; sessao, sem dono",
+    "public/uploads/videos": "jornadas_videos; sessao, sem dono",
+    "public/uploads/redacoes": "privado; dono ou registro",
+    "public/uploads/essays/proposals": "publico hoje",
+    "public/uploads/arquivos": "privado; dono ou registro",
+    "public/uploads/apostilas": "sessao, sem dono",
+    "storage/provas/questoes": "provas_questoes; sessao, sem dono",
+    "storage/chat": "privado; dono ou registro",
+    "storage/uploads": "pasta geral de upload da config",
+    "storage/files": "base alternativa de midia"
+  },
+  "media_serve": {
+    "rota": "GET /media/serve",
+    "parametros": ["type", "key", "tenant"],
+    "publicos_hoje": ["layout", "dashboard_sliders", "professores", "avatars", "essays_proposals"],
+    "deveriam_exigir_sessao": ["professores", "avatars"],
+    "privados_com_dono": ["redacoes", "chat", "arquivos", "tickets", "mensagens"],
+    "privados_sem_conferencia_de_dono": ["provas_questoes", "jornadas_exercicios", "jornadas_documentos", "jornadas_videos", "apostilas", "notifications"],
+    "tenant_na_query": "so type=layout pode trocar de escola sem sessao Master"
+  },
+  "recuperacao_de_senha": {
+    "email_admin_e_outros": {
+      "formulario": "GET /recuperar-senha",
+      "envio": "POST /enviar-recuperacao",
+      "campos": ["_token", "email", "tipo"],
+      "redefinicao": "POST /recuperar-senha/reset",
+      "campos_redefinicao": ["_token", "token", "email", "senha", "confirmar_senha"],
+      "dispara_email": true
+    },
+    "professor": {
+      "formulario": "GET /professor/recuperar-senha",
+      "envio": "POST /professor/enviar-recuperacao",
+      "campos": ["_token", "email"],
+      "dispara_email": true
+    },
+    "aluno_sem_email": {
+      "formulario": "GET /aluno/recuperar-senha",
+      "pergunta": "POST /aluno/recuperar-senha/pergunta",
+      "campos_pergunta": ["_token", "nickname"],
+      "reset": "POST /aluno/recuperar-senha/reset",
+      "campos_reset": ["_token", "resposta", "senha", "confirmar_senha"],
+      "dispara_email": false
+    }
+  },
+  "rate_limit": {
+    "login_web_por_ip": "50 falhas em 900 segundos; so depois do CSRF e com site_url vazio; HTTP 429",
+    "login_web_por_identificador": "aluno 5 falhas em 300 segundos; demais perfis 5 falhas em 900 segundos, vindos de config/app.php",
+    "primeiro_acesso": "nao ha limite no codigo",
+    "recuperacao_email": "nao ha limite no codigo",
+    "recuperacao_aluno": "nao ha limite no codigo",
+    "recuperacao_professor": "nao ha limite no codigo",
+    "api_auth_login": "10 pedidos em 60 segundos por IP",
+    "api_v1_auth_login": "5 pedidos em 300 segundos por CPF e IP"
+  },
+  "html_em_pagina_publica": [
+    {
+      "arquivo": "backend/app/Views/public/guia_academico.php",
+      "rota": "GET /guia/implantar-academico",
+      "uso": "location.hash escolhe uma etapa pelo id; nao grava o hash em HTML"
+    },
+    {
+      "arquivo": "backend/app/Views/auth/login.php",
+      "rota": "nenhuma rota atual renderiza esta view",
+      "uso": "innerHTML recebe texto fixo do proprio script, escolhido pelo select tipo"
+    }
+  ]
+}

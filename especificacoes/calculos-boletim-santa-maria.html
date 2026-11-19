@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Cálculos do boletim — Colégio Santa Maria (referência EducaTudo)</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm 16mm 14mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 11pt;
+    line-height: 1.45;
+    color: #1a1a1a;
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 8px 6px 32px;
+  }
+  h1 { font-size: 20pt; color: #1e3a5f; margin: 0 0 8px; border-bottom: 3px solid #1e3a5f; padding-bottom: 8px; }
+  h2 { font-size: 13.5pt; color: #1e3a5f; margin: 26px 0 10px; padding: 6px 10px; background: #eef3f9; border-left: 5px solid #1e3a5f; page-break-after: avoid; }
+  h3 { font-size: 12pt; color: #0f5132; margin: 18px 0 8px; page-break-after: avoid; }
+  p { margin: 0 0 10px; }
+  ul, ol { margin: 0 0 12px; padding-left: 22px; }
+  li { margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 14px; font-size: 10pt; }
+  th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #eef3f9; color: #1e3a5f; }
+  .capa {
+    text-align: center; padding: 36px 18px 28px; margin-bottom: 22px;
+    background: linear-gradient(180deg, #eef3f9 0%, #fff 100%);
+    border: 1px solid #c5d4e8; border-radius: 8px;
+  }
+  .capa .sub { font-size: 12.5pt; color: #334155; margin-top: 8px; }
+  .capa .meta { font-size: 9.5pt; color: #64748b; margin-top: 14px; }
+  .formula-bloco {
+    font-family: ui-monospace, Consolas, monospace; background: #f1f5f9;
+    border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 12px; margin: 8px 0 12px;
+    font-size: 10.5pt; word-break: break-word;
+  }
+  .destaque { background: #fff8e6; border: 1px solid #f0d78c; border-radius: 6px; padding: 10px 12px; margin: 10px 0; }
+  .importante { background: #fef2f2; border: 1px solid #f5c2c7; border-radius: 6px; padding: 10px 12px; margin: 10px 0; }
+  .dica { background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px; padding: 10px 12px; margin: 10px 0; }
+  .sigla { font-weight: 700; font-family: ui-monospace, Consolas, monospace; color: #1e3a5f; }
+  .page-break { page-break-before: always; }
+  .toc a { color: #1e3a5f; text-decoration: none; }
+  .toc li { margin-bottom: 6px; }
+  .num { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+
+<div class="capa">
+  <h1 style="border:0;padding:0;margin:0 0 4px;">Cálculos do boletim</h1>
+  <div class="sub"><strong>Colégio Santa Maria</strong> — modelo de referência no EducaTudo</div>
+  <p class="sub" style="font-size:11pt;margin-top:12px;">
+    Guia em português claro: o que cada sigla significa, como a nota é calculada
+    e como montar a mesma regra na plataforma.
+  </p>
+  <div class="meta">EducaTudo · Evento de Notas / Montar quadro · Referência pedagógica SM</div>
+</div>
+
+<h2>Sumário</h2>
+<ol class="toc">
+  <li><a href="#visao">Visão geral do boletim SM</a></li>
+  <li><a href="#legenda">Legenda das siglas</a></li>
+  <li><a href="#mu">MU — Média da Unidade (bimestre)</a></li>
+  <li><a href="#ch">CH — 2ª chamada (substituta)</a></li>
+  <li><a href="#pj">PJ / Projeto (opcional) + se</a></li>
+  <li><a href="#ms">MS — Média do Semestre</a></li>
+  <li><a href="#ma">MA — Média Anual</a></li>
+  <li><a href="#mf">PF e MF — Prova Final e Média Final</a></li>
+  <li><a href="#rec">REC — Recuperação semestral</a></li>
+  <li><a href="#fal">FAL — Faltas</a></li>
+  <li><a href="#fluxo">Do bimestre ao ano (fluxo)</a></li>
+  <li><a href="#educatudo">Como montar no EducaTudo</a></li>
+  <li><a href="#erros">Erros comuns</a></li>
+</ol>
+
+<div class="page-break"></div>
+
+<h2 id="visao">1. Visão geral do boletim SM</h2>
+
+<p>
+O print do Colégio Santa Maria organiza o ano em <strong>dois semestres</strong>,
+cada um com <strong>dois bimestres</strong> (unidades). Em cada bimestre aparecem
+notas lançadas (PP, PU, CH, PE, FAL) e uma coluna <strong>calculada</strong> (MU).
+No fim do semestre entram REC e MS; no fim do ano, MA, PF, MF e Situação.
+</p>
+
+<div class="destaque">
+  <strong>Ideia central:</strong> o professor <em>lança</em> PP, PU, CH, PE, FAL, REC, PF.
+  O sistema <em>calcula</em> MU, MS, MA e MF com as fórmulas deste manual.
+</div>
+
+<p>Observação impressa no boletim SM de referência:</p>
+<div class="formula-bloco">O estudante que não atingir média semestral 7,0 (sete) deverá realizar a recuperação semestral.<br>MU = ((PP + PU) / 2) + PE</div>
+
+<h2 id="legenda">2. Legenda das siglas</h2>
+
+<table>
+  <thead>
+    <tr><th>Sigla</th><th>Nome</th><th>Tipo</th><th>Papel</th></tr>
+  </thead>
+  <tbody>
+    <tr><td class="sigla">PP</td><td>Prova Parcial</td><td>Lançada</td><td>Entra na média da MU</td></tr>
+    <tr><td class="sigla">PU</td><td>Prova de Unidade</td><td>Lançada</td><td>Entra na média da MU</td></tr>
+    <tr><td class="sigla">CH</td><td>2ª chamada</td><td>Lançada</td><td>Substitui a 1ª prova (PP ou PU) que faltar</td></tr>
+    <tr><td class="sigla">PE</td><td>Ponto Extra</td><td>Lançada</td><td>Soma <strong>depois</strong> da média (não divide junto)</td></tr>
+    <tr><td class="sigla">PJ</td><td>Projeto / opcional</td><td>Lançada</td><td>Só entra na média se houver nota (com se + média por grupos)</td></tr>
+    <tr><td class="sigla">MU</td><td>Média da Unidade</td><td><strong>Calculada</strong></td><td>Nota do bimestre</td></tr>
+    <tr><td class="sigla">FAL</td><td>Faltas</td><td>Lançada</td><td>Não entra na média de nota</td></tr>
+    <tr><td class="sigla">REC</td><td>Recuperação semestral</td><td>Lançada</td><td>Usada quando MS &lt; 7 (conforme regra da escola)</td></tr>
+    <tr><td class="sigla">MS</td><td>Média do Semestre</td><td><strong>Calculada</strong></td><td>Média das duas MUs do semestre</td></tr>
+    <tr><td class="sigla">MA</td><td>Média Anual</td><td><strong>Calculada</strong></td><td>Média das duas MS</td></tr>
+    <tr><td class="sigla">PF</td><td>Prova Final</td><td>Lançada</td><td>Prova de recuperação/fechamento anual</td></tr>
+    <tr><td class="sigla">MF</td><td>Média Final</td><td><strong>Calculada</strong></td><td>Fecha o ano (com ou sem PF)</td></tr>
+  </tbody>
+</table>
+
+<div class="page-break"></div>
+
+<h2 id="mu">3. MU — Média da Unidade (bimestre)</h2>
+
+<h3>3.1 Regra clássica do print SM</h3>
+<div class="formula-bloco">MU = ((PP + PU) ÷ 2) + PE</div>
+<p>Em português: média de PP e PU, depois some o ponto extra.</p>
+
+<table>
+  <thead>
+    <tr><th>PP</th><th>PU</th><th>PE</th><th>Conta</th><th>MU</th></tr>
+  </thead>
+  <tbody>
+    <tr class="num"><td>8,0</td><td>6,0</td><td>1,0</td><td>((8+6)÷2)+1</td><td><strong>8,0</strong></td></tr>
+    <tr class="num"><td>7,0</td><td>7,0</td><td>0,0</td><td>((7+7)÷2)+0</td><td><strong>7,0</strong></td></tr>
+    <tr class="num"><td>9,0</td><td>5,0</td><td>0,5</td><td>((9+5)÷2)+0,5</td><td><strong>7,5</strong></td></tr>
+  </tbody>
+</table>
+
+<div class="importante">
+  Sem PP ou sem PU (traço), a MU clássica fica incompleta.
+  Por isso a escola usa CH (2ª chamada) e, no EducaTudo, a função
+  <strong>nota substituta</strong> ou <strong>média ( provas | substituta )</strong>.
+</div>
+
+<h3>3.2 MU com CH (2ª chamada)</h3>
+<div class="formula-bloco">MU = nota substituta ( PP , PU , CH ) + PE</div>
+<p>Ou, equivalente com grupos:</p>
+<div class="formula-bloco">MU = média ( PP , PU | CH ) + PE</div>
+
+<table>
+  <thead>
+    <tr><th>PP</th><th>PU</th><th>CH</th><th>PE</th><th>O que acontece</th><th>MU</th></tr>
+  </thead>
+  <tbody>
+    <tr class="num"><td>8,0</td><td>6,0</td><td>—</td><td>1,0</td><td>CH ignorada</td><td><strong>8,0</strong></td></tr>
+    <tr class="num"><td>—</td><td>6,0</td><td>7,0</td><td>1,0</td><td>CH no lugar do PP</td><td><strong>7,5</strong></td></tr>
+    <tr class="num"><td>8,0</td><td>—</td><td>5,0</td><td>0,0</td><td>CH no lugar do PU</td><td><strong>6,5</strong></td></tr>
+    <tr class="num"><td>8,0</td><td>6,0</td><td>10,0</td><td>1,0</td><td>CH <em>não</em> sobe a média</td><td><strong>8,0</strong></td></tr>
+  </tbody>
+</table>
+
+<div class="dica">
+  A CH cobre <strong>só a primeira</strong> prova que faltar. Não é uma terceira nota “por cima”.
+  Não coloque ÷ 2 de novo depois de <em>nota substituta</em> — a média já está dentro.
+</div>
+
+<h2 id="ch">4. CH — detalhe da substituta</h2>
+<ul>
+  <li>Último argumento de <span class="formula-bloco" style="display:inline;padding:2px 6px;margin:0;">nota substituta (…)</span> = substituta.</li>
+  <li>No <span class="formula-bloco" style="display:inline;padding:2px 6px;margin:0;">média ( provas | CH )</span>, o 2º grupo depois do | é a substituta.</li>
+  <li>Se PP e PU existem, CH é ignorada.</li>
+</ul>
+
+<div class="page-break"></div>
+
+<h2 id="pj">5. PJ / Projeto (opcional) + condição se</h2>
+
+<p>
+Algumas turmas/eventos têm <strong>Projeto (PJ)</strong> opcional:
+se o aluno lançou PJ, a média passa a dividir por 3 (PP, PU e PJ);
+se não lançou, continua ÷ 2. A CH continua só nas provas; PE continua fora.
+</p>
+
+<div class="formula-bloco">MU = se ( PJ , média ( PP , PU | CH | PJ ) , média ( PP , PU | CH ) ) + PE</div>
+
+<p>Leitura:</p>
+<ol>
+  <li><strong>se ( PJ , … )</strong> — se tem nota em PJ, usa a 1ª conta; senão a 2ª. (Igual a <em>PJ = verdadeiro</em>.)</li>
+  <li>Dentro de <strong>média ( )</strong>, o <strong>|</strong> separa papéis pela <em>posição</em>:
+    <ul>
+      <li>1º = provas (PP, PU) — CH pode cobrir</li>
+      <li>2º = substituta (CH)</li>
+      <li>3º = opcional (PJ) — só se lançado; CH <strong>nunca</strong> cobre o PJ</li>
+    </ul>
+  </li>
+  <li><strong>+ PE</strong> — sempre soma depois.</li>
+</ol>
+
+<div class="importante">
+  <strong>Por que PJ fica depois do CH?</strong>
+  Porque o 3º grupo do | é o opcional. Não é “avaliar o aluno antes da média”.
+  Quem decide se tem PJ é o <em>se ( )</em> de fora.
+</div>
+
+<table>
+  <thead>
+    <tr><th>PP</th><th>PU</th><th>CH</th><th>PJ</th><th>PE</th><th>Conta efetiva</th><th>MU</th></tr>
+  </thead>
+  <tbody>
+    <tr class="num"><td>8</td><td>6</td><td>—</td><td>—</td><td>1</td><td>((8+6)÷2)+1</td><td><strong>8,0</strong></td></tr>
+    <tr class="num"><td>8</td><td>6</td><td>—</td><td>9</td><td>1</td><td>((8+6+9)÷3)+1</td><td><strong>8,67</strong></td></tr>
+    <tr class="num"><td>—</td><td>6</td><td>7</td><td>9</td><td>0</td><td>((7+6+9)÷3)+0</td><td><strong>7,33</strong></td></tr>
+  </tbody>
+</table>
+
+<h2 id="ms">6. MS — Média do Semestre</h2>
+
+<p>Cada semestre tem duas unidades (duas MUs).</p>
+<div class="formula-bloco">MS 1º = ( MU do 1º bim + MU do 2º bim ) ÷ 2<br>MS 2º = ( MU do 3º bim + MU do 4º bim ) ÷ 2</div>
+
+<table>
+  <thead>
+    <tr><th>MU1</th><th>MU2</th><th>MS</th></tr>
+  </thead>
+  <tbody>
+    <tr class="num"><td>8,0</td><td>6,0</td><td><strong>7,0</strong></td></tr>
+    <tr class="num"><td>7,0</td><td>7,0</td><td><strong>7,0</strong></td></tr>
+    <tr class="num"><td>5,0</td><td>9,0</td><td><strong>7,0</strong></td></tr>
+  </tbody>
+</table>
+
+<div class="destaque">
+  Regra SM: se a média semestral for menor que <strong>7,0</strong>, o aluno deve fazer a
+  <strong>recuperação semestral (REC)</strong>.
+</div>
+
+<div class="page-break"></div>
+
+<h2 id="ma">7. MA — Média Anual</h2>
+<div class="formula-bloco">MA = ( MS 1º + MS 2º ) ÷ 2</div>
+<table>
+  <thead><tr><th>MS 1º</th><th>MS 2º</th><th>MA</th></tr></thead>
+  <tbody>
+    <tr class="num"><td>7,0</td><td>8,0</td><td><strong>7,5</strong></td></tr>
+    <tr class="num"><td>6,0</td><td>6,0</td><td><strong>6,0</strong></td></tr>
+  </tbody>
+</table>
+
+<h2 id="mf">8. PF e MF — Prova Final e Média Final</h2>
+
+<p>
+<strong>PF</strong> é lançada (prova final / recuperação anual, conforme o layout).
+<strong>MF</strong> fecha o ano.
+</p>
+
+<p>Padrão frequente no EducaTudo para “se tiver PF, soma com MA; senão fica MA”:</p>
+<div class="formula-bloco">MF = se ( PF , MA + PF , MA )</div>
+
+<p>Outra forma comum (média com recuperação / composição):</p>
+<div class="formula-bloco">MF = média c/ rec ( MA , PF )</div>
+<p>Sem PF → fica MA. Com PF → (MA + PF) ÷ 2.</p>
+
+<table>
+  <thead><tr><th>MA</th><th>PF</th><th>se (PF, MA+PF, MA)</th><th>média c/ rec (MA, PF)</th></tr></thead>
+  <tbody>
+    <tr class="num"><td>7,0</td><td>—</td><td><strong>7,0</strong></td><td><strong>7,0</strong></td></tr>
+    <tr class="num"><td>6,0</td><td>8,0</td><td><strong>14,0</strong>*</td><td><strong>7,0</strong></td></tr>
+  </tbody>
+</table>
+<p style="font-size:9.5pt;color:#64748b;">
+  * Se usar MA + PF, ajuste o <strong>valor máximo</strong> da coluna (ex.: 20) ou prefira média c/ rec / outra regra da escola.
+  Confirme sempre a regra pedagógica impressa no boletim da unidade.
+</p>
+
+<h2 id="rec">9. REC — Recuperação semestral</h2>
+<p>
+No quadro SM, REC aparece junto de cada semestre.
+Quando a MS fica abaixo de 7,0, o aluno faz a recuperação.
+No editor, use <strong>média c/ rec</strong> se a REC deve entrar só quando existir:
+</p>
+<div class="formula-bloco">média c/ rec ( MS , REC )</div>
+<ul>
+  <li>Sem REC → fica a MS</li>
+  <li>Com REC → (MS + REC) ÷ 2</li>
+</ul>
+
+<h2 id="fal">10. FAL — Faltas</h2>
+<p>
+FAL é lançamento de frequência. <strong>Não entra</strong> na média de PP/PU/MU.
+Aparece no boletim para vida escolar / frequência.
+</p>
+
+<div class="page-break"></div>
+
+<h2 id="fluxo">11. Do bimestre ao ano (fluxo)</h2>
+<ol>
+  <li><strong>Bimestre:</strong> lança PP, PU, (CH), PE, FAL → calcula <strong>MU</strong></li>
+  <li><strong>Semestre:</strong> duas MUs → <strong>MS</strong>; se MS &lt; 7 → <strong>REC</strong></li>
+  <li><strong>Ano:</strong> duas MS → <strong>MA</strong>; se preciso → <strong>PF</strong> → <strong>MF</strong> e Situação</li>
+</ol>
+
+<div class="caixa" style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:10px 12px;">
+  <strong>Mapa rápido</strong><br>
+  PP + PU (+ CH) (+ PJ) + PE → <em>MU</em><br>
+  MU + MU → <em>MS</em><br>
+  MS + MS → <em>MA</em><br>
+  MA (+ PF) → <em>MF</em>
+</div>
+
+<h2 id="educatudo">12. Como montar no EducaTudo</h2>
+<ol>
+  <li>Abra o evento de notas → passo de aparência / cálculo.</li>
+  <li>Clique no bloco amarelo da coluna (ex.: <strong>MU</strong>).</li>
+  <li>Use os chips (PP, PU, CH, PE, PJ…) e os sinais, ou peça no assistente em português.</li>
+  <li>Fórmulas prontas úteis:
+    <ul>
+      <li><em>Média com nota substituta</em> + depois <strong>+ PE</strong></li>
+      <li><em>Provas | substituta | opcional + PE</em> e/ou <em>Se lançou</em></li>
+    </ul>
+  </li>
+  <li>Confira a linha: deve bater com este manual.</li>
+  <li><strong>Salvar bloco</strong>. Pode ocultar PP/PU/CH/PE no print e deixar só MU — o cálculo continua.</li>
+</ol>
+
+<div class="dica">
+  Exemplos prontos no assistente / editor:<br>
+  <span class="formula-bloco" style="display:block;">MU = nota substituta ( PP , PU , CH ) + PE</span>
+  <span class="formula-bloco" style="display:block;">MU = se ( PJ , média ( PP , PU | CH | PJ ) , média ( PP , PU | CH ) ) + PE</span>
+  <span class="formula-bloco" style="display:block;">MS = ( MU1 + MU2 ) ÷ 2</span>
+  <span class="formula-bloco" style="display:block;">MA = ( MS1 + MS2 ) ÷ 2</span>
+  <span class="formula-bloco" style="display:block;">MF = se ( PF , MA + PF , MA )</span>
+</div>
+
+<h2 id="erros">13. Erros comuns</h2>
+<table>
+  <thead><tr><th>Erro</th><th>Efeito</th><th>Correto</th></tr></thead>
+  <tbody>
+    <tr><td>Esquecer + PE na MU</td><td>MU só com a média</td><td>Some PE depois</td></tr>
+    <tr><td>÷ 2 depois de nota substituta</td><td>Nota pela metade</td><td>A função já divide</td></tr>
+    <tr><td>Somar CH como 3ª prova</td><td>CH “puxa” mesmo com PP e PU</td><td>Usar substituta / |</td></tr>
+    <tr><td>| fora de média ( )</td><td>Conta inválida</td><td>| só dentro de média</td></tr>
+    <tr><td>PJ no meio das provas sem se</td><td>PJ vira prova obrigatória</td><td>se + 3º grupo do |</td></tr>
+    <tr><td>REC com + comum e traço</td><td>Ausente vira 0</td><td>média c/ rec</td></tr>
+  </tbody>
+</table>
+
+<p style="margin-top:28px;font-size:9.5pt;color:#64748b;">
+  Referência: print e legenda do Colégio Santa Maria no EducaTudo
+  (<em>QuadroBoletimSantaMariaService</em>: MU = ((PP+PU)/2)+PE; recuperação se MS &lt; 7).
+  Extensões CH / PJ / se alinhadas ao motor de fórmulas do Evento de Notas.
+</p>
+
+</body>
+</html>

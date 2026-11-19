@@ -49,8 +49,14 @@ class ClassController extends BaseController
         $page = max(1, (int)($_GET['page'] ?? 1));
         $offset = ($page - 1) * $perPage;
 
-        $totalTurmasGeral = $this->turmaModel->countAll();
-        $turmas = $this->turmaModel->getAll($perPage, $offset);
+        $filtros = [
+            'ano_letivo_id' => max(0, (int) ($_GET['ano_letivo_id'] ?? 0)),
+            'serie_id' => max(0, (int) ($_GET['serie_id'] ?? 0)),
+            'curso_novo_id' => max(0, (int) ($_GET['curso_id'] ?? $_GET['curso_novo_id'] ?? 0)),
+        ];
+
+        $totalTurmasFiltrado = $this->turmaModel->countAll($filtros);
+        $turmas = $this->turmaModel->getAll($perPage, $offset, $filtros);
 
         // Adicionar contagem de alunos para cada turma
         $vagaSvc = null;
@@ -63,29 +69,30 @@ class ClassController extends BaseController
             $turma['total_alunos'] = $this->turmaModel->countStudents($turma['id']);
             $turma['vagas_resumo'] = $vagaSvc ? $vagaSvc->resumo((int) $turma['id']) : null;
         }
+        unset($turma);
 
-        // Estatísticas do total geral (não só da página atual) — soma via o
-        // mesmo resolver usado por turma, evita assumir o schema de matrícula.
-        $statsRow = $this->db->fetch(
-            "SELECT COUNT(*) AS total_turmas, COUNT(CASE WHEN ativo = 1 THEN 1 END) AS turmas_ativas FROM turmas"
-        );
-        $todasTurmasIds = $this->db->fetchAll("SELECT id FROM turmas");
-        $totalAlunosGeral = 0;
-        foreach ($todasTurmasIds as $t) {
-            $totalAlunosGeral += $this->turmaModel->countStudents((int)$t['id']);
+        // Estatísticas do conjunto filtrado (não só da página atual).
+        $turmasFiltradas = $this->turmaModel->getAll(null, 0, $filtros);
+        $turmasAtivas = 0;
+        $totalAlunosFiltrado = 0;
+        foreach ($turmasFiltradas as $t) {
+            if (!empty($t['ativo'])) {
+                $turmasAtivas++;
+            }
+            $totalAlunosFiltrado += $this->turmaModel->countStudents((int) $t['id']);
         }
         $statsTurmas = [
-            'total_turmas' => (int)($statsRow['total_turmas'] ?? 0),
-            'turmas_ativas' => (int)($statsRow['turmas_ativas'] ?? 0),
-            'total_alunos' => $totalAlunosGeral,
-            'media_alunos' => $totalTurmasGeral > 0 ? round($totalAlunosGeral / $totalTurmasGeral, 1) : 0,
+            'total_turmas' => $totalTurmasFiltrado,
+            'turmas_ativas' => $turmasAtivas,
+            'total_alunos' => $totalAlunosFiltrado,
+            'media_alunos' => $totalTurmasFiltrado > 0 ? round($totalAlunosFiltrado / $totalTurmasFiltrado, 1) : 0,
         ];
 
         $pagination = [
-            'total' => $totalTurmasGeral,
+            'total' => $totalTurmasFiltrado,
             'per_page' => $perPage,
             'page' => $page,
-            'total_pages' => $perPage > 0 ? (int)ceil($totalTurmasGeral / $perPage) : 1,
+            'total_pages' => $perPage > 0 ? (int) ceil($totalTurmasFiltrado / $perPage) : 1,
         ];
 
         $cursosNovo = $this->turmaModel->supportsCursoNovo() ? $this->turmaModel->getCursosNovo() : [];
@@ -108,6 +115,16 @@ class ClassController extends BaseController
             );
         }
 
+        $anosFiltro = $this->turmaModel->getAnosLetivoNovo();
+        try {
+            $todosAnos = $this->db->fetchAll('SELECT id, ano FROM ano_letivo ORDER BY ano DESC') ?: [];
+            if ($todosAnos !== []) {
+                $anosFiltro = $todosAnos;
+            }
+        } catch (\Throwable $e) {
+            // Mantém só os ativos do formulário.
+        }
+
         $data = [
             'title' => 'Gerenciar Turmas - EducaTudo',
             'user' => $user,
@@ -120,10 +137,13 @@ class ClassController extends BaseController
             'cursos' => $this->getCursos(),
             'cursosNovo' => $cursosNovo,
             'seriesPorCurso' => $seriesPorCurso,
+            'seriesNovo' => $seriesNovo,
             'matrizesPorSerie' => $this->matrizesPorSerie($matrizesEmUso),
             'anosLetivo' => $this->turmaModel->getAnosLetivoNovo(),
+            'anosFiltro' => $anosFiltro,
             'salas' => (new Sala())->getAll(true),
             'ano_letivo_id' => $anoLetivoId,
+            'filtros' => $filtros,
         ];
 
         $this->viewWithLayout('admin', 'admin/turmas/index', $data);

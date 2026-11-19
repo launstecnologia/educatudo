@@ -42,6 +42,7 @@
             "App\\Modulos\\CensoEscolar\\": "app/Modulos/censo-escolar/",
             "App\\Modulos\\ConselhoClasse\\": "app/Modulos/conselho-classe/",
             "App\\Modulos\\Diario\\": "app/Modulos/diario/",
+            "App\\Modulos\\EducaSync\\": "app/Modulos/educasync/",
             "App\\Modulos\\Ocorrencias\\": "app/Modulos/ocorrencias/",
             "App\\Modulos\\RegrasAcademicas\\": "app/Modulos/regras-academicas/",
             "App\\Modulos\\DashboardGestao\\": "app/Modulos/dashboard-gestao/",

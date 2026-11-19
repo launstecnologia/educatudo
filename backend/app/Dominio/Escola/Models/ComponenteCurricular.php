@@ -132,15 +132,14 @@ class ComponenteCurricular
             if ($id <= 0) {
                 continue;
             }
+            // Só raízes: desdobramentos entram sob o pai no formulário da matriz.
             if ((int) ($c['pai_id'] ?? 0) > 0) {
                 continue;
             }
-            $ehRotulo = isset($idsComFilhos[$id]);
-            $c['eh_rotulo'] = $ehRotulo;
-            $permiteAvaliacao = !isset($c['permite_avaliacao']) || (int) $c['permite_avaliacao'] === 1;
-            if ($ehRotulo || $permiteAvaliacao) {
-                $out[] = $c;
-            }
+            $c['eh_rotulo'] = isset($idsComFilhos[$id]);
+            // Inclui também raízes com permite_avaliacao=0 (ex.: Matemática/História
+            // do catálogo clássico) — senão o select do offcanvas fica vazio na edição.
+            $out[] = $c;
         }
         return $out;
     }

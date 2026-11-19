@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>EducaTudo — Etapas do painel</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm 18mm 15mm;
+    @bottom-center { content: "EducaTudo  ·  Etapas do painel  ·  " counter(page); font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 8.5pt; color: #6b7280; } }
+  @page :first { margin: 0; @bottom-center { content: none; } }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; color: #1c2430; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10.5pt; line-height: 1.42; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  h1, h2, h3 { margin: 0; line-height: 1.2; break-after: avoid; page-break-after: avoid; }
+  p { margin: 0 0 7px; }
+  h2 { font-size: 15.5pt; color: #1e1b4b; margin: 0 0 2.5mm; padding-bottom: 1.6mm; border-bottom: 2px solid #1e1b4b; }
+  .etapa { break-inside: avoid; page-break-inside: avoid; margin: 0 0 7mm; }
+  .sintese { background: #eef2ff; border-left: 3.5px solid #4f46e5; padding: 3.2mm 4mm; margin: 0 0 2.5mm; border-radius: 0 2mm 2mm 0; }
+  .sintese strong { display: block; font-size: 8.5pt; letter-spacing: .12em; text-transform: uppercase; color: #4338ca; margin-bottom: 1mm; }
+  ul { margin: 0; padding: 0; list-style: none; }
+  li { display: grid; grid-template-columns: 46mm 1fr; gap: 3mm; padding: 1.5mm 0; border-bottom: 1px solid #e5e7eb; break-inside: avoid; }
+  li b { color: #1e1b4b; }
+  .capa { height: 297mm; background: #0f3d4c; color: #fff; padding: 22mm 18mm 18mm; display: flex; flex-direction: column; page-break-after: always; position: relative; overflow: hidden; }
+  .capa::after { content: ""; position: absolute; right: -40mm; bottom: -30mm; width: 140mm; height: 140mm; border-radius: 50%; background: rgba(255,255,255,.06); }
+  .marca { font-size: 11pt; letter-spacing: .18em; text-transform: uppercase; color: #99f6e4; font-weight: 650; }
+  .capa h1 { margin-top: 26mm; font-size: 36pt; letter-spacing: -.03em; max-width: 155mm; }
+  .capa .sub { margin-top: 8mm; font-size: 14pt; max-width: 150mm; color: #ccfbf1; }
+  .faixa { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4mm; position: relative; z-index: 1; }
+  .faixa > div { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); border-radius: 4mm; padding: 5mm 4.5mm; }
+  .faixa .k { font-size: 8pt; letter-spacing: .12em; text-transform: uppercase; color: #99f6e4; margin-bottom: 2mm; }
+  .faixa .v { font-size: 12.5pt; font-weight: 650; }
+  .rodape-capa { margin-top: 8mm; font-size: 9.5pt; color: #a7f3d0; position: relative; z-index: 1; }
+</style>
+</head>
+<body>
+
+<section class="capa">
+  <div class="marca">EducaTudo · Documentação de produto</div>
+  <h1>Etapas do painel</h1>
+  <p class="sub">Uma síntese de cada bloco do menu da escola, na ordem em que o ano se monta e se encerra.</p>
+  <div class="faixa">
+    <div><div class="k">Montar</div><div class="v">Acadêmico</div></div>
+    <div><div class="k">Conduzir</div><div class="v">Rotina</div></div>
+    <div><div class="k">Encerrar</div><div class="v">Fechamento</div></div>
+  </div>
+  <p class="rodape-capa">Novembro de 2026 · Acadêmico, Rotina, Fechamento, Comunicação, Secretaria, Documentos, Usuários e Assistente</p>
+</section>
+
+<section class="etapa">
+  <h2>Acadêmico · Estrutura</h2>
+  <div class="sintese">
+    <strong>Síntese</strong>
+    A escola descreve o ano uma vez. O ano letivo diz quanto tempo dura e se o período é bimestre, trimestre ou semestre. Curso, série, componente e matriz dizem o que se estuda. O calendário diz quais dias contam como aula. Sem esta etapa, turma, nota e frequência não têm onde se apoiar.
+  </div>
+  <ul>
+    <li><b>Ano Letivo</b><span>Abre o ano, com datas e a divisão em períodos. Prova, boletim e fechamento usam esta divisão.</span></li>
+    <li><b>Cursos e Séries</b><span>O percurso. Fundamental e Médio convivem. Curso com progressão anual precisa de série.</span></li>
+    <li><b>Componentes Curriculares</b><span>As disciplinas. “Permite avaliação” marca quem recebe nota.</span></li>
+    <li><b>Matriz Curricular</b><span>Quais disciplinas da série entram no boletim, e com qual carga horária.</span></li>
+    <li><b>Calendário Letivo</b><span>Dias letivos, feriados, recesso e as datas de avaliação. A frequência pula o que não é dia de aula.</span></li>
+  </ul>
+</section>
+
+<section class="etapa">
+  <h2>Acadêmico · Pessoas e turmas</h2>
+  <div class="sintese">
+    <strong>Síntese</strong>
+    Aqui a estrutura ganha gente. Professor, sala, turma e aluno matriculado formam a sala de aula daquele ano. A grade horária diz quem dá qual disciplina, em qual dia e horário. O diário abre a aula a partir dessa grade. Cadastrar o aluno guarda a pessoa. Matricular coloca essa pessoa na turma: sem matrícula ativa, ele fica de fora da chamada, da nota e do boletim.
+  </div>
+  <ul>
+    <li><b>Professores</b><span>Quem leciona, e em quais turmas e disciplinas. Esse vínculo abre o diário e o lançamento de nota.</span></li>
+    <li><b>Salas / Ambientes</b><span>Onde a aula acontece. Turma e grade apontam para uma sala.</span></li>
+    <li><b>Turmas</b><span>O grupo do ano: curso, série, ano letivo e matriz. O fechamento é por turma e período.</span></li>
+    <li><b>Alunos</b><span>O cadastro da pessoa e a matrícula na turma. Remanejamento e transferência mudam esse vínculo.</span></li>
+    <li><b>Grade Horária</b><span>Professor, disciplina, turma, dia e horário. É o mapa que o diário usa para abrir a chamada.</span></li>
+  </ul>
+</section>
+
+<section class="etapa">
+  <h2>Acadêmico · Como a escola avalia</h2>
+  <div class="sintese">
+    <strong>Síntese</strong>
+    A regra diz o que é ser aprovado naquele ano e naquele curso: média, frequência, escala e recuperação. O evento avaliativo é a prova ou o trabalho do período; a nota entra no subevento. O demonstrativo é a conta ao vivo, para a coordenação conferir. O boletim é o documento oficial, gravado quando a escola gera o período. O relatório só imprime o que já foi calculado. Alterar a regra de 2026 preserva 2025.
+  </div>
+  <ul>
+    <li><b>Regras de Aprovação</b><span>Média mínima, frequência, arredondamento, quem vê o documento e como a recuperação entra na nota.</span></li>
+    <li><b>Eventos Avaliativos</b><span>Um card por período do ano letivo. Prova online ou nota informada pela escola, por turma e disciplina.</span></li>
+    <li><b>Demonstrativo de notas</b><span>O quadro do período, atualizado a cada lançamento. Ainda não é o documento da vida escolar.</span></li>
+    <li><b>Boletim</b><span>O documento oficial. Ao gerar, calcula a média, aplica a regra e grava o resultado do aluno.</span></li>
+    <li><b>Relatórios</b><span>A impressão do boletim ou do demonstrativo já prontos.</span></li>
+  </ul>
+</section>
+
+<section class="etapa">
+  <h2>Rotina · O dia a dia</h2>
+  <div class="sintese">
+    <strong>Síntese</strong>
+    Entre o início do período e o fechamento, a rotina registra o que aconteceu em sala. O diário é a aula do dia: chamada e o que foi dado. A frequência da aprovação sai dessa chamada. A presença da portaria, quando a escola usa, registra entrada e saída, e não substitui a falta da aula. A ocorrência documenta um fato do aluno e não altera nota nem falta. Chamada vencida sem diário impede homologar a turma.
+  </div>
+  <ul>
+    <li><b>Diário de Classe</b><span>A aula prevista na grade, naquela data. O professor faz a chamada e registra se a aula ocorreu como o planejado.</span></li>
+    <li><b>Frequência</b><span>As faltas da chamada, por aluno, turma e disciplina. Se a escola usa portaria, a entrada e a saída também aparecem aqui.</span></li>
+    <li><b>Ocorrências</b><span>Atraso, advertência, encaminhamento ou observação. O conselho lê isso junto com nota e frequência.</span></li>
+  </ul>
+</section>
+
+<section class="etapa">
+  <h2>Fechamento · Fim de período</h2>
+  <div class="sintese">
+    <strong>Síntese</strong>
+    Fechar é tornar oficial o resultado da turma naquele período. O caminho é aberto, em fechamento e homologado. Se ainda há recuperação ou exame, o período espera o desfecho de cada aluno. Homologado trava a edição: corrigir exige retificação, com justificativa, e o registro anterior permanece. O conselho delibera sobre o resultado da turma e não reescreve a nota lançada nem a falta da chamada. Ata, ficha e histórico saem depois da homologação.
+  </div>
+  <ul>
+    <li><b>Painel de Fechamento</b><span>Uma linha por turma: estado, alunos, frequência, quem está em recuperação e as pendências. Homologar congela o que o boletim já calculou.</span></li>
+    <li><b>Conselho de Classe</b><span>A sessão da turma. Nota, frequência e ocorrências na mesma ficha. A decisão pode ser aprovado, aprovado pelo conselho, recuperação ou retido.</span></li>
+  </ul>
+</section>
+
+<section class="etapa">
+  <h2>Comunicação</h2>
+  <div class="sintese">
+    <strong>Síntese</strong>
+    A comunicação leva para aluno e família o que a escola precisa avisar, sem mexer em nota nem em matrícula. O comunicado pode pedir leitura. O aviso entra na agenda. O mural é o recado da turma. A reunião marca o encontro com o responsável. Quem publicou acompanha o que já foi lido.
+  </div>
+  <ul>
+    <li><b>Comunicação Escolar</b><span>Recado individual ou para a turma, com anexo e confirmação de leitura.</span></li>
+    <li><b>Avisos à família</b><span>Datas e avisos que aluno e responsável veem na agenda: prova, evento, feriado.</span></li>
+    <li><b>Mural de Recados</b><span>O aviso fixado para as turmas. Professor publica para as turmas dele; a escola, para qualquer turma.</span></li>
+    <li><b>Reuniões</b><span>O encontro com a família, com data e pauta, para a secretaria e a coordenação organizarem o atendimento.</span></li>
+  </ul>
+</section>
+
+<section class="etapa">
+  <h2>Secretaria</h2>
+  <div class="sintese">
+    <strong>Síntese</strong>
+    A secretaria guarda o rastro do aluno e emite o papel. A movimentação muda a turma ou registra a saída. A carteirinha identifica. Os documentos são as declarações e os arquivos já gerados. O censo reaproveita o cadastro e, na exportação, gera o TXT que a escola envia ao Educacenso. O relatório completo cruza o recorte de alunos com cadastro, nota, frequência e aprendizagem, e baixa isso em Excel ou PDF.
+  </div>
+  <ul>
+    <li><b>Censo Escolar</b><span>Reaproveita aluno, turma e matrícula e pede só o que falta. Em Exportações, Gerar TXT cria o arquivo de importação da Matrícula Inicial (o que a escola sobe no Educacenso). Se houver aluno sem código INEP, sai junto o TXT de identificação. O botão fica bloqueado enquanto o leiaute oficial da edição não estiver carregado ou houver pendência no cadastro. Cada geração é uma versão nova: o TXT anterior continua disponível para baixar.</span></li>
+    <li><b>Movimentação de alunos</b><span>Remanejamento entre turmas e transferência. O vínculo muda e fica registrado na ficha.</span></li>
+    <li><b>Carteirinha</b><span>A identificação do aluno para portaria e uso na escola.</span></li>
+    <li><b>Documentos</b><span>Declarações sob demanda e os arquivos que a secretaria já emitiu, para baixar de novo.</span></li>
+    <li><b>Relatório completo</b><span>A secretaria escolhe o ano, a turma ou um aluno e marca o que entra no arquivo. Cada banco vira uma aba no Excel e uma seção no PDF. No cadastro vão dados, ficha, responsáveis, matrícula, documentos entregues e a lista de chamada. No acadêmico, as notas do boletim e o resultado do fechamento. Na rotina, a frequência, cada falta e as ocorrências. Na aprendizagem, redação, prova online e exercício. Senha e o texto da redação ficam de fora. O arquivo gerado continua em Documentos.</span></li>
+  </ul>
+</section>
+
+<section class="etapa">
+  <h2>Usuários</h2>
+  <div class="sintese">
+    <strong>Síntese</strong>
+    Usuários define quem entra no painel da escola e o que cada um pode ver. Administrador opera o ano, com o papel que o perfil permitir: direção, coordenação, secretaria. Monitor acompanha a sala em tempo real e não lança nota nem mexe em cadastro. O perfil de permissão é a lista do que cada papel visualiza e altera. Professor e aluno têm o próprio acesso, fora desta lista.
+  </div>
+  <ul>
+    <li><b>Administradores</b><span>As contas do painel da escola e o papel de cada uma.</span></li>
+    <li><b>Monitores</b><span>Quem supervisiona a sala. O acesso é de acompanhamento.</span></li>
+    <li><b>Perfis de Permissão</b><span>O que cada papel pode abrir e gravar. É o que recorta o menu de uma coordenação e o de uma secretaria.</span></li>
+  </ul>
+</section>
+
+<section class="etapa">
+  <h2>Documentos Institucionais</h2>
+  <div class="sintese">
+    <strong>Síntese</strong>
+    Aqui ficam os papéis da instituição e a forma como a escola imprime. O arquivo guarda o PPP, o regimento e os demais oficiais, cada um com versão. O layout define o papel timbrado e o modelo de declaração, contrato e documento oficial. A secretaria emite em cima desse modelo. Mudar o layout não altera um arquivo que já foi baixado.
+  </div>
+  <ul>
+    <li><b>Documentos Institucionais</b><span>PPP, regimento escolar, plano de curso, calendário e outros oficiais. Cada envio tem título, versão e o arquivo para baixar de novo.</span></li>
+    <li><b>Layout de documentos</b><span>O papel timbrado da escola — logo, cabeçalho, rodapé e assinatura — e os modelos de declaração, histórico e demais papéis. O PDF sai com a mesma folha montada aqui.</span></li>
+  </ul>
+</section>
+
+<section class="etapa">
+  <h2>Assistente</h2>
+  <div class="sintese">
+    <strong>Síntese</strong>
+    O assistente responde a direção e à coordenação sobre aluno, turma e professor: nota, boletim, ocorrência, diário em atraso e a aula do dia. A conversa consulta o que já está no ano. Quando o pedido é um registro — ocorrência, entrada ou saída na portaria, chamada da aula — ele mostra a proposta e só grava depois da confirmação.
+  </div>
+  <ul>
+    <li><b>Assistente</b><span>O chat da escola. Cada conversa fica salva, e um novo chat separa um assunto do outro.</span></li>
+  </ul>
+</section>
+
+</body>
+</html>

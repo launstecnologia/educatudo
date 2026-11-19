@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>EducaTudo — Censo Escolar</title>
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #475569;
+      --line: #e2e8f0;
+      --soft: #f8fafc;
+      --brand: #1d4ed8;
+      --brand-soft: #dbeafe;
+    }
+    * { box-sizing: border-box; }
+    @page { size: A4; margin: 14mm 14mm 16mm; }
+    html, body {
+      margin: 0;
+      color: var(--ink);
+      background: white;
+      font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+      font-size: 12px;
+      line-height: 1.45;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    h1, h2 { margin: 0; line-height: 1.2; }
+    h1 { font-size: 26px; letter-spacing: -0.03em; margin: 4px 0 6px; }
+    h2 {
+      font-size: 14px;
+      margin: 14px 0 6px;
+      padding-bottom: 3px;
+      border-bottom: 2px solid var(--brand-soft);
+      page-break-after: avoid;
+    }
+    p { margin: 0 0 6px; }
+    .kicker {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--brand);
+    }
+    .lead { font-size: 13.5px; color: #1e293b; }
+    .muted { color: var(--muted); font-size: 11px; }
+    table { width: 100%; border-collapse: collapse; margin: 4px 0 8px; page-break-inside: avoid; }
+    th, td { text-align: left; vertical-align: top; padding: 5px 8px; border-bottom: 1px solid var(--line); }
+    th { background: var(--soft); font-size: 11px; color: #334155; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 6px 0 4px; }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 10px;
+      page-break-inside: avoid;
+      background: white;
+    }
+    .card strong { display: block; margin-bottom: 2px; }
+    .card.blue { background: #eff6ff; border-color: #bfdbfe; }
+    .card.green { background: #f0fdfa; border-color: #99f6e4; }
+    .note {
+      background: var(--soft);
+      border-left: 3px solid var(--brand);
+      padding: 7px 10px;
+      margin: 6px 0 2px;
+      page-break-inside: avoid;
+    }
+    ol { margin: 2px 0 6px; padding-left: 18px; }
+    li { margin: 2px 0; }
+    code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 11px; }
+    .quebra { page-break-before: always; }
+    .footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      font-size: 9px;
+      color: #94a3b8;
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="footer">
+    <span>EducaTudo</span>
+    <span>Censo Escolar</span>
+  </div>
+
+  <div class="kicker">EducaTudo</div>
+  <h1>Censo Escolar</h1>
+  <p class="lead">A escola declara ao INEP quem estuda e quem trabalha nela. O EducaTudo monta o arquivo. A secretaria baixa e envia no Educacenso.</p>
+  <p class="muted">Novembro de 2026 · Admin → Censo Escolar</p>
+
+  <h2>O que a secretaria faz</h2>
+  <ol>
+    <li>Abre a edição do ano, na <strong>Matrícula Inicial</strong>.</li>
+    <li>Sincroniza. O sistema traz as turmas daquele ano letivo, os alunos ativos dessas turmas e os professores da grade.</li>
+    <li>Confere a data de referência e completa o que o INEP pede e ainda está vazio.</li>
+    <li>Corrige os erros. Com erro impeditivo, o botão de gerar arquivo fica desligado.</li>
+    <li>Gera o TXT, baixa em Exportações e importa no Educacenso.</li>
+  </ol>
+
+  <h2>Quem entra na declaração</h2>
+  <p>A edição é de um <strong>ano letivo</strong>. Entram as turmas desse ano. Entram os alunos ativos vinculados a essas turmas, cada um com a matrícula da turma em que está. Entram os professores que aparecem na grade dessas turmas. Se a edição for de uma unidade, só entra essa unidade.</p>
+  <div class="note">
+    A <strong>data de referência</strong> é o dia da fotografia do Censo: quem a escola declara naquele dia. No painel ela aparece como Referência (em 2026, 28/05/2026). O sistema sugere 28 de maio do ano da edição. Dá para mudar em Configuração.
+  </div>
+  <p>A lista não se corta sozinha por essa data. Quem saiu antes, ou não deve ser declarado, a secretaria tira na matrícula ou no vínculo, em <strong>Incluir na exportação → Não</strong>. A pessoa continua no cadastro da escola.</p>
+
+  <h2>Os dois TXT</h2>
+  <div class="grid">
+    <div class="card blue">
+      <strong>Importação — entra no Educacenso</strong>
+      Nome <code>mi2026_v1.txt</code>. Cada nova geração vira v2, v3, sem apagar a anterior. Campos separados por <code>|</code>. A última linha é <code>99|</code>.
+    </div>
+    <div class="card green">
+      <strong>Identificação — aluno sem código INEP</strong>
+      Nome <code>id2026_v1.txt</code>. Só é criado se algum aluno do arquivo ainda não tem o código de 12 dígitos. Leva nome, nascimento, filiação e município.
+    </div>
+  </div>
+  <table>
+    <thead>
+      <tr><th>Linha</th><th>O que é</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>00 e 10</td><td>A escola: identificação e infraestrutura</td></tr>
+      <tr><td>20</td><td>As turmas</td></tr>
+      <tr><td>30</td><td>Alunos, professores e gestores</td></tr>
+      <tr><td>40</td><td>Quem é o gestor</td></tr>
+      <tr><td>50</td><td>Qual professor está em qual turma</td></tr>
+      <tr><td>60</td><td>Qual aluno está matriculado em qual turma</td></tr>
+      <tr><td>99</td><td>Fim do arquivo</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="quebra">Enviar ao Educacenso</h2>
+  <ol>
+    <li>Em Exportações, baixe o TXT de importação da versão que acabou de gerar.</li>
+    <li>No Educacenso, abra a migração da <strong>Matrícula Inicial</strong> daquele ano e importe o arquivo.</li>
+    <li>Se o site pedir a identificação dos alunos novos, envie também o TXT de identificação.</li>
+  </ol>
+
+  <h2>Se o arquivo for recusado</h2>
+  <p>O Educacenso devolve a crítica (qual linha e qual campo). A secretaria corrige no EducaTudo, em Pendências ou na aba da pessoa, gera de novo e importa a versão nova. A versão anterior continua na lista, com data e quantidade de linhas, para saber qual arquivo foi o enviado.</p>
+  <p>Erro impeditivo o EducaTudo já segura antes do download. Alerta de pessoa sem código INEP não segura: esse código o Educacenso cria na identificação.</p>
+
+  <h2>Como conferir que deu certo</h2>
+  <ol>
+    <li>Na visão geral, os blocos usados estão completos e os erros impeditivos estão em zero.</li>
+    <li>O Educacenso aceita o arquivo, sem crítica pendente.</li>
+    <li>Quando o Educacenso devolver os códigos INEP, a secretaria sobe esse retorno em <strong>Retornos</strong>, confere e só então grava o código no aluno. O sistema não aplica o código sozinho.</li>
+  </ol>
+  <p>O botão <strong>CSV auxiliar</strong> baixa uma planilha para olhar os alunos no Excel. Esse CSV não entra no Educacenso. O arquivo oficial é o TXT de importação.</p>
+
+  <h2>No fim do ano</h2>
+  <p>A mesma tela tem a <strong>Situação do Aluno</strong>: aprovado, reprovado, transferido, deixou de frequentar. O resultado acadêmico já lançado na escola é reaproveitado. É a segunda coleta do Censo, separada do TXT da Matrícula Inicial.</p>
+</body>
+</html>

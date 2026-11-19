@@ -119,6 +119,7 @@ class AdminPermissionMatrix
             'patrimonio' => ['label' => 'Patrimônio', 'prefixes' => ['/admin/patrimonio']],
             'ocorrencias' => ['label' => 'Ocorrências', 'prefixes' => ['/admin/ocorrencias']],
             'conselho_classe' => ['label' => 'Conselho de Classe', 'prefixes' => ['/admin/conselhos']],
+            'educasync' => ['label' => 'EducaSync', 'prefixes' => ['/admin/educasync']],
             'pacotes_creditos' => ['label' => 'Pacotes de Créditos', 'prefixes' => ['/admin/creditos/pacotes']],
 
             'alertas_sensiveis' => ['label' => 'Alertas Sensíveis', 'prefixes' => ['/admin/monitoramento/alertas-sensiveis', '/admin/monitoramento/alertas']],
@@ -189,7 +190,7 @@ class AdminPermissionMatrix
             'dashboard' => ['label' => 'Dashboard', 'items' => ['dashboard', 'assistente']],
             'rotina_academica' => ['label' => 'Rotina Acadêmica', 'items' => [
                 'alunos', 'ano_letivo', 'calendario_letivo', 'materias',
-                'curso', 'grade_horaria', 'matriz_curricular', 'professores',
+                'curso', 'grade_horaria', 'educasync', 'matriz_curricular', 'professores',
                 'salas', 'series', 'turmas',
             ]],
             'avaliacoes' => ['label' => 'Avaliações e Lançamentos', 'items' => [
@@ -262,7 +263,7 @@ class AdminPermissionMatrix
                     'denuncias_forum', 'forum', 'mural_recados', 'comunicacao_escolar', 'calendario_escolar', 'notificacoes', 'notificacoes_push',
                     'configuracao_boletim', 'grupos_regras_notas', 'avatares_alunos',
                     'apostilas_ia', 'apostilas', 'arquivos', 'expo_colag', 'minicursos', 'planos_aula', 'ava',
-                    'faltas', 'presenca', 'carteirinha', 'diario_classe', 'conformidade', 'calendario_letivo', 'bncc', 'documentos_institucionais', 'modelos_documentos', 'documentos_professor', 'saude_academica', 'grade_horaria', 'materias', 'almoxarifado', 'patrimonio', 'ocorrencias', 'conselho_classe', 'censo_escolar', 'pacotes_creditos',
+                    'faltas', 'presenca', 'carteirinha', 'diario_classe', 'conformidade', 'calendario_letivo', 'bncc', 'documentos_institucionais', 'modelos_documentos', 'documentos_professor', 'saude_academica', 'grade_horaria', 'educasync', 'materias', 'almoxarifado', 'patrimonio', 'ocorrencias', 'conselho_classe', 'censo_escolar', 'pacotes_creditos',
                     'alertas_sensiveis', 'alunos_online', 'reconhecimento_facial',
                     'relatorios_gerais',
                     'administradores', 'professores', 'transferencia', 'lista_chamada',
@@ -285,7 +286,7 @@ class AdminPermissionMatrix
                     'dashboard', 'alunos', 'ano_letivo', 'curso', 'series', 'matriz_curricular', 'regras_academicas', 'resultados_finais', 'vida_escolar', 'salas', 'turmas',
                     'exercicios', 'jornadas_aluno', 'provas_online', 'redacao_professor',
                     'configuracao_boletim', 'grupos_regras_notas', 'relatorios_gerais',
-                    'faltas', 'presenca', 'carteirinha', 'diario_classe', 'conformidade', 'calendario_letivo', 'bncc', 'documentos_institucionais', 'modelos_documentos', 'documentos_professor', 'saude_academica', 'grade_horaria', 'materias', 'almoxarifado', 'patrimonio', 'ocorrencias', 'conselho_classe', 'censo_escolar',
+                    'faltas', 'presenca', 'carteirinha', 'diario_classe', 'conformidade', 'calendario_letivo', 'bncc', 'documentos_institucionais', 'modelos_documentos', 'documentos_professor', 'saude_academica', 'grade_horaria', 'educasync', 'materias', 'almoxarifado', 'patrimonio', 'ocorrencias', 'conselho_classe', 'censo_escolar',
                     'professores', 'transferencia', 'lista_chamada', 'reconhecimento_facial',
                     'acao_rapida_ativar_desativar',
                     'responsaveis_vinculados', 'matriculas_aluno', 'processos_matricula', 'declaracoes_aluno', 'documentos_aluno',

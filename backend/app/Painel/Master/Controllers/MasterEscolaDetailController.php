@@ -979,6 +979,207 @@ class MasterEscolaDetailController extends BaseController
         exit;
     }
 
+    public function professorAtualizarAcesso($id, $professorId): void
+    {
+        $this->salvarAcessoPessoa((int) $id, (int) $professorId, 'professores');
+    }
+
+    public function alunoAtualizarAcesso($id, $alunoId): void
+    {
+        $this->salvarAcessoPessoa((int) $id, (int) $alunoId, 'alunos');
+    }
+
+    private function salvarAcessoPessoa(int $escolaId, int $pessoaId, string $tabela): void
+    {
+        $this->requireMaster();
+        if (!in_array($tabela, ['professores', 'alunos'], true)) {
+            $this->setFlashMessage('Dados inválidos.', 'error');
+            header('Location: ' . URL . '/master/escolas/' . $escolaId . '/detalhes');
+            exit;
+        }
+        $voltar = $this->urlListaAcesso($escolaId, $tabela);
+        $rotulo = $tabela === 'professores' ? 'Professor' : 'Aluno';
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->setFlashMessage('Sessão expirada. Recarregue a página e tente novamente.', 'error');
+            header('Location: ' . $voltar);
+            exit;
+        }
+        $this->getEscolaOrFail($escolaId);
+        $pdo = $this->getTenantPdo($escolaId);
+        if (!$pdo) {
+            $this->setFlashMessage('Não foi possível conectar ao banco da escola.', 'error');
+            header('Location: ' . $voltar);
+            exit;
+        }
+        if ($pessoaId <= 0) {
+            $this->setFlashMessage($rotulo . ' não encontrado nesta escola.', 'error');
+            header('Location: ' . $voltar);
+            exit;
+        }
+
+        $email = trim((string) ($_POST['email'] ?? ''));
+        $senha = trim((string) ($_POST['senha'] ?? ''));
+        $erro = $this->validarEmailSenhaAcesso($tabela, $email, $senha);
+        if ($erro !== null) {
+            $this->setFlashMessage($erro, 'error');
+            header('Location: ' . $voltar);
+            exit;
+        }
+
+        try {
+            $temApelido = false;
+            $colunas = 'id, email';
+            if ($tabela === 'alunos' && $pdo->query("SHOW COLUMNS FROM alunos LIKE 'nickname'")->fetch(\PDO::FETCH_ASSOC)) {
+                $temApelido = true;
+                $colunas .= ', nickname';
+            }
+            $st = $pdo->prepare("SELECT {$colunas} FROM {$tabela} WHERE id = :id LIMIT 1");
+            $st->execute(['id' => $pessoaId]);
+            $pessoa = $st->fetch(\PDO::FETCH_ASSOC);
+            if (!$pessoa) {
+                $this->setFlashMessage($rotulo . ' não encontrado nesta escola.', 'error');
+                header('Location: ' . $voltar);
+                exit;
+            }
+            if ($email !== '') {
+                $dup = $pdo->prepare("SELECT id FROM {$tabela} WHERE email = :email AND id != :id LIMIT 1");
+                $dup->execute(['email' => $email, 'id' => $pessoaId]);
+                if ($dup->fetchColumn()) {
+                    $this->setFlashMessage('Este e-mail já está em uso.', 'error');
+                    header('Location: ' . $voltar);
+                    exit;
+                }
+            }
+
+            $apelidoAtual = trim((string) ($pessoa['nickname'] ?? ''));
+            $apelidoInformado = trim((string) ($_POST['nickname'] ?? ''));
+            $apelidoFinal = $apelidoInformado !== '' ? $apelidoInformado : $apelidoAtual;
+            $alterarApelido = $temApelido && $apelidoInformado !== '' && $apelidoInformado !== $apelidoAtual;
+            if ($alterarApelido && (strlen($apelidoInformado) < 3 || strlen($apelidoInformado) > 60 || preg_match('/\s/', $apelidoInformado))) {
+                $this->setFlashMessage('O apelido deve ter de 3 a 60 caracteres, sem espaço.', 'error');
+                header('Location: ' . $voltar);
+                exit;
+            }
+            if ($tabela === 'alunos' && $senha !== '' && $temApelido && $apelidoFinal === '') {
+                $this->setFlashMessage('Para definir a senha, informe também o apelido de login.', 'error');
+                header('Location: ' . $voltar);
+                exit;
+            }
+            if ($alterarApelido) {
+                $dupApelido = $pdo->prepare('SELECT id FROM alunos WHERE nickname = :nickname AND id != :id LIMIT 1');
+                $dupApelido->execute(['nickname' => $apelidoInformado, 'id' => $pessoaId]);
+                if ($dupApelido->fetchColumn()) {
+                    $this->setFlashMessage('Este apelido já está em uso.', 'error');
+                    header('Location: ' . $voltar);
+                    exit;
+                }
+            }
+
+            $sql = "UPDATE {$tabela} SET email = :email";
+            $params = [
+                'email' => $email === '' ? null : $email,
+                'id' => $pessoaId,
+            ];
+            if ($alterarApelido) {
+                $sql .= ', nickname = :nickname';
+                $params['nickname'] = $apelidoInformado;
+            }
+            if ($senha !== '') {
+                $sql .= ', senha_hash = :senha_hash';
+                $params['senha_hash'] = password_hash($senha, PASSWORD_DEFAULT);
+                if ($tabela === 'alunos' && (!$temApelido || $apelidoFinal !== '')) {
+                    $coluna = $pdo->query("SHOW COLUMNS FROM alunos LIKE 'primeiro\\_acesso'")->fetch(\PDO::FETCH_ASSOC);
+                    if ($coluna) {
+                        $sql .= ', primeiro_acesso = 0';
+                    }
+                }
+            }
+            $sql .= ' WHERE id = :id';
+            $upd = $pdo->prepare($sql);
+            $upd->execute($params);
+
+            $emailAlterado = trim((string) ($pessoa['email'] ?? '')) !== $email;
+            $senhaAlterada = $senha !== '';
+            Logger::info('Master alterou e-mail ou senha', [
+                'escola_id' => $escolaId,
+                'tabela' => $tabela,
+                'pessoa_id' => $pessoaId,
+                'email_alterado' => $emailAlterado,
+                'senha_alterada' => $senhaAlterada,
+                'apelido_alterado' => $alterarApelido,
+            ], 'auth');
+            $avisos = [];
+            if ($emailAlterado) {
+                $avisos[] = 'E-mail atualizado';
+            }
+            if ($alterarApelido) {
+                $avisos[] = 'Apelido atualizado';
+            }
+            if ($senhaAlterada) {
+                $avisos[] = 'Senha definida';
+            }
+            $this->setFlashMessage($avisos === [] ? 'Nada foi alterado.' : implode('. ', $avisos) . '.', 'success');
+        } catch (\Throwable $e) {
+            Logger::error('Falha ao atualizar acesso no master: ' . $e->getMessage(), [
+                'escola_id' => $escolaId,
+                'tabela' => $tabela,
+                'pessoa_id' => $pessoaId,
+            ], 'auth');
+            $this->setFlashMessage('Não foi possível salvar. Tente novamente.', 'error');
+        }
+
+        header('Location: ' . $voltar);
+        exit;
+    }
+
+    private function validarEmailSenhaAcesso(string $tabela, string $email, string $senha): ?string
+    {
+        if ($tabela === 'professores' && $email === '') {
+            return 'Informe o e-mail do professor.';
+        }
+        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+            return 'E-mail inválido.';
+        }
+        if ($senha !== '' && strlen($senha) < 6) {
+            return 'A senha deve ter no mínimo 6 caracteres.';
+        }
+        if (strlen($senha) > 128) {
+            return 'A senha deve ter no máximo 128 caracteres.';
+        }
+        return null;
+    }
+
+    private function urlListaAcesso(int $escolaId, string $tabela): string
+    {
+        $base = URL . '/master/escolas/' . $escolaId . '/' . $tabela;
+        $chaves = $tabela === 'professores'
+            ? ['busca', 'status', 'page']
+            : ['nome', 'turma_id', 'creditos_ordem', 'page'];
+        $query = [];
+        foreach ($chaves as $chave) {
+            $valor = trim((string) ($_POST[$chave] ?? ''));
+            if ($valor === '' || ($chave === 'turma_id' && $valor === '0')) {
+                continue;
+            }
+            if ($chave === 'page' || $chave === 'turma_id') {
+                $numero = (int) $valor;
+                if ($numero > 0) {
+                    $query[$chave] = $numero;
+                }
+                continue;
+            }
+            if ($chave === 'status' && !in_array($valor, ['ativo', 'inativo'], true)) {
+                continue;
+            }
+            if ($chave === 'creditos_ordem' && !in_array($valor, ['maior', 'menor'], true)) {
+                continue;
+            }
+            $query[$chave] = function_exists('mb_substr') ? mb_substr($valor, 0, 120) : substr($valor, 0, 120);
+        }
+
+        return $query === [] ? $base : $base . '?' . http_build_query($query);
+    }
+
     public function alunos($id)
     {
         $this->requireMaster();
@@ -1038,8 +1239,15 @@ class MasterEscolaDetailController extends BaseController
                 $creditosSelect = $creditosDisponiveis
                     ? "COALESCE(cu.saldo, 0)"
                     : "0";
+                $apelidoSelect = '';
+                try {
+                    if ($pdo->query("SHOW COLUMNS FROM alunos LIKE 'nickname'")->fetch(\PDO::FETCH_ASSOC)) {
+                        $apelidoSelect = ', a.nickname';
+                    }
+                } catch (\PDOException $e) {
+                }
                 $stmt = $pdo->prepare(
-                    "SELECT a.id, a.nome, a.email, a.ra, t.nome AS turma_nome,
+                    "SELECT a.id, a.nome, a.email, a.ra, t.nome AS turma_nome{$apelidoSelect},
                             {$creditosSelect} AS saldo_creditos
                      FROM alunos a
                      LEFT JOIN turmas t ON a.turma_id = t.id

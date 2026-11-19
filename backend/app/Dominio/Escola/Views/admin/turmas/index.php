@@ -12,11 +12,23 @@ $series = $series ?? [];
 $cursos = $cursos ?? [];
 $cursosNovo = $cursosNovo ?? [];
 $seriesPorCurso = $seriesPorCurso ?? [];
+$seriesNovo = $seriesNovo ?? [];
 $matrizesPorSerie = $matrizesPorSerie ?? [];
 $anosLetivo = $anosLetivo ?? [];
+$anosFiltro = $anosFiltro ?? $anosLetivo;
 $salas = $salas ?? [];
 $ano_letivo_id = $ano_letivo_id ?? null;
 $usaEstruturaNova = !empty($cursosNovo);
+$filtros = is_array($filtros ?? null) ? $filtros : [];
+$filtroAnoId = (int) ($filtros['ano_letivo_id'] ?? 0);
+$filtroSerieId = (int) ($filtros['serie_id'] ?? 0);
+$filtroCursoId = (int) ($filtros['curso_novo_id'] ?? 0);
+$filtrosAtivosCount = 0;
+foreach ([$filtroAnoId, $filtroSerieId, $filtroCursoId] as $fv) {
+    if ($fv > 0) {
+        $filtrosAtivosCount++;
+    }
+}
 
 $turnos = [
     'manha' => 'Manhã',
@@ -30,6 +42,14 @@ $page_header_subtitle = 'Gerencie as turmas da escola';
 $trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/turmas', 'Turmas');
 ob_start();
 ?>
+<button type="button" onclick="openFilterDrawer()"
+        class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+    <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
+    Filtros
+    <?php if ($filtrosAtivosCount > 0): ?>
+    <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold"><?= $filtrosAtivosCount ?></span>
+    <?php endif; ?>
+</button>
 <?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
 <?php
 $ui_btn_variant = 'complementar';
@@ -123,12 +143,20 @@ $page_header_actions = ob_get_clean();
                 <tr>
                     <td colspan="6" class="px-6 py-12 text-center text-gray-500">
                         <i class="fa-solid fa-users-rectangle text-4xl text-gray-300 mb-4"></i>
+                        <?php if ($filtrosAtivosCount > 0): ?>
+                        <p>Nenhuma turma encontrada com esses filtros</p>
+                        <a href="<?= URL ?>/admin/turmas"
+                           class="mt-4 inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                            Limpar filtros
+                        </a>
+                        <?php else: ?>
                         <p>Nenhuma turma cadastrada</p>
                         <button type="button" onclick="openTurmaDrawer()"
                            class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
                             <i class="fa-solid fa-plus mr-2"></i>
                             Nova Turma
                         </button>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php else: ?>
@@ -234,6 +262,114 @@ $page_header_actions = ob_get_clean();
     </div>
     <?php endif; ?>
 </div>
+
+<!-- Filtro em drawer lateral -->
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
+<aside id="filterDrawer"
+       class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
+       aria-hidden="true">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900">Filtrar turmas</h3>
+        <button type="button" onclick="closeFilterDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+            <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+    </div>
+    <form method="GET" action="<?= URL ?>/admin/turmas" class="flex flex-col flex-1 overflow-hidden" id="turmaFilterForm">
+        <div class="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+            <div>
+                <label for="filtro_ano_letivo_id" class="block text-sm font-medium text-gray-700 mb-1.5">Ano letivo</label>
+                <div class="relative">
+                    <select id="filtro_ano_letivo_id" name="ano_letivo_id"
+                            class="select-reset w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Todos</option>
+                        <?php foreach ($anosFiltro as $al): ?>
+                        <option value="<?= (int) $al['id'] ?>" <?= $filtroAnoId === (int) $al['id'] ? 'selected' : '' ?>>
+                            <?= (int) $al['ano'] ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </div>
+            </div>
+            <?php if ($usaEstruturaNova): ?>
+            <div>
+                <label for="filtro_curso_id" class="block text-sm font-medium text-gray-700 mb-1.5">Curso</label>
+                <div class="relative">
+                    <select id="filtro_curso_id" name="curso_id"
+                            class="select-reset w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            onchange="atualizarSerieFiltro()">
+                        <option value="">Todos</option>
+                        <?php foreach ($cursosNovo as $c): ?>
+                        <option value="<?= (int) $c['id'] ?>" <?= $filtroCursoId === (int) $c['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars((string) $c['nome']) ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </div>
+            </div>
+            <div>
+                <label for="filtro_serie_id" class="block text-sm font-medium text-gray-700 mb-1.5">Série</label>
+                <div class="relative">
+                    <select id="filtro_serie_id" name="serie_id"
+                            class="select-reset w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Todas</option>
+                        <?php foreach ($seriesNovo as $s): ?>
+                        <option value="<?= (int) $s['id'] ?>"
+                                data-curso="<?= (int) ($s['curso_id'] ?? 0) ?>"
+                                <?= $filtroSerieId === (int) $s['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars((string) $s['nome']) ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </div>
+            </div>
+            <?php else: ?>
+            <div>
+                <label for="filtro_curso_legado" class="block text-sm font-medium text-gray-700 mb-1.5">Curso</label>
+                <div class="relative">
+                    <select id="filtro_curso_legado" name="curso_id" disabled
+                            class="select-reset w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
+                        <option value="">Cadastre a estrutura de cursos para filtrar</option>
+                    </select>
+                    <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </div>
+            </div>
+            <div>
+                <label for="filtro_serie_legado" class="block text-sm font-medium text-gray-700 mb-1.5">Série</label>
+                <div class="relative">
+                    <select id="filtro_serie_legado" name="serie_id" disabled
+                            class="select-reset w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
+                        <option value="">Cadastre a estrutura de séries para filtrar</option>
+                    </select>
+                    <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </div>
+            </div>
+            <?php endif; ?>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-200 flex gap-3 bg-gray-50">
+            <a href="<?= URL ?>/admin/turmas"
+               class="flex-1 inline-flex items-center justify-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                Limpar
+            </a>
+            <button type="submit"
+                    class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors">
+                Aplicar filtros
+            </button>
+        </div>
+    </form>
+</aside>
 
 <!-- Offcanvas: Cadastrar/Editar Turma -->
 <div id="turmaDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeTurmaDrawer()"></div>
@@ -586,8 +722,50 @@ document.getElementById('turma-form').addEventListener('submit', function (e) {
 });
 
 document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') { closeTurmaDrawer(); }
+    if (e.key !== 'Escape') return;
+    closeTurmaDrawer();
+    closeFilterDrawer();
 });
+
+function openFilterDrawer() {
+    document.getElementById('filterDrawerBackdrop').classList.remove('hidden');
+    var drawer = document.getElementById('filterDrawer');
+    drawer.setAttribute('aria-hidden', 'false');
+    requestAnimationFrame(function () { drawer.classList.remove('translate-x-full'); });
+}
+
+function closeFilterDrawer() {
+    var drawer = document.getElementById('filterDrawer');
+    if (!drawer) return;
+    drawer.classList.add('translate-x-full');
+    drawer.setAttribute('aria-hidden', 'true');
+    setTimeout(function () {
+        var backdrop = document.getElementById('filterDrawerBackdrop');
+        if (backdrop) backdrop.classList.add('hidden');
+    }, 300);
+}
+
+function atualizarSerieFiltro() {
+    var cursoSel = document.getElementById('filtro_curso_id');
+    var serieSel = document.getElementById('filtro_serie_id');
+    if (!cursoSel || !serieSel) return;
+    var cursoId = parseInt(cursoSel.value, 10) || 0;
+    var selecionada = serieSel.value;
+    Array.prototype.forEach.call(serieSel.options, function (opt) {
+        if (!opt.value) {
+            opt.hidden = false;
+            return;
+        }
+        var optCurso = parseInt(opt.getAttribute('data-curso') || '0', 10) || 0;
+        var visivel = cursoId === 0 || optCurso === cursoId;
+        opt.hidden = !visivel;
+        if (!visivel && opt.value === selecionada) {
+            serieSel.value = '';
+        }
+    });
+}
+
+atualizarSerieFiltro();
 
 // Vindo da página de detalhe da turma (?edit=ID) — abre o offcanvas já em modo edição.
 (function () {

@@ -100,7 +100,9 @@ $router->get('/master/escolas/{id}/provas-ao-vivo', 'Master/MasterEscolaDetailCo
 $router->get('/master/escolas/{id}/usuarios', 'Master/MasterEscolaDetailController@usuarios');
 $router->get('/master/escolas/{id}/professores', 'Master/MasterEscolaDetailController@professores');
 $router->post('/master/escolas/{id}/professores/{professorId}/tudicoins', 'Master/MasterEscolaDetailController@professorCreditarTudicoins');
+$router->post('/master/escolas/{id}/professores/{professorId}/acesso', 'Master/MasterEscolaDetailController@professorAtualizarAcesso');
 $router->get('/master/escolas/{id}/alunos', 'Master/MasterEscolaDetailController@alunos');
+$router->post('/master/escolas/{id}/alunos/{alunoId}/acesso', 'Master/MasterEscolaDetailController@alunoAtualizarAcesso');
 $router->post('/master/escolas/{id}/usuarios/criar', 'Master/MasterEscolaDetailController@usuarioStore');
 $router->post('/master/escolas/{id}/usuarios/atualizar', 'Master/MasterEscolaDetailController@usuarioUpdate');
 $router->get('/master/escolas/{id}/modulos', 'Master/MasterEscolaDetailController@modulos');

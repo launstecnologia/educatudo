@@ -218,6 +218,7 @@ class MatrizCurricularService
         foreach ($oficiais as $linha) {
             $item = [
                 'materia_id' => (int) ($linha['materia_id'] ?? 0),
+                'nome' => (string) ($linha['materia_nome'] ?? ''),
                 'aulas_semana' => (int) ($linha['aulas_semana'] ?? 0),
                 'obrigatorio' => (int) ($linha['obrigatorio'] ?? 1),
                 'ordem_boletim' => (int) ($linha['ordem_boletim'] ?? 0),

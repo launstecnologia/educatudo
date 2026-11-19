@@ -48,6 +48,10 @@ $GLOBALS['__row_actions_dropdown_js_done'] = true;
             e.stopPropagation();
             return;
         }
+        if (e.target.closest('[data-dropdown-menu] a, [data-dropdown-menu] button')) {
+            closeAllMenus();
+            return;
+        }
         if (!e.target.closest('[data-dropdown-menu]')) {
             closeAllMenus();
         }

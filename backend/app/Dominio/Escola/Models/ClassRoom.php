@@ -19,11 +19,16 @@ class ClassRoom
     }
     
     /**
-     * Busca todas as turmas. \Quando $limit é informado, pagina (LIMIT/OFFSET).
+     * Busca todas as turmas. Quando $limit é informado, pagina (LIMIT/OFFSET).
+     * $filtros: ano_letivo_id, serie_id, curso_novo_id (0/ausente = ignora).
+     *
+     * @param array{ano_letivo_id?:int,serie_id?:int,curso_novo_id?:int} $filtros
      */
-    public function getAll(?int $limit = null, int $offset = 0)
+    public function getAll(?int $limit = null, int $offset = 0, array $filtros = [])
     {
         $limitSql = $limit !== null ? ' LIMIT ' . (int)$limit . ' OFFSET ' . (int)$offset : '';
+        $filtro = $this->montarFiltroListagem($filtros);
+        $whereSql = $filtro['sql'] !== '' ? (' WHERE ' . $filtro['sql']) : '';
 
         if ($this->supportsCursos()) {
             return $this->db->fetchAll(
@@ -31,22 +36,76 @@ class ClassRoom
                  FROM turmas t
                  LEFT JOIN cursos c ON c.id = t.curso_id
                  LEFT JOIN tipos_curso tc ON tc.id = c.tipo_curso_id
-                 ORDER BY t.ano_letivo ASC, t.serie ASC, t.nome ASC" . $limitSql
+                 {$whereSql}
+                 ORDER BY t.ano_letivo ASC, t.serie ASC, t.nome ASC" . $limitSql,
+                $filtro['params']
             );
         }
 
         return $this->db->fetchAll(
-            "SELECT * FROM turmas ORDER BY ano_letivo ASC, serie ASC, nome ASC" . $limitSql
+            "SELECT t.* FROM turmas t {$whereSql} ORDER BY t.ano_letivo ASC, t.serie ASC, t.nome ASC" . $limitSql,
+            $filtro['params']
         );
     }
 
     /**
-     * Conta o total de turmas (para paginação).
+     * Conta o total de turmas (para paginação), com os mesmos filtros de getAll.
+     *
+     * @param array{ano_letivo_id?:int,serie_id?:int,curso_novo_id?:int} $filtros
      */
-    public function countAll(): int
+    public function countAll(array $filtros = []): int
     {
-        $row = $this->db->fetch("SELECT COUNT(*) AS total FROM turmas");
+        $filtro = $this->montarFiltroListagem($filtros);
+        $whereSql = $filtro['sql'] !== '' ? (' WHERE ' . $filtro['sql']) : '';
+        $row = $this->db->fetch(
+            "SELECT COUNT(*) AS total FROM turmas t {$whereSql}",
+            $filtro['params']
+        );
         return (int)($row['total'] ?? 0);
+    }
+
+    /**
+     * @param array{ano_letivo_id?:int,serie_id?:int,curso_novo_id?:int} $filtros
+     * @return array{sql:string,params:array<string,int>}
+     */
+    private function montarFiltroListagem(array $filtros): array
+    {
+        $parts = [];
+        $params = [];
+
+        $anoLetivoId = (int) ($filtros['ano_letivo_id'] ?? 0);
+        if ($anoLetivoId > 0) {
+            $temColAnoId = $this->db->fetch("SHOW COLUMNS FROM turmas LIKE 'ano_letivo_id'") !== false;
+            $anoCivil = $this->getAnoById($anoLetivoId);
+            if ($temColAnoId && $anoCivil !== null) {
+                $parts[] = '(t.ano_letivo_id = :filtro_ano_id OR t.ano_letivo = :filtro_ano_civil)';
+                $params['filtro_ano_id'] = $anoLetivoId;
+                $params['filtro_ano_civil'] = $anoCivil;
+            } elseif ($temColAnoId) {
+                $parts[] = 't.ano_letivo_id = :filtro_ano_id';
+                $params['filtro_ano_id'] = $anoLetivoId;
+            } elseif ($anoCivil !== null) {
+                $parts[] = 't.ano_letivo = :filtro_ano_civil';
+                $params['filtro_ano_civil'] = $anoCivil;
+            }
+        }
+
+        $serieId = (int) ($filtros['serie_id'] ?? 0);
+        if ($serieId > 0 && $this->db->fetch("SHOW COLUMNS FROM turmas LIKE 'serie_id'") !== false) {
+            $parts[] = 't.serie_id = :filtro_serie_id';
+            $params['filtro_serie_id'] = $serieId;
+        }
+
+        $cursoNovoId = (int) ($filtros['curso_novo_id'] ?? 0);
+        if ($cursoNovoId > 0 && $this->supportsCursoNovo()) {
+            $parts[] = 't.curso_novo_id = :filtro_curso_novo_id';
+            $params['filtro_curso_novo_id'] = $cursoNovoId;
+        }
+
+        return [
+            'sql' => implode(' AND ', $parts),
+            'params' => $params,
+        ];
     }
 
     /**

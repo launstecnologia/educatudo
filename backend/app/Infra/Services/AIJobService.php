@@ -19,6 +19,8 @@ class AIJobService
     private const MAX_ATTEMPTS = 3;
     private const STALE_MINUTES = 10;
     private const STALE_MINUTES_BOLETIM = 45;
+    /** EducaSync: max_time_s até 600s + margem do HTTP client. */
+    private const STALE_MINUTES_EDUCASYNC = 20;
 
     /**
      * Enfileira um novo job de IA e retorna o id gerado em ai_jobs.
@@ -447,9 +449,10 @@ class AIJobService
                AND attempts < ?
                AND (
                     (job_type IN ('boletim_gerar', 'vida_escolar_boletins_zip', 'fechamento_impressao_lote') AND started_at < NOW() - INTERVAL ? MINUTE)
-                    OR (IFNULL(job_type, '') NOT IN ('boletim_gerar', 'vida_escolar_boletins_zip', 'fechamento_impressao_lote') AND started_at < NOW() - INTERVAL ? MINUTE)
+                    OR (job_type = 'educasync_otimizar' AND started_at < NOW() - INTERVAL ? MINUTE)
+                    OR (IFNULL(job_type, '') NOT IN ('boletim_gerar', 'vida_escolar_boletins_zip', 'fechamento_impressao_lote', 'educasync_otimizar') AND started_at < NOW() - INTERVAL ? MINUTE)
                )",
-            [self::MAX_ATTEMPTS, self::STALE_MINUTES_BOLETIM, self::STALE_MINUTES]
+            [self::MAX_ATTEMPTS, self::STALE_MINUTES_BOLETIM, self::STALE_MINUTES_EDUCASYNC, self::STALE_MINUTES]
         );
 
         $db->query(
@@ -462,9 +465,10 @@ class AIJobService
                AND attempts >= ?
                AND (
                     (job_type IN ('boletim_gerar', 'vida_escolar_boletins_zip', 'fechamento_impressao_lote') AND started_at < NOW() - INTERVAL ? MINUTE)
-                    OR (IFNULL(job_type, '') NOT IN ('boletim_gerar', 'vida_escolar_boletins_zip', 'fechamento_impressao_lote') AND started_at < NOW() - INTERVAL ? MINUTE)
+                    OR (job_type = 'educasync_otimizar' AND started_at < NOW() - INTERVAL ? MINUTE)
+                    OR (IFNULL(job_type, '') NOT IN ('boletim_gerar', 'vida_escolar_boletins_zip', 'fechamento_impressao_lote', 'educasync_otimizar') AND started_at < NOW() - INTERVAL ? MINUTE)
                )",
-            [self::MAX_ATTEMPTS, self::STALE_MINUTES_BOLETIM, self::STALE_MINUTES]
+            [self::MAX_ATTEMPTS, self::STALE_MINUTES_BOLETIM, self::STALE_MINUTES_EDUCASYNC, self::STALE_MINUTES]
         );
     }
 
@@ -584,6 +588,9 @@ class AIJobService
 
             case 'fechamento_impressao_lote':
                 return self::dispatchFechamentoImpressaoLote($payload);
+
+            case 'educasync_otimizar':
+                return (new \App\Modulos\EducaSync\Services\EducaSyncOtimizacaoService())->processarJob($payload);
 
             default:
                 throw new \InvalidArgumentException("Tipo de job desconhecido: {$jobType}");

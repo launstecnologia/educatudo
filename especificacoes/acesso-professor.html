@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>EducaTudo — Acesso do professor</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm 18mm 14mm;
+    @bottom-center { content: "EducaTudo  ·  Acesso do professor  ·  " counter(page); font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 8.5pt; color: #6b7280; } }
+  @page :first { margin: 0; @bottom-center { content: none; } }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; color: #1c2430; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10.5pt; line-height: 1.42; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  h1, h2, h3 { line-height: 1.2; margin: 0; break-after: avoid; page-break-after: avoid; }
+  p { margin: 0 0 8px; }
+  h2 { font-size: 16pt; color: #1e1b4b; margin: 0 0 3mm; padding-bottom: 2mm; border-bottom: 2px solid #1e1b4b; }
+  .lead { font-size: 11.5pt; color: #334155; }
+  .quebra { page-break-before: always; }
+  .chamada { background: #eef2ff; border-left: 3.5px solid #4f46e5; padding: 3.2mm 4mm; margin: 3mm 0 4mm; border-radius: 0 2mm 2mm 0; break-before: avoid; page-break-before: avoid; }
+  table { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm; font-size: 9.4pt; }
+  tr { break-inside: avoid; page-break-inside: avoid; }
+  th { text-align: left; background: #1e1b4b; color: #fff; font-weight: 600; padding: 2mm 2.4mm; }
+  td { padding: 2mm 2.4mm; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  td:first-child { font-weight: 650; width: 30%; }
+  .capa { height: 297mm; background: #1e1b4b; color: #fff; padding: 22mm 18mm 18mm; display: flex; flex-direction: column; page-break-after: always; position: relative; overflow: hidden; }
+  .capa::after { content: ""; position: absolute; right: -40mm; bottom: -30mm; width: 140mm; height: 140mm; border-radius: 50%; background: rgba(255,255,255,.06); }
+  .marca { font-size: 11pt; letter-spacing: .18em; text-transform: uppercase; color: #c4b5fd; font-weight: 650; }
+  .capa h1 { margin-top: 28mm; font-size: 34pt; letter-spacing: -.03em; max-width: 160mm; }
+  .capa .sub { margin-top: 8mm; font-size: 14pt; max-width: 155mm; color: #e0e7ff; }
+  .faixa { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4mm; position: relative; z-index: 1; }
+  .faixa > div { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); border-radius: 4mm; padding: 5mm 4.5mm; }
+  .faixa .k { font-size: 8pt; letter-spacing: .12em; text-transform: uppercase; color: #c4b5fd; margin-bottom: 2mm; }
+  .faixa .v { font-size: 12pt; font-weight: 650; }
+  .rodape-capa { margin-top: 8mm; font-size: 9.5pt; color: #a5b4fc; position: relative; z-index: 1; }
+</style>
+</head>
+<body>
+
+<section class="capa">
+  <div class="marca">EducaTudo · Documentação de produto</div>
+  <h1>Acesso do professor</h1>
+  <p class="sub">Cada página do painel do professor: a aula do dia, a nota da turma e o material que ele publica para os alunos.</p>
+  <div class="faixa">
+    <div><div class="k">Sala</div><div class="v">Grade e diário</div></div>
+    <div><div class="k">Nota</div><div class="v">Prova e redação</div></div>
+    <div><div class="k">Turma</div><div class="v">Jornada e plano</div></div>
+  </div>
+  <p class="rodape-capa">Novembro de 2026 · O professor vê as turmas e as disciplinas dele</p>
+</section>
+
+<section>
+  <h2>O que este acesso alcança</h2>
+  <p class="lead">O professor entra no endereço da escola, no painel do professor. Tudo que ele abre está limitado às turmas e às disciplinas da grade dele naquele ano letivo. A coordenação monta o ano, a regra e o evento. O professor registra a aula, lança a nota que é dele e publica o conteúdo da turma.</p>
+  <p>Página de módulo desligado some ou avisa que aquele recurso não está disponível na escola. O grupo do meio do menu usa o nome da escola. No padrão, o rótulo interno é Colag.</p>
+  <div class="chamada">Algumas escolas usam um menu curto: Dashboard, Diários de Classe, Mural, Avaliações, Questões, Minha grade, Calendário escolar e Meu Drive. As mesmas páginas estão descritas abaixo, no menu completo.</div>
+</section>
+
+<section class="quebra">
+  <h2>O dia da aula</h2>
+  <p class="lead">O que o professor abre para saber onde está e para registrar o que aconteceu em sala.</p>
+  <table>
+    <thead><tr><th>Página</th><th>O que o professor encontra</th></tr></thead>
+    <tbody>
+      <tr><td>Dashboard</td><td>A entrada do painel: o recorte das turmas dele e o caminho para a aula, a prova e o aviso do dia.</td></tr>
+      <tr><td>Minha grade</td><td>O horário semanal dele: dia, turma, disciplina e sala. Nasce da grade horária do ano letivo. Ele consulta o próprio horário. A montagem da grade é da coordenação.</td></tr>
+      <tr><td>Diários de Classe</td><td>As aulas da grade, por data. Ao abrir uma aula, o sistema cria o registro daquele dia e lista os alunos matriculados. O professor faz a chamada e marca a execução: conforme o planejado, parcial, alterada ou não realizada. Se houver plano de aula daquela turma e disciplina na data, o diário o vincula. Chamada vencida sem registro impede o fechamento da turma.</td></tr>
+      <tr><td>Calendário escolar</td><td>O calendário letivo da escola na visão do professor: dias de aula, feriados e as datas de avaliação já marcadas. Serve para encaixar prova e conteúdo no ano.</td></tr>
+      <tr><td>Conselho de Classe</td><td>A sessão da turma naquele período. O professor entra como participante, vê nota, frequência e ocorrências do aluno e registra observação. A deliberação (aprovado, aprovado pelo conselho, recuperação, retido) é da sessão. Ela não reescreve a nota que ele lançou nem a falta da chamada.</td></tr>
+      <tr><td>Meu Drive</td><td>A pasta de arquivos dele. Dali ele organiza material e compartilha com a turma.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Avaliação da turma</h2>
+  <p class="lead">Onde a nota do aluno entra, quando o evento avaliativo atribui o lançamento ao professor.</p>
+  <table>
+    <thead><tr><th>Página</th><th>O que o professor encontra</th></tr></thead>
+    <tbody>
+      <tr><td>Provas Online</td><td>As provas das disciplinas dele. Ele cria ou conduz a prova: questões, turma, data e horário. No menu curto, a mesma entrada se chama Avaliações. Questão dissertativa pode ficar para correção manual. Prova online feita pelo aluno devolve a nota para o evento.</td></tr>
+      <tr><td>Provas Bimestral</td><td>A lista das provas de período dele, com filtro por turma e por ano. É o conjunto da avaliação daquele bimestre ou trimestre, separado da prova avulsa do dia.</td></tr>
+      <tr><td>Questões</td><td>O banco de questões que ele usa nas provas e nos exercícios: criar, revisar e reaproveitar enunciado.</td></tr>
+      <tr><td>Propostas de Redação</td><td>A jornada da redação. Em Listagem ele cria a proposta (tema, critérios, turma, prazo) e acompanha os envios. Em Relatório ele vê quem enviou e como foi a correção. A correção pode ser da IA, dele ou das duas.</td></tr>
+    </tbody>
+  </table>
+  <div class="chamada">O prazo do evento trava o que não foi enviado. Depois da data, o lançamento em aberto fica como não enviado. A média do período e o boletim oficial continuam na coordenação: o professor entrega a nota; a escola gera e homologa.</div>
+</section>
+
+<section>
+  <h2>Conteúdo da turma</h2>
+  <p class="lead">O que o professor prepara e o aluno passa a ver no menu da escola.</p>
+  <table>
+    <thead><tr><th>Página</th><th>O que o professor encontra</th></tr></thead>
+    <tbody>
+      <tr><td>Planos de Aula</td><td>O plano da aula: objetivo, conteúdo, atividade e recurso, ligado à turma e à disciplina. Pode ser exportado e, no dia, o diário puxa o plano daquela data.</td></tr>
+      <tr><td>Jornada do Aluno</td><td>A trilha que ele monta: vídeo, documento, texto, exercício, resumo e redação. Ele acompanha quem avançou, responde dúvida e corrige resumo com nota.</td></tr>
+      <tr><td>Meu Material</td><td>A apostila com IA. Ele sobe ou gera o material, e o aluno da turma passa a abrir em Meu Material.</td></tr>
+      <tr><td>Minha Apostila</td><td>A apostila em arquivo, para consulta e distribuição, sem o fluxo de conversa do Meu Material.</td></tr>
+      <tr><td>Arquivos</td><td>Os arquivos publicados para as turmas dele. O aluno vê a parte que foi compartilhada, em Arquivos.</td></tr>
+      <tr><td>Educa Slides</td><td>A geração de apresentação a partir de um tema ou de um material. O slide sai para a aula; a escola precisa ter o módulo ligado.</td></tr>
+      <tr><td>AVA / EAD</td><td>Os cursos a distância em que ele atua: aulas, turma do curso e o acompanhamento de quem está matriculado no curso.</td></tr>
+      <tr><td>Expo Colag</td><td>A mostra ou feira da escola, quando o módulo está ligado para o professor lançar ou acompanhar o trabalho.</td></tr>
+      <tr><td>Tudinha / Educa Prof</td><td>O assistente de IA do professor, no topo do menu quando a escola configura o aplicativo. Serve para preparar aula, questão e material. Abre com o login dele.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Comunicação, créditos e ajuda</h2>
+  <table>
+    <thead><tr><th>Página</th><th>O que o professor encontra</th></tr></thead>
+    <tbody>
+      <tr><td>Mural de Recados</td><td>O aviso para as turmas que ele leciona. O aluno lê no mural do próprio painel.</td></tr>
+      <tr><td>Recados aos pais</td><td>A mensagem para os responsáveis da turma, quando a escola liga esse canal. Os pais leem no painel ou no aplicativo.</td></tr>
+      <tr><td>Links da escola</td><td>Atalhos que a coordenação marcou como visíveis para o professor: portal, material externo, sistema da escola.</td></tr>
+      <tr><td>Minha Carteira</td><td>O saldo de créditos dele, quando a escola trabalha com crédito de IA. Mostra o que foi consumido em geração e correção.</td></tr>
+      <tr><td>EducaShop</td><td>A compra de recurso com esse crédito, na mesma condição da carteira.</td></tr>
+      <tr><td>Tutoriais</td><td>Os vídeos e os passos que a escola ou a plataforma publicou para ensinar o uso do painel.</td></tr>
+    </tbody>
+  </table>
+  <div class="chamada">Ano letivo, turma, matriz, regra de aprovação e homologação do período ficam no painel da coordenação. O professor entrega a aula, a chamada e a nota das disciplinas dele. O boletim da turma só fecha quando a coordenação gera e homologa.</div>
+</section>
+
+</body>
+</html>

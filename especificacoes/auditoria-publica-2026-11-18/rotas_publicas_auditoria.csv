@@ -1,0 +1,88 @@
+metodo,rota,parametros,controller,middleware,csrf,finalidade
+GET,/login,nenhum,AuthController@loginAluno,nenhum,nao,tela de login do aluno
+POST,/login,_token; tipo; login; senha; site_url vazio,AuthController@autenticar,nenhum,sim,autenticar sessao PHP
+GET,/login/csrf-token,nenhum,AuthController@getLoginCsrfTokenJson,nenhum,nao,devolver o token CSRF da sessao
+GET,/,nenhum,AuthController@loginAluno,nenhum,nao,mesma tela de login do aluno
+GET,/admin,nenhum,AuthController@loginAdmin,nenhum,nao,tela de login do admin
+GET,/professor,nenhum,AuthController@loginProfessor,nenhum,nao,tela de login do professor
+GET,/pais,nenhum,AuthController@loginPais,nenhum,nao,tela de login do responsavel
+GET,/monitor,nenhum,AuthController@loginMonitor,nenhum,nao,tela de login do monitor
+GET,/logout,nenhum,AuthController@logout,nenhum,nao,encerrar sessao
+GET,/auth/entrar-como,token,AuthController@entrarComo,nenhum,nao,troca de sessao por token de uso unico
+GET,/recuperar-senha,tipo opcional,AuthController@recuperarSenha,nenhum,nao,formulario de recuperacao por e-mail
+POST,/enviar-recuperacao,_token; email; tipo,AuthController@enviarRecuperacao,nenhum,sim,pede envio de e-mail de redefinicao
+GET,/recuperar-senha/reset,token; email,AuthController@resetPassword,nenhum,nao,abre o formulario se o token existir
+POST,/recuperar-senha/reset,_token; token; email; senha; confirmar_senha,AuthController@processarReset,nenhum,sim,grava senha nova
+GET,/aluno/recuperar-senha,nenhum,AuthController@recuperarSenhaAluno,nenhum,nao,formulario do aluno sem e-mail
+POST,/aluno/recuperar-senha/pergunta,_token; nickname,AuthController@recuperarSenhaAlunoPergunta,nenhum,sim,pede a pergunta de seguranca
+POST,/aluno/recuperar-senha/reset,_token; resposta; senha; confirmar_senha,AuthController@recuperarSenhaAlunoReset,nenhum,sim,grava senha nova do aluno
+GET,/professor/recuperar-senha,nenhum,AuthController@recuperarSenhaProfessor,nenhum,nao,formulario do professor
+POST,/professor/enviar-recuperacao,_token; email,AuthController@enviarRecuperacaoProfessor,nenhum,sim,pede envio de e-mail do professor
+GET,/professor/recuperar-senha/reset,token; email,AuthController@resetPasswordProfessor,nenhum,nao,abre o formulario do professor
+POST,/professor/recuperar-senha/reset,_token; token; email; senha; confirmar_senha,AuthController@processarResetProfessor,nenhum,sim,grava senha nova do professor
+POST,/auth/alterar-senha-obrigatoria,_token; email; senha_atual; nova_senha; confirmar_senha; tipo,AuthController@alterarSenhaObrigatoriaLogin,nenhum,sim,troca a senha padrao antes do painel
+GET,/primeiro-acesso,turma_id; aluno_nome,AuthController@primeiroAcesso,nenhum,nao,formulario de primeiro acesso
+POST,/primeiro-acesso,_token; turma_id; aluno_id; aluno_nome,AuthController@primeiroAcesso,nenhum,sim,confere nome na escola
+GET,/primeiro-acesso/alunos,nenhum,AuthController@buscarAlunosPorTurma,nenhum,nao,legado; nao lista alunos
+POST,/primeiro-acesso/validar,_token; turma_id; aluno_id; aluno_nome,AuthController@validarPrimeiroAcesso,nenhum,sim,mesma conferencia do primeiro acesso
+GET,/primeiro-acesso/criar,nenhum,AuthController@criarAcesso,sessao de primeiro acesso,nao,formulario de nickname e senha
+POST,/primeiro-acesso/salvar,_token; nickname; senha; confirmar_senha,AuthController@salvarPrimeiroAcesso,sessao de primeiro acesso,sim,cria o acesso do aluno
+GET,/media/serve,type; key; tenant,MediaServeController@serve,nenhum no roteador; sessao conforme o type,nao,entrega arquivo local ou S3
+GET,/uploads/jornadas/exercicios/{filename},filename,ServeImagemExercicioController@serve,nenhum,nao,imagem de enunciado de exercicio
+GET,/ai-job/{id}/status,id,AIJobController@status,sessao conferida no controller,nao,estado de job de IA
+POST,/api/auth/login,JSON email; password,Api/AuthController@login,nenhum,nao,JWT legado de responsavel
+GET,/api/v1/status,nenhum,ApiStatusController@index,nenhum,nao,saude da API mobile
+POST,/api/v1/auth/login,JSON cpf; senha,MobileAuthController@login,nenhum,nao,JWT v1 de responsavel
+POST,/api/v1/auth/refresh,JSON refresh,MobileAuthController@refresh,nenhum,nao,renova JWT v1
+POST,/api/autenticacao/entrar,JSON cpf; senha,MobileAuthController@login,nenhum,nao,alias do login mobile
+POST,/api/autenticacao/renovar,JSON refresh,MobileAuthController@refresh,nenhum,nao,alias da renovacao mobile
+GET,/api/noticias,categoria; limit,NoticiasController@index,nenhum,nao,lista noticias publicas
+GET,/api/docs,nenhum,SwaggerController@index,nenhum,nao,documentacao da API
+GET,/api/openapi.json,nenhum,SwaggerController@openapi,nenhum,nao,contrato OpenAPI
+POST,/api/generate-image,corpo da geracao,GenerateImageController@generate,sessao Master no controller,nao,geracao de imagem; nao e anonima
+GET,/validar/historico/{hash},hash,HistoricoValidacaoController@validar,nenhum,nao,confere hash de historico sem notas
+GET,/validar/carteirinha/{token},token,CarteirinhaPublicoController@validar,nenhum,nao,confere carteirinha
+GET,/carteirinha/{token},token,CarteirinhaPublicoController@ver,nenhum,nao,exibe carteirinha pelo token
+GET,/matricula/interesse,nenhum,MatriculaPublicoController@captacaoForm,nenhum,nao,formulario de interesse
+POST,/matricula/interesse,campos do formulario de captacao,MatriculaPublicoController@captacaoStore,nenhum,conferir no controller,grava interesse de matricula
+GET,/matricula/contrato/{token},token,MatriculaPublicoController@verContrato,nenhum,nao,abre contrato
+POST,/matricula/contrato/{token}/dados,token; dados do contrato,MatriculaPublicoController@confirmarDados,nenhum,conferir no controller,confirma dados do contrato
+POST,/matricula/contrato/{token}/assinar,token,MatriculaPublicoController@assinar,nenhum,conferir no controller,assina contrato
+GET,/matricula/contrato/{token}/pdf,token,MatriculaPublicoController@downloadPdf,nenhum,nao,baixa PDF do contrato
+GET,/expo-colag/s/{token},token,ExpoColagPublicoController@stand,nenhum,nao,pagina publica de stand
+POST,/expo-colag/s/{token}/avaliar,token; avaliacao,ExpoColagPublicoController@avaliarStand,nenhum,conferir no controller,grava avaliacao
+GET,/expo-colag/midia/{id}/capa,id,ExpoColagPublicoController@capa,nenhum,nao,capa de midia
+GET,/captura-gabarito/{token},token,CapturaGabaritoController@abrir,nenhum,nao,abre captura
+POST,/captura-gabarito/{token},token; arquivo,CapturaGabaritoController@enviar,nenhum,conferir no controller,envia gabarito
+GET,/educalabs/public/{share_id},share_id,EducaLabsController@publicView,nenhum,nao,pagina compartilhada
+GET,/educalabs/public/{share_id}/styles.css,share_id,EducaLabsController@publicAsset,nenhum,nao,css do compartilhamento
+GET,/educalabs/public/{share_id}/script.js,share_id,EducaLabsController@publicAsset,nenhum,nao,script do compartilhamento
+GET,/lex/entrar,perfil,LexLoginController@entrar,nenhum,nao,inicia login LEX
+GET,/lex/retorno,state; code; error,LexLoginController@retorno,nenhum,nao,retorno do provedor LEX
+GET,/external-apps/abrir/{id},id,ExternalAppsController@abrir,nenhum,nao,abre app externo
+GET,/external-apps/validate-token,token,ExternalAppsController@validateToken,nenhum,nao,valida token de app
+POST,/external-apps/validate-token,token,ExternalAppsController@validateToken,nenhum,nao,valida token de app
+GET,/external-apps/credit-context,token,ExternalAppsController@creditContext,nenhum,nao,contexto de credito
+POST,/external-apps/consume,token,ExternalAppsController@consumeCredit,nenhum,nao,consome credito
+POST,/external-apps/refund,token,ExternalAppsController@refundCredit,nenhum,nao,estorna credito
+GET,/games/validate-token,token,GameController@validateToken,nenhum,nao,valida token de jogo
+POST,/games/logout,token,GameController@logoutToken,nenhum,nao,encerra token de jogo
+GET,/notes/validate-token,token,NotesTokenController@validateToken,nenhum,nao,valida token de notes
+POST,/notes/logout,token,NotesTokenController@logoutToken,nenhum,nao,encerra token de notes
+GET,/educalabs/validate-token,token,EducaLabsController@validateToken,nenhum,nao,valida token do EducaLabs
+POST,/educalabs/logout,token,EducaLabsController@logoutToken,nenhum,nao,encerra token do EducaLabs
+GET,/creditos/asaas/checkout,parametros de checkout,MasterCreditosCheckoutController@iniciar,nenhum,nao,inicia checkout
+POST,/creditos/asaas/checkout,parametros de checkout,MasterCreditosCheckoutController@iniciar,nenhum,nao,inicia checkout
+POST,/api/webhook/gravacao-jitsi,corpo do webhook,JitsiRecordingWebhookController@handle,assinatura propria,nao,webhook de gravacao
+POST,/api/webhooks/presenca,corpo do webhook,PresencaWebhookController@receber,assinatura propria,nao,webhook de presenca
+POST,/api/webhooks/presenca/{provedor},provedor; corpo,PresencaWebhookController@receber,assinatura propria,nao,webhook de presenca
+POST,/webhooks/zapsign,corpo; assinatura,ZapSignWebhookController@handle,token do webhook,nao,webhook de assinatura
+POST,/webhooks/zapsign/{tenant_slug},tenant_slug; corpo,ZapSignWebhookController@handle,token do webhook,nao,webhook de assinatura
+POST,/api/v1/facial-devices/pair,codigo de pareamento,FacialDeviceApiController@pair,nenhum,nao,pareia totem; fora desta bateria
+GET,/api/parents/children,Authorization Bearer,Api/ParentController@children,ApiAuth,nao,lista filhos; exige JWT
+GET,/api/parents/child/{id}/dashboard,id; Bearer,Api/ParentController@dashboard,ApiAuth,nao,painel do filho
+GET,/api/parents/child/{id}/exams,id; Bearer,Api/ParentController@exams,ApiAuth,nao,provas do filho
+GET,/api/parents/child/{id}/exercises,id; Bearer,Api/ParentController@exercises,ApiAuth,nao,exercicios do filho
+GET,/api/parents/child/{id}/journeys,id; Bearer,Api/ParentController@journeys,ApiAuth,nao,jornadas do filho
+GET,/api/parents/child/{id}/lesson-plans,id; Bearer,Api/ParentController@lessonPlans,ApiAuth,nao,planos do filho
+GET,/api/parents/child/{id}/essays,id; Bearer,Api/ParentController@essays,ApiAuth,nao,redacoes do filho

@@ -21,6 +21,7 @@ class AdminMenuDiagnostico
             ['grupo' => 'Acadêmico · Pessoas', 'label' => 'Professores', 'path' => '/admin/teachers', 'permissao' => 'professores', 'feature' => null, 'secretaria' => true],
             ['grupo' => 'Acadêmico · Pessoas', 'label' => 'Alunos', 'path' => '/admin/students', 'permissao' => 'alunos', 'feature' => null, 'secretaria' => true],
             ['grupo' => 'Acadêmico · Pessoas', 'label' => 'Turmas', 'path' => '/admin/turmas', 'permissao' => 'turmas', 'feature' => null, 'secretaria' => true],
+            ['grupo' => 'Acadêmico · Pessoas', 'label' => 'EducaSync', 'path' => '/admin/educasync', 'permissao' => 'educasync', 'feature' => 'educasync', 'secretaria' => true],
             ['grupo' => 'Acadêmico · Como avalia', 'label' => 'Regras de Aprovação', 'path' => '/admin/regras-academicas', 'permissao' => 'regras_academicas', 'feature' => 'regras_academicas', 'secretaria' => true],
             ['grupo' => 'Acadêmico · Como avalia', 'label' => 'Tipos de Nota', 'path' => '/admin/provas/tipos-avaliacao', 'permissao' => 'provas_online', 'feature' => 'professor_provas', 'secretaria' => true],
             ['grupo' => 'Acadêmico · Como avalia', 'label' => 'Quadro de Notas', 'path' => '/admin/quadros-notas', 'permissao' => 'grupos_regras_notas', 'feature' => 'grupos_regras_notas', 'secretaria' => true],

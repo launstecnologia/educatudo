@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>EducaTudo — ERP acadêmico</title>
+<style>
+  @page {
+    size: A4;
+    margin: 16mm 16mm 18mm 16mm;
+    @bottom-center {
+      content: "EducaTudo  ·  ERP acadêmico  ·  " counter(page);
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 8.5pt;
+      color: #6b7280;
+    }
+  }
+  @page :first {
+    margin: 0;
+    @bottom-center { content: none; }
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    color: #1c2430;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.45;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  h1, h2, h3, h4 { line-height: 1.2; margin: 0; break-after: avoid; page-break-after: avoid; }
+  p { margin: 0 0 8px; }
+  strong { font-weight: 650; }
+
+  .capa {
+    height: 297mm;
+    background: #1e1b4b;
+    color: #fff;
+    padding: 22mm 18mm 18mm;
+    display: flex;
+    flex-direction: column;
+    page-break-after: always;
+    position: relative;
+    overflow: hidden;
+  }
+  .capa::after {
+    content: "";
+    position: absolute;
+    right: -40mm;
+    bottom: -30mm;
+    width: 140mm;
+    height: 140mm;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+  }
+  .marca {
+    font-size: 11pt;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #c4b5fd;
+    font-weight: 650;
+  }
+  .capa h1 {
+    margin-top: 28mm;
+    font-size: 38pt;
+    font-weight: 720;
+    letter-spacing: -0.03em;
+    max-width: 150mm;
+  }
+  .capa .sub {
+    margin-top: 8mm;
+    font-size: 14pt;
+    max-width: 145mm;
+    color: #e0e7ff;
+    line-height: 1.4;
+  }
+  .faixa {
+    margin-top: auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4mm;
+    position: relative;
+    z-index: 1;
+  }
+  .faixa > div {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 4mm;
+    padding: 5mm 4.5mm;
+  }
+  .faixa .k {
+    font-size: 8pt;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #c4b5fd;
+    margin-bottom: 2mm;
+  }
+  .faixa .v { font-size: 12pt; font-weight: 650; }
+  .rodape-capa {
+    margin-top: 8mm;
+    font-size: 9.5pt;
+    color: #a5b4fc;
+    position: relative;
+    z-index: 1;
+  }
+
+  h2 {
+    font-size: 16.5pt;
+    letter-spacing: -0.02em;
+    color: #1e1b4b;
+    margin: 0 0 3mm;
+    padding-bottom: 2mm;
+    border-bottom: 2px solid #1e1b4b;
+  }
+  h3 {
+    font-size: 12.5pt;
+    color: #312e81;
+    margin: 6mm 0 2mm;
+  }
+  h4 {
+    font-size: 10.5pt;
+    color: #1e1b4b;
+    margin: 4mm 0 1.5mm;
+  }
+  .lead { font-size: 11.5pt; color: #334155; margin-bottom: 4mm; }
+
+  .sec { page-break-inside: auto; }
+  .quebra { page-break-before: always; }
+
+  .chamada {
+    background: #eef2ff;
+    border-left: 3.5px solid #4f46e5;
+    padding: 3.5mm 4mm;
+    margin: 3mm 0 4mm;
+    border-radius: 0 2mm 2mm 0;
+  }
+  .aviso {
+    background: #fffbeb;
+    border-left: 3.5px solid #d97706;
+    padding: 3.5mm 4mm;
+    margin: 3mm 0 4mm;
+    border-radius: 0 2mm 2mm 0;
+  }
+  .ok {
+    background: #ecfdf5;
+    border-left: 3.5px solid #059669;
+    padding: 3.5mm 4mm;
+    margin: 3mm 0 4mm;
+    border-radius: 0 2mm 2mm 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 2mm 0 4mm;
+    font-size: 9.5pt;
+    page-break-inside: avoid;
+  }
+  th {
+    text-align: left;
+    background: #1e1b4b;
+    color: #fff;
+    font-weight: 600;
+    padding: 2.2mm 2.6mm;
+  }
+  td {
+    padding: 1.8mm 2.4mm;
+    border-bottom: 1px solid #e5e7eb;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f8fafc; }
+  table.densa { font-size: 8.8pt; margin-bottom: 1.5mm; }
+  table.densa th { padding: 1.6mm 2.4mm; }
+  table.densa td { padding: 0.95mm 2.4mm; }
+
+  .fluxo {
+    display: grid;
+    grid-template-columns: 1fr 8mm 1fr 8mm 1fr;
+    gap: 0;
+    align-items: stretch;
+    margin: 3mm 0 5mm;
+    page-break-inside: avoid;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 3mm;
+    padding: 3.5mm 3.5mm 3mm;
+    box-shadow: 0 1px 0 rgba(15,23,42,0.04);
+  }
+  .card .num {
+    display: inline-block;
+    background: #4f46e5;
+    color: #fff;
+    font-size: 8pt;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    border-radius: 99px;
+    padding: 0.6mm 2.2mm;
+    margin-bottom: 1.5mm;
+  }
+  .card h4 { margin-top: 0; }
+  .card p { margin: 0; font-size: 9.4pt; color: #334155; }
+  .seta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4f46e5;
+    font-size: 16pt;
+    font-weight: 700;
+  }
+
+  .estados {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 2mm;
+    margin: 3mm 0 2mm;
+    page-break-inside: avoid;
+  }
+  .estado {
+    border-radius: 2.5mm;
+    padding: 3mm 2.5mm;
+    min-height: 28mm;
+  }
+  .estado .t { font-weight: 700; font-size: 9.5pt; margin-bottom: 1mm; }
+  .estado p { margin: 0; font-size: 8.4pt; }
+  .e1 { background: #f1f5f9; color: #0f172a; }
+  .e2 { background: #eef2ff; color: #312e81; }
+  .e3 { background: #fff7ed; color: #9a3412; }
+  .e4 { background: #ecfdf5; color: #065f46; }
+  .e5 { background: #fef2f2; color: #991b1b; }
+
+  ol.passos { margin: 1mm 0 3mm 5mm; padding: 0; }
+  ol.passos li { margin: 0 0 1.6mm; }
+  ul.limpo { margin: 1mm 0 3mm 4.5mm; padding: 0; }
+  ul.limpo li { margin: 0 0 1.4mm; }
+
+  .duo {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3mm;
+    margin: 2mm 0 4mm;
+    page-break-inside: avoid;
+  }
+  .mini {
+    border: 1px solid #e5e7eb;
+    border-radius: 2.5mm;
+    padding: 3mm 3.2mm;
+    background: #fff;
+  }
+  .mini h4 { margin-top: 0; }
+  .mini p:last-child { margin-bottom: 0; }
+
+  .indice { margin: 2mm 0 0; }
+  .indice a { color: inherit; text-decoration: none; }
+  .indice .linha {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px dotted #cbd5e1;
+    padding: 1.6mm 0;
+    font-size: 11pt;
+  }
+  .indice .linha span:last-child { color: #64748b; }
+
+  .nota-rodape {
+    margin-top: 6mm;
+    font-size: 8.5pt;
+    color: #64748b;
+  }
+</style>
+</head>
+<body>
+
+<section class="capa">
+  <div class="marca">EducaTudo · Documentação de produto</div>
+  <h1>ERP acadêmico</h1>
+  <p class="sub">Como a escola monta o ano, conduz a rotina da sala e fecha o período — da matrícula ao documento oficial.</p>
+  <div class="faixa">
+    <div>
+      <div class="k">1 · Acadêmico</div>
+      <div class="v">Montar o ano</div>
+    </div>
+    <div>
+      <div class="k">2 · Rotina</div>
+      <div class="v">O dia a dia</div>
+    </div>
+    <div>
+      <div class="k">3 · Fechamento</div>
+      <div class="v">Tornar oficial</div>
+    </div>
+  </div>
+  <p class="rodape-capa">Novembro de 2026 · Uso interno da escola e da equipe EducaTudo</p>
+</section>
+
+<section class="sec">
+  <h2>Para que serve este documento</h2>
+  <p class="lead">Este texto explica o núcleo de gestão escolar do EducaTudo: a parte que substitui o caderno da secretaria, o diário do professor e a ata de fim de período.</p>
+  <p>O EducaTudo também tem aula digital, provas online, redação, jornadas e a tutora Tudinha. Esse outro lado ensina. O ERP acadêmico registra a vida oficial do aluno: em que turma ele está, o que foi dado em sala, quantas faltas teve, qual nota entrou no período e se o resultado pode ser impresso.</p>
+  <div class="chamada">
+    A implantação do ano é reversível. Homologar o período é o ponto sem volta. Até lá, a escola ajusta cadastro, nota e chamada. Depois da homologação, a correção segue o fluxo de retificação, com justificativa e histórico.
+  </div>
+  <p>O menu do painel já está organizado nessa ordem. Este documento segue a mesma ordem.</p>
+
+  <div class="indice">
+    <div class="linha"><span>1. O ano em três tempos</span></div>
+    <div class="linha"><span>2. Quem faz o quê</span></div>
+    <div class="linha"><span>3. Acadêmico — montar o ano</span></div>
+    <div class="linha"><span>4. Como a escola avalia</span></div>
+    <div class="linha"><span>5. Rotina — diário, frequência e ocorrências</span></div>
+    <div class="linha"><span>6. Fechamento</span></div>
+    <div class="linha"><span>7. Secretaria, vida escolar e documentos</span></div>
+    <div class="linha"><span>8. Glossário</span></div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>1. O ano em três tempos</h2>
+  <p class="lead">Tudo o que a escola faz no acadêmico cabe em três momentos. O primeiro acontece uma vez por ano. Os outros dois se repetem a cada bimestre, trimestre ou semestre.</p>
+
+  <div class="fluxo">
+    <div class="card">
+      <div class="num">ACADÊMICO</div>
+      <h4>Montar</h4>
+      <p>Ano letivo, cursos, disciplinas, turmas, matrícula, grade e a regra de aprovação. Sem isso, não há aula para chamar nem aluno para avaliar.</p>
+    </div>
+    <div class="seta">→</div>
+    <div class="card">
+      <div class="num">ROTINA</div>
+      <h4>Registrar</h4>
+      <p>O professor abre a aula da grade, faz a chamada, anota o conteúdo. A coordenação acompanha faltas e ocorrências.</p>
+    </div>
+    <div class="seta">→</div>
+    <div class="card">
+      <div class="num">FECHAMENTO</div>
+      <h4>Oficializar</h4>
+      <p>A média do período é conferida, a recuperação se resolve e a turma é homologada. Daí saem boletim, ficha, ata e histórico.</p>
+    </div>
+  </div>
+
+  <h3>A divisão do ano nasce num lugar só</h3>
+  <p>Bimestre, trimestre, semestre ou etapa única é definido no <strong>Ano Letivo</strong>. Regra de aprovação, evento avaliativo, boletim e fechamento usam essa mesma divisão. Não existe uma segunda tela para “criar o 1º trimestre”.</p>
+
+  <h3>Dois atos que parecem um</h3>
+  <p><strong>Cadastrar o aluno</strong> guarda a pessoa: nome, documentos, responsáveis. <strong>Matricular</strong> coloca essa pessoa numa turma daquele ano. Sem matrícula ativa, o aluno existe no cadastro e fica de fora da chamada, da nota e do boletim.</p>
+
+  <div class="aviso">
+    A trilha <strong>Implantar acadêmico</strong> confere, na ordem, se o ano já pode rodar. Ela lê o que a escola já cadastrou. Homologar continua fora dessa trilha: é o trabalho de fim de período, no Painel de Fechamento.
+  </div>
+</section>
+
+<section class="sec">
+  <h2>2. Quem faz o quê</h2>
+  <p class="lead">O mesmo painel muda de acordo com o papel. Direção vê o conjunto. Coordenação opera a avaliação. Secretaria cuida de pessoa, matrícula e documento. Professor registra a aula que é dele.</p>
+
+  <table>
+    <thead>
+      <tr><th>Papel</th><th>No acadêmico</th><th>Na rotina</th><th>No fechamento</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Direção</strong></td>
+        <td>Ano, regra, visão da escola</td>
+        <td>Indicadores e ocorrências graves</td>
+        <td>Homologa e autoriza retificação</td>
+      </tr>
+      <tr>
+        <td><strong>Coordenação</strong></td>
+        <td>Estrutura, grade, eventos e fórmulas</td>
+        <td>Acompanha diário e faltas</td>
+        <td>Conferência, recuperação, conselho</td>
+      </tr>
+      <tr>
+        <td><strong>Secretaria</strong></td>
+        <td>Alunos, matrícula, movimentação</td>
+        <td>Consulta frequência e documentos</td>
+        <td>Emite ficha, ata, histórico, declaração</td>
+      </tr>
+      <tr>
+        <td><strong>Professor</strong></td>
+        <td>Vê suas turmas e disciplinas</td>
+        <td>Chamada, conteúdo, lançamento de nota</td>
+        <td>Participa do conselho da turma</td>
+      </tr>
+      <tr>
+        <td><strong>Aluno e família</strong></td>
+        <td>—</td>
+        <td>Veem o que a escola liberou</td>
+        <td>Consultam boletim e vida escolar</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>Família e monitor acompanham. Eles não alteram nota, chamada nem resultado. O que o aluno e os pais enxergam depende da regra: a escola marca se o demonstrativo e o boletim ficam disponíveis para o estudante e para a família.</p>
+</section>
+
+<section class="sec quebra">
+  <h2>3. Acadêmico — montar o ano</h2>
+  <p class="lead">O acadêmico descreve a escola uma vez. O resto do ano só consome essa descrição. A ordem abaixo é a ordem de dependência: cada passo prepara o seguinte.</p>
+
+  <h3>Estrutura</h3>
+  <table>
+    <thead>
+      <tr><th>Peça</th><th>O que a escola define</th><th>O que quebra se faltar</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Ano letivo</strong></td>
+        <td>Datas do ano e a divisão em bimestres, trimestres, semestres ou etapa única</td>
+        <td>Prova, boletim e fechamento não sabem em que período estão</td>
+      </tr>
+      <tr>
+        <td><strong>Cursos e séries</strong></td>
+        <td>O percurso. Ensino Fundamental e Médio podem conviver. Curso com progressão anual precisa de série</td>
+        <td>A turma não encontra o ano escolar do aluno</td>
+      </tr>
+      <tr>
+        <td><strong>Componentes curriculares</strong></td>
+        <td>As disciplinas. “Permite avaliação” marca quem recebe nota</td>
+        <td>A matriz nasce vazia</td>
+      </tr>
+      <tr>
+        <td><strong>Matriz curricular</strong></td>
+        <td>Quais disciplinas da série entram no boletim, e com qual carga horária</td>
+        <td>Boletim e grade não acham as matérias da turma</td>
+      </tr>
+      <tr>
+        <td><strong>Calendário letivo</strong></td>
+        <td>Dias letivos, feriados, recesso e as datas de avaliação</td>
+        <td>A frequência conta feriado como aula; o gerador de períodos fica sem data</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Pessoas e turmas</h3>
+  <table>
+    <thead>
+      <tr><th>Peça</th><th>O que a escola define</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Professores</strong></td>
+        <td>Quem leciona. O vínculo com turma e disciplina abre o diário e o lançamento de nota.</td>
+      </tr>
+      <tr>
+        <td><strong>Salas</strong></td>
+        <td>O ambiente da aula. A turma e a grade apontam para uma sala.</td>
+      </tr>
+      <tr>
+        <td><strong>Turmas</strong></td>
+        <td>A sala de aula do ano: curso, série, ano letivo e matriz. O fechamento é por turma e período.</td>
+      </tr>
+      <tr>
+        <td><strong>Alunos matriculados</strong></td>
+        <td>A pessoa na turma. Remanejamento e transferência mudam esse vínculo e deixam rastro na vida escolar.</td>
+      </tr>
+      <tr>
+        <td><strong>Grade horária</strong></td>
+        <td>Qual professor, qual disciplina, qual turma, qual dia e qual horário. O diário abre a aula a partir daqui.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="ok">
+    Quando esses passos estão prontos, o ano já pode rodar: o professor encontra a aula do dia, a coordenação tem onde lançar nota e o fechamento tem turma com aluno.
+  </div>
+
+  <h3>EducaSync</h3>
+  <p>Onde a escola usa, o EducaSync ajuda a manter a grade e os vínculos alinhados. Ele não substitui o cadastro da turma nem a matrícula: organiza o que já foi definido na estrutura.</p>
+</section>
+
+<section class="sec quebra">
+  <h2>4. Como a escola avalia</h2>
+  <p class="lead">A nota digitada e o boletim impresso não nascem na mesma tela. Cada peça responde uma pergunta. A seguinte usa a resposta da anterior.</p>
+
+  <table>
+    <thead>
+      <tr><th>Pergunta da escola</th><th>Onde se responde</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>A partir de quanto o aluno passa? E a frequência conta?</td><td><strong>Regras de Aprovação</strong></td></tr>
+      <tr><td>Qual prova existe neste trimestre, para quais turmas?</td><td><strong>Eventos Avaliativos</strong></td></tr>
+      <tr><td>Qual é a conta ao vivo do período, antes do documento?</td><td><strong>Demonstrativo de notas</strong></td></tr>
+      <tr><td>Qual documento a família recebe, e ele entra no histórico?</td><td><strong>Boletim</strong></td></tr>
+      <tr><td>Como imprimir o que já foi calculado?</td><td><strong>Relatórios</strong></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Regra de aprovação</h3>
+  <p>A regra é o combinado daquele ano e daquele curso: média mínima, frequência mínima, escala da nota, arredondamento, casas decimais e recuperação. Fundamental e Médio podem ter regras diferentes no mesmo ano. A regra fica versionada: alterar 2026 preserva 2025.</p>
+  <p>A escala pode ser numérica (0 a 10 ou 0 a 100) ou conceitual. A escola pode exigir média e frequência juntas, dispensar a frequência, ou aprovar só pela presença.</p>
+  <p>Há dois destinos de documento na própria regra:</p>
+  <div class="duo">
+    <div class="mini">
+      <h4>Modelo oficial</h4>
+      <p>Entra no histórico e na vida escolar. É a matriz regular da série.</p>
+    </div>
+    <div class="mini">
+      <h4>Modelo extra</h4>
+      <p>Curso complementar, como música ou robótica. Fica fora do histórico oficial.</p>
+    </div>
+  </div>
+  <p>As disciplinas que entram no documento são marcadas na regra. O que ficar de fora não aparece no demonstrativo nem no boletim. Os desdobramentos de cada área vêm do cadastro de componentes, não se cadastram de novo aqui.</p>
+
+  <h3>Recuperação dentro da regra</h3>
+  <p>A recuperação também nasce na regra, não numa tela solta. A escola diz quando ela acontece, quem faz, qual é o teto da nota e o que essa nota faz na média.</p>
+  <ul class="limpo">
+    <li><strong>A cada período letivo</strong> — o bimestre ou trimestre ganha o card da avaliação e, ao lado, o card da recuperação.</li>
+    <li><strong>A cada dois ciclos</strong> — uma prova vale para um par de períodos, e a escola escolhe em qual deles a nota entra.</li>
+    <li><strong>Recuperação final</strong> — uma prova no fim do ano, com card próprio.</li>
+  </ul>
+  <p>O efeito pode substituir a média se for maior, substituir a menor nota, fazer a média com a recuperação, somar na pontuação ou seguir uma fórmula da escola. A nota da recuperação só altera o resultado do jeito que este painel definiu. Na hora de fechar o ano, o fechamento é quem aplica essa substituição.</p>
+</section>
+
+<section class="sec quebra">
+  <h2>4. Como a escola avalia <span style="font-weight:500;color:#64748b;font-size:11pt;">· continuação</span></h2>
+
+  <h3>Evento avaliativo</h3>
+  <p>O evento é a prova, o trabalho ou o conjunto de registros daquele período. O mapa do ano mostra um card por bimestre ou trimestre, mais os cards de recuperação. Borda amarela é rascunho, verde é publicado, vermelha é recuperação.</p>
+  <p>O evento principal organiza. A nota entra no <strong>subevento</strong>: cada data, cada lista, cada prova. Pode ser avaliação online, feita pelo aluno na plataforma, ou offline, com a escola informando a nota. A escola escolhe se quem lança é o professor ou a coordenação, e pode definir um prazo. Depois do prazo, o que não foi enviado fica como não enviado e trava.</p>
+  <p>Quando o evento tem várias peças no mesmo período, a escola diz como elas viram uma nota só: última, maior, média, soma ou aproveitamento. O boletim mostra essa nota consolidada. Ele não soma as provas de novo.</p>
+  <div class="chamada">
+    Marcar “disponibilizar para o aluno ao lançar a nota” mostra cada nota assim que ela entra. A média do período só aparece quando o boletim daquele período é gerado.
+  </div>
+
+  <h3>Demonstrativo, boletim e relatório</h3>
+  <p>O <strong>demonstrativo</strong> é o quadro ao vivo do período. Ele é montado no início e cada lançamento aparece sozinho. Serve para a coordenação conferir a conta. Ele não é o documento da vida escolar.</p>
+  <p>O <strong>boletim</strong> é o documento oficial. Ao gerar, o sistema lê as notas do evento, calcula a média do período, aplica a regra (média, frequência, recuperação, arredondamento) e grava o resultado do aluno. Gerar de novo atualiza o mesmo registro. A frequência usada nessa conta vem do diário e da presença, não de um número digitado na hora de gerar.</p>
+  <p>O <strong>relatório</strong> só imprime o que o evento, o demonstrativo e o boletim já calcularam. Sem documento gerado, o relatório sai vazio.</p>
+
+  <h3>Onde o resultado aparece depois</h3>
+  <p>Gerar o boletim do período preenche a média na <strong>ficha de vida escolar</strong> do aluno. Célula digitada à mão, ou nota vinda de outra escola, permanece. O modelo extra não entra nessa ficha nem no histórico.</p>
+  <p>Homologar o ano — ata, ficha individual, boletim oficial congelado — é o módulo de fechamento. Essa etapa não recalcula a nota. Ela torna oficial o que já foi calculado.</p>
+
+  <div class="aviso">
+    Escolas que ainda não usam Eventos Avaliativos veem o caminho anterior no mesmo menu: Tipos de Nota, Quadro de Notas, Lançamento de Notas e Boletins. A pergunta de cada tela é a mesma. O caminho atual junta a prova, a fórmula e o período dentro do evento.
+  </div>
+</section>
+
+<section class="sec quebra">
+  <h2>5. Rotina — o dia a dia</h2>
+  <p class="lead">A rotina é o que acontece entre o início do período e o fechamento. Ela alimenta a frequência da regra de aprovação e as pendências do painel de fechamento.</p>
+
+  <h3>Diário de classe</h3>
+  <p>O professor abre o dia e vê as aulas que a grade marcou para ele. Cada linha é uma aula: turma, disciplina, horário. Ao abrir, o sistema cria o registro daquela aula naquela data, e a chamada lista os alunos com matrícula ativa na turma.</p>
+  <p>Na mesma tela o professor registra a execução da aula — conforme o planejado, parcial, alterada ou não realizada — e a presença de cada aluno. Se existir plano de aula daquela turma e disciplina na data, o diário o encontra e vincula.</p>
+  <p>A coordenação vê o diário da escola para supervisionar o que foi dado e o que ficou em aberto. Aula prevista na grade e ainda sem diário, depois de vencida, vira pendência de chamada.</p>
+
+  <div class="ok">
+    A coordenação só homologa com o diário em dia. Chamada vencida sem registro impede o início do fechamento daquela turma.
+  </div>
+
+  <h3>Frequência</h3>
+  <p>A tela de frequência junta duas origens, conforme o que a escola habilitou:</p>
+  <div class="duo">
+    <div class="mini">
+      <h4>Faltas da sala</h4>
+      <p>Saem da chamada do diário, aula por aula. É esta frequência que a regra de aprovação usa para aprovar ou reprovar por presença.</p>
+    </div>
+    <div class="mini">
+      <h4>Presença da portaria</h4>
+      <p>Entrada e saída do aluno na escola, inclusive por reconhecimento facial quando a escola usa. A família consulta esse histórico. Ela não substitui a chamada da aula.</p>
+    </div>
+  </div>
+  <p>A frequência mínima da regra é um percentual, por exemplo 75%. Com “exigir frequência mínima” marcado, o aluno precisa da média e da presença. Com “avaliação baseada apenas na frequência”, a aprovação olha a presença e dispensa a média.</p>
+
+  <h3>Ocorrências</h3>
+  <p>A ocorrência registra um fato da vida do aluno na escola: atraso, advertência, encaminhamento, observação pedagógica. A coordenação registra; o professor pode contribuir. O conselho de classe enxerga as ocorrências recentes na ficha do aluno, ao lado da nota e da frequência, para deliberar com o contexto da turma.</p>
+  <p>Ocorrência não muda nota nem falta. Ela documenta o que a escola decidiu acompanhar.</p>
+</section>
+
+<section class="sec quebra">
+  <h2>6. Fechamento</h2>
+  <p class="lead">Fechar é passar a turma, naquele período, de “ainda dá para lançar” para “este é o resultado oficial”. A unidade do fechamento é sempre turma × período: o 2º trimestre do 7º ano A, por exemplo.</p>
+
+  <h3>Os cinco estados</h3>
+  <div class="estados">
+    <div class="estado e1">
+      <div class="t">Aberto</div>
+      <p>O período está em uso. Nota e chamada ainda entram.</p>
+    </div>
+    <div class="estado e2">
+      <div class="t">Em fechamento</div>
+      <p>A coordenação conferiu a pauta e iniciou o fechamento.</p>
+    </div>
+    <div class="estado e3">
+      <div class="t">Em recuperação</div>
+      <p>Há aluno cuja situação ainda depende da recuperação ou do exame.</p>
+    </div>
+    <div class="estado e4">
+      <div class="t">Homologado</div>
+      <p>Resultado oficial. A edição trava. Os documentos podem ser emitidos.</p>
+    </div>
+    <div class="estado e5">
+      <div class="t">Retificado</div>
+      <p>Nasce um registro novo, com justificativa. O homologado anterior permanece no histórico.</p>
+    </div>
+  </div>
+  <p>O caminho normal é Aberto → Em fechamento → Homologado. Se ainda existe recuperação ou exame, o período vai para Em recuperação e só homologa quando cada aluno estiver com resultado definitivo: aprovado ou reprovado, ou uma situação especial já resolvida.</p>
+  <p>Um período homologado não reabre. A correção é uma <strong>retificação</strong>: a escola escreve o motivo, o registro antigo deixa de ser o vigente e um novo vigente nasce já marcado como retificado. Dali ele pode voltar a em fechamento, a em recuperação ou seguir para uma nova homologação.</p>
+
+  <h3>O que impede começar</h3>
+  <p>O painel lista, por turma, o estado, a quantidade de alunos, a frequência, quem está em recuperação e as pendências. Iniciar o fechamento exige uma pauta limpa:</p>
+  <ul class="limpo">
+    <li>a turma precisa ter aluno;</li>
+    <li>não pode haver chamada vencida sem diário;</li>
+    <li>não pode haver aluno em recuperação ou exame final ainda sem desfecho;</li>
+    <li>não pode haver outra pendência crítica aberta.</li>
+  </ul>
+  <p>Conferir a turma no painel não inicia o fechamento. Iniciar é um ato separado. Homologar todos, no filtro do ano e do período, percorre as turmas que ainda não estão homologadas e respeita as mesmas travas.</p>
+
+  <div class="aviso">
+    Homologar grava o resultado oficial. A tela pede confirmação e, enquanto grava, pede para não fechar a página. Essa etapa não recalcula a média: ela congela o que o boletim do período já calculou.
+  </div>
+</section>
+
+<section class="sec quebra">
+  <h2>6. Fechamento <span style="font-weight:500;color:#64748b;font-size:11pt;">· continuação</span></h2>
+
+  <h3>Conselho de classe</h3>
+  <p>O conselho é a reunião da turma naquele período. A sessão passa por preparação, andamento, finalizado e, se precisar, reaberto. Professores da turma entram como participantes. A ata é gerada a partir da sessão.</p>
+  <p>Na ficha de cada aluno o conselho vê, juntas, a nota do período, a frequência e as ocorrências recentes. A deliberação escolhe um resultado:</p>
+  <table>
+    <thead>
+      <tr><th>Deliberação</th><th>Sentido</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Aprovado</td><td>Mantém a aprovação já indicada pela regra.</td></tr>
+      <tr><td>Aprovado pelo Conselho</td><td>O colegiado aprova, com o registro dessa decisão.</td></tr>
+      <tr><td>Recuperação</td><td>O aluno segue para a recuperação prevista na regra.</td></tr>
+      <tr><td>Retido</td><td>O aluno não progride.</td></tr>
+      <tr><td>Transferido</td><td>A situação acadêmica acompanha a saída do aluno.</td></tr>
+      <tr><td>Manter resultado preliminar</td><td>O conselho confirma o que a conta já mostrou.</td></tr>
+    </tbody>
+  </table>
+  <p>O conselho também registra encaminhamentos: recuperação, acompanhamento pedagógico, contato com o responsável, atendimento, observação ou decisão final. A observação de um professor fica na ficha do aluno dentro da sessão.</p>
+  <div class="chamada">
+    O conselho delibera sobre o resultado. Ele não reescreve a nota lançada nem a frequência da chamada. Esses números continuam sendo a origem. A decisão do conselho é uma camada em cima deles.
+  </div>
+  <p>A escola pode exigir conselho finalizado antes de publicar o boletim da turma. Sem essa exigência, a publicação do boletim não espera a sessão.</p>
+
+  <h3>Documentos que nascem do período fechado</h3>
+  <p>Com o resultado homologado, a secretaria emite os documentos oficiais do período e do ano. O layout é editável em <strong>Layout de documentos</strong>. Os modelos do fechamento incluem:</p>
+  <ul class="limpo">
+    <li><strong>Boletim escolar</strong> — resultado por componente, carga horária, frequência e situação.</li>
+    <li><strong>Ficha individual</strong> — identificação do aluno e o registro do ano letivo.</li>
+    <li><strong>Ata de resultados finais</strong> e <strong>ata completa da turma</strong>.</li>
+    <li><strong>Histórico escolar</strong>.</li>
+    <li><strong>Declaração de conclusão</strong>, <strong>certificado</strong> e <strong>diploma</strong>, quando o percurso termina.</li>
+  </ul>
+  <p>A impressão em lote, no fechamento, percorre as turmas já homologadas. Turma ainda aberta ou em fechamento fica de fora do lote oficial.</p>
+</section>
+
+<section class="sec quebra">
+  <h2>7. Secretaria, vida escolar e documentos</h2>
+  <p class="lead">A secretaria guarda a pessoa ao longo dos anos. O acadêmico descreve o ano corrente. A vida escolar junta os anos num prontuário.</p>
+
+  <h3>Matrícula e movimentação</h3>
+  <p>O processo de matrícula vincula o aluno à turma, à série e ao período. Pode ser feito pela secretaria ou, quando a escola habilita, num fluxo de interesse e matrícula online, com contrato. Configuração de matrícula define o que esse fluxo pede.</p>
+  <p>Movimentação cobre remanejamento entre turmas e transferência escolar. O aluno deixa uma turma e entra em outra, ou sai da escola, com o registro na ficha. Transferido no conselho e transferência na secretaria conversam: um é a decisão pedagógica, o outro é o ato de registro.</p>
+
+  <h3>Vida escolar</h3>
+  <p>A ficha de vida escolar é o prontuário do aluno na escola. Nela convivem:</p>
+  <ul class="limpo">
+    <li>a ficha de boletim do ano, alimentada quando o boletim do período é gerado;</li>
+    <li>o fechamento de cada período daquela ficha e a homologação da ficha;</li>
+    <li>documentos anexados: histórico, ficha individual, declaração de transferência e outros;</li>
+    <li>a leitura de um histórico ou de uma declaração que já estava na ficha, para trazer notas de outra escola sem apagar o que foi digitado à mão.</li>
+  </ul>
+  <p>Nota calculada pelo EducaTudo preenche a célula vazia. Nota de outra escola, ou nota lançada direto na ficha, permanece.</p>
+
+  <h3>O que mais a secretaria emite no dia a dia</h3>
+  <table>
+    <thead>
+      <tr><th>Tela</th><th>Para que serve</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Documentos</strong></td><td>Declarações sob demanda para aluno e responsável.</td></tr>
+      <tr><td><strong>Carteirinha</strong></td><td>Identificação do aluno para uso na escola.</td></tr>
+      <tr><td><strong>Censo Escolar</strong></td><td>Organiza os dados que a escola presta ao Educacenso a partir do cadastro acadêmico.</td></tr>
+      <tr><td><strong>Layout de documentos</strong></td><td>O visual e os textos dos modelos oficiais, para a secretaria ajustar o papel timbrado da escola.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="sec quebra">
+  <h2>8. Glossário</h2>
+  <p class="lead">As palavras do menu, na ordem em que a escola as encontra.</p>
+  <table class="densa">
+    <thead>
+      <tr><th style="width:38%">Termo</th><th>Significado neste produto</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Ano letivo</td><td>O ano escolar, com datas e a divisão em períodos.</td></tr>
+      <tr><td>Curso e série</td><td>O percurso e o ano escolar dentro dele.</td></tr>
+      <tr><td>Componente curricular</td><td>A disciplina. Pode ou não receber nota.</td></tr>
+      <tr><td>Matriz curricular</td><td>As disciplinas da série, com carga horária.</td></tr>
+      <tr><td>Calendário letivo</td><td>Dias de aula, feriados e datas de avaliação.</td></tr>
+      <tr><td>Turma</td><td>O grupo de alunos de uma série, num ano, com uma matriz.</td></tr>
+      <tr><td>Matrícula</td><td>O vínculo do aluno com a turma. Distinto do cadastro da pessoa.</td></tr>
+      <tr><td>Grade horária</td><td>O horário semanal que o diário usa para abrir a aula.</td></tr>
+      <tr><td>Regra de aprovação</td><td>Média, frequência, escala, arredondamento e recuperação daquele ano e curso.</td></tr>
+      <tr><td>Evento avaliativo</td><td>A prova ou o conjunto de notas de um período. A nota entra no subevento.</td></tr>
+      <tr><td>Demonstrativo</td><td>A conta ao vivo do período, para a coordenação.</td></tr>
+      <tr><td>Boletim</td><td>O documento oficial do período, gravado ao gerar.</td></tr>
+      <tr><td>Modelo oficial / extra</td><td>Oficial entra no histórico. Extra é complementar e fica de fora.</td></tr>
+      <tr><td>Diário de classe</td><td>A aula do dia: chamada, conteúdo e execução.</td></tr>
+      <tr><td>Frequência</td><td>Faltas da chamada, e, se a escola usar, presença da portaria.</td></tr>
+      <tr><td>Fechamento</td><td>O estado oficial da turma naquele período.</td></tr>
+      <tr><td>Homologado</td><td>Resultado congelado. Só muda por retificação.</td></tr>
+      <tr><td>Retificação</td><td>Correção formal, com justificativa e histórico do registro anterior.</td></tr>
+      <tr><td>Conselho de classe</td><td>Sessão da turma. Delibera o resultado sem alterar a nota original.</td></tr>
+      <tr><td>Vida escolar</td><td>O prontuário do aluno através dos anos.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</body>
+</html>

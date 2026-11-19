@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Tudinha — O que a coordenação pode pedir no chat</title>
+<style>
+  @page { size: A4; margin: 14mm 14mm 16mm; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    color: #1e293b;
+    font-size: 11.5pt;
+    line-height: 1.45;
+    background: #fff;
+  }
+  h1, h2, h3 { font-weight: 700; color: #0f172a; margin: 0; line-height: 1.2; }
+  p { margin: 0 0 8px; }
+  .capa {
+    min-height: 250mm;
+    background: linear-gradient(165deg, #312e81 0%, #4f46e5 48%, #818cf8 100%);
+    color: #fff;
+    padding: 22mm 16mm;
+    page-break-after: always;
+    position: relative;
+  }
+  .capa-marca { font-size: 11pt; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.85; }
+  .capa-avatar {
+    width: 92px; height: 92px; border-radius: 50%;
+    border: 4px solid rgba(255,255,255,.85);
+    margin: 28mm 0 10mm;
+    object-fit: cover; background: #fff;
+  }
+  .capa h1 { font-size: 40pt; color: #fff; letter-spacing: -0.02em; }
+  .capa h2 { font-size: 16pt; color: #e0e7ff; font-weight: 500; margin-top: 8px; max-width: 150mm; }
+  .capa-rodape {
+    position: absolute; left: 16mm; right: 16mm; bottom: 18mm;
+    border-top: 1px solid rgba(255,255,255,.35);
+    padding-top: 8px;
+    font-size: 10.5pt; color: #e0e7ff;
+  }
+  h2.sec {
+    font-size: 18pt;
+    color: #312e81;
+    border-bottom: 3px solid #c7d2fe;
+    padding-bottom: 4px;
+    margin: 0 0 10px;
+  }
+  h3 { font-size: 13pt; color: #3730a3; margin: 12px 0 6px; }
+  .lead { font-size: 12.5pt; color: #334155; margin-bottom: 12px; }
+  .page { page-break-after: always; }
+  .page:last-child { page-break-after: auto; }
+  .passos { display: flex; gap: 8px; margin: 8px 0 4px; }
+  .passo {
+    flex: 1; background: #eef2ff; border-radius: 12px; padding: 10px 12px;
+  }
+  .passo b { display: block; color: #4338ca; font-size: 10pt; margin-bottom: 2px; }
+  .grade { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .card {
+    width: calc(50% - 4px);
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: #fff;
+  }
+  .card h3 { margin-top: 0; }
+  .card ul { margin: 4px 0 0; padding-left: 16px; }
+  .card li { margin: 2px 0; }
+  .tag {
+    display: inline-block;
+    font-size: 9pt; font-weight: 700;
+    letter-spacing: 0.04em; text-transform: uppercase;
+    background: #e0e7ff; color: #3730a3;
+    border-radius: 999px; padding: 2px 8px; margin-bottom: 4px;
+  }
+  .tag.verde { background: #dcfce7; color: #166534; }
+  .tag.ambar { background: #fef3c7; color: #92400e; }
+  .ex {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 10px 12px;
+    margin: 8px 0 12px;
+  }
+  .ex .quem { font-size: 9pt; font-weight: 700; color: #64748b; margin-bottom: 3px; }
+  .bolha-eu {
+    background: #4f46e5; color: #fff;
+    border-radius: 14px 14px 4px 14px;
+    padding: 7px 11px; margin: 0 0 6px auto;
+    width: fit-content; max-width: 92%;
+  }
+  .bolha-ela {
+    background: #eef2ff; color: #1e1b4b;
+    border: 1px solid #e0e7ff;
+    border-radius: 14px 14px 14px 4px;
+    padding: 7px 11px;
+    width: fit-content; max-width: 94%;
+  }
+  .lista { margin: 4px 0 10px; padding-left: 18px; }
+  .lista li { margin: 3px 0; }
+  figure { margin: 8px 0 12px; }
+  figure img {
+    width: 100%;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+  }
+  figcaption { font-size: 9.5pt; color: #64748b; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 10px; font-size: 10.5pt; }
+  th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid #e2e8f0; }
+  th { background: #eef2ff; color: #312e81; font-size: 10pt; }
+  .aviso {
+    background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px;
+    padding: 10px 12px; margin-top: 8px;
+  }
+  .aviso b { color: #92400e; }
+  .rodape-doc { font-size: 9pt; color: #94a3b8; margin-top: 14px; }
+  .duas { display: flex; gap: 10px; }
+  .duas > div { flex: 1; }
+</style>
+</head>
+<body>
+
+<section class="capa">
+  <div class="capa-marca">EducaTudo · Painel da escola</div>
+  <img class="capa-avatar" src="avatar.webp" alt="Tudinha">
+  <h1>Tudinha</h1>
+  <h2>Tudo o que a coordenação pode pedir no chat, com exemplos do dia a dia.</h2>
+  <div class="capa-rodape">
+    Material para a equipe da escola · novembro de 2026<br>
+    Fale com ela como falaria com alguém da coordenação. Ela busca os dados da escola e mostra na tela.
+  </div>
+</section>
+
+<section class="page">
+  <h2 class="sec">Como começar</h2>
+  <p class="lead">A Tudinha fica no painel administrativo. Você escreve a pergunta e ela responde com texto, tabelas e, quando faz sentido, um painel com números, gráfico e análise.</p>
+  <div class="passos">
+    <div class="passo"><b>1. Abra um chat</b>Use Novo chat para cada assunto. Assim o histórico não mistura alunos.</div>
+    <div class="passo"><b>2. Fale do jeito natural</b>Nome, RA ou turma já bastam. Não precisa de comando especial.</div>
+    <div class="passo"><b>3. Confira antes de gravar</b>Consulta ela faz na hora. Registro só entra depois que você confirma.</div>
+  </div>
+  <h3>O que ela entende</h3>
+  <ul class="lista">
+    <li>Um aluno, pelo nome ou pelo RA.</li>
+    <li>Uma turma, do jeito que a escola chama: “2º ano B”, “1A”, “2ªB”.</li>
+    <li>Um professor, pelo nome.</li>
+    <li>Um curso ou uma série inteira, por exemplo o 1º ano ou o Ensino Médio.</li>
+    <li>O ano letivo, quando você citar: “em 2024”, “neste ano”.</li>
+  </ul>
+  <div class="ex">
+    <div class="quem">Exemplo</div>
+    <div class="bolha-eu">Me dá um relatório 360 da Ana Luiza.</div>
+    <div class="bolha-ela">A Tudinha abre o perfil completo: nome, RA, turma, score, evolução, boletim, faltas, ocorrências e provas online.</div>
+  </div>
+  <div class="aviso">
+    <b>Ela pode se enganar.</b> Os números vêm da escola, mas a leitura é uma ajuda. Antes de uma decisão importante, confira o boletim, a chamada ou a ocorrência na tela correspondente.
+  </div>
+</section>
+
+<section class="page">
+  <h2 class="sec">Mapa do que dá para fazer</h2>
+  <p class="lead">Tudo cabe em duas ideias: olhar o que já está na escola, ou preparar um registro para você confirmar.</p>
+  <div class="grade">
+    <div class="card">
+      <span class="tag">Consultar</span>
+      <h3>Aluno</h3>
+      <ul>
+        <li>Quem é, RA e turma</li>
+        <li>Relatório completo (360)</li>
+        <li>Boletim e uma nota específica</li>
+        <li>Faltas e frequência</li>
+        <li>Ocorrências já registradas</li>
+        <li>Provas online: acertos, erros e questões</li>
+        <li>Jornadas e exercícios</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="tag">Consultar</span>
+      <h3>Turma, professor e série</h3>
+      <ul>
+        <li>Saúde da turma: quem está crítico ou em atenção</li>
+        <li>Panorama da turma, do professor ou da série</li>
+        <li>Provas da turma e questões mais erradas</li>
+        <li>Ocorrências da turma</li>
+        <li>Aula de hoje na grade</li>
+        <li>Diários de classe em atraso</li>
+        <li>Resultado de simulado (bloco de prova)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="tag ambar">Com confirmação</span>
+      <h3>Registrar</h3>
+      <ul>
+        <li>Nova ocorrência</li>
+        <li>Entrada ou saída na portaria</li>
+        <li>Presença ou falta na chamada do dia</li>
+      </ul>
+      <p style="margin:8px 0 0;font-size:10.5pt;color:#475569;">Ela monta o rascunho e pergunta o que falta. Só grava quando você aperta confirmar.</p>
+    </div>
+    <div class="card">
+      <span class="tag verde">No relatório 360</span>
+      <h3>Leitura pronta</h3>
+      <ul>
+        <li>Score e tendência do ano</li>
+        <li>Gráfico por bimestre ou trimestre</li>
+        <li>Evolução de cada disciplina</li>
+        <li>Análise escrita</li>
+        <li>O que o aluno, a escola e a família podem fazer</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="page">
+  <h2 class="sec">O aluno, do jeito completo</h2>
+  <p class="lead">Quando a coordenação pede um relatório geral, um 360 ou o perfil completo, a Tudinha junta o que está espalhado no sistema numa só resposta.</p>
+  <ul class="lista">
+    <li><b>Quem é:</b> nome, RA e turma.</li>
+    <li><b>Como anda:</b> um score, se subiu, caiu ou ficou estável, e um gráfico por bimestre ou trimestre — o período que a escola usa.</li>
+    <li><b>Por disciplina:</b> média, nota de cada período, variação e se subiu ou caiu. Também mostra quantas matérias estão na média, abaixo, subiram ou caíram.</li>
+    <li><b>Boletim:</b> o quadro de notas, com link para o PDF.</li>
+    <li><b>Frequência:</b> aulas, presenças, faltas e percentual.</li>
+    <li><b>Ocorrências:</b> as do ano, com as que ainda estão abertas em destaque.</li>
+    <li><b>Provas online:</b> se o aluno fez, aparecem acertos, erros e o percentual. Dá para pedir o detalhe do que errou.</li>
+    <li><b>Análise:</b> um texto curto e pontos de atenção pensados naquele aluno: onde melhorar, o que ele pode fazer, o que a escola pode fazer e o que os pais podem fazer.</li>
+  </ul>
+  <div class="ex">
+    <div class="quem">Como pedir</div>
+    <div class="bolha-eu">Me dá um relatório 360 da Ana Luiza.</div>
+    <div class="bolha-eu">Relatório geral do João Silva.</div>
+    <div class="bolha-eu">Visão completa da aluna do RA 24254 em 2024.</div>
+  </div>
+  <figure style="page-break-before: always;">
+    <img src="print-chat-360.png" alt="Chat da Tudinha com o relatório do aluno, frequência e ocorrências">
+    <figcaption>Exemplo real do chat: a Tudinha responde e abre o painel com frequência, faltas, ocorrências e o restante do relatório.</figcaption>
+  </figure>
+</section>
+
+<section class="page">
+  <h2 class="sec">A análise que vem junto</h2>
+  <p class="lead">Além dos números, a Tudinha escreve o que os dados sugerem. O texto cita as matérias que caíram, a frequência e a ocorrência aberta, quando houver. Em seguida vêm sugestões concretas para o aluno, para a escola e para a família — com o nome da matéria e o fato daquele aluno, não um conselho genérico.</p>
+  <figure>
+    <img src="print-analise.png" alt="Trecho da análise da Tudinha sobre a evolução da aluna">
+    <figcaption>Trecho da análise: score, queda entre o primeiro e o último período, matérias mais baixas, frequência e ocorrência em aberto.</figcaption>
+  </figure>
+  <h3>O que pedir em separado, se não quiser o relatório inteiro</h3>
+  <table>
+    <thead><tr><th>Você escreve</th><th>Ela mostra</th></tr></thead>
+    <tbody>
+      <tr><td>Quem é a Ana Luiza? Qual a turma e o RA?</td><td>O cadastro do aluno.</td></tr>
+      <tr><td>Boletim do RA 24254 em 2024.</td><td>O quadro de notas do ano e o PDF.</td></tr>
+      <tr><td>Nota de Matemática no 1º bimestre da Ana Luiza.</td><td>Aquela nota, sem abrir o relatório inteiro.</td></tr>
+      <tr><td>Quantas faltas a Ana Luiza tem em 2024?</td><td>Aulas, presenças, faltas e frequência.</td></tr>
+      <tr><td>Tem ocorrência aberta do RA 24254?</td><td>A lista, com data, título e situação.</td></tr>
+      <tr><td>Como foram as provas online da Maria Clara no 2º ano B?</td><td>Notas, acertos e erros.</td></tr>
+      <tr><td>O que ela errou na última prova de Matemática?</td><td>As questões daquela prova.</td></tr>
+      <tr><td>Como estão as jornadas da Ana Luiza?</td><td>Concluídas, em andamento e o aproveitamento.</td></tr>
+    </tbody>
+  </table>
+  <p>Falta e ocorrência são coisas diferentes. “Quantas faltas?” olha a frequência. “Tem ocorrência?” olha o registro disciplinar.</p>
+</section>
+
+<section class="page">
+  <h2 class="sec">A turma</h2>
+  <p class="lead">Dá para olhar uma turma inteira sem abrir aluno por aluno. Para um retrato geral, peça o panorama. Para só o rendimento, peça a saúde da turma.</p>
+  <div class="ex">
+    <div class="quem">Panorama</div>
+    <div class="bolha-eu">Me dá um relatório geral da turma 2º ano B.</div>
+    <div class="bolha-ela">Saúde da turma, médias, provas online, ocorrências e os alunos que se destacam ou pedem cuidado.</div>
+  </div>
+  <div class="ex">
+    <div class="quem">Perguntas do dia a dia</div>
+    <div class="bolha-eu">Como está a saúde da turma 2ªB?</div>
+    <div class="bolha-eu">Quais alunos da 1A precisam de atenção?</div>
+    <div class="bolha-eu">Ocorrências graves da turma 3º ano A.</div>
+    <div class="bolha-eu">Resumo das provas de Matemática da 2º ano B.</div>
+    <div class="bolha-eu">Qual aula a turma 1A tem hoje?</div>
+  </div>
+  <h3>O que entra no panorama da turma</h3>
+  <ul class="lista">
+    <li>Quantos alunos estão em situação crítica ou de atenção.</li>
+    <li>Médias e o resultado das provas online.</li>
+    <li>Ocorrências da turma.</li>
+    <li>Quem merece um olhar mais de perto.</li>
+  </ul>
+</section>
+
+<section class="page">
+  <h2 class="sec">O professor e a série</h2>
+  <div class="duas">
+    <div>
+      <h3>Um professor</h3>
+      <p>O panorama junta as turmas dele, a saúde dos alunos, as provas, as jornadas e os diários que ainda estão pendentes.</p>
+      <div class="ex">
+        <div class="bolha-eu">Me dá um panorama da professora Ana.</div>
+        <div class="bolha-eu">Em quais turmas o professor Carlos dá aula?</div>
+        <div class="bolha-eu">Como estão as provas da professora Ana na 2º ano B?</div>
+        <div class="bolha-eu">Quais questões a turma mais errou na prova dela?</div>
+        <div class="bolha-eu">Como estão as jornadas do professor Ana?</div>
+      </div>
+    </div>
+    <div>
+      <h3>Um curso ou uma série</h3>
+      <p>Quando a pergunta é maior que uma turma, ela junta as turmas daquela série ou daquele curso e mostra a saúde e a visão de cada turma.</p>
+      <div class="ex">
+        <div class="bolha-eu">Panorama do 1º ano.</div>
+        <div class="bolha-eu">Visão do Ensino Médio.</div>
+        <div class="bolha-eu">Como está o Fundamental neste ano?</div>
+      </div>
+    </div>
+  </div>
+  <h3>A escola, sem escolher uma pessoa</h3>
+  <table>
+    <thead><tr><th>Você escreve</th><th>Ela mostra</th></tr></thead>
+    <tbody>
+      <tr><td>Quais diários estão em atraso?</td><td>Chamadas e registros de aula que passaram do prazo, por turma ou professor.</td></tr>
+      <tr><td>Diários em atraso da professora Ana.</td><td>Só os dela.</td></tr>
+      <tr><td>Quem precisa de atenção na escola em 2024?</td><td>Alertas de cadastro: aluno sem matrícula no ano ou sem chamada. É organização, não nota.</td></tr>
+      <tr><td>Resultados do bloco Simulado 1.</td><td>O resultado daquele simulado e quem precisa de atenção.</td></tr>
+      <tr><td>Quais matérias a escola tem nas provas?</td><td>A lista de matérias cadastradas.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="page">
+  <h2 class="sec">Quando ela registra alguma coisa</h2>
+  <p class="lead">Três registros podem nascer no chat. Em todos, a Tudinha prepara e espera a sua confirmação. Até lá, nada foi gravado.</p>
+  <h3>Nova ocorrência</h3>
+  <p>Ela pergunta o que ainda não foi dito: o que aconteceu, a gravidade, se há outros alunos e se os responsáveis devem ser avisados. Você responde na conversa, ela atualiza o rascunho e só então pede para confirmar.</p>
+  <div class="ex">
+    <div class="quem">Exemplo</div>
+    <div class="bolha-eu">Registra uma ocorrência de comportamento para a Ana Luiza. Ela conversou durante a prova.</div>
+    <div class="bolha-ela">A Tudinha mostra o rascunho e pergunta o que falta — por exemplo a gravidade e se avisa a família. Você confirma no botão. Aí sim a ocorrência existe.</div>
+  </div>
+  <h3>Entrada ou saída</h3>
+  <p>Serve para a portaria. Diga se é entrada ou saída. Se não falar o horário, ela usa o momento atual.</p>
+  <div class="ex">
+    <div class="bolha-eu">Registra a saída da Ana Luiza agora.</div>
+    <div class="bolha-eu">Entrada do João às 7h55.</div>
+  </div>
+  <h3>Chamada da aula</h3>
+  <p>Marca presente ou falta no diário. Diga o aluno, se faltou ou compareceu, a matéria e o dia. Se o dia não for dito, ela considera hoje.</p>
+  <div class="ex">
+    <div class="bolha-eu">Marca falta da Ana Luiza hoje em Matemática.</div>
+    <div class="bolha-eu">João presente na aula de História de ontem.</div>
+  </div>
+  <div class="aviso">
+    <b>Se ela disser que já gravou antes da confirmação, não conte com isso.</b> O registro vale depois do botão de confirmar. Para só consultar, use “tem ocorrência?” ou “quantas faltas?” — isso não cria nada.
+  </div>
+</section>
+
+<section>
+  <h2 class="sec">Frases para colar no chat</h2>
+  <p class="lead">Troque os nomes pelos da sua escola. Um chat por assunto deixa a resposta mais certeira.</p>
+  <table>
+    <thead><tr><th>Situação</th><th>Frase</th></tr></thead>
+    <tbody>
+      <tr><td>Retrato completo do aluno</td><td>Me dá um relatório 360 da Ana Luiza.</td></tr>
+      <tr><td>Só o boletim</td><td>Boletim do RA 24254 em 2024.</td></tr>
+      <tr><td>Uma nota</td><td>Nota de Matemática no 1º bimestre da Ana Luiza.</td></tr>
+      <tr><td>Frequência</td><td>Quantas faltas a Ana Luiza tem neste ano?</td></tr>
+      <tr><td>Ocorrências do aluno</td><td>Tem ocorrência aberta do RA 24254?</td></tr>
+      <tr><td>Provas online</td><td>Como andam as provas da Maria Clara no 2º ano B?</td></tr>
+      <tr><td>O que errou</td><td>O que ela errou na última prova?</td></tr>
+      <tr><td>Jornadas</td><td>Como estão as jornadas da Ana Luiza?</td></tr>
+      <tr><td>Turma inteira</td><td>Relatório geral da turma 2º ano B.</td></tr>
+      <tr><td>Quem preocupa na turma</td><td>Como está a saúde da turma 2ªB?</td></tr>
+      <tr><td>Aula de hoje</td><td>Qual aula a turma 1A tem hoje?</td></tr>
+      <tr><td>Professor</td><td>Panorama da professora Ana.</td></tr>
+      <tr><td>Série inteira</td><td>Panorama do 1º ano.</td></tr>
+      <tr><td>Diário atrasado</td><td>Quais diários estão em atraso?</td></tr>
+      <tr><td>Simulado</td><td>Resultados do bloco Simulado 1. Quem precisa de atenção?</td></tr>
+      <tr><td>Nova ocorrência</td><td>Quero registrar uma ocorrência para a Ana Luiza.</td></tr>
+      <tr><td>Portaria</td><td>Registra a saída da Ana Luiza agora.</td></tr>
+      <tr><td>Chamada</td><td>Marca falta da Ana Luiza hoje em Matemática.</td></tr>
+    </tbody>
+  </table>
+  <h3>Três hábitos que ajudam</h3>
+  <ul class="lista">
+    <li>Comece com Novo chat quando mudar de aluno ou de assunto.</li>
+    <li>Se a resposta vier de outro aluno, repita o nome ou o RA na frase seguinte.</li>
+    <li>Datas e horários aparecem no padrão brasileiro, no horário de Brasília.</li>
+  </ul>
+  <p class="rodape-doc">EducaTudo · Tudinha no painel da escola · guia para a equipe · novembro de 2026</p>
+</section>
+
+</body>
+</html>

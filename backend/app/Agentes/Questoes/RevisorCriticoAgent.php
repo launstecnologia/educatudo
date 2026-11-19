@@ -9,9 +9,9 @@ use Exception;
 
 /**
  * EducaTudo - segunda camada de revisão (segunda opinião), mais rigorosa,
- * usando gpt-5.6-sol. Roda só nas questões que o RevisorQuestaoAgent marcou
- * em `questoes_para_revisao_critica` (incerteza sinalizada por ele, ou
- * nível "desafio" — sempre passa por aqui).
+ * usando GPT-6 Astra (ModeloIA::REVISAO_CRITICA). Roda só nas questões que o
+ * RevisorQuestaoAgent marcou em `questoes_para_revisao_critica` (incerteza
+ * sinalizada por ele, ou nível "desafio" — sempre passa por aqui).
  *
  * Contexto esperado (entrada):
  *   - questoes_validadas (array, formato canônico)

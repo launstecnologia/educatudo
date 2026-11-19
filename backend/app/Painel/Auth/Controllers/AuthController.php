@@ -235,11 +235,25 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
     }
 
     /**
+     * Primeiro acesso e recuperação de senha do aluno estão desligados.
+     * Responde 404 e encerra antes de qualquer consulta ou gravação.
+     */
+    private function negarFluxoAlunoDesabilitado(): void
+    {
+        http_response_code(404);
+        header('Content-Type: text/html; charset=utf-8');
+        header('X-Content-Type-Options: nosniff');
+        echo 'Página não encontrada';
+        exit;
+    }
+
+    /**
      * Primeira tela do primeiro acesso.
      * GET = exibe formulário. POST = valida na mesma URL (submit clássico, sem fetch).
      */
     public function primeiroAcesso()
     {
+        $this->negarFluxoAlunoDesabilitado();
         $db = Database::getInstance();
         $turmas = $db->fetchAll("SELECT id, nome, tipo_ensino FROM turmas ORDER BY nome ASC");
         $csrf_token = $this->generateCsrfToken();
@@ -368,6 +382,7 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
      */
     public function redirectPrimeiroAcesso()
     {
+        $this->negarFluxoAlunoDesabilitado();
         $this->redirect('/primeiro-acesso');
     }
 
@@ -376,8 +391,7 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
      */
     public function buscarAlunosPorTurma()
     {
-        http_response_code(404);
-        $this->json(['error' => 'Recurso indisponível']);
+        $this->negarFluxoAlunoDesabilitado();
     }
 
     /**
@@ -385,6 +399,7 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
      */
     public function validarPrimeiroAcesso()
     {
+        $this->negarFluxoAlunoDesabilitado();
         $result = $this->validarPrimeiroAcessoResult();
         if (isset($result['redirect'])) {
             $this->json(['success' => true, 'redirect' => $result['redirect']]);
@@ -407,6 +422,7 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
      */
     public function criarAcesso()
     {
+        $this->negarFluxoAlunoDesabilitado();
         $alunoId = $_SESSION['primeiro_acesso_aluno_id'] ?? null;
         $alunoNome = $_SESSION['primeiro_acesso_aluno_nome'] ?? '';
         if (!$alunoId) {
@@ -435,6 +451,7 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
      */
     public function salvarPrimeiroAcesso()
     {
+        $this->negarFluxoAlunoDesabilitado();
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
             $this->json(['error' => 'Token inválido'], 400);
         }
@@ -512,6 +529,7 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
      */
     public function sucessoPrimeiroAcesso()
     {
+        $this->negarFluxoAlunoDesabilitado();
         $this->view('auth/acesso-criado', [
             'title' => 'Acesso criado - EducaTudo'
         ]);
@@ -522,6 +540,7 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
      */
     public function recuperarSenhaAluno()
     {
+        $this->negarFluxoAlunoDesabilitado();
         $this->view('auth/recuperar-aluno', [
             'title' => 'Recuperar senha - Aluno',
             'csrf_token' => $this->generateCsrfToken()
@@ -535,6 +554,7 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
      */
     public function recuperarSenhaAlunoPergunta()
     {
+        $this->negarFluxoAlunoDesabilitado();
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
             $this->json(['error' => 'Token inválido'], 400);
             return;
@@ -578,6 +598,7 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
 
     public function recuperarSenhaAlunoReset()
     {
+        $this->negarFluxoAlunoDesabilitado();
         if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
             $this->json(['error' => 'Token inválido'], 400);
         }

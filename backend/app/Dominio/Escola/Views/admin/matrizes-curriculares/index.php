@@ -432,6 +432,30 @@ function matrizFilhosDoPai(paiId) {
     return MATRIZ_FILHOS_POR_PAI[paiId] || MATRIZ_FILHOS_POR_PAI[String(paiId)] || [];
 }
 
+function matrizDistribuirAulasNosFilhos(filhos, totalAulas) {
+    var n = filhos.length;
+    if (!n) return [];
+    var total = Math.max(0, parseInt(totalAulas, 10) || 0);
+    if (total <= 0) {
+        return filhos.map(function (filho) {
+            return {
+                materia_id: parseInt(filho.materia_id || filho.id, 10) || 0,
+                aulas_semana: parseInt(filho.aulas_semana, 10) || 1,
+                nome: filho.nome || filho.materia_nome || ''
+            };
+        });
+    }
+    var base = Math.floor(total / n);
+    var resto = total - (base * n);
+    return filhos.map(function (filho, i) {
+        return {
+            materia_id: parseInt(filho.materia_id || filho.id, 10) || 0,
+            aulas_semana: base + (i < resto ? 1 : 0),
+            nome: filho.nome || filho.materia_nome || ''
+        };
+    });
+}
+
 function matrizAdicionarComponente(dados) {
     if (dados && (dados.eh_rotulo || (dados.filhos && dados.filhos.length))) {
         matrizAdicionarGrupo(dados);
@@ -443,13 +467,23 @@ function matrizAdicionarComponente(dados) {
     var row = clone.querySelector('.matriz-componente-row');
 
     if (dados) {
-        row.querySelector('.matriz-materia-select').value = dados.materia_id;
+        var select = row.querySelector('.matriz-materia-select');
+        var materiaId = String(dados.materia_id || '');
+        select.value = materiaId;
+        // Se o id não está no catálogo (duplicata/legado), injeta opção temporária.
+        if (materiaId && select.value !== materiaId) {
+            var opt = document.createElement('option');
+            opt.value = materiaId;
+            opt.textContent = (dados.nome || ('Componente #' + materiaId)) + ' (na matriz)';
+            select.appendChild(opt);
+            select.value = materiaId;
+        }
         row.querySelector('.matriz-aulas-semana').value = dados.aulas_semana;
         row.querySelector('.matriz-obrigatorio').checked = !!dados.obrigatorio;
         row.querySelector('.matriz-ordem').value = dados.ordem_boletim ?? 0;
         document.getElementById('matriz-componentes-body').appendChild(row);
         if (matrizFilhosDoPai(dados.materia_id).length) {
-            matrizAoTrocarComponente(row.querySelector('.matriz-materia-select'), dados);
+            matrizAoTrocarComponente(select, dados);
             return;
         }
         matrizRecalcularCargaHoraria();
@@ -481,9 +515,23 @@ function matrizAdicionarGrupo(dados) {
     body.appendChild(header);
 
     var aulasPorFilho = {};
-    (dados.filhos || []).forEach(function (f) {
-        aulasPorFilho[String(f.materia_id)] = f.aulas_semana;
+    var temAulasSalvas = false;
+    filhosSalvos.forEach(function (f) {
+        var fid = String(f.materia_id || f.id || '');
+        if (!fid) return;
+        var aulas = parseInt(f.aulas_semana, 10);
+        if (!isNaN(aulas) && aulas > 0) {
+            aulasPorFilho[fid] = aulas;
+            temAulasSalvas = true;
+        }
     });
+
+    // Pai gravado sem filhos (ex.: seed com LP agregada): reparte a carga oficial.
+    if (!temAulasSalvas && parseInt(dados.aulas_semana, 10) > 0) {
+        matrizDistribuirAulasNosFilhos(filhos, dados.aulas_semana).forEach(function (f) {
+            aulasPorFilho[String(f.materia_id)] = f.aulas_semana;
+        });
+    }
 
     filhos.forEach(function (filho) {
         var fid = parseInt(filho.materia_id || filho.id, 10) || 0;
@@ -493,7 +541,8 @@ function matrizAdicionarGrupo(dados) {
         row.setAttribute('data-pai-id', String(paiId));
         row.querySelector('.matriz-materia-select').value = String(fid);
         row.querySelector('.matriz-filho-nome').textContent = filho.nome || filho.materia_nome || ('#' + fid);
-        row.querySelector('.matriz-aulas-semana').value = aulasPorFilho[String(fid)] || filho.aulas_semana || 1;
+        var aulas = aulasPorFilho[String(fid)];
+        row.querySelector('.matriz-aulas-semana').value = (aulas !== undefined && aulas !== null) ? aulas : (filho.aulas_semana || 0);
         body.appendChild(row);
     });
 
@@ -508,16 +557,23 @@ function matrizAoTrocarComponente(select, dadosOriginais) {
         return;
     }
     var row = select.closest('tr');
+    var aulasNaLinha = row.querySelector('.matriz-aulas-semana')
+        ? parseInt(row.querySelector('.matriz-aulas-semana').value, 10) || 0
+        : 0;
     var dados = dadosOriginais || {
         materia_id: id,
         obrigatorio: row.querySelector('.matriz-obrigatorio') ? row.querySelector('.matriz-obrigatorio').checked : true,
         ordem_boletim: row.querySelector('.matriz-ordem') ? row.querySelector('.matriz-ordem').value : 0,
+        aulas_semana: aulasNaLinha,
         filhos: []
     };
     dados.materia_id = id;
     dados.eh_rotulo = true;
+    if (dados.aulas_semana === undefined || dados.aulas_semana === null) {
+        dados.aulas_semana = aulasNaLinha;
+    }
     if (!dados.filhos || !dados.filhos.length) {
-        dados.filhos = filhos;
+        dados.filhos = matrizDistribuirAulasNosFilhos(filhos, dados.aulas_semana);
     }
     row.remove();
     matrizAdicionarGrupo(dados);

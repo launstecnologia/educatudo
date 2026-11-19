@@ -110,16 +110,6 @@ $system_subtitle = \App\Core\LayoutHelper::getSystemSubtitle();
                 <?php include __DIR__ . '/partials/botao_lex.php'; ?>
             <?php endif; ?>
 
-            <!-- Links -->
-            <div class="mt-4 md:mt-6 text-center space-y-2">
-                <a href="<?= URL ?>/primeiro-acesso" class="text-sm text-blue-600 hover:text-blue-500 block">
-                    Primeiro acesso
-                </a>
-                <a href="<?= URL ?>/aluno/recuperar-senha" class="text-sm text-blue-600 hover:text-blue-500 block">
-                    Esqueceu sua senha?
-                </a>
-            </div>
-            
             <!-- Footer -->
             <footer class="mt-6 md:mt-8 pt-4 border-t border-gray-200">
                 <div class="text-center">

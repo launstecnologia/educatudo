@@ -9,11 +9,36 @@ $filtro_nome = $filtro_nome ?? '';
 $filtro_turma = $filtro_turma ?? 0;
 $filtro_creditos_ordem = $filtro_creditos_ordem ?? '';
 $creditos_disponiveis = $creditos_disponiveis ?? false;
+$csrf_token = $csrf_token ?? '';
 $entrar_como_base = URL . '/master/entrar-como?escola_id=' . (int) $escola_id . '&tipo=aluno';
 $base_url = URL . '/master/escolas/' . (int) $escola_id . '/alunos';
 $has_filtros = $filtro_nome !== '' || $filtro_turma > 0 || $filtro_creditos_ordem !== '';
 if (!class_exists('CreditosDecimalHelper')) {
 }
+
+$renderAcoesAluno = static function (array $a, string $suffix) use ($entrar_como_base, $escola_id): void {
+    $id = (int) ($a['id'] ?? 0);
+    $nome = (string) ($a['nome'] ?? '');
+    ob_start();
+    ?>
+    <button type="button"
+            class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            data-abrir-acesso="aluno"
+            data-action="<?= URL ?>/master/escolas/<?= (int) $escola_id ?>/alunos/<?= $id ?>/acesso"
+            data-nome="<?= htmlspecialchars($nome, ENT_QUOTES) ?>"
+            data-email="<?= htmlspecialchars((string) ($a['email'] ?? ''), ENT_QUOTES) ?>"
+            data-login="<?= htmlspecialchars((string) ($a['nickname'] ?? ''), ENT_QUOTES) ?>"
+            data-login-vazio="Sem apelido, o aluno ainda não consegue entrar. Preencha o apelido e a senha para criar o acesso.">
+        <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
+    </button>
+    <a href="<?= $entrar_como_base ?>&id=<?= $id ?>" target="_blank" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+        <i class="fa-solid fa-right-to-bracket text-gray-400 w-4 text-center"></i> Entrar como
+    </a>
+    <?php
+    $row_actions_dropdown_items = ob_get_clean();
+    $row_actions_dropdown_id = 'row-actions-aluno-' . $suffix . $id;
+    include \App\Core\ViewPaths::adminPartial('row_actions_dropdown.php');
+};
 ?>
 
 <div class="bg-white rounded-xl shadow border border-slate-200 p-4 sm:p-6">
@@ -22,6 +47,7 @@ if (!class_exists('CreditosDecimalHelper')) {
             Alunos
             <span class="text-sm font-normal text-slate-500">(<?= (int) $total ?>)</span>
         </h3>
+        <p class="text-xs text-slate-500 mt-1">Para trocar e-mail ou senha, use <strong>Ações → Editar</strong>. O aluno entra com o apelido.</p>
     </div>
 
     <form method="GET" action="<?= $base_url ?>" class="mb-5 space-y-3">
@@ -109,17 +135,7 @@ if (!class_exists('CreditosDecimalHelper')) {
                         </div>
                     </td>
                     <td class="px-3 py-3 align-top text-right whitespace-nowrap">
-                        <?php
-                        ob_start();
-                        ?>
-                        <a href="<?= $entrar_como_base ?>&id=<?= $id ?>" target="_blank" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                            <i class="fa-solid fa-right-to-bracket text-gray-400 w-4 text-center"></i> Entrar como
-                        </a>
-                        <?php
-                        $row_actions_dropdown_items = ob_get_clean();
-                        $row_actions_dropdown_id = 'row-actions-aluno-' . $id;
-                        include \App\Core\ViewPaths::adminPartial('row_actions_dropdown.php');
-                        ?>
+                        <?php $renderAcoesAluno($a, ''); ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -149,17 +165,7 @@ if (!class_exists('CreditosDecimalHelper')) {
                     </div>
                 </div>
                 <div class="shrink-0">
-                    <?php
-                    ob_start();
-                    ?>
-                    <a href="<?= $entrar_como_base ?>&id=<?= $id ?>" target="_blank" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                        <i class="fa-solid fa-right-to-bracket text-gray-400 w-4 text-center"></i> Entrar como
-                    </a>
-                    <?php
-                    $row_actions_dropdown_items = ob_get_clean();
-                    $row_actions_dropdown_id = 'row-actions-aluno-m-' . $id;
-                    include \App\Core\ViewPaths::adminPartial('row_actions_dropdown.php');
-                    ?>
+                    <?php $renderAcoesAluno($a, 'm-'); ?>
                 </div>
             </div>
         </div>
@@ -218,3 +224,17 @@ if (!class_exists('CreditosDecimalHelper')) {
     <?php endif; ?>
     <?php endif; ?>
 </div>
+<?php
+$acesso_id = 'aluno';
+$acesso_titulo = 'Editar aluno';
+$acesso_dica = 'O aluno entra com o apelido, não com o e-mail. Deixe a senha em branco para manter a atual. Mínimo de 6 caracteres.';
+$acesso_email_obrigatorio = false;
+$acesso_mostrar_apelido = true;
+$acesso_ocultos = array_filter([
+    'nome' => $filtro_nome,
+    'turma_id' => $filtro_turma > 0 ? (string) $filtro_turma : '',
+    'creditos_ordem' => $filtro_creditos_ordem,
+    'page' => $page > 1 ? (string) $page : '',
+], static fn ($valor) => $valor !== '' && $valor !== null);
+include __DIR__ . '/_modal_acesso.php';
+?>

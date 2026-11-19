@@ -257,11 +257,8 @@ class AuthManager
             $this->recordLoginAttempt($nickname, false, 'aluno', 'nickname_invalido');
             return null;
         }
-        if (!empty($aluno['primeiro_acesso'])) {
-            throw new \Exception('Primeiro acesso pendente. Use o fluxo de primeiro acesso.');
-        }
-        if (empty($aluno['senha_hash'])) {
-            throw new \Exception('Acesso não criado. Use o fluxo de primeiro acesso.');
+        if (!empty($aluno['primeiro_acesso']) || empty($aluno['senha_hash'])) {
+            throw new \Exception('Seu acesso ainda não foi liberado. Procure a secretaria da escola.');
         }
         if (!password_verify($senha, $aluno['senha_hash'])) {
             $this->recordLoginAttempt($nickname, false, 'aluno', 'senha_invalida');

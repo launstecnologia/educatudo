@@ -83,21 +83,8 @@ $router->post('/enviar-recuperacao', 'Auth/AuthController@enviarRecuperacao');
 $router->get('/recuperar-senha/reset', 'Auth/AuthController@resetPassword');
 $router->post('/recuperar-senha/reset', 'Auth/AuthController@processarReset');
 
-// Primeiro acesso do aluno (GET = formulário; POST = valida na mesma URL, sem fetch)
-$router->get('/primeiro-acesso', 'Auth/AuthController@primeiroAcesso');
-$router->post('/primeiro-acesso', 'Auth/AuthController@primeiroAcesso');
-// Legado: não lista mais alunos. O formulário pede o nome completo.
-$router->get('/primeiro-acesso/alunos', 'Auth/AuthController@buscarAlunosPorTurma');
-$router->get('/primeiro-acesso/validar', 'Auth/AuthController@redirectPrimeiroAcesso'); // GET → redireciona para o formulário
-$router->post('/primeiro-acesso/validar', 'Auth/AuthController@validarPrimeiroAcesso');
-$router->get('/primeiro-acesso/criar', 'Auth/AuthController@criarAcesso');
-$router->post('/primeiro-acesso/salvar', 'Auth/AuthController@salvarPrimeiroAcesso');
-$router->get('/primeiro-acesso/sucesso', 'Auth/AuthController@sucessoPrimeiroAcesso');
-
-// Recuperação de senha do aluno (sem e-mail)
-$router->get('/aluno/recuperar-senha', 'Auth/AuthController@recuperarSenhaAluno');
-$router->post('/aluno/recuperar-senha/pergunta', 'Auth/AuthController@recuperarSenhaAlunoPergunta');
-$router->post('/aluno/recuperar-senha/reset', 'Auth/AuthController@recuperarSenhaAlunoReset');
+// Primeiro acesso e recuperação de senha do aluno estão desligados.
+// As rotas não são registradas: qualquer URL desses fluxos cai no 404 do router.
 
 // Recuperação de senha específica para professores
 $router->get('/professor/recuperar-senha', 'Auth/AuthController@recuperarSenhaProfessor');

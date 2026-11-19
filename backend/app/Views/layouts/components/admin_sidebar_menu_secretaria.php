@@ -23,7 +23,7 @@ $modOn = is_callable($modOn ?? null) ? $modOn : static function (string $key): b
 };
 $academicoOpen = in_array($cur, [
     'academico', 'students', 'ano_letivo', 'calendario_letivo', 'componentes-curriculares',
-    'agrupamentos-componentes', 'curso', 'cursos-series', 'grade_horaria', 'matriz-curricular',
+    'agrupamentos-componentes', 'curso', 'cursos-series', 'grade_horaria', 'educasync', 'matriz-curricular',
     'teachers', 'salas', 'serie', 'turmas', 'tipos_avaliacao', 'boletins', 'boletim_guia', 'boletim_config', 'boletim-layout', 'reports_boletim_coordenacao',
     'grupos-regras-notas', 'quadros-notas', 'regras-academicas', 'recuperacao', 'implantar-academico',
     'provas', 'provas_blocos', 'eventos-avaliativos',
@@ -133,6 +133,12 @@ $gestaoOpen = $secretariaNavOpen;
         <a href="<?= $urlBase ?>/admin/grade-horaria" class="<?= $linkCls($cur === 'grade_horaria') ?>">
             <i class="fa-regular fa-calendar-days w-4 h-4 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text text-sm">Grade Horária</span>
+        </a>
+        <?php endif; ?>
+        <?php if ($secCan(['educasync']) && $modOn('educasync')): ?>
+        <a href="<?= $urlBase ?>/admin/educasync" class="<?= $linkCls($cur === 'educasync') ?>">
+            <i class="fa-solid fa-wand-magic-sparkles w-4 h-4 mr-3 flex-shrink-0"></i>
+            <span class="sidebar-text text-sm">EducaSync</span>
         </a>
         <?php endif; ?>
         </div>

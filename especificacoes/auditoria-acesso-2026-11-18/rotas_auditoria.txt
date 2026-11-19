@@ -1,0 +1,30 @@
+# Rotas GET seguras para teste em homologação
+# Critério: não gravam dado, não baixam arquivo de aluno e não confirmam existência de pessoa.
+# Não usar esta lista em produção. Não inclui /media/serve, /uploads, /primeiro-acesso,
+# /auth/entrar-como, /ai-job, validação de histórico, carteirinha, contrato, gabarito nem API de aluno.
+# Total: 23
+
+GET /master
+GET /
+GET /admin
+GET /professor
+GET /professor/
+GET /pais
+GET /monitor
+GET /monitor/
+GET /guia/implantar-academico
+GET /manifest-aluno.json
+GET /manifest-professor.json
+GET /manifest-admin.json
+GET /manifest-pais.json
+GET /api/docs
+GET /api/openapi.json
+GET /login/csrf-token
+GET /login
+GET /termos-de-uso
+GET /politica-privacidade
+GET /politica-privacidade-app
+GET /app-familia/politica-privacidade
+GET /politica-retencao
+GET /api/v1/status
+

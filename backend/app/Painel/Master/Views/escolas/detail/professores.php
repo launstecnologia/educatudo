@@ -29,6 +29,14 @@ $renderAcoesProfessor = static function (array $p, string $suffix) use ($entrar_
     $nome = (string) ($p['nome'] ?? '');
     ob_start();
     ?>
+    <button type="button"
+            class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            data-abrir-acesso="professor"
+            data-action="<?= URL ?>/master/escolas/<?= (int) $escola_id ?>/professores/<?= $id ?>/acesso"
+            data-nome="<?= htmlspecialchars($nome, ENT_QUOTES) ?>"
+            data-email="<?= htmlspecialchars((string) ($p['email'] ?? ''), ENT_QUOTES) ?>">
+        <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
+    </button>
     <?php if ($creditos_disponiveis): ?>
     <button type="button"
             class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
@@ -55,9 +63,7 @@ $renderAcoesProfessor = static function (array $p, string $suffix) use ($entrar_
             Professores
             <span class="text-sm font-normal text-slate-500">(<?= (int) $total ?>)</span>
         </h3>
-        <?php if ($creditos_disponiveis): ?>
-        <p class="text-xs text-slate-500 mt-1">Para creditar um professor, use <strong>Ações → Dar TudiCoins</strong>.</p>
-        <?php endif; ?>
+        <p class="text-xs text-slate-500 mt-1">Para trocar e-mail ou senha, use <strong>Ações → Editar</strong><?= $creditos_disponiveis ? '. Para creditar, use <strong>Ações → Dar TudiCoins</strong>' : '' ?>.</p>
     </div>
 
     <form method="GET" action="<?= $base_url ?>" class="mb-5 space-y-3">
@@ -261,3 +267,15 @@ $renderAcoesProfessor = static function (array $p, string $suffix) use ($entrar_
 })();
 </script>
 <?php endif; ?>
+<?php
+$acesso_id = 'professor';
+$acesso_titulo = 'Editar professor';
+$acesso_dica = 'O professor entra com o e-mail. Deixe a senha em branco para manter a atual. Mínimo de 6 caracteres.';
+$acesso_email_obrigatorio = true;
+$acesso_ocultos = array_filter([
+    'busca' => $filtro_busca,
+    'status' => $filtro_status,
+    'page' => $page > 1 ? (string) $page : '',
+], static fn ($valor) => $valor !== '' && $valor !== null);
+include __DIR__ . '/_modal_acesso.php';
+?>

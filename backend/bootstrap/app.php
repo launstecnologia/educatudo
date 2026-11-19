@@ -774,16 +774,6 @@ if (strpos($pathForStorage, 'storage/images/') === 0) {
     }
 }
 
-// Fallback: servidor pode não repassar POST /path ao index.php; ?__path= permite usar index.php como entrada
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['__path'])) {
-    $allowedPathFallbacks = ['primeiro-acesso/validar'];
-    $p = trim((string) $_GET['__path'], '/');
-    if (in_array($p, $allowedPathFallbacks, true)) {
-        $_SERVER['REQUEST_URI'] = '/' . $p;
-        unset($_GET['__path']);
-    }
-}
-
 // Bootstrap multi-tenant (se MULTI_TENANT=true no .env): resolve escola e registra conexão do tenant
 $caminhoPedido = $path;
 require_once BASE_PATH . '/app/Core/bootstrap_multi_tenant.php';

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>EducaTudo — Como a plataforma é feita</title>
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #475569;
+      --line: #e2e8f0;
+      --soft: #f8fafc;
+      --brand: #1d4ed8;
+      --brand-soft: #dbeafe;
+    }
+    * { box-sizing: border-box; }
+    @page { size: A4; margin: 16mm 15mm 16mm; }
+    html, body {
+      margin: 0;
+      color: var(--ink);
+      background: white;
+      font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+      font-size: 12.5px;
+      line-height: 1.5;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    h1, h2 { margin: 0; line-height: 1.2; }
+    h1 { font-size: 28px; letter-spacing: -0.03em; margin: 6px 0 8px; }
+    h2 {
+      font-size: 15px;
+      margin: 18px 0 8px;
+      padding-bottom: 4px;
+      border-bottom: 2px solid var(--brand-soft);
+      page-break-after: avoid;
+    }
+    p { margin: 0 0 8px; }
+    .kicker {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--brand);
+    }
+    .lead { font-size: 14px; color: #1e293b; }
+    .muted { color: var(--muted); font-size: 11.5px; }
+    table { width: 100%; border-collapse: collapse; margin: 6px 0 10px; page-break-inside: avoid; }
+    th, td { text-align: left; vertical-align: top; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+    th { background: var(--soft); font-size: 11px; color: #334155; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0 4px; }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      page-break-inside: avoid;
+      background: white;
+    }
+    .card strong { display: block; margin-bottom: 3px; }
+    .card.blue { background: #eff6ff; border-color: #bfdbfe; }
+    .card.green { background: #f0fdfa; border-color: #99f6e4; }
+    .note {
+      background: var(--soft);
+      border-left: 3px solid var(--brand);
+      padding: 8px 12px;
+      margin: 8px 0 4px;
+      page-break-inside: avoid;
+    }
+    ul { margin: 4px 0 8px; padding-left: 18px; }
+    li { margin: 3px 0; }
+    .footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      font-size: 9px;
+      color: #94a3b8;
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="footer">
+    <span>EducaTudo</span>
+    <span>Como a plataforma é feita</span>
+  </div>
+
+  <div class="kicker">EducaTudo</div>
+  <h1>Como a plataforma é feita</h1>
+  <p class="lead">Visão simples da estrutura, para quem está conhecendo o produto. Várias escolas usam o mesmo sistema. Os dados de uma não se misturam com os da outra.</p>
+  <p class="muted">Novembro de 2026</p>
+
+  <h2>Onde roda</h2>
+  <div class="grid">
+    <div class="card blue">
+      <strong>Aplicação na Oracle</strong>
+      O site, a API e os serviços de apoio rodam em servidores na Oracle Cloud. A entrada pública passa pela Cloudflare, com o domínio de cada escola.
+    </div>
+    <div class="card green">
+      <strong>Banco gerenciado pela Oracle</strong>
+      Os dados ficam em MySQL Enterprise - Cloud, fora do servidor da aplicação. Cada escola tem o próprio banco.
+    </div>
+  </div>
+  <p>Junto da aplicação há um Redis, usado para sessão e para lembrar rapidamente qual escola está acessando. Arquivos de aula e materiais ficam em armazenamento separado do banco.</p>
+
+  <h2>Em que linguagem</h2>
+  <table>
+    <thead>
+      <tr><th>Parte</th><th>Linguagem</th><th>O que faz</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Plataforma web e API</td>
+        <td>PHP</td>
+        <td>Painéis do aluno, do professor, da escola e da operação do EducaTudo. Também atende o aplicativo.</td>
+      </tr>
+      <tr>
+        <td>Telas no navegador</td>
+        <td>HTML, CSS e JavaScript</td>
+        <td>O que a pessoa vê e usa no computador.</td>
+      </tr>
+      <tr>
+        <td>Aplicativo dos pais</td>
+        <td>Flutter</td>
+        <td>Acompanhamento do filho no celular. Não acessa o banco: conversa com a API.</td>
+      </tr>
+      <tr>
+        <td>Dados</td>
+        <td>MySQL Enterprise - Cloud</td>
+        <td>Tudo que a escola grava: pessoas, turmas e notas.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Como o sistema é organizado</h2>
+  <p>A plataforma web é um <strong>(MONOLITO)</strong>: ERP modular, com ambientes e bancos segregados por cliente. Cada função opcional é um módulo que a escola liga ou desliga. O núcleo da escola permanece em todas.</p>
+  <div class="grid">
+    <div class="card">
+      <strong>MVC próprio</strong>
+      A tela pede, o controlador coordena, a regra de negócio fica no serviço e o modelo grava e lê o MySQL. A página só monta o que a pessoa vê. Esse caminho foi feito no EducaTudo, para o produto escolar.
+    </div>
+    <div class="card">
+      <strong>Módulos em volta do núcleo</strong>
+      Prova, redação, jornada e os demais recursos nascem como módulo. Dá para entregar um conjunto diferente por escola sem separar o sistema em vários produtos.
+    </div>
+  </div>
+
+  <h2>Estrutura da escola</h2>
+  <p>O núcleo descreve a escola de verdade, e o resto se apoia nele.</p>
+  <ul>
+    <li><strong>Pessoas.</strong> Alunos, professores e monitores, cada um com o seu acesso.</li>
+    <li><strong>Organização.</strong> Ano letivo, curso, série e turma. A turma é onde a aula, a prova e o acompanhamento acontecem.</li>
+    <li><strong>O que a escola liga.</strong> Os módulos usam essas pessoas e essas turmas. Sem esse núcleo, o módulo não tem onde se apoiar.</li>
+  </ul>
+
+  <h2>Como a escola fica separada</h2>
+  <div class="note">
+    A pessoa entra pelo endereço da escola. A plataforma identifica qual escola é e abre somente o banco dela. O banco central não guarda nota, aluno nem conversa: guarda o cadastro da escola, o domínio e o que está ligado para ela.
+  </div>
+  <p>Os módulos ligados mudam de uma escola para outra. Pessoas, turmas e ano letivo existem em todas, cada uma no seu banco.</p>
+
+  <h2>Quem usa</h2>
+  <table>
+    <thead>
+      <tr><th>Quem</th><th>Para quê</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Aluno</td><td>Estudar, fazer prova e redação, tirar dúvida com a Tudinha</td></tr>
+      <tr><td>Professor</td><td>Montar conteúdo, prova e acompanhar a turma</td></tr>
+      <tr><td>Escola</td><td>Cadastrar pessoas, organizar o ano e acompanhar a gestão</td></tr>
+      <tr><td>Monitor</td><td>Acompanhar a sala</td></tr>
+      <tr><td>Pais</td><td>Ver o filho pelo site ou pelo aplicativo</td></tr>
+    </tbody>
+  </table>
+
+</body>
+</html>
