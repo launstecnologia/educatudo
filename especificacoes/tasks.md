@@ -1,5 +1,8 @@
 # Tasks — backlog atual
 
+- [x] Segundo fator por e-mail no login do painel master. A sessão só abre depois do código. Migration `2026_11_19_usuarios_master_codigos_acesso_master.sql`. — 2026-11-19
+- [ ] Rodar a migration master `2026_11_19_usuarios_master_codigos_acesso_master.sql` antes de publicar o login novo. Sem ela, a senha correta não entra no painel.
+
 - [x] Assistente admin (Tudinha): ações de escrita com botão Confirmar — `propor_criar_ocorrencia` (multi-aluno + push pais), `propor_entrada_saida` (portaria) e `propor_chamada_aula` (diário). Migration `2026_11_12_assistente_propostas`. — 2026-11-12
 
 - [ ] **EducaSync** — motor híbrido de horários (OR-Tools + IA). Feito: módulo + migration + solver + gerar/publicar + importar Matriz + disponibilidade + assistente + preferências soft (`evitar_disciplina_slot`, `concentrar_disciplina`) + reotimização parcial com locks. Pendente: Playwright E2E, cenários reais anonimizados. Decisão em `design.md` (2026-11-12). — 2026-11-12

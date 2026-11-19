@@ -15,7 +15,7 @@
             <div class="text-center mb-8">
                 <img src="<?= URL ?>/assets/logos/logo-educatudo-black.png" alt="EducaTudo" class="h-10 w-auto mx-auto mb-6 object-contain">
                 <h1 class="text-xl font-bold text-slate-900">Painel Admin Master</h1>
-                <p class="text-sm text-slate-500 mt-1">Entre com seu e-mail e senha</p>
+                <p class="text-sm text-slate-500 mt-1">Depois da senha, enviamos um código para o seu e-mail</p>
             </div>
             <?php $flash_msg = isset($flash) ? ($flash['message'] ?? null) : null; ?>
             <?php if (!empty($flash_msg)): ?>

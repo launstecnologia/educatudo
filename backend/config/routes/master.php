@@ -3,6 +3,10 @@
 $router->get('/master', 'Master/MasterAuthController@index');
 $router->post('/master/setup', 'Master/MasterAuthController@setup');
 $router->post('/master/login', 'Master/MasterAuthController@autenticar');
+$router->get('/master/verificar', 'Master/MasterAuthController@verificar');
+$router->post('/master/verificar', 'Master/MasterAuthController@confirmarCodigo');
+$router->post('/master/verificar/reenviar', 'Master/MasterAuthController@reenviarCodigo');
+$router->get('/master/verificar/cancelar', 'Master/MasterAuthController@cancelarVerificacao');
 $router->get('/master/dashboard', 'Master/MasterAuthController@dashboard');
 $router->get('/master/logout', 'Master/MasterAuthController@logout');
 $router->get('/master/escolas', 'Master/MasterEscolasController@index');

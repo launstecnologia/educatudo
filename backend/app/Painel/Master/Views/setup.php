@@ -24,6 +24,7 @@
             </div>
             <?php endif; ?>
             <form action="<?= URL ?>/master/setup" method="post" class="space-y-4">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
                 <div>
                     <label for="nome" class="block text-sm font-medium text-slate-700 mb-1">Nome</label>
                     <input id="nome" name="nome" type="text" value="Admin Master"

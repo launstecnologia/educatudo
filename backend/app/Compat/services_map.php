@@ -48,6 +48,7 @@ return [
     'App\\Services\\ClassDiaryReportService' => ['App\\Modulos\\Diario\\Services\\ClassDiaryReportService', 'Modulos/diario/Services/ClassDiaryReportService.php'],
     'App\\Services\\ClassDiaryService' => ['App\\Modulos\\Diario\\Services\\ClassDiaryService', 'Modulos/diario/Services/ClassDiaryService.php'],
     'App\\Services\\ClonarEscolaService' => ['App\\Painel\\Master\\Services\\ClonarEscolaService', 'Painel/Master/Services/ClonarEscolaService.php'],
+    'App\\Services\\CodigoAcessoMasterService' => ['App\\Painel\\Master\\Services\\CodigoAcessoMasterService', 'Painel/Master/Services/CodigoAcessoMasterService.php'],
     'App\\Services\\ComplianceAIService' => ['App\\Modulos\\Conformidade\\Services\\ComplianceAIService', 'Modulos/conformidade/Services/ComplianceAIService.php'],
     'App\\Services\\ComplianceService' => ['App\\Modulos\\Conformidade\\Services\\ComplianceService', 'Modulos/conformidade/Services/ComplianceService.php'],
     'App\\Services\\ComponenteCurricularService' => ['App\\Dominio\\Escola\\Services\\ComponenteCurricularService', 'Dominio/Escola/Services/ComponenteCurricularService.php'],

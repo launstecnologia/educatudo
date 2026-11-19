@@ -11,6 +11,7 @@ use App\Core\BaseController;
 use App\Core\CreditosDecimalHelper;
 use App\Core\Database;
 use App\Core\DatabaseManager;
+use App\Painel\Master\Services\CodigoAcessoMasterService;
 if (!class_exists(__NAMESPACE__ . '\\MasterAuthController', false)) {
 
 class MasterAuthController extends BaseController
@@ -21,6 +22,9 @@ class MasterAuthController extends BaseController
     private const SESSION_MASTER_USER_AVATAR = 'master_user_avatar';
     private const COOKIE_MASTER_AUTH = 'master_auth';
     private const COOKIE_MASTER_LIFETIME = 86400 * 7; // 7 dias
+    private const SESSION_2FA_USUARIO_ID = 'master_2fa_usuario_id';
+    private const SESSION_2FA_CODIGO_ID = 'master_2fa_codigo_id';
+    private const SESSION_2FA_EMAIL = 'master_2fa_email';
 
     public function __construct()
     {
@@ -141,6 +145,10 @@ class MasterAuthController extends BaseController
     {
         $this->ensureMultiTenant();
         $this->redirectIfMasterLoggedIn();
+        if ($this->desafioSegundoFator() !== null) {
+            header('Location: ' . URL . '/master/verificar');
+            exit;
+        }
 
         $db = Database::getInstance();
         $hasUsers = (int) $db->query("SELECT COUNT(*) FROM usuarios_master WHERE ativo = 1")->fetchColumn() > 0;
@@ -148,6 +156,7 @@ class MasterAuthController extends BaseController
         if (!$hasUsers) {
             $this->view('master/setup', [
                 'title' => 'Criar administrador master - EducaTudo',
+                'csrf_token' => $this->generateCsrfToken(),
                 'flash' => $this->getFlashMessage(),
             ]);
             return;
@@ -169,6 +178,13 @@ class MasterAuthController extends BaseController
     {
         $this->ensureMultiTenant();
         $this->redirectIfMasterLoggedIn();
+
+        $token = $_POST['csrf_token'] ?? '';
+        if ($token === '' || !$this->verifyCsrfToken($token)) {
+            $this->setFlashMessage('Requisição inválida. Tente novamente.', 'error');
+            header('Location: ' . URL . '/master');
+            exit;
+        }
 
         $db = Database::getInstance();
         $hasUsers = (int) $db->query("SELECT COUNT(*) FROM usuarios_master WHERE ativo = 1")->fetchColumn() > 0;
@@ -201,18 +217,37 @@ class MasterAuthController extends BaseController
             exit;
         }
 
+        $codigos = new CodigoAcessoMasterService();
+        if (!$codigos->tabelaPronta()) {
+            $this->setFlashMessage('O segundo fator ainda não está instalado. Aplique a migration 2026_11_19_usuarios_master_codigos_acesso_master.sql no banco master.', 'error');
+            header('Location: ' . URL . '/master');
+            exit;
+        }
+        if (!$codigos->emailConfigurado()) {
+            $this->setFlashMessage('O envio de e-mail do painel master não está configurado.', 'error');
+            header('Location: ' . URL . '/master');
+            exit;
+        }
+
         $senhaHash = password_hash($senha, PASSWORD_DEFAULT);
+        $nomeConta = $nome ?: 'Admin Master';
         $id = (int) $db->insert(
             "INSERT INTO usuarios_master (email, senha_hash, nome, ativo) VALUES (?, ?, ?, 1)",
-            [$email, $senhaHash, $nome ?: 'Admin Master']
+            [$email, $senhaHash, $nomeConta]
         );
-        $this->setMasterSession($id, $email, $nome ?: 'Admin Master');
-        $this->setMasterAuthCookie($id);
-        $this->setFlashMessage('Conta criada com sucesso.', 'success');
-        if (function_exists('session_write_close')) {
-            session_write_close();
+        try {
+            $this->prepararDesafioSegundoFator([
+                'id' => $id,
+                'email' => $email,
+                'nome' => $nomeConta,
+            ]);
+        } catch (\RuntimeException $e) {
+            $this->logMaster('setup() segundo fator não enviado', ['user_id' => $id, 'motivo' => $e->getMessage()], true);
+            $this->setFlashMessage('Conta criada. ' . $e->getMessage(), 'error');
+            header('Location: ' . URL . '/master');
+            exit;
         }
-        header('Location: ' . URL . '/master/dashboard');
+        header('Location: ' . URL . '/master/verificar');
         exit;
     }
 
@@ -253,14 +288,157 @@ class MasterAuthController extends BaseController
             exit;
         }
 
+        try {
+            $this->prepararDesafioSegundoFator($user);
+        } catch (\RuntimeException $e) {
+            $this->logMaster('autenticar() segundo fator não enviado', ['user_id' => (int) $user['id'], 'motivo' => $e->getMessage()], true);
+            $this->setFlashMessage($e->getMessage(), 'error');
+            header('Location: ' . URL . '/master');
+            exit;
+        }
+        $this->logMaster('autenticar() senha ok, aguardando código', ['user_id' => (int) $user['id']]);
+        header('Location: ' . URL . '/master/verificar');
+        exit;
+    }
+
+    /**
+     * Tela do código enviado por e-mail. Ainda não abre o painel.
+     */
+    public function verificar()
+    {
+        $this->ensureMultiTenant();
+        $this->redirectIfMasterLoggedIn();
+        $desafio = $this->desafioSegundoFator();
+        if ($desafio === null) {
+            header('Location: ' . URL . '/master');
+            exit;
+        }
+        $this->disableCache();
+        $this->view('master/verificar', [
+            'title' => 'Código de acesso - EducaTudo',
+            'csrf_token' => $this->generateCsrfToken(),
+            'email_mascarado' => $desafio['email'],
+            'flash' => $this->getFlashMessage(),
+        ]);
+    }
+
+    /**
+     * POST: confirma o código e só então abre a sessão master.
+     */
+    public function confirmarCodigo()
+    {
+        $this->ensureMultiTenant();
+        $this->redirectIfMasterLoggedIn();
+
+        $token = $_POST['csrf_token'] ?? '';
+        if ($token === '' || !$this->verifyCsrfToken($token)) {
+            $this->setFlashMessage('Requisição inválida. Tente novamente.', 'error');
+            header('Location: ' . URL . '/master/verificar');
+            exit;
+        }
+
+        $desafio = $this->desafioSegundoFator();
+        if ($desafio === null) {
+            $this->setFlashMessage('Peça um novo código na tela de login.', 'error');
+            header('Location: ' . URL . '/master');
+            exit;
+        }
+
+        $resultado = (new CodigoAcessoMasterService())->confirmar(
+            $desafio['usuario_id'],
+            $desafio['codigo_id'],
+            (string) ($_POST['codigo'] ?? '')
+        );
+        if ($resultado === 'esgotado') {
+            $this->logMaster('confirmarCodigo() tentativas esgotadas', ['user_id' => $desafio['usuario_id']], true);
+            $this->setFlashMessage('Código bloqueado depois de várias tentativas. Peça outro.', 'error');
+            header('Location: ' . URL . '/master/verificar');
+            exit;
+        }
+        if ($resultado !== 'ok') {
+            $this->logMaster('confirmarCodigo() código recusado', ['user_id' => $desafio['usuario_id']]);
+            $this->setFlashMessage('Código incorreto ou expirado.', 'error');
+            header('Location: ' . URL . '/master/verificar');
+            exit;
+        }
+
+        $db = Database::getInstance();
+        $user = $db->fetch(
+            'SELECT id, email, nome, avatar_url FROM usuarios_master WHERE id = :id AND ativo = 1',
+            ['id' => $desafio['usuario_id']]
+        );
+        if (!$user) {
+            $this->limparDesafioSegundoFator();
+            $this->setFlashMessage('Não foi possível concluir o acesso. Entre de novo.', 'error');
+            header('Location: ' . URL . '/master');
+            exit;
+        }
+
+        $this->limparDesafioSegundoFator();
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_regenerate_id(true);
+        }
         $this->setMasterSession((int) $user['id'], $user['email'], $user['nome'], $user['avatar_url'] ?? null);
         $this->setMasterAuthCookie((int) $user['id']);
-        $this->logMaster('autenticar() login ok', ['user_id' => $user['id'], 'cookie_path' => defined('FOLDER') && FOLDER !== '' ? FOLDER : '/', 'redirect' => 'dashboard']);
+        $this->refreshCsrfToken();
+        $this->logMaster('confirmarCodigo() login ok', ['user_id' => (int) $user['id']]);
         $this->setFlashMessage('Login realizado.', 'success');
         if (function_exists('session_write_close')) {
             session_write_close();
         }
         header('Location: ' . URL . '/master/dashboard');
+        exit;
+    }
+
+    /**
+     * POST: envia outro código para o mesmo usuário que já passou da senha.
+     */
+    public function reenviarCodigo()
+    {
+        $this->ensureMultiTenant();
+        $token = $_POST['csrf_token'] ?? '';
+        if ($token === '' || !$this->verifyCsrfToken($token)) {
+            $this->setFlashMessage('Requisição inválida. Tente novamente.', 'error');
+            header('Location: ' . URL . '/master/verificar');
+            exit;
+        }
+
+        $desafio = $this->desafioSegundoFator();
+        if ($desafio === null) {
+            header('Location: ' . URL . '/master');
+            exit;
+        }
+
+        $db = Database::getInstance();
+        $user = $db->fetch(
+            'SELECT id, email, nome FROM usuarios_master WHERE id = :id AND ativo = 1',
+            ['id' => $desafio['usuario_id']]
+        );
+        if (!$user) {
+            $this->limparDesafioSegundoFator();
+            $this->setFlashMessage('Não foi possível reenviar o código. Entre de novo.', 'error');
+            header('Location: ' . URL . '/master');
+            exit;
+        }
+
+        try {
+            $this->prepararDesafioSegundoFator($user);
+        } catch (\RuntimeException $e) {
+            $this->logMaster('reenviarCodigo() falhou', ['user_id' => (int) $user['id'], 'motivo' => $e->getMessage()], true);
+            $this->setFlashMessage($e->getMessage(), 'error');
+        }
+        header('Location: ' . URL . '/master/verificar');
+        exit;
+    }
+
+    /**
+     * Abandona o código pendente e volta ao login.
+     */
+    public function cancelarVerificacao()
+    {
+        $this->limparDesafioSegundoFator();
+        $this->setFlashMessage('Informe e-mail e senha para receber outro código.', 'info');
+        header('Location: ' . URL . '/master');
         exit;
     }
 
@@ -430,6 +608,9 @@ class MasterAuthController extends BaseController
             header('Location: ' . URL . '/master/dashboard');
             exit;
         }
+        if ($this->desafioSegundoFator() !== null) {
+            return;
+        }
         if ($this->restoreMasterSessionFromCookie()) {
             header('Location: ' . URL . '/master/dashboard');
             exit;
@@ -440,6 +621,10 @@ class MasterAuthController extends BaseController
     {
         if (!empty($_SESSION[self::SESSION_MASTER_USER_ID])) {
             return;
+        }
+        if ($this->desafioSegundoFator() !== null) {
+            header('Location: ' . URL . '/master/verificar');
+            exit;
         }
         if ($this->restoreMasterSessionFromCookie()) {
             return;
@@ -466,7 +651,68 @@ class MasterAuthController extends BaseController
             $_SESSION[self::SESSION_MASTER_USER_NOME],
             $_SESSION[self::SESSION_MASTER_USER_AVATAR]
         );
+        $this->limparDesafioSegundoFator();
         $this->clearMasterAuthCookie();
+    }
+
+    /**
+     * Senha já conferida. Grava só o desafio na sessão; a sessão do painel nasce depois do código.
+     *
+     * @param array{id: int|string, email: string, nome: string} $user
+     */
+    private function prepararDesafioSegundoFator(array $user): void
+    {
+        $desafio = (new CodigoAcessoMasterService())->emitir(
+            (int) $user['id'],
+            (string) $user['email'],
+            (string) $user['nome']
+        );
+        unset(
+            $_SESSION[self::SESSION_MASTER_USER_ID],
+            $_SESSION[self::SESSION_MASTER_USER_EMAIL],
+            $_SESSION[self::SESSION_MASTER_USER_NOME],
+            $_SESSION[self::SESSION_MASTER_USER_AVATAR]
+        );
+        $this->clearMasterAuthCookie();
+        $_SESSION[self::SESSION_2FA_USUARIO_ID] = (int) $user['id'];
+        $_SESSION[self::SESSION_2FA_CODIGO_ID] = (int) $desafio['id'];
+        $_SESSION[self::SESSION_2FA_EMAIL] = (string) $desafio['email_mascarado'];
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_regenerate_id(true);
+        }
+        $mascara = (string) $desafio['email_mascarado'];
+        if (!empty($desafio['reaproveitado'])) {
+            $this->setFlashMessage('O código enviado ainda está valendo. Confira ' . $mascara . '.', 'info');
+            return;
+        }
+        $this->setFlashMessage('Enviamos um código de 6 dígitos para ' . $mascara . '.', 'info');
+    }
+
+    /**
+     * @return array{usuario_id: int, codigo_id: int, email: string}|null
+     */
+    private function desafioSegundoFator(): ?array
+    {
+        $usuarioId = (int) ($_SESSION[self::SESSION_2FA_USUARIO_ID] ?? 0);
+        $codigoId = (int) ($_SESSION[self::SESSION_2FA_CODIGO_ID] ?? 0);
+        if ($usuarioId <= 0 || $codigoId <= 0) {
+            return null;
+        }
+
+        return [
+            'usuario_id' => $usuarioId,
+            'codigo_id' => $codigoId,
+            'email' => (string) ($_SESSION[self::SESSION_2FA_EMAIL] ?? 'seu e-mail'),
+        ];
+    }
+
+    private function limparDesafioSegundoFator(): void
+    {
+        unset(
+            $_SESSION[self::SESSION_2FA_USUARIO_ID],
+            $_SESSION[self::SESSION_2FA_CODIGO_ID],
+            $_SESSION[self::SESSION_2FA_EMAIL]
+        );
     }
 }
 
