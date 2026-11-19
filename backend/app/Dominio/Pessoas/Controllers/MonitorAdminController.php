@@ -54,14 +54,19 @@ class MonitorAdminController extends AdminBaseController
             if ($model->emailExists($email)) {
                 throw new \Exception('Email já cadastrado');
             }
+            $senhaTemporaria = \App\Helpers\SenhaTemporaria::gerar();
             $model->create([
                 'nome' => $nome,
                 'email' => $email,
-                'senha' => '123456',
+                'senha' => $senhaTemporaria,
                 'turmas' => $turmas,
                 'ativo' => $ativo,
             ]);
-            $this->json(['success' => true, 'message' => 'Monitor cadastrado com sucesso']);
+            $this->json([
+                'success' => true,
+                'message' => 'Monitor cadastrado. Anote a senha temporária; ela não será mostrada de novo.',
+                'senha_temporaria' => $senhaTemporaria,
+            ]);
         } catch (\Exception $e) {
             $this->json(['error' => $e->getMessage()], 400);
         }

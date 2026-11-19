@@ -204,7 +204,7 @@ document.getElementById('formExcluirAluno')?.addEventListener('submit', function
 function alterarSenhaPadrao(alunoId, alunoNome) {
     console.log('Função alterarSenhaPadrao chamada:', alunoId, alunoNome);
     
-    if (!confirm(`Tem certeza que deseja alterar a senha do aluno "${alunoNome}" para a senha padrão (123456)?`)) {
+    if (!confirm(`Gerar uma senha temporária para o aluno "${alunoNome}"? Ela aparece uma vez. Anote e entregue ao aluno.`)) {
         console.log('Usuário cancelou a operação');
         return;
     }
@@ -256,7 +256,12 @@ function alterarSenhaPadrao(alunoId, alunoNome) {
             // Scroll para o card de sucesso
             document.getElementById('successCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
             
-            alert(`Senha alterada com sucesso! Nova senha: 123456`);
+            const senhaGerada = data.senha_padrao || '';
+            const campoSenha = document.getElementById('senhaTemporariaValor');
+            if (campoSenha) {
+                campoSenha.textContent = senhaGerada;
+            }
+            alert('Senha temporária: ' + senhaGerada + '. Anote agora; ela não será mostrada de novo.');
         } else {
             alert('Erro ao alterar senha: ' + (data.error || 'Erro desconhecido'));
         }
@@ -271,12 +276,17 @@ function alterarSenhaPadrao(alunoId, alunoNome) {
 
 // Função para copiar senha
 function copiarSenha() {
-    const senha = '123456';
+    const campoSenha = document.getElementById('senhaTemporariaValor');
+    const senha = campoSenha ? campoSenha.textContent.trim() : '';
+    if (senha === '') {
+        alert('Não há senha temporária para copiar.');
+        return;
+    }
     navigator.clipboard.writeText(senha).then(() => {
         alert('Senha copiada para a área de transferência!');
     }).catch(err => {
         console.error('Erro ao copiar:', err);
-        alert('Erro ao copiar senha. Tente selecionar e copiar manualmente: 123456');
+        alert('Erro ao copiar senha. Selecione e copie manualmente.');
     });
 }
 

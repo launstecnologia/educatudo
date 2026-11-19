@@ -408,7 +408,7 @@ if (!class_exists(__NAMESPACE__ . '\\MonitorController', false)) {
                     throw new \Exception('Senha incorreta');
                 }
 
-                $senhaPadrao = '123456';
+                $senhaPadrao = \App\Helpers\SenhaTemporaria::gerar();
                 $result = $this->db->update(
                     "UPDATE alunos SET senha_hash = :senha WHERE id = :aluno_id",
                     [
@@ -425,7 +425,7 @@ if (!class_exists(__NAMESPACE__ . '\\MonitorController', false)) {
 
                 $this->json([
                     'success' => true,
-                    'message' => 'Senha alterada para o padrão (123456).',
+                    'message' => 'Senha temporária: ' . $senhaPadrao . '. Anote e entregue ao aluno. Ela não será mostrada de novo.',
                     'senha_padrao' => $senhaPadrao,
                     'aluno_nome' => $aluno['nome'],
                 ]);

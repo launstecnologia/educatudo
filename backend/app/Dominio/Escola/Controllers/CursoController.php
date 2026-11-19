@@ -562,6 +562,7 @@ class CursoController extends BaseController
         $cadastrados = 0;
         $matriculados = 0;
         $erros = [];
+        $senhasGeradas = [];
 
         $raw = file_get_contents($file['tmp_name']);
         if ($raw === false) {
@@ -612,12 +613,13 @@ class CursoController extends BaseController
             if (count($alunos) === 0) {
                 $nickname = $this->gerarNicknameUnico($nome, $studentModel);
                 $raGerado = $this->gerarRaImportacao($studentModel, $rowNum);
+                $senhaTemporaria = \App\Helpers\SenhaTemporaria::gerar();
                 try {
                     $alunoId = $studentModel->create([
                         'nome' => $nome,
                         'email' => $email,
                         'nickname' => $nickname,
-                        'senha' => '123456',
+                        'senha' => $senhaTemporaria,
                         'ra' => $raGerado,
                         'turma_id' => $turma_id,
                         'serie' => $serie,
@@ -625,6 +627,15 @@ class CursoController extends BaseController
                         'ativo' => 1,
                         'pagante' => 1,
                     ]);
+                    $this->db->update(
+                        "UPDATE alunos SET primeiro_acesso = 0 WHERE id = :id",
+                        ['id' => (int) $alunoId]
+                    );
+                    $senhasGeradas[] = [
+                        'nome' => $nome,
+                        'ra' => $raGerado,
+                        'senha' => $senhaTemporaria,
+                    ];
                     $cadastrados++;
                     $movimentacao->vincularAlunoTurma($alunoId, $turma_id, $ano_letivo_id, true);
                 } catch (\Throwable $e) {
@@ -651,7 +662,8 @@ class CursoController extends BaseController
 
         $msg = "Importação concluída: {$cadastrados} cadastrados, {$matriculados} matriculados.";
         if ($cadastrados > 0) {
-            $msg .= ' Quem não veio com RA na planilha recebeu um RA automático. A senha inicial é 123456.';
+            $msg .= ' Quem não veio com RA na planilha recebeu um RA automático. As senhas temporárias aparecem abaixo. Anote antes de sair desta página.';
+            $_SESSION['senhas_importacao_alunos'] = $senhasGeradas;
         }
         if (!empty($erros)) {
             $msg .= ' Erros: ' . count($erros) . ' — ' . implode(' ', array_slice($erros, 0, 3));

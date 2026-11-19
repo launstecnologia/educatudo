@@ -400,7 +400,7 @@ $page_header_actions = ob_get_clean();
             </section>
 
             <p id="teacher-senha-padrao" class="text-sm text-blue-800 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
-                A senha padrão será <strong>123456</strong>. O professor poderá alterá-la após o primeiro login.
+                Uma senha temporária será gerada e mostrada uma vez depois de salvar. Anote e entregue ao professor.
             </p>
 
             <section id="teacher-senha-section" class="hidden">
@@ -587,6 +587,11 @@ function deleteTeacher(id) {
 }
 
 // ---- Importar CSV ----
+function escaparHtml(valor) {
+    return String(valor).replace(/[&<>"']/g, function (caractere) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[caractere];
+    });
+}
 function abrirModalCSV() {
     document.getElementById('modalCSV').classList.remove('hidden');
 }
@@ -606,10 +611,16 @@ document.getElementById('formImportarCSV').addEventListener('submit', function (
         .then((data) => {
             if (data.success) {
                 const erros = (data.erros > 0 && data.mensagens_erro)
-                    ? `<div class="mt-2 text-sm text-green-700"><p class="font-medium">Erros encontrados:</p><ul class="list-disc list-inside mt-1">${data.mensagens_erro.map((msg) => `<li>${msg}</li>`).join('')}</ul></div>`
+                    ? `<div class="mt-2 text-sm text-green-700"><p class="font-medium">Erros encontrados:</p><ul class="list-disc list-inside mt-1">${data.mensagens_erro.map((msg) => `<li>${escaparHtml(msg)}</li>`).join('')}</ul></div>`
                     : '';
-                resultadoDiv.innerHTML = `<div class="bg-green-50 border border-green-200 rounded-lg p-4"><p class="text-green-800 font-medium">${data.message}</p>${erros}</div>`;
-                setTimeout(() => location.reload(), 2000);
+                const senhas = Array.isArray(data.senhas) ? data.senhas : [];
+                const tabela = senhas.length
+                    ? `<table class="mt-3 w-full text-sm text-left"><thead><tr><th class="py-1 pr-2">Nome</th><th class="py-1 pr-2">E-mail</th><th class="py-1">Senha temporária</th></tr></thead><tbody>${senhas.map((item) => `<tr><td class="py-1 pr-2">${escaparHtml(item.nome || '')}</td><td class="py-1 pr-2">${escaparHtml(item.email || '')}</td><td class="py-1 font-mono">${escaparHtml(item.senha || '')}</td></tr>`).join('')}</tbody></table>`
+                    : '';
+                resultadoDiv.innerHTML = `<div class="bg-green-50 border border-green-200 rounded-lg p-4"><p class="text-green-800 font-medium">${escaparHtml(data.message || '')}</p>${erros}${tabela}</div>`;
+                if (!senhas.length) {
+                    setTimeout(() => location.reload(), 2000);
+                }
             } else {
                 resultadoDiv.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-4"><p class="text-red-800">${data.error}</p></div>`;
             }
@@ -736,6 +747,9 @@ document.getElementById('teacher-form').addEventListener('submit', function (e) 
         .then((response) => response.json())
         .then((data) => {
             if (data.success) {
+                if (data.senha_temporaria) {
+                    alert('Professor cadastrado. Senha temporária (anote agora): ' + data.senha_temporaria);
+                }
                 window.location.reload();
             } else {
                 alert('Erro: ' + (data.error || 'Erro ao salvar'));

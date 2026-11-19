@@ -626,10 +626,10 @@
                     <div class="ml-3 flex-1">
                         <h3 class="text-lg font-medium text-green-800">Senha Alterada com Sucesso!</h3>
                         <div class="mt-2 text-sm text-green-700">
-                            <p>A senha do aluno <strong id="alunoNomeConfirmacao"></strong> foi alterada para a senha padrão:</p>
+                            <p>A senha do aluno <strong id="alunoNomeConfirmacao"></strong> foi substituída por esta senha temporária:</p>
                             <div class="mt-2 bg-green-100 border border-green-300 rounded-lg p-3">
                                 <div class="flex items-center justify-between">
-                                    <span class="font-mono text-lg font-bold text-green-800">123456</span>
+                                    <span id="senhaTemporariaValor" class="font-mono text-lg font-bold text-green-800"></span>
                                     <button onclick="copiarSenha()" class="text-green-600 hover:text-green-800 text-sm font-medium">📋 Copiar</button>
                                 </div>
                             </div>

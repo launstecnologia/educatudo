@@ -21,7 +21,39 @@ include \App\Core\ViewPaths::adminPartial('page_header_form.php');
 $flash_status = $status;
 $flash_message = $message;
 include \App\Core\ViewPaths::adminPartial('flash_message.php');
+
+$senhasImportacao = [];
+if (!empty($_SESSION['senhas_importacao_alunos']) && is_array($_SESSION['senhas_importacao_alunos'])) {
+    $senhasImportacao = $_SESSION['senhas_importacao_alunos'];
+    unset($_SESSION['senhas_importacao_alunos']);
+}
 ?>
+<?php if ($senhasImportacao !== []): ?>
+<div class="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 w-full overflow-x-auto">
+    <div class="p-6">
+        <h3 class="text-lg font-semibold text-gray-900">Senhas temporárias</h3>
+        <p class="text-sm text-gray-600 mt-1">Anote agora. Esta lista some ao recarregar a página.</p>
+        <table class="mt-4 w-full text-sm text-left">
+            <thead>
+                <tr class="border-b border-gray-200 text-gray-500">
+                    <th class="py-2 pr-4 font-medium">Nome</th>
+                    <th class="py-2 pr-4 font-medium">RA</th>
+                    <th class="py-2 font-medium">Senha</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($senhasImportacao as $item): ?>
+                <tr class="border-b border-gray-100">
+                    <td class="py-2 pr-4"><?= htmlspecialchars((string) ($item['nome'] ?? '')) ?></td>
+                    <td class="py-2 pr-4"><?= htmlspecialchars((string) ($item['ra'] ?? '')) ?></td>
+                    <td class="py-2 font-mono"><?= htmlspecialchars((string) ($item['senha'] ?? '')) ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+<?php endif; ?>
 
 <div class="bg-white rounded-lg shadow-sm border border-gray-200 w-full">
     <form method="POST"

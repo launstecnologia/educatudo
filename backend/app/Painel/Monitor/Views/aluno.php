@@ -55,7 +55,7 @@ $voltarUrl = URL . '/monitor/dashboard' . (!empty($bloco_id) ? ('?bloco_id=' . (
         <h2 class="font-semibold text-gray-900 mb-3">Ações rápidas</h2>
         <button type="button" id="btn-reset-senha"
                 class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
-            Resetar senha para 123456
+            Gerar senha temporária
         </button>
         <p class="text-xs text-gray-500 mt-2">É necessário informar sua senha de monitor para confirmar.</p>
         <p id="msg-reset" class="text-sm mt-2 hidden"></p>
@@ -129,7 +129,7 @@ $voltarUrl = URL . '/monitor/dashboard' . (!empty($bloco_id) ? ('?bloco_id=' . (
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6" role="dialog" aria-labelledby="modal-reset-titulo">
         <h2 id="modal-reset-titulo" class="text-lg font-bold text-gray-900 mb-2">Confirmar reset de senha</h2>
         <p class="text-sm text-gray-600 mb-4">
-            A senha de <strong><?= htmlspecialchars($aluno['nome']) ?></strong> será alterada para <strong>123456</strong>.
+            A senha de <strong><?= htmlspecialchars($aluno['nome']) ?></strong> será substituída por uma senha temporária, mostrada uma vez.
             Digite sua senha de monitor para confirmar.
         </p>
         <form id="form-reset-senha" class="space-y-4">

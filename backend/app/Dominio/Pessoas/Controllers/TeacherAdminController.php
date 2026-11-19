@@ -238,6 +238,7 @@ class TeacherAdminController extends AdminBaseController
             $erros = 0;
             $linha = 1;
             $mensagensErro = [];
+            $senhasGeradas = [];
             
             // Processar cada linha
             while (($data = fgetcsv($handle, 1000, $delimitador)) !== false) {
@@ -284,17 +285,22 @@ class TeacherAdminController extends AdminBaseController
                     // Gerar código do professor
                     $codigo_prof = $teacherModel->generateCode();
                     
-                    // Criar professor com senha padrão 123456
+                    $senhaTemporaria = \App\Helpers\SenhaTemporaria::gerar();
                     $teacherModel->create([
                         'nome' => $nome,
                         'email' => $email ?: null,
-                        'senha' => '123456',
+                        'senha' => $senhaTemporaria,
                         'codigo_prof' => $codigo_prof,
                         'materias' => $materias,
                         'turmas' => [],
                         'ativo' => 1
                     ]);
-                    
+                    $senhasGeradas[] = [
+                        'nome' => $nome,
+                        'email' => $email,
+                        'senha' => $senhaTemporaria,
+                    ];
+
                     $sucessos++;
                     
                 } catch (\Exception $e) {
@@ -307,10 +313,11 @@ class TeacherAdminController extends AdminBaseController
             
             $this->json([
                 'success' => true,
-                'message' => "Importação concluída! {$sucessos} professor(es) importado(s) com sucesso" . ($erros > 0 ? ", {$erros} erro(s)" : ""),
+                'message' => "Importação concluída! {$sucessos} professor(es) importado(s) com sucesso" . ($erros > 0 ? ", {$erros} erro(s)" : "") . '. Anote as senhas temporárias; elas não serão mostradas de novo.',
                 'sucessos' => $sucessos,
                 'erros' => $erros,
-                'mensagens_erro' => $mensagensErro
+                'mensagens_erro' => $mensagensErro,
+                'senhas' => $senhasGeradas,
             ]);
             
         } catch (\Exception $e) {
@@ -351,21 +358,23 @@ class TeacherAdminController extends AdminBaseController
             // Gera código do professor automaticamente
             $codigo_prof = $teacherModel->generateCode();
             
-            // Senha padrão para professores cadastrados pelo admin
-            $senha_padrao = '123456';
-            
-            // Cria professor com senha padrão
+            $senhaTemporaria = \App\Helpers\SenhaTemporaria::gerar();
+
             $teacherModel->create([
                 'nome' => $nome,
                 'email' => $email,
-                'senha' => $senha_padrao,
+                'senha' => $senhaTemporaria,
                 'codigo_prof' => $codigo_prof,
                 'materias' => $materias,
                 'turmas' => $turmas,
                 'ativo' => $ativo
             ]);
-            
-            $this->json(['success' => true, 'message' => 'Professor cadastrado com sucesso']);
+
+            $this->json([
+                'success' => true,
+                'message' => 'Professor cadastrado. Anote a senha temporária; ela não será mostrada de novo.',
+                'senha_temporaria' => $senhaTemporaria,
+            ]);
             
         } catch (\Exception $e) {
             $this->json(['error' => $e->getMessage()], 400);

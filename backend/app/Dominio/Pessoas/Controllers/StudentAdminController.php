@@ -1323,8 +1323,7 @@ class StudentAdminController extends AdminBaseController
             
             error_log('Aluno encontrado: ' . $aluno['nome'] . ' (ID: ' . $aluno['id'] . ')');
             
-            // Define senha padrão
-            $senha_padrao = '123456';
+            $senha_padrao = \App\Helpers\SenhaTemporaria::gerar();
             $senha_hash = password_hash($senha_padrao, PASSWORD_DEFAULT);
             
             // Log do hash gerado para debug
@@ -1370,8 +1369,8 @@ class StudentAdminController extends AdminBaseController
             error_log('Senha atualizada e verificada com sucesso para aluno: ' . $aluno['id']);
             
             $this->json([
-                'success' => true, 
-                'message' => 'Senha alterada para padrão com sucesso!',
+                'success' => true,
+                'message' => 'Senha temporária gerada. Anote agora; ela não será mostrada de novo.',
                 'senha_padrao' => $senha_padrao,
                 'aluno_nome' => $aluno['nome']
             ]);
@@ -3135,6 +3134,7 @@ class StudentAdminController extends AdminBaseController
                 return $value;
             };
             
+            $senhasGeradas = [];
             // Processar cada linha (pular cabeçalho)
             for ($i = 1; $i < count($rows); $i++) {
                 $row = $rows[$i];
@@ -3189,14 +3189,14 @@ class StudentAdminController extends AdminBaseController
                     }
                 }
                 
-                // Criar aluno
-                $senhaHash = password_hash('123456', PASSWORD_DEFAULT);
-                
-                $colunasInsert = 'nome, email, ra, password, serie, turma_id, ativo, created_at';
-                $valoresInsert = ':nome, :email, :ra, :senha, :serie, :turma_id, 1, NOW()';
+                $senhaClara = \App\Helpers\SenhaTemporaria::gerar();
+                $senhaHash = password_hash($senhaClara, PASSWORD_DEFAULT);
+
+                $colunasInsert = 'nome, email, ra, password, senha_hash, primeiro_acesso, serie, turma_id, ativo, created_at';
+                $valoresInsert = ':nome, :email, :ra, :senha, :senha_hash, 0, :serie, :turma_id, 1, NOW()';
                 if ($this->colunaAlunoPaganteExiste()) {
-                    $colunasInsert = 'nome, email, ra, password, serie, turma_id, ativo, pagante, created_at';
-                    $valoresInsert = ':nome, :email, :ra, :senha, :serie, :turma_id, 1, 1, NOW()';
+                    $colunasInsert = 'nome, email, ra, password, senha_hash, primeiro_acesso, serie, turma_id, ativo, pagante, created_at';
+                    $valoresInsert = ':nome, :email, :ra, :senha, :senha_hash, 0, :serie, :turma_id, 1, 1, NOW()';
                 }
                 $this->db->query(
                     "INSERT INTO alunos ({$colunasInsert}) VALUES ({$valoresInsert})",
@@ -3205,11 +3205,17 @@ class StudentAdminController extends AdminBaseController
                         'email' => $email ?: null,
                         'ra' => $ra,
                         'senha' => $senhaHash,
+                        'senha_hash' => $senhaHash,
                         'serie' => $serieAluno,
                         'turma_id' => $turmaId
                     ]
                 );
-                
+                $senhasGeradas[] = [
+                    'nome' => $nome,
+                    'ra' => $ra,
+                    'senha' => $senhaClara,
+                ];
+
                 $imported++;
             }
             
@@ -3223,7 +3229,8 @@ class StudentAdminController extends AdminBaseController
                 'message' => $message,
                 'imported' => $imported,
                 'skipped' => $skipped,
-                'errors' => $errors
+                'errors' => $errors,
+                'senhas' => $senhasGeradas,
             ]);
             
         } catch (\Exception $e) {

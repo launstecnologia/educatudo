@@ -100,7 +100,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
 
         <div class="flex-1 overflow-y-auto px-6 sm:px-8 py-6 space-y-6">
             <p id="monitor-senha-padrao" class="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                Senha padrão: <strong>123456</strong> (alteração obrigatória no primeiro login)
+                Uma senha temporária será gerada e mostrada uma vez depois de salvar. Anote e entregue ao monitor.
             </p>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
@@ -253,6 +253,9 @@ document.getElementById('monitor-form').addEventListener('submit', function (e) 
         .then((response) => response.json())
         .then((data) => {
             if (data.success) {
+                if (data.senha_temporaria) {
+                    alert('Monitor cadastrado. Senha temporária (anote agora): ' + data.senha_temporaria);
+                }
                 window.location.reload();
             } else {
                 alert('Erro: ' + (data.error || 'Erro ao salvar'));

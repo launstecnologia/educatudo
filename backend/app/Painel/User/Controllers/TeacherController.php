@@ -1853,8 +1853,7 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
             // Professores podem alterar senha de qualquer aluno
             error_log('Aluno encontrado: ' . $aluno['nome'] . ' (ID: ' . $aluno['id'] . ')');
             
-            // Define senha padrão
-            $senha_padrao = '123456';
+            $senha_padrao = \App\Helpers\SenhaTemporaria::gerar();
             $senha_hash = password_hash($senha_padrao, PASSWORD_DEFAULT);
             
             error_log('Senha hash gerada para aluno: ' . $id);
@@ -1874,7 +1873,7 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
             
             $this->json([
                 'success' => true, 
-                'message' => 'Senha alterada para padrão com sucesso!',
+                'message' => 'Senha temporária gerada. Anote agora; ela não será mostrada de novo.',
                 'senha_padrao' => $senha_padrao,
                 'aluno_nome' => $aluno['nome']
             ]);
