@@ -191,11 +191,7 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
      */
     private function writeLoginCsrfLog(array $data)
     {
-        $dir = dirname(__DIR__, 3) . '/storage/logs';
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0755, true);
-        }
-        $file = $dir . '/login_csrf.log';
+        $file = $this->garantirArquivoLoginCsrfLogMigrado();
         $line = date('Y-m-d H:i:s') . ' [LOGIN CSRF] ' . json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
         @file_put_contents($file, $line, FILE_APPEND | LOCK_EX);
 
@@ -208,6 +204,39 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
                 'motivo' => $data['motivo'] ?? '',
             ], 'auth');
         }
+    }
+
+    /** Diretório canônico de logs (BASE_PATH/storage/logs). */
+    private function diretorioStorageLogs(): string
+    {
+        $base = defined('BASE_PATH') ? BASE_PATH : dirname(__DIR__, 4);
+        $dir = $base . '/storage/logs';
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0755, true);
+        }
+
+        return $dir;
+    }
+
+    /**
+     * Path canônico do login_csrf.log; migra o arquivo legado em app/storage/logs se existir.
+     */
+    private function garantirArquivoLoginCsrfLogMigrado(): string
+    {
+        $canonico = $this->diretorioStorageLogs() . '/login_csrf.log';
+        $legado = dirname(__DIR__, 3) . '/storage/logs/login_csrf.log';
+        if (is_file($legado) && !is_file($canonico)) {
+            @rename($legado, $canonico);
+        } elseif (is_file($legado) && is_file($canonico)) {
+            // Concatena legado no canônico uma vez e remove o legado.
+            $extra = @file_get_contents($legado);
+            if (is_string($extra) && $extra !== '') {
+                @file_put_contents($canonico, $extra, FILE_APPEND | LOCK_EX);
+            }
+            @unlink($legado);
+        }
+
+        return $canonico;
     }
 
     /**
@@ -972,6 +1001,70 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
         return max(1, (int) ceil($duration / 60));
     }
 
+    /**
+     * Caminho canônico do contador IP de login (SEC-04 V-02).
+     * Antes: dirname(__DIR__, 3)/storage/logs → app/storage/logs (errado).
+     */
+    private function caminhoArquivoRateLimitLogin(): string
+    {
+        return $this->diretorioStorageLogs() . '/login_rate_limit.json';
+    }
+
+    /** Path legado (bug V-02) — só para migrar contadores existentes. */
+    private function caminhoArquivoRateLimitLoginLegado(): string
+    {
+        return dirname(__DIR__, 3) . '/storage/logs/login_rate_limit.json';
+    }
+
+    /**
+     * Garante leitura/gravação no arquivo canônico.
+     * Se só o legado existir (ou o canônico estiver vazio), copia os contadores
+     * preservando `c` e `t` — sem zerar a janela de bloqueio.
+     */
+    private function garantirArquivoRateLimitLoginMigrado(): string
+    {
+        $canonico = $this->caminhoArquivoRateLimitLogin();
+        $legado = $this->caminhoArquivoRateLimitLoginLegado();
+
+        $legadoExiste = is_file($legado);
+        if (!$legadoExiste) {
+            return $canonico;
+        }
+
+        $fp = @fopen($canonico, 'c+');
+        if ($fp && flock($fp, LOCK_EX)) {
+            $rawCanon = stream_get_contents($fp);
+            $canonTemDados = is_string($rawCanon) && trim($rawCanon) !== '' && trim($rawCanon) !== '{}';
+            if (!$canonTemDados) {
+                $rawLegado = @file_get_contents($legado);
+                if (is_string($rawLegado) && trim($rawLegado) !== '') {
+                    ftruncate($fp, 0);
+                    rewind($fp);
+                    fwrite($fp, $rawLegado);
+                    fflush($fp);
+                    @unlink($legado);
+                }
+            } else {
+                // Canônico já tem dados: remove legado para não haver dois arquivos divergentes.
+                @unlink($legado);
+            }
+            flock($fp, LOCK_UN);
+            fclose($fp);
+            return $canonico;
+        }
+        if ($fp) {
+            fclose($fp);
+        }
+
+        // Fallback sem lock exclusivo: só copia se o canônico ainda não existe.
+        if (!is_file($canonico) && $legadoExiste) {
+            @copy($legado, $canonico);
+            @unlink($legado);
+        }
+
+        return $canonico;
+    }
+
     /** Limite por IP: só bloqueia após muitas tentativas (MAX_LOGIN_ATTEMPTS_IP), para não afetar outros usuários no mesmo IP. */
     private function checkLoginRateLimit($ip)
     {
@@ -981,11 +1074,7 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
         $sec = $this->getSecurityConfig();
         $window = (int) ($sec['lockout_duration'] ?? 900);
         $max = (int) ($sec['max_login_attempts_ip'] ?? 50);
-        $dir = dirname(__DIR__, 3) . '/storage/logs';
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0755, true);
-        }
-        $file = $dir . '/login_rate_limit.json';
+        $file = $this->garantirArquivoRateLimitLoginMigrado();
         $now = time();
         $data = [];
         if (file_exists($file)) {
@@ -1013,11 +1102,7 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
         }
         $sec = $this->getSecurityConfig();
         $window = (int) ($sec['lockout_duration'] ?? 900);
-        $dir = dirname(__DIR__, 3) . '/storage/logs';
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0755, true);
-        }
-        $file = $dir . '/login_rate_limit.json';
+        $file = $this->garantirArquivoRateLimitLoginMigrado();
         $now = time();
         $data = [];
         $fp = @fopen($file, 'c+');
@@ -1226,15 +1311,13 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
         }
     }
 
+    /**
+     * IP do cliente para auditoria de consentimento.
+     * Usa só REMOTE_ADDR: com Nginx real_ip + Cloudflare (V-03), já é o IP real.
+     * Não confia em X-Forwarded-For / Client-IP enviados pelo browser.
+     */
     private function getIpAddress()
     {
-        if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
-            return $_SERVER['HTTP_CLIENT_IP'];
-        }
-        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
-            return trim($ips[0]);
-        }
         return $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     }
     
