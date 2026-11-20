@@ -60,8 +60,9 @@ class ParentController extends BaseController
             return;
         }
 
+        $nomeExpr = \App\Helpers\StudentFormHelper::sqlNomeExibicao('a', $this->db);
         $filhos = $this->db->fetchAll(
-            "SELECT a.id, COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) AS nome, t.nome as turma_nome, t.serie
+            "SELECT a.id, {$nomeExpr} AS nome, t.nome as turma_nome, t.serie
              FROM alunos a
              LEFT JOIN turmas t ON a.turma_id = t.id
              WHERE a.ativo = 1
@@ -75,7 +76,7 @@ class ParentController extends BaseController
                           AND ar.ativo = 1
                     )
                )
-             ORDER BY a.nome ASC",
+             ORDER BY {$nomeExpr} ASC",
             ['parent_id' => $parentId]
         );
 

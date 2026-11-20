@@ -122,6 +122,7 @@ class ParentController extends BaseController
         if (!$pai) {
             return [];
         }
+        $ordemNome = \App\Helpers\StudentFormHelper::sqlNomeExibicao('a', $this->db);
         $filhos = $this->db->fetchAll(
             "SELECT a.*, t.nome as turma_nome, t.serie
              FROM alunos a
@@ -137,7 +138,7 @@ class ParentController extends BaseController
                           AND ar.ativo = 1
                     )
                )
-             ORDER BY COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) ASC",
+             ORDER BY {$ordemNome} ASC",
             [
                 'pai_id_legacy' => $pai['id'],
                 'pai_id_rel' => $pai['id']
@@ -643,7 +644,8 @@ class ParentController extends BaseController
             ['user_id' => $user['id']]
         );
         
-        // Busca filhos do pai
+        // Busca filhos do pai (ordem usa nome_social só se a coluna existir no tenant)
+        $ordemNome = \App\Helpers\StudentFormHelper::sqlNomeExibicao('a', $this->db);
         $filhos = $this->db->fetchAll(
             "SELECT a.*, t.nome as turma_nome
              FROM alunos a
@@ -659,7 +661,7 @@ class ParentController extends BaseController
                           AND ar.ativo = 1
                     )
                )
-             ORDER BY COALESCE(NULLIF(TRIM(a.nome_social), ''), a.nome) ASC",
+             ORDER BY {$ordemNome} ASC",
             [
                 'pai_id_legacy' => $pai['id'],
                 'pai_id_rel' => $pai['id']
