@@ -556,25 +556,38 @@ class Router
         if (!class_exists('EstilosPlataforma', false)) {
         }
 
+        $logoUrl = rtrim((string) URL, '/') . '/assets/logos/logo-educatudo-black.png';
+        $homeUrl = htmlspecialchars(rtrim((string) URL, '/') . '/', ENT_QUOTES, 'UTF-8');
+        $logoEsc = htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8');
+
         return '<!DOCTYPE html>
-        <html lang="pt-BR">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Página não encontrada - EducaTudo</title>
-            ' . EstilosPlataforma::tagLink() . '
-        </head>
-        <body class="bg-gray-100 flex items-center justify-center min-h-screen">
-            <div class="bg-white p-8 rounded-lg shadow-lg text-center">
-                <h1 class="text-6xl font-bold text-primary-600 mb-4">404</h1>
-                <h2 class="text-2xl font-semibold text-gray-800 mb-4">Página não encontrada</h2>
-                <p class="text-gray-600 mb-6">A página que você está procurando não existe.</p>
-                <a href="' . URL . '" class="bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors">
-                    Voltar ao início
-                </a>
-            </div>
-        </body>
-        </html>';
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Página não encontrada — EducaTudo</title>
+    <style>
+        body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;font-family:"Segoe UI",system-ui,-apple-system,sans-serif;color:#1e293b;background:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(8,43,85,.12),transparent),#f1f5f9}
+        main{width:100%;max-width:420px;text-align:center}
+        .logo{height:48px;width:auto;margin:0 auto 28px;display:block}
+        .codigo{margin:0 0 8px;font-size:4.5rem;font-weight:700;letter-spacing:-.04em;line-height:1;color:#082B55}
+        h1{margin:0 0 12px;font-size:1.35rem;font-weight:600;color:#061f3d}
+        p{margin:0 0 28px;font-size:.95rem;line-height:1.55;color:#64748b}
+        a{display:inline-block;padding:12px 22px;border-radius:10px;background:#082B55;color:#fff;text-decoration:none;font-size:.95rem;font-weight:600}
+        a:hover{background:#061f3d}
+    </style>
+</head>
+<body>
+    <main>
+        <img class="logo" src="' . $logoEsc . '" alt="EducaTudo" width="180" height="48">
+        <p class="codigo" aria-hidden="true">404</p>
+        <h1>Página não encontrada</h1>
+        <p>O endereço que você abriu não existe ou foi removido. Confira o link ou volte ao início.</p>
+        <a href="' . $homeUrl . '">Voltar ao início</a>
+    </main>
+</body>
+</html>';
     }
 
     private function isMaintenanceEnabled(): bool
