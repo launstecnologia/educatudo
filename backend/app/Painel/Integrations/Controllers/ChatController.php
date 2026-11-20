@@ -10,23 +10,78 @@ namespace App\Painel\Integrations\Controllers;
 use App\Core\AuthManager;
 use App\Core\BaseController;
 use App\Core\Database;
+
+require_once dirname(__DIR__, 3) . '/Policies/PoliticaAcessoProfessorAluno.php';
+
 if (!class_exists(__NAMESPACE__ . '\\ChatController', false)) {
 class ChatController extends BaseController
 {
     private $authManager;
     private $db;
+    /** @var PoliticaAcessoProfessorAluno|null */
+    private $politicaAcesso;
     
     public function __construct()
     {
         parent::__construct();
         $this->authManager = new AuthManager();
         $this->db = Database::getInstance();
+        $this->politicaAcesso = new \PoliticaAcessoProfessorAluno($this->db);
         
         // Verifica se está logado
         if (!$this->authManager->isLoggedIn()) {
             $this->redirect('/');
             return;
         }
+    }
+
+    /**
+     * Professor autenticado na sessão (nunca confiar em id do request).
+     */
+    private function professorDaSessao(): ?array
+    {
+        $user = $this->authManager->getUser();
+        if (($user['tipo'] ?? '') !== 'professor') {
+            return null;
+        }
+        $professor = $this->db->fetch(
+            'SELECT * FROM professores WHERE id = :user_id LIMIT 1',
+            ['user_id' => (int) $user['id']]
+        );
+        return $professor ?: null;
+    }
+
+    private function alunoDaSessao(): ?array
+    {
+        $user = $this->authManager->getUser();
+        if (($user['tipo'] ?? '') !== 'aluno') {
+            return null;
+        }
+        $aluno = $this->db->fetch(
+            'SELECT a.*, t.nome as turma_nome
+             FROM alunos a
+             LEFT JOIN turmas t ON a.turma_id = t.id
+             WHERE a.id = :user_id
+             LIMIT 1',
+            ['user_id' => (int) $user['id']]
+        );
+        return $aluno ?: null;
+    }
+
+    private function professorPodeAluno(int $professorId, int $alunoId): bool
+    {
+        return $this->politicaAcesso->podeAcessar($professorId, $alunoId);
+    }
+
+    /** HTML: redireciona sem vazar dados. JSON: 403 genérico. */
+    private function negarAcessoChat(string $redirectPath, bool $json = false): void
+    {
+        if ($json) {
+            $this->json(['error' => 'Acesso negado'], 403);
+            return;
+        }
+        $_SESSION['error_message'] = 'Acesso negado.';
+        $this->redirect($redirectPath);
     }
     
     /**
@@ -46,8 +101,8 @@ class ChatController extends BaseController
             ['user_id' => $user['id']]
         );
         
-        // Busca todas as conversas do professor
-        $conversas = $this->db->fetchAll(
+        // Conversas do professor — só alunos com vínculo escolar ainda válido
+        $conversasBrutas = $this->db->fetchAll(
             "SELECT cpa.*, 
                     a.nome as aluno_nome,
                     a.ra as aluno_ra,
@@ -74,6 +129,12 @@ class ChatController extends BaseController
              ORDER BY cpa.ultima_atividade DESC",
             ['prof_id' => $professor['id']]
         );
+        $conversas = [];
+        foreach ($conversasBrutas as $conversa) {
+            if ($this->professorPodeAluno((int) $professor['id'], (int) ($conversa['aluno_id'] ?? 0))) {
+                $conversas[] = $conversa;
+            }
+        }
         
         $data = [
             'title' => 'Chat com Alunos - EducaTudo',
@@ -116,44 +177,44 @@ class ChatController extends BaseController
                 return;
             }
             
-            $professor = $this->db->fetch(
-                "SELECT * FROM professores WHERE id = :user_id",
-                ['user_id' => $user['id']]
-            );
-            
+            $professor = $this->professorDaSessao();
             if (!$professor) {
-                $_SESSION['error_message'] = 'Professor não encontrado';
-                $this->redirect('/professor/chat');
+                $this->negarAcessoChat('/professor/chat');
+                return;
+            }
+
+            $alunoId = (int) $aluno_id;
+            if ($alunoId <= 0 || !$this->professorPodeAluno((int) $professor['id'], $alunoId)) {
+                // Sem vínculo (ou aluno inexistente): não cria registro e não vaza dados.
+                $this->negarAcessoChat('/professor/chat');
                 return;
             }
             
-            // Busca dados do aluno
             $aluno = $this->db->fetch(
                 "SELECT a.*, t.nome as turma_nome 
                  FROM alunos a 
                  LEFT JOIN turmas t ON a.turma_id = t.id 
-                 WHERE a.id = :aluno_id",
-                ['aluno_id' => $aluno_id]
+                 WHERE a.id = :aluno_id AND a.ativo = 1",
+                ['aluno_id' => $alunoId]
             );
             
             if (!$aluno) {
-                $_SESSION['error_message'] = 'Aluno não encontrado';
-                $this->redirect('/professor/chat');
+                $this->negarAcessoChat('/professor/chat');
                 return;
             }
             
-            // Busca ou cria conversa
+            // Busca ou cria conversa (só após vínculo autorizado)
             $chat = $this->db->fetch(
                 "SELECT * FROM chat_professores_alunos 
                  WHERE aluno_id = :aluno_id AND professor_id = :prof_id",
-                ['aluno_id' => $aluno_id, 'prof_id' => $professor['id']]
+                ['aluno_id' => $alunoId, 'prof_id' => $professor['id']]
             );
             
             if (!$chat) {
                 $chat_id = $this->db->insert(
                     "INSERT INTO chat_professores_alunos (aluno_id, professor_id) 
                      VALUES (:aluno_id, :prof_id)",
-                    ['aluno_id' => $aluno_id, 'prof_id' => $professor['id']]
+                    ['aluno_id' => $alunoId, 'prof_id' => $professor['id']]
                 );
                 $chat = $this->db->fetch(
                     "SELECT * FROM chat_professores_alunos WHERE id = :chat_id",
@@ -312,30 +373,36 @@ class ChatController extends BaseController
                 return;
             }
             
-            $aluno_id = $_POST['aluno_id'] ?? null;
+            $alunoId = (int) ($_POST['aluno_id'] ?? 0);
             $mensagem = trim($_POST['mensagem'] ?? '');
             
-            if (empty($aluno_id) || empty($mensagem)) {
+            if ($alunoId <= 0 || $mensagem === '') {
                 throw new \Exception('Aluno e mensagem são obrigatórios');
             }
             
-            $professor = $this->db->fetch(
-                "SELECT * FROM professores WHERE id = :user_id",
-                ['user_id' => $user['id']]
-            );
+            $professor = $this->professorDaSessao();
+            if (!$professor) {
+                $this->negarAcessoChat('/professor/chat', true);
+                return;
+            }
+
+            if (!$this->professorPodeAluno((int) $professor['id'], $alunoId)) {
+                $this->negarAcessoChat('/professor/chat', true);
+                return;
+            }
             
-            // Busca ou cria conversa
+            // Busca ou cria conversa (somente com vínculo válido)
             $chat = $this->db->fetch(
                 "SELECT * FROM chat_professores_alunos 
                  WHERE aluno_id = :aluno_id AND professor_id = :prof_id",
-                ['aluno_id' => $aluno_id, 'prof_id' => $professor['id']]
+                ['aluno_id' => $alunoId, 'prof_id' => $professor['id']]
             );
             
             if (!$chat) {
                 $chat_id = $this->db->insert(
                     "INSERT INTO chat_professores_alunos (aluno_id, professor_id) 
                      VALUES (:aluno_id, :prof_id)",
-                    ['aluno_id' => $aluno_id, 'prof_id' => $professor['id']]
+                    ['aluno_id' => $alunoId, 'prof_id' => $professor['id']]
                 );
             } else {
                 $chat_id = $chat['id'];
@@ -392,22 +459,29 @@ class ChatController extends BaseController
                 return;
             }
             
-            $aluno_id = $_GET['aluno_id'] ?? null;
-            $ultima_mensagem_id = $_GET['ultima_mensagem_id'] ?? 0;
+            $alunoId = (int) ($_GET['aluno_id'] ?? 0);
+            $ultima_mensagem_id = (int) ($_GET['ultima_mensagem_id'] ?? 0);
             
-            if (empty($aluno_id)) {
+            if ($alunoId <= 0) {
                 throw new \Exception('Aluno é obrigatório');
             }
             
-            $professor = $this->db->fetch(
-                "SELECT * FROM professores WHERE id = :user_id",
-                ['user_id' => $user['id']]
-            );
+            $professor = $this->professorDaSessao();
+            if (!$professor) {
+                $this->negarAcessoChat('/professor/chat', true);
+                return;
+            }
+
+            // Conversa antiga sem vínculo atual não libera leitura.
+            if (!$this->professorPodeAluno((int) $professor['id'], $alunoId)) {
+                $this->negarAcessoChat('/professor/chat', true);
+                return;
+            }
             
             $chat = $this->db->fetch(
                 "SELECT * FROM chat_professores_alunos 
                  WHERE aluno_id = :aluno_id AND professor_id = :prof_id",
-                ['aluno_id' => $aluno_id, 'prof_id' => $professor['id']]
+                ['aluno_id' => $alunoId, 'prof_id' => $professor['id']]
             );
             
             if (!$chat) {
@@ -473,16 +547,14 @@ class ChatController extends BaseController
             return;
         }
         
-        $aluno = $this->db->fetch(
-            "SELECT a.*, t.nome as turma_nome 
-             FROM alunos a 
-             LEFT JOIN turmas t ON a.turma_id = t.id 
-             WHERE a.id = :user_id",
-            ['user_id' => $user['id']]
-        );
+        $aluno = $this->alunoDaSessao();
+        if (!$aluno) {
+            $this->negarAcessoChat('/dashboard');
+            return;
+        }
         
-        // Busca professores que têm conversas com o aluno
-        $conversas = $this->db->fetchAll(
+        // Conversas — só com professores ainda vinculados à turma do aluno
+        $conversasBrutas = $this->db->fetchAll(
             "SELECT cpa.*, 
                     p.nome as professor_nome,
                     p.codigo_prof as professor_codigo,
@@ -507,16 +579,25 @@ class ChatController extends BaseController
              ORDER BY cpa.ultima_atividade DESC",
             ['aluno_id' => $aluno['id']]
         );
+        $conversas = [];
+        foreach ($conversasBrutas as $conversa) {
+            if ($this->professorPodeAluno((int) ($conversa['professor_id'] ?? 0), (int) $aluno['id'])) {
+                $conversas[] = $conversa;
+            }
+        }
         
-        // Busca professores da turma do aluno
-        $professores_turma = $this->db->fetchAll(
-            "SELECT DISTINCT p.*
-             FROM professores p
-             JOIN jornadas j ON j.professor_id = p.id
-             WHERE j.turma_id = :turma_id
-             ORDER BY p.nome ASC",
-            ['turma_id' => $aluno['turma_id']]
+        // Professores da turma: mesma regra da política (jornada e/ou JSON turmas)
+        $candidatos = $this->db->fetchAll(
+            "SELECT p.* FROM professores p
+             WHERE (p.ativo = 1 OR p.ativo IS NULL)
+             ORDER BY p.nome ASC"
         );
+        $professores_turma = [];
+        foreach ($candidatos as $candidato) {
+            if ($this->professorPodeAluno((int) $candidato['id'], (int) $aluno['id'])) {
+                $professores_turma[] = $candidato;
+            }
+        }
         
         $data = [
             'title' => 'Chat com Professor - EducaTudo',
@@ -551,38 +632,40 @@ class ChatController extends BaseController
             return;
         }
         
-        $aluno = $this->db->fetch(
-            "SELECT a.*, t.nome as turma_nome 
-             FROM alunos a 
-             LEFT JOIN turmas t ON a.turma_id = t.id 
-             WHERE a.id = :user_id",
-            ['user_id' => $user['id']]
-        );
-        
-        // Busca dados do professor
-        $professor = $this->db->fetch(
-            "SELECT * FROM professores WHERE id = :prof_id",
-            ['prof_id' => $professor_id]
-        );
-        
-        if (!$professor) {
-            $_SESSION['error_message'] = 'Professor não encontrado';
-            $this->redirect('/chat-professor');
+        $aluno = $this->alunoDaSessao();
+        if (!$aluno) {
+            $this->negarAcessoChat('/dashboard');
+            return;
+        }
+
+        $professorId = (int) $professor_id;
+        if ($professorId <= 0 || !$this->professorPodeAluno($professorId, (int) $aluno['id'])) {
+            $this->negarAcessoChat('/chat-professor');
             return;
         }
         
-        // Busca ou cria conversa
+        $professor = $this->db->fetch(
+            "SELECT * FROM professores WHERE id = :prof_id AND (ativo = 1 OR ativo IS NULL)",
+            ['prof_id' => $professorId]
+        );
+        
+        if (!$professor) {
+            $this->negarAcessoChat('/chat-professor');
+            return;
+        }
+        
+        // Busca ou cria conversa (após vínculo)
         $chat = $this->db->fetch(
             "SELECT * FROM chat_professores_alunos 
              WHERE aluno_id = :aluno_id AND professor_id = :prof_id",
-            ['aluno_id' => $aluno['id'], 'prof_id' => $professor_id]
+            ['aluno_id' => $aluno['id'], 'prof_id' => $professorId]
         );
         
         if (!$chat) {
             $chat_id = $this->db->insert(
                 "INSERT INTO chat_professores_alunos (aluno_id, professor_id) 
                  VALUES (:aluno_id, :prof_id)",
-                ['aluno_id' => $aluno['id'], 'prof_id' => $professor_id]
+                ['aluno_id' => $aluno['id'], 'prof_id' => $professorId]
             );
             $chat = $this->db->fetch(
                 "SELECT * FROM chat_professores_alunos WHERE id = :chat_id",
@@ -663,30 +746,35 @@ class ChatController extends BaseController
                 return;
             }
             
-            $professor_id = $_POST['professor_id'] ?? null;
+            $professorId = (int) ($_POST['professor_id'] ?? 0);
             $mensagem = trim($_POST['mensagem'] ?? '');
             
-            if (empty($professor_id) || empty($mensagem)) {
+            if ($professorId <= 0 || $mensagem === '') {
                 throw new \Exception('Professor e mensagem são obrigatórios');
             }
             
-            $aluno = $this->db->fetch(
-                "SELECT * FROM alunos WHERE id = :user_id",
-                ['user_id' => $user['id']]
-            );
+            $aluno = $this->alunoDaSessao();
+            if (!$aluno) {
+                $this->negarAcessoChat('/chat-professor', true);
+                return;
+            }
+
+            if (!$this->professorPodeAluno($professorId, (int) $aluno['id'])) {
+                $this->negarAcessoChat('/chat-professor', true);
+                return;
+            }
             
-            // Busca ou cria conversa
             $chat = $this->db->fetch(
                 "SELECT * FROM chat_professores_alunos 
                  WHERE aluno_id = :aluno_id AND professor_id = :prof_id",
-                ['aluno_id' => $aluno['id'], 'prof_id' => $professor_id]
+                ['aluno_id' => $aluno['id'], 'prof_id' => $professorId]
             );
             
             if (!$chat) {
                 $chat_id = $this->db->insert(
                     "INSERT INTO chat_professores_alunos (aluno_id, professor_id) 
                      VALUES (:aluno_id, :prof_id)",
-                    ['aluno_id' => $aluno['id'], 'prof_id' => $professor_id]
+                    ['aluno_id' => $aluno['id'], 'prof_id' => $professorId]
                 );
             } else {
                 $chat_id = $chat['id'];
@@ -743,22 +831,28 @@ class ChatController extends BaseController
                 return;
             }
             
-            $professor_id = $_GET['professor_id'] ?? null;
-            $ultima_mensagem_id = $_GET['ultima_mensagem_id'] ?? 0;
+            $professorId = (int) ($_GET['professor_id'] ?? 0);
+            $ultima_mensagem_id = (int) ($_GET['ultima_mensagem_id'] ?? 0);
             
-            if (empty($professor_id)) {
+            if ($professorId <= 0) {
                 throw new \Exception('Professor é obrigatório');
             }
             
-            $aluno = $this->db->fetch(
-                "SELECT * FROM alunos WHERE id = :user_id",
-                ['user_id' => $user['id']]
-            );
+            $aluno = $this->alunoDaSessao();
+            if (!$aluno) {
+                $this->negarAcessoChat('/chat-professor', true);
+                return;
+            }
+
+            if (!$this->professorPodeAluno($professorId, (int) $aluno['id'])) {
+                $this->negarAcessoChat('/chat-professor', true);
+                return;
+            }
             
             $chat = $this->db->fetch(
                 "SELECT * FROM chat_professores_alunos 
                  WHERE aluno_id = :aluno_id AND professor_id = :prof_id",
-                ['aluno_id' => $aluno['id'], 'prof_id' => $professor_id]
+                ['aluno_id' => $aluno['id'], 'prof_id' => $professorId]
             );
             
             if (!$chat) {
