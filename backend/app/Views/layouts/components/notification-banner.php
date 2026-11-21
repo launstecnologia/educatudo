@@ -77,15 +77,15 @@ if ($usuario && $notificacoesNaoLidas > 0) {
 </div>
 
 <!-- Modal de Notificações -->
-<div id="notification-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
-    <!-- Backdrop com transição suave -->
-    <div id="modal-backdrop" class="fixed inset-0 bg-gray-500/75 transition-opacity duration-300 ease-out opacity-0" data-csp-click="fecharModalNotificacoes"></div>
+<div id="notification-modal" class="fixed inset-0 z-[100] flex items-center justify-center p-4" style="display: none;" aria-modal="true" role="dialog">
+    <!-- Backdrop: z-0 para não cobrir o painel (senão Fechar/X não recebem clique) -->
+    <div id="modal-backdrop" class="absolute inset-0 z-0 bg-gray-500/75 transition-opacity duration-300 ease-out opacity-0" data-fechar-modal-notificacoes="1"></div>
     
     <!-- Container do Modal -->
-    <div class="relative transform transition-all duration-300 ease-out opacity-0 scale-95 translate-y-4 sm:translate-y-0 sm:scale-95">
+    <div id="notification-modal-panel" class="relative z-10 transform transition-all duration-300 ease-out opacity-0 scale-95 translate-y-4 sm:translate-y-0 sm:scale-95 pointer-events-auto">
         <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden border border-gray-200">
             <!-- Header do Modal -->
-            <div class="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6">
+            <div class="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6 relative z-20">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center">
                         <div class="mx-auto flex size-10 shrink-0 items-center justify-center rounded-full bg-white/20 mr-3">
@@ -98,8 +98,8 @@ if ($usuario && $notificacoesNaoLidas > 0) {
                             <p class="text-purple-100 text-sm">Você tem <span id="modal-notification-count">0</span> notificação(ões) não lida(s)</p>
                         </div>
                     </div>
-                    <button data-csp-click="fecharModalNotificacoes" class="text-white hover:text-purple-200 transition-colors p-1 rounded-full hover:bg-white/10">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <button type="button" id="notification-modal-fechar-x" data-csp-click="fecharModalNotificacoes" data-fechar-modal-notificacoes="1" class="text-white hover:text-purple-200 transition-colors p-1 rounded-full hover:bg-white/10" aria-label="Fechar">
+                        <svg class="w-6 h-6 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
                     </button>
@@ -131,10 +131,10 @@ if ($usuario && $notificacoesNaoLidas > 0) {
                                                 $tiposConteudo = array_filter($tiposConteudo); // Remove valores vazios
                                             }
                                             
-                                            // Texto completo
+                                            // Texto completo (conteúdo rico isolado para não quebrar o modal)
                                             if (in_array('texto', $tiposConteudo) || empty($tiposConteudo)) {
-                                                echo '<div class="mb-3">';
-                                                echo $notif['conteudo']; // Exibir HTML completo
+                                                echo '<div class="mb-3 notification-conteudo-isolado">';
+                                                echo $notif['conteudo']; // HTML do editor — isolado abaixo via CSS/JS
                                                 echo '</div>';
                                             }
                                             
@@ -182,7 +182,7 @@ if ($usuario && $notificacoesNaoLidas > 0) {
             </div>
 
             <!-- Footer do Modal -->
-            <div class="bg-gray-50 px-6 py-4 flex justify-between items-center border-t border-gray-200">
+            <div class="bg-gray-50 px-6 py-4 flex justify-between items-center border-t border-gray-200 relative z-20">
                 <div class="flex space-x-3">
                     <?php 
                     // Verificar se alguma notificação é de atualização
@@ -197,13 +197,13 @@ if ($usuario && $notificacoesNaoLidas > 0) {
                     }
                     ?>
                     <?php if ($temAtualizacao): ?>
-                    <button data-csp-click="atualizarSistema" class="inline-flex justify-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500">
+                    <button type="button" data-csp-click="atualizarSistema" class="inline-flex justify-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500">
                         Atualizar Sistema
                     </button>
                     <?php endif; ?>
                 </div>
                 <div class="flex space-x-3">
-                    <button data-csp-click="fecharModalNotificacoes" class="inline-flex justify-center rounded-md bg-purple-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-purple-500">
+                    <button type="button" id="notification-modal-fechar" data-csp-click="fecharModalNotificacoes" data-fechar-modal-notificacoes="1" class="inline-flex justify-center rounded-md bg-purple-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-purple-500">
                         Fechar
                     </button>
                 </div>
@@ -332,28 +332,30 @@ if ($usuario && $notificacoesNaoLidas > 0) {
 </div>
 
 <script>
-let notificationDropdownOpen = false;
+var notificationDropdownOpen = false;
 
-// Verificar notificações não lidas ao carregar a página
-// Desativado por performance: não iniciar polling/SSE automaticamente
-document.addEventListener('DOMContentLoaded', function() {
-    // Notificações agora só atualizam quando o usuário abre o modal
-    const totalNaoLidas = <?= (int)$notificacoesNaoLidas ?>;
-    const currentPage = '<?= htmlspecialchars($current_page ?? '') ?>';
-    const popupShownKey = 'notificacoes_popup_exibido';
-
-    if (totalNaoLidas > 0) {
-        if (currentPage === 'dashboard') {
-            mostrarModalNotificacoes(totalNaoLidas);
-        } else if (!sessionStorage.getItem(popupShownKey)) {
-            mostrarModalNotificacoes(totalNaoLidas);
-            sessionStorage.setItem(popupShownKey, '1');
-        }
+function notificationCsrfHeaders() {
+    var token = '';
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta) token = meta.getAttribute('content') || '';
+    var headers = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-Requested-With': 'XMLHttpRequest'
+    };
+    if (token) {
+        headers['X-CSRF-TOKEN'] = token;
     }
-});
+    return { headers: headers, token: token };
+}
+
+function painelModalNotificacoes() {
+    return document.getElementById('notification-modal-panel')
+        || document.querySelector('#notification-modal .relative.transform')
+        || document.querySelector('#notification-modal .relative');
+}
 
 function mostrarModalAutomatico() {
-    const totalNaoLidas = <?= $notificacoesNaoLidas ?>;
+    var totalNaoLidas = <?= (int) $notificacoesNaoLidas ?>;
     if (totalNaoLidas > 0) {
         mostrarModalNotificacoes(totalNaoLidas);
     }
@@ -361,11 +363,11 @@ function mostrarModalAutomatico() {
 
 function verificarNotificacoesNaoLidas() {
     fetch('<?= URL ?>/notifications/api/nao-lidas')
-        .then(response => response.json())
-        .then(data => {
+        .then(function (response) { return response.json(); })
+        .then(function (data) {
             atualizarEstadoNotificacoes(data.total || 0);
         })
-        .catch(error => console.error('Erro ao verificar notificações:', error));
+        .catch(function (error) { console.error('Erro ao verificar notificações:', error); });
 }
 
 function atualizarEstadoNotificacoes(total) {
@@ -383,17 +385,13 @@ function iniciarStreamNotificacoes() {
 }
 
 function mostrarBanner() {
-    const banner = document.getElementById('notification-banner');
-    if (banner) {
-        banner.style.display = 'block';
-    }
+    var banner = document.getElementById('notification-banner');
+    if (banner) banner.style.display = 'block';
 }
 
 function esconderBanner() {
-    const banner = document.getElementById('notification-banner');
-    if (banner) {
-        banner.style.display = 'none';
-    }
+    var banner = document.getElementById('notification-banner');
+    if (banner) banner.style.display = 'none';
 }
 
 function fecharBanner() {
@@ -401,7 +399,7 @@ function fecharBanner() {
 }
 
 function atualizarBadge(total) {
-    const badge = document.querySelector('.absolute.-top-1.-right-1');
+    var badge = document.querySelector('.absolute.-top-1.-right-1');
     if (badge) {
         if (total > 0) {
             badge.textContent = total > 99 ? '99+' : total;
@@ -412,66 +410,55 @@ function atualizarBadge(total) {
     }
 }
 
-// Funções do Modal
 function mostrarModalNotificacoes(total) {
-    const modal = document.getElementById('notification-modal');
-    const backdrop = document.getElementById('modal-backdrop');
-    const countElement = document.getElementById('modal-notification-count');
-    
-    if (modal && backdrop && countElement) {
-        countElement.textContent = total;
-        modal.style.display = 'flex';
-        
-        // Animar backdrop
-        setTimeout(() => {
-            backdrop.style.opacity = '1';
-        }, 10);
-        
-        // Animar modal
-        setTimeout(() => {
-            const modalPanel = modal.querySelector('.relative.transform');
+    var modal = document.getElementById('notification-modal');
+    var backdrop = document.getElementById('modal-backdrop');
+    var countElement = document.getElementById('modal-notification-count');
+    if (!modal) return;
+
+    if (countElement) countElement.textContent = total;
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+
+    requestAnimationFrame(function () {
+        if (backdrop) backdrop.style.opacity = '1';
+        var modalPanel = painelModalNotificacoes();
+        if (modalPanel) {
             modalPanel.style.opacity = '1';
             modalPanel.style.transform = 'scale(1) translateY(0)';
-        }, 50);
-    }
+        }
+    });
 }
 
 function abrirModalNotificacoes() {
-    const totalNaoLidas = <?= $notificacoesNaoLidas ?>;
+    var totalNaoLidas = <?= (int) $notificacoesNaoLidas ?>;
     mostrarModalNotificacoes(totalNaoLidas);
 }
 
 function fecharModalNotificacoes() {
-    const modal = document.getElementById('notification-modal');
-    const backdrop = document.getElementById('modal-backdrop');
-    
-    if (modal && backdrop) {
-        // Marcar todas como lidas automaticamente ao fechar
-        marcarTodasComoLidas();
-        
-        // Animar saída
-        const modalPanel = modal.querySelector('.relative.transform');
+    var modal = document.getElementById('notification-modal');
+    if (!modal) return;
+
+    // Esconde na hora — não depende de animação nem de querySelector frágil
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+
+    try { marcarTodasComoLidas(); } catch (e) {}
+
+    var backdrop = document.getElementById('modal-backdrop');
+    var modalPanel = painelModalNotificacoes();
+    if (backdrop) backdrop.style.opacity = '0';
+    if (modalPanel) {
         modalPanel.style.opacity = '0';
         modalPanel.style.transform = 'scale(0.95) translateY(4px)';
-        
-        backdrop.style.opacity = '0';
-        
-        setTimeout(() => {
-            modal.style.display = 'none';
-            // Reset para próxima abertura
-            modalPanel.style.opacity = '0';
-            modalPanel.style.transform = 'scale(0.95) translateY(4px)';
-            backdrop.style.opacity = '0';
-        }, 300);
     }
 }
 
 function toggleNotificationDropdown() {
-    const dropdown = document.getElementById('notification-dropdown');
+    var dropdown = document.getElementById('notification-dropdown');
     if (dropdown) {
         notificationDropdownOpen = !notificationDropdownOpen;
         dropdown.style.display = notificationDropdownOpen ? 'block' : 'none';
-        
         if (notificationDropdownOpen) {
             carregarNotificacoesRecentes();
         }
@@ -480,12 +467,11 @@ function toggleNotificationDropdown() {
 
 function carregarNotificacoesRecentes() {
     fetch('<?= URL ?>/notifications/api/recentes')
-        .then(response => response.json())
-        .then(data => {
-            // Atualizar dropdown com notificações recentes
+        .then(function (response) { return response.json(); })
+        .then(function (data) {
             console.log('Notificações recentes:', data.notificacoes);
         })
-        .catch(error => console.error('Erro ao carregar notificações:', error));
+        .catch(function (error) { console.error('Erro ao carregar notificações:', error); });
 }
 
 function visualizarNotificacao(id) {
@@ -493,78 +479,60 @@ function visualizarNotificacao(id) {
 }
 
 function marcarComoLida(id) {
-    console.log('Marcando notificação como lida:', id);
-    
+    var csrf = notificationCsrfHeaders();
+    var body = 'notificacao_id=' + encodeURIComponent(id);
+    if (csrf.token) body += '&_token=' + encodeURIComponent(csrf.token);
+
     fetch('<?= URL ?>/notifications/api/marcar-lida', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'notificacao_id=' + id
+        headers: csrf.headers,
+        body: body
     })
-    .then(response => {
-        console.log('Resposta da API:', response.status);
-        if (!response.ok) {
-            throw new Error('HTTP error! status: ' + response.status);
-        }
-        return response.text(); // Primeiro como texto para debug
+    .then(function (response) {
+        if (!response.ok) throw new Error('HTTP error! status: ' + response.status);
+        return response.text();
     })
-    .then(text => {
-        console.log('Resposta texto:', text);
+    .then(function (text) {
         try {
-            const data = JSON.parse(text);
-            console.log('Dados parseados:', data);
+            var data = JSON.parse(text);
             if (data.success) {
-                console.log('Sucesso ao marcar como lida');
                 verificarNotificacoesNaoLidas();
                 carregarNotificacoesRecentes();
-            } else {
-                console.error('Erro ao marcar como lida:', data.message);
             }
         } catch (e) {
             console.error('Erro ao fazer parse do JSON:', e);
-            console.error('Texto recebido:', text);
         }
     })
-    .catch(error => {
+    .catch(function (error) {
         console.error('Erro na requisição:', error);
     });
 }
 
 function marcarTodasComoLidas() {
-    console.log('Marcando todas as notificações como lidas...');
-    
+    var csrf = notificationCsrfHeaders();
+    var body = csrf.token ? ('_token=' + encodeURIComponent(csrf.token)) : '';
+
     fetch('<?= URL ?>/notifications/api/marcar-todas-lidas', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        }
+        headers: csrf.headers,
+        body: body
     })
-    .then(response => {
-        console.log('Resposta marcar todas:', response.status);
-        if (!response.ok) {
-            throw new Error('HTTP error! status: ' + response.status);
-        }
-        return response.text(); // Primeiro como texto para debug
+    .then(function (response) {
+        if (!response.ok) throw new Error('HTTP error! status: ' + response.status);
+        return response.text();
     })
-    .then(text => {
-        console.log('Resposta texto:', text);
+    .then(function (text) {
         try {
-            const data = JSON.parse(text);
-            console.log('Dados parseados:', data);
+            var data = JSON.parse(text);
             if (data.success) {
-                console.log('Sucesso ao marcar todas como lidas');
                 verificarNotificacoesNaoLidas();
                 carregarNotificacoesRecentes();
-            } else {
-                console.error('Erro ao marcar todas como lidas:', data.message);
             }
         } catch (e) {
             console.error('Erro ao fazer parse do JSON:', e);
-            console.error('Texto recebido:', text);
         }
     })
-    .catch(error => {
+    .catch(function (error) {
         console.error('Erro na requisição marcar todas:', error);
     });
 }
@@ -573,35 +541,67 @@ function atualizarSistema() {
     window.location.href = '<?= URL ?>/notifications/atualizar';
 }
 
-// Fechar dropdown ao clicar fora
-document.addEventListener('click', function(event) {
-    const dropdown = document.getElementById('notification-dropdown');
-    const button = event.target.closest('button');
-    
+// Expõe para CSP delegation + registro explícito
+window.fecharModalNotificacoes = fecharModalNotificacoes;
+window.abrirModalNotificacoes = abrirModalNotificacoes;
+window.mostrarModalNotificacoes = mostrarModalNotificacoes;
+window.fecharBanner = fecharBanner;
+window.atualizarSistema = atualizarSistema;
+window.toggleNotificationDropdown = toggleNotificationDropdown;
+window.visualizarNotificacao = visualizarNotificacao;
+window.marcarComoLida = marcarComoLida;
+window.marcarTodasComoLidas = marcarTodasComoLidas;
+window.EducaTudoCspActions = window.EducaTudoCspActions || {};
+window.EducaTudoCspActions.fecharModalNotificacoes = function () { fecharModalNotificacoes(); };
+window.EducaTudoCspActions.abrirModalNotificacoes = function () { abrirModalNotificacoes(); };
+window.EducaTudoCspActions.marcarTodasComoLidas = function () { marcarTodasComoLidas(); };
+
+function bindFecharModalNotificacoes() {
+    document.querySelectorAll('[data-fechar-modal-notificacoes]').forEach(function (el) {
+        if (el.dataset.fecharBound === '1') return;
+        el.dataset.fecharBound = '1';
+        el.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            fecharModalNotificacoes();
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    bindFecharModalNotificacoes();
+
+    var totalNaoLidas = <?= (int) $notificacoesNaoLidas ?>;
+    var currentPage = '<?= htmlspecialchars($current_page ?? '', ENT_QUOTES, 'UTF-8') ?>';
+    var popupShownKey = 'notificacoes_popup_exibido';
+
+    if (totalNaoLidas > 0) {
+        if (currentPage === 'dashboard') {
+            mostrarModalNotificacoes(totalNaoLidas);
+        } else if (!sessionStorage.getItem(popupShownKey)) {
+            mostrarModalNotificacoes(totalNaoLidas);
+            sessionStorage.setItem(popupShownKey, '1');
+        }
+    }
+});
+
+if (document.readyState !== 'loading') {
+    bindFecharModalNotificacoes();
+}
+
+document.addEventListener('click', function (event) {
+    var dropdown = document.getElementById('notification-dropdown');
+    var button = event.target.closest('button');
     if (dropdown && notificationDropdownOpen && !dropdown.contains(event.target) && !button) {
         notificationDropdownOpen = false;
         dropdown.style.display = 'none';
     }
 });
 
-// Fechar modal ao clicar fora
-document.addEventListener('click', function(event) {
-    const modal = document.getElementById('notification-modal');
-    if (modal && modal.style.display === 'flex') {
-        // Verificar se o clique foi no backdrop (fora do conteúdo do modal)
-        if (event.target === modal) {
-            marcarTodasComoLidas(); // Marcar todas como lidas ao fechar
-            fecharModalNotificacoes();
-        }
-    }
-});
-
-// Fechar modal com tecla ESC
-document.addEventListener('keydown', function(event) {
-    if (event.key === 'Escape') {
-        const modal = document.getElementById('notification-modal');
+document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' || event.key === 'Esc') {
+        var modal = document.getElementById('notification-modal');
         if (modal && modal.style.display === 'flex') {
-            marcarTodasComoLidas(); // Marcar todas como lidas ao fechar
             fecharModalNotificacoes();
         }
     }
