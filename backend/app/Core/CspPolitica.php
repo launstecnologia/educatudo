@@ -130,7 +130,24 @@ final class CspPolitica
         $handlers = [];
         $seq = 0;
 
-        $html = (string) preg_replace_callback(
+        // NÃO reescrever on* dentro de <script>/<style>/<textarea>/<noscript>.
+        // Caso contrário, strings JS tipo html += '<button onclick=...>' quebram o parse
+        // e funções globais (abrirModal*, fecharModal*) deixam de existir — botões mortos.
+        $slots = [];
+        $protegido = preg_replace_callback(
+            '/<(script|style|textarea|noscript)\b[^>]*>.*?<\/\1>/is',
+            static function (array $m) use (&$slots): string {
+                $key = '<!--CSP_PROTECT_' . count($slots) . '-->';
+                $slots[$key] = $m[0];
+                return $key;
+            },
+            $html
+        );
+        if (!is_string($protegido)) {
+            $protegido = $html;
+        }
+
+        $protegido = (string) preg_replace_callback(
             '/\s(on[a-z]+)\s*=\s*(["\'])(.*?)\2/is',
             static function (array $m) use (&$handlers, &$seq): string {
                 $attr = strtolower($m[1]);
@@ -152,11 +169,15 @@ final class CspPolitica
                 ];
                 return ' data-csp-on-id="' . $id . '"';
             },
-            $html
+            $protegido
         );
 
+        if ($slots !== []) {
+            $protegido = str_replace(array_keys($slots), array_values($slots), $protegido);
+        }
+
         if ($handlers === []) {
-            return $html;
+            return $protegido;
         }
 
         $jsParts = ["(function(){"];
@@ -175,10 +196,10 @@ final class CspPolitica
         $jsParts[] = "})();";
         $script = '<script ' . self::attrNonce() . '>' . implode('', $jsParts) . '</script>';
 
-        if (stripos($html, '</body>') !== false) {
-            return (string) preg_replace('/<\/body>/i', $script . '</body>', $html, 1);
+        if (stripos($protegido, '</body>') !== false) {
+            return (string) preg_replace('/<\/body>/i', $script . '</body>', $protegido, 1);
         }
-        return $html . $script;
+        return $protegido . $script;
     }
 
     /** Pipeline completo para HTML de views (nonce em <script> + migração on*). */

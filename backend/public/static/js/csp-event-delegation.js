@@ -105,6 +105,9 @@
       var pass = el.getAttribute('data-csp-pass');
       if (fn && callNamed(fn, el, e, arg, arg2, pass)) {
         e.preventDefault();
+        e.stopPropagation();
+      } else if (fn && typeof console !== 'undefined' && console.warn) {
+        console.warn('[CSP] handler ausente:', fn);
       }
     }
   });

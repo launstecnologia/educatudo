@@ -303,7 +303,9 @@ if ($usuario && $notificacoesNaoLidas > 0) {
                                         <?= date('d/m H:i', strtotime($notificacao['created_at'])) ?>
                                     </span>
                                     <?php if (!$notificacao['lida']): ?>
-                                        <button onclick="event.stopPropagation(); marcarComoLida(<?= $notificacao['id'] ?>)" 
+                                        <button type="button"
+                                                data-csp-click="marcarComoLida"
+                                                data-csp-arg="<?= (int) $notificacao['id'] ?>"
                                                 class="text-xs text-blue-600 hover:text-blue-800">
                                             Marcar como lida
                                         </button>

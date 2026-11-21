@@ -134,4 +134,20 @@ final class Sec02CspPoliticaTest extends TestCase
         $this->assertStringContainsString('nonce="', $out);
         $this->assertStringContainsString('<p>ok</p>', $out);
     }
+
+    public function testMigrarOnNaoAlteraOnclickDentroDeScript(): void
+    {
+        $html = '<!DOCTYPE html><html><body>'
+            . '<button onclick="fecharModalNotificacoes()">Fechar</button>'
+            . '<script>'
+            . "html += '<button onclick=\"removerModulo(1)\">X</button>';"
+            . 'function abrirModalGerarIA(){ return true; }'
+            . '</script>'
+            . '</body></html>';
+        $out = CspPolitica::prepararHtmlCsp($html);
+        $this->assertStringContainsString('data-csp-on-id=', $out);
+        $this->assertStringContainsString("html += '<button onclick=\"removerModulo(1)\">X</button>';", $out);
+        $this->assertStringContainsString('function abrirModalGerarIA(){ return true; }', $out);
+        $this->assertStringNotContainsString('data-csp-on-id=removerModulo', $out);
+    }
 }
