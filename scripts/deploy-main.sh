@@ -19,11 +19,14 @@ REMOTE="${DEPLOY_REMOTE:-origin}"
 HOST_HEADER="${DEPLOY_HEALTH_HOST:-master.educatudo.com}"
 HEALTH_PATH="${DEPLOY_HEALTH_PATH:-/master}"
 PHP_CONTAINER="${DEPLOY_PHP_CONTAINER:-php_app_educatudo}"
+# Infra local da VPS: não bloqueia o deploy e não é sobrescrita pelo git pull.
 PRESERVE_FILES=(
   docker-compose.yml
   docker-compose.vps.yml
   docker-compose.vps.ssl-origin.yml
   docker-compose.vps.ssl.yml
+  docker/nginx/nginx.conf
+  docker/php/php.ini
 )
 
 cd "$ROOT"
@@ -54,23 +57,47 @@ if [[ ! -f ssl/cloudflare-origin.pem || ! -f ssl/cloudflare-origin.key ]]; then
   exit 1
 fi
 
-# Compose/.env do servidor nao bloqueiam e nao sao sobrescritos pelo deploy de codigo.
+# Compose/.env/nginx/php.ini do servidor nao bloqueiam o git status do deploy.
 GIT_IGNORE_LOCAL=(
   ':!backend/.env'
   ':!docker-compose.yml'
   ':!docker-compose.vps.yml'
   ':!docker-compose.vps.ssl-origin.yml'
   ':!docker-compose.vps.ssl.yml'
+  ':!docker/nginx/nginx.conf'
+  ':!docker/php/php.ini'
 )
 
+# Hotfix local em codigo de app bloqueava o pull. Com backup, volta ao HEAD
+# para o deploy seguir (fonte da verdade = origin/main).
+mapfile -t DIRTY_TRACKED < <(git diff --name-only -- . "${GIT_IGNORE_LOCAL[@]}" || true)
+mapfile -t DIRTY_STAGED < <(git diff --cached --name-only -- . "${GIT_IGNORE_LOCAL[@]}" || true)
+if ((${#DIRTY_TRACKED[@]})) || ((${#DIRTY_STAGED[@]})); then
+  backup_dir="$ROOT/backups/deploy-dirty-$(date +%Y%m%d-%H%M%S)"
+  mkdir -p "$backup_dir"
+  echo "==> Aviso: limpar mudancas locais rastreadas (backup em $backup_dir)"
+  declare -A SEEN=()
+  for f in "${DIRTY_TRACKED[@]}" "${DIRTY_STAGED[@]}"; do
+    [[ -z "$f" || -n "${SEEN[$f]:-}" ]] && continue
+    SEEN[$f]=1
+    mkdir -p "$backup_dir/$(dirname "$f")"
+    if [[ -f "$f" ]]; then
+      cp "$f" "$backup_dir/$f"
+    fi
+    git checkout -- "$f" 2>/dev/null || true
+    git reset HEAD -- "$f" 2>/dev/null || true
+    echo "    reset: $f"
+  done
+fi
+
 if ! git diff --quiet -- . "${GIT_IGNORE_LOCAL[@]}"; then
-  echo "ERRO: existem mudancas rastreadas nao commitadas no servidor." >&2
+  echo "ERRO: ainda ha mudancas rastreadas nao commitadas apos limpeza." >&2
   git status --short
   exit 1
 fi
 
 if ! git diff --cached --quiet -- . "${GIT_IGNORE_LOCAL[@]}"; then
-  echo "ERRO: existem mudancas staged no servidor." >&2
+  echo "ERRO: ainda ha mudancas staged apos limpeza." >&2
   git status --short
   exit 1
 fi
@@ -82,7 +109,11 @@ restore_server_config() {
   fi
   local f
   for f in "${PRESERVE_FILES[@]}"; do
-    if [[ -f "$preserve_dir/$f" ]]; then
+    if [[ -f "$preserve_dir/$(basename "$f")" ]]; then
+      mkdir -p "$ROOT/$(dirname "$f")"
+      cp "$preserve_dir/$(basename "$f")" "$ROOT/$f"
+    elif [[ -f "$preserve_dir/$f" ]]; then
+      mkdir -p "$ROOT/$(dirname "$f")"
       cp "$preserve_dir/$f" "$ROOT/$f"
     fi
   done
@@ -94,7 +125,8 @@ trap restore_server_config EXIT
 preserve_dir="$(mktemp -d)"
 for f in "${PRESERVE_FILES[@]}"; do
   if [[ -f "$f" ]]; then
-    cp "$f" "$preserve_dir/$f"
+    # basename no tmp evita precisar espelhar pastas docker/nginx etc.
+    cp "$f" "$preserve_dir/$(basename "$f")"
     git checkout -- "$f" 2>/dev/null || true
   fi
 done
