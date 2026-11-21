@@ -10,9 +10,13 @@ use App\Models\Essays\EssayProposal;
 use App\Models\Exams\Exam;
 use App\Core\LayoutHelper;
 use App\Core\RedisCache;
+use App\Modulos\Mural\Services\MuralRecadoService;
+
 class DashboardAlunoService
 {
     private const CACHE_TTL = 30;
+    /** v2: contagens do mural alinhadas a MuralRecadoService (portal). */
+    private const CACHE_VERSAO = 'v2';
 
     /** @var mixed */
     private $db;
@@ -177,42 +181,12 @@ class DashboardAlunoService
         return (new EssayProposal())->countPendingForStudent($alunoId);
     }
 
+    /**
+     * Contagem oficial do mural do aluno = mesma regra do portal /mural-recados.
+     */
     private function contarMural(int $alunoId, int $turmaId, bool $apenasNaoVistos): int
     {
-        $sql = $this->sqlMuralBase($turmaId, $apenasNaoVistos);
-        $params = $this->paramsMuralBase($alunoId, $turmaId, $apenasNaoVistos);
-        $row = $this->db->fetch("SELECT COUNT(*) AS total FROM mural_recados r WHERE {$sql}", $params);
-        return (int) ($row['total'] ?? 0);
-    }
-
-    private function sqlMuralBase(int $turmaId, bool $apenasNaoVistos): string
-    {
-        $turmaFiltro = $turmaId > 0
-            ? " OR EXISTS (SELECT 1 FROM mural_recados_turmas rt WHERE rt.mural_recado_id = r.id AND rt.turma_id = :aluno_turma_id)"
-            : '';
-        $sql = "(r.enviar_para_todos = 1{$turmaFiltro}) AND (CURDATE() <= r.data_sai_mural)";
-        if ($apenasNaoVistos) {
-            $sql .= " AND NOT EXISTS (
-                SELECT 1 FROM mural_recados_vistos v
-                WHERE v.mural_recado_id = r.id AND v.aluno_id = :aluno_id
-            )";
-        }
-        return $sql;
-    }
-
-    /**
-     * @return array<string, int|string>
-     */
-    private function paramsMuralBase(int $alunoId, int $turmaId, bool $apenasNaoVistos): array
-    {
-        $params = [];
-        if ($turmaId > 0) {
-            $params['aluno_turma_id'] = $turmaId;
-        }
-        if ($apenasNaoVistos) {
-            $params['aluno_id'] = $alunoId;
-        }
-        return $params;
+        return (new MuralRecadoService($this->db))->contarParaAluno($alunoId, $turmaId, $apenasNaoVistos);
     }
 
     /**
@@ -266,7 +240,8 @@ class DashboardAlunoService
     {
         $tenant = defined('TENANT_SLUG') ? (string) TENANT_SLUG : 'default';
         return sprintf(
-            'dashboard:cards:v1:%s:%d:%d:%d:%d',
+            'dashboard:cards:%s:%s:%d:%d:%d:%d',
+            self::CACHE_VERSAO,
             $tenant,
             $alunoId,
             $turmaId,

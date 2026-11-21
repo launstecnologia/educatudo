@@ -25,8 +25,7 @@ $router->post('/carteira/comprar/status/{id}', 'User/StudentController@carteiraC
 $router->get('/carteira/comprar/simular/{id}', 'User/StudentController@carteiraComprarSimular');
 $router->get('/carteira/planos', 'User/StudentController@carteiraPlanos');
 $router->post('/carteira/planos/assinar', 'User/StudentController@carteiraPlanosAssinar');
-$router->get('/mural-recados', 'User/StudentController@muralRecados');
-$router->post('/mural-recados/marcar-visto', 'User/StudentController@marcarVistoMuralRecado');
+// Mural do aluno → Modulos/mural/routes.php (AlunoMuralController)
 // Flashcards → Modulos/flashcards/routes.php
 // Fórum → Modulos/forum/routes.php
 // Fórum – moderação (admin)
@@ -53,25 +52,27 @@ $router->post('/professor/alterar-senha-obrigatoria', 'User/TeacherController@pr
 $router->get('/pais/alterar-senha-obrigatoria', 'User/ParentController@alterarSenhaObrigatoria');
 $router->post('/pais/alterar-senha-obrigatoria', 'User/ParentController@processarAlteracaoSenha');
 
-// Chat Tudinha
-$router->get('/chat', 'User/StudentController@chat');
-$router->post('/chat/conversa', 'User/StudentController@createConversation');
-$router->post('/chat/mensagem', 'User/StudentController@sendMessage');
-$router->get('/chat/mensagem-stream', 'User/StudentController@sendMessageStream');
-$router->post('/chat/mensagem-stream', 'User/StudentController@sendMessageStream');
-$router->post('/chat/upload-imagem', 'User/StudentController@uploadImage');
-$router->post('/chat/upload-pdf', 'User/StudentController@uploadPdf');
-$router->post('/chat/upload-arquivo', 'User/StudentController@uploadArquivo');
-$router->post('/chat/gerar-imagem', 'User/StudentController@gerarImagem');
-$router->post('/chat/flashcard-concluido', 'User/StudentController@flashcardConcluido');
-$router->post('/chat/texto-para-voz', 'User/StudentController@textoParaVoz');
-$router->post('/chat/voz-para-texto', 'User/StudentController@vozParaTexto');
-$router->post('/chat/voz-realtime/iniciar', 'User/StudentController@iniciarSessaoVoz');
-$router->post('/chat/voz-realtime/salvar-transcricao', 'User/StudentController@salvarTranscricaoVoz');
-$router->get('/chat/mensagens', 'User/StudentController@getMessages');
-$router->get('/chat/ver-imagem', 'User/StudentController@verImagemChat');
-$router->get('/chat/conversa-info', 'User/StudentController@getConversationInfo');
-$router->post('/chat/conversa/excluir', 'User/StudentController@deleteConversation');
+// Chat Tudinha — descontinuado (Etapa 7). HTTP 410; não executa IA/créditos.
+// Preservar /chat-professor (Integrações) e /aluno/provas/voz-para-texto.
+$chatGone = 'User/ChatTudinhaDescontinuadoController@indisponivel';
+$router->get('/chat', $chatGone);
+$router->post('/chat/conversa', $chatGone);
+$router->post('/chat/mensagem', $chatGone);
+$router->get('/chat/mensagem-stream', $chatGone);
+$router->post('/chat/mensagem-stream', $chatGone);
+$router->post('/chat/upload-imagem', $chatGone);
+$router->post('/chat/upload-pdf', $chatGone);
+$router->post('/chat/upload-arquivo', $chatGone);
+$router->post('/chat/gerar-imagem', $chatGone);
+$router->post('/chat/flashcard-concluido', $chatGone);
+$router->post('/chat/texto-para-voz', $chatGone);
+$router->post('/chat/voz-para-texto', $chatGone);
+$router->post('/chat/voz-realtime/iniciar', $chatGone);
+$router->post('/chat/voz-realtime/salvar-transcricao', $chatGone);
+$router->get('/chat/mensagens', $chatGone);
+$router->get('/chat/ver-imagem', $chatGone);
+$router->get('/chat/conversa-info', $chatGone);
+$router->post('/chat/conversa/excluir', $chatGone);
 
 // Inglês - Speaking
 $router->get('/ingles', 'Integrations/EnglishController@index');
@@ -163,7 +164,7 @@ $router->get('/relatorios/redacao', function () {
 
 
 // Calendário letivo
-$router->get('/calendario-letivo', 'User/StudentController@calendarioLetivo');
+$router->get('/calendario-letivo', 'User/AlunoCalendarioController@index');
 $router->get('/agenda', 'Student/AgendaController@agenda');
 $router->post('/agenda/item', 'Student/AgendaController@criarItemPessoal');
 $router->post('/agenda/item/{id}/editar', 'Student/AgendaController@editarItemPessoal');

@@ -11,7 +11,6 @@ $mobile_layout_default = [
     'bottom_nav' => ['enabled' => true, 'behavior' => 'fixed', 'highlight_index' => 2, 'items' => [
         ['label' => 'Dashboard', 'route' => '/dashboard', 'icon' => 'home'],
         ['label' => 'Exercícios', 'route' => '/exercicios', 'icon' => 'books'],
-        ['label' => 'Tudinha', 'route' => '/chat', 'icon' => 'chat'],
         ['label' => 'Redações', 'route' => '/redacoes', 'icon' => 'pencil'],
         ['label' => 'Jogos', 'route' => '/jogos/access', 'icon' => 'game']
     ]],
@@ -39,7 +38,6 @@ $fa_icons = [
 $navbar_links_aluno = [
     ['label' => 'Dashboard', 'route' => '/dashboard', 'icon' => 'home'],
     ['label' => 'Perfil / Editar perfil', 'route' => '/avatar', 'icon' => 'user'],
-    ['label' => 'Tudinha (Chat)', 'route' => '/chat', 'icon' => 'chat'],
     ['label' => 'Exercícios', 'route' => '/exercicios', 'icon' => 'books'],
     ['label' => 'Redações', 'route' => '/redacoes', 'icon' => 'pencil'],
     ['label' => 'Jogos', 'route' => '/jogos/access', 'icon' => 'game'],

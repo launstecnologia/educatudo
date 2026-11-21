@@ -88,7 +88,6 @@
             'items' => [
                 ['label' => 'Dashboard', 'route' => '/dashboard', 'icon' => 'home'],
                 ['label' => 'Exercícios', 'route' => '/exercicios-personalizados/minhas-listas', 'icon' => 'books'],
-                ['label' => \App\Core\LayoutHelper::getIaName(), 'route' => '/chat', 'icon' => 'chat'],
                 ['label' => 'Redações', 'route' => '/redacoes', 'icon' => 'pencil'],
                 ['label' => 'Jogos', 'route' => '/jogos/access', 'icon' => 'game']
             ]
@@ -111,6 +110,13 @@
     $mobileShowHeader = (bool) ($mobileConfig['components']['header'] ?? true);
     $mobileBottomNavEnabled = (bool) ($mobileConfig['bottom_nav']['enabled'] ?? true);
     $mobileBottomNavItems = $mobileConfig['bottom_nav']['items'] ?? [];
+    // Etapa 7 — remover atalho do chat Tudinha (configs legadas em mobile_layout_aluno).
+    if (is_array($mobileBottomNavItems)) {
+        $mobileBottomNavItems = array_values(array_filter($mobileBottomNavItems, static function ($item) {
+            $route = rtrim((string) ($item['route'] ?? ''), '/');
+            return $route !== '/chat' && strpos($route, '/chat/') !== 0;
+        }));
+    }
     if ($gamesBloqueadoAluno && is_array($mobileBottomNavItems)) {
         $mobileBottomNavItems = array_values(array_filter($mobileBottomNavItems, static function ($item) {
             $route = (string) ($item['route'] ?? '');
@@ -123,7 +129,6 @@
     }
     if (is_array($mobileBottomNavItems)) {
         $rotaModuloMobileNav = [
-            '/chat' => 'chat',
             '/exercicios-personalizados' => 'exercicios_ia',
             '/exercicios' => 'exercicios',
             '/redacoes' => 'redacoes',

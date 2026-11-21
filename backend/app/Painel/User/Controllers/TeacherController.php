@@ -19,17 +19,23 @@ use App\Core\LayoutHelper;
 use App\Services\MediaStorageService;
 use App\Dominio\Escola\Services\SchoolCalendarService;
 use App\Helpers\StudentFormHelper;
+
+require_once dirname(__DIR__, 3) . '/Policies/PoliticaAcessoProfessorAluno.php';
+
 if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
     class TeacherController extends BaseController
 {
     private $authManager;
     private $db;
+    /** @var \PoliticaAcessoProfessorAluno|null */
+    private $politicaAcessoProfessorAluno;
     
     public function __construct()
     {
         parent::__construct();
         $this->authManager = new AuthManager();
         $this->db = Database::getInstance();
+        $this->politicaAcessoProfessorAluno = new \PoliticaAcessoProfessorAluno($this->db);
         
         // Verifica se está logado
         if (!$this->authManager->isLoggedIn()) {
@@ -1353,6 +1359,14 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
         $this->redirect('/professor/dashboard');
     }
 
+    /**
+     * Vínculo professor↔aluno (mesma regra do chat SEC-10).
+     */
+    private function professorPodeAcessarAluno(int $professorId, int $alunoId): bool
+    {
+        return $this->politicaAcessoProfessorAluno->podeAcessar($professorId, $alunoId);
+    }
+
     public function student()
     {
         $this->alunosProfessorPausado();
@@ -1412,25 +1426,24 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
             "SELECT * FROM professores WHERE id = :user_id",
             ['user_id' => $user['id']]
         );
-        
-        // Busca dados do aluno
-        $turmas_professor = json_decode($professor['turmas'], true) ?: [];
-        
-        if (empty($turmas_professor)) {
-            $aluno = null;
-        } else {
-            $placeholders = str_repeat('?,', count($turmas_professor) - 1) . '?';
-            $aluno = $this->db->fetch(
-                "SELECT a.*, t.nome as turma_nome
-                 FROM alunos a
-                 JOIN turmas t ON a.turma_id = t.id
-                 WHERE a.id = ? AND a.turma_id IN ($placeholders)",
-                array_merge([$id], $turmas_professor)
-            );
+
+        if (!$professor || !$this->professorPodeAcessarAluno((int) $professor['id'], (int) $id)) {
+            $this->redirect('/professor/dashboard');
+            return;
         }
         
+        $aluno = $this->db->fetch(
+            "SELECT a.*, t.nome as turma_nome
+             FROM alunos a
+             JOIN turmas t ON a.turma_id = t.id
+             WHERE a.id = :aluno_id AND a.ativo = 1
+             LIMIT 1",
+            ['aluno_id' => (int) $id]
+        );
+        
         if (!$aluno) {
-            $this->redirect('/teacher/student');
+            $this->redirect('/professor/dashboard');
+            return;
         }
         
         // Busca estatísticas do aluno
@@ -1520,25 +1533,23 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
             "SELECT * FROM professores WHERE id = :user_id",
             ['user_id' => $user['id']]
         );
-        
-        // Busca dados do aluno
-        $turmas_professor = json_decode($professor['turmas'], true) ?: [];
-        
-        if (empty($turmas_professor)) {
-            $aluno = null;
-        } else {
-            $placeholders = str_repeat('?,', count($turmas_professor) - 1) . '?';
-            $aluno = $this->db->fetch(
-                "SELECT a.*, t.nome as turma_nome
-                 FROM alunos a
-                 JOIN turmas t ON a.turma_id = t.id
-                 WHERE a.id = ? AND a.turma_id IN ($placeholders)",
-                array_merge([$id], $turmas_professor)
-            );
+
+        if (!$professor || !$this->professorPodeAcessarAluno((int) $professor['id'], (int) $id)) {
+            $this->redirect('/professor/dashboard');
+            return;
         }
         
+        $aluno = $this->db->fetch(
+            "SELECT a.*, t.nome as turma_nome
+             FROM alunos a
+             JOIN turmas t ON a.turma_id = t.id
+             WHERE a.id = :aluno_id AND a.ativo = 1
+             LIMIT 1",
+            ['aluno_id' => (int) $id]
+        );
+        
         if (!$aluno) {
-            $this->redirect('/teacher/student');
+            $this->redirect('/professor/dashboard');
             return;
         }
         
@@ -1591,25 +1602,23 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
             "SELECT * FROM professores WHERE id = :user_id",
             ['user_id' => $user['id']]
         );
-        
-        // Busca dados do aluno
-        $turmas_professor = json_decode($professor['turmas'], true) ?: [];
-        
-        if (empty($turmas_professor)) {
-            $aluno = null;
-        } else {
-            $placeholders = str_repeat('?,', count($turmas_professor) - 1) . '?';
-            $aluno = $this->db->fetch(
-                "SELECT a.*, t.nome as turma_nome
-                 FROM alunos a
-                 JOIN turmas t ON a.turma_id = t.id
-                 WHERE a.id = ? AND a.turma_id IN ($placeholders)",
-                array_merge([$id], $turmas_professor)
-            );
+
+        if (!$professor || !$this->professorPodeAcessarAluno((int) $professor['id'], (int) $id)) {
+            $this->redirect('/professor/dashboard');
+            return;
         }
         
+        $aluno = $this->db->fetch(
+            "SELECT a.*, t.nome as turma_nome
+             FROM alunos a
+             JOIN turmas t ON a.turma_id = t.id
+             WHERE a.id = :aluno_id AND a.ativo = 1
+             LIMIT 1",
+            ['aluno_id' => (int) $id]
+        );
+        
         if (!$aluno) {
-            $this->redirect('/teacher/student');
+            $this->redirect('/professor/dashboard');
             return;
         }
         
@@ -1838,11 +1847,17 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
             }
             
             error_log('Professor encontrado: ' . json_encode($professor));
+
+            $alunoId = (int) $id;
+            if ($alunoId <= 0 || !$this->professorPodeAcessarAluno((int) $professor['id'], $alunoId)) {
+                $this->json(['error' => 'Acesso negado'], 403);
+                return;
+            }
             
-            // Verifica se o aluno existe
+            // Verifica se o aluno existe (já autorizado pelo vínculo escolar)
             $aluno = $this->db->fetch(
                 "SELECT a.* FROM alunos a WHERE a.id = :aluno_id",
-                ['aluno_id' => $id]
+                ['aluno_id' => $alunoId]
             );
             
             if (!$aluno) {
@@ -1850,7 +1865,6 @@ if (!class_exists(__NAMESPACE__ . '\\TeacherController', false)) {
                 throw new \Exception('Aluno não encontrado');
             }
             
-            // Professores podem alterar senha de qualquer aluno
             error_log('Aluno encontrado: ' . $aluno['nome'] . ' (ID: ' . $aluno['id'] . ')');
             
             $senha_padrao = \App\Helpers\SenhaTemporaria::gerar();

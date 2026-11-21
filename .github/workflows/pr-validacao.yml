@@ -1,0 +1,94 @@
+# Validação de Pull Request — não faz deploy.
+# O workflow de produção (deploy-main.yml) permanece intacto.
+
+name: PR validação
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: pr-validacao-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  php-qualidade:
+    name: Lint PHP + PHPUnit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_mysql, pdo_sqlite, mbstring, openssl, redis
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: composer-${{ runner.os }}-php8.4-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: |
+            composer-${{ runner.os }}-php8.4-
+
+      - name: Composer install
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Lint PHP alterados
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "${BASE_REF}" ] || [ "${BASE_REF}" = "0000000000000000000000000000000000000000" ]; then
+            BASE_REF="$(git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)"
+          fi
+          mapfile -t FILES < <(git diff --name-only --diff-filter=ACMR "${BASE_REF}"...HEAD -- '*.php' || true)
+          if [ ${#FILES[@]} -eq 0 ]; then
+            echo "Nenhum PHP alterado — lint completo de app/Policies e app/Middleware."
+            mapfile -t FILES < <(find backend/app/Policies backend/app/Middleware -name '*.php' 2>/dev/null || true)
+          fi
+          if [ ${#FILES[@]} -eq 0 ]; then
+            echo "Nada para lintar."
+            exit 0
+          fi
+          echo "Lint em ${#FILES[@]} arquivo(s)…"
+          FAIL=0
+          for f in "${FILES[@]}"; do
+            if [ ! -f "$f" ]; then
+              continue
+            fi
+            if ! php -l "$f"; then
+              FAIL=1
+            fi
+          done
+          exit $FAIL
+
+      - name: PHPUnit (Segurança — gate obrigatório)
+        run: ./vendor/bin/phpunit tests/Seguranca --testdox
+
+      # Módulos migrados na modernização arquitetural (gate obrigatório).
+      - name: PHPUnit (módulos migrados — gate)
+        run: >
+          ./vendor/bin/phpunit tests/Modulos
+          --filter 'MuralRecadoAluno|MuralContagem|MuralDashboard|PlanoAulaAluno|RedacaoAlunoLegado|RedacaoAlunoIa|JornadaAlunoOwnership|ChatTudinhaDescontinuacao|AlunoLimiteDiario|Etapa8Consolidacao'
+          --testdox
+          # Cobre também PlanoAulaAlunoVisibilidadeStatusTest (prefixo PlanoAulaAluno).
+
+      # Suite completa ainda tem falhas pré-existentes fora do escopo da Etapa 1.
+      # Roda para visibilidade; não bloqueia o PR.
+      - name: PHPUnit (suite completa — informativo)
+        continue-on-error: true
+        run: ./vendor/bin/phpunit --testdox

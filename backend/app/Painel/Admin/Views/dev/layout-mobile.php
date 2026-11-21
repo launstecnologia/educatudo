@@ -17,7 +17,6 @@ $defaultStudent = [
         'items' => [
             ['label' => 'Dashboard', 'route' => '/dashboard', 'icon' => 'home'],
             ['label' => 'Exercícios', 'route' => '/exercicios', 'icon' => 'books'],
-            ['label' => 'Tudinha', 'route' => '/chat', 'icon' => 'chat'],
             ['label' => 'Redações', 'route' => '/redacoes', 'icon' => 'pencil'],
             ['label' => 'Jogos', 'route' => '/jogos/access', 'icon' => 'game']
         ]

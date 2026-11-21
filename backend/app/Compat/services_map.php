@@ -44,7 +44,6 @@ return [
     'App\\Services\\CensoMapeadorTxt' => ['App\\Modulos\\CensoEscolar\\Services\\CensoMapeadorTxt', 'Modulos/censo-escolar/Services/CensoMapeadorTxt.php'],
     'App\\Services\\CensoNormalizador' => ['App\\Modulos\\CensoEscolar\\Services\\CensoNormalizador', 'Modulos/censo-escolar/Services/CensoNormalizador.php'],
     'App\\Services\\CensoValidacaoService' => ['App\\Modulos\\CensoEscolar\\Services\\CensoValidacaoService', 'Modulos/censo-escolar/Services/CensoValidacaoService.php'],
-    'App\\Services\\ChatSafetyMonitorService' => ['App\\Infra\\Services\\ChatSafetyMonitorService', 'Infra/Services/ChatSafetyMonitorService.php'],
     'App\\Services\\ClassDiaryReportService' => ['App\\Modulos\\Diario\\Services\\ClassDiaryReportService', 'Modulos/diario/Services/ClassDiaryReportService.php'],
     'App\\Services\\ClassDiaryService' => ['App\\Modulos\\Diario\\Services\\ClassDiaryService', 'Modulos/diario/Services/ClassDiaryService.php'],
     'App\\Services\\ClonarEscolaService' => ['App\\Painel\\Master\\Services\\ClonarEscolaService', 'Painel/Master/Services/ClonarEscolaService.php'],
