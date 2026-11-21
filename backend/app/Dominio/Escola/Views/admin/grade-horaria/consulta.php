@@ -71,7 +71,7 @@ include __DIR__ . '/_preparar.php';
                 <i class="fa-solid fa-file-pdf mr-1.5 text-gray-500"></i>
                 PDF
             </a>
-            <button type="button" onclick="window.print()"
+            <button type="button" data-csp-click="print"
                     class="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 whitespace-nowrap">
                 <i class="fa-solid fa-print mr-1.5 text-gray-500"></i>
                 Imprimir

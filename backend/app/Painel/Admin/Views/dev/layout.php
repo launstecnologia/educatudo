@@ -385,7 +385,7 @@
                     <button type="submit" class="btn-primary-custom px-6 py-2 rounded-lg transition-colors hover:opacity-90">
                         Salvar Configurações
                     </button>
-                    <button type="button" onclick="resetColors()" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+                    <button type="button" data-csp-click="resetColors" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors">
                         Restaurar Padrão
                     </button>
                 </div>

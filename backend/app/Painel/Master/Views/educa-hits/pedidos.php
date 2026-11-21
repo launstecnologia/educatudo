@@ -103,7 +103,7 @@ if ((int) ($pag['per_page'] ?? 25) !== 25) {
             <h2 class="text-lg font-semibold text-slate-900">Pedidos no EducaTudo</h2>
             <p class="text-sm text-slate-500 mt-0.5">Pedidos de todas as escolas ativas com banco configurado.</p>
         </div>
-        <button type="button" onclick="openEhFilterDrawer()"
+        <button type="button" data-csp-click="openEhFilterDrawer"
                 class="relative inline-flex items-center px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors flex-shrink-0">
             <i class="fa-solid fa-filter mr-2 text-slate-500"></i>
             Filtros
@@ -119,7 +119,7 @@ if ((int) ($pag['per_page'] ?? 25) !== 25) {
     <p class="px-6 py-10 text-sm text-slate-500 text-center">
         Nenhum pedido encontrado ou tabela ainda não existe neste ambiente.
         <?php if ($filtrosAtivos > 0): ?>
-        <button type="button" onclick="openEhFilterDrawer()" class="block mx-auto mt-2 text-blue-600 hover:underline">Ajustar filtros</button>
+        <button type="button" data-csp-click="openEhFilterDrawer" class="block mx-auto mt-2 text-blue-600 hover:underline">Ajustar filtros</button>
         <?php endif; ?>
     </p>
     <?php else: ?>
@@ -264,13 +264,13 @@ if ((int) ($pag['per_page'] ?? 25) !== 25) {
 <?php endif; ?>
 
 <!-- Offcanvas filtros -->
-<div id="ehFilterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" onclick="closeEhFilterDrawer()"></div>
+<div id="ehFilterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" data-csp-click="closeEhFilterDrawer"></div>
 <aside id="ehFilterDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-[70] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
         <h3 class="text-lg font-semibold text-slate-900">Filtrar pedidos</h3>
-        <button type="button" onclick="closeEhFilterDrawer()" class="text-slate-400 hover:text-slate-700 p-1" aria-label="Fechar">
+        <button type="button" data-csp-click="closeEhFilterDrawer" class="text-slate-400 hover:text-slate-700 p-1" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-lg"></i>
         </button>
     </div>

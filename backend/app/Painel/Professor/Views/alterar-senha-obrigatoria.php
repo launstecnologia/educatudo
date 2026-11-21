@@ -47,7 +47,7 @@
                            required
                            minlength="8">
                     <button type="button" 
-                            onclick="togglePassword('nova_senha')"
+                            data-csp-click="togglePassword" data-csp-arg="nova_senha"
                             class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none">
                         <svg id="nova_senha-eye" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -86,7 +86,7 @@
                            required
                            minlength="8">
                     <button type="button" 
-                            onclick="togglePassword('confirmar_senha')"
+                            data-csp-click="togglePassword" data-csp-arg="confirmar_senha"
                             class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none">
                         <svg id="confirmar_senha-eye" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>

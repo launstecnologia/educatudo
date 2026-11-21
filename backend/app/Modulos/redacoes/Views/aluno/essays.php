@@ -70,7 +70,7 @@ $tudicoinsTemaIa = \App\Core\CreditosModuleRegistry::acaoIaDisponivel('redacao_g
                 </div>
             </div>
 
-            <button onclick="openAIGeneratedThemeModal()" 
+            <button data-csp-click="openAIGeneratedThemeModal" 
                     class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-3 rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all font-semibold">
                 🎯 Gerar Tema Personalizado
             </button>
@@ -112,7 +112,7 @@ $tudicoinsTemaIa = \App\Core\CreditosModuleRegistry::acaoIaDisponivel('redacao_g
                 </div>
             </div>
 
-            <button onclick="openNovaRedacaoModal()" 
+            <button data-csp-click="openNovaRedacaoModal" 
                     class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-4 py-3 rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all font-semibold">
                 ✍️ Nova Redação
             </button>
@@ -619,7 +619,7 @@ $tudicoinsTemaIa = \App\Core\CreditosModuleRegistry::acaoIaDisponivel('redacao_g
                                 <p class="text-blue-100 text-sm">Descreva o tema que você gostaria de escrever</p>
                             </div>
                         </div>
-                        <button onclick="closeAITThemeModal()" class="text-white hover:text-gray-200 transition-colors">
+                        <button data-csp-click="closeAITThemeModal" class="text-white hover:text-gray-200 transition-colors">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                             </svg>
@@ -643,11 +643,11 @@ $tudicoinsTemaIa = \App\Core\CreditosModuleRegistry::acaoIaDisponivel('redacao_g
                         </div>
 
                         <div class="flex justify-end gap-3">
-                            <button type="button" onclick="closeAITThemeModal()"
+                            <button type="button" data-csp-click="closeAITThemeModal"
                                 class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
                                 Cancelar
                             </button>
-                            <button type="button" onclick="gerarTema()"
+                            <button type="button" data-csp-click="gerarTema"
                                 class="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all font-semibold">
                                 🎯 Gerar Tema
                             </button>
@@ -676,7 +676,7 @@ $tudicoinsTemaIa = \App\Core\CreditosModuleRegistry::acaoIaDisponivel('redacao_g
                                 <p class="text-green-100 text-sm">Escreva sobre qualquer tema que desejar</p>
                             </div>
                         </div>
-                        <button onclick="closeFreeEssayModal()" class="text-white hover:text-gray-200 transition-colors">
+                        <button data-csp-click="closeFreeEssayModal" class="text-white hover:text-gray-200 transition-colors">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                             </svg>
@@ -722,7 +722,7 @@ $tudicoinsTemaIa = \App\Core\CreditosModuleRegistry::acaoIaDisponivel('redacao_g
                         </div>
 
                         <div class="flex justify-end gap-3 mt-6">
-                            <button type="button" onclick="closeFreeEssayModal()"
+                            <button type="button" data-csp-click="closeFreeEssayModal"
                                 class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
                                 Cancelar
                             </button>
@@ -755,7 +755,7 @@ $tudicoinsTemaIa = \App\Core\CreditosModuleRegistry::acaoIaDisponivel('redacao_g
                                 <p class="text-orange-100 text-sm">Faça upload de uma imagem e transcreva o texto</p>
                             </div>
                         </div>
-                        <button onclick="closeImageTranscriptionModal()" class="text-white hover:text-gray-200 transition-colors">
+                        <button data-csp-click="closeImageTranscriptionModal" class="text-white hover:text-gray-200 transition-colors">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                             </svg>
@@ -807,7 +807,7 @@ $tudicoinsTemaIa = \App\Core\CreditosModuleRegistry::acaoIaDisponivel('redacao_g
                         </div>
 
                         <div class="flex justify-end gap-3 mt-6">
-                            <button type="button" onclick="closeImageTranscriptionModal()"
+                            <button type="button" data-csp-click="closeImageTranscriptionModal"
                                 class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
                                 Cancelar
                             </button>
@@ -856,7 +856,7 @@ $tudicoinsTemaIa = \App\Core\CreditosModuleRegistry::acaoIaDisponivel('redacao_g
                     </div>
 
                     <div class="mt-6 text-center">
-                        <button onclick="closeNovaRedacaoModal()"
+                        <button data-csp-click="closeNovaRedacaoModal"
                             class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
                             Cancelar
                         </button>

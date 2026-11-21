@@ -43,7 +43,7 @@ if (($filtros['busca'] ?? '') !== '') {
             <h2 class="text-2xl font-bold text-slate-900 mb-1">Tickets de Suporte</h2>
             <p class="text-slate-500 text-sm">Chamados dos alunos em todas as escolas.</p>
         </div>
-        <button type="button" onclick="openFilterDrawer()"
+        <button type="button" data-csp-click="openFilterDrawer"
                 class="relative inline-flex items-center px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors flex-shrink-0">
             <i class="fa-solid fa-filter mr-2 text-slate-500"></i>
             Filtros
@@ -90,7 +90,7 @@ if (($filtros['busca'] ?? '') !== '') {
                     <td colspan="5" class="px-4 py-10 text-center text-sm text-slate-500">
                         Nenhum ticket encontrado.
                         <?php if ($filtrosAtivos > 0): ?>
-                        <button type="button" onclick="openFilterDrawer()" class="block mx-auto mt-2 text-blue-600 hover:underline">Ajustar filtros</button>
+                        <button type="button" data-csp-click="openFilterDrawer" class="block mx-auto mt-2 text-blue-600 hover:underline">Ajustar filtros</button>
                         <?php endif; ?>
                     </td>
                 </tr>
@@ -163,13 +163,13 @@ if (($filtros['busca'] ?? '') !== '') {
 </div>
 
 <!-- Filtro lateral -->
-<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" onclick="closeFilterDrawer()"></div>
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" data-csp-click="closeFilterDrawer"></div>
 <aside id="filterDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-[70] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
         <h3 class="text-lg font-semibold text-slate-900">Filtrar tickets</h3>
-        <button type="button" onclick="closeFilterDrawer()" class="text-slate-400 hover:text-slate-600 p-1" aria-label="Fechar">
+        <button type="button" data-csp-click="closeFilterDrawer" class="text-slate-400 hover:text-slate-600 p-1" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -218,7 +218,7 @@ if (($filtros['busca'] ?? '') !== '') {
 </aside>
 
 <!-- Offcanvas detalhe -->
-<div id="ticketDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" onclick="closeTicketDrawer()"></div>
+<div id="ticketDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" data-csp-click="closeTicketDrawer"></div>
 <aside id="ticketDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-2xl bg-white shadow-2xl z-[70] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
@@ -228,7 +228,7 @@ if (($filtros['busca'] ?? '') !== '') {
             <h2 class="text-lg font-bold text-slate-900 truncate" id="ticketDrawerTitle">Ticket</h2>
             <div class="flex flex-wrap items-center gap-2 mt-2 text-xs text-slate-500" id="ticketDrawerMeta"></div>
         </div>
-        <button type="button" onclick="closeTicketDrawer()" class="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg" aria-label="Fechar">
+        <button type="button" data-csp-click="closeTicketDrawer" class="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg" aria-label="Fechar">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
     </div>
@@ -238,8 +238,8 @@ if (($filtros['busca'] ?? '') !== '') {
     <div class="border-t border-slate-200 p-4 shrink-0 bg-white" id="ticketDrawerFooter"></div>
 </aside>
 
-<div id="ticketImageLightbox" class="hidden fixed inset-0 bg-black/80 z-[70] items-center justify-center p-6" onclick="closeTicketImageLightbox()">
-    <button type="button" onclick="closeTicketImageLightbox()" class="absolute top-4 right-4 text-white/80 hover:text-white p-2" aria-label="Fechar">
+<div id="ticketImageLightbox" class="hidden fixed inset-0 bg-black/80 z-[70] items-center justify-center p-6" data-csp-click="closeTicketImageLightbox">
+    <button type="button" data-csp-click="closeTicketImageLightbox" class="absolute top-4 right-4 text-white/80 hover:text-white p-2" aria-label="Fechar">
         <i class="fa-solid fa-xmark text-2xl"></i>
     </button>
     <img id="ticketImageLightboxImg" src="" alt="" class="max-w-full max-h-full rounded-lg shadow-2xl" onclick="event.stopPropagation()">

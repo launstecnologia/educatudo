@@ -1271,13 +1271,13 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
         </div>
     </div>
 
-    <div id="boletimConferirBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="fecharConferirBoletim()"></div>
+    <div id="boletimConferirBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="fecharConferirBoletim"></div>
     <aside id="boletimConferirDrawer"
            class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
            aria-hidden="true">
         <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
             <h2 class="text-xl font-bold text-gray-900">Simular boletim</h2>
-            <button type="button" onclick="fecharConferirBoletim()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+            <button type="button" data-csp-click="fecharConferirBoletim" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
                 <i class="fa-solid fa-xmark text-xl"></i>
             </button>
         </div>
@@ -1323,7 +1323,7 @@ $podeGravarBoletimOficialAluno = $regraIdBoletim > 0 && $selectedAlunoId > 0 && 
             </section>
         </div>
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex justify-end">
-            <button type="button" onclick="fecharConferirBoletim()" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Fechar</button>
+            <button type="button" data-csp-click="fecharConferirBoletim" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Fechar</button>
         </div>
     </aside>
 

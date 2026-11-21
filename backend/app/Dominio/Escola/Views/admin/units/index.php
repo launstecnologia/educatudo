@@ -8,7 +8,7 @@ ob_start();
     <i class="fa-solid fa-file-csv mr-2 text-gray-500"></i>
     Exportar Censo (CSV)
 </a>
-<button type="button" onclick="openUnitDrawer()"
+<button type="button" data-csp-click="openUnitDrawer"
         class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
     <i class="fa-solid fa-plus mr-2"></i>
     Nova Unidade
@@ -48,7 +48,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                     <td colspan="7" class="px-6 py-12 text-center text-gray-500">
                         <i class="fa-solid fa-building text-4xl text-gray-300 mb-4"></i>
                         <p>Nenhuma unidade cadastrada</p>
-                        <button type="button" onclick="openUnitDrawer()" class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
+                        <button type="button" data-csp-click="openUnitDrawer" class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
                             <i class="fa-solid fa-plus mr-2"></i> Nova Unidade
                         </button>
                     </td>
@@ -100,13 +100,13 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
 </div>
 
 <!-- Criar/Editar unidade em drawer lateral -->
-<div id="unitDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeUnitDrawer()"></div>
+<div id="unitDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeUnitDrawer"></div>
 <aside id="unitDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
         <h2 id="unitDrawerTitle" class="text-xl font-bold text-gray-900">Nova Unidade</h2>
-        <button type="button" onclick="closeUnitDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeUnitDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -296,7 +296,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
         </div>
 
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="closeUnitDrawer()"
+            <button type="button" data-csp-click="closeUnitDrawer"
                     class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
                 Cancelar
             </button>

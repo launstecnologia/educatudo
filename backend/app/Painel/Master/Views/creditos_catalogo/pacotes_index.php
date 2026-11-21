@@ -10,7 +10,7 @@ $csrf_token = $csrf_token ?? '';
         <p class="text-slate-600 text-sm max-w-2xl">Pacotes reutilizáveis de compra avulsa. Vincule por escola na tela TudiCoins para aparecerem no EducaShop / compra da escola.</p>
     </div>
     <?php if (!$erro_tabela): ?>
-    <button type="button" onclick="openPacoteDrawer()"
+    <button type="button" data-csp-click="openPacoteDrawer"
             class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-colors">
         <i class="fa-solid fa-plus mr-2"></i> Novo pacote
     </button>
@@ -73,7 +73,7 @@ $csrf_token = $csrf_token ?? '';
                 <tr>
                     <td colspan="5" class="px-6 py-12 text-center text-slate-500 text-sm">
                         Nenhum pacote no catálogo.
-                        <button type="button" onclick="openPacoteDrawer()" class="ml-1 text-blue-600 hover:underline font-medium">Criar o primeiro</button>
+                        <button type="button" data-csp-click="openPacoteDrawer" class="ml-1 text-blue-600 hover:underline font-medium">Criar o primeiro</button>
                     </td>
                 </tr>
                 <?php endif; ?>
@@ -82,13 +82,13 @@ $csrf_token = $csrf_token ?? '';
     </div>
 </div>
 
-<div id="pacoteDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" onclick="closePacoteDrawer()"></div>
+<div id="pacoteDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" data-csp-click="closePacoteDrawer"></div>
 <aside id="pacoteDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-xl bg-white shadow-2xl z-[70] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
         <h2 id="pacoteDrawerTitle" class="text-xl font-bold text-gray-900">Novo pacote</h2>
-        <button type="button" onclick="closePacoteDrawer()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+        <button type="button" data-csp-click="closePacoteDrawer" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -129,7 +129,7 @@ $csrf_token = $csrf_token ?? '';
         </div>
 
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="closePacoteDrawer()"
+            <button type="button" data-csp-click="closePacoteDrawer"
                     class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
                 Cancelar
             </button>

@@ -33,7 +33,7 @@ if ((string) ($filtros['serie_id'] ?? '') !== '') {
             </div>
         </div>
         <div class="flex items-center justify-end gap-3 flex-wrap flex-shrink-0 ml-auto">
-            <button type="button" onclick="openFilterDrawer()"
+            <button type="button" data-csp-click="openFilterDrawer"
                     class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                 <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
                 Filtros
@@ -50,7 +50,7 @@ if ((string) ($filtros['serie_id'] ?? '') !== '') {
             include \App\Core\ViewPaths::adminPartial('ui/btn.php');
             ?>
             <?php endif; ?>
-            <button type="button" onclick="openMatrizDrawer()"
+            <button type="button" data-csp-click="openMatrizDrawer"
                class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
                 <i class="fa-solid fa-plus mr-2"></i>
                 Nova Matriz
@@ -73,7 +73,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
         <a href="<?= URL ?>/admin/matrizes-curriculares" class="inline-block mt-4 text-sm font-medium text-blue-600 hover:text-blue-800">Limpar filtros</a>
     <?php else: ?>
         <p>Nenhuma matriz curricular cadastrada</p>
-        <button type="button" onclick="openMatrizDrawer()"
+        <button type="button" data-csp-click="openMatrizDrawer"
            class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
             <i class="fa-solid fa-plus mr-2"></i>
             Cadastrar a primeira matriz
@@ -147,7 +147,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
 </div>
 <?php endif; ?>
 
-<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeFilterDrawer"></div>
 <aside id="filterDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
@@ -156,7 +156,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
             <h3 class="text-lg font-semibold text-gray-900">Filtrar matrizes</h3>
             <p class="mt-0.5 text-xs text-gray-500">Curso e série.</p>
         </div>
-        <button type="button" onclick="closeFilterDrawer()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar filtros">
+        <button type="button" data-csp-click="closeFilterDrawer" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar filtros">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -191,13 +191,13 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
 </aside>
 
 <!-- Offcanvas: Cadastrar/Editar Matriz Curricular -->
-<div id="matrizDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeMatrizDrawer()"></div>
+<div id="matrizDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeMatrizDrawer"></div>
 <aside id="matrizDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
         <h2 id="matrizDrawerTitle" class="text-xl font-bold text-gray-900">Nova Matriz</h2>
-        <button type="button" onclick="closeMatrizDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeMatrizDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -222,7 +222,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                     </div>
                     <div>
                         <label for="mz_curso_id" class="block text-sm font-medium text-gray-700 mb-1">Curso <span class="text-red-500">*</span></label>
-                        <select id="mz_curso_id" name="curso_id" required onchange="matrizAtualizarSeries()"
+                        <select id="mz_curso_id" name="curso_id" required data-csp-change="matrizAtualizarSeries"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
                             <option value="">Selecione o curso</option>
                             <?php foreach ($cursos as $c): ?>
@@ -286,7 +286,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
             <section>
                 <div class="flex items-center justify-between border-b border-gray-200 pb-2 mb-4">
                     <h3 class="text-lg font-semibold text-gray-900">Componentes Curriculares</h3>
-                    <button type="button" onclick="matrizAdicionarComponente()"
+                    <button type="button" data-csp-click="matrizAdicionarComponente"
                             class="inline-flex items-center px-3 py-1.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50">
                         <i class="fa-solid fa-plus mr-1.5"></i> Adicionar componente
                     </button>
@@ -320,7 +320,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
         </div>
 
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="closeMatrizDrawer()"
+            <button type="button" data-csp-click="closeMatrizDrawer"
                     class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
                 Cancelar
             </button>

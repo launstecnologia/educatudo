@@ -5,7 +5,7 @@ $token = (string) ($csrf_token ?? $token ?? '');
 $documentos = is_array($documentos ?? $docs_recebidos ?? null) ? ($documentos ?? $docs_recebidos) : [];
 ?>
 <?php if (!empty($admin_permissions['vida_escolar']['cadastrar'])): ?>
-<div id="veLancarEscolaBackdrop" class="fixed inset-0 bg-black/40 z-[95] hidden" onclick="veFecharLancarEscola()"></div>
+<div id="veLancarEscolaBackdrop" class="fixed inset-0 bg-black/40 z-[95] hidden" data-csp-click="veFecharLancarEscola"></div>
 <aside id="veLancarEscolaDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-[96] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true"
@@ -16,7 +16,7 @@ $documentos = is_array($documentos ?? $docs_recebidos ?? null) ? ($documentos ??
             <h2 id="veLancarEscolaTitulo" class="text-xl font-bold text-gray-900">Lançar Escola</h2>
             <p class="text-sm text-gray-500 mt-0.5">Ano cursado em outra instituição. Linhas em branco nas disciplinas são ignoradas.</p>
         </div>
-        <button type="button" onclick="veFecharLancarEscola()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+        <button type="button" data-csp-click="veFecharLancarEscola" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -104,7 +104,7 @@ $documentos = is_array($documentos ?? $docs_recebidos ?? null) ? ($documentos ??
             <section>
                 <div class="flex items-center justify-between gap-3 border-b border-gray-200 pb-2 mb-4">
                     <h3 class="text-lg font-semibold text-gray-900">Disciplinas e notas</h3>
-                    <button type="button" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50" onclick="veAddCompSimples()">
+                    <button type="button" class="px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50" data-csp-click="veAddCompSimples">
                         <i class="fa-solid fa-plus mr-1"></i>Adicionar disciplina
                     </button>
                 </div>
@@ -127,7 +127,7 @@ $documentos = is_array($documentos ?? $docs_recebidos ?? null) ? ($documentos ??
             </section>
         </div>
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="veFecharLancarEscola()"
+            <button type="button" data-csp-click="veFecharLancarEscola"
                     class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
                 Cancelar
             </button>

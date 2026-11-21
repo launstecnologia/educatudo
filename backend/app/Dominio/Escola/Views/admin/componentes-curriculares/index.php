@@ -29,7 +29,7 @@ $ciclosFiltro = [
             </div>
         </div>
         <div class="flex items-center justify-end gap-3 flex-wrap flex-shrink-0 ml-auto">
-            <button type="button" onclick="openFilterDrawer()"
+            <button type="button" data-csp-click="openFilterDrawer"
                     class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                 <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
                 Filtros
@@ -46,7 +46,7 @@ $ciclosFiltro = [
             include \App\Core\ViewPaths::adminPartial('ui/btn.php');
             ?>
             <?php endif; ?>
-            <button type="button" onclick="openComponenteDrawer()"
+            <button type="button" data-csp-click="openComponenteDrawer"
                     class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
                 <i class="fa-solid fa-plus mr-2"></i>
                 Novo Componente Curricular
@@ -77,7 +77,7 @@ $ciclosFiltro = [
                             <a href="<?= URL ?>/admin/componentes-curriculares" class="inline-block mt-4 text-sm font-medium text-blue-600 hover:text-blue-800">Limpar filtros</a>
                         <?php else: ?>
                             <p>Nenhum componente curricular cadastrado</p>
-                            <button type="button" onclick="openComponenteDrawer()" class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
+                            <button type="button" data-csp-click="openComponenteDrawer" class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
                                 <i class="fa-solid fa-plus mr-2"></i> Novo Componente Curricular
                             </button>
                         <?php endif; ?>
@@ -242,13 +242,13 @@ $ciclosFiltro = [
 </style>
 
 <!-- Criar/Editar componente curricular em drawer lateral -->
-<div id="componenteDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeComponenteDrawer()"></div>
+<div id="componenteDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeComponenteDrawer"></div>
 <aside id="componenteDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
         <h2 id="componenteDrawerTitle" class="text-xl font-bold text-gray-900">Novo Componente Curricular</h2>
-        <button type="button" onclick="closeComponenteDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeComponenteDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -409,7 +409,7 @@ $ciclosFiltro = [
         </div>
 
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="closeComponenteDrawer()"
+            <button type="button" data-csp-click="closeComponenteDrawer"
                     class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
                 Cancelar
             </button>
@@ -421,7 +421,7 @@ $ciclosFiltro = [
     </form>
 </aside>
 
-<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeFilterDrawer"></div>
 <aside id="filterDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
@@ -430,7 +430,7 @@ $ciclosFiltro = [
             <h3 class="text-lg font-semibold text-gray-900">Filtrar componentes</h3>
             <p class="mt-0.5 text-xs text-gray-500">Nome, sigla, área e ciclo ou etapa de ensino.</p>
         </div>
-        <button type="button" onclick="closeFilterDrawer()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar filtros">
+        <button type="button" data-csp-click="closeFilterDrawer" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar filtros">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>

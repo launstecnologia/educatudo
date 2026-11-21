@@ -76,7 +76,7 @@ $tipoConteudoOption = $temUmVideo ? (($videos[0]['tipo'] ?? 'youtube') === 'link
                     <?php endif; ?>
                 </div>
                 <div class="flex gap-2 shrink-0">
-                    <button type="button" onclick="mostrarFormConteudo()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Editar</button>
+                    <button type="button" data-csp-click="mostrarFormConteudo" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Editar</button>
                     <?php if ($temUmVideo): ?>
                         <button type="button" onclick="removerVideo(<?= (int)$conteudoAtual['id'] ?>)" class="px-4 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600">Remover</button>
                     <?php elseif ($temUmDoc): ?>

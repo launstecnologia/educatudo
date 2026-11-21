@@ -178,7 +178,7 @@
                     <h3 class="text-lg font-semibold text-gray-900" id="exerciseTitle">Exercício</h3>
                     <div class="flex items-center space-x-4">
                         <span class="text-sm text-gray-500" id="exerciseProgress">1/5</span>
-                        <button onclick="closeExerciseModal()" class="text-gray-400 hover:text-gray-600">
+                        <button data-csp-click="closeExerciseModal" class="text-gray-400 hover:text-gray-600">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                             </svg>
@@ -191,11 +191,11 @@
                 </div>
                 
                 <div class="mt-6 flex justify-between">
-                    <button id="prevButton" onclick="previousExercise()" 
+                    <button id="prevButton" data-csp-click="previousExercise" 
                             class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors" disabled>
                         Anterior
                     </button>
-                    <button id="nextButton" onclick="nextExercise()" 
+                    <button id="nextButton" data-csp-click="nextExercise" 
                             class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
                         Próximo
                     </button>

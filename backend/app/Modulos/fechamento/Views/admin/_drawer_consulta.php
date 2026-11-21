@@ -3,7 +3,7 @@ $fechConsultaAno = (int) ($ano_letivo ?? date('Y'));
 $fechConsultaPeriodoTipo = (string) ($periodo_tipo ?? 'ano');
 $fechConsultaPeriodoNumero = (int) ($periodo_numero ?? 0);
 ?>
-<div id="fechamentoConsultaBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="fecharFechamentoConsulta()"></div>
+<div id="fechamentoConsultaBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="fecharFechamentoConsulta"></div>
 <aside id="fechamentoConsultaDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true"
@@ -15,13 +15,13 @@ $fechConsultaPeriodoNumero = (int) ($periodo_numero ?? 0);
             <h2 id="fechamentoConsultaTitulo" class="text-xl font-bold text-gray-900">Consulta</h2>
             <p id="fechamentoConsultaSubtitulo" class="text-sm text-gray-500 mt-0.5"></p>
         </div>
-        <button type="button" onclick="fecharFechamentoConsulta()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+        <button type="button" data-csp-click="fecharFechamentoConsulta" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
     <div id="fechamentoConsultaBody" class="flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-6"></div>
     <div class="px-4 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-        <button type="button" onclick="fecharFechamentoConsulta()"
+        <button type="button" data-csp-click="fecharFechamentoConsulta"
                 class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
             Fechar
         </button>

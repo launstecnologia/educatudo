@@ -10,7 +10,7 @@ $page_header_title = 'Notificações';
 $page_header_subtitle = 'Avisos internos para alunos, professores, administradores e responsáveis.';
 ob_start();
 ?>
-<button type="button" onclick="openNotificacaoDrawer()" class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
+<button type="button" data-csp-click="openNotificacaoDrawer" class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
     <i class="fa-solid fa-plus mr-2"></i>Nova notificação
 </button>
 <?php
@@ -23,7 +23,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
     <div class="px-6 py-12 text-center text-gray-500">
         <i class="fa-solid fa-bell text-3xl text-gray-300 mb-3 block"></i>
         <p>Nenhuma notificação encontrada.</p>
-        <button type="button" onclick="openNotificacaoDrawer()" class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90">
+        <button type="button" data-csp-click="openNotificacaoDrawer" class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90">
             <i class="fa-solid fa-plus mr-2"></i>Nova notificação
         </button>
     </div>
@@ -100,13 +100,13 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
 <?php endif; ?>
 </div>
 
-<div id="notificacaoDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeNotificacaoDrawer()"></div>
+<div id="notificacaoDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeNotificacaoDrawer"></div>
 <aside id="notificacaoDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
         <h2 class="text-xl font-bold text-gray-900">Nova notificação</h2>
-        <button type="button" onclick="closeNotificacaoDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeNotificacaoDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -126,15 +126,15 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                         <label class="block text-sm font-medium text-gray-700 mb-2">Tipos de conteúdo <span class="text-red-500">*</span></label>
                         <div class="flex flex-wrap gap-4">
                             <label class="inline-flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" id="incluir_texto" name="tipos_conteudo[]" value="texto" checked class="rounded border-gray-300 text-green-600" onchange="toggleNotifMedia()">
+                                <input type="checkbox" id="incluir_texto" name="tipos_conteudo[]" value="texto" checked class="rounded border-gray-300 text-green-600" data-csp-change="toggleNotifMedia">
                                 <span class="text-sm text-gray-700">Texto</span>
                             </label>
                             <label class="inline-flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" id="incluir_imagem" name="tipos_conteudo[]" value="imagem" class="rounded border-gray-300 text-green-600" onchange="toggleNotifMedia()">
+                                <input type="checkbox" id="incluir_imagem" name="tipos_conteudo[]" value="imagem" class="rounded border-gray-300 text-green-600" data-csp-change="toggleNotifMedia">
                                 <span class="text-sm text-gray-700">Imagem</span>
                             </label>
                             <label class="inline-flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" id="incluir_video" name="tipos_conteudo[]" value="video" class="rounded border-gray-300 text-green-600" onchange="toggleNotifMedia()">
+                                <input type="checkbox" id="incluir_video" name="tipos_conteudo[]" value="video" class="rounded border-gray-300 text-green-600" data-csp-change="toggleNotifMedia">
                                 <span class="text-sm text-gray-700">Vídeo</span>
                             </label>
                         </div>
@@ -189,31 +189,31 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
             <section>
                 <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2 mb-4">Destinatários <span class="text-red-500">*</span></h3>
                 <label class="inline-flex items-center gap-2 cursor-pointer mb-4">
-                    <input type="checkbox" id="todos_usuarios" name="todos_usuarios" value="1" class="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500" onchange="toggleNotifTodos()">
+                    <input type="checkbox" id="todos_usuarios" name="todos_usuarios" value="1" class="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500" data-csp-change="toggleNotifTodos">
                     <span class="text-sm font-medium text-gray-700">Todos os usuários</span>
                 </label>
                 <div id="notif-categorias" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-green-400">
-                        <input type="checkbox" name="categorias[]" value="todos_admins" class="rounded border-gray-300 text-green-600 notif-categoria" onchange="toggleNotifCategorias()">
+                        <input type="checkbox" name="categorias[]" value="todos_admins" class="rounded border-gray-300 text-green-600 notif-categoria" data-csp-change="toggleNotifCategorias">
                         <span class="text-sm text-gray-700">Todos os administradores</span>
                     </label>
                     <label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-green-400">
-                        <input type="checkbox" name="categorias[]" value="todos_professores" class="rounded border-gray-300 text-green-600 notif-categoria" onchange="toggleNotifCategorias()">
+                        <input type="checkbox" name="categorias[]" value="todos_professores" class="rounded border-gray-300 text-green-600 notif-categoria" data-csp-change="toggleNotifCategorias">
                         <span class="text-sm text-gray-700">Todos os professores</span>
                     </label>
                     <label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-green-400">
-                        <input type="checkbox" name="categorias[]" value="todos_alunos" class="rounded border-gray-300 text-green-600 notif-categoria" onchange="toggleNotifCategorias()">
+                        <input type="checkbox" name="categorias[]" value="todos_alunos" class="rounded border-gray-300 text-green-600 notif-categoria" data-csp-change="toggleNotifCategorias">
                         <span class="text-sm text-gray-700">Todos os alunos</span>
                     </label>
                     <label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-green-400">
-                        <input type="checkbox" name="categorias[]" value="todos_pais" class="rounded border-gray-300 text-green-600 notif-categoria" onchange="toggleNotifCategorias()">
+                        <input type="checkbox" name="categorias[]" value="todos_pais" class="rounded border-gray-300 text-green-600 notif-categoria" data-csp-change="toggleNotifCategorias">
                         <span class="text-sm text-gray-700">Todos os responsáveis</span>
                     </label>
                 </div>
             </section>
         </div>
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="closeNotificacaoDrawer()" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
+            <button type="button" data-csp-click="closeNotificacaoDrawer" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
             <button type="submit" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 transition-colors shadow-sm">Enviar notificação</button>
         </div>
     </form>

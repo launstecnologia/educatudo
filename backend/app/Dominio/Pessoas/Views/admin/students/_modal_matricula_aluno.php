@@ -6,7 +6,7 @@
             <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold text-gray-900">Adicionar matrícula</h3>
-                    <button type="button" onclick="fecharModalMatricula()" class="text-gray-400 hover:text-gray-600">
+                    <button type="button" data-csp-click="fecharModalMatricula" class="text-gray-400 hover:text-gray-600">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
@@ -51,7 +51,7 @@
                     </div>
                     <p id="matriculaMsg" class="text-sm hidden"></p>
                     <div class="flex justify-end gap-2 pt-2">
-                        <button type="button" onclick="fecharModalMatricula()" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700">Cancelar</button>
+                        <button type="button" data-csp-click="fecharModalMatricula" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700">Cancelar</button>
                         <button type="submit" class="btn-primary-custom px-4 py-2 rounded-lg font-semibold hover:opacity-90">
                             <i class="fa-solid fa-plus mr-1"></i> Adicionar matrícula
                         </button>

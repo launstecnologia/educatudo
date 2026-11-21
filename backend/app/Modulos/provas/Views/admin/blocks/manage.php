@@ -51,7 +51,7 @@ $urlVoltarLista = \App\Modulos\EventosAvaliativos\Services\RetornoListaProva::en
             </a>
             <?php endif; ?>
             <?php if ($modoLancamentoNota): ?>
-            <button type="button" onclick="openDetalhesEventoDrawer()"
+            <button type="button" data-csp-click="openDetalhesEventoDrawer"
                     class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50">
                 <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
                 Detalhes
@@ -228,7 +228,7 @@ $anoTxt = (int) ($desc['ano_letivo'] ?? 0);
 <?php endif; ?>
 
 <!-- Offcanvas detalhes do evento -->
-<div id="detalhesEventoBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeDetalhesEventoDrawer()"></div>
+<div id="detalhesEventoBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeDetalhesEventoDrawer"></div>
 <aside id="detalhesEventoDrawer"
        class="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-white shadow-2xl transform translate-x-full transition-transform duration-200 ease-out flex flex-col"
        aria-hidden="true">
@@ -237,7 +237,7 @@ $anoTxt = (int) ($desc['ano_letivo'] ?? 0);
             <h3 class="text-lg font-semibold text-gray-900">Detalhes do evento</h3>
             <p class="text-xs text-gray-500 mt-0.5">Período, tipo de nota, destino no quadro e turmas</p>
         </div>
-        <button type="button" onclick="closeDetalhesEventoDrawer()" class="text-gray-400 hover:text-gray-600" aria-label="Fechar">
+        <button type="button" data-csp-click="closeDetalhesEventoDrawer" class="text-gray-400 hover:text-gray-600" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i>
         </button>
     </div>
@@ -708,7 +708,7 @@ $statusLabelsOnline = [
 <!-- Modal Vincular Prova -->
 <div id="modalVincularProva" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
     <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
-        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="fecharModalVincular()"></div>
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" data-csp-click="fecharModalVincular"></div>
         <div class="relative inline-block w-full max-w-lg p-6 my-8 overflow-hidden text-left align-middle bg-white rounded-xl shadow-xl">
             <h3 class="text-lg font-semibold text-gray-900" id="modalVincularTitulo">Vincular prova</h3>
             <p class="mt-1 text-sm text-gray-500" id="modalVincularSubtitulo"></p>
@@ -719,7 +719,7 @@ $statusLabelsOnline = [
                 <p class="text-amber-700">Nenhuma prova disponível para vincular (provas do professor nesta matéria que ainda não estão em outro bloco).</p>
             </div>
             <div class="flex justify-end gap-2 mt-4">
-                <button type="button" onclick="fecharModalVincular()" class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
+                <button type="button" data-csp-click="fecharModalVincular" class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
                     Fechar
                 </button>
             </div>

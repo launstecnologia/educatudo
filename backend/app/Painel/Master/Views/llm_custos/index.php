@@ -60,7 +60,7 @@ $limparUrl = URL . '/master/llm-custos';
                 Tokens, custo USD/R$ e lucro estimado (1 TudiCoin = R$ <?= $fmtDec($brlPorCredito, 2) ?> · dólar R$ <?= $fmtDec($cotacao, 2) ?>).
             </p>
         </div>
-        <button type="button" onclick="openFilterDrawer()"
+        <button type="button" data-csp-click="openFilterDrawer"
                 class="relative inline-flex items-center px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors flex-shrink-0">
             <i class="fa-solid fa-filter mr-2 text-slate-500"></i>
             Filtros
@@ -457,7 +457,7 @@ $usdMaxCredito = $financeiro['usd_max_por_credito'] ?? null;
     </div>
 </div>
 
-<div id="diaDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[80] hidden" onclick="fecharDetalheDia()"></div>
+<div id="diaDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[80] hidden" data-csp-click="fecharDetalheDia"></div>
 <aside id="diaDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-5xl bg-white shadow-2xl z-[90] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
@@ -466,7 +466,7 @@ $usdMaxCredito = $financeiro['usd_max_por_credito'] ?? null;
             <h3 id="diaDrawerTitle" class="text-lg font-semibold text-slate-900">Detalhe do dia</h3>
             <p id="diaDrawerSub" class="text-xs text-slate-500 mt-0.5"></p>
         </div>
-        <button type="button" onclick="fecharDetalheDia()" class="text-slate-400 hover:text-slate-600 p-1" aria-label="Fechar">
+        <button type="button" data-csp-click="fecharDetalheDia" class="text-slate-400 hover:text-slate-600 p-1" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -475,13 +475,13 @@ $usdMaxCredito = $financeiro['usd_max_por_credito'] ?? null;
     </div>
 </aside>
 
-<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" onclick="closeFilterDrawer()"></div>
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" data-csp-click="closeFilterDrawer"></div>
 <aside id="filterDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-[70] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
         <h3 class="text-lg font-semibold text-slate-900">Filtrar custo LLM</h3>
-        <button type="button" onclick="closeFilterDrawer()" class="text-slate-400 hover:text-slate-600 p-1" aria-label="Fechar">
+        <button type="button" data-csp-click="closeFilterDrawer" class="text-slate-400 hover:text-slate-600 p-1" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>

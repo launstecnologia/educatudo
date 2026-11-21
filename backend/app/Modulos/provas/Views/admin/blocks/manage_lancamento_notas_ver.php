@@ -179,7 +179,7 @@ $renderLinha = static function (array $ln): void {
             </p>
         </div>
         <div class="flex flex-wrap items-center gap-2 notas-export-actions">
-            <button type="button" onclick="openFilterDrawer()"
+            <button type="button" data-csp-click="openFilterDrawer"
                     class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50">
                 <i class="fa-solid fa-filter" aria-hidden="true"></i>
                 Filtros
@@ -189,14 +189,14 @@ $renderLinha = static function (array $ln): void {
                 <i class="fa-solid fa-file-import" aria-hidden="true"></i>
                 Importar notas internas
             </a>
-            <button type="button" onclick="exportarNotasExcel()"
+            <button type="button" data-csp-click="exportarNotasExcel"
                     class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm inline-flex items-center gap-1">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                 </svg>
                 Exportar Excel
             </button>
-            <button type="button" onclick="exportarNotasPdf()"
+            <button type="button" data-csp-click="exportarNotasPdf"
                     class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm inline-flex items-center gap-1">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
@@ -306,13 +306,13 @@ $renderLinha = static function (array $ln): void {
     </div>
 </div>
 
-<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeFilterDrawer"></div>
 <aside id="filterDrawer"
        class="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-2xl transform translate-x-full transition-transform duration-200 ease-out flex flex-col"
        aria-hidden="true">
     <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
         <h3 class="text-lg font-semibold text-gray-900">Filtros e ordenação</h3>
-        <button type="button" onclick="closeFilterDrawer()" class="text-gray-400 hover:text-gray-600" aria-label="Fechar">
+        <button type="button" data-csp-click="closeFilterDrawer" class="text-gray-400 hover:text-gray-600" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i>
         </button>
     </div>

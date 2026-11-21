@@ -46,13 +46,13 @@ include __DIR__ . '/_preparar.php';
 }
 </style>
 
-<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden grade-no-print" onclick="closeFilterDrawer()"></div>
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden grade-no-print" data-csp-click="closeFilterDrawer"></div>
 <aside id="filterDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col grade-no-print"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
         <h3 class="text-lg font-semibold text-gray-900">Filtrar grade</h3>
-        <button type="button" onclick="closeFilterDrawer()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+        <button type="button" data-csp-click="closeFilterDrawer" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -244,7 +244,7 @@ function closeFilterDrawer() {
                         <i class="fa-solid fa-file-pdf mr-1.5 text-gray-500"></i>
                         PDF
                     </a>
-                    <button type="button" onclick="window.print()"
+                    <button type="button" data-csp-click="print"
                             class="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 whitespace-nowrap">
                         <i class="fa-solid fa-print mr-1.5 text-gray-500"></i>
                         Imprimir
@@ -341,7 +341,7 @@ function closeFilterDrawer() {
                             <?php if ($filtrosAtivos > 0): ?>
                                 <a href="<?= htmlspecialchars($urlGrade) ?>" class="mt-2 inline-block text-sm text-blue-600 hover:text-blue-800">Limpar filtros</a>
                             <?php else: ?>
-                                <button type="button" onclick="openAulaDrawer()" class="mt-4 btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
+                                <button type="button" data-csp-click="openAulaDrawer" class="mt-4 btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
                                     <i class="fa-solid fa-plus mr-2"></i> Nova aula
                                 </button>
                             <?php endif; ?>

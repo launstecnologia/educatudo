@@ -82,7 +82,7 @@ $ssh2Available = function_exists('ssh2_connect');
         </div>
         <div class="p-6">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <button onclick="executarComandoRapido('git pull')" 
+                <button data-csp-click="executarComandoRapido" data-csp-arg="git pull" 
                         class="p-4 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors text-left">
                     <div class="flex items-center mb-2">
                         <svg class="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -93,7 +93,7 @@ $ssh2Available = function_exists('ssh2_connect');
                     <p class="text-sm text-blue-700">Atualizar código do repositório</p>
                 </button>
                 
-                <button onclick="executarComandoRapido('git status')" 
+                <button data-csp-click="executarComandoRapido" data-csp-arg="git status" 
                         class="p-4 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors text-left">
                     <div class="flex items-center mb-2">
                         <svg class="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -104,7 +104,7 @@ $ssh2Available = function_exists('ssh2_connect');
                     <p class="text-sm text-green-700">Verificar status do repositório</p>
                 </button>
                 
-                <button onclick="executarComandoRapido('git log --oneline -10')" 
+                <button data-csp-click="executarComandoRapido" data-csp-arg="git log --oneline -10" 
                         class="p-4 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors text-left">
                     <div class="flex items-center mb-2">
                         <svg class="w-5 h-5 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -115,7 +115,7 @@ $ssh2Available = function_exists('ssh2_connect');
                     <p class="text-sm text-purple-700">Ver últimas 10 commits</p>
                 </button>
                 
-                <button onclick="executarComandoRapido('git branch')" 
+                <button data-csp-click="executarComandoRapido" data-csp-arg="git branch" 
                         class="p-4 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition-colors text-left">
                     <div class="flex items-center mb-2">
                         <svg class="w-5 h-5 text-orange-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

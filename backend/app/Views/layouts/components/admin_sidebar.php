@@ -235,7 +235,7 @@
                             <i class="fa-solid <?= $fi['icon'] ?> w-4 h-4 mr-3 flex-shrink-0"></i>
                             <span class="sidebar-text"><?= $fi['label'] ?></span>
                         </a>
-                        <button type="button" onclick="toggleNestedMenu('<?= htmlspecialchars($nestedId, ENT_QUOTES) ?>')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                        <button type="button" data-csp-click="toggleNestedMenu" data-csp-arg="&lt;?= htmlspecialchars($nestedId, ENT_QUOTES) ?&gt;" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
                             <svg id="<?= htmlspecialchars($nestedId) ?>-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                             </svg>

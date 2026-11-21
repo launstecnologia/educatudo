@@ -54,7 +54,7 @@ $tomCal = $corCal !== '' ? '--button-primary-color:' . $corCal . ';--primary-tex
     <div class="flex flex-wrap items-center gap-2">
         <h1 class="text-2xl font-bold text-gray-900 flex-1 min-w-[12rem]">Calendário escolar <?= $ano ?></h1>
         <?php if (!empty($pode_adicionar)): ?>
-        <button type="button" onclick="abrirLembrete()" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 shrink-0">
+        <button type="button" data-csp-click="abrirLembrete" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 shrink-0">
             <i class="fa-solid fa-plus"></i>
             Meu evento
         </button>
@@ -76,11 +76,11 @@ $tomCal = $corCal !== '' ? '--button-primary-color:' . $corCal . ';--primary-tex
         <a href="?ano=<?= $ano - 1 ?>" class="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-left"></i></a>
         <a href="?ano=<?= $ano + 1 ?>" class="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-right"></i></a>
         <div class="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
-            <button id="btnViewYear" onclick="setView('year')" class="px-3 py-2 text-sm font-medium"><i class="fa-solid fa-calendar-days mr-1.5"></i>Ano</button>
-            <button id="btnViewMonth" onclick="setView('month')" class="px-3 py-2 text-sm font-medium border-l border-gray-300"><i class="fa-solid fa-calendar mr-1.5"></i>Mês</button>
+            <button id="btnViewYear" data-csp-click="setView" data-csp-arg="year" class="px-3 py-2 text-sm font-medium"><i class="fa-solid fa-calendar-days mr-1.5"></i>Ano</button>
+            <button id="btnViewMonth" data-csp-click="setView" data-csp-arg="month" class="px-3 py-2 text-sm font-medium border-l border-gray-300"><i class="fa-solid fa-calendar mr-1.5"></i>Mês</button>
         </div>
         <div id="navMes" class="hidden items-center gap-1">
-            <button onclick="navMes(-1)" class="px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-left"></i></button>
+            <button data-csp-click="navMes" data-csp-arg="-1" class="px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-left"></i></button>
             <span id="labelMes" class="text-sm font-semibold text-gray-700 w-28 text-center"></span>
             <button onclick="navMes(+1)" class="px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-right"></i></button>
         </div>
@@ -95,14 +95,14 @@ $tomCal = $corCal !== '' ? '--button-primary-color:' . $corCal . ';--primary-tex
 <?php endif; ?>
 
 <?php if (!empty($pode_adicionar)): ?>
-<div id="lembreteBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" onclick="fecharLembrete()"></div>
+<div id="lembreteBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" data-csp-click="fecharLembrete"></div>
 <aside id="lembreteDrawer" class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-[70] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="lembreteDrawerTitle">
     <div class="flex items-center justify-between px-6 py-5 border-b border-gray-200">
         <div>
             <h2 id="lembreteDrawerTitle" class="text-xl font-bold text-gray-900">Meu evento</h2>
             <p class="text-sm text-gray-500 mt-1">Fica só no seu calendário. Ninguém mais vê.</p>
         </div>
-        <button type="button" onclick="fecharLembrete()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+        <button type="button" data-csp-click="fecharLembrete" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -132,7 +132,7 @@ $tomCal = $corCal !== '' ? '--button-primary-color:' . $corCal . ';--primary-tex
             </label>
         </div>
         <div class="flex justify-end gap-2 px-6 py-4 border-t border-gray-200">
-            <button type="button" onclick="fecharLembrete()" class="px-4 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700">Cancelar</button>
+            <button type="button" data-csp-click="fecharLembrete" class="px-4 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700">Cancelar</button>
             <button type="submit" class="px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">Salvar</button>
         </div>
     </form>
@@ -299,7 +299,7 @@ $tomCal = $corCal !== '' ? '--button-primary-color:' . $corCal . ';--primary-tex
                 <p class="text-sm text-gray-500" id="modalDiaTipoLabel"></p>
                 <h3 class="text-xl font-bold text-gray-900 mt-0.5" id="modalDiaData"></h3>
             </div>
-            <button type="button" onclick="closeDayModal()" class="text-gray-400 hover:text-gray-600 p-1 shrink-0" aria-label="Fechar">
+            <button type="button" data-csp-click="closeDayModal" class="text-gray-400 hover:text-gray-600 p-1 shrink-0" aria-label="Fechar">
                 <i class="fa-solid fa-xmark text-xl"></i>
             </button>
         </div>

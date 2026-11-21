@@ -335,7 +335,7 @@ if (!empty($aula['turmas']) && is_array($aula['turmas'])) {
                     div.innerHTML = '<div class="flex items-center gap-3 min-w-0"><i class="fa-solid fa-file text-gray-400 flex-shrink-0"></i><span class="text-sm text-gray-800 truncate">' + data.nome + '</span></div>'
                         + '<div class="flex items-center gap-3 flex-shrink-0">'
                         + '<a href="' + BASE + '/admin/aulas-online/arquivo/download?id=' + data.id + '" class="text-xs text-blue-600 hover:underline">Baixar</a>'
-                        + '<button type="button" onclick="excluirArquivo(' + data.id + ')" class="text-xs text-red-600 hover:underline">Excluir</button>'
+                        + '<button type="button" data-csp-click="excluirArquivo" data-csp-arg=" + data.id + " class="text-xs text-red-600 hover:underline">Excluir</button>'
                         + '</div>';
                     listaEl.appendChild(div);
                 })

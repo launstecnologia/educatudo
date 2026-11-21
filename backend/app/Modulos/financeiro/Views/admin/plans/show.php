@@ -27,7 +27,7 @@
                     <?= $plan['ativo'] ? 'Desativar' : 'Ativar' ?>
                 </button>
             </form>
-            <button type="button" onclick="openPlanItemDrawer()"
+            <button type="button" data-csp-click="openPlanItemDrawer"
                     class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
                 <i class="fa-solid fa-plus mr-2"></i>
                 Novo item
@@ -122,7 +122,7 @@
     <div class="px-6 py-12 text-center text-gray-500">
         <i class="fa-solid fa-list-ul text-4xl text-gray-300 mb-4 block"></i>
         <p>Nenhum item adicionado ainda.</p>
-        <button type="button" onclick="openPlanItemDrawer()"
+        <button type="button" data-csp-click="openPlanItemDrawer"
                 class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
             <i class="fa-solid fa-plus mr-2"></i> Novo item
         </button>
@@ -130,13 +130,13 @@
     <?php endif; ?>
 </div>
 
-<div id="planItemDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closePlanItemDrawer()"></div>
+<div id="planItemDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closePlanItemDrawer"></div>
 <aside id="planItemDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
         <h2 id="planItemDrawerTitle" class="text-xl font-bold text-gray-900">Novo item</h2>
-        <button type="button" onclick="closePlanItemDrawer()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+        <button type="button" data-csp-click="closePlanItemDrawer" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -229,7 +229,7 @@
         </div>
 
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="closePlanItemDrawer()"
+            <button type="button" data-csp-click="closePlanItemDrawer"
                     class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
                 Cancelar
             </button>

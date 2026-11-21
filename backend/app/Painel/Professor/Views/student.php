@@ -120,7 +120,7 @@
                 <!-- Botão Limpar -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2 opacity-0">Ações</label>
-                    <button onclick="limparFiltros()" class="w-full px-4 py-3 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 rounded-xl hover:from-gray-200 hover:to-gray-300 transition-all font-medium text-sm flex items-center justify-center gap-2 shadow-sm hover:shadow-md border-2 border-gray-300">
+                    <button data-csp-click="limparFiltros" class="w-full px-4 py-3 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 rounded-xl hover:from-gray-200 hover:to-gray-300 transition-all font-medium text-sm flex items-center justify-center gap-2 shadow-sm hover:shadow-md border-2 border-gray-300">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>

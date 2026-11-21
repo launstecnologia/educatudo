@@ -198,7 +198,7 @@ $gruposAcoesAluno = [
 ?>
 <div id="offcanvasAcoesAlunoBackdrop"
      class="fixed inset-0 bg-slate-900/40 z-[90] hidden"
-     onclick="fecharOffcanvasAcoesAluno()"
+     data-csp-click="fecharOffcanvasAcoesAluno"
      aria-hidden="true"></div>
 <aside id="offcanvasAcoesAluno"
        class="fixed top-0 right-0 h-full w-full max-w-[28rem] md:max-w-[30rem] bg-white shadow-2xl z-[91] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
@@ -212,7 +212,7 @@ $gruposAcoesAluno = [
             <p class="text-sm text-gray-500 mt-0.5 truncate"><?= safe_htmlspecialchars($alunoNomeAcoes) ?> · <?= safe_htmlspecialchars($alunoIdentAcoes) ?></p>
         </div>
         <button type="button"
-                onclick="fecharOffcanvasAcoesAluno()"
+                data-csp-click="fecharOffcanvasAcoesAluno"
                 class="w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
                 aria-label="Fechar ações do aluno">
             <i class="fa-solid fa-xmark text-lg"></i>

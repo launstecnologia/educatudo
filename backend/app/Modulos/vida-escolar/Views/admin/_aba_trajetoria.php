@@ -229,11 +229,11 @@ $vePodeVerLog = is_array($user ?? null) && (string) ($user['perfil_admin'] ?? ''
 <div class="bg-white rounded-xl shadow-lg p-6">
     <div class="flex flex-wrap items-center justify-between gap-2 text-sm mb-4">
         <div class="flex flex-wrap gap-2" role="tablist">
-            <button type="button" class="ve-origem-pill px-3 py-1.5 rounded-full <?= $veOrigemInicial === 'historico' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>" data-ve-origem="historico" onclick="veAbaOrigem('historico')">Histórico de outra escola</button>
-            <button type="button" class="ve-origem-pill px-3 py-1.5 rounded-full <?= $veOrigemInicial === 'meio' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>" data-ve-origem="meio" onclick="veAbaOrigem('meio')">Chegou no meio do ano</button>
+            <button type="button" class="ve-origem-pill px-3 py-1.5 rounded-full <?= $veOrigemInicial === 'historico' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>" data-ve-origem="historico" data-csp-click="veAbaOrigem" data-csp-arg="historico">Histórico de outra escola</button>
+            <button type="button" class="ve-origem-pill px-3 py-1.5 rounded-full <?= $veOrigemInicial === 'meio' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>" data-ve-origem="meio" data-csp-click="veAbaOrigem" data-csp-arg="meio">Chegou no meio do ano</button>
         </div>
         <?php if ($vePodeVerLog): ?>
-        <button type="button" onclick="veAbrirLogMeioAno()" class="inline-flex items-center px-3 py-1.5 rounded-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+        <button type="button" data-csp-click="veAbrirLogMeioAno" class="inline-flex items-center px-3 py-1.5 rounded-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
             <i class="fa-solid fa-clock-rotate-left mr-1.5 text-xs"></i>Log
         </button>
         <?php endif; ?>
@@ -242,7 +242,7 @@ $vePodeVerLog = is_array($user ?? null) && (string) ($user['perfil_admin'] ?? ''
     <div data-ve-origem-painel="historico" class="<?= $veOrigemInicial === 'historico' ? '' : 'hidden' ?>">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
             <p class="text-sm text-gray-500 flex-1 min-w-[16rem]">Anos já concluídos. Anexe o PDF para a leitura ou digite o ano. O ano desta escola entra sozinho na homologação do boletim.</p>
-            <button type="button" onclick="veAbrirLancarEscola()"
+            <button type="button" data-csp-click="veAbrirLancarEscola"
                     class="shrink-0 inline-flex items-center px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50">
                 <i class="fa-solid fa-plus mr-1.5"></i>Digitar um ano
             </button>
@@ -533,7 +533,7 @@ $vePodeVerLog = is_array($user ?? null) && (string) ($user['perfil_admin'] ?? ''
         ?>
         <div class="flex items-center justify-between gap-3 mb-3">
             <p class="text-sm text-gray-600"><?= $nBlocos > 0 ? 'Componentes da turma. Preencha só os ' . $esc($nomePeriodos) . ' que constam no documento.' : 'A turma ainda não tem componentes. Adicione os que constam no documento.' ?></p>
-            <button type="button" class="shrink-0 px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50" onclick="veAddBlocoBim()">
+            <button type="button" class="shrink-0 px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50" data-csp-click="veAddBlocoBim">
                 <i class="fa-solid fa-plus mr-1"></i>Adicionar componente
             </button>
         </div>
@@ -608,7 +608,7 @@ $vePodeVerLog = is_array($user ?? null) && (string) ($user['perfil_admin'] ?? ''
         <button class="btn-primary-custom mt-4 px-4 py-2 rounded-lg text-sm font-semibold">Salvar notas no boletim</button>
     </form>
     <div id="veModalSenhaMeio" class="fixed inset-0 z-[100] hidden" aria-modal="true" role="dialog">
-        <div class="absolute inset-0 bg-black/50" onclick="veFecharSenhaMeio()"></div>
+        <div class="absolute inset-0 bg-black/50" data-csp-click="veFecharSenhaMeio"></div>
         <div class="relative mx-auto mt-24 w-full max-w-md bg-white rounded-xl shadow-xl p-6">
             <h3 class="text-lg font-semibold text-gray-900">Confirmar senha</h3>
             <p class="text-sm text-gray-600 mt-1">Digite a senha da sua conta para lançar essas notas no boletim. O registro fica no log, com quem lançou e o horário.</p>
@@ -620,8 +620,8 @@ $vePodeVerLog = is_array($user ?? null) && (string) ($user['perfil_admin'] ?? ''
                 <p id="veSenhaMeioErro" class="hidden text-xs text-red-600 mt-2"></p>
             </div>
             <div class="mt-5 flex justify-end gap-2">
-                <button type="button" onclick="veFecharSenhaMeio()" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm">Cancelar</button>
-                <button type="button" onclick="veConfirmarSenhaMeio()" class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-semibold">Salvar</button>
+                <button type="button" data-csp-click="veFecharSenhaMeio" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm">Cancelar</button>
+                <button type="button" data-csp-click="veConfirmarSenhaMeio" class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-semibold">Salvar</button>
             </div>
         </div>
     </div>
@@ -632,7 +632,7 @@ $vePodeVerLog = is_array($user ?? null) && (string) ($user['perfil_admin'] ?? ''
 <?php
 $logsMeioAno = is_array(($quadro['log_meio_ano'] ?? null)) ? $quadro['log_meio_ano'] : [];
 ?>
-<div id="veLogMeioBackdrop" class="fixed inset-0 bg-black/40 z-[97] hidden" onclick="veFecharLogMeioAno()"></div>
+<div id="veLogMeioBackdrop" class="fixed inset-0 bg-black/40 z-[97] hidden" data-csp-click="veFecharLogMeioAno"></div>
 <aside id="veLogMeioDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-xl bg-white shadow-2xl z-[98] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true"
@@ -643,7 +643,7 @@ $logsMeioAno = is_array(($quadro['log_meio_ano'] ?? null)) ? $quadro['log_meio_a
             <h2 id="veLogMeioTitulo" class="text-xl font-bold text-gray-900">Log do meio do ano</h2>
             <p class="text-sm text-gray-500 mt-0.5">Quem lançou as notas da outra escola, o horário e o que entrou no boletim.</p>
         </div>
-        <button type="button" onclick="veFecharLogMeioAno()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+        <button type="button" data-csp-click="veFecharLogMeioAno" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>

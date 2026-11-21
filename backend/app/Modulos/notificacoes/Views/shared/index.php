@@ -113,7 +113,7 @@ $title = $title ?? 'Minhas Notificações';
 <!-- Modal de Notificação -->
 <div id="notification-detail-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
     <!-- Backdrop com transição suave -->
-    <div id="modal-backdrop" class="fixed inset-0 bg-gray-500/75 transition-opacity duration-300 ease-out opacity-0" onclick="fecharModalNotificacao()"></div>
+    <div id="modal-backdrop" class="fixed inset-0 bg-gray-500/75 transition-opacity duration-300 ease-out opacity-0" data-csp-click="fecharModalNotificacao"></div>
     
     <!-- Container do Modal -->
     <div class="relative transform transition-all duration-300 ease-out opacity-0 scale-95 translate-y-4 sm:translate-y-0 sm:scale-95">
@@ -132,7 +132,7 @@ $title = $title ?? 'Minhas Notificações';
                             <p id="modal-sender" class="text-purple-100 text-sm">Por Sistema</p>
                         </div>
                     </div>
-                    <button onclick="fecharModalNotificacao()" class="text-white hover:text-purple-200 transition-colors p-1 rounded-full hover:bg-white/10">
+                    <button data-csp-click="fecharModalNotificacao" class="text-white hover:text-purple-200 transition-colors p-1 rounded-full hover:bg-white/10">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
@@ -153,7 +153,7 @@ $title = $title ?? 'Minhas Notificações';
                     <span id="modal-date">Data</span>
                 </div>
                 <div class="flex space-x-3">
-                    <button onclick="fecharModalNotificacao()" class="inline-flex justify-center rounded-md bg-purple-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-purple-500">
+                    <button data-csp-click="fecharModalNotificacao" class="inline-flex justify-center rounded-md bg-purple-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-purple-500">
                         Fechar
                     </button>
                 </div>

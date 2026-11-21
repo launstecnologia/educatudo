@@ -21,7 +21,7 @@ $page_header_icon = 'fa-solid fa-arrows-rotate';
 ob_start();
 ?>
 <?php if ($podeCadastrar && $schemaPronto): ?>
-<button type="button" onclick="abrirRecuperacao()"
+<button type="button" data-csp-click="abrirRecuperacao"
         class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
     <i class="fa-solid fa-plus mr-2"></i>
     Nova recuperação
@@ -124,13 +124,13 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
     </table>
 </div>
 
-<div id="recuperacao-backdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="fecharRecuperacao()"></div>
+<div id="recuperacao-backdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="fecharRecuperacao"></div>
 <aside id="recuperacao-drawer"
        class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
         <h2 id="recuperacao-titulo" class="text-xl font-bold text-gray-900">Nova recuperação</h2>
-        <button type="button" onclick="fecharRecuperacao()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="fecharRecuperacao" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -198,7 +198,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
             </section>
         </div>
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="fecharRecuperacao()"
+            <button type="button" data-csp-click="fecharRecuperacao"
                     class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
                 Cancelar
             </button>

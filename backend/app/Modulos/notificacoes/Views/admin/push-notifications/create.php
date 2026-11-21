@@ -72,7 +72,7 @@ $title = $title ?? 'Enviar Notificação Push';
                 <label for="tipo_destino" class="block text-sm font-medium text-gray-700 mb-1">Enviar para *</label>
                 <select id="tipo_destino" name="tipo_destino" required
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        onchange="toggleDestinoSelect()">
+                        data-csp-change="toggleDestinoSelect">
                     <option value="todos">Todos (pais, alunos, professores)</option>
                     <option value="pais">Pais</option>
                     <option value="alunos">Alunos</option>

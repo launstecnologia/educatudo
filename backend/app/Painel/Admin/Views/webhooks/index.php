@@ -6,7 +6,7 @@
             <p class="text-gray-600 mt-2">Gerencie os webhooks para integração com serviços externos</p>
         </div>
         <div class="flex items-center space-x-4">
-            <button onclick="openCreateWebhookModal()" class="btn-primary-custom px-4 py-2 rounded-lg transition-colors hover:opacity-90">
+            <button data-csp-click="openCreateWebhookModal" class="btn-primary-custom px-4 py-2 rounded-lg transition-colors hover:opacity-90">
                 <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                 </svg>
@@ -35,7 +35,7 @@
             <div class="p-6">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold text-gray-900">Novo Webhook</h3>
-                    <button onclick="closeCreateWebhookModal()" class="text-gray-400 hover:text-gray-600">
+                    <button data-csp-click="closeCreateWebhookModal" class="text-gray-400 hover:text-gray-600">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
@@ -80,7 +80,7 @@
                     </div>
                     
                     <div class="flex space-x-3">
-                        <button type="button" onclick="closeCreateWebhookModal()" 
+                        <button type="button" data-csp-click="closeCreateWebhookModal" 
                                 class="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors">
                             Cancelar
                         </button>
@@ -102,7 +102,7 @@
             <div class="p-6">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold text-gray-900">Testar Webhook</h3>
-                    <button onclick="closeTestWebhookModal()" class="text-gray-400 hover:text-gray-600">
+                    <button data-csp-click="closeTestWebhookModal" class="text-gray-400 hover:text-gray-600">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>

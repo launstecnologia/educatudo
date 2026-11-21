@@ -15,7 +15,7 @@ foreach (['titulo', 'professor_id', 'status'] as $fk) {
             <p class="text-gray-600">Visualizar propostas e envios dos alunos</p>
         </div>
         <div class="flex items-center gap-3 flex-wrap">
-            <button type="button" onclick="openFilterDrawer()"
+            <button type="button" data-csp-click="openFilterDrawer"
                     class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                 <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
                 Filtros
@@ -33,13 +33,13 @@ foreach (['titulo', 'professor_id', 'status'] as $fk) {
 </div>
 
 <!-- Filtro em drawer lateral -->
-<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeFilterDrawer"></div>
 <aside id="filterDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
         <h3 class="text-lg font-semibold text-gray-900">Filtrar propostas</h3>
-        <button type="button" onclick="closeFilterDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeFilterDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -72,7 +72,7 @@ foreach (['titulo', 'professor_id', 'status'] as $fk) {
             </div>
         </div>
         <div class="px-6 py-4 border-t border-gray-200 flex gap-3 bg-gray-50">
-            <button type="button" onclick="clearFilters()"
+            <button type="button" data-csp-click="clearFilters"
                     class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                 Limpar
             </button>

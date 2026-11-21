@@ -311,14 +311,14 @@ if (!class_exists('LayoutHelper')) {
     <div id="nav-prova" class="bg-white rounded-xl shadow-lg p-6 flex justify-between items-center">
         <div class="flex gap-4">
             <button type="button" 
-                    onclick="questaoAnterior()"
+                    data-csp-click="questaoAnterior"
                     id="btn-anterior"
                     class="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled>
                 ← Anterior
             </button>
             <button type="button" 
-                    onclick="questaoProxima()"
+                    data-csp-click="questaoProxima"
                     id="btn-proximo"
                     class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold">
                 Próximo →
@@ -326,7 +326,7 @@ if (!class_exists('LayoutHelper')) {
         </div>
         <button type="button" 
                 id="btn-finalizar-prova"
-                onclick="finalizarProva()"
+                data-csp-click="finalizarProva"
                 class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-semibold">
             <?= (!empty($modo_bloco) || !empty($modo_seguro)) ? 'Finalizar Matéria' : 'Finalizar Prova' ?>
         </button>

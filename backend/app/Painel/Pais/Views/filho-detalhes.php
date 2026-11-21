@@ -39,16 +39,16 @@
 <div class="bg-white rounded-lg shadow-sm border border-gray-200">
     <div class="border-b border-gray-200">
         <nav class="flex -mb-px overflow-x-auto" aria-label="Tabs">
-            <button onclick="showTab('jornadas')" id="tab-jornadas" class="tab-button active flex items-center px-6 py-4 text-sm font-medium border-b-2 border-blue-500 text-blue-600 whitespace-nowrap">
+            <button data-csp-click="showTab" data-csp-arg="jornadas" id="tab-jornadas" class="tab-button active flex items-center px-6 py-4 text-sm font-medium border-b-2 border-blue-500 text-blue-600 whitespace-nowrap">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
                 Jornadas
             </button>
-            <button onclick="showTab('redacoes')" id="tab-redacoes" class="tab-button flex items-center px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap">
+            <button data-csp-click="showTab" data-csp-arg="redacoes" id="tab-redacoes" class="tab-button flex items-center px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                 Redações
             </button>
             <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('ocorrencias')): ?>
-            <button onclick="showTab('ocorrencias')" id="tab-ocorrencias" class="tab-button flex items-center px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap">
+            <button data-csp-click="showTab" data-csp-arg="ocorrencias" id="tab-ocorrencias" class="tab-button flex items-center px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 Ocorrências
             </button>

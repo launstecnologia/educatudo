@@ -175,7 +175,7 @@
         <div class="p-6 border-b">
             <div class="flex items-center justify-between">
                 <h3 class="text-xl font-bold text-gray-900">Novo Ticket</h3>
-                <button onclick="fecharModalTicket()"
+                <button data-csp-click="fecharModalTicket"
                         class="text-gray-400 hover:text-gray-600 transition-colors">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -281,7 +281,7 @@
             </div>
 
             <div class="mt-6 flex gap-3 justify-end">
-                <button type="button" onclick="fecharModalTicket()"
+                <button type="button" data-csp-click="fecharModalTicket"
                         class="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors">
                     Cancelar
                 </button>

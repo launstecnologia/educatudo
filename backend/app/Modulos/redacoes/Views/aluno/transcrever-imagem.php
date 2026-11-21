@@ -53,11 +53,11 @@
                             <h3 class="text-sm font-medium text-gray-700 mb-2">Preview da Imagem:</h3>
                             <img id="previewImg" class="max-w-full h-auto rounded-lg border border-gray-300" alt="Preview da imagem">
                             <div class="mt-2 flex gap-2">
-                                <button onclick="transcreverImagem()" 
+                                <button data-csp-click="transcreverImagem" 
                                     class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors">
                                     <i class="fas fa-magic mr-2"></i>Transcrever Texto
                                 </button>
-                                <button onclick="removerImagem()" 
+                                <button data-csp-click="removerImagem" 
                                     class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
                                     <i class="fas fa-trash mr-2"></i>Remover
                                 </button>
@@ -104,14 +104,14 @@
                         style="font-family: 'Times New Roman', serif; font-size: 14px; line-height: 1.6;"></textarea>
                     
                     <div class="mt-4 flex justify-between items-center">
-                        <button onclick="salvarRascunho()" 
+                        <button data-csp-click="salvarRascunho" 
                             class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
                             </svg>
                             Salvar Rascunho
                         </button>
-                        <button onclick="finalizarRedacao()" 
+                        <button data-csp-click="finalizarRedacao" 
                             class="px-6 py-2 bg-gradient-to-r from-purple-500 to-blue-600 text-white rounded-lg hover:from-purple-600 hover:to-blue-700 transition-all font-semibold flex items-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
@@ -671,7 +671,7 @@ function showTranscriptionWarning() {
                     </div>
                 </div>
                 <div class="flex justify-end">
-                    <button onclick="hideTranscriptionWarning()" 
+                    <button data-csp-click="hideTranscriptionWarning" 
                         class="px-6 py-2 bg-gradient-to-r from-purple-500 to-blue-600 text-white rounded-lg hover:from-purple-600 hover:to-blue-700 transition-all font-semibold">
                         Entendi, vou revisar
                     </button>

@@ -284,7 +284,7 @@ foreach ($agents ?? [] as $_a) {
                     <h4 class="font-semibold text-gray-900 mb-2">Uso e custos</h4>
                     <div class="flex gap-2 mb-2">
                         <input id="usageLimit" type="number" min="1" max="1000" value="50" class="border border-gray-300 rounded-lg px-3 py-2 w-28">
-                        <button type="button" onclick="loadUsage()" class="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-lg text-sm">Atualizar</button>
+                        <button type="button" data-csp-click="loadUsage" class="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-lg text-sm">Atualizar</button>
                     </div>
                     <pre id="usageResult" class="bg-slate-50 border rounded-lg p-3 text-xs overflow-auto max-h-48"></pre>
                 </div>

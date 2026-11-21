@@ -47,7 +47,7 @@ $dataBr = static function ($v): string {
     </style>
 </head>
 <body>
-    <p class="no-print muted"><button onclick="window.print()">Imprimir / salvar PDF</button></p>
+    <p class="no-print muted"><button data-csp-click="print">Imprimir / salvar PDF</button></p>
     <h1><?= $esc($unidade['nome'] ?? 'Escola') ?></h1>
     <p class="muted" style="text-align:center">INEP <?= $esc($unidade['inep'] ?? '—') ?> · CNPJ <?= $esc($unidade['cnpj'] ?? '—') ?></p>
     <h1>Pacote de transferência</h1>

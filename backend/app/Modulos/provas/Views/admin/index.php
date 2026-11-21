@@ -31,7 +31,7 @@ $page_header_subtitle = 'Gerencie os blocos de provas e o lançamento de notas.'
 $page_header_icon = 'fa-regular fa-clipboard';
 ob_start();
 ?>
-<button type="button" onclick="openFilterDrawer()"
+<button type="button" data-csp-click="openFilterDrawer"
         class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
     <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
     Filtros
@@ -162,13 +162,13 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
 </div>
 <?php endif; ?>
 
-<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeFilterDrawer"></div>
 <aside id="filterDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
         <h3 class="text-lg font-semibold text-gray-900">Filtrar provas</h3>
-        <button type="button" onclick="closeFilterDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeFilterDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -240,7 +240,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
             </div>
         </div>
         <div class="px-6 py-4 border-t border-gray-200 flex gap-3 bg-gray-50">
-            <button type="button" onclick="clearFilters()"
+            <button type="button" data-csp-click="clearFilters"
                     class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                 Limpar
             </button>
@@ -296,28 +296,28 @@ document.addEventListener('keydown', function(e) {
         <h3 class="text-lg font-semibold text-gray-900">Evento de Provas</h3>
         <div id="barraAcoesLote" class="hidden flex-wrap items-center gap-2">
             <span id="contadorSelecionados" class="text-sm text-gray-600 mr-1">0 selecionado(s)</span>
-            <button type="button" onclick="abrirRelatorioNotasLote()"
+            <button type="button" data-csp-click="abrirRelatorioNotasLote"
                     class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700"
                     title="Relatório com matéria, professor, turma, aluno e nota">
                 <i class="fa-solid fa-table" aria-hidden="true"></i>
                 Relatório de notas
             </button>
-            <button type="button" onclick="exportarRelatorioNotasLoteExcel()"
+            <button type="button" data-csp-click="exportarRelatorioNotasLoteExcel"
                     class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700">
                 <i class="fa-solid fa-file-excel" aria-hidden="true"></i>
                 Excel
             </button>
-            <button type="button" onclick="exportarRelatorioNotasLotePdf()"
+            <button type="button" data-csp-click="exportarRelatorioNotasLotePdf"
                     class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700">
                 <i class="fa-solid fa-file-pdf" aria-hidden="true"></i>
                 PDF
             </button>
-            <button type="button" onclick="marcarSelecionadosConcluidos()"
+            <button type="button" data-csp-click="marcarSelecionadosConcluidos"
                     class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-gray-800 text-white hover:bg-gray-900">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 Marcar como concluído
             </button>
-            <button type="button" onclick="excluirSelecionados()"
+            <button type="button" data-csp-click="excluirSelecionados"
                     class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                 Excluir
@@ -327,11 +327,11 @@ document.addEventListener('keydown', function(e) {
 
     <div id="bannerSelecionarTodasPaginas" class="hidden px-6 py-3 border-b border-indigo-100 bg-indigo-50 text-sm text-indigo-950">
         <span id="textoBannerSelecaoPagina"></span>
-        <button type="button" id="btnSelecionarTodasPaginas" onclick="selecionarTodasPaginas()"
+        <button type="button" id="btnSelecionarTodasPaginas" data-csp-click="selecionarTodasPaginas"
                 class="ml-2 font-semibold text-indigo-700 underline hover:text-indigo-900">
             Selecionar todos os eventos deste filtro
         </button>
-        <button type="button" id="btnLimparSelecaoTodasPaginas" onclick="limparSelecaoTodasPaginas()"
+        <button type="button" id="btnLimparSelecaoTodasPaginas" data-csp-click="limparSelecaoTodasPaginas"
                 class="hidden ml-2 font-semibold text-indigo-700 underline hover:text-indigo-900">
             Limpar seleção
         </button>
@@ -377,7 +377,7 @@ document.addEventListener('keydown', function(e) {
                                 <input type="checkbox"
                                        class="checkbox-bloco-lote rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                        value="<?= (int) $bloco['id'] ?>"
-                                       onchange="atualizarBarraAcoesLote()">
+                                       data-csp-change="atualizarBarraAcoesLote">
                             </td>
                             <td class="px-6 py-4">
                                 <?php
@@ -1001,15 +1001,15 @@ function confirmarExcluirComSenha() {
 <!-- Modal: confirmar exclusão com senha -->
 <div id="modalExcluirSenha" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-modal="true">
     <div class="flex min-h-full items-center justify-center p-4">
-        <div class="fixed inset-0 bg-black/50" onclick="fecharModalExcluir()"></div>
+        <div class="fixed inset-0 bg-black/50" data-csp-click="fecharModalExcluir"></div>
         <div class="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6">
             <h3 id="tituloModalExcluir" class="text-lg font-semibold text-gray-900 mb-2">Confirmar exclusão</h3>
             <p id="textoModalExcluir" class="text-sm text-gray-600 mb-4">Para desativar este bloco, digite sua senha. O bloco deixará de aparecer para alunos e professores; os dados são mantidos (LGPD). Quem desativou ficará registrado.</p>
             <label class="block text-sm font-medium text-gray-700 mb-1">Sua senha</label>
             <input type="password" id="inputSenhaExcluir" placeholder="Senha" class="w-full border border-gray-300 rounded-lg px-3 py-2 mb-4" onkeydown="if (event.key==='Enter') confirmarExcluirComSenha();">
             <div class="flex justify-end gap-2">
-                <button type="button" onclick="fecharModalExcluir()" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">Cancelar</button>
-                <button type="button" id="btnConfirmarExcluir" onclick="confirmarExcluirComSenha()" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">Excluir</button>
+                <button type="button" data-csp-click="fecharModalExcluir" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">Cancelar</button>
+                <button type="button" id="btnConfirmarExcluir" data-csp-click="confirmarExcluirComSenha" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">Excluir</button>
             </div>
         </div>
     </div>

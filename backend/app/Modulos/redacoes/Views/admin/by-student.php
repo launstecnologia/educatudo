@@ -173,12 +173,12 @@ $filtro_to   = $filtro_to ?? '';
         <table id="tabela-propostas-aluno" class="min-w-full divide-y divide-gray-100">
             <thead class="bg-gray-50">
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700" onclick="ordenarTabelaAluno('titulo')">Proposta <span class="ml-1 text-gray-300" id="sort-aluno-titulo">↕</span></th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700" onclick="ordenarTabelaAluno('banca')">Banca <span class="ml-1 text-gray-300" id="sort-aluno-banca">↕</span></th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700" data-csp-click="ordenarTabelaAluno" data-csp-arg="titulo">Proposta <span class="ml-1 text-gray-300" id="sort-aluno-titulo">↕</span></th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700" data-csp-click="ordenarTabelaAluno" data-csp-arg="banca">Banca <span class="ml-1 text-gray-300" id="sort-aluno-banca">↕</span></th>
                     <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700" onclick="ordenarTabelaAluno('criacao')">Data criação <span class="ml-1 text-gray-300" id="sort-aluno-criacao">↕</span></th>
-                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700" onclick="ordenarTabelaAluno('data')">Data envio <span class="ml-1 text-gray-300" id="sort-aluno-data">↕</span></th>
-                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700" onclick="ordenarTabelaAluno('nota')">Nota <span class="ml-1 text-gray-300" id="sort-aluno-nota">↕</span></th>
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700" data-csp-click="ordenarTabelaAluno" data-csp-arg="criacao">Data criação <span class="ml-1 text-gray-300" id="sort-aluno-criacao">↕</span></th>
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700" data-csp-click="ordenarTabelaAluno" data-csp-arg="data">Data envio <span class="ml-1 text-gray-300" id="sort-aluno-data">↕</span></th>
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700" data-csp-click="ordenarTabelaAluno" data-csp-arg="nota">Nota <span class="ml-1 text-gray-300" id="sort-aluno-nota">↕</span></th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">

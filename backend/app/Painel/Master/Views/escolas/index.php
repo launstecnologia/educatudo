@@ -202,7 +202,7 @@ $domCfg = is_array($dominio_config ?? null) ? $dominio_config : [];
 $tenantBaseDomain = (string) ($domCfg['tenant_base_domain'] ?? 'localhost');
 $criarBancoDisponivel = !empty($criar_banco_disponivel);
 ?>
-<div id="clonarDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" onclick="fecharClonarEscola()"></div>
+<div id="clonarDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" data-csp-click="fecharClonarEscola"></div>
 <aside id="clonarDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-xl bg-white shadow-2xl z-[70] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
@@ -211,7 +211,7 @@ $criarBancoDisponivel = !empty($criar_banco_disponivel);
             <h2 class="text-xl font-bold text-gray-900">Clonar escola</h2>
             <p id="clonarOrigemLabel" class="text-sm text-slate-500 mt-1"></p>
         </div>
-        <button type="button" onclick="fecharClonarEscola()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+        <button type="button" data-csp-click="fecharClonarEscola" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -290,7 +290,7 @@ $criarBancoDisponivel = !empty($criar_banco_disponivel);
             </section>
         </div>
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="fecharClonarEscola()"
+            <button type="button" data-csp-click="fecharClonarEscola"
                     class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
                 Cancelar
             </button>

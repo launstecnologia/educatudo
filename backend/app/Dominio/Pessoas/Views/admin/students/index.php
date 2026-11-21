@@ -20,7 +20,7 @@ $trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/students', 'Alunos');
             </div>
         </div>
         <div class="flex items-center justify-end gap-3 flex-shrink-0 ml-auto">
-            <button type="button" onclick="openFilterDrawer()"
+            <button type="button" data-csp-click="openFilterDrawer"
                     class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                 <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
                 Filtros
@@ -67,7 +67,7 @@ $trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/students', 'Alunos');
                             <i class="fa-solid fa-user-graduate text-4xl text-gray-300 mb-4"></i>
                             <p>Nenhum aluno encontrado</p>
                             <?php if ($filtrosAtivos > 0): ?>
-                            <button type="button" onclick="clearFilters()" class="mt-3 text-sm text-blue-600 hover:text-blue-800">Limpar filtros</button>
+                            <button type="button" data-csp-click="clearFilters" class="mt-3 text-sm text-blue-600 hover:text-blue-800">Limpar filtros</button>
                             <?php else: ?>
                             <a href="<?= URL ?>/admin/students/create" class="btn-primary-custom mt-4 inline-block px-4 py-2 rounded-lg text-sm transition-colors hover:opacity-90">
                                 Registrar novo Aluno
@@ -164,13 +164,13 @@ $trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/students', 'Alunos');
 </div>
 
 <!-- Filtro lateral -->
-<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeFilterDrawer"></div>
 <aside id="filterDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
         <h3 class="text-lg font-semibold text-gray-900">Filtrar alunos</h3>
-        <button type="button" onclick="closeFilterDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeFilterDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -226,7 +226,7 @@ $trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/students', 'Alunos');
             </div>
         </div>
         <div class="px-6 py-4 border-t border-gray-200 flex gap-3 bg-gray-50">
-            <button type="button" onclick="clearFilters()"
+            <button type="button" data-csp-click="clearFilters"
                     class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                 Limpar
             </button>

@@ -18,7 +18,7 @@
                 Novo Exercício
             </a>
             <?php if (false): /* Integração da API externa pausada. Trocar para true para voltar "Questões do EducaTudo". */ ?>
-            <button type="button" onclick="abrirModalBancoQuestoes('educatudo')"
+            <button type="button" data-csp-click="abrirModalBancoQuestoes" data-csp-arg="educatudo"
                     class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50">
                 <svg class="h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
@@ -28,7 +28,7 @@
                 Questões do EducaTudo
             </button>
             <?php endif; ?>
-            <button type="button" onclick="abrirModalBancoQuestoes('professor')"
+            <button type="button" data-csp-click="abrirModalBancoQuestoes" data-csp-arg="professor"
                     class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50">
                 <svg class="h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
@@ -190,7 +190,7 @@
                 <h3 id="bq-modal-titulo" class="text-xl font-bold text-slate-900">Banco de Questões</h3>
                 <p id="bq-modal-descricao" class="mt-1 text-sm text-slate-600">Selecione questões para importar neste módulo.</p>
             </div>
-            <button type="button" onclick="fecharModalBancoQuestoes()" class="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Fechar">
+            <button type="button" data-csp-click="fecharModalBancoQuestoes" class="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Fechar">
                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
@@ -215,7 +215,7 @@
                         class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700">
                     Buscar
                 </button>
-                <button type="button" onclick="limparFiltrosBancoQuestoes()"
+                <button type="button" data-csp-click="limparFiltrosBancoQuestoes"
                         class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50">
                     Limpar filtros
                 </button>
@@ -241,21 +241,21 @@
 
         <div class="flex shrink-0 flex-col gap-3 border-t border-slate-200 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex items-center gap-2">
-                <button type="button" id="bq-prev" onclick="mudarPaginaBancoQuestoes(-1)"
+                <button type="button" id="bq-prev" data-csp-click="mudarPaginaBancoQuestoes" data-csp-arg="-1"
                         class="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 disabled:opacity-40">
                     Anterior
                 </button>
-                <button type="button" id="bq-next" onclick="mudarPaginaBancoQuestoes(1)"
+                <button type="button" id="bq-next" data-csp-click="mudarPaginaBancoQuestoes" data-csp-arg="1"
                         class="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 disabled:opacity-40">
                     Próxima
                 </button>
             </div>
             <div class="flex justify-end gap-2">
-                <button type="button" onclick="fecharModalBancoQuestoes()"
+                <button type="button" data-csp-click="fecharModalBancoQuestoes"
                         class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                     Fechar
                 </button>
-                <button type="button" onclick="importarSelecionadasBancoQuestoes()"
+                <button type="button" data-csp-click="importarSelecionadasBancoQuestoes"
                         class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
                     Importar selecionadas
                 </button>
@@ -713,7 +713,7 @@ function renderSelecionadasLateralBancoQuestoes() {
                         '<div class="text-xs font-semibold text-indigo-700">ID ' + escapeHtmlBancoQuestoes(meta.id) + '</div>' +
                         '<div class="text-xs text-gray-500">' + escapeHtmlBancoQuestoes([meta.materia, meta.tipo].filter(Boolean).join(' • ')) + '</div>' +
                     '</div>' +
-                    '<button type="button" class="text-xs text-red-600 hover:text-red-700" onclick="removerSelecionadaBancoQuestoes(&quot;' + escapeHtmlBancoQuestoes(meta.id) + '&quot;)">Remover</button>' +
+                    '<button type="button" class="text-xs text-red-600 hover:text-red-700" data-csp-click="removerSelecionadaBancoQuestoes" data-csp-arg="&#039; + escapeHtmlBancoQuestoes(meta.id) + &#039;">Remover</button>' +
                 '</div>' +
                 '<p class="mt-1 text-xs leading-snug text-gray-700">' + escapeHtmlBancoQuestoes(texto) + '</p>' +
             '</div>';

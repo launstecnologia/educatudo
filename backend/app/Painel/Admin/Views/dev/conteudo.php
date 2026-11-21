@@ -29,7 +29,7 @@ if ($flash_message !== ''):
                 <h3 class="text-lg font-semibold text-gray-900">Gerenciar Tutoriais</h3>
                 <p class="text-gray-500 text-sm mt-1">Adicione vídeos tutoriais do YouTube que serão exibidos no menu do professor.</p>
             </div>
-            <button onclick="abrirModalTutorial()" class="btn-primary-custom px-4 py-2 rounded-lg transition-colors hover:opacity-90">
+            <button data-csp-click="abrirModalTutorial" class="btn-primary-custom px-4 py-2 rounded-lg transition-colors hover:opacity-90">
                 ➕ Adicionar Tutorial
             </button>
         </div>
@@ -156,7 +156,7 @@ if ($flash_message !== ''):
                     </div>
 
                     <div class="flex justify-end gap-2 pt-4 border-t">
-                        <button type="button" onclick="fecharModalTutorial()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                        <button type="button" data-csp-click="fecharModalTutorial" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
                             Cancelar
                         </button>
                         <button type="submit" class="btn-primary-custom px-4 py-2 rounded-lg hover:opacity-90">

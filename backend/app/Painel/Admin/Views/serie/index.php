@@ -13,7 +13,7 @@ $page_header_subtitle = 'Cadastre as séries por curso (ex.: 1º Ano, 2º Ano) p
 if ($schema_ready) {
     ob_start();
     ?>
-    <button type="button" onclick="openSerieDrawer()"
+    <button type="button" data-csp-click="openSerieDrawer"
        class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
         <i class="fa-solid fa-plus mr-2"></i>
         Nova Série
@@ -38,7 +38,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 px-6 py-12 text-center text-gray-500">
     <i class="fa-solid fa-layer-group text-4xl text-gray-300 mb-4"></i>
     <p>Nenhuma série cadastrada</p>
-    <button type="button" onclick="openSerieDrawer()"
+    <button type="button" data-csp-click="openSerieDrawer"
        class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
         <i class="fa-solid fa-plus mr-2"></i>
         Cadastrar a primeira série
@@ -145,13 +145,13 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
 
 <?php if ($schema_ready): ?>
 <!-- Offcanvas: Cadastrar/Editar Série -->
-<div id="serieDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeSerieDrawer()"></div>
+<div id="serieDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeSerieDrawer"></div>
 <aside id="serieDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
         <h2 id="serieDrawerTitle" class="text-xl font-bold text-gray-900">Nova Série / Ano Escolar</h2>
-        <button type="button" onclick="closeSerieDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeSerieDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -191,7 +191,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
         </div>
 
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="closeSerieDrawer()"
+            <button type="button" data-csp-click="closeSerieDrawer"
                     class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
                 Cancelar
             </button>

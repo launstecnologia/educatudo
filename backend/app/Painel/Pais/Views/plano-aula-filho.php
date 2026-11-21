@@ -40,7 +40,7 @@ $urlPagina = static function (int $page) use ($baseUrl, $queryFiltro): string {
         </div>
         <?php if ($mostrarFiltro): ?>
         <button type="button"
-                onclick="openFiltroPlanoAulaDrawer()"
+                data-csp-click="openFiltroPlanoAulaDrawer"
                 class="relative inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 shrink-0">
             <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
@@ -151,7 +151,7 @@ $urlPagina = static function (int $page) use ($baseUrl, $queryFiltro): string {
 </div>
 
 <?php if ($mostrarFiltro): ?>
-<div id="filtroPlanoAulaDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFiltroPlanoAulaDrawer()"></div>
+<div id="filtroPlanoAulaDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeFiltroPlanoAulaDrawer"></div>
 <aside id="filtroPlanoAulaDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true"
@@ -159,7 +159,7 @@ $urlPagina = static function (int $page) use ($baseUrl, $queryFiltro): string {
        aria-labelledby="filtroPlanoAulaDrawerTitle">
     <div class="flex items-center justify-between px-6 py-5 border-b border-gray-200">
         <h2 id="filtroPlanoAulaDrawerTitle" class="text-xl font-bold text-gray-900">Filtros</h2>
-        <button type="button" onclick="closeFiltroPlanoAulaDrawer()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+        <button type="button" data-csp-click="closeFiltroPlanoAulaDrawer" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
             </svg>

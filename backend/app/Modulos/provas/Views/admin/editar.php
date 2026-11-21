@@ -65,7 +65,7 @@
 
             <div class="mt-4">
                 <button type="button" 
-                        onclick="adicionarProfessor()"
+                        data-csp-click="adicionarProfessor"
                         class="btn-primary-custom px-4 py-2 text-sm font-semibold rounded-lg transition-colors hover:opacity-90">
                     + Adicionar Professor
                 </button>

@@ -102,7 +102,7 @@
         </div>
         <div class="p-6">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <button onclick="refreshMetrics()" class="flex items-center justify-center p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200">
+                <button data-csp-click="refreshMetrics" class="flex items-center justify-center p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200">
                     <div class="text-center">
                         <div class="text-2xl mb-2">🔄</div>
                         <div class="font-medium text-gray-900">Atualizar</div>
@@ -118,7 +118,7 @@
                     </div>
                 </a>
 
-                <button onclick="sendMetricsNow()" class="flex items-center justify-center p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors border border-purple-200">
+                <button data-csp-click="sendMetricsNow" class="flex items-center justify-center p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors border border-purple-200">
                     <div class="text-center">
                         <div class="text-2xl mb-2">📤</div>
                         <div class="font-medium text-gray-900">Enviar Agora</div>

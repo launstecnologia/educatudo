@@ -148,7 +148,7 @@
             <div class="p-6">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold text-gray-900">Editar Bloco</h3>
-                    <button onclick="fecharModalEditar()" class="text-gray-400 hover:text-gray-600">
+                    <button data-csp-click="fecharModalEditar" class="text-gray-400 hover:text-gray-600">
                         ✕
                     </button>
                 </div>
@@ -193,7 +193,7 @@
                     </div>
                     
                     <div class="flex justify-end space-x-3 mt-6">
-                        <button type="button" onclick="fecharModalEditar()" 
+                        <button type="button" data-csp-click="fecharModalEditar" 
                                 class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
                             Cancelar
                         </button>

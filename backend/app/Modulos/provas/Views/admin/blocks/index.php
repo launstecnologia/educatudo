@@ -308,15 +308,15 @@ function confirmarExcluirComSenha() {
 <!-- Modal: confirmar exclusão com senha -->
 <div id="modalExcluirSenha" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-modal="true">
     <div class="flex min-h-full items-center justify-center p-4">
-        <div class="fixed inset-0 bg-black/50" onclick="fecharModalExcluir()"></div>
+        <div class="fixed inset-0 bg-black/50" data-csp-click="fecharModalExcluir"></div>
         <div class="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-2">Confirmar exclusão</h3>
             <p class="text-sm text-gray-600 mb-4">Para desativar este bloco, digite sua senha. O bloco deixará de aparecer para alunos e professores; os dados são mantidos (LGPD). Quem desativou ficará registrado.</p>
             <label class="block text-sm font-medium text-gray-700 mb-1">Sua senha</label>
             <input type="password" id="inputSenhaExcluir" placeholder="Senha" class="w-full border border-gray-300 rounded-lg px-3 py-2 mb-4" onkeydown="if (event.key==='Enter') confirmarExcluirComSenha();">
             <div class="flex justify-end gap-2">
-                <button type="button" onclick="fecharModalExcluir()" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">Cancelar</button>
-                <button type="button" id="btnConfirmarExcluir" onclick="confirmarExcluirComSenha()" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">Excluir</button>
+                <button type="button" data-csp-click="fecharModalExcluir" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">Cancelar</button>
+                <button type="button" id="btnConfirmarExcluir" data-csp-click="confirmarExcluirComSenha" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">Excluir</button>
             </div>
         </div>
     </div>

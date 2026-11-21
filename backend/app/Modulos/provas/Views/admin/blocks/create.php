@@ -237,7 +237,7 @@ if ($voltarRaw !== '' && preg_match('#^/admin/provas(?:\?[A-Za-z0-9_\-.&=%+]*)?$
                 </label>
                 <button type="button"
                         id="btnAdicionarProfessorTopo"
-                        onclick="adicionarProfessor()"
+                        data-csp-click="adicionarProfessor"
                         class="btn-primary-custom px-4 py-2 text-sm font-semibold rounded-lg transition-colors hover:opacity-90">
                     + Adicionar matéria
                 </button>
@@ -249,7 +249,7 @@ if ($voltarRaw !== '' && preg_match('#^/admin/provas(?:\?[A-Za-z0-9_\-.&=%+]*)?$
             </div>
             <button type="button"
                     id="btnAdicionarMateria"
-                    onclick="adicionarProfessor()"
+                    data-csp-click="adicionarProfessor"
                     class="mt-4 w-full px-4 py-2.5 text-sm font-semibold rounded-lg border border-dashed border-purple-300 text-purple-700 bg-purple-50 hover:bg-purple-100">
                 + Adicionar matéria
             </button>

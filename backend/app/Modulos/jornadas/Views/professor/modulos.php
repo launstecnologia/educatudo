@@ -113,7 +113,7 @@
                 <label for="editar_modulo_obrigatorio" class="ml-2 text-sm text-gray-700">Bloco obrigatório</label>
             </div>
             <div class="flex justify-end gap-2">
-                <button type="button" onclick="fecharEditarModuloModal()"
+                <button type="button" data-csp-click="fecharEditarModuloModal"
                         class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
                     Cancelar
                 </button>

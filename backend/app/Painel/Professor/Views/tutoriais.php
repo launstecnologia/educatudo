@@ -39,7 +39,7 @@
             <!-- Botão Limpar -->
             <div class="flex items-end">
                 <button 
-                    onclick="limparFiltros()" 
+                    data-csp-click="limparFiltros" 
                     class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
                 >
                     Limpar

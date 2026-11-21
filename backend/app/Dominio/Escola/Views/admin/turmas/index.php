@@ -42,7 +42,7 @@ $page_header_subtitle = 'Gerencie as turmas da escola';
 $trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/turmas', 'Turmas');
 ob_start();
 ?>
-<button type="button" onclick="openFilterDrawer()"
+<button type="button" data-csp-click="openFilterDrawer"
         class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
     <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
     Filtros
@@ -59,7 +59,7 @@ $ui_btn_onclick = 'abrirTrilhaTurmas()';
 include \App\Core\ViewPaths::adminPartial('ui/btn.php');
 ?>
 <?php endif; ?>
-<button type="button" onclick="openTurmaDrawer()"
+<button type="button" data-csp-click="openTurmaDrawer"
    class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
     <i class="fa-solid fa-plus mr-2"></i>
     Nova Turma
@@ -151,7 +151,7 @@ $page_header_actions = ob_get_clean();
                         </a>
                         <?php else: ?>
                         <p>Nenhuma turma cadastrada</p>
-                        <button type="button" onclick="openTurmaDrawer()"
+                        <button type="button" data-csp-click="openTurmaDrawer"
                            class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
                             <i class="fa-solid fa-plus mr-2"></i>
                             Nova Turma
@@ -264,13 +264,13 @@ $page_header_actions = ob_get_clean();
 </div>
 
 <!-- Filtro em drawer lateral -->
-<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeFilterDrawer"></div>
 <aside id="filterDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
         <h3 class="text-lg font-semibold text-gray-900">Filtrar turmas</h3>
-        <button type="button" onclick="closeFilterDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeFilterDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -299,7 +299,7 @@ $page_header_actions = ob_get_clean();
                 <div class="relative">
                     <select id="filtro_curso_id" name="curso_id"
                             class="select-reset w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            onchange="atualizarSerieFiltro()">
+                            data-csp-change="atualizarSerieFiltro">
                         <option value="">Todos</option>
                         <?php foreach ($cursosNovo as $c): ?>
                         <option value="<?= (int) $c['id'] ?>" <?= $filtroCursoId === (int) $c['id'] ? 'selected' : '' ?>>
@@ -372,13 +372,13 @@ $page_header_actions = ob_get_clean();
 </aside>
 
 <!-- Offcanvas: Cadastrar/Editar Turma -->
-<div id="turmaDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeTurmaDrawer()"></div>
+<div id="turmaDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeTurmaDrawer"></div>
 <aside id="turmaDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
         <h2 id="turmaDrawerTitle" class="text-xl font-bold text-gray-900">Nova Turma</h2>
-        <button type="button" onclick="closeTurmaDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeTurmaDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -537,7 +537,7 @@ $page_header_actions = ob_get_clean();
         </div>
 
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="closeTurmaDrawer()"
+            <button type="button" data-csp-click="closeTurmaDrawer"
                     class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
                 Cancelar
             </button>

@@ -120,7 +120,7 @@ $badge = static function (string $status): string {
         <div>
             <div class="flex items-center justify-between mb-2">
                 <label class="block text-sm font-medium text-gray-700">Critérios</label>
-                <button type="button" onclick="addCriterio()" class="text-xs font-medium text-green-700 hover:text-green-800"><i class="fa-solid fa-plus mr-1"></i> Adicionar critério</button>
+                <button type="button" data-csp-click="addCriterio" class="text-xs font-medium text-green-700 hover:text-green-800"><i class="fa-solid fa-plus mr-1"></i> Adicionar critério</button>
             </div>
             <div id="criterios" class="space-y-2"></div>
         </div>

@@ -4,7 +4,7 @@
             <!-- Drawer: Financeiro do Aluno -->
             <div id="drawerFinanceiro" class="fixed inset-0 z-[9998] hidden" aria-modal="true">
                 <!-- Overlay -->
-                <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="fecharFinanceiro()"></div>
+                <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" data-csp-click="fecharFinanceiro"></div>
                 <!-- Painel -->
                 <div class="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-2xl flex flex-col transform translate-x-full transition-transform duration-300" id="drawerFinanceiroPanel">
                     <!-- Header -->
@@ -18,7 +18,7 @@
                                class="inline-flex items-center px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
                                 <i class="fa-solid fa-receipt mr-1.5"></i> Extrato completo
                             </a>
-                            <button onclick="fecharFinanceiro()" class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+                            <button data-csp-click="fecharFinanceiro" class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
                                 <i class="fa-solid fa-xmark text-lg"></i>
                             </button>
                         </div>
@@ -37,7 +37,7 @@
             <!-- Drawer: EducaInclui / Laudo do Aluno -->
             <div id="drawerInclusao" class="fixed inset-0 z-[9998] hidden" aria-modal="true">
                 <!-- Overlay -->
-                <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="fecharInclusao()"></div>
+                <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" data-csp-click="fecharInclusao"></div>
                 <!-- Painel -->
                 <div class="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl flex flex-col transform translate-x-full transition-transform duration-300" id="drawerInclusaoPanel">
                     <!-- Header -->
@@ -46,7 +46,7 @@
                             <h3 class="text-lg font-bold text-gray-900">EducaInclui / Laudo</h3>
                             <p class="text-sm text-gray-500" id="drawerInclusaoAluno"></p>
                         </div>
-                        <button onclick="fecharInclusao()" class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+                        <button data-csp-click="fecharInclusao" class="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
                             <i class="fa-solid fa-xmark text-lg"></i>
                         </button>
                     </div>
@@ -315,7 +315,7 @@
                         <h3 class="text-lg font-semibold text-slate-900">
                             <i class="fa-solid fa-file-lines text-amber-500 mr-2"></i> Declarações
                         </h3>
-                        <button type="button" onclick="fecharModalDoc('Declaracoes')" class="text-slate-400 hover:text-slate-600">
+                        <button type="button" data-csp-click="fecharModalDoc" data-csp-arg="Declaracoes" class="text-slate-400 hover:text-slate-600">
                             <i class="fa-solid fa-xmark text-xl"></i>
                         </button>
                     </div>
@@ -349,7 +349,7 @@
                                     <input type="date" id="decl_freq_fim" value="<?= date('Y-m-d') ?>" class="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-sm">
                                 </div>
                             </div>
-                            <button type="button" onclick="gerarDeclaracaoFrequencia()" class="w-full px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors">
+                            <button type="button" data-csp-click="gerarDeclaracaoFrequencia" class="w-full px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors">
                                 <i class="fa-solid fa-download mr-1"></i> Gerar PDF
                             </button>
                         </div>
@@ -369,7 +369,7 @@
                                     <input type="text" id="decl_comp_periodo" placeholder="Ex: 08h às 12h" class="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-sm">
                                 </div>
                             </div>
-                            <button type="button" onclick="gerarDeclaracaoComparecimento()" class="w-full px-3 py-2 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 transition-colors">
+                            <button type="button" data-csp-click="gerarDeclaracaoComparecimento" class="w-full px-3 py-2 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 transition-colors">
                                 <i class="fa-solid fa-download mr-1"></i> Gerar PDF
                             </button>
                         </div>
@@ -384,7 +384,7 @@
                         <h3 class="text-lg font-semibold text-slate-900">
                             <i class="fa-solid fa-folder-open text-rose-500 mr-2"></i> Documentação
                         </h3>
-                        <button type="button" onclick="fecharModalDoc('Documentacao')" class="text-slate-400 hover:text-slate-600">
+                        <button type="button" data-csp-click="fecharModalDoc" data-csp-arg="Documentacao" class="text-slate-400 hover:text-slate-600">
                             <i class="fa-solid fa-xmark text-xl"></i>
                         </button>
                     </div>
@@ -440,7 +440,7 @@
                         <h3 class="text-lg font-semibold text-slate-900">
                             <i class="fa-solid fa-file-signature text-cyan-600 mr-2"></i> Autorizações
                         </h3>
-                        <button type="button" onclick="fecharModalDoc('Autorizacoes')" class="text-slate-400 hover:text-slate-600">
+                        <button type="button" data-csp-click="fecharModalDoc" data-csp-arg="Autorizacoes" class="text-slate-400 hover:text-slate-600">
                             <i class="fa-solid fa-xmark text-xl"></i>
                         </button>
                     </div>
@@ -463,7 +463,7 @@
                                 </div>
                             </div>
                             <input type="text" id="aut_saida_motivo" placeholder="Motivo (opcional)" class="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-sm mb-3">
-                            <button type="button" onclick="gerarAutSaida()" class="w-full px-3 py-2 rounded-lg bg-orange-600 text-white text-sm font-medium hover:bg-orange-700 transition-colors">
+                            <button type="button" data-csp-click="gerarAutSaida" class="w-full px-3 py-2 rounded-lg bg-orange-600 text-white text-sm font-medium hover:bg-orange-700 transition-colors">
                                 <i class="fa-solid fa-download mr-1"></i> Gerar PDF
                             </button>
                         </div>
@@ -478,7 +478,7 @@
                                 <input type="text" id="aut_ret_doc" placeholder="Documento (RG/CPF)" class="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-sm">
                                 <input type="text" id="aut_ret_parentesco" placeholder="Parentesco/vínculo" class="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-sm">
                             </div>
-                            <button type="button" onclick="gerarAutRetirada()" class="w-full px-3 py-2 rounded-lg bg-cyan-600 text-white text-sm font-medium hover:bg-cyan-700 transition-colors">
+                            <button type="button" data-csp-click="gerarAutRetirada" class="w-full px-3 py-2 rounded-lg bg-cyan-600 text-white text-sm font-medium hover:bg-cyan-700 transition-colors">
                                 <i class="fa-solid fa-download mr-1"></i> Gerar PDF
                             </button>
                         </div>
@@ -509,7 +509,7 @@
                                     <input type="text" id="aut_pas_retorno" placeholder="17h" class="w-full px-2 py-1.5 border border-slate-300 rounded-lg text-sm">
                                 </div>
                             </div>
-                            <button type="button" onclick="gerarAutPasseio()" class="w-full px-3 py-2 rounded-lg bg-lime-600 text-white text-sm font-medium hover:bg-lime-700 transition-colors">
+                            <button type="button" data-csp-click="gerarAutPasseio" class="w-full px-3 py-2 rounded-lg bg-lime-600 text-white text-sm font-medium hover:bg-lime-700 transition-colors">
                                 <i class="fa-solid fa-download mr-1"></i> Gerar PDF
                             </button>
                         </div>
@@ -630,12 +630,12 @@
                             <div class="mt-2 bg-green-100 border border-green-300 rounded-lg p-3">
                                 <div class="flex items-center justify-between">
                                     <span id="senhaTemporariaValor" class="font-mono text-lg font-bold text-green-800"></span>
-                                    <button onclick="copiarSenha()" class="text-green-600 hover:text-green-800 text-sm font-medium">📋 Copiar</button>
+                                    <button data-csp-click="copiarSenha" class="text-green-600 hover:text-green-800 text-sm font-medium">📋 Copiar</button>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <button onclick="fecharCardSucesso()" class="text-green-400 hover:text-green-600 ml-2">
+                    <button data-csp-click="fecharCardSucesso" class="text-green-400 hover:text-green-600 ml-2">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>

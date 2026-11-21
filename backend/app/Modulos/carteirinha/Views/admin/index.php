@@ -49,7 +49,7 @@ if ($schemaPronto && $habilitada):
 endif;
 if ($schemaPronto && $podeAlterar):
 ?>
-<button type="button" onclick="openUsoDrawer()" class="inline-flex items-center justify-center w-10 h-10 border border-gray-300 rounded-lg text-gray-600 bg-white hover:bg-gray-50" aria-label="Habilitar ou desabilitar a carteirinha" title="Habilitar ou desabilitar">
+<button type="button" data-csp-click="openUsoDrawer" class="inline-flex items-center justify-center w-10 h-10 border border-gray-300 rounded-lg text-gray-600 bg-white hover:bg-gray-50" aria-label="Habilitar ou desabilitar a carteirinha" title="Habilitar ou desabilitar">
     <i class="fa-solid fa-gear"></i>
 </button>
 <?php
@@ -94,7 +94,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
 <?php if (!$filtrar): ?>
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center text-gray-500">
         <p>Escolha uma turma ou busque um aluno para emitir.</p>
-        <button type="button" onclick="openFiltroDrawer()" class="mt-4 inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+        <button type="button" data-csp-click="openFiltroDrawer" class="mt-4 inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
             <i class="fa-solid fa-filter mr-2 text-gray-500"></i> Filtros
         </button>
     </div>

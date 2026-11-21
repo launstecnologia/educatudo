@@ -141,7 +141,7 @@ if ($slugArquivo === '') {
             <p class="text-gray-600 mt-1"><?= htmlspecialchars($tituloBloco) ?></p>
         </div>
         <div class="flex flex-wrap gap-2 relatorio-notas-actions">
-            <button type="button" onclick="openFilterDrawer()"
+            <button type="button" data-csp-click="openFilterDrawer"
                     class="relative inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50">
                 <i class="fa-solid fa-filter" aria-hidden="true"></i>
                 Filtros
@@ -149,12 +149,12 @@ if ($slugArquivo === '') {
                 <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold"><?= (int) $filtrosAtivosCount ?></span>
                 <?php endif; ?>
             </button>
-            <button type="button" onclick="exportarRelatorioExcel()"
+            <button type="button" data-csp-click="exportarRelatorioExcel"
                     class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700">
                 <i class="fa-solid fa-file-excel" aria-hidden="true"></i>
                 Exportar Excel
             </button>
-            <button type="button" onclick="exportarRelatorioPdf()"
+            <button type="button" data-csp-click="exportarRelatorioPdf"
                     class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700">
                 <i class="fa-solid fa-file-pdf" aria-hidden="true"></i>
                 Exportar PDF
@@ -258,13 +258,13 @@ if ($slugArquivo === '') {
 </div>
 
 <!-- Offcanvas filtros -->
-<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeFilterDrawer"></div>
 <aside id="filterDrawer"
        class="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-2xl transform translate-x-full transition-transform duration-200 ease-out flex flex-col"
        aria-hidden="true">
     <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
         <h3 class="text-lg font-semibold text-gray-900">Filtros</h3>
-        <button type="button" onclick="closeFilterDrawer()" class="text-gray-400 hover:text-gray-600" aria-label="Fechar">
+        <button type="button" data-csp-click="closeFilterDrawer" class="text-gray-400 hover:text-gray-600" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i>
         </button>
     </div>

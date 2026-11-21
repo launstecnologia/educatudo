@@ -42,7 +42,7 @@ $csrfToken = $csrf_token ?? $this->generateCsrfToken();
 <div class="mb-6">
     <div class="flex flex-wrap items-center gap-2">
         <h1 class="text-2xl font-bold text-gray-900 flex-1">Agenda</h1>
-        <button type="button" onclick="abrirFormItem()" class="btn-ai-primary px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+        <button type="button" data-csp-click="abrirFormItem" class="btn-ai-primary px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
             Adicionar
         </button>
@@ -105,7 +105,7 @@ $csrfToken = $csrf_token ?? $this->generateCsrfToken();
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 max-h-[80vh] flex flex-col">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
             <h3 class="text-lg font-bold text-gray-900" id="modalDiaTitulo"></h3>
-            <button type="button" onclick="fecharModalDia()" class="text-gray-400 hover:text-gray-600">
+            <button type="button" data-csp-click="fecharModalDia" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
@@ -118,7 +118,7 @@ $csrfToken = $csrf_token ?? $this->generateCsrfToken();
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h3 class="text-lg font-bold text-gray-900" id="modalEventoTitulo"></h3>
-            <button type="button" onclick="fecharModalEvento()" class="text-gray-400 hover:text-gray-600">
+            <button type="button" data-csp-click="fecharModalEvento" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
@@ -130,8 +130,8 @@ $csrfToken = $csrf_token ?? $this->generateCsrfToken();
         <div class="px-6 pb-4 flex items-center justify-between gap-3">
             <a id="modalEventoLink" href="#" target="_blank" rel="noopener" class="text-accent text-sm font-medium hover:underline hidden">Abrir link</a>
             <div class="flex items-center gap-4 ml-auto">
-                <button type="button" id="modalEventoEditar" onclick="editarItemPessoalAtual()" class="text-accent text-sm font-medium hover:underline hidden">Editar</button>
-                <button type="button" id="modalEventoExcluir" onclick="excluirItemPessoalAtual()" class="text-red-500 text-sm font-medium hover:underline hidden">Excluir item</button>
+                <button type="button" id="modalEventoEditar" data-csp-click="editarItemPessoalAtual" class="text-accent text-sm font-medium hover:underline hidden">Editar</button>
+                <button type="button" id="modalEventoExcluir" data-csp-click="excluirItemPessoalAtual" class="text-red-500 text-sm font-medium hover:underline hidden">Excluir item</button>
             </div>
         </div>
     </div>
@@ -142,7 +142,7 @@ $csrfToken = $csrf_token ?? $this->generateCsrfToken();
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h3 class="text-lg font-bold text-gray-900" id="modalNovoItemTitulo">Adicionar à agenda</h3>
-            <button type="button" onclick="fecharFormItem()" class="text-gray-400 hover:text-gray-600">
+            <button type="button" data-csp-click="fecharFormItem" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>

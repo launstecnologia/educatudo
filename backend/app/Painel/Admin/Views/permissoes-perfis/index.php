@@ -10,7 +10,7 @@ $page_header_title = 'Perfis de Permissão';
 $page_header_subtitle = 'Cadastre perfis reutilizáveis e atribua no cadastro de usuários';
 ob_start();
 ?>
-<button type="button" onclick="openProfileDrawer()"
+<button type="button" data-csp-click="openProfileDrawer"
         class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
     <i class="fa-solid fa-plus mr-2"></i>
     Novo Perfil
@@ -38,7 +38,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                     <td colspan="5" class="px-6 py-12 text-center text-gray-500">
                         <i class="fa-solid fa-user-shield text-4xl text-gray-300 mb-4"></i>
                         <p>Nenhum perfil cadastrado</p>
-                        <button type="button" onclick="openProfileDrawer()" class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
+                        <button type="button" data-csp-click="openProfileDrawer" class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
                             <i class="fa-solid fa-plus mr-2"></i> Novo Perfil
                         </button>
                     </td>
@@ -78,13 +78,13 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
 </div>
 
 <!-- Criar/Editar perfil em drawer lateral -->
-<div id="profileDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeProfileDrawer()"></div>
+<div id="profileDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeProfileDrawer"></div>
 <aside id="profileDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
         <h2 id="profileDrawerTitle" class="text-xl font-bold text-gray-900">Novo Perfil</h2>
-        <button type="button" onclick="closeProfileDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeProfileDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -181,7 +181,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
         </div>
 
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="closeProfileDrawer()"
+            <button type="button" data-csp-click="closeProfileDrawer"
                     class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
                 Cancelar
             </button>

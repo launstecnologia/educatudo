@@ -47,11 +47,11 @@
                 
                 <?php if ($exercicio['status'] === 'rascunho'): ?>
                     <div class="flex space-x-2">
-                        <button onclick="aprovarExercicio()" 
+                        <button data-csp-click="aprovarExercicio" 
                                 class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors">
                             ✅ Aprovar
                         </button>
-                        <button onclick="rejeitarExercicio()" 
+                        <button data-csp-click="rejeitarExercicio" 
                                 class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors">
                             ❌ Rejeitar
                         </button>

@@ -140,7 +140,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php'); ?>
         <div class="flex gap-3 px-6 py-4 border-t border-gray-100">
             <button type="button" onclick="document.getElementById('modalNovaAta').classList.add('hidden')"
                 class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Cancelar</button>
-            <button type="button" onclick="submitAta()"
+            <button type="button" data-csp-click="submitAta"
                 class="flex-1 px-4 py-2.5 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-700">
                 <i class="fa-solid fa-check mr-2"></i>Salvar ATA
             </button>

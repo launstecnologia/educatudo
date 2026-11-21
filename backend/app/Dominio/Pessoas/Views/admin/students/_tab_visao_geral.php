@@ -121,7 +121,7 @@ $classeVinculoVg = static function (string $rotulo): string {
                                     </dl>
                                 </div>
                                 <div class="grid grid-cols-3 gap-2 lg:w-[22rem] shrink-0">
-                                    <button type="button" class="aluno-kpi text-left" <?php if ($podeVidaEscolar): ?>onclick="selecionarAbaAluno('vida-escolar')"<?php endif; ?>>
+                                    <button type="button" class="aluno-kpi text-left" <?php if ($podeVidaEscolar): ?>data-csp-click="selecionarAbaAluno" data-csp-arg="vida-escolar"<?php endif; ?>>
                                         <p class="text-xs text-slate-500 mb-1">Frequência</p>
                                         <?php if ($freqLinha !== null): ?>
                                             <p class="text-2xl font-bold text-slate-800 leading-none"><?= number_format($freqLinha, 0, ',', '.') ?>%</p>
@@ -131,7 +131,7 @@ $classeVinculoVg = static function (string $rotulo): string {
                                             <p class="text-[11px] text-slate-400 mt-1"><?= safe_htmlspecialchars($naoInformado) ?></p>
                                         <?php endif; ?>
                                     </button>
-                                    <button type="button" class="aluno-kpi text-left" <?php if ($podeVidaEscolar): ?>onclick="selecionarAbaAluno('vida-escolar')"<?php endif; ?>>
+                                    <button type="button" class="aluno-kpi text-left" <?php if ($podeVidaEscolar): ?>data-csp-click="selecionarAbaAluno" data-csp-arg="vida-escolar"<?php endif; ?>>
                                         <p class="text-xs text-slate-500 mb-1">Média geral</p>
                                         <?php if ($mediaLinha !== null): ?>
                                             <p class="text-2xl font-bold text-slate-800 leading-none"><?= number_format($mediaLinha, 1, ',', '.') ?></p>
@@ -152,9 +152,9 @@ $classeVinculoVg = static function (string $rotulo): string {
                         <?php endforeach; ?>
                     </ul>
                     <div class="flex flex-wrap gap-2 mt-4">
-                        <button type="button" onclick="selecionarAbaAluno('matriculas')" class="aluno-btn-outline" data-perm-key="matriculas_aluno" data-perm-action="visualizar">Ver matrículas</button>
+                        <button type="button" data-csp-click="selecionarAbaAluno" data-csp-arg="matriculas" class="aluno-btn-outline" data-perm-key="matriculas_aluno" data-perm-action="visualizar">Ver matrículas</button>
                         <?php if ($moduloVidaEscolar && $podeVidaEscolar): ?>
-                        <button type="button" onclick="selecionarAbaAluno('vida-escolar')" class="aluno-btn-outline" data-perm-key="vida_escolar" data-perm-action="visualizar">Vida escolar</button>
+                        <button type="button" data-csp-click="selecionarAbaAluno" data-csp-arg="vida-escolar" class="aluno-btn-outline" data-perm-key="vida_escolar" data-perm-action="visualizar">Vida escolar</button>
                         <?php endif; ?>
                     </div>
                     <?php else: ?>
@@ -185,14 +185,14 @@ $classeVinculoVg = static function (string $rotulo): string {
                                 </div>
                             </dl>
                             <div class="flex flex-wrap gap-2 mt-4">
-                                <button type="button" onclick="selecionarAbaAluno('matriculas')" class="aluno-btn-outline" data-perm-key="matriculas_aluno" data-perm-action="visualizar">Ver matrículas</button>
+                                <button type="button" data-csp-click="selecionarAbaAluno" data-csp-arg="matriculas" class="aluno-btn-outline" data-perm-key="matriculas_aluno" data-perm-action="visualizar">Ver matrículas</button>
                                 <?php if ($moduloVidaEscolar && $podeVidaEscolar): ?>
-                                <button type="button" onclick="selecionarAbaAluno('vida-escolar')" class="aluno-btn-outline" data-perm-key="vida_escolar" data-perm-action="visualizar">Vida escolar</button>
+                                <button type="button" data-csp-click="selecionarAbaAluno" data-csp-arg="vida-escolar" class="aluno-btn-outline" data-perm-key="vida_escolar" data-perm-action="visualizar">Vida escolar</button>
                                 <?php endif; ?>
                             </div>
                         </div>
                         <div class="grid grid-cols-3 gap-2 lg:w-[22rem] shrink-0">
-                            <button type="button" class="aluno-kpi text-left" <?php if ($podeVidaEscolar): ?>onclick="selecionarAbaAluno('vida-escolar')"<?php endif; ?>>
+                            <button type="button" class="aluno-kpi text-left" <?php if ($podeVidaEscolar): ?>data-csp-click="selecionarAbaAluno" data-csp-arg="vida-escolar"<?php endif; ?>>
                                 <p class="text-xs text-slate-500 mb-1">Frequência</p>
                                 <?php if ($kpiFrequencia !== null): ?>
                                     <p class="text-2xl font-bold text-slate-800 leading-none"><?= number_format($kpiFrequencia, 0, ',', '.') ?>%</p>
@@ -202,7 +202,7 @@ $classeVinculoVg = static function (string $rotulo): string {
                                     <p class="text-[11px] text-slate-400 mt-1"><?= safe_htmlspecialchars($naoInformado) ?></p>
                                 <?php endif; ?>
                             </button>
-                            <button type="button" class="aluno-kpi text-left" <?php if ($podeVidaEscolar): ?>onclick="selecionarAbaAluno('vida-escolar')"<?php endif; ?>>
+                            <button type="button" class="aluno-kpi text-left" <?php if ($podeVidaEscolar): ?>data-csp-click="selecionarAbaAluno" data-csp-arg="vida-escolar"<?php endif; ?>>
                                 <p class="text-xs text-slate-500 mb-1">Média geral</p>
                                 <?php if ($kpiMedia !== null): ?>
                                     <p class="text-2xl font-bold text-slate-800 leading-none"><?= number_format($kpiMedia, 1, ',', '.') ?></p>
@@ -242,7 +242,7 @@ $classeVinculoVg = static function (string $rotulo): string {
                             <i class="fa-solid fa-chevron-right text-[10px] text-slate-400"></i>
                         </a>
                         <?php if ($matriculas_schema_ready): ?>
-                        <button type="button" onclick="abrirModalMatricula()"
+                        <button type="button" data-csp-click="abrirModalMatricula"
                                 data-perm-key="matriculas_aluno" data-perm-action="cadastrar"
                                 class="w-full flex items-center gap-3 px-1 py-2.5 hover:bg-slate-50 rounded-lg text-left">
                             <span class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center"><i class="fa-solid fa-graduation-cap"></i></span>
@@ -257,7 +257,7 @@ $classeVinculoVg = static function (string $rotulo): string {
                             <span class="text-sm font-medium text-slate-800 flex-1">Cadastrar responsável</span>
                             <i class="fa-solid fa-chevron-right text-[10px] text-slate-400"></i>
                         </button>
-                        <button type="button" onclick="abrirModalDoc('Declaracoes')"
+                        <button type="button" data-csp-click="abrirModalDoc" data-csp-arg="Declaracoes"
                                 data-perm-key="declaracoes_aluno" data-perm-action="visualizar"
                                 class="w-full flex items-center gap-3 px-1 py-2.5 hover:bg-slate-50 rounded-lg text-left">
                             <span class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center"><i class="fa-solid fa-file-lines"></i></span>

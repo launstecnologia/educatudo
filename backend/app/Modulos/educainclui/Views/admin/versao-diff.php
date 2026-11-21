@@ -271,7 +271,7 @@ foreach (($linhas ?? []) as $l) {
                 <h3 id="educaIncluiDiffModalTitle" class="text-lg font-semibold text-gray-900">Diferença completa</h3>
                 <p class="text-xs text-gray-500">Compare o enunciado original com a versão reescrita por IA.</p>
             </div>
-            <button type="button" onclick="educaIncluiFecharDiffCompleto()" class="inline-flex items-center justify-center w-9 h-9 rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-100" aria-label="Fechar">
+            <button type="button" data-csp-click="educaIncluiFecharDiffCompleto" class="inline-flex items-center justify-center w-9 h-9 rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-100" aria-label="Fechar">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
@@ -306,7 +306,7 @@ foreach (($linhas ?? []) as $l) {
                 </button>
             </form>
             <button type="submit" form="educaIncluiEditForm" class="btn-primary-custom px-4 py-2 rounded-lg hover:opacity-90 text-sm font-semibold">Salvar edição</button>
-            <button type="button" onclick="educaIncluiFecharDiffCompleto()" class="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-900 text-white text-sm font-semibold">Fechar</button>
+            <button type="button" data-csp-click="educaIncluiFecharDiffCompleto" class="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-900 text-white text-sm font-semibold">Fechar</button>
         </div>
     </div>
 </div>

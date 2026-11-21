@@ -48,7 +48,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
 include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
 ?>
 
-<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeFilterDrawer"></div>
 <aside id="filterDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true"
@@ -56,7 +56,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
        aria-labelledby="conselhoFiltroTitulo">
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
         <h3 id="conselhoFiltroTitulo" class="text-lg font-semibold text-gray-900">Filtrar conselhos</h3>
-        <button type="button" onclick="closeFilterDrawer()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+        <button type="button" data-csp-click="closeFilterDrawer" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -87,7 +87,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             </div>
         </div>
         <div class="px-6 py-4 border-t border-gray-200 flex flex-col-reverse sm:flex-row gap-3 bg-gray-50">
-            <button type="button" onclick="clearFilters()"
+            <button type="button" data-csp-click="clearFilters"
                     class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                 Limpar
             </button>

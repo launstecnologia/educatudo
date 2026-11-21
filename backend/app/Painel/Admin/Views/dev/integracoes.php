@@ -78,7 +78,7 @@ if ($flash_message !== ''):
                         />
                         <button
                             type="button"
-                            onclick="togglePasswordVisibility('openai_api_key')"
+                            data-csp-click="togglePasswordVisibility" data-csp-arg="openai_api_key"
                             class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 px-3 py-1 text-sm"
                         >
                             <span id="toggle-openai">👁️ Mostrar</span>
@@ -121,7 +121,7 @@ if ($flash_message !== ''):
                         />
                         <button
                             type="button"
-                            onclick="togglePasswordVisibility('gamma_api_key')"
+                            data-csp-click="togglePasswordVisibility" data-csp-arg="gamma_api_key"
                             class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 px-3 py-1 text-sm"
                         >
                             <span id="toggle-gamma">👁️ Mostrar</span>
@@ -172,7 +172,7 @@ if ($flash_message !== ''):
                         />
                         <button
                             type="button"
-                            onclick="togglePasswordVisibility('nanobanana_api_key')"
+                            data-csp-click="togglePasswordVisibility" data-csp-arg="nanobanana_api_key"
                             class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 px-3 py-1 text-sm"
                         >
                             <span id="toggle-nanobanana">👁️ Mostrar</span>
@@ -215,7 +215,7 @@ if ($flash_message !== ''):
                         />
                         <button
                             type="button"
-                            onclick="togglePasswordVisibility('replicate_api_key')"
+                            data-csp-click="togglePasswordVisibility" data-csp-arg="replicate_api_key"
                             class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 px-3 py-1 text-sm"
                         >
                             <span id="toggle-replicate_api_key">👁️ Mostrar</span>
@@ -291,7 +291,7 @@ if ($flash_message !== ''):
                         />
                         <button
                             type="button"
-                            onclick="togglePasswordVisibility('elevenlabs_api_key')"
+                            data-csp-click="togglePasswordVisibility" data-csp-arg="elevenlabs_api_key"
                             class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 px-3 py-1 text-sm"
                         >
                             <span id="toggle-elevenlabs">👁️ Mostrar</span>
@@ -334,7 +334,7 @@ if ($flash_message !== ''):
                         />
                         <button
                             type="button"
-                            onclick="togglePasswordVisibility('onesignal_app_id')"
+                            data-csp-click="togglePasswordVisibility" data-csp-arg="onesignal_app_id"
                             class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 px-3 py-1 text-sm"
                         >
                             <span id="toggle-onesignal_app_id">👁️ Mostrar</span>
@@ -370,7 +370,7 @@ if ($flash_message !== ''):
                         />
                         <button
                             type="button"
-                            onclick="togglePasswordVisibility('onesignal_rest_api_key')"
+                            data-csp-click="togglePasswordVisibility" data-csp-arg="onesignal_rest_api_key"
                             class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 px-3 py-1 text-sm"
                         >
                             <span id="toggle-onesignal_rest_api_key">👁️ Mostrar</span>
@@ -424,7 +424,7 @@ if ($flash_message !== ''):
                                     placeholder="Sua API Key da Evolution"
                                     class="w-full border border-gray-300 rounded-lg px-4 py-2 pr-24 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                     autocomplete="off" />
-                                <button type="button" onclick="togglePasswordVisibility('evolution_api_key')"
+                                <button type="button" data-csp-click="togglePasswordVisibility" data-csp-arg="evolution_api_key"
                                     class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 px-3 py-1 text-sm">
                                     <span id="toggle-evolution_api_key">👁️ Mostrar</span>
                                 </button>
@@ -511,7 +511,7 @@ if ($flash_message !== ''):
                                    value="<?= htmlspecialchars($email_config['smtp_password'] ?? '') ?>"
                                    placeholder="Sua senha ou senha de app (deixe vazio se não necessário)"
                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                            <button type="button" onclick="togglePasswordVisibility('email_smtp_password')"
+                            <button type="button" data-csp-click="togglePasswordVisibility" data-csp-arg="email_smtp_password"
                                     id="toggle-email_smtp_password"
                                     class="absolute right-3 top-2 text-sm text-indigo-600 hover:text-indigo-800">
                                 👁️ Mostrar
@@ -552,7 +552,7 @@ if ($flash_message !== ''):
                     </div>
 
                     <div class="flex items-center justify-between pt-4 border-t border-gray-200">
-                        <button type="button" onclick="testEmail()"
+                        <button type="button" data-csp-click="testEmail"
                                 class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                             🧪 Testar Configuração
                         </button>

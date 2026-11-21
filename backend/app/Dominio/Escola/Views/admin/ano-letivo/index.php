@@ -44,7 +44,7 @@ $organizacaoAnoLetivo = [
             ?>
             <?php endif; ?>
             <?php if ($schema_ready): ?>
-            <button type="button" onclick="openAnoLetivoDrawer()"
+            <button type="button" data-csp-click="openAnoLetivoDrawer"
                class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
                 <i class="fa-solid fa-plus mr-2"></i>
                 Novo Ano Letivo
@@ -69,7 +69,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 px-6 py-12 text-center text-gray-500">
     <i class="fa-solid fa-calendar-days text-4xl text-gray-300 mb-4"></i>
     <p>Nenhum ano letivo cadastrado</p>
-    <button type="button" onclick="openAnoLetivoDrawer()"
+    <button type="button" data-csp-click="openAnoLetivoDrawer"
        class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
         <i class="fa-solid fa-plus mr-2"></i>
         Cadastrar o primeiro ano letivo
@@ -176,13 +176,13 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
 
 <?php if ($schema_ready): ?>
 <!-- Offcanvas: Cadastrar/Editar Ano Letivo -->
-<div id="anoLetivoDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeAnoLetivoDrawer()"></div>
+<div id="anoLetivoDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeAnoLetivoDrawer"></div>
 <aside id="anoLetivoDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
         <h2 id="anoLetivoDrawerTitle" class="text-xl font-bold text-gray-900">Novo Ano Letivo</h2>
-        <button type="button" onclick="closeAnoLetivoDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeAnoLetivoDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -240,7 +240,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
         </div>
 
         <div class="shrink-0 px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="closeAnoLetivoDrawer()"
+            <button type="button" data-csp-click="closeAnoLetivoDrawer"
                     class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
                 Cancelar
             </button>
@@ -253,7 +253,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
 </aside>
 
 <div id="modalMapaPeriodos" class="fixed inset-0 z-[80] hidden" role="dialog" aria-modal="true" aria-labelledby="modalMapaPeriodosTitulo">
-    <div class="absolute inset-0 bg-black/50" onclick="cancelarMapaPeriodos()"></div>
+    <div class="absolute inset-0 bg-black/50" data-csp-click="cancelarMapaPeriodos"></div>
     <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-y-auto">
         <div class="pointer-events-auto bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-lg my-4 overflow-hidden flex flex-col">
             <div class="px-5 py-4 border-b border-gray-200 flex items-start justify-between gap-3">
@@ -261,17 +261,17 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                     <h3 id="modalMapaPeriodosTitulo" class="text-lg font-semibold text-gray-900">Para onde vai cada período letivo?</h3>
                     <p id="modalMapaPeriodosTexto" class="mt-1 text-sm text-gray-500"></p>
                 </div>
-                <button type="button" onclick="cancelarMapaPeriodos()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+                <button type="button" data-csp-click="cancelarMapaPeriodos" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
                     <i class="fa-solid fa-xmark text-xl"></i>
                 </button>
             </div>
             <div id="modalMapaPeriodosLista" class="px-5 py-4 space-y-3 max-h-[60vh] overflow-y-auto"></div>
             <div class="px-5 py-4 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-                <button type="button" onclick="cancelarMapaPeriodos()"
+                <button type="button" data-csp-click="cancelarMapaPeriodos"
                         class="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
                     Cancelar
                 </button>
-                <button type="button" id="mapa-periodos-confirmar" onclick="confirmarMapaPeriodos()"
+                <button type="button" id="mapa-periodos-confirmar" data-csp-click="confirmarMapaPeriodos"
                         class="btn-primary-custom px-5 py-2.5 rounded-lg font-semibold hover:opacity-90 transition-colors shadow-sm">
                     Confirmar
                 </button>
@@ -765,7 +765,7 @@ $ui_offcanvas_titulo = 'Log do ano letivo';
 $ui_offcanvas_max_w = 'max-w-2xl';
 include \App\Core\ViewPaths::adminPartial('ui/offcanvas.php');
 ?>
-<div id="anoLetivoLogDetalheDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" onclick="fecharDetalheLogAnoLetivo()"></div>
+<div id="anoLetivoLogDetalheDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" data-csp-click="fecharDetalheLogAnoLetivo"></div>
 <aside id="anoLetivoLogDetalheDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-lg bg-white shadow-2xl z-[70] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true"
@@ -773,7 +773,7 @@ include \App\Core\ViewPaths::adminPartial('ui/offcanvas.php');
        aria-labelledby="anoLetivoLogDetalheTitulo">
     <div class="flex items-center justify-between px-6 py-5 border-b border-gray-200">
         <h2 id="anoLetivoLogDetalheTitulo" class="text-xl font-bold text-gray-900">O que foi alterado</h2>
-        <button type="button" onclick="fecharDetalheLogAnoLetivo()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+        <button type="button" data-csp-click="fecharDetalheLogAnoLetivo" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>

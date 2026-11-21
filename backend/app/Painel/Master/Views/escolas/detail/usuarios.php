@@ -142,7 +142,7 @@ $render_dropdown_acoes = static function (array $u, string $suffix = '') use ($e
             Usuários Administradores
             <span class="text-sm font-normal text-slate-500">(<?= (int) $total ?>)</span>
         </h3>
-        <button type="button" onclick="toggleCriarUsuario()" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+        <button type="button" data-csp-click="toggleCriarUsuario" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
             <i class="fa-solid fa-plus text-xs"></i> Cadastrar
         </button>
     </div>
@@ -175,7 +175,7 @@ $render_dropdown_acoes = static function (array $u, string $suffix = '') use ($e
             </div>
         </div>
         <div class="flex flex-col-reverse sm:flex-row gap-2">
-            <button type="button" onclick="toggleCriarUsuario()" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 text-sm">Cancelar</button>
+            <button type="button" data-csp-click="toggleCriarUsuario" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 text-sm">Cancelar</button>
             <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Salvar</button>
         </div>
     </form>

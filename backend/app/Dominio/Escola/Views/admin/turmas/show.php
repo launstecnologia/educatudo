@@ -163,7 +163,7 @@ $page_header_actions = ob_get_clean();
                     <div class="p-6 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3">
                         <h3 class="text-lg font-semibold text-gray-900">Alunos da Turma</h3>
                         <?php if ($matriculas_schema_ready): ?>
-                        <button type="button" onclick="abrirModalVincularAluno()" class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
+                        <button type="button" data-csp-click="abrirModalVincularAluno" class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
                             <i class="fa-solid fa-user-plus mr-2"></i> Vincular aluno
                         </button>
                         <?php endif; ?>
@@ -291,7 +291,7 @@ $page_header_actions = ob_get_clean();
                     <h3 class="text-lg font-semibold text-gray-900 mb-4">Ações rápidas</h3>
                     <div class="space-y-3">
                         <?php if ($matriculas_schema_ready): ?>
-                        <button type="button" onclick="abrirModalVincularAluno()"
+                        <button type="button" data-csp-click="abrirModalVincularAluno"
                                 class="btn-primary-custom w-full inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90">
                             <i class="fa-solid fa-user-plus mr-2"></i>
                             Vincular aluno
@@ -331,7 +331,7 @@ $page_header_actions = ob_get_clean();
     <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold text-gray-900">Vincular aluno à turma</h3>
-            <button type="button" onclick="fecharModalVincularAluno()" class="text-gray-400 hover:text-gray-600">&times;</button>
+            <button type="button" data-csp-click="fecharModalVincularAluno" class="text-gray-400 hover:text-gray-600">&times;</button>
         </div>
         <form id="formVincularAluno" class="space-y-4">
             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
@@ -369,7 +369,7 @@ $page_header_actions = ob_get_clean();
             <?php endif; ?>
             <p id="vincMsg" class="text-sm hidden"></p>
             <div class="flex justify-end gap-2 pt-2">
-                <button type="button" onclick="fecharModalVincularAluno()" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700">Cancelar</button>
+                <button type="button" data-csp-click="fecharModalVincularAluno" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700">Cancelar</button>
                 <button type="submit" class="btn-primary-custom px-4 py-2 rounded-lg font-semibold hover:opacity-90">Vincular</button>
             </div>
         </form>

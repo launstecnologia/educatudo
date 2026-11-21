@@ -24,10 +24,10 @@
 <!-- Tabs: Vídeos / Documentos -->
 <div class="bg-white rounded-xl shadow-lg p-6 mb-6 border border-purple-200">
     <div class="flex space-x-4 mb-6">
-        <button onclick="mostrarTabVideos()" id="tab-videos" class="tab-video active px-6 py-3 bg-purple-600 text-white rounded-lg font-medium">
+        <button data-csp-click="mostrarTabVideos" id="tab-videos" class="tab-video active px-6 py-3 bg-purple-600 text-white rounded-lg font-medium">
             🎥 Vídeos
         </button>
-        <button onclick="mostrarTabDocumentos()" id="tab-documentos" class="tab-video px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">
+        <button data-csp-click="mostrarTabDocumentos" id="tab-documentos" class="tab-video px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">
             📄 Documentos
         </button>
     </div>

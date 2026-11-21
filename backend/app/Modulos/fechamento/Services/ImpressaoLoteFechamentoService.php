@@ -836,7 +836,7 @@ class ImpressaoLoteFechamentoService
             . '</style></head><body>'
             . '<div class="lote-barra"><a href="' . $voltarEsc . '">Voltar ao fechamento</a>'
             . '<strong>' . $tituloEsc . '</strong>'
-            . '<button type="button" onclick="window.print()">Imprimir</button></div>'
+            . '<button type="button" data-csp-click="print">Imprimir</button></div>'
             . $avisosHtml
             . implode('', $partes)
             . '</body></html>';

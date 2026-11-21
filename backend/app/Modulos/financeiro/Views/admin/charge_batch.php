@@ -264,7 +264,7 @@ async function carregarAlunos(turmaId) {
             <label class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer">
                 <input type="checkbox" name="aluno_ids[]" value="${a.id}" checked
                        class="rounded border-gray-300 text-green-600 focus:ring-green-500"
-                       onchange="atualizarContador()">
+                       data-csp-change="atualizarContador">
                 <span class="text-sm text-gray-800">${esc(a.nome)}</span>
                 <span class="text-xs text-gray-400 ml-auto">${esc(a.ra || '')}</span>
             </label>`).join('');

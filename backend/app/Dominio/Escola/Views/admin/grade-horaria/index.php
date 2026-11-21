@@ -33,7 +33,7 @@ foreach (['professor_id', 'materia_id'] as $chaveFiltroGrade) {
 }
 ob_start();
 ?>
-<button type="button" onclick="openFilterDrawer()"
+<button type="button" data-csp-click="openFilterDrawer"
         class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
     <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
     Filtros
@@ -70,7 +70,7 @@ $ui_btn_onclick = 'abrirTrilhaGrade()';
 include \App\Core\ViewPaths::adminPartial('ui/btn.php');
 ?>
 <?php endif; ?>
-<button type="button" onclick="openAulaDrawer()"
+<button type="button" data-csp-click="openAulaDrawer"
         class="inline-flex items-center px-4 py-2.5 bg-primary text-primary rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm">
     <i class="fa-solid fa-plus mr-2"></i>
     Nova aula
@@ -112,13 +112,13 @@ $trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/grade-horaria', 'Grade H
 <?php include __DIR__ . '/_conteudo.php'; ?>
 
 <!-- Criar/Editar aula em drawer lateral -->
-<div id="aulaDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeAulaDrawer()"></div>
+<div id="aulaDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeAulaDrawer"></div>
 <aside id="aulaDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
         <h2 id="aulaDrawerTitle" class="text-xl font-bold text-gray-900">Nova Aula</h2>
-        <button type="button" onclick="closeAulaDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeAulaDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -196,7 +196,7 @@ $trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/grade-horaria', 'Grade H
         </div>
 
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="closeAulaDrawer()"
+            <button type="button" data-csp-click="closeAulaDrawer"
                     class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
                 Cancelar
             </button>
@@ -211,7 +211,7 @@ $trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/grade-horaria', 'Grade H
 <!-- Modal: Importar por imagem (IA) - passo 1: upload / passo 2: preview e salvar -->
 <div id="modal-imagem-ia" class="hidden fixed inset-0 z-50 overflow-y-auto">
     <div class="flex items-center justify-center min-h-screen px-4 py-6">
-        <div class="fixed inset-0 bg-black/50" onclick="fecharModalImportacao()"></div>
+        <div class="fixed inset-0 bg-black/50" data-csp-click="fecharModalImportacao"></div>
         <div id="modal-imagem-ia-box" class="relative bg-white rounded-xl shadow-xl w-full max-w-6xl max-h-[95vh] flex flex-col">
             <!-- Overlay de loading (spinner) -->
             <div id="loading-ia-overlay" class="hidden absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/90 rounded-xl">
@@ -250,7 +250,7 @@ $trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/grade-horaria', 'Grade H
                     </div>
                     <div id="resultado-ia" class="hidden text-sm rounded-lg p-3"></div>
                     <div class="flex justify-end gap-2">
-                        <button type="button" onclick="fecharModalImportacao()"
+                        <button type="button" data-csp-click="fecharModalImportacao"
                                 class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancelar</button>
                         <button type="submit" id="btn-processar" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Processar</button>
                     </div>
@@ -282,9 +282,9 @@ $trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/grade-horaria', 'Grade H
                 <div id="resumo-preview-ia" class="text-sm text-gray-600 mb-4"></div>
                 <div id="resultado-salvar-ia" class="hidden text-sm rounded-lg p-3 mb-4"></div>
                 <div class="flex justify-end gap-2 flex-shrink-0">
-                    <button type="button" id="btn-voltar-importacao" onclick="voltarUploadIA()"
+                    <button type="button" id="btn-voltar-importacao" data-csp-click="voltarUploadIA"
                             class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Enviar outra imagem</button>
-                    <button type="button" id="btn-salvar-importacao" onclick="salvarImportacaoIA()"
+                    <button type="button" id="btn-salvar-importacao" data-csp-click="salvarImportacaoIA"
                             class="btn-primary-custom px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90">
                         Salvar <span id="contador-salvar-ia">0</span> aula(s)
                     </button>
@@ -296,7 +296,7 @@ $trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/grade-horaria', 'Grade H
 
 <div id="modal-excel-grade" class="hidden fixed inset-0 z-50 overflow-y-auto">
     <div class="flex items-center justify-center min-h-screen px-4 py-6">
-        <div class="fixed inset-0 bg-black/50" onclick="fecharImportacaoExcel()"></div>
+        <div class="fixed inset-0 bg-black/50" data-csp-click="fecharImportacaoExcel"></div>
         <div class="relative bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-2">Importar grade por Excel</h3>
             <p class="text-sm text-gray-600 mb-4">Envie uma planilha .xlsx ou .csv com uma aula por linha. Você confere os dados antes de salvar.</p>
@@ -312,7 +312,7 @@ $trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/grade-horaria', 'Grade H
                 </div>
                 <div id="resultado-excel-grade" class="hidden text-sm rounded-lg p-3"></div>
                 <div class="flex justify-end gap-2">
-                    <button type="button" onclick="fecharImportacaoExcel()"
+                    <button type="button" data-csp-click="fecharImportacaoExcel"
                             class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancelar</button>
                     <button type="submit" id="btn-processar-excel" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Conferir planilha</button>
                 </div>

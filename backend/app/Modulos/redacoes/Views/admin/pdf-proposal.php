@@ -31,7 +31,7 @@
 <body>
 
 <div class="no-print" style="background:#f3f4f6;padding:10px 24px;display:flex;gap:10px;align-items:center;">
-    <button onclick="window.print()" style="background:#6366f1;color:#fff;border:none;padding:8px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">🖨️ Imprimir / Salvar PDF</button>
+    <button data-csp-click="print" style="background:#6366f1;color:#fff;border:none;padding:8px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">🖨️ Imprimir / Salvar PDF</button>
     <button onclick="window.close()" style="background:#e5e7eb;color:#374151;border:none;padding:8px 18px;border-radius:6px;font-size:13px;cursor:pointer;">Fechar</button>
 </div>
 

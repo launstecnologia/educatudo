@@ -289,7 +289,10 @@ abstract class BaseController
             \App\Performance\RequestProfiler::markViewStart();
         }
         try {
+            ob_start();
             include $viewFile;
+            $html = ob_get_clean();
+            echo CspPolitica::aplicarNonceEmHtml($html);
         } finally {
             if ($profiler) {
                 \App\Performance\RequestProfiler::markViewEnd();
@@ -374,12 +377,16 @@ abstract class BaseController
             }
             extract($dataForLayout);
             include $layoutFile;
-            ob_end_flush();
+            $htmlLayout = ob_get_clean();
+            // SEC-02: garante nonce em todo <script> da resposta HTML (layouts + partials esquecidos).
+            echo CspPolitica::aplicarNonceEmHtml($htmlLayout);
             if ($profiler) {
                 \App\Performance\RequestProfiler::markViewEnd();
             }
         } catch (\Throwable $e) {
-            ob_end_clean();
+            if (ob_get_level() > 0) {
+                ob_end_clean();
+            }
             if ($profiler) {
                 \App\Performance\RequestProfiler::markViewEnd();
             }

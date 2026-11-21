@@ -456,7 +456,7 @@ if (empty($questoes) && !empty($exercicio_atual['questoes_json'])) {
             <p class="text-sm font-semibold text-gray-900">Parabéns por concluir esta jornada!</p>
             <p class="text-sm text-gray-600 mt-0.5">Quer revisar os conceitos com a <?= htmlspecialchars($ia_nome_tudinha ?? 'Tudinha', ENT_QUOTES, 'UTF-8') ?>?</p>
         </div>
-        <button type="button" onclick="abrirModalTudinhaExercicioJornada()"
+        <button type="button" data-csp-click="abrirModalTudinhaExercicioJornada"
             class="shrink-0 border-2 border-pink-500 text-pink-700 bg-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-pink-50 transition-colors whitespace-nowrap">
             Tudinha explica
         </button>
@@ -481,7 +481,7 @@ if (empty($questoes) && !empty($exercicio_atual['questoes_json'])) {
     
     <!-- Botões de Navegação -->
     <div class="flex justify-between items-center mt-6 pt-6 border-t border-gray-200">
-        <button onclick="questaoAnterior()" 
+        <button data-csp-click="questaoAnterior" 
                 class="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors flex items-center <?= $exercicio_atual_index === 0 ? 'opacity-50 cursor-not-allowed' : '' ?>"
                 <?= $exercicio_atual_index === 0 ? 'disabled' : '' ?>>
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -493,7 +493,7 @@ if (empty($questoes) && !empty($exercicio_atual['questoes_json'])) {
         <?php if ($exercicio_atual_index >= $total_exercicios - 1): ?>
             <!-- Última questão: em modo gabarito não mostra Finalizar, só navegação -->
             <?php if (empty($liberar_gabarito)): ?>
-            <button id="btn-finalizar-exercicios" onclick="finalizarExercicios()" 
+            <button id="btn-finalizar-exercicios" data-csp-click="finalizarExercicios" 
                     class="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
@@ -503,7 +503,7 @@ if (empty($questoes) && !empty($exercicio_atual['questoes_json'])) {
             <?php endif; ?>
         <?php else: ?>
             <!-- Não é a última questão - Botão Próxima -->
-            <button id="btn-proxima-questao" onclick="questaoProxima()" 
+            <button id="btn-proxima-questao" data-csp-click="questaoProxima" 
                     class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center">
                 Próxima
                 <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -561,7 +561,7 @@ if (empty($questoes) && !empty($exercicio_atual['questoes_json'])) {
     <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[88vh] flex flex-col overflow-hidden border border-purple-100" role="dialog" aria-modal="true" aria-labelledby="modal-tudinha-exercicio-titulo" onclick="event.stopPropagation()">
         <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-pink-50 to-purple-50 shrink-0">
             <h3 id="modal-tudinha-exercicio-titulo" class="text-lg font-bold text-gray-900 truncate"><?= htmlspecialchars($ia_nome_tudinha ?? 'Tudinha', ENT_QUOTES, 'UTF-8') ?> explica</h3>
-            <button type="button" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 shrink-0" onclick="fecharModalTudinhaExercicioJornada()" title="Fechar" aria-label="Fechar">
+            <button type="button" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 shrink-0" data-csp-click="fecharModalTudinhaExercicioJornada" title="Fechar" aria-label="Fechar">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
@@ -1041,7 +1041,7 @@ function antesDeNavegar(callback) {
 
 function questaoAnterior() {
     if (exercicioAtualIndex > 0) {
-        var btnAnterior = document.querySelector('button[onclick="questaoAnterior()"]');
+        var btnAnterior = document.querySelector('button[data-csp-click="questaoAnterior"]');
         setButtonLoading(btnAnterior, 'Indo...');
         antesDeNavegar(function() { irParaQuestao(exercicioAtualIndex - 1); });
     }

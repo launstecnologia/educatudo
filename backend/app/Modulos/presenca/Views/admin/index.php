@@ -26,7 +26,7 @@ ob_start();
 ?>
 <?php $frequencia_modo = $frequencia_modo ?? 'presenca'; include \App\Core\ViewPaths::adminPartial('frequencia_toggle.php'); ?>
 <?php if ($schemaPronto): ?>
-<button type="button" onclick="openFilterDrawer()"
+<button type="button" data-csp-click="openFilterDrawer"
         class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
     <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
     Filtros
@@ -41,7 +41,7 @@ ob_start();
     Configurar
 </a>
 <?php if ($schemaPronto): ?>
-<button type="button" onclick="openPresencaDrawer()"
+<button type="button" data-csp-click="openPresencaDrawer"
         class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
     <i class="fa-solid fa-plus mr-2"></i>
     Registrar
@@ -59,13 +59,13 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
     </div>
 <?php else: ?>
 
-<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeFilterDrawer"></div>
 <aside id="filterDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
         <h3 class="text-lg font-semibold text-gray-900">Filtrar presença</h3>
-        <button type="button" onclick="closeFilterDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeFilterDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -101,7 +101,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                 <tr>
                     <td colspan="5" class="px-6 py-12 text-center text-gray-500">
                         <p>Nenhum registro neste dia.</p>
-                        <button type="button" onclick="openPresencaDrawer()" class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90">
+                        <button type="button" data-csp-click="openPresencaDrawer" class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90">
                             <i class="fa-solid fa-plus mr-2"></i>Registrar
                         </button>
                     </td>
@@ -172,13 +172,13 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
     <?php endif; ?>
 </div>
 
-<div id="presencaDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closePresencaDrawer()"></div>
+<div id="presencaDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closePresencaDrawer"></div>
 <aside id="presencaDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
         <h2 class="text-xl font-bold text-gray-900">Registrar entrada ou saída</h2>
-        <button type="button" onclick="closePresencaDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closePresencaDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -223,7 +223,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             </section>
         </div>
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="closePresencaDrawer()" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
+            <button type="button" data-csp-click="closePresencaDrawer" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
             <button type="submit" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 transition-colors shadow-sm">Registrar</button>
         </div>
     </form>

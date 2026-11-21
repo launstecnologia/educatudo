@@ -26,7 +26,7 @@ $planilha = is_array($planilha_sed ?? null) ? $planilha_sed : [];
     </style>
 </head>
 <body>
-    <p class="no-print muted"><button onclick="window.print()">Imprimir / salvar PDF</button></p>
+    <p class="no-print muted"><button data-csp-click="print">Imprimir / salvar PDF</button></p>
     <h1><?= $esc($unidade['nome'] ?? 'Escola') ?></h1>
     <p class="muted" style="text-align:center">Dossiê individual · <?= $esc($aluno['nome'] ?? '') ?> · <?= $esc($gerado_em ?? '') ?></p>
     <p class="muted" style="text-align:center">

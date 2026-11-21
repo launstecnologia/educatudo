@@ -19,7 +19,7 @@
             <?php if (!empty($is_admin_edit)): ?>
                 <span class="bg-indigo-100 text-indigo-800 px-6 py-3 rounded-xl font-medium">Edição pela coordenação — use a tela “Ver prova” para Aprovar ou Retornar ao professor.</span>
             <?php elseif (in_array($prova['status'] ?? 'rascunho', ['rascunho', 'agendada', 'reprovada', 'pendente'])): ?>
-                <button onclick="finalizarProva()"
+                <button data-csp-click="finalizarProva"
                         class="bg-green-600 text-white px-6 py-3 rounded-xl hover:bg-green-700 transition-colors">
                     ✅ Enviar para Aprovação
                 </button>
@@ -152,16 +152,16 @@
             $tudicoinsProvaIa = \App\Core\CreditosModuleRegistry::gerarExercicioProvaLiberado();
             ?>
             <?php if ($tudicoinsProvaIa): ?>
-            <button onclick="abrirModalGerarIA()" class="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors">
+            <button data-csp-click="abrirModalGerarIA" class="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors">
                 Gerar com a Tudinha
             </button>
             <?php endif; ?>
             <?php if (false): /* Integração da API externa pausada. Trocar para true para voltar o banco da API na prova. */ ?>
-            <button onclick="abrirModalBancoQuestoes()" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors">
+            <button data-csp-click="abrirModalBancoQuestoes" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors">
                 Banco de Questões
             </button>
             <?php endif; ?>
-            <button onclick="abrirModalLerImagem()" class="px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
+            <button data-csp-click="abrirModalLerImagem" class="px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
                 Importar PDF ou imagem
             </button>
         </div>
@@ -202,9 +202,9 @@
                 <label class="block text-sm font-medium text-gray-700 mb-2">Enunciado *</label>
                 <input type="hidden" name="enunciado" id="enunciado-questao" required>
                 <div class="editor-toolbar">
-                    <button type="button" class="tb-btn" title="Negrito" onmousedown="event.preventDefault()" onclick="fmtEnunciado('bold')"><b>B</b></button>
-                    <button type="button" class="tb-btn" title="Itálico" onmousedown="event.preventDefault()" onclick="fmtEnunciado('italic')"><i>I</i></button>
-                    <button type="button" class="tb-btn" title="Sublinhado" onmousedown="event.preventDefault()" onclick="fmtEnunciado('underline')"><u>U</u></button>
+                    <button type="button" class="tb-btn" title="Negrito" onmousedown="event.preventDefault()" data-csp-click="fmtEnunciado" data-csp-arg="bold"><b>B</b></button>
+                    <button type="button" class="tb-btn" title="Itálico" onmousedown="event.preventDefault()" data-csp-click="fmtEnunciado" data-csp-arg="italic"><i>I</i></button>
+                    <button type="button" class="tb-btn" title="Sublinhado" onmousedown="event.preventDefault()" data-csp-click="fmtEnunciado" data-csp-arg="underline"><u>U</u></button>
                     <div class="tb-sep"></div>
                     <button type="button" class="tb-btn" title="Lista com marcadores" onmousedown="event.preventDefault();saveSelEnunciado();fmtEnunciado('insertUnorderedList')">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="4" cy="18" r="1.5" fill="currentColor"/></svg>
@@ -216,10 +216,10 @@
                     <button type="button" class="tb-btn tb-font-size" title="Diminuir letra" onmousedown="event.preventDefault();fmtFontSize('editor-enunciado', -1)"><span>A−</span></button>
                     <button type="button" class="tb-btn tb-font-size" title="Aumentar letra" onmousedown="event.preventDefault();fmtFontSize('editor-enunciado', 1)"><span>A+</span></button>
                     <div class="tb-sep"></div>
-                    <button type="button" class="tb-btn" title="Alinhar esquerda" onmousedown="event.preventDefault()" onclick="fmtEnunciado('justifyLeft')">
+                    <button type="button" class="tb-btn" title="Alinhar esquerda" onmousedown="event.preventDefault()" data-csp-click="fmtEnunciado" data-csp-arg="justifyLeft">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
                     </button>
-                    <button type="button" class="tb-btn" title="Centralizar" onmousedown="event.preventDefault()" onclick="fmtEnunciado('justifyCenter')">
+                    <button type="button" class="tb-btn" title="Centralizar" onmousedown="event.preventDefault()" data-csp-click="fmtEnunciado" data-csp-arg="justifyCenter">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
                     </button>
                     <div class="tb-sep"></div>
@@ -243,7 +243,7 @@
                 <input type="file" id="alt-insert-image-input" accept="image/*" class="hidden">
                 <div id="opcoes-lista" class="alt-list mb-3"></div>
                 <div class="flex flex-wrap items-center gap-4 mt-2">
-                    <button type="button" onclick="adicionarOpcao()" class="px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors">
+                    <button type="button" data-csp-click="adicionarOpcao" class="px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors">
                         + Adicionar Alternativa
                     </button>
                     <span class="text-xs text-gray-500 flex-shrink-0">Máximo 5 alternativas (A, B, C, D, E)</span>
@@ -263,7 +263,7 @@
     <div class="bg-white rounded-xl shadow-2xl p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-semibold text-gray-900">Importar exercícios da IA da Apostila</h3>
-            <button onclick="fecharModalColarJson()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+            <button data-csp-click="fecharModalColarJson" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
         </div>
 
         <div class="mb-3">
@@ -298,15 +298,15 @@
         <div class="flex justify-between items-center mt-4">
             <span id="apostila-selecionados-count" class="text-sm text-gray-600"></span>
             <div class="flex gap-3">
-                <button type="button" onclick="fecharModalColarJson()" class="px-4 py-2 text-gray-600 hover:text-gray-900">Cancelar</button>
-                <button type="button" onclick="importarSelecionados()" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">Importar selecionados</button>
+                <button type="button" data-csp-click="fecharModalColarJson" class="px-4 py-2 text-gray-600 hover:text-gray-900">Cancelar</button>
+                <button type="button" data-csp-click="importarSelecionados" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">Importar selecionados</button>
             </div>
         </div>
 
         <details class="mt-4">
             <summary class="text-sm text-gray-500 cursor-pointer">Opção avançada: colar JSON manualmente</summary>
             <textarea id="colar-json-textarea" rows="6" class="w-full text-sm border border-gray-300 rounded-lg p-3 font-mono mt-2" placeholder='[{"enunciado": "...", "tipo": "objetiva", "alternativas": ["...", "..."], "gabarito": "..."}]'></textarea>
-            <button type="button" onclick="importarQuestoesJson()" class="mt-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm">Importar JSON colado</button>
+            <button type="button" data-csp-click="importarQuestoesJson" class="mt-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm">Importar JSON colado</button>
         </details>
     </div>
 </div>
@@ -319,7 +319,7 @@
                 <h3 class="text-xl font-bold text-gray-900">Editar questão</h3>
                 <p class="text-sm text-gray-500 mt-1">Ajuste o enunciado e marque o gabarito.</p>
             </div>
-            <button onclick="fecharModalEditar()" class="text-gray-400 hover:text-gray-600">
+            <button data-csp-click="fecharModalEditar" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
@@ -361,9 +361,9 @@
                 <label class="block text-sm font-medium text-gray-700 mb-2">Enunciado *</label>
                 <input type="hidden" name="enunciado" id="edit-enunciado-value">
                 <div class="editor-toolbar">
-                    <button type="button" class="tb-btn" title="Negrito" onmousedown="event.preventDefault()" onclick="fmtEditEnunciado('bold')"><b>B</b></button>
-                    <button type="button" class="tb-btn" title="Itálico" onmousedown="event.preventDefault()" onclick="fmtEditEnunciado('italic')"><i>I</i></button>
-                    <button type="button" class="tb-btn" title="Sublinhado" onmousedown="event.preventDefault()" onclick="fmtEditEnunciado('underline')"><u>U</u></button>
+                    <button type="button" class="tb-btn" title="Negrito" onmousedown="event.preventDefault()" data-csp-click="fmtEditEnunciado" data-csp-arg="bold"><b>B</b></button>
+                    <button type="button" class="tb-btn" title="Itálico" onmousedown="event.preventDefault()" data-csp-click="fmtEditEnunciado" data-csp-arg="italic"><i>I</i></button>
+                    <button type="button" class="tb-btn" title="Sublinhado" onmousedown="event.preventDefault()" data-csp-click="fmtEditEnunciado" data-csp-arg="underline"><u>U</u></button>
                     <div class="tb-sep"></div>
                     <button type="button" class="tb-btn" title="Lista com marcadores" onmousedown="event.preventDefault();saveSelEditEnunciado();fmtEditEnunciado('insertUnorderedList')">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="4" cy="18" r="1.5" fill="currentColor"/></svg>
@@ -375,10 +375,10 @@
                     <button type="button" class="tb-btn tb-font-size" title="Diminuir letra" onmousedown="event.preventDefault();fmtFontSize('edit-enunciado', -1)"><span>A−</span></button>
                     <button type="button" class="tb-btn tb-font-size" title="Aumentar letra" onmousedown="event.preventDefault();fmtFontSize('edit-enunciado', 1)"><span>A+</span></button>
                     <div class="tb-sep"></div>
-                    <button type="button" class="tb-btn" title="Alinhar esquerda" onmousedown="event.preventDefault()" onclick="fmtEditEnunciado('justifyLeft')">
+                    <button type="button" class="tb-btn" title="Alinhar esquerda" onmousedown="event.preventDefault()" data-csp-click="fmtEditEnunciado" data-csp-arg="justifyLeft">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
                     </button>
-                    <button type="button" class="tb-btn" title="Centralizar" onmousedown="event.preventDefault()" onclick="fmtEditEnunciado('justifyCenter')">
+                    <button type="button" class="tb-btn" title="Centralizar" onmousedown="event.preventDefault()" data-csp-click="fmtEditEnunciado" data-csp-arg="justifyCenter">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
                     </button>
                     <div class="tb-sep"></div>
@@ -403,7 +403,7 @@
                     <img id="edit-imagem-preview" src="" alt="Imagem da questão" 
                          class="max-w-full max-h-64 rounded-lg border border-gray-300 shadow-sm cursor-pointer"
                          onclick="this.classList.toggle('max-h-64'); this.classList.toggle('max-h-none');">
-                    <button type="button" onclick="removerImagemEdicao()" 
+                    <button type="button" data-csp-click="removerImagemEdicao" 
                             class="absolute top-2 right-2 bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm hover:bg-red-600 shadow-md"
                             title="Remover imagem">&times;</button>
                 </div>
@@ -415,7 +415,7 @@
                 </div>
                 <div id="edit-opcoes-lista" class="space-y-3 mb-3"></div>
                 <div class="flex flex-wrap items-center gap-4 mt-2">
-                    <button type="button" onclick="adicionarOpcaoEdicao()" class="px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors">
+                    <button type="button" data-csp-click="adicionarOpcaoEdicao" class="px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors">
                         + Adicionar Alternativa
                     </button>
                     <span class="text-xs text-gray-500 flex-shrink-0">Máximo 5 alternativas (A, B, C, D, E)</span>
@@ -423,7 +423,7 @@
             </div>
             
             <div class="flex justify-end space-x-3 pt-4 border-t">
-                <button type="button" onclick="fecharModalEditar()" 
+                <button type="button" data-csp-click="fecharModalEditar" 
                         class="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">
                     Cancelar
                 </button>
@@ -441,7 +441,7 @@
     <div class="bg-white rounded-xl shadow-2xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center mb-6">
             <h3 class="text-2xl font-bold text-gray-900">Gerar com a Tudinha</h3>
-            <button onclick="fecharModalGerarIA()" class="text-gray-400 hover:text-gray-600">
+            <button data-csp-click="fecharModalGerarIA" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
@@ -592,7 +592,7 @@
             
             
             <div class="flex justify-end space-x-3 pt-4 border-t">
-                <button type="button" onclick="fecharModalGerarIA()" 
+                <button type="button" data-csp-click="fecharModalGerarIA" 
                         class="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">
                     Cancelar
                 </button>
@@ -610,7 +610,7 @@
     <div class="bg-white rounded-xl shadow-2xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center mb-6">
             <h3 class="text-2xl font-bold text-gray-900">Importar PDF ou imagem</h3>
-            <button onclick="fecharModalLerImagem()" class="text-gray-400 hover:text-gray-600">
+            <button data-csp-click="fecharModalLerImagem" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
@@ -640,7 +640,7 @@
                 <div id="preview-imagem-ler" class="mt-4 hidden">
                     <img id="preview-img-ler" src="" alt="Preview" class="max-w-full max-h-64 rounded-lg border border-gray-300">
                     <p id="preview-arquivo-ler" class="hidden text-sm text-gray-700"></p>
-                    <button type="button" onclick="removerImagemLer()" class="mt-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm">
+                    <button type="button" data-csp-click="removerImagemLer" class="mt-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm">
                         Remover Imagem
                     </button>
                 </div>
@@ -648,7 +648,7 @@
             </div>
             
             <div class="flex justify-end space-x-3 pt-4 border-t">
-                <button type="button" onclick="fecharModalLerImagem()" 
+                <button type="button" data-csp-click="fecharModalLerImagem" 
                         class="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">
                     Cancelar
                 </button>
@@ -681,7 +681,7 @@
                     <input type="checkbox" id="selecionar-todas-questoes" onchange="alternarSelecaoQuestoes(this.checked)" class="h-4 w-4 rounded border-gray-300">
                     Selecionar todas
                 </label>
-                <button type="button" id="btn-excluir-questoes" onclick="excluirQuestoesSelecionadas()" disabled
+                <button type="button" id="btn-excluir-questoes" data-csp-click="excluirQuestoesSelecionadas" disabled
                         class="px-3 py-1.5 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                     Excluir selecionadas
                 </button>
@@ -700,7 +700,7 @@
                 <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors" data-questao-id="<?= (int) $questao['id'] ?>">
                     <div class="flex justify-between items-start gap-3">
                         <label class="mt-1 shrink-0 cursor-pointer">
-                            <input type="checkbox" class="questao-selecao h-4 w-4 rounded border-gray-300" value="<?= (int) $questao['id'] ?>" onchange="atualizarBotaoExcluirQuestoes()" aria-label="Selecionar questão <?= (int) ($index + 1) ?>">
+                            <input type="checkbox" class="questao-selecao h-4 w-4 rounded border-gray-300" value="<?= (int) $questao['id'] ?>" data-csp-change="atualizarBotaoExcluirQuestoes" aria-label="Selecionar questão <?= (int) ($index + 1) ?>">
                         </label>
                         <div class="flex-1">
                             <div class="flex items-center mb-2 flex-wrap gap-2">
@@ -802,7 +802,7 @@
     <div class="bg-white rounded-xl shadow-2xl p-6 max-w-6xl w-full mx-4 max-h-[92vh] overflow-y-auto">
         <div class="flex justify-between items-center mb-3">
             <h3 class="text-xl font-bold text-gray-900">Banco de Questões</h3>
-            <button onclick="fecharModalBancoQuestoes()" class="text-gray-400 hover:text-gray-600">
+            <button data-csp-click="fecharModalBancoQuestoes" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
@@ -820,7 +820,7 @@
         </div>
         <div class="flex flex-wrap items-center gap-2 mb-4">
             <button type="button" onclick="buscarBancoQuestoes(true)" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">Buscar</button>
-            <button type="button" onclick="limparFiltrosBancoQuestoes()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">Limpar Filtros</button>
+            <button type="button" data-csp-click="limparFiltrosBancoQuestoes" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">Limpar Filtros</button>
             <span id="bq-total-info" class="text-sm text-gray-600"></span>
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -840,14 +840,14 @@
         </div>
         <div class="flex items-center justify-between mt-4">
             <div class="flex items-center gap-2">
-                <button type="button" id="bq-prev" onclick="mudarPaginaBancoQuestoes(-1)" class="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50">Anterior</button>
-                <button type="button" id="bq-next" onclick="mudarPaginaBancoQuestoes(1)" class="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50">Próxima</button>
+                <button type="button" id="bq-prev" data-csp-click="mudarPaginaBancoQuestoes" data-csp-arg="-1" class="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50">Anterior</button>
+                <button type="button" id="bq-next" data-csp-click="mudarPaginaBancoQuestoes" data-csp-arg="1" class="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50">Próxima</button>
             </div>
             <div class="text-sm text-gray-600">Selecione as questões e clique em OK para importar.</div>
         </div>
         <div class="flex justify-end gap-2 mt-4">
-            <button type="button" onclick="importarSelecionadasBancoQuestoes()" class="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">OK (Importar)</button>
-            <button type="button" onclick="fecharModalBancoQuestoes()" class="px-5 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">Fechar</button>
+            <button type="button" data-csp-click="importarSelecionadasBancoQuestoes" class="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">OK (Importar)</button>
+            <button type="button" data-csp-click="fecharModalBancoQuestoes" class="px-5 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">Fechar</button>
         </div>
     </div>
 </div>
@@ -3097,7 +3097,7 @@ function renderSelecionadasLateralBancoQuestoes() {
                         <div class="text-xs text-indigo-700 font-semibold">ID ${escapeHtml(meta.id)}</div>
                         <div class="text-xs text-gray-500">${escapeHtml([meta.materia, meta.tipo].filter(Boolean).join(' • '))}</div>
                     </div>
-                    <button type="button" class="text-xs text-red-600 hover:text-red-700" onclick="removerSelecionadaBancoQuestoes('${escapeHtml(meta.id)}')">Remover</button>
+                    <button type="button" class="text-xs text-red-600 hover:text-red-700" data-csp-click="removerSelecionadaBancoQuestoes" data-csp-arg="${escapeHtml(meta.id)}">Remover</button>
                 </div>
                 <p class="text-xs text-gray-700 mt-1 leading-snug">${escapeHtml(texto)}</p>
             </div>
@@ -3509,7 +3509,7 @@ function adicionarOpcaoEdicao(texto = '', correta = false) {
             <div class="alt-editor min-h-[60px] px-3 py-2 border border-gray-200 rounded-b-lg text-gray-900 outline-none" id="edit-opcao-editor-${index}" contenteditable="true" data-math="inline" data-placeholder="Alternativa ${letra}..."></div>
         </div>
         <label for="edit-radio-${index}" class="flex items-center gap-2 flex-shrink-0 mt-1 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 cursor-pointer">
-            <input type="radio" name="resposta_opcao_edit" value="${index}" id="edit-radio-${index}" class="w-4 h-4 text-green-600 focus:ring-green-500" ${correta ? 'checked' : ''} onchange="marcarGabaritoEdicao()">
+            <input type="radio" name="resposta_opcao_edit" value="${index}" id="edit-radio-${index}" class="w-4 h-4 text-green-600 focus:ring-green-500" ${correta ? 'checked' : ''} data-csp-change="marcarGabaritoEdicao">
             <span class="text-sm font-medium text-gray-700">Gabarito</span>
         </label>
         <button type="button" onclick="removerOpcaoEdicao(this)" class="px-3 py-2 border border-red-200 text-red-600 rounded-lg text-sm hover:bg-red-50 transition-colors flex-shrink-0">

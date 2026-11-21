@@ -47,56 +47,56 @@
                         <div class="mb-4">
                             <h3 class="text-sm font-semibold text-gray-700 mb-2">Frações e raízes</h3>
                             <div class="flex flex-wrap gap-2">
-                                <button type="button" onclick="inserirSimbolo('\( \\frac{a}{b} \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm" title="Fração">\frac{a}{b}</button>
-                                <button type="button" onclick="inserirSimbolo('\( \\frac{1}{2} \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">\frac{1}{2}</button>
-                                <button type="button" onclick="inserirSimbolo('\( \\sqrt{x} \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">\sqrt{x}</button>
-                                <button type="button" onclick="inserirSimbolo('\( \\sqrt[n]{x} \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">\sqrt[n]{x}</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( \frac{a}{b} \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm" title="Fração">\frac{a}{b}</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( \frac{1}{2} \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">\frac{1}{2}</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( \sqrt{x} \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">\sqrt{x}</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( \sqrt[n]{x} \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">\sqrt[n]{x}</button>
                             </div>
                         </div>
                         <div class="mb-4">
                             <h3 class="text-sm font-semibold text-gray-700 mb-2">Potências e índices</h3>
                             <div class="flex flex-wrap gap-2">
-                                <button type="button" onclick="inserirSimbolo('\( x^2 \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">x²</button>
-                                <button type="button" onclick="inserirSimbolo('\( x^n \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">x^n</button>
-                                <button type="button" onclick="inserirSimbolo('\( x_1 \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">x₁</button>
-                                <button type="button" onclick="inserirSimbolo('\( a^{b} \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">a^b</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( x^2 \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">x²</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( x^n \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">x^n</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( x_1 \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">x₁</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( a^{b} \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">a^b</button>
                             </div>
                         </div>
                         <div class="mb-4">
                             <h3 class="text-sm font-semibold text-gray-700 mb-2">Somatório, integral, limites</h3>
                             <div class="flex flex-wrap gap-2">
-                                <button type="button" onclick="inserirSimbolo('\( \\sum_{i=1}^{n} \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">∑</button>
-                                <button type="button" onclick="inserirSimbolo('\( \\int \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">∫</button>
-                                <button type="button" onclick="inserirSimbolo('\( \\int_a^b \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">∫ₐᵇ</button>
-                                <button type="button" onclick="inserirSimbolo('\( \\lim_{x \\to 0} \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">lim</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( \sum_{i=1}^{n} \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">∑</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( \int \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">∫</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( \int_a^b \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">∫ₐᵇ</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( \lim_{x \to 0} \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">lim</button>
                             </div>
                         </div>
                         <div class="mb-4">
                             <h3 class="text-sm font-semibold text-gray-700 mb-2">Letras gregas (LaTeX)</h3>
                             <div class="flex flex-wrap gap-2">
-                                <button type="button" onclick="inserirSimbolo('\( \\pi \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">π</button>
-                                <button type="button" onclick="inserirSimbolo('\( \\alpha \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">α</button>
-                                <button type="button" onclick="inserirSimbolo('\( \\beta \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">β</button>
-                                <button type="button" onclick="inserirSimbolo('\( \\theta \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">θ</button>
-                                <button type="button" onclick="inserirSimbolo('\( \\Delta \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">Δ</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( \pi \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">π</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( \alpha \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">α</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( \beta \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">β</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( \theta \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">θ</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( \Delta \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">Δ</button>
                             </div>
                         </div>
                         <div class="mb-4">
                             <h3 class="text-sm font-semibold text-gray-700 mb-2">Relações e conjuntos numéricos (LaTeX)</h3>
                             <div class="flex flex-wrap gap-2">
-                                <button type="button" onclick="inserirSimbolo('\( \\neq \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm" title="Diferente">≠</button>
-                                <button type="button" onclick="inserirSimbolo('\( \\not\\subset \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm" title="Não contido">⊄</button>
-                                <button type="button" onclick="inserirSimbolo('\( \\mathbb{Z} \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm" title="Inteiros">ℤ</button>
-                                <button type="button" onclick="inserirSimbolo('\( \\mathbb{Q} \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm" title="Racionais">ℚ</button>
-                                <button type="button" onclick="inserirSimbolo('\( \\mathbb{C} \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm" title="Complexos">ℂ</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( \neq \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm" title="Diferente">≠</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( \not\subset \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm" title="Não contido">⊄</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( \mathbb{Z} \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm" title="Inteiros">ℤ</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( \mathbb{Q} \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm" title="Racionais">ℚ</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( \mathbb{C} \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm" title="Complexos">ℂ</button>
                             </div>
                         </div>
                         <div class="mb-4">
                             <h3 class="text-sm font-semibold text-gray-700 mb-2">Equações comuns</h3>
                             <div class="flex flex-wrap gap-2">
-                                <button type="button" onclick="inserirSimbolo('\( x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a} \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm" title="Bhaskara">Bhaskara</button>
-                                <button type="button" onclick="inserirSimbolo('\( a^2 + b^2 = c^2 \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">Pitágoras</button>
-                                <button type="button" onclick="inserirSimbolo('\( \\angle \)')" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">∠</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( x = \frac{-b \pm \sqrt{b^2-4ac}}{2a} \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm" title="Bhaskara">Bhaskara</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( a^2 + b^2 = c^2 \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">Pitágoras</button>
+                                <button type="button" data-csp-click="inserirSimbolo" data-csp-arg="\( \angle \)" class="btn-simbolo px-3 py-2 bg-amber-100 hover:bg-amber-200 rounded text-sm">∠</button>
                             </div>
                         </div>
                     </div>
@@ -108,19 +108,19 @@
                         <div class="mb-4">
                             <h3 class="text-sm font-semibold text-gray-700 mb-2">Operadores</h3>
                             <div class="grid grid-cols-3 gap-2">
-                                <button onclick="inserirSimbolo('+')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">+</button>
-                                <button onclick="inserirSimbolo('−')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">−</button>
-                                <button onclick="inserirSimbolo('×')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">×</button>
-                                <button onclick="inserirSimbolo('÷')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">÷</button>
-                                <button onclick="inserirSimbolo('±')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">±</button>
-                                <button onclick="inserirSimbolo('∓')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∓</button>
-                                <button onclick="inserirSimbolo('=')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">=</button>
-                                <button onclick="inserirSimbolo('≠')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg" title="Diferente">≠</button>
-                                <button onclick="inserirSimbolo('≈')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">≈</button>
-                                <button onclick="inserirSimbolo('>')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">></button>
-                                <button onclick="inserirSimbolo('<')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg"><</button>
-                                <button onclick="inserirSimbolo('≥')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">≥</button>
-                                <button onclick="inserirSimbolo('≤')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">≤</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="+" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">+</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="−" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">−</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="×" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">×</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="÷" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">÷</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="±" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">±</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="∓" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∓</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="=" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">=</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="≠" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg" title="Diferente">≠</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="≈" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">≈</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="&gt;" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">></button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="&lt;" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg"><</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="≥" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">≥</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="≤" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">≤</button>
                             </div>
                         </div>
                         
@@ -128,15 +128,15 @@
                         <div class="mb-4">
                             <h3 class="text-sm font-semibold text-gray-700 mb-2">Frações e Potências</h3>
                             <div class="grid grid-cols-3 gap-2">
-                                <button onclick="inserirSimbolo('½')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">½</button>
-                                <button onclick="inserirSimbolo('⅓')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">⅓</button>
-                                <button onclick="inserirSimbolo('¼')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">¼</button>
-                                <button onclick="inserirSimbolo('⅔')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">⅔</button>
-                                <button onclick="inserirSimbolo('¾')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">¾</button>
-                                <button onclick="inserirSimbolo('⅛')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">⅛</button>
-                                <button onclick="inserirSimbolo('²')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">²</button>
-                                <button onclick="inserirSimbolo('³')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">³</button>
-                                <button onclick="inserirSimbolo('ⁿ')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">ⁿ</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="½" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">½</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="⅓" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">⅓</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="¼" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">¼</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="⅔" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">⅔</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="¾" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">¾</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="⅛" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">⅛</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="²" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">²</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="³" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">³</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="ⁿ" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">ⁿ</button>
                             </div>
                         </div>
                         
@@ -144,23 +144,23 @@
                         <div class="mb-4">
                             <h3 class="text-sm font-semibold text-gray-700 mb-2">Letras Gregas</h3>
                             <div class="grid grid-cols-3 gap-2">
-                                <button onclick="inserirSimbolo('α')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">α</button>
-                                <button onclick="inserirSimbolo('β')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">β</button>
-                                <button onclick="inserirSimbolo('γ')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">γ</button>
-                                <button onclick="inserirSimbolo('δ')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">δ</button>
-                                <button onclick="inserirSimbolo('ε')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">ε</button>
-                                <button onclick="inserirSimbolo('θ')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">θ</button>
-                                <button onclick="inserirSimbolo('λ')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">λ</button>
-                                <button onclick="inserirSimbolo('μ')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">μ</button>
-                                <button onclick="inserirSimbolo('π')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">π</button>
-                                <button onclick="inserirSimbolo('ρ')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">ρ</button>
-                                <button onclick="inserirSimbolo('σ')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">σ</button>
-                                <button onclick="inserirSimbolo('τ')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">τ</button>
-                                <button onclick="inserirSimbolo('φ')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">φ</button>
-                                <button onclick="inserirSimbolo('ω')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">ω</button>
-                                <button onclick="inserirSimbolo('Ω')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">Ω</button>
-                                <button onclick="inserirSimbolo('Δ')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">Δ</button>
-                                <button onclick="inserirSimbolo('Σ')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">Σ</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="α" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">α</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="β" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">β</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="γ" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">γ</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="δ" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">δ</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="ε" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">ε</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="θ" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">θ</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="λ" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">λ</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="μ" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">μ</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="π" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">π</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="ρ" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">ρ</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="σ" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">σ</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="τ" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">τ</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="φ" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">φ</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="ω" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">ω</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="Ω" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">Ω</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="Δ" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">Δ</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="Σ" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">Σ</button>
                             </div>
                         </div>
                         
@@ -168,14 +168,14 @@
                         <div class="mb-4">
                             <h3 class="text-sm font-semibold text-gray-700 mb-2">Geometria</h3>
                             <div class="grid grid-cols-3 gap-2">
-                                <button onclick="inserirSimbolo('∠')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∠</button>
-                                <button onclick="inserirSimbolo('°')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">°</button>
-                                <button onclick="inserirSimbolo('⊥')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">⊥</button>
-                                <button onclick="inserirSimbolo('∥')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∥</button>
-                                <button onclick="inserirSimbolo('△')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">△</button>
-                                <button onclick="inserirSimbolo('□')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">□</button>
-                                <button onclick="inserirSimbolo('○')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">○</button>
-                                <button onclick="inserirSimbolo('∞')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∞</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="∠" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∠</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="°" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">°</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="⊥" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">⊥</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="∥" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∥</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="△" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">△</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="□" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">□</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="○" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">○</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="∞" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∞</button>
                             </div>
                         </div>
                         
@@ -183,19 +183,19 @@
                         <div class="mb-4">
                             <h3 class="text-sm font-semibold text-gray-700 mb-2">Conjuntos</h3>
                             <div class="grid grid-cols-3 gap-2">
-                                <button onclick="inserirSimbolo('∈')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∈</button>
-                                <button onclick="inserirSimbolo('∉')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∉</button>
-                                <button onclick="inserirSimbolo('⊂')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg" title="Contido">⊂</button>
-                                <button onclick="inserirSimbolo('⊄')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg" title="Não contido">⊄</button>
-                                <button onclick="inserirSimbolo('⊃')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">⊃</button>
-                                <button onclick="inserirSimbolo('∪')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∪</button>
-                                <button onclick="inserirSimbolo('∩')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∩</button>
-                                <button onclick="inserirSimbolo('∅')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∅</button>
-                                <button onclick="inserirSimbolo('ℕ')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg" title="Naturais">ℕ</button>
-                                <button onclick="inserirSimbolo('ℤ')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg" title="Inteiros">ℤ</button>
-                                <button onclick="inserirSimbolo('ℚ')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg" title="Racionais">ℚ</button>
-                                <button onclick="inserirSimbolo('ℝ')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg" title="Reais">ℝ</button>
-                                <button onclick="inserirSimbolo('ℂ')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg" title="Complexos">ℂ</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="∈" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∈</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="∉" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∉</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="⊂" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg" title="Contido">⊂</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="⊄" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg" title="Não contido">⊄</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="⊃" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">⊃</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="∪" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∪</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="∩" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∩</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="∅" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∅</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="ℕ" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg" title="Naturais">ℕ</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="ℤ" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg" title="Inteiros">ℤ</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="ℚ" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg" title="Racionais">ℚ</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="ℝ" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg" title="Reais">ℝ</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="ℂ" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg" title="Complexos">ℂ</button>
                             </div>
                         </div>
                         
@@ -203,16 +203,16 @@
                         <div class="mb-4">
                             <h3 class="text-sm font-semibold text-gray-700 mb-2">Outros</h3>
                             <div class="grid grid-cols-3 gap-2">
-                                <button onclick="inserirSimbolo('√')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">√</button>
-                                <button onclick="inserirSimbolo('∛')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∛</button>
-                                <button onclick="inserirSimbolo('∑')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∑</button>
-                                <button onclick="inserirSimbolo('∏')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∏</button>
-                                <button onclick="inserirSimbolo('∫')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∫</button>
-                                <button onclick="inserirSimbolo('∂')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∂</button>
-                                <button onclick="inserirSimbolo('∇')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∇</button>
-                                <button onclick="inserirSimbolo('∝')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∝</button>
-                                <button onclick="inserirSimbolo('∴')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∴</button>
-                                <button onclick="inserirSimbolo('∵')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∵</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="√" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">√</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="∛" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∛</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="∑" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∑</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="∏" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∏</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="∫" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∫</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="∂" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∂</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="∇" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∇</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="∝" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∝</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="∴" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∴</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="∵" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-blue-100 rounded text-lg">∵</button>
                             </div>
                         </div>
                     </div>
@@ -225,21 +225,21 @@
                         <div class="mb-4">
                             <h3 class="text-sm font-semibold text-gray-700 mb-2">Unidades</h3>
                             <div class="grid grid-cols-3 gap-2">
-                                <button onclick="inserirSimbolo('m')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">m</button>
-                                <button onclick="inserirSimbolo('kg')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">kg</button>
-                                <button onclick="inserirSimbolo('s')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">s</button>
-                                <button onclick="inserirSimbolo('A')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">A</button>
-                                <button onclick="inserirSimbolo('K')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">K</button>
-                                <button onclick="inserirSimbolo('mol')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">mol</button>
-                                <button onclick="inserirSimbolo('cd')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">cd</button>
-                                <button onclick="inserirSimbolo('Hz')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">Hz</button>
-                                <button onclick="inserirSimbolo('N')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">N</button>
-                                <button onclick="inserirSimbolo('J')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">J</button>
-                                <button onclick="inserirSimbolo('W')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">W</button>
-                                <button onclick="inserirSimbolo('V')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">V</button>
-                                <button onclick="inserirSimbolo('Ω')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">Ω</button>
-                                <button onclick="inserirSimbolo('C')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">C</button>
-                                <button onclick="inserirSimbolo('T')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">T</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="m" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">m</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="kg" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">kg</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="s" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">s</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="A" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">A</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="K" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">K</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="mol" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">mol</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="cd" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">cd</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="Hz" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">Hz</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="N" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">N</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="J" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">J</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="W" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">W</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="V" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">V</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="Ω" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">Ω</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="C" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">C</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="T" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">T</button>
                             </div>
                         </div>
                         
@@ -247,17 +247,17 @@
                         <div class="mb-4">
                             <h3 class="text-sm font-semibold text-gray-700 mb-2">Grandezas</h3>
                             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                                <button onclick="inserirSimbolo('v')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="velocidade">v <span class="block text-[10px] opacity-80">velocidade</span></button>
-                                <button onclick="inserirSimbolo('a')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="aceleração">a <span class="block text-[10px] opacity-80">aceleração</span></button>
-                                <button onclick="inserirSimbolo('F')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="força">F <span class="block text-[10px] opacity-80">força</span></button>
-                                <button onclick="inserirSimbolo('E')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="energia">E <span class="block text-[10px] opacity-80">energia</span></button>
-                                <button onclick="inserirSimbolo('P')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="potência">P <span class="block text-[10px] opacity-80">potência</span></button>
-                                <button onclick="inserirSimbolo('I')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="corrente">I <span class="block text-[10px] opacity-80">corrente</span></button>
-                                <button onclick="inserirSimbolo('R')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="resistência">R <span class="block text-[10px] opacity-80">resistência</span></button>
-                                <button onclick="inserirSimbolo('Q')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="carga">Q <span class="block text-[10px] opacity-80">carga</span></button>
-                                <button onclick="inserirSimbolo('ρ')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="densidade">ρ <span class="block text-[10px] opacity-80">densidade</span></button>
-                                <button onclick="inserirSimbolo('λ')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="comprimento de onda">λ <span class="block text-[10px] opacity-80">comp. onda</span></button>
-                                <button onclick="inserirSimbolo('f')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="frequência">f <span class="block text-[10px] opacity-80">frequência</span></button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="v" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="velocidade">v <span class="block text-[10px] opacity-80">velocidade</span></button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="a" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="aceleração">a <span class="block text-[10px] opacity-80">aceleração</span></button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="F" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="força">F <span class="block text-[10px] opacity-80">força</span></button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="E" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="energia">E <span class="block text-[10px] opacity-80">energia</span></button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="P" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="potência">P <span class="block text-[10px] opacity-80">potência</span></button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="I" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="corrente">I <span class="block text-[10px] opacity-80">corrente</span></button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="R" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="resistência">R <span class="block text-[10px] opacity-80">resistência</span></button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="Q" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="carga">Q <span class="block text-[10px] opacity-80">carga</span></button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="ρ" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="densidade">ρ <span class="block text-[10px] opacity-80">densidade</span></button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="λ" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="comprimento de onda">λ <span class="block text-[10px] opacity-80">comp. onda</span></button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="f" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-purple-100 rounded text-xs" title="frequência">f <span class="block text-[10px] opacity-80">frequência</span></button>
                             </div>
                         </div>
                         
@@ -265,12 +265,12 @@
                         <div class="mb-4">
                             <h3 class="text-sm font-semibold text-gray-700 mb-2">Vetores</h3>
                             <div class="grid grid-cols-3 gap-2">
-                                <button onclick="inserirSimbolo('→')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-lg">→</button>
-                                <button onclick="inserirSimbolo('↑')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-lg">↑</button>
-                                <button onclick="inserirSimbolo('↓')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-lg">↓</button>
-                                <button onclick="inserirSimbolo('←')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-lg">←</button>
-                                <button onclick="inserirSimbolo('↔')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-lg">↔</button>
-                                <button onclick="inserirSimbolo('↕')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-lg">↕</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="→" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-lg">→</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="↑" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-lg">↑</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="↓" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-lg">↓</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="←" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-lg">←</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="↔" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-lg">↔</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="↕" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-lg">↕</button>
                             </div>
                         </div>
                         
@@ -278,12 +278,12 @@
                         <div class="mb-4">
                             <h3 class="text-sm font-semibold text-gray-700 mb-2">Especiais</h3>
                             <div class="grid grid-cols-3 gap-2">
-                                <button onclick="inserirSimbolo('°C')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">°C</button>
-                                <button onclick="inserirSimbolo('°F')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">°F</button>
-                                <button onclick="inserirSimbolo('K')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">K</button>
-                                <button onclick="inserirSimbolo('Δ')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-lg">Δ</button>
-                                <button onclick="inserirSimbolo('∇')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-lg">∇</button>
-                                <button onclick="inserirSimbolo('∂')" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-lg">∂</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="°C" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">°C</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="°F" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">°F</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="K" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-sm">K</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="Δ" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-lg">Δ</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="∇" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-lg">∇</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="∂" class="btn-simbolo px-3 py-2 bg-gray-100 hover:bg-purple-100 rounded text-lg">∂</button>
                             </div>
                         </div>
                     </div>
@@ -296,15 +296,15 @@
                         <div>
                             <h3 class="text-sm font-semibold text-gray-700 mb-2">Reações e setas</h3>
                             <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                                <button onclick="inserirSimbolo('→')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm" title="reação">→</button>
-                                <button onclick="inserirSimbolo('⇌')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm" title="equilíbrio">⇌</button>
-                                <button onclick="inserirSimbolo('⇄')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm" title="reversível">⇄</button>
-                                <button onclick="inserirSimbolo('↑')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm" title="gás">↑</button>
-                                <button onclick="inserirSimbolo('↓')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm" title="precipitado">↓</button>
-                                <button onclick="inserirSimbolo('⇒')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm" title="produz">⇒</button>
-                                <button onclick="inserirSimbolo('⇔')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm" title="equilíbrio">⇔</button>
-                                <button onclick="inserirSimbolo('Δ')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm" title="calor">Δ</button>
-                                <button onclick="inserirSimbolo('⊕')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm" title="aquecimento">⊕</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="→" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm" title="reação">→</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="⇌" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm" title="equilíbrio">⇌</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="⇄" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm" title="reversível">⇄</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="↑" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm" title="gás">↑</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="↓" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm" title="precipitado">↓</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="⇒" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm" title="produz">⇒</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="⇔" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm" title="equilíbrio">⇔</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="Δ" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm" title="calor">Δ</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="⊕" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm" title="aquecimento">⊕</button>
                             </div>
                         </div>
                         
@@ -312,18 +312,18 @@
                         <div>
                             <h3 class="text-sm font-semibold text-gray-700 mb-2">Notação</h3>
                             <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                                <button onclick="inserirSimbolo('ΔH')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">ΔH</button>
-                                <button onclick="inserirSimbolo('pH')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">pH</button>
-                                <button onclick="inserirSimbolo('pOH')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">pOH</button>
-                                <button onclick="inserirSimbolo('°C')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">°C</button>
-                                <button onclick="inserirSimbolo('mol')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">mol</button>
-                                <button onclick="inserirSimbolo('M')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm" title="mol/L">M</button>
-                                <button onclick="inserirSimbolo('+')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">+</button>
-                                <button onclick="inserirSimbolo('−')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">−</button>
-                                <button onclick="inserirSimbolo('⁺')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">⁺</button>
-                                <button onclick="inserirSimbolo('⁻')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">⁻</button>
-                                <button onclick="inserirSimbolo('²⁺')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">²⁺</button>
-                                <button onclick="inserirSimbolo('²⁻')" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">²⁻</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="ΔH" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">ΔH</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="pH" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">pH</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="pOH" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">pOH</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="°C" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">°C</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="mol" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">mol</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="M" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm" title="mol/L">M</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="+" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">+</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="−" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">−</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="⁺" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">⁺</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="⁻" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">⁻</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="²⁺" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">²⁺</button>
+                                <button data-csp-click="inserirSimbolo" data-csp-arg="²⁻" class="btn-simbolo px-2 py-2 bg-gray-100 hover:bg-green-100 rounded text-sm">²⁻</button>
                             </div>
                         </div>
                         

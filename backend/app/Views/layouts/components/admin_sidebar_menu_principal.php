@@ -323,7 +323,7 @@ if ($nomeMenuEscola === '') {
                 <i class="fa-regular fa-comments w-4 h-4 mr-3"></i>
                 <span class="sidebar-text text-sm">Fórum</span>
             </a>
-            <button type="button" onclick="toggleNestedMenu('forum')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+            <button type="button" data-csp-click="toggleNestedMenu" data-csp-arg="forum" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
                 <svg id="forum-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
@@ -438,7 +438,7 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::i
                 <i class="fa-solid fa-file-signature w-4 h-4 mr-3 flex-shrink-0"></i>
                 <span class="sidebar-text text-sm">Matrículas</span>
             </a>
-            <button type="button" onclick="toggleNestedMenu('matriculas')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+            <button type="button" data-csp-click="toggleNestedMenu" data-csp-arg="matriculas" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
                 <svg id="matriculas-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
@@ -545,7 +545,7 @@ $urlRecursosEscolares = $canViewSidebar(['almoxarifado'])
             <?php endif; ?>
         </a>
         <?php endif; ?>
-        <button type="button" onclick="abrirModalAlunosOnline()" class="w-full flex items-center px-4 py-2 text-green-200 hover:bg-green-500/20 hover:text-green-100 rounded-lg transition-all duration-200 text-left">
+        <button type="button" data-csp-click="abrirModalAlunosOnline" class="w-full flex items-center px-4 py-2 text-green-200 hover:bg-green-500/20 hover:text-green-100 rounded-lg transition-all duration-200 text-left">
             <i class="fa-solid fa-circle-check w-4 h-4 mr-3"></i>
             <span class="sidebar-text text-sm">Alunos Online</span>
             <span id="badge-online-count" class="ml-auto bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full sidebar-text">0</span>
@@ -724,7 +724,7 @@ $urlRecursosEscolares = $canViewSidebar(['almoxarifado'])
                 <span class="sidebar-text text-sm">Documentos Institucionais</span>
             </a>
             <?php if ((class_exists('LayoutHelper') && \App\Core\LayoutHelper::isModuleEnabled('processo_matricula') && $canViewSidebar(['processos_matricula'])) || $canViewSidebar(['modelos_documentos'])): ?>
-            <button type="button" onclick="toggleNestedMenu('documentos-institucionais')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+            <button type="button" data-csp-click="toggleNestedMenu" data-csp-arg="documentos-institucionais" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
                 <svg id="documentos-institucionais-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
@@ -751,7 +751,7 @@ $urlRecursosEscolares = $canViewSidebar(['almoxarifado'])
                 <i class="fa-solid fa-wallet w-4 h-4 mr-3 flex-shrink-0"></i>
                 <span class="sidebar-text text-sm">TudiCoins da Escola</span>
             </a>
-            <button type="button" onclick="toggleNestedMenu('tudicoins')" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+            <button type="button" data-csp-click="toggleNestedMenu" data-csp-arg="tudicoins" class="px-2 py-2 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
                 <svg id="tudicoins-arrow" class="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>

@@ -119,30 +119,30 @@ $urlPagina = static function (int $p) use ($actionFiltro, $qsBase): string {
         <p class="text-gray-600 mt-1"><?= htmlspecialchars((string) ($bloco['titulo'] ?? '')) ?></p>
     </div>
     <div class="flex flex-wrap gap-2">
-        <button type="button" onclick="openFilterDrawer()"
+        <button type="button" data-csp-click="openFilterDrawer"
                 class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50">
             <i class="fa-solid fa-filter" aria-hidden="true"></i>
             Filtros
         </button>
-        <button type="button" onclick="openHistoricoDrawer()"
+        <button type="button" data-csp-click="openHistoricoDrawer"
                 class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-800 text-sm font-medium hover:bg-indigo-100">
             <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
             Histórico
         </button>
-        <button type="button" onclick="openImportarDrawer()"
+        <button type="button" data-csp-click="openImportarDrawer"
                 class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 text-sm font-medium hover:bg-emerald-100">
             <i class="fa-solid fa-file-import" aria-hidden="true"></i>
             Importar planilha
         </button>
         <?php if ($enacColagHabilitado): ?>
-        <button type="button" onclick="openImportarEnacDrawer()"
+        <button type="button" data-csp-click="openImportarEnacDrawer"
                 class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-sky-200 bg-sky-50 text-sky-900 text-sm font-medium hover:bg-sky-100">
             <i class="fa-solid fa-calculator" aria-hidden="true"></i>
             Importar ENAC
         </button>
         <?php endif; ?>
         <?php if (!$edicaoDesbloqueada): ?>
-        <button type="button" id="btnDesbloquearEdicao" onclick="abrirModalSenha()"
+        <button type="button" id="btnDesbloquearEdicao" data-csp-click="abrirModalSenha"
                 class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-amber-300 bg-amber-50 text-amber-900 text-sm font-semibold hover:bg-amber-100">
             <i class="fa-solid fa-lock" aria-hidden="true"></i>
             Desbloquear edição
@@ -343,7 +343,7 @@ if ($tipoFlash === 'error') {
                                                data-valor-salvo="<?= htmlspecialchars($notaStr) ?>"
                                                <?= $somenteLeitura ? 'readonly' : '' ?>>
                                         <?php if ($bloqueada): ?>
-                                        <button type="button" class="shrink-0 text-amber-600" title="Bloqueada — use Desbloquear edição" onclick="abrirModalSenha()" aria-label="Desbloquear">
+                                        <button type="button" class="shrink-0 text-amber-600" title="Bloqueada — use Desbloquear edição" data-csp-click="abrirModalSenha" aria-label="Desbloquear">
                                             <i class="fa-solid fa-lock text-xs" aria-hidden="true"></i>
                                         </button>
                                         <?php endif; ?>
@@ -428,13 +428,13 @@ if ($tipoFlash === 'error') {
 </form>
 
 <!-- Offcanvas importar planilha -->
-<div id="importarDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeImportarDrawer()"></div>
+<div id="importarDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeImportarDrawer"></div>
 <aside id="importarDrawer"
        class="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-2xl transform translate-x-full transition-transform duration-200 ease-out flex flex-col"
        aria-hidden="true">
     <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
         <h3 class="text-lg font-semibold text-gray-900">Importar notas</h3>
-        <button type="button" onclick="closeImportarDrawer()" class="text-gray-400 hover:text-gray-600" aria-label="Fechar">
+        <button type="button" data-csp-click="closeImportarDrawer" class="text-gray-400 hover:text-gray-600" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i>
         </button>
     </div>
@@ -538,13 +538,13 @@ if ($tipoFlash === 'error') {
 
 <?php if ($enacColagHabilitado): ?>
 <!-- Offcanvas importar ENAC (Colag) -->
-<div id="importarEnacDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeImportarEnacDrawer()"></div>
+<div id="importarEnacDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeImportarEnacDrawer"></div>
 <aside id="importarEnacDrawer"
        class="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-2xl transform translate-x-full transition-transform duration-200 ease-out flex flex-col"
        aria-hidden="true">
     <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
         <h3 class="text-lg font-semibold text-gray-900">Importar ENAC</h3>
-        <button type="button" onclick="closeImportarEnacDrawer()" class="text-gray-400 hover:text-gray-600" aria-label="Fechar">
+        <button type="button" data-csp-click="closeImportarEnacDrawer" class="text-gray-400 hover:text-gray-600" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i>
         </button>
     </div>
@@ -590,13 +590,13 @@ if ($tipoFlash === 'error') {
 <?php endif; ?>
 
 <!-- Offcanvas filtros -->
-<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeFilterDrawer"></div>
 <aside id="filterDrawer"
        class="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-2xl transform translate-x-full transition-transform duration-200 ease-out flex flex-col"
        aria-hidden="true">
     <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
         <h3 class="text-lg font-semibold text-gray-900">Filtros e ordenação</h3>
-        <button type="button" onclick="closeFilterDrawer()" class="text-gray-400 hover:text-gray-600" aria-label="Fechar">
+        <button type="button" data-csp-click="closeFilterDrawer" class="text-gray-400 hover:text-gray-600" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i>
         </button>
     </div>
@@ -670,13 +670,13 @@ if ($tipoFlash === 'error') {
 </aside>
 
 <!-- Offcanvas histórico -->
-<div id="historicoDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeHistoricoDrawer()"></div>
+<div id="historicoDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeHistoricoDrawer"></div>
 <aside id="historicoDrawer"
        class="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-white shadow-2xl transform translate-x-full transition-transform duration-200 ease-out flex flex-col"
        aria-hidden="true">
     <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
         <h3 class="text-lg font-semibold text-gray-900">Histórico de alterações</h3>
-        <button type="button" onclick="closeHistoricoDrawer()" class="text-gray-400 hover:text-gray-600" aria-label="Fechar">
+        <button type="button" data-csp-click="closeHistoricoDrawer" class="text-gray-400 hover:text-gray-600" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl" aria-hidden="true"></i>
         </button>
     </div>
@@ -714,7 +714,7 @@ if ($tipoFlash === 'error') {
 
 <!-- Modal senha -->
 <div id="modalSenha" class="fixed inset-0 z-[60] hidden" aria-modal="true" role="dialog">
-    <div class="absolute inset-0 bg-black/50" onclick="fecharModalSenha()"></div>
+    <div class="absolute inset-0 bg-black/50" data-csp-click="fecharModalSenha"></div>
     <div class="relative mx-auto mt-24 w-full max-w-md bg-white rounded-xl shadow-xl p-6">
         <h3 class="text-lg font-semibold text-gray-900">Confirmar senha</h3>
         <p class="text-sm text-gray-600 mt-1">Digite a senha da sua conta para liberar a alteração de notas já lançadas.</p>
@@ -726,8 +726,8 @@ if ($tipoFlash === 'error') {
             <p id="senhaDesbloqueioErro" class="hidden text-xs text-red-600 mt-2"></p>
         </div>
         <div class="mt-5 flex justify-end gap-2">
-            <button type="button" onclick="fecharModalSenha()" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm">Cancelar</button>
-            <button type="button" id="btnConfirmarSenha" onclick="confirmarSenhaDesbloqueio()"
+            <button type="button" data-csp-click="fecharModalSenha" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm">Cancelar</button>
+            <button type="button" id="btnConfirmarSenha" data-csp-click="confirmarSenhaDesbloqueio"
                     class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
                 Desbloquear
             </button>

@@ -9,7 +9,7 @@
                 Execute migrations em bancos de dados de diferentes escolas
             </p>
         </div>
-        <button onclick="abrirModalEscola()" 
+        <button data-csp-click="abrirModalEscola" 
                 class="btn-primary-custom px-6 py-3 rounded-xl transition-all duration-300 flex items-center shadow-lg hover:shadow-xl hover:opacity-90">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
@@ -279,7 +279,7 @@
             </div>
             
             <div class="flex justify-end space-x-4 pt-4 border-t border-gray-200">
-                <button type="button" onclick="fecharModalEscola()" 
+                <button type="button" data-csp-click="fecharModalEscola" 
                         class="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
                     Cancelar
                 </button>

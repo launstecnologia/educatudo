@@ -124,7 +124,7 @@ $totalRascunhos = (int) ($stats['rascunho'] ?? 0);
             </button>
             <?php endif; ?>
             <button type="button"
-                    onclick="abrirFiltroPlanos()"
+                    data-csp-click="abrirFiltroPlanos"
                     class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                 <i class="fa-solid fa-filter text-gray-500 mr-2"></i>
                 Filtros
@@ -278,11 +278,11 @@ $totalRascunhos = (int) ($stats['rascunho'] ?? 0);
     <?php endif; ?>
 </div>
 
-<div id="planos-filter-backdrop" class="hidden fixed inset-0 bg-black/40 z-40" onclick="fecharFiltroPlanos()"></div>
+<div id="planos-filter-backdrop" class="hidden fixed inset-0 bg-black/40 z-40" data-csp-click="fecharFiltroPlanos"></div>
 <aside id="planos-filter-drawer" class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 translate-x-full transition-transform duration-200">
     <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
         <h3 class="text-base font-semibold text-gray-900">Filtrar planos de aula</h3>
-        <button type="button" class="text-gray-500 hover:text-gray-700" onclick="fecharFiltroPlanos()" aria-label="Fechar filtros">
+        <button type="button" class="text-gray-500 hover:text-gray-700" data-csp-click="fecharFiltroPlanos" aria-label="Fechar filtros">
             <i class="fa-solid fa-xmark"></i>
         </button>
     </div>

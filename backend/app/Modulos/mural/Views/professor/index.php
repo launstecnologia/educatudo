@@ -327,7 +327,7 @@ ob_start();
         </div>
     </div>
     <div class="px-6 sm:px-8 py-4 border-t border-gray-200 flex gap-3">
-        <button type="button" onclick="closeRecadoDrawer()" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Cancelar</button>
+        <button type="button" data-csp-click="closeRecadoDrawer" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Cancelar</button>
         <button type="submit" class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
             <span id="mural-form-submit-label">Publicar</span>
         </button>

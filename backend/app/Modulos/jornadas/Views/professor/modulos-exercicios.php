@@ -24,7 +24,7 @@
                 Lista de Exercícios
             </a>
             <?php if ($tudicoinsAcaoExercicioIa): ?>
-            <button onclick="abrirModalLerImagem()"
+            <button data-csp-click="abrirModalLerImagem"
                     class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50">
                 <svg class="h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -33,7 +33,7 @@
                 </svg>
                 Extrair Imagem
             </button>
-            <button onclick="abrirModalGerarIA()"
+            <button data-csp-click="abrirModalGerarIA"
                     class="inline-flex items-center justify-center gap-2 rounded-lg border border-primary bg-primary px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-colors hover:opacity-90">
                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M13 2L3 14h8l-1 8 11-13h-8l0-7z"></path>
@@ -141,9 +141,9 @@
                 <label class="block text-sm font-medium text-gray-700 mb-2">Enunciado *</label>
                 <input type="hidden" name="enunciado" id="enunciado-jornada" required>
                 <div class="editor-toolbar">
-                    <button type="button" class="tb-btn" title="Negrito" onmousedown="event.preventDefault();saveSelJornada()" onclick="fmtEnunciadoJornada('bold')"><b>B</b></button>
-                    <button type="button" class="tb-btn" title="Itálico" onmousedown="event.preventDefault()" onclick="fmtEnunciadoJornada('italic')"><i>I</i></button>
-                    <button type="button" class="tb-btn" title="Sublinhado" onmousedown="event.preventDefault()" onclick="fmtEnunciadoJornada('underline')"><u>U</u></button>
+                    <button type="button" class="tb-btn" title="Negrito" onmousedown="event.preventDefault();saveSelJornada()" data-csp-click="fmtEnunciadoJornada" data-csp-arg="bold"><b>B</b></button>
+                    <button type="button" class="tb-btn" title="Itálico" onmousedown="event.preventDefault()" data-csp-click="fmtEnunciadoJornada" data-csp-arg="italic"><i>I</i></button>
+                    <button type="button" class="tb-btn" title="Sublinhado" onmousedown="event.preventDefault()" data-csp-click="fmtEnunciadoJornada" data-csp-arg="underline"><u>U</u></button>
                     <div class="tb-sep"></div>
                     <button type="button" class="tb-btn" title="Lista com marcadores" onmousedown="event.preventDefault();saveSelJornada();fmtEnunciadoJornada('insertUnorderedList')">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="4" cy="18" r="1.5" fill="currentColor"/></svg>
@@ -155,10 +155,10 @@
                     <button type="button" class="tb-btn tb-font-size" title="Diminuir letra" onmousedown="event.preventDefault();fmtFontSizeJornada(-1)"><span>A−</span></button>
                     <button type="button" class="tb-btn tb-font-size" title="Aumentar letra" onmousedown="event.preventDefault();fmtFontSizeJornada(1)"><span>A+</span></button>
                     <div class="tb-sep"></div>
-                    <button type="button" class="tb-btn" title="Alinhar esquerda" onmousedown="event.preventDefault()" onclick="fmtEnunciadoJornada('justifyLeft')">
+                    <button type="button" class="tb-btn" title="Alinhar esquerda" onmousedown="event.preventDefault()" data-csp-click="fmtEnunciadoJornada" data-csp-arg="justifyLeft">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
                     </button>
-                    <button type="button" class="tb-btn" title="Centralizar" onmousedown="event.preventDefault()" onclick="fmtEnunciadoJornada('justifyCenter')">
+                    <button type="button" class="tb-btn" title="Centralizar" onmousedown="event.preventDefault()" data-csp-click="fmtEnunciadoJornada" data-csp-arg="justifyCenter">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
                     </button>
                     <div class="tb-sep"></div>
@@ -235,7 +235,7 @@
     <div class="bg-white rounded-xl shadow-2xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center mb-6">
             <h3 class="text-2xl font-bold text-gray-900">📷 Ler Questão de Imagem</h3>
-            <button onclick="fecharModalLerImagem()" class="text-gray-400 hover:text-gray-600">
+            <button data-csp-click="fecharModalLerImagem" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
@@ -264,7 +264,7 @@
                 </div>
                 <div id="preview-imagem-ler" class="mt-4 hidden">
                     <img id="preview-img-ler" src="" alt="Preview" class="max-w-full max-h-64 rounded-lg border border-gray-300">
-                    <button type="button" onclick="removerImagemLer()" class="mt-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm">
+                    <button type="button" data-csp-click="removerImagemLer" class="mt-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm">
                         Remover Imagem
                     </button>
                 </div>
@@ -272,7 +272,7 @@
             </div>
             
             <div class="flex justify-end space-x-3 pt-4 border-t">
-                <button type="button" onclick="fecharModalLerImagem()" 
+                <button type="button" data-csp-click="fecharModalLerImagem" 
                         class="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">
                     Cancelar
                 </button>
@@ -300,7 +300,7 @@
     <div class="bg-white rounded-xl shadow-2xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center mb-6">
             <h3 class="text-2xl font-bold text-gray-900">Gerar exercícios pela Tudinha</h3>
-            <button onclick="fecharModalGerarIA()" class="text-gray-400 hover:text-gray-600">
+            <button data-csp-click="fecharModalGerarIA" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
@@ -423,7 +423,7 @@
             </div>
             
             <div class="flex justify-end space-x-3 pt-4 border-t">
-                <button type="button" onclick="fecharModalGerarIA()" 
+                <button type="button" data-csp-click="fecharModalGerarIA" 
                         class="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">
                     Cancelar
                 </button>
@@ -2254,7 +2254,7 @@ function abrirModalEdicao(exercicio) {
             <div class="bg-white rounded-xl shadow-2xl p-6 max-w-5xl w-full mx-4 max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="text-2xl font-bold text-gray-900">Editar Exercício</h3>
-                    <button onclick="fecharModalEdicao()" class="text-gray-400 hover:text-gray-600">
+                    <button data-csp-click="fecharModalEdicao" class="text-gray-400 hover:text-gray-600">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
@@ -2285,9 +2285,9 @@ function abrirModalEdicao(exercicio) {
                         <label class="block text-sm font-medium text-gray-700 mb-2">Enunciado *</label>
                         <input type="hidden" name="enunciado" id="edit-enunciado-hidden" required>
                         <div class="editor-toolbar">
-                            <button type="button" class="tb-btn" title="Negrito" onmousedown="event.preventDefault();saveSelEdicao()" onclick="fmtEnunciadoEdicao('bold')"><b>B</b></button>
-                            <button type="button" class="tb-btn" title="Itálico" onmousedown="event.preventDefault()" onclick="fmtEnunciadoEdicao('italic')"><i>I</i></button>
-                            <button type="button" class="tb-btn" title="Sublinhado" onmousedown="event.preventDefault()" onclick="fmtEnunciadoEdicao('underline')"><u>U</u></button>
+                            <button type="button" class="tb-btn" title="Negrito" onmousedown="event.preventDefault();saveSelEdicao()" data-csp-click="fmtEnunciadoEdicao" data-csp-arg="bold"><b>B</b></button>
+                            <button type="button" class="tb-btn" title="Itálico" onmousedown="event.preventDefault()" data-csp-click="fmtEnunciadoEdicao" data-csp-arg="italic"><i>I</i></button>
+                            <button type="button" class="tb-btn" title="Sublinhado" onmousedown="event.preventDefault()" data-csp-click="fmtEnunciadoEdicao" data-csp-arg="underline"><u>U</u></button>
                             <div class="tb-sep"></div>
                             <button type="button" class="tb-btn" title="Lista com marcadores" onmousedown="event.preventDefault();saveSelEdicao();fmtEnunciadoEdicao('insertUnorderedList')">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="4" cy="18" r="1.5" fill="currentColor"/></svg>
@@ -2299,10 +2299,10 @@ function abrirModalEdicao(exercicio) {
                             <button type="button" class="tb-btn tb-font-size" title="Diminuir letra" onmousedown="event.preventDefault();fmtFontSizeEdicao(-1)"><span>A−</span></button>
                             <button type="button" class="tb-btn tb-font-size" title="Aumentar letra" onmousedown="event.preventDefault();fmtFontSizeEdicao(1)"><span>A+</span></button>
                             <div class="tb-sep"></div>
-                            <button type="button" class="tb-btn" title="Alinhar esquerda" onmousedown="event.preventDefault()" onclick="fmtEnunciadoEdicao('justifyLeft')">
+                            <button type="button" class="tb-btn" title="Alinhar esquerda" onmousedown="event.preventDefault()" data-csp-click="fmtEnunciadoEdicao" data-csp-arg="justifyLeft">
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
                             </button>
-                            <button type="button" class="tb-btn" title="Centralizar" onmousedown="event.preventDefault()" onclick="fmtEnunciadoEdicao('justifyCenter')">
+                            <button type="button" class="tb-btn" title="Centralizar" onmousedown="event.preventDefault()" data-csp-click="fmtEnunciadoEdicao" data-csp-arg="justifyCenter">
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
                             </button>
                             <div class="tb-sep"></div>
@@ -2334,13 +2334,13 @@ function abrirModalEdicao(exercicio) {
                         <p class="text-sm font-medium text-gray-700 mb-3">Imagem do Enunciado (opcional)</p>
                         <div id="edit-imagem-enunciado-preview" class="hidden mb-3">
                             <img id="edit-imagem-enunciado-img" src="" alt="Preview" class="max-w-full max-h-40 rounded-lg border border-gray-200 shadow-sm object-contain">
-                            <button type="button" onclick="removerImagemEnunciadoEdicao()" class="mt-2 px-3 py-1.5 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors">Remover imagem</button>
+                            <button type="button" data-csp-click="removerImagemEnunciadoEdicao" class="mt-2 px-3 py-1.5 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors">Remover imagem</button>
                         </div>
                         <div id="edit-imagem-enunciado-actions" class="flex flex-wrap items-center gap-2">
                             <input type="file" id="edit-imagem-enunciado" accept="image/*" class="hidden" onchange="uploadImagemEnunciadoEdicao(this)">
                             <button type="button" onclick="document.getElementById('edit-imagem-enunciado').click()"
                                     class="inline-flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 hover:border-gray-400 transition-colors shadow-sm">📷 Escolher arquivo</button>
-                            <button type="button" id="btn-colar-imagem-edit" onclick="ativarColarImagemEdicao()"
+                            <button type="button" id="btn-colar-imagem-edit" data-csp-click="ativarColarImagemEdicao"
                                     class="inline-flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 hover:border-gray-400 transition-colors shadow-sm">📋 Colar imagem</button>
                         </div>
                         <input type="hidden" name="imagem_url" id="edit-imagem-url" value="">
@@ -2359,7 +2359,7 @@ function abrirModalEdicao(exercicio) {
                         </div>
                         <div id="edit-opcoes-lista" class="space-y-3 mb-3"></div>
                         <div class="flex items-center justify-between">
-                            <button type="button" onclick="adicionarOpcaoEdicao()" class="px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors">
+                            <button type="button" data-csp-click="adicionarOpcaoEdicao" class="px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors">
                                 + Adicionar Alternativa
                             </button>
                             <span class="text-xs text-gray-500">Máximo 5 alternativas (A, B, C, D, E)</span>
@@ -2383,7 +2383,7 @@ function abrirModalEdicao(exercicio) {
                     </div>
                     
                     <div class="flex justify-end space-x-3 pt-4 border-t">
-                        <button type="button" onclick="fecharModalEdicao()" 
+                        <button type="button" data-csp-click="fecharModalEdicao" 
                                 class="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">
                             Cancelar
                         </button>

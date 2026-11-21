@@ -99,7 +99,7 @@ $moduloOcorrencias = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::is
                     <h2 class="text-lg font-bold text-gray-900">Lista de chamada</h2>
                     <p class="text-sm text-gray-500">Todos começam como presentes; marque somente as exceções.</p>
                 </div>
-                <button type="button" onclick="marcarTodosPresentes()" class="px-3 py-2 text-sm border border-green-300 text-green-800 rounded-lg hover:bg-green-50">Marcar todos presentes</button>
+                <button type="button" data-csp-click="marcarTodosPresentes" class="px-3 py-2 text-sm border border-green-300 text-green-800 rounded-lg hover:bg-green-50">Marcar todos presentes</button>
             </div>
             <?php if (empty($alunos)): ?>
                 <p class="p-6 text-gray-500">Nenhum aluno ativo encontrado nesta turma.</p>
@@ -216,14 +216,14 @@ $moduloOcorrencias = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::is
                 <p class="text-xs font-semibold uppercase tracking-wider text-gray-500">Observação do aluno</p>
                 <h3 class="text-lg font-bold text-gray-900" id="modalObsNome"></h3>
             </div>
-            <button onclick="fecharObs()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <button data-csp-click="fecharObs" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
         </div>
         <div class="flex-1 overflow-y-auto px-6 py-4">
             <div id="editorObsAluno" style="min-height:220px"></div>
         </div>
         <div class="flex gap-3 px-6 py-4 border-t border-gray-100">
-            <button type="button" onclick="fecharObs()" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Cancelar</button>
-            <button type="button" onclick="salvarObs()" class="flex-1 px-4 py-2.5 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700"><i class="fa-solid fa-check mr-2"></i>Confirmar</button>
+            <button type="button" data-csp-click="fecharObs" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Cancelar</button>
+            <button type="button" data-csp-click="salvarObs" class="flex-1 px-4 py-2.5 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700"><i class="fa-solid fa-check mr-2"></i>Confirmar</button>
         </div>
     </div>
 </div>

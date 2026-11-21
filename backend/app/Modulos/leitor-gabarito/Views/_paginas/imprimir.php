@@ -25,7 +25,7 @@ $baseUrl = URL . ($base ?? '');
 </head>
 <body>
     <div class="barra">
-        <button type="button" onclick="window.print()">Imprimir</button>
+        <button type="button" data-csp-click="print">Imprimir</button>
         <span>Tamanho real, sem “ajustar à página”. Margem pequena para as marcas dos cantos não serem cortadas.</span>
     </div>
     <?php if ($folhas === []): ?>

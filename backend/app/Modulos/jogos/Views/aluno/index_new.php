@@ -67,11 +67,11 @@ $partidaAtiva = $data['partidaAtiva'] ?? null;
                     <p class="text-white">Você tem uma partida ativa na pergunta <?= $partidaAtiva['pergunta_atual'] ?? 1 ?></p>
                     <p class="text-white">Prêmio atual: R$ <?= number_format($partidaAtiva['premio_atual'] ?? 0, 2, ',', '.') ?></p>
                 </div>
-                <button onclick="continuarPartida()" class="continue-button">
+                <button data-csp-click="continuarPartida" class="continue-button">
                     ▶️ Continuar Partida
                 </button>
             <?php else: ?>
-                <button onclick="iniciarPartida()" class="start-button">
+                <button data-csp-click="iniciarPartida" class="start-button">
                     🚀 Iniciar Nova Partida
                 </button>
             <?php endif; ?>
@@ -165,10 +165,10 @@ function carregarJogo(data) {
                 </div>
                 <!-- Botões de Ação -->
                 <div class="header-controls">
-                    <button onclick="pausarJogo()" class="control-btn pause-btn">
+                    <button data-csp-click="pausarJogo" class="control-btn pause-btn">
                         ⏸️ Pausar
                     </button>
-                    <button onclick="fecharJogo()" class="control-btn exit-btn">
+                    <button data-csp-click="fecharJogo" class="control-btn exit-btn">
                         🚪 Sair
                     </button>
                 </div>
@@ -189,19 +189,19 @@ function carregarJogo(data) {
 
             <!-- Alternativas -->
             <div class="alternativas-container">
-                <button onclick="selecionarResposta('A')" class="alternativa-btn">
+                <button data-csp-click="selecionarResposta" data-csp-arg="A" class="alternativa-btn">
                     <div class="letra-alt">A</div>
                     <span class="texto-alt">${data.pergunta.alternativa_a}</span>
                 </button>
-                <button onclick="selecionarResposta('B')" class="alternativa-btn">
+                <button data-csp-click="selecionarResposta" data-csp-arg="B" class="alternativa-btn">
                     <div class="letra-alt">B</div>
                     <span class="texto-alt">${data.pergunta.alternativa_b}</span>
                 </button>
-                <button onclick="selecionarResposta('C')" class="alternativa-btn">
+                <button data-csp-click="selecionarResposta" data-csp-arg="C" class="alternativa-btn">
                     <div class="letra-alt">C</div>
                     <span class="texto-alt">${data.pergunta.alternativa_c}</span>
                 </button>
-                <button onclick="selecionarResposta('D')" class="alternativa-btn">
+                <button data-csp-click="selecionarResposta" data-csp-arg="D" class="alternativa-btn">
                     <div class="letra-alt">D</div>
                     <span class="texto-alt">${data.pergunta.alternativa_d}</span>
                 </button>
@@ -209,13 +209,13 @@ function carregarJogo(data) {
 
             <!-- Botões de Ajuda -->
             <div class="ajudas-container">
-                <button onclick="usarAjuda('plateia')" class="ajuda-btn" ${ajudasUsadas.plateia ? 'disabled' : ''}>
+                <button data-csp-click="usarAjuda" data-csp-arg="plateia" class="ajuda-btn" ${ajudasUsadas.plateia ? 'disabled' : ''}>
                     💡 Ajuda da Plateia
                 </button>
-                <button onclick="usarAjuda('universitarios')" class="ajuda-btn" ${ajudasUsadas.universitarios ? 'disabled' : ''}>
+                <button data-csp-click="usarAjuda" data-csp-arg="universitarios" class="ajuda-btn" ${ajudasUsadas.universitarios ? 'disabled' : ''}>
                     👥 Universitários
                 </button>
-                <button onclick="usarAjuda('pular')" class="ajuda-btn" ${ajudasUsadas.pular ? 'disabled' : ''}>
+                <button data-csp-click="usarAjuda" data-csp-arg="pular" class="ajuda-btn" ${ajudasUsadas.pular ? 'disabled' : ''}>
                     ⏭️ Pular Pergunta
                 </button>
             </div>
@@ -242,7 +242,7 @@ function selecionarResposta(resposta) {
     });
     
     // Marcar resposta selecionada
-    const selectedBtn = document.querySelector(`[onclick="selecionarResposta('${resposta}')"]`);
+    const selectedBtn = document.querySelector(`[data-csp-click="selecionarResposta" data-csp-arg="${resposta}"]`);
     selectedBtn.classList.add('selected');
     
     // Enviar resposta
@@ -306,7 +306,7 @@ function usarAjuda(tipo) {
             showNotification(`Ajuda "${tipo}" utilizada!`, 'info');
             
             // Atualizar botão
-            const btn = document.querySelector(`[onclick="usarAjuda('${tipo}')"]`);
+            const btn = document.querySelector(`[data-csp-click="usarAjuda" data-csp-arg="${tipo}"]`);
             btn.disabled = true;
             btn.style.opacity = '0.5';
         } else {

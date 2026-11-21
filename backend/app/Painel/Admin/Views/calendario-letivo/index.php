@@ -149,11 +149,11 @@ $btnBarra = 'inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-lg
         <div class="min-w-2 flex-1" aria-hidden="true"></div>
         <div class="flex shrink-0 items-center gap-2">
             <div class="inline-flex h-10 shrink-0 items-center overflow-hidden rounded-lg border border-gray-300 bg-white">
-                <button type="button" id="btnViewYear" onclick="setView('year')" class="inline-flex h-full items-center whitespace-nowrap px-3 text-sm font-medium text-gray-700 transition-colors" title="Ano inteiro"><i class="fa-solid fa-calendar-days mr-1.5"></i>Ano</button>
-                <button type="button" id="btnViewMonth" onclick="setView('month')" class="inline-flex h-full items-center whitespace-nowrap border-l border-gray-300 px-3 text-sm font-medium text-gray-700 transition-colors" title="Mês atual"><i class="fa-solid fa-calendar mr-1.5"></i>Mês</button>
+                <button type="button" id="btnViewYear" data-csp-click="setView" data-csp-arg="year" class="inline-flex h-full items-center whitespace-nowrap px-3 text-sm font-medium text-gray-700 transition-colors" title="Ano inteiro"><i class="fa-solid fa-calendar-days mr-1.5"></i>Ano</button>
+                <button type="button" id="btnViewMonth" data-csp-click="setView" data-csp-arg="month" class="inline-flex h-full items-center whitespace-nowrap border-l border-gray-300 px-3 text-sm font-medium text-gray-700 transition-colors" title="Mês atual"><i class="fa-solid fa-calendar mr-1.5"></i>Mês</button>
             </div>
             <div id="navMes" class="hidden shrink-0 items-center gap-1">
-                <button type="button" onclick="navMes(-1)" class="inline-flex h-10 items-center rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 hover:bg-gray-50" aria-label="Mês anterior"><i class="fa-solid fa-chevron-left"></i></button>
+                <button type="button" data-csp-click="navMes" data-csp-arg="-1" class="inline-flex h-10 items-center rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 hover:bg-gray-50" aria-label="Mês anterior"><i class="fa-solid fa-chevron-left"></i></button>
                 <span id="labelMes" class="w-28 whitespace-nowrap text-center text-sm font-semibold text-gray-700"></span>
                 <button type="button" onclick="navMes(+1)" class="inline-flex h-10 items-center rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 hover:bg-gray-50" aria-label="Próximo mês"><i class="fa-solid fa-chevron-right"></i></button>
             </div>
@@ -161,19 +161,19 @@ $btnBarra = 'inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-lg
     </div>
     <div class="flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto py-0.5">
         <div class="flex shrink-0 items-center gap-2">
-        <button type="button" onclick="openFilterDrawer()" class="<?= $btnBarra ?>">
+        <button type="button" data-csp-click="openFilterDrawer" class="<?= $btnBarra ?>">
             <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
             Filtros
             <span id="badgeFiltrosCalendario" class="ml-2 hidden h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-blue-600 px-1.5 text-xs font-semibold text-white">0</span>
         </button>
         <?php if ($variosPronto): ?>
-        <button type="button" onclick="openNovoCalendario()" class="<?= $btnBarra ?>">
+        <button type="button" data-csp-click="openNovoCalendario" class="<?= $btnBarra ?>">
             <i class="fa-solid fa-plus mr-2 text-gray-500"></i>Novo calendário
         </button>
         <?php endif; ?>
-        <button type="button" onclick="openConfigDrawer()" class="<?= $btnBarra ?>"><i class="fa-solid fa-gear mr-2 text-gray-500"></i>Configurar ano</button>
+        <button type="button" data-csp-click="openConfigDrawer" class="<?= $btnBarra ?>"><i class="fa-solid fa-gear mr-2 text-gray-500"></i>Configurar ano</button>
         <?php if ($config): ?>
-        <button type="button" onclick="openEventosDrawer()" class="<?= $btnBarra ?>">
+        <button type="button" data-csp-click="openEventosDrawer" class="<?= $btnBarra ?>">
             <i class="fa-solid fa-list-ul mr-2 text-gray-500"></i>Eventos
             <span class="ml-2 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-gray-100 px-1.5 text-xs font-semibold text-gray-600"><?= count($eventos) ?></span>
         </button>
@@ -181,10 +181,10 @@ $btnBarra = 'inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-lg
         </div>
         <div class="min-w-2 flex-1" aria-hidden="true"></div>
         <?php if (($user['perfil_admin'] ?? '') === 'dev'): ?>
-        <button type="button" onclick="abrirTrilhaCalendario()" class="<?= $btnBarra ?>"><i class="fa-solid fa-clock-rotate-left mr-2 text-gray-500"></i>Log</button>
+        <button type="button" data-csp-click="abrirTrilhaCalendario" class="<?= $btnBarra ?>"><i class="fa-solid fa-clock-rotate-left mr-2 text-gray-500"></i>Log</button>
         <?php endif; ?>
         <?php if ($config): ?>
-        <button type="button" onclick="openEventoDrawer()" class="btn-primary-custom inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-lg px-4 text-sm font-semibold shadow-sm hover:opacity-90"><i class="fa-solid fa-plus mr-2"></i>Adicionar evento</button>
+        <button type="button" data-csp-click="openEventoDrawer" class="btn-primary-custom inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-lg px-4 text-sm font-semibold shadow-sm hover:opacity-90"><i class="fa-solid fa-plus mr-2"></i>Adicionar evento</button>
         <?php endif; ?>
     </div>
 </div>
@@ -385,7 +385,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
 </div><!-- /viewAno -->
 
 <?php if ($config): ?>
-<div id="eventosDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeEventosDrawer()"></div>
+<div id="eventosDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeEventosDrawer"></div>
 <aside id="eventosDrawer"
        class="fixed top-0 right-0 z-50 flex h-full w-full max-w-3xl translate-x-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-in-out"
        aria-hidden="true">
@@ -394,7 +394,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
             <h2 class="text-xl font-bold text-gray-900">Eventos cadastrados</h2>
             <p class="mt-0.5 text-sm text-gray-500"><?= count($eventos) ?> neste calendário</p>
         </div>
-        <button type="button" onclick="closeEventosDrawer()" class="p-1 text-gray-400 hover:text-gray-600" aria-label="Fechar">
+        <button type="button" data-csp-click="closeEventosDrawer" class="p-1 text-gray-400 hover:text-gray-600" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -495,13 +495,13 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
 <?php endif; ?>
 
 <!-- Offcanvas: Configurar ano -->
-<div id="configDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeConfigDrawer()"></div>
+<div id="configDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeConfigDrawer"></div>
 <aside id="configDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
         <h2 id="configDrawerTitle" class="text-xl font-bold text-gray-900">Configurar calendário</h2>
-        <button type="button" onclick="closeConfigDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeConfigDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -590,7 +590,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
             <button type="submit" form="form-excluir-calendario" id="btnExcluirCalendario" onclick="return confirm('Remover este calendário e os eventos dele?');"
                     class="sm:mr-auto px-6 py-2.5 border border-red-200 rounded-lg text-red-700 hover:bg-red-50 transition-colors">Excluir</button>
             <?php endif; ?>
-            <button type="button" onclick="closeConfigDrawer()" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
+            <button type="button" data-csp-click="closeConfigDrawer" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
             <button type="submit" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 transition-colors shadow-sm">Salvar</button>
         </div>
     </form>
@@ -604,7 +604,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
 <?php endif; ?>
 
 <!-- Offcanvas: provas e eventos do dia -->
-<div id="diaDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeDayModal()"></div>
+<div id="diaDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeDayModal"></div>
 <aside id="diaDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
@@ -613,7 +613,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
             <p class="text-xs font-semibold uppercase tracking-wider text-gray-500" id="modalDiaTipoLabel"></p>
             <h2 id="modalDiaData" class="text-xl font-bold text-gray-900"></h2>
         </div>
-        <button type="button" onclick="closeDayModal()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+        <button type="button" data-csp-click="closeDayModal" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -624,13 +624,13 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
 </aside>
 
 <!-- Offcanvas: Adicionar evento -->
-<div id="eventoDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeEventoDrawer()"></div>
+<div id="eventoDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeEventoDrawer"></div>
 <aside id="eventoDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
         <h2 id="eventoDrawerTitle" class="text-xl font-bold text-gray-900">Adicionar evento</h2>
-        <button type="button" onclick="closeEventoDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeEventoDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -710,7 +710,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
                             <p id="novoTipoErro" class="hidden text-xs text-red-600"></p>
                             <div class="flex justify-end gap-2">
                                 <button type="button" onclick="toggleNovoTipo(false)" class="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50">Cancelar</button>
-                                <button type="button" id="btnSalvarTipo" onclick="salvarNovoTipo()" class="btn-primary-custom px-3 py-1.5 text-xs font-semibold rounded-lg">Salvar tipo</button>
+                                <button type="button" id="btnSalvarTipo" data-csp-click="salvarNovoTipo" class="btn-primary-custom px-3 py-1.5 text-xs font-semibold rounded-lg">Salvar tipo</button>
                             </div>
                         </div>
                         <?php endif; ?>
@@ -835,7 +835,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col gap-3">
             <p id="erro_evento_formulario" tabindex="-1" class="hidden text-sm text-red-600" role="alert"></p>
             <div class="flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="closeEventoDrawer()" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
+            <button type="button" data-csp-click="closeEventoDrawer" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
             <button type="submit" id="eventoSubmitBtn" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 transition-colors shadow-sm">
                 <i class="fa-solid fa-plus mr-2"></i>Adicionar
             </button>
@@ -844,7 +844,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
     </form>
 </aside>
 
-<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeFilterDrawer"></div>
 <aside id="filterDrawer"
        class="fixed top-0 right-0 z-50 flex h-full w-full max-w-md translate-x-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-in-out"
        aria-hidden="true">
@@ -853,7 +853,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
             <h3 class="text-lg font-semibold text-gray-900">Filtrar calendário</h3>
             <p class="mt-0.5 text-xs text-gray-500">Tipo e nome do evento.</p>
         </div>
-        <button type="button" onclick="closeFilterDrawer()" class="p-1 text-gray-400 hover:text-gray-600" aria-label="Fechar filtros">
+        <button type="button" data-csp-click="closeFilterDrawer" class="p-1 text-gray-400 hover:text-gray-600" aria-label="Fechar filtros">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -879,7 +879,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
             </fieldset>
         </div>
         <div class="flex gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
-            <button type="button" onclick="limparFiltrosCalendario()" class="inline-flex flex-1 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50">Limpar</button>
+            <button type="button" data-csp-click="limparFiltrosCalendario" class="inline-flex flex-1 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50">Limpar</button>
             <button type="submit" class="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">Aplicar filtros</button>
         </div>
     </form>

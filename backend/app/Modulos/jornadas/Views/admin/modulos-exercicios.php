@@ -25,10 +25,10 @@
 <!-- Tabs: Criar Manual / Gerar por IA -->
 <div class="bg-white rounded-xl shadow-lg p-6 mb-6 border border-purple-200">
     <div class="flex space-x-4 mb-6">
-        <button onclick="mostrarFormManual()" id="tab-manual" class="btn-primary-custom tab-exercicio active px-6 py-3 rounded-lg font-medium">
+        <button data-csp-click="mostrarFormManual" id="tab-manual" class="btn-primary-custom tab-exercicio active px-6 py-3 rounded-lg font-medium">
             ✏️ Criar Manualmente
         </button>
-        <button onclick="mostrarFormIA()" id="tab-ia" class="tab-exercicio px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">
+        <button data-csp-click="mostrarFormIA" id="tab-ia" class="tab-exercicio px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">
             🤖 Gerar com IA
         </button>
     </div>
@@ -73,7 +73,7 @@
                 <label class="block text-sm font-medium text-gray-700 mb-2">Alternativas (Múltipla Escolha) *</label>
                 <div id="opcoes-lista" class="space-y-3 mb-3"></div>
                 <div class="flex items-center justify-between">
-                    <button type="button" onclick="adicionarOpcao()" class="btn-primary-custom px-4 py-2 rounded text-sm transition-colors hover:opacity-90">
+                    <button type="button" data-csp-click="adicionarOpcao" class="btn-primary-custom px-4 py-2 rounded text-sm transition-colors hover:opacity-90">
                         + Adicionar Alternativa
                     </button>
                     <span class="text-xs text-gray-500">Máximo 5 alternativas (A, B, C, D, E)</span>
@@ -574,7 +574,7 @@ function abrirModalEdicao(exercicio) {
             <div class="bg-white rounded-xl shadow-2xl p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="text-2xl font-bold text-gray-900">Editar Exercício</h3>
-                    <button onclick="fecharModalEdicao()" class="text-gray-400 hover:text-gray-600">
+                    <button data-csp-click="fecharModalEdicao" class="text-gray-400 hover:text-gray-600">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
@@ -617,7 +617,7 @@ function abrirModalEdicao(exercicio) {
                         <label class="block text-sm font-medium text-gray-700 mb-2">Alternativas (Múltipla Escolha) *</label>
                         <div id="edit-opcoes-lista" class="space-y-3 mb-3"></div>
                         <div class="flex items-center justify-between">
-                            <button type="button" onclick="adicionarOpcaoEdicao()" class="btn-primary-custom px-4 py-2 rounded text-sm transition-colors hover:opacity-90">
+                            <button type="button" data-csp-click="adicionarOpcaoEdicao" class="btn-primary-custom px-4 py-2 rounded text-sm transition-colors hover:opacity-90">
                                 + Adicionar Alternativa
                             </button>
                             <span class="text-xs text-gray-500">Máximo 5 alternativas (A, B, C, D, E)</span>
@@ -640,7 +640,7 @@ function abrirModalEdicao(exercicio) {
                     </div>
                     
                     <div class="flex justify-end space-x-3 pt-4 border-t">
-                        <button type="button" onclick="fecharModalEdicao()" 
+                        <button type="button" data-csp-click="fecharModalEdicao" 
                                 class="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">
                             Cancelar
                         </button>

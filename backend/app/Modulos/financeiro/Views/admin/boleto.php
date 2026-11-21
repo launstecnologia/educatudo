@@ -6,7 +6,7 @@ $page_header_title    = 'Boleto — ' . $installment['descricao'];
 $page_header_subtitle = 'Simulado · Sem validade bancária real';
 ob_start(); ?>
 <a href="<?= URL ?>/admin/finance/installments/<?= (int)$installment['id'] ?>" class="btn-secondary text-sm">← Voltar</a>
-<button onclick="window.print()" class="btn-primary text-sm"><i class="fa-solid fa-print mr-1"></i> Imprimir</button>
+<button data-csp-click="print" class="btn-primary text-sm"><i class="fa-solid fa-print mr-1"></i> Imprimir</button>
 <?php $page_header_actions = ob_get_clean();
 include \App\Core\ViewPaths::adminPartial('page_header_list.php'); ?>
 

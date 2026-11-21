@@ -39,12 +39,12 @@ $trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/cursos-series', 'Cursos 
             ?>
             <?php endif; ?>
             <?php if ($schema_ready): ?>
-            <button type="button" onclick="openSerieDrawer()"
+            <button type="button" data-csp-click="openSerieDrawer"
                class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
                 <i class="fa-solid fa-plus mr-2"></i>
                 Nova Série / Ano Escolar
             </button>
-            <button type="button" onclick="openCursoDrawer()"
+            <button type="button" data-csp-click="openCursoDrawer"
                class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
                 <i class="fa-solid fa-plus mr-2"></i>
                 Novo Curso
@@ -69,7 +69,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
 <div class="bg-white rounded-xl shadow-sm border border-gray-200 px-6 py-12 text-center text-gray-500">
     <i class="fa-solid fa-graduation-cap text-4xl text-gray-300 mb-4"></i>
     <p>Nenhum curso cadastrado</p>
-    <button type="button" onclick="openCursoDrawer()"
+    <button type="button" data-csp-click="openCursoDrawer"
        class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
         <i class="fa-solid fa-plus mr-2"></i>
         Cadastrar o primeiro curso

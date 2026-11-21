@@ -103,7 +103,7 @@ $queryBase = static function (array $extra = []) use ($filtros, $aba): string {
                 </button>
             </form>
             <?php endif; ?>
-            <button type="button" onclick="openFilterDrawer()"
+            <button type="button" data-csp-click="openFilterDrawer"
                     class="relative inline-flex items-center px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors">
                 <i class="fa-solid fa-filter mr-2 text-slate-500"></i>
                 Filtros
@@ -347,11 +347,11 @@ $queryBase = static function (array $extra = []) use ($filtros, $aba): string {
 
 <!-- Drawer filtros -->
 <div id="filterDrawer" class="fixed inset-0 z-50 hidden" aria-hidden="true">
-    <div class="absolute inset-0 bg-slate-900/40" onclick="closeFilterDrawer()"></div>
+    <div class="absolute inset-0 bg-slate-900/40" data-csp-click="closeFilterDrawer"></div>
     <div class="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-xl flex flex-col">
         <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
             <h3 class="text-lg font-semibold text-slate-900">Filtros</h3>
-            <button type="button" onclick="closeFilterDrawer()" class="p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
+            <button type="button" data-csp-click="closeFilterDrawer" class="p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>

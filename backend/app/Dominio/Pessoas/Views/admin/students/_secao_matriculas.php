@@ -109,7 +109,7 @@
                     </div>
                 <?php endif; ?>
 
-                <button type="button" onclick="toggleHistoricoTurmas()" class="mt-4 text-sm font-semibold text-blue-600 hover:text-blue-800 inline-flex items-center">
+                <button type="button" data-csp-click="toggleHistoricoTurmas" class="mt-4 text-sm font-semibold text-blue-600 hover:text-blue-800 inline-flex items-center">
                     Ver histórico de turmas
                     <i id="icon-historico-chevron" class="fa-solid fa-chevron-down ml-1.5 text-xs transition-transform"></i>
                 </button>

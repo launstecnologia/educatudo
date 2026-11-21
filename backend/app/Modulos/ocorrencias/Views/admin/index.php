@@ -29,7 +29,7 @@ $page_header_title = 'Ocorrências';
 $page_header_subtitle = 'Registro central da vida escolar do aluno. Não altera nota nem frequência.';
 ob_start();
 ?>
-<button type="button" onclick="openFilterDrawer()"
+<button type="button" data-csp-click="openFilterDrawer"
         class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
     <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
     Filtros
@@ -37,7 +37,7 @@ ob_start();
     <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold"><?= $filtrosAtivosCount ?></span>
     <?php endif; ?>
 </button>
-<button type="button" onclick="openOcorrenciaDrawer()"
+<button type="button" data-csp-click="openOcorrenciaDrawer"
    class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
     <i class="fa-solid fa-plus mr-2"></i>
     Nova ocorrência
@@ -51,13 +51,13 @@ $statusLabel = \App\Modulos\Ocorrencias\Models\Ocorrencia::STATUS;
 $gravidadeLabel = \App\Modulos\Ocorrencias\Models\Ocorrencia::GRAVIDADES;
 ?>
 
-<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeFilterDrawer"></div>
 <aside id="filterDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
         <h3 class="text-lg font-semibold text-gray-900">Filtrar ocorrências</h3>
-        <button type="button" onclick="closeFilterDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeFilterDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -134,7 +134,7 @@ $gravidadeLabel = \App\Modulos\Ocorrencias\Models\Ocorrencia::GRAVIDADES;
                 <tr>
                     <td colspan="<?= $schemaEstendido ? 9 : 7 ?>" class="px-6 py-12 text-center text-gray-500">
                         <p>Nenhuma ocorrência encontrada.</p>
-                        <button type="button" onclick="openOcorrenciaDrawer()" class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90">
+                        <button type="button" data-csp-click="openOcorrenciaDrawer" class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90">
                             <i class="fa-solid fa-plus mr-2"></i>Nova ocorrência
                         </button>
                     </td>
@@ -235,13 +235,13 @@ $gravidadeLabel = \App\Modulos\Ocorrencias\Models\Ocorrencia::GRAVIDADES;
 </div>
 <?php endif; ?>
 
-<div id="ocorrenciaDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeOcorrenciaDrawer()"></div>
+<div id="ocorrenciaDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeOcorrenciaDrawer"></div>
 <aside id="ocorrenciaDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
         <h2 class="text-xl font-bold text-gray-900">Nova ocorrência</h2>
-        <button type="button" onclick="closeOcorrenciaDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeOcorrenciaDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -357,7 +357,7 @@ $gravidadeLabel = \App\Modulos\Ocorrencias\Models\Ocorrencia::GRAVIDADES;
             </section>
         </div>
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="closeOcorrenciaDrawer()" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
+            <button type="button" data-csp-click="closeOcorrenciaDrawer" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
             <button type="submit" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 transition-colors shadow-sm">Salvar ocorrência</button>
         </div>
     </form>

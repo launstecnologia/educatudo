@@ -352,7 +352,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                 </div>
             </div>
             <?php if ($recPodeCadastrar): ?>
-            <button type="button" id="rec-nova" onclick="abrirRecuperacao()"
+            <button type="button" id="rec-nova" data-csp-click="abrirRecuperacao"
                     class="btn-primary-custom inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90">
                 + Nova recuperação
             </button>
@@ -426,13 +426,13 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
     </div>
 </form>
 
-<div id="recuperacao-backdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="fecharRecuperacao()"></div>
+<div id="recuperacao-backdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="fecharRecuperacao"></div>
 <aside id="recuperacao-drawer"
        class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
         <h2 id="recuperacao-titulo" class="text-xl font-bold text-gray-900">Nova recuperação</h2>
-        <button type="button" onclick="fecharRecuperacao()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="fecharRecuperacao" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -502,7 +502,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             </section>
         </div>
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="fecharRecuperacao()" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
+            <button type="button" data-csp-click="fecharRecuperacao" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
             <button type="submit" form="recuperacao-form" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 transition-colors shadow-sm">
                 <span id="recuperacao-salvar">Salvar</span>
             </button>
@@ -650,10 +650,10 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
             var id = parseInt(item.id, 10) || 0;
             var acoes = '';
             if (podeAlterar) {
-                acoes += '<button type="button" title="Editar" aria-label="Editar" class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-gray-300 bg-white text-gray-600 hover:bg-gray-50" onclick="abrirRecuperacao(' + id + ')"><i class="fa-solid fa-pen" aria-hidden="true"></i></button>';
+                acoes += '<button type="button" title="Editar" aria-label="Editar" class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-gray-300 bg-white text-gray-600 hover:bg-gray-50" data-csp-click="abrirRecuperacao" data-csp-arg=" + id + "><i class="fa-solid fa-pen" aria-hidden="true"></i></button>';
             }
             if (podeExcluir) {
-                acoes += '<button type="button" title="Excluir" aria-label="Excluir" class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-gray-300 bg-white text-red-500 hover:bg-red-50" onclick="excluirRecuperacao(' + id + ')"><i class="fa-solid fa-trash-can" aria-hidden="true"></i></button>';
+                acoes += '<button type="button" title="Excluir" aria-label="Excluir" class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-gray-300 bg-white text-red-500 hover:bg-red-50" data-csp-click="excluirRecuperacao" data-csp-arg=" + id + "><i class="fa-solid fa-trash-can" aria-hidden="true"></i></button>';
             }
             var quem = 'Abaixo de ' + texto(item.nota_minima);
             if (String(item.permite_aumentar) === '1') {

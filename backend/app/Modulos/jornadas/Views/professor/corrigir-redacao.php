@@ -65,7 +65,7 @@
                     <?php if (($versao_atual ?? 1) > 1 && !empty($correcao_versao_anterior ?? null)): ?>
                         <button 
                             type="button"
-                            onclick="usarCorrecaoVersaoAnterior()"
+                            data-csp-click="usarCorrecaoVersaoAnterior"
                             id="btnUsarVersaoAnterior"
                             class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2"
                             title="Preencher com a correção da versão anterior"
@@ -84,7 +84,7 @@
                     <?php if ($tudicoinsCorrecaoIa): ?>
                     <button 
                         type="button"
-                        onclick="solicitarCorrecaoIA()"
+                        data-csp-click="solicitarCorrecaoIA"
                         id="btnCorrigirIA"
                         class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium flex items-center gap-2"
                     >
@@ -96,7 +96,7 @@
                     <?php if (!empty($redacao['feedback_ia'])): ?>
                     <button 
                         type="button"
-                        onclick="solicitarCorrecaoIA()"
+                        data-csp-click="solicitarCorrecaoIA"
                         id="btnRefazerCorrecaoIA"
                         class="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium flex items-center gap-2"
                     >
@@ -228,7 +228,7 @@
                                     max="200" 
                                     value="<?= $notaProfessor ?>" 
                                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                                    onchange="calcularNotaFinal()"
+                                    data-csp-change="calcularNotaFinal"
                                     required
                                 >
                             </div>
@@ -289,7 +289,7 @@
                         value="1" 
                         id="usarMediaNotas"
                         <?= $usarMedia ? 'checked' : '' ?>
-                        onchange="calcularNotaFinal()"
+                        data-csp-change="calcularNotaFinal"
                         class="mt-1 mr-3 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     >
                     <div class="flex-1">

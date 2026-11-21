@@ -582,7 +582,7 @@ $gradeJornadasAgenda = !$dashOrdemCustom && ($mostrarJornadasDash || $mostrarAge
     <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
         <div class="px-6 py-4 text-white flex items-center justify-between" style="background-color: <?= htmlspecialchars($modalPrimary) ?>">
             <h2 class="text-xl font-bold flex items-center"><span class="mr-2">📌</span> Mural de Recados</h2>
-            <button type="button" onclick="fecharModalMuralRecado()" class="text-white hover:bg-white/20 p-2 rounded-lg">
+            <button type="button" data-csp-click="fecharModalMuralRecado" class="text-white hover:bg-white/20 p-2 rounded-lg">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
@@ -596,7 +596,7 @@ $gradeJornadasAgenda = !$dashOrdemCustom && ($mostrarJornadasDash || $mostrarAge
             ?></p>
         </div>
         <div class="p-4 border-t bg-gray-50 flex justify-end gap-2">
-            <button type="button" onclick="fecharModalMuralRecado()" class="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg">Fechar</button>
+            <button type="button" data-csp-click="fecharModalMuralRecado" class="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg">Fechar</button>
             <a href="<?= URL ?>/mural-recados" class="px-4 py-2 text-white rounded-lg hover:opacity-90 transition-opacity inline-block" style="background-color: <?= htmlspecialchars($modalPrimary) ?>">Visualizar</a>
         </div>
     </div>
@@ -623,7 +623,7 @@ $gradeJornadasAgenda = !$dashOrdemCustom && ($mostrarJornadasDash || $mostrarAge
                     </h2>
                     <p class="text-sm text-purple-100 mt-1">Complete seu perfil para personalizar sua experiência de aprendizado</p>
                 </div>
-                <button onclick="fecharModalOnboarding()" 
+                <button data-csp-click="fecharModalOnboarding" 
                         class="text-white hover:bg-white/20 p-2 rounded-lg transition-colors">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -750,7 +750,7 @@ $gradeJornadasAgenda = !$dashOrdemCustom && ($mostrarJornadasDash || $mostrarAge
         <!-- Footer do Modal -->
         <div class="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
             <button type="button" 
-                    onclick="fecharModalOnboarding()"
+                    data-csp-click="fecharModalOnboarding"
                     class="px-6 py-2.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors font-semibold">
                 Cancelar
             </button>

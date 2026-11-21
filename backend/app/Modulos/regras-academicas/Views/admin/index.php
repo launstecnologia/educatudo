@@ -25,7 +25,7 @@ if ((int) ($filtros['serie_id'] ?? 0) > 0) {
 }
 ob_start();
 ?>
-<button type="button" onclick="openFilterDrawer()"
+<button type="button" data-csp-click="openFilterDrawer"
         class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
     <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
     Filtros
@@ -142,14 +142,14 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
     </div>
 </div>
 
-<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeFilterDrawer"></div>
 <aside id="filterDrawer" class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col" aria-hidden="true">
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
         <div>
             <h3 class="text-lg font-semibold text-gray-900">Filtrar regras</h3>
             <p class="mt-0.5 text-xs text-gray-500">Ano letivo, curso e série.</p>
         </div>
-        <button type="button" onclick="closeFilterDrawer()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar filtros"><i class="fa-solid fa-xmark text-xl"></i></button>
+        <button type="button" data-csp-click="closeFilterDrawer" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar filtros"><i class="fa-solid fa-xmark text-xl"></i></button>
     </div>
     <form method="get" action="<?= URL ?>/admin/regras-academicas" class="flex flex-col flex-1 overflow-hidden">
         <div class="flex-1 overflow-y-auto px-6 py-5 space-y-4">

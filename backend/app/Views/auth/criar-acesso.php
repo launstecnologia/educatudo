@@ -31,7 +31,7 @@ $system_title = \App\Core\LayoutHelper::getSystemTitle();
                 <div class="relative">
                     <input id="senha" name="senha" type="password" required class="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg" placeholder="Crie uma senha">
                     <button type="button"
-                            onclick="togglePassword('senha')"
+                            data-csp-click="togglePassword" data-csp-arg="senha"
                             class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">
                         <svg id="senha-eye" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -61,7 +61,7 @@ $system_title = \App\Core\LayoutHelper::getSystemTitle();
                 <div class="relative">
                     <input id="confirmar_senha" name="confirmar_senha" type="password" required class="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg" placeholder="Confirme a senha">
                     <button type="button"
-                            onclick="togglePassword('confirmar_senha')"
+                            data-csp-click="togglePassword" data-csp-arg="confirmar_senha"
                             class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">
                         <svg id="confirmar_senha-eye" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>

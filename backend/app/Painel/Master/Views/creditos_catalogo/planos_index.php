@@ -15,7 +15,7 @@ $destinoLabels = [
         <p class="text-slate-600 text-sm max-w-2xl">Crie vários planos com TudiCoins mensais. Depois, em cada escola → TudiCoins, marque os planos e sincronize. Assinatura B2C no app depende da flag legada <code class="text-xs">creditos_liberar_b2c</code> no layout da escola (não editada mais nesta tela).</p>
     </div>
     <?php if (!$erro_tabela): ?>
-    <button type="button" onclick="openPlanoDrawer()"
+    <button type="button" data-csp-click="openPlanoDrawer"
             class="inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-colors">
         <i class="fa-solid fa-plus mr-2"></i> Novo plano
     </button>
@@ -80,7 +80,7 @@ $destinoLabels = [
                 <tr>
                     <td colspan="6" class="px-6 py-12 text-center text-slate-500 text-sm">
                         Nenhum plano no catálogo.
-                        <button type="button" onclick="openPlanoDrawer()" class="ml-1 text-blue-600 hover:underline font-medium">Criar o primeiro</button>
+                        <button type="button" data-csp-click="openPlanoDrawer" class="ml-1 text-blue-600 hover:underline font-medium">Criar o primeiro</button>
                     </td>
                 </tr>
                 <?php endif; ?>
@@ -89,13 +89,13 @@ $destinoLabels = [
     </div>
 </div>
 
-<div id="planoDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" onclick="closePlanoDrawer()"></div>
+<div id="planoDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" data-csp-click="closePlanoDrawer"></div>
 <aside id="planoDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-xl bg-white shadow-2xl z-[70] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
         <h2 id="planoDrawerTitle" class="text-xl font-bold text-gray-900">Novo plano</h2>
-        <button type="button" onclick="closePlanoDrawer()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+        <button type="button" data-csp-click="closePlanoDrawer" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -145,7 +145,7 @@ $destinoLabels = [
         </div>
 
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="closePlanoDrawer()"
+            <button type="button" data-csp-click="closePlanoDrawer"
                     class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
                 Cancelar
             </button>

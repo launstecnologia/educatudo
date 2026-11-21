@@ -21,7 +21,7 @@ $page_header_subtitle = 'Cadastre e gerencie os professores da escola';
 $trilhaItens = \App\Helpers\TrilhaAdmin::montar('/admin/teachers', 'Professores');
 ob_start();
 ?>
-<button type="button" onclick="openFilterDrawer()"
+<button type="button" data-csp-click="openFilterDrawer"
         class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
     <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
     Filtros
@@ -29,7 +29,7 @@ ob_start();
     <span class="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-600 text-white text-xs font-semibold"><?= $filtrosAtivosCount ?></span>
     <?php endif; ?>
 </button>
-<button type="button" onclick="abrirModalCSV()"
+<button type="button" data-csp-click="abrirModalCSV"
         class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
     <i class="fa-solid fa-file-import mr-2 text-gray-500"></i>
     Importar CSV
@@ -48,7 +48,7 @@ $ui_btn_onclick = 'abrirTrilhaProfessores()';
 include \App\Core\ViewPaths::adminPartial('ui/btn.php');
 ?>
 <?php endif; ?>
-<button type="button" onclick="openTeacherDrawer()"
+<button type="button" data-csp-click="openTeacherDrawer"
         class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
     <i class="fa-solid fa-plus mr-2"></i>
     Novo Professor
@@ -93,7 +93,7 @@ $page_header_actions = ob_get_clean();
                     <td colspan="4" class="px-6 py-12 text-center text-gray-500">
                         <i class="fa-solid fa-chalkboard-user text-4xl text-gray-300 mb-4"></i>
                         <p>Nenhum professor cadastrado</p>
-                        <button type="button" onclick="openTeacherDrawer()" class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
+                        <button type="button" data-csp-click="openTeacherDrawer" class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
                             <i class="fa-solid fa-plus mr-2"></i> Novo Professor
                         </button>
                     </td>
@@ -220,13 +220,13 @@ $page_header_actions = ob_get_clean();
 </div>
 
 <!-- Filtro em drawer lateral -->
-<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeFilterDrawer"></div>
 <aside id="filterDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
         <h3 class="text-lg font-semibold text-gray-900">Filtrar professores</h3>
-        <button type="button" onclick="closeFilterDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeFilterDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -278,7 +278,7 @@ $page_header_actions = ob_get_clean();
             </div>
         </div>
         <div class="px-6 py-4 border-t border-gray-200 flex gap-3 bg-gray-50">
-            <button type="button" onclick="clearFilters()"
+            <button type="button" data-csp-click="clearFilters"
                     class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                 Limpar
             </button>
@@ -296,7 +296,7 @@ $page_header_actions = ob_get_clean();
         <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full">
             <div class="p-6 border-b border-gray-200 flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-gray-900" id="turmasModalTitle">Turmas do Professor</h3>
-                <button type="button" onclick="closeTurmasModal()" class="text-gray-400 hover:text-gray-600">
+                <button type="button" data-csp-click="closeTurmasModal" class="text-gray-400 hover:text-gray-600">
                     <i class="fa-solid fa-xmark text-xl"></i>
                 </button>
             </div>
@@ -304,7 +304,7 @@ $page_header_actions = ob_get_clean();
                 <div id="turmasModalContent" class="text-sm text-gray-700 space-y-2"></div>
             </div>
             <div class="p-4 border-t border-gray-200 flex justify-end">
-                <button type="button" onclick="closeTurmasModal()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm">
+                <button type="button" data-csp-click="closeTurmasModal" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm">
                     Fechar
                 </button>
             </div>
@@ -318,7 +318,7 @@ $page_header_actions = ob_get_clean();
         <div class="p-6 border-b border-gray-200">
             <div class="flex justify-between items-center">
                 <h3 class="text-xl font-bold text-gray-900">Importar Professores via CSV</h3>
-                <button onclick="fecharModalCSV()" class="text-gray-400 hover:text-gray-600">
+                <button data-csp-click="fecharModalCSV" class="text-gray-400 hover:text-gray-600">
                     <i class="fa-solid fa-xmark text-xl"></i>
                 </button>
             </div>
@@ -349,7 +349,7 @@ $page_header_actions = ob_get_clean();
                            class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
                 </div>
                 <div class="flex justify-end space-x-3">
-                    <button type="button" onclick="fecharModalCSV()"
+                    <button type="button" data-csp-click="fecharModalCSV"
                             class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
                         Cancelar
                     </button>
@@ -365,13 +365,13 @@ $page_header_actions = ob_get_clean();
 </div>
 
 <!-- Criar/Editar professor em drawer lateral -->
-<div id="teacherDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeTeacherDrawer()"></div>
+<div id="teacherDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeTeacherDrawer"></div>
 <aside id="teacherDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
         <h2 id="teacherDrawerTitle" class="text-xl font-bold text-gray-900">Novo Professor</h2>
-        <button type="button" onclick="closeTeacherDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeTeacherDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -488,7 +488,7 @@ $page_header_actions = ob_get_clean();
         </div>
 
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="closeTeacherDrawer()"
+            <button type="button" data-csp-click="closeTeacherDrawer"
                     class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
                 Cancelar
             </button>

@@ -74,14 +74,14 @@
                         style="font-family: 'Times New Roman', serif; font-size: 14px; line-height: 1.6;"><?= isset($rascunho) && $rascunho ? htmlspecialchars($rascunho['conteudo'] ?? '') : '' ?></textarea>
                     
                     <div class="mt-4 flex justify-between items-center">
-                        <button onclick="salvarRascunho()" 
+                        <button data-csp-click="salvarRascunho" 
                             class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
                             </svg>
                             Salvar Rascunho
                         </button>
-                        <button onclick="finalizarRedacao()" 
+                        <button data-csp-click="finalizarRedacao" 
                             class="px-6 py-2 bg-gradient-to-r from-purple-500 to-blue-600 text-white rounded-lg hover:from-purple-600 hover:to-blue-700 transition-all font-semibold flex items-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
@@ -100,7 +100,7 @@
                     <div class="text-center">
                         <div id="timer" class="text-3xl font-bold text-green-600 mb-2">00:00:00</div>
                         <div class="text-sm text-gray-600 mb-4">Tempo de escrita</div>
-                        <button id="timerBtn" onclick="toggleTimer()" 
+                        <button id="timerBtn" data-csp-click="toggleTimer" 
                             class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
                             <i class="fas fa-play mr-2"></i>Iniciar
                         </button>

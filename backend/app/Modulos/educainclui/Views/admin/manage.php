@@ -411,7 +411,7 @@ $steps = [
                                     <?php endif; ?>
                                 </p>
                             </div>
-                            <button type="button" onclick="aplicarSugestaoIA()" class="shrink-0 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium">Aplicar no formulário</button>
+                            <button type="button" data-csp-click="aplicarSugestaoIA" class="shrink-0 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium">Aplicar no formulário</button>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
                             <?php foreach ($ai_suggestion['suggested_rules'] as $k => $v): ?>

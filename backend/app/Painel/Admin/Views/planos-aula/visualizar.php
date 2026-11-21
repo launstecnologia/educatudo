@@ -9,7 +9,7 @@
         <div class="flex flex-wrap items-center gap-3">
             <?php if ($contextoIa !== ''): ?>
             <button type="button"
-                    onclick="abrirContextoIaModal()"
+                    data-csp-click="abrirContextoIaModal"
                     class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-colors hover:opacity-90">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
@@ -272,7 +272,7 @@
                 <h3 class="text-lg font-semibold text-gray-900">Texto gerado pela IA</h3>
                 <p class="mt-1 text-sm text-gray-500">Contexto completo para jornadas, atividades e exercícios.</p>
             </div>
-            <button type="button" onclick="fecharContextoIaModal()" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700" aria-label="Fechar">
+            <button type="button" data-csp-click="fecharContextoIaModal" class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700" aria-label="Fechar">
                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
@@ -282,10 +282,10 @@
             <pre id="contextoIaTexto" class="whitespace-pre-wrap rounded-lg bg-gray-50 p-4 text-sm leading-6 text-gray-800"><?= htmlspecialchars($contextoIa) ?></pre>
         </div>
         <div class="flex flex-wrap items-center justify-end gap-3 border-t border-gray-200 px-5 py-4">
-            <button type="button" onclick="copiarContextoIa()" class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-colors hover:opacity-90">
+            <button type="button" data-csp-click="copiarContextoIa" class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-colors hover:opacity-90">
                 Copiar texto
             </button>
-            <button type="button" onclick="fecharContextoIaModal()" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50">
+            <button type="button" data-csp-click="fecharContextoIaModal" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50">
                 Fechar
             </button>
         </div>

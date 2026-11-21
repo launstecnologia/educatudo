@@ -29,7 +29,7 @@
                 <input type="text" name="confirm_text" required class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="CONFIRMAR">
             </div>
             <div class="flex justify-end gap-2 pt-2">
-                <button type="button" onclick="fecharModalInativarAluno()" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700">Cancelar</button>
+                <button type="button" data-csp-click="fecharModalInativarAluno" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700">Cancelar</button>
                 <button type="submit" class="px-4 py-2 rounded-lg bg-orange-600 text-white hover:bg-orange-700">Confirmar inativação</button>
             </div>
         </form>
@@ -55,7 +55,7 @@
                 <input type="text" name="confirm_text" required class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="CONFIRMAR">
             </div>
             <div class="flex justify-end gap-2 pt-2">
-                <button type="button" onclick="fecharModalExcluirAluno()" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700">Cancelar</button>
+                <button type="button" data-csp-click="fecharModalExcluirAluno" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700">Cancelar</button>
                 <button type="submit" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">Confirmar exclusão</button>
             </div>
         </form>
@@ -76,7 +76,7 @@
                 <input type="text" name="confirm_text" required class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="CONFIRMAR">
             </div>
             <div class="flex justify-end gap-2 pt-2">
-                <button type="button" onclick="fecharModalAtivarAluno()" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700">Cancelar</button>
+                <button type="button" data-csp-click="fecharModalAtivarAluno" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700">Cancelar</button>
                 <button type="submit" class="btn-primary-custom px-4 py-2 rounded-lg hover:opacity-90">Confirmar</button>
             </div>
         </form>
@@ -965,7 +965,7 @@ function formatarAnalise(analise) {
                 <h3 class="text-2xl font-bold text-gray-900">Acessar como Pai</h3>
                 <p class="text-sm text-gray-500 mt-1">Selecione qual responsável deseja acessar no portal.</p>
             </div>
-            <button onclick="fecharModalAcessarComoPai()" class="text-gray-400 hover:text-gray-600">
+            <button data-csp-click="fecharModalAcessarComoPai" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
@@ -988,7 +988,7 @@ function formatarAnalise(analise) {
                         </select>
                     </div>
                     <div class="flex justify-end gap-3">
-                        <button type="button" onclick="fecharModalAcessarComoPai()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
+                        <button type="button" data-csp-click="fecharModalAcessarComoPai" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
                             Cancelar
                         </button>
                         <button type="submit" class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">
@@ -1006,7 +1006,7 @@ function formatarAnalise(analise) {
     <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[92vh] overflow-y-auto">
         <div class="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
             <h3 class="text-2xl font-bold text-gray-900">Editar Responsável</h3>
-            <button onclick="fecharModalEditarResponsavel()" class="text-gray-400 hover:text-gray-600">
+            <button data-csp-click="fecharModalEditarResponsavel" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
@@ -1156,7 +1156,7 @@ function formatarAnalise(analise) {
                 <div id="respEditError" class="hidden mt-4 bg-red-100 border border-red-300 text-red-700 px-3 py-2 rounded-lg text-sm"></div>
                 <div id="respEditSuccess" class="hidden mt-4 bg-green-100 border border-green-300 text-green-700 px-3 py-2 rounded-lg text-sm"></div>
                 <div class="flex justify-end gap-3 mt-6">
-                    <button type="button" onclick="fecharModalEditarResponsavel()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancelar</button>
+                    <button type="button" data-csp-click="fecharModalEditarResponsavel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancelar</button>
                     <button type="submit" class="btn-primary-custom px-4 py-2 rounded-lg hover:opacity-90">Salvar alterações</button>
                 </div>
             </form>
@@ -1169,7 +1169,7 @@ function formatarAnalise(analise) {
     <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div class="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
             <h3 class="text-2xl font-bold text-gray-900">Análise da Tudinha</h3>
-            <button onclick="fecharModalAnalise()" class="text-gray-400 hover:text-gray-600">
+            <button data-csp-click="fecharModalAnalise" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
@@ -1188,10 +1188,10 @@ function formatarAnalise(analise) {
             </div>
             
             <div class="flex justify-end space-x-3">
-                <button onclick="fecharModalAnalise()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                <button data-csp-click="fecharModalAnalise" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
                     Cancelar
                 </button>
-                <button id="btnGerarAnalise" onclick="gerarAnalise()" class="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors">
+                <button id="btnGerarAnalise" data-csp-click="gerarAnalise" class="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors">
                     Gerar Análise
                 </button>
             </div>
@@ -1222,7 +1222,7 @@ function formatarAnalise(analise) {
     <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
         <div class="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
             <h3 class="text-2xl font-bold text-gray-900">Documento do aluno</h3>
-            <button onclick="fecharModalDocumento()" class="text-gray-400 hover:text-gray-600">
+            <button data-csp-click="fecharModalDocumento" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
@@ -1235,7 +1235,7 @@ function formatarAnalise(analise) {
                 <div class="space-y-4">
                     <div>
                         <label for="doc_tipo" class="block text-sm font-medium text-gray-700 mb-2">Tipo de documento</label>
-                        <select id="doc_tipo" name="tipo" onchange="docToggleTitulo()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        <select id="doc_tipo" name="tipo" data-csp-change="docToggleTitulo" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
                             <?php foreach ($docChecklist as $ckTipo => $ckLabel): ?>
                             <option value="<?= htmlspecialchars($ckTipo, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($ckLabel, ENT_QUOTES, 'UTF-8') ?></option>
                             <?php endforeach; ?>
@@ -1267,7 +1267,7 @@ function formatarAnalise(analise) {
                 <div id="docError" class="hidden mt-4 bg-red-100 border border-red-300 text-red-700 px-3 py-2 rounded-lg text-sm"></div>
                 <div id="docSuccess" class="hidden mt-4 bg-green-100 border border-green-300 text-green-700 px-3 py-2 rounded-lg text-sm"></div>
                 <div class="flex justify-end gap-3 mt-6">
-                    <button type="button" onclick="fecharModalDocumento()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancelar</button>
+                    <button type="button" data-csp-click="fecharModalDocumento" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancelar</button>
                     <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Salvar</button>
                 </div>
             </form>
@@ -1284,7 +1284,7 @@ function formatarAnalise(analise) {
     <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[92vh] overflow-y-auto">
         <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
             <h3 class="text-xl font-bold text-gray-900">Cadastrar / Vincular Responsável</h3>
-            <button onclick="fecharModalCadastrarPai()" class="text-gray-400 hover:text-gray-600">
+            <button data-csp-click="fecharModalCadastrarPai" class="text-gray-400 hover:text-gray-600">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
@@ -1445,7 +1445,7 @@ function formatarAnalise(analise) {
                 <div id="successMessagePai" class="hidden mt-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg text-sm"></div>
 
                 <div class="flex justify-end space-x-3 mt-6">
-                    <button type="button" onclick="fecharModalCadastrarPai()"
+                    <button type="button" data-csp-click="fecharModalCadastrarPai"
                             class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
                         Cancelar
                     </button>

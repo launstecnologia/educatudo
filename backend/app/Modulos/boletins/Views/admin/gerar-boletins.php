@@ -199,7 +199,7 @@ $alunoSimNome = trim((string) ($simulacao['aluno']['nome'] ?? ''));
                 Aluno: <strong class="text-gray-800"><?= htmlspecialchars($alunoSimNome !== '' ? $alunoSimNome : '—', ENT_QUOTES, 'UTF-8') ?></strong>
             </p>
         </div>
-        <button type="button" onclick="abrirConferirBoletim()"
+        <button type="button" data-csp-click="abrirConferirBoletim"
                 class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
             <i class="fa-solid fa-user mr-2 text-gray-400" aria-hidden="true"></i>
             Trocar aluno
@@ -238,7 +238,7 @@ $alunoSimNome = trim((string) ($simulacao['aluno']['nome'] ?? ''));
 </div>
 <?php endif; ?>
 
-<div id="boletimConferirBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="fecharConferirBoletim()"></div>
+<div id="boletimConferirBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="fecharConferirBoletim"></div>
 <aside id="boletimConferirDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
@@ -247,7 +247,7 @@ $alunoSimNome = trim((string) ($simulacao['aluno']['nome'] ?? ''));
             <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Notas / Boletins</p>
             <h2 class="text-xl font-bold text-gray-900">Simular boletim</h2>
         </div>
-        <button type="button" onclick="fecharConferirBoletim()" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
+        <button type="button" data-csp-click="fecharConferirBoletim" class="text-gray-400 hover:text-gray-600 p-1" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -294,7 +294,7 @@ $alunoSimNome = trim((string) ($simulacao['aluno']['nome'] ?? ''));
         </section>
     </div>
     <div class="px-6 py-4 border-t border-gray-200 flex justify-end">
-        <button type="button" onclick="fecharConferirBoletim()" class="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium">Fechar</button>
+        <button type="button" data-csp-click="fecharConferirBoletim" class="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm font-medium">Fechar</button>
     </div>
 </aside>
 

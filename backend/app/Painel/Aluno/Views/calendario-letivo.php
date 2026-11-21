@@ -70,11 +70,11 @@ $tomCal = $corCal !== '' ? '--button-primary-color:' . $corCal . ';--primary-tex
         <a href="?ano=<?= $ano - 1 ?>" class="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-left"></i></a>
         <a href="?ano=<?= $ano + 1 ?>" class="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-right"></i></a>
         <div class="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
-            <button id="btnViewYear" onclick="setView('year')" class="px-3 py-2 text-sm font-medium"><i class="fa-solid fa-calendar-days mr-1.5"></i>Ano</button>
-            <button id="btnViewMonth" onclick="setView('month')" class="px-3 py-2 text-sm font-medium border-l border-gray-300"><i class="fa-solid fa-calendar mr-1.5"></i>Mês</button>
+            <button id="btnViewYear" data-csp-click="setView" data-csp-arg="year" class="px-3 py-2 text-sm font-medium"><i class="fa-solid fa-calendar-days mr-1.5"></i>Ano</button>
+            <button id="btnViewMonth" data-csp-click="setView" data-csp-arg="month" class="px-3 py-2 text-sm font-medium border-l border-gray-300"><i class="fa-solid fa-calendar mr-1.5"></i>Mês</button>
         </div>
         <div id="navMes" class="hidden items-center gap-1">
-            <button onclick="navMes(-1)" class="px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-left"></i></button>
+            <button data-csp-click="navMes" data-csp-arg="-1" class="px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-left"></i></button>
             <span id="labelMes" class="text-sm font-semibold text-gray-700 w-28 text-center"></span>
             <button onclick="navMes(+1)" class="px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-50"><i class="fa-solid fa-chevron-right"></i></button>
         </div>
@@ -227,7 +227,7 @@ $tomCal = $corCal !== '' ? '--button-primary-color:' . $corCal . ';--primary-tex
                 <p class="text-xs font-semibold uppercase tracking-wider opacity-75" id="modalDiaTipoLabel"></p>
                 <h3 class="text-lg font-bold" id="modalDiaData"></h3>
             </div>
-            <button onclick="closeDayModal()" class="opacity-75 hover:opacity-100"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <button data-csp-click="closeDayModal" class="opacity-75 hover:opacity-100"><i class="fa-solid fa-xmark text-xl"></i></button>
         </div>
         <div id="modalDiaBody" class="px-6 pb-6 space-y-3 max-h-80 overflow-y-auto"></div>
     </div>

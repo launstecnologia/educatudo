@@ -49,19 +49,19 @@ $title = $title ?? 'Nova Notificação';
                             <label class="flex items-center">
                                 <input type="checkbox" id="incluir_texto" name="tipos_conteudo[]" value="texto" checked
                                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                       onchange="toggleMediaOptions()">
+                                       data-csp-change="toggleMediaOptions">
                                 <span class="ml-2 text-sm text-gray-700">Texto</span>
                             </label>
                             <label class="flex items-center">
                                 <input type="checkbox" id="incluir_imagem" name="tipos_conteudo[]" value="imagem"
                                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                       onchange="toggleMediaOptions()">
+                                       data-csp-change="toggleMediaOptions">
                                 <span class="ml-2 text-sm text-gray-700">Imagem</span>
                             </label>
                             <label class="flex items-center">
                                 <input type="checkbox" id="incluir_video" name="tipos_conteudo[]" value="video"
                                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                       onchange="toggleMediaOptions()">
+                                       data-csp-change="toggleMediaOptions">
                                 <span class="ml-2 text-sm text-gray-700">Vídeo</span>
                             </label>
                         </div>
@@ -128,7 +128,7 @@ $title = $title ?? 'Nova Notificação';
                         </div>
                         <div id="image-preview" class="mt-4 hidden">
                             <img id="preview-img" class="max-w-full h-48 object-cover rounded-lg">
-                            <button type="button" onclick="removeImage()" class="mt-2 text-red-600 hover:text-red-800 text-sm">
+                            <button type="button" data-csp-click="removeImage" class="mt-2 text-red-600 hover:text-red-800 text-sm">
                                 Remover imagem
                             </button>
                         </div>
@@ -167,7 +167,7 @@ $title = $title ?? 'Nova Notificação';
                 <div class="flex items-center">
                     <input type="checkbox" id="todos_usuarios" name="todos_usuarios" value="1"
                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                           onchange="toggleAllUsers()">
+                           data-csp-change="toggleAllUsers">
                     <label for="todos_usuarios" class="ml-3 text-sm font-medium text-gray-700">
                         Todos os usuários
                     </label>
@@ -180,25 +180,25 @@ $title = $title ?? 'Nova Notificação';
                         <label class="flex items-center p-3 border border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer">
                             <input type="checkbox" id="todos_admins" name="categorias[]" value="todos_admins"
                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                   onchange="toggleCategorias()">
+                                   data-csp-change="toggleCategorias">
                             <span class="ml-2 text-sm text-gray-700">Todos os Admins</span>
                         </label>
                         <label class="flex items-center p-3 border border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer">
                             <input type="checkbox" id="todos_professores" name="categorias[]" value="todos_professores"
                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                   onchange="toggleCategorias()">
+                                   data-csp-change="toggleCategorias">
                             <span class="ml-2 text-sm text-gray-700">Todos os Professores</span>
                         </label>
                         <label class="flex items-center p-3 border border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer">
                             <input type="checkbox" id="todos_alunos" name="categorias[]" value="todos_alunos"
                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                   onchange="toggleCategorias()">
+                                   data-csp-change="toggleCategorias">
                             <span class="ml-2 text-sm text-gray-700">Todos os Alunos</span>
                         </label>
                         <label class="flex items-center p-3 border border-gray-200 rounded-lg hover:border-blue-300 cursor-pointer">
                             <input type="checkbox" id="todos_pais" name="categorias[]" value="todos_pais"
                                    class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                   onchange="toggleCategorias()">
+                                   data-csp-change="toggleCategorias">
                             <span class="ml-2 text-sm text-gray-700">Todos os Pais</span>
                         </label>
                     </div>

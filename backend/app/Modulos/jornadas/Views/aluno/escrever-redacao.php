@@ -61,7 +61,7 @@
                             <h2 class="text-xl font-bold text-gray-900">Tema da Redação</h2>
                             <?php if ($redacao_jornada['documento_tema']): ?>
                                 <div class="flex gap-2">
-                                    <button onclick="abrirVisualizadorDocumento()" 
+                                    <button data-csp-click="abrirVisualizadorDocumento" 
                                             class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm font-medium"
                                             title="Abrir documento ao lado da área de escrita">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -70,7 +70,7 @@
                                         </svg>
                                         Visualizar ao Lado
                                     </button>
-                                    <button onclick="abrirModalDocumento()" 
+                                    <button data-csp-click="abrirModalDocumento" 
                                             class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm font-medium"
                                             title="Abrir documento em tela cheia">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -138,21 +138,21 @@
                                         <span class="font-medium">Documento do Tema</span>
                                     </div>
                                     <div class="flex items-center gap-2">
-                                        <button onclick="ajustarTamanhoDocumento('diminuir')" 
+                                        <button data-csp-click="ajustarTamanhoDocumento" data-csp-arg="diminuir" 
                                                 class="p-1 hover:bg-blue-700 rounded transition-colors" 
                                                 title="Diminuir">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
                                             </svg>
                                         </button>
-                                        <button onclick="ajustarTamanhoDocumento('aumentar')" 
+                                        <button data-csp-click="ajustarTamanhoDocumento" data-csp-arg="aumentar" 
                                                 class="p-1 hover:bg-blue-700 rounded transition-colors" 
                                                 title="Aumentar">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                                             </svg>
                                         </button>
-                                        <button onclick="fecharVisualizadorDocumento()" 
+                                        <button data-csp-click="fecharVisualizadorDocumento" 
                                                 class="p-1 hover:bg-blue-700 rounded transition-colors" 
                                                 title="Fechar">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -173,7 +173,7 @@
                     
                     <div class="flex justify-between items-center relative z-20">
                         <div class="flex items-center gap-3">
-                            <button onclick="salvarRascunho()" 
+                            <button data-csp-click="salvarRascunho" 
                                 class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
@@ -182,7 +182,7 @@
                             </button>
                             <span id="autosaveStatus" class="text-xs text-gray-500">Autosave ativo</span>
                         </div>
-                        <button onclick="enviarEContinuar()" 
+                        <button data-csp-click="enviarEContinuar" 
                             class="px-6 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all font-semibold flex items-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
@@ -207,7 +207,7 @@
                 </svg>
                 <span class="text-lg font-semibold">Documento do Tema - <?= htmlspecialchars($redacao_jornada['tema_sugerido']) ?></span>
             </div>
-            <button onclick="fecharModalDocumento()" 
+            <button data-csp-click="fecharModalDocumento" 
                     class="p-2 hover:bg-purple-700 rounded transition-colors"
                     title="Fechar (ESC)">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

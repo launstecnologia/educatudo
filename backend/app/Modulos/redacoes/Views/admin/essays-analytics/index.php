@@ -129,10 +129,10 @@ $validOrdens = [
         <table id="tabela-propostas" class="min-w-full divide-y divide-gray-100">
             <thead class="bg-gray-50">
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700" onclick="ordenarTabela('titulo')">Proposta <span class="ml-1 text-gray-300" id="sort-titulo">↕</span></th>
-                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700" onclick="ordenarTabela('envios')">Envios <span class="ml-1 text-gray-300" id="sort-envios">↕</span></th>
-                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700" onclick="ordenarTabela('corrigidos')">Corrigidos <span class="ml-1 text-gray-300" id="sort-corrigidos">↕</span></th>
-                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700" onclick="ordenarTabela('nota')">Média <span class="ml-1 text-gray-300" id="sort-nota">↕</span></th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700" data-csp-click="ordenarTabela" data-csp-arg="titulo">Proposta <span class="ml-1 text-gray-300" id="sort-titulo">↕</span></th>
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700" data-csp-click="ordenarTabela" data-csp-arg="envios">Envios <span class="ml-1 text-gray-300" id="sort-envios">↕</span></th>
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700" data-csp-click="ordenarTabela" data-csp-arg="corrigidos">Corrigidos <span class="ml-1 text-gray-300" id="sort-corrigidos">↕</span></th>
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700" data-csp-click="ordenarTabela" data-csp-arg="nota">Média <span class="ml-1 text-gray-300" id="sort-nota">↕</span></th>
                     <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th>
                 </tr>
             </thead>

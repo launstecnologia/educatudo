@@ -48,7 +48,7 @@ if ($uma && $urlCelular !== '') {
         <?php if ($pdfUrl !== ''): ?>
         <a class="carteirinha-envio-btn" href="<?= $e($pdfUrl) ?>">Baixar PDF</a>
         <?php endif; ?>
-        <button type="button" class="carteirinha-envio-btn carteirinha-envio-btn-forte" onclick="imprimirCarteirinha()">Imprimir</button>
+        <button type="button" class="carteirinha-envio-btn carteirinha-envio-btn-forte" data-csp-click="imprimirCarteirinha">Imprimir</button>
         <script>
         function imprimirCarteirinha() {
             document.body.classList.add('carteirinha-imprimindo');

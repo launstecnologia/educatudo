@@ -13,7 +13,7 @@ $page_header_title = 'Gerenciar Usuários';
 $page_header_subtitle = 'Gerencie usuários do sistema com controle de permissões';
 ob_start();
 ?>
-<button type="button" onclick="openFilterDrawer()"
+<button type="button" data-csp-click="openFilterDrawer"
         class="relative inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
     <i class="fa-solid fa-filter mr-2 text-gray-500"></i>
     Filtros
@@ -26,7 +26,7 @@ ob_start();
     <i class="fa-solid fa-user-shield mr-2 text-gray-500"></i>
     Perfis de Permissão
 </a>
-<button type="button" onclick="openUserDrawer()"
+<button type="button" data-csp-click="openUserDrawer"
         class="btn-primary-custom inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
     <i class="fa-solid fa-plus mr-2"></i>
     Novo Usuário
@@ -56,9 +56,9 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                         <i class="fa-solid fa-users text-4xl text-gray-300 mb-4"></i>
                         <p>Nenhum usuário encontrado</p>
                         <?php if ($filtrosAtivosCount > 0): ?>
-                        <button type="button" onclick="clearFilters()" class="mt-3 text-sm text-blue-600 hover:text-blue-800">Limpar filtros</button>
+                        <button type="button" data-csp-click="clearFilters" class="mt-3 text-sm text-blue-600 hover:text-blue-800">Limpar filtros</button>
                         <?php else: ?>
-                        <button type="button" onclick="openUserDrawer()" class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
+                        <button type="button" data-csp-click="openUserDrawer" class="btn-primary-custom mt-4 inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90">
                             <i class="fa-solid fa-plus mr-2"></i> Novo Usuário
                         </button>
                         <?php endif; ?>
@@ -187,13 +187,13 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
 </div>
 
 <!-- Filtro em drawer lateral -->
-<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeFilterDrawer()"></div>
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeFilterDrawer"></div>
 <aside id="filterDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
         <h3 class="text-lg font-semibold text-gray-900">Filtrar usuários</h3>
-        <button type="button" onclick="closeFilterDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeFilterDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -235,7 +235,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
             </div>
         </div>
         <div class="px-6 py-4 border-t border-gray-200 flex gap-3 bg-gray-50">
-            <button type="button" onclick="clearFilters()"
+            <button type="button" data-csp-click="clearFilters"
                     class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                 Limpar
             </button>
@@ -248,13 +248,13 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
 </aside>
 
 <!-- Criar/Editar usuário em drawer lateral -->
-<div id="userDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeUserDrawer()"></div>
+<div id="userDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeUserDrawer"></div>
 <aside id="userDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
         <h2 id="userDrawerTitle" class="text-xl font-bold text-gray-900">Novo Usuário</h2>
-        <button type="button" onclick="closeUserDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeUserDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -348,7 +348,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                             <input type="password" id="senha" name="senha" minlength="8" autocomplete="new-password"
                                    class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                                    placeholder="Mínimo 8 caracteres">
-                            <button type="button" onclick="alternarVisibilidadeSenha('senha')"
+                            <button type="button" data-csp-click="alternarVisibilidadeSenha" data-csp-arg="senha"
                                     class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                                     aria-label="Mostrar senha">
                                 <svg id="senha-eye" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -367,7 +367,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                             <input type="password" id="confirmar_senha" name="confirmar_senha" minlength="8" autocomplete="new-password"
                                    class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                                    placeholder="Digite a senha novamente">
-                            <button type="button" onclick="alternarVisibilidadeSenha('confirmar_senha')"
+                            <button type="button" data-csp-click="alternarVisibilidadeSenha" data-csp-arg="confirmar_senha"
                                     class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                                     aria-label="Mostrar confirmação da senha">
                                 <svg id="confirmar_senha-eye" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -461,7 +461,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                                 <input type="password" id="edit_senha" autocomplete="new-password" disabled
                                        class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                                        placeholder="Mínimo 8 caracteres">
-                                <button type="button" onclick="alternarVisibilidadeSenha('edit_senha')"
+                                <button type="button" data-csp-click="alternarVisibilidadeSenha" data-csp-arg="edit_senha"
                                         class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                                         aria-label="Mostrar nova senha">
                                     <svg id="edit_senha-eye" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -480,7 +480,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                                 <input type="password" id="edit_confirmar_senha" autocomplete="new-password" disabled
                                        class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                                        placeholder="Digite a senha novamente">
-                                <button type="button" onclick="alternarVisibilidadeSenha('edit_confirmar_senha')"
+                                <button type="button" data-csp-click="alternarVisibilidadeSenha" data-csp-arg="edit_confirmar_senha"
                                         class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                                         aria-label="Mostrar confirmação da nova senha">
                                     <svg id="edit_confirmar_senha-eye" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -533,7 +533,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
         </div>
 
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="closeUserDrawer()"
+            <button type="button" data-csp-click="closeUserDrawer"
                     class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
                 Cancelar
             </button>

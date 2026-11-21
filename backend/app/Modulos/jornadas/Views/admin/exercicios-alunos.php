@@ -53,7 +53,7 @@ $primeiraSecaoVisivel = null;
         ?>
         <?php if ($ehConteudoOuDica): ?>
         <button id="tab-<?= $slug ?>" 
-                onclick="showSection('<?= $slug ?>')"
+                data-csp-click="showSection" data-csp-arg="&lt;?= $slug ?&gt;"
                 class="tab-button flex items-center space-x-2 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-teal-600 hover:border-teal-300 transition-all whitespace-nowrap"
                 data-color="teal">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -64,7 +64,7 @@ $primeiraSecaoVisivel = null;
         </button>
         <?php elseif ($ehExercicio && !empty($temExercicios) && !empty($alunosExercicios)): ?>
         <button id="tab-<?= $jaTemTabExercicios ? $slug : 'exercicios' ?>" 
-                onclick="showSection('exercicios')"
+                data-csp-click="showSection" data-csp-arg="exercicios"
                 class="tab-button flex items-center space-x-2 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-blue-600 hover:border-blue-300 transition-all whitespace-nowrap"
                 data-color="blue">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -80,7 +80,7 @@ $primeiraSecaoVisivel = null;
         <!-- Tab Exercícios (legado: se não houver etapas ou como fallback) -->
         <?php if (!empty($temExercicios) && !empty($alunosExercicios) && empty($etapas)): ?>
         <button id="tab-exercicios" 
-                onclick="showSection('exercicios')"
+                data-csp-click="showSection" data-csp-arg="exercicios"
                 class="tab-button flex items-center space-x-2 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-blue-600 hover:border-blue-300 transition-all whitespace-nowrap"
                 data-color="blue">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -95,7 +95,7 @@ $primeiraSecaoVisivel = null;
         <!-- Tab Redação -->
         <?php if (!empty($redacoes)): ?>
         <button id="tab-redacoes" 
-                onclick="showSection('redacoes')"
+                data-csp-click="showSection" data-csp-arg="redacoes"
                 class="tab-button <?= empty($temExercicios) || empty($alunosExercicios) ? 'active border-purple-600 text-purple-600' : 'border-transparent text-gray-500' ?> flex items-center space-x-2 px-6 py-4 text-sm font-medium border-b-2 hover:text-purple-600 hover:border-purple-300 transition-all whitespace-nowrap"
                 data-color="purple">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -127,7 +127,7 @@ $primeiraSecaoVisivel = null;
         ?>
         <?php if (!empty($resumos)): ?>
         <button id="tab-resumos" 
-                onclick="showSection('resumos')"
+                data-csp-click="showSection" data-csp-arg="resumos"
                 class="tab-button flex items-center space-x-2 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-green-600 hover:border-green-300 transition-all whitespace-nowrap"
                 data-color="green">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

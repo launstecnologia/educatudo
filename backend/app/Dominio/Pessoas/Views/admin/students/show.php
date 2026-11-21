@@ -297,7 +297,7 @@ $abasAluno['pedagogico'] = ['label' => 'Pedagógico', 'count' => null];
 <div class="mb-5 flex items-center justify-between gap-3">
     <h2 class="text-2xl font-bold text-gray-900">Detalhes do aluno</h2>
     <button type="button"
-            onclick="voltarDetalheAluno()"
+            data-csp-click="voltarDetalheAluno"
             class="aluno-btn-outline shrink-0">
         <i class="fa-solid fa-arrow-left mr-2"></i>
         Voltar
@@ -340,7 +340,7 @@ function voltarDetalheAluno() {
                         aria-controls="aba-painel-<?= safe_htmlspecialchars($abaId) ?>"
                         data-aba="<?= safe_htmlspecialchars($abaId) ?>"
                         <?php if (!empty($abaMeta['perm_key'])): ?>data-perm-key="<?= safe_htmlspecialchars($abaMeta['perm_key']) ?>" data-perm-action="visualizar"<?php endif; ?>
-                        onclick="selecionarAbaAluno('<?= safe_htmlspecialchars($abaId) ?>')">
+                        data-csp-click="selecionarAbaAluno" data-csp-arg="&lt;?= safe_htmlspecialchars($abaId) ?&gt;">
                     <?= safe_htmlspecialchars($abaMeta['label']) ?>
                     <?php if ($abaMeta['count'] !== null && (int) $abaMeta['count'] > 0): ?>
                         <span class="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full text-xs font-semibold <?= safe_htmlspecialchars($abaMeta['count_class'] ?? 'bg-slate-100 text-slate-600') ?>"><?= (int) $abaMeta['count'] ?></span>

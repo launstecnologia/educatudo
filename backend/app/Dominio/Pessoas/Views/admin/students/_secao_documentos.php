@@ -41,7 +41,7 @@
                 </div>
             </div>
             <?php if ($docCanEdit): ?>
-            <button type="button" onclick="abrirModalDocumento()" class="inline-flex items-center px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700">
+            <button type="button" data-csp-click="abrirModalDocumento" class="inline-flex items-center px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700">
                 <i class="fa-solid fa-plus mr-2"></i> Documento
             </button>
             <?php endif; ?>

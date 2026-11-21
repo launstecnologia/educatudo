@@ -100,13 +100,13 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
 <?php endif; ?>
 </div>
 
-<div id="eventoEscolarDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeEventoEscolarDrawer()"></div>
+<div id="eventoEscolarDrawerBackdrop" class="fixed inset-0 bg-black/40 z-40 hidden" data-csp-click="closeEventoEscolarDrawer"></div>
 <aside id="eventoEscolarDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-3xl bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-gray-200">
         <h2 id="eventoEscolarDrawerTitle" class="text-xl font-bold text-gray-900">Novo evento</h2>
-        <button type="button" onclick="closeEventoEscolarDrawer()" class="text-gray-400 hover:text-gray-600 p-1">
+        <button type="button" data-csp-click="closeEventoEscolarDrawer" class="text-gray-400 hover:text-gray-600 p-1">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>
@@ -207,7 +207,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
             </section>
         </div>
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button type="button" onclick="closeEventoEscolarDrawer()" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
+            <button type="button" data-csp-click="closeEventoEscolarDrawer" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>
             <button type="submit" class="btn-primary-custom px-6 py-2.5 rounded-lg font-semibold hover:opacity-90 transition-colors shadow-sm">
                 <span id="evento-escolar-submit-label">Publicar e notificar</span>
             </button>

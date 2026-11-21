@@ -855,7 +855,7 @@ $ocultarRefNotas = !empty($ocultar_ref_notas);
     <div class="bg-white rounded-xl shadow-xl w-full max-w-[96vw] max-h-[92vh] flex flex-col">
         <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-200 shrink-0">
             <h3 id="modalNotasAlunoTitulo" class="text-lg font-semibold text-gray-900">Notas</h3>
-            <button type="button" onclick="fecharModalNotasAluno()" class="text-gray-400 hover:text-gray-700 p-1" aria-label="Fechar">
+            <button type="button" data-csp-click="fecharModalNotasAluno" class="text-gray-400 hover:text-gray-700 p-1" aria-label="Fechar">
                 <i class="fa-solid fa-xmark text-lg"></i>
             </button>
         </div>

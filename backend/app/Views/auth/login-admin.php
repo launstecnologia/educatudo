@@ -70,7 +70,7 @@
                                class="w-full px-4 py-2 md:py-3 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors text-base"
                                placeholder="Digite sua senha">
                         <button type="button" 
-                                onclick="togglePassword('senha')"
+                                data-csp-click="togglePassword" data-csp-arg="senha"
                                 class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none transition-colors">
                             <svg id="senha-eye" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -141,5 +141,6 @@
             navigator.serviceWorker.register('<?= URL ?>/service-worker.js').catch(() => {});
         }
     </script>
+    <script src="<?= URL ?>/public/static/js/csp-event-delegation.js" defer></script>
 </body>
 </html>

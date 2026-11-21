@@ -929,7 +929,7 @@ div[class*="border"],
                 Responda 15 perguntas corretamente e ganhe R$ 1.000.000!<br>
                 Você tem 3 ajudas especiais para usar durante o jogo.
             </p>
-                    <button onclick="iniciarNovaPartida()" class="start-button">
+                    <button data-csp-click="iniciarNovaPartida" class="start-button">
             🎮 Iniciar Nova Partida
         </button>
     </div>
@@ -1065,10 +1065,10 @@ function carregarJogo(data) {
                 </div>
                 <!-- Botões de Ação -->
                 <div class="header-controls">
-                    <button onclick="pausarJogo()" class="control-btn pause-btn">
+                    <button data-csp-click="pausarJogo" class="control-btn pause-btn">
                         ⏸️ Pausar
                     </button>
-                    <button onclick="fecharJogo()" class="control-btn exit-btn">
+                    <button data-csp-click="fecharJogo" class="control-btn exit-btn">
                         🚪 Sair
                     </button>
                 </div>
@@ -1089,19 +1089,19 @@ function carregarJogo(data) {
 
             <!-- Alternativas -->
             <div class="alternativas-container">
-                <button onclick="selecionarResposta('A')" class="alternativa-btn">
+                <button data-csp-click="selecionarResposta" data-csp-arg="A" class="alternativa-btn">
                     <div class="letra-alt">A</div>
                     <span class="texto-alt">${data.pergunta.alternativa_a}</span>
                 </button>
-                <button onclick="selecionarResposta('B')" class="alternativa-btn">
+                <button data-csp-click="selecionarResposta" data-csp-arg="B" class="alternativa-btn">
                     <div class="letra-alt">B</div>
                     <span class="texto-alt">${data.pergunta.alternativa_b}</span>
                 </button>
-                <button onclick="selecionarResposta('C')" class="alternativa-btn">
+                <button data-csp-click="selecionarResposta" data-csp-arg="C" class="alternativa-btn">
                     <div class="letra-alt">C</div>
                     <span class="texto-alt">${data.pergunta.alternativa_c}</span>
                 </button>
-                <button onclick="selecionarResposta('D')" class="alternativa-btn">
+                <button data-csp-click="selecionarResposta" data-csp-arg="D" class="alternativa-btn">
                     <div class="letra-alt">D</div>
                     <span class="texto-alt">${data.pergunta.alternativa_d}</span>
                 </button>
@@ -1109,13 +1109,13 @@ function carregarJogo(data) {
 
             <!-- Botões de Ajuda -->
             <div class="ajudas-container">
-                <button onclick="usarAjuda('plateia')" class="ajuda-btn" ${ajudasUsadas.plateia ? 'disabled' : ''}>
+                <button data-csp-click="usarAjuda" data-csp-arg="plateia" class="ajuda-btn" ${ajudasUsadas.plateia ? 'disabled' : ''}>
                     💡 Ajuda da Plateia
                 </button>
-                <button onclick="usarAjuda('universitarios')" class="ajuda-btn" ${ajudasUsadas.universitarios ? 'disabled' : ''}>
+                <button data-csp-click="usarAjuda" data-csp-arg="universitarios" class="ajuda-btn" ${ajudasUsadas.universitarios ? 'disabled' : ''}>
                     👥 Universitários
                 </button>
-                <button onclick="usarAjuda('pular')" class="ajuda-btn" ${ajudasUsadas.pular ? 'disabled' : ''}>
+                <button data-csp-click="usarAjuda" data-csp-arg="pular" class="ajuda-btn" ${ajudasUsadas.pular ? 'disabled' : ''}>
                     ⏭️ Pular Pergunta
                 </button>
             </div>
@@ -1280,7 +1280,7 @@ function mostrarResultadoFinal(data) {
             </div>
             ` : ''}
             
-            <button onclick="fecharJogo()" class="continue-button">
+            <button data-csp-click="fecharJogo" class="continue-button">
                 🏠 Voltar ao Menu
                 </button>
         </div>

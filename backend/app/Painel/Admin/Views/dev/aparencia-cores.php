@@ -51,7 +51,7 @@ $camposCor = [
                     <?php endforeach; ?>
                 </div>
                 <div class="flex justify-end space-x-4">
-                    <button type="button" onclick="resetColors()" class="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">Restaurar padrão</button>
+                    <button type="button" data-csp-click="resetColors" class="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">Restaurar padrão</button>
                     <button type="submit" class="btn-primary-custom px-6 py-2 rounded-lg transition-colors hover:opacity-90">Salvar cores</button>
                 </div>
             </form>

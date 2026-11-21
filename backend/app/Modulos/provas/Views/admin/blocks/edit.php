@@ -247,7 +247,7 @@ $chkLancProf = $isFmtLanc && $cfgNota === 'professor_por_questao';
                 </label>
                 <button type="button"
                         id="btnAdicionarProfessorTopo"
-                        onclick="adicionarProfessor()"
+                        data-csp-click="adicionarProfessor"
                         class="btn-primary-custom px-4 py-2 text-sm font-semibold rounded-lg transition-colors hover:opacity-90">
                     + Adicionar matéria
                 </button>
@@ -259,7 +259,7 @@ $chkLancProf = $isFmtLanc && $cfgNota === 'professor_por_questao';
             </div>
             <button type="button"
                     id="btnAdicionarMateria"
-                    onclick="adicionarProfessor()"
+                    data-csp-click="adicionarProfessor"
                     class="mt-4 w-full px-4 py-2.5 text-sm font-semibold rounded-lg border border-dashed border-purple-300 text-purple-700 bg-purple-50 hover:bg-purple-100">
                 + Adicionar matéria
             </button>

@@ -11,7 +11,7 @@ $aulasTardeTipos = \App\Helpers\LessonPlanAfternoonHelper::tipos();
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h3 class="text-lg font-semibold text-gray-900">Aulas da Tarde (Oficinas de Aprendizagem / Salas de Estudo)</h3>
         <button type="button"
-                onclick="adicionarAulasTardeAtividade()"
+                data-csp-click="adicionarAulasTardeAtividade"
                 class="inline-flex items-center px-3 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors">
             + Adicionar atividade
         </button>

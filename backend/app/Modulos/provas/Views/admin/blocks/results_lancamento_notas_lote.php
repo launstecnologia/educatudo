@@ -86,7 +86,7 @@ if (!class_exists('AlunoLancamentoNotaHelper', false)) {
                 <i class="fa-solid fa-file-excel" aria-hidden="true"></i>
                 Exportar Excel
             </a>
-            <button type="button" onclick="exportarRelatorioLotePdf()"
+            <button type="button" data-csp-click="exportarRelatorioLotePdf"
                     class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700">
                 <i class="fa-solid fa-file-pdf" aria-hidden="true"></i>
                 Exportar PDF

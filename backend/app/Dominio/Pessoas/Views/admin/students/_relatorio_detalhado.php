@@ -12,29 +12,29 @@
         </div>
         <div class="border-b border-slate-200 px-4 student-tabs-nav-scroll">
             <nav class="student-tabs-nav -mb-px py-1" aria-label="Tabs">
-                <button onclick="showTab('relatorio')" id="tab-relatorio" data-tab-perm-key="tab_relatorio" class="tab-button active flex items-center px-4 py-3 text-sm font-medium border-b-2 border-blue-500 text-blue-600 whitespace-nowrap">
+                <button data-csp-click="showTab" data-csp-arg="relatorio" id="tab-relatorio" data-tab-perm-key="tab_relatorio" class="tab-button active flex items-center px-4 py-3 text-sm font-medium border-b-2 border-blue-500 text-blue-600 whitespace-nowrap">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                     Desempenho
                 </button>
-                <button onclick="showTab('redacoes')" id="tab-redacoes" data-tab-perm-key="tab_redacao" class="tab-button flex items-center px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap">
+                <button data-csp-click="showTab" data-csp-arg="redacoes" id="tab-redacoes" data-tab-perm-key="tab_redacao" class="tab-button flex items-center px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                     Jornada de Redação
                 </button>
                 <?php if (!class_exists('LayoutHelper') || \App\Core\LayoutHelper::isModuleEnabled('ocorrencias')): ?>
-                <button onclick="showTab('ocorrencias')" id="tab-ocorrencias" data-tab-perm-key="tab_ocorrencias" class="tab-button flex items-center px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap">
+                <button data-csp-click="showTab" data-csp-arg="ocorrencias" id="tab-ocorrencias" data-tab-perm-key="tab_ocorrencias" class="tab-button flex items-center px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     Ocorrências
                 </button>
                 <?php endif; ?>
-                <button onclick="showTab('jornadas')" id="tab-jornadas" data-tab-perm-key="tab_jornadas" class="tab-button flex items-center px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap">
+                <button data-csp-click="showTab" data-csp-arg="jornadas" id="tab-jornadas" data-tab-perm-key="tab_jornadas" class="tab-button flex items-center px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
                     Jornadas
                 </button>
-                <button onclick="showTab('provas')" id="tab-provas" data-tab-perm-key="tab_provas" class="tab-button flex items-center px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap">
+                <button data-csp-click="showTab" data-csp-arg="provas" id="tab-provas" data-tab-perm-key="tab_provas" class="tab-button flex items-center px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     Provas
                 </button>
-                <button onclick="showTab('acessos')" id="tab-acessos" data-tab-perm-key="tab_acessos" class="tab-button flex items-center px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap">
+                <button data-csp-click="showTab" data-csp-arg="acessos" id="tab-acessos" data-tab-perm-key="tab_acessos" class="tab-button flex items-center px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                     Acessos
                 </button>
@@ -483,13 +483,13 @@
                 </div>
                 <?php if (!empty($ocorrencias)): ?>
                 <div class="flex flex-wrap gap-3 mb-4">
-                    <select id="filtroOcStatus" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="filtrarOcorrenciasAluno()">
+                    <select id="filtroOcStatus" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" data-csp-change="filtrarOcorrenciasAluno">
                         <option value="">Todos os status</option>
                         <option value="aberta">Aberta</option>
                         <option value="em_acompanhamento">Em acompanhamento</option>
                         <option value="encerrada">Encerrada</option>
                     </select>
-                    <select id="filtroOcCategoria" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="filtrarOcorrenciasAluno()">
+                    <select id="filtroOcCategoria" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" data-csp-change="filtrarOcorrenciasAluno">
                         <option value="">Todas as categorias</option>
                         <?php
                         $catsTab = [];
@@ -606,13 +606,13 @@
 
             <!-- Modal genérico de abrir/imprimir conteúdo (usado pelas abas Provas e Notas) -->
             <div id="modal-notas-evento" class="hidden fixed inset-0 z-50 p-4 sm:p-6">
-                <div class="absolute inset-0 bg-black/50" onclick="fecharModalNotasEvento()"></div>
+                <div class="absolute inset-0 bg-black/50" data-csp-click="fecharModalNotasEvento"></div>
                 <div class="relative bg-white rounded-xl border border-gray-200 shadow-xl max-w-6xl mx-auto h-[85vh] flex flex-col overflow-hidden">
                     <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
                         <h4 id="modal-notas-evento-title" class="text-base font-semibold text-gray-900">Notas do evento</h4>
                         <div class="flex items-center gap-2">
-                            <button type="button" class="px-3 py-1.5 text-sm rounded-md bg-emerald-600 hover:bg-emerald-700 text-white" onclick="imprimirNotasModalAtual()">Imprimir</button>
-                            <button type="button" class="px-3 py-1.5 text-sm rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700" onclick="fecharModalNotasEvento()">Fechar</button>
+                            <button type="button" class="px-3 py-1.5 text-sm rounded-md bg-emerald-600 hover:bg-emerald-700 text-white" data-csp-click="imprimirNotasModalAtual">Imprimir</button>
+                            <button type="button" class="px-3 py-1.5 text-sm rounded-md bg-gray-200 hover:bg-gray-300 text-gray-700" data-csp-click="fecharModalNotasEvento">Fechar</button>
                         </div>
                     </div>
                     <div id="modal-notas-evento-body" class="w-full flex-1 overflow-y-auto p-4 bg-gray-50"></div>

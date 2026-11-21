@@ -5,17 +5,17 @@ namespace App\Core;
 /**
  * SEC-02 — Geração centralizada de Content-Security-Policy.
  *
- * Enforcement (baseline): allowlist completa + unsafe-inline/unsafe-eval
- * (compatível com MathJax, scripts inline e handlers on* ainda não migrados).
+ * Modo padrão (produção): enforcement baseline com unsafe-inline/unsafe-eval
+ * + Report-Only candidata restritiva (nonce, sem unsafe-* em script-src).
  *
- * Report-Only (candidata): sem unsafe-eval; com nonce e sem unsafe-inline em
- * script-src para coletar violações. Não promover sem autorização explícita.
+ * Modo restrito (CSP_STRICT_ENFORCEMENT=true|1): enforcement = política
+ * candidata (sem unsafe-inline/unsafe-eval; com nonce). Não ativar em
+ * produção sem validação manual — flag existe para homologação.
  */
 final class CspPolitica
 {
     private static ?string $nonce = null;
 
-    /** Hosts de script usados pela plataforma (CDNs + Jitsi + push + acessibilidade). */
     private const SCRIPT_HOSTS = [
         'https://cdnjs.cloudflare.com',
         'https://unpkg.com',
@@ -46,8 +46,7 @@ final class CspPolitica
         'https://fonts.gstatic.com',
     ];
 
-    /** Origens explícitas para a candidata (Onda 4) — sem wildcards https:/wss:. */
-    private const CONNECT_HOSTS_CANDIDATA = [
+    private const CONNECT_HOSTS_RESTRITA = [
         "'self'",
         'https:',
         'wss://ws.educatudo.com',
@@ -59,7 +58,7 @@ final class CspPolitica
         'https://vlibras.gov.br',
     ];
 
-    private const FRAME_HOSTS_CANDIDATA = [
+    private const FRAME_HOSTS_RESTRITA = [
         "'self'",
         'https://8x8.vc',
         'https://meet.launs.com.br',
@@ -80,15 +79,29 @@ final class CspPolitica
         return self::$nonce;
     }
 
-    /** Atributo HTML pronto: nonce="..." */
     public static function attrNonce(): string
     {
         return 'nonce="' . htmlspecialchars(self::nonce(), ENT_QUOTES, 'UTF-8') . '"';
     }
 
     /**
-     * Insere nonce em tags <script> sem nonce (útil para $additional_js).
+     * CSP_STRICT_ENFORCEMENT=true|1 ativa enforcement restritivo (homologação).
+     * Padrão: false (produção segura até validação manual).
      */
+    public static function modoRestritoAtivo(): bool
+    {
+        $raw = null;
+        if (function_exists('env')) {
+            $raw = env('CSP_STRICT_ENFORCEMENT', null);
+        }
+        if ($raw === null || $raw === '') {
+            $fromEnv = getenv('CSP_STRICT_ENFORCEMENT');
+            $raw = ($fromEnv !== false) ? $fromEnv : '';
+        }
+        $v = strtolower(trim((string) $raw));
+        return $v === '1' || $v === 'true' || $v === 'yes' || $v === 'on';
+    }
+
     public static function aplicarNonceEmHtml(string $html): string
     {
         $attr = self::attrNonce();
@@ -105,13 +118,12 @@ final class CspPolitica
         );
     }
 
-    public static function politicaEnforcement(): string
+    public static function politicaEnforcementBaseline(): string
     {
         $scriptHosts = implode(' ', self::SCRIPT_HOSTS);
         $styleHosts = implode(' ', self::STYLE_HOSTS);
         $fontHosts = implode(' ', self::FONT_HOSTS);
-        // NÃO incluir nonce no enforcement enquanto houver scripts/on* sem nonce:
-        // em CSP2+, a presença de nonce/hash invalida 'unsafe-inline'.
+
         return implode('; ', [
             "default-src 'self'",
             "base-uri 'self'",
@@ -130,34 +142,50 @@ final class CspPolitica
     }
 
     /**
-     * Candidata Report-Only: sem unsafe-eval; script-src com nonce (sem unsafe-inline).
-     * Violações alimentam o endurecimento; não bloqueiam a UI.
+     * Política restritiva: sem unsafe-inline/unsafe-eval em script-src; com nonce.
+     * Usada como Report-Only (padrão) e como Enforcement quando CSP_STRICT_ENFORCEMENT=true.
      */
-    public static function politicaCandidataReportOnly(): string
+    public static function politicaRestrita(bool $comReportUri = true): string
     {
         $scriptHosts = implode(' ', self::SCRIPT_HOSTS);
         $styleHosts = implode(' ', self::STYLE_HOSTS);
         $fontHosts = implode(' ', self::FONT_HOSTS);
-        $connect = implode(' ', self::CONNECT_HOSTS_CANDIDATA);
-        $frames = implode(' ', self::FRAME_HOSTS_CANDIDATA);
+        $connect = implode(' ', self::CONNECT_HOSTS_RESTRITA);
+        $frames = implode(' ', self::FRAME_HOSTS_RESTRITA);
         $nonce = self::nonce();
 
-        return implode('; ', [
+        $parts = [
             "default-src 'self'",
             "base-uri 'self'",
             "object-src 'none'",
             "frame-ancestors 'self'",
             "form-action 'self'",
             "worker-src 'self' blob: https://cdnjs.cloudflare.com",
-            "script-src 'self' 'nonce-{$nonce}' {$scriptHosts}",
+            "script-src 'self' 'nonce-{$nonce}' 'strict-dynamic' {$scriptHosts}",
             "style-src 'self' 'unsafe-inline' {$styleHosts}",
             "font-src 'self' data: {$fontHosts}",
             "img-src 'self' data: blob: https:",
             "connect-src {$connect}",
             "frame-src {$frames}",
             "media-src 'self' blob: https:",
-            'report-uri /api/csp-report',
-        ]);
+        ];
+        if ($comReportUri) {
+            $parts[] = 'report-uri /api/csp-report';
+        }
+        return implode('; ', $parts);
+    }
+
+    /** Alias legado dos testes / docs. */
+    public static function politicaEnforcement(): string
+    {
+        return self::modoRestritoAtivo()
+            ? self::politicaRestrita(false)
+            : self::politicaEnforcementBaseline();
+    }
+
+    public static function politicaCandidataReportOnly(): string
+    {
+        return self::politicaRestrita(true);
     }
 
     public static function emitirCabecalhos(): void
@@ -166,11 +194,17 @@ final class CspPolitica
             return;
         }
         header('Permissions-Policy: geolocation=(), payment=(), usb=()');
-        header('Content-Security-Policy: ' . self::politicaEnforcement());
+
+        if (self::modoRestritoAtivo()) {
+            // Homologação: só enforcement restritivo (já é a candidata).
+            header('Content-Security-Policy: ' . self::politicaRestrita(true));
+            return;
+        }
+
+        header('Content-Security-Policy: ' . self::politicaEnforcementBaseline());
         header('Content-Security-Policy-Report-Only: ' . self::politicaCandidataReportOnly());
     }
 
-    /** Exposto para testes — não usar em produção para forçar nonce. */
     public static function reiniciarParaTeste(): void
     {
         self::$nonce = null;

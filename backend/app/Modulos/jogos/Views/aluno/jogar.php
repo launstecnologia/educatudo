@@ -69,7 +69,7 @@
             
             <!-- Alternativas -->
             <div class="grid grid-cols-1 gap-2 mb-2">
-                <button class="alternative-btn rounded-full flex items-center group py-2 px-5 gap-3" onclick="selecionarResposta('A')">
+                <button class="alternative-btn rounded-full flex items-center group py-2 px-5 gap-3" data-csp-click="selecionarResposta" data-csp-arg="A">
                     <div class="alternative-number rounded-full flex items-center justify-center text-white font-black flex-shrink-0" 
                          style="width: 36px; height: 36px; font-size: 16px;">
                         A
@@ -77,7 +77,7 @@
                     <span class="text-white font-black flex-1 text-left text-base" id="alt-A">Carregando...</span>
                 </button>
                 
-                <button class="alternative-btn rounded-full flex items-center group py-2 px-5 gap-3" onclick="selecionarResposta('B')">
+                <button class="alternative-btn rounded-full flex items-center group py-2 px-5 gap-3" data-csp-click="selecionarResposta" data-csp-arg="B">
                     <div class="alternative-number rounded-full flex items-center justify-center text-white font-black flex-shrink-0" 
                          style="width: 36px; height: 36px; font-size: 16px;">
                         B
@@ -85,7 +85,7 @@
                     <span class="text-white font-black flex-1 text-left text-base" id="alt-B">Carregando...</span>
                 </button>
                 
-                <button class="alternative-btn rounded-full flex items-center group py-2 px-5 gap-3" onclick="selecionarResposta('C')">
+                <button class="alternative-btn rounded-full flex items-center group py-2 px-5 gap-3" data-csp-click="selecionarResposta" data-csp-arg="C">
                     <div class="alternative-number rounded-full flex items-center justify-center text-white font-black flex-shrink-0" 
                          style="width: 36px; height: 36px; font-size: 16px;">
                         C
@@ -93,7 +93,7 @@
                     <span class="text-white font-black flex-1 text-left text-base" id="alt-C">Carregando...</span>
                 </button>
                 
-                <button class="alternative-btn rounded-full flex items-center group py-2 px-5 gap-3" onclick="selecionarResposta('D')">
+                <button class="alternative-btn rounded-full flex items-center group py-2 px-5 gap-3" data-csp-click="selecionarResposta" data-csp-arg="D">
                     <div class="alternative-number rounded-full flex items-center justify-center text-white font-black flex-shrink-0" 
                          style="width: 36px; height: 36px; font-size: 16px;">
                         D
@@ -104,28 +104,28 @@
             
             <!-- Botões de Ajuda -->
             <div class="flex justify-center gap-3 mb-2">
-                <button id="help-plateia" class="help-btn rounded-xl flex flex-col items-center justify-center px-4 py-3 gap-1" onclick="usarAjuda('plateia')">
+                <button id="help-plateia" class="help-btn rounded-xl flex flex-col items-center justify-center px-4 py-3 gap-1" data-csp-click="usarAjuda" data-csp-arg="plateia">
                     <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M21 5c-1.11-.35-2.33-.5-3.5-.5-1.95 0-4.05.4-5.5 1.5-1.45-1.1-3.55-1.5-5.5-1.5S2.45 4.9 1 6v14.65c0 .25.25.5.5.5.1 0 .15-.05.25-.05C3.1 20.45 5.05 20 6.5 20c1.95 0 4.05.4 5.5 1.5 1.35-.85 3.8-1.5 5.5-1.5 1.65 0 3.35.3 4.75 1.05.1.05.15.05.25.05.25 0 .5-.25.5-.5V6c-.6-.45-1.25-.75-2-1zm0 13.5c-1.1-.35-2.3-.5-3.5-.5-1.7 0-4.15.65-5.5 1.5V8c1.35-.85 3.8-1.5 5.5-1.5 1.2 0 2.4.15 3.5.5v11.5z"/>
                     </svg>
                     <span class="text-white font-bold text-xs">CARTAS</span>
                 </button>
                 
-                <button id="help-universitarios" class="help-btn rounded-xl flex flex-col items-center justify-center px-4 py-3 gap-1" onclick="usarAjuda('universitarios')">
+                <button id="help-universitarios" class="help-btn rounded-xl flex flex-col items-center justify-center px-4 py-3 gap-1" data-csp-click="usarAjuda" data-csp-arg="universitarios">
                     <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z"/>
                     </svg>
                     <span class="text-white font-bold text-xs">UNIVERSIT.</span>
                 </button>
                 
-                <button id="help-pular" class="help-btn rounded-xl flex flex-col items-center justify-center px-4 py-3 gap-1" onclick="usarAjuda('pular')">
+                <button id="help-pular" class="help-btn rounded-xl flex flex-col items-center justify-center px-4 py-3 gap-1" data-csp-click="usarAjuda" data-csp-arg="pular">
                     <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
                     </svg>
                     <span class="text-white font-bold text-xs">PULAR</span>
                 </button>
                 
-                <button id="exit-game" class="help-btn rounded-xl flex flex-col items-center justify-center px-4 py-3 gap-1" onclick="fecharJogo()">
+                <button id="exit-game" class="help-btn rounded-xl flex flex-col items-center justify-center px-4 py-3 gap-1" data-csp-click="fecharJogo">
                     <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/>
                     </svg>
@@ -159,7 +159,7 @@
                             <p class="text-blue-100 text-sm" id="helpModalSubtitle">Opiniões dos especialistas</p>
                         </div>
                     </div>
-                    <button onclick="fecharModalAjuda()" class="text-white hover:text-gray-200 transition-colors">
+                    <button data-csp-click="fecharModalAjuda" class="text-white hover:text-gray-200 transition-colors">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
@@ -176,7 +176,7 @@
             
             <!-- Footer do Modal -->
             <div class="bg-gray-50 px-6 py-4 flex justify-end">
-                <button onclick="fecharModalAjuda()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-semibold">
+                <button data-csp-click="fecharModalAjuda" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-semibold">
                     Entendi!
                 </button>
             </div>
@@ -419,7 +419,7 @@ function usarAjuda(tipo) {
             showNotification(`Ajuda "${tipo}" utilizada!`, 'info');
             
             // Atualizar botão
-            const btn = document.querySelector(`[onclick="usarAjuda('${tipo}')"]`);
+            const btn = document.querySelector(`[data-csp-click="usarAjuda" data-csp-arg="${tipo}"]`);
             btn.disabled = true;
             btn.style.opacity = '0.5';
             

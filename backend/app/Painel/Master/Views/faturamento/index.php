@@ -33,7 +33,7 @@ $limparUrl = URL . '/master/faturamento';
             <h2 class="text-2xl font-bold text-slate-900 mb-1">Faturamento</h2>
             <p class="text-slate-600 text-sm">Acompanhe as compras de TudiCoins feitas por alunos e professores nas escolas.</p>
         </div>
-        <button type="button" onclick="openFilterDrawer()"
+        <button type="button" data-csp-click="openFilterDrawer"
                 class="relative inline-flex items-center px-4 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors flex-shrink-0">
             <i class="fa-solid fa-filter mr-2 text-slate-500"></i>
             Filtros
@@ -68,7 +68,7 @@ $limparUrl = URL . '/master/faturamento';
     <div class="px-6 py-10 text-center text-sm text-slate-500">
         <p>Nenhuma compra encontrada com os filtros atuais.</p>
         <?php if ($filtrosAtivos > 0): ?>
-        <button type="button" onclick="openFilterDrawer()" class="mt-3 text-sm text-blue-600 hover:underline">Ajustar filtros</button>
+        <button type="button" data-csp-click="openFilterDrawer" class="mt-3 text-sm text-blue-600 hover:underline">Ajustar filtros</button>
         <?php endif; ?>
     </div>
     <?php else: ?>
@@ -179,13 +179,13 @@ $limparUrl = URL . '/master/faturamento';
     <?php endif; ?>
 </div>
 
-<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" onclick="closeFilterDrawer()"></div>
+<div id="filterDrawerBackdrop" class="fixed inset-0 bg-black/40 z-[60] hidden" data-csp-click="closeFilterDrawer"></div>
 <aside id="filterDrawer"
        class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-[70] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col"
        aria-hidden="true">
     <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
         <h3 class="text-lg font-semibold text-slate-900">Filtrar faturamento</h3>
-        <button type="button" onclick="closeFilterDrawer()" class="text-slate-400 hover:text-slate-600 p-1" aria-label="Fechar">
+        <button type="button" data-csp-click="closeFilterDrawer" class="text-slate-400 hover:text-slate-600 p-1" aria-label="Fechar">
             <i class="fa-solid fa-xmark text-xl"></i>
         </button>
     </div>

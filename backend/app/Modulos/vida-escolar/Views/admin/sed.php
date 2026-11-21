@@ -21,7 +21,7 @@ $sed = is_array($sed ?? null) ? $sed : ['itens' => []];
     </style>
 </head>
 <body>
-    <p class="no-print muted"><button onclick="window.print()">Imprimir / salvar PDF</button></p>
+    <p class="no-print muted"><button data-csp-click="print">Imprimir / salvar PDF</button></p>
     <h1>Digitação assistida — SED / GDAE</h1>
     <p class="muted"><?= $esc($unidade['nome'] ?? '') ?> · <?= $esc($aluno['nome'] ?? '') ?> · <?= $esc($gerado_em ?? '') ?></p>
     <p class="muted">Copie os valores para o portal da Secretaria. Não há envio automático.</p>

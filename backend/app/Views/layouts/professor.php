@@ -514,7 +514,7 @@
         <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
             <div class="bg-gradient-to-r from-green-500 to-green-600 px-6 py-4 flex justify-between items-center">
                 <h3 class="text-xl font-bold text-white">🟢 Alunos Online</h3>
-                <button onclick="fecharModalAlunosOnline()" class="text-white hover:text-gray-200 transition-colors">
+                <button data-csp-click="fecharModalAlunosOnline" class="text-white hover:text-gray-200 transition-colors">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
@@ -649,7 +649,7 @@
         <div class="bg-white rounded-xl shadow-xl max-w-md w-full">
             <div class="bg-gradient-to-r from-purple-500 to-purple-600 px-6 py-4 flex justify-between items-center rounded-t-xl">
                 <h3 class="text-xl font-bold text-white">Trocar Foto de Perfil</h3>
-                <button onclick="fecharModalTrocarFoto()" class="text-white hover:text-gray-200 transition-colors">
+                <button data-csp-click="fecharModalTrocarFoto" class="text-white hover:text-gray-200 transition-colors">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
@@ -681,7 +681,7 @@
                     </div>
                     
                     <div class="flex space-x-3">
-                        <button type="button" onclick="fecharModalTrocarFoto()" class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                        <button type="button" data-csp-click="fecharModalTrocarFoto" class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
                             Cancelar
                         </button>
                         <button type="submit" class="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
