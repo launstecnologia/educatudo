@@ -74,7 +74,7 @@ function isPrivatePage(url) {
   const alunoPaths = [
     '/dashboard', '/avatar', '/perfil', '/carteira', '/agenda', '/provas',
     '/jornada', '/jornadas', '/redacao', '/redacoes', '/exercicios', '/forum',
-    '/chat', '/notificacoes', '/tickets', '/suporte', '/simulados', '/jogos',
+    '/notificacoes', '/tickets', '/suporte', '/simulados', '/jogos',
     '/games', '/cursos', '/drive', '/arquivos', '/boletim', '/notas',
     '/flashcard', '/ingles', '/apostila', '/material', '/recuperacao',
     '/educahits', '/educashop', '/minha-carteira', '/presenca'

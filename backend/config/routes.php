@@ -16,15 +16,19 @@ foreach ($modulosPublicos as $routesFile) {
 }
 
 $router->middleware('Auth', function ($router) {
-    require __DIR__ . '/routes/student.php';
-    require __DIR__ . '/routes/monitor.php';
-    require __DIR__ . '/routes/teacher.php';
-    require __DIR__ . '/routes/admin.php';
-    require __DIR__ . '/routes/parents.php';
+    // CSRF gradual: padrão audit (log). CSRF_MODE=enforce para bloquear.
+    // JWT/webhooks ficam fora deste bloco (public.php / api_v1 / routes.public).
+    $router->middleware('Csrf', function ($router) {
+        require __DIR__ . '/routes/student.php';
+        require __DIR__ . '/routes/monitor.php';
+        require __DIR__ . '/routes/teacher.php';
+        require __DIR__ . '/routes/admin.php';
+        require __DIR__ . '/routes/parents.php';
 
-    // Módulos físicos (app/Modulos/<chave>/routes.php)
-    $modulosRoutes = glob(dirname(__DIR__) . '/app/Modulos/*/routes.php') ?: [];
-    foreach ($modulosRoutes as $routesFile) {
-        require $routesFile;
-    }
+        // Módulos físicos (app/Modulos/<chave>/routes.php)
+        $modulosRoutes = glob(dirname(__DIR__) . '/app/Modulos/*/routes.php') ?: [];
+        foreach ($modulosRoutes as $routesFile) {
+            require $routesFile;
+        }
+    });
 });

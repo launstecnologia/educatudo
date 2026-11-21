@@ -211,11 +211,9 @@ if (session_status() === PHP_SESSION_NONE) {
         }
     }
     @session_start();
-    if ($pedidoHttps && !headers_sent()) {
-        header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
-    }
+    // HSTS, X-Frame-Options, nosniff e Referrer-Policy ficam na borda (proxy / Nginx).
+    // Evita cabeçalho duplicado no pentest (proxy + PHP / Nginx + PHP).
     if (!headers_sent()) {
-        header('Referrer-Policy: strict-origin-when-cross-origin');
         header('Permissions-Policy: geolocation=(), payment=(), usb=()');
         header("Content-Security-Policy-Report-Only: default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://unpkg.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https:; frame-src 'self' https:; media-src 'self' blob: https:");
     }

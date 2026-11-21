@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../Policies/ParentStudentAccessPolicy.php';
 use App\Middleware\ApiAuthMiddleware;
 use App\Core\BaseController;
 use App\Core\Database;
+use App\Modulos\Jornadas\Services\PlanoAulaAlunoService;
 
 class ParentController extends BaseController
 {
@@ -367,27 +368,16 @@ class ParentController extends BaseController
             return;
         }
 
-        $anoAtual = date('Y');
-        $planos = $this->db->fetchAll(
-            "SELECT pa.id, pa.titulo, pa.objetivos, pa.created_at,
-                    p.nome as professor_nome, m.nome as materia_nome
-             FROM planos_aula pa
-             LEFT JOIN professores p ON pa.professor_id = p.id
-             LEFT JOIN materias m ON pa.materia_id = m.id
-             WHERE pa.turma_id = :turma_id AND pa.deleted_at IS NULL AND YEAR(pa.created_at) = :ano_atual
-             ORDER BY pa.created_at DESC",
-            ['turma_id' => $turmaId, 'ano_atual' => $anoAtual]
-        );
-
+        $planos = (new PlanoAulaAlunoService($this->db))->listarParaTurma($turmaId, (int) date('Y'));
         $list = [];
         foreach ($planos as $pa) {
             $list[] = [
                 'id' => (int) $pa['id'],
                 'titulo' => $pa['titulo'],
-                'objetivos' => $pa['objetivos'],
-                'professor_nome' => $pa['professor_nome'],
-                'materia_nome' => $pa['materia_nome'],
-                'created_at' => $pa['created_at'] ? date('Y-m-d', strtotime($pa['created_at'])) : null,
+                'objetivos' => $pa['objetivos'] ?? null,
+                'professor_nome' => $pa['professor_nome'] ?? null,
+                'materia_nome' => $pa['materia_nome'] ?? null,
+                'created_at' => !empty($pa['created_at']) ? date('Y-m-d', strtotime((string) $pa['created_at'])) : null,
             ];
         }
         $this->jsonSuccess($list);

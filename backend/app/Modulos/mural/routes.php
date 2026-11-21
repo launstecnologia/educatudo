@@ -16,6 +16,10 @@ $router->post('/admin/mural-recados/excluir', 'Modulos/mural/AdminMuralControlle
 
 $router->get('/mural-recados/anexo/{id}', 'Modulos/mural/MuralAnexoController@baixar');
 
+// Aluno (URLs preservadas — migrado de StudentController)
+$router->get('/mural-recados', 'Modulos/mural/AlunoMuralController@index');
+$router->post('/mural-recados/marcar-visto', 'Modulos/mural/AlunoMuralController@marcarVisto');
+
 // Professor
 $router->get('/professor/mural-recados', 'Modulos/mural/TeacherMuralController@index');
 $router->get('/professor/mural-recados/criar', 'Modulos/mural/TeacherMuralController@criar');

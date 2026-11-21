@@ -143,16 +143,9 @@ class ChatController extends BaseController
             'user' => $user,
             'current_page' => 'chat'
         ];
-        
-        // Verifica se a view existe antes de renderizar
-        $viewPath = __DIR__ . '/../../Views/teacher/chat/index.php';
-        if (file_exists($viewPath)) {
-            $this->viewWithLayout('professor', 'teacher/chat/index', $data);
-        } else {
-            // View ainda não criada, redireciona para dashboard
-            $_SESSION['info_message'] = 'Funcionalidade de chat em desenvolvimento';
-            $this->redirect('/teacher/dashboard');
-        }
+
+        // Resolve via BaseController → Modulos/comunicacao/Views/professor/index.php
+        $this->viewWithLayout('professor', 'teacher/chat/index', $data);
     }
     
     /**
@@ -266,75 +259,15 @@ class ChatController extends BaseController
                 'csrf_token' => $this->generateCsrfToken(),
                 'current_page' => 'chat'
             ];
-            
-            // Verifica se a view existe antes de renderizar
-            $viewPath = __DIR__ . '/../../Views/teacher/chat/chat.php';
-            $layoutPath = __DIR__ . '/../../Views/layouts/professor.php';
-            
-            if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-            
-                error_log("=== chatProfessor - Verificando view: $viewPath ===");
-            
-            }
-            if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                error_log("=== chatProfessor - View existe: " . (file_exists($viewPath) ? 'SIM' : 'NÃO') . " ===");
-            }
-            if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                error_log("=== chatProfessor - Layout existe: " . (file_exists($layoutPath) ? 'SIM' : 'NÃO') . " ===");
-            }
-            
-            if (!file_exists($viewPath)) {
-                if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                    error_log("=== chatProfessor - View não encontrada, redirecionando ===");
-                }
-                $_SESSION['info_message'] = 'Funcionalidade de chat em desenvolvimento';
-                $this->redirect('/professor/chat');
-                return;
-            }
-            
-            if (!file_exists($layoutPath)) {
-                if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                    error_log("=== chatProfessor - Layout não encontrado, redirecionando ===");
-                }
-                $_SESSION['error_message'] = 'Layout não encontrado';
-                $this->redirect('/professor/chat');
-                return;
-            }
-            
-            if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-            
-                error_log("=== chatProfessor - Renderizando view ===");
-            
-            }
-            if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                error_log("=== chatProfessor - Layout: professor ===");
-            }
-            if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                error_log("=== chatProfessor - View: teacher/chat/chat ===");
-            }
-            if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                error_log("=== chatProfessor - Data keys: " . implode(', ', array_keys($data)) . " ===");
-            }
-            
-            // Renderiza a view diretamente sem try-catch interno para que erros sejam capturados pelo catch externo
+
+            // Resolve via BaseController → Modulos/comunicacao/Views/professor/chat.php
             $this->viewWithLayout('professor', 'teacher/chat/chat', $data);
-            if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                error_log("=== chatProfessor - View renderizada com sucesso ===");
-            }
-            return; // Importante: retorna após renderizar para não continuar
+            return;
         } catch (\Exception $e) {
             if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                error_log("=== chatProfessor - EXCEÇÃO CAPTURADA: " . $e->getMessage() . " ===");
+                error_log('chatProfessor: ' . $e->getMessage());
             }
-            if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                error_log("=== chatProfessor - Arquivo: " . $e->getFile() . " Linha: " . $e->getLine() . " ===");
-            }
-            if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                if (!empty($_ENV['APP_DEBUG']) && $_ENV['APP_DEBUG'] === 'true') {
-                    error_log("=== chatProfessor - Stack trace: " . $e->getTraceAsString() . " ===");
-                }
-            }
-            $_SESSION['error_message'] = 'Erro ao carregar chat: ' . $e->getMessage();
+            $_SESSION['error_message'] = 'Erro ao carregar chat.';
             $this->redirect('/professor/chat');
             return;
         } catch (\Throwable $e) {
@@ -608,16 +541,9 @@ class ChatController extends BaseController
             'csrf_token' => $this->generateCsrfToken(),
             'current_page' => 'chat'
         ];
-        
-        // Verifica se a view existe antes de renderizar
-        $viewPath = __DIR__ . '/../../Views/student/chat/index.php';
-        if (file_exists($viewPath)) {
-            $this->viewWithLayout('student', 'student/chat/index', $data);
-        } else {
-            // View ainda não criada, redireciona para dashboard
-            $_SESSION['info_message'] = 'Funcionalidade de chat em desenvolvimento';
-            $this->redirect('/dashboard');
-        }
+
+        // Resolve via BaseController → Modulos/comunicacao/Views/aluno/index.php
+        $this->viewWithLayout('student', 'student/chat/index', $data);
     }
     
     /**
@@ -716,16 +642,9 @@ class ChatController extends BaseController
             'csrf_token' => $this->generateCsrfToken(),
             'current_page' => 'chat'
         ];
-        
-        // Verifica se a view existe antes de renderizar
-        $viewPath = __DIR__ . '/../../Views/student/chat/chat.php';
-        if (file_exists($viewPath)) {
-            $this->viewWithLayout('student', 'student/chat/chat', $data);
-        } else {
-            // View ainda não criada, redireciona para dashboard
-            $_SESSION['info_message'] = 'Funcionalidade de chat em desenvolvimento';
-            $this->redirect('/dashboard');
-        }
+
+        // Resolve via BaseController → Modulos/comunicacao/Views/aluno/chat.php
+        $this->viewWithLayout('student', 'student/chat/chat', $data);
     }
     
     /**
@@ -916,7 +835,7 @@ class ChatController extends BaseController
                 $this->redirect('/dashboard');
                 break;
             case 'professor':
-                $this->redirect('/teacher/dashboard');
+                $this->redirect('/professor/dashboard');
                 break;
             case 'admin_escola':
             case 'admin':

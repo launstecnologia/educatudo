@@ -80,8 +80,7 @@ $fecharBlocoDash = static function () use ($dashOrdemCustom): void {
 <?php $abrirBlocoDash('slider'); ?>
 <?php
 $sliderModuleRoutes = [
-    'chat_tudinha' => '/chat',
-    'chat_tudinha_2' => '/chat?ui=v2',
+    // chat_tudinha / chat_tudinha_2: descontinuados (Etapa 7) — não mapear para /chat
     'educahits' => '/educa-hits',
     'redacoes' => '/redacoes',
     'exercicios' => '/exercicios',
@@ -90,6 +89,7 @@ $sliderModuleRoutes = [
     'notas' => '/notas',
     'boletim' => '/boletim',
 ];
+$sliderModulosDescontinuados = ['chat_tudinha', 'chat_tudinha_2'];
 ?>
 <div class="mb-6 md:mb-8">
     <div id="dashboard-slider" class="dashboard-slider-loading relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" style="aspect-ratio: 21 / 9;">
@@ -98,8 +98,13 @@ $sliderModuleRoutes = [
             $link = trim((string) ($slide['link_url'] ?? ''));
             $actionType = trim((string) ($slide['action_type'] ?? 'external'));
             $moduleKey = trim((string) ($slide['module_key'] ?? ''));
-            if ($actionType === 'module' && $moduleKey !== '' && isset($sliderModuleRoutes[$moduleKey])) {
+            if ($actionType === 'module' && in_array($moduleKey, $sliderModulosDescontinuados, true)) {
+                $link = ''; // chat Tudinha descontinuado — slide sem destino de chat
+            } elseif ($actionType === 'module' && $moduleKey !== '' && isset($sliderModuleRoutes[$moduleKey])) {
                 $link = URL . $sliderModuleRoutes[$moduleKey];
+            }
+            if ($link !== '' && (preg_match('#/chat(?:\\?|$)#', $link) || str_ends_with(rtrim(parse_url($link, PHP_URL_PATH) ?: '', '/'), '/chat'))) {
+                $link = ''; // links absolutos legados para /chat
             }
             $imgUrl = trim((string) ($slide['image_url'] ?? ''));
             $isFirstSlide = $idx === 0;

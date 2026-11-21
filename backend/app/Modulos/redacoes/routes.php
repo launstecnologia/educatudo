@@ -5,20 +5,20 @@
  * @var Router $router
  */
 
-$router->get('/redacoes', 'User/StudentController@essays');
-$router->get('/redacoes/escrever', 'User/StudentController@escreverRedacao');
-$router->get('/redacoes/escrever-livre', 'User/StudentController@escreverRedacaoLivre');
-$router->get('/redacoes/transcrever', 'User/StudentController@transcreverImagemPage');
-$router->get('/redacoes/historico', 'User/StudentController@historicoRedacoes');
-$router->get('/redacoes/{id}', 'User/StudentController@verRedacao');
-$router->get('/redacoes/rascunho/{id}', 'User/StudentController@continuarRascunho');
-$router->post('/redacoes/criar', 'User/StudentController@createEssay');
-$router->post('/redacoes/gerar-tema', 'User/StudentController@gerarTemaIA');
-$router->post('/redacoes/transcrever-imagem', 'User/StudentController@transcreverImagem');
-$router->post('/redacoes/corrigir', 'User/StudentController@corrigirRedacao');
-$router->post('/redacoes/salvar-rascunho', 'User/StudentController@salvarRascunho');
-$router->post('/redacoes/rascunho/{id}/excluir', 'User/StudentController@excluirRascunho');
-$router->post('/redacoes/{id}/ocultar', 'User/StudentController@ocultarRedacao');
+$router->get('/redacoes', 'Modulos/redacoes/AlunoRedacaoLegadoController@hub');
+$router->get('/redacoes/escrever', 'Modulos/redacoes/AlunoRedacaoLegadoController@escrever');
+$router->get('/redacoes/escrever-livre', 'Modulos/redacoes/AlunoRedacaoLegadoController@escreverLivre');
+$router->get('/redacoes/transcrever', 'Modulos/redacoes/AlunoRedacaoLegadoController@transcreverPagina');
+$router->get('/redacoes/historico', 'Modulos/redacoes/AlunoRedacaoLegadoController@historico');
+$router->get('/redacoes/{id}', 'Modulos/redacoes/AlunoRedacaoLegadoController@ver');
+$router->get('/redacoes/rascunho/{id}', 'Modulos/redacoes/AlunoRedacaoLegadoController@continuarRascunho');
+$router->post('/redacoes/criar', 'Modulos/redacoes/AlunoRedacaoLegadoController@criar');
+$router->post('/redacoes/gerar-tema', 'Modulos/redacoes/AlunoRedacaoLegadoController@gerarTema');
+$router->post('/redacoes/transcrever-imagem', 'Modulos/redacoes/AlunoRedacaoLegadoController@transcreverImagem');
+$router->post('/redacoes/corrigir', 'Modulos/redacoes/AlunoRedacaoLegadoController@corrigir');
+$router->post('/redacoes/salvar-rascunho', 'Modulos/redacoes/AlunoRedacaoLegadoController@salvarRascunho');
+$router->post('/redacoes/rascunho/{id}/excluir', 'Modulos/redacoes/AlunoRedacaoLegadoController@excluirRascunho');
+$router->post('/redacoes/{id}/ocultar', 'Modulos/redacoes/AlunoRedacaoLegadoController@ocultar');
 $router->get('/admin/redacao-configuravel', 'Modulos/redacoes/AdminEssayController@index');
 $router->get('/admin/redacao-configuravel/bancas/novo', 'Modulos/redacoes/AdminEssayController@boardCreate');
 $router->post('/admin/redacao-configuravel/bancas', 'Modulos/redacoes/AdminEssayController@boardStore');

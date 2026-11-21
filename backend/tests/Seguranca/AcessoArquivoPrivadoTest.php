@@ -47,4 +47,28 @@ final class AcessoArquivoPrivadoTest extends TestCase
         $this->assertFalse(AcessoArquivoPrivado::podeLer('notifications', 'aviso.png'));
         $this->assertFalse(AcessoArquivoPrivado::podeLer('tipo_que_nao_existe', 'a.png'));
     }
+
+    /** SEC-05: dono do caminho aluno/{id}/ lê; outro aluno não. */
+    public function testAlunoLeSomenteProprioCaminhoChat(): void
+    {
+        $_SESSION = ['user_id' => 618, 'user_type' => 'aluno'];
+        $this->assertTrue(AcessoArquivoPrivado::podeLer('chat', 'aluno/618/sec05_privado_a.txt'));
+
+        $_SESSION = ['user_id' => 619, 'user_type' => 'aluno'];
+        $this->assertFalse(AcessoArquivoPrivado::podeLer('chat', 'aluno/618/sec05_privado_a.txt'));
+    }
+
+    /** SEC-05: professor não lê chat privado só pelo path (so_dono / sem vínculo de registro). */
+    public function testProfessorNaoLeChatPrivadoPorPath(): void
+    {
+        $_SESSION = ['user_id' => 56, 'user_type' => 'professor'];
+        $this->assertFalse(AcessoArquivoPrivado::podeLer('chat', 'aluno/618/sec05_privado_a.txt'));
+    }
+
+    /** SEC-05: admin da escola passa no gate de arquivo privado (isolamento de tenant é na sessão/host). */
+    public function testAdminMesmaEscolaPodeLerArquivoPrivado(): void
+    {
+        $_SESSION = ['user_id' => 28, 'user_type' => 'admin_escola'];
+        $this->assertTrue(AcessoArquivoPrivado::podeLer('chat', 'aluno/618/sec05_privado_a.txt'));
+    }
 }

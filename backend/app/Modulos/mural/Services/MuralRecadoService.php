@@ -339,6 +339,158 @@ class MuralRecadoService
         $this->marcarSinoLido($recadoId, $alunoId, 'alunos');
     }
 
+    /**
+     * Recados visíveis ao aluno (mesma regra que o antigo StudentController).
+     *
+     * @param array{professor_id?:int|string,materia_id?:int|string,data_de?:string,data_ate?:string} $filtros
+     * @return array<int, array<string, mixed>>
+     */
+    public function listarParaAluno(int $alunoId, int $turmaId, array $filtros = [], bool $apenasNaoVistos = false): array
+    {
+        $turmaId = max(0, $turmaId);
+        $params = ['aluno_destino' => $alunoId];
+        $sql = "SELECT r.id, r.titulo, r.conteudo, r.data_publicacao, r.data_sai_mural, r.autor_tipo, r.autor_id,
+                CASE WHEN r.autor_tipo = 'professor' THEN (SELECT p.nome FROM professores p WHERE p.id = r.autor_id LIMIT 1) ELSE 'Admin' END as autor_nome
+                FROM mural_recados r
+                WHERE COALESCE(r.publico, 'alunos') = 'alunos'
+                AND (
+                    r.aluno_id = :aluno_destino
+                    OR (
+                        r.aluno_id IS NULL
+                        AND (r.enviar_para_todos = 1" . ($turmaId > 0 ? " OR EXISTS (
+                    SELECT 1 FROM mural_recados_turmas rt WHERE rt.mural_recado_id = r.id AND rt.turma_id = :aluno_turma_id
+                  )" : '') . ')
+                    )
+                )
+                AND (CURDATE() <= r.data_sai_mural)';
+        if ($turmaId > 0) {
+            $params['aluno_turma_id'] = $turmaId;
+        }
+        if (!empty($filtros['professor_id'])) {
+            $sql .= " AND r.autor_tipo = 'professor' AND r.autor_id = :filtro_professor_id";
+            $params['filtro_professor_id'] = (int) $filtros['professor_id'];
+        }
+        if (!empty($filtros['materia_id'])) {
+            $sql .= ' AND r.materia_id = :filtro_materia_id';
+            $params['filtro_materia_id'] = (int) $filtros['materia_id'];
+        }
+        if (!empty($filtros['data_de'])) {
+            $sql .= ' AND DATE(r.data_publicacao) >= :filtro_data_de';
+            $params['filtro_data_de'] = $filtros['data_de'];
+        }
+        if (!empty($filtros['data_ate'])) {
+            $sql .= ' AND DATE(r.data_publicacao) <= :filtro_data_ate';
+            $params['filtro_data_ate'] = $filtros['data_ate'];
+        }
+        if ($apenasNaoVistos) {
+            $sql .= ' AND NOT EXISTS (SELECT 1 FROM mural_recados_vistos v WHERE v.mural_recado_id = r.id AND v.aluno_id = :aluno_id)';
+            $params['aluno_id'] = $alunoId;
+        }
+        $sql .= ' ORDER BY r.data_publicacao DESC';
+        return $this->db->fetchAll($sql, $params);
+    }
+
+    public function contarParaAluno(int $alunoId, int $turmaId, bool $apenasNaoVistos = false): int
+    {
+        $sqlWhere = $this->sqlBaseVisibilidadeAluno($turmaId, $apenasNaoVistos);
+        $params = $this->paramsBaseVisibilidadeAluno($alunoId, $turmaId, $apenasNaoVistos);
+        $row = $this->db->fetch("SELECT COUNT(*) AS total FROM mural_recados r WHERE {$sqlWhere}", $params);
+        return (int) ($row['total'] ?? 0);
+    }
+
+    /**
+     * Resumo para o dashboard (não lidos, com autor).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listarNaoVistosResumoParaAluno(int $alunoId, int $turmaId, int $limit = 10): array
+    {
+        $limit = max(1, min(50, $limit));
+        $sqlWhere = $this->sqlBaseVisibilidadeAluno($turmaId, true);
+        $params = $this->paramsBaseVisibilidadeAluno($alunoId, $turmaId, true);
+        return $this->db->fetchAll(
+            "SELECT r.id, r.titulo, r.conteudo, r.data_publicacao,
+                    COALESCE(p.nome, 'Admin') AS autor_nome
+             FROM mural_recados r
+             LEFT JOIN professores p ON r.autor_tipo = 'professor' AND p.id = r.autor_id
+             WHERE {$sqlWhere}
+             ORDER BY r.data_publicacao DESC
+             LIMIT {$limit}",
+            $params
+        );
+    }
+
+    /**
+     * @return array<int, array{id:int|string,nome:string}>
+     */
+    public function listarProfessoresFiltroAluno(): array
+    {
+        return $this->db->fetchAll(
+            "SELECT DISTINCT p.id, p.nome
+             FROM mural_recados r
+             JOIN professores p ON p.id = r.autor_id
+             WHERE r.autor_tipo = 'professor'
+             ORDER BY p.nome"
+        );
+    }
+
+    /**
+     * @return array<int, array{id:int|string,nome:string}>
+     */
+    public function listarMateriasFiltroAluno(): array
+    {
+        try {
+            $rows = $this->db->fetchAll('SELECT id, nome FROM materias ORDER BY nome');
+            if (!empty($rows)) {
+                return $rows;
+            }
+        } catch (\Throwable $e) {
+        }
+        try {
+            return $this->db->fetchAll('SELECT id, nome FROM jornadas_materias ORDER BY nome');
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    private function sqlBaseVisibilidadeAluno(int $turmaId, bool $apenasNaoVistos): string
+    {
+        $turmaFiltro = $turmaId > 0
+            ? ' OR EXISTS (SELECT 1 FROM mural_recados_turmas rt WHERE rt.mural_recado_id = r.id AND rt.turma_id = :aluno_turma_id)'
+            : '';
+        $sql = "COALESCE(r.publico, 'alunos') = 'alunos'
+                AND (
+                    r.aluno_id = :aluno_destino
+                    OR (
+                        r.aluno_id IS NULL
+                        AND (r.enviar_para_todos = 1{$turmaFiltro})
+                    )
+                )
+                AND (CURDATE() <= r.data_sai_mural)";
+        if ($apenasNaoVistos) {
+            $sql .= ' AND NOT EXISTS (
+                SELECT 1 FROM mural_recados_vistos v
+                WHERE v.mural_recado_id = r.id AND v.aluno_id = :aluno_id
+            )';
+        }
+        return $sql;
+    }
+
+    /**
+     * @return array<string, int|string>
+     */
+    private function paramsBaseVisibilidadeAluno(int $alunoId, int $turmaId, bool $apenasNaoVistos): array
+    {
+        $params = ['aluno_destino' => $alunoId];
+        if ($turmaId > 0) {
+            $params['aluno_turma_id'] = $turmaId;
+        }
+        if ($apenasNaoVistos) {
+            $params['aluno_id'] = $alunoId;
+        }
+        return $params;
+    }
+
     public function marcarVistoProfessor(int $recadoId, int $professorId): void
     {
         if ($recadoId <= 0 || $professorId <= 0 || !$this->professorPodeVer($recadoId, $professorId)) {

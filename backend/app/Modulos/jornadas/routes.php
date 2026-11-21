@@ -205,5 +205,5 @@ $router->post('/professor/planos-aula/aprovar-rascunhos', 'Education/LessonPlanC
 $router->post('/professor/planos-aula/duplicar/{id}', 'Education/LessonPlanController@duplicar');
 $router->post('/professor/planos-aula/excluir/{id}', 'Education/LessonPlanController@excluir');
 $router->get('/professor/planos-aula/pdf/{id}', 'Education/LessonPlanController@exportarPdf');
-$router->get('/aluno/planos-aula', 'User/StudentController@planosAula');
-$router->get('/aluno/planos-aula/visualizar/{id}', 'User/StudentController@visualizarPlanoAula');
+$router->get('/aluno/planos-aula', 'Modulos/jornadas/AlunoPlanoAulaController@index');
+$router->get('/aluno/planos-aula/visualizar/{id}', 'Modulos/jornadas/AlunoPlanoAulaController@visualizar');

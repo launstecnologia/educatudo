@@ -3,6 +3,7 @@
 namespace App\Dominio\Pessoas\Services;
 
 use App\Core\Database;
+use App\Modulos\Jornadas\Services\PlanoAulaAlunoService;
 
 /** Consultas acadêmicas compartilháveis pelos adapters da API. */
 class ParentAcademicReadService
@@ -876,37 +877,37 @@ class ParentAcademicReadService
     {
         $student = $this->db->fetch('SELECT turma_id FROM alunos WHERE id = :id', ['id' => $studentId]);
         $classId = (int) ($student['turma_id'] ?? 0);
-        if ($classId <= 0) return [];
-        $rows = $this->db->fetchAll(
-            "SELECT pa.id, pa.titulo, pa.objetivos, pa.created_at, p.nome professor_name, m.nome subject_name
-             FROM planos_aula pa LEFT JOIN professores p ON p.id = pa.professor_id
-             LEFT JOIN materias m ON m.id = pa.materia_id
-             WHERE pa.turma_id = :class_id AND pa.deleted_at IS NULL
-             ORDER BY pa.created_at DESC LIMIT 100",
-            ['class_id' => $classId]
-        );
-        return array_map(function (array $row): array { return [
-            'id' => (int) $row['id'], 'title' => (string) $row['titulo'],
-            'objectives' => $row['objetivos'], 'teacher_name' => $row['professor_name'],
-            'subject_name' => $row['subject_name'], 'created_at' => $this->isoDate($row['created_at'] ?? null),
-        ]; }, $rows);
+        if ($classId <= 0) {
+            return [];
+        }
+        // Sem filtro de ano civil — contrato histórico do adapter acadêmico (assimetria documentada na Etapa 5).
+        $rows = (new PlanoAulaAlunoService($this->db))->listarParaTurma($classId, false);
+        $rows = array_slice($rows, 0, 100);
+        return array_map(function (array $row): array {
+            return [
+                'id' => (int) $row['id'],
+                'title' => (string) ($row['titulo'] ?? ''),
+                'objectives' => $row['objetivos'] ?? null,
+                'teacher_name' => $row['professor_nome'] ?? null,
+                'subject_name' => $row['materia_nome'] ?? null,
+                'created_at' => $this->isoDate($row['created_at'] ?? null),
+            ];
+        }, $rows);
     }
 
     public function lessonPlan(int $studentId, int $planId): ?array
     {
-        $row = $this->db->fetch(
-            "SELECT pa.*, p.nome professor_name, m.nome subject_name,
-                    t.nome class_name, t.serie class_grade
-             FROM alunos a
-             INNER JOIN planos_aula pa ON pa.turma_id = a.turma_id
-             LEFT JOIN professores p ON p.id = pa.professor_id
-             LEFT JOIN materias m ON m.id = pa.materia_id
-             LEFT JOIN turmas t ON t.id = pa.turma_id
-             WHERE a.id = :student_id AND pa.id = :plan_id AND pa.deleted_at IS NULL
-             LIMIT 1",
-            ['student_id' => $studentId, 'plan_id' => $planId]
-        );
-        if (!$row) return null;
+        $student = $this->db->fetch('SELECT turma_id FROM alunos WHERE id = :id', ['id' => $studentId]);
+        $turmaAluno = (int) ($student['turma_id'] ?? 0);
+        $plano = (new PlanoAulaAlunoService($this->db))->buscarNaoDeletado($planId);
+        if (!$plano || $turmaAluno <= 0 || (int) ($plano['turma_id'] ?? 0) !== $turmaAluno) {
+            return null;
+        }
+        $row = $plano;
+        $row['professor_name'] = $plano['professor_nome'] ?? null;
+        $row['subject_name'] = $plano['materia_nome'] ?? null;
+        $row['class_name'] = $plano['turma_nome'] ?? null;
+        $row['class_grade'] = $plano['turma_serie'] ?? null;
 
         $resourcesList = null;
         if (!empty($row['recursos_lista'])) {

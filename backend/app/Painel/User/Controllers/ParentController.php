@@ -17,6 +17,7 @@ use App\Modulos\Drive\Services\DriveStorageService;
 use App\Core\FeatureGate;
 use App\Core\LayoutHelper;
 use App\Modulos\GruposRegrasNotas\Services\PainelNotasService;
+use App\Modulos\Jornadas\Services\PlanoAulaAlunoService;
 use App\Services\ParentJornadasService;
 use App\Services\SchoolCalendarService;
 if (!class_exists(__NAMESPACE__ . '\\ParentController', false)) {
@@ -1240,30 +1241,8 @@ class ParentController extends BaseController
         
         $planosAula = [];
         if (!empty($filho['turma_id'])) {
-            $anoAtual = date('Y');
-            $planosAula = $this->db->fetchAll(
-                "SELECT pa.*, 
-                        p.nome as professor_nome,
-                        m.nome as materia_nome,
-                        t.nome as turma_nome,
-                        t.serie as turma_serie
-                 FROM planos_aula pa
-                 LEFT JOIN professores p ON pa.professor_id = p.id
-                 LEFT JOIN materias m ON pa.materia_id = m.id
-                 LEFT JOIN turmas t ON pa.turma_id = t.id
-                 WHERE pa.turma_id = :turma_id 
-                     AND pa.deleted_at IS NULL
-                     AND YEAR(pa.created_at) = :ano_atual
-                 ORDER BY pa.created_at DESC",
-                [
-                    'turma_id' => $filho['turma_id'],
-                    'ano_atual' => $anoAtual
-                ]
-            ) ?: [];
-            foreach ($planosAula as &$plano) {
-                $plano['data_exibicao'] = $this->formatarDataPlanoAula($plano);
-            }
-            unset($plano);
+            // Mesma política do aluno: só status aprovado (PlanoAulaAlunoService).
+            $planosAula = (new PlanoAulaAlunoService($this->db))->listarParaTurma((int) $filho['turma_id']);
         }
 
         $filtroProfessor = trim((string) ($_GET['professor'] ?? ''));
@@ -1335,15 +1314,7 @@ class ParentController extends BaseController
             return;
         }
         $planoId = (int) $planoId;
-        $plano = $this->db->fetch(
-            "SELECT pa.*, p.nome as professor_nome, m.nome as materia_nome, t.nome as turma_nome
-             FROM planos_aula pa
-             LEFT JOIN professores p ON pa.professor_id = p.id
-             LEFT JOIN materias m ON pa.materia_id = m.id
-             LEFT JOIN turmas t ON pa.turma_id = t.id
-             WHERE pa.id = :plano_id AND pa.deleted_at IS NULL",
-            ['plano_id' => $planoId]
-        );
+        $plano = (new PlanoAulaAlunoService($this->db))->buscarNaoDeletado($planoId);
         if (!$plano || (int)$plano['turma_id'] !== (int)$filho['turma_id']) {
             $this->redirect('/pais/filhos/' . (int)$id . '/plano-aula');
             return;
@@ -1376,10 +1347,7 @@ class ParentController extends BaseController
             return;
         }
         $planoId = (int) $planoId;
-        $plano = $this->db->fetch(
-            "SELECT * FROM planos_aula WHERE id = :plano_id AND deleted_at IS NULL",
-            ['plano_id' => $planoId]
-        );
+        $plano = (new PlanoAulaAlunoService($this->db))->buscarNaoDeletado($planoId);
         if (!$plano || (int)$plano['turma_id'] !== (int)$filho['turma_id']) {
             $this->redirect('/pais/filhos/' . (int)$id . '/plano-aula');
             return;

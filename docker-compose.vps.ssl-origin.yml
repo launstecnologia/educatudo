@@ -9,3 +9,4 @@ services:
     volumes:
       - ./ssl:/etc/ssl/educatudo:ro
       - ./docker/nginx/vps-prod-ssl-origin.conf:/etc/nginx/conf.d/ssl.conf:ro
+      - ./docker/nginx/cloudflare-real-ip.conf:/etc/nginx/snippets/cloudflare-real-ip.conf:ro

@@ -1,0 +1,187 @@
+{
+    "generated_at": "2026-11-20T17:42:33+00:00",
+    "base": "http:\/\/127.0.0.1",
+    "results": [
+        {
+            "id": "RL-01-bloqueio-identificador-admin",
+            "status": "APROVADO",
+            "detail": "Após 4 falhas seedadas, nova tentativa retornou bloqueio (max_login_attempts=5 ⇒ allowUntil=4).",
+            "evidence": {
+                "http": 302,
+                "marker": "sec04.lockout.1795196548@colag.local"
+            }
+        },
+        {
+            "id": "RL-02-recuperacao-apos-janela",
+            "status": "APROVADO",
+            "detail": "Falhas com created_at > lockout_duration não bloqueiam; tentativa volta a ser avaliada.",
+            "evidence": {
+                "still_locked": false,
+                "invalid_msg": true
+            }
+        },
+        {
+            "id": "RL-03-ip-nao-confia-xff-cliente",
+            "status": "APROVADO",
+            "detail": "Rate limit de login usa REMOTE_ADDR; header X-Forwarded-For do cliente não virou chave do contador.",
+            "evidence": {
+                "recorded_ips": [
+                    "172.20.0.1"
+                ],
+                "xff_injected": "203.0.113.50"
+            }
+        },
+        {
+            "id": "RL-04-bloqueio-por-ip-arquivo",
+            "status": "APROVADO",
+            "detail": "Arquivo login_rate_limit.json com c>=max_login_attempts_ip bloqueou login (IP observado: 172.20.0.1).",
+            "evidence": {
+                "real_ip": "172.20.0.1"
+            }
+        },
+        {
+            "id": "RL-05-contador-compartilhado-arquivo",
+            "status": "APROVADO",
+            "detail": "Contador IP persiste em storage\/logs\/login_rate_limit.json (volume do container PHP; compartilhado entre workers FPM do mesmo container).",
+            "evidence": {
+                "storage": "file+flock",
+                "redis": false
+            }
+        },
+        {
+            "id": "RL-06-master-senha-rate-limit",
+            "status": "APROVADO",
+            "detail": "POST \/master\/login aplica max_login_attempts (5) e bloqueia após falhas na janela lockout_duration.",
+            "evidence": {
+                "blocked": true,
+                "invalid_msgs": [
+                    true,
+                    true,
+                    true,
+                    false,
+                    false
+                ]
+            }
+        },
+        {
+            "id": "RL-07-otp-master-max-tentativas",
+            "status": "APROVADO",
+            "detail": "CodigoAcessoMasterService::confirmar — 5 erros → esgotado; código válido ainda passa em outro desafio.",
+            "evidence": {
+                "ok": true,
+                "usuario_id": 1,
+                "codigo_id": 5,
+                "resultados": [
+                    "invalido",
+                    "invalido",
+                    "invalido",
+                    "invalido",
+                    "esgotado"
+                ],
+                "sexto": "esgotado",
+                "tentativas": 5,
+                "max": 5,
+                "esgotado": true,
+                "codigo_valido": "ok"
+            }
+        },
+        {
+            "id": "PERM-01-anonimo-admin",
+            "status": "APROVADO",
+            "detail": "GET \/admin\/dashboard sem sessão redireciona para login.",
+            "evidence": {
+                "code": 302
+            }
+        },
+        {
+            "id": "PERM-02-anonimo-master",
+            "status": "APROVADO",
+            "detail": "GET \/master\/dashboard sem sessão redireciona.",
+            "evidence": {
+                "code": 302
+            }
+        },
+        {
+            "id": "PERM-03-login-admin-lab",
+            "status": "APROVADO",
+            "detail": "Login admin lab ok.",
+            "evidence": {
+                "code": 302
+            }
+        },
+        {
+            "id": "PERM-04-admin-nao-acessa-master",
+            "status": "APROVADO",
+            "detail": "Sessão admin de tenant não abre \/master\/dashboard (exige master_user_id).",
+            "evidence": {
+                "code": 302
+            }
+        },
+        {
+            "id": "PERM-05-admin-cross-tenant",
+            "status": "APROVADO",
+            "detail": "Cookie de Colag em escola2.localhost não mantém painel admin (sessaoConfereComEscolaAtual \/ Auth).",
+            "evidence": {
+                "code": 302,
+                "loc": "http:\/\/escola2.localhost\/admin"
+            }
+        },
+        {
+            "id": "PERM-06-post-admin-direto",
+            "status": "APROVADO",
+            "detail": "POST \/admin\/students direto (sem CSRF completo) não retornou 200 de sucesso de criação.",
+            "evidence": {
+                "code": 302
+            }
+        },
+        {
+            "id": "PERM-07-login-monitor-lab",
+            "status": "APROVADO",
+            "detail": "Login monitor lab ok.",
+            "evidence": {
+                "code": 302,
+                "headers": "HTTP\/1.1 302 Found\r\nServer: nginx\r\nDate: Fri, 20 Nov 2026 17:42:32 GMT\r\nContent-Type: text\/html; charset=UTF-8\r\nTransfer-Encoding: chunked\r\nConnection: keep-alive\r\nExpires: Thu, 19 Nov 1981 08:52:00 GMT\r\nCache-Control: no-store, no-cache, must-revalidate\r\nPragma: no-cache\r\nPermissions-Policy: geoloc"
+            }
+        },
+        {
+            "id": "PERM-08-monitor-nao-acessa-admin",
+            "status": "APROVADO",
+            "detail": "Monitor autenticado é redirecionado ao tentar \/admin\/dashboard (AdminBaseController).",
+            "evidence": {
+                "code": 302
+            }
+        },
+        {
+            "id": "PERM-09-login-aluno-lab",
+            "status": "APROVADO",
+            "detail": "Login aluno lab ok.",
+            "evidence": {
+                "code": 302
+            }
+        },
+        {
+            "id": "PERM-10-aluno-nao-acessa-admin",
+            "status": "APROVADO",
+            "detail": "Aluno autenticado não permanece em \/admin\/dashboard.",
+            "evidence": {
+                "code": 302
+            }
+        },
+        {
+            "id": "PERM-11-master-post-sem-sessao",
+            "status": "APROVADO",
+            "detail": "POST \/master\/escolas\/salvar sem sessão master é rejeitado\/redirecionado.",
+            "evidence": {
+                "code": 302
+            }
+        },
+        {
+            "id": "PERM-12-cron-master-sem-key",
+            "status": "APROVADO",
+            "detail": "Endpoint cron Master sem key retorna 403.",
+            "evidence": {
+                "code": 403
+            }
+        }
+    ]
+}

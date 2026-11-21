@@ -275,6 +275,21 @@ class MasterAuthController extends BaseController
             exit;
         }
 
+        $ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+        $bloqueio = $this->verificarLimiteLoginMaster($email, $ip);
+        if ($bloqueio !== null) {
+            $this->logMaster('autenticar() bloqueado por rate limit', [
+                'motivo' => $bloqueio['motivo'],
+                'minutos' => $bloqueio['minutos'],
+            ], true);
+            $this->setFlashMessage(
+                "Muitas tentativas de login. Tente novamente em {$bloqueio['minutos']} minutos.",
+                'error'
+            );
+            header('Location: ' . URL . '/master');
+            exit;
+        }
+
         $db = Database::getInstance();
         $stmt = $db->query("SELECT id, email, senha_hash, nome, avatar_url FROM usuarios_master WHERE email = ? AND ativo = 1", [$email]);
         $user = $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -282,11 +297,26 @@ class MasterAuthController extends BaseController
         $pwOk = $user && password_verify($senha, $user['senha_hash']);
 
         if (!$user || !$pwOk) {
+            $this->registrarFalhaLoginMaster($email, $ip);
             $this->logMaster('autenticar() credenciais inválidas', ['user_found' => $user ? 'sim' : 'nao']);
-            $this->setFlashMessage('E-mail ou senha incorretos.', 'error');
+            $bloqueioApos = $this->verificarLimiteLoginMaster($email, $ip);
+            if ($bloqueioApos !== null) {
+                $this->logMaster('autenticar() bloqueado após falha', [
+                    'motivo' => $bloqueioApos['motivo'],
+                    'minutos' => $bloqueioApos['minutos'],
+                ], true);
+                $this->setFlashMessage(
+                    "Muitas tentativas de login. Tente novamente em {$bloqueioApos['minutos']} minutos.",
+                    'error'
+                );
+            } else {
+                $this->setFlashMessage('E-mail ou senha incorretos.', 'error');
+            }
             header('Location: ' . URL . '/master');
             exit;
         }
+
+        $this->limparFalhaLoginMaster($email);
 
         try {
             $this->prepararDesafioSegundoFator($user);
@@ -713,6 +743,195 @@ class MasterAuthController extends BaseController
             $_SESSION[self::SESSION_2FA_CODIGO_ID],
             $_SESSION[self::SESSION_2FA_EMAIL]
         );
+    }
+
+    /**
+     * Mesmos tetos do login admin/monitor: max_login_attempts (5) por e-mail
+     * e max_login_attempts_ip por IP, na janela lockout_duration.
+     *
+     * @return array{motivo: string, minutos: int}|null
+     */
+    private function verificarLimiteLoginMaster(string $email, string $ip): ?array
+    {
+        $sec = $this->obterConfigSegurancaMaster();
+        $janela = max(60, (int) ($sec['lockout_duration'] ?? 900));
+        $maxEmail = max(1, (int) ($sec['max_login_attempts'] ?? 5));
+        $maxIp = max(1, (int) ($sec['max_login_attempts_ip'] ?? 50));
+        // Alinhado ao AuthManager: bloqueia na tentativa N quando max=N (após N-1 falhas).
+        $limiteEmail = max(1, $maxEmail - 1);
+        $minutos = max(1, (int) ceil($janela / 60));
+
+        $dados = $this->lerContadoresLoginMaster($janela);
+        $chaveEmail = $this->chaveRateLimitEmailMaster($email);
+        if ($chaveEmail !== '' && $this->contadorAtivoMaster($dados, $chaveEmail, $janela) >= $limiteEmail) {
+            return ['motivo' => 'email', 'minutos' => $minutos];
+        }
+        $chaveIp = $this->chaveRateLimitIpMaster($ip);
+        if ($chaveIp !== '' && $this->contadorAtivoMaster($dados, $chaveIp, $janela) >= $maxIp) {
+            return ['motivo' => 'ip', 'minutos' => $minutos];
+        }
+
+        return null;
+    }
+
+    private function registrarFalhaLoginMaster(string $email, string $ip): void
+    {
+        $sec = $this->obterConfigSegurancaMaster();
+        $janela = max(60, (int) ($sec['lockout_duration'] ?? 900));
+        $chaves = array_values(array_filter([
+            $this->chaveRateLimitEmailMaster($email),
+            $this->chaveRateLimitIpMaster($ip),
+        ]));
+        if ($chaves === []) {
+            return;
+        }
+        $this->atualizarContadoresLoginMaster($janela, static function (array $dados) use ($chaves, $janela): array {
+            $agora = time();
+            foreach ($chaves as $chave) {
+                $entrada = $dados[$chave] ?? ['c' => 0, 't' => $agora];
+                if (!is_array($entrada) || ($agora - (int) ($entrada['t'] ?? $agora)) > $janela) {
+                    $entrada = ['c' => 0, 't' => $agora];
+                }
+                $entrada['c'] = (int) ($entrada['c'] ?? 0) + 1;
+                $entrada['t'] = (int) ($entrada['t'] ?? $agora);
+                $dados[$chave] = $entrada;
+            }
+            return $dados;
+        });
+    }
+
+    /** Sucesso na senha zera só o contador do e-mail; o de IP segue na janela. */
+    private function limparFalhaLoginMaster(string $email): void
+    {
+        $sec = $this->obterConfigSegurancaMaster();
+        $janela = max(60, (int) ($sec['lockout_duration'] ?? 900));
+        $chave = $this->chaveRateLimitEmailMaster($email);
+        if ($chave === '') {
+            return;
+        }
+        $this->atualizarContadoresLoginMaster($janela, static function (array $dados) use ($chave): array {
+            unset($dados[$chave]);
+            return $dados;
+        });
+    }
+
+    /** @return array<string, mixed> */
+    private function obterConfigSegurancaMaster(): array
+    {
+        $configPath = defined('CONFIG_PATH')
+            ? CONFIG_PATH
+            : ((defined('BASE_PATH') ? BASE_PATH : dirname(__DIR__, 4)) . '/config/app.php');
+        $config = is_file($configPath) ? require $configPath : [];
+
+        return is_array($config['security'] ?? null) ? $config['security'] : [];
+    }
+
+    private function arquivoRateLimitMaster(): string
+    {
+        $base = defined('BASE_PATH') ? BASE_PATH : dirname(__DIR__, 4);
+        $dir = $base . '/storage/logs';
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0755, true);
+        }
+
+        return $dir . '/master_login_rate_limit.json';
+    }
+
+    private function chaveRateLimitEmailMaster(string $email): string
+    {
+        $email = mb_strtolower(trim($email));
+        if ($email === '') {
+            return '';
+        }
+
+        return 'email:' . hash('sha256', $email);
+    }
+
+    private function chaveRateLimitIpMaster(string $ip): string
+    {
+        $ip = trim($ip);
+        if ($ip === '' || $ip === 'unknown') {
+            return '';
+        }
+
+        return 'ip:' . $ip;
+    }
+
+    /** @return array<string, array{c: int, t: int}> */
+    private function lerContadoresLoginMaster(int $janela): array
+    {
+        $arquivo = $this->arquivoRateLimitMaster();
+        if (!is_file($arquivo)) {
+            return [];
+        }
+        $fp = @fopen($arquivo, 'c+');
+        if (!$fp || !flock($fp, LOCK_SH)) {
+            if ($fp) {
+                fclose($fp);
+            }
+            return [];
+        }
+        $raw = stream_get_contents($fp);
+        flock($fp, LOCK_UN);
+        fclose($fp);
+        $dados = $raw !== false && $raw !== '' ? (json_decode($raw, true) ?: []) : [];
+        if (!is_array($dados)) {
+            return [];
+        }
+        $agora = time();
+        foreach ($dados as $chave => $entrada) {
+            if (!is_array($entrada) || ($agora - (int) ($entrada['t'] ?? 0)) > $janela) {
+                unset($dados[$chave]);
+            }
+        }
+
+        return $dados;
+    }
+
+    private function contadorAtivoMaster(array $dados, string $chave, int $janela): int
+    {
+        $entrada = $dados[$chave] ?? null;
+        if (!is_array($entrada)) {
+            return 0;
+        }
+        $agora = time();
+        if (($agora - (int) ($entrada['t'] ?? 0)) > $janela) {
+            return 0;
+        }
+
+        return (int) ($entrada['c'] ?? 0);
+    }
+
+    /**
+     * @param callable(array): array $mutator
+     */
+    private function atualizarContadoresLoginMaster(int $janela, callable $mutator): void
+    {
+        $arquivo = $this->arquivoRateLimitMaster();
+        $fp = @fopen($arquivo, 'c+');
+        if (!$fp || !flock($fp, LOCK_EX)) {
+            if ($fp) {
+                fclose($fp);
+            }
+            return;
+        }
+        $raw = stream_get_contents($fp);
+        $dados = $raw !== false && $raw !== '' ? (json_decode($raw, true) ?: []) : [];
+        if (!is_array($dados)) {
+            $dados = [];
+        }
+        $agora = time();
+        foreach ($dados as $chave => $entrada) {
+            if (!is_array($entrada) || ($agora - (int) ($entrada['t'] ?? 0)) > $janela) {
+                unset($dados[$chave]);
+            }
+        }
+        $dados = $mutator($dados);
+        ftruncate($fp, 0);
+        rewind($fp);
+        fwrite($fp, json_encode($dados));
+        flock($fp, LOCK_UN);
+        fclose($fp);
     }
 }
 

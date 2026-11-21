@@ -306,12 +306,15 @@ $tudicoinsTemaIa = \App\Core\CreditosModuleRegistry::acaoIaDisponivel('redacao_g
             }
             
             try {
+                const formData = new FormData();
+                formData.append('_token', <?= json_encode($_SESSION['csrf_token'] ?? ($csrf_token ?? '')) ?>);
                 const response = await fetch(`<?= URL ?>/redacoes/${id}/ocultar`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': <?= json_encode($_SESSION['csrf_token'] ?? ($csrf_token ?? '')) ?>
+                    },
+                    body: formData
                 });
                 
                 const data = await response.json();

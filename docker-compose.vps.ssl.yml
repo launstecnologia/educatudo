@@ -11,3 +11,4 @@ services:
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - ./docker/nginx/vps-prod-ssl.conf:/etc/nginx/conf.d/ssl.conf:ro
+      - ./docker/nginx/cloudflare-real-ip.conf:/etc/nginx/snippets/cloudflare-real-ip.conf:ro
