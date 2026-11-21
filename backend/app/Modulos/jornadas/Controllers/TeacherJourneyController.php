@@ -5301,52 +5301,94 @@ Retorne APENAS um JSON válido no seguinte formato:
 
             $media = new MediaStorageService($this->config);
             $imageUrl = null;
-            $filename = null;
+            $falhaPersistencia = false;
+            $mimesPermitidos = [
+                'image/jpeg' => 'jpg',
+                'image/png' => 'png',
+                'image/gif' => 'gif',
+                'image/webp' => 'webp',
+            ];
 
             // Colagem: imagem em base64 no POST
             $base64 = $_POST['imagem_base64'] ?? '';
             if ($base64 !== '') {
                 if (preg_match('/^data:image\/(\w+);base64,(.+)$/', $base64, $m)) {
-                    $ext = $m[1] === 'jpeg' ? 'jpg' : $m[1];
+                    $extBruta = strtolower((string) $m[1]);
+                    $ext = $extBruta === 'jpeg' ? 'jpg' : $extBruta;
                     $data = base64_decode($m[2], true);
-                    if ($data !== false && strlen($data) > 0 && strlen($data) <= 10 * 1024 * 1024) {
-                        $filename = 'exercicio_' . $user['id'] . '_' . time() . '_' . uniqid() . '.' . $ext;
-                        $key = MediaStorageService::userKey('teacher', $user['id'], $filename);
-                        $tmpPath = sys_get_temp_dir() . '/' . $filename;
-                        if (file_put_contents($tmpPath, $data) !== false && $media->put('jornadas_exercicios', $key, $tmpPath, 'image/' . ($ext === 'jpg' ? 'jpeg' : $ext))) {
-                            $imageUrl = $this->buildStableJourneyExerciseMediaUrl($key);
-                        }
-                        @unlink($tmpPath);
+                    if ($data === false || strlen($data) === 0) {
+                        throw new \Exception('Imagem colada inválida.');
                     }
+                    if (strlen($data) > 10 * 1024 * 1024) {
+                        throw new \Exception('Arquivo muito grande. Máximo 10MB.');
+                    }
+                    $tmpPath = sys_get_temp_dir() . '/jornada_img_' . bin2hex(random_bytes(8)) . '.' . $ext;
+                    if (file_put_contents($tmpPath, $data) === false) {
+                        throw new \Exception('Não foi possível processar a imagem colada.');
+                    }
+                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                    $mime = $finfo ? (string) finfo_file($finfo, $tmpPath) : '';
+                    if ($finfo) {
+                        finfo_close($finfo);
+                    }
+                    if (!isset($mimesPermitidos[$mime])) {
+                        @unlink($tmpPath);
+                        throw new \Exception('Tipo não permitido. Use JPG, PNG, GIF ou WebP.');
+                    }
+                    $ext = $mimesPermitidos[$mime];
+                    $filename = 'exercicio_' . (int) $user['id'] . '_' . time() . '_' . uniqid('', true) . '.' . $ext;
+                    $key = MediaStorageService::userKey('teacher', (int) $user['id'], $filename);
+                    if ($media->put('jornadas_exercicios', $key, $tmpPath, $mime)) {
+                        $imageUrl = $this->buildStableJourneyExerciseMediaUrl($key);
+                    } else {
+                        $falhaPersistencia = true;
+                    }
+                    @unlink($tmpPath);
                 }
             }
 
             // Upload por arquivo
             if ($imageUrl === null && !empty($_FILES['imagem']['name'])) {
                 $file = $_FILES['imagem'];
-                $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-                if (!in_array($file['type'], $allowedTypes)) {
-                    throw new \Exception('Tipo não permitido. Use JPG, PNG, GIF ou WebP.');
+                $erroUpload = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
+                if ($erroUpload !== UPLOAD_ERR_OK) {
+                    throw new \Exception('Falha no envio do arquivo (código ' . $erroUpload . ').');
                 }
-                if ($file['size'] > 10 * 1024 * 1024) {
+                if (empty($file['tmp_name']) || !is_uploaded_file((string) $file['tmp_name'])) {
+                    throw new \Exception('Upload inválido.');
+                }
+                if ((int) ($file['size'] ?? 0) > 10 * 1024 * 1024) {
                     throw new \Exception('Arquivo muito grande. Máximo 10MB.');
                 }
-                $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-                $filename = 'exercicio_' . $user['id'] . '_' . time() . '_' . uniqid() . '.' . $ext;
-                $key = MediaStorageService::userKey('teacher', $user['id'], $filename);
-                if ($media->put('jornadas_exercicios', $key, $file['tmp_name'], $file['type'])) {
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                $mime = $finfo ? (string) finfo_file($finfo, (string) $file['tmp_name']) : '';
+                if ($finfo) {
+                    finfo_close($finfo);
+                }
+                if (!isset($mimesPermitidos[$mime])) {
+                    throw new \Exception('Tipo não permitido. Use JPG, PNG, GIF ou WebP.');
+                }
+                $ext = $mimesPermitidos[$mime];
+                $filename = 'exercicio_' . (int) $user['id'] . '_' . time() . '_' . uniqid('', true) . '.' . $ext;
+                $key = MediaStorageService::userKey('teacher', (int) $user['id'], $filename);
+                if ($media->put('jornadas_exercicios', $key, (string) $file['tmp_name'], $mime)) {
                     $imageUrl = $this->buildStableJourneyExerciseMediaUrl($key);
+                } else {
+                    $falhaPersistencia = true;
                 }
             }
 
             if ($imageUrl === null) {
+                if ($falhaPersistencia) {
+                    throw new \Exception('Não foi possível salvar a imagem no armazenamento. Tente novamente.');
+                }
                 throw new \Exception('Nenhuma imagem recebida. Escolha um arquivo ou cole uma imagem (Ctrl+V).');
             }
 
             $this->json(['success' => true, 'image_url' => $imageUrl]);
         } catch (\Exception $e) {
             error_log("Erro ao fazer upload de imagem do exercício: " . $e->getMessage());
-            $this->json(['error' => $e->getMessage()], 400);
+            $this->json(['success' => false, 'error' => $e->getMessage()], 400);
         }
     }
     

@@ -714,22 +714,57 @@ function abrirMathAltJornada(btn) {
 // ── Imagem no enunciado e alternativas (igual à prova) ──
 var altEditorForImageJornada = null;
 
+function tokenCsrfJornadaExercicios() {
+    return csrfTokenModuloExercicios
+        || (typeof getCsrfToken === 'function' ? getCsrfToken() : '')
+        || ((document.querySelector('meta[name="csrf-token"]') || {}).content || '');
+}
+
+function appendCsrfFormDataJornada(formData) {
+    if (!formData.has('_token')) {
+        formData.append('_token', tokenCsrfJornadaExercicios());
+    }
+    return formData;
+}
+
+function headersCsrfUploadJornada() {
+    return {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-TOKEN': tokenCsrfJornadaExercicios()
+    };
+}
+
+function parseUploadImagemJornadaResponse(response) {
+    return response.text().then(function(text) {
+        var data = null;
+        try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
+        if (!response.ok) {
+            var msg = (data && data.error) ? data.error : ('Upload falhou (HTTP ' + response.status + ')');
+            throw new Error(msg);
+        }
+        if (!data || !data.success) {
+            throw new Error((data && data.error) ? data.error : 'Erro no upload');
+        }
+        if (!data.image_url || typeof data.image_url !== 'string') {
+            throw new Error('URL da imagem não retornada');
+        }
+        return data;
+    });
+}
+
 function uploadImageForEditorJornada(file) {
     if (!file || !file.type.startsWith('image/')) return Promise.reject(new Error('Arquivo não é uma imagem'));
-    var formData = new FormData();
+    var formData = appendCsrfFormDataJornada(new FormData());
     formData.append('imagem', file);
-    formData.append('_token', csrfTokenModuloExercicios || (typeof getCsrfToken === 'function' ? getCsrfToken() : ''));
-    return fetch(baseUrl + '/professor/jornadas/modulos/upload-imagem-exercicio', { method: 'POST', body: formData })
-        .then(function(r) {
-            if (!r.ok) throw new Error('Upload falhou: ' + r.status);
-            return r.json();
-        })
-        .then(function(data) {
-            if (!data || !data.success) throw new Error(data && data.error ? data.error : 'Erro no upload');
-            var url = data.image_url;
-            if (!url || typeof url !== 'string') throw new Error('URL da imagem não retornada');
-            return url;
-        });
+    return fetch(baseUrl + '/professor/jornadas/modulos/upload-imagem-exercicio', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: headersCsrfUploadJornada(),
+        body: formData
+    }).then(parseUploadImagemJornadaResponse).then(function(data) {
+        return data.image_url;
+    });
 }
 
 function normalizarUrlImagemJornada(url) {
@@ -851,17 +886,20 @@ function uploadImagemEnunciadoManual(input) {
     imgEl.src = URL.createObjectURL(file);
     previewEl.classList.remove('hidden');
     if (actionsEl) actionsEl.classList.add('hidden');
-    const formData = new FormData();
+    const formData = appendCsrfFormDataJornada(new FormData());
     formData.append('imagem', file);
-    fetch(baseUrl + '/professor/jornadas/modulos/upload-imagem-exercicio', { method: 'POST', body: formData })
-        .then(r => r.json())
+    fetch(baseUrl + '/professor/jornadas/modulos/upload-imagem-exercicio', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: headersCsrfUploadJornada(),
+        body: formData
+    })
+        .then(parseUploadImagemJornadaResponse)
         .then(data => {
-            if (data.success) {
-                document.getElementById('imagem-url-manual').value = data.image_url;
-                /* mantém o preview com blob URL para não quebrar se a URL do servidor não carregar */
-            } else alert('Erro: ' + (data.error || 'Upload falhou'));
+            document.getElementById('imagem-url-manual').value = data.image_url;
+            /* mantém o preview com blob URL para não quebrar se a URL do servidor não carregar */
         })
-        .catch(() => alert('Erro ao enviar imagem'));
+        .catch((err) => alert('Erro ao enviar imagem: ' + (err && err.message ? err.message : 'falha desconhecida')));
 }
 
 function removerImagemEnunciadoManual() {
@@ -884,17 +922,20 @@ function uploadImagemEnunciadoEdicao(input) {
     imgEl.src = URL.createObjectURL(file);
     previewEl.classList.remove('hidden');
     if (actionsEl) actionsEl.classList.add('hidden');
-    const formData = new FormData();
+    const formData = appendCsrfFormDataJornada(new FormData());
     formData.append('imagem', file);
-    fetch(baseUrl + '/professor/jornadas/modulos/upload-imagem-exercicio', { method: 'POST', body: formData })
-        .then(r => r.json())
+    fetch(baseUrl + '/professor/jornadas/modulos/upload-imagem-exercicio', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: headersCsrfUploadJornada(),
+        body: formData
+    })
+        .then(parseUploadImagemJornadaResponse)
         .then(data => {
-            if (data.success) {
-                document.getElementById('edit-imagem-url').value = data.image_url;
-                /* mantém o preview com blob URL */
-            } else alert('Erro: ' + (data.error || 'Upload falhou'));
+            document.getElementById('edit-imagem-url').value = data.image_url;
+            /* mantém o preview com blob URL */
         })
-        .catch(() => alert('Erro ao enviar imagem'));
+        .catch((err) => alert('Erro ao enviar imagem: ' + (err && err.message ? err.message : 'falha desconhecida')));
 }
 
 function removerImagemEnunciadoEdicao() {
@@ -909,17 +950,20 @@ function removerImagemEnunciadoEdicao() {
 }
 
 function colarImagemEnviar(base64, callbackUrl, callbackPreview) {
-    const formData = new FormData();
+    const formData = appendCsrfFormDataJornada(new FormData());
     formData.append('imagem_base64', base64);
-    fetch(baseUrl + '/professor/jornadas/modulos/upload-imagem-exercicio', { method: 'POST', body: formData })
-        .then(r => r.json())
+    fetch(baseUrl + '/professor/jornadas/modulos/upload-imagem-exercicio', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: headersCsrfUploadJornada(),
+        body: formData
+    })
+        .then(parseUploadImagemJornadaResponse)
         .then(data => {
-            if (data.success) {
-                if (callbackUrl) callbackUrl(data.image_url);
-                if (callbackPreview) callbackPreview(data.image_url);
-            } else alert('Erro ao colar imagem: ' + (data.error || ''));
+            if (callbackUrl) callbackUrl(data.image_url);
+            if (callbackPreview) callbackPreview(data.image_url);
         })
-        .catch(() => alert('Erro ao enviar imagem colada'));
+        .catch((err) => alert('Erro ao colar imagem: ' + (err && err.message ? err.message : 'falha desconhecida')));
 }
 
 function ativarColarImagemManual() {
@@ -1298,6 +1342,12 @@ document.addEventListener('DOMContentLoaded', function() {
         e.stopPropagation();
         showImageResizePopoverJornada(img);
     }, true);
+    var editImagemEnunciadoInput = document.getElementById('edit-imagem-enunciado');
+    if (editImagemEnunciadoInput) {
+        editImagemEnunciadoInput.addEventListener('change', function() {
+            uploadImagemEnunciadoEdicao(this);
+        });
+    }
     var enunciadoImgInput = document.getElementById('enunciado-jornada-insert-image-input');
     if (enunciadoImgInput) {
         enunciadoImgInput.addEventListener('change', function() {
@@ -2346,7 +2396,7 @@ function abrirModalEdicao(exercicio) {
                             <button type="button" data-csp-click="removerImagemEnunciadoEdicao" class="mt-2 px-3 py-1.5 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors">Remover imagem</button>
                         </div>
                         <div id="edit-imagem-enunciado-actions" class="flex flex-wrap items-center gap-2">
-                            <input type="file" id="edit-imagem-enunciado" accept="image/*" class="hidden" onchange="uploadImagemEnunciadoEdicao(this)">
+                            <input type="file" id="edit-imagem-enunciado" accept="image/*" class="hidden">
                             <button type="button" data-csp-click-id="edit-imagem-enunciado"
                                     class="inline-flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 hover:border-gray-400 transition-colors shadow-sm">📷 Escolher arquivo</button>
                             <button type="button" id="btn-colar-imagem-edit" data-csp-click="ativarColarImagemEdicao"
