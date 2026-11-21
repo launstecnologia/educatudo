@@ -121,6 +121,7 @@ $renderAcoesProfessor = static function (array $p, string $suffix) use ($entrar_
                         <div class="font-medium text-sm text-slate-900 break-words"><?= htmlspecialchars($p['nome'] ?? '') ?></div>
                         <div class="text-xs text-slate-500 mt-0.5 break-all"><?= htmlspecialchars($p['email'] ?? '') ?></div>
                         <div class="flex flex-wrap items-center gap-1.5 mt-2">
+                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">ID: <?= $id ?></span>
                             <?php if ($ativo): ?>
                             <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Ativo</span>
                             <?php else: ?>
@@ -153,6 +154,7 @@ $renderAcoesProfessor = static function (array $p, string $suffix) use ($entrar_
                     <div class="font-medium text-sm text-slate-900 break-words"><?= htmlspecialchars($p['nome'] ?? '') ?></div>
                     <div class="text-xs text-slate-500 mt-0.5 break-all"><?= htmlspecialchars($p['email'] ?? '') ?></div>
                     <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">ID: <?= $id ?></span>
                         <?php if ($ativo): ?>
                         <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Ativo</span>
                         <?php else: ?>
