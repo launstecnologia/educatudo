@@ -70,16 +70,33 @@ GIT_IGNORE_LOCAL=(
 
 # Hotfix local em codigo de app bloqueava o pull. Com backup, volta ao HEAD
 # para o deploy seguir (fonte da verdade = origin/main).
-mapfile -t DIRTY_TRACKED < <(git diff --name-only -- . "${GIT_IGNORE_LOCAL[@]}" || true)
-mapfile -t DIRTY_STAGED < <(git diff --cached --name-only -- . "${GIT_IGNORE_LOCAL[@]}" || true)
-if ((${#DIRTY_TRACKED[@]})) || ((${#DIRTY_STAGED[@]})); then
+# Nunca reseta infra preservada (compose/php.ini/nginx), mesmo se o pathspec falhar.
+is_preserved_path() {
+  local candidate="$1" p
+  [[ "$candidate" == "backend/.env" ]] && return 0
+  for p in "${PRESERVE_FILES[@]}"; do
+    [[ "$candidate" == "$p" ]] && return 0
+  done
+  return 1
+}
+
+dirty_files=()
+while IFS= read -r f; do
+  [[ -n "$f" ]] || continue
+  is_preserved_path "$f" && continue
+  dirty_files+=("$f")
+done < <({
+  git diff --name-only -- . "${GIT_IGNORE_LOCAL[@]}" || true
+  git diff --cached --name-only -- . "${GIT_IGNORE_LOCAL[@]}" || true
+} | sort -u)
+
+if ((${#dirty_files[@]})); then
   backup_dir="$ROOT/backups/deploy-dirty-$(date +%Y%m%d-%H%M%S)"
-  mkdir -p "$backup_dir"
+  if ! mkdir -p "$backup_dir" 2>/dev/null; then
+    backup_dir="$(mktemp -d /tmp/educatudo-deploy-dirty-XXXXXX)"
+  fi
   echo "==> Aviso: limpar mudancas locais rastreadas (backup em $backup_dir)"
-  declare -A SEEN=()
-  for f in "${DIRTY_TRACKED[@]}" "${DIRTY_STAGED[@]}"; do
-    [[ -z "$f" || -n "${SEEN[$f]:-}" ]] && continue
-    SEEN[$f]=1
+  for f in "${dirty_files[@]}"; do
     mkdir -p "$backup_dir/$(dirname "$f")"
     if [[ -f "$f" ]]; then
       cp "$f" "$backup_dir/$f"
