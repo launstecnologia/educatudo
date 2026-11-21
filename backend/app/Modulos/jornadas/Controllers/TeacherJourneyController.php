@@ -5299,7 +5299,19 @@ Retorne APENAS um JSON válido no seguinte formato:
                 return;
             }
 
-            $media = new MediaStorageService($this->config);
+            $configMedia = $this->config;
+            $tenantSlug = trim((string) (
+                (defined('TENANT_SLUG') ? TENANT_SLUG : '')
+                ?: ($configMedia['tenant']['slug'] ?? '')
+                ?: ($configMedia['school']['code'] ?? '')
+            ));
+            // Alinha com MediaServe: uploads de escola no S3 usam prefixo do tenant
+            if ($tenantSlug !== '') {
+                $configMedia['tenant'] = array_merge($configMedia['tenant'] ?? [], ['slug' => $tenantSlug]);
+                $configMedia['school'] = array_merge($configMedia['school'] ?? [], ['code' => $tenantSlug]);
+                $configMedia['media'] = array_merge($configMedia['media'] ?? [], ['tenant_prefix' => true]);
+            }
+            $media = new MediaStorageService($configMedia);
             $imageUrl = null;
             $falhaPersistencia = false;
             $mimesPermitidos = [
@@ -5380,7 +5392,17 @@ Retorne APENAS um JSON válido no seguinte formato:
 
             if ($imageUrl === null) {
                 if ($falhaPersistencia) {
-                    throw new \Exception('Não foi possível salvar a imagem no armazenamento. Tente novamente.');
+                    $detalhe = method_exists($media, 'getLastError') ? (string) ($media->getLastError() ?? '') : '';
+                    $modo = $media->isS3() ? 'S3' : 'local';
+                    $msg = 'Não foi possível salvar a imagem no armazenamento (' . $modo . ').';
+                    if ($detalhe !== '') {
+                        $msg .= ' ' . $detalhe;
+                    } elseif (!$media->isS3()) {
+                        $msg .= ' Verifique MEDIA_STORAGE=s3 e AWS_* no .env do servidor.';
+                    } else {
+                        $msg .= ' Tente novamente ou confira permissões do bucket.';
+                    }
+                    throw new \Exception($msg);
                 }
                 throw new \Exception('Nenhuma imagem recebida. Escolha um arquivo ou cole uma imagem (Ctrl+V).');
             }

@@ -13,6 +13,8 @@ class MediaStorageService
     private $s3Client = null;
     private $bucket = null;
     private $useS3 = false;
+    /** @var string|null última falha de put/get para o caller exibir/diagnóstico */
+    private $lastError = null;
 
     /** Tipos que sempre usam storage local (storage/files/{slug}/), mesmo com S3 configurado */
     private static $localFilesTypes = ['layout', 'avatars', 'professores', 'notifications'];
@@ -79,6 +81,11 @@ class MediaStorageService
     public function isS3(): bool
     {
         return $this->useS3;
+    }
+
+    public function getLastError(): ?string
+    {
+        return $this->lastError;
     }
 
     /**
@@ -186,7 +193,17 @@ class MediaStorageService
      */
     public function put(string $type, string $key, string $sourcePath, ?string $contentType = null): bool
     {
+        $this->lastError = null;
         $key = $this->normalizeKey($key);
+        if ($key === '') {
+            $this->lastError = 'Chave de arquivo inválida.';
+            return false;
+        }
+        if ($sourcePath === '' || !is_file($sourcePath)) {
+            $this->lastError = 'Arquivo temporário ausente ou ilegível.';
+            error_log('MediaStorageService put: source missing type=' . $type . ' key=' . $key . ' path=' . $sourcePath);
+            return false;
+        }
 
         if ($this->useLocalFilesForType($type)) {
             $basePath = $this->localBasePath($type);
@@ -194,6 +211,7 @@ class MediaStorageService
             $dir = dirname($fullPath);
             if (!is_dir($dir)) {
                 if (!@mkdir($dir, 0775, true) && !@mkdir($dir, 0777, true)) {
+                    $this->lastError = 'Não foi possível criar diretório local de mídia.';
                     error_log('MediaStorageService put (local): não foi possível criar diretório: ' . $dir . ' | ' . ((error_get_last() ?? [])['message'] ?? ''));
                     return false;
                 }
@@ -201,29 +219,43 @@ class MediaStorageService
             }
             $ok = @copy($sourcePath, $fullPath) || @move_uploaded_file($sourcePath, $fullPath);
             if (!$ok) {
+                $this->lastError = 'Falha ao gravar arquivo no disco local.';
                 error_log('MediaStorageService put (local): falha ao gravar em ' . $fullPath . ' | ' . ((error_get_last() ?? [])['message'] ?? '') . ' | source: ' . (is_file($sourcePath) ? 'ok' : 'missing'));
             }
             return $ok;
         }
 
         if ($this->useS3) {
-            $body = file_get_contents($sourcePath);
-            if ($body === false) {
-                return false;
-            }
             $s3Key = $this->buildS3ObjectKey($type, $key);
             $params = [
                 'Bucket' => $this->bucket,
                 'Key' => $s3Key,
-                'Body' => $body,
+                'SourceFile' => $sourcePath,
                 'ContentType' => $contentType ?: 'application/octet-stream',
             ];
             try {
                 $this->s3Client->putObject($params);
                 return true;
-            } catch (\Exception $e) {
-                error_log('MediaStorageService S3 putObject: ' . $e->getMessage());
-                return false;
+            } catch (\Throwable $e) {
+                // Fallback: Body em memória (alguns hosts/open_basedir falham no SourceFile)
+                try {
+                    $body = @file_get_contents($sourcePath);
+                    if ($body === false) {
+                        throw $e;
+                    }
+                    $this->s3Client->putObject([
+                        'Bucket' => $this->bucket,
+                        'Key' => $s3Key,
+                        'Body' => $body,
+                        'ContentType' => $contentType ?: 'application/octet-stream',
+                    ]);
+                    return true;
+                } catch (\Throwable $e2) {
+                    $msg = $e2->getMessage() ?: $e->getMessage();
+                    $this->lastError = 'S3 putObject falhou: ' . $msg;
+                    error_log('MediaStorageService S3 putObject: ' . $msg . ' | type=' . $type . ' key=' . $key . ' s3Key=' . $s3Key);
+                    return false;
+                }
             }
         }
 
@@ -231,9 +263,17 @@ class MediaStorageService
         $fullPath = $basePath . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $key);
         $dir = dirname($fullPath);
         if (!is_dir($dir)) {
-            @mkdir($dir, 0755, true) || @mkdir($dir, 0777, true);
+            if (!@mkdir($dir, 0755, true) && !@mkdir($dir, 0777, true)) {
+                $this->lastError = 'Não foi possível criar diretório local (MEDIA_STORAGE!=s3).';
+                return false;
+            }
         }
-        return @copy($sourcePath, $fullPath) || @move_uploaded_file($sourcePath, $fullPath);
+        $ok = @copy($sourcePath, $fullPath) || @move_uploaded_file($sourcePath, $fullPath);
+        if (!$ok) {
+            $this->lastError = 'Falha ao gravar no disco local. Confira MEDIA_STORAGE=s3 e credenciais AWS no .env, ou permissão em ' . $dir;
+            error_log('MediaStorageService put (local fallback): ' . $fullPath . ' | ' . ((error_get_last() ?? [])['message'] ?? ''));
+        }
+        return $ok;
     }
 
     /**
