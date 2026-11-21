@@ -13,11 +13,11 @@ $initial_data_json = $initial_data_json ?? '{}';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Anotação - Meu Caderno</title>
     <link rel="stylesheet" href="https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/dev/index.css">
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
         window.EXCALIDRAW_ASSET_PATH = "https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/";
         window.CADERNO_EXCALIDRAW_VIEW_INITIAL = <?= $initial_data_json ?>;
     </script>
-    <script type="importmap">
+    <script type="importmap" <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     {
         "imports": {
             "react": "https://esm.sh/react@18.2.0",
@@ -34,7 +34,7 @@ $initial_data_json = $initial_data_json ?? '{}';
 </head>
 <body>
     <div id="excalidraw-root"></div>
-    <script type="module">
+    <script type="module" <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     (function() {
         const initial = window.CADERNO_EXCALIDRAW_VIEW_INITIAL || {};
         const initialData = {

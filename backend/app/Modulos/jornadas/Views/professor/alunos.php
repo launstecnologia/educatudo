@@ -194,7 +194,7 @@
     <?php endif; ?>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     function verDetalhesAluno(alunoId) {
         // Implementar visualização detalhada do aluno
         alert('Funcionalidade de ver detalhes do aluno será implementada');

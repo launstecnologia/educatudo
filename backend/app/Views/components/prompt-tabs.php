@@ -52,7 +52,7 @@ $tabKeys      = array_keys($promptTabs);
     <?php endforeach; ?>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function() {
     var container = document.getElementById('<?= $tabsId ?>');
     if (!container) return;

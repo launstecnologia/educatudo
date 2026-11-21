@@ -131,7 +131,7 @@ $urlAtribuir = $url_atribuir_nota ?? (URL . '/professor/jornadas/resumos/atribui
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.getElementById('formAvaliarResumo').addEventListener('submit', function(e) {
     e.preventDefault();
     var form = this;

@@ -30,6 +30,8 @@ $router->get('/manifest-pais.json', 'Pwa/PwaController@manifestPais');
 
 // API de tracking de push (service worker - sem sessão)
 $router->post('/api/webhook/gravacao-jitsi', 'Webhooks/JitsiRecordingWebhookController@handle');
+// SEC-02 — relatórios CSP (Report-Only candidata); sem sessão / sem CSRF (rota pública)
+$router->post('/api/csp-report', 'Webhooks/CspReportController@receber');
 // Notificações API → Modulos/notificacoes/routes.php
 
 // API Notícias → Modulos/noticias/routes.public.php

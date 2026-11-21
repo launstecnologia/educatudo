@@ -853,7 +853,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 let opcoesCount = 0;
 let opcoesCountEdicao = 0;
 const letras = ['A', 'B', 'C', 'D', 'E'];

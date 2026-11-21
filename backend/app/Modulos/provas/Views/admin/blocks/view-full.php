@@ -65,7 +65,7 @@ if (!class_exists('LayoutHelper')) {
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 function liberarProvaParaAluno(blocoId) {
     if (!confirm('Liberar este bloco de provas para os alunos? A prova ficará disponível na data e no horário programados (<?= date('d/m/Y', strtotime($bloco['data_prova'])) ?> das <?= date('H:i', strtotime($bloco['hora_inicio'])) ?> às <?= date('H:i', strtotime($bloco['hora_fim'])) ?>).')) {
         return;

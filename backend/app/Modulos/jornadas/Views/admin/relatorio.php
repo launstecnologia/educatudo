@@ -46,7 +46,7 @@ $reports_filter_base_url = URL . '/admin/jornadas/relatorio';
 }
 </style>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.addEventListener('DOMContentLoaded', function() {
     var tipo = document.querySelector('.reports-filter-tipo');
     if (!tipo) return;

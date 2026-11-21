@@ -209,7 +209,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 // Inicializa drag and drop
 let sortable = Sortable.create(document.getElementById('blocosList'), {
     animation: 150,

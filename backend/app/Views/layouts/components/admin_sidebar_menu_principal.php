@@ -55,7 +55,7 @@ if ($nomeMenuEscola === '') {
             <i class="fa-solid fa-book-open w-5 h-5 mr-3"></i>
             <span class="sidebar-text">Acadêmico</span>
         </a>
-        <button type="button" onclick="toggleMenuGroup('academico')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+        <button type="button" data-csp-action="toggle-menu-group" data-csp-group="academico" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
             <svg id="academico-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
@@ -204,7 +204,7 @@ if ($nomeMenuEscola === '') {
             <i class="fa-regular fa-clipboard w-5 h-5 mr-3"></i>
             <span class="sidebar-text">Rotina</span>
         </a>
-        <button type="button" onclick="toggleMenuGroup('rotina')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+        <button type="button" data-csp-action="toggle-menu-group" data-csp-group="rotina" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
             <svg id="rotina-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
@@ -244,7 +244,7 @@ if ($nomeMenuEscola === '') {
             <i class="fa-solid fa-clipboard-check w-5 h-5 mr-3"></i>
             <span class="sidebar-text">Fechamento</span>
         </a>
-        <button type="button" onclick="toggleMenuGroup('fechamento')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+        <button type="button" data-csp-action="toggle-menu-group" data-csp-group="fechamento" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
             <svg id="fechamento-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
@@ -277,7 +277,7 @@ if ($nomeMenuEscola === '') {
             <i class="fa-solid fa-school w-5 h-5 mr-3"></i>
             <span class="sidebar-text"><?= htmlspecialchars($nomeMenuEscola) ?></span>
         </a>
-        <button type="button" onclick="toggleMenuGroup('escola')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+        <button type="button" data-csp-action="toggle-menu-group" data-csp-group="escola" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
             <svg id="escola-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
@@ -300,7 +300,7 @@ if ($nomeMenuEscola === '') {
             <i class="fa-regular fa-comments w-5 h-5 mr-3"></i>
             <span class="sidebar-text">Comunicação</span>
         </a>
-        <button type="button" onclick="toggleMenuGroup('comunicacao')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+        <button type="button" data-csp-action="toggle-menu-group" data-csp-group="comunicacao" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
             <svg id="comunicacao-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
@@ -362,7 +362,7 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::i
             <i class="fa-regular fa-folder w-5 h-5 mr-3"></i>
             <span class="sidebar-text">Conteúdo</span>
         </a>
-        <button type="button" onclick="toggleMenuGroup('conteudo')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+        <button type="button" data-csp-action="toggle-menu-group" data-csp-group="conteudo" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
             <svg id="conteudo-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
@@ -400,7 +400,7 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::i
             <i class="fa-regular fa-money-bill-1 w-5 h-5 mr-3"></i>
             <span class="sidebar-text">Financeiro</span>
         </a>
-        <button type="button" onclick="toggleMenuGroup('financeiro-escolar')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+        <button type="button" data-csp-action="toggle-menu-group" data-csp-group="financeiro-escolar" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
             <svg id="financeiro-escolar-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
@@ -419,7 +419,7 @@ $conteudoMaterialOn = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::i
             <i class="fa-regular fa-folder-open w-5 h-5 mr-3"></i>
             <span class="sidebar-text">Secretaria</span>
         </a>
-        <button type="button" onclick="toggleMenuGroup('secretaria')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+        <button type="button" data-csp-action="toggle-menu-group" data-csp-group="secretaria" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
             <svg id="secretaria-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
@@ -498,7 +498,7 @@ $urlRecursosEscolares = $canViewSidebar(['almoxarifado'])
             <i class="fa-solid fa-boxes-stacked w-5 h-5 mr-3"></i>
             <span class="sidebar-text">Recursos</span>
         </a>
-        <button type="button" onclick="toggleMenuGroup('recursos-escolares')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+        <button type="button" data-csp-action="toggle-menu-group" data-csp-group="recursos-escolares" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
             <svg id="recursos-escolares-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
@@ -529,7 +529,7 @@ $urlRecursosEscolares = $canViewSidebar(['almoxarifado'])
             <i class="fa-regular fa-circle-check w-5 h-5 mr-3"></i>
             <span class="sidebar-text">Monitoramento</span>
         </a>
-        <button type="button" onclick="toggleMenuGroup('monitoramento')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+        <button type="button" data-csp-action="toggle-menu-group" data-csp-group="monitoramento" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
             <svg id="monitoramento-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
@@ -566,7 +566,7 @@ $urlRecursosEscolares = $canViewSidebar(['almoxarifado'])
             <i class="fa-regular fa-id-card w-5 h-5 mr-3"></i>
             <span class="sidebar-text">Pedagógico</span>
         </a>
-        <button type="button" onclick="toggleMenuGroup('pedagogico')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+        <button type="button" data-csp-action="toggle-menu-group" data-csp-group="pedagogico" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
             <svg id="pedagogico-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
@@ -639,7 +639,7 @@ $urlRecursosEscolares = $canViewSidebar(['almoxarifado'])
             <i class="fa-solid fa-gear w-5 h-5 mr-3"></i>
             <span class="sidebar-text">Sistema</span>
         </a>
-        <button type="button" onclick="toggleMenuGroup('sistema')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+        <button type="button" data-csp-action="toggle-menu-group" data-csp-group="sistema" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
             <svg id="sistema-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
@@ -679,7 +679,7 @@ $urlRecursosEscolares = $canViewSidebar(['almoxarifado'])
             <i class="fa-regular fa-user w-5 h-5 mr-3"></i>
             <span class="sidebar-text">Usuários</span>
         </a>
-        <button type="button" onclick="toggleMenuGroup('usuarios')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+        <button type="button" data-csp-action="toggle-menu-group" data-csp-group="usuarios" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
             <svg id="usuarios-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
@@ -710,7 +710,7 @@ $urlRecursosEscolares = $canViewSidebar(['almoxarifado'])
             <i class="fa-solid fa-sliders w-5 h-5 mr-3"></i>
             <span class="sidebar-text">Z-Configuração</span>
         </a>
-        <button type="button" onclick="toggleMenuGroup('z-configuracao')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+        <button type="button" data-csp-action="toggle-menu-group" data-csp-group="z-configuracao" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
             <svg id="z-configuracao-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>

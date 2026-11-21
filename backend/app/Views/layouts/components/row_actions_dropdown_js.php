@@ -14,7 +14,7 @@ if (!empty($GLOBALS['__row_actions_dropdown_js_done'])) {
 }
 $GLOBALS['__row_actions_dropdown_js_done'] = true;
 ?>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function () {
     function closeAllMenus() {
         document.querySelectorAll('[data-dropdown-menu]').forEach(function (m) { m.classList.add('hidden'); });

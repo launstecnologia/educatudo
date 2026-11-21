@@ -399,7 +399,7 @@ include $ui . '/offcanvas.php';
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.getElementById('btn-marcar-todas')?.addEventListener('click', function () {
     document.querySelectorAll('.checkbox-questao').forEach(function (el) { el.checked = true; });
 });

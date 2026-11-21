@@ -118,7 +118,7 @@ $title = $title ?? 'Enviar Notificação Push';
     </form>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 function toggleDestinoSelect() {
     var tipo = document.getElementById('tipo_destino').value;
     var wrapTurma = document.getElementById('wrap_turma');

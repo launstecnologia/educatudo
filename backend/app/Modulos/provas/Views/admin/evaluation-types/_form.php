@@ -191,7 +191,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
         </div>
     </div>
 </div>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function () {
     var form = document.getElementById('form-tipo-nota');
     if (!form) return;

@@ -10,7 +10,7 @@ if ($onesignal_app_id === '' || $base_url === '') return;
 if (strpos($base_url, 'localhost') !== false || strpos($base_url, '127.0.0.1') !== false) return;
 ?>
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function() {
   var appId = <?= json_encode($onesignal_app_id) ?>;
   var baseUrl = <?= json_encode(rtrim($base_url, '/')) ?>;

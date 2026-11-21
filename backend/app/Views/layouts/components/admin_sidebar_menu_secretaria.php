@@ -66,7 +66,7 @@ $gestaoOpen = $secretariaNavOpen;
             <i class="fa-solid fa-book-open w-5 h-5 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text">Acadêmico</span>
         </a>
-        <button type="button" onclick="toggleMenuGroup('sec-academico')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+        <button type="button" data-csp-action="toggle-menu-group" data-csp-group="sec-academico" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
             <svg id="sec-academico-arrow" class="w-4 h-4 flex-shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
@@ -214,7 +214,7 @@ $gestaoOpen = $secretariaNavOpen;
             <i class="fa-regular fa-clipboard w-5 h-5 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text">Rotina</span>
         </a>
-        <button type="button" onclick="toggleMenuGroup('sec-rotina')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+        <button type="button" data-csp-action="toggle-menu-group" data-csp-group="sec-rotina" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
             <svg id="sec-rotina-arrow" class="w-4 h-4 flex-shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
@@ -259,7 +259,7 @@ $secRelatorioCompleto = $secCan(['relatorios_gerais']);
             <i class="fa-regular fa-id-card w-5 h-5 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text">Pedagógico</span>
         </a>
-        <button type="button" onclick="toggleMenuGroup('sec-pedagogico')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+        <button type="button" data-csp-action="toggle-menu-group" data-csp-group="sec-pedagogico" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
             <svg id="sec-pedagogico-arrow" class="w-4 h-4 flex-shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
@@ -296,7 +296,7 @@ $secRelatorioCompleto = $secCan(['relatorios_gerais']);
             <i class="fa-solid fa-clipboard-check w-5 h-5 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text">Fechamento</span>
         </a>
-        <button type="button" onclick="toggleMenuGroup('sec-fechamento')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+        <button type="button" data-csp-action="toggle-menu-group" data-csp-group="sec-fechamento" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
             <svg id="sec-fechamento-arrow" class="w-4 h-4 flex-shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
@@ -329,7 +329,7 @@ $secRelatorioCompleto = $secCan(['relatorios_gerais']);
             <i class="fa-regular fa-folder-open w-5 h-5 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text">Secretaria</span>
         </a>
-        <button type="button" onclick="toggleMenuGroup('sec-secretaria')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+        <button type="button" data-csp-action="toggle-menu-group" data-csp-group="sec-secretaria" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
             <svg id="sec-secretaria-arrow" class="w-4 h-4 flex-shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
@@ -388,7 +388,7 @@ if ($secAlmoxarifadoOk || $secPatrimonioOk):
             <i class="fa-solid fa-boxes-stacked w-5 h-5 mr-3 flex-shrink-0"></i>
             <span class="sidebar-text">Recursos</span>
         </a>
-        <button type="button" onclick="toggleMenuGroup('recursos-escolares')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+        <button type="button" data-csp-action="toggle-menu-group" data-csp-group="recursos-escolares" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
             <svg id="recursos-escolares-arrow" class="w-4 h-4 flex-shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>

@@ -118,7 +118,7 @@ $ajaxUrl = URL . '/professor/provas/evento-lancar-notas/' . $eventoId . '/ajax';
 </form>
 
 <?php if (!empty($turmas_com_alunos)): ?>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function () {
     var csrfToken = <?= json_encode($csrf_token, JSON_UNESCAPED_UNICODE) ?>;
     var materiaId = <?= (int) $materiaId ?>;

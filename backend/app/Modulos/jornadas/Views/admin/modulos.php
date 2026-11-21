@@ -84,7 +84,7 @@
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 function carregarModulos() {
     fetch('<?= URL ?>/admin/jornadas/<?= $jornada['id'] ?>/modulos/lista')
         .then(response => response.json())

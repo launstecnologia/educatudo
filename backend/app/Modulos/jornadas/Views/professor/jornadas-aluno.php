@@ -137,7 +137,7 @@
     <?php endif; ?>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('searchInput');
     const turmaFilter = document.getElementById('turmaFilter');

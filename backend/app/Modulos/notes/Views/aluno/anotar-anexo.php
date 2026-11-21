@@ -98,7 +98,7 @@ $podeAnotar = !empty($urlArquivo);
 <?php if ($ehPdf): ?>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <?php endif; ?>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function() {
     var cadernoId = <?= (int)$cadernoId ?>;
     var anexoId = <?= (int)$anexoId ?>;

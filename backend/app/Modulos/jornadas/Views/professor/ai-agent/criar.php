@@ -273,7 +273,7 @@ $title = $title ?? 'Criar Agente de IA - EducaTudo';
 }
 </style>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.addEventListener('DOMContentLoaded', function() {
     // Toggle visual dos cards - permite múltipla seleção
     document.querySelectorAll('.card-option').forEach(card => {

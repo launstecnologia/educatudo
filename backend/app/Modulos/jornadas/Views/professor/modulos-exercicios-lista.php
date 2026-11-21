@@ -265,7 +265,7 @@
 </div>
 
 <?php include \App\Core\ViewPaths::component('ai-job-poller.php'); ?>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 const iaGeracaoModuloId = <?= (int)$modulo['id'] ?>;
 const iaGeracaoStorageKey = 'educatudo:jornada:exercicios-ia:' + iaGeracaoModuloId;
 const csrfTokenModuloExercicios = <?= json_encode($csrf_token ?? '') ?>;

@@ -236,7 +236,7 @@
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 function toggleLiberado(blocoId, novoStatus) {
     if (!confirm('Tem certeza que deseja ' + (novoStatus ? 'liberar' : 'bloquear') + ' este bloco?')) {
         return;

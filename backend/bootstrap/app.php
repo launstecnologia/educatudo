@@ -212,13 +212,9 @@ if (session_status() === PHP_SESSION_NONE) {
     }
     @session_start();
     // HSTS, X-Frame-Options, nosniff e Referrer-Policy ficam na borda (proxy / Nginx).
-    // Evita cabeçalho duplicado no pentest (proxy + PHP / Nginx + PHP).
-    // CSP em enforcement (mesmo conteúdo que estava em Report-Only). Ainda com
-    // unsafe-inline/unsafe-eval — apertar depois sem quebrar MathJax/CDN/Jitsi.
-    // Rollback: renomear de volta para Content-Security-Policy-Report-Only.
+    // CSP: App\Core\CspPolitica — enforcement (baseline) + Report-Only (candidata SEC-02).
     if (!headers_sent()) {
-        header('Permissions-Policy: geolocation=(), payment=(), usb=()');
-        header("Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://unpkg.com https://cdn.jsdelivr.net https://8x8.vc https://meet.launs.com.br; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-src 'self' https:; media-src 'self' blob: https:");
+        \App\Core\CspPolitica::emitirCabecalhos();
     }
     // Token CSRF é criado apenas em BaseController::generateCsrf() (nunca aqui, para não sobrescrever).
 }

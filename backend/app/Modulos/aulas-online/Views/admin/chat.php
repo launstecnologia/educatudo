@@ -88,7 +88,7 @@ $canUseJitsiApi = $jitsiExternalApiSrc !== '' && $jitsiApiRoom !== '';
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function () {
     const aulaId = <?= (int) ($aula['id'] ?? 0) ?>;
     const chatBox = document.getElementById('chatBox');
@@ -215,7 +215,7 @@ $canUseJitsiApi = $jitsiExternalApiSrc !== '' && $jitsiApiRoom !== '';
 
 <?php if ($canUseJitsiApi): ?>
 <script src="<?= htmlspecialchars($jitsiExternalApiSrc) ?>"></script>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function () {
     const parentNode = document.getElementById('jitsiRoom');
     const recordingStatus = document.getElementById('recordingStatus');

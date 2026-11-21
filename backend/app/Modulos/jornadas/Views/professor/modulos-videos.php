@@ -207,13 +207,13 @@ $tipoConteudoOption = $temUmVideo ? (($videos[0]['tipo'] ?? 'youtube') === 'link
     </div>
 </div>
 <?php if ($temConteudo && $conteudoAtual): ?>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 window.conteudoAtualEdicao = <?= json_encode($conteudoAtual) ?>;
 window.tipoConteudoOptionEdicao = '<?= htmlspecialchars($tipoConteudoOption) ?>';
 </script>
 <?php endif; ?>
 <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 var URL_BASE = '<?= URL ?>';
 var CSRF = '<?= htmlspecialchars($csrf_token) ?>';
 var JORNADA_ID = <?= (int)($modulo['jornada_id'] ?? 0) ?>;

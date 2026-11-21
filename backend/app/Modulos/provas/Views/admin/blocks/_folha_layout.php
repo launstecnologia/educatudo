@@ -253,7 +253,7 @@ $indiceFolha = 0;
     <p class="texto-extra final<?= ($textoExtra === '' || !$textoExtraNoFim) ? ' oculta' : '' ?>" id="fim-texto-extra"><?= htmlspecialchars($textoExtra, ENT_QUOTES, 'UTF-8') ?></p>
     <p class="rodape-tela" id="cab-rodape"><?= htmlspecialchars((string) ($layout['rodape'] ?? ''), ENT_QUOTES, 'UTF-8') ?></p>
 </article>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 window.paginarFolha = function () {
     var folha = document.getElementById('folha-prova');
     if (!folha || folha.getAttribute('data-paginando') === '1') return;

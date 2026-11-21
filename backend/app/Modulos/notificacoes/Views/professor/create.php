@@ -213,7 +213,7 @@ $title = $title ?? 'Nova Notificação para Turma';
     </form>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 var quillConteudo;
 
 function toggleMediaOptions() {

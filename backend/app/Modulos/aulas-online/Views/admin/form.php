@@ -254,7 +254,7 @@ if (!empty($aula['turmas']) && is_array($aula['turmas'])) {
 </div>
 <?php endif; ?>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function () {
     const chkTodos = document.getElementById('enviar_para_todos');
     const box = document.getElementById('box-turmas');

@@ -178,7 +178,7 @@ $csrfToken = (string) ($csrf_token ?? '');
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function() {
     var formAtual = null;
     var modal = document.getElementById('modal-senha-validar');

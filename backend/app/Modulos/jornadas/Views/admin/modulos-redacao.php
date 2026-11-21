@@ -107,7 +107,7 @@
 </div>
 <?php endif; ?>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.getElementById('formTemaRedacao').addEventListener('submit', function(e) {
     e.preventDefault();
     

@@ -219,7 +219,7 @@
     </form>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function() {
     const URL_BASE = '<?= URL ?>';
     const blocoTurmas = document.getElementById('blocoTurmas');

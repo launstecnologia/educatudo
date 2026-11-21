@@ -1,3 +1,4 @@
+<?php $csp_nonce_attr = $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce(); ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -90,13 +91,13 @@ $master_iniciais = \App\Services\MasterAvatarService::iniciais($master_nome);
             </div>
         </div>
     </div>
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     function getCsrfToken() {
         const tokenElement = document.querySelector('meta[name="csrf-token"]');
         return tokenElement ? tokenElement.getAttribute('content') : '';
     }
     </script>
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     document.getElementById('mobileMenuToggle')?.addEventListener('click', function() {
         var s = document.getElementById('sidebar');
         var o = document.getElementById('sidebar-overlay');
@@ -104,7 +105,7 @@ $master_iniciais = \App\Services\MasterAvatarService::iniciais($master_nome);
         if (o) o.classList.toggle('hidden', !s || !s.classList.contains('mobile-open'));
     });
     </script>
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     (function() {
         window.EDUCATUDO_MASTER_ONLINE = { data: null };
         var ws = null;

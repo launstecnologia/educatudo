@@ -231,7 +231,7 @@
     min-height: 400px !important;
 }
 </style>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 let editorVideo = null;
 let editorDocumento = null;
 

@@ -74,7 +74,7 @@ $colspan = 4 + ($temRegras ? 1 : 0);
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 function excluirTipo(id, nome) {
     if (!confirm(`Deseja excluir o tipo "${nome}"?`)) return;
     fetch(`<?= URL ?>/admin/provas/tipos-avaliacao/${id}`, { method: 'DELETE' })

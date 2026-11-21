@@ -1,3 +1,4 @@
+<?php $csp_nonce_attr = $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce(); ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>

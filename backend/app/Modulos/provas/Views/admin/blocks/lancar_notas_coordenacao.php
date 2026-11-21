@@ -735,7 +735,7 @@ if ($tipoFlash === 'error') {
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function () {
     var edicaoLiberada = <?= $edicaoDesbloqueada ? 'true' : 'false' ?>;
     var urlDesbloquear = <?= json_encode($urlDesbloquear, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;

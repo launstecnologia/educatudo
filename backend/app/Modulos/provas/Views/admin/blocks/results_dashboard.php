@@ -243,7 +243,7 @@ $jsonDashboard = json_encode($d, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function() {
     var DASH = <?= $jsonDashboard ?: '{}' ?>;
     var BLOCO_ID = <?= $blocoId ?>;

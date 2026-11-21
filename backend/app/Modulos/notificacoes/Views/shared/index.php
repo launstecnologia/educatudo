@@ -162,7 +162,7 @@ $title = $title ?? 'Minhas Notificações';
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 let notificacaoAtual = null;
 
 function abrirModalNotificacao(id) {

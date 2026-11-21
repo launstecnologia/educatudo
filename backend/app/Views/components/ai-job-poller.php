@@ -3,7 +3,7 @@
  * Componente de polling para jobs de IA assíncronos.
  */
 ?>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function (global) {
     var APP_BASE_URL = <?= json_encode(defined('URL') ? rtrim((string) URL, '/') : '') ?>;
 

@@ -16,7 +16,7 @@ $csrf_token = $csrf_token ?? '';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Anotações - <?= htmlspecialchars($caderno_titulo) ?> - Meu Caderno</title>
     <link rel="stylesheet" href="https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/dev/index.css">
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
         window.EXCALIDRAW_ASSET_PATH = "https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/";
         window.CADERNO_EXCALIDRAW_CONFIG = {
             cadernoId: <?= (int)$caderno_id ?>,
@@ -24,7 +24,7 @@ $csrf_token = $csrf_token ?? '';
             csrfToken: <?= json_encode($csrf_token) ?>
         };
     </script>
-    <script type="importmap">
+    <script type="importmap" <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     {"imports":{"react":"https://esm.sh/react@19.0.0","react/jsx-runtime":"https://esm.sh/react@19.0.0/jsx-runtime","react-dom":"https://esm.sh/react-dom@19.0.0","react-dom/client":"https://esm.sh/react-dom@19.0.0/client"}}
     </script>
     <style>
@@ -55,7 +55,7 @@ $csrf_token = $csrf_token ?? '';
         <div id="excalidraw-root"></div>
     </div>
 
-    <script type="module">
+    <script type="module" <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     (function() {
         const CONFIG = window.CADERNO_EXCALIDRAW_CONFIG;
         if (!CONFIG || !CONFIG.cadernoId) return;

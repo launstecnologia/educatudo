@@ -219,7 +219,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
     </form>
 </aside>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 function toggleNotifMedia() {
     var texto = document.getElementById('incluir_texto').checked;
     var imagem = document.getElementById('incluir_imagem').checked;

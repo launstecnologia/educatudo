@@ -251,7 +251,7 @@
         <div id="modalAlunosErroLista" class="p-5 overflow-y-auto space-y-2"></div>
     </div>
 </div>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function () {
     var modal = document.getElementById('modalAlunosErro');
     if (!modal) return;

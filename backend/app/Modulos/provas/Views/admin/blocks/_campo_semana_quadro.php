@@ -30,7 +30,7 @@ if ($vinculosIni === []) {
             <i class="fa-solid fa-plus mr-2 text-gray-500"></i>Adicionar destino
         </button>
         <input type="hidden" id="semana" name="semana" value="<?= $semanaSel > 0 ? $semanaSel : '' ?>">
-        <script>
+        <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
         (function () {
             var catalogo = <?= json_encode($gruposRegrasNotas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) ?> || [];
             var vinculosIni = <?= json_encode($vinculosIni, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) ?> || [];
@@ -399,7 +399,7 @@ if ($vinculosIni === []) {
         <p class="text-xs text-gray-500 mt-1">Para prova semanal, escolha a semana (S1, S2…). Cadastre um Quadro de Notas com blocos A/B para a semana entrar sozinha ao escolher o bloco.</p>
     <?php endif; ?>
 </div>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function () {
     var sel = document.getElementById('tipo_avaliacao_id');
     var wrap = document.getElementById('campo-semana-evento');

@@ -131,7 +131,7 @@ $title = $title ?? 'Agentes de IA - EducaTudo';
     </div>
 <?php endif; ?>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 function excluirAgente(agenteId, nomeAgente) {
     if (!confirm(`Tem certeza que deseja excluir o agente "${nomeAgente}"?\n\nEsta ação não pode ser desfeita e excluirá todos os documentos e conversas associados.`)) {
         return;

@@ -4,7 +4,7 @@ if (!class_exists('PeriodoLetivo')) {
 $periodoLetivoMapa = \App\Core\PeriodoLetivo::mapaPorAno();
 $periodoLetivoPadrao = \App\Core\PeriodoLetivo::doAno((int) date('Y'));
 ?>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 window.PeriodoLetivoUI = {
     mapa: <?= json_encode($periodoLetivoMapa, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
     padrao: <?= json_encode($periodoLetivoPadrao, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,

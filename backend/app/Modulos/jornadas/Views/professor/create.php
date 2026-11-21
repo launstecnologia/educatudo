@@ -267,7 +267,7 @@
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     // Data mínima já definida no HTML (hoje, via PHP). Garantir data_fim >= data_inicio ao mudar data_inicio
     (function() {
         const dataInicioEl = document.getElementById('data_inicio');

@@ -225,7 +225,7 @@
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 let isRunning = false;
 let startTime = null;
 let timerInterval = null;

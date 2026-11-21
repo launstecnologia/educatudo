@@ -119,7 +119,7 @@ $annotatorJsVersion = '20250612';
 <?php endif; ?>
 
 <script src="<?= URL ?>/public/static/js/essay-image-annotator.js?v=<?= htmlspecialchars($annotatorJsVersion) ?>"></script>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function() {
     var mount = document.getElementById(<?= json_encode($annotatorId) ?>);
     if (!mount || typeof EssayImageAnnotator === 'undefined') return;

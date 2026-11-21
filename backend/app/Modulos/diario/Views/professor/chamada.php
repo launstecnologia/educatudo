@@ -229,7 +229,7 @@ $moduloOcorrencias = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::is
 </div>
 
 <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 var toolbarSimples  = [['bold','italic','underline'],['blockquote'],[{'list':'ordered'},{'list':'bullet'}],['clean']];
 var toolbarCompleto = [['bold','italic','underline','strike'],['blockquote'],
     [{'list':'ordered'},{'list':'bullet'}],[{'color':[]},{'background':[]}],['clean']];

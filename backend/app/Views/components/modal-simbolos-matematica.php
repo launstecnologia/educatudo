@@ -351,7 +351,7 @@
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 let campoAtivoSimbolos = null;
 
 function abrirModalSimbolos(campoId) {

@@ -112,7 +112,7 @@
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 function excluirModelo(id) {
     if (!confirm('Deseja excluir este bloco modelo? Esta ação não pode ser desfeita.')) {
         return;

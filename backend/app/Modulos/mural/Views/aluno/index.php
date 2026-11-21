@@ -95,7 +95,7 @@
 </div>
 <?php endif; ?>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.marcar-visto-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {

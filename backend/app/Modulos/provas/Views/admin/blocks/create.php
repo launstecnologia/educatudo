@@ -477,7 +477,7 @@ if ($voltarRaw !== '' && preg_match('#^/admin/provas(?:\?[A-Za-z0-9_\-.&=%+]*)?$
 </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 const professores = <?= json_encode($professores ?? []) ?>;
 const materias = <?= json_encode($materias ?? []) ?>;
 const turmas = <?= json_encode($turmas ?? []) ?>;

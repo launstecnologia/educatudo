@@ -252,7 +252,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
     </form>
 </aside>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 function openFilterDrawer() {
     document.getElementById('filterDrawerBackdrop').classList.remove('hidden');
     const drawer = document.getElementById('filterDrawer');
@@ -513,7 +513,7 @@ document.addEventListener('keydown', function(e) {
 <!-- Portal do dropdown (fora do card/table para não ser cortado) -->
 <div id="dropdown-actions-portal" class="hidden fixed z-[100] w-56 py-1 bg-white rounded-lg shadow-xl border border-gray-200"></div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 var CSRF_TOKEN_PROVAS = <?= json_encode((string) ($csrf_token ?? ''), JSON_UNESCAPED_UNICODE) ?>;
 
 function abrirDropdownAcoes(btn) {

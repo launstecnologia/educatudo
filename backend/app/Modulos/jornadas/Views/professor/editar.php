@@ -273,7 +273,7 @@
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     // No formulário de edição, permitir datas anteriores (não definir data mínima)
 
     // Validar que data fim seja maior ou igual à data início (permite mesmo dia)

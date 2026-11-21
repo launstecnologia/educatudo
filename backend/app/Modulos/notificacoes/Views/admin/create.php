@@ -311,7 +311,7 @@ $title = $title ?? 'Nova Notificação';
     </form>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 var quillConteudo;
 
 function toggleMediaOptions() {

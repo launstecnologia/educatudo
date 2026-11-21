@@ -303,7 +303,7 @@ $totalPages = (int) ($pag['total_pages'] ?? 1);
     </form>
 </aside>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 function openFilterDrawer() {
     document.getElementById('filterDrawerBackdrop').classList.remove('hidden');
     var drawer = document.getElementById('filterDrawer');

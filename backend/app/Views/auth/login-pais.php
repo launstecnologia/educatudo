@@ -114,7 +114,7 @@
     </footer>
 
 
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
         // Função para alternar visualização de senha
         function togglePassword(inputId) {
             const input = document.getElementById(inputId);
@@ -133,7 +133,7 @@
         }
 
     </script>
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('<?= URL ?>/service-worker.js').catch(function() {});
         }

@@ -153,7 +153,7 @@
 </div>
 <?php endif; ?>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function() {
     const token = document.querySelector('input[name="_token"]') && document.querySelector('input[name="_token"]').value;
     const descricaoInitial = <?= json_encode(!empty($redacao_jornada['descricao_tema']) ? $redacao_jornada['descricao_tema'] : '') ?>;

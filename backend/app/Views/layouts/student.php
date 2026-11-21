@@ -1,3 +1,4 @@
+<?php $csp_nonce_attr = $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce(); ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -1594,7 +1595,7 @@
                 <?php endif; /* fim menu padrão (não Grupo Seb) */ ?>
                 <?php endif; /* fim !preview */ ?>
             </nav>
-            <script>
+            <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
             (function () {
                 function rotuloMenu(elemento) {
                     var texto = elemento.querySelector('.sidebar-text');
@@ -1870,7 +1871,7 @@
             </div>
         </div>
     </div>
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
         document.getElementById('consentConfirm')?.addEventListener('click', async function() {
             const checkbox = document.getElementById('consentCheckbox');
             if (!checkbox || !checkbox.checked) {
@@ -2047,7 +2048,7 @@
     </div>
 
     <!-- JavaScript for Sidebar Toggle -->
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
         // Mobile Menu Toggle (igual ao Professor)
         (function() {
             const mobileMenuToggle = document.getElementById('mobileMenuToggle');
@@ -2228,7 +2229,7 @@
     </script>
 
     <!-- Common JavaScript -->
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
         // Global utility functions
         function showNotification(message, type = 'success') {
             const notification = document.createElement('div');
@@ -2508,7 +2509,7 @@
     <?php endif; ?>
 
     <?php if ($studentAccessibilityEnabled): ?>
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
         (function() {
             const storageKey = 'educatudo_student_accessibility';
             const defaults = {
@@ -2715,23 +2716,12 @@
     </script>
     <?php endif; ?>
 
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('<?= URL ?>/service-worker.js').catch(() => {});
-        }
-    </script>
+    <script src="<?= URL ?>/public/static/js/csp-service-worker-register.js" data-sw-url="<?= URL ?>/service-worker.js" defer></script>
+    <script src="<?= URL ?>/public/static/js/csp-event-delegation.js" defer></script>
     <!-- MathJax v3: renderização de fórmulas matemáticas (LaTeX) na Jornada do Aluno -->
-    <script>
-      window.MathJax = {
-        tex: {
-          inlineMath: [['$', '$'], ['\\(', '\\)']],
-          displayMath: [['$$', '$$'], ['\\[', '\\]']]
-        },
-        svg: { fontCache: 'global' }
-      };
-    </script>
+    <script src="<?= URL ?>/public/static/js/csp-mathjax-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
       (function() {
         function runTypeset() {
           if (window.MathJax && window.MathJax.typesetPromise) {
@@ -2760,7 +2750,7 @@
     if ($onesignal_app_id === '' && function_exists('env')) { $onesignal_app_id = trim(env('ONESIGNAL_APP_ID', '')); }
     include __DIR__ . '/../components/onesignal-init.php';
     ?>
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.notes-open-new-tab').forEach(function(el) {
             el.addEventListener('click', function(e) {
@@ -2775,7 +2765,7 @@
     });
     </script>
     <?php if (isset($user['tipo']) && $user['tipo'] === 'aluno'): ?>
-    <script>window.EDUCATUDO_URL = <?= json_encode(defined('URL') ? URL : '') ?>;</script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>window.EDUCATUDO_URL = <?= json_encode(defined('URL') ? URL : '') ?>;</script>
     <script src="<?= URL ?>/public/static/js/student-presence.js?v=20250608b"></script>
     <?php endif; ?>
     <?php include __DIR__ . '/components/websocket-presence.php'; ?>
@@ -2802,11 +2792,11 @@
         </div>
     </div>
     <script src="https://vlibras.gov.br/app/vlibras-plugin.js"></script>
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
         new window.VLibras.Widget('https://vlibras.gov.br/app');
     </script>
     <?php endif; ?>
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     (function () {
         var progress = document.getElementById('htmx-progress');
         var progressHideTimer = null;
@@ -3135,7 +3125,7 @@
         background-color: rgba(255, 255, 255, 0.12) !important;
     }
     </style>
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     (function () {
         var sb = document.getElementById('sidebar');
         if (!sb) return;

@@ -378,7 +378,7 @@ unset($_SESSION['flash_message'], $_SESSION['flash_type']);
     </div>
 </div>
 <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function() {
     var baseExcluir = <?= json_encode($base ?? (URL . '/admin/mural-recados'), JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>;
     var csrfToken = <?= json_encode($csrf_token ?? '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>;

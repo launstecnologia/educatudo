@@ -47,7 +47,7 @@ $reports_filter_hide_professor = true;
 }
 </style>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.addEventListener('DOMContentLoaded', function() {
     var tipo = document.querySelector('.reports-filter-tipo');
     if (!tipo) return;

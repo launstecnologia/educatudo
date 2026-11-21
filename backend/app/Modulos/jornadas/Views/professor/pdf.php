@@ -339,7 +339,7 @@
         </div>
     </div>
 
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
         window.onload = function() {
             window.print();
         }

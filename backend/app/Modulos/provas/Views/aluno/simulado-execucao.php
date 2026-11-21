@@ -230,7 +230,7 @@
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.addEventListener('DOMContentLoaded', function() {
     const questoes = <?= json_encode($questoes) ?>;
     const tempoLimite = <?= $simulado['tempo_limite'] ?>;

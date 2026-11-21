@@ -280,7 +280,7 @@ $title = $title ?? 'Nova Notificação';
     </form>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 function toggleMediaOptions() {
     const incluirTexto = document.getElementById('incluir_texto').checked;
     const incluirImagem = document.getElementById('incluir_imagem').checked;

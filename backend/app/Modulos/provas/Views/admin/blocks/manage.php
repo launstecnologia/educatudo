@@ -324,7 +324,7 @@ $anoTxt = (int) ($desc['ano_letivo'] ?? 0);
     </div>
 </aside>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 window.openDetalhesEventoDrawer = function () {
     document.getElementById('detalhesEventoBackdrop').classList.remove('hidden');
     var d = document.getElementById('detalhesEventoDrawer');
@@ -727,7 +727,7 @@ $statusLabelsOnline = [
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.querySelectorAll('[data-dropdown-menu] button, [data-dropdown-menu] a').forEach(function (el) {
     el.addEventListener('click', function () {
         document.querySelectorAll('[data-dropdown-menu]').forEach(function (menu) {

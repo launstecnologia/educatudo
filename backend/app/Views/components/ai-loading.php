@@ -147,7 +147,7 @@ $aiLoadingSkipMarkup = $aiLoadingSkipMarkup ?? false;
 
 <?php if ($aiLoadingIncludeAssets && !defined('EDUCATUDO_AI_LOADING_JS')): ?>
 <?php define('EDUCATUDO_AI_LOADING_JS', true); ?>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function (global) {
     if (global.EducaAiLoading) {
         return;

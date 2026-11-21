@@ -74,7 +74,7 @@ if (trim($observacaoRaw) !== '' && strpos(trim($observacaoRaw), '{') === 0) {
                         <canvas id="canvas-show"></canvas>
                     </div>
                 </div>
-                <script>window.cadernoObservacaoCanvasData = <?= json_encode($observacaoPayload['canvas']) ?>;</script>
+                <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>window.cadernoObservacaoCanvasData = <?= json_encode($observacaoPayload['canvas']) ?>;</script>
             <?php endif; ?>
         <?php elseif (trim($observacaoRaw) !== ''): ?>
             <div class="caderno-prose prose prose-sm max-w-none mb-6">
@@ -121,7 +121,7 @@ if (trim($observacaoRaw) !== '' && strpos(trim($observacaoRaw), '{') === 0) {
 
 <?php if (!empty($observacaoPayload['canvas']) && isset($observacaoPayload['canvas']['objects'])): ?>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function() {
     var data = window.cadernoObservacaoCanvasData;
     if (!data || typeof fabric === 'undefined') return;
@@ -155,7 +155,7 @@ if (trim($observacaoRaw) !== '' && strpos(trim($observacaoRaw), '{') === 0) {
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function() {
     var modal = document.getElementById('modalAnotarAnexo');
     var iframe = document.getElementById('iframeAnotar');

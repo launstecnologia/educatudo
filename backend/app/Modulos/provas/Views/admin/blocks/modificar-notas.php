@@ -300,11 +300,11 @@ $formatarNota = static function ($valor): string {
     </div>
 </div>
 
-<script type="application/json" id="mn-config"><?= json_encode([
+<script type="application/json" id="mn-config" <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>><?= json_encode([
     'salvarUrl' => URL . '/admin/provas/blocos/' . $blocoId . '/provas/' . $provaId . '/modificar-notas',
     'csrf' => (string) ($csrf_token ?? ''),
 ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?></script>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function () {
     var cfgEl = document.getElementById('mn-config');
     if (!cfgEl) return;

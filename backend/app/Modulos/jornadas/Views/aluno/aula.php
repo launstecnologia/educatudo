@@ -202,7 +202,7 @@
     <input type="hidden" id="tempo_inicio" value="<?= time() ?>">
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.addEventListener('DOMContentLoaded', function() {
     const resumoForm = document.getElementById('resumoForm');
     const duvidaForm = document.getElementById('duvidaForm');

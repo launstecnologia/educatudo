@@ -290,7 +290,7 @@
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.addEventListener('DOMContentLoaded', function() {
     const filtroStatus = document.getElementById('filtroStatus');
     const filtroTipo = document.getElementById('filtroTipo');

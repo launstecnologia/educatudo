@@ -223,20 +223,20 @@
 </div>
 
 <?php if ($asyncLoad): ?>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 window.jornadasIndexConfig = {
     asyncLoad: true,
     apiMontar: <?= json_encode(URL . '/jornadas/api/montar', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
 };
 </script>
 <script src="<?= URL ?>/public/static/js/jornadas-index-loader.js?v=20260805"></script>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 if (typeof window.jornadasIndexBoot === 'function') {
     window.jornadasIndexBoot();
 }
 </script>
 <?php else: ?>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.addEventListener('DOMContentLoaded', function() {
     const dashBaseline = <?= json_encode([
         'total' => (int) $dTotal,

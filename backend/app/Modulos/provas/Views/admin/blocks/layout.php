@@ -208,7 +208,7 @@ $flashMsg = (string) ($flash_message ?? '');
 
     </div>
 </form>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function () {
     var folha = document.getElementById('folha-prova');
     var form = document.getElementById('form-layout');

@@ -38,7 +38,7 @@ $aulasTardeTipos = \App\Helpers\LessonPlanAfternoonHelper::tipos();
     ?>
 </template>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 const AULAS_TARDE_TIPOS = <?= json_encode($aulasTardeTipos, JSON_UNESCAPED_UNICODE) ?>;
 
 function limparErroCampoObrigatorio(el) {

@@ -180,7 +180,7 @@ $ui_offcanvas_max_w = 'max-w-md';
 include $ui . '/offcanvas.php';
 ?>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.addEventListener('DOMContentLoaded', function () {
     const selecionarTodas = document.getElementById('selecionar-todas');
     const checkboxes = Array.from(document.querySelectorAll('.checkbox-prova'));

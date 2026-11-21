@@ -390,7 +390,7 @@
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 // Nota da IA (extraída do PHP)
 const notaIA = <?= $notaIAFinal ?>;
 

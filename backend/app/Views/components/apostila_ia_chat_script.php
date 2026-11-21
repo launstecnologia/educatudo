@@ -7,7 +7,7 @@
 $erroConexaoMsg = $erroConexaoMsg ?? 'Falha de conexão. Verifique sua conexão e tente novamente.';
 $sessaoIdAtiva = (int)($sessaoIdAtiva ?? 0);
 ?>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function () {
     var csrfToken = <?= json_encode($csrf_token) ?>;
     var chatStreamUrl = <?= json_encode($chatStreamUrl) ?>;

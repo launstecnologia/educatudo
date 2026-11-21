@@ -295,7 +295,7 @@ foreach ($stats as $s) {
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function() {
     var questoesData = <?= json_encode($questoesAlt, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 

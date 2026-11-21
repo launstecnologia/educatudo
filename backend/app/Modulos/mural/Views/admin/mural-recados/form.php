@@ -61,7 +61,7 @@ $titulo = $isEdit ? 'Editar Recado' : 'Novo Recado';
 .quill-editor-wrapper .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid #e5e7eb; background: #f9fafb; }
 .quill-editor-wrapper .ql-container.ql-snow { border: none; }
 </style>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.addEventListener('DOMContentLoaded', function() {
     var rTodos = document.querySelector('input[name="enviar_para_todos"][value="1"]');
     var rTurmas = document.getElementById('radio_turmas');

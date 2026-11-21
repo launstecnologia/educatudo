@@ -290,7 +290,7 @@ $base = $base_url_jornadas ?? (URL . '/admin/jornadas');
         </div>
     <?php endforeach; ?>
 </div>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function() {
     var baseUrl = '<?= rtrim(URL, "/") ?>';
     var urlAtribuirNota = '<?= htmlspecialchars($url_atribuir_nota ?? (URL . '/professor/jornadas/exercicios/atribuir-nota-dissertativa'), ENT_QUOTES, 'UTF-8') ?>';

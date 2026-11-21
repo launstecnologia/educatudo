@@ -371,7 +371,7 @@ $statCards = [
 </div>
 <?php endif; ?>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 function toggleLiberada(id) {
     fetch('<?= URL ?>/professor/provas/toggle-liberada/' + id, {
         method: 'POST',

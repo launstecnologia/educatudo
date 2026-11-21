@@ -82,7 +82,7 @@
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.addEventListener('DOMContentLoaded', function() {
     // Cria a prova automaticamente quando há evento
     // Pega materia_id da URL ou da variável PHP
@@ -300,7 +300,7 @@ document.addEventListener('DOMContentLoaded', function() {
     </form>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 <?php if (!empty($evento)): ?>
 // Quando está criando dentro de um evento, os campos já estão preenchidos via hidden inputs
 // Não precisa de JavaScript adicional

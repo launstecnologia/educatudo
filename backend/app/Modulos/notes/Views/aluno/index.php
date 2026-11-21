@@ -142,7 +142,7 @@ $semPasta = $semPasta ?? [];
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.getElementById('btn-nova-pasta')?.addEventListener('click', function() {
     document.getElementById('modal-nova-pasta').classList.remove('hidden');
 });

@@ -1,3 +1,4 @@
+<?php $csp_nonce_attr = $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce(); ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -80,7 +81,7 @@
     <?php endif; ?>
 
     <!-- Common JavaScript -->
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
         // Global utility functions
         function showNotification(message, type = 'success') {
             const notification = document.createElement('div');

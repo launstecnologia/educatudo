@@ -195,7 +195,7 @@
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 function ocultarSimulado(id) {
     if (confirm('Tem certeza que deseja remover este simulado da sua lista? Ele não será excluído permanentemente.')) {
         fetch(`<?= URL ?>/simulados/${id}/ocultar`, {

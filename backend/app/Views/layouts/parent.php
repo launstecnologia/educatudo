@@ -1,3 +1,4 @@
+<?php $csp_nonce_attr = $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce(); ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -118,7 +119,7 @@
         <span class="hidden md:inline font-semibold">Suporte</span>
     </a>
 
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
         document.getElementById('mobileMenuToggle')?.addEventListener('click', function() {
             document.getElementById('sidebar').classList.toggle('mobile-open');
             document.getElementById('sidebar-overlay').classList.toggle('active');
@@ -133,11 +134,8 @@
         });
     </script>
     <?php if (isset($additional_js)): ?><?= $additional_js ?><?php endif; ?>
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('<?= URL ?>/service-worker.js').catch(function() {});
-        }
-    </script>
+    <script src="<?= URL ?>/public/static/js/csp-service-worker-register.js" data-sw-url="<?= URL ?>/service-worker.js" defer></script>
+    <script src="<?= URL ?>/public/static/js/csp-event-delegation.js" defer></script>
     <?php
     $base_url = defined('URL') ? URL : '';
     $onesignal_app_id = trim(\App\Core\LayoutHelper::get('onesignal_app_id', ''));

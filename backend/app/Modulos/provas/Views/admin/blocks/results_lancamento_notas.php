@@ -350,7 +350,7 @@ if ($slugArquivo === '') {
     </form>
 </aside>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function () {
     var EXPORT_LINHAS = <?= json_encode($exportLinhas, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     var ARQUIVO_BASE = <?= json_encode($slugArquivo, JSON_UNESCAPED_UNICODE) ?>;

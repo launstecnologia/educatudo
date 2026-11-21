@@ -1,3 +1,4 @@
+<?php $csp_nonce_attr = $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce(); ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -383,7 +384,7 @@
             </div>
         </div>
     </div>
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
         document.getElementById('consentConfirm')?.addEventListener('click', async function() {
             const checkbox = document.getElementById('consentCheckbox');
             if (!checkbox || !checkbox.checked) {
@@ -449,7 +450,7 @@
     <?php endif; ?>
 
     <!-- Common JavaScript -->
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
         // Global utility functions
         function showNotification(message, type = 'success') {
             const notification = document.createElement('div');
@@ -530,7 +531,7 @@
         </div>
     </div>
 
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     let alunosOnlineSource = null;
     let ultimoSnapshot = null;
 
@@ -692,7 +693,7 @@
         </div>
     </div>
     
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     // Funções para modal de trocar foto
     function abrirModalTrocarFoto() {
         const modal = document.getElementById('modalTrocarFoto');
@@ -826,22 +827,11 @@
     });
     </script>
 
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('<?= URL ?>/service-worker.js').catch(() => {});
-        }
-    </script>
+    <script src="<?= URL ?>/public/static/js/csp-service-worker-register.js" data-sw-url="<?= URL ?>/service-worker.js" defer></script>
+    <script src="<?= URL ?>/public/static/js/csp-event-delegation.js" defer></script>
 
     <!-- MathJax v3: renderização de fórmulas matemáticas (LaTeX) na Jornada -->
-    <script>
-      window.MathJax = {
-        tex: {
-          inlineMath: [['$', '$'], ['\\(', '\\)']],
-          displayMath: [['$$', '$$'], ['\\[', '\\]']]
-        },
-        svg: { fontCache: 'global' }
-      };
-    </script>
+    <script src="<?= URL ?>/public/static/js/csp-mathjax-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
 
     <?php if (isset($additional_js)): ?>

@@ -220,7 +220,7 @@ if (!class_exists('AlunoLancamentoNotaHelper', false)) {
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function () {
     window.exportarRelatorioLotePdf = function () {
         document.body.classList.add('printing-relatorio-lote');

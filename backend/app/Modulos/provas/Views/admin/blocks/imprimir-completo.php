@@ -55,7 +55,7 @@ $baseUrl = defined('URL') ? rtrim(URL, '/') : '';
         }
         .enunciado mjx-container { font-size: 1em; }
     </style>
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
         window.MathJax = {
             tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], processEscapes: true },
             svg: { fontCache: 'global' },
@@ -134,7 +134,7 @@ $baseUrl = defined('URL') ? rtrim(URL, '/') : '';
         <?php endforeach; ?>
     </div>
 
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     (function() {
         function runTypeset() {
             if (window.MathJax && window.MathJax.typesetPromise) {

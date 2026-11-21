@@ -165,7 +165,7 @@ if (trim($observacaoRaw) !== '' && strpos(trim($observacaoRaw), '{') === 0) {
 .cor-preset.selected { box-shadow: 0 0 0 2px white, 0 0 0 4px #059669; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.addEventListener('DOMContentLoaded', function() {
     var container = document.getElementById('canvas-unico-container');
     if (!container || typeof fabric === 'undefined') return;
@@ -422,7 +422,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.querySelectorAll('.excluir-anexo').forEach(function(btn) {
     btn.addEventListener('click', function() {
         if (!confirm('Excluir este anexo?')) return;

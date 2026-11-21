@@ -202,7 +202,7 @@
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 function showJornadaEnviando(texto) {
     var el = document.getElementById('jornada-enviando-overlay');
     var txt = document.getElementById('jornada-enviando-texto');

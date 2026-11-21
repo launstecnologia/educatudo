@@ -158,7 +158,7 @@ $title = $title ?? 'Agente de IA - EducaTudo';
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 let currentConversaId = <?= !empty($conversa_atual) ? $conversa_atual['id'] : 'null' ?>;
 const agenteId = <?= $agente['id'] ?>;
 const csrfToken = <?= json_encode($csrf_token) ?>;
@@ -449,7 +449,7 @@ async function excluirDocumento(documentoId) {
 </script>
 
 <!-- MathJax para renderização de equações matemáticas -->
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 window.MathJax = {
     tex: {
         inlineMath: [['\\(', '\\)']],
@@ -465,7 +465,7 @@ window.MathJax = {
 </script>
 <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
 <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 // Função para renderizar MathJax após adicionar mensagens
 function renderMathJax() {
     if (window.MathJax && window.MathJax.typesetPromise) {

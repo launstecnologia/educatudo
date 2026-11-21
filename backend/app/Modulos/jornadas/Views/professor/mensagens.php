@@ -181,7 +181,7 @@
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.addEventListener('DOMContentLoaded', function() {
     const formResposta = document.getElementById('formResposta');
     if (formResposta) {

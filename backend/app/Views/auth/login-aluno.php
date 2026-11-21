@@ -128,7 +128,7 @@ $system_subtitle = \App\Core\LayoutHelper::getSystemSubtitle();
     </div>
     </div>
 
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
         // Função para alternar visualização de senha
         function togglePassword(inputId) {
             const input = document.getElementById(inputId);

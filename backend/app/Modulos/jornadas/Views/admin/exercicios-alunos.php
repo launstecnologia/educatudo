@@ -608,7 +608,7 @@ $mostrarExerciciosPrimeiro = ($primeiraSecaoVisivel === 'exercicios') || (empty(
 }
 </style>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 function showSection(section) {
     // Esconde todas as seções
     const sections = document.querySelectorAll('.section-content');

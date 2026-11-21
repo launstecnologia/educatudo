@@ -246,7 +246,7 @@ $tiposRes = ['multipla_escolha' => 'Múltipla Escolha', 'verdadeiro_falso' => 'V
 </div>
 
 <?php if ($totalQuestoesProva > 0): ?>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function() {
     var total = <?= (int) $totalQuestoesProva ?>;
     var atual = 0;

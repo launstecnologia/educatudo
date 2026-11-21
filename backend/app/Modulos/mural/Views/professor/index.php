@@ -65,7 +65,7 @@ unset($_SESSION['flash_message'], $_SESSION['flash_type']);
         <?php endforeach; ?>
     </div>
 </div>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.querySelectorAll('.marcar-visto-professor').forEach(function (btn) {
     btn.addEventListener('click', function () {
         var form = new FormData();
@@ -351,7 +351,7 @@ include $ui . '/offcanvas.php';
 #recadoDrawer { z-index: 70; }
 </style>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function() {
     var modal = document.getElementById('modalVerRecado');
     var modalTitle = document.getElementById('modalVerRecadoTitle');
@@ -386,7 +386,7 @@ include $ui . '/offcanvas.php';
     });
 })();
 </script>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function () {
     var form = document.getElementById('mural-form');
     if (!form) return;

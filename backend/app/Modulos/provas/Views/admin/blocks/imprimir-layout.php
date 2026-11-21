@@ -40,7 +40,7 @@ $baseUrl = defined('URL') ? rtrim((string) URL, '/') : '';
             .toolbar, #gerando-gabaritos { display: none !important; }
         }
     </style>
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
         window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], processEscapes: true }, svg: { fontCache: 'global' }, options: { enableMenu: false } };
     </script>
     <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
@@ -63,7 +63,7 @@ $baseUrl = defined('URL') ? rtrim((string) URL, '/') : '';
             <p>Gerando o PDF dos gabaritos...</p>
         </div>
     </div>
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     (function () {
         var linkGabaritos = document.getElementById('btn-pdf-gabaritos');
         var aviso = document.getElementById('gerando-gabaritos');
@@ -84,7 +84,7 @@ $baseUrl = defined('URL') ? rtrim((string) URL, '/') : '';
         });
     })();
     </script>
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     function paginarEImprimir(imprimir) {
         var seguir = function () {
             if (window.paginarFolha) window.paginarFolha();

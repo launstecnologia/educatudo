@@ -437,7 +437,7 @@
 </div>
 
 <?php include \App\Core\ViewPaths::component('ai-job-poller.php'); ?>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 let opcoesCount = 5;
 const letras = ['A', 'B', 'C', 'D', 'E'];
 

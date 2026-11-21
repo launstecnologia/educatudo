@@ -29,7 +29,7 @@ $storage_key = $ios_install_storage_key ?? 'ios_install_dismissed';
         </button>
     </div>
 </div>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function() {
     var banner = document.getElementById('ios-install-banner');
     var closeBtn = document.getElementById('ios-install-banner-close');

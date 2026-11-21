@@ -119,7 +119,7 @@ $statusClass = $isLive
 </div>
 
 <?php if ($isLive): ?>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function () {
     const forms = Array.from(document.querySelectorAll('.chat-form'));
     const lastByAula = {};

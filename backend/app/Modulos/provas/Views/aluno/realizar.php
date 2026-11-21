@@ -52,7 +52,7 @@ if (!class_exists('LayoutHelper')) {
     body.ei-accessible.ei-element-spacing-medium .questao-container { padding: 2rem !important; }
     body.ei-accessible.ei-element-spacing-large .questao-container { padding: 2.5rem !important; }
 </style>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function() {
     try {
         var defaults = {
@@ -335,7 +335,7 @@ if (!class_exists('LayoutHelper')) {
 <?php endif; ?>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 // Modais (evitam alert/confirm e sair do fullscreen)
 function mostrarModal(titulo, msg) {
     var el = document.getElementById('modal-aviso-realizar');
@@ -1317,7 +1317,7 @@ function bloquearSaida(e) {
 </script>
 
 <?php if (!empty($acessibilidade_tts) || !empty($acessibilidade_highlight)): ?>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function(){
     function init(){
         <?php if (!empty($acessibilidade_highlight)): ?>
@@ -1421,7 +1421,7 @@ function bloquearSaida(e) {
 <?php endif; ?>
 
 <?php if (!empty($acessibilidade_progress)): ?>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 // EducaInclui — barra de progresso (respondidas / total)
 (function(){
     function calc(){
@@ -1453,7 +1453,7 @@ function bloquearSaida(e) {
 <?php endif; ?>
 
 <?php if (!empty($acessibilidade_audio)): ?>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 // EducaInclui — resposta por áudio em questões dissertativas (transcrição automática)
 (function(){
     var CSRF = '<?= htmlspecialchars((string) ($csrf_token ?? ($_SESSION['csrf_token'] ?? ''))) ?>';
@@ -1516,7 +1516,7 @@ function bloquearSaida(e) {
 <?php endif; ?>
 
 <?php if (!empty($acessibilidade_glossary)): ?>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 // EducaInclui — glossário: clique duplo numa palavra do enunciado para ver o significado
 (function(){
     var pop = null;

@@ -37,7 +37,7 @@ if (!function_exists('wysiwyg_field')) {
             .ck-wysiwyg-box .ck.ck-toolbar { border-top-left-radius: 0.5rem; border-top-right-radius: 0.5rem; }
             .ck-wysiwyg-box .ck-focused { border-color: #22c55e !important; box-shadow: 0 0 0 2px rgba(34,197,94,.4) !important; }
         </style>
-        <script>
+        <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
         (function () {
             function initOne(ta) {
                 if (!ta || ta.getAttribute('data-ck-inited') || typeof ClassicEditor === 'undefined') return;

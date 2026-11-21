@@ -355,7 +355,7 @@ $clsCtaInativo = 'block w-full bg-gray-200 text-gray-600 text-center py-3 rounde
             <?php endforeach; ?>
         </div>
     </div>
-    <script>
+    <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     (function() {
         try {
             var ultimo = sessionStorage.getItem('ultimo_clique_iniciar');

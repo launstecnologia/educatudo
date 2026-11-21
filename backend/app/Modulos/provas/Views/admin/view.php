@@ -403,7 +403,7 @@ if (!class_exists('LayoutHelper')) {
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 function aprovarProva(provaId) {
     if (!confirm('Deseja aprovar esta avaliação? Após aprovar, o professor não poderá mais editar. A prova só será liberada para os alunos quando você fizer a aprovação final do bloco.')) {
         return;

@@ -365,7 +365,7 @@ $wizardSteps = [
 }
 </style>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 var quillConteudo, quillObjetivos, quillRecursos;
 var currentStep = 0;
 var copilotoFiles = [];
@@ -735,7 +735,7 @@ function containsHtml(value) {
 function sanitizeCopilotoHtml(value) {
     let html = decodeHtmlEntities(value)
         .replace(/^\s*[•\-*]\s*(?=<(?:ul|ol|li|p|div|strong|b|em|i|br)\b)/i, '')
-        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<script [\s\S]*?<\/script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>/gi, '')
         .replace(/<style[\s\S]*?<\/style>/gi, '')
         .replace(/\son\w+="[^"]*"/gi, '')
         .replace(/\son\w+='[^']*'/gi, '')

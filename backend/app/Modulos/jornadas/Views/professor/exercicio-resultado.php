@@ -139,7 +139,7 @@
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 function aprovarExercicio() {
     if (confirm('Tem certeza que deseja aprovar estes exercícios?')) {
         const formData = new FormData();

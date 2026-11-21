@@ -30,7 +30,7 @@
                     <p class="text-blue-600 text-sm mt-1">Isso pode levar alguns segundos.</p>
                 </div>
                 <?php include \App\Core\ViewPaths::component('ai-job-poller.php'); ?>
-                <script>
+                <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
                 new AIJobPoller(<?= (int) $_GET['job_id'] ?>, {
                     onDone: function(result) {
                         var exercicioId = result && result.exercicio_id ? result.exercicio_id : null;

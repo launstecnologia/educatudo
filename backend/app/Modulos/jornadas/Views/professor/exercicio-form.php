@@ -262,7 +262,7 @@
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 document.addEventListener('DOMContentLoaded', function() {
     const tipoExercicio = document.querySelectorAll('input[name="tipo_exercicio"]');
     const secaoIA = document.getElementById('secaoIA');

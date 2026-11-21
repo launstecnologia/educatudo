@@ -298,7 +298,7 @@ $ocultarTituloExercicioJornada = \App\Core\TenantRelease::shouldUse('jornadas_oc
         </div>
     <?php endforeach; ?>
 </div>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function() {
     var baseUrl = '<?= rtrim(URL, "/") ?>';
     var csrfToken = '<?= htmlspecialchars($csrf_token ?? $_SESSION["csrf_token"] ?? "", ENT_QUOTES, "UTF-8") ?>';

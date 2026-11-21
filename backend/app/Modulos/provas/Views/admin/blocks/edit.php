@@ -495,7 +495,7 @@ $chkLancProf = $isFmtLanc && $cfgNota === 'professor_por_questao';
 </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 <?php
 $jsonJsBloco = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE;
 ?>

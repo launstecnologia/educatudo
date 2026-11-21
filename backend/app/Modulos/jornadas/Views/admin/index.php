@@ -313,7 +313,7 @@ $periodoFiltro = \App\Core\PeriodoLetivo::doAno((int) date('Y'));
     <?php endif; ?>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     function esc(s) {
         if (s == null) return '';
         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

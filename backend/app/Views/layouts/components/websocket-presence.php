@@ -10,7 +10,7 @@ $wsUserName = (string) ($user['nome'] ?? '');
 $wsUserTipo = (string) ($user['tipo'] ?? '');
 $wsEnabled = ($wsEscola !== '' && $wsUserId > 0 && in_array($wsUserTipo, ['aluno', 'professor', 'admin'], true));
 ?>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 (function() {
     window.EDUCATUDO_WS = {
         url: "wss://ws.educatudo.com",

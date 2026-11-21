@@ -17,7 +17,7 @@ function decodeUnicodeEscapesExercicio($str) {
  */
 function prepararTextoParaMathJax($str) {
     if ($str === '' || $str === null || !is_string($str)) return $str;
-    $str = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $str);
+    $str = preg_replace('/<script \b[^ <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>]*>.*?<\/script>/is', '', $str);
     $str = preg_replace('/<style\b[^>]*>.*?<\/style>/is', '', $str);
     // Normaliza delimitadores que possam ter vindo escapados (ex.: \\ ( no banco vira \( no HTML )
     $str = str_replace(['\\\\(', '\\\\)', '\\\\[', '\\\\]'], ['\\(', '\\)', '\\[', '\\]'], $str);
@@ -258,7 +258,7 @@ if (empty($questoes) && !empty($exercicio_atual['questoes_json'])) {
             if ($originalTemMidiaOuTabela && !$sanitizadoTemMidiaOuTabela) {
                 // Fallback: preserva mídia/tabela quando o purifier remove conteúdo válido do professor.
                 // Mantém segurança removendo scripts/iframes e atributos on*.
-                $enunciadoFallbackSeguro = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $enunciadoOriginal);
+                $enunciadoFallbackSeguro = preg_replace('/<script \b[^ <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>]*>.*?<\/script>/is', '', $enunciadoOriginal);
                 $enunciadoFallbackSeguro = preg_replace('/<iframe\b[^>]*>.*?<\/iframe>/is', '', $enunciadoFallbackSeguro);
                 $enunciadoFallbackSeguro = preg_replace('/\s+on\w+\s*=\s*["\'][^"\']*["\']/i', '', $enunciadoFallbackSeguro);
                 $enunciadoFallbackSeguro = preg_replace('/\s+on\w+\s*=\s*[^\s>]+/i', '', $enunciadoFallbackSeguro);
@@ -575,7 +575,7 @@ if (empty($questoes) && !empty($exercicio_atual['questoes_json'])) {
 </div>
 <?php endif; ?>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 var EXERCICIO_ID_TUDINHA_MODAL = <?= (int)($exercicio_atual['id'] ?? 0) ?>;
 var CSRF_TOKEN_TUDINHA_EXERCICIO = <?= json_encode($csrf_token ?? '', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;
 

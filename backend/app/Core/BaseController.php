@@ -278,6 +278,8 @@ abstract class BaseController
             throw new \Exception("View não encontrada: {$view}");
         }
 
+        $data = $this->enriquecerDadosCsp(is_array($data) ? $data : []);
+
         // Extrai as variáveis para o escopo da view
         extract($data);
 
@@ -331,6 +333,7 @@ abstract class BaseController
         // Preserva o array $data original ANTES de qualquer extract
         // Faz uma cópia profunda para garantir que não será modificado
         $dataForLayout = is_array($data) ? unserialize(serialize($data)) : [];
+        $dataForLayout = $this->enriquecerDadosCsp($dataForLayout);
 
         $profiler = class_exists(\App\Performance\RequestProfiler::class);
         if ($profiler) {
@@ -342,6 +345,7 @@ abstract class BaseController
         try {
             // Cria uma cópia para o extract da view também
             $dataForView = is_array($data) ? unserialize(serialize($data)) : [];
+            $dataForView = $this->enriquecerDadosCsp($dataForView);
             extract($dataForView);
             include $viewFile;
             $content = ob_get_clean();
@@ -573,6 +577,22 @@ abstract class BaseController
         }
 
         return ['message' => null, 'type' => 'info', 'meta' => null];
+    }
+
+    /**
+     * SEC-02: nonce CSP por resposta + aplica nonce em $additional_js inline.
+     *
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    protected function enriquecerDadosCsp(array $data): array
+    {
+        $data['csp_nonce'] = CspPolitica::nonce();
+        $data['csp_nonce_attr'] = CspPolitica::attrNonce();
+        if (!empty($data['additional_js']) && is_string($data['additional_js'])) {
+            $data['additional_js'] = CspPolitica::aplicarNonceEmHtml($data['additional_js']);
+        }
+        return $data;
     }
     
 }

@@ -211,7 +211,7 @@
 </div>
 
 <?php include \App\Core\ViewPaths::component('ai-job-poller.php'); ?>
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 const csrfTokenModuloExerciciosAdmin = <?= json_encode($csrf_token ?? '') ?>;
 let opcoesCount = 0;
 const letras = ['A', 'B', 'C', 'D', 'E'];

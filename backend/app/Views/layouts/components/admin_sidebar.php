@@ -269,7 +269,7 @@
                             <i class="fa-regular fa-money-bill-1 w-5 h-5 mr-3"></i>
                             <span class="sidebar-text">Financeiro</span>
                         </a>
-                        <button type="button" onclick="toggleMenuGroup('financeiro')" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
+                        <button type="button" data-csp-action="toggle-menu-group" data-csp-group="financeiro" class="px-3 py-3 text-purple-100 hover:text-white transition-colors" title="Expandir submenu">
                             <svg id="financeiro-arrow" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                             </svg>

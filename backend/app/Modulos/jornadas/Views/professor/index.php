@@ -314,7 +314,7 @@ include $ui . '/offcanvas.php';
     </div>
 <?php endif; ?>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     // Filtros e busca
     document.addEventListener('DOMContentLoaded', function() {
         const filtroBusca = document.getElementById('filtroBusca');

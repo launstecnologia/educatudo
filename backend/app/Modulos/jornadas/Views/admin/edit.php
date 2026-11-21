@@ -250,7 +250,7 @@
     </form>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
     // Validar que data fim seja maior que data início
     document.getElementById('data_inicio').addEventListener('change', function() {
         const dataFim = document.getElementById('data_fim');

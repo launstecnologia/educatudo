@@ -126,7 +126,7 @@
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 let moduloEditandoId = null;
 
 function escapeJsString(value) {

@@ -85,7 +85,7 @@
     </form>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 const professores = <?= json_encode($professores ?? [], JSON_UNESCAPED_UNICODE) ?>;
 const materias = <?= json_encode($materias ?? [], JSON_UNESCAPED_UNICODE) ?>;
 let professorCounter = 0;

@@ -294,7 +294,7 @@
     </div>
 </div>
 
-<script>
+<script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
 function abrirContextoIaModal() {
     const modal = document.getElementById('contextoIaModal');
     if (modal) modal.classList.remove('hidden');
