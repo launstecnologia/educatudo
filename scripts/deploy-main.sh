@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy de código (main): git pull + composer se necessário + restart do PHP.
+# Deploy de código (main): git fetch + reset --hard + composer se necessário + restart do PHP.
 # Não recria Nginx/Redis nem aplica compose da VPS — infra fica no servidor.
 #
 # Uso no servidor:
@@ -10,6 +10,9 @@
 #   backend/.env
 #   ssl/cloudflare-origin.pem
 #   ssl/cloudflare-origin.key
+#
+# Preserva na VPS (não sobrescreve):
+#   docker-compose*.yml, docker/nginx/nginx.conf, docker/php/php.ini
 
 set -euo pipefail
 
@@ -19,7 +22,6 @@ REMOTE="${DEPLOY_REMOTE:-origin}"
 HOST_HEADER="${DEPLOY_HEALTH_HOST:-master.educatudo.com}"
 HEALTH_PATH="${DEPLOY_HEALTH_PATH:-/master}"
 PHP_CONTAINER="${DEPLOY_PHP_CONTAINER:-php_app_educatudo}"
-# Infra local da VPS: não bloqueia o deploy e não é sobrescrita pelo git pull.
 PRESERVE_FILES=(
   docker-compose.yml
   docker-compose.vps.yml
@@ -57,81 +59,18 @@ if [[ ! -f ssl/cloudflare-origin.pem || ! -f ssl/cloudflare-origin.key ]]; then
   exit 1
 fi
 
-# Compose/.env/nginx/php.ini do servidor nao bloqueiam o git status do deploy.
-GIT_IGNORE_LOCAL=(
-  ':!backend/.env'
-  ':!docker-compose.yml'
-  ':!docker-compose.vps.yml'
-  ':!docker-compose.vps.ssl-origin.yml'
-  ':!docker-compose.vps.ssl.yml'
-  ':!docker/nginx/nginx.conf'
-  ':!docker/php/php.ini'
-)
-
-# Hotfix local em codigo de app bloqueava o pull. Com backup, volta ao HEAD
-# para o deploy seguir (fonte da verdade = origin/main).
-# Nunca reseta infra preservada (compose/php.ini/nginx), mesmo se o pathspec falhar.
-is_preserved_path() {
-  local candidate="$1" p
-  [[ "$candidate" == "backend/.env" ]] && return 0
-  for p in "${PRESERVE_FILES[@]}"; do
-    [[ "$candidate" == "$p" ]] && return 0
-  done
-  return 1
-}
-
-dirty_files=()
-while IFS= read -r f; do
-  [[ -n "$f" ]] || continue
-  is_preserved_path "$f" && continue
-  dirty_files+=("$f")
-done < <({
-  git diff --name-only -- . "${GIT_IGNORE_LOCAL[@]}" || true
-  git diff --cached --name-only -- . "${GIT_IGNORE_LOCAL[@]}" || true
-} | sort -u)
-
-if ((${#dirty_files[@]})); then
-  backup_dir="$ROOT/backups/deploy-dirty-$(date +%Y%m%d-%H%M%S)"
-  if ! mkdir -p "$backup_dir" 2>/dev/null; then
-    backup_dir="$(mktemp -d /tmp/educatudo-deploy-dirty-XXXXXX)"
-  fi
-  echo "==> Aviso: limpar mudancas locais rastreadas (backup em $backup_dir)"
-  for f in "${dirty_files[@]}"; do
-    mkdir -p "$backup_dir/$(dirname "$f")"
-    if [[ -f "$f" ]]; then
-      cp "$f" "$backup_dir/$f"
-    fi
-    git checkout -- "$f" 2>/dev/null || true
-    git reset HEAD -- "$f" 2>/dev/null || true
-    echo "    reset: $f"
-  done
-fi
-
-if ! git diff --quiet -- . "${GIT_IGNORE_LOCAL[@]}"; then
-  echo "ERRO: ainda ha mudancas rastreadas nao commitadas apos limpeza." >&2
-  git status --short
-  exit 1
-fi
-
-if ! git diff --cached --quiet -- . "${GIT_IGNORE_LOCAL[@]}"; then
-  echo "ERRO: ainda ha mudancas staged apos limpeza." >&2
-  git status --short
-  exit 1
-fi
-
 preserve_dir=""
 restore_server_config() {
   if [[ -z "${preserve_dir:-}" || ! -d "$preserve_dir" ]]; then
     return
   fi
-  local f
+  local f base
   for f in "${PRESERVE_FILES[@]}"; do
-    if [[ -f "$preserve_dir/$(basename "$f")" ]]; then
+    base="$(basename "$f")"
+    if [[ -f "$preserve_dir/$base" ]]; then
       mkdir -p "$ROOT/$(dirname "$f")"
-      cp "$preserve_dir/$(basename "$f")" "$ROOT/$f"
-    elif [[ -f "$preserve_dir/$f" ]]; then
-      mkdir -p "$ROOT/$(dirname "$f")"
-      cp "$preserve_dir/$f" "$ROOT/$f"
+      cp "$preserve_dir/$base" "$ROOT/$f"
+      echo "    restaurado: $f"
     fi
   done
   rm -rf "$preserve_dir"
@@ -139,16 +78,39 @@ restore_server_config() {
 }
 trap restore_server_config EXIT
 
-preserve_dir="$(mktemp -d)"
+echo "==> Preservando config local da VPS"
+preserve_dir="$(mktemp -d /tmp/educatudo-deploy-preserve-XXXXXX)"
 for f in "${PRESERVE_FILES[@]}"; do
   if [[ -f "$f" ]]; then
-    # basename no tmp evita precisar espelhar pastas docker/nginx etc.
     cp "$f" "$preserve_dir/$(basename "$f")"
-    git checkout -- "$f" 2>/dev/null || true
+    echo "    salvo: $f"
   fi
 done
 
-echo "==> Atualizando codigo"
+# Backup de hotfixes de app (nao-preservados) antes do hard reset
+backup_dir="$(mktemp -d /tmp/educatudo-deploy-dirty-XXXXXX)"
+backed_up=0
+while IFS= read -r f; do
+  [[ -n "$f" ]] || continue
+  skip=0
+  for p in "${PRESERVE_FILES[@]}"; do
+    [[ "$f" == "$p" || "$f" == "backend/.env" ]] && skip=1 && break
+  done
+  ((skip)) && continue
+  if [[ -f "$f" ]]; then
+    mkdir -p "$backup_dir/$(dirname "$f")"
+    cp "$f" "$backup_dir/$f"
+    echo "    backup hotfix: $f"
+    backed_up=1
+  fi
+done < <(git diff --name-only HEAD 2>/dev/null || true)
+if ((backed_up)); then
+  echo "    backup em $backup_dir"
+else
+  rm -rf "$backup_dir"
+fi
+
+echo "==> Atualizando codigo ($REMOTE/$BRANCH)"
 git fetch "$REMOTE" "$BRANCH"
 
 current_branch="$(git branch --show-current)"
@@ -157,8 +119,17 @@ if [[ "$current_branch" != "$BRANCH" ]]; then
   git switch "$BRANCH"
 fi
 
-git pull --ff-only "$REMOTE" "$BRANCH"
+if ! git reset --hard "$REMOTE/$BRANCH"; then
+  echo "ERRO: git reset --hard falhou. Verifique permissao de escrita no repo." >&2
+  echo "Sugestao: sudo chown -R ubuntu:ubuntu /opt/educatudo" >&2
+  echo "          (mantenha storage/uploads acessiveis ao www-data depois)" >&2
+  ls -la backend/app/Painel/Auth/Controllers/AuthController.php 2>/dev/null || true
+  exit 1
+fi
+
+echo "==> Restaurando config local da VPS"
 restore_server_config
+trap - EXIT
 
 mkdir -p backend/storage/logs backend/storage/cache backend/storage/sessions backend/uploads
 
@@ -214,3 +185,4 @@ esac
 
 echo "==> Deploy concluido"
 git log --oneline --decorate -1
+echo "    (compose/php.ini/nginx locais preservados; status M neles e esperado)"
