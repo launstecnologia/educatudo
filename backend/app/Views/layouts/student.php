@@ -662,6 +662,14 @@
                     <span class="sidebar-text">Mural de Recado</span>
                 </a>
                 <?php endif; ?>
+                <?php if (\App\Core\LayoutHelper::isModuleEnabled('chat_professor')): ?>
+                <a href="<?= URL ?>/chat-professor" class="flex items-center px-4 py-3 <?= (($current_page ?? '') === 'chat') || strpos($_SERVER['REQUEST_URI'] ?? '', '/chat-professor') !== false ? 'text-white bg-white/20' : 'text-purple-100 hover:bg-white/20 hover:text-white' ?> rounded-xl transition-all duration-200 hover:scale-105">
+                    <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                    </svg>
+                    <span class="sidebar-text">Chat</span>
+                </a>
+                <?php endif; ?>
                 <a href="<?= URL ?>/logout?portal=aluno" class="flex items-center px-4 py-3 text-red-200 hover:bg-red-500/20 hover:text-red-100 rounded-xl transition-all duration-200 hover:scale-105 mt-4">
                     <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
