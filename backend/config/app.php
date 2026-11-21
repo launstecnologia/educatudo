@@ -64,12 +64,10 @@ if (!function_exists('env')) {
 
 $schoolCodeConfig = $tenantSlugRuntime !== '' ? $tenantSlugRuntime : env('SCHOOL_CODE', 'default');
 $entraComoSecret = (string) env('ENTRA_COMO_SECRET', '');
-$requestHost = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
-$requestHost = preg_replace('/:\d+$/', '', $requestHost);
-$isLocalHost = in_array($requestHost, ['localhost', '127.0.0.1', '::1'], true)
-    || str_ends_with($requestHost, '.localhost');
+// Em development, gera secret local estável se ENTRA_COMO_SECRET estiver vazio
+// (permite "Entrar como" no Master sem configurar a var; em production a var é obrigatória).
 $isLocalEnv = defined('ENVIRONMENT') && ENVIRONMENT === 'development';
-if ($entraComoSecret === '' && $isLocalEnv && $isLocalHost) {
+if ($entraComoSecret === '' && $isLocalEnv) {
     $entraComoSecret = hash(
         'sha256',
         'entrar-como-local-' . env('DB_HOST', '') . env('DB_NAME', '') . env('DB_USER', '') . env('DB_PASS', '')
@@ -118,7 +116,7 @@ return [
         'lockout_duration' => (int) env('LOCKOUT_DURATION', 900),
         // Limite por IP: maior que o por nickname, para não bloquear outros usuários no mesmo IP (ex.: laboratório)
         'max_login_attempts_ip' => (int) env('MAX_LOGIN_ATTEMPTS_IP', 50),
-        // Em localhost, permite testar "Entrar como" mesmo sem ENTRA_COMO_SECRET no .env.
+        // Em APP_ENV=development, permite testar "Entrar como" mesmo sem ENTRA_COMO_SECRET no .env.
         'entra_como_secret' => $entraComoSecret,
     ],
 

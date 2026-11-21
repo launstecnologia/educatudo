@@ -664,7 +664,7 @@ class MasterEscolaDetailController extends BaseController
 
         $secret = $this->config['security']['entra_como_secret'] ?? '';
         if ($secret === '') {
-            $this->setFlashMessage('Não foi possível gerar o token. Verifique a configuração do banco no .env.', 'error');
+            $this->setFlashMessage('Não foi possível gerar o token. Defina ENTRA_COMO_SECRET no .env (openssl rand -base64 32).', 'error');
             header('Location: ' . URL . '/master/escolas/' . $escolaId . '/detalhes');
             exit;
         }
