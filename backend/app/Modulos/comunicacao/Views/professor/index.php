@@ -1,84 +1,89 @@
 <!-- Header Section -->
 <div class="mb-8">
-    <div class="flex items-center justify-between flex-wrap gap-3">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-900">Chat com Alunos</h1>
-            <p class="text-gray-600 mt-2">Inicie uma conversa ou continue de onde parou</p>
-        </div>
+    <div>
+        <h1 class="text-3xl font-bold text-gray-900">Chat com Alunos</h1>
+        <p class="text-gray-600 mt-2">Inicie uma conversa ou continue de onde parou</p>
     </div>
 </div>
 
 <?php
 $alunosDisponiveis = $alunos_disponiveis ?? [];
-$idsComConversa = [];
-foreach ($conversas ?? [] as $conv) {
-    $idsComConversa[(int) ($conv['aluno_id'] ?? 0)] = true;
+$turmasFiltro = [];
+foreach ($alunosDisponiveis as $alunoRow) {
+    $tid = (int) ($alunoRow['turma_id'] ?? 0);
+    $tnome = trim((string) ($alunoRow['turma_nome'] ?? ''));
+    if ($tid > 0 && $tnome !== '' && !isset($turmasFiltro[$tid])) {
+        $turmasFiltro[$tid] = $tnome;
+    }
+}
+asort($turmasFiltro, SORT_NATURAL | SORT_FLAG_CASE);
+
+$alunosJson = [];
+foreach ($alunosDisponiveis as $alunoRow) {
+    $alunosJson[] = [
+        'id' => (int) ($alunoRow['id'] ?? 0),
+        'nome' => (string) ($alunoRow['nome'] ?? ''),
+        'ra' => (string) ($alunoRow['ra'] ?? ''),
+        'turma_id' => (int) ($alunoRow['turma_id'] ?? 0),
+        'turma_nome' => (string) ($alunoRow['turma_nome'] ?? ''),
+    ];
 }
 ?>
 
-<!-- Alunos vinculados (iniciar conversa) -->
-<div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <h2 class="text-xl font-semibold text-gray-900">Alunos das suas turmas</h2>
-        <?php if (!empty($alunosDisponiveis)): ?>
-        <input type="search"
-               id="filtro-alunos-chat"
-               placeholder="Buscar aluno ou turma..."
-               class="w-full sm:w-72 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-               autocomplete="off">
-        <?php endif; ?>
-    </div>
+<!-- Iniciar conversa (filtros, sem cards) -->
+<div class="bg-white rounded-xl shadow-lg p-6 mb-6 w-full">
+    <h2 class="text-xl font-semibold text-gray-900 mb-1">Nova conversa</h2>
+    <p class="text-sm text-gray-500 mb-5">Filtre pela turma e escolha o aluno</p>
 
     <?php if (empty($alunosDisponiveis)): ?>
-        <div class="text-center py-10">
+        <div class="text-center py-8">
             <p class="text-gray-500 font-medium">Nenhum aluno vinculado às suas turmas</p>
             <p class="text-sm text-gray-400 mt-2">Confira se suas turmas estão cadastradas no perfil do professor.</p>
         </div>
     <?php else: ?>
-        <div id="lista-alunos-chat" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <?php foreach ($alunosDisponiveis as $aluno): ?>
-                <?php
-                $alunoId = (int) ($aluno['id'] ?? 0);
-                $temConversa = !empty($idsComConversa[$alunoId]);
-                $busca = mb_strtolower(
-                    trim(($aluno['nome'] ?? '') . ' ' . ($aluno['turma_nome'] ?? '') . ' ' . ($aluno['ra'] ?? '')),
-                    'UTF-8'
-                );
-                ?>
-                <a href="<?= URL ?>/professor/chat/<?= $alunoId ?>"
-                   data-busca="<?= htmlspecialchars($busca, ENT_QUOTES, 'UTF-8') ?>"
-                   class="aluno-chat-card flex items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-200">
-                    <div class="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center mr-4 shrink-0">
-                        <span class="text-white font-semibold text-lg">
-                            <?= htmlspecialchars(mb_strtoupper(mb_substr((string) ($aluno['nome'] ?? '?'), 0, 1))) ?>
-                        </span>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <h3 class="font-medium text-gray-900 truncate"><?= htmlspecialchars($aluno['nome'] ?? '') ?></h3>
-                        <p class="text-sm text-gray-600 truncate">
-                            <?= htmlspecialchars($aluno['turma_nome'] ?? 'Sem turma') ?>
-                            <?php if (!empty($aluno['ra'])): ?>
-                                · RA <?= htmlspecialchars($aluno['ra']) ?>
-                            <?php endif; ?>
-                        </p>
-                        <?php if ($temConversa): ?>
-                            <span class="inline-block mt-1 text-xs text-purple-600 font-medium">Conversa existente</span>
-                        <?php else: ?>
-                            <span class="inline-block mt-1 text-xs text-gray-500">Iniciar conversa</span>
-                        <?php endif; ?>
-                    </div>
-                    <svg class="w-5 h-5 text-gray-400 shrink-0 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                    </svg>
-                </a>
-            <?php endforeach; ?>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+                <label for="filtro-turma-chat" class="block text-sm font-medium text-gray-700 mb-1">Turma</label>
+                <select id="filtro-turma-chat" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    <option value="">Todas as turmas</option>
+                    <?php foreach ($turmasFiltro as $turmaId => $turmaNome): ?>
+                        <option value="<?= (int) $turmaId ?>"><?= htmlspecialchars($turmaNome) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="md:col-span-2">
+                <label for="filtro-nome-chat" class="block text-sm font-medium text-gray-700 mb-1">Buscar aluno</label>
+                <input type="search"
+                       id="filtro-nome-chat"
+                       placeholder="Nome ou RA..."
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                       autocomplete="off">
+            </div>
         </div>
-        <p id="filtro-alunos-vazio" class="hidden text-center text-sm text-gray-500 mt-4">Nenhum aluno encontrado com esse filtro.</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <div class="md:col-span-2">
+                <label for="select-aluno-chat" class="block text-sm font-medium text-gray-700 mb-1">Aluno</label>
+                <select id="select-aluno-chat" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    <option value="">Selecione um aluno</option>
+                </select>
+                <p id="filtro-alunos-vazio" class="hidden text-sm text-amber-600 mt-2">Nenhum aluno encontrado com esses filtros.</p>
+            </div>
+            <div>
+                <button type="button"
+                        id="btn-abrir-chat"
+                        disabled
+                        class="w-full px-4 py-2 rounded-lg text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                    Abrir conversa
+                </button>
+            </div>
+        </div>
+        <p class="text-xs text-gray-400 mt-3"><span id="contador-alunos-filtro"><?= count($alunosDisponiveis) ?></span> aluno(s) disponível(is)</p>
     <?php endif; ?>
 </div>
 
 <!-- Conversas Existentes -->
-<div class="bg-white rounded-xl shadow-lg">
+<div class="bg-white rounded-xl shadow-lg w-full">
     <div class="p-6 border-b border-gray-200">
         <h2 class="text-xl font-semibold text-gray-900">Conversas recentes</h2>
     </div>
@@ -89,56 +94,39 @@ foreach ($conversas ?? [] as $conv) {
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
                 </svg>
                 <p class="text-gray-500 text-lg font-medium">Nenhuma conversa ainda</p>
-                <p class="text-sm text-gray-400 mt-2">Escolha um aluno acima para começar</p>
+                <p class="text-sm text-gray-400 mt-2">Use os filtros acima para iniciar</p>
             </div>
         <?php else: ?>
-            <div class="space-y-4">
+            <div class="divide-y divide-gray-100">
                 <?php foreach ($conversas as $conversa): ?>
                     <a href="<?= URL ?>/professor/chat/<?= (int) $conversa['aluno_id'] ?>"
-                       class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer <?= ($conversa['mensagens_nao_lidas'] ?? 0) > 0 ? 'border-l-4 border-purple-500' : '' ?>">
+                       class="flex items-center justify-between py-3 px-1 hover:bg-gray-50 rounded-lg transition-colors <?= ($conversa['mensagens_nao_lidas'] ?? 0) > 0 ? 'bg-purple-50/40' : '' ?>">
                         <div class="flex items-center flex-1 min-w-0">
-                            <div class="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center mr-4 shrink-0">
-                                <span class="text-white font-semibold text-lg">
+                            <div class="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center mr-3 shrink-0">
+                                <span class="text-white font-semibold text-sm">
                                     <?= htmlspecialchars(mb_strtoupper(mb_substr((string) ($conversa['aluno_nome'] ?? '?'), 0, 1))) ?>
                                 </span>
                             </div>
                             <div class="flex-1 min-w-0">
-                                <div class="flex items-center space-x-2 mb-1">
-                                    <h3 class="font-medium text-gray-900 truncate"><?= htmlspecialchars($conversa['aluno_nome'] ?? '') ?></h3>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="font-medium text-gray-900 truncate text-sm"><?= htmlspecialchars($conversa['aluno_nome'] ?? '') ?></h3>
                                     <?php if (($conversa['mensagens_nao_lidas'] ?? 0) > 0): ?>
-                                        <span class="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full font-medium">
+                                        <span class="px-1.5 py-0.5 bg-red-500 text-white text-[10px] rounded-full font-medium">
                                             <?= (int) $conversa['mensagens_nao_lidas'] ?>
                                         </span>
                                     <?php endif; ?>
                                 </div>
-                                <div class="flex items-center space-x-2 text-sm text-gray-600 mb-1">
-                                    <?php if (!empty($conversa['turma_nome'])): ?>
-                                        <span class="text-gray-500"><?= htmlspecialchars($conversa['turma_nome']) ?></span>
+                                <p class="text-xs text-gray-500 truncate">
+                                    <?= htmlspecialchars($conversa['turma_nome'] ?? '') ?>
+                                    <?php if (!empty($conversa['ultima_mensagem'])): ?>
+                                        · <?= htmlspecialchars(mb_substr($conversa['ultima_mensagem'], 0, 50)) ?><?= mb_strlen($conversa['ultima_mensagem']) > 50 ? '…' : '' ?>
                                     <?php endif; ?>
-                                    <?php if (!empty($conversa['aluno_ra'])): ?>
-                                        <span class="text-gray-400">·</span>
-                                        <span class="text-gray-500">RA: <?= htmlspecialchars($conversa['aluno_ra']) ?></span>
-                                    <?php endif; ?>
-                                </div>
-                                <?php if (!empty($conversa['ultima_mensagem'])): ?>
-                                    <p class="text-sm text-gray-600 truncate">
-                                        <?= htmlspecialchars(mb_substr($conversa['ultima_mensagem'], 0, 60)) ?><?= mb_strlen($conversa['ultima_mensagem']) > 60 ? '...' : '' ?>
-                                    </p>
-                                    <?php if (!empty($conversa['ultima_mensagem_data'])): ?>
-                                        <p class="text-xs text-gray-400 mt-1">
-                                            <?= date('d/m/Y H:i', strtotime($conversa['ultima_mensagem_data'])) ?>
-                                        </p>
-                                    <?php endif; ?>
-                                <?php else: ?>
-                                    <p class="text-sm text-gray-400">Nenhuma mensagem ainda</p>
-                                <?php endif; ?>
+                                </p>
                             </div>
                         </div>
-                        <div class="ml-4 shrink-0">
-                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                            </svg>
-                        </div>
+                        <svg class="w-4 h-4 text-gray-400 shrink-0 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
                     </a>
                 <?php endforeach; ?>
             </div>
@@ -149,20 +137,67 @@ foreach ($conversas ?? [] as $conv) {
 <?php if (!empty($alunosDisponiveis)): ?>
 <script>
 (function () {
-    var input = document.getElementById('filtro-alunos-chat');
+    var alunos = <?= json_encode($alunosJson, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP) ?>;
+    var baseUrl = <?= json_encode(rtrim(URL, '/') . '/professor/chat/', JSON_UNESCAPED_SLASHES) ?>;
+    var selTurma = document.getElementById('filtro-turma-chat');
+    var inpNome = document.getElementById('filtro-nome-chat');
+    var selAluno = document.getElementById('select-aluno-chat');
+    var btn = document.getElementById('btn-abrir-chat');
     var vazio = document.getElementById('filtro-alunos-vazio');
-    if (!input) return;
-    input.addEventListener('input', function () {
-        var q = (input.value || '').toLowerCase().trim();
-        var cards = document.querySelectorAll('.aluno-chat-card');
-        var visiveis = 0;
-        cards.forEach(function (card) {
-            var ok = !q || (card.getAttribute('data-busca') || '').indexOf(q) !== -1;
-            card.classList.toggle('hidden', !ok);
-            if (ok) visiveis++;
+    var contador = document.getElementById('contador-alunos-filtro');
+
+    function normaliza(s) {
+        return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+
+    function filtrados() {
+        var turma = selTurma.value;
+        var q = normaliza(inpNome.value).trim();
+        return alunos.filter(function (a) {
+            if (turma && String(a.turma_id) !== turma) return false;
+            if (!q) return true;
+            var blob = normaliza(a.nome + ' ' + a.ra);
+            return blob.indexOf(q) !== -1;
         });
-        if (vazio) vazio.classList.toggle('hidden', visiveis > 0);
+    }
+
+    function render() {
+        var lista = filtrados();
+        var atual = selAluno.value;
+        selAluno.innerHTML = '';
+        var opt0 = document.createElement('option');
+        opt0.value = '';
+        opt0.textContent = lista.length ? 'Selecione um aluno' : 'Nenhum aluno neste filtro';
+        selAluno.appendChild(opt0);
+
+        lista.sort(function (a, b) {
+            return a.nome.localeCompare(b.nome, 'pt-BR');
+        }).forEach(function (a) {
+            var opt = document.createElement('option');
+            opt.value = String(a.id);
+            opt.textContent = a.nome + (a.turma_nome ? ' (' + a.turma_nome + ')' : '') + (a.ra ? ' · ' + a.ra : '');
+            selAluno.appendChild(opt);
+        });
+
+        if (atual && lista.some(function (a) { return String(a.id) === atual; })) {
+            selAluno.value = atual;
+        }
+        btn.disabled = !selAluno.value;
+        if (vazio) vazio.classList.toggle('hidden', lista.length > 0);
+        if (contador) contador.textContent = String(lista.length);
+    }
+
+    selTurma.addEventListener('change', render);
+    inpNome.addEventListener('input', render);
+    selAluno.addEventListener('change', function () {
+        btn.disabled = !selAluno.value;
     });
+    btn.addEventListener('click', function () {
+        if (!selAluno.value) return;
+        window.location.href = baseUrl + encodeURIComponent(selAluno.value);
+    });
+
+    render();
 })();
 </script>
 <?php endif; ?>
