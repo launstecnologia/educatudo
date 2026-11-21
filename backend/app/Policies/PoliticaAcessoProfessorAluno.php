@@ -20,6 +20,96 @@ class PoliticaAcessoProfessorAluno
         $this->db = $db ?: Database::getInstance();
     }
 
+    /**
+     * Alunos ativos que o professor pode iniciar chat (turma via cadastro e/ou jornada).
+     *
+     * @return list<array{id:int|string,nome:string,ra?:string,turma_id?:int|string,turma_nome?:string}>
+     */
+    public function listarAlunosVinculados(int $professorId): array
+    {
+        if ($professorId <= 0) {
+            return [];
+        }
+
+        $turmaIds = $this->idsTurmasDoProfessor($professorId);
+        if ($turmaIds === []) {
+            return [];
+        }
+
+        $params = [];
+        $placeholders = [];
+        foreach ($turmaIds as $i => $turmaId) {
+            $chave = 'turma_' . $i;
+            $placeholders[] = ':' . $chave;
+            $params[$chave] = $turmaId;
+        }
+
+        $candidatos = $this->db->fetchAll(
+            'SELECT a.id, a.nome, a.ra, a.turma_id, t.nome AS turma_nome
+             FROM alunos a
+             LEFT JOIN turmas t ON t.id = a.turma_id
+             WHERE a.ativo = 1
+               AND a.turma_id IN (' . implode(',', $placeholders) . ')
+             ORDER BY t.nome ASC, a.nome ASC',
+            $params
+        );
+        if (!is_array($candidatos)) {
+            return [];
+        }
+
+        $lista = [];
+        foreach ($candidatos as $aluno) {
+            $alunoId = (int) ($aluno['id'] ?? 0);
+            if ($alunoId > 0 && $this->podeAcessar($professorId, $alunoId)) {
+                $lista[] = $aluno;
+            }
+        }
+
+        return $lista;
+    }
+
+    /** @return list<int> */
+    private function idsTurmasDoProfessor(int $professorId): array
+    {
+        $ids = [];
+
+        $professor = $this->db->fetch(
+            'SELECT turmas FROM professores WHERE id = :id AND (ativo = 1 OR ativo IS NULL) LIMIT 1',
+            ['id' => $professorId]
+        );
+        if ($professor) {
+            $turmas = json_decode((string) ($professor['turmas'] ?? '[]'), true);
+            if (is_array($turmas)) {
+                foreach ($turmas as $turmaId) {
+                    $id = (int) $turmaId;
+                    if ($id > 0) {
+                        $ids[$id] = true;
+                    }
+                }
+            }
+        }
+
+        if ($this->tabelaExiste('jornadas')) {
+            $rows = $this->db->fetchAll(
+                'SELECT DISTINCT turma_id
+                 FROM jornadas
+                 WHERE professor_id = :professor_id
+                   AND (ativo = 1 OR ativo IS NULL)',
+                ['professor_id' => $professorId]
+            );
+            if (is_array($rows)) {
+                foreach ($rows as $row) {
+                    $id = (int) ($row['turma_id'] ?? 0);
+                    if ($id > 0) {
+                        $ids[$id] = true;
+                    }
+                }
+            }
+        }
+
+        return array_map('intval', array_keys($ids));
+    }
+
     public function podeAcessar(int $professorId, int $alunoId): bool
     {
         if ($professorId <= 0 || $alunoId <= 0) {

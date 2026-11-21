@@ -14,7 +14,8 @@ final class PoliticaAcessoProfessorAlunoTest extends TestCase
     {
         $pdo = new PDO('sqlite::memory:');
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $pdo->exec('CREATE TABLE alunos (id INTEGER PRIMARY KEY, turma_id INTEGER, ativo INTEGER)');
+        $pdo->exec('CREATE TABLE alunos (id INTEGER PRIMARY KEY, turma_id INTEGER, ativo INTEGER, nome TEXT, ra TEXT)');
+        $pdo->exec('CREATE TABLE turmas (id INTEGER PRIMARY KEY, nome TEXT)');
         $pdo->exec('CREATE TABLE professores (id INTEGER PRIMARY KEY, turmas TEXT, ativo INTEGER)');
         $pdo->exec('CREATE TABLE jornadas (id INTEGER PRIMARY KEY, professor_id INTEGER, turma_id INTEGER, ativo INTEGER)');
         $pdo->exec('CREATE TABLE matricula (id INTEGER PRIMARY KEY, aluno_id INTEGER, turma_id INTEGER, status TEXT)');
@@ -35,6 +36,12 @@ final class PoliticaAcessoProfessorAlunoTest extends TestCase
                 $stmt->execute($params);
                 $row = $stmt->fetch(PDO::FETCH_ASSOC);
                 return $row === false ? null : $row;
+            }
+            public function fetchAll(string $sql, array $params = [])
+            {
+                $stmt = $this->pdo->prepare($sql);
+                $stmt->execute($params);
+                return $stmt->fetchAll(PDO::FETCH_ASSOC);
             }
         };
     }
@@ -130,5 +137,20 @@ final class PoliticaAcessoProfessorAlunoTest extends TestCase
         $this->assertFalse($politica->podeAcessar(0, 1));
         $this->assertFalse($politica->podeAcessar(1, 0));
         $this->assertFalse($politica->podeAcessar(-1, -1));
+    }
+
+    public function testListarAlunosVinculadosRetornaSoDaTurma(): void
+    {
+        $pdo = $this->banco();
+        $pdo->exec("INSERT INTO turmas (id, nome) VALUES (24, '1A'), (99, 'Outra')");
+        $pdo->exec("INSERT INTO alunos (id, turma_id, ativo, nome, ra) VALUES (619, 24, 1, 'Aluno A', 'RA1')");
+        $pdo->exec("INSERT INTO alunos (id, turma_id, ativo, nome, ra) VALUES (620, 99, 1, 'Aluno B', 'RA2')");
+        $pdo->exec("INSERT INTO professores (id, turmas, ativo) VALUES (56, '[24]', 1)");
+
+        $politica = new PoliticaAcessoProfessorAluno($this->db($pdo));
+        $lista = $politica->listarAlunosVinculados(56);
+        $ids = array_map(static fn ($a) => (int) $a['id'], $lista);
+
+        $this->assertSame([619], $ids);
     }
 }

@@ -135,11 +135,15 @@ class ChatController extends BaseController
                 $conversas[] = $conversa;
             }
         }
+
+        // Alunos vinculados para iniciar conversa (mesmo critério de ownership)
+        $alunos_disponiveis = $this->politicaAcesso->listarAlunosVinculados((int) $professor['id']);
         
         $data = [
             'title' => 'Chat com Alunos - EducaTudo',
             'professor' => $professor,
             'conversas' => $conversas,
+            'alunos_disponiveis' => $alunos_disponiveis,
             'user' => $user,
             'current_page' => 'chat'
         ];

@@ -9,7 +9,12 @@
 </div>
 
 <!-- Professores Disponíveis -->
-<?php if (!empty($professores_turma)): ?>
+<?php if (empty($professores_turma)): ?>
+<div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+    <h2 class="text-xl font-semibold text-gray-900 mb-2">Professores da Sua Turma</h2>
+    <p class="text-gray-500">Nenhum professor vinculado à sua turma no momento.</p>
+</div>
+<?php else: ?>
 <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
     <h2 class="text-xl font-semibold text-gray-900 mb-4">Professores da Sua Turma</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
