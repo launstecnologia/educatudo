@@ -53,6 +53,25 @@ if [[ ! -f backend/.env ]]; then
   exit 1
 fi
 
+# SEC-10: /master só responde 200/302 no host MASTER_DOMAIN. Sem isso o health check
+# falha com 404 e o Actions marca o deploy como vermelho (o git reset já ocorreu).
+master_domain_env="$(
+  grep -E '^[[:space:]]*MASTER_DOMAIN[[:space:]]*=' backend/.env \
+    | tail -n 1 \
+    | sed -E 's/^[[:space:]]*MASTER_DOMAIN[[:space:]]*=[[:space:]]*//; s/[[:space:]]+#.*$//; s/^["'\'']//; s/["'\'']$//; s/[[:space:]]*$//' \
+    | tr '[:upper:]' '[:lower:]'
+)"
+if [[ -z "$master_domain_env" ]]; then
+  echo "ERRO: MASTER_DOMAIN ausente ou vazio em backend/.env." >&2
+  echo "Defina MASTER_DOMAIN=master.educatudo.com (sem comentario na mesma linha) e reexecute o Deploy main." >&2
+  exit 1
+fi
+if [[ -z "${DEPLOY_HEALTH_HOST:-}" ]]; then
+  HOST_HEADER="$master_domain_env"
+fi
+echo "    MASTER_DOMAIN: $master_domain_env"
+echo "    Health Host:   $HOST_HEADER"
+
 if [[ ! -f ssl/cloudflare-origin.pem || ! -f ssl/cloudflare-origin.key ]]; then
   echo "ERRO: certificado Cloudflare Origin ausente em ssl/." >&2
   echo "Esperado: ssl/cloudflare-origin.pem e ssl/cloudflare-origin.key" >&2
@@ -147,8 +166,48 @@ if ! docker inspect "$PHP_CONTAINER" >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "==> Reiniciando PHP para limpar opcache (sem recriar Nginx/infra)"
-docker restart "$PHP_CONTAINER"
+echo "==> Recriando PHP para limpar opcache e recarregar env_file (MASTER_DOMAIN)"
+# docker restart NAO relê env_file; sem recreate o processo pode ficar com env antigo.
+# O bootstrap tambem le backend/.env do disco — recreate cobre os dois caminhos.
+if docker compose version >/dev/null 2>&1; then
+  compose_files=()
+  [[ -f docker-compose.yml ]] && compose_files+=(-f docker-compose.yml)
+  [[ -f docker-compose.vps.yml ]] && compose_files+=(-f docker-compose.vps.yml)
+  [[ -f docker-compose.vps.ssl-origin.yml ]] && compose_files+=(-f docker-compose.vps.ssl-origin.yml)
+  [[ -f docker-compose.vps.ssl.yml ]] && compose_files+=(-f docker-compose.vps.ssl.yml)
+  if ((${#compose_files[@]})) && docker compose "${compose_files[@]}" ps -q php >/dev/null 2>&1; then
+    docker compose "${compose_files[@]}" up -d --force-recreate --no-deps php
+  else
+    docker restart "$PHP_CONTAINER"
+  fi
+else
+  docker restart "$PHP_CONTAINER"
+fi
+
+echo "==> Conferindo MASTER_DOMAIN visivel no container"
+docker exec "$PHP_CONTAINER" php -r '
+$f = "/var/www/html/.env";
+if (!is_file($f)) { fwrite(STDERR, "ERRO: .env ausente no container\n"); exit(1); }
+$master = "";
+foreach (file($f, FILE_IGNORE_NEW_LINES) ?: [] as $i => $line) {
+  $line = trim((string) $line);
+  if ($i === 0) { $line = preg_replace("/^\xEF\xBB\xBF/", "", $line) ?? $line; }
+  if ($line === "" || $line[0] === "#") { continue; }
+  if (preg_match("/^MASTER_DOMAIN\s*=\s*(.+)$/i", $line, $m)) {
+    $v = trim($m[1]);
+    if ($v !== "" && ($v[0] ?? "") !== "\"" && ($v[0] ?? "") !== "'\''") {
+      $hash = strpos($v, "#");
+      if ($hash !== false) { $v = trim(substr($v, 0, $hash)); }
+    }
+    $v = trim($v, " \t\"'\''");
+    if ($v !== "") { $master = strtolower($v); }
+  }
+}
+$proc = getenv("MASTER_DOMAIN");
+echo "    arquivo: " . ($master !== "" ? $master : "(vazio)") . PHP_EOL;
+echo "    getenv:  " . (is_string($proc) && trim($proc) !== "" ? strtolower(trim($proc)) : "(vazio)") . PHP_EOL;
+if ($master === "") { fwrite(STDERR, "ERRO: MASTER_DOMAIN vazio no .env montado no PHP\n"); exit(1); }
+'
 
 echo "==> Ajustando permissoes de storage/uploads"
 if command -v sudo >/dev/null 2>&1; then
@@ -177,7 +236,16 @@ done
 case "$status" in
   200|302) ;;
   *)
-    echo "ERRO: health check retornou $status" >&2
+    echo "ERRO: health check retornou $status (Host: $HOST_HEADER$HEALTH_PATH)" >&2
+    if [[ "$status" == "404" ]]; then
+      echo "Dica SEC-10: 404 em /master costuma significar que o PHP nao ve MASTER_DOMAIN=$HOST_HEADER." >&2
+      echo "Confira: grep MASTER_DOMAIN backend/.env && docker exec $PHP_CONTAINER php -r \"echo getenv('MASTER_DOMAIN')?:'(vazio)';\"" >&2
+    fi
+    if [[ -f /tmp/educatudo-deploy-health.html ]]; then
+      echo "---- corpo (primeiras linhas) ----" >&2
+      head -n 20 /tmp/educatudo-deploy-health.html >&2 || true
+      echo "---- fim ----" >&2
+    fi
     docker logs --tail=120 "$PHP_CONTAINER" >&2 || true
     exit 1
     ;;
