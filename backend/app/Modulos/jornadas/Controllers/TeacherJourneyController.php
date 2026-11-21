@@ -6916,7 +6916,8 @@ Retorne APENAS um JSON válido no seguinte formato:
             'title' => 'Gerenciar Módulos - ' . $jornada['titulo'] . ' - EducaTudo',
             'user' => $user,
             'jornada' => $jornada,
-            'current_page' => 'journeys'
+            'current_page' => 'journeys',
+            'csrf_token' => $this->generateCsrfToken(),
         ];
         
         $this->viewWithLayout('professor', 'teacher/journeys/modulos', $data);

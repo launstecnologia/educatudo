@@ -29,6 +29,7 @@
     
     <form id="adicionarModuloForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <input type="hidden" name="jornada_id" value="<?= $jornada['id'] ?>">
+        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '', ENT_QUOTES, 'UTF-8') ?>">
         
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">Tipo de Módulo *</label>
@@ -85,6 +86,21 @@
 </div>
 
 <script <?= $csp_nonce_attr ?? \App\Core\CspPolitica::attrNonce() ?>>
+const CSRF_TOKEN = <?= json_encode($csrf_token ?? '', JSON_UNESCAPED_UNICODE) ?>;
+function csrfHeaders() {
+    return {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-TOKEN': CSRF_TOKEN
+    };
+}
+function withCsrf(formData) {
+    if (!formData.has('_token')) {
+        formData.append('_token', CSRF_TOKEN);
+    }
+    return formData;
+}
+
 function carregarModulos() {
     fetch('<?= URL ?>/admin/jornadas/<?= $jornada['id'] ?>/modulos/lista')
         .then(response => response.json())
@@ -119,10 +135,18 @@ document.addEventListener('DOMContentLoaded', function() {
         
         fetch('<?= URL ?>/admin/jornadas/adicionar-modulo', {
             method: 'POST',
-            body: formData
+            headers: csrfHeaders(),
+            credentials: 'same-origin',
+            body: withCsrf(formData)
         })
-        .then(response => response.json())
-        .then(data => {
+        .then(async response => {
+            const raw = await response.text();
+            let data = {};
+            try { data = raw ? JSON.parse(raw) : {}; } catch (e) {
+                throw new Error(response.status === 403 || response.status === 419
+                    ? 'Token CSRF inválido ou ausente. Recarregue a página e tente novamente.'
+                    : ('Erro HTTP ' + response.status));
+            }
             if (data.success) {
                 alert('Módulo adicionado com sucesso!');
                 form.reset();
@@ -132,7 +156,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
-            alert('Erro de conexão');
+            alert(error.message || 'Erro de conexão');
             console.error(error);
         });
     });
@@ -215,10 +239,18 @@ function removerModulo(moduloId) {
     
     fetch('<?= URL ?>/admin/jornadas/remover-modulo', {
         method: 'POST',
-        body: formData
+        headers: csrfHeaders(),
+        credentials: 'same-origin',
+        body: withCsrf(formData)
     })
-    .then(response => response.json())
-    .then(data => {
+    .then(async response => {
+        const raw = await response.text();
+        let data = {};
+        try { data = raw ? JSON.parse(raw) : {}; } catch (e) {
+            throw new Error(response.status === 403 || response.status === 419
+                ? 'Token CSRF inválido ou ausente. Recarregue a página e tente novamente.'
+                : ('Erro HTTP ' + response.status));
+        }
         if (data.success) {
             alert('Módulo removido com sucesso!');
             carregarModulos();
@@ -227,7 +259,7 @@ function removerModulo(moduloId) {
         }
     })
     .catch(error => {
-        alert('Erro de conexão');
+        alert(error.message || 'Erro de conexão');
         console.error(error);
     });
 }

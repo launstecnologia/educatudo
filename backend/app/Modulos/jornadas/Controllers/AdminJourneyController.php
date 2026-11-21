@@ -2172,7 +2172,8 @@ class AdminJourneyController extends BaseController
             'user' => $user,
             'jornada' => $jornada,
             'aulas' => $aulas,
-            'current_page' => 'journeys'
+            'current_page' => 'journeys',
+            'csrf_token' => $this->generateCsrfToken(),
         ];
         
         $this->viewWithLayout('admin', 'admin/journeys/modulos', $data);

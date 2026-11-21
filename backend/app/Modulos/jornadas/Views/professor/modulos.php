@@ -45,6 +45,7 @@
     
     <form id="adicionarModuloForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <input type="hidden" name="jornada_id" value="<?= $jornada['id'] ?>">
+        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '', ENT_QUOTES, 'UTF-8') ?>">
         
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">Tipo de Bloco *</label>
@@ -102,6 +103,7 @@
         <h4 class="text-lg font-semibold text-gray-900 mb-4">Editar Bloco</h4>
         <form id="editarModuloForm" class="space-y-4">
             <input type="hidden" name="modulo_id" id="editar_modulo_id">
+            <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '', ENT_QUOTES, 'UTF-8') ?>">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Título</label>
                 <input type="text" name="titulo" id="editar_modulo_titulo" required
@@ -137,6 +139,21 @@ function escapeJsString(value) {
         .replace(/\r/g, '\\r');
 }
 
+const CSRF_TOKEN = <?= json_encode($csrf_token ?? '', JSON_UNESCAPED_UNICODE) ?>;
+function csrfHeaders() {
+    return {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-TOKEN': CSRF_TOKEN
+    };
+}
+function withCsrf(formData) {
+    if (!formData.has('_token')) {
+        formData.append('_token', CSRF_TOKEN);
+    }
+    return formData;
+}
+
 function abrirEditarModuloModal(moduloId, titulo, obrigatorio) {
     moduloEditandoId = moduloId;
     document.getElementById('editar_modulo_id').value = moduloId;
@@ -160,10 +177,18 @@ document.getElementById('editarModuloForm').addEventListener('submit', function(
 
     fetch('<?= URL ?>/professor/jornadas/editar-modulo', {
         method: 'POST',
-        body: formData
+        headers: csrfHeaders(),
+        credentials: 'same-origin',
+        body: withCsrf(formData)
     })
-    .then(response => response.json())
-    .then(data => {
+    .then(async response => {
+        const raw = await response.text();
+        let data = {};
+        try { data = raw ? JSON.parse(raw) : {}; } catch (e) {
+            throw new Error(response.status === 403 || response.status === 419
+                ? 'Token CSRF inválido ou ausente. Recarregue a página e tente novamente.'
+                : ('Erro HTTP ' + response.status));
+        }
         if (data.success) {
             fecharEditarModuloModal();
             carregarModulos();
@@ -172,7 +197,7 @@ document.getElementById('editarModuloForm').addEventListener('submit', function(
         }
     })
     .catch(error => {
-        alert('Erro de conexão');
+        alert(error.message || 'Erro de conexão');
         console.error(error);
     });
 });
@@ -253,10 +278,18 @@ document.addEventListener('DOMContentLoaded', function() {
         
         fetch('<?= URL ?>/professor/jornadas/adicionar-modulo', {
             method: 'POST',
-            body: formData
+            headers: csrfHeaders(),
+            credentials: 'same-origin',
+            body: withCsrf(formData)
         })
-        .then(response => response.json())
-        .then(data => {
+        .then(async response => {
+            const raw = await response.text();
+            let data = {};
+            try { data = raw ? JSON.parse(raw) : {}; } catch (e) {
+                throw new Error(response.status === 403 || response.status === 419
+                    ? 'Token CSRF inválido ou ausente. Recarregue a página e tente novamente.'
+                    : ('Erro HTTP ' + response.status));
+            }
             if (data.success) {
                 alert('Bloco adicionado com sucesso!');
                 form.reset();
@@ -266,7 +299,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
-            alert('Erro de conexão');
+            alert(error.message || 'Erro de conexão');
             console.error(error);
         });
     });
@@ -569,23 +602,29 @@ function salvarOrdem() {
     
     fetch('<?= URL ?>/professor/jornadas/atualizar-ordem-modulos', {
         method: 'POST',
-        body: formData
+        headers: csrfHeaders(),
+        credentials: 'same-origin',
+        body: withCsrf(formData)
     })
-    .then(response => response.json())
-    .then(data => {
+    .then(async response => {
+        const raw = await response.text();
+        let data = {};
+        try { data = raw ? JSON.parse(raw) : {}; } catch (e) {
+            throw new Error(response.status === 403 || response.status === 419
+                ? 'Token CSRF inválido ou ausente. Recarregue a página e tente novamente.'
+                : ('Erro HTTP ' + response.status));
+        }
         if (data.success) {
             console.log('Ordem atualizada com sucesso');
         } else {
             console.error('Erro ao atualizar ordem:', data.error);
             alert('Erro ao salvar ordem: ' + (data.error || 'Erro desconhecido'));
-            // Recarrega para restaurar a ordem anterior
             carregarModulos();
         }
     })
     .catch(error => {
-        console.error('Erro de conexão ao salvar ordem:', error);
-        alert('Erro de conexão ao salvar ordem');
-        // Recarrega para restaurar a ordem anterior
+        console.error('Erro ao salvar ordem:', error);
+        alert(error.message || 'Erro de conexão ao salvar ordem');
         carregarModulos();
     });
 }
@@ -600,10 +639,18 @@ function removerModulo(moduloId) {
     
     fetch('<?= URL ?>/professor/jornadas/remover-modulo', {
         method: 'POST',
-        body: formData
+        headers: csrfHeaders(),
+        credentials: 'same-origin',
+        body: withCsrf(formData)
     })
-    .then(response => response.json())
-    .then(data => {
+    .then(async response => {
+        const raw = await response.text();
+        let data = {};
+        try { data = raw ? JSON.parse(raw) : {}; } catch (e) {
+            throw new Error(response.status === 403 || response.status === 419
+                ? 'Token CSRF inválido ou ausente. Recarregue a página e tente novamente.'
+                : ('Erro HTTP ' + response.status));
+        }
         if (data.success) {
             alert('Bloco removido com sucesso!');
             carregarModulos();
@@ -612,7 +659,7 @@ function removerModulo(moduloId) {
         }
     })
     .catch(error => {
-        alert('Erro de conexão');
+        alert(error.message || 'Erro de conexão');
         console.error(error);
     });
 }
