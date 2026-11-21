@@ -3,6 +3,7 @@
 namespace App\Modulos\Mural\Services;
 
 use App\Core\Database;
+use App\Core\TenantResolver;
 
 /**
  * Publica o recado do mural no sino e registra a confirmação de leitura.
@@ -11,9 +12,35 @@ class MuralRecadoService
 {
     private $db;
 
+    /** @var array<string, bool> */
+    private static array $colunaCache = [];
+
     public function __construct($db = null)
     {
         $this->db = $db ?: Database::getInstance();
+    }
+
+    private function colunaExiste(string $tabela, string $coluna): bool
+    {
+        $chave = TenantResolver::workerCacheKey() . ':' . $tabela . '.' . $coluna;
+        if (array_key_exists($chave, self::$colunaCache)) {
+            return self::$colunaCache[$chave];
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT 1 AS ok
+                 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = :tabela
+                   AND COLUMN_NAME = :coluna
+                 LIMIT 1',
+                ['tabela' => $tabela, 'coluna' => $coluna]
+            );
+            self::$colunaCache[$chave] = !empty($row);
+        } catch (\Throwable $e) {
+            self::$colunaCache[$chave] = false;
+        }
+        return self::$colunaCache[$chave];
     }
 
     public function publicarNoSino(int $recadoId): void
@@ -348,24 +375,12 @@ class MuralRecadoService
     public function listarParaAluno(int $alunoId, int $turmaId, array $filtros = [], bool $apenasNaoVistos = false): array
     {
         $turmaId = max(0, $turmaId);
-        $params = ['aluno_destino' => $alunoId];
+        $params = $this->paramsBaseVisibilidadeAluno($alunoId, $turmaId, $apenasNaoVistos);
+        $sqlWhere = $this->sqlBaseVisibilidadeAluno($turmaId, $apenasNaoVistos);
         $sql = "SELECT r.id, r.titulo, r.conteudo, r.data_publicacao, r.data_sai_mural, r.autor_tipo, r.autor_id,
                 CASE WHEN r.autor_tipo = 'professor' THEN (SELECT p.nome FROM professores p WHERE p.id = r.autor_id LIMIT 1) ELSE 'Admin' END as autor_nome
                 FROM mural_recados r
-                WHERE COALESCE(r.publico, 'alunos') = 'alunos'
-                AND (
-                    r.aluno_id = :aluno_destino
-                    OR (
-                        r.aluno_id IS NULL
-                        AND (r.enviar_para_todos = 1" . ($turmaId > 0 ? " OR EXISTS (
-                    SELECT 1 FROM mural_recados_turmas rt WHERE rt.mural_recado_id = r.id AND rt.turma_id = :aluno_turma_id
-                  )" : '') . ')
-                    )
-                )
-                AND (CURDATE() <= r.data_sai_mural)';
-        if ($turmaId > 0) {
-            $params['aluno_turma_id'] = $turmaId;
-        }
+                WHERE {$sqlWhere}";
         if (!empty($filtros['professor_id'])) {
             $sql .= " AND r.autor_tipo = 'professor' AND r.autor_id = :filtro_professor_id";
             $params['filtro_professor_id'] = (int) $filtros['professor_id'];
@@ -381,10 +396,6 @@ class MuralRecadoService
         if (!empty($filtros['data_ate'])) {
             $sql .= ' AND DATE(r.data_publicacao) <= :filtro_data_ate';
             $params['filtro_data_ate'] = $filtros['data_ate'];
-        }
-        if ($apenasNaoVistos) {
-            $sql .= ' AND NOT EXISTS (SELECT 1 FROM mural_recados_vistos v WHERE v.mural_recado_id = r.id AND v.aluno_id = :aluno_id)';
-            $params['aluno_id'] = $alunoId;
         }
         $sql .= ' ORDER BY r.data_publicacao DESC';
         return $this->db->fetchAll($sql, $params);
@@ -458,14 +469,21 @@ class MuralRecadoService
         $turmaFiltro = $turmaId > 0
             ? ' OR EXISTS (SELECT 1 FROM mural_recados_turmas rt WHERE rt.mural_recado_id = r.id AND rt.turma_id = :aluno_turma_id)'
             : '';
-        $sql = "COALESCE(r.publico, 'alunos') = 'alunos'
-                AND (
+        $filtroPublico = $this->colunaExiste('mural_recados', 'publico')
+            ? "COALESCE(r.publico, 'alunos') = 'alunos' AND "
+            : '';
+        if ($this->colunaExiste('mural_recados', 'aluno_id')) {
+            $destinoSql = "(
                     r.aluno_id = :aluno_destino
                     OR (
                         r.aluno_id IS NULL
                         AND (r.enviar_para_todos = 1{$turmaFiltro})
                     )
-                )
+                )";
+        } else {
+            $destinoSql = "(r.enviar_para_todos = 1{$turmaFiltro})";
+        }
+        $sql = "{$filtroPublico}{$destinoSql}
                 AND (CURDATE() <= r.data_sai_mural)";
         if ($apenasNaoVistos) {
             $sql .= ' AND NOT EXISTS (
@@ -481,7 +499,10 @@ class MuralRecadoService
      */
     private function paramsBaseVisibilidadeAluno(int $alunoId, int $turmaId, bool $apenasNaoVistos): array
     {
-        $params = ['aluno_destino' => $alunoId];
+        $params = [];
+        if ($this->colunaExiste('mural_recados', 'aluno_id')) {
+            $params['aluno_destino'] = $alunoId;
+        }
         if ($turmaId > 0) {
             $params['aluno_turma_id'] = $turmaId;
         }
@@ -524,6 +545,9 @@ class MuralRecadoService
                 WHERE rt.mural_recado_id = r.id AND rt.turma_id IN (' . implode(',', $marcas) . ')
             ))';
         }
+        if (!$this->colunaExiste('mural_recados', 'publico')) {
+            return [];
+        }
         return $this->db->fetchAll(
             "SELECT r.id, r.titulo, r.conteudo, r.data_publicacao, r.enviar_para_todos,
                     CASE WHEN v.id IS NULL THEN 0 ELSE 1 END AS ja_visto
@@ -545,14 +569,11 @@ class MuralRecadoService
 
     private function alunoPodeVer(int $recadoId, int $alunoId): bool
     {
-        $row = $this->db->fetch(
-            "SELECT r.id
-             FROM mural_recados r
-             INNER JOIN alunos a ON a.id = :aluno AND a.ativo = 1
-             WHERE r.id = :rid
-               AND COALESCE(r.publico, 'alunos') = 'alunos'
-               AND CURDATE() <= r.data_sai_mural
-               AND (
+        $filtroPublico = $this->colunaExiste('mural_recados', 'publico')
+            ? "AND COALESCE(r.publico, 'alunos') = 'alunos'"
+            : '';
+        if ($this->colunaExiste('mural_recados', 'aluno_id')) {
+            $destinoSql = "(
                     r.aluno_id = a.id
                     OR (
                         r.aluno_id IS NULL
@@ -564,7 +585,24 @@ class MuralRecadoService
                             )
                         )
                     )
-               )
+               )";
+        } else {
+            $destinoSql = "(
+                    r.enviar_para_todos = 1
+                    OR EXISTS (
+                        SELECT 1 FROM mural_recados_turmas rt
+                        WHERE rt.mural_recado_id = r.id AND rt.turma_id = a.turma_id
+                    )
+               )";
+        }
+        $row = $this->db->fetch(
+            "SELECT r.id
+             FROM mural_recados r
+             INNER JOIN alunos a ON a.id = :aluno AND a.ativo = 1
+             WHERE r.id = :rid
+               {$filtroPublico}
+               AND CURDATE() <= r.data_sai_mural
+               AND {$destinoSql}
              LIMIT 1",
             ['aluno' => $alunoId, 'rid' => $recadoId]
         );
@@ -573,6 +611,9 @@ class MuralRecadoService
 
     private function professorPodeVer(int $recadoId, int $professorId): bool
     {
+        if (!$this->colunaExiste('mural_recados', 'publico')) {
+            return false;
+        }
         $recado = $this->db->fetch(
             "SELECT id, professor_id, enviar_para_todos
              FROM mural_recados

@@ -38,6 +38,32 @@ class RedacaoAlunoLegadoService
     }
 
     /**
+     * Últimas redações do aluno para o card do dashboard.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listarRecentesParaDashboard(int $alunoId, int $limite = 5): array
+    {
+        if ($alunoId <= 0) {
+            return [];
+        }
+        $limite = max(1, min(20, $limite));
+        try {
+            return $this->db->fetchAll(
+                "SELECT r.*, t.titulo AS tema_titulo
+                 FROM redacoes r
+                 LEFT JOIN redacoes_temas t ON r.tema_id = t.id
+                 WHERE r.aluno_id = :aluno_id
+                 ORDER BY r.created_at DESC
+                 LIMIT {$limite}",
+                ['aluno_id' => $alunoId]
+            ) ?: [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public function buscarDoAluno(int $id, int $alunoId): ?array

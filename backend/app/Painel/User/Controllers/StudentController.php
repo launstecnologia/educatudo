@@ -17,6 +17,7 @@ use App\Models\Education\OnlineClass;
 use App\Modulos\GrupoSeb\Services\GrupoSebService;
 use App\Dominio\Pessoas\Services\AlunoLimiteDiarioService;
 use App\Modulos\Mural\Services\MuralRecadoService;
+use App\Modulos\Redacoes\Services\RedacaoAlunoLegadoService;
 use App\Services\StudentAgendaService;
 if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
     class StudentController extends BaseController
@@ -719,7 +720,7 @@ if (!class_exists(__NAMESPACE__ . '\\StudentController', false)) {
         });
 
         $redacoes_recentes = $this->medirDashboard('redacoes_recentes', function () use ($alunoId) {
-            return $this->getRecentEssays($alunoId);
+            return (new RedacaoAlunoLegadoService($this->db))->listarRecentesParaDashboard($alunoId);
         });
 
         $limites_diarios = $this->medirDashboard('limites_diarios', function () use ($alunoId) {
