@@ -58,11 +58,15 @@ final class Sec10F01F05Test extends TestCase
         $this->assertStringContainsString("/chat-professor/marcar-lidas", $student);
     }
 
-    public function testF03CsrfExcecoesVaziasPorPadrao(): void
+    public function testF03CsrfExcecoesSomenteSendBeaconJustificados(): void
     {
         $lista = require $this->path('config/csrf_excecoes.php');
         $this->assertIsArray($lista);
-        $this->assertSame([], $lista);
+        // sendBeacon/beforeunload não enviam X-CSRF-TOKEN — lista curta e justificada
+        $this->assertContains('/aluno/provas/bloco/', $lista);
+        $this->assertContains('/aluno/provas/log-evento', $lista);
+        $this->assertContains('/jogo-milhao/abandonar', $lista);
+        $this->assertLessThanOrEqual(5, count($lista));
     }
 
     public function testF01HostMasterNuncaResolveComoEscola(): void

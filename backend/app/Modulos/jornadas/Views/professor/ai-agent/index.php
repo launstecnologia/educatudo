@@ -141,7 +141,9 @@ function excluirAgente(agenteId, nomeAgente) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRF-Token': <?= json_encode($_SESSION['csrf_token'] ?? '') ?>
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': <?= json_encode($_SESSION['csrf_token'] ?? '') ?>
         },
         body: JSON.stringify({
             _token: <?= json_encode($_SESSION['csrf_token'] ?? '') ?>

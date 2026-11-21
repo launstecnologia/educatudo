@@ -633,7 +633,12 @@ function salvarPlano(statusPlano) {
 
     fetch('<?= URL ?>/professor/planos-aula/salvar', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': (data && data._token) || (typeof getCsrfToken === 'function' ? getCsrfToken() : '')
+        },
         body: JSON.stringify(data)
     })
     .then(response => response.json())

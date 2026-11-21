@@ -268,6 +268,9 @@ async function enviarMensagem() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken || (typeof getCsrfToken === 'function' ? getCsrfToken() : '')
             },
             body: JSON.stringify({
                 mensagem: mensagem,
@@ -397,6 +400,9 @@ async function excluirDocumento(documentoId) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken || (typeof getCsrfToken === 'function' ? getCsrfToken() : '')
             },
             body: JSON.stringify({
                 _token: csrfToken

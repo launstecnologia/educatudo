@@ -6,8 +6,17 @@
  * Liste aqui apenas POSTs autenticados com proteção alternativa ou legado em migração.
  *
  * Comparação: str_starts_with no path normalizado (sem query string).
+ *
+ * Isenções abaixo: sendBeacon/beforeunload não permitem header X-CSRF-TOKEN.
+ * Proteção alternativa = sessão Auth + ownership no controller.
  */
 return [
-    // Exemplos / legado — ampliar só com justificativa e ticket.
-    // '/professor/api/', // se algum endpoint de monitoramento não enviar _token
+    // Único POST sob este prefixo: cancelar-seguro (sendBeacon ao fechar aba)
+    '/aluno/provas/bloco/',
+
+    // Telemetria de prova via sendBeacon (JSON sem headers custom)
+    '/aluno/provas/log-evento',
+
+    // Abandono de jogo ao fechar aba (sendBeacon)
+    '/jogo-milhao/abandonar',
 ];

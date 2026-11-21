@@ -513,7 +513,8 @@ function solicitarCorrecaoIA() {
         headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': tokenInput.value || (typeof getCsrfToken === 'function' ? getCsrfToken() : '')
         },
         credentials: 'same-origin',
         body: JSON.stringify({

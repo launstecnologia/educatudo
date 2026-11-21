@@ -436,6 +436,9 @@ document.getElementById('planoForm').addEventListener('submit', function(e) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': (data && data._token) || (typeof getCsrfToken === 'function' ? getCsrfToken() : '')
         },
         body: JSON.stringify(data)
     })

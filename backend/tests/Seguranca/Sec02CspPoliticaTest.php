@@ -189,6 +189,15 @@ final class Sec02CspPoliticaTest extends TestCase
         $this->assertStringNotContainsString('/public/static/', $tag);
     }
 
+    public function testCsrfFetchJsCobreFetchEXHR(): void
+    {
+        $js = (string) file_get_contents(dirname(__DIR__, 2) . '/public/static/js/csrf-fetch.js');
+        $this->assertStringContainsString('X-CSRF-TOKEN', $js);
+        $this->assertStringContainsString('window.fetch', $js);
+        $this->assertStringContainsString('XMLHttpRequest', $js);
+        $this->assertStringContainsString('FormData', $js);
+    }
+
     public function testStrictNoHeaderExigeDoisFlags(): void
     {
         putenv('CSP_STRICT_ENFORCEMENT=true');

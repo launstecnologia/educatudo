@@ -207,14 +207,20 @@ include \App\Core\ViewPaths::component('apostila_ia_chat_script.php');
 
                 return fetch(gerarSlidesApiUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': csrfToken || (typeof getCsrfToken === 'function' ? getCsrfToken() : '')
+                    },
                     body: JSON.stringify({
                         conteudo: preparado.conteudo,
                         slides: 8,
                         tema: preparado.tema || capituloOuTema,
                         nivelDetalhamento: 'medium',
                         estiloImagem: '',
-                        salvarSlide: true
+                        salvarSlide: true,
+                        _token: csrfToken || ''
                     })
                 });
             })
