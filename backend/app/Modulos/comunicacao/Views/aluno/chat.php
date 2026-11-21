@@ -176,6 +176,23 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    function csrfTokenAluno() {
+        const form = document.getElementById('formMensagem');
+        const input = form ? form.querySelector('input[name="_token"]') : null;
+        return input ? input.value : '';
+    }
+
+    function marcarLidasAluno() {
+        const body = new FormData();
+        body.append('_token', csrfTokenAluno());
+        body.append('professor_id', '<?= (int) $professor['id'] ?>');
+        return fetch('<?= URL ?>/chat-professor/marcar-lidas', { method: 'POST', body }).catch(() => null);
+    }
+
+    <?php if (!empty($chat) && !empty($mensagens)): ?>
+    marcarLidasAluno();
+    <?php endif; ?>
+
     // Atualizar mensagens a cada 5 segundos
     setInterval(() => {
         buscarNovasMensagens();
@@ -203,6 +220,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     });
                     chatMessages.scrollTop = chatMessages.scrollHeight;
+                    marcarLidasAluno();
                 }
             })
             .catch(error => console.error('Erro ao buscar mensagens:', error));

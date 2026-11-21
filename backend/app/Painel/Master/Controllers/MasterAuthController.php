@@ -20,8 +20,8 @@ class MasterAuthController extends BaseController
     private const SESSION_MASTER_USER_EMAIL = 'master_user_email';
     private const SESSION_MASTER_USER_NOME = 'master_user_nome';
     private const SESSION_MASTER_USER_AVATAR = 'master_user_avatar';
+    /** Cookie legado de “lembrar login” — só limpo no logout; não restaura sessão. */
     private const COOKIE_MASTER_AUTH = 'master_auth';
-    private const COOKIE_MASTER_LIFETIME = 86400 * 7; // 7 dias
     private const SESSION_2FA_USUARIO_ID = 'master_2fa_usuario_id';
     private const SESSION_2FA_CODIGO_ID = 'master_2fa_codigo_id';
     private const SESSION_2FA_EMAIL = 'master_2fa_email';
@@ -47,95 +47,26 @@ class MasterAuthController extends BaseController
         }
     }
 
-    private function getMasterAuthSecret(): string
+    /**
+     * Expira o cookie legado master_auth (não há mais restauração automática).
+     */
+    private function clearMasterAuthCookie(): void
     {
-        $envPath = defined('ENV_FILE_PATH') ? ENV_FILE_PATH : (__DIR__ . '/../../../.env');
-        $paths = [$envPath, __DIR__ . '/../../../.env'];
-        foreach ($paths as $p) {
-            if (!is_file($p)) {
-                continue;
-            }
-            $lines = @file($p, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
-            foreach ($lines as $line) {
-                $line = trim($line);
-                if ($line === '' || $line[0] === '#') {
-                    continue;
-                }
-                if (stripos($line, 'SCHOOL_SECRET_KEY=') === 0 && preg_match('/SCHOOL_SECRET_KEY\s*=\s*(.+)$/i', $line, $m)) {
-                    $v = trim($m[1]);
-                    if (strlen($v) >= 2 && (($v[0] === '"' && substr($v, -1) === '"') || ($v[0] === "'" && substr($v, -1) === "'"))) {
-                        $v = substr($v, 1, -1);
-                    }
-                    return trim($v) ?: 'master-default-secret-change-me';
-                }
-            }
-            break;
+        if (php_sapi_name() === 'cli') {
+            return;
         }
-        return 'master-default-secret-change-me';
-    }
-
-    private function setMasterAuthCookie(int $userId): void
-    {
-        $secret = $this->getMasterAuthSecret();
-        $payload = $userId . '.' . hash_hmac('sha256', (string) $userId, $secret);
-        $value = base64_encode($payload);
-        $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
-        setcookie(self::COOKIE_MASTER_AUTH, $value, [
-            'expires' => time() + self::COOKIE_MASTER_LIFETIME,
+        $secure = function_exists('educatudoDetectHttps')
+            ? educatudoDetectHttps()
+            : (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+        setcookie(self::COOKIE_MASTER_AUTH, '', [
+            'expires' => time() - 3600,
             'path' => defined('FOLDER') && FOLDER !== '' ? FOLDER : '/',
             'domain' => '',
             'secure' => $secure,
             'httponly' => true,
             'samesite' => 'Lax',
         ]);
-    }
-
-    private function clearMasterAuthCookie(): void
-    {
-        setcookie(self::COOKIE_MASTER_AUTH, '', [
-            'expires' => time() - 3600,
-            'path' => defined('FOLDER') && FOLDER !== '' ? FOLDER : '/',
-            'domain' => '',
-            'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
-            'httponly' => true,
-            'samesite' => 'Lax',
-        ]);
-    }
-
-    /** Restaura sessão master a partir do cookie (quando sessão PHP não persiste). */
-    private function restoreMasterSessionFromCookie(): bool
-    {
-        $raw = $_COOKIE[self::COOKIE_MASTER_AUTH] ?? '';
-        if ($raw === '') {
-            return false;
-        }
-        $payload = base64_decode($raw, true);
-        if ($payload === false) {
-            $this->logMaster('restoreMasterSessionFromCookie: base64_decode falhou', [], true);
-            return false;
-        }
-        $parts = explode('.', $payload);
-        if (count($parts) !== 2 || !ctype_digit($parts[0])) {
-            $this->logMaster('restoreMasterSessionFromCookie: payload inválido', ['parts_count' => count($parts)], true);
-            return false;
-        }
-        $userId = (int) $parts[0];
-        $secret = $this->getMasterAuthSecret();
-        $expected = hash_hmac('sha256', (string) $userId, $secret);
-        if (!hash_equals($expected, $parts[1])) {
-            $this->logMaster('restoreMasterSessionFromCookie: assinatura inválida (cookie de outro ambiente?)', [], true);
-            return false;
-        }
-        $db = Database::getInstance();
-        $stmt = $db->query("SELECT id, email, nome, avatar_url FROM usuarios_master WHERE id = ? AND ativo = 1", [$userId]);
-        $user = $stmt->fetch(\PDO::FETCH_ASSOC);
-        if (!$user) {
-            $this->logMaster('restoreMasterSessionFromCookie: usuário não encontrado no banco', ['user_id' => $userId], true);
-            return false;
-        }
-        $this->setMasterSession((int) $user['id'], $user['email'], $user['nome'], $user['avatar_url'] ?? null);
-        $this->logMaster('restoreMasterSessionFromCookie: ok', ['user_id' => $userId]);
-        return true;
+        unset($_COOKIE[self::COOKIE_MASTER_AUTH]);
     }
 
     /**
@@ -409,7 +340,7 @@ class MasterAuthController extends BaseController
             session_regenerate_id(true);
         }
         $this->setMasterSession((int) $user['id'], $user['email'], $user['nome'], $user['avatar_url'] ?? null);
-        $this->setMasterAuthCookie((int) $user['id']);
+        $this->clearMasterAuthCookie();
         $this->refreshCsrfToken();
         $this->logMaster('confirmarCodigo() login ok', ['user_id' => (int) $user['id']]);
         $this->setFlashMessage('Login realizado.', 'success');
@@ -641,10 +572,6 @@ class MasterAuthController extends BaseController
         if ($this->desafioSegundoFator() !== null) {
             return;
         }
-        if ($this->restoreMasterSessionFromCookie()) {
-            header('Location: ' . URL . '/master/dashboard');
-            exit;
-        }
     }
 
     private function requireMasterAuth(): void
@@ -655,9 +582,6 @@ class MasterAuthController extends BaseController
         if ($this->desafioSegundoFator() !== null) {
             header('Location: ' . URL . '/master/verificar');
             exit;
-        }
-        if ($this->restoreMasterSessionFromCookie()) {
-            return;
         }
         $this->setFlashMessage('Faça login para acessar o painel master.', 'error');
         header('Location: ' . URL . '/master');

@@ -13,11 +13,24 @@ final class MasterAcessoCodigoTest extends TestCase
     {
         $bootstrap = file_get_contents(dirname(__DIR__, 2) . '/app/Core/bootstrap_multi_tenant.php');
         $this->assertNotFalse($bootstrap);
-        $this->assertStringContainsString("\$appEnv === 'production'", $bootstrap);
+        $this->assertStringContainsString('$isProducaoBootstrap', $bootstrap);
         $this->assertStringContainsString('MASTER_DOMAIN', $bootstrap);
         $this->assertStringContainsString('educatudo_responder_host_desconhecido', $bootstrap);
         $this->assertStringContainsString('$isMasterPath', $bootstrap);
         $this->assertStringContainsString('$isMasterDomain', $bootstrap);
+        $this->assertStringContainsString('$masterDomainConfigurado', $bootstrap);
+        // Fail-closed: produção sem domínio master não libera /master em host escolar.
+        $this->assertStringContainsString('$isProducaoBootstrap || $masterDomainConfigurado', $bootstrap);
+    }
+
+    public function testMasterAuthNaoRestauraCookiePersistente(): void
+    {
+        $auth = file_get_contents(dirname(__DIR__, 2) . '/app/Painel/Master/Controllers/MasterAuthController.php');
+        $this->assertNotFalse($auth);
+        $this->assertStringNotContainsString('restoreMasterSessionFromCookie', $auth);
+        $this->assertStringNotContainsString('setMasterAuthCookie', $auth);
+        $this->assertStringNotContainsString('master-default-secret-change-me', $auth);
+        $this->assertStringContainsString('clearMasterAuthCookie', $auth);
     }
 
     public function testControllersMasterExigemSessaoMaster(): void

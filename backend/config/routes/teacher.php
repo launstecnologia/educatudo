@@ -69,6 +69,7 @@ $router->get('/teacher/jornadas', function() {
 $router->get('/professor/chat', 'Integrations/ChatController@indexProfessor');
 $router->get('/professor/chat/{aluno_id}', 'Integrations/ChatController@chatProfessor');
 $router->post('/professor/chat/enviar-mensagem', 'Integrations/ChatController@enviarMensagemProfessor');
+$router->post('/professor/chat/marcar-lidas', 'Integrations/ChatController@marcarMensagensLidasProfessor');
 $router->get('/professor/chat/buscar-mensagens', 'Integrations/ChatController@buscarMensagensProfessor');
 // Drive: rotas em app/Modulos/drive/routes.php
 // Rotas antigas mantidas para compatibilidade

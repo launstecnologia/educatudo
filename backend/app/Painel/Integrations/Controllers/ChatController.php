@@ -201,57 +201,36 @@ class ChatController extends BaseController
                 return;
             }
             
-            // Busca ou cria conversa (só após vínculo autorizado)
+            // GET só lê: conversa inexistente = tela vazia (criação no POST de envio).
             $chat = $this->db->fetch(
                 "SELECT * FROM chat_professores_alunos 
                  WHERE aluno_id = :aluno_id AND professor_id = :prof_id",
                 ['aluno_id' => $alunoId, 'prof_id' => $professor['id']]
             );
-            
-            if (!$chat) {
-                $chat_id = $this->db->insert(
-                    "INSERT INTO chat_professores_alunos (aluno_id, professor_id) 
-                     VALUES (:aluno_id, :prof_id)",
-                    ['aluno_id' => $alunoId, 'prof_id' => $professor['id']]
+
+            $mensagens = [];
+            if ($chat) {
+                $mensagens = $this->db->fetchAll(
+                    "SELECT cpm.*, 
+                            a.nome as aluno_nome,
+                            p.nome as professor_nome
+                     FROM chat_professores_alunos_mensagens cpm
+                     LEFT JOIN alunos a ON cpm.remetente_tipo = 'aluno' AND cpm.remetente_id = a.id
+                     LEFT JOIN professores p ON cpm.remetente_tipo = 'professor' AND cpm.remetente_id = p.id
+                     WHERE cpm.chat_id = :chat_id
+                     ORDER BY cpm.created_at ASC",
+                    ['chat_id' => $chat['id']]
                 );
-                $chat = $this->db->fetch(
-                    "SELECT * FROM chat_professores_alunos WHERE id = :chat_id",
-                    ['chat_id' => $chat_id]
-                );
+                foreach ($mensagens as &$mensagem) {
+                    $mensagem['anexos'] = $this->db->fetchAll(
+                        "SELECT * FROM chat_professores_alunos_anexos 
+                         WHERE mensagem_id = :mensagem_id
+                         ORDER BY created_at ASC",
+                        ['mensagem_id' => $mensagem['id']]
+                    );
+                }
+                unset($mensagem);
             }
-            
-            // Busca mensagens
-            $mensagens = $this->db->fetchAll(
-                "SELECT cpm.*, 
-                        a.nome as aluno_nome,
-                        p.nome as professor_nome
-                 FROM chat_professores_alunos_mensagens cpm
-                 LEFT JOIN alunos a ON cpm.remetente_tipo = 'aluno' AND cpm.remetente_id = a.id
-                 LEFT JOIN professores p ON cpm.remetente_tipo = 'professor' AND cpm.remetente_id = p.id
-                 WHERE cpm.chat_id = :chat_id
-                 ORDER BY cpm.created_at ASC",
-                ['chat_id' => $chat['id']]
-            );
-            
-            // Busca anexos das mensagens
-            foreach ($mensagens as &$mensagem) {
-                $mensagem['anexos'] = $this->db->fetchAll(
-                    "SELECT * FROM chat_professores_alunos_anexos 
-                     WHERE mensagem_id = :mensagem_id
-                     ORDER BY created_at ASC",
-                    ['mensagem_id' => $mensagem['id']]
-                );
-            }
-            
-            // Marca mensagens como lidas
-            $this->db->update(
-                "UPDATE chat_professores_alunos_mensagens 
-                 SET lida = 1, lida_em = NOW() 
-                 WHERE chat_id = :chat_id 
-                 AND remetente_tipo = 'aluno' 
-                 AND lida = 0",
-                ['chat_id' => $chat['id']]
-            );
             
             $data = [
                 'title' => 'Chat com ' . $aluno['nome'] . ' - EducaTudo',
@@ -449,7 +428,7 @@ class ChatController extends BaseController
                 ]
             );
             
-            // Busca anexos das mensagens
+            // Busca anexos das mensagens (GET de polling não grava estado)
             foreach ($mensagens as &$mensagem) {
                 $mensagem['anexos'] = $this->db->fetchAll(
                     "SELECT * FROM chat_professores_alunos_anexos 
@@ -458,23 +437,56 @@ class ChatController extends BaseController
                     ['mensagem_id' => $mensagem['id']]
                 );
             }
-            
-            // Marca mensagens como lidas
-            if (!empty($mensagens)) {
-                $this->db->update(
-                    "UPDATE chat_professores_alunos_mensagens 
-                     SET lida = 1, lida_em = NOW() 
-                     WHERE chat_id = :chat_id 
-                     AND remetente_tipo = 'aluno' 
-                     AND lida = 0",
-                    ['chat_id' => $chat['id']]
-                );
-            }
+            unset($mensagem);
             
             $this->json(['success' => true, 'mensagens' => $mensagens]);
             
         } catch (\Exception $e) {
             $this->json(['error' => 'Não foi possível buscar as mensagens.'], 400);
+        }
+    }
+
+    /**
+     * POST: professor confirma leitura das mensagens do aluno (CSRF + vínculo).
+     */
+    public function marcarMensagensLidasProfessor()
+    {
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->json(['error' => 'Token inválido'], 400);
+            return;
+        }
+        try {
+            $user = $this->authManager->getUser();
+            if (($user['tipo'] ?? '') !== 'professor') {
+                $this->json(['error' => 'Acesso negado'], 403);
+                return;
+            }
+            $alunoId = (int) ($_POST['aluno_id'] ?? 0);
+            $professor = $this->professorDaSessao();
+            if (!$professor || $alunoId <= 0 || !$this->professorPodeAluno((int) $professor['id'], $alunoId)) {
+                $this->negarAcessoChat('/professor/chat', true);
+                return;
+            }
+            $chat = $this->db->fetch(
+                "SELECT id FROM chat_professores_alunos
+                 WHERE aluno_id = :aluno_id AND professor_id = :prof_id",
+                ['aluno_id' => $alunoId, 'prof_id' => $professor['id']]
+            );
+            if (!$chat) {
+                $this->json(['success' => true, 'atualizadas' => 0]);
+                return;
+            }
+            $this->db->update(
+                "UPDATE chat_professores_alunos_mensagens
+                 SET lida = 1, lida_em = NOW()
+                 WHERE chat_id = :chat_id
+                   AND remetente_tipo = 'aluno'
+                   AND lida = 0",
+                ['chat_id' => (int) $chat['id']]
+            );
+            $this->json(['success' => true]);
+        } catch (\Exception $e) {
+            $this->json(['error' => 'Não foi possível confirmar a leitura.'], 400);
         }
     }
     
@@ -590,57 +602,36 @@ class ChatController extends BaseController
             return;
         }
         
-        // Busca ou cria conversa (após vínculo)
+        // GET só lê: conversa inexistente = tela vazia (criação no POST de envio).
         $chat = $this->db->fetch(
             "SELECT * FROM chat_professores_alunos 
              WHERE aluno_id = :aluno_id AND professor_id = :prof_id",
             ['aluno_id' => $aluno['id'], 'prof_id' => $professorId]
         );
-        
-        if (!$chat) {
-            $chat_id = $this->db->insert(
-                "INSERT INTO chat_professores_alunos (aluno_id, professor_id) 
-                 VALUES (:aluno_id, :prof_id)",
-                ['aluno_id' => $aluno['id'], 'prof_id' => $professorId]
+
+        $mensagens = [];
+        if ($chat) {
+            $mensagens = $this->db->fetchAll(
+                "SELECT cpm.*, 
+                        a.nome as aluno_nome,
+                        p.nome as professor_nome
+                 FROM chat_professores_alunos_mensagens cpm
+                 LEFT JOIN alunos a ON cpm.remetente_tipo = 'aluno' AND cpm.remetente_id = a.id
+                 LEFT JOIN professores p ON cpm.remetente_tipo = 'professor' AND cpm.remetente_id = p.id
+                 WHERE cpm.chat_id = :chat_id
+                 ORDER BY cpm.created_at ASC",
+                ['chat_id' => $chat['id']]
             );
-            $chat = $this->db->fetch(
-                "SELECT * FROM chat_professores_alunos WHERE id = :chat_id",
-                ['chat_id' => $chat_id]
-            );
+            foreach ($mensagens as &$mensagem) {
+                $mensagem['anexos'] = $this->db->fetchAll(
+                    "SELECT * FROM chat_professores_alunos_anexos 
+                     WHERE mensagem_id = :mensagem_id
+                     ORDER BY created_at ASC",
+                    ['mensagem_id' => $mensagem['id']]
+                );
+            }
+            unset($mensagem);
         }
-        
-        // Busca mensagens
-        $mensagens = $this->db->fetchAll(
-            "SELECT cpm.*, 
-                    a.nome as aluno_nome,
-                    p.nome as professor_nome
-             FROM chat_professores_alunos_mensagens cpm
-             LEFT JOIN alunos a ON cpm.remetente_tipo = 'aluno' AND cpm.remetente_id = a.id
-             LEFT JOIN professores p ON cpm.remetente_tipo = 'professor' AND cpm.remetente_id = p.id
-             WHERE cpm.chat_id = :chat_id
-             ORDER BY cpm.created_at ASC",
-            ['chat_id' => $chat['id']]
-        );
-        
-        // Busca anexos das mensagens
-        foreach ($mensagens as &$mensagem) {
-            $mensagem['anexos'] = $this->db->fetchAll(
-                "SELECT * FROM chat_professores_alunos_anexos 
-                 WHERE mensagem_id = :mensagem_id
-                 ORDER BY created_at ASC",
-                ['mensagem_id' => $mensagem['id']]
-            );
-        }
-        
-        // Marca mensagens como lidas
-        $this->db->update(
-            "UPDATE chat_professores_alunos_mensagens 
-             SET lida = 1, lida_em = NOW() 
-             WHERE chat_id = :chat_id 
-             AND remetente_tipo = 'professor' 
-             AND lida = 0",
-            ['chat_id' => $chat['id']]
-        );
         
         $data = [
             'title' => 'Chat com ' . $professor['nome'] . ' - EducaTudo',
@@ -811,7 +802,7 @@ class ChatController extends BaseController
                 ]
             );
             
-            // Busca anexos das mensagens
+            // Busca anexos das mensagens (GET de polling não grava estado)
             foreach ($mensagens as &$mensagem) {
                 $mensagem['anexos'] = $this->db->fetchAll(
                     "SELECT * FROM chat_professores_alunos_anexos 
@@ -820,23 +811,56 @@ class ChatController extends BaseController
                     ['mensagem_id' => $mensagem['id']]
                 );
             }
-            
-            // Marca mensagens como lidas
-            if (!empty($mensagens)) {
-                $this->db->update(
-                    "UPDATE chat_professores_alunos_mensagens 
-                     SET lida = 1, lida_em = NOW() 
-                     WHERE chat_id = :chat_id 
-                     AND remetente_tipo = 'professor' 
-                     AND lida = 0",
-                    ['chat_id' => $chat['id']]
-                );
-            }
+            unset($mensagem);
             
             $this->json(['success' => true, 'mensagens' => $mensagens]);
             
         } catch (\Exception $e) {
             $this->json(['error' => 'Não foi possível buscar as mensagens.'], 400);
+        }
+    }
+
+    /**
+     * POST: aluno confirma leitura das mensagens do professor (CSRF + vínculo).
+     */
+    public function marcarMensagensLidasAluno()
+    {
+        if (!$this->verifyCsrfToken($_POST['_token'] ?? '')) {
+            $this->json(['error' => 'Token inválido'], 400);
+            return;
+        }
+        try {
+            $user = $this->authManager->getUser();
+            if (($user['tipo'] ?? '') !== 'aluno') {
+                $this->json(['error' => 'Acesso negado'], 403);
+                return;
+            }
+            $professorId = (int) ($_POST['professor_id'] ?? 0);
+            $aluno = $this->alunoDaSessao();
+            if (!$aluno || $professorId <= 0 || !$this->professorPodeAluno($professorId, (int) $aluno['id'])) {
+                $this->negarAcessoChat('/chat-professor', true);
+                return;
+            }
+            $chat = $this->db->fetch(
+                "SELECT id FROM chat_professores_alunos
+                 WHERE aluno_id = :aluno_id AND professor_id = :prof_id",
+                ['aluno_id' => $aluno['id'], 'prof_id' => $professorId]
+            );
+            if (!$chat) {
+                $this->json(['success' => true, 'atualizadas' => 0]);
+                return;
+            }
+            $this->db->update(
+                "UPDATE chat_professores_alunos_mensagens
+                 SET lida = 1, lida_em = NOW()
+                 WHERE chat_id = :chat_id
+                   AND remetente_tipo = 'professor'
+                   AND lida = 0",
+                ['chat_id' => (int) $chat['id']]
+            );
+            $this->json(['success' => true]);
+        } catch (\Exception $e) {
+            $this->json(['error' => 'Não foi possível confirmar a leitura.'], 400);
         }
     }
     

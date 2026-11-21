@@ -58,10 +58,38 @@ class CsrfMiddleware
         $this->registrar($path, $method, $motivo);
 
         if ($this->modo !== 'enforce') {
+            $this->avisarAuditEmProducao();
             return;
         }
 
         $this->bloquear();
+    }
+
+    /**
+     * Em produção, audit não bloqueia — registra alerta único por worker para lembrar do CSRF_MODE=enforce.
+     */
+    private function avisarAuditEmProducao(): void
+    {
+        static $avisou = false;
+        if ($avisou) {
+            return;
+        }
+        $env = defined('ENVIRONMENT') ? (string) ENVIRONMENT : 'production';
+        if ($env !== 'production') {
+            return;
+        }
+        $avisou = true;
+        try {
+            if (class_exists(\App\Core\Logger::class, false) || class_exists('Logger')) {
+                \App\Core\Logger::warning(
+                    '[CSRF] modo audit em produção — defina CSRF_MODE=enforce após homologar formulários',
+                    ['modo' => $this->modo],
+                    'security'
+                );
+            }
+        } catch (\Throwable $e) {
+            // não interromper
+        }
     }
 
     /** @return list<string> */

@@ -69,10 +69,15 @@ $host = strtolower(trim((string) ($_SERVER['HTTP_HOST'] ?? '')));
 if ($host !== '' && strpos($host, ':') !== false) {
     $host = explode(':', $host, 2)[0];
 }
+// Host canônico: só HTTP_HOST (já sem porta). Não usar X-Forwarded-Host.
+$appEnvBootstrap = defined('ENVIRONMENT') ? (string) ENVIRONMENT : 'production';
+$isProducaoBootstrap = ($appEnvBootstrap === 'production');
+$masterDomainConfigurado = defined('MASTER_DOMAIN') && MASTER_DOMAIN !== '';
 $isMasterDomain = false;
-if (defined('MASTER_DOMAIN') && MASTER_DOMAIN !== '') {
-    $isMasterDomain = (strtolower(trim(MASTER_DOMAIN)) === $host);
-} else {
+if ($masterDomainConfigurado) {
+    $isMasterDomain = (strtolower(trim((string) MASTER_DOMAIN)) === $host);
+} elseif (!$isProducaoBootstrap) {
+    // Dev/local sem MASTER_DOMAIN: convenção master.*
     $isMasterDomain = (strpos($host, 'master.') === 0);
 }
 
@@ -170,21 +175,18 @@ if (!function_exists('educatudo_responder_host_desconhecido')) {
     }
 }
 
-// Produção: /master só no domínio administrativo (MASTER_DOMAIN). Selecionar a
-// conexão master não concede privilégios — auth continua em master_user_id —
-// mas evita abrir o banco master a partir do host de uma escola.
-$appEnv = defined('ENVIRONMENT') ? (string) ENVIRONMENT : 'production';
-if (
-    $isMasterPath
-    && !$isMasterDomain
-    && $appEnv === 'production'
-    && defined('MASTER_DOMAIN')
-    && MASTER_DOMAIN !== ''
-) {
-    educatudo_responder_host_desconhecido($host !== '' ? $host : 'desconhecido');
+// Isolamento do painel Master por domínio.
+// Produção: fail-closed — sem MASTER_DOMAIN ou host ≠ MASTER_DOMAIN → /master negado.
+// Dev/local: se MASTER_DOMAIN estiver definido, também exige o host; senão permite /master
+// em qualquer host (fluxo local legado).
+if ($isMasterPath && !$isMasterDomain) {
+    if ($isProducaoBootstrap || $masterDomainConfigurado) {
+        educatudo_responder_host_desconhecido($host !== '' ? $host : 'desconhecido');
+    }
 }
 
-// Rotas /master (dev/local) e domínio MASTER abrem o banco MASTER.
+// Rotas /master autorizadas e domínio MASTER abrem o banco MASTER.
+// Selecionar a conexão master não concede privilégios — auth continua em master_user_id.
 if ($isMasterPath || $isMasterDomain) {
     $masterPdo = Database::createMasterPdo();
     $GLOBALS['_educatudo_master_pdo'] = $masterPdo;

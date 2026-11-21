@@ -126,6 +126,7 @@ $router->post('/aluno/provas/voz-para-texto', 'User/StudentController@vozParaTex
 $router->get('/chat-professor', 'Integrations/ChatController@indexAluno');
 $router->get('/chat-professor/{professor_id}', 'Integrations/ChatController@chatAluno');
 $router->post('/chat-professor/enviar-mensagem', 'Integrations/ChatController@enviarMensagemAluno');
+$router->post('/chat-professor/marcar-lidas', 'Integrations/ChatController@marcarMensagensLidasAluno');
 $router->get('/chat-professor/buscar-mensagens', 'Integrations/ChatController@buscarMensagensAluno');
 
 // Jornadas → Modulos/jornadas/routes.php

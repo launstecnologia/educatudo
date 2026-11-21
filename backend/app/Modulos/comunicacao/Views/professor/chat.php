@@ -123,6 +123,26 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     scrollToBottom();
+
+    function csrfToken() {
+        const input = formMensagem.querySelector('input[name="_token"]');
+        return input ? input.value : '';
+    }
+
+    async function marcarLidas() {
+        try {
+            const body = new FormData();
+            body.append('_token', csrfToken());
+            body.append('aluno_id', '<?= (int) $aluno['id'] ?>');
+            await fetch('<?= URL ?>/professor/chat/marcar-lidas', { method: 'POST', body });
+        } catch (e) {
+            // leitura é best-effort
+        }
+    }
+
+    <?php if (!empty($chat) && !empty($mensagens)): ?>
+    marcarLidas();
+    <?php endif; ?>
     
     // Enviar mensagem
     formMensagem.addEventListener('submit', async function(e) {
@@ -225,6 +245,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 
                 scrollToBottom();
+                marcarLidas();
             }
         } catch (error) {
             console.error('Erro ao buscar mensagens:', error);

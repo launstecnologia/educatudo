@@ -30,6 +30,8 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
     
     /** Nome do cookie CSRF de login (double-submit: enviado no POST mesmo se sessão mudar) */
     const LOGIN_CSRF_COOKIE = 'login_csrf';
+    /** TTL do token de login (cookie + validação no servidor), em segundos. */
+    private const LOGIN_CSRF_TTL = 600;
 
     /**
      * Exibe a tela de login (fluxo GET exclusivo).
@@ -88,21 +90,30 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
 
     private function setLoginCsrfCookie($token)
     {
+        $expiraEm = time() + self::LOGIN_CSRF_TTL;
+        $_SESSION['login_csrf_token'] = (string) $token;
+        $_SESSION['login_csrf_expires_at'] = $expiraEm;
+
         if (php_sapi_name() === 'cli') {
             return;
         }
+        $payload = $this->empacotarLoginCsrfCookie((string) $token, $expiraEm);
+        if ($payload === '') {
+            return;
+        }
         $opts = [
-            'expires' => time() + 600,
+            'expires' => $expiraEm,
             'path' => '/',
             'secure' => $this->isSecureCookieRequest(),
             'httponly' => true,
             'samesite' => 'Lax',
         ];
-        setcookie(self::LOGIN_CSRF_COOKIE, $token, $opts);
+        setcookie(self::LOGIN_CSRF_COOKIE, $payload, $opts);
     }
 
     private function clearLoginCsrfCookie()
     {
+        unset($_SESSION['login_csrf_token'], $_SESSION['login_csrf_expires_at']);
         if (php_sapi_name() === 'cli') {
             return;
         }
@@ -114,25 +125,132 @@ if (!class_exists(__NAMESPACE__ . '\\AuthController', false)) {
             'samesite' => 'Lax',
         ];
         setcookie(self::LOGIN_CSRF_COOKIE, '', $opts);
+        unset($_COOKIE[self::LOGIN_CSRF_COOKIE]);
     }
 
     /**
-     * Valida CSRF do login: sessão OU cookie (double-submit). Cookie é aceito quando a sessão
-     * mudou entre GET e POST (outra aba, load balancer). Cookie é de uso único (limpo após validar).
+     * Segredo para assinar o cookie de login CSRF. Sem segredo configurado,
+     * a validação fica só na sessão (com deadline).
+     */
+    private function loginCsrfSecret(): string
+    {
+        $env = getenv('SCHOOL_SECRET_KEY');
+        if (is_string($env) && trim($env) !== '') {
+            return trim($env);
+        }
+        if (isset($_ENV['SCHOOL_SECRET_KEY']) && is_string($_ENV['SCHOOL_SECRET_KEY']) && trim($_ENV['SCHOOL_SECRET_KEY']) !== '') {
+            return trim((string) $_ENV['SCHOOL_SECRET_KEY']);
+        }
+        return '';
+    }
+
+    private function empacotarLoginCsrfCookie(string $token, int $expiraEm): string
+    {
+        $secret = $this->loginCsrfSecret();
+        if ($secret === '') {
+            // Sem segredo: cookie simples (validação exige sessão com deadline).
+            return $token;
+        }
+        $sig = hash_hmac('sha256', $token . '|' . $expiraEm, $secret);
+        return rtrim(strtr(base64_encode($token . '|' . $expiraEm . '|' . $sig), '+/', '-_'), '=');
+    }
+
+    /**
+     * @return array{token:string,expira:int}|null
+     */
+    private function desempacotarLoginCsrfCookie(string $raw): ?array
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return null;
+        }
+        // Legado: cookie = token hex 64 (sem prazo embutido) — rejeitado sem sessão.
+        if (preg_match('/^[a-f0-9]{64}$/', $raw)) {
+            return ['token' => $raw, 'expira' => 0];
+        }
+        $padded = strtr($raw, '-_', '+/');
+        $pad = strlen($padded) % 4;
+        if ($pad > 0) {
+            $padded .= str_repeat('=', 4 - $pad);
+        }
+        $decoded = base64_decode($padded, true);
+        if ($decoded === false) {
+            return null;
+        }
+        $parts = explode('|', $decoded);
+        if (count($parts) !== 3) {
+            return null;
+        }
+        [$token, $expiraRaw, $sig] = $parts;
+        if ($token === '' || strlen($token) !== 64 || !ctype_digit($expiraRaw) || $sig === '') {
+            return null;
+        }
+        $secret = $this->loginCsrfSecret();
+        if ($secret === '') {
+            return null;
+        }
+        $esperado = hash_hmac('sha256', $token . '|' . $expiraRaw, $secret);
+        if (!hash_equals($esperado, $sig)) {
+            return null;
+        }
+        return ['token' => $token, 'expira' => (int) $expiraRaw];
+    }
+
+    /**
+     * Valida CSRF do login com deadline no servidor (600s).
+     * Aceita token da sessão (com expires_at) ou cookie assinado com o mesmo prazo.
+     * Cookie legado sem assinatura/expiração só vale se a sessão ainda tiver o deadline.
      */
     private function verifyLoginCsrfToken($postToken)
     {
         if ($postToken === '' || strlen($postToken) !== 64) {
             return false;
         }
-        if ($this->verifyCsrfToken($postToken)) {
+
+        $agora = time();
+        $sessToken = (string) ($_SESSION['login_csrf_token'] ?? '');
+        $sessExpira = (int) ($_SESSION['login_csrf_expires_at'] ?? 0);
+
+        if ($sessToken !== '' && hash_equals($sessToken, $postToken)) {
+            if ($sessExpira > 0 && $agora > $sessExpira) {
+                $this->clearLoginCsrfCookie();
+                return false;
+            }
+            if ($sessExpira <= 0) {
+                return false;
+            }
             return true;
         }
-        $cookieToken = $_COOKIE[self::LOGIN_CSRF_COOKIE] ?? '';
-        if ($cookieToken !== '' && hash_equals($cookieToken, $postToken)) {
+
+        // Token CSRF geral da sessão, emitido junto com o formulário de login.
+        if ($this->verifyCsrfToken($postToken) && $sessExpira > 0 && $agora <= $sessExpira) {
+            if ($sessToken === '' || hash_equals($sessToken, $postToken)) {
+                return true;
+            }
+        }
+
+        $cookieRaw = (string) ($_COOKIE[self::LOGIN_CSRF_COOKIE] ?? '');
+        $pacote = $this->desempacotarLoginCsrfCookie($cookieRaw);
+        if ($pacote === null || !hash_equals($pacote['token'], $postToken)) {
+            return false;
+        }
+
+        $expira = (int) $pacote['expira'];
+        if ($expira > 0) {
+            if ($agora > $expira) {
+                $this->clearLoginCsrfCookie();
+                return false;
+            }
             $this->clearLoginCsrfCookie();
             return true;
         }
+
+        // Cookie legado (só o token): exige deadline na sessão.
+        if ($sessExpira > 0 && $agora <= $sessExpira && ($sessToken === '' || hash_equals($sessToken, $postToken))) {
+            $this->clearLoginCsrfCookie();
+            return true;
+        }
+
         return false;
     }
 
