@@ -5,26 +5,26 @@
             <!-- Header -->
             <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 flex justify-between items-center">
                 <h2 class="text-2xl font-bold">Símbolos e Equações</h2>
-                <button onclick="fecharModalSimbolos()" class="text-white hover:text-gray-200 text-2xl font-bold">
+                <button data-csp-click="fecharModalSimbolos" class="text-white hover:text-gray-200 text-2xl font-bold">
                     ×
                 </button>
             </div>
             
             <!-- Tabs -->
             <div class="border-b border-gray-200 flex flex-wrap">
-                <button onclick="mostrarTabSimbolos('equacoes')" id="tab-equacoes" 
+                <button data-csp-click="mostrarTabSimbolos" data-csp-arg="equacoes" id="tab-equacoes" 
                         class="tab-simbolos active px-4 py-3 font-medium text-blue-600 border-b-2 border-blue-600">
                     ∑ Equações
                 </button>
-                <button onclick="mostrarTabSimbolos('matematica')" id="tab-matematica" 
+                <button data-csp-click="mostrarTabSimbolos" data-csp-arg="matematica" id="tab-matematica" 
                         class="tab-simbolos px-4 py-3 font-medium text-gray-600 hover:text-blue-600">
                     📐 Símbolos
                 </button>
-                <button onclick="mostrarTabSimbolos('fisica')" id="tab-fisica" 
+                <button data-csp-click="mostrarTabSimbolos" data-csp-arg="fisica" id="tab-fisica" 
                         class="tab-simbolos px-4 py-3 font-medium text-gray-600 hover:text-blue-600">
                     ⚛️ Física
                 </button>
-                <button onclick="mostrarTabSimbolos('quimica')" id="tab-quimica" 
+                <button data-csp-click="mostrarTabSimbolos" data-csp-arg="quimica" id="tab-quimica" 
                         class="tab-simbolos px-4 py-3 font-medium text-gray-600 hover:text-blue-600">
                     🧪 Química
                 </button>
@@ -40,7 +40,7 @@
                         <div class="flex gap-2 flex-wrap">
                             <input type="text" id="input-latex-custom" placeholder="Ex: \frac{1}{2}, x^2, \sqrt{n}" 
                                    class="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                            <button type="button" onclick="inserirLatexCustom()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Inserir</button>
+                            <button type="button" data-csp-click="inserirLatexCustom" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Inserir</button>
                         </div>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -342,7 +342,7 @@
             
             <!-- Footer -->
             <div class="border-t border-gray-200 p-4 flex justify-end">
-                <button onclick="fecharModalSimbolos()" 
+                <button data-csp-click="fecharModalSimbolos" 
                         class="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">
                     Fechar
                 </button>

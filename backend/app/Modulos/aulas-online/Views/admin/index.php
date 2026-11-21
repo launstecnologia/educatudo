@@ -151,7 +151,7 @@
                                 <?php endif; ?>
                                 <div class="border-t border-gray-100 my-1"></div>
                                 <form method="post" action="<?= URL ?>/admin/aulas-online/excluir"
-                                      onsubmit="return confirm('Excluir esta aula online?');" class="w-full">
+                                      data-csp-confirm="Excluir esta aula online?" class="w-full">
                                     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
                                     <input type="hidden" name="id" value="<?= (int)($item['id'] ?? 0) ?>">
                                     <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">

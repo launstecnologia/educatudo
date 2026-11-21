@@ -140,7 +140,7 @@
                                 <input type="hidden" name="enabled" value="<?= $emManutencao ? '0' : '1' ?>">
                                 <button type="submit"
                                         class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm <?= $emManutencao ? 'text-emerald-700 hover:bg-emerald-50' : 'text-amber-700 hover:bg-amber-50' ?>"
-                                        onclick="return confirm('<?= $emManutencao ? 'Retirar esta escola da manutenção?' : 'Colocar esta escola em manutenção?' ?>')">
+                                        data-csp-confirm="&lt;?= $emManutencao ? &#039;Retirar esta escola da manutenção?&#039; : &#039;Colocar esta escola em manutenção?&#039; ?&gt;">
                                     <i class="fa-solid <?= $emManutencao ? 'fa-circle-play text-emerald-500' : 'fa-screwdriver-wrench text-amber-500' ?> w-4 text-center"></i>
                                     <?= $emManutencao ? 'Sair da manutenção' : 'Entrar em manutenção' ?>
                                 </button>

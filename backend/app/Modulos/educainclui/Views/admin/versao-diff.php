@@ -116,13 +116,13 @@ foreach (($linhas ?? []) as $l) {
                     Gerar todos os diffs
                 </button>
             </form>
-            <form method="post" action="<?= URL ?>/admin/inclusao/versoes/aprovar" onsubmit="return confirm('Aprovar esta versão?');">
+            <form method="post" action="<?= URL ?>/admin/inclusao/versoes/aprovar" data-csp-confirm="Aprovar esta versão?">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
                 <input type="hidden" name="version_id" value="<?= (int) ($versao['id'] ?? 0) ?>">
                 <input type="hidden" name="acao" value="aprovar">
                 <button type="submit" class="btn-primary-custom px-4 py-2 rounded-lg hover:opacity-90 text-sm font-medium">Aprovar</button>
             </form>
-            <form method="post" action="<?= URL ?>/admin/inclusao/versoes/aprovar" onsubmit="return confirm('Reprovar esta versão?');">
+            <form method="post" action="<?= URL ?>/admin/inclusao/versoes/aprovar" data-csp-confirm="Reprovar esta versão?">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
                 <input type="hidden" name="version_id" value="<?= (int) ($versao['id'] ?? 0) ?>">
                 <input type="hidden" name="acao" value="reprovar">
@@ -296,7 +296,7 @@ foreach (($linhas ?? []) as $l) {
             </form>
         </div>
         <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex flex-wrap justify-end gap-2">
-            <form id="educaIncluiRewriteOneForm" method="post" action="<?= URL ?>/admin/inclusao/versoes/questao/refazer" onsubmit="return confirm('Refazer somente esta questão por IA?');">
+            <form id="educaIncluiRewriteOneForm" method="post" action="<?= URL ?>/admin/inclusao/versoes/questao/refazer" data-csp-confirm="Refazer somente esta questão por IA?">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
                 <input type="hidden" name="version_id" value="<?= (int) ($versao['id'] ?? 0) ?>">
                 <input type="hidden" name="clone_questao_id" value="">

@@ -16,7 +16,7 @@ $showOutros = $tipo === \App\Helpers\LessonPlanAfternoonHelper::TIPO_OUTROS;
     <div class="flex items-center justify-between gap-2">
         <p class="aulas-tarde-atividade-titulo text-sm font-semibold text-gray-800">Atividade <?= is_numeric($index) ? ((int) $index + 1) : '' ?></p>
         <button type="button"
-                onclick="removerAulasTardeAtividade(this)"
+                data-csp-click="removerAulasTardeAtividade" data-csp-pass="el"
                 class="aulas-tarde-remover-btn text-sm text-red-600 hover:text-red-700 font-medium <?= $isFirst ? 'hidden' : '' ?>">
             Remover
         </button>

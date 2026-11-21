@@ -153,7 +153,7 @@ $categorias = [
                 </label>
                 <select name="turma_id" id="turmaSelect"
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                        onchange="carregarAlunos(this.value)">
+                        data-csp-change="carregarAlunos" data-csp-pass="value">
                     <option value="">Selecione...</option>
                     <?php foreach ($turmas as $t): ?>
                     <option value="<?= (int)$t['id'] ?>"><?= $esc($t['nome']) ?> <?= $t['serie'] ? '— ' . $esc($t['serie']) : '' ?></option>

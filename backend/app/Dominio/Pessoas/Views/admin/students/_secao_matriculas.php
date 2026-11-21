@@ -95,7 +95,7 @@
                                         </td>
                                         <td class="py-2 pr-4">
                                             <?php if (($mat['status'] ?? '') === 'ativa'): ?>
-                                            <form action="<?= URL ?>/admin/students/<?= (int)$student['id'] ?>/matricula/<?= (int)$mat['id'] ?>/encerrar" method="POST" class="inline" onsubmit="return confirm('Encerrar esta matrícula?');">
+                                            <form action="<?= URL ?>/admin/students/<?= (int)$student['id'] ?>/matricula/<?= (int)$mat['id'] ?>/encerrar" method="POST" class="inline" data-csp-confirm="Encerrar esta matrícula?">
                                                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                                                 <input type="hidden" name="data_saida" value="<?= date('Y-m-d') ?>">
                                                 <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-semibold">Encerrar</button>

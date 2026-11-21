@@ -121,7 +121,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                 </button>
                 <?php endif; ?>
                 <?php ob_start(); ?>
-                <button type="button" onclick="openCursoDrawer(<?= $cid ?>)"
+                <button type="button" data-csp-click="openCursoDrawer" data-csp-arg="<?= $cid ?>"
                    class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                     <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar curso
                 </button>
@@ -168,7 +168,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                         </td>
                         <td class="px-6 py-3">
                             <?php ob_start(); ?>
-                            <button type="button" onclick="openSerieDrawer(<?= (int) $serie['id'] ?>)"
+                            <button type="button" data-csp-click="openSerieDrawer" data-csp-arg="<?= (int) $serie['id'] ?>"
                                class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                 <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                             </button>

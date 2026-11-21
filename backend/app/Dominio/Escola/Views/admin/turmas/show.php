@@ -311,12 +311,12 @@ $page_header_actions = ob_get_clean();
                             Importar / vincular (CSV)
                         </a>
                         <?php endif; ?>
-                        <button type="button" onclick="toggleStatus(<?= $turma['id'] ?? 0 ?>, <?= ($turma['ativo'] ?? 0) ? 'false' : 'true' ?>)"
+                        <button type="button" data-csp-click="toggleStatus" data-csp-arg="<?= $turma['id'] ?? 0 ?>, <?= ($turma['ativo'] ?? 0) ? 'false' : 'true' ?>"
                                 class="w-full inline-flex items-center justify-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
                             <i class="fa-solid fa-power-off mr-2 text-gray-500"></i>
                             <?= ($turma['ativo'] ?? 0) ? 'Desativar' : 'Ativar' ?>
                         </button>
-                        <button type="button" onclick="deleteTurma(<?= $turma['id'] ?? 0 ?>)"
+                        <button type="button" data-csp-click="deleteTurma" data-csp-arg="<?= $turma['id'] ?? 0 ?>"
                                 class="w-full inline-flex items-center justify-center px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">
                             <i class="fa-solid fa-trash-can mr-2"></i>
                             Excluir turma

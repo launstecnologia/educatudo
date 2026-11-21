@@ -460,12 +460,12 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
                             </form>
                             <?php if ($podeAlterarEvento): ?>
                             <?php ob_start(); ?>
-                            <button type="button" onclick="editarEvento(<?= $eventoId ?>)"
+                            <button type="button" data-csp-click="editarEvento" data-csp-arg="<?= $eventoId ?>"
                                     class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">
                                 <i class="fa-solid fa-pen w-4 text-center text-gray-400"></i> Editar
                             </button>
                             <div class="my-1 border-t border-gray-100"></div>
-                            <button type="submit" form="form-excluir-evento-<?= $eventoId ?>" onclick="return confirm('Remover este evento?');"
+                            <button type="submit" form="form-excluir-evento-<?= $eventoId ?>" data-csp-confirm="Remover este evento?"
                                     class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50">
                                 <i class="fa-solid fa-trash-can w-4 text-center text-red-400"></i> Excluir
                             </button>
@@ -475,7 +475,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
                             include \App\Core\ViewPaths::adminPartial('row_actions_dropdown.php');
                             ?>
                             <?php else: ?>
-                            <button type="submit" form="form-excluir-evento-<?= $eventoId ?>" onclick="return confirm('Remover este evento?');"
+                            <button type="submit" form="form-excluir-evento-<?= $eventoId ?>" data-csp-confirm="Remover este evento?"
                                     class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50">
                                 <i class="fa-solid fa-trash-can text-xs"></i> Excluir
                             </button>
@@ -587,7 +587,7 @@ $diasLetivosMeta = (int)($status['dias_meta'] ?? 200);
         </div>
         <div class="px-6 sm:px-8 py-5 border-t border-gray-200 flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-3">
             <?php if ($variosPronto && $calendarioId > 0): ?>
-            <button type="submit" form="form-excluir-calendario" id="btnExcluirCalendario" onclick="return confirm('Remover este calendário e os eventos dele?');"
+            <button type="submit" form="form-excluir-calendario" id="btnExcluirCalendario" data-csp-confirm="Remover este calendário e os eventos dele?"
                     class="sm:mr-auto px-6 py-2.5 border border-red-200 rounded-lg text-red-700 hover:bg-red-50 transition-colors">Excluir</button>
             <?php endif; ?>
             <button type="button" data-csp-click="closeConfigDrawer" class="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancelar</button>

@@ -64,10 +64,10 @@ $destinoLabels = [
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
                         <?php ob_start(); ?>
-                        <button type="button" onclick="openPlanoDrawer(<?= $planoId ?>)" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                        <button type="button" data-csp-click="openPlanoDrawer" data-csp-arg="<?= $planoId ?>" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
                             <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                         </button>
-                        <button type="button" onclick="togglePlano(<?= $planoId ?>)" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                        <button type="button" data-csp-click="togglePlano" data-csp-arg="<?= $planoId ?>" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
                             <i class="fa-solid fa-power-off text-gray-400 w-4 text-center"></i> <?= !empty($pl['ativo']) ? 'Desativar' : 'Ativar' ?>
                         </button>
                         <?php $row_actions_dropdown_items = ob_get_clean(); ?>

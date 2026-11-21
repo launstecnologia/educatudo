@@ -101,7 +101,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                                         <i class="fa-solid fa-up-right-from-square text-gray-400 w-4 text-center"></i> Ver prova
                                     </a>
                                     <div class="border-t border-gray-100 my-1"></div>
-                                    <form method="post" action="<?= URL ?>/admin/ava/avaliacoes/<?= (int) $av['id'] ?>/excluir" onsubmit="return confirm('Remover esta avaliação da disciplina?');">
+                                    <form method="post" action="<?= URL ?>/admin/ava/avaliacoes/<?= (int) $av['id'] ?>/excluir" data-csp-confirm="Remover esta avaliação da disciplina?">
                                         <input type="hidden" name="_token" value="<?= $csrf ?>">
                                         <input type="hidden" name="disciplina_id" value="<?= $dId ?>">
                                         <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">

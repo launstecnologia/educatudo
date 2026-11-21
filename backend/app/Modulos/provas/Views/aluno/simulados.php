@@ -170,7 +170,7 @@
                                         Ver Resultado
                                     </a>
                                 <?php endif; ?>
-                                <button onclick="ocultarSimulado(<?= $simulado['id'] ?>)" 
+                                <button data-csp-click="ocultarSimulado" data-csp-arg="<?= $simulado['id'] ?>" 
                                         class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors">
                                     Remover
                                 </button>

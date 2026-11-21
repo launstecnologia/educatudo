@@ -83,7 +83,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                         <div class="border-t border-gray-100 my-1"></div>
                         <a href="<?= URL ?>/admin/notifications/<?= (int) $notificacao['id'] ?>/delete"
                            class="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                           onclick="return confirm('Tem certeza que deseja excluir esta notificação?')">
+                           data-csp-confirm="Tem certeza que deseja excluir esta notificação?">
                             <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Excluir
                         </a>
                         <?php

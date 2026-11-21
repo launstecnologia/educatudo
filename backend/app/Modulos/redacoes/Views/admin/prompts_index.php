@@ -59,9 +59,9 @@
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                             <a href="<?= URL ?>/admin/redacao-configuravel/bancas/<?= (int)$board['id'] ?>/tipos/<?= (int)$textType['id'] ?>/prompts/<?= (int)$p['id'] ?>/editar" class="text-blue-600 hover:text-blue-900">Editar</a>
                             <?php if (!$p['is_active']): ?>
-                            <button type="button" onclick="setActive(<?= (int)$board['id'] ?>, <?= (int)$textType['id'] ?>, <?= (int)$p['id'] ?>)" class="text-green-600 hover:text-green-900">Definir como ativo</button>
+                            <button type="button" data-csp-click="setActive" data-csp-arg="<?= (int)$board['id'] ?>, <?= (int)$textType['id'] ?>, <?= (int)$p['id'] ?>" class="text-green-600 hover:text-green-900">Definir como ativo</button>
                             <?php endif; ?>
-                            <button type="button" onclick="deletePrompt(<?= (int)$board['id'] ?>, <?= (int)$textType['id'] ?>, <?= (int)$p['id'] ?>)" class="text-red-600 hover:text-red-900">Excluir</button>
+                            <button type="button" data-csp-click="deletePrompt" data-csp-arg="<?= (int)$board['id'] ?>, <?= (int)$textType['id'] ?>, <?= (int)$p['id'] ?>" class="text-red-600 hover:text-red-900">Excluir</button>
                         </td>
                     </tr>
                     <?php endforeach; ?>

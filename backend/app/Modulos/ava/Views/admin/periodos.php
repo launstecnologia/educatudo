@@ -57,7 +57,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                                 <td class="px-6 py-4 text-sm text-gray-600"><?= (int) ($s['ordem'] ?? 0) ?></td>
                                 <td class="px-6 py-4 text-right whitespace-nowrap">
                                     <?php ob_start(); ?>
-                                    <form method="post" action="<?= URL ?>/admin/ava/semestres/<?= (int) $s['id'] ?>/excluir" onsubmit="return confirm('Remover período?');">
+                                    <form method="post" action="<?= URL ?>/admin/ava/semestres/<?= (int) $s['id'] ?>/excluir" data-csp-confirm="Remover período?">
                                         <input type="hidden" name="_token" value="<?= $csrf ?>">
                                         <input type="hidden" name="curso_id" value="<?= $cursoId ?>">
                                         <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">

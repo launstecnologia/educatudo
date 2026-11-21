@@ -30,7 +30,7 @@ if (!class_exists('LayoutHelper')) {
                     ✓ Liberada para alunos
                 </span>
             <?php elseif ($podeLiberar): ?>
-                <button type="button" id="btnLiberarProvaAluno" onclick="liberarProvaParaAluno(<?= (int)$bloco['id'] ?>)"
+                <button type="button" id="btnLiberarProvaAluno" data-csp-click="liberarProvaParaAluno" data-csp-arg="<?= (int)$bloco['id'] ?>"
                         class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
                     Liberar prova para aluno
                 </button>

@@ -16,7 +16,9 @@ class SwaggerController extends BaseController
     {
         $openapiUrl = (defined('URL') ? URL : '') . '/api/openapi.json';
         header('Content-Type: text/html; charset=utf-8');
+        ob_start();
         require __DIR__ . '/../Views/documentacao.php';
+        echo \App\Core\CspPolitica::prepararHtmlCsp((string) ob_get_clean());
         exit;
     }
 

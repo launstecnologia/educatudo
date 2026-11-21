@@ -18,7 +18,7 @@ ob_start(); ?>
 <form method="POST" action="<?= URL ?>/admin/finance/disparar-regua" class="inline">
     <input type="hidden" name="_token" value="<?= $esc($csrf_token) ?>">
     <button type="submit"
-            onclick="return confirm('Disparar régua de cobrança agora?')"
+            data-csp-confirm="Disparar régua de cobrança agora?"
             class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
         <i class="fa-solid fa-bell mr-2 text-gray-500"></i> Disparar Régua
     </button>

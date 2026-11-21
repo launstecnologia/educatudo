@@ -45,7 +45,7 @@ include __DIR__ . '/../../../../../Views/admin/_partials/page_header_list.php'; 
         <button type="submit" class="btn-primary text-sm">Abrir campanha</button>
     </form>
     <?php elseif (($campanha['status'] ?? '') === 'aberta'): ?>
-    <form method="POST" action="<?= URL ?>/admin/enrollment/campanhas/<?= $id ?>/status" onsubmit="return confirm('Encerrar esta campanha?')">
+    <form method="POST" action="<?= URL ?>/admin/enrollment/campanhas/<?= $id ?>/status" data-csp-confirm="Encerrar esta campanha?">
         <input type="hidden" name="_token" value="<?= $esc($csrf_token ?? '') ?>">
         <input type="hidden" name="status" value="encerrada">
         <button type="submit" class="btn-secondary text-sm">Encerrar</button>
@@ -53,7 +53,7 @@ include __DIR__ . '/../../../../../Views/admin/_partials/page_header_list.php'; 
     <?php endif; ?>
     <?php if (($campanha['status'] ?? '') !== 'encerrada'): ?>
     <form method="POST" action="<?= URL ?>/admin/enrollment/campanhas/<?= $id ?>/gerar"
-          onsubmit="return confirm('Gerar processos de rematrícula para os alunos do ano de origem?')">
+          data-csp-confirm="Gerar processos de rematrícula para os alunos do ano de origem?">
         <input type="hidden" name="_token" value="<?= $esc($csrf_token ?? '') ?>">
         <button type="submit" class="btn-secondary text-sm">
             <i class="fa-solid fa-wand-magic-sparkles mr-1.5"></i> Gerar processos

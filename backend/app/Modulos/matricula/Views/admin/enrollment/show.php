@@ -51,7 +51,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php'); ?>
             <div class="flex gap-2">
                 <?php if ($enrollment['status'] !== 'cancelada'): ?>
                 <form method="POST" action="<?= URL ?>/admin/enrollment/<?= (int)$enrollment['id'] ?>/cancelar" class="inline"
-                      onsubmit="return confirm('Cancelar esta matrícula?')">
+                      data-csp-confirm="Cancelar esta matrícula?">
                     <input type="hidden" name="_token" value="<?= $esc($csrf_token) ?>">
                     <button type="submit" class="text-xs text-red-600 hover:text-red-800 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50 transition">
                         Cancelar

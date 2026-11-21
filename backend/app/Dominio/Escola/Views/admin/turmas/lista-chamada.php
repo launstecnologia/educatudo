@@ -141,7 +141,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
             </form>
             <div class="px-6 pb-6">
                 <form method="POST" action="<?= URL ?>/admin/turmas/<?= $turmaId ?>/lista-chamada/recalcular"
-                      onsubmit="return confirm('Recalcular números de chamada conforme o critério atual?');">
+                      data-csp-confirm="Recalcular números de chamada conforme o critério atual?">
                     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                     <input type="hidden" name="ano_letivo_id" value="<?= $ano_letivo_id ?>">
                     <button type="submit"

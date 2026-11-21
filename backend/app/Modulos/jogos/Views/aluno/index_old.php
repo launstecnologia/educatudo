@@ -916,7 +916,7 @@ div[class*="border"],
                     <div class="text-6xl mb-4">⏰</div>
                     <h3 class="text-2xl font-bold text-orange-600 mb-4">Partida em Andamento!</h3>
                     <p class="text-gray-600 mb-6">Você tem uma partida em andamento. Continue jogando!</p>
-            <button onclick="continuarPartida(<?= $partidaAtiva['id'] ?>)" 
+            <button data-csp-click="continuarPartida" data-csp-arg="<?= $partidaAtiva['id'] ?>" 
                             class="start-button">
                         ▶️ Continuar Partida
             </button>

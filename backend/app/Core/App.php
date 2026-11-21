@@ -103,7 +103,10 @@ class App
         }
         
         http_response_code(500);
-        echo $this->renderErrorPage($e);
+        $html500 = $this->renderErrorPage($e);
+        echo class_exists(CspPolitica::class)
+            ? CspPolitica::prepararHtmlCsp($html500)
+            : $html500;
     }
     
     /**

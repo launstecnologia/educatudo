@@ -84,7 +84,7 @@ $urlVoltarLista = \App\Modulos\EventosAvaliativos\Services\RetornoListaProva::en
             </span>
             <?php else: ?>
             <form method="post" action="<?= URL ?>/admin/provas/blocos/<?= (int)$bloco['id'] ?>/liberar-gabarito" class="inline"
-                  onsubmit="return confirm('Liberar o gabarito deste bloco para todos os alunos?');">
+                  data-csp-confirm="Liberar o gabarito deste bloco para todos os alunos?">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars((string)($csrf_token ?? '')) ?>">
                 <input type="hidden" name="origem" value="gerenciar">
                 <button type="submit" class="inline-flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700">
@@ -102,7 +102,7 @@ $urlVoltarLista = \App\Modulos\EventosAvaliativos\Services\RetornoListaProva::en
             </a>
             <?php endif; ?>
             <?php if (!$modoLancamentoNota && isset($mostrarBotaoAprovacaoFinal) && $mostrarBotaoAprovacaoFinal): ?>
-            <button onclick="aprovarBlocoFinal(<?= $bloco['id'] ?>)" 
+            <button data-csp-click="aprovarBlocoFinal" data-csp-arg="<?= $bloco['id'] ?>" 
                     class="inline-flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
                 <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
                 Aprovação Final
@@ -649,7 +649,7 @@ $statusLabelsOnline = [
                         </a>
                         <?php if (!empty($prova['professor_id']) && !empty($prova['materia_id'])): ?>
                         <button type="button"
-                                onclick="abrirModalTrocar(<?= (int) $bloco['id'] ?>, <?= (int) $prova['professor_id'] ?>, <?= (int) $prova['materia_id'] ?>, '<?= htmlspecialchars(addslashes((string) ($prova['professor_nome'] ?? '')), ENT_QUOTES) ?>', '<?= htmlspecialchars(addslashes((string) ($prova['materia_nome'] ?? '')), ENT_QUOTES) ?>', <?= (int) $prova['prova_id'] ?>)"
+                                data-csp-click="abrirModalTrocar" data-csp-arg="<?= (int) $bloco['id'] ?>, <?= (int) $prova['professor_id'] ?>, <?= (int) $prova['materia_id'] ?>, '<?= htmlspecialchars(addslashes((string) ($prova['professor_nome'] ?? '')), ENT_QUOTES) ?>', '<?= htmlspecialchars(addslashes((string) ($prova['materia_nome'] ?? '')), ENT_QUOTES) ?>', <?= (int) $prova['prova_id'] ?>"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-right-left text-gray-400 w-4 text-center" aria-hidden="true"></i>
                             Trocar
@@ -662,12 +662,12 @@ $statusLabelsOnline = [
                         </a>
                         <?php endif; ?>
                         <?php if ($podeAprovarReprovar): ?>
-                        <button type="button" onclick="aprovarProva(<?= (int) $prova['prova_id'] ?>)"
+                        <button type="button" data-csp-click="aprovarProva" data-csp-arg="<?= (int) $prova['prova_id'] ?>"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-check text-green-600 w-4 text-center" aria-hidden="true"></i>
                             Aprovar
                         </button>
-                        <button type="button" onclick="reprovarProva(<?= (int) $prova['prova_id'] ?>)"
+                        <button type="button" data-csp-click="reprovarProva" data-csp-arg="<?= (int) $prova['prova_id'] ?>"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                             <i class="fa-solid fa-xmark text-red-400 w-4 text-center" aria-hidden="true"></i>
                             Reprovar

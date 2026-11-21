@@ -104,7 +104,7 @@ $title = $title ?? 'Minhas Notificações';
                                         <a href="<?= URL ?>/professor/notifications/<?= $notificacao['id'] ?>" class="text-blue-600 hover:text-blue-900">Ver</a>
                                         <a href="<?= URL ?>/professor/notifications/<?= $notificacao['id'] ?>/delete" 
                                            class="text-red-600 hover:text-red-900"
-                                           onclick="return confirm('Tem certeza que deseja excluir esta notificação?')">Excluir</a>
+                                           data-csp-confirm="Tem certeza que deseja excluir esta notificação?">Excluir</a>
                                     </div>
                                 </td>
                             </tr>

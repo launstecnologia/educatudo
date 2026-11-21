@@ -116,13 +116,13 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <?php ob_start(); ?>
-                        <button type="button" onclick="openAnoLetivoDrawer(<?= (int) $row['id'] ?>)"
+                        <button type="button" data-csp-click="openAnoLetivoDrawer" data-csp-arg="<?= (int) $row['id'] ?>"
                            class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                         </button>
                         <div class="border-t border-gray-100 my-1"></div>
                         <form action="<?= URL ?>/admin/ano-letivo/<?= (int) $row['id'] ?>/delete" method="POST"
-                              onsubmit="return confirm('Excluir este ano letivo?');">
+                              data-csp-confirm="Excluir este ano letivo?">
                             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                             <input type="hidden" name="ano" value="<?= (int) $row['ano'] ?>">
                             <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">

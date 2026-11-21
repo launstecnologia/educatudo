@@ -127,7 +127,7 @@ $rotuloModeloFiltro = $filtroBoletimNome !== '' ? $filtroBoletimNome : ('Modelo 
             </div>
         </div>
         <form method="POST" action="<?= URL ?>/admin/boletim/cancelar-geracao" class="shrink-0"
-              onsubmit="return confirm('Parar a geração em andamento? Os boletins já gravados deste lote ficam como estão.');">
+              data-csp-confirm="Parar a geração em andamento? Os boletins já gravados deste lote ficam como estão.">
             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
             <button type="submit"
                     class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold text-white bg-red-600 hover:bg-red-700">
@@ -404,7 +404,7 @@ $rotuloModeloFiltro = $filtroBoletimNome !== '' ? $filtroBoletimNome : ('Modelo 
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-sliders text-gray-400 w-4 text-center"></i> Configurar notas
                         </a>
-                        <button type="button" onclick="duplicarEventoBoletim(<?= $eventoId ?>)"
+                        <button type="button" data-csp-click="duplicarEventoBoletim" data-csp-arg="<?= $eventoId ?>"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-copy text-gray-400 w-4 text-center"></i> Duplicar
                         </button>
@@ -412,12 +412,12 @@ $rotuloModeloFiltro = $filtroBoletimNome !== '' ? $filtroBoletimNome : ('Modelo 
                         $liberadoAlunoPaisMenu = ((int) ($evento['vis_aluno'] ?? 1) === 1) && ((int) ($evento['vis_pais'] ?? 1) === 1);
                         $eventoForaDaLista = !empty($evento['oculto_lista_avaliacoes']) || (int) ($evento['vis_coordenacao'] ?? 1) !== 1;
                         ?>
-                        <button type="button" onclick="alterarVisibilidadeEventoBoletim(<?= $eventoId ?>, <?= $liberadoAlunoPaisMenu ? 0 : 1 ?>)"
+                        <button type="button" data-csp-click="alterarVisibilidadeEventoBoletim" data-csp-arg="<?= $eventoId ?>, <?= $liberadoAlunoPaisMenu ? 0 : 1 ?>"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid <?= $liberadoAlunoPaisMenu ? 'fa-eye-slash' : 'fa-eye' ?> text-gray-400 w-4 text-center"></i>
                             <?= $liberadoAlunoPaisMenu ? 'Ocultar de alunos/pais' : 'Disponibilizar' ?>
                         </button>
-                        <button type="button" onclick="desabilitarEventoLista(<?= $eventoId ?>, <?= $eventoForaDaLista ? 0 : 1 ?>)"
+                        <button type="button" data-csp-click="desabilitarEventoLista" data-csp-arg="<?= $eventoId ?>, <?= $eventoForaDaLista ? 0 : 1 ?>"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid <?= $eventoForaDaLista ? 'fa-eye' : 'fa-ban' ?> text-gray-400 w-4 text-center"></i>
                             <?= $eventoForaDaLista ? 'Habilitar' : 'Desabilitar' ?>
@@ -425,7 +425,7 @@ $rotuloModeloFiltro = $filtroBoletimNome !== '' ? $filtroBoletimNome : ('Modelo 
                         <div class="border-t border-gray-100 my-1"></div>
                         <?php if ($geracaoEmAndamento): ?>
                         <form method="POST" action="<?= URL ?>/admin/boletim/cancelar-geracao" class="block"
-                              onsubmit="return confirm('Parar a geração deste evento?');">
+                              data-csp-confirm="Parar a geração deste evento?">
                             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
                             <input type="hidden" name="regra_id" value="<?= $eventoId ?>">
                             <button type="submit"
@@ -434,7 +434,7 @@ $rotuloModeloFiltro = $filtroBoletimNome !== '' ? $filtroBoletimNome : ('Modelo 
                             </button>
                         </form>
                         <?php endif; ?>
-                        <button type="button" onclick="excluirEventoBoletim(<?= $eventoId ?>)"
+                        <button type="button" data-csp-click="excluirEventoBoletim" data-csp-arg="<?= $eventoId ?>"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                             <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Excluir
                         </button>

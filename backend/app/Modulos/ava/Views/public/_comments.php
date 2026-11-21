@@ -68,7 +68,7 @@ $renderAutor = static function (array $c): string {
                         </form>
                         <?php endif; ?>
                         <?php if ($podeExcluir): ?>
-                        <form method="post" action="<?= htmlspecialchars($deleteBase . $cid . '/excluir') ?>" onsubmit="return confirm('Remover comentário?');">
+                        <form method="post" action="<?= htmlspecialchars($deleteBase . $cid . '/excluir') ?>" data-csp-confirm="Remover comentário?">
                             <input type="hidden" name="_token" value="<?= $csrf ?>">
                             <button type="submit" class="text-gray-300 hover:text-red-600" title="Remover"><i class="fa-solid fa-trash"></i></button>
                         </form>
@@ -86,7 +86,7 @@ $renderAutor = static function (array $c): string {
                             <div class="flex items-start justify-between gap-3">
                                 <div class="text-sm font-semibold text-gray-900"><?= $renderAutor($r) ?><span class="ml-2 text-xs font-normal text-gray-400"><?= htmlspecialchars(date('d/m/Y H:i', strtotime((string) ($r['created_at'] ?? 'now')))) ?></span></div>
                                 <?php if ($podeExcluirR): ?>
-                                <form method="post" action="<?= htmlspecialchars($deleteBase . $rid . '/excluir') ?>" onsubmit="return confirm('Remover resposta?');">
+                                <form method="post" action="<?= htmlspecialchars($deleteBase . $rid . '/excluir') ?>" data-csp-confirm="Remover resposta?">
                                     <input type="hidden" name="_token" value="<?= $csrf ?>">
                                     <button type="submit" class="text-gray-300 hover:text-red-600" title="Remover"><i class="fa-solid fa-trash"></i></button>
                                 </form>

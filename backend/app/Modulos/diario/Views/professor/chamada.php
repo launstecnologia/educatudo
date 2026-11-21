@@ -137,7 +137,7 @@ $moduloOcorrencias = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::is
                                 <td class="px-4 py-3">
                                     <textarea name="frequencias[<?= $aid ?>][observacao]" id="obsHidden_<?= $aid ?>" class="hidden"><?= htmlspecialchars($obs) ?></textarea>
                                     <button type="button"
-                                        onclick="abrirObs(<?= $aid ?>, <?= json_encode(htmlspecialchars($aluno['nome'])) ?>, <?= json_encode($obs) ?>)"
+                                        data-csp-click="abrirObs" data-csp-arg="<?= $aid ?>, <?= json_encode(htmlspecialchars($aluno['nome'])) ?>, <?= json_encode($obs) ?>"
                                         class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors <?= $obs !== '' ? 'border-purple-300 text-purple-700 bg-purple-50 hover:bg-purple-100' : 'border-gray-300 text-gray-500 bg-white hover:bg-gray-50' ?>">
                                         <i class="fa-solid <?= $obs !== '' ? 'fa-pen-to-square' : 'fa-plus' ?> text-xs"></i>
                                         <?= $obs !== '' ? 'Ver obs.' : 'Anotar' ?>
@@ -203,7 +203,7 @@ $moduloOcorrencias = !class_exists('LayoutHelper') || \App\Core\LayoutHelper::is
 
         <div class="flex flex-col-reverse sm:flex-row justify-end gap-3 pb-8">
             <button type="submit" name="acao" value="rascunho" class="px-5 py-2.5 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50">Salvar rascunho</button>
-            <button type="submit" name="acao" value="finalizar" onclick="return confirm('Finalizar esta chamada? Os dados continuarão registrados no histórico.')" class="px-5 py-2.5 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700">Finalizar chamada</button>
+            <button type="submit" name="acao" value="finalizar" data-csp-confirm="Finalizar esta chamada? Os dados continuarão registrados no histórico." class="px-5 py-2.5 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700">Finalizar chamada</button>
         </div>
     </form>
 </div>

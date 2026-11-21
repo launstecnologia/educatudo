@@ -62,7 +62,7 @@ $cargosAssinados = array_column($assinaturas, 'cargo');
                 <input type="hidden" name="_token" value="<?= $token ?>">
                 <button class="px-4 py-2 rounded-lg text-sm font-medium border border-slate-300 bg-white">Reabrir rascunho</button>
             </form>
-            <form method="post" action="<?= $base ?>/emitir" onsubmit="return confirm('Emitir congela o documento. Continuar?');">
+            <form method="post" action="<?= $base ?>/emitir" data-csp-confirm="Emitir congela o documento. Continuar?">
                 <input type="hidden" name="_token" value="<?= $token ?>">
                 <button class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-semibold" <?= empty($checklist['ok']) ? 'disabled title="Complete o checklist"' : '' ?>>
                     Emitir (imutável)
@@ -153,7 +153,7 @@ $cargosAssinados = array_column($assinaturas, 'cargo');
                             </td>
                             <td class="px-3 py-2 text-right">
                                 <?php if ($editavel && ($it['origem'] ?? '') === 'Externo'): ?>
-                                    <form method="post" action="<?= $base ?>/itens/<?= (int) $it['id'] ?>/excluir" onsubmit="return confirm('Excluir item externo?');">
+                                    <form method="post" action="<?= $base ?>/itens/<?= (int) $it['id'] ?>/excluir" data-csp-confirm="Excluir item externo?">
                                         <input type="hidden" name="_token" value="<?= $token ?>">
                                         <button class="text-red-600 hover:text-red-800 text-xs font-medium">Excluir</button>
                                     </form>

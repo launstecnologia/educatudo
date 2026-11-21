@@ -35,7 +35,7 @@ $turmaAnoLabel = $turmaAnoLabel ?? $turmaDisplay;
                 Editar aluno
             </a>
             <button type="button"
-                    onclick="abrirOffcanvasAcoesAluno(this)"
+                    data-csp-click="abrirOffcanvasAcoesAluno" data-csp-pass="el"
                     class="aluno-btn-outline"
                     aria-haspopup="dialog"
                     aria-controls="offcanvasAcoesAluno">
@@ -85,7 +85,7 @@ $turmaAnoLabel = $turmaAnoLabel ?? $turmaDisplay;
                 Editar aluno
             </a>
             <button type="button"
-                    onclick="abrirOffcanvasAcoesAluno(this)"
+                    data-csp-click="abrirOffcanvasAcoesAluno" data-csp-pass="el"
                     class="aluno-btn-outline"
                     aria-haspopup="dialog"
                     aria-controls="offcanvasAcoesAluno">

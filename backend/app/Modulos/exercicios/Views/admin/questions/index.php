@@ -115,7 +115,7 @@
                         <div class="flex flex-wrap gap-1">
                             <a href="<?= URL ?>/admin/exercises/<?= $exercicio['id'] ?>/questions/<?= $questao['id'] ?>/edit" 
                                class="text-blue-600 hover:text-blue-900 bg-blue-50 px-2 py-1 rounded text-xs">Editar</a>
-                            <button onclick="deleteQuestion(<?= $questao['id'] ?>)" 
+                            <button data-csp-click="deleteQuestion" data-csp-arg="<?= $questao['id'] ?>" 
                                     class="text-red-600 hover:text-red-900 bg-red-50 px-2 py-1 rounded text-xs">Excluir</button>
                         </div>
                     </td>

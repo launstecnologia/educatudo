@@ -66,7 +66,7 @@ $profiles = [
                                 <div class="flex gap-2 items-center">
                                     <input type="text" id="<?= $prefix ?>_icon_192" name="config[<?= $prefix ?>_icon_192]" value="<?= htmlspecialchars($icon192) ?>" class="flex-1 border border-gray-300 rounded-lg px-3 py-2">
                                     <input type="file" id="<?= $prefix ?>_icon_file" accept="image/png,image/jpeg,image/jpg,image/gif" class="hidden">
-                                    <button type="button" onclick="document.getElementById('<?= $prefix ?>_icon_file').click()" class="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm font-medium text-gray-700 whitespace-nowrap">Selecionar imagem</button>
+                                    <button type="button" data-csp-click-id="&lt;?= $prefix ?&gt;_icon_file" class="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm font-medium text-gray-700 whitespace-nowrap">Selecionar imagem</button>
                                 </div>
                                 <p class="text-xs text-gray-500 mt-1">PNG ou JPG recomendado (quadrado). Será usado em 192 e 512.</p>
                             </div>

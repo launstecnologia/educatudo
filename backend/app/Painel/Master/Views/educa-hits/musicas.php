@@ -78,7 +78,7 @@ require __DIR__ . '/_nav.php';
                         <?php endif; ?>
                         <?php if ($educahits_delete_song_url !== '' && $songId !== ''): ?>
                         <?php if ($audioUrl !== '' || $coverUrl !== ''): ?><div class="border-t border-slate-100 my-1"></div><?php endif; ?>
-                        <form method="post" action="<?= URL ?>/master/educa-hits/delete-song" onsubmit="return confirm('Tem certeza que deseja apagar esta música?');">
+                        <form method="post" action="<?= URL ?>/master/educa-hits/delete-song" data-csp-confirm="Tem certeza que deseja apagar esta música?">
                             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                             <input type="hidden" name="song_id" value="<?= htmlspecialchars($songId) ?>">
                             <input type="hidden" name="title" value="<?= htmlspecialchars($title) ?>">

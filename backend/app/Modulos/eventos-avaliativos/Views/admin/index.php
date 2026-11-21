@@ -97,7 +97,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
         <?php endif; ?>
         <?php if ($ehDev && $schemaPronto && $podeDuplicar): ?>
         <form method="POST" action="<?= URL ?>/admin/eventos-avaliativos/duplicar-notas"
-              onsubmit="return confirm('DEV: copiar notas dos alunos do período anterior para os eventos de mesmo nome deste período?');">
+              data-csp-confirm="DEV: copiar notas dos alunos do período anterior para os eventos de mesmo nome deste período?">
             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>">
             <input type="hidden" name="ano" value="<?= $ano ?>">
             <input type="hidden" name="periodo" value="<?= $periodoNum ?>">

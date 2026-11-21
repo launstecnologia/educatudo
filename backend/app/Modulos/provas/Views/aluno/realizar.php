@@ -221,7 +221,7 @@ if (!class_exists('LayoutHelper')) {
     <div class="flex flex-wrap gap-2 justify-center" id="questoesSelector">
         <?php foreach ($questoes as $index => $questao): ?>
             <button type="button"
-                    onclick="irParaQuestao(<?= $index ?>)"
+                    data-csp-click="irParaQuestao" data-csp-arg="<?= $index ?>"
                     class="questao-btn w-12 h-12 rounded-lg font-semibold transition-all border-2 <?= $index === 0 ? 'bg-blue-600 text-white border-blue-700' : (isset($respostas[$questao['id']]) ? 'bg-green-100 text-green-800 border-green-300' : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200') ?>"
                     data-questao="<?= $index ?>"
                     id="btn-questao-<?= $index ?>">

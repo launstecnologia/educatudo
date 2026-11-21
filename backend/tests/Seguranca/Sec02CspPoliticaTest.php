@@ -110,4 +110,28 @@ final class Sec02CspPoliticaTest extends TestCase
         $this->assertStringContainsString('wss://ws.educatudo.com', $p);
         $this->assertStringNotContainsString('report-uri', $p);
     }
+
+    public function testMigrarOnRemoveAtributosEGeraScriptComNonce(): void
+    {
+        $html = '<!DOCTYPE html><html><body>'
+            . '<button onclick="closeFilterDrawer()">Fechar</button>'
+            . '<form onsubmit="return confirm(\'Excluir?\')"><button>Ok</button></form>'
+            . '<img src="/x.png" onerror="this.style.display=\'none\'">'
+            . '</body></html>';
+        $out = CspPolitica::prepararHtmlCsp($html);
+        $this->assertSame(0, preg_match_all('/\son[a-z]+\s*=\s*["\']/i', $out));
+        // cada handler: 1x no HTML + 1x no querySelector do script nonce
+        $this->assertSame(6, substr_count($out, 'data-csp-on-id='));
+        $this->assertStringContainsString('addEventListener', $out);
+        $this->assertStringContainsString('closeFilterDrawer()', $out);
+        $this->assertMatchesRegularExpression('/<script[^>]*nonce="/', $out);
+    }
+
+    public function testPrepararHtmlCspNaoQuebraSemOn(): void
+    {
+        $html = '<html><body><script src="/a.js"></script><p>ok</p></body></html>';
+        $out = CspPolitica::prepararHtmlCsp($html);
+        $this->assertStringContainsString('nonce="', $out);
+        $this->assertStringContainsString('<p>ok</p>', $out);
+    }
 }

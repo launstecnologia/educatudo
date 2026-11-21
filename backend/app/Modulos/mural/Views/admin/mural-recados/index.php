@@ -270,7 +270,7 @@ unset($_SESSION['flash_message'], $_SESSION['flash_type']);
                     <button type="button" class="btn-visualizar-recado flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" data-titulo="<?= htmlspecialchars($r['titulo'], ENT_QUOTES, 'UTF-8') ?>" data-data-pub="<?= htmlspecialchars($data_pub, ENT_QUOTES, 'UTF-8') ?>" data-conteudo="<?= htmlspecialchars($r['conteudo'] ?? '', ENT_QUOTES, 'UTF-8') ?>" data-autor="<?= htmlspecialchars($autor_nome, ENT_QUOTES, 'UTF-8') ?>">
                         <i class="fa-solid fa-eye text-gray-400 w-4 text-center"></i> Visualizar
                     </button>
-                    <button type="button" onclick="openMuralDrawer(<?= (int)$r['id'] ?>)" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                    <button type="button" data-csp-click="openMuralDrawer" data-csp-arg="<?= (int)$r['id'] ?>" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                         <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                     </button>
                     <div class="border-t border-gray-100 my-1"></div>

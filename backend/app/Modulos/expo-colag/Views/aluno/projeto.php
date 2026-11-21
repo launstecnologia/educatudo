@@ -29,7 +29,7 @@ $renderParticipacao = static function () use ($insc, $status, $projeto, $csrf_to
                            class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-medium">Acessar painel</a>
                     <?php endif; ?>
                     <form method="post" action="<?= URL ?>/expo-colag/projeto/<?= (int) $projeto['id'] ?>/cancelar-inscricao"
-                          onsubmit="return confirm('Deseja realmente cancelar sua inscrição?');">
+                          data-csp-confirm="Deseja realmente cancelar sua inscrição?">
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
                         <input type="hidden" name="inscricao_id" value="<?= (int) $insc['id'] ?>">
                         <button type="submit" class="px-4 py-2 rounded-lg text-sm font-medium border border-emerald-200 text-emerald-900 bg-white hover:bg-emerald-50">Cancelar inscrição</button>

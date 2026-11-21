@@ -199,7 +199,7 @@ $totalPages = (int) ($pag['total_pages'] ?? 1);
                                    class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                     <i class="fa-solid fa-eye text-gray-400 w-4 text-center"></i> Visualizar
                                 </a>
-                                <form method="post" action="<?= URL ?>/admin/diario/reabrir" onsubmit="return confirm('Reabrir este diário? O professor poderá editar chamadas novamente.')">
+                                <form method="post" action="<?= URL ?>/admin/diario/reabrir" data-csp-confirm="Reabrir este diário? O professor poderá editar chamadas novamente.">
                                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string) $csrf_token) ?>">
                                     <input type="hidden" name="fechamento_id" value="<?= (int) $f['id'] ?>">
                                     <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-amber-700 hover:bg-amber-50">

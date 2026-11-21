@@ -23,8 +23,9 @@ Relatório desta preparação: [`relatorios-seguranca/SEC-02-PREPARACAO-ENFORCEM
 
 ## Handlers HTML
 
-Preferir `data-csp-click` / `data-csp-change` / `data-csp-action` + `/public/static/js/csp-event-delegation.js`.  
-Ainda existem handlers `on*` legados (~750) — bloqueiam modo restrito até migrar.
+Preferir `data-csp-click` / `data-csp-change` / `data-csp-action` + `/public/static/js/csp-event-delegation.js`.
+
+**Migração automática na resposta:** `CspPolitica::prepararHtmlCsp()` remove atributos `on*` e recria listeners em `<script nonce>`. Páginas via `BaseController::view` / `viewWithLayout` saem sem `on*` no HTML.
 
 ## Relatórios
 

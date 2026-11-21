@@ -47,7 +47,7 @@ $confirmDeleteJs = $selectedFile ? "return confirm('Excluir o log \\'" . addslas
                            title="<?= htmlspecialchars($f['name']) ?>">
                             <?= htmlspecialchars($f['name']) ?>
                         </a>
-                        <form method="post" action="<?= URL ?>/admin/dev-settings/logs/delete" class="flex-shrink-0 inline" onsubmit="return confirm('Excluir \'<?= htmlspecialchars(addslashes($f['name'])) ?>\'?');">
+                        <form method="post" action="<?= URL ?>/admin/dev-settings/logs/delete" class="flex-shrink-0 inline" data-csp-confirm="Excluir \&#039;&lt;?= htmlspecialchars(addslashes($f[&#039;name&#039;])) ?&gt;\&#039;?">
                             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                             <input type="hidden" name="file" value="<?= htmlspecialchars($f['name']) ?>">
                             <button type="submit" class="p-1.5 rounded text-red-600 hover:bg-red-50" title="Excluir">🗑️</button>

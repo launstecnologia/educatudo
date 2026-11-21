@@ -220,7 +220,7 @@ include __DIR__ . '/_filtros.php';
                     <td class="px-4 py-2 text-gray-500"><?= htmlspecialchars((string) ($esp['observacao'] ?? '')) ?></td>
                     <td class="px-4 py-2 text-right">
                         <form method="POST" action="<?= URL ?>/admin/resultados-finais/turma/<?= $turmaId ?>/especial/<?= (int) $esp['id'] ?>/excluir"
-                              onsubmit="return confirm('Remover esta situação?')">
+                              data-csp-confirm="Remover esta situação?">
                             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                             <button type="submit" class="text-sm text-red-600 hover:underline">Excluir</button>
                         </form>

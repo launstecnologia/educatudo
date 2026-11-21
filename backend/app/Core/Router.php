@@ -179,7 +179,10 @@ class Router
             if (!$this->isMaintenanceBypassRoute($uriWithoutPrefix)) {
                 http_response_code(503);
                 header('Retry-After: 1800');
-                echo $this->renderMaintenancePage();
+                $htmlMaint = $this->renderMaintenancePage();
+                echo class_exists(CspPolitica::class)
+                    ? CspPolitica::prepararHtmlCsp($htmlMaint)
+                    : $htmlMaint;
                 exit;
             }
         }
@@ -487,7 +490,10 @@ class Router
         $this->logNotFound();
         
         http_response_code(404);
-        echo $this->renderNotFoundPage();
+        $html404 = $this->renderNotFoundPage();
+        echo class_exists(CspPolitica::class)
+            ? CspPolitica::prepararHtmlCsp($html404)
+            : $html404;
     }
     
     /**

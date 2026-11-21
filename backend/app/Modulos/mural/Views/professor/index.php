@@ -120,7 +120,7 @@ document.querySelectorAll('.marcar-visto-professor').forEach(function (btn) {
                             <button type="button" class="btn-editar-recado inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-800 text-sm" data-recado-id="<?= (int)$r['id'] ?>">
                                 <i class="fas fa-edit"></i> Editar
                             </button>
-                            <form action="<?= URL ?>/professor/mural-recados/excluir" method="post" class="inline" onsubmit="return confirm('Excluir este recado?');">
+                            <form action="<?= URL ?>/professor/mural-recados/excluir" method="post" class="inline" data-csp-confirm="Excluir este recado?">
                                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
                                 <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
                                 <button type="submit" class="inline-flex items-center gap-1.5 text-red-600 hover:text-red-800 text-sm">

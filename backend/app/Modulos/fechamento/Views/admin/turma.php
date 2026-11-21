@@ -356,7 +356,7 @@ $fechHomologarQs = http_build_query([
                     <?php if (!$travado): ?>
                     <td class="px-4 py-2 text-right">
                         <form method="POST" action="<?= URL ?>/admin/resultados-finais/turma/<?= $turmaId ?>/especial/<?= (int) $esp['id'] ?>/excluir"
-                              onsubmit="return confirm('Remover esta situação?')">
+                              data-csp-confirm="Remover esta situação?">
                             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                             <input type="hidden" name="ano_letivo" value="<?= $anoLetivo ?>">
                             <input type="hidden" name="periodo_tipo" value="<?= htmlspecialchars($periodoTipo) ?>">

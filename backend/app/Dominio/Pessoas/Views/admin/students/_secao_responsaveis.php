@@ -87,7 +87,7 @@
                     </div>
                 <?php endif; ?>
                 <div class="mt-3 pt-3 border-t border-slate-100">
-                    <button type="button" onclick="abrirModalCadastrarPai(<?= (int)($student['id'] ?? 0) ?>)" data-perm-key="acao_rapida_cadastrar_responsavel" data-perm-action="cadastrar" class="text-sm font-semibold text-blue-600 hover:text-blue-800">
+                    <button type="button" data-csp-click="abrirModalCadastrarPai" data-csp-arg="<?= (int)($student['id'] ?? 0) ?>" data-perm-key="acao_rapida_cadastrar_responsavel" data-perm-action="cadastrar" class="text-sm font-semibold text-blue-600 hover:text-blue-800">
                         Cadastrar responsável
                     </button>
                 </div>

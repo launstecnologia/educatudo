@@ -68,7 +68,7 @@ if (!function_exists('jornadaBuildMediaKey')) {
             <!-- Botão Iniciar etapa (conteúdo só aparece após clicar) -->
             <div id="iniciar-etapa-wrap-<?= $modulo['id'] ?>" class="text-center py-8">
                 <p class="text-gray-600 mb-4">Clique em iniciar para ver o conteúdo. O tempo será contabilizado até você finalizar.</p>
-                <button type="button" onclick="iniciarEtapa(<?= $modulo['id'] ?>)" 
+                <button type="button" data-csp-click="iniciarEtapa" data-csp-arg="<?= $modulo['id'] ?>" 
                         class="px-8 py-4 bg-blue-500 text-white rounded-lg text-lg font-semibold hover:bg-blue-600 transition-colors inline-flex items-center gap-2">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>

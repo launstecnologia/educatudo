@@ -81,7 +81,7 @@ require_once \App\Core\ViewPaths::helper('RichTextHelper.php');
                         <li class="py-2 px-3 flex items-center justify-between">
                             <a href="<?= URL ?>/cursos/entrega/arquivo/<?= (int) $f['id'] ?>" target="_blank" rel="noopener" class="text-sm text-gray-700 hover:text-green-700"><i class="fa-solid fa-paperclip text-gray-400 mr-2"></i><?= htmlspecialchars((string) ($f['nome'] ?? 'Arquivo')) ?></a>
                             <?php if (!$avaliada): ?>
-                            <form method="post" action="<?= URL ?>/cursos/entrega/arquivo/<?= (int) $f['id'] ?>/excluir" onsubmit="return confirm('Remover arquivo?');">
+                            <form method="post" action="<?= URL ?>/cursos/entrega/arquivo/<?= (int) $f['id'] ?>/excluir" data-csp-confirm="Remover arquivo?">
                                 <input type="hidden" name="_token" value="<?= $csrf ?>">
                                 <button type="submit" class="text-gray-300 hover:text-red-600"><i class="fa-solid fa-xmark"></i></button>
                             </form>

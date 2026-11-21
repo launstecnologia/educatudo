@@ -95,7 +95,7 @@ $title = $title ?? 'Minhas Notificações';
                                                 Marcar como lida
                                             </a>
                                         <?php endif; ?>
-                                        <button onclick="abrirModalNotificacao(<?= $notificacao['id'] ?>)" 
+                                        <button data-csp-click="abrirModalNotificacao" data-csp-arg="<?= $notificacao['id'] ?>" 
                                                 class="text-sm text-purple-600 hover:text-purple-800 font-medium">
                                             Ver detalhes
                                         </button>

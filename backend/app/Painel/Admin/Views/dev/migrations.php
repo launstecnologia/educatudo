@@ -44,11 +44,11 @@
                                 <span class="px-3 py-1 rounded-full text-xs font-medium <?= $escola['ativo'] ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' ?>">
                                     <?= $escola['ativo'] ? 'Ativa' : 'Inativa' ?>
                                 </span>
-                                <button onclick="editarEscola(<?= htmlspecialchars(json_encode($escola)) ?>)" 
+                                <button data-csp-click="editarEscola" data-csp-arg="<?= htmlspecialchars(json_encode($escola)) ?>" 
                                         class="btn-primary-custom px-3 py-1 rounded-lg text-sm hover:opacity-90">
                                     Editar
                                 </button>
-                                <button onclick="deletarEscola(<?= $escola['id'] ?>)" 
+                                <button data-csp-click="deletarEscola" data-csp-arg="<?= $escola['id'] ?>" 
                                         class="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm">
                                     Deletar
                                 </button>

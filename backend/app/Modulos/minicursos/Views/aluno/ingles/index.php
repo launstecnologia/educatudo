@@ -80,7 +80,7 @@
     <h2 class="text-xl font-semibold text-gray-900 mb-4">Conversas anteriores</h2>
     <div class="space-y-2">
         <?php foreach ($historico as $conv): ?>
-        <div class="bg-gray-50 rounded-lg p-3 hover:bg-gray-100 transition-colors cursor-pointer" onclick="carregarConversa(<?= (int)$conv['id'] ?>)">
+        <div class="bg-gray-50 rounded-lg p-3 hover:bg-gray-100 transition-colors cursor-pointer" data-csp-click="carregarConversa" data-csp-arg="<?= (int)$conv['id'] ?>">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-900">Conversa #<?= (int)$conv['id'] ?></p>

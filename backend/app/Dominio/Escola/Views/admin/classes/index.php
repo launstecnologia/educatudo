@@ -70,11 +70,11 @@
                             <div class="flex space-x-2">
                                 <a href="<?= URL ?>/admin/classes/<?= $turma['id'] ?>/edit" 
                                    class="text-blue-600 hover:text-blue-900">Editar</a>
-                                <button onclick="toggleStatusClass(<?= $turma['id'] ?>, <?= $turma['ativo'] ? 'false' : 'true' ?>)" 
+                                <button data-csp-click="toggleStatusClass" data-csp-arg="<?= $turma['id'] ?>, <?= $turma['ativo'] ? 'false' : 'true' ?>" 
                                         class="text-orange-600 hover:text-orange-900">
                                     <?= $turma['ativo'] ? 'Desativar' : 'Ativar' ?>
                                 </button>
-                                <button onclick="deleteClass(<?= $turma['id'] ?>)" 
+                                <button data-csp-click="deleteClass" data-csp-arg="<?= $turma['id'] ?>" 
                                         class="text-red-600 hover:text-red-900">Excluir</button>
                             </div>
                         </td>

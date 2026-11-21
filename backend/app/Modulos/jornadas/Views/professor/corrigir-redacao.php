@@ -198,7 +198,7 @@
                                     <button
                                         type="button"
                                         class="text-xs px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-100"
-                                        onclick="copiarFeedbackIAParaProfessor(<?= $num ?>)"
+                                        data-csp-click="copiarFeedbackIAParaProfessor" data-csp-arg="<?= $num ?>"
                                     >
                                         Copiar texto da IA
                                     </button>

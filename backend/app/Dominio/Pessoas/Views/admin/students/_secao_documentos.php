@@ -110,7 +110,7 @@
                                 <?php endif; ?>
                                 <?php if ($docCanDelete && $docId > 0 && ($temArquivo || $linha['tipo'] === 'outros')): ?>
                                 <button type="button" class="px-2 py-1 text-xs font-medium text-red-600 hover:text-red-800"
-                                        onclick="removerDocumento(<?= $docId ?>)">
+                                        data-csp-click="removerDocumento" data-csp-arg="<?= $docId ?>">
                                     Remover
                                 </button>
                                 <?php endif; ?>

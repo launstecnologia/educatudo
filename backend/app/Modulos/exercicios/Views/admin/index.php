@@ -209,7 +209,7 @@ foreach (['materia', 'nivel', 'titulo'] as $fk) {
                                 <i class="fa-solid fa-file-export text-gray-400 w-4 text-center"></i> Exportar
                             </a>
                             <div class="border-t border-gray-100 my-1"></div>
-                            <button type="button" onclick="deleteExercise(<?= $exercise['id'] ?>)"
+                            <button type="button" data-csp-click="deleteExercise" data-csp-arg="<?= $exercise['id'] ?>"
                                     class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                                 <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Excluir
                             </button>

@@ -159,7 +159,7 @@ $ciclosFiltro = [
                             <?php if (!$ehFilho): ?>
                                 <div class="mt-1 flex h-5 w-5 shrink-0 items-center justify-center">
                                     <?php if ($temFilhos): ?>
-                                        <button type="button" class="cc-seta flex h-5 w-5 items-center justify-center text-gray-400 hover:text-gray-600" aria-expanded="true" aria-label="Recolher desdobramentos de <?= htmlspecialchars($item['nome'] ?? '') ?>" onclick="alternarFilhosComponente(<?= $itemId ?>, this)">
+                                        <button type="button" class="cc-seta flex h-5 w-5 items-center justify-center text-gray-400 hover:text-gray-600" aria-expanded="true" aria-label="Recolher desdobramentos de <?= htmlspecialchars($item['nome'] ?? '') ?>" data-csp-click="alternarFilhosComponente" data-csp-arg="<?= $itemId ?>, this)">
                                             <svg class="cc-seta-marca" width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
                                                 <path d="M2.25 4.25 L6 8 L9.75 4.25" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                                             </svg>
@@ -208,12 +208,12 @@ $ciclosFiltro = [
                     </td>
                     <td class="px-4 py-3 align-middle whitespace-nowrap text-right">
                         <?php ob_start(); ?>
-                        <button type="button" onclick="openComponenteDrawer(<?= (int) $item['id'] ?>)"
+                        <button type="button" onclick="openComponenteDrawer(<?= (int) $item['id'] ?>"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                         </button>
                         <div class="border-t border-gray-100 my-1"></div>
-                        <button type="button" onclick="deleteComponente(<?= (int) $item['id'] ?>)"
+                        <button type="button" data-csp-click="deleteComponente" data-csp-arg="<?= (int) $item['id'] ?>"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                             <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Excluir
                         </button>

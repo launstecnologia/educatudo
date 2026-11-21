@@ -336,7 +336,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
 
                 <?php if ($podeEnturmar): ?>
                 <form method="POST" action="<?= URL ?>/admin/enrollment/<?= (int)$enrollment['id'] ?>/status" class="inline"
-                      onsubmit="return confirm('Enturmar este aluno?')">
+                      data-csp-confirm="Enturmar este aluno?">
                     <input type="hidden" name="_token" value="<?= $esc($csrf_token) ?>">
                     <input type="hidden" name="novo_status" value="enturmada">
                     <button type="submit" class="text-xs text-emerald-700 border border-emerald-200 rounded-lg px-3 py-1.5 hover:bg-emerald-50 transition">
@@ -356,7 +356,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
 
                 <?php if ($enrollment['status'] !== 'cancelada'): ?>
                 <form method="POST" action="<?= URL ?>/admin/enrollment/<?= (int)$enrollment['id'] ?>/cancelar" class="inline"
-                      onsubmit="return confirm('Cancelar esta matrícula?')">
+                      data-csp-confirm="Cancelar esta matrícula?">
                     <input type="hidden" name="_token" value="<?= $esc($csrf_token) ?>">
                     <button type="submit" class="text-xs text-red-600 hover:text-red-800 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50 transition">
                         Cancelar
@@ -530,7 +530,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
                     </div>
                     <form method="POST"
                           action="<?= URL ?>/admin/enrollment/<?= (int)$enrollment['id'] ?>/documentos/<?= (int)$doc['id'] ?>/remover"
-                          onsubmit="return confirm('Remover este documento?')">
+                          data-csp-confirm="Remover este documento?">
                         <input type="hidden" name="_token" value="<?= $esc($csrf_token) ?>">
                         <button type="submit" class="text-xs font-medium text-red-600 hover:text-red-800 px-2 py-1 rounded-md hover:bg-red-50">Remover</button>
                     </form>
@@ -691,7 +691,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
 
             <?php if ($podeEnturmar): ?>
             <form method="POST" action="<?= URL ?>/admin/enrollment/<?= (int)$enrollment['id'] ?>/status"
-                  onsubmit="return confirm('Enturmar este aluno?')">
+                  data-csp-confirm="Enturmar este aluno?">
                 <input type="hidden" name="_token" value="<?= $esc($csrf_token) ?>">
                 <input type="hidden" name="novo_status" value="enturmada">
                 <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">

@@ -10,7 +10,7 @@
     <div class="flex items-center gap-3 flex-shrink-0">
         <a href="<?= URL ?>/admin/aulas-online/arquivo/download?id=<?= (int)$arq['id'] ?>"
            class="text-xs text-blue-600 hover:underline">Baixar</a>
-        <button type="button" onclick="excluirArquivo(<?= (int)$arq['id'] ?>)"
+        <button type="button" data-csp-click="excluirArquivo" data-csp-arg="<?= (int)$arq['id'] ?>"
                 class="text-xs text-red-600 hover:underline">Excluir</button>
     </div>
 </div>

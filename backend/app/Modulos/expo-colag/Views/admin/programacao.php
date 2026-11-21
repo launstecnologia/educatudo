@@ -71,7 +71,7 @@ $csrf_token = $csrf_token ?? '';
                                 <?php if (!empty($item['local'])): ?> · <?= htmlspecialchars($item['local']) ?><?php endif; ?>
                             </p>
                         </div>
-                        <form method="post" action="<?= URL ?>/admin/expo-colag/programacao" onsubmit="return confirm('Excluir?');">
+                        <form method="post" action="<?= URL ?>/admin/expo-colag/programacao" data-csp-confirm="Excluir?">
                             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
                             <input type="hidden" name="acao" value="excluir">
                             <input type="hidden" name="item_id" value="<?= (int) $item['id'] ?>">

@@ -44,7 +44,7 @@ $csrf_token = $csrf_token ?? '';
                         <td class="px-4 py-3 text-right">
                             <a href="<?= URL ?>/admin/minicursos/<?= (int)$row['id'] ?>" class="text-indigo-600 hover:underline text-sm">Módulos e Aulas</a>
                             <a href="<?= URL ?>/admin/minicursos/editar/<?= (int)$row['id'] ?>" class="text-gray-600 hover:underline text-sm ml-2">Editar</a>
-                            <form method="post" action="<?= URL ?>/admin/minicursos/excluir/<?= (int)$row['id'] ?>" class="inline ml-2" onsubmit="return confirm('Excluir este minicurso e todos os módulos/aulas?');">
+                            <form method="post" action="<?= URL ?>/admin/minicursos/excluir/<?= (int)$row['id'] ?>" class="inline ml-2" data-csp-confirm="Excluir este minicurso e todos os módulos/aulas?">
                                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                                 <button type="submit" class="text-red-600 hover:underline text-sm">Excluir</button>
                             </form>

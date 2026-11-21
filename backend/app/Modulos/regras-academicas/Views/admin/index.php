@@ -124,7 +124,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/flash_message.php';
                             <a href="<?= URL ?>/admin/regras-academicas/<?= (int) $row['id'] ?>/editar" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                 <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                             </a>
-                            <form method="POST" action="<?= URL ?>/admin/regras-academicas/<?= (int) $row['id'] ?>/delete" onsubmit="return confirm('Excluir esta regra? O histórico de versões também será removido.');">
+                            <form method="POST" action="<?= URL ?>/admin/regras-academicas/<?= (int) $row['id'] ?>/delete" data-csp-confirm="Excluir esta regra? O histórico de versões também será removido.">
                                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                                 <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                                     <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Excluir

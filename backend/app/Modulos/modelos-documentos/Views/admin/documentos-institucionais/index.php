@@ -73,7 +73,7 @@ if (!($schema_pronto ?? false)): ?>
                             <?php if (!empty($d['arquivo_key'])): ?>
                                 <a href="<?= URL ?>/admin/documentos-institucionais/baixar?id=<?= (int) $d['id'] ?>" target="_blank" class="text-sm font-medium text-green-700 hover:text-green-900 mr-4">Baixar</a>
                             <?php endif; ?>
-                            <form method="post" action="<?= URL ?>/admin/documentos-institucionais/excluir" onsubmit="return confirm('Remover este documento?');" class="inline">
+                            <form method="post" action="<?= URL ?>/admin/documentos-institucionais/excluir" data-csp-confirm="Remover este documento?" class="inline">
                                 <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
                                 <input type="hidden" name="id" value="<?= (int) $d['id'] ?>">
                                 <button type="submit" class="text-sm text-red-600 hover:text-red-800">Remover</button>

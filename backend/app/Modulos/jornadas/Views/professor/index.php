@@ -293,7 +293,7 @@ include $ui . '/offcanvas.php';
                             <i class="fa-regular fa-copy text-gray-500"></i>
                             Duplicar
                         </button>
-                        <button type="button" onclick="confirmarExclusao(this)"
+                        <button type="button" data-csp-click="confirmarExclusao" data-csp-pass="el"
                                 class="jornada-deletar inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
                                 data-jornada-id="<?= (int)$jornada['id'] ?>"
                                 data-jornada-titulo="<?= htmlspecialchars($jornada['titulo'] ?? 'Jornada', ENT_QUOTES, 'UTF-8') ?>"
@@ -301,7 +301,7 @@ include $ui . '/offcanvas.php';
                             <i class="fa-regular fa-trash-can text-gray-500"></i>
                             Inativar
                         </button>
-                        <button onclick="window.location.href='<?= URL ?>/professor/jornadas/<?= $jornada['id'] ?>'" 
+                        <button data-csp-href="<?= URL ?>/professor/jornadas/<?= $jornada['id'] ?>" 
                                 class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 hover:border-blue-300"
                                 title="Visualizar">
                             <i class="fa-regular fa-eye text-blue-600"></i>

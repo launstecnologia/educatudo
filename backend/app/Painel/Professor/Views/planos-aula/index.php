@@ -115,7 +115,7 @@ $totalRascunhos = (int) ($stats['rascunho'] ?? 0);
         <div class="flex items-center gap-3 flex-shrink-0">
             <?php if ($totalRascunhos > 0): ?>
             <button type="button"
-                    onclick="aprovarTodosRascunhos(<?= (int) $totalRascunhos ?>)"
+                    data-csp-click="aprovarTodosRascunhos" data-csp-arg="<?= (int) $totalRascunhos ?>"
                     class="inline-flex items-center px-4 py-2.5 border border-green-200 rounded-lg text-sm font-semibold text-green-700 bg-green-50 hover:bg-green-100 transition-colors">
                 <svg class="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M20 6 9 17l-5-5"></path>
@@ -234,12 +234,12 @@ $totalRascunhos = (int) ($stats['rascunho'] ?? 0);
                                    class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                     <i class="fa-solid fa-file-pdf text-gray-400 w-4 text-center"></i> Exportar PDF
                                 </a>
-                                <button type="button" onclick="duplicarPlano(<?= $planoId ?>)"
+                                <button type="button" data-csp-click="duplicarPlano" data-csp-arg="<?= $planoId ?>"
                                         class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                     <i class="fa-solid fa-copy text-gray-400 w-4 text-center"></i> Duplicar
                                 </button>
                                 <div class="border-t border-gray-100 my-1"></div>
-                                <button type="button" onclick="excluirPlano(<?= $planoId ?>)"
+                                <button type="button" data-csp-click="excluirPlano" data-csp-arg="<?= $planoId ?>"
                                         class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                                     <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Excluir
                                 </button>

@@ -506,7 +506,7 @@ $steps = [
                 <div class="flex flex-wrap gap-3">
                     <?php if ($status !== 'ativa'): ?>
                         <?php if ($podeAtivar): ?>
-                            <form method="post" action="<?= URL ?>/admin/inclusao/ativar" onsubmit="return confirm('Ativar a máscara? As regras passarão a valer nas provas do aluno.');">
+                            <form method="post" action="<?= URL ?>/admin/inclusao/ativar" data-csp-confirm="Ativar a máscara? As regras passarão a valer nas provas do aluno.">
                                 <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
                                 <input type="hidden" name="mascara_id" value="<?= $accId ?>">
                                 <button type="submit" class="btn-primary-custom px-4 py-2 rounded-lg hover:opacity-90 text-sm font-medium">Ativar máscara</button>
@@ -524,7 +524,7 @@ $steps = [
                         </form>
                     <?php endif; ?>
                     <?php if ($status !== 'encerrada'): ?>
-                        <form method="post" action="<?= URL ?>/admin/inclusao/status" onsubmit="return confirm('Encerrar a máscara?');">
+                        <form method="post" action="<?= URL ?>/admin/inclusao/status" data-csp-confirm="Encerrar a máscara?">
                             <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
                             <input type="hidden" name="mascara_id" value="<?= $accId ?>">
                             <input type="hidden" name="status" value="encerrada">

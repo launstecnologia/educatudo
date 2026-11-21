@@ -112,7 +112,7 @@ $voltarComFiltroAdmin = str_contains((string) $back_url, '/admin/planos-aula');
                                         </svg>
                                     </button>
                                 <?php else: ?>
-                                    <button type="button" onclick="removerData(this)" 
+                                    <button type="button" data-csp-click="removerData" data-csp-pass="el" 
                                             class="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -323,7 +323,7 @@ function adicionarData() {
                    class="w-48 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 data-input">
             <span class="dia-semana text-sm text-gray-600 font-medium"></span>
         </div>
-        <button type="button" onclick="removerData(this)" 
+        <button type="button" data-csp-click="removerData" data-csp-pass="el" 
                 class="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>

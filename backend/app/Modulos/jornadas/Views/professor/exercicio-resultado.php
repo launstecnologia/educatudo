@@ -14,7 +14,7 @@
                     <p class="text-gray-600 mt-1">Jornada: <?= htmlspecialchars($jornada['titulo']) ?></p>
                 </div>
                 <div class="flex space-x-3">
-                    <button onclick="window.location.href='<?= URL ?>/professor/jornadas/<?= $jornada['id'] ?>'" 
+                    <button data-csp-href="<?= URL ?>/professor/jornadas/<?= $jornada['id'] ?>" 
                             class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors">
                         ← Voltar para Jornada
                     </button>

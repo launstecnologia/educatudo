@@ -81,7 +81,7 @@
                         </div>
                         <div class="flex-1">
                             <input type="file" id="<?= htmlspecialchars($inputId) ?>" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden" data-logo-upload="<?= htmlspecialchars($slot['type']) ?>">
-                            <button type="button" onclick="document.getElementById('<?= htmlspecialchars($inputId) ?>').click()" class="btn-primary-custom px-4 py-2 rounded-lg hover:opacity-90 transition-colors">
+                            <button type="button" data-csp-click-id="&lt;?= htmlspecialchars($inputId) ?&gt;" class="btn-primary-custom px-4 py-2 rounded-lg hover:opacity-90 transition-colors">
                                 <?= htmlspecialchars($slot['button']) ?>
                             </button>
                             <p class="text-sm text-gray-500 mt-1"><?= htmlspecialchars($slot['hint']) ?></p>
@@ -107,7 +107,7 @@
                         </div>
                         <div class="flex-1">
                             <input type="file" id="cover-input" accept="image/*" class="hidden">
-                            <button type="button" onclick="document.getElementById('cover-input').click()" class="btn-primary-custom px-4 py-2 rounded-lg hover:opacity-90 transition-colors">
+                            <button type="button" data-csp-click-id="cover-input" class="btn-primary-custom px-4 py-2 rounded-lg hover:opacity-90 transition-colors">
                                 Escolher Capa
                             </button>
                             <p class="text-sm text-gray-500 mt-1">Formatos: JPG, PNG, GIF, SVG</p>

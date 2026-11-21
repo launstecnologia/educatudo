@@ -43,7 +43,7 @@ $periodoFim = (string) ($periodo['fim'] ?? '');
                 </p>
             </div>
         </div>
-        <form method="post" action="<?= URL ?>/admin/diario/reabrir" onsubmit="return confirm('Reabrir este diário? O professor poderá editar chamadas novamente.')">
+        <form method="post" action="<?= URL ?>/admin/diario/reabrir" data-csp-confirm="Reabrir este diário? O professor poderá editar chamadas novamente.">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string) $csrf_token) ?>">
             <input type="hidden" name="fechamento_id" value="<?= $fechamentoId ?>">
             <button type="submit" class="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">

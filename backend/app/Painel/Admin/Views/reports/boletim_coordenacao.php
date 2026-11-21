@@ -292,7 +292,7 @@ $alunoQFiltro = trim((string) ($aluno_q ?? ''));
         <div class="flex flex-wrap items-center gap-3">
             <strong><?= $totalAlunosResumo ?> <?= $totalAlunosResumo === 1 ? 'aluno' : 'alunos' ?></strong>
             <?php if (!empty($pode_editar_observacao) && $totalAlunosResumo > 0): ?>
-            <form method="post" action="<?= URL ?>/admin/reports/boletim-coordenacao/observacoes/limpar" class="inline" onsubmit="return confirm('Apagar a observação atual de todos os alunos deste relatório, inclusive os das outras páginas? O texto continua salvo nas versões.');">
+            <form method="post" action="<?= URL ?>/admin/reports/boletim-coordenacao/observacoes/limpar" class="inline" data-csp-confirm="Apagar a observação atual de todos os alunos deste relatório, inclusive os das outras páginas? O texto continua salvo nas versões.">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="executar" value="1">
                 <input type="hidden" name="pagina" value="<?= $paginaAtual ?>">

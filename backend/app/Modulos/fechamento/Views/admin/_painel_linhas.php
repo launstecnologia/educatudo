@@ -83,7 +83,7 @@ else:
         <?php ob_start(); ?>
         <?php if ($podeAlterar && !$periodoEncerrado): ?>
         <form method="POST" action="<?= URL ?>/admin/fechamento/turma/<?= $tid ?>/homologar"
-              onsubmit="return window.fechIniciarHomologacao(this)"
+              data-csp-submit-pass-el="fechIniciarHomologacao"
               data-confirm-msg="Homologar a turma <?= htmlspecialchars((string) ($turma['nome'] ?? ''), ENT_QUOTES, 'UTF-8') ?>?">
             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
             <input type="hidden" name="ano_letivo" value="<?= $anoLetivo ?>">

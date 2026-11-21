@@ -131,7 +131,7 @@ foreach ($documentos as $d) {
                 </p>
             <?php endif; ?>
             <?php if ($st !== 'validada' && $st !== 'cancelada'): ?>
-            <form method="post" action="<?= $base ?>/importar/<?= (int) $imp['id'] ?>/validar" onsubmit="return confirm('Validar e gravar no boletim/histórico?');">
+            <form method="post" action="<?= $base ?>/importar/<?= (int) $imp['id'] ?>/validar" data-csp-confirm="Validar e gravar no boletim/histórico?">
                 <input type="hidden" name="_token" value="<?= $esc($token) ?>">
                 <button class="btn-primary-custom px-4 py-2 rounded-lg text-sm font-semibold" <?= ($anosIa === [] && $bimsIa === []) ? 'disabled title="Sem anos ou notas para validar"' : '' ?>>Validar leitura</button>
             </form>
@@ -175,7 +175,7 @@ foreach ($documentos as $d) {
                                         data-ve-boletim-toggle="<?= $esc($painelId) ?>"
                                         aria-expanded="false"
                                         aria-controls="<?= $esc($painelId) ?>"
-                                        onclick="veToggleBoletimAno(this)">
+                                        data-csp-click="veToggleBoletimAno" data-csp-pass="el">
                                     <i class="fa-solid fa-table mr-1.5 text-gray-400"></i>
                                     Boletim
                                     <i class="fa-solid fa-chevron-down ml-1.5 text-[10px] text-gray-400 ve-boletim-chevron"></i>
@@ -576,7 +576,7 @@ $vePodeVerLog = is_array($user ?? null) && (string) ($user['perfil_admin'] ?? ''
                         <td class="px-2 py-2 text-center"><input name="bim_faltas[<?= $i ?>][<?= (int) $p ?>]" value="<?= $esc(is_array($salvoMeio) ? ($salvoMeio['faltas'] ?? '') : '') ?>" inputmode="numeric" class="<?= $celBim ?>"></td>
                         <?php endforeach; ?>
                         <td class="px-2 py-2 text-center">
-                            <button type="button" class="text-gray-400 hover:text-red-600" onclick="veRemoverLinhaBim(this)" aria-label="Remover componente"><i class="fa-solid fa-xmark"></i></button>
+                            <button type="button" class="text-gray-400 hover:text-red-600" data-csp-click="veRemoverLinhaBim" data-csp-pass="el" aria-label="Remover componente"><i class="fa-solid fa-xmark"></i></button>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -601,7 +601,7 @@ $vePodeVerLog = is_array($user ?? null) && (string) ($user['perfil_admin'] ?? ''
                 <td class="px-2 py-2 text-center"><input name="bim_faltas[__I__][<?= (int) $p ?>]" inputmode="numeric" class="<?= $celBim ?>"></td>
                 <?php endforeach; ?>
                 <td class="px-2 py-2 text-center">
-                    <button type="button" class="text-gray-400 hover:text-red-600" onclick="veRemoverLinhaBim(this)" aria-label="Remover componente"><i class="fa-solid fa-xmark"></i></button>
+                    <button type="button" class="text-gray-400 hover:text-red-600" data-csp-click="veRemoverLinhaBim" data-csp-pass="el" aria-label="Remover componente"><i class="fa-solid fa-xmark"></i></button>
                 </td>
             </tr>
         </template>

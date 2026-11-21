@@ -174,7 +174,7 @@
                                     <td class="px-4 py-2 text-sm text-gray-600"><?= (int)($lp['total_sessoes'] ?? 0) ?></td>
                                     <td class="px-4 py-2 text-sm text-gray-600"><?= !empty($lp['created_at']) ? date('d/m/Y H:i', strtotime($lp['created_at'])) : '—' ?></td>
                                     <td class="px-4 py-2 text-right">
-                                        <form method="post" action="<?= URL ?>/admin/students/excluir-lista-exercicio-ia" class="inline" onsubmit="return confirm('Excluir esta lista? Esta ação não pode ser desfeita.');">
+                                        <form method="post" action="<?= URL ?>/admin/students/excluir-lista-exercicio-ia" class="inline" data-csp-confirm="Excluir esta lista? Esta ação não pode ser desfeita.">
                                             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
                                             <input type="hidden" name="lista_id" value="<?= (int)$lp['id'] ?>">
                                             <input type="hidden" name="aluno_id" value="<?= (int)($student['id'] ?? 0) ?>">
@@ -285,7 +285,7 @@
                         <?php foreach ($redacoes as $index => $redacao): ?>
                             <div class="bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
                                 <!-- Header Clicável -->
-                                <button onclick="toggleRedacaoDetails(<?= $redacao['id'] ?>)" class="w-full text-left p-6 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                                <button data-csp-click="toggleRedacaoDetails" data-csp-arg="<?= $redacao['id'] ?>" class="w-full text-left p-6 flex items-center justify-between hover:bg-gray-50 transition-colors">
                                     <div class="flex-1">
                                         <div class="flex items-center flex-wrap gap-3 mb-2">
                                             <h4 class="text-lg font-bold text-gray-900">

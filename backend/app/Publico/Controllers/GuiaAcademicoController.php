@@ -55,7 +55,9 @@ class GuiaAcademicoController extends BaseController
             'css_tema' => $cssTema,
         ];
         extract($viewData, EXTR_SKIP);
+        ob_start();
         require __DIR__ . '/../../Views/public/guia_academico.php';
+        echo \App\Core\CspPolitica::prepararHtmlCsp((string) ob_get_clean());
     }
 }
 }

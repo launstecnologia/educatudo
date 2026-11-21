@@ -53,7 +53,7 @@ require __DIR__ . '/_reports_filters_form.php';
 <div class="space-y-4">
     <?php foreach ($redacoes_com_correcao as $redacao): ?>
     <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div class="p-4 bg-gray-50 border-b border-gray-200 cursor-pointer" onclick="toggleRedacao(<?= $redacao['id'] ?>)">
+        <div class="p-4 bg-gray-50 border-b border-gray-200 cursor-pointer" data-csp-click="toggleRedacao" data-csp-arg="<?= $redacao['id'] ?>">
             <div class="flex items-center justify-between">
                 <div>
                     <h4 class="font-semibold text-gray-900"><?= htmlspecialchars($redacao['aluno_nome']) ?> - RA: <?= htmlspecialchars($redacao['ra']) ?></h4>

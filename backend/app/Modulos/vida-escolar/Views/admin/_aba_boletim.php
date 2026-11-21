@@ -649,7 +649,7 @@ $rotuloAbaFicha = static function (array $f): array {
                         </div>
                         <button class="shrink-0 h-10 px-4 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">Fechar</button>
                     </form>
-                    <form method="post" action="<?= $base ?>/homologar" class="shrink-0" onsubmit="return confirm('Homologar o boletim deste ano? As células preenchidas serão travadas.');">
+                    <form method="post" action="<?= $base ?>/homologar" class="shrink-0" data-csp-confirm="Homologar o boletim deste ano? As células preenchidas serão travadas.">
                         <input type="hidden" name="_token" value="<?= $esc($token) ?>">
                         <input type="hidden" name="ficha_id" value="<?= (int) $ficha['id'] ?>">
                         <label class="hidden sm:block text-sm font-medium text-gray-700 mb-1">&nbsp;</label>
@@ -661,7 +661,7 @@ $rotuloAbaFicha = static function (array $f): array {
             <div class="rounded-xl border <?= $fichaHomologada ? 'border-amber-200 bg-amber-50/60' : 'border-gray-200 bg-slate-50' ?> p-4">
                 <h4 class="text-sm font-semibold text-gray-900">Corrigir notas</h4>
                 <p class="text-xs text-gray-500 mt-0.5 mb-3">Reabre o período travado. O motivo é obrigatório e fica na auditoria.</p>
-                <form method="post" action="<?= $base ?>/reabrir" class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end" onsubmit="return confirm('Reabrir para correção? A versão atual permanece na auditoria.');">
+                <form method="post" action="<?= $base ?>/reabrir" class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end" data-csp-confirm="Reabrir para correção? A versão atual permanece na auditoria.">
                     <input type="hidden" name="_token" value="<?= $esc($token) ?>">
                     <input type="hidden" name="ficha_id" value="<?= (int) $ficha['id'] ?>">
                     <div class="sm:col-span-4">

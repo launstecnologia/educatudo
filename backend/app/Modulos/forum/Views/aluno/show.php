@@ -29,7 +29,7 @@ $uploadBase = rtrim(URL, '/') . '/public/uploads/';
             </p>
             <div class="mt-4 text-gray-700 whitespace-pre-wrap"><?= nl2br(htmlspecialchars($topic['content'] ?? '')) ?></div>
             <?php if (!empty($can_moderate)): ?>
-                <form action="<?= $baseUrl ?>/moderation/delete-topic" method="post" class="mt-4 inline" onsubmit="return confirm('Excluir este tópico e todas as respostas?');">
+                <form action="<?= $baseUrl ?>/moderation/delete-topic" method="post" class="mt-4 inline" data-csp-confirm="Excluir este tópico e todas as respostas?">
                     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
                     <input type="hidden" name="topic_id" value="<?= (int)$topic['id'] ?>">
                     <button type="submit" class="text-sm text-red-600 hover:underline">Excluir tópico (moderação)</button>
@@ -84,7 +84,7 @@ $uploadBase = rtrim(URL, '/') . '/public/uploads/';
                                     </form>
                                 <?php endif; ?>
                                 <?php if (!empty($can_moderate)): ?>
-                                    <form action="<?= $baseUrl ?>/moderation/delete-reply" method="post" class="inline" onsubmit="return confirm('Excluir esta resposta?');">
+                                    <form action="<?= $baseUrl ?>/moderation/delete-reply" method="post" class="inline" data-csp-confirm="Excluir esta resposta?">
                                         <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
                                         <input type="hidden" name="reply_id" value="<?= (int)$r['id'] ?>">
                                         <button type="submit" class="text-xs text-red-600 hover:underline">Excluir</button>

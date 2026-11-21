@@ -86,12 +86,12 @@ $csrfToken = $csrf_token ?? $this->generateCsrfToken();
         <div class="min-h-[90px] p-1.5 flex flex-col bg-white" <?= $isHoje ? 'style="box-shadow: inset 0 0 0 2px var(--primary-color, #a855f7);"' : '' ?>>
             <span class="text-xs font-semibold inline-flex items-center justify-center w-6 h-6 rounded-full self-end <?= $isHoje ? 'text-white' : 'text-gray-600' ?>" <?= $isHoje ? 'style="background-color: var(--primary-color, #a855f7);"' : '' ?>><?= $dia ?></span>
             <?php foreach (array_slice($evsDia, 0, 3) as $ev): ?>
-                <button type="button" onclick="abrirDetalheEvento(<?= htmlspecialchars(json_encode($ev), ENT_QUOTES) ?>)" class="text-left text-[11px] rounded px-1 py-0.5 mt-0.5 truncate font-medium hover:opacity-80" style="background-color:<?= $ev['cor'] ?>22; color:<?= $ev['cor'] ?>;">
+                <button type="button" data-csp-click="abrirDetalheEvento" data-csp-arg="<?= htmlspecialchars(json_encode($ev), ENT_QUOTES) ?>" class="text-left text-[11px] rounded px-1 py-0.5 mt-0.5 truncate font-medium hover:opacity-80" style="background-color:<?= $ev['cor'] ?>22; color:<?= $ev['cor'] ?>;">
                     <?= htmlspecialchars($ev['titulo']) ?>
                 </button>
             <?php endforeach; ?>
             <?php if (count($evsDia) > 3): ?>
-                <button type="button" onclick="abrirDiaCompleto(<?= htmlspecialchars(json_encode($dia . ' de ' . $mesesNomes[$mes - 1]), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($evsDia), ENT_QUOTES) ?>)" class="text-left text-[10px] text-accent font-medium mt-0.5 hover:underline">
+                <button type="button" data-csp-click="abrirDiaCompleto" data-csp-arg="<?= htmlspecialchars(json_encode($dia . ' de ' . $mesesNomes[$mes - 1]), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($evsDia), ENT_QUOTES) ?>" class="text-left text-[10px] text-accent font-medium mt-0.5 hover:underline">
                     +<?= count($evsDia) - 3 ?> mais
                 </button>
             <?php endif; ?>

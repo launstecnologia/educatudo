@@ -139,7 +139,7 @@ if (!empty($proposal['repertoire'])) {
                         ✏️ Editar redação enviada
                     </a>
                     <?php if ($canDeleteSubmission): ?>
-                    <form action="<?= URL ?>/jornada-redacao/<?= (int)$proposal['id'] ?>/excluir-redacao" method="POST" onsubmit="return confirm('Deseja excluir sua redação enviada? Você poderá escrever novamente.');">
+                    <form action="<?= URL ?>/jornada-redacao/<?= (int)$proposal['id'] ?>/excluir-redacao" method="POST" data-csp-confirm="Deseja excluir sua redação enviada? Você poderá escrever novamente.">
                         <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
                         <button type="submit" class="block w-full bg-red-500 hover:bg-red-600 text-white text-center font-semibold px-6 py-3 rounded-lg transition">
                             🗑️ Excluir redação enviada
@@ -151,7 +151,7 @@ if (!empty($proposal['repertoire'])) {
                         ✍️ <?= $submission ? 'Continuar redação' : 'Escrever redação' ?>
                     </a>
                     <?php if ($canDeleteSubmission): ?>
-                    <form action="<?= URL ?>/jornada-redacao/<?= (int)$proposal['id'] ?>/excluir-redacao" method="POST" onsubmit="return confirm('Deseja excluir sua redação atual?');">
+                    <form action="<?= URL ?>/jornada-redacao/<?= (int)$proposal['id'] ?>/excluir-redacao" method="POST" data-csp-confirm="Deseja excluir sua redação atual?">
                         <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
                         <button type="submit" class="block w-full bg-red-500 hover:bg-red-600 text-white text-center font-semibold px-6 py-3 rounded-lg transition">
                             🗑️ Excluir redação

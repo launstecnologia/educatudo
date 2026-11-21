@@ -89,7 +89,7 @@ $pendentes = count($pendentes_list);
         <form method="post" action="<?= URL ?>/master/migrations/executar-escola">
             <input type="hidden" name="escola_id" value="<?= (int) $escola_id ?>">
             <button type="submit" class="px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium"
-                    onclick="return confirm('Deseja executar as migrations pendentes?')">
+                    data-csp-confirm="Deseja executar as migrations pendentes?">
                 Executar migrations pendentes
             </button>
         </form>

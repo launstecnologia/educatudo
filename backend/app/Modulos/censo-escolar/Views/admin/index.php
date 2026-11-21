@@ -98,7 +98,7 @@ $esc = static fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
         <input type="hidden" name="_token" value="<?= $esc($csrf_token) ?>">
     </form>
     <?php if (($edicao['status'] ?? '') !== 'fechado'): ?>
-    <form method="POST" action="<?= URL ?>/admin/censo/<?= $eid ?>/fechar" onsubmit="return confirm('Fechar a edição? Os dados declarados ficarão bloqueados.');">
+    <form method="POST" action="<?= URL ?>/admin/censo/<?= $eid ?>/fechar" data-csp-confirm="Fechar a edição? Os dados declarados ficarão bloqueados.">
         <input type="hidden" name="_token" value="<?= $esc($csrf_token) ?>">
         <button class="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">Fechar edição</button>
     </form>

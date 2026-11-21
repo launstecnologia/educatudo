@@ -150,7 +150,7 @@
                                 <a href="<?= URL ?>/professor/jornadas/modulos/<?= (int) $modulo['id'] ?>/exercicios/criar?editar=<?= (int) $exercicio['id'] ?>" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                     <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                                 </a>
-                                <button type="button" onclick="removerExercicio(<?= (int) $exercicio['id'] ?>)" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                                <button type="button" data-csp-click="removerExercicio" data-csp-arg="<?= (int) $exercicio['id'] ?>" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                                     <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Remover
                                 </button>
                             <?php

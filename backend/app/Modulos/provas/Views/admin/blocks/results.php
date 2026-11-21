@@ -31,7 +31,7 @@ $total_canceladas = (int)($total_canceladas ?? 0);
                     </span>
                 <?php else: ?>
                     <form method="post" action="<?= URL ?>/admin/provas/blocos/<?= (int)$bloco['id'] ?>/liberar-gabarito" class="inline"
-                          onsubmit="return confirm('Liberar o gabarito deste bloco para todos os alunos?');">
+                          data-csp-confirm="Liberar o gabarito deste bloco para todos os alunos?">
                         <input type="hidden" name="_token" value="<?= htmlspecialchars((string)($csrf_token ?? '')) ?>">
                         <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg">
                             Liberar gabarito
@@ -284,7 +284,7 @@ $total_canceladas = (int)($total_canceladas ?? 0);
                                     Ver resultado
                                 </a>
                                 <form method="post" action="<?= URL ?>/admin/provas/blocos/<?= (int)$bloco['id'] ?>/aluno/<?= (int)$aluno['aluno_id'] ?>/reabrir" class="inline"
-                                      onsubmit="return confirm('Reabrir a prova para este aluno? Ele poderá continuar de onde parou.');">
+                                      data-csp-confirm="Reabrir a prova para este aluno? Ele poderá continuar de onde parou.">
                                     <button type="submit" class="text-amber-600 hover:text-amber-800 font-medium text-sm">
                                         Reabrir prova
                                     </button>

@@ -65,7 +65,7 @@ $badge = static function (string $status): string {
                             <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                         </a>
                         <div class="border-t border-gray-100 my-1"></div>
-                        <form method="post" action="<?= URL . $base ?>/atividades/<?= (int) $a['id'] ?>/excluir" onsubmit="return confirm('Excluir esta atividade e todas as entregas?');">
+                        <form method="post" action="<?= URL . $base ?>/atividades/<?= (int) $a['id'] ?>/excluir" data-csp-confirm="Excluir esta atividade e todas as entregas?">
                             <input type="hidden" name="_token" value="<?= $csrf ?>">
                             <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                                 <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Excluir
@@ -96,7 +96,7 @@ $badge = static function (string $status): string {
             <?php foreach ($rubricas as $r): ?>
             <li class="py-3 flex items-center justify-between">
                 <span class="text-sm text-gray-800"><?= htmlspecialchars((string) $r['titulo']) ?> <span class="text-xs text-gray-400">(<?= (int) ($r['total_criterios'] ?? 0) ?> critérios)</span></span>
-                <form method="post" action="<?= URL . $base ?>/rubricas/<?= (int) $r['id'] ?>/excluir" onsubmit="return confirm('Remover rubrica?');">
+                <form method="post" action="<?= URL . $base ?>/rubricas/<?= (int) $r['id'] ?>/excluir" data-csp-confirm="Remover rubrica?">
                     <input type="hidden" name="_token" value="<?= $csrf ?>">
                     <button type="submit" class="text-gray-300 hover:text-red-600"><i class="fa-solid fa-trash"></i></button>
                 </form>

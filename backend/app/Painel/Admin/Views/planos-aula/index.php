@@ -81,7 +81,7 @@ $resumoPlanos = [
         </div>
         <div class="flex flex-wrap items-center gap-3">
             <?php if ($totalRascunhos > 0): ?>
-            <button type="button" onclick="aprovarTodosRascunhosAdmin(<?= (int) $totalRascunhos ?>)"
+            <button type="button" data-csp-click="aprovarTodosRascunhosAdmin" data-csp-arg="<?= (int) $totalRascunhos ?>"
                     class="inline-flex items-center px-4 py-2.5 border border-green-200 rounded-lg text-sm font-semibold text-green-700 bg-green-50 hover:bg-green-100 transition-colors">
                 <svg class="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M20 6 9 17l-5-5"></path>

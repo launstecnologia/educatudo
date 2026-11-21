@@ -97,14 +97,14 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                     <td class="px-4 py-4 text-gray-600"><?= htmlspecialchars((string) (($r['turmas_nomes'] ?? '') !== '' ? $r['turmas_nomes'] : 'Toda a escola')) ?></td>
                     <td class="px-4 py-4 text-right">
                         <?php ob_start(); ?>
-                        <button type="button" onclick="openReuniaoDrawer(<?= (int) $r['id'] ?>)" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                        <button type="button" data-csp-click="openReuniaoDrawer" data-csp-arg="<?= (int) $r['id'] ?>" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                         </button>
                         <a href="<?= URL ?>/admin/reunioes/geral/<?= (int) $r['id'] ?>/pdf" target="_blank" rel="noopener" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-file-pdf text-gray-400 w-4 text-center"></i> Baixar PDF
                         </a>
                         <div class="border-t border-gray-100 my-1"></div>
-                        <form method="post" action="<?= URL ?>/admin/reunioes/geral/excluir" onsubmit="return confirm('Remover esta reunião?');">
+                        <form method="post" action="<?= URL ?>/admin/reunioes/geral/excluir" data-csp-confirm="Remover esta reunião?">
                             <input type="hidden" name="_token" value="<?= $csrf ?>">
                             <input type="hidden" name="id" value="<?= (int) $r['id'] ?>">
                             <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">

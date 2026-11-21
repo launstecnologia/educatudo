@@ -56,12 +56,12 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php');
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right">
                         <?php ob_start(); ?>
-                        <button type="button" onclick="openMonitorDrawer(<?= (int) $m['id'] ?>)"
+                        <button type="button" data-csp-click="openMonitorDrawer" data-csp-arg="<?= (int) $m['id'] ?>"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                         </button>
                         <div class="border-t border-gray-100 my-1"></div>
-                        <button type="button" onclick="excluirMonitor(<?= (int) $m['id'] ?>)"
+                        <button type="button" data-csp-click="excluirMonitor" data-csp-arg="<?= (int) $m['id'] ?>"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                             <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Excluir
                         </button>

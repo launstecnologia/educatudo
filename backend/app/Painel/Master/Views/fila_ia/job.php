@@ -49,7 +49,7 @@ if (!empty($result['questoes']) && is_array($result['questoes'])) {
         <?php endif; ?>
         <?php if (in_array($status, ['processing', 'failed', 'pending'], true)): ?>
         <form method="post" action="<?= URL ?>/master/fila-ia/reenfileirar"
-              onsubmit="return confirm('Reenfileirar este job para o cron processar de novo?');">
+              data-csp-confirm="Reenfileirar este job para o cron processar de novo?">
             <input type="hidden" name="_token" value="<?= htmlspecialchars((string) $csrf_token) ?>">
             <input type="hidden" name="escola_id" value="<?= (int) ($job['escola_id'] ?? 0) ?>">
             <input type="hidden" name="job_id" value="<?= (int) ($job['id'] ?? 0) ?>">

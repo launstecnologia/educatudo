@@ -65,7 +65,7 @@ $estadoBadge = static function (string $s): array {
                     </form>
                     <?php endif; ?>
                     <div class="border-t border-gray-100 my-1"></div>
-                    <form method="post" action="<?= URL . $base ?>/ao-vivo/<?= $aid ?>/excluir" onsubmit="return confirm('Excluir esta aula ao vivo?');">
+                    <form method="post" action="<?= URL . $base ?>/ao-vivo/<?= $aid ?>/excluir" data-csp-confirm="Excluir esta aula ao vivo?">
                         <input type="hidden" name="_token" value="<?= $csrf ?>">
                         <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                             <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Excluir

@@ -51,7 +51,7 @@ $tiposAula = ['video' => 'Vídeo', 'slides' => 'Slides', 'pdf' => 'PDF', 'link' 
                 <h3 class="text-lg font-semibold text-gray-900"><?= htmlspecialchars($mod['titulo']) ?></h3>
                 <div class="flex gap-2">
                     <button type="button" onclick="document.getElementById('form-aula-<?= $mod['id'] ?>').classList.toggle('hidden')" class="text-sm bg-indigo-600 text-white px-3 py-1.5 rounded hover:bg-indigo-700">+ Aula</button>
-                    <form method="post" action="<?= URL ?>/admin/minicursos/modulo/excluir" class="inline" onsubmit="return confirm('Excluir este módulo e todas as aulas?');">
+                    <form method="post" action="<?= URL ?>/admin/minicursos/modulo/excluir" class="inline" data-csp-confirm="Excluir este módulo e todas as aulas?">
                         <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                         <input type="hidden" name="id" value="<?= (int)$mod['id'] ?>">
                         <button type="submit" class="text-sm text-red-600 hover:underline">Excluir módulo</button>
@@ -115,7 +115,7 @@ $tiposAula = ['video' => 'Vídeo', 'slides' => 'Slides', 'pdf' => 'PDF', 'link' 
                                 </div>
                                 <div class="flex gap-2">
                                     <button type="button" onclick="document.getElementById('edit-aula-<?= (int)$aula['id'] ?>').classList.toggle('hidden')" class="text-sm text-indigo-600 hover:underline">Editar</button>
-                                    <form method="post" action="<?= URL ?>/admin/minicursos/aula/excluir" class="inline" onsubmit="return confirm('Excluir esta aula?');">
+                                    <form method="post" action="<?= URL ?>/admin/minicursos/aula/excluir" class="inline" data-csp-confirm="Excluir esta aula?">
                                         <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                                         <input type="hidden" name="id" value="<?= (int)$aula['id'] ?>">
                                         <input type="hidden" name="minicurso_id" value="<?= $id ?>">

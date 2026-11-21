@@ -49,7 +49,7 @@
                             <a href="<?= URL ?>/admin/redacao-configuravel/bancas/<?= (int)$board['id'] ?>/tipos/<?= (int)$item['id'] ?>/criterios" class="text-indigo-600 hover:text-indigo-900">Critérios</a>
                             <a href="<?= URL ?>/admin/redacao-configuravel/bancas/<?= (int)$board['id'] ?>/tipos/<?= (int)$item['id'] ?>/prompts" class="text-amber-600 hover:text-amber-900">Prompts</a>
                             <a href="<?= URL ?>/admin/redacao-configuravel/bancas/<?= (int)$board['id'] ?>/tipos/<?= (int)$item['id'] ?>/editar" class="text-blue-600 hover:text-blue-900">Editar</a>
-                            <button type="button" onclick="deleteTextType(<?= (int)$board['id'] ?>, <?= (int)$item['id'] ?>)" class="text-red-600 hover:text-red-900">Excluir</button>
+                            <button type="button" data-csp-click="deleteTextType" data-csp-arg="<?= (int)$board['id'] ?>, <?= (int)$item['id'] ?>" class="text-red-600 hover:text-red-900">Excluir</button>
                         </td>
                     </tr>
                     <?php endforeach; ?>

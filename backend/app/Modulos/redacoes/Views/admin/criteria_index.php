@@ -50,7 +50,7 @@
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?= number_format((float)$item['max_score'], 1, ',', '.') ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                             <a href="<?= URL ?>/admin/redacao-configuravel/bancas/<?= (int)$board['id'] ?>/tipos/<?= (int)$textType['id'] ?>/criterios/<?= (int)$item['id'] ?>/editar" class="text-blue-600 hover:text-blue-900">Editar</a>
-                            <button type="button" onclick="deleteCriterion(<?= (int)$board['id'] ?>, <?= (int)$textType['id'] ?>, <?= (int)$item['id'] ?>)" class="text-red-600 hover:text-red-900">Excluir</button>
+                            <button type="button" data-csp-click="deleteCriterion" data-csp-arg="<?= (int)$board['id'] ?>, <?= (int)$textType['id'] ?>, <?= (int)$item['id'] ?>" class="text-red-600 hover:text-red-900">Excluir</button>
                         </td>
                     </tr>
                     <?php endforeach; ?>

@@ -124,12 +124,12 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <?php ob_start(); ?>
-                        <button type="button" onclick="openMatrizDrawer(<?= (int) $row['id'] ?>)"
+                        <button type="button" data-csp-click="openMatrizDrawer" data-csp-arg="<?= (int) $row['id'] ?>"
                            class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                         </button>
                         <div class="border-t border-gray-100 my-1"></div>
-                        <button type="button" onclick="excluirMatriz(<?= (int) $row['id'] ?>)"
+                        <button type="button" data-csp-click="excluirMatriz" data-csp-arg="<?= (int) $row['id'] ?>"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                             <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Excluir
                         </button>
@@ -355,7 +355,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
             <input type="number" class="matriz-ordem w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm" min="0" value="0">
         </td>
         <td class="px-3 py-2 align-top">
-            <button type="button" onclick="matrizRemoverComponente(this)" class="text-red-500 hover:text-red-700" aria-label="Remover">
+            <button type="button" data-csp-click="matrizRemoverComponente" data-csp-pass="el" class="text-red-500 hover:text-red-700" aria-label="Remover">
                 <i class="fa-solid fa-trash-can"></i>
             </button>
         </td>
@@ -377,7 +377,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
             <input type="number" class="matriz-grupo-ordem w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm" min="0" value="0">
         </td>
         <td class="px-3 py-2 align-top">
-            <button type="button" onclick="matrizRemoverGrupo(this)" class="text-red-500 hover:text-red-700" aria-label="Remover área">
+            <button type="button" data-csp-click="matrizRemoverGrupo" data-csp-pass="el" class="text-red-500 hover:text-red-700" aria-label="Remover área">
                 <i class="fa-solid fa-trash-can"></i>
             </button>
         </td>

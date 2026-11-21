@@ -69,7 +69,7 @@ $realizacoes = $realizacoes ?? [];
                                     Ver resultado
                                 </a>
                             <?php elseif ($ehCancelada): ?>
-                                <form method="post" action="<?= URL ?>/admin/provas/liberar-tentativa/<?= (int)$prova['id'] ?>/<?= (int)$aluno['id'] ?>" class="inline" onsubmit="return confirm('Liberar nova tentativa para este aluno? Ele poderá realizar a prova novamente.');">
+                                <form method="post" action="<?= URL ?>/admin/provas/liberar-tentativa/<?= (int)$prova['id'] ?>/<?= (int)$aluno['id'] ?>" class="inline" data-csp-confirm="Liberar nova tentativa para este aluno? Ele poderá realizar a prova novamente.">
                                     <button type="submit" class="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded text-sm font-medium cursor-pointer">
                                         Liberar nova tentativa
                                     </button>

@@ -133,7 +133,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
         <?php else: foreach ($anexos as $an): ?>
             <li class="py-2 flex items-center justify-between">
                 <span class="text-sm text-gray-700"><i class="fa-solid <?= ($an['tipo'] ?? '') === 'link' ? 'fa-link' : 'fa-paperclip' ?> mr-2 text-gray-400"></i><?= htmlspecialchars((string) ($an['nome'] ?? 'Anexo')) ?></span>
-                <form method="post" action="<?= URL . $base ?>/anexos/<?= (int) $an['id'] ?>/excluir" onsubmit="return confirm('Remover anexo?');">
+                <form method="post" action="<?= URL . $base ?>/anexos/<?= (int) $an['id'] ?>/excluir" data-csp-confirm="Remover anexo?">
                     <input type="hidden" name="_token" value="<?= $csrf ?>">
                     <button type="submit" class="text-gray-400 hover:text-red-600"><i class="fa-solid fa-xmark"></i></button>
                 </form>

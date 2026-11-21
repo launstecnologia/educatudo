@@ -12,7 +12,7 @@ ob_start(); ?>
 <form method="POST" action="<?= URL ?>/admin/enrollment/score/recalcular" class="inline">
     <input type="hidden" name="_token" value="<?= $esc($csrf_token ?? '') ?>">
     <input type="hidden" name="ciclo" value="<?= (int)$ciclo ?>">
-    <button type="submit" class="btn-secondary text-sm" onclick="return confirm('Recalcular scores para todos os alunos ativos?')">
+    <button type="submit" class="btn-secondary text-sm" data-csp-confirm="Recalcular scores para todos os alunos ativos?">
         <i class="fa-solid fa-rotate mr-1.5"></i> Recalcular
     </button>
 </form>

@@ -28,7 +28,7 @@ $temCorrecaoProfessor = ($redacao['nota_final_professor'] ?? $redacao['nota_fina
                             <input type="hidden" name="redacao_id" value="<?= $redacao['redacao_id'] ?? $redacao['id'] ?? '' ?>">
                             <button type="submit" 
                                     class="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors font-medium"
-                                    onclick="return confirm('Deseja refazer esta redação? Você poderá ver a correção e escrever uma nova versão. A redação anterior será mantida no histórico.')">
+                                    data-csp-confirm="Deseja refazer esta redação? Você poderá ver a correção e escrever uma nova versão. A redação anterior será mantida no histórico.">
                                 <i class="fas fa-redo mr-2"></i>Refazer Redação
                             </button>
                         </form>

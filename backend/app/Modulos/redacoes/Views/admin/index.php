@@ -69,10 +69,10 @@ if ($flash && is_array($flash) && !empty($flash['message'])):
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                             <a href="<?= URL ?>/admin/redacao-configuravel/bancas/<?= (int)$b['id'] ?>/tipos" class="text-indigo-600 hover:text-indigo-900">Tipos</a>
                             <a href="<?= URL ?>/admin/redacao-configuravel/bancas/<?= (int)$b['id'] ?>/editar" class="text-blue-600 hover:text-blue-900">Editar</a>
-                            <button type="button" onclick="toggleBoard(<?= (int)$b['id'] ?>, <?= (int)$b['is_active'] ?>)" class="text-amber-600 hover:text-amber-900">
+                            <button type="button" data-csp-click="toggleBoard" data-csp-arg="<?= (int)$b['id'] ?>, <?= (int)$b['is_active'] ?>" class="text-amber-600 hover:text-amber-900">
                                 <?= $b['is_active'] ? 'Desativar' : 'Ativar' ?>
                             </button>
-                            <button type="button" onclick="deleteBoard(<?= (int)$b['id'] ?>)" class="text-red-600 hover:text-red-900">Excluir</button>
+                            <button type="button" data-csp-click="deleteBoard" data-csp-arg="<?= (int)$b['id'] ?>" class="text-red-600 hover:text-red-900">Excluir</button>
                         </td>
                     </tr>
                     <?php endforeach; ?>

@@ -99,7 +99,7 @@
                 <div class="bloco-card border-2 rounded-xl transition-all <?= $statusClass ?> <?= $estaExpandida ? 'shadow-lg' : 'hover:shadow-md' ?>" 
                      data-etapa="<?= $index ?>" data-modulo-id="<?= $modulo['id'] ?>">
                     <!-- Cabeçalho do Bloco (sempre visível) -->
-                    <div class="p-4 cursor-pointer" onclick="toggleEtapa(<?= $index ?>)">
+                    <div class="p-4 cursor-pointer" data-csp-click="toggleEtapa" data-csp-arg="<?= $index ?>">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center space-x-4 flex-1">
                                 <!-- Número e Status -->

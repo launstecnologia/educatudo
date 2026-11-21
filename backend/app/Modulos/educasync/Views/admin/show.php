@@ -164,7 +164,7 @@ $classeTh = 'px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tra
                         <li class="flex items-center justify-between px-3 py-1.5 text-sm text-gray-700">
                             <span><?= (int) $s['ordem'] ?>ª · <?= htmlspecialchars(substr((string) $s['horario_de'], 0, 5)) ?>–<?= htmlspecialchars(substr((string) $s['horario_ate'], 0, 5)) ?></span>
                             <?php if (!$temVersoes): ?>
-                            <form method="POST" action="<?= $base ?>/slots/<?= (int) $s['id'] ?>/excluir" onsubmit="return confirm('Remover este horário?');">
+                            <form method="POST" action="<?= $base ?>/slots/<?= (int) $s['id'] ?>/excluir" data-csp-confirm="Remover este horário?">
                                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                                 <button type="submit" class="text-gray-400 hover:text-red-600" title="Remover horário" aria-label="Remover horário">
                                     <i class="fa-solid fa-xmark"></i>
@@ -220,7 +220,7 @@ $classeTh = 'px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tra
                 </form>
                 <?php if ($totalDemandas > 0): ?>
                 <form method="POST" action="<?= $base ?>/demandas/excluir-todas"
-                      onsubmit="return confirm('Excluir as <?= (int) $totalDemandas ?> demanda(s) deste cenário de uma vez?\n\nIsso não remove horários nem versões — só a lista de matéria/professor/aulas.');">
+                      data-csp-confirm="Excluir as &lt;?= (int) $totalDemandas ?&gt; demanda(s) deste cenário de uma vez?\n\nIsso não remove horários nem versões — só a lista de matéria/professor/aulas.">
                     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                     <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg border border-red-200 bg-white text-sm font-semibold text-red-700 hover:bg-red-50">
                         <i class="fa-solid fa-trash-can mr-2"></i>Excluir todas
@@ -228,7 +228,7 @@ $classeTh = 'px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tra
                 </form>
                 <?php endif; ?>
                 <form method="POST" action="<?= $base ?>/demandas/importar-matriz"
-                      onsubmit="return confirm('Importar as demandas das matrizes das turmas ativas de <?= $anoLetivoCenario ?>?\n\nO professor vem do vínculo matéria no cadastro do professor (e, se houver vários, do histórico da grade). Demandas já existentes da mesma turma/matéria serão atualizadas.');">
+                      data-csp-confirm="Importar as demandas das matrizes das turmas ativas de &lt;?= $anoLetivoCenario ?&gt;?\n\nO professor vem do vínculo matéria no cadastro do professor (e, se houver vários, do histórico da grade). Demandas já existentes da mesma turma/matéria serão atualizadas.">
                     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                     <button type="submit" class="inline-flex items-center px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-gray-700 hover:bg-gray-50">
                         <i class="fa-solid fa-file-import mr-2"></i>Importar da Matriz
@@ -472,7 +472,7 @@ $classeTh = 'px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tra
                                 <td class="px-4 py-3 text-sm text-gray-700"><?= (int) $d['aulas_semana'] ?></td>
                                 <td class="px-4 py-3 text-right">
                                     <?php if (!$temVersoes): ?>
-                                    <form method="POST" action="<?= $base ?>/demandas/<?= (int) $d['id'] ?>/excluir" class="inline" onsubmit="return confirm('Remover esta demanda?');">
+                                    <form method="POST" action="<?= $base ?>/demandas/<?= (int) $d['id'] ?>/excluir" class="inline" data-csp-confirm="Remover esta demanda?">
                                         <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                                         <button type="submit" class="text-gray-400 hover:text-red-600" title="Remover demanda" aria-label="Remover demanda">
                                             <i class="fa-solid fa-trash"></i>

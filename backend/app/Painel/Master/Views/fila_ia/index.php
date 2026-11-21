@@ -93,7 +93,7 @@ $queryBase = static function (array $extra = []) use ($filtros, $aba): string {
         <div class="flex items-center gap-2 flex-shrink-0">
             <?php if ($travadosCount > 0): ?>
             <form method="post" action="<?= URL ?>/master/fila-ia/destravar"
-                  onsubmit="return confirm('Reenfileirar jobs travados em processing (>10 min)?');">
+                  data-csp-confirm="Reenfileirar jobs travados em processing (&gt;10 min)?">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars((string) $csrf_token) ?>">
                 <input type="hidden" name="escola_id" value="<?= (int) ($filtros['escola_id'] ?? 0) ?>">
                 <button type="submit"

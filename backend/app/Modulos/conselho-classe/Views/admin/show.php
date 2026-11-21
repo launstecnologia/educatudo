@@ -95,13 +95,13 @@ if ($periodo === '') {
     </form>
     <?php endif; ?>
     <?php if ($status === 'em_andamento' || $status === 'reaberto'): ?>
-    <form method="POST" action="<?= URL ?>/admin/conselhos/<?= $sid ?>/finalizar" onsubmit="return confirm('Finalizar este Conselho? Depois só perfis autorizados poderão reabrir.');">
+    <form method="POST" action="<?= URL ?>/admin/conselhos/<?= $sid ?>/finalizar" data-csp-confirm="Finalizar este Conselho? Depois só perfis autorizados poderão reabrir.">
         <input type="hidden" name="_token" value="<?= htmlspecialchars((string) $csrf_token) ?>">
         <button type="submit" class="px-4 py-2 rounded-lg text-sm font-semibold border border-gray-300 bg-white text-gray-800 hover:bg-gray-50">Finalizar</button>
     </form>
     <?php endif; ?>
     <?php if ($status === 'finalizado'): ?>
-    <form method="POST" action="<?= URL ?>/admin/conselhos/<?= $sid ?>/reabrir" onsubmit="return confirm('Reabrir o Conselho? Toda alteração posterior fica auditada.');">
+    <form method="POST" action="<?= URL ?>/admin/conselhos/<?= $sid ?>/reabrir" data-csp-confirm="Reabrir o Conselho? Toda alteração posterior fica auditada.">
         <input type="hidden" name="_token" value="<?= htmlspecialchars((string) $csrf_token) ?>">
         <button type="submit" class="px-4 py-2 rounded-lg text-sm font-semibold border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100">Reabrir</button>
     </form>

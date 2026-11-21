@@ -55,7 +55,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                                 <td class="px-6 py-4 text-sm text-gray-600"><?= htmlspecialchars((string) ($cat['descricao'] ?? '')) ?: '—' ?></td>
                                 <td class="px-6 py-4 text-right whitespace-nowrap">
                                     <?php ob_start(); ?>
-                                    <form method="post" action="<?= URL ?>/admin/ava/categorias/<?= (int) $cat['id'] ?>/excluir" onsubmit="return confirm('Remover categoria?');">
+                                    <form method="post" action="<?= URL ?>/admin/ava/categorias/<?= (int) $cat['id'] ?>/excluir" data-csp-confirm="Remover categoria?">
                                         <input type="hidden" name="_token" value="<?= $csrf ?>">
                                         <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                                             <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Excluir

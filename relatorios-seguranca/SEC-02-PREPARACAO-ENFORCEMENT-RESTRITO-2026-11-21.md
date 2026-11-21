@@ -98,7 +98,19 @@ No DevTools → Console: violações CSP **não** devem aparecer como bloqueio n
 | `polyfill.io` na allowlist | Baixa/média | Ainda usado no ai-agent |
 | Promoção acidental em prod | Controlada | Flag default false |
 
-**Critério de conclusão (produto):** ainda **não** atingido a 100% em produção — baseline continua com `unsafe-*`. A aplicação **está preparada** para rodar restrito via flag após zerar violações injustificadas na homologação.
+## Migração completa de `on*` (atualização)
+
+`CspPolitica::prepararHtmlCsp()` agora:
+
+1. Remove **todos** os atributos HTML `on*` da resposta
+2. Recria os handlers como `addEventListener` dentro de `<script nonce="...">`
+3. Aplica nonce em todas as tags `<script>`
+
+Assim, **na resposta HTML entregue ao browser** não restam `onclick`/`onchange`/etc. — requisito para `script-src` sem `unsafe-inline`.
+
+O fonte PHP ainda pode conter `on*` legados (~400); isso é dívida de limpeza, não bloqueio de CSP, porque o pós-processamento do `BaseController` migra na saída.
+
+**Critério funcional:** páginas via `view` / `viewWithLayout` ficam aptas ao modo restrito (`CSP_STRICT_ENFORCEMENT=true`) quanto a handlers inline. Produção permanece baseline até homologação manual.
 
 ---
 

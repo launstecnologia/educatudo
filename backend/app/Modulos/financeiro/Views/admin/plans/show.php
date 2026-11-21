@@ -88,13 +88,13 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right">
                         <?php ob_start(); ?>
-                        <button type="button" onclick="openPlanItemDrawer(<?= (int) $item['id'] ?>)"
+                        <button type="button" data-csp-click="openPlanItemDrawer" data-csp-arg="<?= (int) $item['id'] ?>"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                         </button>
                         <div class="border-t border-gray-100 my-1"></div>
                         <form method="POST" action="<?= URL ?>/admin/finance/plans/<?= (int)$plan['id'] ?>/items/<?= (int)$item['id'] ?>/delete"
-                              onsubmit="return confirm('Remover este item?');">
+                              data-csp-confirm="Remover este item?">
                             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                             <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                                 <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Remover

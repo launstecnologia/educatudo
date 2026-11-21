@@ -88,7 +88,7 @@ $render_form_editar = static function (array $u) use ($escola_id, $csrf_token, $
             </div>
         </div>
         <div class="flex flex-col-reverse sm:flex-row gap-2">
-            <button type="button" onclick="toggleEditUser(<?= $id ?>)" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 text-sm">Cancelar</button>
+            <button type="button" data-csp-click="toggleEditUser" data-csp-arg="<?= $id ?>" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 text-sm">Cancelar</button>
             <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Salvar</button>
         </div>
     </form>
@@ -104,7 +104,7 @@ $render_dropdown_acoes = static function (array $u, string $suffix = '') use ($e
     <a href="<?= $entrar_como_base ?>&id=<?= $id ?>" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
         <i class="fa-solid fa-right-to-bracket text-gray-400 w-4 text-center"></i> Entrar como
     </a>
-    <button type="button" onclick="toggleEditUser(<?= $id ?>)" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+    <button type="button" data-csp-click="toggleEditUser" data-csp-arg="<?= $id ?>" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
         <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
     </button>
     <div class="border-t border-slate-100 my-1"></div>

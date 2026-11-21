@@ -188,7 +188,7 @@ if (empty($questoes) && !empty($exercicio_atual['questoes_json'])) {
 <div class="bg-white rounded-xl shadow-lg p-4 mb-6 border border-blue-200">
     <div class="flex flex-wrap gap-2 justify-center">
         <?php foreach ($exercicios as $index => $ex): ?>
-            <button onclick="irParaQuestao(<?= $index ?>)" 
+            <button data-csp-click="irParaQuestao" data-csp-arg="<?= $index ?>" 
                     class="questao-btn w-10 h-10 rounded-lg font-semibold transition-all <?= $index === $exercicio_atual_index ? 'bg-blue-600 text-white' : (!empty($ex['resposta_salva']) ? 'bg-blue-100 text-blue-800 border-2 border-blue-300' : 'bg-gray-100 text-gray-700 hover:bg-gray-200') ?>"
                     data-questao="<?= $index ?>">
                 <?= $index + 1 ?>
@@ -435,7 +435,7 @@ if (empty($questoes) && !empty($exercicio_atual['questoes_json'])) {
                           data-exercicio-id="<?= $exercicio_atual['id'] ?>"
                           onblur="salvarRespostaDissertativa(<?= $exercicio_atual['id'] ?>)"><?= htmlspecialchars($exercicio_atual['resposta_salva'] ?? '', ENT_QUOTES, 'UTF-8') ?></textarea>
                 <p class="text-sm text-gray-500">Sua resposta é salva automaticamente ao sair do campo. Você também pode clicar em "Salvar resposta" antes de ir para a próxima questão.</p>
-                <button type="button" onclick="salvarRespostaDissertativa(<?= $exercicio_atual['id'] ?>)"
+                <button type="button" data-csp-click="salvarRespostaDissertativa" data-csp-arg="<?= $exercicio_atual['id'] ?>"
                         data-dissertativa-salvar="<?= $exercicio_atual['id'] ?>"
                         class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm">
                     Salvar resposta

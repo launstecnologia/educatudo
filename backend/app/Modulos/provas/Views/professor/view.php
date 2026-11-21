@@ -211,7 +211,7 @@ if (!class_exists('LayoutHelper')) {
                                     Ver Resultado
                                 </a>
                             <?php elseif ($realizacao['status'] === 'cancelada'): ?>
-                                <form method="post" action="<?= URL ?>/professor/provas/liberar-tentativa/<?= (int)$prova['id'] ?>/<?= (int)$realizacao['aluno_id'] ?>" class="inline" onsubmit="return confirm('Liberar nova tentativa para este aluno? Ele poderá realizar a prova novamente.');">
+                                <form method="post" action="<?= URL ?>/professor/provas/liberar-tentativa/<?= (int)$prova['id'] ?>/<?= (int)$realizacao['aluno_id'] ?>" class="inline" data-csp-confirm="Liberar nova tentativa para este aluno? Ele poderá realizar a prova novamente.">
                                     <button type="submit" class="text-amber-700 hover:text-amber-900 font-medium">Liberar nova tentativa</button>
                                 </form>
                             <?php endif; ?>

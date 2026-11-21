@@ -122,7 +122,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                         <?php endif; ?>
                         <?php if ($podeExcluir && $schemaPronto): ?>
                         <div class="border-t border-gray-100 my-1"></div>
-                        <form method="POST" action="<?= URL ?>/admin/eventos-avaliativos/boletim/<?= $id ?>/excluir" onsubmit="return confirm('Excluir este boletim?');">
+                        <form method="POST" action="<?= URL ?>/admin/eventos-avaliativos/boletim/<?= $id ?>/excluir" data-csp-confirm="Excluir este boletim?">
                             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>">
                             <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                                 <i class="fa-solid fa-trash-can text-red-400 w-4 text-center shrink-0" aria-hidden="true"></i>

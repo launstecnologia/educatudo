@@ -73,13 +73,13 @@ $statusBadge = static function (string $status): string {
                                         <a href="<?= URL ?>/admin/inclusao/versoes/<?= (int) $v['id'] ?>/pdf" target="_blank" rel="noopener" class="px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-xs font-medium">
                                             <i class="fa-regular fa-file-pdf mr-1"></i> PDF
                                         </a>
-                                        <form method="post" action="<?= URL ?>/admin/inclusao/versoes/aprovar" onsubmit="return confirm('Aprovar esta versão? Ela passará a ser entregue ao aluno.');">
+                                        <form method="post" action="<?= URL ?>/admin/inclusao/versoes/aprovar" data-csp-confirm="Aprovar esta versão? Ela passará a ser entregue ao aluno.">
                                             <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
                                             <input type="hidden" name="version_id" value="<?= (int) $v['id'] ?>">
                                             <input type="hidden" name="acao" value="aprovar">
                                             <button type="submit" class="btn-primary-custom px-3 py-1.5 rounded-lg hover:opacity-90 text-xs font-medium">Aprovar</button>
                                         </form>
-                                        <form method="post" action="<?= URL ?>/admin/inclusao/versoes/aprovar" onsubmit="return confirm('Reprovar esta versão?');">
+                                        <form method="post" action="<?= URL ?>/admin/inclusao/versoes/aprovar" data-csp-confirm="Reprovar esta versão?">
                                             <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
                                             <input type="hidden" name="version_id" value="<?= (int) $v['id'] ?>">
                                             <input type="hidden" name="acao" value="reprovar">
@@ -129,7 +129,7 @@ $statusBadge = static function (string $status): string {
                                         <a href="<?= URL ?>/admin/inclusao/versoes/<?= (int) $v['id'] ?>/pdf" target="_blank" rel="noopener" class="px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-xs font-medium">
                                             <i class="fa-regular fa-file-pdf mr-1"></i> PDF
                                         </a>
-                                        <form method="post" action="<?= URL ?>/admin/inclusao/versoes/aprovar" onsubmit="return confirm('Reprovar esta versão? Ela deixará de ser entregue ao aluno.');">
+                                        <form method="post" action="<?= URL ?>/admin/inclusao/versoes/aprovar" data-csp-confirm="Reprovar esta versão? Ela deixará de ser entregue ao aluno.">
                                             <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
                                             <input type="hidden" name="version_id" value="<?= (int) $v['id'] ?>">
                                             <input type="hidden" name="acao" value="reprovar">

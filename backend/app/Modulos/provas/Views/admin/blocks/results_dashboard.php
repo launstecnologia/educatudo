@@ -47,7 +47,7 @@ $jsonDashboard = json_encode($d, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
             </span>
             <?php else: ?>
             <form method="post" action="<?= URL ?>/admin/provas/blocos/<?= $blocoId ?>/liberar-gabarito" class="inline"
-                  onsubmit="return confirm('Liberar o gabarito deste bloco para todos os alunos?');">
+                  data-csp-confirm="Liberar o gabarito deste bloco para todos os alunos?">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars((string)($csrf_token ?? '')) ?>">
                 <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 text-sm font-medium">
                     <i class="fa-solid fa-unlock-keyhole" aria-hidden="true"></i>

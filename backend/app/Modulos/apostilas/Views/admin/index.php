@@ -91,7 +91,7 @@
                             </a>
                             <?php if (in_array($status, ['erro', 'pronto'], true) && empty($item['is_legado'])): ?>
                                 <form action="<?= URL ?>/admin/apostilas-ia/<?= $itemId ?>/reprocessar" method="POST"
-                                      onsubmit="return confirm('Reprocessar esta apostila?');" class="w-full">
+                                      data-csp-confirm="Reprocessar esta apostila?" class="w-full">
                                     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
                                     <button type="submit"
                                             class="w-full text-center bg-orange-50 text-orange-700 px-2 py-1.5 rounded-lg hover:bg-orange-100 text-xs font-medium">

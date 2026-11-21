@@ -124,7 +124,7 @@
                 
                 <!-- Actions -->
                 <div class="flex space-x-2">
-                    <button onclick="startExercise(<?= $lista['id'] ?>)" 
+                    <button data-csp-click="startExercise" data-csp-arg="<?= $lista['id'] ?>" 
                             class="flex-1 bg-green-500 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors">
                         <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -158,7 +158,7 @@
                         <p class="text-sm text-gray-500">Nota</p>
                         <p class="text-lg font-semibold text-blue-600"><?= round(($exercicio['acertos'] / $exercicio['total_respostas']) * 100) ?>%</p>
                     </div>
-                    <button onclick="viewExerciseResults(<?= $exercicio['id'] ?>)" 
+                    <button data-csp-click="viewExerciseResults" data-csp-arg="<?= $exercicio['id'] ?>" 
                             class="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors">
                         Ver Resultado
                     </button>

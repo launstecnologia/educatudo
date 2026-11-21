@@ -136,7 +136,7 @@
                 
                 <div class="flex items-center space-x-2">
                     <span class="text-sm text-gray-600">Questão:</span>
-                    <select onchange="navegarParaQuestao(this.value)" class="px-3 py-1 border border-gray-300 rounded text-sm">
+                    <select data-csp-change="navegarParaQuestao" data-csp-pass="value" class="px-3 py-1 border border-gray-300 rounded text-sm">
                         <?php for ($i = 1; $i <= $total_questoes; $i++): ?>
                             <option value="<?= $i ?>" <?= $i === $questao_atual ? 'selected' : '' ?>>
                                 <?= $i ?>

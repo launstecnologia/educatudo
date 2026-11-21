@@ -36,7 +36,7 @@
                     <button type="button"
                             data-share-url="<?= URL ?>/educalabs/public/<?= htmlspecialchars($project['share_id'] ?? '') ?>"
                             class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm font-semibold"
-                            onclick="copyShareLink(this)">
+                            data-csp-click="copyShareLink" data-csp-pass="el">
                         Compartilhar
                     </button>
                 </div>

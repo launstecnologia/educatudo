@@ -44,7 +44,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php'); ?>
                 <td class="px-4 py-3 text-right">
                     <form method="POST" action="<?= URL ?>/admin/finance/price-table/<?= (int)$item['id'] ?>/delete" class="inline">
                         <input type="hidden" name="_token" value="<?= $esc($csrf_token) ?>">
-                        <button class="text-xs text-red-400 hover:text-red-600" onclick="return confirm('Remover?')">✕</button>
+                        <button class="text-xs text-red-400 hover:text-red-600" data-csp-confirm="Remover?">✕</button>
                     </form>
                 </td>
             </tr>

@@ -177,11 +177,11 @@
                                 </span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <button onclick="verDetalhesAluno(<?= $aluno['id'] ?>)" 
+                                <button data-csp-click="verDetalhesAluno" data-csp-arg="<?= $aluno['id'] ?>" 
                                         class="text-blue-600 hover:text-blue-900 mr-3">
                                     Ver Detalhes
                                 </button>
-                                <button onclick="enviarMensagem(<?= $aluno['id'] ?>)" 
+                                <button data-csp-click="enviarMensagem" data-csp-arg="<?= $aluno['id'] ?>" 
                                         class="text-green-600 hover:text-green-900">
                                     Enviar Mensagem
                                 </button>

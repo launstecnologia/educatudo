@@ -161,23 +161,23 @@ $page_header_actions = ob_get_clean();
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                                 data-turmas="<?= $turmasJson ?>"
                                 data-professor="<?= htmlspecialchars($teacher['nome'] ?? '') ?>"
-                                onclick="openTurmasModal(this)">
+                                data-csp-click="openTurmasModal" data-csp-pass="el">
                             <i class="fa-solid fa-people-group text-gray-400 w-4 text-center"></i> Ver turmas
                         </button>
-                        <button type="button" onclick="openTeacherDrawer(<?= (int) $teacher['id'] ?>)"
+                        <button type="button" data-csp-click="openTeacherDrawer" data-csp-arg="<?= (int) $teacher['id'] ?>"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                         </button>
-                        <button type="button" onclick="toggleStatusTeacher(<?= (int) $teacher['id'] ?>, <?= $teacher['ativo'] ? 'false' : 'true' ?>)"
+                        <button type="button" data-csp-click="toggleStatusTeacher" data-csp-arg="<?= (int) $teacher['id'] ?>, <?= $teacher['ativo'] ? 'false' : 'true' ?>"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-power-off text-gray-400 w-4 text-center"></i> <?= $teacher['ativo'] ? 'Desativar' : 'Ativar' ?>
                         </button>
-                        <button type="button" onclick="togglePaganteTeacher(<?= (int) $teacher['id'] ?>, <?= ($teacher['pagante'] ?? 1) ? 'false' : 'true' ?>)"
+                        <button type="button" data-csp-click="togglePaganteTeacher" data-csp-arg="<?= (int) $teacher['id'] ?>, <?= ($teacher['pagante'] ?? 1) ? 'false' : 'true' ?>"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-sack-dollar text-gray-400 w-4 text-center"></i> Marcar como <?= ($teacher['pagante'] ?? 1) ? 'não pagante' : 'pagante' ?>
                         </button>
                         <div class="border-t border-gray-100 my-1"></div>
-                        <button type="button" onclick="deleteTeacher(<?= (int) $teacher['id'] ?>)"
+                        <button type="button" data-csp-click="deleteTeacher" data-csp-arg="<?= (int) $teacher['id'] ?>"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                             <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Excluir
                         </button>

@@ -213,7 +213,7 @@ if ($voltarRaw !== '' && preg_match('#^/admin/provas(?:\?[A-Za-z0-9_\-.&=%+]*)?$
             </label>
             <select id="bloco_modelo_id"
                     name="bloco_modelo_id"
-                    onchange="carregarModelo(this.value)"
+                    data-csp-change="carregarModelo" data-csp-pass="value"
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                 <option value="">-- Selecione um bloco de professores (opcional) --</option>
                 <?php if (!empty($blocosModelo)): ?>

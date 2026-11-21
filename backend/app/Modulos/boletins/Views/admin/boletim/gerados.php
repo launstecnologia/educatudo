@@ -239,7 +239,7 @@ $modeloEventoGerados = !empty($modelo_evento)
                 </div>
             </div>
             <form method="POST" action="<?= URL ?>/admin/boletim/cancelar-geracao" class="shrink-0"
-                  onsubmit="return confirm('Parar a geração em andamento? Os boletins já gravados deste lote ficam como estão.');">
+                  data-csp-confirm="Parar a geração em andamento? Os boletins já gravados deste lote ficam como estão.">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
                 <?php if ($selectedRegraId > 0): ?>
                 <input type="hidden" name="regra_id" value="<?= (int) $selectedRegraId ?>">

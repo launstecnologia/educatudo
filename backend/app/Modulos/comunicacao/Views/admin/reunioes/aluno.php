@@ -47,7 +47,7 @@ include \App\Core\ViewPaths::adminPartial('page_header_list.php'); ?>
             </span>
             <?php endif; ?>
         </div>
-        <form method="post" action="<?= URL ?>/admin/reunioes/aluno/excluir" onsubmit="return confirm('Remover esta ATA?')">
+        <form method="post" action="<?= URL ?>/admin/reunioes/aluno/excluir" data-csp-confirm="Remover esta ATA?">
             <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
             <input type="hidden" name="id" value="<?= (int) $r['id'] ?>">
             <input type="hidden" name="aluno_id" value="<?= $alunoId ?>">

@@ -182,23 +182,23 @@
                         </div>
                         <div class="flex space-x-2 ml-4">
                             <?php if ($exercicio['status'] === 'publicado'): ?>
-                                <button onclick="alternarStatusExercicio(<?= $exercicio['id'] ?>)" 
+                                <button data-csp-click="alternarStatusExercicio" data-csp-arg="<?= $exercicio['id'] ?>" 
                                         class="px-3 py-1 bg-yellow-500 text-white rounded text-sm hover:bg-yellow-600 transition-colors"
                                         title="Despublicar exercício">
                                     👁️ Despublicar
                                 </button>
                             <?php else: ?>
-                                <button onclick="alternarStatusExercicio(<?= $exercicio['id'] ?>)" 
+                                <button data-csp-click="alternarStatusExercicio" data-csp-arg="<?= $exercicio['id'] ?>" 
                                         class="btn-primary-custom px-3 py-1 rounded text-sm transition-colors hover:opacity-90"
                                         title="Publicar exercício">
                                     ✅ Publicar
                                 </button>
                             <?php endif; ?>
-                            <button onclick="editarExercicio(<?= $exercicio['id'] ?>)" 
+                            <button data-csp-click="editarExercicio" data-csp-arg="<?= $exercicio['id'] ?>" 
                                     class="btn-primary-custom px-3 py-1 rounded text-sm transition-colors hover:opacity-90">
                                 Editar
                             </button>
-                            <button onclick="removerExercicio(<?= $exercicio['id'] ?>)" 
+                            <button data-csp-click="removerExercicio" data-csp-arg="<?= $exercicio['id'] ?>" 
                                     class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors">
                                 Remover
                             </button>
@@ -258,7 +258,7 @@ function adicionarOpcao() {
                    class="w-5 h-5 text-purple-600 focus:ring-purple-500">
             <label for="radio-${opcoesCount - 1}" class="text-sm text-gray-700 cursor-pointer">Correta</label>
         </div>
-        <button type="button" onclick="removerOpcao(this)" 
+        <button type="button" data-csp-click="removerOpcao" data-csp-pass="el" 
                 class="px-3 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors">
             Remover
         </button>

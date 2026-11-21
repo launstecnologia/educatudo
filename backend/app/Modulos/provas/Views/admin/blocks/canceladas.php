@@ -43,7 +43,7 @@ $csrfToken = (string) ($csrf_token ?? '');
         <?php if ($totalCanceladas > 0): ?>
         <form method="post"
               action="<?= URL ?>/admin/provas/blocos/<?= (int)$bloco['id'] ?>/liberar-tentativas"
-              onsubmit="return confirm('Liberar nova tentativa para todos desta lista (<?= (int)$totalCanceladas ?> prova<?= $totalCanceladas === 1 ? '' : 's' ?>)? As respostas atuais serão apagadas e cada aluno precisará refazer a prova.');">
+              data-csp-confirm="Liberar nova tentativa para todos desta lista (&lt;?= (int)$totalCanceladas ?&gt; prova&lt;?= $totalCanceladas === 1 ? &#039;&#039; : &#039;s&#039; ?&gt;)? As respostas atuais serão apagadas e cada aluno precisará refazer a prova.">
             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
             <button type="submit"
                     class="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
@@ -91,7 +91,7 @@ $csrfToken = (string) ($csrf_token ?? '');
                             </button>
                         </form>
                         <?php endif; ?>
-                        <form method="post" action="<?= URL ?>/admin/provas/liberar-tentativa/<?= (int)$row['prova_id'] ?>/<?= (int)$row['aluno_id'] ?>" class="inline" onsubmit="return confirm('Liberar nova tentativa para <?= htmlspecialchars(addslashes($row['aluno_nome'] ?? '')) ?>? As respostas atuais serão apagadas e o aluno precisará refazer a prova.');">
+                        <form method="post" action="<?= URL ?>/admin/provas/liberar-tentativa/<?= (int)$row['prova_id'] ?>/<?= (int)$row['aluno_id'] ?>" class="inline" data-csp-confirm="Liberar nova tentativa para &lt;?= htmlspecialchars(addslashes($row[&#039;aluno_nome&#039;] ?? &#039;&#039;)) ?&gt;? As respostas atuais serão apagadas e o aluno precisará refazer a prova.">
                             <input type="hidden" name="return_url" value="/admin/provas/blocos/<?= (int)$bloco['id'] ?>/canceladas">
                             <button type="submit" class="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded text-sm font-medium cursor-pointer">
                                 Liberar nova tentativa

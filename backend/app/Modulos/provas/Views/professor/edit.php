@@ -229,7 +229,7 @@
                     </button>
                     <div class="tb-sep"></div>
                     <input type="file" id="enunciado-insert-image-input" accept="image/*" class="hidden">
-                    <button type="button" class="tb-math-btn tb-img-btn" title="Inserir ou colar imagem (Ctrl+V)" onclick="document.getElementById('enunciado-insert-image-input').click()">
+                    <button type="button" class="tb-math-btn tb-img-btn" title="Inserir ou colar imagem (Ctrl+V)" data-csp-click-id="enunciado-insert-image-input">
                         <svg class="tb-img-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
                         Imagem
                     </button>
@@ -388,7 +388,7 @@
                     </button>
                     <div class="tb-sep"></div>
                     <input type="file" id="edit-enunciado-insert-image-input" accept="image/*" class="hidden">
-                    <button type="button" class="tb-math-btn tb-img-btn" title="Inserir ou colar imagem (Ctrl+V)" onclick="document.getElementById('edit-enunciado-insert-image-input').click()">
+                    <button type="button" class="tb-math-btn tb-img-btn" title="Inserir ou colar imagem (Ctrl+V)" data-csp-click-id="edit-enunciado-insert-image-input">
                         <svg class="tb-img-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
                         Imagem
                     </button>
@@ -781,11 +781,11 @@
                             <?php endif; ?>
                         </div>
                         <div class="flex space-x-2 ml-4">
-                            <button onclick="editarQuestao(<?= $questao['id'] ?>)" 
+                            <button data-csp-click="editarQuestao" data-csp-arg="<?= $questao['id'] ?>" 
                                     class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors">
                                 Editar
                             </button>
-                            <button onclick="removerQuestao(<?= $questao['id'] ?>)" 
+                            <button data-csp-click="removerQuestao" data-csp-arg="<?= $questao['id'] ?>" 
                                     class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors">
                                 Remover
                             </button>
@@ -2076,7 +2076,7 @@ function adicionarOpcao() {
                 <input type="radio" name="resposta_opcao" value="${idx}" id="radio-${idx}" class="w-5 h-5 text-blue-600 focus:ring-blue-500">
                 <span class="alt-correct">Gabarito</span>
             </label>
-            <button type="button" onclick="removerOpcao(this)" class="px-3 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors whitespace-nowrap">
+            <button type="button" data-csp-click="removerOpcao" data-csp-pass="el" class="px-3 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors whitespace-nowrap">
                 Remover
             </button>
         </div>
@@ -3512,7 +3512,7 @@ function adicionarOpcaoEdicao(texto = '', correta = false) {
             <input type="radio" name="resposta_opcao_edit" value="${index}" id="edit-radio-${index}" class="w-4 h-4 text-green-600 focus:ring-green-500" ${correta ? 'checked' : ''} data-csp-change="marcarGabaritoEdicao">
             <span class="text-sm font-medium text-gray-700">Gabarito</span>
         </label>
-        <button type="button" onclick="removerOpcaoEdicao(this)" class="px-3 py-2 border border-red-200 text-red-600 rounded-lg text-sm hover:bg-red-50 transition-colors flex-shrink-0">
+        <button type="button" data-csp-click="removerOpcaoEdicao" data-csp-pass="el" class="px-3 py-2 border border-red-200 text-red-600 rounded-lg text-sm hover:bg-red-50 transition-colors flex-shrink-0">
             Remover
         </button>
     `;

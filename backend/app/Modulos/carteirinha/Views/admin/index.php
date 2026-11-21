@@ -165,7 +165,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
                                     <i class="fa-solid fa-rotate text-gray-400 w-4 text-center"></i> Reemitir
                                 </button>
                             </form>
-                            <form method="POST" action="<?= URL ?>/admin/carteirinha/cancelar" onsubmit="return confirm('Cancelar esta carteirinha? O QR deixa de valer.');">
+                            <form method="POST" action="<?= URL ?>/admin/carteirinha/cancelar" data-csp-confirm="Cancelar esta carteirinha? O QR deixa de valer.">
                                 <input type="hidden" name="csrf_token" value="<?= $e($csrf) ?>">
                                 <input type="hidden" name="id" value="<?= (int) $aluno['carteirinha_id'] ?>">
                                 <input type="hidden" name="turma_id" value="<?= $turmaId ?>">
@@ -177,7 +177,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php';
                             </form>
                             <?php endif; ?>
                             <?php if ((int) $aluno['carteirinha_id'] > 0): ?>
-                            <button type="button" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" onclick="abrirCarteirinha(<?= (int) $aluno['id'] ?>)">
+                            <button type="button" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" data-csp-click="abrirCarteirinha" data-csp-arg="<?= (int) $aluno['id'] ?>">
                                 <i class="fa-solid fa-print text-gray-400 w-4 text-center"></i> Imprimir
                             </button>
                             <?php endif; ?>

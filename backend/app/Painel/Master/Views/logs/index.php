@@ -91,7 +91,7 @@ $arquivosDisco = $diagnostico['arquivos'] ?? [];
         <h3 class="text-sm font-semibold text-slate-800">Arquivos no disco</h3>
         <div class="flex flex-wrap items-center gap-2">
             <a href="<?= URL ?>/master/logs/baixar-todos" class="px-3 py-1.5 border border-blue-300 text-blue-700 bg-white rounded-lg text-xs font-medium hover:bg-blue-50">Baixar todos</a>
-            <form method="POST" action="<?= URL ?>/master/logs/excluir" onsubmit="return confirm('Excluir TODOS os <?= count($arquivosDisco) ?> arquivos de log desta pasta?');">
+            <form method="POST" action="<?= URL ?>/master/logs/excluir" data-csp-confirm="Excluir TODOS os &lt;?= count($arquivosDisco) ?&gt; arquivos de log desta pasta?">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
                 <input type="hidden" name="arquivo" value="todos">
                 <button type="submit" class="px-3 py-1.5 border border-red-300 text-red-700 bg-white rounded-lg text-xs font-medium hover:bg-red-50">Excluir todos</button>
@@ -107,7 +107,7 @@ $arquivosDisco = $diagnostico['arquivos'] ?? [];
             </div>
             <div class="flex items-center gap-1 shrink-0">
                 <a href="<?= URL ?>/master/logs/baixar?arquivo=<?= rawurlencode((string) $arq['nome']) ?>" class="px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 rounded-lg">Baixar</a>
-                <form method="POST" action="<?= URL ?>/master/logs/excluir" onsubmit="return confirm('Excluir <?= htmlspecialchars((string) $arq['nome'], ENT_QUOTES) ?>?');">
+                <form method="POST" action="<?= URL ?>/master/logs/excluir" data-csp-confirm="Excluir &lt;?= htmlspecialchars((string) $arq[&#039;nome&#039;], ENT_QUOTES) ?&gt;?">
                     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken) ?>">
                     <input type="hidden" name="arquivo" value="<?= htmlspecialchars((string) $arq['nome']) ?>">
                     <button type="submit" class="px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 rounded-lg">Excluir</button>

@@ -118,6 +118,76 @@ final class CspPolitica
         );
     }
 
+    /**
+     * SEC-02 — remove atributos on* do HTML e recria como addEventListener
+     * dentro de um <script nonce> (compatível com CSP sem unsafe-inline).
+     *
+     * O corpo do handler já vem renderizado (<?= ... ?> expandido). Mantém `this`
+     * e trata `return false` como preventDefault.
+     */
+    public static function migrarAtributosOnParaScriptNonce(string $html): string
+    {
+        $handlers = [];
+        $seq = 0;
+
+        $html = (string) preg_replace_callback(
+            '/\s(on[a-z]+)\s*=\s*(["\'])(.*?)\2/is',
+            static function (array $m) use (&$handlers, &$seq): string {
+                $attr = strtolower($m[1]);
+                $event = substr($attr, 2);
+                if ($event === '' || !preg_match('/^[a-z]+$/', $event)) {
+                    return $m[0];
+                }
+                $body = html_entity_decode($m[3], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $body = trim($body);
+                if ($body === '') {
+                    return '';
+                }
+                $seq++;
+                $id = 'csp_on_' . $seq . '_' . substr(hash('sha256', $event . '|' . $body . '|' . $seq), 0, 10);
+                $handlers[] = [
+                    'id' => $id,
+                    'event' => $event,
+                    'body' => $body,
+                ];
+                return ' data-csp-on-id="' . $id . '"';
+            },
+            $html
+        );
+
+        if ($handlers === []) {
+            return $html;
+        }
+
+        $jsParts = ["(function(){"];
+        foreach ($handlers as $h) {
+            $id = $h['id'];
+            $event = $h['event'];
+            // Evita quebrar o HTML se o corpo tiver literal </script>
+            $body = preg_replace('/<\/script/i', '<\\/script', $h['body']);
+            $jsParts[] = "var __e=document.querySelector('[data-csp-on-id=\"{$id}\"]');";
+            $jsParts[] = "if(__e){__e.addEventListener('{$event}',function(event){";
+            $jsParts[] = "try{var __r=(function(event){{$body}}).call(this,event);";
+            $jsParts[] = "if(__r===false){if(event&&event.preventDefault)event.preventDefault();if(event&&event.stopPropagation)event.stopPropagation();}";
+            $jsParts[] = "}catch(__err){console.error('CSP on-handler',__err);}";
+            $jsParts[] = "});}";
+        }
+        $jsParts[] = "})();";
+        $script = '<script ' . self::attrNonce() . '>' . implode('', $jsParts) . '</script>';
+
+        if (stripos($html, '</body>') !== false) {
+            return (string) preg_replace('/<\/body>/i', $script . '</body>', $html, 1);
+        }
+        return $html . $script;
+    }
+
+    /** Pipeline completo para HTML de views (nonce em <script> + migração on*). */
+    public static function prepararHtmlCsp(string $html): string
+    {
+        $html = self::migrarAtributosOnParaScriptNonce($html);
+        return self::aplicarNonceEmHtml($html);
+    }
+
     public static function politicaEnforcementBaseline(): string
     {
         $scriptHosts = implode(' ', self::SCRIPT_HOSTS);

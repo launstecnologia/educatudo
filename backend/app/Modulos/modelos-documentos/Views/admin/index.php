@@ -161,7 +161,7 @@ if ($layoutsHistorico !== []):
                         <?php if (!$codigoSistema): ?>
                         <div class="border-t border-gray-100 my-1"></div>
                         <form method="post" action="<?= URL ?>/admin/modelos-documentos/excluir"
-                              onsubmit="return confirm('Excluir este modelo?')">
+                              data-csp-confirm="Excluir este modelo?">
                             <input type="hidden" name="csrf_token" value="<?= $esc($csrf_token ?? '') ?>">
                             <input type="hidden" name="_token" value="<?= $esc($csrf_token ?? '') ?>">
                             <input type="hidden" name="id" value="<?= $rowId ?>">

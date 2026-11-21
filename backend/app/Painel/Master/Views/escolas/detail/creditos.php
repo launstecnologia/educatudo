@@ -151,7 +151,7 @@ $inputClass = 'w-full min-w-0 px-3 py-2 border border-slate-300 rounded-lg text-
             <div class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3">
                 <button type="submit" form="form-creditos-renovar"
                         class="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 font-medium text-sm w-full sm:w-auto"
-                        onclick="return confirm('Isso renova a cota mensal de alunos, professores, usuários admin e da escola (conforme os valores salvos). TudiCoins comprados continuam no saldo. Deseja continuar?');">
+                        data-csp-confirm="Isso renova a cota mensal de alunos, professores, usuários admin e da escola (conforme os valores salvos). TudiCoins comprados continuam no saldo. Deseja continuar?">
                     Renovar todos
                 </button>
                 <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm w-full sm:w-auto">Salvar</button>

@@ -111,7 +111,7 @@ if ($usuario && $notificacoesNaoLidas > 0) {
                 <div id="modal-notifications-content" class="space-y-4 max-h-[60vh] overflow-y-auto">
                     <?php if (!empty($notificacoesModal)): ?>
                         <?php foreach ($notificacoesModal as $notif): ?>
-                            <div class="bg-gray-50 rounded-lg p-4 border-l-4 <?= $notif['lida'] ? 'border-gray-300' : 'border-blue-500' ?> hover:bg-gray-100 transition-colors cursor-pointer border border-gray-200" onclick="visualizarNotificacao(<?= $notif['id'] ?>)">
+                            <div class="bg-gray-50 rounded-lg p-4 border-l-4 <?= $notif['lida'] ? 'border-gray-300' : 'border-blue-500' ?> hover:bg-gray-100 transition-colors cursor-pointer border border-gray-200" data-csp-click="visualizarNotificacao" data-csp-arg="<?= $notif['id'] ?>">
                                 <div class="flex items-start justify-between">
                                     <div class="flex-1">
                                         <div class="flex items-center mb-2">
@@ -246,7 +246,7 @@ if ($usuario && $notificacoesNaoLidas > 0) {
                 </div>
             <?php else: ?>
                 <?php foreach ($notificacoesModal as $notificacao): ?>
-                    <div class="p-4 border-b hover:bg-gray-50 cursor-pointer" onclick="visualizarNotificacao(<?= $notificacao['id'] ?>)">
+                    <div class="p-4 border-b hover:bg-gray-50 cursor-pointer" data-csp-click="visualizarNotificacao" data-csp-arg="<?= $notificacao['id'] ?>">
                         <div class="flex items-start">
                             <div class="flex-shrink-0">
                                 <?php if ($notificacao['tipo_conteudo'] === 'video'): ?>

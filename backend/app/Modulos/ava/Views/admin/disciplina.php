@@ -78,7 +78,7 @@ $dId = (int) ($disciplina['id'] ?? 0);
                             </div>
                             <div class="flex items-center gap-2 flex-shrink-0">
                                 <a href="<?= URL . $base ?>/modulos/<?= (int) $m['id'] ?>/aulas/nova" class="inline-flex items-center px-3 py-1.5 bg-primary text-primary rounded-lg text-xs font-semibold hover:opacity-90 transition-colors"><i class="fa-solid fa-plus mr-1"></i> Aula</a>
-                                <form method="post" action="<?= URL . $base ?>/modulos/<?= (int) $m['id'] ?>/excluir" onsubmit="return confirm('Excluir módulo e suas aulas?');">
+                                <form method="post" action="<?= URL . $base ?>/modulos/<?= (int) $m['id'] ?>/excluir" data-csp-confirm="Excluir módulo e suas aulas?">
                                     <input type="hidden" name="_token" value="<?= $csrf ?>">
                                     <button type="submit" class="text-gray-400 hover:text-red-600 px-2"><i class="fa-solid fa-trash"></i></button>
                                 </form>
@@ -100,7 +100,7 @@ $dId = (int) ($disciplina['id'] ?? 0);
                                             <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                                         </a>
                                         <div class="border-t border-gray-100 my-1"></div>
-                                        <form method="post" action="<?= URL . $base ?>/aulas/<?= (int) $a['id'] ?>/excluir" onsubmit="return confirm('Excluir aula?');">
+                                        <form method="post" action="<?= URL . $base ?>/aulas/<?= (int) $a['id'] ?>/excluir" data-csp-confirm="Excluir aula?">
                                             <input type="hidden" name="_token" value="<?= $csrf ?>">
                                             <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                                                 <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Excluir
@@ -148,7 +148,7 @@ $dId = (int) ($disciplina['id'] ?? 0);
                             <div class="text-xs text-gray-400"><?= (float) ($al['progresso_pct'] ?? 0) ?>% · <?= htmlspecialchars((string) ($al['status'] ?? '')) ?></div>
                         </div>
                         <?php if ($isAdmin): ?>
-                        <form method="post" action="<?= URL ?>/admin/ava/disciplinas/<?= $dId ?>/cancelar-matricula" onsubmit="return confirm('Cancelar matrícula?');">
+                        <form method="post" action="<?= URL ?>/admin/ava/disciplinas/<?= $dId ?>/cancelar-matricula" data-csp-confirm="Cancelar matrícula?">
                             <input type="hidden" name="_token" value="<?= $csrf ?>">
                             <input type="hidden" name="aluno_id" value="<?= (int) ($al['aluno_id'] ?? 0) ?>">
                             <button type="submit" class="text-gray-400 hover:text-red-600"><i class="fa-solid fa-xmark"></i></button>

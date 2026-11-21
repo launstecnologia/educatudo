@@ -15,7 +15,7 @@
                     <p class="text-sm text-gray-500"><?= htmlspecialchars($jornada['materia_nome']) ?> • <?= htmlspecialchars($jornada['turma_nome']) ?></p>
                 </div>
                 <div class="flex space-x-3">
-                    <button onclick="window.location.href='<?= URL ?>/professor/jornadas/<?= $jornada['id'] ?>'" 
+                    <button data-csp-href="<?= URL ?>/professor/jornadas/<?= $jornada['id'] ?>" 
                             class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors">
                         ← Voltar para Jornada
                     </button>
@@ -120,12 +120,12 @@
                                     </div>
                                     
                                     <div class="flex space-x-1">
-                                        <button onclick="editarBloco(<?= $bloco['id'] ?>)" 
+                                        <button data-csp-click="editarBloco" data-csp-arg="<?= $bloco['id'] ?>" 
                                                 class="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
                                                 title="Editar">
                                             ✏️
                                         </button>
-                                        <button onclick="removerBloco(<?= $bloco['id'] ?>)" 
+                                        <button data-csp-click="removerBloco" data-csp-arg="<?= $bloco['id'] ?>" 
                                                 class="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
                                                 title="Remover">
                                             🗑️

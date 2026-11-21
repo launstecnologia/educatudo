@@ -102,7 +102,7 @@ if (!class_exists('LayoutHelper')) {
                                     data-questao-id="<?= (int) $questao['id'] ?>"
                                     data-invalidada="<?= !empty($questao['invalidada']) ? '1' : '0' ?>"
                                     data-observacao="<?= htmlspecialchars((string) ($questao['observacao_invalidacao'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
-                                    onclick="abrirModalInvalidacaoQuestao(this)">
+                                    data-csp-click="abrirModalInvalidacaoQuestao" data-csp-pass="el">
                                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 3c-.77-1.33-2.69-1.33-3.46 0L3.2 16c-.77 1.33.19 3 1.73 3z"></path>
                                 </svg>
@@ -179,7 +179,7 @@ if (!class_exists('LayoutHelper')) {
                                     Ver Resultado
                                 </a>
                             <?php elseif ($realizacao['status'] === 'cancelada'): ?>
-                                <form method="post" action="<?= URL ?>/admin/provas/liberar-tentativa/<?= (int)$prova['id'] ?>/<?= (int)$realizacao['aluno_id'] ?>" class="inline" onsubmit="return confirm('Liberar nova tentativa para este aluno? Ele poderá realizar a prova novamente.');">
+                                <form method="post" action="<?= URL ?>/admin/provas/liberar-tentativa/<?= (int)$prova['id'] ?>/<?= (int)$realizacao['aluno_id'] ?>" class="inline" data-csp-confirm="Liberar nova tentativa para este aluno? Ele poderá realizar a prova novamente.">
                                     <button type="submit" class="text-amber-700 hover:text-amber-900 font-medium">Liberar nova tentativa</button>
                                 </form>
                             <?php endif; ?>
@@ -291,7 +291,7 @@ if (!class_exists('LayoutHelper')) {
         $podeRetornar = $estaEnviada;
         ?>
         <?php if ($podeAprovar): ?>
-            <button id="btnAprovarProva" onclick="aprovarProva(<?= $prova['id'] ?>)"
+            <button id="btnAprovarProva" data-csp-click="aprovarProva" data-csp-arg="<?= $prova['id'] ?>"
                     class="btn-primary-custom px-6 py-2 rounded-lg transition-colors flex items-center hover:opacity-90">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
@@ -307,7 +307,7 @@ if (!class_exists('LayoutHelper')) {
             </button>
         <?php endif; ?>
         <?php if ($podeRetornar): ?>
-            <button onclick="abrirModalRetornar(<?= $prova['id'] ?>)"
+            <button data-csp-click="abrirModalRetornar" data-csp-arg="<?= $prova['id'] ?>"
                     class="bg-orange-600 text-white px-6 py-2 rounded-lg hover:bg-orange-700 transition-colors flex items-center">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>

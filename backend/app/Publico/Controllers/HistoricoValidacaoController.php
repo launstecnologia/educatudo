@@ -37,7 +37,9 @@ class HistoricoValidacaoController extends BaseController
             'escola_sistema' => $escolaNome,
         ];
         extract($viewData, EXTR_SKIP);
+        ob_start();
         require __DIR__ . '/../../Views/public/historico_validar.php';
+        echo \App\Core\CspPolitica::prepararHtmlCsp((string) ob_get_clean());
     }
 }
 }

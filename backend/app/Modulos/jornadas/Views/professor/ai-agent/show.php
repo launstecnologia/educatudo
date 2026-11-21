@@ -73,7 +73,7 @@ $title = $title ?? 'Agente de IA - EducaTudo';
                                 <?php if ($doc['status_processamento'] === 'processando'): ?>
                                     <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
                                 <?php else: ?>
-                                    <button onclick="excluirDocumento(<?= $doc['id'] ?>)" 
+                                    <button data-csp-click="excluirDocumento" data-csp-arg="<?= $doc['id'] ?>" 
                                             class="text-red-500 hover:text-red-700 transition-colors p-1 rounded hover:bg-red-50"
                                             title="Excluir documento">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

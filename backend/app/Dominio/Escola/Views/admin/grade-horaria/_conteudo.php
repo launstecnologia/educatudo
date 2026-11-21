@@ -291,10 +291,10 @@ function closeFilterDrawer() {
                                     $diaNum = (int) ($item['dia_semana'] ?? 0);
                                     ob_start();
                                 ?>
-                                    <button type="button" onclick="openAulaDrawer(<?= (int) $item['id'] ?>)" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                    <button type="button" data-csp-click="openAulaDrawer" data-csp-arg="<?= (int) $item['id'] ?>" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                         <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                                     </button>
-                                    <form action="<?= URL ?>/admin/grade-horaria/<?= (int) $item['id'] ?>" method="post" onsubmit="return confirm('Remover esta aula da grade?');">
+                                    <form action="<?= URL ?>/admin/grade-horaria/<?= (int) $item['id'] ?>" method="post" data-csp-confirm="Remover esta aula da grade?">
                                         <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                                         <input type="hidden" name="_method" value="DELETE">
                                         <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
@@ -404,7 +404,7 @@ function closeFilterDrawer() {
                                                             ?>
                                                                 <div class="grade-card relative rounded-md border <?= htmlspecialchars($cor['border']) ?> <?= htmlspecialchars($cor['bg']) ?> <?= htmlspecialchars($cor['text']) ?> px-2 py-1.5 hover:shadow-sm transition-shadow">
                                                                     <button type="button"
-                                                                            onclick="openAulaDrawer(<?= (int) $aula['id'] ?>)"
+                                                                            data-csp-click="openAulaDrawer" data-csp-arg="<?= (int) $aula['id'] ?>"
                                                                             class="w-full text-left min-w-0">
                                                                         <p class="text-[11px] font-semibold leading-snug pr-5 break-words"><?= htmlspecialchars((string) ($aula['materia_nome'] ?? '')) ?></p>
                                                                         <p class="mt-0.5 text-[11px] opacity-80"><?= htmlspecialchars($nomeProfessorCurto((string) ($aula['professor_nome'] ?? ''))) ?></p>
@@ -428,10 +428,10 @@ function closeFilterDrawer() {
                                                                         </button>
                                                                         <div data-dropdown-menu class="hidden fixed z-50 w-44 origin-top-right rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5 overflow-hidden">
                                                                             <div class="py-1">
-                                                                                <button type="button" onclick="openAulaDrawer(<?= (int) $aula['id'] ?>)" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                                                                <button type="button" data-csp-click="openAulaDrawer" data-csp-arg="<?= (int) $aula['id'] ?>" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                                                                     <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                                                                                 </button>
-                                                                                <form action="<?= URL ?>/admin/grade-horaria/<?= (int) $aula['id'] ?>" method="post" onsubmit="return confirm('Remover esta aula da grade?');">
+                                                                                <form action="<?= URL ?>/admin/grade-horaria/<?= (int) $aula['id'] ?>" method="post" data-csp-confirm="Remover esta aula da grade?">
                                                                                     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                                                                                     <input type="hidden" name="_method" value="DELETE">
                                                                                     <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">

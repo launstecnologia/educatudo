@@ -267,7 +267,7 @@ $tomCal = $corCal !== '' ? '--button-primary-color:' . $corCal . ';--primary-tex
             </div>
             <?php if (!empty($ev['minha_informacao'])): ?>
             <span class="text-xs font-semibold px-2 py-1 rounded-full bg-blue-50 text-blue-700">Minha</span>
-            <form method="post" action="<?= URL ?>/professor/calendario-letivo/informacao/excluir" onsubmit="return confirm('Remover esta informação do seu calendário?');">
+            <form method="post" action="<?= URL ?>/professor/calendario-letivo/informacao/excluir" data-csp-confirm="Remover esta informação do seu calendário?">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars((string) ($csrf_token ?? '')) ?>">
                 <input type="hidden" name="ano" value="<?= $ano ?>">
                 <input type="hidden" name="calendario_id" value="<?= (int) ($calendario_id ?? 0) ?>">

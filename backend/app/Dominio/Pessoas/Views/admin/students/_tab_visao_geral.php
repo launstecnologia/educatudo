@@ -250,7 +250,7 @@ $classeVinculoVg = static function (string $rotulo): string {
                             <i class="fa-solid fa-chevron-right text-[10px] text-slate-400"></i>
                         </button>
                         <?php endif; ?>
-                        <button type="button" onclick="abrirModalCadastrarPai(<?= $alunoIdVg ?>)"
+                        <button type="button" data-csp-click="abrirModalCadastrarPai" data-csp-arg="<?= $alunoIdVg ?>"
                                 data-perm-key="acao_rapida_cadastrar_responsavel" data-perm-action="cadastrar"
                                 class="w-full flex items-center gap-3 px-1 py-2.5 hover:bg-slate-50 rounded-lg text-left">
                             <span class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center"><i class="fa-solid fa-user-plus"></i></span>
@@ -265,7 +265,7 @@ $classeVinculoVg = static function (string $rotulo): string {
                             <i class="fa-solid fa-chevron-right text-[10px] text-slate-400"></i>
                         </button>
                     </div>
-                    <button type="button" onclick="abrirOffcanvasAcoesAluno(this)" class="aluno-link mt-3">
+                    <button type="button" data-csp-click="abrirOffcanvasAcoesAluno" data-csp-pass="el" class="aluno-link mt-3">
                         Ver todas as ações <i class="fa-solid fa-chevron-right text-[10px]"></i>
                     </button>
                 </div>

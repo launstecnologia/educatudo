@@ -24,7 +24,7 @@ if (trim($observacaoRaw) !== '' && strpos(trim($observacaoRaw), '{') === 0) {
             <a href="<?= URL ?>/caderno/<?= $cadernoId ?>/editar" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors">
                 Editar
             </a>
-            <form method="POST" action="<?= URL ?>/caderno/<?= $cadernoId ?>/excluir" class="inline" onsubmit="return confirm('Excluir esta anotação e todos os anexos?');">
+            <form method="POST" action="<?= URL ?>/caderno/<?= $cadernoId ?>/excluir" class="inline" data-csp-confirm="Excluir esta anotação e todos os anexos?">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                 <button type="submit" class="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 font-medium transition-colors">
                     Excluir

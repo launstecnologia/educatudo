@@ -8,7 +8,7 @@
                     <p class="text-gray-600 mt-1">Visualize suas redações e correções</p>
                 </div>
                 <div class="flex gap-3">
-                    <button onclick="window.location.href='<?= URL ?>/redacoes'" 
+                    <button data-csp-href="<?= URL ?>/redacoes'" 
                         class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
                         <i class="fas fa-arrow-left mr-2"></i>Voltar
                     </button>
@@ -88,7 +88,7 @@
                                         <?= date('d/m/Y H:i', strtotime($redacao['created_at'])) ?>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <button onclick="window.location.href='<?= URL ?>/redacoes/<?= $redacao['id'] ?>'" 
+                                        <button onclick="window.location.href='<?= URL ?>/redacoes/<?= $redacao['id'] ?>" 
                                             class="text-blue-600 hover:text-blue-900 mr-3">
                                             <i class="fas fa-eye mr-1"></i>Ver
                                         </button>

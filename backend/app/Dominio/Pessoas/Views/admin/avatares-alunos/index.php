@@ -45,14 +45,14 @@ $page_header_actions = '
                     <i class="fa-regular fa-square-check mr-2"></i>
                     Selecionar todos
                 </button>
-                <form id="form-excluir-selecionados" method="POST" action="<?= URL ?>/admin/avatares-alunos/excluir-selecionados" onsubmit="return confirmarExcluirSelecionados();">
+                <form id="form-excluir-selecionados" method="POST" action="<?= URL ?>/admin/avatares-alunos/excluir-selecionados" data-csp-submit-check="confirmarExcluirSelecionados">
                     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
                     <button type="submit" id="btn-excluir-selecionados" disabled class="inline-flex items-center px-4 py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                         <i class="fa-solid fa-trash-can mr-2"></i>
                         Excluir selecionados
                     </button>
                 </form>
-                <form method="POST" action="<?= URL ?>/admin/avatares-alunos/excluir-todos" onsubmit="return confirm('Excluir todos os avatares disponiveis para alunos? As selecoes atuais dos alunos serao limpas.');">
+                <form method="POST" action="<?= URL ?>/admin/avatares-alunos/excluir-todos" data-csp-confirm="Excluir todos os avatares disponiveis para alunos? As selecoes atuais dos alunos serao limpas.">
                     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
                     <button type="submit" class="inline-flex items-center px-4 py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors">
                         <i class="fa-solid fa-trash-can mr-2"></i>
@@ -95,7 +95,7 @@ $page_header_actions = '
                             <?= htmlspecialchars((string) ($avatar['origem'] ?? 'Escola')) ?> · <?= htmlspecialchars((string) $avatar['modificado']) ?>
                         </p>
                     </div>
-                    <form method="POST" action="<?= URL ?>/admin/avatares-alunos/excluir" class="mt-3" onsubmit="return confirm('Excluir este avatar? Alunos que usam essa imagem ficarao sem avatar selecionado.');">
+                    <form method="POST" action="<?= URL ?>/admin/avatares-alunos/excluir" class="mt-3" data-csp-confirm="Excluir este avatar? Alunos que usam essa imagem ficarao sem avatar selecionado.">
                         <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
                         <input type="hidden" name="arquivo" value="<?= htmlspecialchars((string) $avatar['arquivo']) ?>">
                         <button type="submit" class="w-full inline-flex items-center justify-center px-3 py-2 border border-red-200 rounded-lg text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 transition-colors">

@@ -165,7 +165,7 @@
                             <span class="text-xs text-gray-500">
                                 <?= $video['tipo'] === 'youtube' ? '📺 YouTube' : '📁 Upload' ?>
                             </span>
-                            <button onclick="removerVideo(<?= $video['id'] ?>)" 
+                            <button data-csp-click="removerVideo" data-csp-arg="<?= $video['id'] ?>" 
                                     class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors">
                                 Remover
                             </button>
@@ -212,7 +212,7 @@
                                class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition-colors">
                                 Ver
                             </a>
-                            <button onclick="removerDocumento(<?= $doc['id'] ?>)" 
+                            <button data-csp-click="removerDocumento" data-csp-arg="<?= $doc['id'] ?>" 
                                     class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors">
                                 Remover
                             </button>

@@ -204,7 +204,7 @@
                             </details>
                         </div>
                         <div class="ml-3">
-                            <form action="<?= URL ?>/admin/apostilas/excluir" method="POST" onsubmit="return confirm('Deseja remover esta apostila?');">
+                            <form action="<?= URL ?>/admin/apostilas/excluir" method="POST" data-csp-confirm="Deseja remover esta apostila?">
                                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
                                 <input type="hidden" name="id" value="<?= (int)$item['id'] ?>">
                                 <button type="submit" class="text-red-600 hover:text-red-800 text-sm font-medium">

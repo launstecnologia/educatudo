@@ -35,7 +35,7 @@ $usageTypeLabels = [
             <div class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                 <p class="text-sm text-amber-800 font-medium mb-1">Importar dados históricos do banco</p>
                 <p class="text-xs text-amber-700 mb-2">Conversas do chat professor (<code>professores_ia_mensagens</code>) e mensagens da IA do chat aluno (<code>tudinha_mensagens</code> com is_ia=1) podem ser importadas para calcular custos estimados. Execute a migração <code>20260205_000003_logs_uso_llm_add_source.sql</code> antes.</p>
-                <form method="post" action="<?= URL ?>/admin/dev-settings/custos-llm/importar-banco" class="inline" onsubmit="return confirm('Isso vai adicionar registros de custo a partir das conversas e mensagens de IA já salvas no banco. Continuar?');">
+                <form method="post" action="<?= URL ?>/admin/dev-settings/custos-llm/importar-banco" class="inline" data-csp-confirm="Isso vai adicionar registros de custo a partir das conversas e mensagens de IA já salvas no banco. Continuar?">
                     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                     <button type="submit" class="px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium">Importar do banco (conversas e mensagens de IA)</button>
                 </form>

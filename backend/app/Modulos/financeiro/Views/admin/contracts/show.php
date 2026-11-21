@@ -40,7 +40,7 @@ $statusBadge = match($contract['status']) {
             <form method="POST" action="<?= URL ?>/admin/finance/contracts/<?= (int)$contract['id'] ?>/cancel" class="inline">
                 <input type="hidden" name="_token" value="<?= $esc($csrf_token) ?>">
                 <button type="submit"
-                        onclick="return confirm('Cancelar contrato?')"
+                        data-csp-confirm="Cancelar contrato?"
                         class="inline-flex items-center px-4 py-2 border border-red-200 rounded-lg text-sm font-medium text-red-600 bg-white hover:bg-red-50 transition-colors">
                     Cancelar Contrato
                 </button>
@@ -197,7 +197,7 @@ $statusBadge = match($contract['status']) {
             <form method="POST" action="<?= URL ?>/admin/finance/contracts/<?= (int)$contract['id'] ?>/discounts/<?= (int)$d['id'] ?>/remove" class="inline">
                 <input type="hidden" name="_token" value="<?= $esc($csrf_token) ?>">
                 <button type="submit"
-                        onclick="return confirm('Remover desconto?')"
+                        data-csp-confirm="Remover desconto?"
                         class="text-xs text-gray-400 hover:text-red-500 transition-colors">
                     <i class="fa-solid fa-xmark"></i>
                 </button>

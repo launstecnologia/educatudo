@@ -43,7 +43,7 @@ if ($flash_message !== ''):
         </ul>
         <div class="mt-6 flex justify-end gap-3">
             <button type="submit" class="btn-primary-custom px-5 py-2.5 rounded-lg font-medium hover:opacity-90 order-2">Salvar montagem</button>
-            <button type="submit" name="restaurar" value="1" class="order-1 px-5 py-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50" onclick="return confirm('Restaurar a ordem e a visibilidade do dashboard atual?');">Restaurar padrão</button>
+            <button type="submit" name="restaurar" value="1" class="order-1 px-5 py-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50" data-csp-confirm="Restaurar a ordem e a visibilidade do dashboard atual?">Restaurar padrão</button>
         </div>
     </form>
 </div>

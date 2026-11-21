@@ -204,17 +204,17 @@ $page_header_actions = ob_get_clean();
                            class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-circle-info text-gray-400 w-4 text-center"></i> Detalhes
                         </a>
-                        <button type="button" onclick="openTurmaDrawer(<?= (int) $turma['id'] ?>)"
+                        <button type="button" data-csp-click="openTurmaDrawer" data-csp-arg="<?= (int) $turma['id'] ?>"
                            class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-pen text-gray-400 w-4 text-center"></i> Editar
                         </button>
                         <button type="button"
-                                onclick="toggleStatus(<?= (int) $turma['id'] ?>, <?= $turma['ativo'] ? 'false' : 'true' ?>)"
+                                data-csp-click="toggleStatus" data-csp-arg="<?= (int) $turma['id'] ?>, <?= $turma['ativo'] ? 'false' : 'true' ?>"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <i class="fa-solid fa-power-off text-gray-400 w-4 text-center"></i> <?= $turma['ativo'] ? 'Desativar' : 'Ativar' ?>
                         </button>
                         <div class="border-t border-gray-100 my-1"></div>
-                        <button type="button" onclick="openBulkDeleteSingle(<?= (int) $turma['id'] ?>)"
+                        <button type="button" data-csp-click="openBulkDeleteSingle" data-csp-arg="<?= (int) $turma['id'] ?>"
                                 class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                             <i class="fa-solid fa-trash-can text-red-400 w-4 text-center"></i> Excluir
                         </button>

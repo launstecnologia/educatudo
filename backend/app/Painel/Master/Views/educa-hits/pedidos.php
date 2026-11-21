@@ -142,7 +142,7 @@ if ((int) ($pag['per_page'] ?? 25) !== 25) {
                 <button type="submit" name="bulk_action" value="apply" class="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">
                     Aplicar aos selecionados
                 </button>
-                <button type="submit" name="bulk_action" value="excluded" class="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-rose-600 text-white text-sm font-medium hover:bg-rose-700" onclick="return confirm('Excluir permanentemente os pedidos selecionados? Esta ação remove o registro no banco da escola.');">
+                <button type="submit" name="bulk_action" value="excluded" class="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-rose-600 text-white text-sm font-medium hover:bg-rose-700" data-csp-confirm="Excluir permanentemente os pedidos selecionados? Esta ação remove o registro no banco da escola.">
                     Excluir selecionados
                 </button>
             </div>

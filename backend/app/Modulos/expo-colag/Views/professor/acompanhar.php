@@ -312,7 +312,7 @@ foreach ($atribuicoes as $a) {
                             <?php endif; ?>
                         </p>
                     </div>
-                    <form method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/tarefas/excluir" onsubmit="return confirm('Remover tarefa?');">
+                    <form method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/tarefas/excluir" data-csp-confirm="Remover tarefa?">
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
                         <input type="hidden" name="tarefa_id" value="<?= $tid ?>">
                         <button type="submit" class="text-xs text-red-600 hover:underline">Excluir</button>
@@ -512,7 +512,7 @@ foreach ($atribuicoes as $a) {
                             <?php endif; ?>
                         </div>
                     </div>
-                    <form method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/conteudos/remover" onsubmit="return confirm('Remover conteúdo?');">
+                    <form method="post" action="<?= htmlspecialchars($baseUrlExpo) ?>/projetos/<?= $pid ?>/conteudos/remover" data-csp-confirm="Remover conteúdo?">
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
                         <input type="hidden" name="conteudo_id" value="<?= (int) $m['id'] ?>">
                         <button type="submit" class="text-xs text-red-600 hover:underline">Remover</button>

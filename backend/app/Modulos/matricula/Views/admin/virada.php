@@ -49,7 +49,7 @@ include __DIR__ . '/../../../../Views/admin/_partials/page_header_list.php'; ?>
     <div class="flex flex-wrap items-center justify-between gap-3">
         <h3 class="font-semibold text-gray-800">Sucessão de turmas</h3>
         <form method="POST" action="<?= URL ?>/admin/enrollment/virada/clonar"
-              onsubmit="return confirm('Clonar turmas do ano de origem para o destino? Turmas já ligadas serão ignoradas.')">
+              data-csp-confirm="Clonar turmas do ano de origem para o destino? Turmas já ligadas serão ignoradas.">
             <input type="hidden" name="_token" value="<?= $esc($csrf_token ?? '') ?>">
             <input type="hidden" name="ano_origem_id" value="<?= $ano_origem_id ?>">
             <input type="hidden" name="ano_destino_id" value="<?= $ano_destino_id ?>">

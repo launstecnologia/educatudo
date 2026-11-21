@@ -165,7 +165,7 @@ $diasFixar = [1 => 'Seg', 2 => 'Ter', 3 => 'Qua', 4 => 'Qui', 5 => 'Sex'];
             <p class="text-sm text-gray-500">Esta versão não tem aulas para fixar.</p>
             <?php else: ?>
             <form method="POST" action="<?= $voltarUrl ?>/versoes/<?= $versaoId ?>/reotimizar" class="space-y-4"
-                  onsubmit="return confirm('Reotimizar a partir desta versão? Isso consome TudiCoins da escola.');">
+                  data-csp-confirm="Reotimizar a partir desta versão? Isso consome TudiCoins da escola.">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                 <div>
                     <span class="block text-sm font-medium text-gray-700 mb-1.5">Manter aulas destes dias</span>

@@ -168,7 +168,7 @@
                     </button>
                     <div class="tb-sep"></div>
                     <input type="file" id="enunciado-jornada-insert-image-input" accept="image/*" class="hidden">
-                    <button type="button" class="tb-math-btn tb-img-btn" title="Inserir ou colar imagem (Ctrl+V)" onclick="document.getElementById('enunciado-jornada-insert-image-input').click()">
+                    <button type="button" class="tb-math-btn tb-img-btn" title="Inserir ou colar imagem (Ctrl+V)" data-csp-click-id="enunciado-jornada-insert-image-input">
                         <svg class="tb-img-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
                         Imagem
                     </button>
@@ -1011,7 +1011,7 @@ function adicionarOpcao() {
                    class="w-5 h-5 text-blue-600 focus:ring-blue-500">
             <label for="radio-${opcoesCount - 1}" class="text-sm text-gray-700 cursor-pointer">Gabarito</label>
         </div>
-        <button type="button" onclick="removerOpcao(this)" 
+        <button type="button" data-csp-click="removerOpcao" data-csp-pass="el" 
                 class="px-3 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors">
             Remover
         </button>
@@ -2312,7 +2312,7 @@ function abrirModalEdicao(exercicio) {
                             </button>
                             <div class="tb-sep"></div>
                             <input type="file" id="edit-enunciado-insert-image-input" accept="image/*" class="hidden">
-                            <button type="button" class="tb-math-btn tb-img-btn" title="Inserir ou colar imagem (Ctrl+V)" onclick="document.getElementById('edit-enunciado-insert-image-input').click()">
+                            <button type="button" class="tb-math-btn tb-img-btn" title="Inserir ou colar imagem (Ctrl+V)" data-csp-click-id="edit-enunciado-insert-image-input">
                                 <svg class="tb-img-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
                                 Imagem
                             </button>
@@ -2338,7 +2338,7 @@ function abrirModalEdicao(exercicio) {
                         </div>
                         <div id="edit-imagem-enunciado-actions" class="flex flex-wrap items-center gap-2">
                             <input type="file" id="edit-imagem-enunciado" accept="image/*" class="hidden" onchange="uploadImagemEnunciadoEdicao(this)">
-                            <button type="button" onclick="document.getElementById('edit-imagem-enunciado').click()"
+                            <button type="button" data-csp-click-id="edit-imagem-enunciado"
                                     class="inline-flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 hover:border-gray-400 transition-colors shadow-sm">📷 Escolher arquivo</button>
                             <button type="button" id="btn-colar-imagem-edit" data-csp-click="ativarColarImagemEdicao"
                                     class="inline-flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 hover:border-gray-400 transition-colors shadow-sm">📋 Colar imagem</button>
@@ -2706,7 +2706,7 @@ function adicionarOpcaoEdicao(opcaoExistente = null) {
             <input type="checkbox" name="resposta_opcao_edit[]" value="${index}" id="radio-edit-${index}" class="w-5 h-5 text-blue-600 focus:ring-blue-500">
             <label for="radio-edit-${index}" class="opcao-radio-label alt-correct">Gabarito</label>
         </div>
-        <button type="button" onclick="removerOpcaoEdicao(this)" class="px-3 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors">Remover</button>
+        <button type="button" data-csp-click="removerOpcaoEdicao" data-csp-pass="el" class="px-3 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors">Remover</button>
     `;
     
     const editor = div.querySelector('.alt-editor');

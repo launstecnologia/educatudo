@@ -102,7 +102,7 @@ $urlLancarFaltas = URL . '/admin/faltas/lancar';
                                         <a href="<?= $urlLancarFaltas ?>?evento_id=<?= $eid ?>" class="inline-flex items-center justify-center p-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700" title="Abrir página para lançar faltas neste evento" aria-label="Lançar faltas">
                                             <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9h2m-2 4h2m-5-4h.01M12 16h.01"/></svg>
                                         </a>
-                                        <form method="POST" action="<?= URL ?>/admin/faltas/excluir" class="inline" onsubmit="return confirm('Deseja realmente excluir este evento de faltas e todos os lançamentos associados?');">
+                                        <form method="POST" action="<?= URL ?>/admin/faltas/excluir" class="inline" data-csp-confirm="Deseja realmente excluir este evento de faltas e todos os lançamentos associados?">
                                             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
                                             <input type="hidden" name="evento_id" value="<?= $eid ?>">
                                             <button type="submit" class="inline-flex items-center justify-center p-2 rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100" title="Excluir este evento permanentemente" aria-label="Excluir evento">

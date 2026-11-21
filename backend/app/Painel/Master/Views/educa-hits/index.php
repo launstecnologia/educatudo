@@ -353,7 +353,7 @@ $eh_status_styles = static function (string $s): string {
                     </td>
                     <td class="px-4 py-2 text-xs text-slate-700 whitespace-nowrap">
                         <?php if ($educahits_delete_song_url !== '' && $songId !== ''): ?>
-                        <form method="post" action="<?= URL ?>/master/educa-hits/delete-song" onsubmit="return confirm('Tem certeza que deseja apagar esta música?');">
+                        <form method="post" action="<?= URL ?>/master/educa-hits/delete-song" data-csp-confirm="Tem certeza que deseja apagar esta música?">
                             <input type="hidden" name="_token" value="<?= htmlspecialchars($csrf_token) ?>">
                             <input type="hidden" name="song_id" value="<?= htmlspecialchars($songId) ?>">
                             <input type="hidden" name="title" value="<?= htmlspecialchars($title) ?>">

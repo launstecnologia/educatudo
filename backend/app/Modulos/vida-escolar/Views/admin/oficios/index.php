@@ -165,7 +165,7 @@ include \App\Core\ViewPaths::adminPartial('flash_message.php');
                             <?php if ($st !== 'cancelado'): ?>
                             <div class="border-t border-gray-100 my-1"></div>
                             <form method="post" action="<?= URL ?>/admin/vida-escolar/oficios/<?= (int) $o['id'] ?>/cancelar"
-                                  onsubmit="return confirm('Cancelar este ofício?');">
+                                  data-csp-confirm="Cancelar este ofício?">
                                 <input type="hidden" name="_token" value="<?= $esc($token) ?>">
                                 <button type="submit" class="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                                     <i class="fa-solid fa-ban text-red-400 w-4 text-center"></i> Cancelar

@@ -172,7 +172,7 @@ $tudicoinsTemaIa = \App\Core\CreditosModuleRegistry::acaoIaDisponivel('redacao_g
                                     </svg>
                                     Continuar
                                 </a>
-                                <button onclick="excluirRascunho(<?= $rascunho['id'] ?>)" 
+                                <button data-csp-click="excluirRascunho" data-csp-arg="<?= $rascunho['id'] ?>" 
                                         class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
                                     Excluir
                                 </button>
@@ -245,7 +245,7 @@ $tudicoinsTemaIa = \App\Core\CreditosModuleRegistry::acaoIaDisponivel('redacao_g
                                             Ver Detalhes
                                         </a>
                                     <?php endif; ?>
-                                    <button onclick="ocultarRedacao(<?= $redacao['id'] ?>)" 
+                                    <button data-csp-click="ocultarRedacao" data-csp-arg="<?= $redacao['id'] ?>" 
                                             class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors">
                                         Remover
                                     </button>
