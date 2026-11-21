@@ -400,15 +400,33 @@
         savingModal.classList.remove('hidden');
         
         try {
+            const csrfToken = (formData.get('_token') || '').toString();
             const response = await fetch('<?= URL ?>/professor/jornadas', {
                 method: 'POST',
-                body: formData
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {})
+                },
+                body: formData,
+                credentials: 'same-origin'
             });
-            
-            const result = await response.json();
+
+            const raw = await response.text();
+            let result = {};
+            try {
+                result = raw ? JSON.parse(raw) : {};
+            } catch (parseErr) {
+                errorDiv.textContent = response.status === 419 || response.status === 403
+                    ? 'Sessão expirada ou token inválido. Recarregue a página e tente novamente.'
+                    : ('Erro ao criar jornada (HTTP ' + response.status + '). Tente novamente.');
+                errorDiv.classList.remove('hidden');
+                savingModal.classList.add('hidden');
+                return;
+            }
             
             if (response.ok) {
-                successDiv.textContent = result.message;
+                successDiv.textContent = result.message || 'Jornada criada com sucesso';
                 successDiv.classList.remove('hidden');
                 window.location.href = '<?= URL ?>/professor/jornadas';
             } else {

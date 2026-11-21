@@ -212,9 +212,16 @@ class AlunoTurmaResolver
         }
 
         $placeholders = implode(',', array_fill(0, count($turmaIds), '?'));
+        $temHistorico = $this->supportsHistoricoTurmas();
 
         if ($this->supportsMatricula()) {
-            // Ativos com matrícula ativa + transferidos da turma (mesmo se inativos no cadastro).
+            // Ativos com matrícula ativa + transferidos + (opcional) histórico de turma.
+            $joinHistorico = $temHistorico
+                ? " OR EXISTS (
+                        SELECT 1 FROM alunos_turmas_historico h
+                        WHERE h.aluno_id = a.id AND h.turma_id = t.id
+                    )"
+                : '';
             $sql = "SELECT DISTINCT a.id, a.nome, a.ra, a.ativo, t.id AS turma_id, t.nome AS turma_nome,
                            CASE
                                WHEN EXISTS (
@@ -248,6 +255,7 @@ class AlunoTurmaResolver
                                 WHERE mx.aluno_id = a.id AND mx.turma_id = t.id
                             )
                         )
+                        {$joinHistorico}
                     )
                     WHERE t.id IN ($placeholders)
                       AND (
@@ -257,10 +265,35 @@ class AlunoTurmaResolver
                               WHERE mtr.aluno_id = a.id AND mtr.turma_id = t.id
                                 AND mtr.status = 'transferido'
                           )
+                          " . ($temHistorico
+                                ? " OR EXISTS (
+                                        SELECT 1 FROM alunos_turmas_historico h2
+                                        WHERE h2.aluno_id = a.id AND h2.turma_id = t.id
+                                    )"
+                                : '') . "
                       )
                     ORDER BY t.nome, a.nome";
 
             return $this->db->fetchAll($sql, $turmaIds) ?: [];
+        }
+
+        if ($temHistorico) {
+            // Turma atual + histórico (ex.: alunos em recuperação ainda vinculados pela turma anterior).
+            return $this->db->fetchAll(
+                "SELECT DISTINCT a.id, a.nome, a.ra, a.ativo, a.turma_id, t.nome AS turma_nome, 0 AS transferido
+                 FROM alunos a
+                 INNER JOIN turmas t ON t.id = a.turma_id
+                 WHERE a.ativo = 1
+                 AND (
+                    a.turma_id IN ($placeholders)
+                    OR EXISTS (
+                        SELECT 1 FROM alunos_turmas_historico h
+                        WHERE h.aluno_id = a.id AND h.turma_id IN ($placeholders)
+                    )
+                 )
+                 ORDER BY t.nome, a.nome",
+                array_merge($turmaIds, $turmaIds)
+            ) ?: [];
         }
 
         return $this->db->fetchAll(
@@ -271,6 +304,20 @@ class AlunoTurmaResolver
              ORDER BY t.nome, a.nome",
             $turmaIds
         ) ?: [];
+    }
+
+    private function supportsHistoricoTurmas(): bool
+    {
+        static $cache = null;
+        if ($cache !== null) {
+            return $cache;
+        }
+        try {
+            $cache = $this->db->fetch("SHOW TABLES LIKE 'alunos_turmas_historico'") !== false;
+        } catch (\Exception $e) {
+            $cache = false;
+        }
+        return $cache;
     }
 
     public function detectarDivergenciaCadastro(int $alunoId): bool

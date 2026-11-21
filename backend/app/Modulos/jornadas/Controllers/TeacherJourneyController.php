@@ -16,6 +16,7 @@ use App\Core\Logger;
 use App\Services\MediaStorageService;
 use App\Services\OpenAIService;
 use App\Core\PeriodoLetivo;
+use App\Dominio\Pessoas\Services\AlunoTurmaResolver;
 
 if (!class_exists(__NAMESPACE__ . '\\TeacherJourneyController', false)) {
 class TeacherJourneyController extends BaseController
@@ -636,24 +637,9 @@ class TeacherJourneyController extends BaseController
                 return;
             }
             
-            // Na seleção de alunos da jornada, considerar turma atual e histórico
-            // para ficar consistente com a contagem exibida em Turmas.
-            $placeholders = implode(',', array_fill(0, count($turmasValidas), '?'));
-            $alunos = $this->db->fetchAll(
-                "SELECT a.id, a.nome, a.ra, a.turma_id, t.nome AS turma_nome
-                 FROM alunos a
-                 INNER JOIN turmas t ON t.id = a.turma_id
-                 WHERE a.ativo = 1
-                 AND (
-                    a.turma_id IN ($placeholders)
-                    OR EXISTS (
-                        SELECT 1 FROM alunos_turmas_historico h
-                        WHERE h.aluno_id = a.id AND h.turma_id IN ($placeholders)
-                    )
-                 )
-                 ORDER BY t.nome ASC, a.nome ASC",
-                array_merge($turmasValidas, $turmasValidas)
-            );
+            // Turma atual, matrícula ativa/transferida e histórico — mesmo critério das Turmas.
+            $resolver = new AlunoTurmaResolver();
+            $alunos = $resolver->listarAlunosPorTurmasIds($turmasValidas);
             
             $this->json([
                 'success' => true,
@@ -751,23 +737,10 @@ class TeacherJourneyController extends BaseController
             }
             $turmasIds = array_values(array_unique(array_map('intval', $turmasIds)));
             if ($tipoSelecaoAlunos === 'especificos' && !empty($alunosIds)) {
-                $placeholdersTurmas = implode(',', array_fill(0, count($turmasIds), '?'));
-                $placeholdersAlunos = implode(',', array_fill(0, count($alunosIds), '?'));
-                $alunosValidos = $this->db->fetchAll(
-                    "SELECT id FROM alunos
-                     WHERE ativo = 1
-                     AND id IN ($placeholdersAlunos)
-                     AND (
-                        turma_id IN ($placeholdersTurmas)
-                        OR EXISTS (
-                            SELECT 1 FROM alunos_turmas_historico h
-                            WHERE h.aluno_id = alunos.id
-                            AND h.turma_id IN ($placeholdersTurmas)
-                        )
-                     )",
-                    array_merge($alunosIds, $turmasIds, $turmasIds)
-                );
-                $alunosIds = array_map('intval', array_column($alunosValidos, 'id'));
+                $alunosIds = $this->filtrarAlunosAutorizadosNasTurmas($turmasIds, $alunosIds);
+                if ($alunosIds === []) {
+                    throw new \Exception('Nenhum dos alunos selecionados pertence às turmas informadas');
+                }
             }
             
             // Verifica se os planos de aula pertencem ao professor (se fornecidos)
@@ -2294,23 +2267,10 @@ class TeacherJourneyController extends BaseController
             }
             $turmasIds = array_values(array_unique(array_map('intval', $turmasIds)));
             if ($tipoSelecaoAlunos === 'especificos' && !empty($alunosIds)) {
-                $placeholdersTurmas = implode(',', array_fill(0, count($turmasIds), '?'));
-                $placeholdersAlunos = implode(',', array_fill(0, count($alunosIds), '?'));
-                $alunosValidos = $this->db->fetchAll(
-                    "SELECT id FROM alunos
-                     WHERE ativo = 1
-                     AND id IN ($placeholdersAlunos)
-                     AND (
-                        turma_id IN ($placeholdersTurmas)
-                        OR EXISTS (
-                            SELECT 1 FROM alunos_turmas_historico h
-                            WHERE h.aluno_id = alunos.id
-                            AND h.turma_id IN ($placeholdersTurmas)
-                        )
-                     )",
-                    array_merge($alunosIds, $turmasIds, $turmasIds)
-                );
-                $alunosIds = array_map('intval', array_column($alunosValidos, 'id'));
+                $alunosIds = $this->filtrarAlunosAutorizadosNasTurmas($turmasIds, $alunosIds);
+                if ($alunosIds === []) {
+                    throw new \Exception('Nenhum dos alunos selecionados pertence às turmas informadas');
+                }
             }
             
             // Verifica se os planos de aula pertencem ao professor (se fornecidos)
@@ -9339,6 +9299,38 @@ Formato: \Texto corrido, sem títulos ou subtítulos, em parágrafos bem estrutu
         }
         
         return $anexosIds;
+    }
+
+    /**
+     * Intersecta alunos escolhidos com os autorizados nas turmas (matrícula/histórico).
+     *
+     * @param list<int> $turmasIds
+     * @param list<int> $alunosIds
+     * @return list<int>
+     */
+    private function filtrarAlunosAutorizadosNasTurmas(array $turmasIds, array $alunosIds): array
+    {
+        $alunosIds = array_values(array_unique(array_map('intval', $alunosIds)));
+        $turmasIds = array_values(array_unique(array_map('intval', $turmasIds)));
+        if ($alunosIds === [] || $turmasIds === []) {
+            return [];
+        }
+        $resolver = new AlunoTurmaResolver();
+        $naTurma = $resolver->listarAlunosPorTurmasIds($turmasIds);
+        $permitidos = [];
+        foreach ($naTurma as $aluno) {
+            $id = (int) ($aluno['id'] ?? 0);
+            if ($id > 0) {
+                $permitidos[$id] = true;
+            }
+        }
+        $filtrados = [];
+        foreach ($alunosIds as $id) {
+            if (isset($permitidos[$id])) {
+                $filtrados[] = $id;
+            }
+        }
+        return $filtrados;
     }
 }
 }

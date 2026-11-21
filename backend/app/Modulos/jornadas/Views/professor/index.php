@@ -94,7 +94,7 @@ ob_start();
     </div>
     <div class="px-6 sm:px-8 py-4 border-t border-gray-200 flex gap-3">
         <button type="button" id="limparFiltros" class="flex-1 inline-flex items-center justify-center px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">Limpar</button>
-        <button type="button" onclick="closeFiltroDrawer()" class="flex-1 inline-flex items-center justify-center px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">Aplicar filtros</button>
+        <button type="button" data-csp-click="closeFiltroDrawer" class="flex-1 inline-flex items-center justify-center px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">Aplicar filtros</button>
     </div>
 </div>
 <?php
@@ -457,29 +457,39 @@ include $ui . '/offcanvas.php';
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': '<?= htmlspecialchars($csrf_token) ?>'
                 },
+                credentials: 'same-origin',
                 body: JSON.stringify({
                     jornada_id: jornadaId,
                     status: newStatus,
                     _token: '<?= htmlspecialchars($csrf_token) ?>'
                 })
             })
-            .then(response => {
-                return response.json();
-            })
-            .then(result => {
+            .then(async response => {
+                const raw = await response.text();
+                let result = {};
+                try {
+                    result = raw ? JSON.parse(raw) : {};
+                } catch (e) {
+                    throw new Error(response.status === 403 || response.status === 419
+                        ? 'Sessão expirada ou token inválido. Recarregue a página.'
+                        : ('Erro HTTP ' + response.status));
+                }
                 if (result.success) {
                     if (result.warnings && result.warnings.length > 0) {
-                        alert('⚠️ Atenção:\n\n' + result.warnings.join('\n\n'));
+                        alert('Atenção:\n\n' + result.warnings.join('\n\n'));
                     }
                     location.reload();
                 } else {
-                    alert('Erro ao alterar status: ' + result.error);
+                    alert('Erro ao alterar status: ' + (result.error || 'falha desconhecida'));
                 }
             })
             .catch(error => {
                 console.error('Erro na requisição:', error);
-                alert('Erro de conexão');
+                alert(error.message || 'Erro de conexão');
             });
         }
     }
@@ -494,6 +504,12 @@ include $ui . '/offcanvas.php';
         formData.append('jornada_id', jornadaId);
         fetch('<?= URL ?>/professor/jornadas/duplicar', {
             method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': '<?= htmlspecialchars($csrf_token) ?>'
+            },
+            credentials: 'same-origin',
             body: formData
         })
         .then(r => r.json())
@@ -557,7 +573,7 @@ include $ui . '/offcanvas.php';
                     <div class="flex space-x-3">
                         <button 
                             type="button"
-                            onclick="fecharModalExclusao()" 
+                            data-csp-click="fecharModalExclusao" 
                             class="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
                         >
                             Cancelar

@@ -136,7 +136,9 @@ class CsrfMiddleware
         if (is_string($header) && $header !== '') {
             return $header;
         }
-        // Alguns clients enviam no header genérico
+        // Alguns clients enviam no header genérico.
+        // POST application/json: preferir X-CSRF-TOKEN (não ler php://input aqui —
+        // o stream só pode ser consumido uma vez e quebraria os controllers).
         $xToken = $_SERVER['HTTP_X_XSRF_TOKEN'] ?? '';
         return is_string($xToken) ? $xToken : '';
     }
@@ -168,15 +170,19 @@ class CsrfMiddleware
             && strtolower((string) $_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
         $acceptsJson = isset($_SERVER['HTTP_ACCEPT'])
             && strpos((string) $_SERVER['HTTP_ACCEPT'], 'application/json') !== false;
-        $wantsJson = $isAjax || $acceptsJson
-            || (isset($_SERVER['CONTENT_TYPE']) && str_contains((string) $_SERVER['CONTENT_TYPE'], 'application/json'));
+        $contentType = strtolower((string) ($_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? ''));
+        $isJsonBody = str_contains($contentType, 'application/json');
+        // fetch() do browser manda Sec-Fetch-Mode cors/same-origin; formulário clássico manda navigate.
+        $fetchMode = strtolower((string) ($_SERVER['HTTP_SEC_FETCH_MODE'] ?? ''));
+        $isFetchApi = in_array($fetchMode, ['cors', 'same-origin', 'no-cors'], true);
+        $wantsJson = $isAjax || $acceptsJson || $isJsonBody || $isFetchApi;
 
         if ($wantsJson) {
             http_response_code(403);
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode([
                 'success' => false,
-                'error' => 'Token CSRF inválido ou ausente.',
+                'error' => 'Token CSRF inválido ou ausente. Recarregue a página e tente novamente.',
                 'code' => 'csrf_invalid',
             ], JSON_UNESCAPED_UNICODE);
             exit;
