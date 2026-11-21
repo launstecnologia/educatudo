@@ -14,6 +14,22 @@ $envPath = ENV_FILE_PATH;
 $paths = [$envPath, __DIR__ . '/../../.env', __DIR__ . '/../../../.env'];
 $multiTenant = 'false';
 $masterDomain = '';
+
+$educatudoParseEnvValue = static function (string $raw): string {
+    $v = trim($raw);
+    // Remove comentário inline fora de aspas: valor # comentário
+    if ($v !== '' && ($v[0] !== '"' && $v[0] !== "'")) {
+        $hashPos = strpos($v, '#');
+        if ($hashPos !== false) {
+            $v = trim(substr($v, 0, $hashPos));
+        }
+    }
+    if (strlen($v) >= 2 && (($v[0] === '"' && substr($v, -1) === '"') || ($v[0] === "'" && substr($v, -1) === "'"))) {
+        $v = substr($v, 1, -1);
+    }
+    return trim($v);
+};
+
 foreach ($paths as $p) {
     $resolved = is_file($p) ? $p : (realpath($p) ?: $p);
     if (!is_file($resolved)) {
@@ -23,29 +39,44 @@ foreach ($paths as $p) {
     if (!is_array($lines)) {
         continue;
     }
-    foreach ($lines as $line) {
-        $line = trim($line);
+    foreach ($lines as $idx => $line) {
+        $line = trim((string) $line);
+        // BOM no início do arquivo
+        if ($idx === 0) {
+            $line = preg_replace('/^\xEF\xBB\xBF/', '', $line) ?? $line;
+        }
         if ($line === '' || $line[0] === '#') {
             continue;
         }
-        if (stripos($line, 'MULTI_TENANT') === 0 && preg_match('/MULTI_TENANT\s*=\s*(.+)$/i', $line, $m)) {
-            $v = trim($m[1]);
-            if (strlen($v) >= 2 && (($v[0] === '"' && substr($v, -1) === '"') || ($v[0] === "'" && substr($v, -1) === "'"))) {
-                $v = substr($v, 1, -1);
-            }
-            $multiTenant = trim($v);
+        if (preg_match('/^MULTI_TENANT\s*=\s*(.+)$/i', $line, $m)) {
+            $multiTenant = $educatudoParseEnvValue($m[1]);
         }
-        if (stripos($line, 'MASTER_DOMAIN') === 0 && preg_match('/MASTER_DOMAIN\s*=\s*(.+)$/i', $line, $m)) {
-            $v = trim($m[1]);
-            if (strlen($v) >= 2 && (($v[0] === '"' && substr($v, -1) === '"') || ($v[0] === "'" && substr($v, -1) === "'"))) {
-                $v = substr($v, 1, -1);
+        if (preg_match('/^MASTER_DOMAIN\s*=\s*(.+)$/i', $line, $m)) {
+            $parsed = $educatudoParseEnvValue($m[1]);
+            if ($parsed !== '') {
+                $masterDomain = $parsed;
             }
-            $masterDomain = trim($v);
         }
     }
-    if ($multiTenant !== 'false') {
+    // Só para de varrer quando já temos multi-tenant ativo E o domínio master
+    // (evita perder MASTER_DOMAIN que está só noutro .env candidato).
+    if (strtolower($multiTenant) === 'true' && $masterDomain !== '') {
         break;
     }
+}
+
+// Fallback: processo / putenv (php-fpm, Docker secrets).
+$fromProcMaster = getenv('MASTER_DOMAIN');
+if (is_string($fromProcMaster) && trim($fromProcMaster) !== '') {
+    $masterDomain = $educatudoParseEnvValue($fromProcMaster);
+} elseif (isset($_ENV['MASTER_DOMAIN']) && is_string($_ENV['MASTER_DOMAIN']) && trim($_ENV['MASTER_DOMAIN']) !== '') {
+    $masterDomain = $educatudoParseEnvValue((string) $_ENV['MASTER_DOMAIN']);
+}
+$fromProcMulti = getenv('MULTI_TENANT');
+if (is_string($fromProcMulti) && trim($fromProcMulti) !== '') {
+    $multiTenant = $educatudoParseEnvValue($fromProcMulti);
+} elseif (isset($_ENV['MULTI_TENANT']) && is_string($_ENV['MULTI_TENANT']) && trim($_ENV['MULTI_TENANT']) !== '') {
+    $multiTenant = $educatudoParseEnvValue((string) $_ENV['MULTI_TENANT']);
 }
 
 if (strtolower($multiTenant) !== 'true') {
@@ -54,7 +85,7 @@ if (strtolower($multiTenant) !== 'true') {
 
 define('MULTI_TENANT_ACTIVE', true);
 if ($masterDomain !== '') {
-    define('MASTER_DOMAIN', $masterDomain);
+    define('MASTER_DOMAIN', strtolower(trim($masterDomain)));
 }
 
 // Se a requisição for para o painel /master, usa conexão master (não resolve tenant)
@@ -73,9 +104,13 @@ if ($host !== '' && strpos($host, ':') !== false) {
 $appEnvBootstrap = defined('ENVIRONMENT') ? (string) ENVIRONMENT : 'production';
 $isProducaoBootstrap = ($appEnvBootstrap === 'production');
 $masterDomainConfigurado = defined('MASTER_DOMAIN') && MASTER_DOMAIN !== '';
+$masterDomainNormalizado = $masterDomainConfigurado ? strtolower(trim((string) MASTER_DOMAIN)) : '';
+// Host reservado administrativo: MASTER_DOMAIN exato ou label "master.*" — nunca é escola.
+$hostReservadoMaster = ($masterDomainNormalizado !== '' && $host === $masterDomainNormalizado)
+    || ($host !== '' && strpos($host, 'master.') === 0);
 $isMasterDomain = false;
 if ($masterDomainConfigurado) {
-    $isMasterDomain = (strtolower(trim((string) MASTER_DOMAIN)) === $host);
+    $isMasterDomain = ($host === $masterDomainNormalizado);
 } elseif (!$isProducaoBootstrap) {
     // Dev/local sem MASTER_DOMAIN: convenção master.*
     $isMasterDomain = (strpos($host, 'master.') === 0);
@@ -192,6 +227,12 @@ if ($isMasterPath || $isMasterDomain) {
     $GLOBALS['_educatudo_master_pdo'] = $masterPdo;
     Database::setCurrentInstance(Database::createFromPdo($masterPdo));
     return;
+}
+
+// Host administrativo reservado (master.*) nunca resolve como escola — evita Portal do Aluno
+// em master.educatudo.com quando MASTER_DOMAIN ainda não casou ou há dominio legado no MASTER.
+if ($hostReservadoMaster) {
+    educatudo_responder_host_desconhecido($host !== '' ? $host : 'desconhecido');
 }
 
 // Fast-path: Redis HIT em tenant + config → abre só o TENANT, sem handshake no MASTER.

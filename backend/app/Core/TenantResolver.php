@@ -62,6 +62,11 @@ class TenantResolver
         $host = self::hostFromRequest();
         $cacheKey = self::cacheKeyFromRequest();
 
+        // Domínio administrativo nunca é tenant (mesmo se escolas.dominio estiver sujo).
+        if (self::hostEhReservadoMaster($host)) {
+            return null;
+        }
+
         if ($slug !== null) {
             $tenant = $this->resolveBySlug($slug);
             if ($tenant !== null) {
@@ -115,12 +120,16 @@ class TenantResolver
      */
     public function resolveTenantIncludingInactive(): ?array
     {
+        $host = self::hostFromRequest();
+        if (self::hostEhReservadoMaster($host)) {
+            return null;
+        }
+
         $slug = self::slugFromHeader();
         if ($slug !== null) {
             return $this->resolveBySlugIncludingInactive($slug);
         }
 
-        $host = self::hostFromRequest();
         if ($host === '') {
             return null;
         }
@@ -148,6 +157,11 @@ class TenantResolver
      */
     public static function cachedTenantFromRequest(): ?array
     {
+        $host = self::hostFromRequest();
+        if (self::hostEhReservadoMaster($host)) {
+            return null;
+        }
+
         $cacheKey = self::cacheKeyFromRequest();
         $cached = RedisCache::get($cacheKey);
         if ($cached === null) {
@@ -156,7 +170,7 @@ class TenantResolver
         $decoded = json_decode($cached, true);
         $tenant = self::validarTenantCacheado(
             is_array($decoded) ? $decoded : null,
-            self::hostFromRequest(),
+            $host,
             self::slugFromHeader()
         );
         if ($tenant === null) {
@@ -216,6 +230,24 @@ class TenantResolver
             $host = explode(':', $host, 2)[0];
         }
         return strtolower($host);
+    }
+
+    /**
+     * Host do painel Master / label master.* — não pode resolver escola.
+     */
+    public static function hostEhReservadoMaster(string $host): bool
+    {
+        $host = strtolower(trim($host));
+        if ($host !== '' && strpos($host, ':') !== false) {
+            $host = explode(':', $host, 2)[0];
+        }
+        if ($host === '') {
+            return false;
+        }
+        if (defined('MASTER_DOMAIN') && MASTER_DOMAIN !== '' && $host === strtolower(trim((string) MASTER_DOMAIN))) {
+            return true;
+        }
+        return strpos($host, 'master.') === 0;
     }
 
     /**

@@ -21,6 +21,16 @@ final class MasterAcessoCodigoTest extends TestCase
         $this->assertStringContainsString('$masterDomainConfigurado', $bootstrap);
         // Fail-closed: produção sem domínio master não libera /master em host escolar.
         $this->assertStringContainsString('$isProducaoBootstrap || $masterDomainConfigurado', $bootstrap);
+        // Host master.* nunca abre como escola (Portal do Aluno).
+        $this->assertStringContainsString('$hostReservadoMaster', $bootstrap);
+    }
+
+    public function testTenantResolverNaoResolveHostMaster(): void
+    {
+        $resolver = file_get_contents(dirname(__DIR__, 2) . '/app/Core/TenantResolver.php');
+        $this->assertNotFalse($resolver);
+        $this->assertStringContainsString('hostEhReservadoMaster', $resolver);
+        $this->assertStringContainsString("strpos(\$host, 'master.') === 0", $resolver);
     }
 
     public function testMasterAuthNaoRestauraCookiePersistente(): void

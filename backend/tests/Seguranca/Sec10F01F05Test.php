@@ -64,4 +64,14 @@ final class Sec10F01F05Test extends TestCase
         $this->assertIsArray($lista);
         $this->assertSame([], $lista);
     }
+
+    public function testF01HostMasterNuncaResolveComoEscola(): void
+    {
+        $bootstrap = file_get_contents($this->path('app/Core/bootstrap_multi_tenant.php'));
+        $resolver = file_get_contents($this->path('app/Core/TenantResolver.php'));
+        $this->assertNotFalse($bootstrap);
+        $this->assertNotFalse($resolver);
+        $this->assertStringContainsString('$hostReservadoMaster', $bootstrap);
+        $this->assertStringContainsString('hostEhReservadoMaster', $resolver);
+    }
 }
