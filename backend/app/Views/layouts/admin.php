@@ -7,6 +7,7 @@
     <?php include __DIR__ . '/components/estilos_plataforma.php'; ?>
     <title><?= htmlspecialchars($title ?? 'EducaTudo Admin') ?></title>
     <meta name="csrf-token" content="<?= htmlspecialchars((string) ($csrf_token ?? $_SESSION['csrf_token'] ?? '')) ?>">
+    <?= \App\Core\CspPolitica::tagCsrfFetch() ?>
     <link rel="manifest" href="<?= URL ?>/manifest-admin.json">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
     <?php 

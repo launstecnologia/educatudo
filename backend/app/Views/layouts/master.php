@@ -7,6 +7,7 @@
     <?php include __DIR__ . '/components/estilos_plataforma.php'; ?>
     <title><?= htmlspecialchars($title ?? 'Painel Admin Master') ?></title>
     <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
+    <?= \App\Core\CspPolitica::tagCsrfFetch() ?>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">

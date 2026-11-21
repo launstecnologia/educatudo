@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
+    <?= \App\Core\CspPolitica::tagCsrfFetch() ?>
     <title><?= htmlspecialchars($title ?? 'EducaTudo - Pais') ?></title>
     <link rel="manifest" href="<?= URL ?>/manifest-pais.json">
     <?php require_once __DIR__ . '/../../Core/LayoutHelper.php'; ?>

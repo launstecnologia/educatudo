@@ -321,6 +321,9 @@ async function removerBloco(blocoId) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': <?= json_encode($csrf_token) ?>
             },
             body: JSON.stringify({
                 _token: <?= json_encode($csrf_token) ?>

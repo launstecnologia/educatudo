@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <?php include __DIR__ . '/components/estilos_plataforma.php'; ?>
     <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
+    <?= \App\Core\CspPolitica::tagCsrfFetch() ?>
     <?php
     // Avatar do aluno via ContextoAluno (sessão — sem query extra por página)
     $avatar_url = null;

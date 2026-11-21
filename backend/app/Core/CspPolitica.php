@@ -166,6 +166,15 @@ final class CspPolitica
         return self::tagScriptEstatico('js/csp-event-delegation.js', true);
     }
 
+    /**
+     * Patch global de fetch para enviar X-CSRF-TOKEN (JSON) e _token (FormData).
+     * Carregar no <head> sem defer, depois do meta csrf-token.
+     */
+    public static function tagCsrfFetch(): string
+    {
+        return self::tagScriptEstatico('js/csrf-fetch.js', false);
+    }
+
     public static function aplicarNonceEmHtml(string $html): string
     {
         $attr = self::attrNonce();

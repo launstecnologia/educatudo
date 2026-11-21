@@ -750,7 +750,8 @@ function importarSelecionadasBancoQuestoes() {
         headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': <?= json_encode($csrf_token ?? ($_SESSION['csrf_token'] ?? '')) ?>
         },
         body: JSON.stringify({
             modulo_id: <?= (int)$modulo['id'] ?>,

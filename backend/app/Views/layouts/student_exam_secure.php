@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
     <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
+    <?= \App\Core\CspPolitica::tagCsrfFetch() ?>
     <title><?= htmlspecialchars($title ?? 'Prova - EducaTudo') ?></title>
     <?php include __DIR__ . '/components/estilos_plataforma.php'; ?>
     <style>

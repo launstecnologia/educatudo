@@ -718,6 +718,7 @@ function uploadImageForEditorJornada(file) {
     if (!file || !file.type.startsWith('image/')) return Promise.reject(new Error('Arquivo não é uma imagem'));
     var formData = new FormData();
     formData.append('imagem', file);
+    formData.append('_token', csrfTokenModuloExercicios || (typeof getCsrfToken === 'function' ? getCsrfToken() : ''));
     return fetch(baseUrl + '/professor/jornadas/modulos/upload-imagem-exercicio', { method: 'POST', body: formData })
         .then(function(r) {
             if (!r.ok) throw new Error('Upload falhou: ' + r.status);
@@ -1178,6 +1179,10 @@ function atualizarIndicesOpcoes() {
         ? '<?= URL ?>/professor/jornadas/modulos/atualizar-exercicio'
         : '<?= URL ?>/professor/jornadas/modulos/adicionar-exercicio';
 
+    if (!formData.has('_token')) {
+        formData.append('_token', csrfTokenModuloExercicios || (typeof getCsrfToken === 'function' ? getCsrfToken() : ''));
+    }
+
     fetch(endpoint, {
         method: 'POST',
         body: formData
@@ -1511,6 +1516,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const formData = new FormData();
             formData.append('imagem', imagemInputEl.files[0]);
             formData.append('modulo_id', '<?= $modulo['id'] ?>');
+            formData.append('_token', csrfTokenModuloExercicios || (typeof getCsrfToken === 'function' ? getCsrfToken() : ''));
             
             const btnLer = document.getElementById('btn-ler-imagem');
             const loadingEl = document.getElementById('loading-ler-imagem');
@@ -1880,7 +1886,10 @@ document.getElementById('gerarExercicioIAForm').addEventListener('submit', funct
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            // Middleware CSRF não lê _token do body JSON — header é obrigatório
+            'X-CSRF-TOKEN': csrfTokenModuloExercicios || (typeof getCsrfToken === 'function' ? getCsrfToken() : '')
         },
         credentials: 'same-origin',
         body: JSON.stringify(data)

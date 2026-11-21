@@ -88,6 +88,7 @@
     }
     ?>
     <meta name="csrf-token" content="<?= htmlspecialchars($csrf_token) ?>">
+    <?= \App\Core\CspPolitica::tagCsrfFetch() ?>
     <style>
         <?= \App\Core\LayoutHelper::generateCustomCSS() ?>
         

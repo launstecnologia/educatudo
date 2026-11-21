@@ -180,6 +180,15 @@ final class Sec02CspPoliticaTest extends TestCase
         $this->assertStringNotContainsString('/public/static/', $tag);
     }
 
+    public function testTagCsrfFetchSemDeferComCacheBust(): void
+    {
+        $tag = CspPolitica::tagCsrfFetch();
+        $this->assertStringContainsString('csrf-fetch.js?v=', $tag);
+        $this->assertStringContainsString('nonce="', $tag);
+        $this->assertStringNotContainsString(' defer', $tag);
+        $this->assertStringNotContainsString('/public/static/', $tag);
+    }
+
     public function testStrictNoHeaderExigeDoisFlags(): void
     {
         putenv('CSP_STRICT_ENFORCEMENT=true');
