@@ -72,6 +72,27 @@ fi
 echo "    MASTER_DOMAIN: $master_domain_env"
 echo "    Health Host:   $HOST_HEADER"
 
+# SEC-10 F03: auditor exige CSRF_MODE presente no arquivo e no processo (env_file).
+csrf_mode_env="$(
+  grep -E '^[[:space:]]*CSRF_MODE[[:space:]]*=' backend/.env \
+    | tail -n 1 \
+    | sed -E 's/^[[:space:]]*CSRF_MODE[[:space:]]*=[[:space:]]*//; s/[[:space:]]+#.*$//; s/^["'\'']//; s/["'\'']$//; s/[[:space:]]*$//' \
+    | tr '[:upper:]' '[:lower:]'
+)"
+if [[ -z "$csrf_mode_env" ]]; then
+  echo "ERRO: CSRF_MODE ausente em backend/.env (SEC-10 F03)." >&2
+  echo "Defina CSRF_MODE=enforce (rollback: CSRF_MODE=audit) e reexecute o deploy." >&2
+  exit 1
+fi
+if [[ "$csrf_mode_env" != "enforce" && "$csrf_mode_env" != "audit" ]]; then
+  echo "ERRO: CSRF_MODE invalido='$csrf_mode_env' (use enforce ou audit)." >&2
+  exit 1
+fi
+echo "    CSRF_MODE:     $csrf_mode_env"
+if [[ "$csrf_mode_env" != "enforce" ]]; then
+  echo "AVISO: CSRF_MODE=$csrf_mode_env — auditoria SEC-10 F03 exige enforce em producao." >&2
+fi
+
 if [[ ! -f ssl/cloudflare-origin.pem || ! -f ssl/cloudflare-origin.key ]]; then
   echo "ERRO: certificado Cloudflare Origin ausente em ssl/." >&2
   echo "Esperado: ssl/cloudflare-origin.pem e ssl/cloudflare-origin.key" >&2
@@ -211,9 +232,15 @@ foreach (file($f, FILE_IGNORE_NEW_LINES) ?: [] as $i => $line) {
   }
 }
 $proc = getenv("MASTER_DOMAIN");
-echo "    arquivo: " . ($master !== "" ? $master : "(vazio)") . PHP_EOL;
-echo "    getenv:  " . (is_string($proc) && trim($proc) !== "" ? strtolower(trim($proc)) : "(vazio)") . PHP_EOL;
+echo "    MASTER_DOMAIN arquivo: " . ($master !== "" ? $master : "(vazio)") . PHP_EOL;
+echo "    MASTER_DOMAIN getenv:  " . (is_string($proc) && trim($proc) !== "" ? strtolower(trim($proc)) : "(vazio)") . PHP_EOL;
 if ($master === "") { fwrite(STDERR, "ERRO: MASTER_DOMAIN vazio no .env montado no PHP\n"); exit(1); }
+$csrf = getenv("CSRF_MODE");
+echo "    CSRF_MODE getenv:      " . (is_string($csrf) && trim($csrf) !== "" ? strtolower(trim($csrf)) : "(vazio)") . PHP_EOL;
+if (!is_string($csrf) || trim($csrf) === "") {
+  fwrite(STDERR, "ERRO: CSRF_MODE ausente no processo PHP (env_file). Recrie o container apos gravar no .env.\n");
+  exit(1);
+}
 '
 # Nginx precisa ver o upstream PHP de novo apos recreate.
 sleep 3

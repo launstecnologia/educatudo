@@ -64,7 +64,7 @@ Arquivos: `ChatController`, rotas teacher/student, views do chat.
 |---|---|---|
 | F01 | `MASTER_DOMAIN` no `.env` de produção | Remover só em emergência (reabre host escolar) |
 | F02 | deploy do código | N/A (cookie legado só limpo) |
-| F03 | `CSRF_MODE=enforce` após homolog | `CSRF_MODE=audit` |
+| F03 | `CSRF_MODE=enforce` no `backend/.env` + recrear PHP (`env_file`) | `CSRF_MODE=audit` + recrear PHP |
 | F04/F05 | deploy do código | revert do commit |
 
 ## Testes sugeridos
