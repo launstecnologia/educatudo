@@ -185,6 +185,13 @@ else
 fi
 
 echo "==> Conferindo MASTER_DOMAIN visivel no container"
+# Aguarda o PHP-FPM aceitar conexoes apos recreate (Actions falhava no health cedo demais).
+for _wait in 1 2 3 4 5 6 7 8 9 10; do
+  if docker exec "$PHP_CONTAINER" php -v >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
 docker exec "$PHP_CONTAINER" php -r '
 $f = "/var/www/html/.env";
 if (!is_file($f)) { fwrite(STDERR, "ERRO: .env ausente no container\n"); exit(1); }
@@ -208,6 +215,8 @@ echo "    arquivo: " . ($master !== "" ? $master : "(vazio)") . PHP_EOL;
 echo "    getenv:  " . (is_string($proc) && trim($proc) !== "" ? strtolower(trim($proc)) : "(vazio)") . PHP_EOL;
 if ($master === "") { fwrite(STDERR, "ERRO: MASTER_DOMAIN vazio no .env montado no PHP\n"); exit(1); }
 '
+# Nginx precisa ver o upstream PHP de novo apos recreate.
+sleep 3
 
 echo "==> Ajustando permissoes de storage/uploads"
 if command -v sudo >/dev/null 2>&1; then
